@@ -197,7 +197,7 @@ export class AlpacaTradingEngine implements ISecuritiesTradingEngine {
       equity: parseFloat(account.equity),
       buyingPower: parseFloat(account.buying_power),
       unrealizedPnL,
-      realizedPnL: parseFloat(account.equity) - parseFloat(account.cash) - unrealizedPnL,
+      realizedPnL: 0, // Alpaca account API 不提供此字段，由 wallet commit history 追踪
       dayTradeCount: account.daytrade_count,
       dayTradingBuyingPower: parseFloat(account.daytrading_buying_power),
     };

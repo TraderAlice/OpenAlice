@@ -2,6 +2,10 @@
   <img src="alice-full.png" alt="Open Alice" width="128">
 </p>
 
+<p align="center">
+  <a href="https://deepwiki.com/TraderAlice/OpenAlice">📖 Documentation</a> · <a href="https://traderalice.com/live">🔴 Live Demo</a> · <a href="https://github.com/TraderAlice/OpenAlice/blob/master/LICENSE">MIT License</a>
+</p>
+
 # Open Alice
 
 A personal AI trading agent. She automatically fetches news, computes quantitative factors, logs trade rationale, builds strategies across different timeframes, and monitors and adjusts your portfolio 24/7.

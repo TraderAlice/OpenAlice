@@ -415,7 +415,7 @@ npx vitest run src/core/*.spec.ts
 ## 设计决策记录
 
 ### 为什么不用 BullMQ？
-Little Pony 是单进程应用，不需要 Redis 支持的分布式任务队列。Agent Events（84 行的 EventEmitter）+ 文件持久化已经满足需求。
+OpenAlice 是单进程应用，不需要 Redis 支持的分布式任务队列。Agent Events（84 行的 EventEmitter）+ 文件持久化已经满足需求。
 
 ### 为什么心跳和 cron 共用 scheduler？
 OpenClaw 的设计：两条独立的触发线（cron timer + heartbeat interval）最终汇聚到同一个执行入口。共用 scheduler 天然支持唤醒合并 — cron 和心跳在同一个 250ms 窗口内只执行一次。
