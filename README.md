@@ -167,6 +167,10 @@ data/
   securities-trading/        # Securities wallet commit history
 ```
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=TraderAlice/OpenAlice&type=Date)](https://star-history.com/#TraderAlice/OpenAlice&Date)
+
 ## License
 
 [MIT](LICENSE)
