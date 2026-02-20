@@ -8,10 +8,10 @@ import { buildParsedMessage } from './helpers.js'
 import { MediaGroupMerger } from './media-group.js'
 import { askClaudeCode } from '../../providers/claude-code/index.js'
 import type { ClaudeCodeConfig } from '../../providers/claude-code/index.js'
-import { SessionStore } from '../../core/session.js'
-import { forceCompact } from '../../core/compaction.js'
-import { readAIConfig, writeAIConfig, type AIProvider } from '../../core/ai-config.js'
-import { registerConnector, touchInteraction } from '../../core/connector-registry.js'
+import { SessionStore } from '../../core/session'
+import { forceCompact } from '../../core/compaction'
+import { readAIConfig, writeAIConfig, type AIProvider } from '../../core/ai-config'
+import { registerConnector, touchInteraction } from '../../core/connector-registry'
 
 const MAX_MESSAGE_LENGTH = 4096
 

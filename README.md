@@ -21,7 +21,7 @@ A personal AI trading agent. She automatically fetches news, computes quantitati
 - **Securities trading** — Alpaca integration for US equities with the same wallet workflow
 - **Market analysis** — technical indicators, news search, and price simulation via sandboxed tools
 - **Cognitive state** — persistent "brain" with frontal lobe memory, emotion tracking, and commit history
-- **Scheduling** — heartbeat loop + cron jobs with auto-compaction, dedup, and delivery queue
+- **Event log** — persistent append-only JSONL event log with real-time subscriptions and crash recovery
 - **Web UI** — built-in local chat interface on port 3002, no Telegram account needed
 
 ## Architecture
@@ -37,9 +37,8 @@ graph LR
     PR[ProviderRouter]
     E[Engine]
     S[Session Store]
-    SC[Scheduler]
-    CRN[Cron Engine]
-    DQ[Delivery Queue]
+    EL[Event Log]
+    CR[Connector Registry]
   end
 
   subgraph Extensions
@@ -48,7 +47,6 @@ graph LR
     ST[Securities Trading]
     BR[Brain]
     BW[Browser]
-    CR[Cron Tools]
   end
 
   subgraph Interfaces
@@ -62,15 +60,13 @@ graph LR
   VS --> PR
   PR --> E
   E --> S
-  SC --> E
-  CRN --> SC
-  DQ --> WEB & TG
+  E --> EL
+  CR --> WEB & TG
   AK --> E
   CT --> E
   ST --> E
   BR --> E
   BW --> E
-  CR --> CRN
   WEB --> E
   TG --> E
   HTTP --> E
@@ -79,7 +75,7 @@ graph LR
 
 **Providers** — interchangeable AI backends. Claude Code spawns `claude -p` as a subprocess; Vercel AI SDK runs a `ToolLoopAgent` in-process. `ProviderRouter` reads `ai-provider.json` on each call to select the active backend at runtime.
 
-**Core** — `Engine` manages AI conversations with a generation lock and session persistence (JSONL). `Scheduler` drives heartbeat loops; `CronEngine` handles scheduled jobs. `DeliveryQueue` ensures outbound messages (heartbeat/cron replies) reach the last-interacted connector with file-based retry. `ConnectorRegistry` tracks which channel the user last spoke through.
+**Core** — `Engine` manages AI conversations with a generation lock and session persistence (JSONL). `EventLog` provides persistent append-only event storage (JSONL) with real-time subscriptions and crash recovery. `ConnectorRegistry` tracks which channel the user last spoke through.
 
 **Extensions** — domain-specific tool sets injected into the engine. Each extension owns its tools, state, and persistence.
 
@@ -148,7 +144,6 @@ All config lives in `data/config/` as JSON files with Zod validation. Missing fi
 | `crypto.json` | Allowed symbols, exchange provider (CCXT), demo trading flag |
 | `securities.json` | Allowed symbols, broker provider (Alpaca), paper trading flag |
 | `compaction.json` | Context window limits, auto-compaction thresholds |
-| `scheduler.json` | Heartbeat interval, cron toggle, delivery queue settings |
 | `ai-provider.json` | Active AI provider (`vercel-ai-sdk` or `claude-code`), switchable at runtime |
 | `persona.md` | System prompt personality (free-form markdown) |
 
@@ -164,11 +159,8 @@ src/
     session.ts               # JSONL session store + format converters
     compaction.ts            # Auto-summarize long context windows
     config.ts                # Zod-validated config loader
-    scheduler.ts             # Heartbeat loop with dedup and active hours
-    cron.ts                  # Cron engine (at/every/cron expressions)
+    event-log.ts             # Persistent append-only event log (JSONL)
     connector-registry.ts    # Last-interacted channel tracker
-    delivery.ts              # Outbound message queue with retry + backoff
-    agent-events.ts          # In-memory system event bus (cron → scheduler)
     media.ts                 # MediaAttachment extraction from tool outputs
     types.ts                 # Plugin, EngineContext interfaces
   providers/
@@ -180,7 +172,6 @@ src/
     securities-trading/      # Alpaca integration, wallet, tools
     brain/                   # Cognitive state (memory, emotion)
     browser/                 # Browser automation bridge (via OpenClaw)
-    cron/                    # Cron job management tools
   connectors/
     web/                     # Web UI chat (Hono, SSE push)
     telegram/                # Telegram bot (grammY, polling, commands)
@@ -194,8 +185,7 @@ data/
   brain/                     # Agent memory and emotion logs
   crypto-trading/            # Crypto wallet commit history
   securities-trading/        # Securities wallet commit history
-  cron/                      # Persisted cron job definitions
-  delivery-queue/            # Failed delivery retry store
+  event-log/                 # Persistent event log (events.jsonl)
 docs/                        # Architecture documentation
 ```
 
