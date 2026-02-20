@@ -22,6 +22,7 @@ A personal AI trading agent. She automatically fetches news, computes quantitati
 - **Market analysis** — technical indicators, news search, and price simulation via sandboxed tools
 - **Cognitive state** — persistent "brain" with frontal lobe memory, emotion tracking, and commit history
 - **Scheduling** — heartbeat loop + cron jobs with auto-compaction, dedup, and delivery queue
+- **Web UI** — built-in local chat interface on port 3002, no Telegram account needed
 
 ## Architecture
 
@@ -48,6 +49,7 @@ graph LR
   end
 
   subgraph Connectors
+    WEB[Web UI]
     TG[Telegram]
     HTTP[HTTP API]
     MCP[MCP Server]
@@ -63,6 +65,7 @@ graph LR
   BR --> E
   BW --> E
   CR --> E
+  WEB --> E
   TG --> E
   HTTP --> E
   MCP --> E
@@ -74,7 +77,7 @@ graph LR
 
 **Extensions** — domain-specific tool sets injected into the engine. Each extension owns its tools, state, and persistence.
 
-**Connectors** — external interfaces. Telegram bot for chat, HTTP for webhooks, MCP server for tool exposure.
+**Connectors** — external interfaces. Web UI for local chat, Telegram bot for mobile, HTTP for webhooks, MCP server for tool exposure.
 
 ## Quick Start
 
@@ -159,6 +162,7 @@ src/
     browser/                 # Browser automation bridge
     cron/                    # Cron job management tools
   connectors/
+    web/                     # Web UI chat (local browser, SSE push)
     telegram/                # Telegram bot (polling, commands, settings)
   plugins/
     http.ts                  # HTTP webhook endpoint
