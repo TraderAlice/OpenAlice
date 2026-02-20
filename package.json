@@ -9,7 +9,13 @@
     "test": "vitest run",
     "test:watch": "vitest"
   },
-  "keywords": ["trading", "ai-agent", "crypto", "securities", "file-driven"],
+  "keywords": [
+    "trading",
+    "ai-agent",
+    "crypto",
+    "securities",
+    "file-driven"
+  ],
   "author": "Open Alice Contributors",
   "license": "MIT",
   "repository": {
@@ -21,6 +27,7 @@
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.44",
     "@alpacahq/alpaca-trade-api": "^3.1.3",
+    "@grammyjs/auto-retry": "^2.0.2",
     "@hono/node-server": "^1.19.9",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "@sinclair/typebox": "0.34.48",
@@ -31,6 +38,7 @@
     "decimal.js": "^10.6.0",
     "express": "^5.2.1",
     "file-type": "^21.3.0",
+    "grammy": "^1.40.0",
     "hono": "^4.11.9",
     "json5": "^2.2.3",
     "pino": "^10.3.1",
@@ -43,7 +51,6 @@
   },
   "devDependencies": {
     "@ai-sdk/provider": "^3.0.8",
-    "@grammyjs/types": "^3.24.0",
     "@types/express": "^5.0.6",
     "@types/node": "^25.2.3",
     "@types/ws": "^8.18.1",

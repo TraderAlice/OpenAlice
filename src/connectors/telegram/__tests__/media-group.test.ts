@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { MediaGroupMerger } from '../media-group.js'
-import { parseUpdate } from '../handler.js'
+import { buildParsedMessage } from '../helpers.js'
 import {
   resetCounters,
-  textUpdate,
-  mediaGroupPhotoUpdate,
+  textMessage,
+  mediaGroupPhotoMessage,
 } from './fixtures.js'
 import type { ParsedMessage } from '../types.js'
 
@@ -13,8 +13,12 @@ beforeEach(() => {
   resetCounters()
 })
 
-function parse(update: ReturnType<typeof textUpdate>): ParsedMessage {
-  return parseUpdate(update)!
+function pm(text: string): ParsedMessage {
+  return buildParsedMessage(textMessage(text))
+}
+
+function albumPm(groupId: string, caption?: string): ParsedMessage {
+  return buildParsedMessage(mediaGroupPhotoMessage(groupId, caption))
 }
 
 describe('MediaGroupMerger', () => {
@@ -24,7 +28,7 @@ describe('MediaGroupMerger', () => {
       onMerged: (m) => results.push(m),
     })
 
-    merger.push(parse(textUpdate('hello')))
+    merger.push(pm('hello'))
     expect(results).toHaveLength(1)
     expect(results[0].text).toBe('hello')
   })
@@ -36,9 +40,9 @@ describe('MediaGroupMerger', () => {
       onMerged: (m) => results.push(m),
     })
 
-    merger.push(parse(mediaGroupPhotoUpdate('album_1', 'caption here')))
-    merger.push(parse(mediaGroupPhotoUpdate('album_1')))
-    merger.push(parse(mediaGroupPhotoUpdate('album_1')))
+    merger.push(albumPm('album_1', 'caption here'))
+    merger.push(albumPm('album_1'))
+    merger.push(albumPm('album_1'))
 
     // Not emitted yet
     expect(results).toHaveLength(0)
@@ -62,9 +66,9 @@ describe('MediaGroupMerger', () => {
       onMerged: (m) => results.push(m),
     })
 
-    merger.push(parse(mediaGroupPhotoUpdate('group_a')))
-    merger.push(parse(mediaGroupPhotoUpdate('group_b')))
-    merger.push(parse(mediaGroupPhotoUpdate('group_a')))
+    merger.push(albumPm('group_a'))
+    merger.push(albumPm('group_b'))
+    merger.push(albumPm('group_a'))
 
     vi.advanceTimersByTime(500)
 
@@ -80,10 +84,10 @@ describe('MediaGroupMerger', () => {
       onMerged: (m) => results.push(m),
     })
 
-    merger.push(parse(mediaGroupPhotoUpdate('album_1')))
+    merger.push(albumPm('album_1'))
     vi.advanceTimersByTime(400)
     // Add another within the window — timer should reset
-    merger.push(parse(mediaGroupPhotoUpdate('album_1')))
+    merger.push(albumPm('album_1'))
     vi.advanceTimersByTime(400)
     // Still not flushed (only 400ms since last push)
     expect(results).toHaveLength(0)
@@ -100,8 +104,8 @@ describe('MediaGroupMerger', () => {
       onMerged: (m) => results.push(m),
     })
 
-    merger.push(parse(mediaGroupPhotoUpdate('a')))
-    merger.push(parse(mediaGroupPhotoUpdate('b')))
+    merger.push(albumPm('a'))
+    merger.push(albumPm('b'))
 
     expect(results).toHaveLength(0)
 
@@ -119,9 +123,9 @@ describe('MediaGroupMerger', () => {
     })
 
     // Push in any order — they should be sorted by messageId
-    const m1 = parse(mediaGroupPhotoUpdate('album_1'))
-    const m2 = parse(mediaGroupPhotoUpdate('album_1', 'cap'))
-    const m3 = parse(mediaGroupPhotoUpdate('album_1'))
+    const m1 = albumPm('album_1')
+    const m2 = albumPm('album_1', 'cap')
+    const m3 = albumPm('album_1')
 
     merger.push(m3)
     merger.push(m1)
@@ -141,8 +145,8 @@ describe('MediaGroupMerger', () => {
       onMerged: (m) => results.push(m),
     })
 
-    merger.push(parse(mediaGroupPhotoUpdate('album_1')))
-    merger.push(parse(mediaGroupPhotoUpdate('album_1')))
+    merger.push(albumPm('album_1'))
+    merger.push(albumPm('album_1'))
 
     vi.advanceTimersByTime(500)
 
@@ -156,10 +160,10 @@ describe('MediaGroupMerger', () => {
       onMerged: (m) => results.push(m),
     })
 
-    merger.push(parse(textUpdate('before')))
-    merger.push(parse(mediaGroupPhotoUpdate('album_1')))
-    merger.push(parse(textUpdate('during')))
-    merger.push(parse(mediaGroupPhotoUpdate('album_1')))
+    merger.push(pm('before'))
+    merger.push(albumPm('album_1'))
+    merger.push(pm('during'))
+    merger.push(albumPm('album_1'))
 
     // Non-album messages emitted immediately
     expect(results).toHaveLength(2)
