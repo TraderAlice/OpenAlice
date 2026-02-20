@@ -7,6 +7,7 @@ import type { Plugin, EngineContext, MediaAttachment } from './core/types.js'
 import { HttpPlugin } from './plugins/http.js'
 import { McpPlugin } from './plugins/mcp.js'
 import { TelegramPlugin } from './connectors/telegram/index.js'
+import { WebPlugin } from './connectors/web/index.js'
 import { Sandbox, RealMarketDataProvider, RealNewsProvider, fetchRealtimeData } from './extension/analysis-kit/index.js'
 import { createAnalysisTools } from './extension/analysis-kit/index.js'
 import type { ICryptoTradingEngine, Operation, WalletExportState } from './extension/crypto-trading/index.js'
@@ -254,6 +255,10 @@ async function main() {
 
   if (config.engine.mcpPort) {
     plugins.push(new McpPlugin(engine.tools, config.engine.mcpPort))
+  }
+
+  if (config.engine.webPort) {
+    plugins.push(new WebPlugin({ port: config.engine.webPort }))
   }
 
   if (process.env.TELEGRAM_BOT_TOKEN) {
