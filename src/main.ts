@@ -31,16 +31,6 @@ import {
 import { Brain, createBrainTools } from './extension/brain/index.js'
 import type { BrainExportState } from './extension/brain/index.js'
 import { createBrowserTools } from './extension/browser/index.js'
-import { createCronTools } from './extension/cron/index.js'
-import {
-  createScheduler, stripAckToken,
-  readHeartbeatFile, isHeartbeatFileEmpty, HeartbeatDedup,
-  type Scheduler,
-} from './core/scheduler.js'
-import { createCronEngine, type CronEngine } from './core/cron.js'
-import { resolveDeliveryTarget } from './core/connector-registry.js'
-import { enqueue, ack, recoverPending } from './core/delivery.js'
-import { emit } from './core/agent-events.js'
 import { SessionStore } from './core/session.js'
 import { ProviderRouter } from './core/ai-provider.js'
 import { createAgent } from './providers/vercel-ai-sdk/index.js'
@@ -223,22 +213,12 @@ async function main() {
 
   // ==================== Tool Assembly ====================
 
-  // Cron engine (created early so tools can reference it; timers start later after plugins)
-  let cronEngine: CronEngine | null = null
-  if (config.scheduler.cron.enabled) {
-    cronEngine = createCronEngine({
-      config: config.scheduler.cron,
-      onWake: (reason) => scheduler?.requestWake(reason),
-    })
-  }
-
   const tools = {
     ...createAnalysisTools(sandbox),
     ...createCryptoTradingTools(cryptoEngine, wallet, cryptoWalletStateBridge),
     ...(secResult ? createSecuritiesTradingTools(secResult.engine, secWallet, secWalletStateBridge) : {}),
     ...createBrainTools(brain),
     ...createBrowserTools(),
-    ...(cronEngine ? createCronTools(cronEngine) : {}),
   }
 
   // ==================== AI Provider Chain ====================
@@ -278,161 +258,11 @@ async function main() {
     console.log(`plugin started: ${plugin.name}`)
   }
 
-  // ==================== Scheduling Subsystem ====================
-
-  // Dedicated session for heartbeat/cron conversations (separate from user chat sessions)
-  const heartbeatSession = new SessionStore('heartbeat')
-  await heartbeatSession.restore()
-
-  // Heartbeat dedup — suppress identical messages within 24h
-  const heartbeatDedup = new HeartbeatDedup()
-
-  // HEARTBEAT.md path (convention: workspace root)
-  const heartbeatFilePath = resolve('HEARTBEAT.md')
-
-  // RunOnce callback: bridge scheduler → engine → delivery
-  const runOnce: Parameters<typeof createScheduler>[1] = async ({ reason, prompt, systemEvents }) => {
-    // --- Guard 1: requests-in-flight ---
-    // If the engine is already generating (e.g. user chat), defer this tick
-    if (engine.isGenerating) {
-      console.log('scheduler: engine busy, deferring heartbeat')
-      return { status: 'skipped', reason: 'engine-busy' }
-    }
-
-    // --- Guard 2: empty heartbeat file ---
-    // For interval/retry ticks, skip if HEARTBEAT.md has no actionable content.
-    // Cron, manual, hook wakes always run regardless.
-    const isLowPriority = reason === 'interval' || reason === 'retry'
-    if (isLowPriority && systemEvents.length === 0) {
-      const fileContent = await readHeartbeatFile(heartbeatFilePath)
-      if (fileContent === null || isHeartbeatFileEmpty(fileContent)) {
-        return { status: 'skipped', reason: 'empty-heartbeat-file' }
-      }
-    }
-
-    // Build prompt — cron/exec events get a dedicated prompt instead of the heartbeat one
-    const hasCronEvents = systemEvents.some((e) => e.source === 'cron')
-    let fullPrompt: string
-
-    if (hasCronEvents) {
-      // Cron events: build a purpose-built prompt so the agent relays the reminder
-      const eventLines = systemEvents.map((evt) => `- ${evt.text}`)
-      fullPrompt = [
-        'A scheduled reminder has been triggered. The reminder content is shown below.',
-        'Please relay this reminder to the user in a helpful and friendly way.',
-        'Do NOT reply with HEARTBEAT_OK — this is a cron event that must be delivered.',
-        '',
-        ...eventLines,
-      ].join('\n')
-    } else if (systemEvents.length > 0) {
-      // Other system events (exec, etc.): append to heartbeat prompt
-      const parts: string[] = [prompt, '', '--- System Events ---']
-      for (const evt of systemEvents) {
-        parts.push(`[${evt.source}] ${evt.text}`)
-      }
-      fullPrompt = parts.join('\n')
-    } else {
-      fullPrompt = prompt
-    }
-
-    // Route through unified provider (Engine → ProviderRouter → Vercel or Claude Code)
-    const result = await engine.askWithSession(fullPrompt, heartbeatSession, {
-      systemPrompt: instructions,
-      maxHistoryEntries: 30,
-      historyPreamble: 'The following is the recent heartbeat/cron conversation history. Use it as context if it references earlier events or decisions.',
-    })
-
-    // Strip ack token to decide if the response should be delivered.
-    // Cron events bypass the ack check — they must always be delivered.
-    const { shouldSkip, text } = stripAckToken(
-      result.text,
-      config.scheduler.heartbeat.ackToken,
-      config.scheduler.heartbeat.ackMaxChars,
-    )
-
-    if (shouldSkip && !hasCronEvents) {
-      return { status: 'ok-ack', text }
-    }
-
-    if (!text.trim()) {
-      return { status: 'ok-empty' }
-    }
-
-    // --- Guard 3: dedup ---
-    // Suppress identical alert text within 24h window
-    if (heartbeatDedup.isDuplicate(text)) {
-      console.log('scheduler: duplicate heartbeat response suppressed')
-      return { status: 'skipped', reason: 'duplicate' }
-    }
-
-    // Resolve delivery target (last-interacted channel)
-    const target = resolveDeliveryTarget()
-    if (!target) {
-      console.warn('scheduler: no delivery target available, response dropped')
-      return { status: 'skipped', reason: 'no-delivery-target', text }
-    }
-
-    // Persist to delivery queue first, then attempt immediate delivery
-    const deliveryConfig = config.scheduler.delivery
-    const entryId = await enqueue(deliveryConfig, {
-      channel: target.channel,
-      to: target.to,
-      text,
-    })
-
-    try {
-      await target.deliver(text)
-      await ack(deliveryConfig, entryId)
-      heartbeatDedup.record(text)
-      emit('delivery', { status: 'sent', channel: target.channel, to: target.to })
-      return { status: 'sent', text }
-    } catch (err) {
-      console.error('scheduler: delivery failed, queued for retry:', err)
-      emit('delivery', { status: 'failed', channel: target.channel, error: String(err) })
-      return { status: 'sent', text, reason: 'queued-for-retry' }
-    }
-  }
-
-  // Create scheduler (timers start immediately if heartbeat enabled)
-  let scheduler: Scheduler | null = null
-  if (config.scheduler.heartbeat.enabled) {
-    scheduler = createScheduler(
-      { heartbeat: config.scheduler.heartbeat },
-      runOnce,
-    )
-    console.log(`scheduler: heartbeat enabled (every ${config.scheduler.heartbeat.every})`)
-  }
-
-  if (cronEngine) {
-    console.log('scheduler: cron enabled')
-  }
-
-  // ==================== Post-Plugin Init ====================
-  // Plugins are started → connectors are registered → safe to start cron & recovery
-
-  // Start cron engine (loads jobs from disk, arms timers)
-  if (cronEngine) {
-    await cronEngine.start()
-  }
-
-  // Recover any pending deliveries from previous runs (fire-and-forget)
-  recoverPending({
-    config: config.scheduler.delivery,
-    deliver: async (entry) => {
-      const target = resolveDeliveryTarget()
-      if (!target) throw new Error('no delivery target')
-      await target.deliver(entry.text)
-    },
-    log: { info: console.log, warn: console.warn },
-  }).catch((err) => console.error('delivery recovery error:', err))
-
   // ==================== Shutdown ====================
 
   let stopped = false
   const shutdown = async () => {
     stopped = true
-    scheduler?.stop()
-    cronEngine?.stop()
     for (const plugin of plugins) {
       await plugin.stop()
     }

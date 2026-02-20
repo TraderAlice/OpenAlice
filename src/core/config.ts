@@ -86,50 +86,6 @@ const compactionSchema = z.object({
   microcompactKeepRecent: z.number().default(3),
 })
 
-const activeHoursSchema = z.object({
-  start: z.string().regex(/^\d{1,2}:\d{2}$/, 'Expected HH:MM format'),
-  end: z.string().regex(/^\d{1,2}:\d{2}$/, 'Expected HH:MM format'),
-  timezone: z.string().default('local'),
-}).nullable().default(null)
-
-const heartbeatSchema = z.object({
-  enabled: z.boolean().default(false),
-  every: z.string().default('30m'),
-  prompt: z.string().default('Read HEARTBEAT.md and check if anything needs attention. Reply HEARTBEAT_OK if nothing to report.'),
-  ackToken: z.string().default('HEARTBEAT_OK'),
-  ackMaxChars: z.number().default(300),
-  activeHours: activeHoursSchema,
-})
-
-const cronConfigSchema = z.object({
-  enabled: z.boolean().default(false),
-  storePath: z.string().default('data/cron/jobs.json'),
-})
-
-const deliveryConfigSchema = z.object({
-  queueDir: z.string().default('data/delivery-queue'),
-  maxRetries: z.number().int().positive().default(5),
-})
-
-const schedulerSchema = z.object({
-  heartbeat: heartbeatSchema.default({
-    enabled: false,
-    every: '30m',
-    prompt: 'Read HEARTBEAT.md and check if anything needs attention. Reply HEARTBEAT_OK if nothing to report.',
-    ackToken: 'HEARTBEAT_OK',
-    ackMaxChars: 300,
-    activeHours: null,
-  }),
-  cron: cronConfigSchema.default({
-    enabled: false,
-    storePath: 'data/cron/jobs.json',
-  }),
-  delivery: deliveryConfigSchema.default({
-    queueDir: 'data/delivery-queue',
-    maxRetries: 5,
-  }),
-})
-
 // ==================== Unified Config Type ====================
 
 export type Config = {
@@ -139,7 +95,6 @@ export type Config = {
   crypto: z.infer<typeof cryptoSchema>
   securities: z.infer<typeof securitiesSchema>
   compaction: z.infer<typeof compactionSchema>
-  scheduler: z.infer<typeof schedulerSchema>
 }
 
 // ==================== Loader ====================
@@ -157,14 +112,13 @@ async function loadJsonFile(filename: string): Promise<unknown> {
 }
 
 export async function loadConfig(): Promise<Config> {
-  const [engineRaw, modelRaw, agentRaw, cryptoRaw, securitiesRaw, compactionRaw, schedulerRaw] = await Promise.all([
+  const [engineRaw, modelRaw, agentRaw, cryptoRaw, securitiesRaw, compactionRaw] = await Promise.all([
     loadJsonFile('engine.json'),
     loadJsonFile('model.json'),
     loadJsonFile('agent.json'),
     loadJsonFile('crypto.json'),
     loadJsonFile('securities.json'),
     loadJsonFile('compaction.json'),
-    loadJsonFile('scheduler.json'),
   ])
 
   return {
@@ -174,7 +128,6 @@ export async function loadConfig(): Promise<Config> {
     crypto: cryptoSchema.parse(cryptoRaw),
     securities: securitiesSchema.parse(securitiesRaw),
     compaction: compactionSchema.parse(compactionRaw),
-    scheduler: schedulerSchema.parse(schedulerRaw),
   }
 }
 
@@ -189,7 +142,6 @@ const sectionSchemas: Record<ConfigSection, z.ZodTypeAny> = {
   crypto: cryptoSchema,
   securities: securitiesSchema,
   compaction: compactionSchema,
-  scheduler: schedulerSchema,
 }
 
 const sectionFiles: Record<ConfigSection, string> = {
@@ -199,7 +151,6 @@ const sectionFiles: Record<ConfigSection, string> = {
   crypto: 'crypto.json',
   securities: 'securities.json',
   compaction: 'compaction.json',
-  scheduler: 'scheduler.json',
 }
 
 /** Validate and write a config section to disk. Returns the validated config. */
