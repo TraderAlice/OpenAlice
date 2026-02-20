@@ -277,12 +277,262 @@ export const WEB_UI_HTML = /* html */ `<!DOCTYPE html>
       font-size: 16px;
     }
 
+    /* Settings gear button */
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    #settings-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 6px;
+      transition: color 0.2s, background 0.2s;
+      display: flex;
+      align-items: center;
+    }
+    #settings-btn:hover {
+      color: var(--text);
+      background: var(--bg-tertiary);
+    }
+    #settings-btn svg { width: 20px; height: 20px; }
+
+    /* Settings overlay & panel */
+    #settings-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 100;
+    }
+    #settings-overlay.open { display: block; }
+    #settings-panel {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 380px;
+      max-width: 90vw;
+      height: 100%;
+      background: var(--bg-secondary);
+      border-left: 1px solid var(--border);
+      z-index: 101;
+      transform: translateX(100%);
+      transition: transform 0.25s ease;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #settings-panel.open { transform: translateX(0); }
+
+    .settings-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .settings-header h2 {
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .settings-close {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 20px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      transition: color 0.2s, background 0.2s;
+    }
+    .settings-close:hover {
+      color: var(--text);
+      background: var(--bg-tertiary);
+    }
+
+    .settings-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 20px;
+    }
+    .settings-body::-webkit-scrollbar { width: 4px; }
+    .settings-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .settings-section {
+      margin-bottom: 24px;
+    }
+    .settings-section h3 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+    }
+
+    /* Toggle group (for provider switch) */
+    .toggle-group {
+      display: flex;
+      gap: 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .toggle-group button {
+      flex: 1;
+      padding: 8px 12px;
+      background: var(--bg);
+      color: var(--text-muted);
+      border: none;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: background 0.2s, color 0.2s;
+    }
+    .toggle-group button + button {
+      border-left: 1px solid var(--border);
+    }
+    .toggle-group button.active {
+      background: var(--accent-dim);
+      color: var(--accent);
+    }
+    .toggle-group button:hover:not(.active) {
+      background: var(--bg-tertiary);
+      color: var(--text);
+    }
+
+    /* Form fields */
+    .field {
+      margin-bottom: 12px;
+    }
+    .field label {
+      display: block;
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    .field input, .field select {
+      width: 100%;
+      padding: 8px 10px;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .field input:focus, .field select:focus {
+      border-color: var(--accent);
+    }
+    .field input[type="number"] {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Switch toggle */
+    .switch-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .switch-row span {
+      font-size: 14px;
+    }
+    .switch {
+      position: relative;
+      width: 40px;
+      height: 22px;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .switch .slider {
+      position: absolute;
+      inset: 0;
+      background: var(--bg-tertiary);
+      border-radius: 11px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .switch .slider::before {
+      content: "";
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      left: 3px;
+      bottom: 3px;
+      background: var(--text-muted);
+      border-radius: 50%;
+      transition: transform 0.2s, background 0.2s;
+    }
+    .switch input:checked + .slider {
+      background: var(--accent-dim);
+    }
+    .switch input:checked + .slider::before {
+      transform: translateX(18px);
+      background: var(--accent);
+    }
+
+    /* Save button */
+    .save-btn {
+      background: var(--user-bubble);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 0.2s;
+      margin-top: 4px;
+    }
+    .save-btn:hover { opacity: 0.85; }
+    .save-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .save-btn.saved {
+      background: var(--green);
+    }
+
+    /* Toast notification */
+    .toast {
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--bg-tertiary);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      opacity: 0;
+      transition: opacity 0.3s, transform 0.3s;
+      z-index: 200;
+      pointer-events: none;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    .toast.error {
+      border-color: var(--red);
+      color: var(--red);
+    }
+
     /* Responsive */
     @media (max-width: 600px) {
       #app { max-width: 100%; }
       .msg { max-width: 92%; }
       #messages { padding: 12px; }
       #input-area { padding: 12px; }
+      #settings-panel { width: 100%; max-width: 100%; }
     }
   </style>
 </head>
@@ -290,11 +540,91 @@ export const WEB_UI_HTML = /* html */ `<!DOCTYPE html>
   <div id="app">
     <header>
       <h1>Open Alice</h1>
-      <div class="status">
-        <div class="dot" id="sse-dot"></div>
-        <span id="sse-status">connected</span>
+      <div class="header-right">
+        <div class="status">
+          <div class="dot" id="sse-dot"></div>
+          <span id="sse-status">connected</span>
+        </div>
+        <button id="settings-btn" title="Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
       </div>
     </header>
+
+    <!-- Settings panel -->
+    <div id="settings-overlay"></div>
+    <div id="settings-panel">
+      <div class="settings-header">
+        <h2>Settings</h2>
+        <button class="settings-close" id="settings-close-btn">&times;</button>
+      </div>
+      <div class="settings-body">
+        <!-- AI Provider -->
+        <div class="settings-section">
+          <h3>AI Provider</h3>
+          <div class="toggle-group" id="provider-toggle">
+            <button data-provider="claude-code">Claude Code</button>
+            <button data-provider="vercel-ai-sdk">Vercel AI SDK</button>
+          </div>
+        </div>
+
+        <!-- Model (only relevant for Vercel AI SDK) -->
+        <div class="settings-section" id="model-section" style="display:none">
+          <h3>Model <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;color:var(--text-muted)">(Vercel AI SDK)</span></h3>
+          <div class="field">
+            <label>Provider</label>
+            <input type="text" id="cfg-model-provider" placeholder="anthropic">
+          </div>
+          <div class="field">
+            <label>Model</label>
+            <input type="text" id="cfg-model-name" placeholder="claude-sonnet-4-5-20250929">
+          </div>
+          <button class="save-btn" id="save-model">Save</button>
+        </div>
+
+        <!-- Compaction -->
+        <div class="settings-section">
+          <h3>Compaction</h3>
+          <div class="field">
+            <label>Max Context Tokens</label>
+            <input type="number" id="cfg-compact-ctx" step="1000">
+          </div>
+          <div class="field">
+            <label>Max Output Tokens</label>
+            <input type="number" id="cfg-compact-out" step="1000">
+          </div>
+          <button class="save-btn" id="save-compaction">Save</button>
+        </div>
+
+        <!-- Scheduler -->
+        <div class="settings-section">
+          <h3>Scheduler</h3>
+          <div class="switch-row">
+            <span>Heartbeat</span>
+            <label class="switch">
+              <input type="checkbox" id="cfg-hb-enabled">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="field">
+            <label>Heartbeat Interval</label>
+            <input type="text" id="cfg-hb-every" placeholder="30m">
+          </div>
+          <div class="switch-row">
+            <span>Cron</span>
+            <label class="switch">
+              <input type="checkbox" id="cfg-cron-enabled">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <button class="save-btn" id="save-scheduler">Save</button>
+        </div>
+      </div>
+    </div>
+    <div class="toast" id="toast"></div>
     <div id="messages"></div>
     <div id="input-area">
       <textarea id="input" placeholder="Send a message..." rows="1"><\/textarea>
@@ -512,6 +842,140 @@ export const WEB_UI_HTML = /* html */ `<!DOCTYPE html>
         // EventSource auto-reconnects
       };
     }
+
+    // ==================== Settings ====================
+    const settingsBtn = document.getElementById('settings-btn');
+    const settingsPanel = document.getElementById('settings-panel');
+    const settingsOverlay = document.getElementById('settings-overlay');
+    const settingsCloseBtn = document.getElementById('settings-close-btn');
+    const toastEl = document.getElementById('toast');
+
+    let toastTimer = null;
+    function showToast(msg, isError) {
+      toastEl.textContent = msg;
+      toastEl.className = 'toast show' + (isError ? ' error' : '');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { toastEl.className = 'toast'; }, 2000);
+    }
+
+    function openSettings() {
+      settingsOverlay.classList.add('open');
+      settingsPanel.classList.add('open');
+      loadSettingsData();
+    }
+    function closeSettings() {
+      settingsOverlay.classList.remove('open');
+      settingsPanel.classList.remove('open');
+    }
+
+    settingsBtn.addEventListener('click', openSettings);
+    settingsOverlay.addEventListener('click', closeSettings);
+    settingsCloseBtn.addEventListener('click', closeSettings);
+
+    // Load current config into form
+    async function loadSettingsData() {
+      try {
+        const res = await fetch(API_BASE + '/api/config');
+        if (!res.ok) return;
+        const cfg = await res.json();
+
+        // AI Provider toggle
+        document.querySelectorAll('#provider-toggle button').forEach((btn) => {
+          btn.classList.toggle('active', btn.dataset.provider === cfg.aiProvider);
+        });
+        updateModelVisibility(cfg.aiProvider);
+
+        // Model
+        document.getElementById('cfg-model-provider').value = cfg.model?.provider || '';
+        document.getElementById('cfg-model-name').value = cfg.model?.model || '';
+
+        // Compaction
+        document.getElementById('cfg-compact-ctx').value = cfg.compaction?.maxContextTokens || '';
+        document.getElementById('cfg-compact-out').value = cfg.compaction?.maxOutputTokens || '';
+
+        // Scheduler
+        document.getElementById('cfg-hb-enabled').checked = cfg.scheduler?.heartbeat?.enabled || false;
+        document.getElementById('cfg-hb-every').value = cfg.scheduler?.heartbeat?.every || '30m';
+        document.getElementById('cfg-cron-enabled').checked = cfg.scheduler?.cron?.enabled || false;
+      } catch (err) {
+        showToast('Failed to load config', true);
+      }
+    }
+
+    // Model section visibility based on provider
+    function updateModelVisibility(provider) {
+      const el = document.getElementById('model-section');
+      if (el) el.style.display = provider === 'vercel-ai-sdk' ? '' : 'none';
+    }
+
+    // Provider toggle — instant save
+    document.querySelectorAll('#provider-toggle button').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const provider = btn.dataset.provider;
+        try {
+          const res = await fetch(API_BASE + '/api/config/ai-provider', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ provider }),
+          });
+          if (!res.ok) { showToast('Failed to switch provider', true); return; }
+          document.querySelectorAll('#provider-toggle button').forEach((b) => {
+            b.classList.toggle('active', b.dataset.provider === provider);
+          });
+          updateModelVisibility(provider);
+          showToast('Provider: ' + (provider === 'claude-code' ? 'Claude Code' : 'Vercel AI SDK'));
+        } catch { showToast('Network error', true); }
+      });
+    });
+
+    // Save helpers
+    async function saveSection(section, data, btnId) {
+      const btn = document.getElementById(btnId);
+      btn.disabled = true;
+      try {
+        const res = await fetch(API_BASE + '/api/config/' + section, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          showToast(err.error || 'Save failed', true);
+          return;
+        }
+        btn.classList.add('saved');
+        btn.textContent = 'Saved';
+        showToast(section + ' updated');
+        setTimeout(() => { btn.classList.remove('saved'); btn.textContent = 'Save'; }, 1500);
+      } catch { showToast('Network error', true); }
+      finally { btn.disabled = false; }
+    }
+
+    document.getElementById('save-model').addEventListener('click', () => {
+      saveSection('model', {
+        provider: document.getElementById('cfg-model-provider').value.trim(),
+        model: document.getElementById('cfg-model-name').value.trim(),
+      }, 'save-model');
+    });
+
+    document.getElementById('save-compaction').addEventListener('click', () => {
+      saveSection('compaction', {
+        maxContextTokens: Number(document.getElementById('cfg-compact-ctx').value),
+        maxOutputTokens: Number(document.getElementById('cfg-compact-out').value),
+      }, 'save-compaction');
+    });
+
+    document.getElementById('save-scheduler').addEventListener('click', () => {
+      saveSection('scheduler', {
+        heartbeat: {
+          enabled: document.getElementById('cfg-hb-enabled').checked,
+          every: document.getElementById('cfg-hb-every').value.trim() || '30m',
+        },
+        cron: {
+          enabled: document.getElementById('cfg-cron-enabled').checked,
+        },
+      }, 'save-scheduler');
+    });
 
     // ==================== Init ====================
     loadHistory().then(() => {

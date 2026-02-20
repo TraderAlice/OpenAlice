@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { readFile } from 'fs/promises'
+import { readFile, writeFile, mkdir } from 'fs/promises'
 import { resolve } from 'path'
 
 const CONFIG_DIR = resolve('data/config')
@@ -176,4 +176,37 @@ export async function loadConfig(): Promise<Config> {
     compaction: compactionSchema.parse(compactionRaw),
     scheduler: schedulerSchema.parse(schedulerRaw),
   }
+}
+
+// ==================== Writer ====================
+
+export type ConfigSection = keyof Config
+
+const sectionSchemas: Record<ConfigSection, z.ZodTypeAny> = {
+  engine: engineSchema,
+  model: modelSchema,
+  agent: agentSchema,
+  crypto: cryptoSchema,
+  securities: securitiesSchema,
+  compaction: compactionSchema,
+  scheduler: schedulerSchema,
+}
+
+const sectionFiles: Record<ConfigSection, string> = {
+  engine: 'engine.json',
+  model: 'model.json',
+  agent: 'agent.json',
+  crypto: 'crypto.json',
+  securities: 'securities.json',
+  compaction: 'compaction.json',
+  scheduler: 'scheduler.json',
+}
+
+/** Validate and write a config section to disk. Returns the validated config. */
+export async function writeConfigSection(section: ConfigSection, data: unknown): Promise<unknown> {
+  const schema = sectionSchemas[section]
+  const validated = schema.parse(data)
+  await mkdir(CONFIG_DIR, { recursive: true })
+  await writeFile(resolve(CONFIG_DIR, sectionFiles[section]), JSON.stringify(validated, null, 2) + '\n')
+  return validated
 }
