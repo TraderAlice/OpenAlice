@@ -13,7 +13,7 @@ const engineSchema = z.object({
   mcpPort: z.number().int().positive().optional(),
   webPort: z.number().int().positive().default(3002),
   timeframe: z.string().default('1h'),
-  dataRefreshInterval: z.number().int().positive().default(300_000),
+  dataRefreshInterval: z.number().int().positive().default(600_000),
 })
 
 const modelSchema = z.object({

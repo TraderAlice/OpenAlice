@@ -9,6 +9,7 @@ import { McpPlugin } from './plugins/mcp.js'
 import { TelegramPlugin } from './connectors/telegram/index.js'
 import { WebPlugin } from './connectors/web/index.js'
 import { Sandbox, RealMarketDataProvider, RealNewsProvider, fetchRealtimeData } from './extension/analysis-kit/index.js'
+import type { MarketData, NewsItem } from './extension/analysis-kit/index.js'
 import { createAnalysisTools } from './extension/analysis-kit/index.js'
 import type { ICryptoTradingEngine, Operation, WalletExportState } from './extension/crypto-trading/index.js'
 import {
@@ -148,7 +149,15 @@ async function main() {
     : new SecWallet(secWalletConfig)
 
   // Sandbox (data access + realtime market & news data)
-  const { marketData, news } = await fetchRealtimeData()
+  let marketData: Record<string, MarketData[]> = {}
+  let news: NewsItem[] = []
+  try {
+    const realtimeData = await fetchRealtimeData()
+    marketData = realtimeData.marketData
+    news = realtimeData.news
+  } catch (err) {
+    console.warn('DotAPI initial fetch failed (non-fatal, starting with empty data):', err)
+  }
   const marketProvider = new RealMarketDataProvider(marketData)
   const newsProvider = new RealNewsProvider(news)
 
