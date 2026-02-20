@@ -39,6 +39,7 @@ import { VercelAIProvider } from './providers/vercel-ai-sdk/vercel-provider.js'
 import { ClaudeCodeProvider } from './providers/claude-code/claude-code-provider.js'
 import { createEventLog } from './core/event-log.js'
 import { createCronEngine, createCronListener, createCronTools } from './task/cron/index.js'
+import { createHeartbeat } from './task/heartbeat/index.js'
 
 const WALLET_FILE = resolve('data/crypto-trading/commit.json')
 const SEC_WALLET_FILE = resolve('data/securities-trading/commit.json')
@@ -259,6 +260,17 @@ async function main() {
   cronListener.start()
   console.log('cron: engine + listener started')
 
+  // ==================== Heartbeat ====================
+
+  const heartbeat = createHeartbeat({
+    config: config.heartbeat,
+    cronEngine, eventLog, engine,
+  })
+  await heartbeat.start()
+  if (config.heartbeat.enabled) {
+    console.log(`heartbeat: enabled (every ${config.heartbeat.every})`)
+  }
+
   // ==================== Plugins ====================
 
   const plugins: Plugin[] = [new HttpPlugin()]
@@ -292,6 +304,7 @@ async function main() {
   let stopped = false
   const shutdown = async () => {
     stopped = true
+    heartbeat.stop()
     cronListener.stop()
     cronEngine.stop()
     for (const plugin of plugins) {

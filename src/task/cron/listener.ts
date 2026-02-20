@@ -16,6 +16,7 @@ import type { Engine } from '../../core/engine.js'
 import { SessionStore } from '../../core/session.js'
 import { resolveDeliveryTarget } from '../../core/connector-registry.js'
 import type { CronFirePayload } from './engine.js'
+import { HEARTBEAT_JOB_NAME } from '../heartbeat/heartbeat.js'
 
 // ==================== Types ====================
 
@@ -42,6 +43,9 @@ export function createCronListener(opts: CronListenerOpts): CronListener {
 
   async function handleFire(entry: EventLogEntry): Promise<void> {
     const payload = entry.payload as CronFirePayload
+
+    // Guard: heartbeat events are handled by the heartbeat listener
+    if (payload.jobName === HEARTBEAT_JOB_NAME) return
 
     // Guard: skip if already processing (serial execution)
     if (processing) {

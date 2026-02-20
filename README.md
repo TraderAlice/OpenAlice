@@ -22,6 +22,7 @@ A personal AI trading agent. She automatically fetches news, computes quantitati
 - **Market analysis** — technical indicators, news search, and price simulation via sandboxed tools
 - **Cognitive state** — persistent "brain" with frontal lobe memory, emotion tracking, and commit history
 - **Event log** — persistent append-only JSONL event log with real-time subscriptions and crash recovery
+- **Cron scheduling** — event-driven cron system with AI-powered job execution and automatic delivery to the last-interacted channel
 - **Web UI** — built-in local chat interface on port 3002, no Telegram account needed
 
 ## Architecture
@@ -49,6 +50,10 @@ graph LR
     BW[Browser]
   end
 
+  subgraph Tasks
+    CRON[Cron Engine]
+  end
+
   subgraph Interfaces
     WEB[Web UI]
     TG[Telegram]
@@ -67,6 +72,8 @@ graph LR
   ST --> E
   BR --> E
   BW --> E
+  CRON --> EL
+  EL --> CRON
   WEB --> E
   TG --> E
   HTTP --> E
@@ -78,6 +85,8 @@ graph LR
 **Core** — `Engine` manages AI conversations with a generation lock and session persistence (JSONL). `EventLog` provides persistent append-only event storage (JSONL) with real-time subscriptions and crash recovery. `ConnectorRegistry` tracks which channel the user last spoke through.
 
 **Extensions** — domain-specific tool sets injected into the engine. Each extension owns its tools, state, and persistence.
+
+**Tasks** — scheduled background work. `CronEngine` manages jobs and fires `cron.fire` events into the EventLog on schedule; a listener picks them up, runs them through the AI engine, and delivers replies via the ConnectorRegistry.
 
 **Interfaces** — external surfaces. Web UI for local chat, Telegram bot for mobile, HTTP for webhooks, MCP server for tool exposure.
 
@@ -175,6 +184,8 @@ src/
   connectors/
     web/                     # Web UI chat (Hono, SSE push)
     telegram/                # Telegram bot (grammY, polling, commands)
+  task/
+    cron/                    # Cron scheduling (engine, listener, AI tools)
   plugins/
     http.ts                  # HTTP health/status endpoint
     mcp.ts                   # MCP server for tool exposure
@@ -185,6 +196,7 @@ data/
   brain/                     # Agent memory and emotion logs
   crypto-trading/            # Crypto wallet commit history
   securities-trading/        # Securities wallet commit history
+  cron/                      # Cron job definitions (jobs.json)
   event-log/                 # Persistent event log (events.jsonl)
 docs/                        # Architecture documentation
 ```

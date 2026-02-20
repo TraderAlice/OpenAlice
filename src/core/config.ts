@@ -86,6 +86,21 @@ const compactionSchema = z.object({
   microcompactKeepRecent: z.number().default(3),
 })
 
+const activeHoursSchema = z.object({
+  start: z.string().regex(/^\d{1,2}:\d{2}$/, 'Expected HH:MM format'),
+  end: z.string().regex(/^\d{1,2}:\d{2}$/, 'Expected HH:MM format'),
+  timezone: z.string().default('local'),
+}).nullable().default(null)
+
+const heartbeatSchema = z.object({
+  enabled: z.boolean().default(false),
+  every: z.string().default('30m'),
+  prompt: z.string().default('Check if anything needs attention. If nothing to report, reply HEARTBEAT_OK.'),
+  ackToken: z.string().default('HEARTBEAT_OK'),
+  ackMaxChars: z.number().default(300),
+  activeHours: activeHoursSchema,
+})
+
 // ==================== Unified Config Type ====================
 
 export type Config = {
@@ -95,6 +110,7 @@ export type Config = {
   crypto: z.infer<typeof cryptoSchema>
   securities: z.infer<typeof securitiesSchema>
   compaction: z.infer<typeof compactionSchema>
+  heartbeat: z.infer<typeof heartbeatSchema>
 }
 
 // ==================== Loader ====================
@@ -112,13 +128,14 @@ async function loadJsonFile(filename: string): Promise<unknown> {
 }
 
 export async function loadConfig(): Promise<Config> {
-  const [engineRaw, modelRaw, agentRaw, cryptoRaw, securitiesRaw, compactionRaw] = await Promise.all([
+  const [engineRaw, modelRaw, agentRaw, cryptoRaw, securitiesRaw, compactionRaw, heartbeatRaw] = await Promise.all([
     loadJsonFile('engine.json'),
     loadJsonFile('model.json'),
     loadJsonFile('agent.json'),
     loadJsonFile('crypto.json'),
     loadJsonFile('securities.json'),
     loadJsonFile('compaction.json'),
+    loadJsonFile('heartbeat.json'),
   ])
 
   return {
@@ -128,6 +145,7 @@ export async function loadConfig(): Promise<Config> {
     crypto: cryptoSchema.parse(cryptoRaw),
     securities: securitiesSchema.parse(securitiesRaw),
     compaction: compactionSchema.parse(compactionRaw),
+    heartbeat: heartbeatSchema.parse(heartbeatRaw),
   }
 }
 
@@ -142,6 +160,7 @@ const sectionSchemas: Record<ConfigSection, z.ZodTypeAny> = {
   crypto: cryptoSchema,
   securities: securitiesSchema,
   compaction: compactionSchema,
+  heartbeat: heartbeatSchema,
 }
 
 const sectionFiles: Record<ConfigSection, string> = {
@@ -151,6 +170,7 @@ const sectionFiles: Record<ConfigSection, string> = {
   crypto: 'crypto.json',
   securities: 'securities.json',
   compaction: 'compaction.json',
+  heartbeat: 'heartbeat.json',
 }
 
 /** Validate and write a config section to disk. Returns the validated config. */
