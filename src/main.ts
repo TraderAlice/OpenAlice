@@ -38,6 +38,7 @@ import { createAgent } from './providers/vercel-ai-sdk/index.js'
 import { VercelAIProvider } from './providers/vercel-ai-sdk/vercel-provider.js'
 import { ClaudeCodeProvider } from './providers/claude-code/claude-code-provider.js'
 import { createEventLog } from './core/event-log.js'
+import { createCronEngine, createCronListener, createCronTools } from './task/cron/index.js'
 
 const WALLET_FILE = resolve('data/crypto-trading/commit.json')
 const SEC_WALLET_FILE = resolve('data/securities-trading/commit.json')
@@ -221,6 +222,14 @@ async function main() {
     }
   }, config.engine.dataRefreshInterval)
 
+  // ==================== Event Log ====================
+
+  const eventLog = await createEventLog()
+
+  // ==================== Cron ====================
+
+  const cronEngine = createCronEngine({ eventLog })
+
   // ==================== Tool Assembly ====================
 
   const tools = {
@@ -229,6 +238,7 @@ async function main() {
     ...(secResult ? createSecuritiesTradingTools(secResult.engine, secWallet, secWalletStateBridge) : {}),
     ...createBrainTools(brain),
     ...createBrowserTools(),
+    ...createCronTools(cronEngine),
   }
 
   // ==================== AI Provider Chain ====================
@@ -240,9 +250,14 @@ async function main() {
 
   const engine = new Engine({ agent, tools, provider: router })
 
-  // ==================== Event Log ====================
+  // ==================== Cron Lifecycle ====================
 
-  const eventLog = await createEventLog()
+  await cronEngine.start()
+  const cronSession = new SessionStore('cron/default')
+  await cronSession.restore()
+  const cronListener = createCronListener({ eventLog, engine, session: cronSession })
+  cronListener.start()
+  console.log('cron: engine + listener started')
 
   // ==================== Plugins ====================
 
@@ -277,6 +292,8 @@ async function main() {
   let stopped = false
   const shutdown = async () => {
     stopped = true
+    cronListener.stop()
+    cronEngine.stop()
     for (const plugin of plugins) {
       await plugin.stop()
     }
