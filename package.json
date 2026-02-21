@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "tsx --env-file=.env --watch src/main.ts",
-    "build": "tsup src/main.ts --format esm --dts",
+    "dev:ui": "cd ui && pnpm dev",
+    "build": "pnpm build:ui && pnpm build:backend",
+    "build:ui": "cd ui && pnpm install && pnpm build",
+    "build:backend": "tsup src/main.ts --format esm --dts",
     "test": "vitest run",
     "test:watch": "vitest"
   },

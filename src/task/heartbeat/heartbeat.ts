@@ -34,10 +34,6 @@ export interface HeartbeatConfig {
   every: string
   /** Prompt sent to the AI on each heartbeat. */
   prompt: string
-  /** Token the AI can return to signal "nothing to report". */
-  ackToken: string
-  /** Max chars for a response to be considered a short ack (suppressed). */
-  ackMaxChars: number
   /** Active hours window. Null = always active. */
   activeHours: {
     start: string   // "HH:MM"
@@ -49,9 +45,28 @@ export interface HeartbeatConfig {
 export const DEFAULT_HEARTBEAT_CONFIG: HeartbeatConfig = {
   enabled: false,
   every: '30m',
-  prompt: 'Check if anything needs attention. If nothing to report, reply HEARTBEAT_OK.',
-  ackToken: 'HEARTBEAT_OK',
-  ackMaxChars: 300,
+  prompt: `Check if anything needs attention. Respond using the structured format below.
+
+## Response Format
+
+STATUS: HEARTBEAT_OK | CHAT_YES | CHAT_NO
+REASON: <brief explanation of your decision>
+CONTENT: <message to deliver, only when STATUS is CHAT_YES>
+
+## Examples
+
+If nothing to report:
+STATUS: HEARTBEAT_OK
+REASON: All systems normal, no alerts or notable changes.
+
+If you decide not to message:
+STATUS: CHAT_NO
+REASON: Minor price fluctuations, nothing worth reporting.
+
+If you want to send a message:
+STATUS: CHAT_YES
+REASON: Significant price movement detected.
+CONTENT: BTC just dropped 8% in the last hour — now at $87,200. This may trigger stop-losses.`,
   activeHours: null,
 }
 
@@ -115,13 +130,19 @@ export function createHeartbeat(opts: HeartbeatOpts): Heartbeat {
         historyPreamble: 'The following is the recent heartbeat conversation history.',
       })
 
-      // 3. Ack token filter
-      const { shouldSkip, text } = stripAckToken(result.text, config.ackToken, config.ackMaxChars)
-      if (shouldSkip) {
-        await eventLog.append('heartbeat.skip', { reason: 'ack', text })
+      // 3. Parse structured response
+      const parsed = parseHeartbeatResponse(result.text)
+
+      if (parsed.status === 'HEARTBEAT_OK' || parsed.status === 'CHAT_NO') {
+        await eventLog.append('heartbeat.skip', {
+          reason: parsed.status === 'HEARTBEAT_OK' ? 'ack' : 'chat-no',
+          parsedReason: parsed.reason,
+        })
         return
       }
 
+      // CHAT_YES (or unparsed fallback)
+      const text = parsed.content || result.text
       if (!text.trim()) {
         await eventLog.append('heartbeat.skip', { reason: 'empty' })
         return
@@ -149,6 +170,7 @@ export function createHeartbeat(opts: HeartbeatOpts): Heartbeat {
       // 6. Done event
       await eventLog.append('heartbeat.done', {
         reply: text,
+        reason: parsed.reason,
         durationMs: now() - startMs,
         delivered,
       })
@@ -221,39 +243,53 @@ export function createHeartbeat(opts: HeartbeatOpts): Heartbeat {
   }
 }
 
-// ==================== Ack Token ====================
+// ==================== Response Parser ====================
 
-export interface StripResult {
-  shouldSkip: boolean
-  text: string
+export type HeartbeatStatus = 'HEARTBEAT_OK' | 'CHAT_YES' | 'CHAT_NO'
+
+export interface ParsedHeartbeatResponse {
+  status: HeartbeatStatus
+  reason: string
+  content: string
+  /** True when the raw response couldn't be parsed into the structured format. */
+  unparsed: boolean
 }
 
 /**
- * Strip the ack token from an AI response.
+ * Parse a structured heartbeat response from the AI.
  *
- * If the remaining text after stripping is empty or under ackMaxChars,
- * it's considered "nothing to report" (shouldSkip = true).
+ * Expected format:
+ *   STATUS: HEARTBEAT_OK | CHAT_YES | CHAT_NO
+ *   REASON: <text>
+ *   CONTENT: <text>       (only for CHAT_YES)
+ *
+ * If the response doesn't match the expected format, treats the entire
+ * raw text as a CHAT_YES message (fail-open: deliver rather than swallow).
  */
-export function stripAckToken(raw: string, ackToken: string, ackMaxChars: number): StripResult {
-  if (!raw.trim()) return { shouldSkip: true, text: '' }
-
-  // Remove all occurrences of the ack token (case-insensitive, with optional markdown wrapping)
-  const escaped = ackToken.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const pattern = new RegExp(
-    `(?:\\*{0,2}|<[^>]+>)?\\s*${escaped}\\s*(?:\\*{0,2}|<\\/[^>]+>)?`,
-    'gi',
-  )
-
-  const stripped = raw.replace(pattern, '').trim()
-
-  if (!stripped) return { shouldSkip: true, text: '' }
-
-  // Short remaining text after stripping → treat as ack noise
-  if (stripped.length <= ackMaxChars && raw.includes(ackToken)) {
-    return { shouldSkip: true, text: stripped }
+export function parseHeartbeatResponse(raw: string): ParsedHeartbeatResponse {
+  const trimmed = raw.trim()
+  if (!trimmed) {
+    return { status: 'HEARTBEAT_OK', reason: 'empty response', content: '', unparsed: false }
   }
 
-  return { shouldSkip: false, text: stripped || raw }
+  // Extract STATUS field (case-insensitive, allows leading whitespace on the line)
+  const statusMatch = /^\s*STATUS:\s*(HEARTBEAT_OK|CHAT_YES|CHAT_NO)\s*$/im.exec(trimmed)
+  if (!statusMatch) {
+    // Fail-open: can't parse → treat as a message to deliver
+    return { status: 'CHAT_YES', reason: 'unparsed response', content: trimmed, unparsed: true }
+  }
+
+  const status = statusMatch[1].toUpperCase() as HeartbeatStatus
+
+  // Extract REASON field (everything after "REASON:" until next field or end)
+  const reasonMatch = /^\s*REASON:\s*(.+?)(?=\n\s*(?:STATUS|CONTENT):|\s*$)/ims.exec(trimmed)
+  const reason = reasonMatch?.[1]?.trim() ?? ''
+
+  // Extract CONTENT field (everything after "CONTENT:" to end)
+  const contentMatch = /^\s*CONTENT:\s*(.+)/ims.exec(trimmed)
+  const content = contentMatch?.[1]?.trim() ?? ''
+
+  return { status, reason, content, unparsed: false }
 }
 
 // ==================== Active Hours ====================

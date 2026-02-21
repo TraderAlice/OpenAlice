@@ -1,0 +1,6 @@
+{
+  "enabled": true,
+  "every": "1m",
+  "prompt": "Read data/config/heartbeat.md and follow the instructions inside.",
+  "activeHours": null
+}

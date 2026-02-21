@@ -6,7 +6,7 @@ import { createEventLog, type EventLog } from '../../core/event-log.js'
 import { createCronEngine, type CronEngine } from '../cron/engine.js'
 import {
   createHeartbeat,
-  stripAckToken,
+  parseHeartbeatResponse,
   isWithinActiveHours,
   HeartbeatDedup,
   HEARTBEAT_JOB_NAME,
@@ -29,9 +29,7 @@ function makeConfig(overrides: Partial<HeartbeatConfig> = {}): HeartbeatConfig {
   return {
     enabled: true,
     every: '30m',
-    prompt: 'Check if anything needs attention. Reply HEARTBEAT_OK if nothing to report.',
-    ackToken: 'HEARTBEAT_OK',
-    ackMaxChars: 300,
+    prompt: 'Check if anything needs attention.',
     activeHours: null,
     ...overrides,
   }
@@ -39,7 +37,11 @@ function makeConfig(overrides: Partial<HeartbeatConfig> = {}): HeartbeatConfig {
 
 // ==================== Mock Engine ====================
 
-function createMockEngine(response = 'Market alert: BTC dropped 5%') {
+const CHAT_YES_RESPONSE = `STATUS: CHAT_YES
+REASON: Significant price movement detected.
+CONTENT: Market alert: BTC dropped 5%`
+
+function createMockEngine(response = CHAT_YES_RESPONSE) {
   return {
     _response: response,
     setResponse(text: string) { this._response = text },
@@ -177,8 +179,8 @@ describe('heartbeat', () => {
       })
     })
 
-    it('should skip ack responses (HEARTBEAT_OK)', async () => {
-      mockEngine.setResponse('HEARTBEAT_OK')
+    it('should skip HEARTBEAT_OK responses', async () => {
+      mockEngine.setResponse('STATUS: HEARTBEAT_OK\nREASON: All systems normal.')
 
       heartbeat = createHeartbeat({
         config: makeConfig(),
@@ -196,10 +198,62 @@ describe('heartbeat', () => {
       })
 
       const skips = eventLog.recent({ type: 'heartbeat.skip' })
-      expect(skips[0].payload).toMatchObject({ reason: 'ack' })
+      expect(skips[0].payload).toMatchObject({ reason: 'ack', parsedReason: 'All systems normal.' })
 
       // Should NOT have heartbeat.done
       expect(eventLog.recent({ type: 'heartbeat.done' })).toHaveLength(0)
+    })
+
+    it('should skip CHAT_NO responses', async () => {
+      mockEngine.setResponse('STATUS: CHAT_NO\nREASON: Minor fluctuations, nothing worth reporting.')
+
+      heartbeat = createHeartbeat({
+        config: makeConfig(),
+        cronEngine, eventLog,
+        engine: mockEngine as any,
+        session,
+      })
+      await heartbeat.start()
+
+      await cronEngine.runNow(cronEngine.list()[0].id)
+
+      await vi.waitFor(() => {
+        const skips = eventLog.recent({ type: 'heartbeat.skip' })
+        expect(skips).toHaveLength(1)
+      })
+
+      const skips = eventLog.recent({ type: 'heartbeat.skip' })
+      expect(skips[0].payload).toMatchObject({ reason: 'chat-no' })
+    })
+
+    it('should deliver unparsed responses (fail-open)', async () => {
+      const delivered: string[] = []
+      connectorRegistry.registerConnector({
+        channel: 'test', to: 'user1',
+        deliver: async (text) => { delivered.push(text) },
+      })
+      connectorRegistry.touchInteraction('test', 'user1')
+
+      // Raw text without structured format
+      mockEngine.setResponse('BTC just crashed 15%, major liquidation event!')
+
+      heartbeat = createHeartbeat({
+        config: makeConfig(),
+        cronEngine, eventLog,
+        engine: mockEngine as any,
+        session,
+      })
+      await heartbeat.start()
+
+      await cronEngine.runNow(cronEngine.list()[0].id)
+
+      await vi.waitFor(() => {
+        const done = eventLog.recent({ type: 'heartbeat.done' })
+        expect(done).toHaveLength(1)
+      })
+
+      expect(delivered).toHaveLength(1)
+      expect(delivered[0]).toBe('BTC just crashed 15%, major liquidation event!')
     })
 
     it('should ignore non-heartbeat cron.fire events', async () => {
@@ -447,45 +501,78 @@ describe('heartbeat', () => {
   })
 })
 
-// ==================== Unit Tests: stripAckToken ====================
+// ==================== Unit Tests: parseHeartbeatResponse ====================
 
-describe('stripAckToken', () => {
-  it('should detect plain ack token', () => {
-    const r = stripAckToken('HEARTBEAT_OK', 'HEARTBEAT_OK', 300)
-    expect(r.shouldSkip).toBe(true)
+describe('parseHeartbeatResponse', () => {
+  it('should parse HEARTBEAT_OK', () => {
+    const r = parseHeartbeatResponse('STATUS: HEARTBEAT_OK\nREASON: All good.')
+    expect(r.status).toBe('HEARTBEAT_OK')
+    expect(r.reason).toBe('All good.')
+    expect(r.content).toBe('')
+    expect(r.unparsed).toBe(false)
   })
 
-  it('should detect ack token with whitespace', () => {
-    const r = stripAckToken('  HEARTBEAT_OK  ', 'HEARTBEAT_OK', 300)
-    expect(r.shouldSkip).toBe(true)
+  it('should parse CHAT_NO', () => {
+    const r = parseHeartbeatResponse('STATUS: CHAT_NO\nREASON: Nothing worth reporting.')
+    expect(r.status).toBe('CHAT_NO')
+    expect(r.reason).toBe('Nothing worth reporting.')
+    expect(r.content).toBe('')
+    expect(r.unparsed).toBe(false)
   })
 
-  it('should detect ack with markdown bold', () => {
-    const r = stripAckToken('**HEARTBEAT_OK**', 'HEARTBEAT_OK', 300)
-    expect(r.shouldSkip).toBe(true)
+  it('should parse CHAT_YES with content', () => {
+    const r = parseHeartbeatResponse(
+      'STATUS: CHAT_YES\nREASON: Price alert.\nCONTENT: BTC dropped 8% to $87,200.',
+    )
+    expect(r.status).toBe('CHAT_YES')
+    expect(r.reason).toBe('Price alert.')
+    expect(r.content).toBe('BTC dropped 8% to $87,200.')
+    expect(r.unparsed).toBe(false)
   })
 
-  it('should skip short remaining text after stripping', () => {
-    const r = stripAckToken('HEARTBEAT_OK — all good!', 'HEARTBEAT_OK', 300)
-    expect(r.shouldSkip).toBe(true)
-    expect(r.text).toBe('— all good!')
+  it('should parse CHAT_YES with multiline content', () => {
+    const r = parseHeartbeatResponse(
+      'STATUS: CHAT_YES\nREASON: Multiple alerts.\nCONTENT: Line 1\nLine 2\nLine 3',
+    )
+    expect(r.status).toBe('CHAT_YES')
+    expect(r.content).toBe('Line 1\nLine 2\nLine 3')
   })
 
-  it('should NOT skip long substantive response', () => {
-    const longText = 'HEARTBEAT_OK but also: ' + 'x'.repeat(400)
-    const r = stripAckToken(longText, 'HEARTBEAT_OK', 300)
-    expect(r.shouldSkip).toBe(false)
+  it('should be case-insensitive for STATUS field', () => {
+    const r = parseHeartbeatResponse('status: heartbeat_ok\nreason: ok')
+    expect(r.status).toBe('HEARTBEAT_OK')
   })
 
-  it('should NOT skip response without ack token', () => {
-    const r = stripAckToken('Market alert: BTC down 10%', 'HEARTBEAT_OK', 300)
-    expect(r.shouldSkip).toBe(false)
-    expect(r.text).toBe('Market alert: BTC down 10%')
+  it('should handle extra whitespace', () => {
+    const r = parseHeartbeatResponse('  STATUS:   CHAT_NO  \n  REASON:   All quiet.  ')
+    expect(r.status).toBe('CHAT_NO')
+    expect(r.reason).toBe('All quiet.')
+  })
+
+  it('should fail-open on unparseable response (deliver it)', () => {
+    const r = parseHeartbeatResponse('Something unexpected happened with BTC!')
+    expect(r.status).toBe('CHAT_YES')
+    expect(r.content).toBe('Something unexpected happened with BTC!')
+    expect(r.unparsed).toBe(true)
   })
 
   it('should handle empty input', () => {
-    const r = stripAckToken('', 'HEARTBEAT_OK', 300)
-    expect(r.shouldSkip).toBe(true)
+    const r = parseHeartbeatResponse('')
+    expect(r.status).toBe('HEARTBEAT_OK')
+    expect(r.content).toBe('')
+    expect(r.unparsed).toBe(false)
+  })
+
+  it('should handle response with only STATUS line', () => {
+    const r = parseHeartbeatResponse('STATUS: HEARTBEAT_OK')
+    expect(r.status).toBe('HEARTBEAT_OK')
+    expect(r.reason).toBe('')
+  })
+
+  it('should handle CHAT_YES without CONTENT field', () => {
+    const r = parseHeartbeatResponse('STATUS: CHAT_YES\nREASON: Want to say hi.')
+    expect(r.status).toBe('CHAT_YES')
+    expect(r.content).toBe('')
   })
 })
 

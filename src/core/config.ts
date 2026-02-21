@@ -95,9 +95,7 @@ const activeHoursSchema = z.object({
 const heartbeatSchema = z.object({
   enabled: z.boolean().default(false),
   every: z.string().default('30m'),
-  prompt: z.string().default('Check if anything needs attention. If nothing to report, reply HEARTBEAT_OK.'),
-  ackToken: z.string().default('HEARTBEAT_OK'),
-  ackMaxChars: z.number().default(300),
+  prompt: z.string().default('Check if anything needs attention. Respond with STATUS: HEARTBEAT_OK if nothing to report.'),
   activeHours: activeHoursSchema,
 })
 

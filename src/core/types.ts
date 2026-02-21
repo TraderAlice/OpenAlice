@@ -1,5 +1,6 @@
 import type { Sandbox } from '../extension/analysis-kit/index.js'
 import type { ICryptoTradingEngine } from '../extension/crypto-trading/index.js'
+import type { CronEngine } from '../task/cron/engine.js'
 import type { Heartbeat } from '../task/heartbeat/index.js'
 import type { Config } from './config.js'
 import type { Engine } from './engine.js'
@@ -20,6 +21,7 @@ export interface EngineContext {
   engine: Engine
   eventLog: EventLog
   heartbeat: Heartbeat
+  cronEngine: CronEngine
 }
 
 /** A media attachment collected from tool results (e.g. browser screenshots). */
