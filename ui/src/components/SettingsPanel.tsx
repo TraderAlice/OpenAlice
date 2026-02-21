@@ -101,6 +101,11 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                 </Section>
               )}
 
+              {/* Connectivity */}
+              <Section title="Connectivity">
+                <ConnectivityForm config={config} onSave={saveSection} />
+              </Section>
+
               {/* Compaction */}
               <Section title="Compaction">
                 <CompactionForm config={config} onSave={saveSection} />
@@ -206,6 +211,38 @@ function CompactionForm({
         onClick={() =>
           onSave('compaction', { maxContextTokens: Number(ctx), maxOutputTokens: Number(out) }, 'Compaction')
         }
+      />
+    </>
+  )
+}
+
+function ConnectivityForm({
+  config,
+  onSave,
+}: {
+  config: AppConfig
+  onSave: (section: string, data: unknown, label: string) => void
+}) {
+  const eng = config.engine as Record<string, unknown>
+  const [mcpPort, setMcpPort] = useState(String(eng.mcpPort ?? ''))
+  const [askMcpPort, setAskMcpPort] = useState(String(eng.askMcpPort ?? ''))
+
+  return (
+    <>
+      <Field label="MCP Port (tools)">
+        <input className={inputClass} type="number" value={mcpPort} onChange={(e) => setMcpPort(e.target.value)} placeholder="Disabled" />
+      </Field>
+      <Field label="Ask MCP Port (connector)">
+        <input className={inputClass} type="number" value={askMcpPort} onChange={(e) => setAskMcpPort(e.target.value)} placeholder="Disabled" />
+      </Field>
+      <p className="text-[11px] text-text-muted mb-2">Leave empty to disable. Restart required after change.</p>
+      <SaveButton
+        onClick={() => {
+          const patch = { ...eng }
+          if (mcpPort) patch.mcpPort = Number(mcpPort); else delete patch.mcpPort
+          if (askMcpPort) patch.askMcpPort = Number(askMcpPort); else delete patch.askMcpPort
+          onSave('engine', patch, 'Connectivity')
+        }}
       />
     </>
   )

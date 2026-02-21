@@ -8,6 +8,7 @@ import { HttpPlugin } from './plugins/http.js'
 import { McpPlugin } from './plugins/mcp.js'
 import { TelegramPlugin } from './connectors/telegram/index.js'
 import { WebPlugin } from './connectors/web/index.js'
+import { McpAskPlugin } from './connectors/mcp-ask/index.js'
 import { Sandbox, RealMarketDataProvider, RealNewsProvider, fetchRealtimeData } from './extension/analysis-kit/index.js'
 import type { MarketData, NewsItem } from './extension/analysis-kit/index.js'
 import { createAnalysisTools } from './extension/analysis-kit/index.js'
@@ -283,6 +284,10 @@ async function main() {
 
   if (config.engine.mcpPort) {
     plugins.push(new McpPlugin(toolCenter.getMcpTools(), config.engine.mcpPort))
+  }
+
+  if (config.engine.askMcpPort) {
+    plugins.push(new McpAskPlugin({ port: config.engine.askMcpPort }))
   }
 
   if (config.engine.webPort) {
