@@ -1,6 +1,6 @@
 import { anthropic } from '@ai-sdk/anthropic'
 import { readFile, writeFile, appendFile, mkdir } from 'fs/promises'
-import { resolve } from 'path'
+import { resolve, dirname } from 'path'
 import { Engine } from './core/engine.js'
 import { loadConfig } from './core/config.js'
 import type { Plugin, EngineContext } from './core/types.js'
@@ -49,9 +49,21 @@ const SEC_WALLET_FILE = resolve('data/securities-trading/commit.json')
 const BRAIN_FILE = resolve('data/brain/commit.json')
 const FRONTAL_LOBE_FILE = resolve('data/brain/frontal-lobe.md')
 const EMOTION_LOG_FILE = resolve('data/brain/emotion-log.md')
-const PERSONA_FILE = resolve('data/config/persona.md')
+const PERSONA_FILE = resolve('data/brain/persona.md')
+const PERSONA_DEFAULT = resolve('data/default/persona.default.md')
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+
+/** Read a file, copying from default if it doesn't exist yet. */
+async function readWithDefault(target: string, defaultFile: string): Promise<string> {
+  try { return await readFile(target, 'utf-8') } catch { /* not found — copy default */ }
+  try {
+    const content = await readFile(defaultFile, 'utf-8')
+    await mkdir(dirname(target), { recursive: true })
+    await writeFile(target, content)
+    return content
+  } catch { return '' }
+}
 
 async function main() {
   const config = await loadConfig()
@@ -200,8 +212,7 @@ async function main() {
     : new Brain({ onCommit: brainOnCommit })
 
   // Build system prompt: persona + current brain state
-  let persona = ''
-  try { persona = await readFile(PERSONA_FILE, 'utf-8') } catch { /* use empty */ }
+  const persona = await readWithDefault(PERSONA_FILE, PERSONA_DEFAULT)
 
   const frontalLobe = brain.getFrontalLobe()
   const emotion = brain.getEmotion().current

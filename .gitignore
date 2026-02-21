@@ -3,6 +3,7 @@ dist/
 logs/
 /data/*
 !/data/config/
+!/data/default/
 state.json
 *.log
 
