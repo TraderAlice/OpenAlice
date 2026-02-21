@@ -1,8 +1,6 @@
 {
   "enabled": true,
-  "every": "30m",
-  "prompt": "Check if anything needs attention. If nothing to report, reply HEARTBEAT_OK.",
-  "ackToken": "HEARTBEAT_OK",
-  "ackMaxChars": 300,
+  "every": "1m",
+  "prompt": "Read data/config/heartbeat.md and follow the instructions inside.",
   "activeHours": null
 }
