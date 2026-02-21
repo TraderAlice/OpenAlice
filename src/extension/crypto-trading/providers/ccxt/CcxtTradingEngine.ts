@@ -51,6 +51,9 @@ export class CcxtTradingEngine implements ICryptoTradingEngine {
   /** Circuit breaker — wired into placeOrder. */
   readonly circuitBreaker = new DailyLossCircuitBreaker();
 
+  /** Track pending reduceOnly orders for deferred realized PnL recording. */
+  private pendingReduceOnlyUnrealized = new Map<string, number>();
+
   constructor(private config: CcxtEngineConfig) {
     const exchanges = ccxt as unknown as Record<string, new (opts: Record<string, unknown>) => Exchange>;
     const ExchangeClass = exchanges[config.exchange];
@@ -214,13 +217,12 @@ export class CcxtTradingEngine implements ICryptoTradingEngine {
       if (order.reduceOnly) params.reduceOnly = true;
 
       // Snapshot unrealized PnL before close for realized PnL calculation
+      // Uses same getPositions() as post-close to ensure consistent universe
       let preCloseUnrealizedPnL: number | null = null;
       if (order.reduceOnly) {
         try {
-          const prePositions = await this.exchange.fetchPositions();
-          preCloseUnrealizedPnL = prePositions
-            .filter(p => Math.abs(parseFloat(String(p.contracts ?? 0))) > 0)
-            .reduce((sum, p) => sum + parseFloat(String(p.unrealizedPnl ?? 0)), 0);
+          const prePositions = await this.getPositions();
+          preCloseUnrealizedPnL = prePositions.reduce((sum, p) => sum + p.unrealizedPnL, 0);
         } catch { /* best-effort */ }
       }
 
@@ -242,24 +244,23 @@ export class CcxtTradingEngine implements ICryptoTradingEngine {
       const status = this.mapOrderStatus(ccxtOrder.status);
 
       // Record realized PnL for circuit breaker when a reduceOnly order fills
-      if (status === 'filled' && order.reduceOnly) {
-        try {
-          // Fetch fresh positions to update unrealized snapshot
-          const freshPositions = await this.getPositions(); // side-effect: updates updateUnrealizedPnL
-          // Compute realized PnL = pre-close unrealized - post-close unrealized
-          // The difference is what was "realized" by closing the position
-          if (preCloseUnrealizedPnL !== null) {
-            const postUnrealized = freshPositions.reduce((sum, p) => sum + p.unrealizedPnL, 0);
-            const realizedPnL = preCloseUnrealizedPnL - postUnrealized;
-            // Record as realized event (positive = profit, negative = loss)
-            this.circuitBreaker.recordPnL(realizedPnL);
-          }
-          // Also record fees as a separate realized loss
-          const fee = ccxtOrder.fee?.cost ?? 0;
-          if (fee > 0) {
-            this.circuitBreaker.recordPnL(-fee);
-          }
-        } catch { /* best-effort */ }
+      if (order.reduceOnly) {
+        if (status === 'filled') {
+          // Immediate fill: compute realized PnL now
+          try {
+            const freshPositions = await this.getPositions(); // side-effect: updates updateUnrealizedPnL
+            if (preCloseUnrealizedPnL !== null) {
+              const postUnrealized = freshPositions.reduce((sum, p) => sum + p.unrealizedPnL, 0);
+              const realizedPnL = preCloseUnrealizedPnL - postUnrealized;
+              this.circuitBreaker.recordPnL(realizedPnL);
+            }
+            const fee = ccxtOrder.fee?.cost ?? 0;
+            if (fee > 0) this.circuitBreaker.recordPnL(-fee);
+          } catch { /* best-effort */ }
+        } else if (ccxtOrder.id && preCloseUnrealizedPnL !== null) {
+          // Deferred fill (limit order pending): store pre-close snapshot for later
+          this.pendingReduceOnlyUnrealized.set(ccxtOrder.id, preCloseUnrealizedPnL);
+        }
       }
 
       return {
@@ -339,6 +340,18 @@ export class CcxtTradingEngine implements ICryptoTradingEngine {
       // Cache orderId -> symbol
       if (o.id) {
         this.orderSymbolCache.set(o.id, o.symbol);
+
+        // Check for deferred reduceOnly fills — record realized PnL
+        if (this.mapOrderStatus(o.status) === 'filled' && this.pendingReduceOnlyUnrealized.has(o.id)) {
+          const preUnrealized = this.pendingReduceOnlyUnrealized.get(o.id)!;
+          this.pendingReduceOnlyUnrealized.delete(o.id);
+          try {
+            // Get current unrealized to compute diff
+            const currentPositions = await this.getPositions();
+            const postUnrealized = currentPositions.reduce((sum, p) => sum + p.unrealizedPnL, 0);
+            this.circuitBreaker.recordPnL(preUnrealized - postUnrealized);
+          } catch { /* best-effort */ }
+        }
       }
 
       result.push({
