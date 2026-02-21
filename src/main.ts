@@ -33,6 +33,7 @@ import { Brain, createBrainTools } from './extension/brain/index.js'
 import type { BrainExportState } from './extension/brain/index.js'
 import { createBrowserTools } from './extension/browser/index.js'
 import { SessionStore } from './core/session.js'
+import { ToolCenter } from './core/tool-center.js'
 import { ProviderRouter } from './core/ai-provider.js'
 import { createAgent } from './providers/vercel-ai-sdk/index.js'
 import { VercelAIProvider } from './providers/vercel-ai-sdk/vercel-provider.js'
@@ -231,25 +232,28 @@ async function main() {
 
   const cronEngine = createCronEngine({ eventLog })
 
-  // ==================== Tool Assembly ====================
+  // ==================== Tool Center ====================
 
-  const tools = {
-    ...createAnalysisTools(sandbox),
-    ...createCryptoTradingTools(cryptoEngine, wallet, cryptoWalletStateBridge),
-    ...(secResult ? createSecuritiesTradingTools(secResult.engine, secWallet, secWalletStateBridge) : {}),
-    ...createBrainTools(brain),
-    ...createBrowserTools(),
-    ...createCronTools(cronEngine),
+  const toolCenter = new ToolCenter()
+  toolCenter.register(createAnalysisTools(sandbox))
+  toolCenter.register(createCryptoTradingTools(cryptoEngine, wallet, cryptoWalletStateBridge))
+  if (secResult) {
+    toolCenter.register(createSecuritiesTradingTools(secResult.engine, secWallet, secWalletStateBridge))
   }
+  toolCenter.register(createBrainTools(brain))
+  toolCenter.register(createBrowserTools())
+  toolCenter.register(createCronTools(cronEngine))
+
+  console.log(`tool-center: ${toolCenter.list().length} tools registered`)
 
   // ==================== AI Provider Chain ====================
 
-  const agent = createAgent(model, tools, instructions, config.agent.maxSteps)
+  const agent = createAgent(model, toolCenter.getVercelTools(), instructions, config.agent.maxSteps)
   const vercelProvider = new VercelAIProvider(agent, config.compaction)
   const claudeCodeProvider = new ClaudeCodeProvider(config.agent.claudeCode, config.compaction)
   const router = new ProviderRouter(vercelProvider, claudeCodeProvider)
 
-  const engine = new Engine({ agent, tools, provider: router })
+  const engine = new Engine({ agent, provider: router })
 
   // ==================== Cron Lifecycle ====================
 
@@ -276,7 +280,7 @@ async function main() {
   const plugins: Plugin[] = [new HttpPlugin()]
 
   if (config.engine.mcpPort) {
-    plugins.push(new McpPlugin(engine.tools, config.engine.mcpPort))
+    plugins.push(new McpPlugin(toolCenter.getMcpTools(), config.engine.mcpPort))
   }
 
   if (config.engine.webPort) {

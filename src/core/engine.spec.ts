@@ -44,7 +44,7 @@ function makeEngine(overrides: MakeEngineOpts = {}): Engine {
   const agent = createAgent(model, tools, instructions, maxSteps)
   const provider = new VercelAIProvider(agent, compaction)
 
-  return new Engine({ agent, tools, provider })
+  return new Engine({ agent, provider })
 }
 
 /** In-memory SessionStore mock (no filesystem). */
@@ -104,16 +104,9 @@ describe('Engine', () => {
   // -------------------- Construction --------------------
 
   describe('constructor', () => {
-    it('creates an agent with the given tools and instructions', () => {
+    it('creates an engine with agent and provider', () => {
       const engine = makeEngine({ instructions: 'custom instructions' })
       expect(engine.agent).toBeDefined()
-      expect(engine.tools).toEqual({})
-    })
-
-    it('exposes provided tools via readonly property', () => {
-      const dummyTool = { description: 'test', inputSchema: {}, execute: async () => 'ok' }
-      const engine = makeEngine({ tools: { myTool: dummyTool } as any })
-      expect(engine.tools).toHaveProperty('myTool')
     })
   })
 

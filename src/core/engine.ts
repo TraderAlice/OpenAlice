@@ -6,7 +6,6 @@
  * the Vercel AI SDK agent (for MCP, compaction callbacks, etc.).
  */
 
-import type { Tool } from 'ai'
 import type { MediaAttachment } from './types.js'
 import type { SessionStore } from './session.js'
 import type { AIProvider, AskOptions, ProviderResult } from './ai-provider.js'
@@ -16,9 +15,8 @@ import { extractMediaFromToolOutput } from './media.js'
 // ==================== Types ====================
 
 export interface EngineOpts {
-  /** Pre-built Vercel AI SDK agent (still used by `ask()` and MCP tool exposure). */
+  /** Pre-built Vercel AI SDK agent (still used by `ask()`). */
   agent: Agent
-  tools: Record<string, Tool>
   /** The provider router (or any AIProvider) that handles session-aware calls. */
   provider: AIProvider
 }
@@ -36,15 +34,11 @@ export class Engine {
   private _generating = false
   private provider: AIProvider
 
-  /** The underlying ToolLoopAgent (used by `ask()` and exposed for MCP). */
+  /** The underlying ToolLoopAgent (used by `ask()`). */
   readonly agent: Agent
-
-  /** Tools registered with the agent (for MCP exposure, etc.). */
-  readonly tools: Record<string, Tool>
 
   constructor(opts: EngineOpts) {
     this.agent = opts.agent
-    this.tools = opts.tools
     this.provider = opts.provider
   }
 
