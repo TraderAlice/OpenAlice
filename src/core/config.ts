@@ -11,6 +11,7 @@ const engineSchema = z.object({
   interval: z.number().int().positive().default(5000),
   port: z.number().int().positive().default(3000),
   mcpPort: z.number().int().positive().optional(),
+  askMcpPort: z.number().int().positive().optional(),
   webPort: z.number().int().positive().default(3002),
   timeframe: z.string().default('1h'),
   dataRefreshInterval: z.number().int().positive().default(600_000),
