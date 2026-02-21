@@ -252,7 +252,7 @@ async function main() {
 
   const agent = createAgent(model, toolCenter.getVercelTools(), instructions, config.agent.maxSteps)
   const vercelProvider = new VercelAIProvider(agent, config.compaction)
-  const claudeCodeProvider = new ClaudeCodeProvider(config.agent.claudeCode, config.compaction)
+  const claudeCodeProvider = new ClaudeCodeProvider(config.agent.claudeCode, config.compaction, instructions)
   const router = new ProviderRouter(vercelProvider, claudeCodeProvider)
 
   const agentCenter = new AgentCenter(router)

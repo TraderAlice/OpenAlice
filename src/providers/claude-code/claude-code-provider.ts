@@ -16,6 +16,7 @@ export class ClaudeCodeProvider implements AIProvider {
   constructor(
     private claudeCodeConfig: ClaudeCodeConfig,
     private compaction: CompactionConfig,
+    private systemPrompt?: string,
   ) {}
 
   async ask(prompt: string): Promise<ProviderResult> {
@@ -28,6 +29,7 @@ export class ClaudeCodeProvider implements AIProvider {
       claudeCode: this.claudeCodeConfig,
       compaction: this.compaction,
       ...opts,
+      systemPrompt: opts?.systemPrompt ?? this.systemPrompt,
     })
   }
 }
