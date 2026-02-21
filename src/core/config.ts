@@ -26,7 +26,6 @@ const agentSchema = z.object({
   maxSteps: z.number().int().positive().default(20),
   evolutionMode: z.boolean().default(false),
   claudeCode: z.object({
-    allowedTools: z.array(z.string()).optional(),
     disallowedTools: z.array(z.string()).default([
       'Task', 'TaskOutput',
       'AskUserQuestion', 'TodoWrite',

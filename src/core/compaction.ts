@@ -257,7 +257,7 @@ export async function compactIfNeeded(
   // Phase 1: try microcompact
   const { entries: microcompacted, savedTokens } = microcompact(activeEntries, config)
   if (savedTokens >= MIN_MICROCOMPACT_SAVINGS && estimateSessionTokens(microcompacted) < threshold) {
-    console.log(`compaction: microcompact saved ~${savedTokens} tokens (${activeEntries.length} → ${microcompacted.length} entries)`)
+    console.log(`compaction: microcompact saved ~${savedTokens} tokens (${currentTokens} → ${estimateSessionTokens(microcompacted)} tokens, ${activeEntries.length} entries)`)
     return { compacted: true, method: 'microcompact', activeEntries: microcompacted }
   }
 
