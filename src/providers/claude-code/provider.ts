@@ -25,11 +25,21 @@ function stripImageData(raw: string): string {
   } catch { return raw }
 }
 
-/** Tools to disallow in normal (non-evolution) mode — Bash is blocked. */
-export const NORMAL_DISALLOWED_TOOLS = ['Bash']
+/** Tools pre-approved in normal mode (no Bash). */
+const NORMAL_ALLOWED_TOOLS = [
+  'Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'WebFetch',
+]
 
-/** Tools to disallow in evolution mode — nothing extra blocked. */
-export const EVOLUTION_DISALLOWED_TOOLS: string[] = []
+/** Tools pre-approved in evolution mode (includes Bash). */
+const EVOLUTION_ALLOWED_TOOLS = [
+  'Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep', 'WebSearch', 'WebFetch',
+]
+
+/** Extra tools to disallow in normal mode. */
+const NORMAL_EXTRA_DISALLOWED = ['Bash']
+
+/** Extra tools to disallow in evolution mode. */
+const EVOLUTION_EXTRA_DISALLOWED: string[] = []
 
 /**
  * Spawn `claude -p` as a stateless child process and collect the result.
@@ -43,13 +53,21 @@ export async function askClaudeCode(
   config: ClaudeCodeConfig = {},
 ): Promise<ClaudeCodeResult> {
   const {
+    allowedTools = [],
     disallowedTools = [],
+    evolutionMode = false,
     maxTurns = 20,
     cwd = process.cwd(),
     systemPrompt,
     appendSystemPrompt,
     onToolResult,
   } = config
+
+  // Merge: explicit config overrides mode defaults
+  const modeAllowed = evolutionMode ? EVOLUTION_ALLOWED_TOOLS : NORMAL_ALLOWED_TOOLS
+  const modeDisallowed = evolutionMode ? EVOLUTION_EXTRA_DISALLOWED : NORMAL_EXTRA_DISALLOWED
+  const finalAllowed = allowedTools.length > 0 ? allowedTools : modeAllowed
+  const finalDisallowed = [...disallowedTools, ...modeDisallowed]
 
   const args = [
     '-p', prompt,
@@ -58,8 +76,12 @@ export async function askClaudeCode(
     '--max-turns', String(maxTurns),
   ]
 
-  if (disallowedTools.length > 0) {
-    args.push('--disallowedTools', ...disallowedTools)
+  if (finalAllowed.length > 0) {
+    args.push('--allowedTools', ...finalAllowed)
+  }
+
+  if (finalDisallowed.length > 0) {
+    args.push('--disallowedTools', ...finalDisallowed)
   }
 
   if (systemPrompt) {
