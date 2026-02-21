@@ -8,7 +8,7 @@
 
 # Open Alice
 
-A personal AI trading agent. She automatically fetches news, computes quantitative factors, logs trade rationale, builds strategies across different timeframes, and monitors and adjusts your portfolio 24/7.
+Your one-person Wall Street. Alice is an AI trading agent that gives you your own research desk, quant team, trading floor, and risk management — all running on your laptop 24/7.
 
 - **File-driven** — Markdown defines persona and tasks, JSON defines config, JSONL stores conversations. Both humans and AI control Alice by reading and modifying files. The same read/write primitives that power vibe coding transfer directly to vibe trading. No database, no containers, just files.
 - **Reasoning-driven** — every trading decision is based on continuous reasoning and signal mixing. Visit [traderalice.com/live](https://traderalice.com/live) to see how Alice reasons in real time.
