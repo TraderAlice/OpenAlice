@@ -1,7 +1,7 @@
 {
   "maxSteps": 20,
+  "evolutionMode": false,
   "claudeCode": {
-    "allowedTools": ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "WebSearch", "WebFetch"],
     "disallowedTools": [
       "Task", "TaskOutput",
       "AskUserQuestion", "TodoWrite",

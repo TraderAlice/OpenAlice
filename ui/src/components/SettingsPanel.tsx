@@ -94,6 +94,30 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                 </div>
               </Section>
 
+              {/* Evolution Mode */}
+              <Section title="Evolution Mode">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1 mr-3">
+                    <span className="text-sm">
+                      {config.agent?.evolutionMode ? 'Enabled' : 'Disabled'}
+                    </span>
+                    <p className="text-[11px] text-text-muted mt-0.5">
+                      {config.agent?.evolutionMode
+                        ? 'Full project access — AI can modify source code'
+                        : 'Sandbox mode — AI can only edit data/brain/'}
+                    </p>
+                  </div>
+                  <Toggle
+                    checked={config.agent?.evolutionMode || false}
+                    onChange={async (v) => {
+                      const agentData = { ...config.agent, evolutionMode: v }
+                      await saveSection('agent', agentData, 'Evolution Mode')
+                      setConfig((c) => c ? { ...c, agent: { ...c.agent, evolutionMode: v } } : c)
+                    }}
+                  />
+                </div>
+              </Section>
+
               {/* Model (only for Vercel AI SDK) */}
               {config.aiProvider === 'vercel-ai-sdk' && (
                 <Section title="Model">

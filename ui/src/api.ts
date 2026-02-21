@@ -17,6 +17,7 @@ export interface AppConfig {
   aiProvider: string
   engine: Record<string, unknown>
   model: { provider: string; model: string }
+  agent: { evolutionMode: boolean; claudeCode: Record<string, unknown> }
   compaction: { maxContextTokens: number; maxOutputTokens: number }
   scheduler: {
     heartbeat: { enabled: boolean; every: string }

@@ -25,7 +25,13 @@ function stripImageData(raw: string): string {
   } catch { return raw }
 }
 
-const DEFAULT_ALLOWED_TOOLS = [
+/** Normal mode: sandbox in data/brain/, read-write but no Bash */
+export const NORMAL_ALLOWED_TOOLS = [
+  'Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'WebFetch',
+]
+
+/** Evolution mode: full project access including Bash */
+export const EVOLUTION_ALLOWED_TOOLS = [
   'Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep', 'WebSearch', 'WebFetch',
 ]
 
@@ -41,7 +47,7 @@ export async function askClaudeCode(
   config: ClaudeCodeConfig = {},
 ): Promise<ClaudeCodeResult> {
   const {
-    allowedTools = DEFAULT_ALLOWED_TOOLS,
+    allowedTools = NORMAL_ALLOWED_TOOLS,
     disallowedTools = [],
     maxTurns = 20,
     cwd = process.cwd(),
