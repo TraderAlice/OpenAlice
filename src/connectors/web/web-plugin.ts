@@ -2,14 +2,15 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { streamSSE } from 'hono/streaming'
 import { serve } from '@hono/node-server'
+import { serveStatic } from '@hono/node-server/serve-static'
 import { readFile } from 'node:fs/promises'
+import { resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import type { Plugin, EngineContext } from '../../core/types.js'
 import { SessionStore, toTextHistory } from '../../core/session.js'
 import { registerConnector, touchInteraction } from '../../core/connector-registry.js'
 import { loadConfig, writeConfigSection, type ConfigSection } from '../../core/config.js'
 import { readAIConfig, writeAIConfig, type AIProvider } from '../../core/ai-config.js'
-import { WEB_UI_HTML } from './ui.js'
 
 export interface WebConfig {
   port: number
@@ -41,9 +42,6 @@ export class WebPlugin implements Plugin {
 
     const app = new Hono()
     app.use('/api/*', cors())
-
-    // ==================== Serve UI ====================
-    app.get('/', (c) => c.html(WEB_UI_HTML))
 
     // ==================== Chat endpoint ====================
     app.post('/api/chat', async (c) => {
@@ -196,7 +194,7 @@ export class WebPlugin implements Plugin {
     app.put('/api/config/:section', async (c) => {
       try {
         const section = c.req.param('section') as ConfigSection
-        const validSections: ConfigSection[] = ['engine', 'model', 'agent', 'crypto', 'securities', 'compaction', 'scheduler']
+        const validSections: ConfigSection[] = ['engine', 'model', 'agent', 'crypto', 'securities', 'compaction', 'heartbeat']
         if (!validSections.includes(section)) {
           return c.json({ error: `Invalid section "${section}". Valid: ${validSections.join(', ')}` }, 400)
         }
@@ -210,6 +208,133 @@ export class WebPlugin implements Plugin {
         return c.json({ error: String(err) }, 500)
       }
     })
+
+    // ==================== Event Log endpoints ====================
+    app.get('/api/events/recent', (c) => {
+      const afterSeq = Number(c.req.query('afterSeq')) || 0
+      const limit = Number(c.req.query('limit')) || 100
+      const type = c.req.query('type') || undefined
+      const entries = ctx.eventLog.recent({ afterSeq, limit, type })
+      return c.json({ entries, lastSeq: ctx.eventLog.lastSeq() })
+    })
+
+    app.get('/api/events/stream', (c) => {
+      return streamSSE(c, async (stream) => {
+        const unsub = ctx.eventLog.subscribe((entry) => {
+          stream.writeSSE({ data: JSON.stringify(entry) }).catch(() => {})
+        })
+
+        const pingInterval = setInterval(() => {
+          stream.writeSSE({ event: 'ping', data: '' }).catch(() => {})
+        }, 30_000)
+
+        stream.onAbort(() => {
+          clearInterval(pingInterval)
+          unsub()
+        })
+
+        await new Promise<void>(() => {})
+      })
+    })
+
+    // ==================== Cron endpoints ====================
+    app.get('/api/cron/jobs', (c) => {
+      const jobs = ctx.cronEngine.list()
+      return c.json({ jobs })
+    })
+
+    app.post('/api/cron/jobs', async (c) => {
+      try {
+        const body = await c.req.json<{
+          name: string
+          payload: string
+          schedule: { kind: string; at?: string; every?: string; cron?: string }
+          enabled?: boolean
+        }>()
+        if (!body.name || !body.payload || !body.schedule?.kind) {
+          return c.json({ error: 'name, payload, and schedule are required' }, 400)
+        }
+        const id = await ctx.cronEngine.add({
+          name: body.name,
+          payload: body.payload,
+          schedule: body.schedule as import('../../task/cron/engine.js').CronSchedule,
+          enabled: body.enabled,
+        })
+        return c.json({ id })
+      } catch (err) {
+        return c.json({ error: String(err) }, 500)
+      }
+    })
+
+    app.put('/api/cron/jobs/:id', async (c) => {
+      try {
+        const id = c.req.param('id')
+        const body = await c.req.json()
+        await ctx.cronEngine.update(id, body)
+        return c.json({ ok: true })
+      } catch (err) {
+        return c.json({ error: String(err) }, 500)
+      }
+    })
+
+    app.delete('/api/cron/jobs/:id', async (c) => {
+      try {
+        const id = c.req.param('id')
+        await ctx.cronEngine.remove(id)
+        return c.json({ ok: true })
+      } catch (err) {
+        return c.json({ error: String(err) }, 500)
+      }
+    })
+
+    app.post('/api/cron/jobs/:id/run', async (c) => {
+      try {
+        const id = c.req.param('id')
+        await ctx.cronEngine.runNow(id)
+        return c.json({ ok: true })
+      } catch (err) {
+        return c.json({ error: String(err) }, 500)
+      }
+    })
+
+    // ==================== Heartbeat endpoints ====================
+    app.get('/api/heartbeat/status', (c) => {
+      return c.json({
+        enabled: ctx.heartbeat.isEnabled(),
+      })
+    })
+
+    app.post('/api/heartbeat/trigger', async (c) => {
+      try {
+        // Find the __heartbeat__ cron job and runNow on it
+        const jobs = ctx.cronEngine.list()
+        const hbJob = jobs.find((j) => j.name === '__heartbeat__')
+        if (!hbJob) {
+          return c.json({ error: 'Heartbeat cron job not found. Is heartbeat enabled?' }, 404)
+        }
+        await ctx.cronEngine.runNow(hbJob.id)
+        return c.json({ ok: true })
+      } catch (err) {
+        return c.json({ error: String(err) }, 500)
+      }
+    })
+
+    app.put('/api/heartbeat/enabled', async (c) => {
+      try {
+        const body = await c.req.json<{ enabled: boolean }>()
+        await ctx.heartbeat.setEnabled(body.enabled)
+        return c.json({ enabled: ctx.heartbeat.isEnabled() })
+      } catch (err) {
+        return c.json({ error: String(err) }, 500)
+      }
+    })
+
+    // ==================== Serve UI (Vite build output) ====================
+    const uiRoot = resolve('dist/ui')
+    app.use('/*', serveStatic({ root: uiRoot }))
+
+    // SPA fallback: serve index.html for non-API routes (client-side routing)
+    app.get('*', serveStatic({ root: uiRoot, path: 'index.html' }))
 
     // ==================== Connector registration ====================
     this.unregisterConnector = registerConnector({
