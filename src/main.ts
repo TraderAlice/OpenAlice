@@ -40,7 +40,6 @@ import { ProviderRouter } from './core/ai-provider.js'
 import { createAgent } from './providers/vercel-ai-sdk/index.js'
 import { VercelAIProvider } from './providers/vercel-ai-sdk/vercel-provider.js'
 import { ClaudeCodeProvider } from './providers/claude-code/claude-code-provider.js'
-import { NORMAL_DISALLOWED_TOOLS, EVOLUTION_DISALLOWED_TOOLS } from './providers/claude-code/provider.js'
 import { createEventLog } from './core/event-log.js'
 import { createCronEngine, createCronListener, createCronTools } from './task/cron/index.js'
 import { createHeartbeat } from './task/heartbeat/index.js'
@@ -264,13 +263,7 @@ async function main() {
 
   const agent = createAgent(model, toolCenter.getVercelTools(), instructions, config.agent.maxSteps)
   const vercelProvider = new VercelAIProvider(agent, config.compaction)
-  const modeDisallowed = config.agent.evolutionMode ? EVOLUTION_DISALLOWED_TOOLS : NORMAL_DISALLOWED_TOOLS
-  const claudeCodeConfig = {
-    ...config.agent.claudeCode,
-    disallowedTools: [...(config.agent.claudeCode.disallowedTools ?? []), ...modeDisallowed],
-    cwd: config.agent.evolutionMode ? process.cwd() : resolve('data/brain'),
-  }
-  const claudeCodeProvider = new ClaudeCodeProvider(claudeCodeConfig, config.compaction, instructions)
+  const claudeCodeProvider = new ClaudeCodeProvider(config.compaction, instructions)
   const router = new ProviderRouter(vercelProvider, claudeCodeProvider)
 
   const agentCenter = new AgentCenter(router)

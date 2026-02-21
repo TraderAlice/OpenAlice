@@ -26,6 +26,7 @@ const agentSchema = z.object({
   maxSteps: z.number().int().positive().default(20),
   evolutionMode: z.boolean().default(false),
   claudeCode: z.object({
+    allowedTools: z.array(z.string()).optional(),
     disallowedTools: z.array(z.string()).default([
       'Task', 'TaskOutput',
       'AskUserQuestion', 'TodoWrite',
@@ -153,6 +154,18 @@ export async function loadConfig(): Promise<Config> {
     compaction: await parseAndSeed(files[5], compactionSchema, raws[5]),
     aiProvider: await parseAndSeed(files[6], aiProviderSchema, raws[6]),
     heartbeat:  await parseAndSeed(files[7], heartbeatSchema, raws[7]),
+  }
+}
+
+// ==================== Hot-read helpers ====================
+
+/** Read agent config from disk (called per-request for hot-reload). */
+export async function readAgentConfig() {
+  try {
+    const raw = JSON.parse(await readFile(resolve(CONFIG_DIR, 'agent.json'), 'utf-8'))
+    return agentSchema.parse(raw)
+  } catch {
+    return agentSchema.parse({})
   }
 }
 

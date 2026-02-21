@@ -1,8 +1,12 @@
 import type { ContentBlock } from '../../core/session.js'
 
 export interface ClaudeCodeConfig {
+  /** Tools pre-approved for use in non-interactive (-p) mode. */
+  allowedTools?: string[]
   /** Tools removed from the model's context entirely (not just denied). */
   disallowedTools?: string[]
+  /** When true, grants Bash access and broader permissions. */
+  evolutionMode?: boolean
   /** Max agentic turns before Claude Code exits. Default: 20 */
   maxTurns?: number
   /** Working directory for Claude Code. Default: process.cwd() */
