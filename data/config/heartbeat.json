@@ -1,0 +1,8 @@
+{
+  "enabled": true,
+  "every": "30m",
+  "prompt": "Check if anything needs attention. If nothing to report, reply HEARTBEAT_OK.",
+  "ackToken": "HEARTBEAT_OK",
+  "ackMaxChars": 300,
+  "activeHours": null
+}
