@@ -23,6 +23,7 @@ Your one-person Wall Street. Alice is an AI trading agent that gives you your ow
 - **Cognitive state** — persistent "brain" with frontal lobe memory, emotion tracking, and commit history
 - **Event log** — persistent append-only JSONL event log with real-time subscriptions and crash recovery
 - **Cron scheduling** — event-driven cron system with AI-powered job execution and automatic delivery to the last-interacted channel
+- **Evolution mode** — two-tier permission system. Normal mode sandboxes the AI to `data/brain/`; evolution mode gives full project access including Bash, enabling the agent to modify its own source code
 - **Web UI** — built-in local chat interface on port 3002, no Telegram account needed
 
 ## Architecture
@@ -155,12 +156,21 @@ All config lives in `data/config/` as JSON files with Zod validation. Missing fi
 |------|---------|
 | `engine.json` | Trading pairs, tick interval, HTTP/MCP ports, timeframe |
 | `model.json` | AI model provider and model name |
-| `agent.json` | Max agent steps, Claude Code allowed/disallowed tools |
+| `agent.json` | Max agent steps, evolution mode toggle, Claude Code tool permissions |
 | `crypto.json` | Allowed symbols, exchange provider (CCXT), demo trading flag |
 | `securities.json` | Allowed symbols, broker provider (Alpaca), paper trading flag |
 | `compaction.json` | Context window limits, auto-compaction thresholds |
+| `heartbeat.json` | Heartbeat enable/disable, interval, active hours |
 | `ai-provider.json` | Active AI provider (`vercel-ai-sdk` or `claude-code`), switchable at runtime |
-| `persona.md` | System prompt personality (free-form markdown) |
+
+Persona and heartbeat prompts use a **default + user override** pattern:
+
+| Default (git-tracked) | User override (gitignored) |
+|------------------------|---------------------------|
+| `data/default/persona.default.md` | `data/brain/persona.md` |
+| `data/default/heartbeat.default.md` | `data/brain/heartbeat.md` |
+
+On first run, defaults are auto-copied to the user override path. Edit the user files to customize without touching version control.
 
 ## Project Structure
 
@@ -202,6 +212,7 @@ src/
   openclaw/                  # Browser automation subsystem (frozen)
 data/
   config/                    # JSON configuration files
+  default/                   # Factory defaults (persona, heartbeat prompts)
   sessions/                  # JSONL conversation histories
   brain/                     # Agent memory and emotion logs
   crypto-trading/            # Crypto wallet commit history
