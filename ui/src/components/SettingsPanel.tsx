@@ -137,7 +137,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
 
               {/* Scheduler */}
               <Section title="Scheduler">
-                <SchedulerForm config={config} onSave={saveSection} />
+                <SchedulerForm config={config} onSave={saveSection} showToast={showToast} />
               </Section>
             </>
           )}
@@ -275,30 +275,38 @@ function ConnectivityForm({
 function SchedulerForm({
   config,
   onSave,
+  showToast,
 }: {
   config: AppConfig
   onSave: (section: string, data: unknown, label: string) => void
+  showToast: (msg: string, error?: boolean) => void
 }) {
-  const [hbEnabled, setHbEnabled] = useState(config.scheduler?.heartbeat?.enabled || false)
-  const [hbEvery, setHbEvery] = useState(config.scheduler?.heartbeat?.every || '30m')
-  const [cronEnabled, setCronEnabled] = useState(config.scheduler?.cron?.enabled || false)
+  const [hbEnabled, setHbEnabled] = useState(config.heartbeat?.enabled || false)
+  const [hbEvery, setHbEvery] = useState(config.heartbeat?.every || '30m')
 
   return (
     <>
       <div className="flex items-center justify-between mb-3">
         <span className="text-sm">Heartbeat</span>
-        <Toggle checked={hbEnabled} onChange={setHbEnabled} />
+        <Toggle
+          checked={hbEnabled}
+          onChange={async (v) => {
+            try {
+              await api.heartbeat.setEnabled(v)
+              setHbEnabled(v)
+              showToast(`Heartbeat ${v ? 'enabled' : 'disabled'}`)
+            } catch {
+              showToast('Failed to toggle heartbeat', true)
+            }
+          }}
+        />
       </div>
       <Field label="Heartbeat Interval">
         <input className={inputClass} value={hbEvery} onChange={(e) => setHbEvery(e.target.value)} placeholder="30m" />
       </Field>
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-sm">Cron</span>
-        <Toggle checked={cronEnabled} onChange={setCronEnabled} />
-      </div>
       <SaveButton
         onClick={() =>
-          onSave('scheduler', { heartbeat: { enabled: hbEnabled, every: hbEvery }, cron: { enabled: cronEnabled } }, 'Scheduler')
+          onSave('heartbeat', { ...config.heartbeat, every: hbEvery }, 'Heartbeat interval')
         }
       />
     </>

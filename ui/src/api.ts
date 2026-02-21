@@ -19,10 +19,7 @@ export interface AppConfig {
   model: { provider: string; model: string }
   agent: { evolutionMode: boolean; claudeCode: Record<string, unknown> }
   compaction: { maxContextTokens: number; maxOutputTokens: number }
-  scheduler: {
-    heartbeat: { enabled: boolean; every: string }
-    cron: { enabled: boolean }
-  }
+  heartbeat: { enabled: boolean; every: string; prompt: string }
   [key: string]: unknown
 }
 
