@@ -24,8 +24,9 @@ const modelSchema = z.object({
 
 const agentSchema = z.object({
   maxSteps: z.number().int().positive().default(20),
+  evolutionMode: z.boolean().default(false),
   claudeCode: z.object({
-    allowedTools: z.array(z.string()).default(['Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep', 'WebSearch', 'WebFetch']),
+    allowedTools: z.array(z.string()).optional(),
     disallowedTools: z.array(z.string()).default([
       'Task', 'TaskOutput',
       'AskUserQuestion', 'TodoWrite',
@@ -35,7 +36,6 @@ const agentSchema = z.object({
     ]),
     maxTurns: z.number().int().positive().default(20),
   }).default({
-    allowedTools: ['Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep', 'WebSearch', 'WebFetch'],
     disallowedTools: [
       'Task', 'TaskOutput',
       'AskUserQuestion', 'TodoWrite',
@@ -96,7 +96,7 @@ const activeHoursSchema = z.object({
 const heartbeatSchema = z.object({
   enabled: z.boolean().default(false),
   every: z.string().default('30m'),
-  prompt: z.string().default('Check if anything needs attention. Respond with STATUS: HEARTBEAT_OK if nothing to report.'),
+  prompt: z.string().default('Read data/brain/heartbeat.md (or data/default/heartbeat.default.md if not found) and follow the instructions inside.'),
   activeHours: activeHoursSchema,
 })
 

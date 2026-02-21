@@ -25,7 +25,13 @@ function stripImageData(raw: string): string {
   } catch { return raw }
 }
 
-const DEFAULT_ALLOWED_TOOLS = [
+/** Normal mode: sandbox in data/brain/, read-write but no Bash */
+export const NORMAL_ALLOWED_TOOLS = [
+  'Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'WebFetch',
+]
+
+/** Evolution mode: full project access including Bash */
+export const EVOLUTION_ALLOWED_TOOLS = [
   'Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep', 'WebSearch', 'WebFetch',
 ]
 
@@ -41,7 +47,7 @@ export async function askClaudeCode(
   config: ClaudeCodeConfig = {},
 ): Promise<ClaudeCodeResult> {
   const {
-    allowedTools = DEFAULT_ALLOWED_TOOLS,
+    allowedTools = NORMAL_ALLOWED_TOOLS,
     disallowedTools = [],
     maxTurns = 20,
     cwd = process.cwd(),
@@ -159,8 +165,23 @@ export async function askClaudeCode(
         })
       }
 
+      // When the final turn is a tool call with no standalone text output,
+      // resultText is empty. Fall back to the last assistant text blocks.
+      let text = resultText
+      if (!text) {
+        for (let i = messages.length - 1; i >= 0; i--) {
+          if (messages[i].role === 'assistant') {
+            text = messages[i].content
+              .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
+              .map(b => b.text)
+              .join('\n')
+            if (text) break
+          }
+        }
+      }
+
       resolve({
-        text: resultText || '(no output)',
+        text: text || '(no output)',
         ok: true,
         messages,
       })

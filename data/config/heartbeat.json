@@ -1,6 +1,6 @@
 {
   "enabled": true,
   "every": "30m",
-  "prompt": "Read data/config/heartbeat.md and follow the instructions inside.",
+  "prompt": "Read data/brain/heartbeat.md (or data/default/heartbeat.default.md if not found) and follow the instructions inside.",
   "activeHours": null
 }

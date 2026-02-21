@@ -1,6 +1,6 @@
 import { anthropic } from '@ai-sdk/anthropic'
 import { readFile, writeFile, appendFile, mkdir } from 'fs/promises'
-import { resolve } from 'path'
+import { resolve, dirname } from 'path'
 import { Engine } from './core/engine.js'
 import { loadConfig } from './core/config.js'
 import type { Plugin, EngineContext } from './core/types.js'
@@ -40,6 +40,7 @@ import { ProviderRouter } from './core/ai-provider.js'
 import { createAgent } from './providers/vercel-ai-sdk/index.js'
 import { VercelAIProvider } from './providers/vercel-ai-sdk/vercel-provider.js'
 import { ClaudeCodeProvider } from './providers/claude-code/claude-code-provider.js'
+import { NORMAL_ALLOWED_TOOLS, EVOLUTION_ALLOWED_TOOLS } from './providers/claude-code/provider.js'
 import { createEventLog } from './core/event-log.js'
 import { createCronEngine, createCronListener, createCronTools } from './task/cron/index.js'
 import { createHeartbeat } from './task/heartbeat/index.js'
@@ -49,9 +50,21 @@ const SEC_WALLET_FILE = resolve('data/securities-trading/commit.json')
 const BRAIN_FILE = resolve('data/brain/commit.json')
 const FRONTAL_LOBE_FILE = resolve('data/brain/frontal-lobe.md')
 const EMOTION_LOG_FILE = resolve('data/brain/emotion-log.md')
-const PERSONA_FILE = resolve('data/config/persona.md')
+const PERSONA_FILE = resolve('data/brain/persona.md')
+const PERSONA_DEFAULT = resolve('data/default/persona.default.md')
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+
+/** Read a file, copying from default if it doesn't exist yet. */
+async function readWithDefault(target: string, defaultFile: string): Promise<string> {
+  try { return await readFile(target, 'utf-8') } catch { /* not found — copy default */ }
+  try {
+    const content = await readFile(defaultFile, 'utf-8')
+    await mkdir(dirname(target), { recursive: true })
+    await writeFile(target, content)
+    return content
+  } catch { return '' }
+}
 
 async function main() {
   const config = await loadConfig()
@@ -200,8 +213,7 @@ async function main() {
     : new Brain({ onCommit: brainOnCommit })
 
   // Build system prompt: persona + current brain state
-  let persona = ''
-  try { persona = await readFile(PERSONA_FILE, 'utf-8') } catch { /* use empty */ }
+  const persona = await readWithDefault(PERSONA_FILE, PERSONA_DEFAULT)
 
   const frontalLobe = brain.getFrontalLobe()
   const emotion = brain.getEmotion().current
@@ -252,7 +264,13 @@ async function main() {
 
   const agent = createAgent(model, toolCenter.getVercelTools(), instructions, config.agent.maxSteps)
   const vercelProvider = new VercelAIProvider(agent, config.compaction)
-  const claudeCodeProvider = new ClaudeCodeProvider(config.agent.claudeCode, config.compaction, instructions)
+  const claudeCodeConfig = {
+    ...config.agent.claudeCode,
+    allowedTools: config.agent.claudeCode.allowedTools              // user explicit override
+      ?? (config.agent.evolutionMode ? EVOLUTION_ALLOWED_TOOLS : NORMAL_ALLOWED_TOOLS),
+    cwd: config.agent.evolutionMode ? process.cwd() : resolve('data/brain'),
+  }
+  const claudeCodeProvider = new ClaudeCodeProvider(claudeCodeConfig, config.compaction, instructions)
   const router = new ProviderRouter(vercelProvider, claudeCodeProvider)
 
   const agentCenter = new AgentCenter(router)
