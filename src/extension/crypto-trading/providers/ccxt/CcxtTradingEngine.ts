@@ -230,6 +230,19 @@ export class CcxtTradingEngine implements ICryptoTradingEngine {
 
       const status = this.mapOrderStatus(ccxtOrder.status);
 
+      // Record realized PnL for circuit breaker when order is a close/reduceOnly
+      if (status === 'filled' && order.reduceOnly) {
+        try {
+          // Approximate PnL: for reduceOnly orders, fetch fresh unrealizedPnL delta
+          // A more precise approach would diff position snapshots, but this catches the main case
+          const positions = await this.getPositions();
+          const pos = positions.find(p => p.symbol === order.symbol);
+          if (pos) {
+            this.circuitBreaker.recordPnL(pos.unrealizedPnL);
+          }
+        } catch { /* best-effort PnL recording */ }
+      }
+
       return {
         success: true,
         orderId: ccxtOrder.id,
@@ -270,6 +283,14 @@ export class CcxtTradingEngine implements ICryptoTradingEngine {
         unrealizedPnL: parseFloat(String(p.unrealizedPnl ?? 0)),
         positionValue: size * parseFloat(String(p.markPrice ?? 0)),
       });
+    }
+
+    // Feed aggregate unrealized PnL to circuit breaker on every position fetch
+    const totalUnrealizedPnL = result.reduce((sum, p) => sum + p.unrealizedPnL, 0);
+    if (totalUnrealizedPnL !== 0) {
+      // Record as a snapshot — prune old entries first, then record current state
+      // This ensures the CB always reflects the latest unrealized exposure
+      this.circuitBreaker.recordPnL(totalUnrealizedPnL);
     }
 
     return result;
