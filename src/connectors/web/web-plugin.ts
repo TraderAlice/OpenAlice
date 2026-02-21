@@ -325,6 +325,8 @@ export class WebPlugin implements Plugin {
     })
 
     // ==================== Serve UI (Vite build output) ====================
+    // Serves the built frontend from dist/ui/ (produced by `pnpm build:ui`).
+    // During development, use the Vite dev server (port 5173) instead — see README.
     const uiRoot = resolve('dist/ui')
     app.use('/*', serveStatic({ root: uiRoot }))
 
