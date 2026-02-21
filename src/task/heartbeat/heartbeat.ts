@@ -117,10 +117,12 @@ export function createHeartbeat(opts: HeartbeatOpts): Heartbeat {
 
     processing = true
     const startMs = now()
+    console.log('heartbeat: firing...')
 
     try {
       // 1. Active hours guard
       if (!isWithinActiveHours(config.activeHours, now())) {
+        console.log('heartbeat: skipped (outside active hours)')
         await eventLog.append('heartbeat.skip', { reason: 'outside-active-hours' })
         return
       }
@@ -129,11 +131,13 @@ export function createHeartbeat(opts: HeartbeatOpts): Heartbeat {
       const result = await engine.askWithSession(payload.payload, session, {
         historyPreamble: 'The following is the recent heartbeat conversation history.',
       })
+      const durationMs = now() - startMs
 
       // 3. Parse structured response
       const parsed = parseHeartbeatResponse(result.text)
 
       if (parsed.status === 'HEARTBEAT_OK' || parsed.status === 'CHAT_NO') {
+        console.log(`heartbeat: ${parsed.status} — ${parsed.reason || 'no reason'} (${durationMs}ms)`)
         await eventLog.append('heartbeat.skip', {
           reason: parsed.status === 'HEARTBEAT_OK' ? 'ack' : 'chat-no',
           parsedReason: parsed.reason,
@@ -144,12 +148,14 @@ export function createHeartbeat(opts: HeartbeatOpts): Heartbeat {
       // CHAT_YES (or unparsed fallback)
       const text = parsed.content || result.text
       if (!text.trim()) {
+        console.log(`heartbeat: skipped (empty content) (${durationMs}ms)`)
         await eventLog.append('heartbeat.skip', { reason: 'empty' })
         return
       }
 
       // 4. Dedup
       if (dedup.isDuplicate(text, now())) {
+        console.log(`heartbeat: skipped (duplicate) (${durationMs}ms)`)
         await eventLog.append('heartbeat.skip', { reason: 'duplicate' })
         return
       }
@@ -167,11 +173,13 @@ export function createHeartbeat(opts: HeartbeatOpts): Heartbeat {
         }
       }
 
+      console.log(`heartbeat: CHAT_YES — delivered=${delivered} (${durationMs}ms)`)
+
       // 6. Done event
       await eventLog.append('heartbeat.done', {
         reply: text,
         reason: parsed.reason,
-        durationMs: now() - startMs,
+        durationMs,
         delivered,
       })
     } catch (err) {
