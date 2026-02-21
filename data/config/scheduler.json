@@ -1,9 +1,0 @@
-{
-  "heartbeat": {
-    "enabled": true,
-    "every": "30m"
-  },
-  "cron": {
-    "enabled": true
-  }
-}

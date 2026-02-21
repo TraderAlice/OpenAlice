@@ -12,11 +12,12 @@ const DEFAULT_PROVIDER: AIProvider = 'vercel-ai-sdk'
 
 export async function readAIConfig(): Promise<AIConfig> {
   try {
-    const raw = await readFile(CONFIG_PATH, 'utf-8')
-    const parsed = JSON.parse(raw) as AIConfig
-    return parsed
+    return JSON.parse(await readFile(CONFIG_PATH, 'utf-8')) as AIConfig
   } catch {
-    return { provider: DEFAULT_PROVIDER }
+    const config: AIConfig = { provider: DEFAULT_PROVIDER }
+    await mkdir(dirname(CONFIG_PATH), { recursive: true })
+    await writeFile(CONFIG_PATH, JSON.stringify(config, null, 2) + '\n')
+    return config
   }
 }
 
