@@ -27,6 +27,3 @@ coverage/
 
 # Claude Code project config (internal use only)
 CLAUDE.md
-
-# Runtime state (written by writeAIConfig, not project config)
-data/config/ai-provider.json
