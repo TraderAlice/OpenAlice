@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { LanguageModel, Tool } from 'ai'
 import { MockLanguageModelV3 } from 'ai/test'
-import { Engine, type EngineResult } from './engine.js'
+import { Engine } from './engine.js'
 import { DEFAULT_COMPACTION_CONFIG, type CompactionConfig } from './compaction.js'
 import { createAgent } from '../providers/vercel-ai-sdk/index.js'
 import { VercelAIProvider } from '../providers/vercel-ai-sdk/vercel-provider.js'
@@ -249,127 +249,16 @@ describe('Engine', () => {
     })
   })
 
-  // -------------------- withLock (concurrency) --------------------
+  // -------------------- error handling --------------------
 
-  describe('concurrency', () => {
-    it('serializes concurrent ask() calls', async () => {
-      const order: number[] = []
-      let callCount = 0
+  describe('error handling', () => {
+    it('propagates errors from ask()', async () => {
       const model = new MockLanguageModelV3({
-        doGenerate: async () => {
-          const n = ++callCount
-          order.push(n)
-          // Simulate async delay
-          await new Promise((r) => setTimeout(r, 10))
-          return makeDoGenerate(`response ${n}`)
-        },
+        doGenerate: async () => { throw new Error('boom') },
       })
       const engine = makeEngine({ model })
 
-      // Launch two concurrent requests
-      const [r1, r2] = await Promise.all([
-        engine.ask('first'),
-        engine.ask('second'),
-      ])
-
-      // Both should complete — order should be sequential (1 before 2)
-      expect(order).toEqual([1, 2])
-      expect(r1.text).toBe('response 1')
-      expect(r2.text).toBe('response 2')
-    })
-
-    it('serializes concurrent askWithSession() calls', async () => {
-      const order: number[] = []
-      let callCount = 0
-      const model = new MockLanguageModelV3({
-        doGenerate: async () => {
-          const n = ++callCount
-          order.push(n)
-          await new Promise((r) => setTimeout(r, 10))
-          return makeDoGenerate(`session response ${n}`)
-        },
-      })
-      const engine = makeEngine({ model })
-      const session = makeSessionMock()
-
-      const [r1, r2] = await Promise.all([
-        engine.askWithSession('first', session),
-        engine.askWithSession('second', session),
-      ])
-
-      expect(order).toEqual([1, 2])
-      expect(r1.text).toBe('session response 1')
-      expect(r2.text).toBe('session response 2')
-    })
-
-    it('releases lock even when generation throws', async () => {
-      let callCount = 0
-      const model = new MockLanguageModelV3({
-        doGenerate: async () => {
-          callCount++
-          if (callCount === 1) throw new Error('boom')
-          return makeDoGenerate('recovered')
-        },
-      })
-      const engine = makeEngine({ model })
-
-      // First call should fail
       await expect(engine.ask('fail')).rejects.toThrow('boom')
-
-      // Second call should succeed (lock released)
-      const result = await engine.ask('recover')
-      expect(result.text).toBe('recovered')
-    })
-  })
-
-  // -------------------- isGenerating --------------------
-
-  describe('isGenerating', () => {
-    it('is false before any call', () => {
-      const engine = makeEngine()
-      expect(engine.isGenerating).toBe(false)
-    })
-
-    it('is true during generation and false after', async () => {
-      let observedDuringGeneration = false
-      const model = new MockLanguageModelV3({
-        doGenerate: async () => {
-          // We can't check engine.isGenerating from inside doGenerate
-          // because we don't have the engine ref. But we test the state
-          // transitions via concurrent observation below.
-          return makeDoGenerate('done')
-        },
-      })
-      const engine = makeEngine({ model })
-
-      // Start a generation that takes some time
-      const slowModel = new MockLanguageModelV3({
-        doGenerate: async () => {
-          await new Promise((r) => setTimeout(r, 50))
-          return makeDoGenerate('slow')
-        },
-      })
-      const slowEngine = makeEngine({ model: slowModel })
-
-      const promise = slowEngine.ask('test')
-
-      // Give it a tick to enter withLock
-      await new Promise((r) => setTimeout(r, 5))
-      observedDuringGeneration = slowEngine.isGenerating
-
-      await promise
-      expect(observedDuringGeneration).toBe(true)
-      expect(slowEngine.isGenerating).toBe(false)
-    })
-
-    it('resets to false even on error', async () => {
-      const model = new MockLanguageModelV3({
-        doGenerate: async () => { throw new Error('fail') },
-      })
-      const engine = makeEngine({ model })
-
-      await expect(engine.ask('test')).rejects.toThrow()
-      expect(engine.isGenerating).toBe(false)
     })
   })
 })

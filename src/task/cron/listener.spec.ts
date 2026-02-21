@@ -29,10 +29,8 @@ function createMockEngine(response = 'AI reply') {
       return { text: response, media: [] }
     }),
     // Stubs for other Engine properties
-    isGenerating: false,
     ask: vi.fn(),
     agent: {} as any,
-    tools: {},
   }
 }
 
