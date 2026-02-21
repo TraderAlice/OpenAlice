@@ -159,8 +159,23 @@ export async function askClaudeCode(
         })
       }
 
+      // When the final turn is a tool call with no standalone text output,
+      // resultText is empty. Fall back to the last assistant text blocks.
+      let text = resultText
+      if (!text) {
+        for (let i = messages.length - 1; i >= 0; i--) {
+          if (messages[i].role === 'assistant') {
+            text = messages[i].content
+              .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
+              .map(b => b.text)
+              .join('\n')
+            if (text) break
+          }
+        }
+      }
+
       resolve({
-        text: resultText || '(no output)',
+        text: text || '(no output)',
         ok: true,
         messages,
       })
