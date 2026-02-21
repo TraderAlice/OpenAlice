@@ -143,10 +143,22 @@ Powered by [Alpaca](https://alpaca.markets/). Supports paper and live trading â€
 ### Run
 
 ```bash
-pnpm dev        # development with watch mode
-pnpm build      # production build
+pnpm dev        # start backend (port 3002) with watch mode
+pnpm dev:ui     # start frontend dev server (port 5173) with hot reload
+pnpm build      # production build (backend + UI)
 pnpm test       # run tests
 ```
+
+### Web UI
+
+The backend (port 3002) serves both the API and the built frontend from `dist/ui/`. During development, run `pnpm dev:ui` to start Vite's dev server on port 5173, which proxies API requests to port 3002 and provides hot module replacement.
+
+| Port | What | When |
+|------|------|------|
+| 5173 | Vite dev server (hot reload) | `pnpm dev:ui` |
+| 3002 | Backend API + built UI | `pnpm dev` / `pnpm build && node dist/main.js` |
+
+> **Note:** Port 3002 only serves the UI after `pnpm build` (or `pnpm build:ui`). If you haven't built yet, use port 5173 for frontend development.
 
 ## Configuration
 

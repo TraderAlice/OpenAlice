@@ -4,6 +4,8 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // Dev server on port 5173 with API proxy to the backend (port 3002).
+  // Use this during development for hot reload. See README for details.
   server: {
     port: 5173,
     proxy: {

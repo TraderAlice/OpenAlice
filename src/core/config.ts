@@ -7,7 +7,7 @@ const CONFIG_DIR = resolve('data/config')
 // ==================== Individual Schemas ====================
 
 const engineSchema = z.object({
-  pairs: z.array(z.string()).min(1),
+  pairs: z.array(z.string()).min(1).default(['BTC/USD', 'ETH/USD', 'SOL/USD']),
   interval: z.number().int().positive().default(5000),
   port: z.number().int().positive().default(3000),
   mcpPort: z.number().int().positive().optional(),
@@ -26,7 +26,6 @@ const agentSchema = z.object({
   maxSteps: z.number().int().positive().default(20),
   evolutionMode: z.boolean().default(false),
   claudeCode: z.object({
-    allowedTools: z.array(z.string()).optional(),
     disallowedTools: z.array(z.string()).default([
       'Task', 'TaskOutput',
       'AskUserQuestion', 'TodoWrite',
@@ -114,37 +113,40 @@ export type Config = {
 
 // ==================== Loader ====================
 
-async function loadJsonFile(filename: string): Promise<unknown> {
+/** Read a JSON config file. Returns undefined if file does not exist. */
+async function loadJsonFile(filename: string): Promise<unknown | undefined> {
   try {
-    const raw = await readFile(resolve(CONFIG_DIR, filename), 'utf-8')
-    return JSON.parse(raw)
+    return JSON.parse(await readFile(resolve(CONFIG_DIR, filename), 'utf-8'))
   } catch (err: unknown) {
     if (err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code === 'ENOENT') {
-      return {} // File not found → use defaults from Zod schema
+      return undefined
     }
     throw err
   }
 }
 
+/** Parse with Zod; if the file was missing, seed it to disk with defaults. */
+async function parseAndSeed<T>(filename: string, schema: z.ZodType<T>, raw: unknown | undefined): Promise<T> {
+  const parsed = schema.parse(raw ?? {})
+  if (raw === undefined) {
+    await mkdir(CONFIG_DIR, { recursive: true })
+    await writeFile(resolve(CONFIG_DIR, filename), JSON.stringify(parsed, null, 2) + '\n')
+  }
+  return parsed
+}
+
 export async function loadConfig(): Promise<Config> {
-  const [engineRaw, modelRaw, agentRaw, cryptoRaw, securitiesRaw, compactionRaw, heartbeatRaw] = await Promise.all([
-    loadJsonFile('engine.json'),
-    loadJsonFile('model.json'),
-    loadJsonFile('agent.json'),
-    loadJsonFile('crypto.json'),
-    loadJsonFile('securities.json'),
-    loadJsonFile('compaction.json'),
-    loadJsonFile('heartbeat.json'),
-  ])
+  const files = ['engine.json', 'model.json', 'agent.json', 'crypto.json', 'securities.json', 'compaction.json', 'heartbeat.json'] as const
+  const raws = await Promise.all(files.map((f) => loadJsonFile(f)))
 
   return {
-    engine: engineSchema.parse(engineRaw),
-    model: modelSchema.parse(modelRaw),
-    agent: agentSchema.parse(agentRaw),
-    crypto: cryptoSchema.parse(cryptoRaw),
-    securities: securitiesSchema.parse(securitiesRaw),
-    compaction: compactionSchema.parse(compactionRaw),
-    heartbeat: heartbeatSchema.parse(heartbeatRaw),
+    engine:     await parseAndSeed(files[0], engineSchema, raws[0]),
+    model:      await parseAndSeed(files[1], modelSchema, raws[1]),
+    agent:      await parseAndSeed(files[2], agentSchema, raws[2]),
+    crypto:     await parseAndSeed(files[3], cryptoSchema, raws[3]),
+    securities: await parseAndSeed(files[4], securitiesSchema, raws[4]),
+    compaction: await parseAndSeed(files[5], compactionSchema, raws[5]),
+    heartbeat:  await parseAndSeed(files[6], heartbeatSchema, raws[6]),
   }
 }
 

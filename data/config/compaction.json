@@ -1,6 +1,0 @@
-{
-  "maxContextTokens": 200000,
-  "maxOutputTokens": 20000,
-  "autoCompactBuffer": 13000,
-  "microcompactKeepRecent": 3
-}

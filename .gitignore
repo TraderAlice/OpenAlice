@@ -2,7 +2,6 @@ node_modules/
 dist/
 logs/
 /data/*
-!/data/config/
 !/data/default/
 !/data/default/**
 state.json

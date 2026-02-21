@@ -25,15 +25,11 @@ function stripImageData(raw: string): string {
   } catch { return raw }
 }
 
-/** Normal mode: sandbox in data/brain/, read-write but no Bash */
-export const NORMAL_ALLOWED_TOOLS = [
-  'Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'WebFetch',
-]
+/** Tools to disallow in normal (non-evolution) mode — Bash is blocked. */
+export const NORMAL_DISALLOWED_TOOLS = ['Bash']
 
-/** Evolution mode: full project access including Bash */
-export const EVOLUTION_ALLOWED_TOOLS = [
-  'Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep', 'WebSearch', 'WebFetch',
-]
+/** Tools to disallow in evolution mode — nothing extra blocked. */
+export const EVOLUTION_DISALLOWED_TOOLS: string[] = []
 
 /**
  * Spawn `claude -p` as a stateless child process and collect the result.
@@ -47,7 +43,6 @@ export async function askClaudeCode(
   config: ClaudeCodeConfig = {},
 ): Promise<ClaudeCodeResult> {
   const {
-    allowedTools = NORMAL_ALLOWED_TOOLS,
     disallowedTools = [],
     maxTurns = 20,
     cwd = process.cwd(),
@@ -61,7 +56,6 @@ export async function askClaudeCode(
     '--output-format', 'stream-json',
     '--verbose',
     '--max-turns', String(maxTurns),
-    '--allowedTools', allowedTools.join(','),
   ]
 
   if (disallowedTools.length > 0) {

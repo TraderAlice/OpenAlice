@@ -45,7 +45,6 @@ export class TelegramPlugin implements Plugin {
   async start(engineCtx: EngineContext) {
     // Inject agent config into Claude Code config (used by /compact command)
     this.claudeCodeConfig = {
-      allowedTools: engineCtx.config.agent.claudeCode.allowedTools,
       disallowedTools: engineCtx.config.agent.claudeCode.disallowedTools,
       maxTurns: engineCtx.config.agent.claudeCode.maxTurns,
       ...this.claudeCodeConfig,

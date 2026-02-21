@@ -1,8 +1,6 @@
 import type { ContentBlock } from '../../core/session.js'
 
 export interface ClaudeCodeConfig {
-  /** Tools that Claude Code is allowed to use without prompting. */
-  allowedTools?: string[]
   /** Tools removed from the model's context entirely (not just denied). */
   disallowedTools?: string[]
   /** Max agentic turns before Claude Code exits. Default: 20 */
