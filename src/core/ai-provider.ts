@@ -28,6 +28,9 @@ export interface ProviderResult {
 
 /** Unified AI provider — each backend implements its own session handling. */
 export interface AIProvider {
+  /** Stateless prompt — no session context. */
+  ask(prompt: string): Promise<ProviderResult>
+  /** Prompt with session history and compaction. */
   askWithSession(prompt: string, session: SessionStore, opts?: AskOptions): Promise<ProviderResult>
 }
 
@@ -39,6 +42,14 @@ export class ProviderRouter implements AIProvider {
     private vercel: AIProvider,
     private claudeCode: AIProvider | null,
   ) {}
+
+  async ask(prompt: string): Promise<ProviderResult> {
+    const aiConfig = await readAIConfig()
+    if (aiConfig.provider === 'claude-code' && this.claudeCode) {
+      return this.claudeCode.ask(prompt)
+    }
+    return this.vercel.ask(prompt)
+  }
 
   async askWithSession(prompt: string, session: SessionStore, opts?: AskOptions): Promise<ProviderResult> {
     const aiConfig = await readAIConfig()

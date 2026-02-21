@@ -48,10 +48,7 @@ function createMockEngine(response = CHAT_YES_RESPONSE) {
     askWithSession: vi.fn(async function (this: any) {
       return { text: this._response, media: [] }
     }),
-    isGenerating: false,
     ask: vi.fn(),
-    agent: {} as any,
-    tools: {},
   }
 }
 

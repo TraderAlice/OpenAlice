@@ -9,6 +9,7 @@ import type { AIProvider, AskOptions, ProviderResult } from '../../core/ai-provi
 import type { SessionStore } from '../../core/session.js'
 import type { CompactionConfig } from '../../core/compaction.js'
 import type { ClaudeCodeConfig } from './types.js'
+import { askClaudeCode } from './provider.js'
 import { askClaudeCodeWithSession } from './session.js'
 
 export class ClaudeCodeProvider implements AIProvider {
@@ -16,6 +17,11 @@ export class ClaudeCodeProvider implements AIProvider {
     private claudeCodeConfig: ClaudeCodeConfig,
     private compaction: CompactionConfig,
   ) {}
+
+  async ask(prompt: string): Promise<ProviderResult> {
+    const result = await askClaudeCode(prompt, this.claudeCodeConfig)
+    return { text: result.text, media: [] }
+  }
 
   async askWithSession(prompt: string, session: SessionStore, opts?: AskOptions): Promise<ProviderResult> {
     return askClaudeCodeWithSession(prompt, session, {

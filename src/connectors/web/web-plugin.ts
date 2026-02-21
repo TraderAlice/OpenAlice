@@ -51,11 +51,6 @@ export class WebPlugin implements Plugin {
         return c.json({ error: 'message is required' }, 400)
       }
 
-      // Guard: engine already processing
-      if (ctx.engine.isGenerating) {
-        return c.json({ error: 'Engine is busy, please try again in a moment.' }, 409)
-      }
-
       touchInteraction('web', 'default')
 
       // Log: message received

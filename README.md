@@ -36,7 +36,9 @@ graph LR
 
   subgraph Core
     PR[ProviderRouter]
+    AC[AgentCenter]
     E[Engine]
+    TC[ToolCenter]
     S[Session Store]
     EL[Event Log]
     CR[Connector Registry]
@@ -52,6 +54,7 @@ graph LR
 
   subgraph Tasks
     CRON[Cron Engine]
+    HB[Heartbeat]
   end
 
   subgraph Interfaces
@@ -63,17 +66,20 @@ graph LR
 
   CC --> PR
   VS --> PR
-  PR --> E
+  PR --> AC
+  AC --> E
   E --> S
-  E --> EL
-  CR --> WEB & TG
-  AK --> E
-  CT --> E
-  ST --> E
-  BR --> E
-  BW --> E
+  TC -->|Vercel tools| VS
+  TC -->|MCP tools| MCP
+  AK --> TC
+  CT --> TC
+  ST --> TC
+  BR --> TC
+  BW --> TC
   CRON --> EL
+  HB --> CRON
   EL --> CRON
+  CR --> WEB & TG
   WEB --> E
   TG --> E
   HTTP --> E
@@ -82,11 +88,11 @@ graph LR
 
 **Providers** — interchangeable AI backends. Claude Code spawns `claude -p` as a subprocess; Vercel AI SDK runs a `ToolLoopAgent` in-process. `ProviderRouter` reads `ai-provider.json` on each call to select the active backend at runtime.
 
-**Core** — `Engine` manages AI conversations with a generation lock and session persistence (JSONL). `EventLog` provides persistent append-only event storage (JSONL) with real-time subscriptions and crash recovery. `ConnectorRegistry` tracks which channel the user last spoke through.
+**Core** — `Engine` is a thin facade that delegates to `AgentCenter`, which routes all calls (both stateless and session-aware) through `ProviderRouter`. `ToolCenter` is a centralized tool registry — extensions register tools there, and it exports them in Vercel AI SDK and MCP formats. `EventLog` provides persistent append-only event storage (JSONL) with real-time subscriptions and crash recovery. `ConnectorRegistry` tracks which channel the user last spoke through.
 
-**Extensions** — domain-specific tool sets injected into the engine. Each extension owns its tools, state, and persistence.
+**Extensions** — domain-specific tool sets registered in `ToolCenter`. Each extension owns its tools, state, and persistence.
 
-**Tasks** — scheduled background work. `CronEngine` manages jobs and fires `cron.fire` events into the EventLog on schedule; a listener picks them up, runs them through the AI engine, and delivers replies via the ConnectorRegistry.
+**Tasks** — scheduled background work. `CronEngine` manages jobs and fires `cron.fire` events into the EventLog on schedule; a listener picks them up, runs them through the AI engine, and delivers replies via the ConnectorRegistry. `Heartbeat` is a periodic health-check that uses a structured response protocol (HEARTBEAT_OK / CHAT_NO / CHAT_YES).
 
 **Interfaces** — external surfaces. Web UI for local chat, Telegram bot for mobile, HTTP for webhooks, MCP server for tool exposure.
 
@@ -162,8 +168,10 @@ All config lives in `data/config/` as JSON files with Zod validation. Missing fi
 src/
   main.ts                    # Composition root — wires everything together
   core/
-    engine.ts                # Generation lock, delegates to ProviderRouter
-    ai-provider.ts           # AIProvider interface + ProviderRouter
+    engine.ts                # Thin facade, delegates to AgentCenter
+    agent-center.ts          # Centralized AI agent management, owns ProviderRouter
+    ai-provider.ts           # AIProvider interface + ProviderRouter (runtime switching)
+    tool-center.ts           # Centralized tool registry (Vercel + MCP export)
     ai-config.ts             # Runtime provider config read/write
     session.ts               # JSONL session store + format converters
     compaction.ts            # Auto-summarize long context windows
@@ -186,6 +194,7 @@ src/
     telegram/                # Telegram bot (grammY, polling, commands)
   task/
     cron/                    # Cron scheduling (engine, listener, AI tools)
+    heartbeat/               # Periodic heartbeat with structured response protocol
   plugins/
     http.ts                  # HTTP health/status endpoint
     mcp.ts                   # MCP server for tool exposure

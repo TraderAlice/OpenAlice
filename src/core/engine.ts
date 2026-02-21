@@ -1,26 +1,26 @@
 /**
  * Engine — AI conversation service.
  *
- * Owns the generation lock (one-at-a-time) and delegates to an AIProvider
- * for session-aware calls.  The stateless `ask()` still goes directly through
- * the Vercel AI SDK agent (for MCP, compaction callbacks, etc.).
+ * Thin facade that delegates all calls to AgentCenter, which routes
+ * through the configured AI provider (Vercel AI SDK, Claude Code, etc.)
+ * via ProviderRouter.
+ *
+ * Both `ask()` and `askWithSession()` go through the provider route.
+ *
+ * Concurrency control is NOT handled here — callers (Web, Telegram, Cron, etc.)
+ * manage their own serialization as appropriate for their context.
  */
 
-import type { Tool } from 'ai'
 import type { MediaAttachment } from './types.js'
 import type { SessionStore } from './session.js'
-import type { AIProvider, AskOptions, ProviderResult } from './ai-provider.js'
-import { type Agent } from '../providers/vercel-ai-sdk/index.js'
-import { extractMediaFromToolOutput } from './media.js'
+import type { AskOptions } from './ai-provider.js'
+import type { AgentCenter } from './agent-center.js'
 
 // ==================== Types ====================
 
 export interface EngineOpts {
-  /** Pre-built Vercel AI SDK agent (still used by `ask()` and MCP tool exposure). */
-  agent: Agent
-  tools: Record<string, Tool>
-  /** The provider router (or any AIProvider) that handles session-aware calls. */
-  provider: AIProvider
+  /** The AgentCenter that owns provider routing. */
+  agentCenter: AgentCenter
 }
 
 export interface EngineResult {
@@ -32,60 +32,21 @@ export interface EngineResult {
 // ==================== Engine ====================
 
 export class Engine {
-  private generationLock = Promise.resolve()
-  private _generating = false
-  private provider: AIProvider
-
-  /** The underlying ToolLoopAgent (used by `ask()` and exposed for MCP). */
-  readonly agent: Agent
-
-  /** Tools registered with the agent (for MCP exposure, etc.). */
-  readonly tools: Record<string, Tool>
+  private agentCenter: AgentCenter
 
   constructor(opts: EngineOpts) {
-    this.agent = opts.agent
-    this.tools = opts.tools
-    this.provider = opts.provider
+    this.agentCenter = opts.agentCenter
   }
 
   // ==================== Public API ====================
 
-  /** Whether a generation is currently in progress (for requests-in-flight guard). */
-  get isGenerating(): boolean { return this._generating }
-
-  /** Simple prompt (no session context). Uses the Vercel agent directly. */
+  /** Simple prompt (no session context). Routed through the configured AI provider. */
   async ask(prompt: string): Promise<EngineResult> {
-    const media: MediaAttachment[] = []
-    const result = await this.withLock(() => this.agent.generate({
-      prompt,
-      onStepFinish: (step) => {
-        for (const tr of step.toolResults) {
-          media.push(...extractMediaFromToolOutput(tr.output))
-        }
-      },
-    }))
-    return { text: result.text ?? '', media }
+    return this.agentCenter.ask(prompt)
   }
 
-  /** Prompt with session — delegates to the configured AIProvider, serialized by the generation lock. */
+  /** Prompt with session — routed through the configured AI provider. */
   async askWithSession(prompt: string, session: SessionStore, opts?: AskOptions): Promise<EngineResult> {
-    return this.withLock(() => this.provider.askWithSession(prompt, session, opts))
-  }
-
-  // ==================== Internals ====================
-
-  /** Serialize concurrent calls — one generation at a time. */
-  private async withLock<T>(fn: () => Promise<T>): Promise<T> {
-    const prev = this.generationLock
-    let resolve!: () => void
-    this.generationLock = new Promise<void>((r) => { resolve = r })
-    await prev
-    this._generating = true
-    try {
-      return await fn()
-    } finally {
-      this._generating = false
-      resolve()
-    }
+    return this.agentCenter.askWithSession(prompt, session, opts)
   }
 }

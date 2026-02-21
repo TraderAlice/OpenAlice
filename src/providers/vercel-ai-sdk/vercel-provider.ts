@@ -20,6 +20,19 @@ export class VercelAIProvider implements AIProvider {
     private compaction: CompactionConfig,
   ) {}
 
+  async ask(prompt: string): Promise<ProviderResult> {
+    const media: MediaAttachment[] = []
+    const result = await this.agent.generate({
+      prompt,
+      onStepFinish: (step) => {
+        for (const tr of step.toolResults) {
+          media.push(...extractMediaFromToolOutput(tr.output))
+        }
+      },
+    })
+    return { text: result.text ?? '', media }
+  }
+
   async askWithSession(prompt: string, session: SessionStore, _opts?: AskOptions): Promise<ProviderResult> {
     // AskOptions (historyPreamble, systemPrompt, etc.) are Claude Code–specific; silently ignored here.
 
