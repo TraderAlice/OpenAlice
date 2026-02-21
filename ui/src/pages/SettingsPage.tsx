@@ -1,20 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api, type AppConfig } from '../api'
 
-interface SettingsPanelProps {
-  open: boolean
-  onClose: () => void
-}
-
-export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
+export function SettingsPage() {
   const [config, setConfig] = useState<AppConfig | null>(null)
   const [toast, setToast] = useState<{ msg: string; error?: boolean } | null>(null)
 
-  // Load config when panel opens
   useEffect(() => {
-    if (!open) return
     api.config.load().then(setConfig).catch(() => showToast('Failed to load config', true))
-  }, [open])
+  }, [])
 
   const showToast = useCallback((msg: string, error = false) => {
     setToast({ msg, error })
@@ -47,102 +40,75 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   )
 
   return (
-    <>
-      {/* Overlay */}
-      <div
-        className={`fixed inset-0 bg-black/50 z-100 transition-opacity ${open ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-        onClick={onClose}
-      />
+    <div className="flex flex-col flex-1 min-h-0 px-5 py-4 gap-6 overflow-y-auto">
+      {config && (
+        <>
+          {/* AI Provider */}
+          <Section title="AI Provider">
+            <div className="flex border border-border rounded-lg overflow-hidden">
+              {(['claude-code', 'vercel-ai-sdk'] as const).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => handleProviderSwitch(p)}
+                  className={`flex-1 py-2 px-3 text-[13px] font-medium transition-colors ${
+                    config.aiProvider === p
+                      ? 'bg-accent-dim text-accent'
+                      : 'bg-bg text-text-muted hover:bg-bg-tertiary hover:text-text'
+                  } ${p === 'vercel-ai-sdk' ? 'border-l border-border' : ''}`}
+                >
+                  {p === 'claude-code' ? 'Claude Code' : 'Vercel AI SDK'}
+                </button>
+              ))}
+            </div>
+          </Section>
 
-      {/* Panel */}
-      <div
-        className={`fixed top-0 right-0 w-[380px] max-w-[90vw] h-full bg-bg-secondary border-l border-border z-101 flex flex-col overflow-hidden transition-transform duration-250 ease-out ${
-          open ? 'translate-x-0' : 'translate-x-full'
-        }`}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
-          <h2 className="text-base font-semibold">Settings</h2>
-          <button
-            onClick={onClose}
-            className="text-text-muted hover:text-text hover:bg-bg-tertiary rounded-md px-2 py-1 text-xl transition-colors"
-          >
-            &times;
-          </button>
-        </div>
+          {/* Evolution Mode */}
+          <Section title="Evolution Mode">
+            <div className="flex items-center justify-between">
+              <div className="flex-1 mr-3">
+                <span className="text-sm">
+                  {config.agent?.evolutionMode ? 'Enabled' : 'Disabled'}
+                </span>
+                <p className="text-[11px] text-text-muted mt-0.5">
+                  {config.agent?.evolutionMode
+                    ? 'Full project access — AI can modify source code'
+                    : 'Sandbox mode — AI can only edit data/brain/'}
+                </p>
+              </div>
+              <Toggle
+                checked={config.agent?.evolutionMode || false}
+                onChange={async (v) => {
+                  const agentData = { ...config.agent, evolutionMode: v }
+                  await saveSection('agent', agentData, 'Evolution Mode')
+                  setConfig((c) => c ? { ...c, agent: { ...c.agent, evolutionMode: v } } : c)
+                }}
+              />
+            </div>
+          </Section>
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
-          {config && (
-            <>
-              {/* AI Provider */}
-              <Section title="AI Provider">
-                <div className="flex border border-border rounded-lg overflow-hidden">
-                  {(['claude-code', 'vercel-ai-sdk'] as const).map((p) => (
-                    <button
-                      key={p}
-                      onClick={() => handleProviderSwitch(p)}
-                      className={`flex-1 py-2 px-3 text-[13px] font-medium transition-colors ${
-                        config.aiProvider === p
-                          ? 'bg-accent-dim text-accent'
-                          : 'bg-bg text-text-muted hover:bg-bg-tertiary hover:text-text'
-                      } ${p === 'vercel-ai-sdk' ? 'border-l border-border' : ''}`}
-                    >
-                      {p === 'claude-code' ? 'Claude Code' : 'Vercel AI SDK'}
-                    </button>
-                  ))}
-                </div>
-              </Section>
-
-              {/* Evolution Mode */}
-              <Section title="Evolution Mode">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1 mr-3">
-                    <span className="text-sm">
-                      {config.agent?.evolutionMode ? 'Enabled' : 'Disabled'}
-                    </span>
-                    <p className="text-[11px] text-text-muted mt-0.5">
-                      {config.agent?.evolutionMode
-                        ? 'Full project access — AI can modify source code'
-                        : 'Sandbox mode — AI can only edit data/brain/'}
-                    </p>
-                  </div>
-                  <Toggle
-                    checked={config.agent?.evolutionMode || false}
-                    onChange={async (v) => {
-                      const agentData = { ...config.agent, evolutionMode: v }
-                      await saveSection('agent', agentData, 'Evolution Mode')
-                      setConfig((c) => c ? { ...c, agent: { ...c.agent, evolutionMode: v } } : c)
-                    }}
-                  />
-                </div>
-              </Section>
-
-              {/* Model (only for Vercel AI SDK) */}
-              {config.aiProvider === 'vercel-ai-sdk' && (
-                <Section title="Model">
-                  <ModelForm config={config} onSave={saveSection} />
-                </Section>
-              )}
-
-              {/* Connectivity */}
-              <Section title="Connectivity">
-                <ConnectivityForm config={config} onSave={saveSection} />
-              </Section>
-
-              {/* Compaction */}
-              <Section title="Compaction">
-                <CompactionForm config={config} onSave={saveSection} />
-              </Section>
-
-              {/* Scheduler */}
-              <Section title="Scheduler">
-                <SchedulerForm config={config} onSave={saveSection} showToast={showToast} />
-              </Section>
-            </>
+          {/* Model (only for Vercel AI SDK) */}
+          {config.aiProvider === 'vercel-ai-sdk' && (
+            <Section title="Model">
+              <ModelForm config={config} onSave={saveSection} />
+            </Section>
           )}
-        </div>
-      </div>
+
+          {/* Connectivity */}
+          <Section title="Connectivity">
+            <ConnectivityForm config={config} onSave={saveSection} />
+          </Section>
+
+          {/* Compaction */}
+          <Section title="Compaction">
+            <CompactionForm config={config} onSave={saveSection} />
+          </Section>
+
+          {/* Heartbeat */}
+          <Section title="Heartbeat">
+            <HeartbeatForm config={config} onSave={saveSection} showToast={showToast} />
+          </Section>
+        </>
+      )}
 
       {/* Toast */}
       <div
@@ -152,9 +118,11 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
       >
         {toast?.msg}
       </div>
-    </>
+    </div>
   )
 }
+
+// ==================== Shared Components ====================
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -187,8 +155,29 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
+function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className={`relative w-10 h-[22px] rounded-full cursor-pointer transition-colors ${
+        checked ? 'bg-accent-dim' : 'bg-bg-tertiary'
+      }`}
+    >
+      <span
+        className={`absolute w-4 h-4 rounded-full bottom-[3px] left-[3px] transition-all ${
+          checked ? 'translate-x-[18px] bg-accent' : 'bg-text-muted'
+        }`}
+      />
+    </button>
+  )
+}
+
 const inputClass =
   'w-full px-2.5 py-2 bg-bg text-text border border-border rounded-md font-sans text-sm outline-none transition-colors focus:border-accent'
+
+// ==================== Form Sections ====================
 
 function ModelForm({
   config,
@@ -272,7 +261,7 @@ function ConnectivityForm({
   )
 }
 
-function SchedulerForm({
+function HeartbeatForm({
   config,
   onSave,
   showToast,
@@ -287,7 +276,7 @@ function SchedulerForm({
   return (
     <>
       <div className="flex items-center justify-between mb-3">
-        <span className="text-sm">Heartbeat</span>
+        <span className="text-sm">Enabled</span>
         <Toggle
           checked={hbEnabled}
           onChange={async (v) => {
@@ -301,7 +290,7 @@ function SchedulerForm({
           }}
         />
       </div>
-      <Field label="Heartbeat Interval">
+      <Field label="Interval">
         <input className={inputClass} value={hbEvery} onChange={(e) => setHbEvery(e.target.value)} placeholder="30m" />
       </Field>
       <SaveButton
@@ -310,24 +299,5 @@ function SchedulerForm({
         }
       />
     </>
-  )
-}
-
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button
-      role="switch"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-      className={`relative w-10 h-[22px] rounded-full cursor-pointer transition-colors ${
-        checked ? 'bg-accent-dim' : 'bg-bg-tertiary'
-      }`}
-    >
-      <span
-        className={`absolute w-4 h-4 rounded-full bottom-[3px] left-[3px] transition-all ${
-          checked ? 'translate-x-[18px] bg-accent' : 'bg-text-muted'
-        }`}
-      />
-    </button>
   )
 }

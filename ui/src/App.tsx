@@ -1,14 +1,13 @@
 import { useState, useEffect } from 'react'
 import { Header } from './components/Header'
-import { SettingsPanel } from './components/SettingsPanel'
 import { ChatPage } from './pages/ChatPage'
 import { EventsPage } from './pages/EventsPage'
+import { SettingsPage } from './pages/SettingsPage'
 
-export type Page = 'chat' | 'events'
+export type Page = 'chat' | 'events' | 'settings'
 
 export function App() {
   const [page, setPage] = useState<Page>('chat')
-  const [settingsOpen, setSettingsOpen] = useState(false)
   const [sseConnected, setSseConnected] = useState(false)
 
   // Track SSE connection state
@@ -27,10 +26,10 @@ export function App() {
         sseConnected={sseConnected}
         currentPage={page}
         onNavigate={setPage}
-        onOpenSettings={() => setSettingsOpen(true)}
       />
-      {page === 'chat' ? <ChatPage /> : <EventsPage />}
-      <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      {page === 'chat' && <ChatPage />}
+      {page === 'events' && <EventsPage />}
+      {page === 'settings' && <SettingsPage />}
     </div>
   )
 }
