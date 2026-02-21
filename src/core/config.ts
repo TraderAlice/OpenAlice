@@ -92,6 +92,10 @@ const activeHoursSchema = z.object({
   timezone: z.string().default('local'),
 }).nullable().default(null)
 
+export const aiProviderSchema = z.object({
+  provider: z.enum(['claude-code', 'vercel-ai-sdk']).default('claude-code'),
+})
+
 const heartbeatSchema = z.object({
   enabled: z.boolean().default(false),
   every: z.string().default('30m'),
@@ -108,6 +112,7 @@ export type Config = {
   crypto: z.infer<typeof cryptoSchema>
   securities: z.infer<typeof securitiesSchema>
   compaction: z.infer<typeof compactionSchema>
+  aiProvider: z.infer<typeof aiProviderSchema>
   heartbeat: z.infer<typeof heartbeatSchema>
 }
 
@@ -136,7 +141,7 @@ async function parseAndSeed<T>(filename: string, schema: z.ZodType<T>, raw: unkn
 }
 
 export async function loadConfig(): Promise<Config> {
-  const files = ['engine.json', 'model.json', 'agent.json', 'crypto.json', 'securities.json', 'compaction.json', 'heartbeat.json'] as const
+  const files = ['engine.json', 'model.json', 'agent.json', 'crypto.json', 'securities.json', 'compaction.json', 'ai-provider.json', 'heartbeat.json'] as const
   const raws = await Promise.all(files.map((f) => loadJsonFile(f)))
 
   return {
@@ -146,7 +151,8 @@ export async function loadConfig(): Promise<Config> {
     crypto:     await parseAndSeed(files[3], cryptoSchema, raws[3]),
     securities: await parseAndSeed(files[4], securitiesSchema, raws[4]),
     compaction: await parseAndSeed(files[5], compactionSchema, raws[5]),
-    heartbeat:  await parseAndSeed(files[6], heartbeatSchema, raws[6]),
+    aiProvider: await parseAndSeed(files[6], aiProviderSchema, raws[6]),
+    heartbeat:  await parseAndSeed(files[7], heartbeatSchema, raws[7]),
   }
 }
 
@@ -161,6 +167,7 @@ const sectionSchemas: Record<ConfigSection, z.ZodTypeAny> = {
   crypto: cryptoSchema,
   securities: securitiesSchema,
   compaction: compactionSchema,
+  aiProvider: aiProviderSchema,
   heartbeat: heartbeatSchema,
 }
 
@@ -171,6 +178,7 @@ const sectionFiles: Record<ConfigSection, string> = {
   crypto: 'crypto.json',
   securities: 'securities.json',
   compaction: 'compaction.json',
+  aiProvider: 'ai-provider.json',
   heartbeat: 'heartbeat.json',
 }
 
