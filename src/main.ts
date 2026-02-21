@@ -34,6 +34,7 @@ import type { BrainExportState } from './extension/brain/index.js'
 import { createBrowserTools } from './extension/browser/index.js'
 import { SessionStore } from './core/session.js'
 import { ToolCenter } from './core/tool-center.js'
+import { AgentCenter } from './core/agent-center.js'
 import { ProviderRouter } from './core/ai-provider.js'
 import { createAgent } from './providers/vercel-ai-sdk/index.js'
 import { VercelAIProvider } from './providers/vercel-ai-sdk/vercel-provider.js'
@@ -253,7 +254,8 @@ async function main() {
   const claudeCodeProvider = new ClaudeCodeProvider(config.agent.claudeCode, config.compaction)
   const router = new ProviderRouter(vercelProvider, claudeCodeProvider)
 
-  const engine = new Engine({ agent, provider: router })
+  const agentCenter = new AgentCenter(router)
+  const engine = new Engine({ agentCenter })
 
   // ==================== Cron Lifecycle ====================
 

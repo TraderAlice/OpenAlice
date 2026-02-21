@@ -28,9 +28,8 @@ function createMockEngine(response = 'AI reply') {
       if (shouldFail) throw new Error('engine error')
       return { text: response, media: [] }
     }),
-    // Stubs for other Engine properties
+    // Stubs for other Engine methods
     ask: vi.fn(),
-    agent: {} as any,
   }
 }
 

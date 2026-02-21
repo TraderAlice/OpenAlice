@@ -1,8 +1,11 @@
 /**
  * Engine — AI conversation service.
  *
- * Thin wrapper over an AIProvider. Delegates stateless calls to the Vercel
- * agent and session-aware calls to the configured provider (via ProviderRouter).
+ * Thin facade that delegates all calls to AgentCenter, which routes
+ * through the configured AI provider (Vercel AI SDK, Claude Code, etc.)
+ * via ProviderRouter.
+ *
+ * Both `ask()` and `askWithSession()` go through the provider route.
  *
  * Concurrency control is NOT handled here — callers (Web, Telegram, Cron, etc.)
  * manage their own serialization as appropriate for their context.
@@ -10,17 +13,14 @@
 
 import type { MediaAttachment } from './types.js'
 import type { SessionStore } from './session.js'
-import type { AIProvider, AskOptions, ProviderResult } from './ai-provider.js'
-import { type Agent } from '../providers/vercel-ai-sdk/index.js'
-import { extractMediaFromToolOutput } from './media.js'
+import type { AskOptions } from './ai-provider.js'
+import type { AgentCenter } from './agent-center.js'
 
 // ==================== Types ====================
 
 export interface EngineOpts {
-  /** Pre-built Vercel AI SDK agent (still used by `ask()`). */
-  agent: Agent
-  /** The provider router (or any AIProvider) that handles session-aware calls. */
-  provider: AIProvider
+  /** The AgentCenter that owns provider routing. */
+  agentCenter: AgentCenter
 }
 
 export interface EngineResult {
@@ -32,34 +32,21 @@ export interface EngineResult {
 // ==================== Engine ====================
 
 export class Engine {
-  private provider: AIProvider
-
-  /** The underlying ToolLoopAgent (used by `ask()`). */
-  readonly agent: Agent
+  private agentCenter: AgentCenter
 
   constructor(opts: EngineOpts) {
-    this.agent = opts.agent
-    this.provider = opts.provider
+    this.agentCenter = opts.agentCenter
   }
 
   // ==================== Public API ====================
 
-  /** Simple prompt (no session context). Uses the Vercel agent directly. */
+  /** Simple prompt (no session context). Routed through the configured AI provider. */
   async ask(prompt: string): Promise<EngineResult> {
-    const media: MediaAttachment[] = []
-    const result = await this.agent.generate({
-      prompt,
-      onStepFinish: (step) => {
-        for (const tr of step.toolResults) {
-          media.push(...extractMediaFromToolOutput(tr.output))
-        }
-      },
-    })
-    return { text: result.text ?? '', media }
+    return this.agentCenter.ask(prompt)
   }
 
-  /** Prompt with session — delegates to the configured AIProvider. */
+  /** Prompt with session — routed through the configured AI provider. */
   async askWithSession(prompt: string, session: SessionStore, opts?: AskOptions): Promise<EngineResult> {
-    return this.provider.askWithSession(prompt, session, opts)
+    return this.agentCenter.askWithSession(prompt, session, opts)
   }
 }

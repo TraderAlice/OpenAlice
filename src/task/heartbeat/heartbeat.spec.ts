@@ -49,7 +49,6 @@ function createMockEngine(response = CHAT_YES_RESPONSE) {
       return { text: this._response, media: [] }
     }),
     ask: vi.fn(),
-    agent: {} as any,
   }
 }
 

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { LanguageModel, Tool } from 'ai'
 import { MockLanguageModelV3 } from 'ai/test'
 import { Engine } from './engine.js'
+import { AgentCenter } from './agent-center.js'
 import { DEFAULT_COMPACTION_CONFIG, type CompactionConfig } from './compaction.js'
 import { createAgent } from '../providers/vercel-ai-sdk/index.js'
 import { VercelAIProvider } from '../providers/vercel-ai-sdk/vercel-provider.js'
@@ -43,8 +44,9 @@ function makeEngine(overrides: MakeEngineOpts = {}): Engine {
 
   const agent = createAgent(model, tools, instructions, maxSteps)
   const provider = new VercelAIProvider(agent, compaction)
+  const agentCenter = new AgentCenter(provider)
 
-  return new Engine({ agent, provider })
+  return new Engine({ agentCenter })
 }
 
 /** In-memory SessionStore mock (no filesystem). */
@@ -104,9 +106,9 @@ describe('Engine', () => {
   // -------------------- Construction --------------------
 
   describe('constructor', () => {
-    it('creates an engine with agent and provider', () => {
+    it('creates an engine with agentCenter', () => {
       const engine = makeEngine({ instructions: 'custom instructions' })
-      expect(engine.agent).toBeDefined()
+      expect(engine).toBeInstanceOf(Engine)
     })
   })
 
