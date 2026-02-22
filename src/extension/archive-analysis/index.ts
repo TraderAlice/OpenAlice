@@ -8,3 +8,7 @@ export { RealMarketDataProvider } from './data/RealMarketDataProvider';
 export { RealNewsProvider } from './data/RealNewsProvider';
 export { MockDataProvider } from './data/MockDataProvider';
 export { fetchRealtimeData } from './data/DotApiClient';
+
+// Analysis tools
+export { createAnalysisTools } from './adapter';
+export type { IAnalysisContext } from './interfaces';

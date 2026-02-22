@@ -9,10 +9,9 @@ import { McpPlugin } from './plugins/mcp.js'
 import { TelegramPlugin } from './connectors/telegram/index.js'
 import { WebPlugin } from './connectors/web/index.js'
 import { McpAskPlugin } from './connectors/mcp-ask/index.js'
-import { KlineStore, NewsStore, RealMarketDataProvider, RealNewsProvider, fetchRealtimeData } from './extension/analysis-kit/index.js'
-import type { MarketData, NewsItem } from './extension/analysis-kit/index.js'
+import { KlineStore, NewsStore, RealMarketDataProvider, RealNewsProvider, fetchRealtimeData, createAnalysisTools } from './extension/archive-analysis/index.js'
+import type { MarketData, NewsItem } from './extension/archive-analysis/index.js'
 import { createThinkingTools } from './extension/thinking-kit/index.js'
-import { createAnalysisTools } from './extension/analysis-tools/index.js'
 import type { Operation, WalletExportState } from './extension/crypto-trading/index.js'
 import {
   Wallet,

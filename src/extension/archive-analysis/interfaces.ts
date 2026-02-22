@@ -1,4 +1,4 @@
-import type { IMarketDataProvider, NewsItem } from '../analysis-kit/data/interfaces';
+import type { IMarketDataProvider, NewsItem } from './data/interfaces';
 
 /**
  * Narrow context interface for analysis tools.

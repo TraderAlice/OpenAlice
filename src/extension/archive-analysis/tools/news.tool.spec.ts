@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { globNews, grepNews, readNews, NewsToolContext } from './news.tool';
-import type { NewsItem } from '../../analysis-kit/data/interfaces';
+import type { NewsItem } from '../data/interfaces';
 
 describe('news.tool', () => {
   // Mock news data
