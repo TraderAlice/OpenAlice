@@ -33,6 +33,11 @@ import type { BrainExportState } from './extension/brain/index.js'
 import { createBrowserTools } from './extension/browser/index.js'
 import { OpenBBEquityClient, SymbolIndex } from './openbb/equity/index.js'
 import { createEquityTools } from './extension/equity/index.js'
+import { OpenBBCryptoClient } from './openbb/crypto/index.js'
+import { OpenBBCurrencyClient } from './openbb/currency/index.js'
+import { createCryptoTools } from './extension/crypto/index.js'
+import { createCurrencyTools } from './extension/currency/index.js'
+import { createAnalysisTools } from './extension/analysis-kit/index.js'
 import { SessionStore } from './core/session.js'
 import { ToolCenter } from './core/tool-center.js'
 import { AgentCenter } from './core/agent-center.js'
@@ -215,9 +220,14 @@ async function main() {
 
   const cronEngine = createCronEngine({ eventLog })
 
-  // ==================== Equity Symbol Index ====================
+  // ==================== OpenBB Clients ====================
 
   const equityClient = new OpenBBEquityClient(config.openbb.apiUrl, config.openbb.defaultProvider)
+  const cryptoClient = new OpenBBCryptoClient(config.openbb.apiUrl, config.openbb.defaultProvider)
+  const currencyClient = new OpenBBCurrencyClient(config.openbb.apiUrl, config.openbb.defaultProvider)
+
+  // ==================== Equity Symbol Index ====================
+
   const symbolIndex = new SymbolIndex()
   await symbolIndex.load(equityClient)
 
@@ -235,6 +245,9 @@ async function main() {
   toolCenter.register(createBrowserTools())
   toolCenter.register(createCronTools(cronEngine))
   toolCenter.register(createEquityTools(symbolIndex))
+  toolCenter.register(createCryptoTools(cryptoClient))
+  toolCenter.register(createCurrencyTools(currencyClient))
+  toolCenter.register(createAnalysisTools(equityClient, cryptoClient, currencyClient))
 
   console.log(`tool-center: ${toolCenter.list().length} tools registered`)
 
