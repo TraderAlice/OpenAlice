@@ -27,13 +27,18 @@ export function SettingsPage() {
 
     const observer = new IntersectionObserver(
       (entries) => {
+        // Pick the topmost intersecting entry
+        let topmost: IntersectionObserverEntry | null = null
         for (const entry of entries) {
           if (entry.isIntersecting) {
-            setActiveSection(entry.target.id)
+            if (!topmost || entry.boundingClientRect.top < topmost.boundingClientRect.top) {
+              topmost = entry
+            }
           }
         }
+        if (topmost) setActiveSection(topmost.target.id)
       },
-      { root: container, rootMargin: '-20% 0px -70% 0px', threshold: 0 },
+      { root: container, rootMargin: '0px 0px -60% 0px', threshold: 0 },
     )
 
     for (const { id } of SECTIONS) {
@@ -45,6 +50,7 @@ export function SettingsPage() {
   }, [config])
 
   const scrollToSection = (id: string) => {
+    setActiveSection(id)
     const el = scrollRef.current?.querySelector(`#${id}`)
     el?.scrollIntoView({ behavior: 'smooth' })
   }
@@ -113,7 +119,7 @@ export function SettingsPage() {
         {config && (
           <div className="max-w-[640px] space-y-8">
             {/* AI Provider */}
-            <Section id="ai-provider" title="AI Provider">
+            <Section id="ai-provider" title="AI Provider" description="Runtime switch between AI backends. Claude Code calls the local CLI with file and Bash access; Vercel AI SDK calls the API directly using the model configured below. Changes take effect immediately.">
               <div className="flex border border-border rounded-lg overflow-hidden">
                 {(['claude-code', 'vercel-ai-sdk'] as const).map((p) => (
                   <button
@@ -132,7 +138,7 @@ export function SettingsPage() {
             </Section>
 
             {/* Agent */}
-            <Section id="agent" title="Agent">
+            <Section id="agent" title="Agent" description="Controls file-system and tool permissions for the AI. Changes apply on the next request.">
               <div className="flex items-center justify-between">
                 <div className="flex-1 mr-3">
                   <span className="text-sm">
@@ -157,23 +163,23 @@ export function SettingsPage() {
 
             {/* Model (only for Vercel AI SDK) */}
             {config.aiProvider === 'vercel-ai-sdk' && (
-              <Section id="model" title="Model">
+              <Section id="model" title="Model" description="Model used by Vercel AI SDK. Provider is currently anthropic only. Ignored when using Claude Code (uses the claude CLI from PATH).">
                 <ModelForm config={config} onSave={saveSection} />
               </Section>
             )}
 
             {/* Connectivity */}
-            <Section id="connectivity" title="Connectivity">
+            <Section id="connectivity" title="Connectivity" description="MCP server ports for external agent integration. Tool port exposes trading, analysis and other tools; Ask port provides a multi-turn conversation interface. Leave empty to disable. Restart required after changes.">
               <ConnectivityForm config={config} onSave={saveSection} />
             </Section>
 
             {/* Compaction */}
-            <Section id="compaction" title="Compaction">
+            <Section id="compaction" title="Compaction" description="Context window management. When conversation size approaches Max Context minus Max Output tokens, older messages are automatically summarized to free up space. Set Max Context to match your model's context limit.">
               <CompactionForm config={config} onSave={saveSection} />
             </Section>
 
             {/* Heartbeat */}
-            <Section id="heartbeat" title="Heartbeat">
+            <Section id="heartbeat" title="Heartbeat" description="Periodic self-check. Alice reviews markets, news and alerts at the configured interval, and only pushes a notification when there's something worth your attention. Interval format: 30m, 1h, 6h.">
               <HeartbeatForm config={config} onSave={saveSection} showToast={showToast} />
             </Section>
           </div>
@@ -194,12 +200,15 @@ export function SettingsPage() {
 
 // ==================== Shared Components ====================
 
-function Section({ id, title, children }: { id?: string; title: string; children: React.ReactNode }) {
+function Section({ id, title, description, children }: { id?: string; title: string; description?: string; children: React.ReactNode }) {
   return (
     <div id={id}>
       <h3 className="text-[13px] font-semibold text-text-muted uppercase tracking-wide mb-3">
         {title}
       </h3>
+      {description && (
+        <p className="text-[12px] text-text-muted mb-3 -mt-1">{description}</p>
+      )}
       {children}
     </div>
   )
@@ -318,7 +327,6 @@ function ConnectivityForm({
       <Field label="Ask MCP Port (connector)">
         <input className={inputClass} type="number" value={askMcpPort} onChange={(e) => setAskMcpPort(e.target.value)} placeholder="Disabled" />
       </Field>
-      <p className="text-[11px] text-text-muted mb-2">Leave empty to disable. Restart required after change.</p>
       <SaveButton
         onClick={() => {
           const patch = { ...eng }
