@@ -238,17 +238,17 @@ export class EquityIndicatorCalculator {
     const { name, args } = node
     const evaluatedArgs = await Promise.all(args.map((arg) => this.evaluate(arg)))
 
-    // Data access functions
+    // Data access functions: FUNC('symbol', lookback, 'interval')
     if (name === 'CLOSE')
-      return await DataAccess.CLOSE(evaluatedArgs[0] as string, evaluatedArgs[1] as number, this.context)
+      return await DataAccess.CLOSE(evaluatedArgs[0] as string, evaluatedArgs[1] as number, evaluatedArgs[2] as string, this.context)
     if (name === 'HIGH')
-      return await DataAccess.HIGH(evaluatedArgs[0] as string, evaluatedArgs[1] as number, this.context)
+      return await DataAccess.HIGH(evaluatedArgs[0] as string, evaluatedArgs[1] as number, evaluatedArgs[2] as string, this.context)
     if (name === 'LOW')
-      return await DataAccess.LOW(evaluatedArgs[0] as string, evaluatedArgs[1] as number, this.context)
+      return await DataAccess.LOW(evaluatedArgs[0] as string, evaluatedArgs[1] as number, evaluatedArgs[2] as string, this.context)
     if (name === 'OPEN')
-      return await DataAccess.OPEN(evaluatedArgs[0] as string, evaluatedArgs[1] as number, this.context)
+      return await DataAccess.OPEN(evaluatedArgs[0] as string, evaluatedArgs[1] as number, evaluatedArgs[2] as string, this.context)
     if (name === 'VOLUME')
-      return await DataAccess.VOLUME(evaluatedArgs[0] as string, evaluatedArgs[1] as number, this.context)
+      return await DataAccess.VOLUME(evaluatedArgs[0] as string, evaluatedArgs[1] as number, evaluatedArgs[2] as string, this.context)
 
     // Statistics functions
     if (name === 'SMA') return Statistics.SMA(evaluatedArgs[0] as number[], evaluatedArgs[1] as number)

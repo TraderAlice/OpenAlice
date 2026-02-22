@@ -10,8 +10,8 @@
  *   扩展方法：在 SymbolIndex 的 SOURCES 数组中添加新的 provider 即可。
  *
  * equityCalculateIndicator:
- *   量化因子计算器，支持类 Excel 公式语法。数据按需从 OpenBB API 拉取日级别 OHLCV，
- *   不缓存。lookback 参数为交易日数，内部转换为日历日期调用 getHistorical。
+ *   量化因子计算器，支持类 Excel 公式语法。数据按需从 OpenBB API 拉取 OHLCV，不缓存。
+ *   数据访问函数签名：CLOSE('symbol', lookback, 'interval')，interval 为必选参数。
  *   内置 16 个函数：CLOSE/HIGH/LOW/OPEN/VOLUME + SMA/EMA/STDEV/MAX/MIN/SUM/AVERAGE
  *   + RSI/BBANDS/MACD/ATR。
  */
@@ -23,6 +23,24 @@ import type { OpenBBEquityClient } from '@/openbb/equity/client'
 import { EquityIndicatorCalculator } from '@/openbb/equity/indicator/calculator'
 import type { EquityIndicatorContext } from '@/openbb/equity/indicator/types'
 import type { EquityHistoricalData } from '@/openbb/equity/types'
+
+/** 根据 lookback 根数和 interval 估算需要拉取的日历天数 */
+function estimateCalendarDays(lookback: number, interval: string): number {
+  // 解析 interval：数字 + 单位（d/w/h/m）
+  const match = interval.match(/^(\d+)([dwhm])$/)
+  if (!match) return Math.ceil(lookback * 1.5) + 10 // fallback
+
+  const n = parseInt(match[1])
+  const unit = match[2]
+
+  switch (unit) {
+    case 'd': return Math.ceil(lookback * n * 1.5) + 10  // 交易日→日历日
+    case 'w': return lookback * n * 7 + 10
+    case 'h': return Math.ceil(lookback * n / 6.5) + 10  // 美股每天 6.5h
+    case 'm': return Math.ceil(lookback * n / 390) + 10  // 美股每天 390min
+    default:  return Math.ceil(lookback * 1.5) + 10
+  }
+}
 
 export function createEquityTools(symbolIndex: SymbolIndex, equityClient: OpenBBEquityClient) {
   return {
@@ -51,33 +69,31 @@ Use this FIRST to find the correct symbol before querying any equity data.`,
     equityCalculateIndicator: tool({
       description: `Calculate technical indicators for equities using formula expressions.
 
-Data access: CLOSE('AAPL', 252), HIGH, LOW, OPEN, VOLUME — first arg is symbol, second is lookback in trading days.
+Data access: CLOSE('AAPL', 252, '1d'), HIGH, LOW, OPEN, VOLUME — args: symbol, lookback (bar count), interval (e.g. '1d', '1w', '1h').
 Statistics: SMA(data, period), EMA, STDEV, MAX, MIN, SUM, AVERAGE.
 Technical: RSI(data, 14), BBANDS(data, 20, 2), MACD(data, 12, 26, 9), ATR(highs, lows, closes, 14).
-Array access: CLOSE('AAPL', 10)[-1] for latest price. Supports +, -, *, / operators.
+Array access: CLOSE('AAPL', 10, '1d')[-1] for latest price. Supports +, -, *, / operators.
 
 Examples:
-  SMA(CLOSE('AAPL', 252), 50)  — 50-day moving average
-  RSI(CLOSE('TSLA', 50), 14)   — 14-day RSI
-  BBANDS(CLOSE('MSFT', 100), 20, 2) — Bollinger Bands
-  (CLOSE('AAPL', 1)[0] - SMA(CLOSE('AAPL', 252), 50)) / SMA(CLOSE('AAPL', 252), 50) * 100 — % deviation from 50-MA
+  SMA(CLOSE('AAPL', 252, '1d'), 50)  — 50-day moving average
+  RSI(CLOSE('TSLA', 50, '1d'), 14)   — 14-day RSI
+  BBANDS(CLOSE('MSFT', 100, '1d'), 20, 2) — Bollinger Bands
 
 Use equitySearch first to resolve the correct symbol.`,
       inputSchema: z.object({
-        formula: z.string().describe("Formula expression, e.g. SMA(CLOSE('AAPL', 252), 50)"),
+        formula: z.string().describe("Formula expression, e.g. SMA(CLOSE('AAPL', 252, '1d'), 50)"),
         precision: z.number().int().min(0).max(10).optional().describe('Decimal places (default: 4)'),
       }),
       execute: async ({ formula, precision }) => {
         const context: EquityIndicatorContext = {
-          getHistoricalData: async (symbol, lookback) => {
-            // lookback = 交易日数，转换为日历日（×1.5 + buffer 覆盖周末和节假日）
-            const calendarDays = Math.ceil(lookback * 1.5) + 10
+          getHistoricalData: async (symbol, lookback, interval) => {
+            // 根据 interval 估算需要拉取的日历天数
+            const calendarDays = estimateCalendarDays(lookback, interval)
             const startDate = new Date()
             startDate.setDate(startDate.getDate() - calendarDays)
             const start_date = startDate.toISOString().slice(0, 10)
 
-            const results = await equityClient.getHistorical({ symbol, start_date }) as EquityHistoricalData[]
-            // 按日期升序排列，取最后 lookback 条
+            const results = await equityClient.getHistorical({ symbol, start_date, interval }) as EquityHistoricalData[]
             results.sort((a, b) => a.date.localeCompare(b.date))
             return results.slice(-lookback)
           },

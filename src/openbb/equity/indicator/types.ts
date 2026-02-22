@@ -12,11 +12,12 @@ import type { EquityHistoricalData } from '@/openbb/equity/types'
 /** Equity 指标计算上下文 — 提供历史 OHLCV 数据获取能力 */
 export interface EquityIndicatorContext {
   /**
-   * 获取历史 OHLCV 数据（日级别）
+   * 获取历史 OHLCV 数据
    * @param symbol - Equity ticker，如 "AAPL"
-   * @param lookback - 需要的交易日数
+   * @param lookback - K 线根数
+   * @param interval - K 线周期，如 "1d", "1w", "1h"
    */
-  getHistoricalData: (symbol: string, lookback: number) => Promise<EquityHistoricalData[]>
+  getHistoricalData: (symbol: string, lookback: number, interval: string) => Promise<EquityHistoricalData[]>
 }
 
 // ==================== AST ====================

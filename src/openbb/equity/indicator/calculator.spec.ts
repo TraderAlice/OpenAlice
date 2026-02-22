@@ -21,7 +21,7 @@ const mockData: EquityHistoricalData[] = Array.from({ length: 50 }, (_, i) => ({
 }))
 
 const mockContext: EquityIndicatorContext = {
-  getHistoricalData: async (_symbol: string, lookback: number) => {
+  getHistoricalData: async (_symbol: string, lookback: number, _interval: string) => {
     return mockData.slice(-lookback)
   },
 }
@@ -88,29 +88,29 @@ describe('arithmetic', () => {
 
 describe('data access', () => {
   it('CLOSE returns correct array', async () => {
-    const result = await calc("CLOSE('AAPL', 10)")
+    const result = await calc("CLOSE('AAPL', 10, '1d')")
     expect(Array.isArray(result)).toBe(true)
     expect(result).toEqual([140, 141, 142, 143, 144, 145, 146, 147, 148, 149])
   })
 
   it('HIGH returns correct array', async () => {
-    const result = await calc("HIGH('AAPL', 5)")
+    const result = await calc("HIGH('AAPL', 5, '1d')")
     expect(result).toEqual([147, 148, 149, 150, 151])
   })
 
   it('LOW returns correct array', async () => {
-    const result = await calc("LOW('AAPL', 3)")
+    const result = await calc("LOW('AAPL', 3, '1d')")
     expect(result).toEqual([146, 147, 148])
   })
 
   it('OPEN returns correct array', async () => {
-    const result = await calc("OPEN('AAPL', 3)")
+    const result = await calc("OPEN('AAPL', 3, '1d')")
     expect(result).toEqual([147, 148, 149])
   })
 
   it('VOLUME handles null as 0', async () => {
     // mockData[48].volume = null, mockData[49].volume = 1490
-    const result = await calc("VOLUME('AAPL', 2)")
+    const result = await calc("VOLUME('AAPL', 2, '1d')")
     expect(result).toEqual([0, 1490])
   })
 })
@@ -119,19 +119,19 @@ describe('data access', () => {
 
 describe('array access', () => {
   it('positive index', async () => {
-    expect(await calc("CLOSE('AAPL', 10)[0]")).toBe(140)
+    expect(await calc("CLOSE('AAPL', 10, '1d')[0]")).toBe(140)
   })
 
   it('negative index (-1 = last)', async () => {
-    expect(await calc("CLOSE('AAPL', 10)[-1]")).toBe(149)
+    expect(await calc("CLOSE('AAPL', 10, '1d')[-1]")).toBe(149)
   })
 
   it('negative index (-2 = second to last)', async () => {
-    expect(await calc("CLOSE('AAPL', 10)[-2]")).toBe(148)
+    expect(await calc("CLOSE('AAPL', 10, '1d')[-2]")).toBe(148)
   })
 
   it('out of bounds throws', async () => {
-    await expect(calc("CLOSE('AAPL', 10)[100]")).rejects.toThrow('out of bounds')
+    await expect(calc("CLOSE('AAPL', 10, '1d')[100]")).rejects.toThrow('out of bounds')
   })
 })
 
@@ -140,40 +140,40 @@ describe('array access', () => {
 describe('statistics', () => {
   it('SMA', async () => {
     // last 10 closes: 140..149, SMA(10) = 144.5
-    expect(await calc("SMA(CLOSE('AAPL', 20), 10)")).toBe(144.5)
+    expect(await calc("SMA(CLOSE('AAPL', 20, '1d'), 10)")).toBe(144.5)
   })
 
   it('EMA', async () => {
-    const result = await calc("EMA(CLOSE('AAPL', 20), 10)")
+    const result = await calc("EMA(CLOSE('AAPL', 20, '1d'), 10)")
     expect(typeof result).toBe('number')
     expect(result).toBeGreaterThan(140)
   })
 
   it('STDEV', async () => {
     // stdev of 140..149 ≈ 2.87
-    const result = await calc("STDEV(CLOSE('AAPL', 10))")
+    const result = await calc("STDEV(CLOSE('AAPL', 10, '1d'))")
     expect(result).toBeCloseTo(2.87, 1)
   })
 
   it('MAX', async () => {
-    expect(await calc("MAX(CLOSE('AAPL', 10))")).toBe(149)
+    expect(await calc("MAX(CLOSE('AAPL', 10, '1d'))")).toBe(149)
   })
 
   it('MIN', async () => {
-    expect(await calc("MIN(CLOSE('AAPL', 10))")).toBe(140)
+    expect(await calc("MIN(CLOSE('AAPL', 10, '1d'))")).toBe(140)
   })
 
   it('SUM', async () => {
     // 140+141+...+149 = 1445
-    expect(await calc("SUM(CLOSE('AAPL', 10))")).toBe(1445)
+    expect(await calc("SUM(CLOSE('AAPL', 10, '1d'))")).toBe(1445)
   })
 
   it('AVERAGE', async () => {
-    expect(await calc("AVERAGE(CLOSE('AAPL', 10))")).toBe(144.5)
+    expect(await calc("AVERAGE(CLOSE('AAPL', 10, '1d'))")).toBe(144.5)
   })
 
   it('SMA insufficient data throws', async () => {
-    await expect(calc("SMA(CLOSE('AAPL', 5), 10)")).rejects.toThrow('at least 10')
+    await expect(calc("SMA(CLOSE('AAPL', 5, '1d'), 10)")).rejects.toThrow('at least 10')
   })
 })
 
@@ -181,7 +181,7 @@ describe('statistics', () => {
 
 describe('technical indicators', () => {
   it('RSI returns 0-100, trending up → high RSI', async () => {
-    const result = (await calc("RSI(CLOSE('AAPL', 30), 14)")) as number
+    const result = (await calc("RSI(CLOSE('AAPL', 30, '1d'), 14)")) as number
     expect(result).toBeGreaterThanOrEqual(0)
     expect(result).toBeLessThanOrEqual(100)
     // 连续上涨，RSI 应接近 100
@@ -189,7 +189,7 @@ describe('technical indicators', () => {
   })
 
   it('BBANDS returns { upper, middle, lower }', async () => {
-    const result = (await calc("BBANDS(CLOSE('AAPL', 30), 20, 2)")) as Record<string, number>
+    const result = (await calc("BBANDS(CLOSE('AAPL', 30, '1d'), 20, 2)")) as Record<string, number>
     expect(result).toHaveProperty('upper')
     expect(result).toHaveProperty('middle')
     expect(result).toHaveProperty('lower')
@@ -198,7 +198,7 @@ describe('technical indicators', () => {
   })
 
   it('MACD returns { macd, signal, histogram }', async () => {
-    const result = (await calc("MACD(CLOSE('AAPL', 50), 12, 26, 9)")) as Record<string, number>
+    const result = (await calc("MACD(CLOSE('AAPL', 50, '1d'), 12, 26, 9)")) as Record<string, number>
     expect(result).toHaveProperty('macd')
     expect(result).toHaveProperty('signal')
     expect(result).toHaveProperty('histogram')
@@ -206,7 +206,7 @@ describe('technical indicators', () => {
   })
 
   it('ATR returns positive number', async () => {
-    const result = (await calc("ATR(HIGH('AAPL', 30), LOW('AAPL', 30), CLOSE('AAPL', 30), 14)")) as number
+    const result = (await calc("ATR(HIGH('AAPL', 30, '1d'), LOW('AAPL', 30, '1d'), CLOSE('AAPL', 30, '1d'), 14)")) as number
     expect(typeof result).toBe('number')
     expect(result).toBeGreaterThan(0)
   })
@@ -218,19 +218,19 @@ describe('complex expressions', () => {
   it('price deviation from MA (%)', async () => {
     // (149 - 144.5) / 144.5 * 100 ≈ 3.11%
     const result = await calc(
-      "(CLOSE('AAPL', 1)[0] - SMA(CLOSE('AAPL', 10), 10)) / SMA(CLOSE('AAPL', 10), 10) * 100",
+      "(CLOSE('AAPL', 1, '1d')[0] - SMA(CLOSE('AAPL', 10, '1d'), 10)) / SMA(CLOSE('AAPL', 10, '1d'), 10) * 100",
     )
     expect(result).toBeCloseTo(3.11, 1)
   })
 
   it('arithmetic on function results', async () => {
     // MAX - MIN of last 10 closes = 149 - 140 = 9
-    const result = await calc("MAX(CLOSE('AAPL', 10)) - MIN(CLOSE('AAPL', 10))")
+    const result = await calc("MAX(CLOSE('AAPL', 10, '1d')) - MIN(CLOSE('AAPL', 10, '1d'))")
     expect(result).toBe(9)
   })
 
   it('double-quoted strings work', async () => {
-    const result = await calc('CLOSE("AAPL", 3)')
+    const result = await calc('CLOSE("AAPL", 3, "1d")')
     expect(Array.isArray(result)).toBe(true)
     expect((result as number[]).length).toBe(3)
   })
@@ -255,13 +255,13 @@ describe('precision', () => {
   })
 
   it('precision applies to arrays', async () => {
-    const result = (await calc("STDEV(CLOSE('AAPL', 10))", 1)) as number
+    const result = (await calc("STDEV(CLOSE('AAPL', 10, '1d'))", 1)) as number
     // 2.87... → 2.9
     expect(result).toBe(2.9)
   })
 
   it('precision applies to record values', async () => {
-    const result = (await calc("BBANDS(CLOSE('AAPL', 30), 20, 2)", 2)) as Record<string, number>
+    const result = (await calc("BBANDS(CLOSE('AAPL', 30, '1d'), 20, 2)", 2)) as Record<string, number>
     // 所有值应只有 2 位小数
     for (const v of Object.values(result)) {
       const decimals = v.toString().split('.')[1]?.length ?? 0
@@ -278,15 +278,15 @@ describe('errors', () => {
   })
 
   it('unknown function throws', async () => {
-    await expect(calc("FAKE('AAPL', 10)")).rejects.toThrow('Unknown function: FAKE')
+    await expect(calc("FAKE('AAPL', 10, '1d')")).rejects.toThrow('Unknown function: FAKE')
   })
 
   it('missing closing paren throws', async () => {
-    await expect(calc("SMA(CLOSE('AAPL', 10), 5")).rejects.toThrow()
+    await expect(calc("SMA(CLOSE('AAPL', 10, '1d'), 5")).rejects.toThrow()
   })
 
   it('missing closing bracket throws', async () => {
-    await expect(calc("CLOSE('AAPL', 10)[0")).rejects.toThrow()
+    await expect(calc("CLOSE('AAPL', 10, '1d')[0")).rejects.toThrow()
   })
 
   it('unterminated string throws', async () => {
@@ -294,10 +294,10 @@ describe('errors', () => {
   })
 
   it('binary op on non-numbers throws', async () => {
-    await expect(calc("CLOSE('AAPL', 10) + 1")).rejects.toThrow('require numbers')
+    await expect(calc("CLOSE('AAPL', 10, '1d') + 1")).rejects.toThrow('require numbers')
   })
 
   it('array access on non-array throws', async () => {
-    await expect(calc("SMA(CLOSE('AAPL', 20), 10)[0]")).rejects.toThrow('requires an array')
+    await expect(calc("SMA(CLOSE('AAPL', 20, '1d'), 10)[0]")).rejects.toThrow('requires an array')
   })
 })
