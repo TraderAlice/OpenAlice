@@ -20,7 +20,7 @@ export class HttpPlugin implements Plugin {
           ])
         : [null, [], []]
       return c.json({
-        playheadTime: ctx.klineStore.getPlayheadTime().toISOString(),
+        currentTime: new Date().toISOString(),
         account,
         positions,
         orders,

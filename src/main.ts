@@ -9,10 +9,7 @@ import { McpPlugin } from './plugins/mcp.js'
 import { TelegramPlugin } from './connectors/telegram/index.js'
 import { WebPlugin } from './connectors/web/index.js'
 import { McpAskPlugin } from './connectors/mcp-ask/index.js'
-import { KlineStore, NewsStore, RealMarketDataProvider, RealNewsProvider, fetchRealtimeData } from './extension/analysis-kit/index.js'
-import type { MarketData, NewsItem } from './extension/analysis-kit/index.js'
 import { createThinkingTools } from './extension/thinking-kit/index.js'
-import { createAnalysisTools } from './extension/analysis-tools/index.js'
 import type { Operation, WalletExportState } from './extension/crypto-trading/index.js'
 import {
   Wallet,
@@ -34,6 +31,13 @@ import {
 import { Brain, createBrainTools } from './extension/brain/index.js'
 import type { BrainExportState } from './extension/brain/index.js'
 import { createBrowserTools } from './extension/browser/index.js'
+import { OpenBBEquityClient, SymbolIndex } from './openbb/equity/index.js'
+import { createEquityTools } from './extension/equity/index.js'
+import { OpenBBCryptoClient } from './openbb/crypto/index.js'
+import { OpenBBCurrencyClient } from './openbb/currency/index.js'
+import { createCryptoTools } from './extension/crypto/index.js'
+import { createCurrencyTools } from './extension/currency/index.js'
+import { createAnalysisTools } from './extension/analysis-kit/index.js'
 import { SessionStore } from './core/session.js'
 import { ToolCenter } from './core/tool-center.js'
 import { AgentCenter } from './core/agent-center.js'
@@ -167,22 +171,6 @@ async function main() {
     ? SecWallet.restore(secSavedState, secWalletConfig)
     : new SecWallet(secWalletConfig)
 
-  // Data stores (realtime market & news data)
-  let marketData: Record<string, MarketData[]> = {}
-  let news: NewsItem[] = []
-  try {
-    const realtimeData = await fetchRealtimeData()
-    marketData = realtimeData.marketData
-    news = realtimeData.news
-  } catch (err) {
-    console.warn('DotAPI initial fetch failed (non-fatal, starting with empty data):', err)
-  }
-  const marketProvider = new RealMarketDataProvider(marketData)
-  const newsProvider = new RealNewsProvider(news)
-
-  const klineStore = new KlineStore({ timeframe: config.engine.timeframe }, marketProvider)
-  const newsStore = new NewsStore(newsProvider)
-
   // Brain: cognitive state with commit-based tracking
   const brainDir = resolve('data/brain')
   const brainOnCommit = async (state: BrainExportState) => {
@@ -224,17 +212,6 @@ async function main() {
     `**Emotion:** ${emotion}`,
   ].join('\n')
 
-  // Refresh market data & news periodically
-  setInterval(async () => {
-    try {
-      const { marketData, news } = await fetchRealtimeData()
-      marketProvider.reload(marketData)
-      newsProvider.reload(news)
-    } catch (err) {
-      console.error('DotAPI refresh failed:', err)
-    }
-  }, config.engine.dataRefreshInterval)
-
   // ==================== Event Log ====================
 
   const eventLog = await createEventLog()
@@ -243,18 +220,21 @@ async function main() {
 
   const cronEngine = createCronEngine({ eventLog })
 
+  // ==================== OpenBB Clients ====================
+
+  const equityClient = new OpenBBEquityClient(config.openbb.apiUrl, config.openbb.defaultProvider)
+  const cryptoClient = new OpenBBCryptoClient(config.openbb.apiUrl, config.openbb.defaultProvider)
+  const currencyClient = new OpenBBCurrencyClient(config.openbb.apiUrl, config.openbb.defaultProvider)
+
+  // ==================== Equity Symbol Index ====================
+
+  const symbolIndex = new SymbolIndex()
+  await symbolIndex.load(equityClient)
+
   // ==================== Tool Center ====================
 
   const toolCenter = new ToolCenter()
   toolCenter.register(createThinkingTools())
-  toolCenter.register(createAnalysisTools({
-    getPlayheadTime: () => klineStore.getPlayheadTime(),
-    getLatestOHLCV: (s) => klineStore.getLatestOHLCV(s),
-    getAvailableSymbols: () => klineStore.getAvailableSymbols(),
-    calculatePreviousTime: (l) => klineStore.calculatePreviousTime(l),
-    marketDataProvider: klineStore.marketDataProvider,
-    getNewsV2: (o) => newsStore.getNewsV2(o),
-  }))
   if (cryptoEngine) {
     toolCenter.register(createCryptoTradingTools(cryptoEngine, wallet, cryptoWalletStateBridge))
   }
@@ -264,6 +244,10 @@ async function main() {
   toolCenter.register(createBrainTools(brain))
   toolCenter.register(createBrowserTools())
   toolCenter.register(createCronTools(cronEngine))
+  toolCenter.register(createEquityTools(symbolIndex))
+  toolCenter.register(createCryptoTools(cryptoClient))
+  toolCenter.register(createCurrencyTools(currencyClient))
+  toolCenter.register(createAnalysisTools(equityClient, cryptoClient, currencyClient))
 
   console.log(`tool-center: ${toolCenter.list().length} tools registered`)
 
@@ -322,7 +306,7 @@ async function main() {
     }))
   }
 
-  const ctx: EngineContext = { config, engine, klineStore, newsStore, cryptoEngine, eventLog, heartbeat, cronEngine }
+  const ctx: EngineContext = { config, engine, cryptoEngine, eventLog, heartbeat, cronEngine }
 
   for (const plugin of plugins) {
     await plugin.start(ctx)
@@ -352,9 +336,6 @@ async function main() {
 
   console.log('engine: started')
   while (!stopped) {
-    const now = new Date()
-    klineStore.setPlayheadTime(now)
-    newsStore.setPlayheadTime(now)
     await sleep(config.engine.interval)
   }
 }

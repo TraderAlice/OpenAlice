@@ -13,8 +13,6 @@ const engineSchema = z.object({
   mcpPort: z.number().int().positive().default(3001),
   askMcpPort: z.number().int().positive().optional(),
   webPort: z.number().int().positive().default(3002),
-  timeframe: z.string().default('1h'),
-  dataRefreshInterval: z.number().int().positive().default(600_000),
 })
 
 const modelSchema = z.object({
@@ -83,6 +81,11 @@ const securitiesSchema = z.object({
   ]).default({ type: 'alpaca', paper: true }),
 })
 
+const openbbSchema = z.object({
+  apiUrl: z.string().default('http://localhost:6900'),
+  defaultProvider: z.string().default('yfinance'),
+})
+
 const compactionSchema = z.object({
   maxContextTokens: z.number().default(200_000),
   maxOutputTokens: z.number().default(20_000),
@@ -115,6 +118,7 @@ export type Config = {
   agent: z.infer<typeof agentSchema>
   crypto: z.infer<typeof cryptoSchema>
   securities: z.infer<typeof securitiesSchema>
+  openbb: z.infer<typeof openbbSchema>
   compaction: z.infer<typeof compactionSchema>
   aiProvider: z.infer<typeof aiProviderSchema>
   heartbeat: z.infer<typeof heartbeatSchema>
@@ -145,7 +149,7 @@ async function parseAndSeed<T>(filename: string, schema: z.ZodType<T>, raw: unkn
 }
 
 export async function loadConfig(): Promise<Config> {
-  const files = ['engine.json', 'model.json', 'agent.json', 'crypto.json', 'securities.json', 'compaction.json', 'ai-provider.json', 'heartbeat.json'] as const
+  const files = ['engine.json', 'model.json', 'agent.json', 'crypto.json', 'securities.json', 'openbb.json', 'compaction.json', 'ai-provider.json', 'heartbeat.json'] as const
   const raws = await Promise.all(files.map((f) => loadJsonFile(f)))
 
   return {
@@ -154,9 +158,10 @@ export async function loadConfig(): Promise<Config> {
     agent:      await parseAndSeed(files[2], agentSchema, raws[2]),
     crypto:     await parseAndSeed(files[3], cryptoSchema, raws[3]),
     securities: await parseAndSeed(files[4], securitiesSchema, raws[4]),
-    compaction: await parseAndSeed(files[5], compactionSchema, raws[5]),
-    aiProvider: await parseAndSeed(files[6], aiProviderSchema, raws[6]),
-    heartbeat:  await parseAndSeed(files[7], heartbeatSchema, raws[7]),
+    openbb:     await parseAndSeed(files[5], openbbSchema, raws[5]),
+    compaction: await parseAndSeed(files[6], compactionSchema, raws[6]),
+    aiProvider: await parseAndSeed(files[7], aiProviderSchema, raws[7]),
+    heartbeat:  await parseAndSeed(files[8], heartbeatSchema, raws[8]),
   }
 }
 
@@ -182,6 +187,7 @@ const sectionSchemas: Record<ConfigSection, z.ZodTypeAny> = {
   agent: agentSchema,
   crypto: cryptoSchema,
   securities: securitiesSchema,
+  openbb: openbbSchema,
   compaction: compactionSchema,
   aiProvider: aiProviderSchema,
   heartbeat: heartbeatSchema,
@@ -193,6 +199,7 @@ const sectionFiles: Record<ConfigSection, string> = {
   agent: 'agent.json',
   crypto: 'crypto.json',
   securities: 'securities.json',
+  openbb: 'openbb.json',
   compaction: 'compaction.json',
   aiProvider: 'ai-provider.json',
   heartbeat: 'heartbeat.json',
