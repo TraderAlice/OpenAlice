@@ -1,4 +1,4 @@
-import type { NewsItem } from '../data/interfaces';
+import type { NewsItem } from '../../analysis-kit/data/interfaces';
 
 /**
  * Context for News tools

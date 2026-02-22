@@ -11,7 +11,8 @@ import { WebPlugin } from './connectors/web/index.js'
 import { McpAskPlugin } from './connectors/mcp-ask/index.js'
 import { Sandbox, RealMarketDataProvider, RealNewsProvider, fetchRealtimeData } from './extension/analysis-kit/index.js'
 import type { MarketData, NewsItem } from './extension/analysis-kit/index.js'
-import { createAnalysisTools } from './extension/analysis-kit/index.js'
+import { createThinkingTools } from './extension/thinking-kit/index.js'
+import { createAnalysisTools } from './extension/analysis-tools/index.js'
 import type { ICryptoTradingEngine, Operation, WalletExportState } from './extension/crypto-trading/index.js'
 import {
   Wallet,
@@ -248,6 +249,7 @@ async function main() {
   // ==================== Tool Center ====================
 
   const toolCenter = new ToolCenter()
+  toolCenter.register(createThinkingTools())
   toolCenter.register(createAnalysisTools(sandbox))
   toolCenter.register(createCryptoTradingTools(cryptoEngine, wallet, cryptoWalletStateBridge))
   if (secResult) {

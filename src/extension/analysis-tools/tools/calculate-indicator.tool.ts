@@ -1,5 +1,5 @@
 import { IndicatorCalculator, FunctionContext } from './indicators';
-import type { IMarketDataProvider } from '../data/interfaces';
+import type { IMarketDataProvider } from '../../analysis-kit/data/interfaces';
 
 /**
  * Context for calculating technical indicators

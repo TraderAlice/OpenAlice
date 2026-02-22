@@ -8,8 +8,8 @@ import {
   calculateIndicator,
   CalculateIndicatorContext,
 } from './calculate-indicator.tool';
-import type { IDataProvider } from '../sandbox/interfaces';
-import { MarketData } from '../sandbox/data-providers/interfaces';
+import type { IDataProvider } from '../../analysis-kit/data/interfaces';
+import type { MarketData } from '../../analysis-kit/data/interfaces';
 
 describe('calculateIndicator', () => {
   // Mock historical data: 20 candlesticks, price incrementing from 100 to 119
