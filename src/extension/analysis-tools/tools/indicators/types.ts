@@ -2,7 +2,7 @@
  * Technical indicator calculation module - Type definitions
  */
 
-import { MarketData } from '../../data/interfaces';
+import { MarketData } from '../../../analysis-kit/data/interfaces';
 
 /**
  * Function execution context

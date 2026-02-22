@@ -10,7 +10,7 @@ const engineSchema = z.object({
   pairs: z.array(z.string()).min(1).default(['BTC/USD', 'ETH/USD', 'SOL/USD']),
   interval: z.number().int().positive().default(5000),
   port: z.number().int().positive().default(3000),
-  mcpPort: z.number().int().positive().optional(),
+  mcpPort: z.number().int().positive().default(3001),
   askMcpPort: z.number().int().positive().optional(),
   webPort: z.number().int().positive().default(3002),
   timeframe: z.string().default('1h'),
@@ -64,11 +64,14 @@ const cryptoSchema = z.object({
     z.object({
       type: z.literal('none'),
     }),
-  ]).default({ type: 'none' }),
+  ]).default({ type: 'ccxt', exchange: 'bybit', sandbox: false, demoTrading: true, defaultMarketType: 'swap' }),
 })
 
 const securitiesSchema = z.object({
-  allowedSymbols: z.array(z.string()).default([]),
+  allowedSymbols: z.array(z.string()).default([
+    'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA',
+    'SPY', 'QQQ',
+  ]),
   provider: z.discriminatedUnion('type', [
     z.object({
       type: z.literal('alpaca'),
@@ -77,7 +80,7 @@ const securitiesSchema = z.object({
     z.object({
       type: z.literal('none'),
     }),
-  ]).default({ type: 'none' }),
+  ]).default({ type: 'alpaca', paper: true }),
 })
 
 const compactionSchema = z.object({

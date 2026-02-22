@@ -1,4 +1,5 @@
-import type { Sandbox } from '../extension/analysis-kit/index.js'
+import type { KlineStore } from '../extension/analysis-kit/index.js'
+import type { NewsStore } from '../extension/analysis-kit/index.js'
 import type { ICryptoTradingEngine } from '../extension/crypto-trading/index.js'
 import type { CronEngine } from '../task/cron/engine.js'
 import type { Heartbeat } from '../task/heartbeat/index.js'
@@ -16,8 +17,9 @@ export interface Plugin {
 
 export interface EngineContext {
   config: Config
-  sandbox: Sandbox
-  cryptoEngine: ICryptoTradingEngine
+  klineStore: KlineStore
+  newsStore: NewsStore
+  cryptoEngine: ICryptoTradingEngine | null
   engine: Engine
   eventLog: EventLog
   heartbeat: Heartbeat

@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import { IndicatorCalculator } from './calculator';
 import { FunctionContext } from './types';
-import { MarketData } from '../../sandbox/data-providers/interfaces';
+import type { MarketData } from '../../../analysis-kit/data/interfaces';
 
 describe('IndicatorCalculator', () => {
   // Mock historical data: 50 candlesticks, price incrementing from 100 to 149

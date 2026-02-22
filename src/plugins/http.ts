@@ -12,13 +12,15 @@ export class HttpPlugin implements Plugin {
     app.get('/health', (c) => c.json({ ok: true }))
 
     app.get('/status', async (c) => {
-      const [account, positions, orders] = await Promise.all([
-        ctx.cryptoEngine.getAccount(),
-        ctx.cryptoEngine.getPositions(),
-        ctx.cryptoEngine.getOrders(),
-      ])
+      const [account, positions, orders] = ctx.cryptoEngine
+        ? await Promise.all([
+            ctx.cryptoEngine.getAccount(),
+            ctx.cryptoEngine.getPositions(),
+            ctx.cryptoEngine.getOrders(),
+          ])
+        : [null, [], []]
       return c.json({
-        playheadTime: ctx.sandbox.getPlayheadTime().toISOString(),
+        playheadTime: ctx.klineStore.getPlayheadTime().toISOString(),
         account,
         positions,
         orders,

@@ -1,10 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { RealMarketDataProvider } from './RealMarketDataProvider';
-import { RealNewsProvider } from './RealNewsProvider';
-import { Sandbox } from '../sandbox/Sandbox';
-import { MarketData, NewsItem } from './interfaces';
+import { KlineStore } from '../kline/KlineStore';
+import { MarketData } from './interfaces';
 import ohlcvFixture from './fixtures/btc-usd-1h.json';
-import newsFixture from './fixtures/panews.json';
 
 /**
  * Load OHLCV fixture as historicalData (same transform as DataLoader)
@@ -23,17 +21,6 @@ function loadOHLCVFixture(): Record<string, MarketData[]> {
   };
 }
 
-/**
- * Load news fixture as NewsItem[] (same transform as DjiraiClient)
- */
-function loadNewsFixture(): NewsItem[] {
-  return newsFixture.data.map((record) => ({
-    time: new Date(record.createdAt),
-    title: record.title,
-    content: record.content,
-    metadata: record.metadata as Record<string, string | null>,
-  }));
-}
 
 describe('RealMarketDataProvider', () => {
   describe('with fixture data', () => {
@@ -56,23 +43,20 @@ describe('RealMarketDataProvider', () => {
       expect(data.high).toBeGreaterThanOrEqual(data.low);
     });
 
-    it('should work with Sandbox integration', async () => {
+    it('should work with KlineStore integration', async () => {
       const historicalData = loadOHLCVFixture();
-      const newsData = loadNewsFixture();
 
       const marketDataProvider = new RealMarketDataProvider(historicalData);
-      const newsProvider = new RealNewsProvider(newsData);
 
-      const sandbox = new Sandbox(
+      const klineStore = new KlineStore(
         { timeframe: '1h' },
         marketDataProvider,
-        newsProvider,
       );
 
       // Set playhead to a time within the fixture data range
-      sandbox.setPlayheadTime(new Date('2025-10-02T12:00:00Z'));
+      klineStore.setPlayheadTime(new Date('2025-10-02T12:00:00Z'));
 
-      const [btcData] = await sandbox.getLatestOHLCV(['BTC/USD']);
+      const [btcData] = await klineStore.getLatestOHLCV(['BTC/USD']);
 
       expect(btcData.open).toBeGreaterThan(0);
       expect(btcData.high).toBeGreaterThanOrEqual(btcData.low);
