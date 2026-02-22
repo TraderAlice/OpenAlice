@@ -14,10 +14,9 @@ export interface EquityIndicatorContext {
   /**
    * 获取历史 OHLCV 数据
    * @param symbol - Equity ticker，如 "AAPL"
-   * @param lookback - K 线根数
    * @param interval - K 线周期，如 "1d", "1w", "1h"
    */
-  getHistoricalData: (symbol: string, lookback: number, interval: string) => Promise<EquityHistoricalData[]>
+  getHistoricalData: (symbol: string, interval: string) => Promise<EquityHistoricalData[]>
 }
 
 // ==================== AST ====================
