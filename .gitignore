@@ -27,5 +27,6 @@ Thumbs.db
 # Test
 coverage/
 
-# Claude Code project config (internal use only)
+# Claude Code
 CLAUDE.md
+.claude/
