@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Header } from './components/Header'
+import { Sidebar } from './components/Sidebar'
 import { ChatPage } from './pages/ChatPage'
 import { EventsPage } from './pages/EventsPage'
 import { SettingsPage } from './pages/SettingsPage'
@@ -21,15 +21,17 @@ export function App() {
   }, [])
 
   return (
-    <div className="flex flex-col h-full max-w-[900px] mx-auto">
-      <Header
+    <div className="flex h-full">
+      <Sidebar
         sseConnected={sseConnected}
         currentPage={page}
         onNavigate={setPage}
       />
-      {page === 'chat' && <ChatPage />}
-      {page === 'events' && <EventsPage />}
-      {page === 'settings' && <SettingsPage />}
+      <main className="flex-1 flex flex-col min-w-0 min-h-0 bg-bg">
+        {page === 'chat' && <ChatPage />}
+        {page === 'events' && <EventsPage />}
+        {page === 'settings' && <SettingsPage />}
+      </main>
     </div>
   )
 }

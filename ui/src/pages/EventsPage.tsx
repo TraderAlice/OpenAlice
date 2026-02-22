@@ -77,9 +77,9 @@ function EventLogSection() {
   const types = [...new Set(entries.map((e) => e.type))].sort()
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 h-full">
       {/* Controls */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 shrink-0">
         <select
           value={typeFilter}
           onChange={(e) => setTypeFilter(e.target.value)}
@@ -107,10 +107,10 @@ function EventLogSection() {
         </span>
       </div>
 
-      {/* Event list */}
+      {/* Event list — fills remaining space */}
       <div
         ref={containerRef}
-        className="bg-bg rounded-lg border border-border overflow-y-auto max-h-[60vh] font-mono text-xs"
+        className="flex-1 min-h-0 bg-bg rounded-lg border border-border overflow-y-auto font-mono text-xs"
       >
         {filtered.length === 0 ? (
           <div className="px-4 py-8 text-center text-text-muted">No events yet</div>
@@ -150,7 +150,7 @@ function EventRow({ entry }: { entry: EventLogEntry }) {
         <td className="px-3 py-1.5 text-text-muted">{entry.seq}</td>
         <td className="px-3 py-1.5 text-text-muted">{formatTime(entry.ts)}</td>
         <td className={`px-3 py-1.5 ${eventTypeColor(entry.type)}`}>{entry.type}</td>
-        <td className="px-3 py-1.5 text-text-muted truncate max-w-[400px]">
+        <td className="px-3 py-1.5 text-text-muted truncate">
           {isLong ? payloadStr.slice(0, 120) + '...' : payloadStr}
           {isLong && (
             <span className="ml-1 text-accent">{expanded ? '▾' : '▸'}</span>
@@ -549,36 +549,41 @@ export function EventsPage() {
   const [tab, setTab] = useState<Tab>('events')
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 px-5 py-4 gap-4 overflow-y-auto">
-      {/* Heartbeat card — always visible */}
-      <HeartbeatSection />
-
-      {/* Tab switcher */}
-      <div className="flex gap-1 bg-bg-secondary rounded-lg p-1 self-start">
-        <button
-          onClick={() => setTab('events')}
-          className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
-            tab === 'events'
-              ? 'bg-bg-tertiary text-text'
-              : 'text-text-muted hover:text-text'
-          }`}
-        >
-          Event Log
-        </button>
-        <button
-          onClick={() => setTab('cron')}
-          className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
-            tab === 'cron'
-              ? 'bg-bg-tertiary text-text'
-              : 'text-text-muted hover:text-text'
-          }`}
-        >
-          Cron Jobs
-        </button>
+    <div className="flex flex-col flex-1 min-h-0">
+      {/* Page header */}
+      <div className="flex items-center gap-4 px-6 py-4 border-b border-border shrink-0">
+        <h2 className="text-base font-semibold text-text">Events</h2>
+        <div className="flex gap-1 bg-bg-secondary rounded-lg p-1">
+          <button
+            onClick={() => setTab('events')}
+            className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
+              tab === 'events'
+                ? 'bg-bg-tertiary text-text'
+                : 'text-text-muted hover:text-text'
+            }`}
+          >
+            Event Log
+          </button>
+          <button
+            onClick={() => setTab('cron')}
+            className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
+              tab === 'cron'
+                ? 'bg-bg-tertiary text-text'
+                : 'text-text-muted hover:text-text'
+            }`}
+          >
+            Cron Jobs
+          </button>
+        </div>
       </div>
 
-      {/* Tab content */}
-      {tab === 'events' ? <EventLogSection /> : <CronSection />}
+      {/* Content area */}
+      <div className="flex-1 flex flex-col min-h-0 px-6 py-5 gap-4">
+        <HeartbeatSection />
+        <div className="flex-1 min-h-0">
+          {tab === 'events' ? <EventLogSection /> : <CronSection />}
+        </div>
+      </div>
     </div>
   )
 }
