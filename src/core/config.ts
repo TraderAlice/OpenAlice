@@ -64,11 +64,14 @@ const cryptoSchema = z.object({
     z.object({
       type: z.literal('none'),
     }),
-  ]).default({ type: 'none' }),
+  ]).default({ type: 'ccxt', exchange: 'bybit', sandbox: false, demoTrading: true, defaultMarketType: 'swap' }),
 })
 
 const securitiesSchema = z.object({
-  allowedSymbols: z.array(z.string()).default([]),
+  allowedSymbols: z.array(z.string()).default([
+    'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA',
+    'SPY', 'QQQ',
+  ]),
   provider: z.discriminatedUnion('type', [
     z.object({
       type: z.literal('alpaca'),
@@ -77,7 +80,7 @@ const securitiesSchema = z.object({
     z.object({
       type: z.literal('none'),
     }),
-  ]).default({ type: 'none' }),
+  ]).default({ type: 'alpaca', paper: true }),
 })
 
 const compactionSchema = z.object({
