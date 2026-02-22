@@ -33,6 +33,8 @@ import {
 import { Brain, createBrainTools } from './extension/brain/index.js'
 import type { BrainExportState } from './extension/brain/index.js'
 import { createBrowserTools } from './extension/browser/index.js'
+import { OpenBBEquityClient, SymbolIndex } from './openbb/equity/index.js'
+import { createEquityTools } from './extension/equity/index.js'
 import { SessionStore } from './core/session.js'
 import { ToolCenter } from './core/tool-center.js'
 import { AgentCenter } from './core/agent-center.js'
@@ -242,6 +244,12 @@ async function main() {
 
   const cronEngine = createCronEngine({ eventLog })
 
+  // ==================== Equity Symbol Index ====================
+
+  const equityClient = new OpenBBEquityClient(config.openbb.apiUrl, config.openbb.defaultProvider)
+  const symbolIndex = new SymbolIndex()
+  await symbolIndex.load(equityClient)
+
   // ==================== Tool Center ====================
 
   const toolCenter = new ToolCenter()
@@ -263,6 +271,7 @@ async function main() {
   toolCenter.register(createBrainTools(brain))
   toolCenter.register(createBrowserTools())
   toolCenter.register(createCronTools(cronEngine))
+  toolCenter.register(createEquityTools(symbolIndex))
 
   console.log(`tool-center: ${toolCenter.list().length} tools registered`)
 
