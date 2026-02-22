@@ -1,4 +1,6 @@
 export { OpenBBEquityClient } from './client'
 export { SymbolIndex } from './SymbolIndex'
 export type { SymbolEntry } from './SymbolIndex'
+export { EquityIndicatorCalculator } from './indicator/calculator'
+export type { EquityIndicatorContext } from './indicator/types'
 export type * from './types'
