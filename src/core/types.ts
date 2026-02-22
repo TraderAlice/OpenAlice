@@ -1,5 +1,3 @@
-import type { KlineStore } from '../extension/archive-analysis/index.js'
-import type { NewsStore } from '../extension/archive-analysis/index.js'
 import type { ICryptoTradingEngine } from '../extension/crypto-trading/index.js'
 import type { CronEngine } from '../task/cron/engine.js'
 import type { Heartbeat } from '../task/heartbeat/index.js'
@@ -17,8 +15,6 @@ export interface Plugin {
 
 export interface EngineContext {
   config: Config
-  klineStore: KlineStore
-  newsStore: NewsStore
   cryptoEngine: ICryptoTradingEngine | null
   engine: Engine
   eventLog: EventLog
