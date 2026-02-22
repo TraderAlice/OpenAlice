@@ -234,7 +234,7 @@ async function main() {
   toolCenter.register(createBrainTools(brain))
   toolCenter.register(createBrowserTools())
   toolCenter.register(createCronTools(cronEngine))
-  toolCenter.register(createEquityTools(symbolIndex, equityClient))
+  toolCenter.register(createEquityTools(symbolIndex))
 
   console.log(`tool-center: ${toolCenter.list().length} tools registered`)
 

@@ -1,16 +1,15 @@
 /**
- * Equity Indicator Calculator unit tests
+ * Indicator Calculator unit tests
  *
  * 覆盖：四则运算、运算符优先级、数据访问、统计函数、技术指标、
  * 数组索引、嵌套表达式、精度控制、错误处理。
  */
 import { describe, it, expect } from 'vitest'
-import { EquityIndicatorCalculator } from './calculator'
-import type { EquityIndicatorContext } from './types'
-import type { EquityHistoricalData } from '@/openbb/equity/types'
+import { IndicatorCalculator } from './calculator'
+import type { IndicatorContext, OhlcvData } from './types'
 
 // Mock: 50 根日线，收盘价 100~149，volume 第 48 根为 null 测边界
-const mockData: EquityHistoricalData[] = Array.from({ length: 50 }, (_, i) => ({
+const mockData: OhlcvData[] = Array.from({ length: 50 }, (_, i) => ({
   date: `2025-${String(Math.floor(i / 28) + 1).padStart(2, '0')}-${String((i % 28) + 1).padStart(2, '0')}`,
   open: 100 + i,
   high: 102 + i,
@@ -20,14 +19,14 @@ const mockData: EquityHistoricalData[] = Array.from({ length: 50 }, (_, i) => ({
   vwap: null,
 }))
 
-const mockContext: EquityIndicatorContext = {
+const mockContext: IndicatorContext = {
   getHistoricalData: async (_symbol: string, _interval: string) => {
     return mockData
   },
 }
 
 function calc(formula: string, precision?: number) {
-  const calculator = new EquityIndicatorCalculator(mockContext)
+  const calculator = new IndicatorCalculator(mockContext)
   return calculator.calculate(formula, precision)
 }
 

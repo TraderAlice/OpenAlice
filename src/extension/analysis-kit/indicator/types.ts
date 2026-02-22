@@ -1,22 +1,32 @@
 /**
- * Equity Indicator Calculator — 类型定义
+ * Indicator Calculator — 类型定义
  *
- * 从 archive-analysis 迁移，适配 OpenBB equity 数据层。
- * 去掉了 currentTime/playhead 概念，数据类型以 OpenBB EquityHistoricalData 为准。
+ * 通用 OHLCV 量化因子计算器，支持 equity / crypto / currency。
  */
 
-import type { EquityHistoricalData } from '@/openbb/equity/types'
+// ==================== Data ====================
+
+/** 通用 OHLCV 数据，equity/crypto/currency 共用 */
+export interface OhlcvData {
+  date: string
+  open: number
+  high: number
+  low: number
+  close: number
+  volume: number | null
+  [key: string]: unknown
+}
 
 // ==================== Context ====================
 
-/** Equity 指标计算上下文 — 提供历史 OHLCV 数据获取能力 */
-export interface EquityIndicatorContext {
+/** 指标计算上下文 — 提供历史 OHLCV 数据获取能力 */
+export interface IndicatorContext {
   /**
    * 获取历史 OHLCV 数据
-   * @param symbol - Equity ticker，如 "AAPL"
+   * @param symbol - 资产 symbol，如 "AAPL"、"BTCUSD"、"EURUSD"
    * @param interval - K 线周期，如 "1d", "1w", "1h"
    */
-  getHistoricalData: (symbol: string, interval: string) => Promise<EquityHistoricalData[]>
+  getHistoricalData: (symbol: string, interval: string) => Promise<OhlcvData[]>
 }
 
 // ==================== AST ====================

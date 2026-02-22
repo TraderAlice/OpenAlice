@@ -2,7 +2,6 @@
  * Statistics functions — 纯数学计算
  *
  * SMA, EMA, STDEV, MAX, MIN, SUM, AVERAGE
- * 从 archive-analysis 直接复制，无改动。
  */
 
 /** Simple Moving Average */

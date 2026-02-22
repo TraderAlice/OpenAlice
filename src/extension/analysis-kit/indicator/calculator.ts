@@ -1,19 +1,18 @@
 /**
- * Equity Indicator Calculator — AST 表达式解析与求值
+ * Indicator Calculator — AST 表达式解析与求值
  *
- * 从 archive-analysis 改编，适配 OpenBB equity 数据层。
- * 去掉了 currentTime/playhead 概念，数据按需从 OpenBB API 拉取。
+ * 通用量化因子计算器，支持 equity / crypto / currency。
  *
  * 支持类 Excel 公式语法：
  * - SMA(CLOSE('AAPL', '1d'), 50)
- * - RSI(CLOSE('TSLA', '1d'), 14)
- * - (CLOSE('AAPL', '1d')[-1] - SMA(CLOSE('AAPL', '1d'), 50)) / SMA(CLOSE('AAPL', '1d'), 50) * 100
+ * - RSI(CLOSE('BTCUSD', '1d'), 14)
+ * - (CLOSE('EURUSD', '1d')[-1] - SMA(CLOSE('EURUSD', '1d'), 50)) / SMA(CLOSE('EURUSD', '1d'), 50) * 100
  */
 
 import type {
   ASTNode,
   CalculationResult,
-  EquityIndicatorContext,
+  IndicatorContext,
   FunctionNode,
   BinaryOpNode,
   ArrayAccessNode,
@@ -22,8 +21,8 @@ import * as DataAccess from './functions/data-access'
 import * as Statistics from './functions/statistics'
 import * as Technical from './functions/technical'
 
-export class EquityIndicatorCalculator {
-  constructor(private context: EquityIndicatorContext) {}
+export class IndicatorCalculator {
+  constructor(private context: IndicatorContext) {}
 
   async calculate(
     formula: string,

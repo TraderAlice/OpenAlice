@@ -2,7 +2,6 @@
  * Technical indicator functions — 纯数学计算
  *
  * RSI, BBANDS, MACD, ATR
- * 从 archive-analysis 直接复制，无改动。
  */
 
 import { EMA } from './statistics'
