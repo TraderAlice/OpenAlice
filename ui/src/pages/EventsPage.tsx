@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { api, type EventLogEntry, type CronJob, type CronSchedule } from '../api'
+import { Toggle } from '../components/Toggle'
 
 // ==================== Helpers ====================
 
@@ -33,7 +34,7 @@ function scheduleLabel(s: CronSchedule): string {
 
 // Map event types to color classes
 function eventTypeColor(type: string): string {
-  if (type.startsWith('heartbeat.')) return 'text-purple-400'
+  if (type.startsWith('heartbeat.')) return 'text-purple'
   if (type.startsWith('cron.')) return 'text-accent'
   if (type.startsWith('message.')) return 'text-green'
   return 'text-text-muted'
@@ -196,12 +197,19 @@ function CronSection() {
     return () => clearInterval(id)
   }, [loadJobs])
 
+  const [error, setError] = useState<string | null>(null)
+
+  const showError = (msg: string) => {
+    setError(msg)
+    setTimeout(() => setError(null), 3000)
+  }
+
   const handleToggle = async (job: CronJob) => {
     try {
       await api.cron.update(job.id, { enabled: !job.enabled })
       await loadJobs()
-    } catch (err) {
-      console.warn('Failed to toggle job:', err)
+    } catch {
+      showError('Failed to toggle job')
     }
   }
 
@@ -209,18 +217,18 @@ function CronSection() {
     try {
       await api.cron.runNow(job.id)
       await loadJobs()
-    } catch (err) {
-      console.warn('Failed to run job:', err)
+    } catch {
+      showError('Failed to run job')
     }
   }
 
   const handleDelete = async (job: CronJob) => {
-    if (job.name === '__heartbeat__') return // Don't delete heartbeat
+    if (job.name === '__heartbeat__') return
     try {
       await api.cron.remove(job.id)
       await loadJobs()
-    } catch (err) {
-      console.warn('Failed to delete job:', err)
+    } catch {
+      showError('Failed to delete job')
     }
   }
 
@@ -230,6 +238,7 @@ function CronSection() {
 
   return (
     <div className="flex flex-col gap-3">
+      {error && <div className="text-xs text-red">{error}</div>}
       <div className="flex items-center justify-between">
         <span className="text-xs text-text-muted">{jobs.length} jobs</span>
         <button
@@ -279,21 +288,12 @@ function CronJobCard({ job, onToggle, onRunNow, onDelete }: {
     <div className={`rounded-lg border ${job.enabled ? 'border-border' : 'border-border/50 opacity-60'} bg-bg`}>
       <div className="flex items-center gap-3 px-4 py-3">
         {/* Toggle */}
-        <button
-          onClick={onToggle}
-          className={`w-8 h-4 rounded-full relative transition-colors ${
-            job.enabled ? 'bg-green' : 'bg-bg-tertiary'
-          }`}
-        >
-          <div className={`w-3 h-3 rounded-full bg-white absolute top-0.5 transition-all ${
-            job.enabled ? 'left-4.5' : 'left-0.5'
-          }`} />
-        </button>
+        <Toggle size="sm" checked={job.enabled} onChange={() => onToggle()} />
 
         {/* Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className={`text-sm font-medium ${isHeartbeat ? 'text-purple-400' : 'text-text'}`}>
+            <span className={`text-sm font-medium ${isHeartbeat ? 'text-purple' : 'text-text'}`}>
               {isHeartbeat ? '💓 heartbeat' : job.name}
             </span>
             <span className="text-xs text-text-muted">{job.id}</span>
@@ -470,13 +470,15 @@ function HeartbeatSection() {
     api.heartbeat.status().then(({ enabled }) => setEnabled(enabled)).catch(console.warn)
   }, [])
 
-  const handleToggle = async () => {
-    if (enabled === null) return
+  const [error, setError] = useState<string | null>(null)
+
+  const handleToggle = async (v: boolean) => {
     try {
-      const result = await api.heartbeat.setEnabled(!enabled)
+      const result = await api.heartbeat.setEnabled(v)
       setEnabled(result.enabled)
-    } catch (err) {
-      console.warn('Failed to toggle heartbeat:', err)
+    } catch {
+      setError('Failed to toggle heartbeat')
+      setTimeout(() => setError(null), 3000)
     }
   }
 
@@ -515,25 +517,18 @@ function HeartbeatSection() {
             </span>
           )}
 
+          {error && <span className="text-xs text-red">{error}</span>}
+
           <button
             onClick={handleTrigger}
             disabled={triggering}
-            className="px-3 py-1.5 text-xs rounded-md bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:bg-purple-500/30 transition-colors disabled:opacity-50"
+            className="px-3 py-1.5 text-xs rounded-md bg-purple-dim text-purple border border-purple/30 hover:bg-purple/30 transition-colors disabled:opacity-50"
           >
             {triggering ? 'Triggering...' : 'Trigger Now'}
           </button>
 
           {enabled !== null && (
-            <button
-              onClick={handleToggle}
-              className={`w-10 h-5 rounded-full relative transition-colors ${
-                enabled ? 'bg-green' : 'bg-bg-tertiary'
-              }`}
-            >
-              <div className={`w-4 h-4 rounded-full bg-white absolute top-0.5 transition-all ${
-                enabled ? 'left-5.5' : 'left-0.5'
-              }`} />
-            </button>
+            <Toggle checked={enabled} onChange={handleToggle} />
           )}
         </div>
       </div>

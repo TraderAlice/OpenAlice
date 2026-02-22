@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Sidebar } from './components/Sidebar'
 import { ChatPage } from './pages/ChatPage'
 import { EventsPage } from './pages/EventsPage'
@@ -10,16 +10,6 @@ export function App() {
   const [page, setPage] = useState<Page>('chat')
   const [sseConnected, setSseConnected] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
-
-  // Track SSE connection state
-  useEffect(() => {
-    const es = new EventSource('/api/chat/events')
-
-    es.onopen = () => setSseConnected(true)
-    es.onerror = () => setSseConnected(false)
-
-    return () => es.close()
-  }, [])
 
   return (
     <div className="flex h-full">
@@ -44,7 +34,7 @@ export function App() {
           </button>
           <span className="text-sm font-semibold text-text">Open Alice</span>
         </div>
-        {page === 'chat' && <ChatPage />}
+        {page === 'chat' && <ChatPage onSSEStatus={setSseConnected} />}
         {page === 'events' && <EventsPage />}
         {page === 'settings' && <SettingsPage />}
       </main>

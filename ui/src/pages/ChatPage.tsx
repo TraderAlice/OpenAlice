@@ -3,9 +3,14 @@ import { api, type ChatMessage as ChatMessageType } from '../api'
 import { ChatMessage, ThinkingIndicator } from '../components/ChatMessage'
 import { ChatInput } from '../components/ChatInput'
 
-export function ChatPage() {
-  const [messages, setMessages] = useState<ChatMessageType[]>([])
+interface ChatPageProps {
+  onSSEStatus?: (connected: boolean) => void
+}
+
+export function ChatPage({ onSSEStatus }: ChatPageProps) {
+  const [messages, setMessages] = useState<(ChatMessageType & { _id: number })[]>([])
   const [isWaiting, setIsWaiting] = useState(false)
+  const nextId = useRef(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const userScrolledUp = useRef(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -34,28 +39,30 @@ export function ChatPage() {
   // Load chat history
   useEffect(() => {
     api.chat.history(100).then(({ messages }) => {
-      setMessages(messages)
+      setMessages(messages.map(m => ({ ...m, _id: nextId.current++ })))
     }).catch((err) => {
       console.warn('Failed to load history:', err)
     })
   }, [])
 
-  // Connect SSE for push notifications
+  // Connect SSE for push notifications + report connection status
   useEffect(() => {
     const es = api.chat.connectSSE((data) => {
       if (data.type === 'message' && data.text) {
         setMessages((prev) => [
           ...prev,
-          { role: 'notification', text: data.text },
+          { role: 'notification', text: data.text, _id: nextId.current++ },
         ])
       }
     })
-    return () => es.close()
-  }, [])
+    es.onopen = () => onSSEStatus?.(true)
+    es.onerror = () => onSSEStatus?.(false)
+    return () => { es.close(); onSSEStatus?.(false) }
+  }, [onSSEStatus])
 
   // Send message
   const handleSend = useCallback(async (text: string) => {
-    setMessages((prev) => [...prev, { role: 'user', text }])
+    setMessages((prev) => [...prev, { role: 'user', text, _id: nextId.current++ }])
     setIsWaiting(true)
 
     try {
@@ -67,7 +74,7 @@ export function ChatPage() {
           if (m.type === 'image') {
             setMessages((prev) => [
               ...prev,
-              { role: 'assistant', text: `![image](${m.url})` },
+              { role: 'assistant', text: `![image](${m.url})`, _id: nextId.current++ },
             ])
           }
         }
@@ -75,13 +82,13 @@ export function ChatPage() {
 
       // Add text response
       if (data.text) {
-        setMessages((prev) => [...prev, { role: 'assistant', text: data.text }])
+        setMessages((prev) => [...prev, { role: 'assistant', text: data.text, _id: nextId.current++ }])
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error'
       setMessages((prev) => [
         ...prev,
-        { role: 'notification', text: `Error: ${msg}` },
+        { role: 'notification', text: `Error: ${msg}`, _id: nextId.current++ },
       ])
     } finally {
       setIsWaiting(false)
@@ -97,8 +104,8 @@ export function ChatPage() {
             Send a message to start chatting
           </div>
         )}
-        {messages.map((msg, i) => (
-          <ChatMessage key={i} role={msg.role} text={msg.text} timestamp={msg.timestamp} />
+        {messages.map((msg) => (
+          <ChatMessage key={msg._id} role={msg.role} text={msg.text} timestamp={msg.timestamp} />
         ))}
         {isWaiting && <ThinkingIndicator />}
         <div ref={messagesEndRef} />

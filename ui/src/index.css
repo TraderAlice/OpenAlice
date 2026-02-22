@@ -16,6 +16,8 @@
   --color-notification-border: #d29922;
   --color-green: #3fb950;
   --color-red: #f85149;
+  --color-purple: #a78bfa;
+  --color-purple-dim: rgba(139, 92, 246, 0.2);
 
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Microsoft YaHei", "Hiragino Sans GB", "Noto Sans CJK SC", sans-serif;
@@ -105,6 +107,26 @@ body,
 }
 .markdown-content a:hover {
   text-decoration: underline;
+}
+.markdown-content h1 {
+  font-size: 1.25em;
+  font-weight: 600;
+  margin: 0.75em 0 0.5em;
+}
+.markdown-content h2 {
+  font-size: 1.125em;
+  font-weight: 600;
+  margin: 0.75em 0 0.5em;
+}
+.markdown-content h3 {
+  font-size: 1em;
+  font-weight: 600;
+  margin: 0.5em 0 0.25em;
+}
+.markdown-content h1:first-child,
+.markdown-content h2:first-child,
+.markdown-content h3:first-child {
+  margin-top: 0;
 }
 
 /* Thinking animation */

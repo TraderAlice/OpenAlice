@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { Marked } from 'marked'
 import { markedHighlight } from 'marked-highlight'
 import hljs from 'highlight.js'
+import DOMPurify from 'dompurify'
 import 'highlight.js/styles/github-dark.min.css'
 
 const marked = new Marked(
@@ -26,7 +27,7 @@ interface ChatMessageProps {
 export function ChatMessage({ role, text, timestamp }: ChatMessageProps) {
   const html = useMemo(() => {
     if (role === 'user') return null
-    return marked.parse(text) as string
+    return DOMPurify.sanitize(marked.parse(text) as string)
   }, [role, text])
 
   return (
@@ -49,7 +50,7 @@ export function ChatMessage({ role, text, timestamp }: ChatMessageProps) {
         }`}
       >
         {role === 'user' ? (
-          text
+          <span className="whitespace-pre-wrap">{text}</span>
         ) : role === 'notification' ? (
           <div className="markdown-content" dangerouslySetInnerHTML={{ __html: `\ud83d\udd14 ${html}` }} />
         ) : (

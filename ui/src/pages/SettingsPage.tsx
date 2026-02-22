@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { api, type AppConfig } from '../api'
+import { Toggle } from '../components/Toggle'
 
 const SECTIONS = [
   { id: 'ai-provider', label: 'AI Provider' },
@@ -55,9 +56,16 @@ export function SettingsPage() {
     el?.scrollIntoView({ behavior: 'smooth' })
   }
 
+  const toastTimer = useRef<ReturnType<typeof setTimeout>>(null)
+
   const showToast = useCallback((msg: string, error = false) => {
     setToast({ msg, error })
-    setTimeout(() => setToast(null), 2000)
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    toastTimer.current = setTimeout(() => setToast(null), 2000)
+  }, [])
+
+  useEffect(() => () => {
+    if (toastTimer.current) clearTimeout(toastTimer.current)
   }, [])
 
   const handleProviderSwitch = useCallback(
@@ -234,25 +242,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button
-      role="switch"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-      className={`relative w-10 h-[22px] rounded-full cursor-pointer transition-colors ${
-        checked ? 'bg-accent-dim' : 'bg-bg-tertiary'
-      }`}
-    >
-      <span
-        className={`absolute w-4 h-4 rounded-full bottom-[3px] left-[3px] transition-all ${
-          checked ? 'translate-x-[18px] bg-accent' : 'bg-text-muted'
-        }`}
-      />
-    </button>
-  )
-}
-
 const inputClass =
   'w-full px-2.5 py-2 bg-bg text-text border border-border rounded-md font-sans text-sm outline-none transition-colors focus:border-accent'
 
@@ -350,6 +339,11 @@ function HeartbeatForm({
 }) {
   const [hbEnabled, setHbEnabled] = useState(config.heartbeat?.enabled || false)
   const [hbEvery, setHbEvery] = useState(config.heartbeat?.every || '30m')
+
+  // Sync enabled state from API on mount (may differ from config if toggled on Events page)
+  useEffect(() => {
+    api.heartbeat.status().then(({ enabled }) => setHbEnabled(enabled)).catch(() => {})
+  }, [])
 
   return (
     <>
