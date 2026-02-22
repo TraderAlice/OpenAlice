@@ -28,6 +28,16 @@ export class OpenBBCommodityClient {
     return this.request('/psd_data', params)
   }
 
+  // ==================== EIA ====================
+
+  async getPetroleumStatus(params: Record<string, unknown>) {
+    return this.request('/petroleum_status_report', params)
+  }
+
+  async getEnergyOutlook(params: Record<string, unknown>) {
+    return this.request('/short_term_energy_outlook', params)
+  }
+
   // ==================== Internal ====================
 
   private async request<T = Record<string, unknown>>(path: string, params: Record<string, unknown>): Promise<T[]> {
