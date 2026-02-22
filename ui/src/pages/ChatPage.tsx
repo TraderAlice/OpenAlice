@@ -107,7 +107,7 @@ export function ChatPage({ onSSEStatus }: ChatPageProps) {
   return (
     <div className="flex flex-col flex-1 min-h-0 max-w-[800px] mx-auto w-full">
       {/* Messages */}
-      <div ref={containerRef} className="flex-1 overflow-y-auto px-5 py-5 space-y-5 relative">
+      <div ref={containerRef} className="flex-1 overflow-y-auto px-5 py-6 relative">
         {messages.length === 0 && !isWaiting && (
           <div className="flex-1 flex flex-col items-center justify-center h-full gap-4 select-none">
             <div className="w-14 h-14 rounded-2xl bg-bg-secondary border border-border flex items-center justify-center text-accent">
@@ -121,10 +121,27 @@ export function ChatPage({ onSSEStatus }: ChatPageProps) {
             </div>
           </div>
         )}
-        {messages.map((msg) => (
-          <ChatMessage key={msg._id} role={msg.role} text={msg.text} timestamp={msg.timestamp} />
-        ))}
-        {isWaiting && <ThinkingIndicator />}
+        <div className="flex flex-col">
+          {messages.map((msg, i) => {
+            const prev = messages[i - 1]
+            const isGrouped = prev?.role === msg.role && msg.role === 'assistant'
+            return (
+              <div key={msg._id} className={isGrouped ? 'mt-1' : i === 0 ? '' : 'mt-5'}>
+                <ChatMessage
+                  role={msg.role}
+                  text={msg.text}
+                  timestamp={msg.timestamp}
+                  isGrouped={isGrouped}
+                />
+              </div>
+            )
+          })}
+          {isWaiting && (
+            <div className={`${messages.length > 0 ? 'mt-5' : ''}`}>
+              <ThinkingIndicator />
+            </div>
+          )}
+        </div>
         <div ref={messagesEndRef} />
       </div>
 

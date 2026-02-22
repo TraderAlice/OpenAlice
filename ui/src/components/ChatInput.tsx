@@ -35,8 +35,8 @@ export function ChatInput({ disabled, onSend }: ChatInputProps) {
   }, [])
 
   return (
-    <div className="px-4 py-3 shrink-0">
-      <div className="flex items-end gap-2 bg-bg-secondary border border-border rounded-2xl px-4 py-2 max-w-[800px] mx-auto transition-colors focus-within:border-accent/50">
+    <div className="px-4 pt-2 pb-4 pb-[max(1rem,env(safe-area-inset-bottom))] shrink-0">
+      <div className="flex items-end gap-2 bg-bg-secondary border border-border rounded-2xl px-4 py-2 max-w-[800px] mx-auto transition-colors focus-within:border-accent/50 shadow-sm">
         <textarea
           ref={textareaRef}
           disabled={disabled}
