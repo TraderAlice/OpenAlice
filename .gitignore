@@ -21,6 +21,9 @@ Thumbs.db
 *.swp
 *.swo
 
+# Build cache
+*.tsbuildinfo
+
 # Test
 coverage/
 
