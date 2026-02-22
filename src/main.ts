@@ -13,7 +13,7 @@ import { KlineStore, NewsStore, RealMarketDataProvider, RealNewsProvider, fetchR
 import type { MarketData, NewsItem } from './extension/analysis-kit/index.js'
 import { createThinkingTools } from './extension/thinking-kit/index.js'
 import { createAnalysisTools } from './extension/analysis-tools/index.js'
-import type { ICryptoTradingEngine, Operation, WalletExportState } from './extension/crypto-trading/index.js'
+import type { Operation, WalletExportState } from './extension/crypto-trading/index.js'
 import {
   Wallet,
   initCryptoAllowedSymbols,
@@ -82,7 +82,7 @@ async function main() {
   } catch (err) {
     console.warn('crypto trading engine init failed (non-fatal, continuing without it):', err)
   }
-  const cryptoEngine: ICryptoTradingEngine = cryptoResult?.engine ?? null as unknown as ICryptoTradingEngine
+  const cryptoEngine = cryptoResult?.engine ?? null
 
   // Wallet: wire callbacks to crypto trading engine (or throw stubs if no provider)
   const cryptoWalletStateBridge = cryptoResult
@@ -255,7 +255,9 @@ async function main() {
     marketDataProvider: klineStore.marketDataProvider,
     getNewsV2: (o) => newsStore.getNewsV2(o),
   }))
-  toolCenter.register(createCryptoTradingTools(cryptoEngine, wallet, cryptoWalletStateBridge))
+  if (cryptoEngine) {
+    toolCenter.register(createCryptoTradingTools(cryptoEngine, wallet, cryptoWalletStateBridge))
+  }
   if (secResult) {
     toolCenter.register(createSecuritiesTradingTools(secResult.engine, secWallet, secWalletStateBridge))
   }

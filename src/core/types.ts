@@ -19,7 +19,7 @@ export interface EngineContext {
   config: Config
   klineStore: KlineStore
   newsStore: NewsStore
-  cryptoEngine: ICryptoTradingEngine
+  cryptoEngine: ICryptoTradingEngine | null
   engine: Engine
   eventLog: EventLog
   heartbeat: Heartbeat
