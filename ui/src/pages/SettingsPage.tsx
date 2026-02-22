@@ -88,10 +88,10 @@ export function SettingsPage() {
     <div className="flex flex-col flex-1 min-h-0">
       {/* Page header + section nav */}
       <div className="shrink-0 border-b border-border">
-        <div className="px-6 py-4">
+        <div className="px-4 md:px-6 py-4">
           <h2 className="text-base font-semibold text-text">Settings</h2>
         </div>
-        <div className="flex gap-1 px-6 pb-3">
+        <div className="flex gap-1 px-4 md:px-6 pb-3 overflow-x-auto">
           {visibleSections.map((s) => (
             <button
               key={s.id}
@@ -109,7 +109,7 @@ export function SettingsPage() {
       </div>
 
       {/* Scrollable content */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-5">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 md:px-6 py-5">
         {config && (
           <div className="max-w-[640px] space-y-8">
             {/* AI Provider */}
