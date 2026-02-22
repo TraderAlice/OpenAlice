@@ -1,36 +1,23 @@
-import {
-  SandboxConfig,
-} from './interfaces';
-import {
-  IMarketDataProvider,
-  INewsProvider,
-  NewsItem,
-  GetNewsV2Options,
-} from '../data/interfaces';
+import type { IMarketDataProvider } from '../data/interfaces';
+
 /**
- * Analysis sandbox (data access + cognitive state)
+ * K-line (candlestick) data store with time isolation.
  *
- * Core responsibilities:
- * 1. Maintains playheadTime -- current data timestamp, updated externally via setPlayheadTime()
- * 2. Provides market data, news, and cognition (frontal lobe) interfaces
- *
- * Not responsible for: trade execution (ITradingEngine), operation tracking (IWallet)
+ * Wraps an IMarketDataProvider and enforces that all queries
+ * are bounded by playheadTime (cannot see future data).
  */
-export class Sandbox {
+export class KlineStore {
   private playheadTime: Date;
-  private config: SandboxConfig;
+  private timeframe: string;
   readonly marketDataProvider: IMarketDataProvider;
-  readonly newsProvider: INewsProvider;
 
   constructor(
-    config: SandboxConfig,
+    config: { timeframe: string },
     marketDataProvider: IMarketDataProvider,
-    newsProvider: INewsProvider,
   ) {
-    this.config = config;
+    this.timeframe = config.timeframe;
     this.playheadTime = new Date();
     this.marketDataProvider = marketDataProvider;
-    this.newsProvider = newsProvider;
   }
 
   // ==================== Time management ====================
@@ -55,16 +42,9 @@ export class Sandbox {
           this.playheadTime,
           symbol,
         );
-        return { ...marketData, interval: this.config.timeframe };
+        return { ...marketData, interval: this.timeframe };
       }),
     );
-  }
-
-  async getNewsV2(options: Omit<GetNewsV2Options, 'endTime'>): Promise<NewsItem[]> {
-    return await this.newsProvider.getNewsV2({
-      ...options,
-      endTime: this.playheadTime,
-    });
   }
 
   /**
@@ -89,23 +69,22 @@ export class Sandbox {
   // ==================== Utility methods ====================
 
   /**
-   * Calculate the start time for looking back N candlesticks based on lookback
+   * Calculate the start time for looking back N candlesticks based on timeframe
    */
   calculatePreviousTime(lookback: number): Date {
-    const timeframe = this.config.timeframe;
     const startTime = new Date(this.playheadTime);
 
-    if (timeframe.endsWith('d')) {
-      const days = parseInt(timeframe.replace('d', ''));
+    if (this.timeframe.endsWith('d')) {
+      const days = parseInt(this.timeframe.replace('d', ''));
       startTime.setDate(startTime.getDate() - lookback * days);
-    } else if (timeframe.endsWith('h')) {
-      const hours = parseInt(timeframe.replace('h', ''));
+    } else if (this.timeframe.endsWith('h')) {
+      const hours = parseInt(this.timeframe.replace('h', ''));
       startTime.setHours(startTime.getHours() - lookback * hours);
-    } else if (timeframe.endsWith('m')) {
-      const minutes = parseInt(timeframe.replace('m', ''));
+    } else if (this.timeframe.endsWith('m')) {
+      const minutes = parseInt(this.timeframe.replace('m', ''));
       startTime.setMinutes(startTime.getMinutes() - lookback * minutes);
     } else {
-      throw new Error(`Unsupported timeframe: ${timeframe}`);
+      throw new Error(`Unsupported timeframe: ${this.timeframe}`);
     }
 
     return startTime;

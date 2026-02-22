@@ -9,7 +9,7 @@ import { McpPlugin } from './plugins/mcp.js'
 import { TelegramPlugin } from './connectors/telegram/index.js'
 import { WebPlugin } from './connectors/web/index.js'
 import { McpAskPlugin } from './connectors/mcp-ask/index.js'
-import { Sandbox, RealMarketDataProvider, RealNewsProvider, fetchRealtimeData } from './extension/analysis-kit/index.js'
+import { KlineStore, NewsStore, RealMarketDataProvider, RealNewsProvider, fetchRealtimeData } from './extension/analysis-kit/index.js'
 import type { MarketData, NewsItem } from './extension/analysis-kit/index.js'
 import { createThinkingTools } from './extension/thinking-kit/index.js'
 import { createAnalysisTools } from './extension/analysis-tools/index.js'
@@ -167,7 +167,7 @@ async function main() {
     ? SecWallet.restore(secSavedState, secWalletConfig)
     : new SecWallet(secWalletConfig)
 
-  // Sandbox (data access + realtime market & news data)
+  // Data stores (realtime market & news data)
   let marketData: Record<string, MarketData[]> = {}
   let news: NewsItem[] = []
   try {
@@ -180,11 +180,8 @@ async function main() {
   const marketProvider = new RealMarketDataProvider(marketData)
   const newsProvider = new RealNewsProvider(news)
 
-  const sandbox = new Sandbox(
-    { timeframe: config.engine.timeframe },
-    marketProvider,
-    newsProvider,
-  )
+  const klineStore = new KlineStore({ timeframe: config.engine.timeframe }, marketProvider)
+  const newsStore = new NewsStore(newsProvider)
 
   // Brain: cognitive state with commit-based tracking
   const brainDir = resolve('data/brain')
@@ -250,7 +247,14 @@ async function main() {
 
   const toolCenter = new ToolCenter()
   toolCenter.register(createThinkingTools())
-  toolCenter.register(createAnalysisTools(sandbox))
+  toolCenter.register(createAnalysisTools({
+    getPlayheadTime: () => klineStore.getPlayheadTime(),
+    getLatestOHLCV: (s) => klineStore.getLatestOHLCV(s),
+    getAvailableSymbols: () => klineStore.getAvailableSymbols(),
+    calculatePreviousTime: (l) => klineStore.calculatePreviousTime(l),
+    marketDataProvider: klineStore.marketDataProvider,
+    getNewsV2: (o) => newsStore.getNewsV2(o),
+  }))
   toolCenter.register(createCryptoTradingTools(cryptoEngine, wallet, cryptoWalletStateBridge))
   if (secResult) {
     toolCenter.register(createSecuritiesTradingTools(secResult.engine, secWallet, secWalletStateBridge))
@@ -316,7 +320,7 @@ async function main() {
     }))
   }
 
-  const ctx: EngineContext = { config, engine, sandbox, cryptoEngine, eventLog, heartbeat, cronEngine }
+  const ctx: EngineContext = { config, engine, klineStore, newsStore, cryptoEngine, eventLog, heartbeat, cronEngine }
 
   for (const plugin of plugins) {
     await plugin.start(ctx)
@@ -346,7 +350,9 @@ async function main() {
 
   console.log('engine: started')
   while (!stopped) {
-    sandbox.setPlayheadTime(new Date())
+    const now = new Date()
+    klineStore.setPlayheadTime(now)
+    newsStore.setPlayheadTime(now)
     await sleep(config.engine.interval)
   }
 }

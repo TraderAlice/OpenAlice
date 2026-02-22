@@ -18,7 +18,7 @@ export class HttpPlugin implements Plugin {
         ctx.cryptoEngine.getOrders(),
       ])
       return c.json({
-        playheadTime: ctx.sandbox.getPlayheadTime().toISOString(),
+        playheadTime: ctx.klineStore.getPlayheadTime().toISOString(),
         account,
         positions,
         orders,
