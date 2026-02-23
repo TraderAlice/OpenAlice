@@ -1,14 +1,19 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { api, type ChatMessage as ChatMessageType } from '../api'
-import { ChatMessage, ThinkingIndicator } from '../components/ChatMessage'
+import { api, type ChatHistoryItem, type ToolCall } from '../api'
+import { ChatMessage, ToolCallGroup, ThinkingIndicator } from '../components/ChatMessage'
 import { ChatInput } from '../components/ChatInput'
+
+/** Unified display item for the message list. */
+type DisplayItem =
+  | { kind: 'text'; role: 'user' | 'assistant' | 'notification'; text: string; timestamp?: string | null; _id: number }
+  | { kind: 'tool_calls'; calls: ToolCall[]; timestamp?: string; _id: number }
 
 interface ChatPageProps {
   onSSEStatus?: (connected: boolean) => void
 }
 
 export function ChatPage({ onSSEStatus }: ChatPageProps) {
-  const [messages, setMessages] = useState<(ChatMessageType & { _id: number })[]>([])
+  const [messages, setMessages] = useState<DisplayItem[]>([])
   const [isWaiting, setIsWaiting] = useState(false)
   const [showScrollBtn, setShowScrollBtn] = useState(false)
   const nextId = useRef(0)
@@ -42,7 +47,7 @@ export function ChatPage({ onSSEStatus }: ChatPageProps) {
   // Load chat history
   useEffect(() => {
     api.chat.history(100).then(({ messages }) => {
-      setMessages(messages.map(m => ({ ...m, _id: nextId.current++ })))
+      setMessages(messages.map((m): DisplayItem => ({ ...m, _id: nextId.current++ })))
     }).catch((err) => {
       console.warn('Failed to load history:', err)
     })
@@ -54,7 +59,7 @@ export function ChatPage({ onSSEStatus }: ChatPageProps) {
       if (data.type === 'message' && data.text) {
         setMessages((prev) => [
           ...prev,
-          { role: 'notification', text: data.text, _id: nextId.current++ },
+          { kind: 'text', role: 'notification', text: data.text, _id: nextId.current++ },
         ])
       }
     })
@@ -65,7 +70,7 @@ export function ChatPage({ onSSEStatus }: ChatPageProps) {
 
   // Send message
   const handleSend = useCallback(async (text: string) => {
-    setMessages((prev) => [...prev, { role: 'user', text, _id: nextId.current++ }])
+    setMessages((prev) => [...prev, { kind: 'text', role: 'user', text, _id: nextId.current++ }])
     setIsWaiting(true)
 
     try {
@@ -77,7 +82,7 @@ export function ChatPage({ onSSEStatus }: ChatPageProps) {
           if (m.type === 'image') {
             setMessages((prev) => [
               ...prev,
-              { role: 'assistant', text: `![image](${m.url})`, _id: nextId.current++ },
+              { kind: 'text', role: 'assistant', text: `![image](${m.url})`, _id: nextId.current++ },
             ])
           }
         }
@@ -85,13 +90,13 @@ export function ChatPage({ onSSEStatus }: ChatPageProps) {
 
       // Add text response
       if (data.text) {
-        setMessages((prev) => [...prev, { role: 'assistant', text: data.text, _id: nextId.current++ }])
+        setMessages((prev) => [...prev, { kind: 'text', role: 'assistant', text: data.text, _id: nextId.current++ }])
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error'
       setMessages((prev) => [
         ...prev,
-        { role: 'notification', text: `Error: ${msg}`, _id: nextId.current++ },
+        { kind: 'text', role: 'notification', text: `Error: ${msg}`, _id: nextId.current++ },
       ])
     } finally {
       setIsWaiting(false)
@@ -123,8 +128,26 @@ export function ChatPage({ onSSEStatus }: ChatPageProps) {
         )}
         <div className="flex flex-col">
           {messages.map((msg, i) => {
-            const prev = messages[i - 1]
-            const isGrouped = prev?.role === msg.role && msg.role === 'assistant'
+            const prev = i > 0 ? messages[i - 1] : undefined
+
+            if (msg.kind === 'tool_calls') {
+              // Tool calls get compact spacing, grouped under the preceding assistant block
+              const prevIsAssistantish = prev != null && (
+                prev.kind === 'tool_calls' ||
+                (prev.kind === 'text' && prev.role === 'assistant')
+              )
+              return (
+                <div key={msg._id} className={prevIsAssistantish ? 'mt-1' : i === 0 ? '' : 'mt-5'}>
+                  <ToolCallGroup calls={msg.calls} timestamp={msg.timestamp} />
+                </div>
+              )
+            }
+
+            const isGrouped =
+              msg.role === 'assistant' && prev != null && (
+                (prev.kind === 'text' && prev.role === 'assistant') ||
+                prev.kind === 'tool_calls'
+              )
             return (
               <div key={msg._id} className={isGrouped ? 'mt-1' : i === 0 ? '' : 'mt-5'}>
                 <ChatMessage

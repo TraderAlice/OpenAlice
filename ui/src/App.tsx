@@ -3,8 +3,9 @@ import { Sidebar } from './components/Sidebar'
 import { ChatPage } from './pages/ChatPage'
 import { EventsPage } from './pages/EventsPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { DataSourcesPage } from './pages/DataSourcesPage'
 
-export type Page = 'chat' | 'events' | 'settings'
+export type Page = 'chat' | 'events' | 'data-sources' | 'settings'
 
 export function App() {
   const [page, setPage] = useState<Page>('chat')
@@ -36,6 +37,7 @@ export function App() {
         </div>
         {page === 'chat' && <ChatPage onSSEStatus={setSseConnected} />}
         {page === 'events' && <EventsPage />}
+        {page === 'data-sources' && <DataSourcesPage />}
         {page === 'settings' && <SettingsPage />}
       </main>
     </div>

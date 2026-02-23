@@ -19,7 +19,7 @@ Your one-person Wall Street. Alice is an AI trading agent that gives you your ow
 - **Dual AI provider** — switch between Claude Code CLI and Vercel AI SDK at runtime, no restart needed
 - **Crypto trading** — CCXT-based execution (Bybit, OKX, Binance, etc.) with a git-like wallet (stage, commit, push)
 - **Securities trading** — Alpaca integration for US equities with the same wallet workflow
-- **Market analysis** — technical indicators, news search, and price simulation via sandboxed tools
+- **Market data** — OpenBB-powered equity, crypto, commodity, and currency data layers with symbol search and technical indicator calculator
 - **Cognitive state** — persistent "brain" with frontal lobe memory, emotion tracking, and commit history
 - **Event log** — persistent append-only JSONL event log with real-time subscriptions and crash recovery
 - **Cron scheduling** — event-driven cron system with AI-powered job execution and automatic delivery to the last-interacted channel
@@ -46,6 +46,7 @@ graph LR
   end
 
   subgraph Extensions
+    OBB[OpenBB Data]
     AK[Analysis Kit]
     CT[Crypto Trading]
     ST[Securities Trading]
@@ -72,6 +73,7 @@ graph LR
   E --> S
   TC -->|Vercel tools| VS
   TC -->|MCP tools| MCP
+  OBB --> AK
   AK --> TC
   CT --> TC
   ST --> TC
@@ -117,8 +119,8 @@ cp .env.example .env    # then fill in your keys
 
 OpenAlice ships with two provider modes:
 
-- **Vercel AI SDK** (default) — runs the agent in-process. Supports any provider compatible with the [Vercel AI SDK](https://sdk.vercel.ai/docs) (Anthropic, OpenAI, Google, etc.). Swap the provider implementation in `src/providers/vercel-ai-sdk/` to use your preferred model. Requires an API key for your chosen provider (e.g. `ANTHROPIC_API_KEY` for Anthropic).
-- **Claude Code** (file-driven mode) — spawns `claude -p` as a subprocess, giving the agent full Claude Code capabilities. Requires [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated on the host machine. No separate API key needed — uses your Claude Code login. To switch models, see [how to change Claude Code's model](https://docs.anthropic.com/en/docs/claude-code/settings#model-configuration).
+- **Claude Code** (default) — spawns `claude -p` as a subprocess, giving the agent full Claude Code capabilities. Requires [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated on the host machine. No separate API key needed — uses your Claude Code login. To switch models, see [how to change Claude Code's model](https://docs.anthropic.com/en/docs/claude-code/settings#model-configuration).
+- **Vercel AI SDK** — runs the agent in-process. Supports any provider compatible with the [Vercel AI SDK](https://sdk.vercel.ai/docs) (Anthropic, OpenAI, Google, etc.). Swap the provider implementation in `src/providers/vercel-ai-sdk/` to use your preferred model. Requires an API key for your chosen provider (e.g. `ANTHROPIC_API_KEY` for Anthropic).
 
 ### Crypto Trading
 
@@ -206,11 +208,21 @@ src/
     claude-code/             # Claude Code CLI subprocess wrapper
     vercel-ai-sdk/           # Vercel AI SDK ToolLoopAgent wrapper
   extension/
-    analysis-kit/            # Market data, indicators, news, sandbox
+    analysis-kit/            # Indicator calculator and market data tools
+    archive-analysis/        # Legacy market data layer (KlineStore, NewsStore)
+    equity/                  # Equity search and data adapter
+    crypto/                  # Crypto search and data adapter
+    currency/                # Currency search and data adapter
     crypto-trading/          # CCXT integration, wallet, tools
     securities-trading/      # Alpaca integration, wallet, tools
+    thinking-kit/            # Reasoning and calculation tools
     brain/                   # Cognitive state (memory, emotion)
     browser/                 # Browser automation bridge (via OpenClaw)
+  openbb/
+    equity/                  # OpenBB equity data layer (price, fundamentals, estimates, etc.)
+    crypto/                  # OpenBB crypto data layer
+    commodity/               # OpenBB commodity data layer (EIA, spot prices)
+    currency/                # OpenBB currency data layer
   connectors/
     web/                     # Web UI chat (Hono, SSE push)
     telegram/                # Telegram bot (grammY, polling, commands)

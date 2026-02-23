@@ -318,3 +318,100 @@ export function toTextHistory(entries: SessionEntry[]): Array<{ role: 'user' | '
 
   return history
 }
+
+// ==================== Chat History (for Web UI) ====================
+
+/** A display-ready chat history item — either plain text or a group of paired tool calls. */
+export type ChatHistoryItem =
+  | { kind: 'text'; role: 'user' | 'assistant'; text: string; timestamp?: string }
+  | { kind: 'tool_calls'; calls: Array<{ name: string; input: string; result?: string }>; timestamp?: string }
+
+/** Strip common MCP tool-name prefixes for cleaner display. */
+function shortToolName(name: string): string {
+  return name.replace(/^mcp__[^_]+__/, '')
+}
+
+/**
+ * Convert session entries → display-ready chat history for the Web UI.
+ *
+ * - Text blocks are preserved as-is.
+ * - tool_use entries are paired with their corresponding tool_result entries
+ *   and emitted as `{ kind: 'tool_calls' }` items.
+ * - Consumed tool_result entries are skipped so they don't appear twice.
+ */
+export function toChatHistory(entries: SessionEntry[]): ChatHistoryItem[] {
+  const items: ChatHistoryItem[] = []
+
+  // Set of entry indices that have been consumed as tool results.
+  const consumed = new Set<number>()
+
+  for (let i = 0; i < entries.length; i++) {
+    if (consumed.has(i)) continue
+
+    const entry = entries[i]
+    if (entry.type === 'system') continue
+
+    const { message } = entry
+    if (message.role !== 'user' && message.role !== 'assistant') continue
+
+    // Plain string content — always text.
+    if (typeof message.content === 'string') {
+      if (message.content.trim()) {
+        items.push({ kind: 'text', role: message.role as 'user' | 'assistant', text: message.content, timestamp: entry.timestamp })
+      }
+      continue
+    }
+
+    // Content block array — classify by block types present.
+    const textBlocks = message.content.filter((b): b is Extract<ContentBlock, { type: 'text' }> => b.type === 'text')
+    const toolUseBlocks = message.content.filter((b): b is Extract<ContentBlock, { type: 'tool_use' }> => b.type === 'tool_use')
+    const toolResultBlocks = message.content.filter((b): b is Extract<ContentBlock, { type: 'tool_result' }> => b.type === 'tool_result')
+
+    // If this entry has tool_use blocks, pair them with tool_results from the next entry.
+    if (toolUseBlocks.length > 0) {
+      // Build a result map from the next entry (if it contains tool_results).
+      const resultMap = new Map<string, string>()
+      if (i + 1 < entries.length) {
+        const nextEntry = entries[i + 1]
+        if (nextEntry.type !== 'system' && typeof nextEntry.message.content !== 'string') {
+          for (const block of nextEntry.message.content) {
+            if (block.type === 'tool_result') {
+              resultMap.set(block.tool_use_id, block.content)
+            }
+          }
+          if (resultMap.size > 0) {
+            consumed.add(i + 1)
+          }
+        }
+      }
+
+      const calls = toolUseBlocks.map((tu) => ({
+        name: shortToolName(tu.name),
+        input: truncate(JSON.stringify(tu.input), TOOL_SUMMARY_MAX),
+        result: resultMap.get(tu.id) ? truncate(resultMap.get(tu.id)!, TOOL_SUMMARY_MAX) : undefined,
+      }))
+
+      items.push({ kind: 'tool_calls', calls, timestamp: entry.timestamp })
+
+      // If there were also text blocks in this same entry, emit them separately.
+      const text = textBlocks.map((b) => b.text).join('\n')
+      if (text.trim()) {
+        items.push({ kind: 'text', role: message.role as 'user' | 'assistant', text, timestamp: entry.timestamp })
+      }
+      continue
+    }
+
+    // Pure tool_result entry (not consumed by a preceding tool_use) — skip it.
+    if (toolResultBlocks.length > 0 && textBlocks.length === 0) {
+      continue
+    }
+
+    // Text-only entry.
+    const text = textBlocks.map((b) => b.text).join('\n')
+    if (text.trim()) {
+      items.push({ kind: 'text', role: message.role as 'user' | 'assistant', text, timestamp: entry.timestamp })
+    }
+  }
+
+  return items
+}

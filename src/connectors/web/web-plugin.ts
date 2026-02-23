@@ -7,7 +7,7 @@ import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import type { Plugin, EngineContext } from '../../core/types.js'
-import { SessionStore, toTextHistory } from '../../core/session.js'
+import { SessionStore, toChatHistory } from '../../core/session.js'
 import { registerConnector, touchInteraction } from '../../core/connector-registry.js'
 import { loadConfig, writeConfigSection, type ConfigSection } from '../../core/config.js'
 import { readAIConfig, writeAIConfig, type AIProvider } from '../../core/ai-config.js'
@@ -97,21 +97,10 @@ export class WebPlugin implements Plugin {
       const limit = Number(c.req.query('limit')) || 100
 
       const entries = await this.session.readActive()
-      const history = toTextHistory(entries)
-      const trimmed = history.slice(-limit)
+      const items = toChatHistory(entries)
+      const trimmed = items.slice(-limit)
 
-      // Attach timestamps from the original entries (best-effort match)
-      const entryTimestamps = entries
-        .filter((e) => e.type === 'user' || e.type === 'assistant')
-        .map((e) => e.timestamp)
-
-      const messages = trimmed.map((h, i) => ({
-        role: h.role,
-        text: h.text,
-        timestamp: entryTimestamps[entryTimestamps.length - trimmed.length + i] ?? null,
-      }))
-
-      return c.json({ messages })
+      return c.json({ messages: trimmed })
     })
 
     // ==================== SSE endpoint ====================
