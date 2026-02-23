@@ -190,6 +190,7 @@ export function SettingsPage() {
             <Section id="heartbeat" title="Heartbeat" description="Periodic self-check. Alice reviews markets, news and alerts at the configured interval, and only pushes a notification when there's something worth your attention. Interval format: 30m, 1h, 6h.">
               <HeartbeatForm config={config} onSave={saveSection} showToast={showToast} />
             </Section>
+
           </div>
         )}
       </div>
