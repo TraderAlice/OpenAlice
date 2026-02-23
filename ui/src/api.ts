@@ -5,13 +5,25 @@
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'notification'
   text: string
-  timestamp?: number | null
+  timestamp?: string | null
 }
 
 export interface ChatResponse {
   text: string
   media: Array<{ type: 'image'; url: string }>
 }
+
+/** A tool call paired with its result (used in history). */
+export interface ToolCall {
+  name: string
+  input: string
+  result?: string
+}
+
+/** Display-ready chat history item from the backend. */
+export type ChatHistoryItem =
+  | { kind: 'text'; role: 'user' | 'assistant'; text: string; timestamp?: string }
+  | { kind: 'tool_calls'; calls: ToolCall[]; timestamp?: string }
 
 export interface AppConfig {
   aiProvider: string
@@ -73,7 +85,7 @@ export const api = {
       return res.json()
     },
 
-    async history(limit = 100): Promise<{ messages: ChatMessage[] }> {
+    async history(limit = 100): Promise<{ messages: ChatHistoryItem[] }> {
       const res = await fetch(`/api/chat/history?limit=${limit}`)
       if (!res.ok) throw new Error('Failed to load history')
       return res.json()

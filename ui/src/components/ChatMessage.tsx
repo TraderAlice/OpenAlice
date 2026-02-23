@@ -1,4 +1,5 @@
-import { useMemo, useRef, useEffect, useCallback } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
+import type { ToolCall } from '../api'
 import { Marked } from 'marked'
 import { markedHighlight } from 'marked-highlight'
 import hljs from 'highlight.js'
@@ -21,7 +22,7 @@ const marked = new Marked(
 interface ChatMessageProps {
   role: 'user' | 'assistant' | 'notification'
   text: string
-  timestamp?: number | null
+  timestamp?: string | number | null
   /** True when this message follows another message of the same role — hides the label/avatar */
   isGrouped?: boolean
 }
@@ -121,6 +122,59 @@ export function ChatMessage({ role, text, timestamp, isGrouped }: ChatMessagePro
       </div>
       {timestamp && (
         <div className="text-[11px] text-text-muted mt-1 ml-8 opacity-0 group-hover:opacity-100 transition-opacity">
+          {new Date(timestamp).toLocaleString()}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ==================== Tool Call Group ====================
+
+interface ToolCallGroupProps {
+  calls: ToolCall[]
+  timestamp?: string | null
+}
+
+export function ToolCallGroup({ calls, timestamp }: ToolCallGroupProps) {
+  const [expanded, setExpanded] = useState(false)
+
+  const summary = calls.map((c) => c.name).join(', ')
+
+  return (
+    <div className="flex flex-col items-start ml-8">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-bg-secondary border border-border text-text-muted text-[12px] hover:text-text hover:border-accent/40 transition-colors cursor-pointer select-none"
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 opacity-60">
+          <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+        </svg>
+        <span className="truncate max-w-[400px]">{summary}</span>
+        <svg
+          width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+          className={`shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`}
+        >
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+      </button>
+
+      {expanded && (
+        <div className="mt-1 ml-1 border-l-2 border-border pl-3 flex flex-col gap-2 py-1">
+          {calls.map((call, i) => (
+            <div key={i} className="text-[12px]">
+              <div className="text-text-muted font-medium">{call.name}</div>
+              <pre className="text-[11px] text-text-muted/70 font-mono whitespace-pre-wrap break-all mt-0.5 leading-relaxed">{call.input}</pre>
+              {call.result && (
+                <pre className="text-[11px] text-green/80 font-mono whitespace-pre-wrap break-all mt-0.5 leading-relaxed">{call.result}</pre>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {timestamp && (
+        <div className="text-[11px] text-text-muted mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
           {new Date(timestamp).toLocaleString()}
         </div>
       )}
