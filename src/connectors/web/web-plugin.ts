@@ -9,7 +9,7 @@ import { randomUUID } from 'node:crypto'
 import type { Plugin, EngineContext } from '../../core/types.js'
 import { SessionStore, toChatHistory } from '../../core/session.js'
 import { registerConnector, touchInteraction } from '../../core/connector-registry.js'
-import { loadConfig, writeConfigSection, type ConfigSection } from '../../core/config.js'
+import { loadConfig, writeConfigSection, readApiKeysConfig, type ConfigSection } from '../../core/config.js'
 import { readAIConfig, writeAIConfig, type AIProvider } from '../../core/ai-config.js'
 
 export interface WebConfig {
@@ -178,7 +178,7 @@ export class WebPlugin implements Plugin {
     app.put('/api/config/:section', async (c) => {
       try {
         const section = c.req.param('section') as ConfigSection
-        const validSections: ConfigSection[] = ['engine', 'model', 'agent', 'crypto', 'securities', 'compaction', 'aiProvider', 'heartbeat']
+        const validSections: ConfigSection[] = ['engine', 'model', 'agent', 'crypto', 'securities', 'compaction', 'aiProvider', 'heartbeat', 'apiKeys']
         if (!validSections.includes(section)) {
           return c.json({ error: `Invalid section "${section}". Valid: ${validSections.join(', ')}` }, 400)
         }
@@ -189,6 +189,20 @@ export class WebPlugin implements Plugin {
         if (err instanceof Error && err.name === 'ZodError') {
           return c.json({ error: 'Validation failed', details: JSON.parse(err.message) }, 400)
         }
+        return c.json({ error: String(err) }, 500)
+      }
+    })
+
+    // ==================== API Keys status ====================
+    app.get('/api/config/api-keys/status', async (c) => {
+      try {
+        const keys = await readApiKeysConfig()
+        return c.json({
+          anthropic: !!keys.anthropic,
+          openai: !!keys.openai,
+          google: !!keys.google,
+        })
+      } catch (err) {
         return c.json({ error: String(err) }, 500)
       }
     })

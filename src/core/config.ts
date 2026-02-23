@@ -17,7 +17,7 @@ const engineSchema = z.object({
 
 const modelSchema = z.object({
   provider: z.string().default('anthropic'),
-  model: z.string().default('claude-sonnet-4-5-20250929'),
+  model: z.string().default('claude-sonnet-4-6'),
 })
 
 const agentSchema = z.object({
@@ -108,6 +108,12 @@ export const aiProviderSchema = z.object({
   provider: z.enum(['claude-code', 'vercel-ai-sdk']).default('claude-code'),
 })
 
+const apiKeysSchema = z.object({
+  anthropic: z.string().optional(),
+  openai: z.string().optional(),
+  google: z.string().optional(),
+})
+
 const heartbeatSchema = z.object({
   enabled: z.boolean().default(false),
   every: z.string().default('30m'),
@@ -127,6 +133,7 @@ export type Config = {
   compaction: z.infer<typeof compactionSchema>
   aiProvider: z.infer<typeof aiProviderSchema>
   heartbeat: z.infer<typeof heartbeatSchema>
+  apiKeys: z.infer<typeof apiKeysSchema>
 }
 
 // ==================== Loader ====================
@@ -154,7 +161,7 @@ async function parseAndSeed<T>(filename: string, schema: z.ZodType<T>, raw: unkn
 }
 
 export async function loadConfig(): Promise<Config> {
-  const files = ['engine.json', 'model.json', 'agent.json', 'crypto.json', 'securities.json', 'openbb.json', 'compaction.json', 'ai-provider.json', 'heartbeat.json'] as const
+  const files = ['engine.json', 'model.json', 'agent.json', 'crypto.json', 'securities.json', 'openbb.json', 'compaction.json', 'ai-provider.json', 'heartbeat.json', 'api-keys.json'] as const
   const raws = await Promise.all(files.map((f) => loadJsonFile(f)))
 
   return {
@@ -167,6 +174,7 @@ export async function loadConfig(): Promise<Config> {
     compaction: await parseAndSeed(files[6], compactionSchema, raws[6]),
     aiProvider: await parseAndSeed(files[7], aiProviderSchema, raws[7]),
     heartbeat:  await parseAndSeed(files[8], heartbeatSchema, raws[8]),
+    apiKeys:    await parseAndSeed(files[9], apiKeysSchema, raws[9]),
   }
 }
 
@@ -179,6 +187,26 @@ export async function readAgentConfig() {
     return agentSchema.parse(raw)
   } catch {
     return agentSchema.parse({})
+  }
+}
+
+/** Read model config from disk (called per-request for hot-reload). */
+export async function readModelConfig() {
+  try {
+    const raw = JSON.parse(await readFile(resolve(CONFIG_DIR, 'model.json'), 'utf-8'))
+    return modelSchema.parse(raw)
+  } catch {
+    return modelSchema.parse({})
+  }
+}
+
+/** Read API keys config from disk (called per-request for hot-reload). */
+export async function readApiKeysConfig() {
+  try {
+    const raw = JSON.parse(await readFile(resolve(CONFIG_DIR, 'api-keys.json'), 'utf-8'))
+    return apiKeysSchema.parse(raw)
+  } catch {
+    return apiKeysSchema.parse({})
   }
 }
 
@@ -196,6 +224,7 @@ const sectionSchemas: Record<ConfigSection, z.ZodTypeAny> = {
   compaction: compactionSchema,
   aiProvider: aiProviderSchema,
   heartbeat: heartbeatSchema,
+  apiKeys: apiKeysSchema,
 }
 
 const sectionFiles: Record<ConfigSection, string> = {
@@ -208,6 +237,7 @@ const sectionFiles: Record<ConfigSection, string> = {
   compaction: 'compaction.json',
   aiProvider: 'ai-provider.json',
   heartbeat: 'heartbeat.json',
+  apiKeys: 'api-keys.json',
 }
 
 /** Validate and write a config section to disk. Returns the validated config. */
