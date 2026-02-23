@@ -4,7 +4,7 @@
   "description": "File-based trading agent engine",
   "type": "module",
   "scripts": {
-    "dev": "tsx --env-file=.env --watch src/main.ts",
+    "dev": "tsx --env-file=.env src/main.ts",
     "dev:ui": "cd ui && pnpm dev",
     "build": "pnpm build:ui && pnpm build:backend",
     "build:ui": "cd ui && pnpm install && pnpm build",
