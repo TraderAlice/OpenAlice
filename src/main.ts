@@ -1,4 +1,3 @@
-import { anthropic } from '@ai-sdk/anthropic'
 import { readFile, writeFile, appendFile, mkdir } from 'fs/promises'
 import { resolve, dirname } from 'path'
 import { Engine } from './core/engine.js'
@@ -42,7 +41,6 @@ import { SessionStore } from './core/session.js'
 import { ToolCenter } from './core/tool-center.js'
 import { AgentCenter } from './core/agent-center.js'
 import { ProviderRouter } from './core/ai-provider.js'
-import { createAgent } from './providers/vercel-ai-sdk/index.js'
 import { VercelAIProvider } from './providers/vercel-ai-sdk/vercel-provider.js'
 import { ClaudeCodeProvider } from './providers/claude-code/claude-code-provider.js'
 import { createEventLog } from './core/event-log.js'
@@ -72,7 +70,6 @@ async function readWithDefault(target: string, defaultFile: string): Promise<str
 
 async function main() {
   const config = await loadConfig()
-  const model = anthropic(config.model.model)
 
   // ==================== Infrastructure ====================
 
@@ -253,8 +250,12 @@ async function main() {
 
   // ==================== AI Provider Chain ====================
 
-  const agent = createAgent(model, toolCenter.getVercelTools(), instructions, config.agent.maxSteps)
-  const vercelProvider = new VercelAIProvider(agent, config.compaction)
+  const vercelProvider = new VercelAIProvider(
+    toolCenter.getVercelTools(),
+    instructions,
+    config.agent.maxSteps,
+    config.compaction,
+  )
   const claudeCodeProvider = new ClaudeCodeProvider(config.compaction, instructions)
   const router = new ProviderRouter(vercelProvider, claudeCodeProvider)
 

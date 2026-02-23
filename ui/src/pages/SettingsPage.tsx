@@ -171,8 +171,8 @@ export function SettingsPage() {
 
             {/* Model (only for Vercel AI SDK) */}
             {config.aiProvider === 'vercel-ai-sdk' && (
-              <Section id="model" title="Model" description="Model used by Vercel AI SDK. Provider is currently anthropic only. Ignored when using Claude Code (uses the claude CLI from PATH).">
-                <ModelForm config={config} onSave={saveSection} />
+              <Section id="model" title="Model" description="Model and API keys for Vercel AI SDK. Supports Anthropic, OpenAI, and Google. Changes take effect on the next request (hot-reload).">
+                <ModelForm config={config} onSave={saveSection} showToast={showToast} />
               </Section>
             )}
 
@@ -248,25 +248,197 @@ const inputClass =
 
 // ==================== Form Sections ====================
 
+const PROVIDER_MODELS: Record<string, { label: string; value: string }[]> = {
+  anthropic: [
+    { label: 'Claude Opus 4.6', value: 'claude-opus-4-6' },
+    { label: 'Claude Sonnet 4.6', value: 'claude-sonnet-4-6' },
+    { label: 'Claude Haiku 4.5', value: 'claude-haiku-4-5' },
+  ],
+  openai: [
+    { label: 'GPT-5.2 Pro', value: 'gpt-5.2-pro' },
+    { label: 'GPT-5.2', value: 'gpt-5.2' },
+    { label: 'GPT-5 Mini', value: 'gpt-5-mini' },
+  ],
+  google: [
+    { label: 'Gemini 3.1 Pro', value: 'gemini-3.1-pro-preview' },
+    { label: 'Gemini 3 Flash', value: 'gemini-3-flash-preview' },
+    { label: 'Gemini 2.5 Pro', value: 'gemini-2.5-pro' },
+  ],
+}
+
+const PROVIDERS = [
+  { value: 'anthropic', label: 'Anthropic' },
+  { value: 'openai', label: 'OpenAI' },
+  { value: 'google', label: 'Google' },
+]
+
 function ModelForm({
   config,
   onSave,
+  showToast,
 }: {
   config: AppConfig
   onSave: (section: string, data: unknown, label: string) => void
+  showToast: (msg: string, error?: boolean) => void
 }) {
-  const [provider, setProvider] = useState(config.model?.provider || '')
+  const [provider, setProvider] = useState(config.model?.provider || 'anthropic')
   const [model, setModel] = useState(config.model?.model || '')
+  const [customModel, setCustomModel] = useState('')
+  const [showKeys, setShowKeys] = useState(false)
+  const [keyStatus, setKeyStatus] = useState<Record<string, boolean>>({})
+  const [keys, setKeys] = useState({ anthropic: '', openai: '', google: '' })
+  const [savingKeys, setSavingKeys] = useState(false)
+
+  // Check if current model is in the preset list
+  const presets = PROVIDER_MODELS[provider] || []
+  const isCustom = model !== '' && !presets.some((p) => p.value === model)
+
+  // Load API key status on mount
+  useEffect(() => {
+    api.apiKeys.status().then(setKeyStatus).catch(() => {})
+  }, [])
+
+  const handleProviderChange = (newProvider: string) => {
+    setProvider(newProvider)
+    const defaults = PROVIDER_MODELS[newProvider]
+    if (defaults?.length) {
+      setModel(defaults[0].value)
+      setCustomModel('')
+    } else {
+      setModel('')
+    }
+  }
+
+  const handleModelSelect = (value: string) => {
+    if (value === '__custom__') {
+      setModel('')
+      setCustomModel('')
+    } else {
+      setModel(value)
+      setCustomModel('')
+    }
+  }
+
+  const effectiveModel = isCustom || model === '' ? customModel || model : model
+
+  const handleSaveKeys = async () => {
+    setSavingKeys(true)
+    try {
+      // Only send non-empty keys
+      const payload: Record<string, string> = {}
+      if (keys.anthropic) payload.anthropic = keys.anthropic
+      if (keys.openai) payload.openai = keys.openai
+      if (keys.google) payload.google = keys.google
+      await api.apiKeys.save(payload)
+      // Refresh status
+      const status = await api.apiKeys.status()
+      setKeyStatus(status)
+      setKeys({ anthropic: '', openai: '', google: '' })
+      showToast('API keys saved')
+    } catch {
+      showToast('Failed to save API keys', true)
+    } finally {
+      setSavingKeys(false)
+    }
+  }
 
   return (
     <>
       <Field label="Provider">
-        <input className={inputClass} value={provider} onChange={(e) => setProvider(e.target.value)} placeholder="anthropic" />
+        <div className="flex border border-border rounded-lg overflow-hidden">
+          {PROVIDERS.map((p) => (
+            <button
+              key={p.value}
+              onClick={() => handleProviderChange(p.value)}
+              className={`flex-1 py-2 px-3 text-[13px] font-medium transition-colors ${
+                provider === p.value
+                  ? 'bg-accent-dim text-accent'
+                  : 'bg-bg text-text-muted hover:bg-bg-tertiary hover:text-text'
+              } ${p.value !== 'anthropic' ? 'border-l border-border' : ''}`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
       </Field>
+
       <Field label="Model">
-        <input className={inputClass} value={model} onChange={(e) => setModel(e.target.value)} placeholder="claude-sonnet-4-5-20250929" />
+        <select
+          className={inputClass}
+          value={isCustom || model === '' ? '__custom__' : model}
+          onChange={(e) => handleModelSelect(e.target.value)}
+        >
+          {presets.map((m) => (
+            <option key={m.value} value={m.value}>{m.label}</option>
+          ))}
+          <option value="__custom__">Custom...</option>
+        </select>
       </Field>
-      <SaveButton onClick={() => onSave('model', { provider, model }, 'Model')} />
+
+      {(isCustom || model === '') && (
+        <Field label="Custom Model ID">
+          <input
+            className={inputClass}
+            value={customModel || model}
+            onChange={(e) => { setCustomModel(e.target.value); setModel(e.target.value) }}
+            placeholder="e.g. claude-sonnet-4-5-20250929"
+          />
+        </Field>
+      )}
+
+      <SaveButton onClick={() => onSave('model', { provider, model: effectiveModel }, 'Model')} />
+
+      {/* API Keys */}
+      <div className="mt-5 border-t border-border pt-4">
+        <button
+          onClick={() => setShowKeys(!showKeys)}
+          className="flex items-center gap-1.5 text-[13px] text-text-muted hover:text-text transition-colors"
+        >
+          <svg
+            width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+            className={`transition-transform ${showKeys ? 'rotate-90' : ''}`}
+          >
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+          API Keys
+          <span className="text-[11px] text-text-muted/60 ml-1">
+            ({Object.values(keyStatus).filter(Boolean).length}/{Object.keys(keyStatus).length} configured)
+          </span>
+        </button>
+
+        {showKeys && (
+          <div className="mt-3 space-y-3">
+            <p className="text-[11px] text-text-muted">
+              Enter API keys below. Leave empty to keep existing value. Keys are stored in config JSON (not env vars).
+            </p>
+            {PROVIDERS.map((p) => (
+              <Field key={p.value} label={`${p.label} API Key`}>
+                <div className="relative">
+                  <input
+                    className={inputClass}
+                    type="password"
+                    value={keys[p.value as keyof typeof keys]}
+                    onChange={(e) => setKeys((k) => ({ ...k, [p.value]: e.target.value }))}
+                    placeholder={keyStatus[p.value] ? '(configured)' : 'Not configured'}
+                  />
+                  {keyStatus[p.value] && (
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-green">
+                      active
+                    </span>
+                  )}
+                </div>
+              </Field>
+            ))}
+            <button
+              onClick={handleSaveKeys}
+              disabled={savingKeys}
+              className="bg-user-bubble text-white rounded-lg px-4 py-2 text-[13px] font-medium cursor-pointer transition-opacity hover:opacity-85 disabled:opacity-50"
+            >
+              {savingKeys ? 'Saving...' : 'Save Keys'}
+            </button>
+          </div>
+        )}
+      </div>
     </>
   )
 }
