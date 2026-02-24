@@ -83,7 +83,17 @@ const securitiesSchema = z.object({
 
 const openbbSchema = z.object({
   apiUrl: z.string().default('http://localhost:6900'),
-  defaultProvider: z.string().default('yfinance'),
+  providers: z.object({
+    equity: z.string().default('yfinance'),
+    crypto: z.string().default('yfinance'),
+    currency: z.string().default('yfinance'),
+    commodity: z.string().default('yfinance'),
+  }).default({
+    equity: 'yfinance',
+    crypto: 'yfinance',
+    currency: 'yfinance',
+    commodity: 'yfinance',
+  }),
   providerKeys: z.object({
     fred: z.string().optional(),
     fmp: z.string().optional(),

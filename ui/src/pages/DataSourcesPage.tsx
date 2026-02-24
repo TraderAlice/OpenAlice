@@ -113,6 +113,20 @@ function SaveButton({ onClick, label = 'Save' }: { onClick: () => void; label?: 
 
 // ==================== Connection ====================
 
+const PROVIDER_OPTIONS: Record<string, string[]> = {
+  equity: ['yfinance', 'fmp', 'intrinio', 'nasdaq'],
+  crypto: ['yfinance', 'fmp'],
+  currency: ['yfinance', 'fmp', 'econdb'],
+  commodity: ['yfinance'],
+}
+
+const ASSET_LABELS: Record<string, string> = {
+  equity: 'Equity',
+  crypto: 'Crypto',
+  currency: 'Currency',
+  commodity: 'Commodity',
+}
+
 function ConnectionSection({
   openbb,
   onSave,
@@ -123,9 +137,19 @@ function ConnectionSection({
   showToast: (msg: string, error?: boolean) => void
 }) {
   const [apiUrl, setApiUrl] = useState((openbb.apiUrl as string) || 'http://localhost:6900')
-  const [defaultProvider, setDefaultProvider] = useState((openbb.defaultProvider as string) || 'yfinance')
+  const existingProviders = (openbb.providers ?? {}) as Record<string, string>
+  const [providers, setProviders] = useState<Record<string, string>>({
+    equity: existingProviders.equity || 'yfinance',
+    crypto: existingProviders.crypto || 'yfinance',
+    currency: existingProviders.currency || 'yfinance',
+    commodity: existingProviders.commodity || 'yfinance',
+  })
   const [testing, setTesting] = useState(false)
   const [status, setStatus] = useState<'idle' | 'ok' | 'error'>('idle')
+
+  const setProvider = (asset: string, value: string) => {
+    setProviders((prev) => ({ ...prev, [asset]: value }))
+  }
 
   const testConnection = async () => {
     setTesting(true)
@@ -155,11 +179,30 @@ function ConnectionSection({
       <Field label="API URL">
         <input className={inputClass} value={apiUrl} onChange={(e) => { setApiUrl(e.target.value); setStatus('idle') }} placeholder="http://localhost:6900" />
       </Field>
-      <Field label="Default Provider">
-        <input className={inputClass} value={defaultProvider} onChange={(e) => setDefaultProvider(e.target.value)} placeholder="yfinance" />
-      </Field>
+
+      <div className="mb-3">
+        <label className="block text-[13px] text-text-muted mb-1.5">Default Providers</label>
+        <p className="text-[11px] text-text-muted/60 mb-2">Each asset class uses its own data provider. Economy endpoints use dedicated providers (FRED, BLS, etc.) and are not configurable here.</p>
+        <div className="grid grid-cols-2 gap-2">
+          {Object.entries(PROVIDER_OPTIONS).map(([asset, options]) => (
+            <div key={asset}>
+              <label className="block text-[11px] text-text-muted mb-0.5">{ASSET_LABELS[asset]}</label>
+              <select
+                className={inputClass}
+                value={providers[asset]}
+                onChange={(e) => setProvider(asset, e.target.value)}
+              >
+                {options.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div className="flex items-center gap-2 mt-1">
-        <SaveButton onClick={() => onSave({ ...openbb, apiUrl, defaultProvider }, 'Connection')} />
+        <SaveButton onClick={() => onSave({ ...openbb, apiUrl, providers }, 'Connection')} />
         <button
           onClick={testConnection}
           disabled={testing}
