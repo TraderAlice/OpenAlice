@@ -212,8 +212,24 @@ function ProviderKeysSection({
     for (const k of ALL_PROVIDER_KEYS) init[k] = existing[k] || ''
     return init
   })
+  const [testStatus, setTestStatus] = useState<Record<string, 'idle' | 'testing' | 'ok' | 'error'>>({})
 
-  const setKey = (k: string, v: string) => setKeys((prev) => ({ ...prev, [k]: v }))
+  const setKey = (k: string, v: string) => {
+    setKeys((prev) => ({ ...prev, [k]: v }))
+    setTestStatus((prev) => ({ ...prev, [k]: 'idle' }))
+  }
+
+  const testProvider = async (provider: string) => {
+    const key = keys[provider]
+    if (!key) return
+    setTestStatus((prev) => ({ ...prev, [provider]: 'testing' }))
+    try {
+      const result = await api.openbb.testProvider(provider, key)
+      setTestStatus((prev) => ({ ...prev, [provider]: result.ok ? 'ok' : 'error' }))
+    } catch {
+      setTestStatus((prev) => ({ ...prev, [provider]: 'error' }))
+    }
+  }
 
   const buildProviderKeys = () => {
     const result: Record<string, string> = {}
@@ -229,19 +245,37 @@ function ProviderKeysSection({
   const renderGroup = (label: string, providers: ReadonlyArray<{ key: string; name: string; desc: string; hint: string }>) => (
     <div className="mb-4">
       <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wide mb-2">{label}</p>
-      {providers.map(({ key, name, desc, hint }) => (
-        <Field key={key} label={name}>
-          <p className="text-[11px] text-text-muted mb-1">{desc}</p>
-          <p className="text-[10px] text-text-muted/60 mb-1.5">{hint}</p>
-          <input
-            className={inputClass}
-            type="password"
-            value={keys[key]}
-            onChange={(e) => setKey(key, e.target.value)}
-            placeholder="Not configured"
-          />
-        </Field>
-      ))}
+      {providers.map(({ key, name, desc, hint }) => {
+        const status = testStatus[key] || 'idle'
+        return (
+          <Field key={key} label={name}>
+            <p className="text-[11px] text-text-muted mb-1">{desc}</p>
+            <p className="text-[10px] text-text-muted/60 mb-1.5">{hint}</p>
+            <div className="flex items-center gap-2">
+              <input
+                className={inputClass}
+                type="password"
+                value={keys[key]}
+                onChange={(e) => setKey(key, e.target.value)}
+                placeholder="Not configured"
+              />
+              <button
+                onClick={() => testProvider(key)}
+                disabled={!keys[key] || status === 'testing'}
+                className={`shrink-0 border rounded-md px-3 py-2 text-[12px] font-medium cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-default ${
+                  status === 'ok'
+                    ? 'border-green text-green'
+                    : status === 'error'
+                      ? 'border-red text-red'
+                      : 'border-border text-text-muted hover:bg-bg-tertiary hover:text-text'
+                }`}
+              >
+                {status === 'testing' ? '...' : status === 'ok' ? 'OK' : status === 'error' ? 'Fail' : 'Test'}
+              </button>
+            </div>
+          </Field>
+        )
+      })}
     </div>
   )
 

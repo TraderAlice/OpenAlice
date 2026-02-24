@@ -9,7 +9,7 @@ import { randomUUID } from 'node:crypto'
 import type { Plugin, EngineContext } from '../../core/types.js'
 import { SessionStore, toChatHistory } from '../../core/session.js'
 import { registerConnector, touchInteraction } from '../../core/connector-registry.js'
-import { loadConfig, writeConfigSection, readApiKeysConfig, type ConfigSection } from '../../core/config.js'
+import { loadConfig, writeConfigSection, readApiKeysConfig, readOpenbbConfig, type ConfigSection } from '../../core/config.js'
 import { readAIConfig, writeAIConfig, type AIProvider } from '../../core/ai-config.js'
 
 export interface WebConfig {
@@ -178,7 +178,7 @@ export class WebPlugin implements Plugin {
     app.put('/api/config/:section', async (c) => {
       try {
         const section = c.req.param('section') as ConfigSection
-        const validSections: ConfigSection[] = ['engine', 'model', 'agent', 'crypto', 'securities', 'compaction', 'aiProvider', 'heartbeat', 'apiKeys']
+        const validSections: ConfigSection[] = ['engine', 'model', 'agent', 'crypto', 'securities', 'openbb', 'compaction', 'aiProvider', 'heartbeat', 'apiKeys']
         if (!validSections.includes(section)) {
           return c.json({ error: `Invalid section "${section}". Valid: ${validSections.join(', ')}` }, 400)
         }
@@ -204,6 +204,45 @@ export class WebPlugin implements Plugin {
         })
       } catch (err) {
         return c.json({ error: String(err) }, 500)
+      }
+    })
+
+    // ==================== OpenBB provider key test ====================
+    app.post('/api/openbb/test-provider', async (c) => {
+      const TEST_ENDPOINTS: Record<string, { credField: string; path: string }> = {
+        fred:             { credField: 'fred_api_key',             path: '/api/v1/economy/fred_search?query=GDP&provider=fred' },
+        bls:              { credField: 'bls_api_key',              path: '/api/v1/economy/survey/bls_search?query=unemployment&provider=bls' },
+        eia:              { credField: 'eia_api_key',              path: '/api/v1/commodity/short_term_energy_outlook?provider=eia' },
+        econdb:           { credField: 'econdb_api_key',           path: '/api/v1/economy/available_indicators?provider=econdb' },
+        fmp:              { credField: 'fmp_api_key',              path: '/api/v1/equity/screener?provider=fmp&limit=1' },
+        nasdaq:           { credField: 'nasdaq_api_key',           path: '/api/v1/equity/search?query=AAPL&provider=nasdaq&is_symbol=true' },
+        intrinio:         { credField: 'intrinio_api_key',         path: '/api/v1/equity/search?query=AAPL&provider=intrinio&limit=1' },
+        tradingeconomics: { credField: 'tradingeconomics_api_key', path: '/api/v1/economy/calendar?provider=tradingeconomics' },
+      }
+
+      try {
+        const { provider, key } = await c.req.json<{ provider: string; key: string }>()
+        const endpoint = TEST_ENDPOINTS[provider]
+        if (!endpoint) return c.json({ ok: false, error: `Unknown provider: ${provider}` }, 400)
+        if (!key) return c.json({ ok: false, error: 'No API key provided' }, 400)
+
+        const openbbConfig = await readOpenbbConfig()
+        const credHeader = JSON.stringify({ [endpoint.credField]: key })
+        const url = `${openbbConfig.apiUrl}${endpoint.path}`
+
+        const res = await fetch(url, {
+          signal: AbortSignal.timeout(15_000),
+          headers: { 'X-OpenBB-Credentials': credHeader },
+        })
+
+        if (res.ok) {
+          return c.json({ ok: true })
+        }
+        const body = await res.text().catch(() => '')
+        return c.json({ ok: false, error: `OpenBB returned ${res.status}: ${body.slice(0, 200)}` })
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return c.json({ ok: false, error: msg.includes('timeout') ? 'Cannot reach OpenBB API' : msg })
       }
     })
 

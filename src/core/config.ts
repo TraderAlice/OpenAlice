@@ -205,6 +205,16 @@ export async function readModelConfig() {
   }
 }
 
+/** Read OpenBB config from disk (called per-request for hot-reload). */
+export async function readOpenbbConfig() {
+  try {
+    const raw = JSON.parse(await readFile(resolve(CONFIG_DIR, 'openbb.json'), 'utf-8'))
+    return openbbSchema.parse(raw)
+  } catch {
+    return openbbSchema.parse({})
+  }
+}
+
 /** Read API keys config from disk (called per-request for hot-reload). */
 export async function readApiKeysConfig() {
   try {
