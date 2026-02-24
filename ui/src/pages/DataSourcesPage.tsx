@@ -114,17 +114,15 @@ function SaveButton({ onClick, label = 'Save' }: { onClick: () => void; label?: 
 // ==================== Connection ====================
 
 const PROVIDER_OPTIONS: Record<string, string[]> = {
-  equity: ['yfinance', 'fmp', 'intrinio', 'nasdaq'],
-  crypto: ['yfinance', 'fmp'],
-  currency: ['yfinance', 'fmp', 'econdb'],
-  commodity: ['yfinance'],
+  equity: ['yfinance', 'fmp', 'intrinio', 'tiingo', 'alpha_vantage'],
+  crypto: ['yfinance', 'fmp', 'tiingo'],
+  currency: ['yfinance', 'fmp', 'tiingo'],
 }
 
 const ASSET_LABELS: Record<string, string> = {
   equity: 'Equity',
   crypto: 'Crypto',
   currency: 'Currency',
-  commodity: 'Commodity',
 }
 
 function ConnectionSection({
@@ -142,7 +140,6 @@ function ConnectionSection({
     equity: existingProviders.equity || 'yfinance',
     crypto: existingProviders.crypto || 'yfinance',
     currency: existingProviders.currency || 'yfinance',
-    commodity: existingProviders.commodity || 'yfinance',
   })
   const [testing, setTesting] = useState(false)
   const [status, setStatus] = useState<'idle' | 'ok' | 'error'>('idle')
@@ -182,7 +179,7 @@ function ConnectionSection({
 
       <div className="mb-3">
         <label className="block text-[13px] text-text-muted mb-1.5">Default Providers</label>
-        <p className="text-[11px] text-text-muted/60 mb-2">Each asset class uses its own data provider. Economy endpoints use dedicated providers (FRED, BLS, etc.) and are not configurable here.</p>
+        <p className="text-[11px] text-text-muted/60 mb-2">Each asset class uses its own data provider. Commodity and economy endpoints use dedicated providers (FRED, EIA, BLS, etc.) per-endpoint.</p>
         <div className="grid grid-cols-2 gap-2">
           {Object.entries(PROVIDER_OPTIONS).map(([asset, options]) => (
             <div key={asset}>
