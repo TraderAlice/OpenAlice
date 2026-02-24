@@ -88,6 +88,11 @@ const openbbSchema = z.object({
     fred: z.string().optional(),
     fmp: z.string().optional(),
     eia: z.string().optional(),
+    bls: z.string().optional(),
+    nasdaq: z.string().optional(),
+    tradingeconomics: z.string().optional(),
+    econdb: z.string().optional(),
+    intrinio: z.string().optional(),
   }).default({}),
 })
 

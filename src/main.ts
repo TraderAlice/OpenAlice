@@ -34,6 +34,7 @@ import { OpenBBEquityClient, SymbolIndex } from './openbb/equity/index.js'
 import { createEquityTools } from './extension/equity/index.js'
 import { OpenBBCryptoClient } from './openbb/crypto/index.js'
 import { OpenBBCurrencyClient } from './openbb/currency/index.js'
+import { OpenBBEconomyClient } from './openbb/economy/index.js'
 import { createCryptoTools } from './extension/crypto/index.js'
 import { createCurrencyTools } from './extension/currency/index.js'
 import { createAnalysisTools } from './extension/analysis-kit/index.js'
@@ -219,9 +220,11 @@ async function main() {
 
   // ==================== OpenBB Clients ====================
 
-  const equityClient = new OpenBBEquityClient(config.openbb.apiUrl, config.openbb.defaultProvider)
-  const cryptoClient = new OpenBBCryptoClient(config.openbb.apiUrl, config.openbb.defaultProvider)
-  const currencyClient = new OpenBBCurrencyClient(config.openbb.apiUrl, config.openbb.defaultProvider)
+  const providerKeys = config.openbb.providerKeys
+  const equityClient = new OpenBBEquityClient(config.openbb.apiUrl, config.openbb.defaultProvider, providerKeys)
+  const cryptoClient = new OpenBBCryptoClient(config.openbb.apiUrl, config.openbb.defaultProvider, providerKeys)
+  const currencyClient = new OpenBBCurrencyClient(config.openbb.apiUrl, config.openbb.defaultProvider, providerKeys)
+  const economyClient = new OpenBBEconomyClient(config.openbb.apiUrl, undefined, providerKeys)
 
   // ==================== Equity Symbol Index ====================
 
