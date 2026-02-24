@@ -20,22 +20,26 @@ import { createAgent } from './agent.js'
 
 export class VercelAIProvider implements AIProvider {
   private cachedKey: string | null = null
+  private cachedToolCount: number = 0
   private cachedAgent: Agent | null = null
 
   constructor(
-    private tools: Record<string, Tool>,
+    private getTools: () => Record<string, Tool>,
     private instructions: string,
     private maxSteps: number,
     private compaction: CompactionConfig,
   ) {}
 
-  /** Lazily create or return the cached agent, re-creating when config changes. */
+  /** Lazily create or return the cached agent, re-creating when config or tools change. */
   private async resolveAgent(): Promise<Agent> {
     const { model, key } = await createModelFromConfig()
-    if (key !== this.cachedKey) {
-      this.cachedAgent = createAgent(model, this.tools, this.instructions, this.maxSteps)
+    const tools = this.getTools()
+    const toolCount = Object.keys(tools).length
+    if (key !== this.cachedKey || toolCount !== this.cachedToolCount) {
+      this.cachedAgent = createAgent(model, tools, this.instructions, this.maxSteps)
       this.cachedKey = key
-      console.log(`vercel-ai: model loaded → ${key}`)
+      this.cachedToolCount = toolCount
+      console.log(`vercel-ai: model loaded → ${key} (${toolCount} tools)`)
     }
     return this.cachedAgent!
   }
