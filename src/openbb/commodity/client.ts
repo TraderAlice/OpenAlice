@@ -6,14 +6,17 @@
  */
 
 import type { OBBjectResponse } from './types'
+import { buildCredentialsHeader } from '../credential-map'
 
 export class OpenBBCommodityClient {
   private baseUrl: string
   private defaultProvider: string | undefined
+  private credentialsHeader: string | undefined
 
-  constructor(baseUrl: string, defaultProvider?: string) {
+  constructor(baseUrl: string, defaultProvider?: string, providerKeys?: Record<string, string | undefined>) {
     this.baseUrl = baseUrl.replace(/\/$/, '')
     this.defaultProvider = defaultProvider
+    this.credentialsHeader = buildCredentialsHeader(providerKeys)
   }
 
   // ==================== Price ====================
@@ -56,8 +59,14 @@ export class OpenBBCommodityClient {
 
     const url = `${this.baseUrl}/api/v1/commodity${path}?${query.toString()}`
 
+    const headers: Record<string, string> = {}
+    if (this.credentialsHeader) {
+      headers['X-OpenBB-Credentials'] = this.credentialsHeader
+    }
+
     const res = await fetch(url, {
       signal: AbortSignal.timeout(30_000),
+      headers,
     })
 
     if (!res.ok) {

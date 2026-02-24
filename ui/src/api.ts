@@ -206,6 +206,17 @@ export const api = {
     },
   },
 
+  openbb: {
+    async testProvider(provider: string, key: string): Promise<{ ok: boolean; error?: string }> {
+      const res = await fetch('/api/openbb/test-provider', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ provider, key }),
+      })
+      return res.json()
+    },
+  },
+
   apiKeys: {
     async status(): Promise<Record<string, boolean>> {
       const res = await fetch('/api/config/api-keys/status')

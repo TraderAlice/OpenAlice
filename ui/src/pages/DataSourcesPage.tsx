@@ -113,6 +113,18 @@ function SaveButton({ onClick, label = 'Save' }: { onClick: () => void; label?: 
 
 // ==================== Connection ====================
 
+const PROVIDER_OPTIONS: Record<string, string[]> = {
+  equity: ['yfinance', 'fmp', 'intrinio', 'tiingo', 'alpha_vantage'],
+  crypto: ['yfinance', 'fmp', 'tiingo'],
+  currency: ['yfinance', 'fmp', 'tiingo'],
+}
+
+const ASSET_LABELS: Record<string, string> = {
+  equity: 'Equity',
+  crypto: 'Crypto',
+  currency: 'Currency',
+}
+
 function ConnectionSection({
   openbb,
   onSave,
@@ -123,9 +135,18 @@ function ConnectionSection({
   showToast: (msg: string, error?: boolean) => void
 }) {
   const [apiUrl, setApiUrl] = useState((openbb.apiUrl as string) || 'http://localhost:6900')
-  const [defaultProvider, setDefaultProvider] = useState((openbb.defaultProvider as string) || 'yfinance')
+  const existingProviders = (openbb.providers ?? {}) as Record<string, string>
+  const [providers, setProviders] = useState<Record<string, string>>({
+    equity: existingProviders.equity || 'yfinance',
+    crypto: existingProviders.crypto || 'yfinance',
+    currency: existingProviders.currency || 'yfinance',
+  })
   const [testing, setTesting] = useState(false)
   const [status, setStatus] = useState<'idle' | 'ok' | 'error'>('idle')
+
+  const setProvider = (asset: string, value: string) => {
+    setProviders((prev) => ({ ...prev, [asset]: value }))
+  }
 
   const testConnection = async () => {
     setTesting(true)
@@ -155,11 +176,30 @@ function ConnectionSection({
       <Field label="API URL">
         <input className={inputClass} value={apiUrl} onChange={(e) => { setApiUrl(e.target.value); setStatus('idle') }} placeholder="http://localhost:6900" />
       </Field>
-      <Field label="Default Provider">
-        <input className={inputClass} value={defaultProvider} onChange={(e) => setDefaultProvider(e.target.value)} placeholder="yfinance" />
-      </Field>
+
+      <div className="mb-3">
+        <label className="block text-[13px] text-text-muted mb-1.5">Default Providers</label>
+        <p className="text-[11px] text-text-muted/60 mb-2">Each asset class uses its own data provider. Commodity and economy endpoints use dedicated providers (FRED, EIA, BLS, etc.) per-endpoint.</p>
+        <div className="grid grid-cols-2 gap-2">
+          {Object.entries(PROVIDER_OPTIONS).map(([asset, options]) => (
+            <div key={asset}>
+              <label className="block text-[11px] text-text-muted mb-0.5">{ASSET_LABELS[asset]}</label>
+              <select
+                className={inputClass}
+                value={providers[asset]}
+                onChange={(e) => setProvider(asset, e.target.value)}
+              >
+                {options.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div className="flex items-center gap-2 mt-1">
-        <SaveButton onClick={() => onSave({ ...openbb, apiUrl, defaultProvider }, 'Connection')} />
+        <SaveButton onClick={() => onSave({ ...openbb, apiUrl, providers }, 'Connection')} />
         <button
           onClick={testConnection}
           disabled={testing}
@@ -183,11 +223,21 @@ function ConnectionSection({
 
 // ==================== Provider Keys ====================
 
-const PROVIDERS = [
-  { key: 'fred', name: 'FRED', desc: 'Federal Reserve Economic Data — commodity spot prices' },
-  { key: 'fmp', name: 'FMP', desc: 'Financial Modeling Prep — fundamentals, crypto search' },
-  { key: 'eia', name: 'EIA', desc: 'Energy Information Administration — petroleum & energy reports' },
+const FREE_PROVIDERS = [
+  { key: 'fred', name: 'FRED', desc: 'Federal Reserve Economic Data — CPI, GDP, interest rates, and thousands of macro indicators.', hint: 'Free — get your key at fredaccount.stlouisfed.org/apikeys' },
+  { key: 'bls', name: 'BLS', desc: 'Bureau of Labor Statistics — employment, nonfarm payrolls, wages, and CPI by region.', hint: 'Free — register at registrationapps.bls.gov/bls_registration' },
+  { key: 'eia', name: 'EIA', desc: 'Energy Information Administration — petroleum status, energy outlook reports.', hint: 'Free — register at eia.gov/opendata' },
+  { key: 'econdb', name: 'EconDB', desc: 'Global macro indicators, country profiles, and port shipping data.', hint: 'Optional — works without key (limited). Register at econdb.com' },
 ] as const
+
+const PAID_PROVIDERS = [
+  { key: 'fmp', name: 'FMP', desc: 'Financial Modeling Prep — financial statements, fundamentals, economic calendar.', hint: 'Freemium — 250 req/day free at financialmodelingprep.com' },
+  { key: 'nasdaq', name: 'Nasdaq', desc: 'Nasdaq Data Link — dividend/earnings calendars, short interest.', hint: 'Freemium — sign up at data.nasdaq.com' },
+  { key: 'intrinio', name: 'Intrinio', desc: 'Equity fundamentals, options data, institutional ownership.', hint: 'Paid — free trial at intrinio.com' },
+  { key: 'tradingeconomics', name: 'Trading Economics', desc: 'Global economic calendar, 20M+ indicators across 196 countries.', hint: 'Paid — plans at tradingeconomics.com' },
+] as const
+
+const ALL_PROVIDER_KEYS = [...FREE_PROVIDERS, ...PAID_PROVIDERS].map((p) => p.key)
 
 function ProviderKeysSection({
   openbb,
@@ -197,13 +247,29 @@ function ProviderKeysSection({
   onSave: (data: unknown, label: string) => void
 }) {
   const existing = (openbb.providerKeys ?? {}) as Record<string, string | undefined>
-  const [keys, setKeys] = useState<Record<string, string>>({
-    fred: existing.fred || '',
-    fmp: existing.fmp || '',
-    eia: existing.eia || '',
+  const [keys, setKeys] = useState<Record<string, string>>(() => {
+    const init: Record<string, string> = {}
+    for (const k of ALL_PROVIDER_KEYS) init[k] = existing[k] || ''
+    return init
   })
+  const [testStatus, setTestStatus] = useState<Record<string, 'idle' | 'testing' | 'ok' | 'error'>>({})
 
-  const setKey = (k: string, v: string) => setKeys((prev) => ({ ...prev, [k]: v }))
+  const setKey = (k: string, v: string) => {
+    setKeys((prev) => ({ ...prev, [k]: v }))
+    setTestStatus((prev) => ({ ...prev, [k]: 'idle' }))
+  }
+
+  const testProvider = async (provider: string) => {
+    const key = keys[provider]
+    if (!key) return
+    setTestStatus((prev) => ({ ...prev, [provider]: 'testing' }))
+    try {
+      const result = await api.openbb.testProvider(provider, key)
+      setTestStatus((prev) => ({ ...prev, [provider]: result.ok ? 'ok' : 'error' }))
+    } catch {
+      setTestStatus((prev) => ({ ...prev, [provider]: 'error' }))
+    }
+  }
 
   const buildProviderKeys = () => {
     const result: Record<string, string> = {}
@@ -215,6 +281,43 @@ function ProviderKeysSection({
 
   const [expanded, setExpanded] = useState(false)
   const configuredCount = Object.values(keys).filter(Boolean).length
+
+  const renderGroup = (label: string, providers: ReadonlyArray<{ key: string; name: string; desc: string; hint: string }>) => (
+    <div className="mb-4">
+      <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wide mb-2">{label}</p>
+      {providers.map(({ key, name, desc, hint }) => {
+        const status = testStatus[key] || 'idle'
+        return (
+          <Field key={key} label={name}>
+            <p className="text-[11px] text-text-muted mb-1">{desc}</p>
+            <p className="text-[10px] text-text-muted/60 mb-1.5">{hint}</p>
+            <div className="flex items-center gap-2">
+              <input
+                className={inputClass}
+                type="password"
+                value={keys[key]}
+                onChange={(e) => setKey(key, e.target.value)}
+                placeholder="Not configured"
+              />
+              <button
+                onClick={() => testProvider(key)}
+                disabled={!keys[key] || status === 'testing'}
+                className={`shrink-0 border rounded-md px-3 py-2 text-[12px] font-medium cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-default ${
+                  status === 'ok'
+                    ? 'border-green text-green'
+                    : status === 'error'
+                      ? 'border-red text-red'
+                      : 'border-border text-text-muted hover:bg-bg-tertiary hover:text-text'
+                }`}
+              >
+                {status === 'testing' ? '...' : status === 'ok' ? 'OK' : status === 'error' ? 'Fail' : 'Test'}
+              </button>
+            </div>
+          </Field>
+        )
+      })}
+    </div>
+  )
 
   return (
     <div className="border-t border-border pt-5">
@@ -230,21 +333,11 @@ function ProviderKeysSection({
       </button>
       {expanded && (
         <div className="mt-3">
-          <p className="text-[12px] text-text-muted mb-3">
-            Optional third-party data providers supported by OpenBB. These are NOT required — the default yfinance provider covers equities, crypto and forex for free. Adding keys here unlocks extra data sources like commodity prices and energy reports.
+          <p className="text-[12px] text-text-muted mb-4">
+            Optional data providers powered by OpenBB. The default yfinance covers equities, crypto and forex for free. Adding API keys here unlocks macro economic data (CPI, GDP, employment), energy reports, and expanded fundamentals.
           </p>
-          {PROVIDERS.map(({ key, name, desc }) => (
-            <Field key={key} label={name}>
-              <p className="text-[11px] text-text-muted mb-1.5">{desc}</p>
-              <input
-                className={inputClass}
-                type="password"
-                value={keys[key]}
-                onChange={(e) => setKey(key, e.target.value)}
-                placeholder="Not configured"
-              />
-            </Field>
-          ))}
+          {renderGroup('Free', FREE_PROVIDERS)}
+          {renderGroup('Paid / Freemium', PAID_PROVIDERS)}
           <SaveButton onClick={() => onSave({ ...openbb, providerKeys: buildProviderKeys() }, 'Provider keys')} />
         </div>
       )}

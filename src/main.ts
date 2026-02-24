@@ -9,7 +9,7 @@ import { TelegramPlugin } from './connectors/telegram/index.js'
 import { WebPlugin } from './connectors/web/index.js'
 import { McpAskPlugin } from './connectors/mcp-ask/index.js'
 import { createThinkingTools } from './extension/thinking-kit/index.js'
-import type { Operation, WalletExportState } from './extension/crypto-trading/index.js'
+import type { WalletExportState } from './extension/crypto-trading/index.js'
 import {
   Wallet,
   initCryptoAllowedSymbols,
@@ -34,6 +34,8 @@ import { OpenBBEquityClient, SymbolIndex } from './openbb/equity/index.js'
 import { createEquityTools } from './extension/equity/index.js'
 import { OpenBBCryptoClient } from './openbb/crypto/index.js'
 import { OpenBBCurrencyClient } from './openbb/currency/index.js'
+import { OpenBBEconomyClient } from './openbb/economy/index.js'
+import { OpenBBCommodityClient } from './openbb/commodity/index.js'
 import { createCryptoTools } from './extension/crypto/index.js'
 import { createCurrencyTools } from './extension/currency/index.js'
 import { createAnalysisTools } from './extension/analysis-kit/index.js'
@@ -75,72 +77,51 @@ async function main() {
 
   // Initialize crypto trading symbol whitelist from config
   initCryptoAllowedSymbols(config.crypto.allowedSymbols)
+  initSecAllowedSymbols(config.securities.allowedSymbols)
 
-  // Crypto trading engine (CCXT or none) — non-fatal on failure
-  let cryptoResult: Awaited<ReturnType<typeof createCryptoTradingEngine>> = null
-  try {
-    cryptoResult = await createCryptoTradingEngine(config)
-  } catch (err) {
+  // Start CCXT init in background — do NOT await here, letting everything else proceed immediately
+  const cryptoInitPromise = createCryptoTradingEngine(config).catch((err) => {
     console.warn('crypto trading engine init failed (non-fatal, continuing without it):', err)
-  }
-  const cryptoEngine = cryptoResult?.engine ?? null
+    return null
+  })
 
-  // Wallet: wire callbacks to crypto trading engine (or throw stubs if no provider)
-  const cryptoWalletStateBridge = cryptoResult
-    ? createCryptoWalletStateBridge(cryptoResult.engine)
-    : undefined
+  // Run Securities init + all local file reads in parallel
+  const [
+    secResultOrNull,
+    savedState,
+    secSavedState,
+    brainExport,
+    persona,
+  ] = await Promise.all([
+    createSecuritiesTradingEngine(config).catch((err) => {
+      console.warn('securities trading engine init failed (non-fatal, continuing without it):', err)
+      return null
+    }),
+    readFile(WALLET_FILE, 'utf-8').then((r) => JSON.parse(r) as WalletExportState).catch(() => undefined),
+    readFile(SEC_WALLET_FILE, 'utf-8').then((r) => JSON.parse(r) as SecWalletExportState).catch(() => undefined),
+    readFile(BRAIN_FILE, 'utf-8').then((r) => JSON.parse(r) as BrainExportState).catch(() => undefined),
+    readWithDefault(PERSONA_FILE, PERSONA_DEFAULT),
+  ])
+
+  const secResult = secResultOrNull
+
+  // ==================== Commit callbacks ====================
 
   const onCryptoCommit = async (state: WalletExportState) => {
     await mkdir(resolve('data/crypto-trading'), { recursive: true })
     await writeFile(WALLET_FILE, JSON.stringify(state, null, 2))
   }
 
-  const cryptoWalletConfig = cryptoResult
-    ? {
-        executeOperation: createCryptoOperationDispatcher(cryptoResult.engine),
-        getWalletState: cryptoWalletStateBridge!,
-        onCommit: onCryptoCommit,
-      }
-    : {
-        executeOperation: async (_op: Operation) => {
-          throw new Error('Crypto trading service not connected')
-        },
-        getWalletState: async () => {
-          throw new Error('Crypto trading service not connected')
-        },
-        onCommit: onCryptoCommit,
-      }
-
-  // Restore wallet from disk if available
-  let savedState: WalletExportState | undefined
-  try {
-    const raw = await readFile(WALLET_FILE, 'utf-8')
-    savedState = JSON.parse(raw)
-  } catch { /* file not found → fresh start */ }
-
-  const wallet = savedState
-    ? Wallet.restore(savedState, cryptoWalletConfig)
-    : new Wallet(cryptoWalletConfig)
-
-  // ==================== Securities Trading ====================
-
-  initSecAllowedSymbols(config.securities.allowedSymbols)
-
-  let secResult: Awaited<ReturnType<typeof createSecuritiesTradingEngine>> = null
-  try {
-    secResult = await createSecuritiesTradingEngine(config)
-  } catch (err) {
-    console.warn('securities trading engine init failed (non-fatal, continuing without it):', err)
-  }
-
-  const secWalletStateBridge = secResult
-    ? createSecWalletStateBridge(secResult.engine)
-    : undefined
-
   const onSecCommit = async (state: SecWalletExportState) => {
     await mkdir(resolve('data/securities-trading'), { recursive: true })
     await writeFile(SEC_WALLET_FILE, JSON.stringify(state, null, 2))
   }
+
+  // ==================== Securities Trading ====================
+
+  const secWalletStateBridge = secResult
+    ? createSecWalletStateBridge(secResult.engine)
+    : undefined
 
   const secWalletConfig = secResult
     ? {
@@ -158,17 +139,15 @@ async function main() {
         onCommit: onSecCommit,
       }
 
-  let secSavedState: SecWalletExportState | undefined
-  try {
-    const raw = await readFile(SEC_WALLET_FILE, 'utf-8')
-    secSavedState = JSON.parse(raw)
-  } catch { /* file not found → fresh start */ }
-
   const secWallet = secSavedState
     ? SecWallet.restore(secSavedState, secWalletConfig)
     : new SecWallet(secWalletConfig)
 
-  // Brain: cognitive state with commit-based tracking
+  // Kept for shutdown cleanup reference (populated when CCXT resolves)
+  let cryptoResultRef: Awaited<ReturnType<typeof createCryptoTradingEngine>> = null
+
+  // ==================== Brain ====================
+
   const brainDir = resolve('data/brain')
   const brainOnCommit = async (state: BrainExportState) => {
     await mkdir(brainDir, { recursive: true })
@@ -184,18 +163,9 @@ async function main() {
     }
   }
 
-  let brainExport: BrainExportState | undefined
-  try {
-    const raw = await readFile(BRAIN_FILE, 'utf-8')
-    brainExport = JSON.parse(raw)
-  } catch { /* not found → fresh start */ }
-
   const brain = brainExport
     ? Brain.restore(brainExport, { onCommit: brainOnCommit })
     : new Brain({ onCommit: brainOnCommit })
-
-  // Build system prompt: persona + current brain state
-  const persona = await readWithDefault(PERSONA_FILE, PERSONA_DEFAULT)
 
   const frontalLobe = brain.getFrontalLobe()
   const emotion = brain.getEmotion().current
@@ -219,9 +189,13 @@ async function main() {
 
   // ==================== OpenBB Clients ====================
 
-  const equityClient = new OpenBBEquityClient(config.openbb.apiUrl, config.openbb.defaultProvider)
-  const cryptoClient = new OpenBBCryptoClient(config.openbb.apiUrl, config.openbb.defaultProvider)
-  const currencyClient = new OpenBBCurrencyClient(config.openbb.apiUrl, config.openbb.defaultProvider)
+  const providerKeys = config.openbb.providerKeys
+  const { providers } = config.openbb
+  const equityClient = new OpenBBEquityClient(config.openbb.apiUrl, providers.equity, providerKeys)
+  const cryptoClient = new OpenBBCryptoClient(config.openbb.apiUrl, providers.crypto, providerKeys)
+  const currencyClient = new OpenBBCurrencyClient(config.openbb.apiUrl, providers.currency, providerKeys)
+  const commodityClient = new OpenBBCommodityClient(config.openbb.apiUrl, undefined, providerKeys)
+  const economyClient = new OpenBBEconomyClient(config.openbb.apiUrl, undefined, providerKeys)
 
   // ==================== Equity Symbol Index ====================
 
@@ -232,9 +206,7 @@ async function main() {
 
   const toolCenter = new ToolCenter()
   toolCenter.register(createThinkingTools())
-  if (cryptoEngine) {
-    toolCenter.register(createCryptoTradingTools(cryptoEngine, wallet, cryptoWalletStateBridge))
-  }
+  // Crypto trading tools are injected later in the background when CCXT resolves
   if (secResult) {
     toolCenter.register(createSecuritiesTradingTools(secResult.engine, secWallet, secWalletStateBridge))
   }
@@ -246,12 +218,12 @@ async function main() {
   toolCenter.register(createCurrencyTools(currencyClient))
   toolCenter.register(createAnalysisTools(equityClient, cryptoClient, currencyClient))
 
-  console.log(`tool-center: ${toolCenter.list().length} tools registered`)
+  console.log(`tool-center: ${toolCenter.list().length} tools registered (crypto trading pending ccxt)`)
 
   // ==================== AI Provider Chain ====================
 
   const vercelProvider = new VercelAIProvider(
-    toolCenter.getVercelTools(),
+    () => toolCenter.getVercelTools(),
     instructions,
     config.agent.maxSteps,
     config.compaction,
@@ -307,12 +279,34 @@ async function main() {
     }))
   }
 
-  const ctx: EngineContext = { config, engine, cryptoEngine, eventLog, heartbeat, cronEngine }
+  const ctx: EngineContext = { config, engine, cryptoEngine: null, eventLog, heartbeat, cronEngine }
 
   for (const plugin of plugins) {
     await plugin.start(ctx)
     console.log(`plugin started: ${plugin.name}`)
   }
+
+  console.log('engine: started (crypto trading tools pending ccxt init)')
+
+  // ==================== CCXT Background Injection ====================
+  // When the CCXT engine is ready, register crypto trading tools so the next
+  // agent call picks them up automatically (VercelAIProvider re-checks tool count).
+
+  cryptoInitPromise.then((cryptoResult) => {
+    cryptoResultRef = cryptoResult
+    if (!cryptoResult) return
+    const bridge = createCryptoWalletStateBridge(cryptoResult.engine)
+    const realWalletConfig = {
+      executeOperation: createCryptoOperationDispatcher(cryptoResult.engine),
+      getWalletState: bridge,
+      onCommit: onCryptoCommit,
+    }
+    const realWallet = savedState
+      ? Wallet.restore(savedState, realWalletConfig)
+      : new Wallet(realWalletConfig)
+    toolCenter.register(createCryptoTradingTools(cryptoResult.engine, realWallet, bridge))
+    console.log(`ccxt: crypto trading tools online (${toolCenter.list().length} tools total)`)
+  })
 
   // ==================== Shutdown ====================
 
@@ -326,7 +320,7 @@ async function main() {
       await plugin.stop()
     }
     await eventLog.close()
-    await cryptoResult?.close()
+    await cryptoResultRef?.close()
     await secResult?.close()
     process.exit(0)
   }
@@ -335,7 +329,6 @@ async function main() {
 
   // ==================== Tick Loop ====================
 
-  console.log('engine: started')
   while (!stopped) {
     await sleep(config.engine.interval)
   }

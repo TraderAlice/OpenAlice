@@ -83,11 +83,24 @@ const securitiesSchema = z.object({
 
 const openbbSchema = z.object({
   apiUrl: z.string().default('http://localhost:6900'),
-  defaultProvider: z.string().default('yfinance'),
+  providers: z.object({
+    equity: z.string().default('yfinance'),
+    crypto: z.string().default('yfinance'),
+    currency: z.string().default('yfinance'),
+  }).default({
+    equity: 'yfinance',
+    crypto: 'yfinance',
+    currency: 'yfinance',
+  }),
   providerKeys: z.object({
     fred: z.string().optional(),
     fmp: z.string().optional(),
     eia: z.string().optional(),
+    bls: z.string().optional(),
+    nasdaq: z.string().optional(),
+    tradingeconomics: z.string().optional(),
+    econdb: z.string().optional(),
+    intrinio: z.string().optional(),
   }).default({}),
 })
 
@@ -197,6 +210,16 @@ export async function readModelConfig() {
     return modelSchema.parse(raw)
   } catch {
     return modelSchema.parse({})
+  }
+}
+
+/** Read OpenBB config from disk (called per-request for hot-reload). */
+export async function readOpenbbConfig() {
+  try {
+    const raw = JSON.parse(await readFile(resolve(CONFIG_DIR, 'openbb.json'), 'utf-8'))
+    return openbbSchema.parse(raw)
+  } catch {
+    return openbbSchema.parse({})
   }
 }
 
