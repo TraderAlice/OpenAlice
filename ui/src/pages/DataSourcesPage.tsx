@@ -183,11 +183,21 @@ function ConnectionSection({
 
 // ==================== Provider Keys ====================
 
-const PROVIDERS = [
-  { key: 'fred', name: 'FRED', desc: 'Federal Reserve Economic Data — commodity spot prices' },
-  { key: 'fmp', name: 'FMP', desc: 'Financial Modeling Prep — fundamentals, crypto search' },
-  { key: 'eia', name: 'EIA', desc: 'Energy Information Administration — petroleum & energy reports' },
+const FREE_PROVIDERS = [
+  { key: 'fred', name: 'FRED', desc: 'Federal Reserve Economic Data — CPI, GDP, interest rates, and thousands of macro indicators.', hint: 'Free — get your key at fredaccount.stlouisfed.org/apikeys' },
+  { key: 'bls', name: 'BLS', desc: 'Bureau of Labor Statistics — employment, nonfarm payrolls, wages, and CPI by region.', hint: 'Free — register at registrationapps.bls.gov/bls_registration' },
+  { key: 'eia', name: 'EIA', desc: 'Energy Information Administration — petroleum status, energy outlook reports.', hint: 'Free — register at eia.gov/opendata' },
+  { key: 'econdb', name: 'EconDB', desc: 'Global macro indicators, country profiles, and port shipping data.', hint: 'Optional — works without key (limited). Register at econdb.com' },
 ] as const
+
+const PAID_PROVIDERS = [
+  { key: 'fmp', name: 'FMP', desc: 'Financial Modeling Prep — financial statements, fundamentals, economic calendar.', hint: 'Freemium — 250 req/day free at financialmodelingprep.com' },
+  { key: 'nasdaq', name: 'Nasdaq', desc: 'Nasdaq Data Link — dividend/earnings calendars, short interest.', hint: 'Freemium — sign up at data.nasdaq.com' },
+  { key: 'intrinio', name: 'Intrinio', desc: 'Equity fundamentals, options data, institutional ownership.', hint: 'Paid — free trial at intrinio.com' },
+  { key: 'tradingeconomics', name: 'Trading Economics', desc: 'Global economic calendar, 20M+ indicators across 196 countries.', hint: 'Paid — plans at tradingeconomics.com' },
+] as const
+
+const ALL_PROVIDER_KEYS = [...FREE_PROVIDERS, ...PAID_PROVIDERS].map((p) => p.key)
 
 function ProviderKeysSection({
   openbb,
@@ -197,10 +207,10 @@ function ProviderKeysSection({
   onSave: (data: unknown, label: string) => void
 }) {
   const existing = (openbb.providerKeys ?? {}) as Record<string, string | undefined>
-  const [keys, setKeys] = useState<Record<string, string>>({
-    fred: existing.fred || '',
-    fmp: existing.fmp || '',
-    eia: existing.eia || '',
+  const [keys, setKeys] = useState<Record<string, string>>(() => {
+    const init: Record<string, string> = {}
+    for (const k of ALL_PROVIDER_KEYS) init[k] = existing[k] || ''
+    return init
   })
 
   const setKey = (k: string, v: string) => setKeys((prev) => ({ ...prev, [k]: v }))
@@ -216,6 +226,25 @@ function ProviderKeysSection({
   const [expanded, setExpanded] = useState(false)
   const configuredCount = Object.values(keys).filter(Boolean).length
 
+  const renderGroup = (label: string, providers: ReadonlyArray<{ key: string; name: string; desc: string; hint: string }>) => (
+    <div className="mb-4">
+      <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wide mb-2">{label}</p>
+      {providers.map(({ key, name, desc, hint }) => (
+        <Field key={key} label={name}>
+          <p className="text-[11px] text-text-muted mb-1">{desc}</p>
+          <p className="text-[10px] text-text-muted/60 mb-1.5">{hint}</p>
+          <input
+            className={inputClass}
+            type="password"
+            value={keys[key]}
+            onChange={(e) => setKey(key, e.target.value)}
+            placeholder="Not configured"
+          />
+        </Field>
+      ))}
+    </div>
+  )
+
   return (
     <div className="border-t border-border pt-5">
       <button
@@ -230,21 +259,11 @@ function ProviderKeysSection({
       </button>
       {expanded && (
         <div className="mt-3">
-          <p className="text-[12px] text-text-muted mb-3">
-            Optional third-party data providers supported by OpenBB. These are NOT required — the default yfinance provider covers equities, crypto and forex for free. Adding keys here unlocks extra data sources like commodity prices and energy reports.
+          <p className="text-[12px] text-text-muted mb-4">
+            Optional data providers powered by OpenBB. The default yfinance covers equities, crypto and forex for free. Adding API keys here unlocks macro economic data (CPI, GDP, employment), energy reports, and expanded fundamentals.
           </p>
-          {PROVIDERS.map(({ key, name, desc }) => (
-            <Field key={key} label={name}>
-              <p className="text-[11px] text-text-muted mb-1.5">{desc}</p>
-              <input
-                className={inputClass}
-                type="password"
-                value={keys[key]}
-                onChange={(e) => setKey(key, e.target.value)}
-                placeholder="Not configured"
-              />
-            </Field>
-          ))}
+          {renderGroup('Free', FREE_PROVIDERS)}
+          {renderGroup('Paid / Freemium', PAID_PROVIDERS)}
           <SaveButton onClick={() => onSave({ ...openbb, providerKeys: buildProviderKeys() }, 'Provider keys')} />
         </div>
       )}
