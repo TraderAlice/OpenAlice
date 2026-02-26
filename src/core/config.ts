@@ -63,6 +63,10 @@ const cryptoSchema = z.object({
       type: z.literal('none'),
     }),
   ]).default({ type: 'ccxt', exchange: 'bybit', sandbox: false, demoTrading: true, defaultMarketType: 'swap' }),
+  guards: z.array(z.object({
+    type: z.string(),
+    options: z.record(z.string(), z.unknown()).default({}),
+  })).default([]),
 })
 
 const securitiesSchema = z.object({

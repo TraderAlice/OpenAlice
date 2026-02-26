@@ -17,6 +17,8 @@ import {
   createCryptoTradingTools,
   createCryptoOperationDispatcher,
   createCryptoWalletStateBridge,
+  createGuardPipeline,
+  resolveGuards,
 } from './extension/crypto-trading/index.js'
 import type { SecOperation, SecWalletExportState } from './extension/securities-trading/index.js'
 import {
@@ -296,8 +298,10 @@ async function main() {
     cryptoResultRef = cryptoResult
     if (!cryptoResult) return
     const bridge = createCryptoWalletStateBridge(cryptoResult.engine)
+    const rawDispatcher = createCryptoOperationDispatcher(cryptoResult.engine)
+    const guards = resolveGuards(config.crypto.guards)
     const realWalletConfig = {
-      executeOperation: createCryptoOperationDispatcher(cryptoResult.engine),
+      executeOperation: createGuardPipeline(rawDispatcher, cryptoResult.engine, guards),
       getWalletState: bridge,
       onCommit: onCryptoCommit,
     }
