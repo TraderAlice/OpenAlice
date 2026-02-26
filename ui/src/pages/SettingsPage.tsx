@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { api, type AppConfig } from '../api'
 import { Toggle } from '../components/Toggle'
 import { SaveIndicator } from '../components/SaveIndicator'
+import { Section, Field, inputClass } from '../components/form'
 import { useAutoSave, type SaveStatus } from '../hooks/useAutoSave'
 
 const SECTIONS = [
@@ -30,7 +31,6 @@ export function SettingsPage() {
 
     const observer = new IntersectionObserver(
       (entries) => {
-        // Pick the topmost intersecting entry
         let topmost: IntersectionObserverEntry | null = null
         for (const entry of entries) {
           if (entry.isIntersecting) {
@@ -70,7 +70,6 @@ export function SettingsPage() {
     [],
   )
 
-  // Visible sections based on config
   const visibleSections = config
     ? SECTIONS.filter((s) => s.id !== 'model' || config.aiProvider === 'vercel-ai-sdk')
     : []
@@ -183,34 +182,6 @@ export function SettingsPage() {
   )
 }
 
-// ==================== Shared Components ====================
-
-function Section({ id, title, description, children }: { id?: string; title: string; description?: string; children: React.ReactNode }) {
-  return (
-    <div id={id}>
-      <h3 className="text-[13px] font-semibold text-text-muted uppercase tracking-wide mb-3">
-        {title}
-      </h3>
-      {description && (
-        <p className="text-[12px] text-text-muted mb-3 -mt-1">{description}</p>
-      )}
-      {children}
-    </div>
-  )
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="mb-3">
-      <label className="block text-[13px] text-text-muted mb-1">{label}</label>
-      {children}
-    </div>
-  )
-}
-
-const inputClass =
-  'w-full px-2.5 py-2 bg-bg text-text border border-border rounded-md font-sans text-sm outline-none transition-colors focus:border-accent'
-
 // ==================== Form Sections ====================
 
 const PROVIDER_MODELS: Record<string, { label: string; value: string }[]> = {
@@ -247,12 +218,10 @@ function ModelForm({ config }: { config: AppConfig }) {
   const [keySaveStatus, setKeySaveStatus] = useState<SaveStatus>('idle')
   const keySavedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Check if current model is in the preset list
   const presets = PROVIDER_MODELS[provider] || []
   const isCustom = model !== '' && !presets.some((p) => p.value === model)
   const effectiveModel = isCustom || model === '' ? customModel || model : model
 
-  // Auto-save model selection
   const modelData = useMemo(
     () => ({ provider, model: effectiveModel }),
     [provider, effectiveModel],
@@ -267,7 +236,6 @@ function ModelForm({ config }: { config: AppConfig }) {
     save: saveModel,
   })
 
-  // Load API key status on mount
   useEffect(() => {
     api.apiKeys.status().then(setKeyStatus).catch(() => {})
   }, [])
@@ -484,7 +452,6 @@ function HeartbeatForm({ config }: { config: AppConfig }) {
   const [hbEvery, setHbEvery] = useState(config.heartbeat?.every || '30m')
   const [ready, setReady] = useState(false)
 
-  // Sync enabled state from API on mount (may differ from config if toggled on Events page)
   useEffect(() => {
     api.heartbeat.status().then(({ enabled }) => {
       setHbEnabled(enabled)
