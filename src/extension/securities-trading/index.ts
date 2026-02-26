@@ -30,3 +30,7 @@ export { createSecuritiesTradingEngine } from './factory';
 export type { SecuritiesTradingEngineResult } from './factory';
 export { createSecOperationDispatcher } from './operation-dispatcher';
 export { createSecWalletStateBridge } from './wallet-state-bridge';
+
+// Guard pipeline
+export type { SecOperationGuard, SecGuardContext } from './guards/index';
+export { createSecGuardPipeline, resolveSecGuards, registerSecGuard } from './guards/index';

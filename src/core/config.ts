@@ -83,6 +83,10 @@ const securitiesSchema = z.object({
       type: z.literal('none'),
     }),
   ]).default({ type: 'alpaca', paper: true }),
+  guards: z.array(z.object({
+    type: z.string(),
+    options: z.record(z.string(), z.unknown()).default({}),
+  })).default([]),
 })
 
 const openbbSchema = z.object({

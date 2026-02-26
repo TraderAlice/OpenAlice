@@ -28,6 +28,8 @@ import {
   createSecuritiesTradingTools,
   createSecOperationDispatcher,
   createSecWalletStateBridge,
+  createSecGuardPipeline,
+  resolveSecGuards,
 } from './extension/securities-trading/index.js'
 import { Brain, createBrainTools } from './extension/brain/index.js'
 import type { BrainExportState } from './extension/brain/index.js'
@@ -125,9 +127,15 @@ async function main() {
     ? createSecWalletStateBridge(secResult.engine)
     : undefined
 
+  const secGuards = resolveSecGuards(config.securities.guards)
+
   const secWalletConfig = secResult
     ? {
-        executeOperation: createSecOperationDispatcher(secResult.engine),
+        executeOperation: createSecGuardPipeline(
+          createSecOperationDispatcher(secResult.engine),
+          secResult.engine,
+          secGuards,
+        ),
         getWalletState: secWalletStateBridge!,
         onCommit: onSecCommit,
       }
