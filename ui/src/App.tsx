@@ -5,8 +5,9 @@ import { EventsPage } from './pages/EventsPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { DataSourcesPage } from './pages/DataSourcesPage'
 import { TradingPage } from './pages/TradingPage'
+import { SecuritiesPage } from './pages/SecuritiesPage'
 
-export type Page = 'chat' | 'events' | 'data-sources' | 'trading' | 'settings'
+export type Page = 'chat' | 'events' | 'data-sources' | 'trading' | 'securities' | 'settings'
 
 export function App() {
   const [page, setPage] = useState<Page>('chat')
@@ -40,6 +41,7 @@ export function App() {
         {page === 'events' && <EventsPage />}
         {page === 'data-sources' && <DataSourcesPage />}
         {page === 'trading' && <TradingPage />}
+        {page === 'securities' && <SecuritiesPage />}
         {page === 'settings' && <SettingsPage />}
       </main>
     </div>
