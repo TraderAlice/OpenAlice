@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '../api'
+import { Toggle } from '../components/Toggle'
+import { SaveIndicator } from '../components/SaveIndicator'
+import { useAutoSave } from '../hooks/useAutoSave'
 
 const inputClass =
   'w-full px-2.5 py-2 bg-bg text-text border border-border rounded-md font-sans text-sm outline-none transition-colors focus:border-accent'
@@ -18,47 +21,57 @@ interface CryptoConfig {
 
 export function TradingPage() {
   const [config, setConfig] = useState<CryptoConfig | null>(null)
-  const [toast, setToast] = useState<{ msg: string; error?: boolean } | null>(null)
-  const toastTimer = useRef<ReturnType<typeof setTimeout>>(null)
-
-  const showToast = useCallback((msg: string, error = false) => {
-    setToast({ msg, error })
-    if (toastTimer.current) clearTimeout(toastTimer.current)
-    toastTimer.current = setTimeout(() => setToast(null), 2000)
-  }, [])
+  const [loadError, setLoadError] = useState(false)
+  const flushRequestedRef = useRef(false)
 
   useEffect(() => {
-    api.config.load().then((full) => {
-      setConfig((full as Record<string, unknown>).crypto as CryptoConfig)
-    }).catch(() => showToast('Failed to load config', true))
-  }, [showToast])
-
-  useEffect(() => () => {
-    if (toastTimer.current) clearTimeout(toastTimer.current)
+    api.config
+      .load()
+      .then((full) => setConfig((full as Record<string, unknown>).crypto as CryptoConfig))
+      .catch(() => setLoadError(true))
   }, [])
 
-  const saveCrypto = useCallback(
-    async (data: unknown, label: string) => {
-      try {
-        const result = await api.config.updateSection('crypto', data)
-        setConfig(result as CryptoConfig)
-        showToast(`${label} updated`)
-      } catch (err) {
-        showToast(err instanceof Error ? err.message : 'Save failed', true)
-      }
-    },
-    [showToast],
-  )
+  const saveCrypto = useCallback(async (data: CryptoConfig) => {
+    const result = await api.config.updateSection('crypto', data)
+    setConfig(result as CryptoConfig)
+  }, [])
+
+  const { status, flush, retry } = useAutoSave({
+    data: config!,
+    save: saveCrypto,
+    delay: 600,
+    enabled: config !== null,
+  })
+
+  // After React commits a state update with flushRequested, trigger immediate save
+  useEffect(() => {
+    if (flushRequestedRef.current && config) {
+      flushRequestedRef.current = false
+      flush()
+    }
+  }, [config, flush])
+
+  const updateConfig = useCallback((patch: Partial<CryptoConfig>) => {
+    setConfig((prev) => (prev ? { ...prev, ...patch } : prev))
+  }, [])
+
+  const updateConfigImmediate = useCallback((patch: Partial<CryptoConfig>) => {
+    setConfig((prev) => (prev ? { ...prev, ...patch } : prev))
+    flushRequestedRef.current = true
+  }, [])
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
       {/* Header */}
       <div className="shrink-0 border-b border-border">
-        <div className="px-4 md:px-6 py-4">
-          <h2 className="text-base font-semibold text-text">Crypto Trading</h2>
-          <p className="text-[12px] text-text-muted mt-1">
-            Exchange connection and trading guard configuration for cryptocurrency markets.
-          </p>
+        <div className="px-4 md:px-6 py-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-text">Crypto Trading</h2>
+            <p className="text-[12px] text-text-muted mt-1">
+              Exchange connection and trading guard configuration for cryptocurrency markets.
+            </p>
+          </div>
+          <SaveIndicator status={status} onRetry={retry} />
         </div>
       </div>
 
@@ -66,19 +79,19 @@ export function TradingPage() {
       <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5">
         {config && (
           <div className="max-w-[640px] space-y-8">
-            <ExchangeSection config={config} onSave={saveCrypto} />
-            <GuardsSection config={config} onSave={saveCrypto} />
+            <ExchangeSection
+              config={config}
+              onChange={updateConfig}
+              onChangeImmediate={updateConfigImmediate}
+            />
+            <GuardsSection
+              config={config}
+              onChange={updateConfig}
+              onChangeImmediate={updateConfigImmediate}
+            />
           </div>
         )}
-      </div>
-
-      {/* Toast */}
-      <div
-        className={`fixed bottom-20 left-1/2 -translate-x-1/2 bg-bg-tertiary text-text border border-border px-4 py-2 rounded-lg text-[13px] z-[200] transition-all duration-300 pointer-events-none ${
-          toast ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'
-        } ${toast?.error ? 'border-red text-red' : ''}`}
-      >
-        {toast?.msg}
+        {loadError && <p className="text-[13px] text-red">Failed to load configuration.</p>}
       </div>
     </div>
   )
@@ -92,9 +105,7 @@ function SectionHeader({ title, description }: { title: string; description?: st
       <h3 className="text-[13px] font-semibold text-text-muted uppercase tracking-wide">
         {title}
       </h3>
-      {description && (
-        <p className="text-[12px] text-text-muted mt-1">{description}</p>
-      )}
+      {description && <p className="text-[12px] text-text-muted mt-1">{description}</p>}
     </div>
   )
 }
@@ -108,58 +119,23 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
-function SaveButton({ onClick, label = 'Save' }: { onClick: () => void; label?: string }) {
-  return (
-    <button
-      onClick={onClick}
-      className="bg-user-bubble text-white rounded-lg px-4 py-2 text-[13px] font-medium cursor-pointer transition-opacity hover:opacity-85 mt-1"
-    >
-      {label}
-    </button>
-  )
-}
-
-function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
-  return (
-    <label className="flex items-center gap-2.5 cursor-pointer mb-2">
-      <button
-        role="switch"
-        aria-checked={checked}
-        onClick={() => onChange(!checked)}
-        className={`relative w-9 h-5 rounded-full transition-colors ${checked ? 'bg-accent' : 'bg-border'}`}
-      >
-        <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${checked ? 'translate-x-4' : ''}`} />
-      </button>
-      <span className="text-[13px] text-text">{label}</span>
-    </label>
-  )
-}
-
 // ==================== Exchange Section ====================
 
-function ExchangeSection({
-  config,
-  onSave,
-}: {
+interface SectionProps {
   config: CryptoConfig
-  onSave: (data: unknown, label: string) => void
-}) {
+  onChange: (patch: Partial<CryptoConfig>) => void
+  onChangeImmediate: (patch: Partial<CryptoConfig>) => void
+}
+
+function ExchangeSection({ config, onChange, onChangeImmediate }: SectionProps) {
   const provider = config.provider
   const isCcxt = provider.type === 'ccxt'
 
-  const [exchange, setExchange] = useState(isCcxt ? provider.exchange || 'bybit' : 'bybit')
-  const [sandbox, setSandbox] = useState(isCcxt ? provider.sandbox ?? false : false)
-  const [demoTrading, setDemoTrading] = useState(isCcxt ? provider.demoTrading ?? true : true)
-  const [marketType, setMarketType] = useState<'spot' | 'swap'>(isCcxt ? provider.defaultMarketType || 'swap' : 'swap')
-
-  const handleSave = () => {
-    onSave(
-      {
-        ...config,
-        provider: { type: 'ccxt', exchange, sandbox, demoTrading, defaultMarketType: marketType },
-      },
-      'Exchange',
-    )
+  const patchProvider = (field: string, value: unknown, immediate: boolean) => {
+    const patch = {
+      provider: { ...provider, type: 'ccxt' as const, [field]: value },
+    }
+    immediate ? onChangeImmediate(patch) : onChange(patch)
   }
 
   return (
@@ -171,22 +147,37 @@ function ExchangeSection({
       <Field label="Exchange">
         <input
           className={inputClass}
-          value={exchange}
-          onChange={(e) => setExchange(e.target.value.trim())}
+          value={isCcxt ? provider.exchange || '' : ''}
+          onChange={(e) => patchProvider('exchange', e.target.value.trim(), false)}
           placeholder="bybit"
         />
       </Field>
       <Field label="Market Type">
-        <select className={inputClass} value={marketType} onChange={(e) => setMarketType(e.target.value as 'spot' | 'swap')}>
+        <select
+          className={inputClass}
+          value={isCcxt ? provider.defaultMarketType || 'swap' : 'swap'}
+          onChange={(e) => patchProvider('defaultMarketType', e.target.value, true)}
+        >
           <option value="swap">Perpetual Swap</option>
           <option value="spot">Spot</option>
         </select>
       </Field>
       <div className="mb-3">
-        <Toggle checked={sandbox} onChange={setSandbox} label="Sandbox Mode" />
-        <Toggle checked={demoTrading} onChange={setDemoTrading} label="Demo Trading" />
+        <label className="flex items-center gap-2.5 cursor-pointer mb-2">
+          <Toggle
+            checked={isCcxt ? provider.sandbox ?? false : false}
+            onChange={(v) => patchProvider('sandbox', v, true)}
+          />
+          <span className="text-[13px] text-text">Sandbox Mode</span>
+        </label>
+        <label className="flex items-center gap-2.5 cursor-pointer mb-2">
+          <Toggle
+            checked={isCcxt ? provider.demoTrading ?? true : true}
+            onChange={(v) => patchProvider('demoTrading', v, true)}
+          />
+          <span className="text-[13px] text-text">Demo Trading</span>
+        </label>
       </div>
-      <SaveButton onClick={handleSave} />
     </div>
   )
 }
@@ -194,15 +185,26 @@ function ExchangeSection({
 // ==================== Guards Section ====================
 
 const GUARD_TYPES = [
-  { type: 'max-position-size', label: 'Max Position Size', desc: 'Limits each position as a percentage of account equity.' },
-  { type: 'max-leverage', label: 'Max Leverage', desc: 'Caps leverage for all symbols, with optional per-symbol overrides.' },
-  { type: 'cooldown', label: 'Cooldown', desc: 'Enforces a minimum interval between trades on the same symbol.' },
+  {
+    type: 'max-position-size',
+    label: 'Max Position Size',
+    desc: 'Limits each position as a percentage of account equity.',
+  },
+  {
+    type: 'max-leverage',
+    label: 'Max Leverage',
+    desc: 'Caps leverage for all symbols, with optional per-symbol overrides.',
+  },
+  {
+    type: 'cooldown',
+    label: 'Cooldown',
+    desc: 'Enforces a minimum interval between trades on the same symbol.',
+  },
 ] as const
 
 type GuardEntry = { type: string; options: Record<string, unknown> }
 
 function guardSummary(g: GuardEntry): string {
-  const meta = GUARD_TYPES.find((t) => t.type === g.type)
   switch (g.type) {
     case 'max-position-size': {
       const pct = Number(g.options.maxPercentOfEquity ?? 25)
@@ -217,58 +219,44 @@ function guardSummary(g: GuardEntry): string {
       return `${Math.round(ms / 1000)}s`
     }
     default:
-      return meta?.label || g.type
+      return g.type
   }
 }
 
-function GuardsSection({
-  config,
-  onSave,
-}: {
-  config: CryptoConfig
-  onSave: (data: unknown, label: string) => void
-}) {
-  const [guards, setGuards] = useState<GuardEntry[]>(() =>
-    (config.guards || []).map((g) => ({ ...g, options: { ...g.options } })),
-  )
+function GuardsSection({ config, onChange, onChangeImmediate }: SectionProps) {
+  const guards = config.guards || []
   const [editingIdx, setEditingIdx] = useState<number | null>(null)
 
   const addGuard = (type: string) => {
     const defaults: Record<string, Record<string, unknown>> = {
       'max-position-size': { maxPercentOfEquity: 25 },
       'max-leverage': { maxLeverage: 10 },
-      'cooldown': { minIntervalMs: 60000 },
+      cooldown: { minIntervalMs: 60000 },
     }
-    const newGuard: GuardEntry = { type, options: defaults[type] || {} }
-    setGuards((prev) => [...prev, newGuard])
-    setEditingIdx(guards.length)
+    const newGuards = [...guards, { type, options: defaults[type] || {} }]
+    onChangeImmediate({ guards: newGuards })
+    setEditingIdx(newGuards.length - 1)
   }
 
   const removeGuard = (idx: number) => {
-    setGuards((prev) => prev.filter((_, i) => i !== idx))
+    onChangeImmediate({ guards: guards.filter((_, i) => i !== idx) })
     setEditingIdx(null)
   }
 
   const moveGuard = (idx: number, dir: -1 | 1) => {
     const target = idx + dir
     if (target < 0 || target >= guards.length) return
-    setGuards((prev) => {
-      const next = [...prev]
-      ;[next[idx], next[target]] = [next[target], next[idx]]
-      return next
-    })
+    const next = [...guards]
+    ;[next[idx], next[target]] = [next[target], next[idx]]
+    onChangeImmediate({ guards: next })
     setEditingIdx((prev) => (prev === idx ? target : prev))
   }
 
   const updateOptions = (idx: number, options: Record<string, unknown>) => {
-    setGuards((prev) => prev.map((g, i) => (i === idx ? { ...g, options } : g)))
+    const next = guards.map((g, i) => (i === idx ? { ...g, options } : g))
+    onChange({ guards: next })
   }
 
-  const handleSave = () => {
-    onSave({ ...config, guards }, 'Guards')
-  }
-
-  // Guard types not already added
   const availableTypes = GUARD_TYPES.filter((t) => !guards.some((g) => g.type === t.type))
 
   return (
@@ -279,7 +267,9 @@ function GuardsSection({
       />
 
       {guards.length === 0 && (
-        <p className="text-[12px] text-text-muted/60 mb-3">No guards configured. All trades will pass through unchecked.</p>
+        <p className="text-[12px] text-text-muted/60 mb-3">
+          No guards configured. All trades will pass through unchecked.
+        </p>
       )}
 
       <div className="space-y-2 mb-3">
@@ -298,7 +288,9 @@ function GuardsSection({
                 </button>
                 <span className="text-[13px] font-medium text-text flex-1">
                   {meta?.label || guard.type}
-                  <span className="text-text-muted font-normal ml-2 text-[12px]">{guardSummary(guard)}</span>
+                  <span className="text-text-muted font-normal ml-2 text-[12px]">
+                    {guardSummary(guard)}
+                  </span>
                 </span>
                 <div className="flex items-center gap-0.5">
                   <button
@@ -349,8 +341,6 @@ function GuardsSection({
           <AddGuardButton types={availableTypes} onAdd={addGuard} />
         </div>
       )}
-
-      <SaveButton onClick={handleSave} />
     </div>
   )
 }
@@ -381,17 +371,17 @@ function AddGuardButton({
       {types.map(({ type, label, desc }) => (
         <button
           key={type}
-          onClick={() => { onAdd(type); setOpen(false) }}
+          onClick={() => {
+            onAdd(type)
+            setOpen(false)
+          }}
           className="block w-full text-left px-2.5 py-2 rounded-md hover:bg-bg-tertiary transition-colors"
         >
           <span className="text-[13px] text-text font-medium">{label}</span>
           <span className="block text-[11px] text-text-muted/60">{desc}</span>
         </button>
       ))}
-      <button
-        onClick={() => setOpen(false)}
-        className="text-[11px] text-text-muted hover:text-text mt-1"
-      >
+      <button onClick={() => setOpen(false)} className="text-[11px] text-text-muted hover:text-text mt-1">
         Cancel
       </button>
     </div>
@@ -439,7 +429,9 @@ function MaxPositionSizeEditor({
         value={pct}
         onChange={(e) => onChange({ ...options, maxPercentOfEquity: Number(e.target.value) })}
       />
-      <p className="text-[10px] text-text-muted/60 mt-1">Rejects orders where estimated position value exceeds this % of account equity.</p>
+      <p className="text-[10px] text-text-muted/60 mt-1">
+        Rejects orders where estimated position value exceeds this % of account equity.
+      </p>
     </Field>
   )
 }
@@ -462,7 +454,9 @@ function MaxLeverageEditor({
         value={lev}
         onChange={(e) => onChange({ ...options, maxLeverage: Number(e.target.value) })}
       />
-      <p className="text-[10px] text-text-muted/60 mt-1">Rejects orders and leverage adjustments exceeding this limit.</p>
+      <p className="text-[10px] text-text-muted/60 mt-1">
+        Rejects orders and leverage adjustments exceeding this limit.
+      </p>
     </Field>
   )
 }
@@ -485,7 +479,9 @@ function CooldownEditor({
         value={seconds}
         onChange={(e) => onChange({ ...options, minIntervalMs: Number(e.target.value) * 1000 })}
       />
-      <p className="text-[10px] text-text-muted/60 mt-1">Minimum seconds between trades on the same symbol.</p>
+      <p className="text-[10px] text-text-muted/60 mt-1">
+        Minimum seconds between trades on the same symbol.
+      </p>
     </Field>
   )
 }

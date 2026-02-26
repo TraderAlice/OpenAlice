@@ -1,53 +1,66 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { api, type AppConfig } from '../api'
+import { SaveIndicator } from '../components/SaveIndicator'
+import { useAutoSave } from '../hooks/useAutoSave'
 
 const inputClass =
   'w-full px-2.5 py-2 bg-bg text-text border border-border rounded-md font-sans text-sm outline-none transition-colors focus:border-accent'
 
+type OpenbbConfig = Record<string, unknown>
+
 export function DataSourcesPage() {
   const [config, setConfig] = useState<AppConfig | null>(null)
-  const [toast, setToast] = useState<{ msg: string; error?: boolean } | null>(null)
-  const toastTimer = useRef<ReturnType<typeof setTimeout>>(null)
-
-  const showToast = useCallback((msg: string, error = false) => {
-    setToast({ msg, error })
-    if (toastTimer.current) clearTimeout(toastTimer.current)
-    toastTimer.current = setTimeout(() => setToast(null), 2000)
-  }, [])
+  const [openbb, setOpenbb] = useState<OpenbbConfig | null>(null)
+  const [loadError, setLoadError] = useState(false)
+  const flushRequestedRef = useRef(false)
 
   useEffect(() => {
-    api.config.load().then(setConfig).catch(() => showToast('Failed to load config', true))
-  }, [showToast])
-
-  useEffect(() => () => {
-    if (toastTimer.current) clearTimeout(toastTimer.current)
+    api.config.load().then((full) => {
+      setConfig(full)
+      setOpenbb((full as Record<string, unknown>).openbb as OpenbbConfig)
+    }).catch(() => setLoadError(true))
   }, [])
 
-  const saveOpenbb = useCallback(
-    async (data: unknown, label: string) => {
-      try {
-        await api.config.updateSection('openbb', data)
-        showToast(`${label} updated`)
-      } catch (err) {
-        showToast(err instanceof Error ? err.message : 'Save failed', true)
-      }
-    },
-    [showToast],
-  )
+  const saveOpenbb = useCallback(async (data: OpenbbConfig) => {
+    const result = await api.config.updateSection('openbb', data)
+    setOpenbb(result as OpenbbConfig)
+  }, [])
 
-  const openbb = config
-    ? ((config as Record<string, unknown>).openbb as Record<string, unknown> | undefined)
-    : undefined
+  const { status, flush, retry } = useAutoSave({
+    data: openbb!,
+    save: saveOpenbb,
+    delay: 600,
+    enabled: openbb !== null,
+  })
+
+  useEffect(() => {
+    if (flushRequestedRef.current && openbb) {
+      flushRequestedRef.current = false
+      flush()
+    }
+  }, [openbb, flush])
+
+  const updateOpenbb = useCallback((patch: Partial<OpenbbConfig>) => {
+    setOpenbb((prev) => (prev ? { ...prev, ...patch } : prev))
+  }, [])
+
+  const updateOpenbbImmediate = useCallback((patch: Partial<OpenbbConfig>) => {
+    setOpenbb((prev) => (prev ? { ...prev, ...patch } : prev))
+    flushRequestedRef.current = true
+  }, [])
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
       {/* Header */}
       <div className="shrink-0 border-b border-border">
-        <div className="px-4 md:px-6 py-4">
-          <h2 className="text-base font-semibold text-text">Data Sources</h2>
-          <p className="text-[12px] text-text-muted mt-1">
-            Market data powered by OpenBB. The default provider yfinance is free and works out of the box.
-          </p>
+        <div className="px-4 md:px-6 py-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-text">Data Sources</h2>
+            <p className="text-[12px] text-text-muted mt-1">
+              Market data powered by OpenBB. The default provider yfinance is free and works out of the box.
+            </p>
+          </div>
+          <SaveIndicator status={status} onRetry={retry} />
         </div>
       </div>
 
@@ -55,22 +68,18 @@ export function DataSourcesPage() {
       <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5">
         {config && openbb && (
           <div className="max-w-[640px] space-y-8">
-            {/* Connection */}
-            <ConnectionSection openbb={openbb} onSave={saveOpenbb} showToast={showToast} />
-
-            {/* Provider Keys */}
-            <ProviderKeysSection openbb={openbb} onSave={saveOpenbb} />
+            <ConnectionSection
+              openbb={openbb}
+              onChange={updateOpenbb}
+              onChangeImmediate={updateOpenbbImmediate}
+            />
+            <ProviderKeysSection
+              openbb={openbb}
+              onChange={updateOpenbb}
+            />
           </div>
         )}
-      </div>
-
-      {/* Toast */}
-      <div
-        className={`fixed bottom-20 left-1/2 -translate-x-1/2 bg-bg-tertiary text-text border border-border px-4 py-2 rounded-lg text-[13px] z-[200] transition-all duration-300 pointer-events-none ${
-          toast ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'
-        } ${toast?.error ? 'border-red text-red' : ''}`}
-      >
-        {toast?.msg}
+        {loadError && <p className="text-[13px] text-red">Failed to load configuration.</p>}
       </div>
     </div>
   )
@@ -100,17 +109,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
-function SaveButton({ onClick, label = 'Save' }: { onClick: () => void; label?: string }) {
-  return (
-    <button
-      onClick={onClick}
-      className="bg-user-bubble text-white rounded-lg px-4 py-2 text-[13px] font-medium cursor-pointer transition-opacity hover:opacity-85 mt-1"
-    >
-      {label}
-    </button>
-  )
-}
-
 // ==================== Connection ====================
 
 const PROVIDER_OPTIONS: Record<string, string[]> = {
@@ -125,43 +123,27 @@ const ASSET_LABELS: Record<string, string> = {
   currency: 'Currency',
 }
 
-function ConnectionSection({
-  openbb,
-  onSave,
-  showToast,
-}: {
-  openbb: Record<string, unknown>
-  onSave: (data: unknown, label: string) => void
-  showToast: (msg: string, error?: boolean) => void
-}) {
-  const [apiUrl, setApiUrl] = useState((openbb.apiUrl as string) || 'http://localhost:6900')
-  const existingProviders = (openbb.providers ?? {}) as Record<string, string>
-  const [providers, setProviders] = useState<Record<string, string>>({
-    equity: existingProviders.equity || 'yfinance',
-    crypto: existingProviders.crypto || 'yfinance',
-    currency: existingProviders.currency || 'yfinance',
-  })
-  const [testing, setTesting] = useState(false)
-  const [status, setStatus] = useState<'idle' | 'ok' | 'error'>('idle')
+interface SectionProps {
+  openbb: OpenbbConfig
+  onChange: (patch: Partial<OpenbbConfig>) => void
+  onChangeImmediate: (patch: Partial<OpenbbConfig>) => void
+}
 
-  const setProvider = (asset: string, value: string) => {
-    setProviders((prev) => ({ ...prev, [asset]: value }))
-  }
+function ConnectionSection({ openbb, onChange, onChangeImmediate }: SectionProps) {
+  const [testing, setTesting] = useState(false)
+  const [testStatus, setTestStatus] = useState<'idle' | 'ok' | 'error'>('idle')
+
+  const apiUrl = (openbb.apiUrl as string) || 'http://localhost:6900'
+  const providers = (openbb.providers ?? { equity: 'yfinance', crypto: 'yfinance', currency: 'yfinance' }) as Record<string, string>
 
   const testConnection = async () => {
     setTesting(true)
-    setStatus('idle')
+    setTestStatus('idle')
     try {
       const res = await fetch(`${apiUrl}/api/v1/equity/search?query=AAPL&provider=sec`, { signal: AbortSignal.timeout(5000) })
-      if (res.ok) {
-        setStatus('ok')
-      } else {
-        setStatus('error')
-        showToast(`OpenBB returned ${res.status}`, true)
-      }
+      setTestStatus(res.ok ? 'ok' : 'error')
     } catch {
-      setStatus('error')
-      showToast('Cannot reach OpenBB API', true)
+      setTestStatus('error')
     } finally {
       setTesting(false)
     }
@@ -174,7 +156,12 @@ function ConnectionSection({
         description="OpenBB sidecar API connection. Unless you changed the default setup, these should work as-is."
       />
       <Field label="API URL">
-        <input className={inputClass} value={apiUrl} onChange={(e) => { setApiUrl(e.target.value); setStatus('idle') }} placeholder="http://localhost:6900" />
+        <input
+          className={inputClass}
+          value={apiUrl}
+          onChange={(e) => { onChange({ apiUrl: e.target.value }); setTestStatus('idle') }}
+          placeholder="http://localhost:6900"
+        />
       </Field>
 
       <div className="mb-3">
@@ -186,8 +173,8 @@ function ConnectionSection({
               <label className="block text-[11px] text-text-muted mb-0.5">{ASSET_LABELS[asset]}</label>
               <select
                 className={inputClass}
-                value={providers[asset]}
-                onChange={(e) => setProvider(asset, e.target.value)}
+                value={providers[asset] || 'yfinance'}
+                onChange={(e) => onChangeImmediate({ providers: { ...providers, [asset]: e.target.value } })}
               >
                 {options.map((opt) => (
                   <option key={opt} value={opt}>{opt}</option>
@@ -199,22 +186,21 @@ function ConnectionSection({
       </div>
 
       <div className="flex items-center gap-2 mt-1">
-        <SaveButton onClick={() => onSave({ ...openbb, apiUrl, providers }, 'Connection')} />
         <button
           onClick={testConnection}
           disabled={testing}
           className={`border rounded-lg px-4 py-2 text-[13px] font-medium cursor-pointer transition-colors disabled:opacity-50 ${
-            status === 'ok'
+            testStatus === 'ok'
               ? 'border-green text-green'
-              : status === 'error'
+              : testStatus === 'error'
                 ? 'border-red text-red'
                 : 'border-border text-text-muted hover:bg-bg-tertiary hover:text-text'
           }`}
         >
-          {testing ? 'Testing...' : status === 'ok' ? 'Connected' : status === 'error' ? 'Failed' : 'Test Connection'}
+          {testing ? 'Testing...' : testStatus === 'ok' ? 'Connected' : testStatus === 'error' ? 'Failed' : 'Test Connection'}
         </button>
-        {status !== 'idle' && (
-          <div className={`w-2 h-2 rounded-full ${status === 'ok' ? 'bg-green' : 'bg-red'}`} />
+        {testStatus !== 'idle' && (
+          <div className={`w-2 h-2 rounded-full ${testStatus === 'ok' ? 'bg-green' : 'bg-red'}`} />
         )}
       </div>
     </div>
@@ -241,10 +227,10 @@ const ALL_PROVIDER_KEYS = [...FREE_PROVIDERS, ...PAID_PROVIDERS].map((p) => p.ke
 
 function ProviderKeysSection({
   openbb,
-  onSave,
+  onChange,
 }: {
-  openbb: Record<string, unknown>
-  onSave: (data: unknown, label: string) => void
+  openbb: OpenbbConfig
+  onChange: (patch: Partial<OpenbbConfig>) => void
 }) {
   const existing = (openbb.providerKeys ?? {}) as Record<string, string | undefined>
   const [keys, setKeys] = useState<Record<string, string>>(() => {
@@ -257,6 +243,13 @@ function ProviderKeysSection({
   const setKey = (k: string, v: string) => {
     setKeys((prev) => ({ ...prev, [k]: v }))
     setTestStatus((prev) => ({ ...prev, [k]: 'idle' }))
+    // Build providerKeys from updated keys
+    const updated = { ...keys, [k]: v }
+    const providerKeys: Record<string, string> = {}
+    for (const [key, val] of Object.entries(updated)) {
+      if (val) providerKeys[key] = val
+    }
+    onChange({ providerKeys })
   }
 
   const testProvider = async (provider: string) => {
@@ -269,14 +262,6 @@ function ProviderKeysSection({
     } catch {
       setTestStatus((prev) => ({ ...prev, [provider]: 'error' }))
     }
-  }
-
-  const buildProviderKeys = () => {
-    const result: Record<string, string> = {}
-    for (const [k, v] of Object.entries(keys)) {
-      if (v) result[k] = v
-    }
-    return result
   }
 
   const [expanded, setExpanded] = useState(false)
@@ -338,7 +323,6 @@ function ProviderKeysSection({
           </p>
           {renderGroup('Free', FREE_PROVIDERS)}
           {renderGroup('Paid / Freemium', PAID_PROVIDERS)}
-          <SaveButton onClick={() => onSave({ ...openbb, providerKeys: buildProviderKeys() }, 'Provider keys')} />
         </div>
       )}
     </div>

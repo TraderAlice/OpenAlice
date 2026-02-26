@@ -1,6 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { api, type AppConfig } from '../api'
 import { Toggle } from '../components/Toggle'
+import { SaveIndicator } from '../components/SaveIndicator'
+import { useAutoSave, type SaveStatus } from '../hooks/useAutoSave'
 
 const SECTIONS = [
   { id: 'ai-provider', label: 'AI Provider' },
@@ -13,12 +15,11 @@ const SECTIONS = [
 
 export function SettingsPage() {
   const [config, setConfig] = useState<AppConfig | null>(null)
-  const [toast, setToast] = useState<{ msg: string; error?: boolean } | null>(null)
   const [activeSection, setActiveSection] = useState('ai-provider')
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    api.config.load().then(setConfig).catch(() => showToast('Failed to load config', true))
+    api.config.load().then(setConfig).catch(() => {})
   }, [])
 
   // Track active section via IntersectionObserver
@@ -56,41 +57,16 @@ export function SettingsPage() {
     el?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  const toastTimer = useRef<ReturnType<typeof setTimeout>>(null)
-
-  const showToast = useCallback((msg: string, error = false) => {
-    setToast({ msg, error })
-    if (toastTimer.current) clearTimeout(toastTimer.current)
-    toastTimer.current = setTimeout(() => setToast(null), 2000)
-  }, [])
-
-  useEffect(() => () => {
-    if (toastTimer.current) clearTimeout(toastTimer.current)
-  }, [])
-
   const handleProviderSwitch = useCallback(
     async (provider: string) => {
       try {
         await api.config.setProvider(provider)
         setConfig((c) => (c ? { ...c, aiProvider: provider } : c))
-        showToast(`Provider: ${provider === 'claude-code' ? 'Claude Code' : 'Vercel AI SDK'}`)
       } catch {
-        showToast('Failed to switch provider', true)
+        // Button state reflects actual saved state — no change on failure
       }
     },
-    [showToast],
-  )
-
-  const saveSection = useCallback(
-    async (section: string, data: unknown, label: string) => {
-      try {
-        await api.config.updateSection(section, data)
-        showToast(`${label} updated`)
-      } catch (err) {
-        showToast(err instanceof Error ? err.message : 'Save failed', true)
-      }
-    },
-    [showToast],
+    [],
   )
 
   // Visible sections based on config
@@ -161,9 +137,12 @@ export function SettingsPage() {
                 <Toggle
                   checked={config.agent?.evolutionMode || false}
                   onChange={async (v) => {
-                    const agentData = { ...config.agent, evolutionMode: v }
-                    await saveSection('agent', agentData, 'Evolution Mode')
-                    setConfig((c) => c ? { ...c, agent: { ...c.agent, evolutionMode: v } } : c)
+                    try {
+                      await api.config.updateSection('agent', { ...config.agent, evolutionMode: v })
+                      setConfig((c) => c ? { ...c, agent: { ...c.agent, evolutionMode: v } } : c)
+                    } catch {
+                      // Toggle doesn't flip on failure
+                    }
                   }}
                 />
               </div>
@@ -172,36 +151,27 @@ export function SettingsPage() {
             {/* Model (only for Vercel AI SDK) */}
             {config.aiProvider === 'vercel-ai-sdk' && (
               <Section id="model" title="Model" description="Model and API keys for Vercel AI SDK. Supports Anthropic, OpenAI, and Google. Changes take effect on the next request (hot-reload).">
-                <ModelForm config={config} onSave={saveSection} showToast={showToast} />
+                <ModelForm config={config} />
               </Section>
             )}
 
             {/* Connectivity */}
             <Section id="connectivity" title="Connectivity" description="MCP server ports for external agent integration. Tool port exposes trading, analysis and other tools; Ask port provides a multi-turn conversation interface. Leave empty to disable. Restart required after changes.">
-              <ConnectivityForm config={config} onSave={saveSection} />
+              <ConnectivityForm config={config} />
             </Section>
 
             {/* Compaction */}
             <Section id="compaction" title="Compaction" description="Context window management. When conversation size approaches Max Context minus Max Output tokens, older messages are automatically summarized to free up space. Set Max Context to match your model's context limit.">
-              <CompactionForm config={config} onSave={saveSection} />
+              <CompactionForm config={config} />
             </Section>
 
             {/* Heartbeat */}
             <Section id="heartbeat" title="Heartbeat" description="Periodic self-check. Alice reviews markets, news and alerts at the configured interval, and only pushes a notification when there's something worth your attention. Interval format: 30m, 1h, 6h.">
-              <HeartbeatForm config={config} onSave={saveSection} showToast={showToast} />
+              <HeartbeatForm config={config} />
             </Section>
 
           </div>
         )}
-      </div>
-
-      {/* Toast */}
-      <div
-        className={`fixed bottom-20 left-1/2 -translate-x-1/2 bg-bg-tertiary text-text border border-border px-4 py-2 rounded-lg text-[13px] z-[200] transition-all duration-300 pointer-events-none ${
-          toast ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'
-        } ${toast?.error ? 'border-red text-red' : ''}`}
-      >
-        {toast?.msg}
       </div>
     </div>
   )
@@ -220,17 +190,6 @@ function Section({ id, title, description, children }: { id?: string; title: str
       )}
       {children}
     </div>
-  )
-}
-
-function SaveButton({ onClick, label = 'Save' }: { onClick: () => void; label?: string }) {
-  return (
-    <button
-      onClick={onClick}
-      className="bg-user-bubble text-white rounded-lg px-4 py-2 text-[13px] font-medium cursor-pointer transition-opacity hover:opacity-85 mt-1"
-    >
-      {label}
-    </button>
   )
 }
 
@@ -272,30 +231,43 @@ const PROVIDERS = [
   { value: 'google', label: 'Google' },
 ]
 
-function ModelForm({
-  config,
-  onSave,
-  showToast,
-}: {
-  config: AppConfig
-  onSave: (section: string, data: unknown, label: string) => void
-  showToast: (msg: string, error?: boolean) => void
-}) {
+function ModelForm({ config }: { config: AppConfig }) {
   const [provider, setProvider] = useState(config.model?.provider || 'anthropic')
   const [model, setModel] = useState(config.model?.model || '')
   const [customModel, setCustomModel] = useState('')
   const [showKeys, setShowKeys] = useState(false)
   const [keyStatus, setKeyStatus] = useState<Record<string, boolean>>({})
   const [keys, setKeys] = useState({ anthropic: '', openai: '', google: '' })
-  const [savingKeys, setSavingKeys] = useState(false)
+  const [keySaveStatus, setKeySaveStatus] = useState<SaveStatus>('idle')
+  const keySavedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Check if current model is in the preset list
   const presets = PROVIDER_MODELS[provider] || []
   const isCustom = model !== '' && !presets.some((p) => p.value === model)
+  const effectiveModel = isCustom || model === '' ? customModel || model : model
+
+  // Auto-save model selection
+  const modelData = useMemo(
+    () => ({ provider, model: effectiveModel }),
+    [provider, effectiveModel],
+  )
+
+  const saveModel = useCallback(async (data: { provider: string; model: string }) => {
+    await api.config.updateSection('model', data)
+  }, [])
+
+  const { status: modelStatus, retry: modelRetry } = useAutoSave({
+    data: modelData,
+    save: saveModel,
+  })
 
   // Load API key status on mount
   useEffect(() => {
     api.apiKeys.status().then(setKeyStatus).catch(() => {})
+  }, [])
+
+  useEffect(() => () => {
+    if (keySavedTimer.current) clearTimeout(keySavedTimer.current)
   }, [])
 
   const handleProviderChange = (newProvider: string) => {
@@ -319,26 +291,22 @@ function ModelForm({
     }
   }
 
-  const effectiveModel = isCustom || model === '' ? customModel || model : model
-
   const handleSaveKeys = async () => {
-    setSavingKeys(true)
+    setKeySaveStatus('saving')
     try {
-      // Only send non-empty keys
       const payload: Record<string, string> = {}
       if (keys.anthropic) payload.anthropic = keys.anthropic
       if (keys.openai) payload.openai = keys.openai
       if (keys.google) payload.google = keys.google
       await api.apiKeys.save(payload)
-      // Refresh status
       const status = await api.apiKeys.status()
       setKeyStatus(status)
       setKeys({ anthropic: '', openai: '', google: '' })
-      showToast('API keys saved')
+      setKeySaveStatus('saved')
+      if (keySavedTimer.current) clearTimeout(keySavedTimer.current)
+      keySavedTimer.current = setTimeout(() => setKeySaveStatus('idle'), 2000)
     } catch {
-      showToast('Failed to save API keys', true)
-    } finally {
-      setSavingKeys(false)
+      setKeySaveStatus('error')
     }
   }
 
@@ -386,7 +354,7 @@ function ModelForm({
         </Field>
       )}
 
-      <SaveButton onClick={() => onSave('model', { provider, model: effectiveModel }, 'Model')} />
+      <SaveIndicator status={modelStatus} onRetry={modelRetry} />
 
       {/* API Keys */}
       <div className="mt-5 border-t border-border pt-4">
@@ -429,13 +397,16 @@ function ModelForm({
                 </div>
               </Field>
             ))}
-            <button
-              onClick={handleSaveKeys}
-              disabled={savingKeys}
-              className="bg-user-bubble text-white rounded-lg px-4 py-2 text-[13px] font-medium cursor-pointer transition-opacity hover:opacity-85 disabled:opacity-50"
-            >
-              {savingKeys ? 'Saving...' : 'Save Keys'}
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleSaveKeys}
+                disabled={keySaveStatus === 'saving'}
+                className="bg-user-bubble text-white rounded-lg px-4 py-2 text-[13px] font-medium cursor-pointer transition-opacity hover:opacity-85 disabled:opacity-50"
+              >
+                Save Keys
+              </button>
+              <SaveIndicator status={keySaveStatus} onRetry={handleSaveKeys} />
+            </div>
           </div>
         )}
       </div>
@@ -443,15 +414,20 @@ function ModelForm({
   )
 }
 
-function CompactionForm({
-  config,
-  onSave,
-}: {
-  config: AppConfig
-  onSave: (section: string, data: unknown, label: string) => void
-}) {
+function CompactionForm({ config }: { config: AppConfig }) {
   const [ctx, setCtx] = useState(String(config.compaction?.maxContextTokens || ''))
   const [out, setOut] = useState(String(config.compaction?.maxOutputTokens || ''))
+
+  const data = useMemo(
+    () => ({ maxContextTokens: Number(ctx), maxOutputTokens: Number(out) }),
+    [ctx, out],
+  )
+
+  const save = useCallback(async (d: { maxContextTokens: number; maxOutputTokens: number }) => {
+    await api.config.updateSection('compaction', d)
+  }, [])
+
+  const { status, retry } = useAutoSave({ data, save })
 
   return (
     <>
@@ -461,25 +437,28 @@ function CompactionForm({
       <Field label="Max Output Tokens">
         <input className={inputClass} type="number" step={1000} value={out} onChange={(e) => setOut(e.target.value)} />
       </Field>
-      <SaveButton
-        onClick={() =>
-          onSave('compaction', { maxContextTokens: Number(ctx), maxOutputTokens: Number(out) }, 'Compaction')
-        }
-      />
+      <SaveIndicator status={status} onRetry={retry} />
     </>
   )
 }
 
-function ConnectivityForm({
-  config,
-  onSave,
-}: {
-  config: AppConfig
-  onSave: (section: string, data: unknown, label: string) => void
-}) {
+function ConnectivityForm({ config }: { config: AppConfig }) {
   const eng = config.engine as Record<string, unknown>
   const [mcpPort, setMcpPort] = useState(String(eng.mcpPort ?? ''))
   const [askMcpPort, setAskMcpPort] = useState(String(eng.askMcpPort ?? ''))
+
+  const data = useMemo(() => {
+    const patch = { ...eng }
+    if (mcpPort) patch.mcpPort = Number(mcpPort); else delete patch.mcpPort
+    if (askMcpPort) patch.askMcpPort = Number(askMcpPort); else delete patch.askMcpPort
+    return patch
+  }, [eng, mcpPort, askMcpPort])
+
+  const save = useCallback(async (d: Record<string, unknown>) => {
+    await api.config.updateSection('engine', d)
+  }, [])
+
+  const { status, retry } = useAutoSave({ data, save })
 
   return (
     <>
@@ -489,34 +468,38 @@ function ConnectivityForm({
       <Field label="Ask MCP Port (connector)">
         <input className={inputClass} type="number" value={askMcpPort} onChange={(e) => setAskMcpPort(e.target.value)} placeholder="Disabled" />
       </Field>
-      <SaveButton
-        onClick={() => {
-          const patch = { ...eng }
-          if (mcpPort) patch.mcpPort = Number(mcpPort); else delete patch.mcpPort
-          if (askMcpPort) patch.askMcpPort = Number(askMcpPort); else delete patch.askMcpPort
-          onSave('engine', patch, 'Connectivity')
-        }}
-      />
+      <SaveIndicator status={status} onRetry={retry} />
     </>
   )
 }
 
-function HeartbeatForm({
-  config,
-  onSave,
-  showToast,
-}: {
-  config: AppConfig
-  onSave: (section: string, data: unknown, label: string) => void
-  showToast: (msg: string, error?: boolean) => void
-}) {
+function HeartbeatForm({ config }: { config: AppConfig }) {
   const [hbEnabled, setHbEnabled] = useState(config.heartbeat?.enabled || false)
   const [hbEvery, setHbEvery] = useState(config.heartbeat?.every || '30m')
+  const [ready, setReady] = useState(false)
 
   // Sync enabled state from API on mount (may differ from config if toggled on Events page)
   useEffect(() => {
-    api.heartbeat.status().then(({ enabled }) => setHbEnabled(enabled)).catch(() => {})
+    api.heartbeat.status().then(({ enabled }) => {
+      setHbEnabled(enabled)
+      setReady(true)
+    }).catch(() => setReady(true))
   }, [])
+
+  const heartbeatData = useMemo(
+    () => ({ ...config.heartbeat, enabled: hbEnabled, every: hbEvery }),
+    [config.heartbeat, hbEnabled, hbEvery],
+  )
+
+  const save = useCallback(async (d: Record<string, unknown>) => {
+    await api.config.updateSection('heartbeat', d)
+  }, [])
+
+  const { status, retry } = useAutoSave({
+    data: heartbeatData,
+    save,
+    enabled: ready,
+  })
 
   return (
     <>
@@ -528,9 +511,8 @@ function HeartbeatForm({
             try {
               await api.heartbeat.setEnabled(v)
               setHbEnabled(v)
-              showToast(`Heartbeat ${v ? 'enabled' : 'disabled'}`)
             } catch {
-              showToast('Failed to toggle heartbeat', true)
+              // Toggle doesn't flip on failure
             }
           }}
         />
@@ -538,11 +520,7 @@ function HeartbeatForm({
       <Field label="Interval">
         <input className={inputClass} value={hbEvery} onChange={(e) => setHbEvery(e.target.value)} placeholder="30m" />
       </Field>
-      <SaveButton
-        onClick={() =>
-          onSave('heartbeat', { ...config.heartbeat, every: hbEvery }, 'Heartbeat interval')
-        }
-      />
+      <SaveIndicator status={status} onRetry={retry} />
     </>
   )
 }
