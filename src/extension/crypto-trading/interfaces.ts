@@ -35,6 +35,7 @@ export interface ICryptoTradingEngine {
   adjustLeverage(symbol: string, newLeverage: number): Promise<{ success: boolean; error?: string }>;
   getTicker(symbol: string): Promise<CryptoTicker>;
   getFundingRate(symbol: string): Promise<CryptoFundingRate>;
+  getOrderBook(symbol: string, limit?: number): Promise<CryptoOrderBook>;
 }
 
 // ==================== Orders ====================
@@ -120,6 +121,18 @@ export interface CryptoFundingRate {
   fundingRate: number;
   nextFundingTime?: Date;
   previousFundingRate?: number;
+  timestamp: Date;
+}
+
+// ==================== Order Book ====================
+
+/** A single price level in the order book: [price, amount] */
+export type CryptoOrderBookLevel = [price: number, amount: number];
+
+export interface CryptoOrderBook {
+  symbol: string;
+  bids: CryptoOrderBookLevel[];
+  asks: CryptoOrderBookLevel[];
   timestamp: Date;
 }
 

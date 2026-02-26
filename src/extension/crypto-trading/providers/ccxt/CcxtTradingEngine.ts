@@ -16,6 +16,8 @@ import type {
   CryptoAccountInfo,
   CryptoTicker,
   CryptoFundingRate,
+  CryptoOrderBook,
+  CryptoOrderBookLevel,
 } from '../../interfaces.js';
 import { SymbolMapper } from './symbol-map.js';
 
@@ -322,6 +324,20 @@ export class CcxtTradingEngine implements ICryptoTradingEngine {
         : undefined,
       previousFundingRate: funding.previousFundingRate ?? undefined,
       timestamp: new Date(funding.timestamp ?? Date.now()),
+    };
+  }
+
+  async getOrderBook(symbol: string, limit?: number): Promise<CryptoOrderBook> {
+    this.ensureInit();
+
+    const ccxtSymbol = this.symbolMapper.toCcxt(symbol);
+    const book = await this.exchange.fetchOrderBook(ccxtSymbol, limit);
+
+    return {
+      symbol,
+      bids: book.bids.map(([p, a]) => [p ?? 0, a ?? 0] as CryptoOrderBookLevel),
+      asks: book.asks.map(([p, a]) => [p ?? 0, a ?? 0] as CryptoOrderBookLevel),
+      timestamp: new Date(book.timestamp ?? Date.now()),
     };
   }
 

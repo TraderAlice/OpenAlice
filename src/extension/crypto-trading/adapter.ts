@@ -328,6 +328,25 @@ This reflects the exchange's own price, not an external data provider.`,
       },
     }),
 
+    cryptoGetOrderBook: tool({
+      description: `Query the order book (market depth) for a symbol.
+
+Returns bids (buy orders) and asks (sell orders) sorted by price:
+- bids: descending (best/highest bid first)
+- asks: ascending (best/lowest ask first)
+Each level is [price, amount].
+
+Use this to evaluate liquidity and potential slippage before placing large orders.`,
+      inputSchema: z.object({
+        symbol: z.string().describe('Trading pair symbol, e.g. BTC/USD'),
+        limit: z.number().int().min(1).max(100).optional()
+          .describe('Number of price levels per side (default: 20)'),
+      }),
+      execute: async ({ symbol, limit }) => {
+        return await tradingEngine.getOrderBook(symbol, limit ?? 20);
+      },
+    }),
+
     cryptoGetFundingRate: tool({
       description: `Query the current funding rate for a perpetual contract.
 
