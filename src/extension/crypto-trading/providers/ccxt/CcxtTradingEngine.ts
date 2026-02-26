@@ -52,7 +52,7 @@ export class CcxtTradingEngine implements ICryptoTradingEngine {
       apiKey: config.apiKey,
       secret: config.apiSecret,
       password: config.password,
-      ...config.options,
+      options: config.options,
     });
 
     if (config.sandbox) {
