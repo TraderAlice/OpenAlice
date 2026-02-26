@@ -30,12 +30,12 @@ export async function createSecuritiesTradingEngine(
       // Dynamic import to avoid loading Alpaca SDK when not needed
       const { AlpacaTradingEngine } = await import('./providers/alpaca/index.js');
 
-      const apiKey = process.env.ALPACA_API_KEY;
-      const secretKey = process.env.ALPACA_SECRET_KEY;
+      const apiKey = providerConfig.apiKey;
+      const secretKey = providerConfig.secretKey;
 
       if (!apiKey || !secretKey) {
         throw new Error(
-          'ALPACA_API_KEY and ALPACA_SECRET_KEY must be set in .env for Alpaca provider',
+          'apiKey and secretKey must be configured for Alpaca provider (Settings → Securities)',
         );
       }
 

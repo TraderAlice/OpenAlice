@@ -178,7 +178,7 @@ export class WebPlugin implements Plugin {
     app.put('/api/config/:section', async (c) => {
       try {
         const section = c.req.param('section') as ConfigSection
-        const validSections: ConfigSection[] = ['engine', 'model', 'agent', 'crypto', 'securities', 'openbb', 'compaction', 'aiProvider', 'heartbeat', 'apiKeys']
+        const validSections: ConfigSection[] = ['engine', 'model', 'agent', 'crypto', 'securities', 'openbb', 'compaction', 'aiProvider', 'heartbeat', 'apiKeys', 'telegram']
         if (!validSections.includes(section)) {
           return c.json({ error: `Invalid section "${section}". Valid: ${validSections.join(', ')}` }, 400)
         }
@@ -364,6 +364,20 @@ export class WebPlugin implements Plugin {
       } catch (err) {
         return c.json({ error: String(err) }, 500)
       }
+    })
+
+    // ==================== Trading Engine Reconnect ====================
+
+    app.post('/api/crypto/reconnect', async (c) => {
+      if (!ctx.reconnectCrypto) return c.json({ success: false, error: 'Not available' }, 501)
+      const result = await ctx.reconnectCrypto()
+      return c.json(result, result.success ? 200 : 500)
+    })
+
+    app.post('/api/securities/reconnect', async (c) => {
+      if (!ctx.reconnectSecurities) return c.json({ success: false, error: 'Not available' }, 501)
+      const result = await ctx.reconnectSecurities()
+      return c.json(result, result.success ? 200 : 500)
     })
 
     // ==================== Serve UI (Vite build output) ====================

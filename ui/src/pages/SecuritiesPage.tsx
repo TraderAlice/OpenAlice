@@ -11,6 +11,8 @@ interface SecuritiesConfig {
   allowedSymbols: string[]
   provider: {
     type: 'alpaca' | 'none'
+    apiKey?: string
+    secretKey?: string
     paper?: boolean
   }
   guards: Array<{ type: string; options: Record<string, unknown> }>
@@ -77,6 +79,7 @@ export function SecuritiesPage() {
           <div className="max-w-[640px] space-y-8">
             <ProviderSection
               config={config}
+              onChange={updateConfig}
               onChangeImmediate={updateConfigImmediate}
             />
             <GuardsSection
@@ -118,33 +121,102 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function ProviderSection({
   config,
+  onChange,
   onChangeImmediate,
 }: {
   config: SecuritiesConfig
+  onChange: (patch: Partial<SecuritiesConfig>) => void
   onChangeImmediate: (patch: Partial<SecuritiesConfig>) => void
 }) {
   const isAlpaca = config.provider.type === 'alpaca'
+
+  const patchProvider = (field: string, value: unknown, immediate: boolean) => {
+    const patch = {
+      provider: { ...config.provider, type: 'alpaca' as const, [field]: value },
+    }
+    immediate ? onChangeImmediate(patch) : onChange(patch)
+  }
 
   return (
     <div>
       <SectionHeader
         title="Broker"
-        description="Alpaca brokerage connection. API keys are read from ALPACA_API_KEY and ALPACA_SECRET_KEY environment variables."
+        description="Alpaca brokerage connection. Save your credentials, then click Reconnect to apply."
       />
+      <Field label="API Key">
+        <input
+          className={inputClass}
+          type="password"
+          value={isAlpaca ? config.provider.apiKey || '' : ''}
+          onChange={(e) => patchProvider('apiKey', e.target.value, false)}
+          placeholder="Not configured"
+        />
+      </Field>
+      <Field label="Secret Key">
+        <input
+          className={inputClass}
+          type="password"
+          value={isAlpaca ? config.provider.secretKey || '' : ''}
+          onChange={(e) => patchProvider('secretKey', e.target.value, false)}
+          placeholder="Not configured"
+        />
+      </Field>
       <label className="flex items-center gap-2.5 cursor-pointer mb-2">
         <Toggle
           checked={isAlpaca ? config.provider.paper ?? true : true}
-          onChange={(v) =>
-            onChangeImmediate({
-              provider: { ...config.provider, type: 'alpaca', paper: v },
-            })
-          }
+          onChange={(v) => patchProvider('paper', v, true)}
         />
         <span className="text-[13px] text-text">Paper Trading</span>
       </label>
       <p className="text-[11px] text-text-muted/60">
         When enabled, orders are routed to Alpaca's paper trading environment. Disable for live trading.
       </p>
+      <ReconnectButton variant="securities" />
+    </div>
+  )
+}
+
+// ==================== Reconnect ====================
+
+function ReconnectButton({ variant }: { variant: 'crypto' | 'securities' }) {
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
+  const [message, setMessage] = useState('')
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current) }, [])
+
+  const handleReconnect = async () => {
+    setStatus('loading')
+    setMessage('')
+    try {
+      const result = variant === 'crypto'
+        ? await api.trading.reconnectCrypto()
+        : await api.trading.reconnectSecurities()
+      if (result.success) {
+        setStatus('success')
+        setMessage(result.message || 'Connected')
+        timerRef.current = setTimeout(() => setStatus('idle'), 3000)
+      } else {
+        setStatus('error')
+        setMessage(result.error || 'Connection failed')
+      }
+    } catch (err) {
+      setStatus('error')
+      setMessage(err instanceof Error ? err.message : 'Connection failed')
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-3 mt-3">
+      <button
+        onClick={handleReconnect}
+        disabled={status === 'loading'}
+        className="px-3 py-1.5 text-[13px] font-medium rounded-md border border-border hover:bg-bg-tertiary disabled:opacity-50 transition-colors"
+      >
+        {status === 'loading' ? 'Connecting...' : 'Reconnect'}
+      </button>
+      {status === 'success' && <span className="text-[12px] text-green">{message}</span>}
+      {status === 'error' && <span className="text-[12px] text-red">{message}</span>}
     </div>
   )
 }

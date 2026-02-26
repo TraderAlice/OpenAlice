@@ -13,6 +13,12 @@ export interface Plugin {
   stop(): Promise<void>
 }
 
+export interface ReconnectResult {
+  success: boolean
+  error?: string
+  message?: string
+}
+
 export interface EngineContext {
   config: Config
   cryptoEngine: ICryptoTradingEngine | null
@@ -20,6 +26,8 @@ export interface EngineContext {
   eventLog: EventLog
   heartbeat: Heartbeat
   cronEngine: CronEngine
+  reconnectCrypto?: () => Promise<ReconnectResult>
+  reconnectSecurities?: () => Promise<ReconnectResult>
 }
 
 /** A media attachment collected from tool results (e.g. browser screenshots). */

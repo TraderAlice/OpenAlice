@@ -2,7 +2,7 @@ import { readFile, writeFile, appendFile, mkdir } from 'fs/promises'
 import { resolve, dirname } from 'path'
 import { Engine } from './core/engine.js'
 import { loadConfig } from './core/config.js'
-import type { Plugin, EngineContext } from './core/types.js'
+import type { Plugin, EngineContext, ReconnectResult } from './core/types.js'
 import { HttpPlugin } from './plugins/http.js'
 import { McpPlugin } from './plugins/mcp.js'
 import { TelegramPlugin } from './connectors/telegram/index.js'
@@ -107,7 +107,7 @@ async function main() {
     readWithDefault(PERSONA_FILE, PERSONA_DEFAULT),
   ])
 
-  const secResult = secResultOrNull
+  let secResultRef = secResultOrNull
 
   // ==================== Commit callbacks ====================
 
@@ -123,17 +123,17 @@ async function main() {
 
   // ==================== Securities Trading ====================
 
-  const secWalletStateBridge = secResult
-    ? createSecWalletStateBridge(secResult.engine)
+  const secWalletStateBridge = secResultRef
+    ? createSecWalletStateBridge(secResultRef.engine)
     : undefined
 
   const secGuards = resolveSecGuards(config.securities.guards)
 
-  const secWalletConfig = secResult
+  const secWalletConfig = secResultRef
     ? {
         executeOperation: createSecGuardPipeline(
-          createSecOperationDispatcher(secResult.engine),
-          secResult.engine,
+          createSecOperationDispatcher(secResultRef.engine),
+          secResultRef.engine,
           secGuards,
         ),
         getWalletState: secWalletStateBridge!,
@@ -217,8 +217,8 @@ async function main() {
   const toolCenter = new ToolCenter()
   toolCenter.register(createThinkingTools())
   // Crypto trading tools are injected later in the background when CCXT resolves
-  if (secResult) {
-    toolCenter.register(createSecuritiesTradingTools(secResult.engine, secWallet, secWalletStateBridge))
+  if (secResultRef) {
+    toolCenter.register(createSecuritiesTradingTools(secResultRef.engine, secWallet, secWalletStateBridge))
   }
   toolCenter.register(createBrainTools(brain))
   toolCenter.register(createBrowserTools())
@@ -264,6 +264,89 @@ async function main() {
     console.log(`heartbeat: enabled (every ${config.heartbeat.every})`)
   }
 
+  // ==================== Engine Reconnect ====================
+
+  let cryptoReconnecting = false
+  const reconnectCrypto = async (): Promise<ReconnectResult> => {
+    if (cryptoReconnecting) return { success: false, error: 'Reconnect already in progress' }
+    cryptoReconnecting = true
+    try {
+      const freshConfig = await loadConfig()
+      initCryptoAllowedSymbols(freshConfig.crypto.allowedSymbols)
+
+      // Create new engine FIRST — if this fails, old engine stays functional
+      const newResult = await createCryptoTradingEngine(freshConfig)
+      await cryptoResultRef?.close()
+      cryptoResultRef = newResult
+
+      if (!newResult) {
+        return { success: true, message: 'Crypto trading disabled (provider: none)' }
+      }
+
+      const bridge = createCryptoWalletStateBridge(newResult.engine)
+      const rawDispatcher = createCryptoOperationDispatcher(newResult.engine)
+      const guards = resolveGuards(freshConfig.crypto.guards)
+      const walletConfig = {
+        executeOperation: createGuardPipeline(rawDispatcher, newResult.engine, guards),
+        getWalletState: bridge,
+        onCommit: onCryptoCommit,
+      }
+      const savedWallet = await readFile(WALLET_FILE, 'utf-8')
+        .then((r) => JSON.parse(r) as WalletExportState).catch(() => undefined)
+      const newWallet = savedWallet ? Wallet.restore(savedWallet, walletConfig) : new Wallet(walletConfig)
+
+      toolCenter.register(createCryptoTradingTools(newResult.engine, newWallet, bridge))
+      console.log(`reconnect: crypto trading engine online (${toolCenter.list().length} tools)`)
+      return { success: true, message: 'Crypto trading engine reconnected' }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error('reconnect: crypto failed:', msg)
+      return { success: false, error: msg }
+    } finally {
+      cryptoReconnecting = false
+    }
+  }
+
+  let secReconnecting = false
+  const reconnectSecurities = async (): Promise<ReconnectResult> => {
+    if (secReconnecting) return { success: false, error: 'Reconnect already in progress' }
+    secReconnecting = true
+    try {
+      const freshConfig = await loadConfig()
+      initSecAllowedSymbols(freshConfig.securities.allowedSymbols)
+
+      const newResult = await createSecuritiesTradingEngine(freshConfig)
+      await secResultRef?.close()
+      secResultRef = newResult
+
+      if (!newResult) {
+        return { success: true, message: 'Securities trading disabled (provider: none)' }
+      }
+
+      const bridge = createSecWalletStateBridge(newResult.engine)
+      const rawDispatcher = createSecOperationDispatcher(newResult.engine)
+      const guards = resolveSecGuards(freshConfig.securities.guards)
+      const walletConfig = {
+        executeOperation: createSecGuardPipeline(rawDispatcher, newResult.engine, guards),
+        getWalletState: bridge,
+        onCommit: onSecCommit,
+      }
+      const savedWallet = await readFile(SEC_WALLET_FILE, 'utf-8')
+        .then((r) => JSON.parse(r) as SecWalletExportState).catch(() => undefined)
+      const newWallet = savedWallet ? SecWallet.restore(savedWallet, walletConfig) : new SecWallet(walletConfig)
+
+      toolCenter.register(createSecuritiesTradingTools(newResult.engine, newWallet, bridge))
+      console.log(`reconnect: securities trading engine online (${toolCenter.list().length} tools)`)
+      return { success: true, message: 'Securities trading engine reconnected' }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error('reconnect: securities failed:', msg)
+      return { success: false, error: msg }
+    } finally {
+      secReconnecting = false
+    }
+  }
+
   // ==================== Plugins ====================
 
   const plugins: Plugin[] = [new HttpPlugin()]
@@ -280,16 +363,14 @@ async function main() {
     plugins.push(new WebPlugin({ port: config.engine.webPort }))
   }
 
-  if (process.env.TELEGRAM_BOT_TOKEN) {
+  if (config.telegram.botToken) {
     plugins.push(new TelegramPlugin({
-      token: process.env.TELEGRAM_BOT_TOKEN,
-      allowedChatIds: process.env.TELEGRAM_CHAT_ID
-        ? process.env.TELEGRAM_CHAT_ID.split(',').map(Number)
-        : [],
+      token: config.telegram.botToken,
+      allowedChatIds: config.telegram.chatIds,
     }))
   }
 
-  const ctx: EngineContext = { config, engine, cryptoEngine: null, eventLog, heartbeat, cronEngine }
+  const ctx: EngineContext = { config, engine, cryptoEngine: null, eventLog, heartbeat, cronEngine, reconnectCrypto, reconnectSecurities }
 
   for (const plugin of plugins) {
     await plugin.start(ctx)
@@ -333,7 +414,7 @@ async function main() {
     }
     await eventLog.close()
     await cryptoResultRef?.close()
-    await secResult?.close()
+    await secResultRef?.close()
     process.exit(0)
   }
   process.on('SIGINT', shutdown)

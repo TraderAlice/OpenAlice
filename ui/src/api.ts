@@ -237,6 +237,18 @@ export const api = {
     },
   },
 
+  trading: {
+    async reconnectCrypto(): Promise<{ success: boolean; error?: string; message?: string }> {
+      const res = await fetch('/api/crypto/reconnect', { method: 'POST' })
+      return res.json()
+    },
+
+    async reconnectSecurities(): Promise<{ success: boolean; error?: string; message?: string }> {
+      const res = await fetch('/api/securities/reconnect', { method: 'POST' })
+      return res.json()
+    },
+  },
+
   heartbeat: {
     async status(): Promise<{ enabled: boolean }> {
       const res = await fetch('/api/heartbeat/status')

@@ -54,6 +54,9 @@ const cryptoSchema = z.object({
     z.object({
       type: z.literal('ccxt'),
       exchange: z.string(),
+      apiKey: z.string().optional(),
+      apiSecret: z.string().optional(),
+      password: z.string().optional(),
       sandbox: z.boolean().default(false),
       demoTrading: z.boolean().default(false),
       defaultMarketType: z.enum(['spot', 'swap']).default('swap'),
@@ -62,7 +65,14 @@ const cryptoSchema = z.object({
     z.object({
       type: z.literal('none'),
     }),
-  ]).default({ type: 'ccxt', exchange: 'bybit', sandbox: false, demoTrading: true, defaultMarketType: 'swap' }),
+  ]).default({
+    type: 'ccxt', exchange: 'bybit', sandbox: false, demoTrading: true, defaultMarketType: 'swap',
+    // Only load linear (USDT-margined) markets from ccxt.
+    // Default is ['spot', 'linear', 'inverse', 'option'] — the extra categories
+    // add unnecessary parallel requests during loadMarkets(), and any single failure
+    // (common on bybit demo API) aborts the entire init.
+    options: { fetchMarkets: { types: ['linear'] } },
+  }),
   guards: z.array(z.object({
     type: z.string(),
     options: z.record(z.string(), z.unknown()).default({}),
@@ -77,6 +87,8 @@ const securitiesSchema = z.object({
   provider: z.discriminatedUnion('type', [
     z.object({
       type: z.literal('alpaca'),
+      apiKey: z.string().optional(),
+      secretKey: z.string().optional(),
       paper: z.boolean().default(true),
     }),
     z.object({
@@ -135,6 +147,12 @@ const apiKeysSchema = z.object({
   google: z.string().optional(),
 })
 
+const telegramSchema = z.object({
+  botToken: z.string().optional(),
+  botUsername: z.string().optional(),
+  chatIds: z.array(z.number()).default([]),
+})
+
 const heartbeatSchema = z.object({
   enabled: z.boolean().default(false),
   every: z.string().default('30m'),
@@ -155,6 +173,7 @@ export type Config = {
   aiProvider: z.infer<typeof aiProviderSchema>
   heartbeat: z.infer<typeof heartbeatSchema>
   apiKeys: z.infer<typeof apiKeysSchema>
+  telegram: z.infer<typeof telegramSchema>
 }
 
 // ==================== Loader ====================
@@ -182,7 +201,7 @@ async function parseAndSeed<T>(filename: string, schema: z.ZodType<T>, raw: unkn
 }
 
 export async function loadConfig(): Promise<Config> {
-  const files = ['engine.json', 'model.json', 'agent.json', 'crypto.json', 'securities.json', 'openbb.json', 'compaction.json', 'ai-provider.json', 'heartbeat.json', 'api-keys.json'] as const
+  const files = ['engine.json', 'model.json', 'agent.json', 'crypto.json', 'securities.json', 'openbb.json', 'compaction.json', 'ai-provider.json', 'heartbeat.json', 'api-keys.json', 'telegram.json'] as const
   const raws = await Promise.all(files.map((f) => loadJsonFile(f)))
 
   return {
@@ -196,6 +215,7 @@ export async function loadConfig(): Promise<Config> {
     aiProvider: await parseAndSeed(files[7], aiProviderSchema, raws[7]),
     heartbeat:  await parseAndSeed(files[8], heartbeatSchema, raws[8]),
     apiKeys:    await parseAndSeed(files[9], apiKeysSchema, raws[9]),
+    telegram:   await parseAndSeed(files[10], telegramSchema, raws[10]),
   }
 }
 
@@ -256,6 +276,7 @@ const sectionSchemas: Record<ConfigSection, z.ZodTypeAny> = {
   aiProvider: aiProviderSchema,
   heartbeat: heartbeatSchema,
   apiKeys: apiKeysSchema,
+  telegram: telegramSchema,
 }
 
 const sectionFiles: Record<ConfigSection, string> = {
@@ -269,6 +290,7 @@ const sectionFiles: Record<ConfigSection, string> = {
   aiProvider: 'ai-provider.json',
   heartbeat: 'heartbeat.json',
   apiKeys: 'api-keys.json',
+  telegram: 'telegram.json',
 }
 
 /** Validate and write a config section to disk. Returns the validated config. */
