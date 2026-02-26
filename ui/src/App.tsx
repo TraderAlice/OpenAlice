@@ -4,8 +4,9 @@ import { ChatPage } from './pages/ChatPage'
 import { EventsPage } from './pages/EventsPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { DataSourcesPage } from './pages/DataSourcesPage'
+import { TradingPage } from './pages/TradingPage'
 
-export type Page = 'chat' | 'events' | 'data-sources' | 'settings'
+export type Page = 'chat' | 'events' | 'data-sources' | 'trading' | 'settings'
 
 export function App() {
   const [page, setPage] = useState<Page>('chat')
@@ -38,6 +39,7 @@ export function App() {
         {page === 'chat' && <ChatPage onSSEStatus={setSseConnected} />}
         {page === 'events' && <EventsPage />}
         {page === 'data-sources' && <DataSourcesPage />}
+        {page === 'trading' && <TradingPage />}
         {page === 'settings' && <SettingsPage />}
       </main>
     </div>

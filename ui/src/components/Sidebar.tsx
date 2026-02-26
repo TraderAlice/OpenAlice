@@ -40,6 +40,19 @@ const NAV_ITEMS: { page: Page; label: string; icon: (active: boolean) => ReactNo
     ),
   },
   {
+    page: 'trading',
+    label: 'Crypto',
+    icon: (active) => (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M2 20h20" />
+        <path d="M5 17V10" /><path d="M5 7V4" /><path d="M3 10h4" /><path d="M3 7h4" />
+        <path d="M10 17V13" /><path d="M10 10V6" /><path d="M8 13h4" /><path d="M8 10h4" />
+        <path d="M15 17V11" /><path d="M15 8V4" /><path d="M13 11h4" /><path d="M13 8h4" />
+        <path d="M20 17V14" /><path d="M20 11V8" /><path d="M18 14h4" /><path d="M18 11h4" />
+      </svg>
+    ),
+  },
+  {
     page: 'settings',
     label: 'Settings',
     icon: (active) => (
