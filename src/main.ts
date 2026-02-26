@@ -264,6 +264,89 @@ async function main() {
     console.log(`heartbeat: enabled (every ${config.heartbeat.every})`)
   }
 
+  // ==================== Engine Reconnect ====================
+
+  let cryptoReconnecting = false
+  const reconnectCrypto = async (): Promise<ReconnectResult> => {
+    if (cryptoReconnecting) return { success: false, error: 'Reconnect already in progress' }
+    cryptoReconnecting = true
+    try {
+      const freshConfig = await loadConfig()
+      initCryptoAllowedSymbols(freshConfig.crypto.allowedSymbols)
+
+      // Create new engine FIRST — if this fails, old engine stays functional
+      const newResult = await createCryptoTradingEngine(freshConfig)
+      await cryptoResultRef?.close()
+      cryptoResultRef = newResult
+
+      if (!newResult) {
+        return { success: true, message: 'Crypto trading disabled (provider: none)' }
+      }
+
+      const bridge = createCryptoWalletStateBridge(newResult.engine)
+      const rawDispatcher = createCryptoOperationDispatcher(newResult.engine)
+      const guards = resolveGuards(freshConfig.crypto.guards)
+      const walletConfig = {
+        executeOperation: createGuardPipeline(rawDispatcher, newResult.engine, guards),
+        getWalletState: bridge,
+        onCommit: onCryptoCommit,
+      }
+      const savedWallet = await readFile(WALLET_FILE, 'utf-8')
+        .then((r) => JSON.parse(r) as WalletExportState).catch(() => undefined)
+      const newWallet = savedWallet ? Wallet.restore(savedWallet, walletConfig) : new Wallet(walletConfig)
+
+      toolCenter.register(createCryptoTradingTools(newResult.engine, newWallet, bridge))
+      console.log(`reconnect: crypto trading engine online (${toolCenter.list().length} tools)`)
+      return { success: true, message: 'Crypto trading engine reconnected' }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error('reconnect: crypto failed:', msg)
+      return { success: false, error: msg }
+    } finally {
+      cryptoReconnecting = false
+    }
+  }
+
+  let secReconnecting = false
+  const reconnectSecurities = async (): Promise<ReconnectResult> => {
+    if (secReconnecting) return { success: false, error: 'Reconnect already in progress' }
+    secReconnecting = true
+    try {
+      const freshConfig = await loadConfig()
+      initSecAllowedSymbols(freshConfig.securities.allowedSymbols)
+
+      const newResult = await createSecuritiesTradingEngine(freshConfig)
+      await secResultRef?.close()
+      secResultRef = newResult
+
+      if (!newResult) {
+        return { success: true, message: 'Securities trading disabled (provider: none)' }
+      }
+
+      const bridge = createSecWalletStateBridge(newResult.engine)
+      const rawDispatcher = createSecOperationDispatcher(newResult.engine)
+      const guards = resolveSecGuards(freshConfig.securities.guards)
+      const walletConfig = {
+        executeOperation: createSecGuardPipeline(rawDispatcher, newResult.engine, guards),
+        getWalletState: bridge,
+        onCommit: onSecCommit,
+      }
+      const savedWallet = await readFile(SEC_WALLET_FILE, 'utf-8')
+        .then((r) => JSON.parse(r) as SecWalletExportState).catch(() => undefined)
+      const newWallet = savedWallet ? SecWallet.restore(savedWallet, walletConfig) : new SecWallet(walletConfig)
+
+      toolCenter.register(createSecuritiesTradingTools(newResult.engine, newWallet, bridge))
+      console.log(`reconnect: securities trading engine online (${toolCenter.list().length} tools)`)
+      return { success: true, message: 'Securities trading engine reconnected' }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error('reconnect: securities failed:', msg)
+      return { success: false, error: msg }
+    } finally {
+      secReconnecting = false
+    }
+  }
+
   // ==================== Plugins ====================
 
   const plugins: Plugin[] = [new HttpPlugin()]
@@ -287,7 +370,7 @@ async function main() {
     }))
   }
 
-  const ctx: EngineContext = { config, engine, cryptoEngine: null, eventLog, heartbeat, cronEngine }
+  const ctx: EngineContext = { config, engine, cryptoEngine: null, eventLog, heartbeat, cronEngine, reconnectCrypto, reconnectSecurities }
 
   for (const plugin of plugins) {
     await plugin.start(ctx)

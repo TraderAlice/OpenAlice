@@ -366,6 +366,20 @@ export class WebPlugin implements Plugin {
       }
     })
 
+    // ==================== Trading Engine Reconnect ====================
+
+    app.post('/api/crypto/reconnect', async (c) => {
+      if (!ctx.reconnectCrypto) return c.json({ success: false, error: 'Not available' }, 501)
+      const result = await ctx.reconnectCrypto()
+      return c.json(result, result.success ? 200 : 500)
+    })
+
+    app.post('/api/securities/reconnect', async (c) => {
+      if (!ctx.reconnectSecurities) return c.json({ success: false, error: 'Not available' }, 501)
+      const result = await ctx.reconnectSecurities()
+      return c.json(result, result.success ? 200 : 500)
+    })
+
     // ==================== Serve UI (Vite build output) ====================
     // Serves the built frontend from dist/ui/ (produced by `pnpm build:ui`).
     // During development, use the Vite dev server (port 5173) instead — see README.
