@@ -43,6 +43,7 @@ import { OpenBBCommodityClient } from './openbb/commodity/index.js'
 import { OpenBBNewsClient } from './openbb/news/index.js'
 import { createCryptoTools } from './extension/crypto/index.js'
 import { createCurrencyTools } from './extension/currency/index.js'
+import { createNewsTools } from './extension/news/index.js'
 import { createAnalysisTools } from './extension/analysis-kit/index.js'
 import { SessionStore } from './core/session.js'
 import { ToolCenter } from './core/tool-center.js'
@@ -225,9 +226,10 @@ async function main() {
   toolCenter.register(createBrainTools(brain))
   toolCenter.register(createBrowserTools())
   toolCenter.register(createCronTools(cronEngine))
-  toolCenter.register(createEquityTools(symbolIndex))
+  toolCenter.register(createEquityTools(symbolIndex, equityClient))
   toolCenter.register(createCryptoTools(cryptoClient))
   toolCenter.register(createCurrencyTools(currencyClient))
+  toolCenter.register(createNewsTools(newsClient))
   toolCenter.register(createAnalysisTools(equityClient, cryptoClient, currencyClient))
 
   console.log(`tool-center: ${toolCenter.list().length} tools registered (crypto trading pending ccxt)`)
