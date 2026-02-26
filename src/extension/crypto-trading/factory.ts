@@ -31,13 +31,13 @@ export async function createCryptoTradingEngine(
       return null;
 
     case 'ccxt': {
-      const apiKey = process.env.EXCHANGE_API_KEY;
-      const apiSecret = process.env.EXCHANGE_API_SECRET;
-      const password = process.env.EXCHANGE_PASSWORD;
+      const apiKey = providerConfig.apiKey;
+      const apiSecret = providerConfig.apiSecret;
+      const password = providerConfig.password;
 
       if (!apiKey || !apiSecret) {
         throw new Error(
-          'EXCHANGE_API_KEY and EXCHANGE_API_SECRET must be set in .env for CCXT provider',
+          'apiKey and apiSecret must be configured for CCXT provider (Settings → Crypto Trading)',
         );
       }
 

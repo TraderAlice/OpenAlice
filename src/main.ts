@@ -2,7 +2,7 @@ import { readFile, writeFile, appendFile, mkdir } from 'fs/promises'
 import { resolve, dirname } from 'path'
 import { Engine } from './core/engine.js'
 import { loadConfig } from './core/config.js'
-import type { Plugin, EngineContext } from './core/types.js'
+import type { Plugin, EngineContext, ReconnectResult } from './core/types.js'
 import { HttpPlugin } from './plugins/http.js'
 import { McpPlugin } from './plugins/mcp.js'
 import { TelegramPlugin } from './connectors/telegram/index.js'
@@ -107,7 +107,7 @@ async function main() {
     readWithDefault(PERSONA_FILE, PERSONA_DEFAULT),
   ])
 
-  const secResult = secResultOrNull
+  let secResultRef = secResultOrNull
 
   // ==================== Commit callbacks ====================
 
@@ -123,17 +123,17 @@ async function main() {
 
   // ==================== Securities Trading ====================
 
-  const secWalletStateBridge = secResult
-    ? createSecWalletStateBridge(secResult.engine)
+  const secWalletStateBridge = secResultRef
+    ? createSecWalletStateBridge(secResultRef.engine)
     : undefined
 
   const secGuards = resolveSecGuards(config.securities.guards)
 
-  const secWalletConfig = secResult
+  const secWalletConfig = secResultRef
     ? {
         executeOperation: createSecGuardPipeline(
-          createSecOperationDispatcher(secResult.engine),
-          secResult.engine,
+          createSecOperationDispatcher(secResultRef.engine),
+          secResultRef.engine,
           secGuards,
         ),
         getWalletState: secWalletStateBridge!,
@@ -217,8 +217,8 @@ async function main() {
   const toolCenter = new ToolCenter()
   toolCenter.register(createThinkingTools())
   // Crypto trading tools are injected later in the background when CCXT resolves
-  if (secResult) {
-    toolCenter.register(createSecuritiesTradingTools(secResult.engine, secWallet, secWalletStateBridge))
+  if (secResultRef) {
+    toolCenter.register(createSecuritiesTradingTools(secResultRef.engine, secWallet, secWalletStateBridge))
   }
   toolCenter.register(createBrainTools(brain))
   toolCenter.register(createBrowserTools())
@@ -280,12 +280,10 @@ async function main() {
     plugins.push(new WebPlugin({ port: config.engine.webPort }))
   }
 
-  if (process.env.TELEGRAM_BOT_TOKEN) {
+  if (config.telegram.botToken) {
     plugins.push(new TelegramPlugin({
-      token: process.env.TELEGRAM_BOT_TOKEN,
-      allowedChatIds: process.env.TELEGRAM_CHAT_ID
-        ? process.env.TELEGRAM_CHAT_ID.split(',').map(Number)
-        : [],
+      token: config.telegram.botToken,
+      allowedChatIds: config.telegram.chatIds,
     }))
   }
 
@@ -333,7 +331,7 @@ async function main() {
     }
     await eventLog.close()
     await cryptoResultRef?.close()
-    await secResult?.close()
+    await secResultRef?.close()
     process.exit(0)
   }
   process.on('SIGINT', shutdown)

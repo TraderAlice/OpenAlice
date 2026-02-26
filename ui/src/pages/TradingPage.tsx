@@ -12,6 +12,9 @@ interface CryptoConfig {
   provider: {
     type: 'ccxt' | 'none'
     exchange?: string
+    apiKey?: string
+    apiSecret?: string
+    password?: string
     sandbox?: boolean
     demoTrading?: boolean
     defaultMarketType?: 'spot' | 'swap'
@@ -150,6 +153,33 @@ function ExchangeSection({ config, onChange, onChangeImmediate }: SectionProps) 
           value={isCcxt ? provider.exchange || '' : ''}
           onChange={(e) => patchProvider('exchange', e.target.value.trim(), false)}
           placeholder="bybit"
+        />
+      </Field>
+      <Field label="API Key">
+        <input
+          className={inputClass}
+          type="password"
+          value={isCcxt ? provider.apiKey || '' : ''}
+          onChange={(e) => patchProvider('apiKey', e.target.value, false)}
+          placeholder="Not configured"
+        />
+      </Field>
+      <Field label="API Secret">
+        <input
+          className={inputClass}
+          type="password"
+          value={isCcxt ? provider.apiSecret || '' : ''}
+          onChange={(e) => patchProvider('apiSecret', e.target.value, false)}
+          placeholder="Not configured"
+        />
+      </Field>
+      <Field label="Password (optional)">
+        <input
+          className={inputClass}
+          type="password"
+          value={isCcxt ? provider.password || '' : ''}
+          onChange={(e) => patchProvider('password', e.target.value, false)}
+          placeholder="Required by some exchanges (e.g. OKX)"
         />
       </Field>
       <Field label="Market Type">

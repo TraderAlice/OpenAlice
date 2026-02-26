@@ -11,6 +11,7 @@ const SECTIONS = [
   { id: 'connectivity', label: 'Connectivity' },
   { id: 'compaction', label: 'Compaction' },
   { id: 'heartbeat', label: 'Heartbeat' },
+  { id: 'telegram', label: 'Telegram' },
 ]
 
 export function SettingsPage() {
@@ -168,6 +169,11 @@ export function SettingsPage() {
             {/* Heartbeat */}
             <Section id="heartbeat" title="Heartbeat" description="Periodic self-check. Alice reviews markets, news and alerts at the configured interval, and only pushes a notification when there's something worth your attention. Interval format: 30m, 1h, 6h.">
               <HeartbeatForm config={config} />
+            </Section>
+
+            {/* Telegram */}
+            <Section id="telegram" title="Telegram" description="Connect a Telegram bot for mobile notifications and two-way chat. Create a bot via @BotFather, paste the token below, and add your chat ID (send /start to the bot, then use @userinfobot to find your ID). Restart required.">
+              <TelegramForm config={config} />
             </Section>
 
           </div>
@@ -519,6 +525,60 @@ function HeartbeatForm({ config }: { config: AppConfig }) {
       </div>
       <Field label="Interval">
         <input className={inputClass} value={hbEvery} onChange={(e) => setHbEvery(e.target.value)} placeholder="30m" />
+      </Field>
+      <SaveIndicator status={status} onRetry={retry} />
+    </>
+  )
+}
+
+function TelegramForm({ config }: { config: AppConfig }) {
+  const tg = (config as Record<string, unknown>).telegram as Record<string, unknown> | undefined
+  const [botToken, setBotToken] = useState((tg?.botToken as string) || '')
+  const [botUsername, setBotUsername] = useState((tg?.botUsername as string) || '')
+  const [chatIds, setChatIds] = useState(
+    Array.isArray(tg?.chatIds) ? (tg.chatIds as number[]).join(', ') : '',
+  )
+
+  const data = useMemo(() => ({
+    botToken: botToken || undefined,
+    botUsername: botUsername || undefined,
+    chatIds: chatIds
+      ? chatIds.split(',').map((s) => Number(s.trim())).filter((n) => !isNaN(n))
+      : [],
+  }), [botToken, botUsername, chatIds])
+
+  const save = useCallback(async (d: Record<string, unknown>) => {
+    await api.config.updateSection('telegram', d)
+  }, [])
+
+  const { status, retry } = useAutoSave({ data, save })
+
+  return (
+    <>
+      <Field label="Bot Token">
+        <input
+          className={inputClass}
+          type="password"
+          value={botToken}
+          onChange={(e) => setBotToken(e.target.value)}
+          placeholder="123456:ABC-DEF..."
+        />
+      </Field>
+      <Field label="Bot Username">
+        <input
+          className={inputClass}
+          value={botUsername}
+          onChange={(e) => setBotUsername(e.target.value)}
+          placeholder="my_bot"
+        />
+      </Field>
+      <Field label="Allowed Chat IDs">
+        <input
+          className={inputClass}
+          value={chatIds}
+          onChange={(e) => setChatIds(e.target.value)}
+          placeholder="Comma-separated, e.g. 123456, 789012"
+        />
       </Field>
       <SaveIndicator status={status} onRetry={retry} />
     </>
