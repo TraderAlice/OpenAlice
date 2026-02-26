@@ -1,14 +1,14 @@
 /**
- * OpenBB Commodity REST API Client
+ * OpenBB News REST API Client
  *
  * Wraps the OpenBB sidecar API (default: http://localhost:6900).
- * Every method maps 1:1 to an OpenBB commodity endpoint.
+ * Every method maps 1:1 to an OpenBB news endpoint.
  */
 
 import type { OBBjectResponse } from './types'
 import { buildCredentialsHeader } from '../credential-map'
 
-export class OpenBBCommodityClient {
+export class OpenBBNewsClient {
   private baseUrl: string
   private defaultProvider: string | undefined
   private credentialsHeader: string | undefined
@@ -19,36 +19,14 @@ export class OpenBBCommodityClient {
     this.credentialsHeader = buildCredentialsHeader(providerKeys)
   }
 
-  // ==================== Price ====================
+  // ==================== News ====================
 
-  async getSpotPrices(params: Record<string, unknown>) {
-    return this.request('/price/spot', params)
+  async getWorldNews(params: Record<string, unknown> = {}) {
+    return this.request('/world', params)
   }
 
-  // ==================== PSD ====================
-
-  async getPsdData(params: Record<string, unknown>) {
-    return this.request('/psd_data', params)
-  }
-
-  // ==================== EIA ====================
-
-  async getPetroleumStatus(params: Record<string, unknown>) {
-    return this.request('/petroleum_status_report', params)
-  }
-
-  async getEnergyOutlook(params: Record<string, unknown>) {
-    return this.request('/short_term_energy_outlook', params)
-  }
-
-  // ==================== Reports ====================
-
-  async getPsdReport(params: Record<string, unknown>) {
-    return this.request('/psd_report', params)
-  }
-
-  async getWeatherBulletins(params: Record<string, unknown> = {}) {
-    return this.request('/weather_bulletins', params)
+  async getCompanyNews(params: Record<string, unknown>) {
+    return this.request('/company', params)
   }
 
   // ==================== Internal ====================
@@ -67,7 +45,7 @@ export class OpenBBCommodityClient {
       }
     }
 
-    const url = `${this.baseUrl}/api/v1/commodity${path}?${query.toString()}`
+    const url = `${this.baseUrl}/api/v1/news${path}?${query.toString()}`
 
     const headers: Record<string, string> = {}
     if (this.credentialsHeader) {

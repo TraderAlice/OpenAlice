@@ -40,6 +40,7 @@ import { OpenBBCryptoClient } from './openbb/crypto/index.js'
 import { OpenBBCurrencyClient } from './openbb/currency/index.js'
 import { OpenBBEconomyClient } from './openbb/economy/index.js'
 import { OpenBBCommodityClient } from './openbb/commodity/index.js'
+import { OpenBBNewsClient } from './openbb/news/index.js'
 import { createCryptoTools } from './extension/crypto/index.js'
 import { createCurrencyTools } from './extension/currency/index.js'
 import { createAnalysisTools } from './extension/analysis-kit/index.js'
@@ -206,6 +207,7 @@ async function main() {
   const currencyClient = new OpenBBCurrencyClient(config.openbb.apiUrl, providers.currency, providerKeys)
   const commodityClient = new OpenBBCommodityClient(config.openbb.apiUrl, undefined, providerKeys)
   const economyClient = new OpenBBEconomyClient(config.openbb.apiUrl, undefined, providerKeys)
+  const newsClient = new OpenBBNewsClient(config.openbb.apiUrl, undefined, providerKeys)
 
   // ==================== Equity Symbol Index ====================
 

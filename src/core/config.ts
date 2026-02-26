@@ -121,6 +121,9 @@ const openbbSchema = z.object({
     tradingeconomics: z.string().optional(),
     econdb: z.string().optional(),
     intrinio: z.string().optional(),
+    benzinga: z.string().optional(),
+    tiingo: z.string().optional(),
+    biztoc: z.string().optional(),
   }).default({}),
 })
 
