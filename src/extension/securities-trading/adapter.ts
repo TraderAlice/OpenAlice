@@ -271,6 +271,23 @@ IMPORTANT: If result is an empty array [], you have no holdings.`,
       },
     }),
 
+    secGetQuote: tool({
+      description: `Query the latest quote/price for a stock symbol.
+
+Returns real-time market data from the broker:
+- last: last traded price
+- bid/ask: current best bid and ask
+- volume: today's trading volume
+
+Use this to check current prices before placing orders.`,
+      inputSchema: z.object({
+        symbol: z.string().describe('Ticker symbol, e.g. "AAPL", "SPY"'),
+      }),
+      execute: async ({ symbol }) => {
+        return await tradingEngine.getQuote(symbol);
+      },
+    }),
+
     secGetMarketClock: tool({
       description:
         'Get current market clock status (isOpen, nextOpen, nextClose). Use this to check if the market is currently open for trading.',

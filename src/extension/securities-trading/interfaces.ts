@@ -22,6 +22,9 @@ export interface ISecuritiesTradingEngine {
   getAccount(): Promise<SecAccountInfo>;
   cancelOrder(orderId: string): Promise<boolean>;
   getMarketClock(): Promise<MarketClock>;
+  getQuote(symbol: string): Promise<SecQuote>;
+  /** Native close position. If not implemented, dispatcher falls back to reverse market order. */
+  closePosition?(symbol: string, qty?: number): Promise<SecOrderResult>;
 }
 
 // ==================== Orders ====================
@@ -90,6 +93,17 @@ export interface SecAccountInfo {
   realizedPnL: number;
   dayTradeCount?: number;
   dayTradingBuyingPower?: number;
+}
+
+// ==================== Quote ====================
+
+export interface SecQuote {
+  symbol: string;
+  last: number;
+  bid: number;
+  ask: number;
+  volume: number;
+  timestamp: Date;
 }
 
 // ==================== Market clock ====================

@@ -19,6 +19,7 @@ import type {
   SecOrder,
   SecHolding,
   SecAccountInfo,
+  SecQuote,
   MarketClock,
 } from '../../interfaces.js';
 
@@ -70,6 +71,12 @@ interface AlpacaOrderRaw {
   filled_at: string | null;
   created_at: string;
   reject_reason: string | null;
+}
+
+interface AlpacaSnapshotRaw {
+  LatestTrade: { Price: number; Timestamp: string };
+  LatestQuote: { BidPrice: number; AskPrice: number; Timestamp: string };
+  DailyBar: { Volume: number };
 }
 
 interface AlpacaClockRaw {
@@ -221,6 +228,54 @@ export class AlpacaTradingEngine implements ISecuritiesTradingEngine {
       nextClose: new Date(clock.next_close),
       timestamp: new Date(clock.timestamp),
     };
+  }
+
+  async getQuote(symbol: string): Promise<SecQuote> {
+    const snapshot = await this.client.getSnapshot(symbol) as AlpacaSnapshotRaw;
+
+    return {
+      symbol,
+      last: snapshot.LatestTrade.Price,
+      bid: snapshot.LatestQuote.BidPrice,
+      ask: snapshot.LatestQuote.AskPrice,
+      volume: snapshot.DailyBar.Volume,
+      timestamp: new Date(snapshot.LatestTrade.Timestamp),
+    };
+  }
+
+  async closePosition(symbol: string, qty?: number): Promise<SecOrderResult> {
+    // Alpaca SDK closePosition only supports full close.
+    // For partial close, fall back to reverse market order.
+    if (qty != null) {
+      const portfolio = await this.getPortfolio();
+      const holding = portfolio.find(h => h.symbol === symbol);
+      if (!holding) {
+        return { success: false, error: `No holding for ${symbol}` };
+      }
+      return this.placeOrder({
+        symbol,
+        side: holding.side === 'long' ? 'sell' : 'buy',
+        type: 'market',
+        qty,
+        timeInForce: 'day',
+      });
+    }
+
+    try {
+      const result = await this.client.closePosition(symbol) as AlpacaOrderRaw;
+      const isFilled = result.status === 'filled';
+      return {
+        success: true,
+        orderId: result.id,
+        filledPrice: isFilled && result.filled_avg_price ? parseFloat(result.filled_avg_price) : undefined,
+        filledQty: isFilled && result.filled_qty ? parseFloat(result.filled_qty) : undefined,
+      };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
   }
 
   // ==================== Internal methods ====================

@@ -43,23 +43,28 @@ export function createSecOperationDispatcher(engine: ISecuritiesTradingEngine) {
         const symbol = op.params.symbol as string;
         const qty = op.params.qty as number | undefined;
 
-        const portfolio = await engine.getPortfolio();
-        const holding = portfolio.find(h => h.symbol === symbol);
+        let result;
 
-        if (!holding) {
-          return { success: false, error: `No holding for ${symbol}` };
+        if (engine.closePosition) {
+          // Native close (e.g. Alpaca closePosition API)
+          result = await engine.closePosition(symbol, qty);
+        } else {
+          // Fallback: reverse market order
+          const portfolio = await engine.getPortfolio();
+          const holding = portfolio.find(h => h.symbol === symbol);
+
+          if (!holding) {
+            return { success: false, error: `No holding for ${symbol}` };
+          }
+
+          result = await engine.placeOrder({
+            symbol,
+            side: holding.side === 'long' ? 'sell' : 'buy',
+            type: 'market',
+            qty: qty ?? holding.qty,
+            timeInForce: 'day',
+          });
         }
-
-        const closeSide = holding.side === 'long' ? 'sell' : 'buy';
-        const closeQty = qty ?? holding.qty;
-
-        const result = await engine.placeOrder({
-          symbol,
-          side: closeSide,
-          type: 'market',
-          qty: closeQty,
-          timeInForce: 'day',
-        });
 
         return {
           success: result.success,
