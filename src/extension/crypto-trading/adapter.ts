@@ -309,5 +309,41 @@ RISK CHECK: Before placing new orders, verify that percentageOfEquity doesn't ex
         return await tradingEngine.getAccount();
       },
     }),
+
+    cryptoGetTicker: tool({
+      description: `Query the current exchange ticker for a symbol.
+
+Returns real-time price data directly from the exchange:
+- last: last traded price
+- bid/ask: current best bid and ask
+- high/low: 24h high and low
+- volume: 24h base volume
+
+This reflects the exchange's own price, not an external data provider.`,
+      inputSchema: z.object({
+        symbol: z.string().describe('Trading pair symbol, e.g. BTC/USD'),
+      }),
+      execute: async ({ symbol }) => {
+        return await tradingEngine.getTicker(symbol);
+      },
+    }),
+
+    cryptoGetFundingRate: tool({
+      description: `Query the current funding rate for a perpetual contract.
+
+Returns:
+- fundingRate: current/latest funding rate (e.g. 0.0001 = 0.01%)
+- nextFundingTime: when the next funding payment occurs
+- previousFundingRate: the previous period's rate
+
+Positive rate = longs pay shorts. Negative rate = shorts pay longs.
+Essential for evaluating carry cost on perpetual positions.`,
+      inputSchema: z.object({
+        symbol: z.string().describe('Trading pair symbol, e.g. BTC/USD'),
+      }),
+      execute: async ({ symbol }) => {
+        return await tradingEngine.getFundingRate(symbol);
+      },
+    }),
   };
 }

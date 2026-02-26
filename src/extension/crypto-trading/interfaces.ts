@@ -33,6 +33,8 @@ export interface ICryptoTradingEngine {
   getAccount(): Promise<CryptoAccountInfo>;
   cancelOrder(orderId: string): Promise<boolean>;
   adjustLeverage(symbol: string, newLeverage: number): Promise<{ success: boolean; error?: string }>;
+  getTicker(symbol: string): Promise<CryptoTicker>;
+  getFundingRate(symbol: string): Promise<CryptoFundingRate>;
 }
 
 // ==================== Orders ====================
@@ -98,6 +100,27 @@ export interface CryptoAccountInfo {
   equity: number;
   realizedPnL: number;
   totalPnL: number;
+}
+
+// ==================== Market data ====================
+
+export interface CryptoTicker {
+  symbol: string;
+  last: number;
+  bid: number;
+  ask: number;
+  high: number;
+  low: number;
+  volume: number;
+  timestamp: Date;
+}
+
+export interface CryptoFundingRate {
+  symbol: string;
+  fundingRate: number;
+  nextFundingTime?: Date;
+  previousFundingRate?: number;
+  timestamp: Date;
 }
 
 // ==================== Precision ====================

@@ -14,6 +14,8 @@ import type {
   CryptoPosition,
   CryptoOrder,
   CryptoAccountInfo,
+  CryptoTicker,
+  CryptoFundingRate,
 } from '../../interfaces.js';
 import { SymbolMapper } from './symbol-map.js';
 
@@ -228,7 +230,10 @@ export class CcxtTradingEngine implements ICryptoTradingEngine {
   async getAccount(): Promise<CryptoAccountInfo> {
     this.ensureInit();
 
-    const balance = await this.exchange.fetchBalance();
+    const [balance, rawPositions] = await Promise.all([
+      this.exchange.fetchBalance(),
+      this.exchange.fetchPositions(),
+    ]);
 
     // CCXT Balance uses indexer to access currency
     const bal = balance as unknown as Record<string, Record<string, unknown>>;
@@ -236,17 +241,22 @@ export class CcxtTradingEngine implements ICryptoTradingEngine {
     const free = parseFloat(String(bal['free']?.['USDT'] ?? bal['free']?.['USD'] ?? 0));
     const used = parseFloat(String(bal['used']?.['USDT'] ?? bal['used']?.['USD'] ?? 0));
 
-    // Aggregate unrealizedPnL from positions
-    const positions = await this.getPositions();
-    const unrealizedPnL = positions.reduce((sum, p) => sum + p.unrealizedPnL, 0);
+    // Aggregate PnL from raw positions
+    let unrealizedPnL = 0;
+    let realizedPnL = 0;
+    for (const p of rawPositions) {
+      if (!this.symbolMapper.tryToInternal(p.symbol)) continue;
+      unrealizedPnL += parseFloat(String(p.unrealizedPnl ?? 0));
+      realizedPnL += parseFloat(String((p as unknown as Record<string, unknown>).realizedPnl ?? 0));
+    }
 
     return {
       balance: free,
       totalMargin: used,
       unrealizedPnL,
       equity: total,
-      realizedPnL: 0,
-      totalPnL: unrealizedPnL,
+      realizedPnL,
+      totalPnL: realizedPnL + unrealizedPnL,
     };
   }
 
@@ -278,6 +288,41 @@ export class CcxtTradingEngine implements ICryptoTradingEngine {
         error: err instanceof Error ? err.message : String(err),
       };
     }
+  }
+
+  async getTicker(symbol: string): Promise<CryptoTicker> {
+    this.ensureInit();
+
+    const ccxtSymbol = this.symbolMapper.toCcxt(symbol);
+    const ticker = await this.exchange.fetchTicker(ccxtSymbol);
+
+    return {
+      symbol,
+      last: ticker.last ?? 0,
+      bid: ticker.bid ?? 0,
+      ask: ticker.ask ?? 0,
+      high: ticker.high ?? 0,
+      low: ticker.low ?? 0,
+      volume: ticker.baseVolume ?? 0,
+      timestamp: new Date(ticker.timestamp ?? Date.now()),
+    };
+  }
+
+  async getFundingRate(symbol: string): Promise<CryptoFundingRate> {
+    this.ensureInit();
+
+    const ccxtSymbol = this.symbolMapper.toCcxt(symbol);
+    const funding = await this.exchange.fetchFundingRate(ccxtSymbol);
+
+    return {
+      symbol,
+      fundingRate: funding.fundingRate ?? 0,
+      nextFundingTime: funding.fundingDatetime
+        ? new Date(funding.fundingDatetime)
+        : undefined,
+      previousFundingRate: funding.previousFundingRate ?? undefined,
+      timestamp: new Date(funding.timestamp ?? Date.now()),
+    };
   }
 
   // ==================== Helpers ====================
