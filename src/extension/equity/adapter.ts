@@ -55,8 +55,8 @@ Use equitySearch first to resolve the correct symbol.`,
       }),
       execute: async ({ symbol }) => {
         const [profile, metrics] = await Promise.all([
-          equityClient.getProfile({ symbol }).catch(() => []),
-          equityClient.getKeyMetrics({ symbol, limit: 1 }).catch(() => []),
+          equityClient.getProfile({ symbol, provider: 'yfinance' }).catch(() => []),
+          equityClient.getKeyMetrics({ symbol, limit: 1, provider: 'yfinance' }).catch(() => []),
         ])
         return { profile: profile[0] ?? null, metrics: metrics[0] ?? null }
       },
@@ -76,7 +76,7 @@ Use equitySearch first to resolve the correct symbol.`,
         limit: z.number().int().positive().optional().describe('Number of periods to return (default: 5)'),
       }),
       execute: async ({ symbol, type, period, limit }) => {
-        const params: Record<string, unknown> = { symbol }
+        const params: Record<string, unknown> = { symbol, provider: 'yfinance' }
         if (period) params.period = period
         if (limit) params.limit = limit
 
@@ -105,7 +105,7 @@ Use equitySearch first to resolve the correct symbol.`,
         limit: z.number().int().positive().optional().describe('Number of periods to return (default: 5)'),
       }),
       execute: async ({ symbol, period, limit }) => {
-        const params: Record<string, unknown> = { symbol }
+        const params: Record<string, unknown> = { symbol, provider: 'fmp' }
         if (period) params.period = period
         if (limit) params.limit = limit
         return await equityClient.getFinancialRatios(params)
@@ -123,7 +123,7 @@ Use equitySearch first to resolve the correct symbol.`,
         symbol: z.string().describe('Ticker symbol, e.g. "AAPL"'),
       }),
       execute: async ({ symbol }) => {
-        return await equityClient.getEstimateConsensus({ symbol })
+        return await equityClient.getEstimateConsensus({ symbol, provider: 'yfinance' })
       },
     }),
 
@@ -140,7 +140,7 @@ Can be queried by symbol (specific company) or by date range (market-wide).`,
         end_date: z.string().optional().describe('End date in YYYY-MM-DD format'),
       }),
       execute: async ({ symbol, start_date, end_date }) => {
-        const params: Record<string, unknown> = {}
+        const params: Record<string, unknown> = { provider: 'fmp' }
         if (symbol) params.symbol = symbol
         if (start_date) params.start_date = start_date
         if (end_date) params.end_date = end_date
@@ -160,7 +160,7 @@ Use equitySearch first to resolve the correct symbol.`,
         limit: z.number().int().positive().optional().describe('Number of transactions to return (default: 20)'),
       }),
       execute: async ({ symbol, limit }) => {
-        const params: Record<string, unknown> = { symbol }
+        const params: Record<string, unknown> = { symbol, provider: 'fmp' }
         if (limit) params.limit = limit
         return await equityClient.getInsiderTrading(params)
       },

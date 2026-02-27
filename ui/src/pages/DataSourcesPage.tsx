@@ -55,12 +55,14 @@ const PROVIDER_OPTIONS: Record<string, string[]> = {
   equity: ['yfinance', 'fmp', 'intrinio', 'tiingo', 'alpha_vantage'],
   crypto: ['yfinance', 'fmp', 'tiingo'],
   currency: ['yfinance', 'fmp', 'tiingo'],
+  news: ['fmp', 'benzinga', 'tiingo', 'biztoc', 'intrinio'],
 }
 
 const ASSET_LABELS: Record<string, string> = {
   equity: 'Equity',
   crypto: 'Crypto',
   currency: 'Currency',
+  news: 'News',
 }
 
 interface ConnectionSectionProps {
@@ -74,7 +76,7 @@ function ConnectionSection({ openbb, onChange, onChangeImmediate }: ConnectionSe
   const [testStatus, setTestStatus] = useState<'idle' | 'ok' | 'error'>('idle')
 
   const apiUrl = (openbb.apiUrl as string) || 'http://localhost:6900'
-  const providers = (openbb.providers ?? { equity: 'yfinance', crypto: 'yfinance', currency: 'yfinance' }) as Record<string, string>
+  const providers = (openbb.providers ?? { equity: 'yfinance', crypto: 'yfinance', currency: 'yfinance', news: 'fmp' }) as Record<string, string>
 
   const testConnection = async () => {
     setTesting(true)
@@ -156,7 +158,10 @@ const FREE_PROVIDERS = [
 ] as const
 
 const PAID_PROVIDERS = [
-  { key: 'fmp', name: 'FMP', desc: 'Financial Modeling Prep — financial statements, fundamentals, economic calendar.', hint: 'Freemium — 250 req/day free at financialmodelingprep.com' },
+  { key: 'fmp', name: 'FMP', desc: 'Financial Modeling Prep — financial statements, fundamentals, economic calendar, news.', hint: 'Freemium — 250 req/day free at financialmodelingprep.com' },
+  { key: 'benzinga', name: 'Benzinga', desc: 'Real-time news, analyst ratings and price targets.', hint: 'Paid — plans at benzinga.com' },
+  { key: 'tiingo', name: 'Tiingo', desc: 'News and historical market data.', hint: 'Freemium — free tier at tiingo.com' },
+  { key: 'biztoc', name: 'Biztoc', desc: 'Aggregated business and finance news.', hint: 'Freemium — register at biztoc.com' },
   { key: 'nasdaq', name: 'Nasdaq', desc: 'Nasdaq Data Link — dividend/earnings calendars, short interest.', hint: 'Freemium — sign up at data.nasdaq.com' },
   { key: 'intrinio', name: 'Intrinio', desc: 'Equity fundamentals, options data, institutional ownership.', hint: 'Paid — free trial at intrinio.com' },
   { key: 'tradingeconomics', name: 'Trading Economics', desc: 'Global economic calendar, 20M+ indicators across 196 countries.', hint: 'Paid — plans at tradingeconomics.com' },

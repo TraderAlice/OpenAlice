@@ -212,7 +212,7 @@ async function main() {
   const currencyClient = new OpenBBCurrencyClient(config.openbb.apiUrl, providers.currency, providerKeys)
   const commodityClient = new OpenBBCommodityClient(config.openbb.apiUrl, undefined, providerKeys)
   const economyClient = new OpenBBEconomyClient(config.openbb.apiUrl, undefined, providerKeys)
-  const newsClient = new OpenBBNewsClient(config.openbb.apiUrl, undefined, providerKeys)
+  const newsClient = new OpenBBNewsClient(config.openbb.apiUrl, providers.news, providerKeys)
 
   // ==================== Equity Symbol Index ====================
 
