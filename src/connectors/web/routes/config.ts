@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { loadConfig, writeConfigSection, readApiKeysConfig, readOpenbbConfig, type ConfigSection } from '../../../core/config.js'
+import { loadConfig, writeConfigSection, readApiKeysConfig, readOpenbbConfig, validSections, type ConfigSection } from '../../../core/config.js'
 import { readAIConfig, writeAIConfig, type AIProvider } from '../../../core/ai-config.js'
 
 interface ConfigRouteOpts {
@@ -36,7 +36,6 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
   app.put('/:section', async (c) => {
     try {
       const section = c.req.param('section') as ConfigSection
-      const validSections: ConfigSection[] = ['engine', 'model', 'agent', 'crypto', 'securities', 'openbb', 'compaction', 'aiProvider', 'heartbeat', 'apiKeys', 'connectors']
       if (!validSections.includes(section)) {
         return c.json({ error: `Invalid section "${section}". Valid: ${validSections.join(', ')}` }, 400)
       }

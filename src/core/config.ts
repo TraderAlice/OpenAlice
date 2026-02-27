@@ -336,6 +336,9 @@ const sectionFiles: Record<ConfigSection, string> = {
   newsCollector: 'news-collector.json',
 }
 
+/** All valid config section names (derived from sectionSchemas). */
+export const validSections = Object.keys(sectionSchemas) as ConfigSection[]
+
 /** Validate and write a config section to disk. Returns the validated config. */
 export async function writeConfigSection(section: ConfigSection, data: unknown): Promise<unknown> {
   const schema = sectionSchemas[section]
