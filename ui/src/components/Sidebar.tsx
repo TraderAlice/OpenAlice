@@ -9,7 +9,36 @@ interface SidebarProps {
   onClose: () => void
 }
 
-const NAV_ITEMS: { page: Page; label: string; icon: (active: boolean) => ReactNode }[] = [
+// Chevron icon for expandable groups
+const Chevron = ({ expanded }: { expanded: boolean }) => (
+  <svg
+    width="14" height="14" viewBox="0 0 24 24"
+    fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+    className={`transition-transform duration-150 ${expanded ? 'rotate-90' : ''}`}
+  >
+    <polyline points="9 18 15 12 9 6" />
+  </svg>
+)
+
+// ==================== Nav item definitions ====================
+
+interface NavLeaf {
+  page: Page
+  label: string
+  icon: (active: boolean) => ReactNode
+}
+
+interface NavGroup {
+  prefix: string
+  label: string
+  icon: (active: boolean) => ReactNode
+  children: { page: Page; label: string }[]
+}
+
+type NavItem = NavLeaf | NavGroup
+const isGroup = (item: NavItem): item is NavGroup => 'children' in item
+
+const NAV_ITEMS: NavItem[] = [
   {
     page: 'chat',
     label: 'Chat',
@@ -52,7 +81,7 @@ const NAV_ITEMS: { page: Page; label: string; icon: (active: boolean) => ReactNo
     ),
   },
   {
-    page: 'trading',
+    prefix: 'trading',
     label: 'Crypto',
     icon: (active) => (
       <svg width="18" height="18" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -63,9 +92,13 @@ const NAV_ITEMS: { page: Page; label: string; icon: (active: boolean) => ReactNo
         <path d="M20 17V14" /><path d="M20 11V8" /><path d="M18 14h4" /><path d="M18 11h4" />
       </svg>
     ),
+    children: [
+      { page: 'trading/connection', label: 'Connection' },
+      { page: 'trading/guards', label: 'Guards' },
+    ],
   },
   {
-    page: 'securities',
+    prefix: 'securities',
     label: 'Securities',
     icon: (active) => (
       <svg width="18" height="18" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -73,6 +106,10 @@ const NAV_ITEMS: { page: Page; label: string; icon: (active: boolean) => ReactNo
         <polyline points="17 6 23 6 23 12" />
       </svg>
     ),
+    children: [
+      { page: 'securities/connection', label: 'Connection' },
+      { page: 'securities/guards', label: 'Guards' },
+    ],
   },
   {
     page: 'settings',
@@ -85,6 +122,8 @@ const NAV_ITEMS: { page: Page; label: string; icon: (active: boolean) => ReactNo
     ),
   },
 ]
+
+// ==================== Sidebar ====================
 
 export function Sidebar({ sseConnected, currentPage, onNavigate, open, onClose }: SidebarProps) {
   const handleNav = useCallback(
@@ -126,20 +165,77 @@ export function Sidebar({ sseConnected, currentPage, onNavigate, open, onClose }
 
         {/* Navigation */}
         <nav className="flex-1 flex flex-col gap-0.5 px-3">
-          {NAV_ITEMS.map(({ page, label, icon }) => (
-            <button
-              key={page}
-              onClick={() => handleNav(page)}
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left ${
-                currentPage === page
-                  ? 'bg-bg-tertiary text-text'
-                  : 'text-text-muted hover:text-text hover:bg-bg-tertiary/50'
-              }`}
-            >
-              <span className="flex items-center justify-center w-5 h-5">{icon(currentPage === page)}</span>
-              {label}
-            </button>
-          ))}
+          {NAV_ITEMS.map((item) => {
+            if (isGroup(item)) {
+              const expanded = currentPage.startsWith(`${item.prefix}/`)
+              return (
+                <div key={item.prefix}>
+                  {/* Group parent */}
+                  <button
+                    onClick={() => {
+                      if (expanded) {
+                        // Already expanded — collapse by navigating away is weird,
+                        // so just toggle to first child (no-op if already there)
+                        // In practice, clicking the active group header does nothing special
+                      } else {
+                        handleNav(item.children[0].page)
+                      }
+                    }}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left ${
+                      expanded
+                        ? 'text-text'
+                        : 'text-text-muted hover:text-text hover:bg-bg-tertiary/50'
+                    }`}
+                  >
+                    <span className="flex items-center justify-center w-5 h-5">{item.icon(expanded)}</span>
+                    <span className="flex-1">{item.label}</span>
+                    <Chevron expanded={expanded} />
+                  </button>
+
+                  {/* Children — animate height */}
+                  <div
+                    className={`overflow-hidden transition-all duration-150 ${
+                      expanded ? 'max-h-40 opacity-100' : 'max-h-0 opacity-0'
+                    }`}
+                  >
+                    {item.children.map((child) => {
+                      const isActive = currentPage === child.page
+                      return (
+                        <button
+                          key={child.page}
+                          onClick={() => handleNav(child.page)}
+                          className={`w-full flex items-center pl-11 pr-3 py-1.5 rounded-lg text-[13px] transition-colors text-left ${
+                            isActive
+                              ? 'bg-bg-tertiary text-text'
+                              : 'text-text-muted hover:text-text hover:bg-bg-tertiary/50'
+                          }`}
+                        >
+                          {child.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            }
+
+            // Leaf item
+            const isActive = currentPage === item.page
+            return (
+              <button
+                key={item.page}
+                onClick={() => handleNav(item.page)}
+                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left ${
+                  isActive
+                    ? 'bg-bg-tertiary text-text'
+                    : 'text-text-muted hover:text-text hover:bg-bg-tertiary/50'
+                }`}
+              >
+                <span className="flex items-center justify-center w-5 h-5">{item.icon(isActive)}</span>
+                {item.label}
+              </button>
+            )
+          })}
         </nav>
 
         {/* SSE Connection Status */}

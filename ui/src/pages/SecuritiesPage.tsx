@@ -18,7 +18,7 @@ interface SecuritiesConfig {
   guards: GuardEntry[]
 }
 
-export function SecuritiesPage() {
+export function SecuritiesPage({ tab }: { tab: string }) {
   const { config, status, loadError, updateConfig, updateConfigImmediate, retry } =
     useConfigPage<SecuritiesConfig>({
       section: 'securities',
@@ -43,7 +43,9 @@ export function SecuritiesPage() {
           <div>
             <h2 className="text-base font-semibold text-text">Securities Trading</h2>
             <p className="text-[12px] text-text-muted mt-1">
-              Broker connection and trading guard configuration for US equities.
+              {tab === 'connection'
+                ? 'Broker connection and SDK configuration for US equities.'
+                : 'Trading guards validate operations before they reach the broker.'}
             </p>
           </div>
           <SaveIndicator status={status} onRetry={retry} />
@@ -54,46 +56,57 @@ export function SecuritiesPage() {
       <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5">
         {config && (
           <div className="max-w-[640px] space-y-8">
-            {/* Enable / SDK selection */}
-            <Section title="Trading Interface">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <p className="text-[13px] text-text">Enable Securities Trading</p>
-                  <p className="text-[11px] text-text-muted/60">
-                    When disabled, the securities trading engine and all related tools are unloaded.
-                  </p>
-                </div>
-                <Toggle checked={enabled} onChange={handleToggle} />
-              </div>
-
-              {enabled && (
-                <div className="mt-1">
-                  <p className="text-[12px] text-text-muted mb-3">Select a broker SDK to connect with your brokerage.</p>
-                  <SDKSelector
-                    options={SECURITIES_SDK_OPTIONS}
-                    selected="alpaca"
-                    onSelect={() => {/* future: switch SDK */}}
-                  />
-                </div>
-              )}
-            </Section>
-
-            {/* Provider config — only when enabled */}
-            {enabled && (
+            {tab === 'connection' && (
               <>
-                <BrokerSection
-                  config={config}
-                  onChange={updateConfig}
-                  onChangeImmediate={updateConfigImmediate}
-                />
-                <GuardsSection
-                  guards={config.guards || []}
-                  guardTypes={SECURITIES_GUARD_TYPES}
-                  description="Trading guards validate operations before they reach the broker. Guards run in order — first rejection stops the operation."
-                  onChange={(guards) => updateConfig({ guards })}
-                  onChangeImmediate={(guards) => updateConfigImmediate({ guards })}
-                />
+                {/* Enable / SDK selection */}
+                <Section title="Trading Interface">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <p className="text-[13px] text-text">Enable Securities Trading</p>
+                      <p className="text-[11px] text-text-muted/60">
+                        When disabled, the securities trading engine and all related tools are unloaded.
+                      </p>
+                    </div>
+                    <Toggle checked={enabled} onChange={handleToggle} />
+                  </div>
+
+                  {enabled && (
+                    <div className="mt-1">
+                      <p className="text-[12px] text-text-muted mb-3">Select a broker SDK to connect with your brokerage.</p>
+                      <SDKSelector
+                        options={SECURITIES_SDK_OPTIONS}
+                        selected="alpaca"
+                        onSelect={() => {/* future: switch SDK */}}
+                      />
+                    </div>
+                  )}
+                </Section>
+
+                {/* Broker config — only when enabled */}
+                {enabled && (
+                  <BrokerSection
+                    config={config}
+                    onChange={updateConfig}
+                    onChangeImmediate={updateConfigImmediate}
+                  />
+                )}
               </>
+            )}
+
+            {tab === 'guards' && enabled && (
+              <GuardsSection
+                guards={config.guards || []}
+                guardTypes={SECURITIES_GUARD_TYPES}
+                description="Trading guards validate operations before they reach the broker. Guards run in order — first rejection stops the operation."
+                onChange={(guards) => updateConfig({ guards })}
+                onChangeImmediate={(guards) => updateConfigImmediate({ guards })}
+              />
+            )}
+
+            {tab === 'guards' && !enabled && (
+              <p className="text-[13px] text-text-muted">
+                Enable securities trading in the Connection tab to configure guards.
+              </p>
             )}
           </div>
         )}

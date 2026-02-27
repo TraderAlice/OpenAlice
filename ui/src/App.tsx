@@ -8,7 +8,11 @@ import { DataSourcesPage } from './pages/DataSourcesPage'
 import { TradingPage } from './pages/TradingPage'
 import { SecuritiesPage } from './pages/SecuritiesPage'
 
-export type Page = 'chat' | 'portfolio' | 'events' | 'data-sources' | 'trading' | 'securities' | 'settings'
+export type Page =
+  | 'chat' | 'portfolio' | 'events' | 'data-sources'
+  | 'trading/connection' | 'trading/guards'
+  | 'securities/connection' | 'securities/guards'
+  | 'settings'
 
 export function App() {
   const [page, setPage] = useState<Page>('chat')
@@ -42,8 +46,8 @@ export function App() {
         {page === 'portfolio' && <PortfolioPage />}
         {page === 'events' && <EventsPage />}
         {page === 'data-sources' && <DataSourcesPage />}
-        {page === 'trading' && <TradingPage />}
-        {page === 'securities' && <SecuritiesPage />}
+        {page.startsWith('trading/') && <TradingPage tab={page.split('/')[1]} />}
+        {page.startsWith('securities/') && <SecuritiesPage tab={page.split('/')[1]} />}
         {page === 'settings' && <SettingsPage />}
       </main>
     </div>

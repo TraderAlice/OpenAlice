@@ -22,7 +22,7 @@ interface CryptoConfig {
   guards: GuardEntry[]
 }
 
-export function TradingPage() {
+export function TradingPage({ tab }: { tab: string }) {
   const { config, status, loadError, updateConfig, updateConfigImmediate, retry } =
     useConfigPage<CryptoConfig>({
       section: 'crypto',
@@ -48,7 +48,9 @@ export function TradingPage() {
           <div>
             <h2 className="text-base font-semibold text-text">Crypto Trading</h2>
             <p className="text-[12px] text-text-muted mt-1">
-              Exchange connection and trading guard configuration for cryptocurrency markets.
+              {tab === 'connection'
+                ? 'Exchange connection and SDK configuration for cryptocurrency markets.'
+                : 'Trading guards validate operations before they reach the exchange.'}
             </p>
           </div>
           <SaveIndicator status={status} onRetry={retry} />
@@ -59,46 +61,57 @@ export function TradingPage() {
       <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5">
         {config && (
           <div className="max-w-[640px] space-y-8">
-            {/* Enable / SDK selection */}
-            <Section title="Trading Interface">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <p className="text-[13px] text-text">Enable Crypto Trading</p>
-                  <p className="text-[11px] text-text-muted/60">
-                    When disabled, the crypto trading engine and all related tools are unloaded.
-                  </p>
-                </div>
-                <Toggle checked={enabled} onChange={handleToggle} />
-              </div>
-
-              {enabled && (
-                <div className="mt-1">
-                  <p className="text-[12px] text-text-muted mb-3">Select a trading SDK to connect with your exchange.</p>
-                  <SDKSelector
-                    options={CRYPTO_SDK_OPTIONS}
-                    selected="ccxt"
-                    onSelect={() => {/* future: switch SDK */}}
-                  />
-                </div>
-              )}
-            </Section>
-
-            {/* Provider config — only when enabled */}
-            {enabled && (
+            {tab === 'connection' && (
               <>
-                <ExchangeSection
-                  config={config}
-                  onChange={updateConfig}
-                  onChangeImmediate={updateConfigImmediate}
-                />
-                <GuardsSection
-                  guards={config.guards || []}
-                  guardTypes={CRYPTO_GUARD_TYPES}
-                  description="Trading guards validate operations before they reach the exchange. Guards run in order — first rejection stops the operation."
-                  onChange={(guards) => updateConfig({ guards })}
-                  onChangeImmediate={(guards) => updateConfigImmediate({ guards })}
-                />
+                {/* Enable / SDK selection */}
+                <Section title="Trading Interface">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <p className="text-[13px] text-text">Enable Crypto Trading</p>
+                      <p className="text-[11px] text-text-muted/60">
+                        When disabled, the crypto trading engine and all related tools are unloaded.
+                      </p>
+                    </div>
+                    <Toggle checked={enabled} onChange={handleToggle} />
+                  </div>
+
+                  {enabled && (
+                    <div className="mt-1">
+                      <p className="text-[12px] text-text-muted mb-3">Select a trading SDK to connect with your exchange.</p>
+                      <SDKSelector
+                        options={CRYPTO_SDK_OPTIONS}
+                        selected="ccxt"
+                        onSelect={() => {/* future: switch SDK */}}
+                      />
+                    </div>
+                  )}
+                </Section>
+
+                {/* Exchange config — only when enabled */}
+                {enabled && (
+                  <ExchangeSection
+                    config={config}
+                    onChange={updateConfig}
+                    onChangeImmediate={updateConfigImmediate}
+                  />
+                )}
               </>
+            )}
+
+            {tab === 'guards' && enabled && (
+              <GuardsSection
+                guards={config.guards || []}
+                guardTypes={CRYPTO_GUARD_TYPES}
+                description="Trading guards validate operations before they reach the exchange. Guards run in order — first rejection stops the operation."
+                onChange={(guards) => updateConfig({ guards })}
+                onChangeImmediate={(guards) => updateConfigImmediate({ guards })}
+              />
+            )}
+
+            {tab === 'guards' && !enabled && (
+              <p className="text-[13px] text-text-muted">
+                Enable crypto trading in the Connection tab to configure guards.
+              </p>
             )}
           </div>
         )}
