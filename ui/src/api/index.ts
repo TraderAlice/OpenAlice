@@ -39,4 +39,5 @@ export type {
   SecHolding,
   WalletCommitLog,
   ReconnectResult,
+  ConnectorsConfig,
 } from './types'

@@ -32,7 +32,7 @@ export function createConfigRoutes() {
   app.put('/:section', async (c) => {
     try {
       const section = c.req.param('section') as ConfigSection
-      const validSections: ConfigSection[] = ['engine', 'model', 'agent', 'crypto', 'securities', 'openbb', 'compaction', 'aiProvider', 'heartbeat', 'apiKeys', 'telegram']
+      const validSections: ConfigSection[] = ['engine', 'model', 'agent', 'crypto', 'securities', 'openbb', 'compaction', 'aiProvider', 'heartbeat', 'apiKeys', 'connectors']
       if (!validSections.includes(section)) {
         return c.json({ error: `Invalid section "${section}". Valid: ${validSections.join(', ')}` }, 400)
       }

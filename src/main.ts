@@ -364,22 +364,23 @@ async function main() {
 
   const plugins: Plugin[] = [new HttpPlugin()]
 
-  if (config.engine.mcpPort) {
-    plugins.push(new McpPlugin(toolCenter.getMcpTools(), config.engine.mcpPort))
+  if (config.connectors.mcp.enabled && config.connectors.mcp.port) {
+    plugins.push(new McpPlugin(toolCenter.getMcpTools(), config.connectors.mcp.port))
   }
 
-  if (config.engine.askMcpPort) {
-    plugins.push(new McpAskPlugin({ port: config.engine.askMcpPort }))
+  if (config.connectors.mcpAsk.enabled && config.connectors.mcpAsk.port) {
+    plugins.push(new McpAskPlugin({ port: config.connectors.mcpAsk.port }))
   }
 
-  if (config.engine.webPort) {
-    plugins.push(new WebPlugin({ port: config.engine.webPort }))
+  // Web UI is always active (no enabled flag)
+  if (config.connectors.web.port) {
+    plugins.push(new WebPlugin({ port: config.connectors.web.port }))
   }
 
-  if (config.telegram.botToken) {
+  if (config.connectors.telegram.enabled && config.connectors.telegram.botToken) {
     plugins.push(new TelegramPlugin({
-      token: config.telegram.botToken,
-      allowedChatIds: config.telegram.chatIds,
+      token: config.connectors.telegram.botToken,
+      allowedChatIds: config.connectors.telegram.chatIds,
     }))
   }
 

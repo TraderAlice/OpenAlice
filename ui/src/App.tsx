@@ -7,9 +7,10 @@ import { SettingsPage } from './pages/SettingsPage'
 import { DataSourcesPage } from './pages/DataSourcesPage'
 import { TradingPage } from './pages/TradingPage'
 import { SecuritiesPage } from './pages/SecuritiesPage'
+import { ConnectorsPage } from './pages/ConnectorsPage'
 
 export type Page =
-  | 'chat' | 'portfolio' | 'events' | 'data-sources'
+  | 'chat' | 'portfolio' | 'events' | 'data-sources' | 'connectors'
   | 'trading/connection' | 'trading/guards'
   | 'securities/connection' | 'securities/guards'
   | 'settings'
@@ -46,6 +47,7 @@ export function App() {
         {page === 'portfolio' && <PortfolioPage />}
         {page === 'events' && <EventsPage />}
         {page === 'data-sources' && <DataSourcesPage />}
+        {page === 'connectors' && <ConnectorsPage />}
         {page.startsWith('trading/') && <TradingPage tab={page.split('/')[1]} />}
         {page.startsWith('securities/') && <SecuritiesPage tab={page.split('/')[1]} />}
         {page === 'settings' && <SettingsPage />}

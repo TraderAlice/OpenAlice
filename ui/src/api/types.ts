@@ -30,7 +30,20 @@ export interface AppConfig {
   agent: { evolutionMode: boolean; claudeCode: Record<string, unknown> }
   compaction: { maxContextTokens: number; maxOutputTokens: number }
   heartbeat: { enabled: boolean; every: string; prompt: string }
+  connectors: ConnectorsConfig
   [key: string]: unknown
+}
+
+export interface ConnectorsConfig {
+  web: { port: number }
+  mcp: { enabled: boolean; port?: number }
+  mcpAsk: { enabled: boolean; port?: number }
+  telegram: {
+    enabled: boolean
+    botToken?: string
+    botUsername?: string
+    chatIds: number[]
+  }
 }
 
 // ==================== Events ====================
