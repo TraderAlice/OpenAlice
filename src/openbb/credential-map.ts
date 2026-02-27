@@ -14,6 +14,9 @@ const keyMapping: Record<string, string> = {
   tradingeconomics: 'tradingeconomics_api_key',
   econdb: 'econdb_api_key',
   intrinio: 'intrinio_api_key',
+  benzinga: 'benzinga_api_key',
+  tiingo: 'tiingo_token',
+  biztoc: 'biztoc_api_key',
 }
 
 /**

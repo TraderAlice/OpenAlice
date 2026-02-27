@@ -2,16 +2,15 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { api, type AppConfig } from '../api'
 import { Toggle } from '../components/Toggle'
 import { SaveIndicator } from '../components/SaveIndicator'
+import { Section, Field, inputClass } from '../components/form'
 import { useAutoSave, type SaveStatus } from '../hooks/useAutoSave'
 
 const SECTIONS = [
   { id: 'ai-provider', label: 'AI Provider' },
   { id: 'agent', label: 'Agent' },
   { id: 'model', label: 'Model' },
-  { id: 'connectivity', label: 'Connectivity' },
   { id: 'compaction', label: 'Compaction' },
   { id: 'heartbeat', label: 'Heartbeat' },
-  { id: 'telegram', label: 'Telegram' },
 ]
 
 export function SettingsPage() {
@@ -30,7 +29,6 @@ export function SettingsPage() {
 
     const observer = new IntersectionObserver(
       (entries) => {
-        // Pick the topmost intersecting entry
         let topmost: IntersectionObserverEntry | null = null
         for (const entry of entries) {
           if (entry.isIntersecting) {
@@ -70,7 +68,6 @@ export function SettingsPage() {
     [],
   )
 
-  // Visible sections based on config
   const visibleSections = config
     ? SECTIONS.filter((s) => s.id !== 'model' || config.aiProvider === 'vercel-ai-sdk')
     : []
@@ -156,11 +153,6 @@ export function SettingsPage() {
               </Section>
             )}
 
-            {/* Connectivity */}
-            <Section id="connectivity" title="Connectivity" description="MCP server ports for external agent integration. Tool port exposes trading, analysis and other tools; Ask port provides a multi-turn conversation interface. Leave empty to disable. Restart required after changes.">
-              <ConnectivityForm config={config} />
-            </Section>
-
             {/* Compaction */}
             <Section id="compaction" title="Compaction" description="Context window management. When conversation size approaches Max Context minus Max Output tokens, older messages are automatically summarized to free up space. Set Max Context to match your model's context limit.">
               <CompactionForm config={config} />
@@ -171,45 +163,12 @@ export function SettingsPage() {
               <HeartbeatForm config={config} />
             </Section>
 
-            {/* Telegram */}
-            <Section id="telegram" title="Telegram" description="Connect a Telegram bot for mobile notifications and two-way chat. Create a bot via @BotFather, paste the token below, and add your chat ID (send /start to the bot, then use @userinfobot to find your ID). Restart required.">
-              <TelegramForm config={config} />
-            </Section>
-
           </div>
         )}
       </div>
     </div>
   )
 }
-
-// ==================== Shared Components ====================
-
-function Section({ id, title, description, children }: { id?: string; title: string; description?: string; children: React.ReactNode }) {
-  return (
-    <div id={id}>
-      <h3 className="text-[13px] font-semibold text-text-muted uppercase tracking-wide mb-3">
-        {title}
-      </h3>
-      {description && (
-        <p className="text-[12px] text-text-muted mb-3 -mt-1">{description}</p>
-      )}
-      {children}
-    </div>
-  )
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="mb-3">
-      <label className="block text-[13px] text-text-muted mb-1">{label}</label>
-      {children}
-    </div>
-  )
-}
-
-const inputClass =
-  'w-full px-2.5 py-2 bg-bg text-text border border-border rounded-md font-sans text-sm outline-none transition-colors focus:border-accent'
 
 // ==================== Form Sections ====================
 
@@ -247,12 +206,10 @@ function ModelForm({ config }: { config: AppConfig }) {
   const [keySaveStatus, setKeySaveStatus] = useState<SaveStatus>('idle')
   const keySavedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Check if current model is in the preset list
   const presets = PROVIDER_MODELS[provider] || []
   const isCustom = model !== '' && !presets.some((p) => p.value === model)
   const effectiveModel = isCustom || model === '' ? customModel || model : model
 
-  // Auto-save model selection
   const modelData = useMemo(
     () => ({ provider, model: effectiveModel }),
     [provider, effectiveModel],
@@ -267,7 +224,6 @@ function ModelForm({ config }: { config: AppConfig }) {
     save: saveModel,
   })
 
-  // Load API key status on mount
   useEffect(() => {
     api.apiKeys.status().then(setKeyStatus).catch(() => {})
   }, [])
@@ -448,43 +404,11 @@ function CompactionForm({ config }: { config: AppConfig }) {
   )
 }
 
-function ConnectivityForm({ config }: { config: AppConfig }) {
-  const eng = config.engine as Record<string, unknown>
-  const [mcpPort, setMcpPort] = useState(String(eng.mcpPort ?? ''))
-  const [askMcpPort, setAskMcpPort] = useState(String(eng.askMcpPort ?? ''))
-
-  const data = useMemo(() => {
-    const patch = { ...eng }
-    if (mcpPort) patch.mcpPort = Number(mcpPort); else delete patch.mcpPort
-    if (askMcpPort) patch.askMcpPort = Number(askMcpPort); else delete patch.askMcpPort
-    return patch
-  }, [eng, mcpPort, askMcpPort])
-
-  const save = useCallback(async (d: Record<string, unknown>) => {
-    await api.config.updateSection('engine', d)
-  }, [])
-
-  const { status, retry } = useAutoSave({ data, save })
-
-  return (
-    <>
-      <Field label="MCP Port (tools)">
-        <input className={inputClass} type="number" value={mcpPort} onChange={(e) => setMcpPort(e.target.value)} placeholder="Disabled" />
-      </Field>
-      <Field label="Ask MCP Port (connector)">
-        <input className={inputClass} type="number" value={askMcpPort} onChange={(e) => setAskMcpPort(e.target.value)} placeholder="Disabled" />
-      </Field>
-      <SaveIndicator status={status} onRetry={retry} />
-    </>
-  )
-}
-
 function HeartbeatForm({ config }: { config: AppConfig }) {
   const [hbEnabled, setHbEnabled] = useState(config.heartbeat?.enabled || false)
   const [hbEvery, setHbEvery] = useState(config.heartbeat?.every || '30m')
   const [ready, setReady] = useState(false)
 
-  // Sync enabled state from API on mount (may differ from config if toggled on Events page)
   useEffect(() => {
     api.heartbeat.status().then(({ enabled }) => {
       setHbEnabled(enabled)
@@ -531,56 +455,3 @@ function HeartbeatForm({ config }: { config: AppConfig }) {
   )
 }
 
-function TelegramForm({ config }: { config: AppConfig }) {
-  const tg = (config as Record<string, unknown>).telegram as Record<string, unknown> | undefined
-  const [botToken, setBotToken] = useState((tg?.botToken as string) || '')
-  const [botUsername, setBotUsername] = useState((tg?.botUsername as string) || '')
-  const [chatIds, setChatIds] = useState(
-    Array.isArray(tg?.chatIds) ? (tg.chatIds as number[]).join(', ') : '',
-  )
-
-  const data = useMemo(() => ({
-    botToken: botToken || undefined,
-    botUsername: botUsername || undefined,
-    chatIds: chatIds
-      ? chatIds.split(',').map((s) => Number(s.trim())).filter((n) => !isNaN(n))
-      : [],
-  }), [botToken, botUsername, chatIds])
-
-  const save = useCallback(async (d: Record<string, unknown>) => {
-    await api.config.updateSection('telegram', d)
-  }, [])
-
-  const { status, retry } = useAutoSave({ data, save })
-
-  return (
-    <>
-      <Field label="Bot Token">
-        <input
-          className={inputClass}
-          type="password"
-          value={botToken}
-          onChange={(e) => setBotToken(e.target.value)}
-          placeholder="123456:ABC-DEF..."
-        />
-      </Field>
-      <Field label="Bot Username">
-        <input
-          className={inputClass}
-          value={botUsername}
-          onChange={(e) => setBotUsername(e.target.value)}
-          placeholder="my_bot"
-        />
-      </Field>
-      <Field label="Allowed Chat IDs">
-        <input
-          className={inputClass}
-          value={chatIds}
-          onChange={(e) => setChatIds(e.target.value)}
-          placeholder="Comma-separated, e.g. 123456, 789012"
-        />
-      </Field>
-      <SaveIndicator status={status} onRetry={retry} />
-    </>
-  )
-}

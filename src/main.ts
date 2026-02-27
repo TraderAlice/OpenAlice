@@ -40,8 +40,10 @@ import { OpenBBCryptoClient } from './openbb/crypto/index.js'
 import { OpenBBCurrencyClient } from './openbb/currency/index.js'
 import { OpenBBEconomyClient } from './openbb/economy/index.js'
 import { OpenBBCommodityClient } from './openbb/commodity/index.js'
+import { OpenBBNewsClient } from './openbb/news/index.js'
 import { createCryptoTools } from './extension/crypto/index.js'
 import { createCurrencyTools } from './extension/currency/index.js'
+import { createNewsTools } from './extension/news/index.js'
 import { createAnalysisTools } from './extension/analysis-kit/index.js'
 import { SessionStore } from './core/session.js'
 import { ToolCenter } from './core/tool-center.js'
@@ -52,6 +54,7 @@ import { ClaudeCodeProvider } from './providers/claude-code/claude-code-provider
 import { createEventLog } from './core/event-log.js'
 import { createCronEngine, createCronListener, createCronTools } from './task/cron/index.js'
 import { createHeartbeat } from './task/heartbeat/index.js'
+import { NewsCollectorStore, NewsCollector, wrapNewsToolsForPiggyback, createNewsArchiveTools } from './extension/news-collector/index.js'
 
 const WALLET_FILE = resolve('data/crypto-trading/commit.json')
 const SEC_WALLET_FILE = resolve('data/securities-trading/commit.json')
@@ -153,6 +156,10 @@ async function main() {
     ? SecWallet.restore(secSavedState, secWalletConfig)
     : new SecWallet(secWalletConfig)
 
+  // Mutable wallet references — updated on reconnect so REST getters always return current instance
+  let currentCryptoWallet: InstanceType<typeof Wallet> | null = null
+  let currentSecWallet: InstanceType<typeof SecWallet> = secWallet
+
   // Kept for shutdown cleanup reference (populated when CCXT resolves)
   let cryptoResultRef: Awaited<ReturnType<typeof createCryptoTradingEngine>> = null
 
@@ -197,6 +204,14 @@ async function main() {
 
   const cronEngine = createCronEngine({ eventLog })
 
+  // ==================== News Collector Store ====================
+
+  const newsStore = new NewsCollectorStore({
+    maxInMemory: config.newsCollector.maxInMemory,
+    retentionDays: config.newsCollector.retentionDays,
+  })
+  await newsStore.init()
+
   // ==================== OpenBB Clients ====================
 
   const providerKeys = config.openbb.providerKeys
@@ -206,6 +221,7 @@ async function main() {
   const currencyClient = new OpenBBCurrencyClient(config.openbb.apiUrl, providers.currency, providerKeys)
   const commodityClient = new OpenBBCommodityClient(config.openbb.apiUrl, undefined, providerKeys)
   const economyClient = new OpenBBEconomyClient(config.openbb.apiUrl, undefined, providerKeys)
+  const newsClient = new OpenBBNewsClient(config.openbb.apiUrl, undefined, providerKeys)
 
   // ==================== Equity Symbol Index ====================
 
@@ -223,9 +239,20 @@ async function main() {
   toolCenter.register(createBrainTools(brain))
   toolCenter.register(createBrowserTools())
   toolCenter.register(createCronTools(cronEngine))
-  toolCenter.register(createEquityTools(symbolIndex))
+  toolCenter.register(createEquityTools(symbolIndex, equityClient))
   toolCenter.register(createCryptoTools(cryptoClient))
   toolCenter.register(createCurrencyTools(currencyClient))
+  let newsTools = createNewsTools(newsClient, {
+    companyProvider: providers.newsCompany,
+    worldProvider: providers.newsWorld,
+  })
+  if (config.newsCollector.piggybackOpenBB) {
+    newsTools = wrapNewsToolsForPiggyback(newsTools, newsStore)
+  }
+  toolCenter.register(newsTools)
+  if (config.newsCollector.enabled) {
+    toolCenter.register(createNewsArchiveTools(newsStore))
+  }
   toolCenter.register(createAnalysisTools(equityClient, cryptoClient, currencyClient))
 
   console.log(`tool-center: ${toolCenter.list().length} tools registered (crypto trading pending ccxt)`)
@@ -264,6 +291,19 @@ async function main() {
     console.log(`heartbeat: enabled (every ${config.heartbeat.every})`)
   }
 
+  // ==================== News Collector ====================
+
+  let newsCollector: NewsCollector | null = null
+  if (config.newsCollector.enabled && config.newsCollector.feeds.length > 0) {
+    newsCollector = new NewsCollector({
+      store: newsStore,
+      feeds: config.newsCollector.feeds,
+      intervalMs: config.newsCollector.intervalMinutes * 60 * 1000,
+    })
+    newsCollector.start()
+    console.log(`news-collector: started (${config.newsCollector.feeds.length} feeds, every ${config.newsCollector.intervalMinutes}m)`)
+  }
+
   // ==================== Engine Reconnect ====================
 
   let cryptoReconnecting = false
@@ -294,6 +334,7 @@ async function main() {
       const savedWallet = await readFile(WALLET_FILE, 'utf-8')
         .then((r) => JSON.parse(r) as WalletExportState).catch(() => undefined)
       const newWallet = savedWallet ? Wallet.restore(savedWallet, walletConfig) : new Wallet(walletConfig)
+      currentCryptoWallet = newWallet
 
       toolCenter.register(createCryptoTradingTools(newResult.engine, newWallet, bridge))
       console.log(`reconnect: crypto trading engine online (${toolCenter.list().length} tools)`)
@@ -334,6 +375,7 @@ async function main() {
       const savedWallet = await readFile(SEC_WALLET_FILE, 'utf-8')
         .then((r) => JSON.parse(r) as SecWalletExportState).catch(() => undefined)
       const newWallet = savedWallet ? SecWallet.restore(savedWallet, walletConfig) : new SecWallet(walletConfig)
+      currentSecWallet = newWallet
 
       toolCenter.register(createSecuritiesTradingTools(newResult.engine, newWallet, bridge))
       console.log(`reconnect: securities trading engine online (${toolCenter.list().length} tools)`)
@@ -349,30 +391,97 @@ async function main() {
 
   // ==================== Plugins ====================
 
-  const plugins: Plugin[] = [new HttpPlugin()]
+  // Core plugins — always-on, not toggleable at runtime
+  const corePlugins: Plugin[] = [new HttpPlugin()]
 
-  if (config.engine.mcpPort) {
-    plugins.push(new McpPlugin(toolCenter.getMcpTools(), config.engine.mcpPort))
+  // MCP Server is always active when a port is set — Claude Code provider depends on it for tools
+  if (config.connectors.mcp.port) {
+    corePlugins.push(new McpPlugin(toolCenter.getMcpTools(), config.connectors.mcp.port))
   }
 
-  if (config.engine.askMcpPort) {
-    plugins.push(new McpAskPlugin({ port: config.engine.askMcpPort }))
+  // Web UI is always active (no enabled flag)
+  if (config.connectors.web.port) {
+    corePlugins.push(new WebPlugin({ port: config.connectors.web.port }))
   }
 
-  if (config.engine.webPort) {
-    plugins.push(new WebPlugin({ port: config.engine.webPort }))
+  // Optional plugins — toggleable at runtime via reconnectConnectors()
+  const optionalPlugins = new Map<string, Plugin>()
+
+  if (config.connectors.mcpAsk.enabled && config.connectors.mcpAsk.port) {
+    optionalPlugins.set('mcp-ask', new McpAskPlugin({ port: config.connectors.mcpAsk.port }))
   }
 
-  if (config.telegram.botToken) {
-    plugins.push(new TelegramPlugin({
-      token: config.telegram.botToken,
-      allowedChatIds: config.telegram.chatIds,
+  if (config.connectors.telegram.enabled && config.connectors.telegram.botToken) {
+    optionalPlugins.set('telegram', new TelegramPlugin({
+      token: config.connectors.telegram.botToken,
+      allowedChatIds: config.connectors.telegram.chatIds,
     }))
   }
 
-  const ctx: EngineContext = { config, engine, cryptoEngine: null, eventLog, heartbeat, cronEngine, reconnectCrypto, reconnectSecurities }
+  // ==================== Connector Reconnect ====================
 
-  for (const plugin of plugins) {
+  let connectorsReconnecting = false
+  const reconnectConnectors = async (): Promise<ReconnectResult> => {
+    if (connectorsReconnecting) return { success: false, error: 'Reconnect already in progress' }
+    connectorsReconnecting = true
+    try {
+      const fresh = await loadConfig()
+      const changes: string[] = []
+
+      // --- MCP Ask ---
+      const mcpAskWanted = fresh.connectors.mcpAsk.enabled && !!fresh.connectors.mcpAsk.port
+      const mcpAskRunning = optionalPlugins.has('mcp-ask')
+      if (mcpAskRunning && !mcpAskWanted) {
+        await optionalPlugins.get('mcp-ask')!.stop()
+        optionalPlugins.delete('mcp-ask')
+        changes.push('mcp-ask stopped')
+      } else if (!mcpAskRunning && mcpAskWanted) {
+        const p = new McpAskPlugin({ port: fresh.connectors.mcpAsk.port! })
+        await p.start(ctx)
+        optionalPlugins.set('mcp-ask', p)
+        changes.push('mcp-ask started')
+      }
+
+      // --- Telegram ---
+      const telegramWanted = fresh.connectors.telegram.enabled && !!fresh.connectors.telegram.botToken
+      const telegramRunning = optionalPlugins.has('telegram')
+      if (telegramRunning && !telegramWanted) {
+        await optionalPlugins.get('telegram')!.stop()
+        optionalPlugins.delete('telegram')
+        changes.push('telegram stopped')
+      } else if (!telegramRunning && telegramWanted) {
+        const p = new TelegramPlugin({
+          token: fresh.connectors.telegram.botToken!,
+          allowedChatIds: fresh.connectors.telegram.chatIds,
+        })
+        await p.start(ctx)
+        optionalPlugins.set('telegram', p)
+        changes.push('telegram started')
+      }
+
+      if (changes.length > 0) {
+        console.log(`reconnect: connectors — ${changes.join(', ')}`)
+      }
+      return { success: true, message: changes.length > 0 ? changes.join(', ') : 'no changes' }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error('reconnect: connectors failed:', msg)
+      return { success: false, error: msg }
+    } finally {
+      connectorsReconnecting = false
+    }
+  }
+
+  const ctx: EngineContext = {
+    config, engine, cryptoEngine: null, eventLog, heartbeat, cronEngine,
+    reconnectCrypto, reconnectSecurities, reconnectConnectors,
+    getCryptoEngine: () => cryptoResultRef?.engine ?? null,
+    getSecuritiesEngine: () => secResultRef?.engine ?? null,
+    getCryptoWallet: () => currentCryptoWallet,
+    getSecWallet: () => currentSecWallet,
+  }
+
+  for (const plugin of [...corePlugins, ...optionalPlugins.values()]) {
     await plugin.start(ctx)
     console.log(`plugin started: ${plugin.name}`)
   }
@@ -397,6 +506,7 @@ async function main() {
     const realWallet = savedState
       ? Wallet.restore(savedState, realWalletConfig)
       : new Wallet(realWalletConfig)
+    currentCryptoWallet = realWallet
     toolCenter.register(createCryptoTradingTools(cryptoResult.engine, realWallet, bridge))
     console.log(`ccxt: crypto trading tools online (${toolCenter.list().length} tools total)`)
   })
@@ -406,12 +516,14 @@ async function main() {
   let stopped = false
   const shutdown = async () => {
     stopped = true
+    newsCollector?.stop()
     heartbeat.stop()
     cronListener.stop()
     cronEngine.stop()
-    for (const plugin of plugins) {
+    for (const plugin of [...corePlugins, ...optionalPlugins.values()]) {
       await plugin.stop()
     }
+    await newsStore.close()
     await eventLog.close()
     await cryptoResultRef?.close()
     await secResultRef?.close()

@@ -1,53 +1,17 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState } from 'react'
 import { api, type AppConfig } from '../api'
 import { SaveIndicator } from '../components/SaveIndicator'
-import { useAutoSave } from '../hooks/useAutoSave'
-
-const inputClass =
-  'w-full px-2.5 py-2 bg-bg text-text border border-border rounded-md font-sans text-sm outline-none transition-colors focus:border-accent'
+import { Section, Field, inputClass } from '../components/form'
+import { useConfigPage } from '../hooks/useConfigPage'
 
 type OpenbbConfig = Record<string, unknown>
 
 export function DataSourcesPage() {
-  const [config, setConfig] = useState<AppConfig | null>(null)
-  const [openbb, setOpenbb] = useState<OpenbbConfig | null>(null)
-  const [loadError, setLoadError] = useState(false)
-  const flushRequestedRef = useRef(false)
-
-  useEffect(() => {
-    api.config.load().then((full) => {
-      setConfig(full)
-      setOpenbb((full as Record<string, unknown>).openbb as OpenbbConfig)
-    }).catch(() => setLoadError(true))
-  }, [])
-
-  const saveOpenbb = useCallback(async (data: OpenbbConfig) => {
-    const result = await api.config.updateSection('openbb', data)
-    setOpenbb(result as OpenbbConfig)
-  }, [])
-
-  const { status, flush, retry } = useAutoSave({
-    data: openbb!,
-    save: saveOpenbb,
-    delay: 600,
-    enabled: openbb !== null,
-  })
-
-  useEffect(() => {
-    if (flushRequestedRef.current && openbb) {
-      flushRequestedRef.current = false
-      flush()
-    }
-  }, [openbb, flush])
-
-  const updateOpenbb = useCallback((patch: Partial<OpenbbConfig>) => {
-    setOpenbb((prev) => (prev ? { ...prev, ...patch } : prev))
-  }, [])
-
-  const updateOpenbbImmediate = useCallback((patch: Partial<OpenbbConfig>) => {
-    setOpenbb((prev) => (prev ? { ...prev, ...patch } : prev))
-    flushRequestedRef.current = true
-  }, [])
+  const { config, status, loadError, updateConfig, updateConfigImmediate, retry } =
+    useConfigPage<OpenbbConfig>({
+      section: 'openbb',
+      extract: (full: AppConfig) => (full as Record<string, unknown>).openbb as OpenbbConfig,
+    })
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
@@ -66,45 +30,21 @@ export function DataSourcesPage() {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5">
-        {config && openbb && (
+        {config && (
           <div className="max-w-[640px] space-y-8">
             <ConnectionSection
-              openbb={openbb}
-              onChange={updateOpenbb}
-              onChangeImmediate={updateOpenbbImmediate}
+              openbb={config}
+              onChange={updateConfig}
+              onChangeImmediate={updateConfigImmediate}
             />
             <ProviderKeysSection
-              openbb={openbb}
-              onChange={updateOpenbb}
+              openbb={config}
+              onChange={updateConfig}
             />
           </div>
         )}
         {loadError && <p className="text-[13px] text-red">Failed to load configuration.</p>}
       </div>
-    </div>
-  )
-}
-
-// ==================== Sections ====================
-
-function SectionHeader({ title, description }: { title: string; description?: string }) {
-  return (
-    <div className="mb-3">
-      <h3 className="text-[13px] font-semibold text-text-muted uppercase tracking-wide">
-        {title}
-      </h3>
-      {description && (
-        <p className="text-[12px] text-text-muted mt-1">{description}</p>
-      )}
-    </div>
-  )
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="mb-3">
-      <label className="block text-[13px] text-text-muted mb-1">{label}</label>
-      {children}
     </div>
   )
 }
@@ -115,26 +55,30 @@ const PROVIDER_OPTIONS: Record<string, string[]> = {
   equity: ['yfinance', 'fmp', 'intrinio', 'tiingo', 'alpha_vantage'],
   crypto: ['yfinance', 'fmp', 'tiingo'],
   currency: ['yfinance', 'fmp', 'tiingo'],
+  newsCompany: ['yfinance', 'fmp', 'benzinga', 'intrinio'],
+  newsWorld: ['fmp', 'benzinga', 'tiingo', 'biztoc', 'intrinio'],
 }
 
 const ASSET_LABELS: Record<string, string> = {
   equity: 'Equity',
   crypto: 'Crypto',
   currency: 'Currency',
+  newsCompany: 'News (Company)',
+  newsWorld: 'News (World)',
 }
 
-interface SectionProps {
+interface ConnectionSectionProps {
   openbb: OpenbbConfig
   onChange: (patch: Partial<OpenbbConfig>) => void
   onChangeImmediate: (patch: Partial<OpenbbConfig>) => void
 }
 
-function ConnectionSection({ openbb, onChange, onChangeImmediate }: SectionProps) {
+function ConnectionSection({ openbb, onChange, onChangeImmediate }: ConnectionSectionProps) {
   const [testing, setTesting] = useState(false)
   const [testStatus, setTestStatus] = useState<'idle' | 'ok' | 'error'>('idle')
 
   const apiUrl = (openbb.apiUrl as string) || 'http://localhost:6900'
-  const providers = (openbb.providers ?? { equity: 'yfinance', crypto: 'yfinance', currency: 'yfinance' }) as Record<string, string>
+  const providers = (openbb.providers ?? { equity: 'yfinance', crypto: 'yfinance', currency: 'yfinance', newsCompany: 'yfinance', newsWorld: 'fmp' }) as Record<string, string>
 
   const testConnection = async () => {
     setTesting(true)
@@ -150,11 +94,10 @@ function ConnectionSection({ openbb, onChange, onChangeImmediate }: SectionProps
   }
 
   return (
-    <div>
-      <SectionHeader
-        title="Connection"
-        description="OpenBB sidecar API connection. Unless you changed the default setup, these should work as-is."
-      />
+    <Section
+      title="Connection"
+      description="OpenBB sidecar API connection. Unless you changed the default setup, these should work as-is."
+    >
       <Field label="API URL">
         <input
           className={inputClass}
@@ -203,7 +146,7 @@ function ConnectionSection({ openbb, onChange, onChangeImmediate }: SectionProps
           <div className={`w-2 h-2 rounded-full ${testStatus === 'ok' ? 'bg-green' : 'bg-red'}`} />
         )}
       </div>
-    </div>
+    </Section>
   )
 }
 
@@ -217,7 +160,10 @@ const FREE_PROVIDERS = [
 ] as const
 
 const PAID_PROVIDERS = [
-  { key: 'fmp', name: 'FMP', desc: 'Financial Modeling Prep — financial statements, fundamentals, economic calendar.', hint: 'Freemium — 250 req/day free at financialmodelingprep.com' },
+  { key: 'fmp', name: 'FMP', desc: 'Financial Modeling Prep — financial statements, fundamentals, economic calendar, news.', hint: 'Freemium — 250 req/day free at financialmodelingprep.com' },
+  { key: 'benzinga', name: 'Benzinga', desc: 'Real-time news, analyst ratings and price targets.', hint: 'Paid — plans at benzinga.com' },
+  { key: 'tiingo', name: 'Tiingo', desc: 'News and historical market data.', hint: 'Freemium — free tier at tiingo.com' },
+  { key: 'biztoc', name: 'Biztoc', desc: 'Aggregated business and finance news.', hint: 'Freemium — register at biztoc.com' },
   { key: 'nasdaq', name: 'Nasdaq', desc: 'Nasdaq Data Link — dividend/earnings calendars, short interest.', hint: 'Freemium — sign up at data.nasdaq.com' },
   { key: 'intrinio', name: 'Intrinio', desc: 'Equity fundamentals, options data, institutional ownership.', hint: 'Paid — free trial at intrinio.com' },
   { key: 'tradingeconomics', name: 'Trading Economics', desc: 'Global economic calendar, 20M+ indicators across 196 countries.', hint: 'Paid — plans at tradingeconomics.com' },
@@ -243,7 +189,6 @@ function ProviderKeysSection({
   const setKey = (k: string, v: string) => {
     setKeys((prev) => ({ ...prev, [k]: v }))
     setTestStatus((prev) => ({ ...prev, [k]: 'idle' }))
-    // Build providerKeys from updated keys
     const updated = { ...keys, [k]: v }
     const providerKeys: Record<string, string> = {}
     for (const [key, val] of Object.entries(updated)) {

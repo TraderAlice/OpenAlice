@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { readFile, writeFile, mkdir } from 'fs/promises'
 import { resolve } from 'path'
+import { newsCollectorSchema } from '../extension/news-collector/config.js'
 
 const CONFIG_DIR = resolve('data/config')
 
@@ -10,9 +11,6 @@ const engineSchema = z.object({
   pairs: z.array(z.string()).min(1).default(['BTC/USD', 'ETH/USD', 'SOL/USD']),
   interval: z.number().int().positive().default(5000),
   port: z.number().int().positive().default(3000),
-  mcpPort: z.number().int().positive().default(3001),
-  askMcpPort: z.number().int().positive().optional(),
-  webPort: z.number().int().positive().default(3002),
 })
 
 const modelSchema = z.object({
@@ -107,10 +105,14 @@ const openbbSchema = z.object({
     equity: z.string().default('yfinance'),
     crypto: z.string().default('yfinance'),
     currency: z.string().default('yfinance'),
+    newsCompany: z.string().default('yfinance'),
+    newsWorld: z.string().default('fmp'),
   }).default({
     equity: 'yfinance',
     crypto: 'yfinance',
     currency: 'yfinance',
+    newsCompany: 'yfinance',
+    newsWorld: 'fmp',
   }),
   providerKeys: z.object({
     fred: z.string().optional(),
@@ -121,6 +123,9 @@ const openbbSchema = z.object({
     tradingeconomics: z.string().optional(),
     econdb: z.string().optional(),
     intrinio: z.string().optional(),
+    benzinga: z.string().optional(),
+    tiingo: z.string().optional(),
+    biztoc: z.string().optional(),
   }).default({}),
 })
 
@@ -147,10 +152,21 @@ const apiKeysSchema = z.object({
   google: z.string().optional(),
 })
 
-const telegramSchema = z.object({
-  botToken: z.string().optional(),
-  botUsername: z.string().optional(),
-  chatIds: z.array(z.number()).default([]),
+const connectorsSchema = z.object({
+  web: z.object({ port: z.number().int().positive().default(3002) }).default({ port: 3002 }),
+  mcp: z.object({
+    port: z.number().int().positive().default(3001),
+  }).default({ port: 3001 }),
+  mcpAsk: z.object({
+    enabled: z.boolean().default(false),
+    port: z.number().int().positive().optional(),
+  }).default({ enabled: false }),
+  telegram: z.object({
+    enabled: z.boolean().default(false),
+    botToken: z.string().optional(),
+    botUsername: z.string().optional(),
+    chatIds: z.array(z.number()).default([]),
+  }).default({ enabled: false, chatIds: [] }),
 })
 
 const heartbeatSchema = z.object({
@@ -173,7 +189,8 @@ export type Config = {
   aiProvider: z.infer<typeof aiProviderSchema>
   heartbeat: z.infer<typeof heartbeatSchema>
   apiKeys: z.infer<typeof apiKeysSchema>
-  telegram: z.infer<typeof telegramSchema>
+  connectors: z.infer<typeof connectorsSchema>
+  newsCollector: z.infer<typeof newsCollectorSchema>
 }
 
 // ==================== Loader ====================
@@ -201,8 +218,31 @@ async function parseAndSeed<T>(filename: string, schema: z.ZodType<T>, raw: unkn
 }
 
 export async function loadConfig(): Promise<Config> {
-  const files = ['engine.json', 'model.json', 'agent.json', 'crypto.json', 'securities.json', 'openbb.json', 'compaction.json', 'ai-provider.json', 'heartbeat.json', 'api-keys.json', 'telegram.json'] as const
+  const files = ['engine.json', 'model.json', 'agent.json', 'crypto.json', 'securities.json', 'openbb.json', 'compaction.json', 'ai-provider.json', 'heartbeat.json', 'api-keys.json', 'connectors.json', 'news-collector.json'] as const
   const raws = await Promise.all(files.map((f) => loadJsonFile(f)))
+
+  // ---------- Migration: consolidate old telegram.json + engine port fields ----------
+  const connectorsRaw = raws[10] as Record<string, unknown> | undefined
+  if (connectorsRaw === undefined) {
+    // First load after upgrade — migrate from old locations
+    const oldTelegram = await loadJsonFile('telegram.json')
+    const oldEngine = raws[0] as Record<string, unknown> | undefined
+    const migrated: Record<string, unknown> = {}
+    if (oldTelegram && typeof oldTelegram === 'object') {
+      migrated.telegram = { ...(oldTelegram as Record<string, unknown>), enabled: true }
+    }
+    if (oldEngine) {
+      if (oldEngine.webPort !== undefined) migrated.web = { port: oldEngine.webPort }
+      if (oldEngine.mcpPort !== undefined) migrated.mcp = { port: oldEngine.mcpPort }
+      if (oldEngine.askMcpPort !== undefined) migrated.mcpAsk = { enabled: true, port: oldEngine.askMcpPort }
+      // Strip migrated fields from engine.json
+      const { mcpPort: _m, askMcpPort: _a, webPort: _w, ...cleanEngine } = oldEngine
+      raws[0] = cleanEngine
+      await mkdir(CONFIG_DIR, { recursive: true })
+      await writeFile(resolve(CONFIG_DIR, 'engine.json'), JSON.stringify(cleanEngine, null, 2) + '\n')
+    }
+    raws[10] = Object.keys(migrated).length > 0 ? migrated : undefined
+  }
 
   return {
     engine:     await parseAndSeed(files[0], engineSchema, raws[0]),
@@ -215,7 +255,8 @@ export async function loadConfig(): Promise<Config> {
     aiProvider: await parseAndSeed(files[7], aiProviderSchema, raws[7]),
     heartbeat:  await parseAndSeed(files[8], heartbeatSchema, raws[8]),
     apiKeys:    await parseAndSeed(files[9], apiKeysSchema, raws[9]),
-    telegram:   await parseAndSeed(files[10], telegramSchema, raws[10]),
+    connectors: await parseAndSeed(files[10], connectorsSchema, raws[10]),
+    newsCollector: await parseAndSeed(files[11], newsCollectorSchema, raws[11]),
   }
 }
 
@@ -276,7 +317,8 @@ const sectionSchemas: Record<ConfigSection, z.ZodTypeAny> = {
   aiProvider: aiProviderSchema,
   heartbeat: heartbeatSchema,
   apiKeys: apiKeysSchema,
-  telegram: telegramSchema,
+  connectors: connectorsSchema,
+  newsCollector: newsCollectorSchema,
 }
 
 const sectionFiles: Record<ConfigSection, string> = {
@@ -290,8 +332,12 @@ const sectionFiles: Record<ConfigSection, string> = {
   aiProvider: 'ai-provider.json',
   heartbeat: 'heartbeat.json',
   apiKeys: 'api-keys.json',
-  telegram: 'telegram.json',
+  connectors: 'connectors.json',
+  newsCollector: 'news-collector.json',
 }
+
+/** All valid config section names (derived from sectionSchemas). */
+export const validSections = Object.keys(sectionSchemas) as ConfigSection[]
 
 /** Validate and write a config section to disk. Returns the validated config. */
 export async function writeConfigSection(section: ConfigSection, data: unknown): Promise<unknown> {
