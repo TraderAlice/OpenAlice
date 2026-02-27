@@ -459,9 +459,10 @@ async function main() {
         changes.push('telegram started')
       }
 
-      const msg = changes.length > 0 ? changes.join(', ') : 'no changes'
-      console.log(`reconnect: connectors — ${msg}`)
-      return { success: true, message: msg }
+      if (changes.length > 0) {
+        console.log(`reconnect: connectors — ${changes.join(', ')}`)
+      }
+      return { success: true, message: changes.length > 0 ? changes.join(', ') : 'no changes' }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       console.error('reconnect: connectors failed:', msg)
