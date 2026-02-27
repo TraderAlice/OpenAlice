@@ -4,8 +4,8 @@ import { MockLanguageModelV3 } from 'ai/test'
 import { Engine } from './engine.js'
 import { AgentCenter } from './agent-center.js'
 import { DEFAULT_COMPACTION_CONFIG, type CompactionConfig } from './compaction.js'
-import { createAgent } from '../providers/vercel-ai-sdk/index.js'
 import { VercelAIProvider } from '../providers/vercel-ai-sdk/vercel-provider.js'
+import { createModelFromConfig } from './model-factory.js'
 import type { SessionStore, SessionEntry } from './session.js'
 
 // ==================== Helpers ====================
@@ -42,8 +42,8 @@ function makeEngine(overrides: MakeEngineOpts = {}): Engine {
   const maxSteps = overrides.maxSteps ?? 1
   const compaction = overrides.compaction ?? DEFAULT_COMPACTION_CONFIG
 
-  const agent = createAgent(model, tools, instructions, maxSteps)
-  const provider = new VercelAIProvider(agent, compaction)
+  vi.mocked(createModelFromConfig).mockResolvedValue({ model, key: 'test:mock-model' })
+  const provider = new VercelAIProvider(() => tools, instructions, maxSteps, compaction)
   const agentCenter = new AgentCenter(provider)
 
   return new Engine({ agentCenter })
@@ -85,6 +85,12 @@ function makeSessionMock(entries: SessionEntry[] = []): SessionStore {
     exists: vi.fn(async () => store.length > 0),
   } as unknown as SessionStore
 }
+
+// ==================== Mock model-factory ====================
+
+vi.mock('./model-factory.js', () => ({
+  createModelFromConfig: vi.fn(),
+}))
 
 // ==================== Mock compaction ====================
 
