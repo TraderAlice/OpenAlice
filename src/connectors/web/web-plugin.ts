@@ -40,7 +40,9 @@ export class WebPlugin implements Plugin {
     // ==================== Mount route modules ====================
     app.route('/api/chat', createChatRoutes({ ctx, session, sseClients: this.sseClients, mediaMap }))
     app.route('/api/media', createMediaRoutes(mediaMap))
-    app.route('/api/config', createConfigRoutes())
+    app.route('/api/config', createConfigRoutes({
+      onConnectorsChange: async () => { await ctx.reconnectConnectors?.() },
+    }))
     app.route('/api/openbb', createOpenbbRoutes())
     app.route('/api/events', createEventsRoutes(ctx))
     app.route('/api/cron', createCronRoutes(ctx))

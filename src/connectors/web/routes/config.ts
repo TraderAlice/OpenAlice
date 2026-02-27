@@ -2,8 +2,12 @@ import { Hono } from 'hono'
 import { loadConfig, writeConfigSection, readApiKeysConfig, readOpenbbConfig, type ConfigSection } from '../../../core/config.js'
 import { readAIConfig, writeAIConfig, type AIProvider } from '../../../core/ai-config.js'
 
+interface ConfigRouteOpts {
+  onConnectorsChange?: () => Promise<void>
+}
+
 /** Config routes: GET /, PUT /ai-provider, PUT /:section, GET /api-keys/status */
-export function createConfigRoutes() {
+export function createConfigRoutes(opts?: ConfigRouteOpts) {
   const app = new Hono()
 
   app.get('/', async (c) => {
@@ -38,6 +42,10 @@ export function createConfigRoutes() {
       }
       const body = await c.req.json()
       const validated = await writeConfigSection(section, body)
+      // Hot-reload connectors when their config changes
+      if (section === 'connectors') {
+        await opts?.onConnectorsChange?.()
+      }
       return c.json(validated)
     } catch (err) {
       if (err instanceof Error && err.name === 'ZodError') {

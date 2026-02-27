@@ -391,39 +391,96 @@ async function main() {
 
   // ==================== Plugins ====================
 
-  const plugins: Plugin[] = [new HttpPlugin()]
+  // Core plugins — always-on, not toggleable at runtime
+  const corePlugins: Plugin[] = [new HttpPlugin()]
 
   // MCP Server is always active when a port is set — Claude Code provider depends on it for tools
   if (config.connectors.mcp.port) {
-    plugins.push(new McpPlugin(toolCenter.getMcpTools(), config.connectors.mcp.port))
-  }
-
-  if (config.connectors.mcpAsk.enabled && config.connectors.mcpAsk.port) {
-    plugins.push(new McpAskPlugin({ port: config.connectors.mcpAsk.port }))
+    corePlugins.push(new McpPlugin(toolCenter.getMcpTools(), config.connectors.mcp.port))
   }
 
   // Web UI is always active (no enabled flag)
   if (config.connectors.web.port) {
-    plugins.push(new WebPlugin({ port: config.connectors.web.port }))
+    corePlugins.push(new WebPlugin({ port: config.connectors.web.port }))
+  }
+
+  // Optional plugins — toggleable at runtime via reconnectConnectors()
+  const optionalPlugins = new Map<string, Plugin>()
+
+  if (config.connectors.mcpAsk.enabled && config.connectors.mcpAsk.port) {
+    optionalPlugins.set('mcp-ask', new McpAskPlugin({ port: config.connectors.mcpAsk.port }))
   }
 
   if (config.connectors.telegram.enabled && config.connectors.telegram.botToken) {
-    plugins.push(new TelegramPlugin({
+    optionalPlugins.set('telegram', new TelegramPlugin({
       token: config.connectors.telegram.botToken,
       allowedChatIds: config.connectors.telegram.chatIds,
     }))
   }
 
+  // ==================== Connector Reconnect ====================
+
+  let connectorsReconnecting = false
+  const reconnectConnectors = async (): Promise<ReconnectResult> => {
+    if (connectorsReconnecting) return { success: false, error: 'Reconnect already in progress' }
+    connectorsReconnecting = true
+    try {
+      const fresh = await loadConfig()
+      const changes: string[] = []
+
+      // --- MCP Ask ---
+      const mcpAskWanted = fresh.connectors.mcpAsk.enabled && !!fresh.connectors.mcpAsk.port
+      const mcpAskRunning = optionalPlugins.has('mcp-ask')
+      if (mcpAskRunning && !mcpAskWanted) {
+        await optionalPlugins.get('mcp-ask')!.stop()
+        optionalPlugins.delete('mcp-ask')
+        changes.push('mcp-ask stopped')
+      } else if (!mcpAskRunning && mcpAskWanted) {
+        const p = new McpAskPlugin({ port: fresh.connectors.mcpAsk.port! })
+        await p.start(ctx)
+        optionalPlugins.set('mcp-ask', p)
+        changes.push('mcp-ask started')
+      }
+
+      // --- Telegram ---
+      const telegramWanted = fresh.connectors.telegram.enabled && !!fresh.connectors.telegram.botToken
+      const telegramRunning = optionalPlugins.has('telegram')
+      if (telegramRunning && !telegramWanted) {
+        await optionalPlugins.get('telegram')!.stop()
+        optionalPlugins.delete('telegram')
+        changes.push('telegram stopped')
+      } else if (!telegramRunning && telegramWanted) {
+        const p = new TelegramPlugin({
+          token: fresh.connectors.telegram.botToken!,
+          allowedChatIds: fresh.connectors.telegram.chatIds,
+        })
+        await p.start(ctx)
+        optionalPlugins.set('telegram', p)
+        changes.push('telegram started')
+      }
+
+      const msg = changes.length > 0 ? changes.join(', ') : 'no changes'
+      console.log(`reconnect: connectors — ${msg}`)
+      return { success: true, message: msg }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error('reconnect: connectors failed:', msg)
+      return { success: false, error: msg }
+    } finally {
+      connectorsReconnecting = false
+    }
+  }
+
   const ctx: EngineContext = {
     config, engine, cryptoEngine: null, eventLog, heartbeat, cronEngine,
-    reconnectCrypto, reconnectSecurities,
+    reconnectCrypto, reconnectSecurities, reconnectConnectors,
     getCryptoEngine: () => cryptoResultRef?.engine ?? null,
     getSecuritiesEngine: () => secResultRef?.engine ?? null,
     getCryptoWallet: () => currentCryptoWallet,
     getSecWallet: () => currentSecWallet,
   }
 
-  for (const plugin of plugins) {
+  for (const plugin of [...corePlugins, ...optionalPlugins.values()]) {
     await plugin.start(ctx)
     console.log(`plugin started: ${plugin.name}`)
   }
@@ -462,7 +519,7 @@ async function main() {
     heartbeat.stop()
     cronListener.stop()
     cronEngine.stop()
-    for (const plugin of plugins) {
+    for (const plugin of [...corePlugins, ...optionalPlugins.values()]) {
       await plugin.stop()
     }
     await newsStore.close()

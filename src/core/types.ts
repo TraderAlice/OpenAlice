@@ -29,6 +29,7 @@ export interface EngineContext {
   cronEngine: CronEngine
   reconnectCrypto?: () => Promise<ReconnectResult>
   reconnectSecurities?: () => Promise<ReconnectResult>
+  reconnectConnectors?: () => Promise<ReconnectResult>
   /** Current crypto trading engine (updates on reconnect). */
   getCryptoEngine?: () => ICryptoTradingEngine | null
   /** Current securities trading engine (updates on reconnect). */
