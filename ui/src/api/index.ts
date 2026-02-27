@@ -40,4 +40,6 @@ export type {
   WalletCommitLog,
   ReconnectResult,
   ConnectorsConfig,
+  NewsCollectorConfig,
+  NewsCollectorFeed,
 } from './types'
