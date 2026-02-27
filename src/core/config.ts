@@ -154,9 +154,8 @@ const apiKeysSchema = z.object({
 const connectorsSchema = z.object({
   web: z.object({ port: z.number().int().positive().default(3002) }).default({ port: 3002 }),
   mcp: z.object({
-    enabled: z.boolean().default(false),
     port: z.number().int().positive().optional(),
-  }).default({ enabled: false }),
+  }).default({}),
   mcpAsk: z.object({
     enabled: z.boolean().default(false),
     port: z.number().int().positive().optional(),

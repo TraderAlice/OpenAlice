@@ -11,21 +11,19 @@ export function ConnectorsPage() {
       extract: (full: AppConfig) => full.connectors,
     })
 
-  // Derive selected connector IDs from enabled flags (web is always included)
+  // Derive selected connector IDs from enabled flags (web + mcp are always included)
   const selected = config
     ? [
         'web',
-        ...(config.mcp.enabled ? ['mcp'] : []),
+        'mcp',
         ...(config.mcpAsk.enabled ? ['mcpAsk'] : []),
         ...(config.telegram.enabled ? ['telegram'] : []),
       ]
-    : ['web']
+    : ['web', 'mcp']
 
   const handleToggle = (id: string) => {
     if (!config) return
-    if (id === 'mcp') {
-      updateConfigImmediate({ mcp: { ...config.mcp, enabled: !config.mcp.enabled } })
-    } else if (id === 'mcpAsk') {
+    if (id === 'mcpAsk') {
       updateConfigImmediate({ mcpAsk: { ...config.mcpAsk, enabled: !config.mcpAsk.enabled } })
     } else if (id === 'telegram') {
       updateConfigImmediate({ telegram: { ...config.telegram, enabled: !config.telegram.enabled } })
@@ -54,7 +52,7 @@ export function ConnectorsPage() {
             {/* Connector selector cards */}
             <Section
               title="Active Connectors"
-              description="Select which connectors to enable. Web UI is always active."
+              description="Select which connectors to enable. Web UI and MCP Server are always active."
             >
               <SDKSelector
                 options={CONNECTOR_OPTIONS}
@@ -78,26 +76,24 @@ export function ConnectorsPage() {
               </Field>
             </Section>
 
-            {/* MCP Server config */}
-            {config.mcp.enabled && (
-              <Section
-                title="MCP Server"
-                description="Exposes tools via MCP for external AI agents."
-              >
-                <Field label="Port">
-                  <input
-                    className={inputClass}
-                    type="number"
-                    value={config.mcp.port ?? ''}
-                    onChange={(e) => {
-                      const v = e.target.value
-                      updateConfig({ mcp: { ...config.mcp, port: v ? Number(v) : undefined } })
-                    }}
-                    placeholder="e.g. 3001"
-                  />
-                </Field>
-              </Section>
-            )}
+            {/* MCP Server config — always shown */}
+            <Section
+              title="MCP Server"
+              description="Tool bridge for Claude Code provider and external AI agents."
+            >
+              <Field label="Port">
+                <input
+                  className={inputClass}
+                  type="number"
+                  value={config.mcp.port ?? ''}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    updateConfig({ mcp: { port: v ? Number(v) : undefined } })
+                  }}
+                  placeholder="e.g. 3001"
+                />
+              </Field>
+            </Section>
 
             {/* MCP Ask config */}
             {config.mcpAsk.enabled && (

@@ -201,9 +201,10 @@ export const CONNECTOR_OPTIONS: SDKOption[] = [
   {
     id: 'mcp',
     name: 'MCP Server',
-    description: 'Exposes tools via Model Context Protocol for external AI agents.',
+    description: 'Tool bridge for Claude Code provider and external AI agents.',
     badge: 'MC',
     badgeColor: 'text-purple',
+    locked: true,
   },
   {
     id: 'mcpAsk',

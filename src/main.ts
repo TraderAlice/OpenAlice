@@ -364,7 +364,8 @@ async function main() {
 
   const plugins: Plugin[] = [new HttpPlugin()]
 
-  if (config.connectors.mcp.enabled && config.connectors.mcp.port) {
+  // MCP Server is always active when a port is set — Claude Code provider depends on it for tools
+  if (config.connectors.mcp.port) {
     plugins.push(new McpPlugin(toolCenter.getMcpTools(), config.connectors.mcp.port))
   }
 

@@ -36,7 +36,7 @@ export interface AppConfig {
 
 export interface ConnectorsConfig {
   web: { port: number }
-  mcp: { enabled: boolean; port?: number }
+  mcp: { port?: number }
   mcpAsk: { enabled: boolean; port?: number }
   telegram: {
     enabled: boolean
