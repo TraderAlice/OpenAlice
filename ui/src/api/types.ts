@@ -46,6 +46,24 @@ export interface ConnectorsConfig {
   }
 }
 
+// ==================== News Collector ====================
+
+export interface NewsCollectorFeed {
+  name: string
+  url: string
+  source: string
+  categories?: string[]
+}
+
+export interface NewsCollectorConfig {
+  enabled: boolean
+  intervalMinutes: number
+  maxInMemory: number
+  retentionDays: number
+  piggybackOpenBB: boolean
+  feeds: NewsCollectorFeed[]
+}
+
 // ==================== Events ====================
 
 export interface EventLogEntry {

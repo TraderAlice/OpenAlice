@@ -189,6 +189,23 @@ export const SECURITIES_SDK_OPTIONS: SDKOption[] = [
   },
 ]
 
+export const DATASOURCE_OPTIONS: SDKOption[] = [
+  {
+    id: 'openbb',
+    name: 'OpenBB',
+    description: 'Market data, financials, and economic indicators via OpenBB sidecar API.',
+    badge: 'OB',
+    badgeColor: 'text-green',
+  },
+  {
+    id: 'newsCollector',
+    name: 'News Collector',
+    description: 'RSS/Atom feed aggregation for crypto and financial news.',
+    badge: 'NC',
+    badgeColor: 'text-purple',
+  },
+]
+
 export const CONNECTOR_OPTIONS: SDKOption[] = [
   {
     id: 'web',

@@ -16,15 +16,25 @@ export interface ParsedFeedItem {
 
 /**
  * Fetch a feed URL and return parsed items.
+ * Retries once after a 2s delay on failure.
  */
-export async function fetchAndParseFeed(url: string): Promise<ParsedFeedItem[]> {
-  const res = await fetch(url, {
-    signal: AbortSignal.timeout(15_000),
-    headers: { 'User-Agent': 'OpenAlice/1.0 NewsCollector' },
-  })
-  if (!res.ok) throw new Error(`RSS fetch failed: ${res.status} ${res.statusText}`)
-  const xml = await res.text()
-  return parseRSSXml(xml)
+export async function fetchAndParseFeed(url: string, retries = 1): Promise<ParsedFeedItem[]> {
+  let lastError: unknown
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url, {
+        signal: AbortSignal.timeout(15_000),
+        headers: { 'User-Agent': 'OpenAlice/1.0 NewsCollector' },
+      })
+      if (!res.ok) throw new Error(`RSS fetch failed: ${res.status} ${res.statusText}`)
+      const xml = await res.text()
+      return parseRSSXml(xml)
+    } catch (err) {
+      lastError = err
+      if (attempt < retries) await new Promise((r) => setTimeout(r, 2000))
+    }
+  }
+  throw lastError
 }
 
 /**

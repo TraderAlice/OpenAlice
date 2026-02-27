@@ -7,19 +7,31 @@
  * - Recover from file on startup
  * - Dedup set survives restarts
  *
- * Implements INewsProvider so archive-analysis tools (globNews/grepNews/readNews) work.
+ * Implements INewsProvider so globNews/grepNews/readNews tools work.
  */
 
 import { appendFile, readFile, mkdir } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { dirname } from 'node:path'
-import type { INewsProvider, GetNewsV2Options, NewsItem } from '../archive-analysis/data/interfaces.js'
-import { parseLookback } from '../archive-analysis/data/RealNewsProvider.js'
-import type { NewsRecord } from './types.js'
+import type { INewsProvider, GetNewsV2Options, NewsItem, NewsRecord } from './types.js'
 
 const DEFAULT_LOG_PATH = 'data/news-collector/news.jsonl'
 const DEFAULT_MAX_IN_MEMORY = 2000
 const DEFAULT_RETENTION_DAYS = 7
+
+/**
+ * Parse a semantic time string into milliseconds.
+ * Supported formats: 1h, 2h, 12h, 24h, 1d, 2d, 7d, 30d
+ */
+export function parseLookback(lookback: string): number | null {
+  const match = lookback.match(/^(\d+)(h|d)$/i)
+  if (!match) return null
+  const value = parseInt(match[1], 10)
+  const unit = match[2].toLowerCase()
+  if (unit === 'h') return value * 60 * 60 * 1000
+  if (unit === 'd') return value * 24 * 60 * 60 * 1000
+  return null
+}
 
 export interface NewsCollectorStoreOpts {
   logPath?: string

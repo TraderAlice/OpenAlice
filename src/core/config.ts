@@ -100,6 +100,7 @@ const securitiesSchema = z.object({
 })
 
 const openbbSchema = z.object({
+  enabled: z.boolean().default(true),
   apiUrl: z.string().default('http://localhost:6900'),
   providers: z.object({
     equity: z.string().default('yfinance'),
