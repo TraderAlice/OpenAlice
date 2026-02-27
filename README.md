@@ -112,7 +112,8 @@ graph LR
   CRON --> EL
   HB --> CRON
   EL --> CRON
-  CR --> WEB & TG
+  CR --> WEB
+  CR --> TG
   WEB --> E
   TG --> E
   HTTP --> E
