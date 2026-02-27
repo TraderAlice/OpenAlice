@@ -9,10 +9,8 @@ export type {
   CryptoOrder,
   CryptoPosition,
   CryptoAccountInfo,
-  CryptoAllowedSymbol,
   SymbolPrecision,
 } from './interfaces';
-export { CRYPTO_ALLOWED_SYMBOLS, initCryptoAllowedSymbols } from './interfaces';
 
 // Wallet domain
 export { Wallet } from './wallet/Wallet';

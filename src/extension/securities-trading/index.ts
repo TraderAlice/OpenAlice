@@ -11,7 +11,6 @@ export type {
   SecAccountInfo,
   MarketClock,
 } from './interfaces';
-export { SEC_ALLOWED_SYMBOLS, initSecAllowedSymbols } from './interfaces';
 
 // Wallet domain
 export { SecWallet } from './wallet/SecWallet';

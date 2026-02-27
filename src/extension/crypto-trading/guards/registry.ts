@@ -2,11 +2,13 @@ import type { OperationGuard, GuardRegistryEntry } from './types.js';
 import { MaxPositionSizeGuard } from './max-position-size.js';
 import { MaxLeverageGuard } from './max-leverage.js';
 import { CooldownGuard } from './cooldown.js';
+import { SymbolWhitelistGuard } from './symbol-whitelist.js';
 
 const builtinGuards: GuardRegistryEntry[] = [
   { type: 'max-position-size', create: (opts) => new MaxPositionSizeGuard(opts) },
   { type: 'max-leverage',      create: (opts) => new MaxLeverageGuard(opts) },
   { type: 'cooldown',          create: (opts) => new CooldownGuard(opts) },
+  { type: 'symbol-whitelist',  create: (opts) => new SymbolWhitelistGuard(opts) },
 ];
 
 const registry = new Map<string, GuardRegistryEntry['create']>(

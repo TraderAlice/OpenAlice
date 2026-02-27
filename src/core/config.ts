@@ -44,10 +44,6 @@ const agentSchema = z.object({
 })
 
 const cryptoSchema = z.object({
-  allowedSymbols: z.array(z.string()).min(1).default([
-    'BTC/USD', 'ETH/USD', 'SOL/USD', 'BNB/USD', 'APT/USD',
-    'SUI/USD', 'HYPE/USD', 'DOGE/USD', 'XRP/USD',
-  ]),
   provider: z.discriminatedUnion('type', [
     z.object({
       type: z.literal('ccxt'),
@@ -78,10 +74,6 @@ const cryptoSchema = z.object({
 })
 
 const securitiesSchema = z.object({
-  allowedSymbols: z.array(z.string()).default([
-    'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA',
-    'SPY', 'QQQ',
-  ]),
   provider: z.discriminatedUnion('type', [
     z.object({
       type: z.literal('alpaca'),

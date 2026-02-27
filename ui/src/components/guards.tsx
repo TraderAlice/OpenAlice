@@ -21,18 +21,21 @@ export const CRYPTO_GUARD_TYPES: GuardType[] = [
   { type: 'max-position-size', label: 'Max Position Size', desc: 'Limits each position as a percentage of account equity.' },
   { type: 'max-leverage', label: 'Max Leverage', desc: 'Caps leverage for all symbols, with optional per-symbol overrides.' },
   { type: 'cooldown', label: 'Cooldown', desc: 'Enforces a minimum interval between trades on the same symbol.' },
+  { type: 'symbol-whitelist', label: 'Symbol Whitelist', desc: 'Restricts trading to a specific set of symbols.' },
 ]
 
 /** Securities guards (no max-leverage) */
 export const SECURITIES_GUARD_TYPES: GuardType[] = [
   { type: 'max-position-size', label: 'Max Position Size', desc: 'Limits each position as a percentage of account equity.' },
   { type: 'cooldown', label: 'Cooldown', desc: 'Enforces a minimum interval between trades on the same symbol.' },
+  { type: 'symbol-whitelist', label: 'Symbol Whitelist', desc: 'Restricts trading to a specific set of symbols.' },
 ]
 
 const GUARD_DEFAULTS: Record<string, Record<string, unknown>> = {
   'max-position-size': { maxPercentOfEquity: 25 },
   'max-leverage': { maxLeverage: 10 },
   cooldown: { minIntervalMs: 60000 },
+  'symbol-whitelist': { symbols: [] },
 }
 
 // ==================== Summary ====================
@@ -50,6 +53,10 @@ export function guardSummary(g: GuardEntry): string {
     case 'cooldown': {
       const ms = Number(g.options.minIntervalMs ?? 60000)
       return `${Math.round(ms / 1000)}s`
+    }
+    case 'symbol-whitelist': {
+      const symbols = (g.options.symbols as string[] | undefined) ?? []
+      return symbols.length === 0 ? 'none' : `${symbols.length} symbols`
     }
     default:
       return g.type
@@ -242,6 +249,8 @@ function GuardOptionsEditor({
       return <MaxLeverageEditor options={options} onChange={onChange} />
     case 'cooldown':
       return <CooldownEditor options={options} onChange={onChange} />
+    case 'symbol-whitelist':
+      return <SymbolWhitelistEditor options={options} onChange={onChange} />
     default:
       return <GenericEditor options={options} onChange={onChange} />
   }
@@ -304,6 +313,29 @@ function CooldownEditor({ options, onChange }: EditorProps) {
       />
       <p className="text-[10px] text-text-muted/60 mt-1">
         Minimum seconds between trades on the same symbol.
+      </p>
+    </Field>
+  )
+}
+
+function SymbolWhitelistEditor({ options, onChange }: EditorProps) {
+  const symbols = (options.symbols as string[] | undefined) ?? []
+  const value = symbols.join(', ')
+  return (
+    <Field label="Allowed Symbols">
+      <input
+        className={inputClass}
+        type="text"
+        placeholder="BTC/USD, ETH/USD, SOL/USD"
+        value={value}
+        onChange={(e) => {
+          const raw = e.target.value
+          const parsed = raw.split(',').map((s) => s.trim()).filter(Boolean)
+          onChange({ ...options, symbols: parsed })
+        }}
+      />
+      <p className="text-[10px] text-text-muted/60 mt-1">
+        Comma-separated list of symbols allowed for trading.
       </p>
     </Field>
   )

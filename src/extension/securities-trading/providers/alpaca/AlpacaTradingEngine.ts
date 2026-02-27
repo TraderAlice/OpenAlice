@@ -27,7 +27,6 @@ export interface AlpacaTradingEngineConfig {
   apiKey: string;
   secretKey: string;
   paper: boolean;
-  allowedSymbols: string[];
 }
 
 // Alpaca SDK response shapes (SDK types are all `any`)
@@ -104,7 +103,7 @@ export class AlpacaTradingEngine implements ISecuritiesTradingEngine {
     // Verify connection by fetching account
     const account = await this.client.getAccount() as AlpacaAccountRaw;
     console.log(
-      `Alpaca: connected (paper=${this.config.paper}, equity=$${parseFloat(account.equity).toFixed(2)}, symbols=${this.config.allowedSymbols.length})`,
+      `Alpaca: connected (paper=${this.config.paper}, equity=$${parseFloat(account.equity).toFixed(2)})`,
     );
   }
 
@@ -157,9 +156,7 @@ export class AlpacaTradingEngine implements ISecuritiesTradingEngine {
   async getPortfolio(): Promise<SecHolding[]> {
     const positions = await this.client.getPositions() as AlpacaPositionRaw[];
 
-    return positions
-      .filter(p => this.config.allowedSymbols.length === 0 || this.config.allowedSymbols.includes(p.symbol))
-      .map(p => ({
+    return positions.map(p => ({
         symbol: p.symbol,
         side: p.side === 'long' ? 'long' as const : 'short' as const,
         qty: parseFloat(p.qty),
@@ -183,9 +180,7 @@ export class AlpacaTradingEngine implements ISecuritiesTradingEngine {
       symbols: undefined,
     }) as AlpacaOrderRaw[];
 
-    return orders
-      .filter(o => this.config.allowedSymbols.length === 0 || this.config.allowedSymbols.includes(o.symbol))
-      .map(o => this.mapOrder(o));
+    return orders.map(o => this.mapOrder(o));
   }
 
   async getAccount(): Promise<SecAccountInfo> {

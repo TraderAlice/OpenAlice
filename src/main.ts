@@ -12,7 +12,6 @@ import { createThinkingTools } from './extension/thinking-kit/index.js'
 import type { WalletExportState } from './extension/crypto-trading/index.js'
 import {
   Wallet,
-  initCryptoAllowedSymbols,
   createCryptoTradingEngine,
   createCryptoTradingTools,
   createCryptoOperationDispatcher,
@@ -23,7 +22,6 @@ import {
 import type { SecOperation, SecWalletExportState } from './extension/securities-trading/index.js'
 import {
   SecWallet,
-  initSecAllowedSymbols,
   createSecuritiesTradingEngine,
   createSecuritiesTradingTools,
   createSecOperationDispatcher,
@@ -81,10 +79,6 @@ async function main() {
   const config = await loadConfig()
 
   // ==================== Infrastructure ====================
-
-  // Initialize crypto trading symbol whitelist from config
-  initCryptoAllowedSymbols(config.crypto.allowedSymbols)
-  initSecAllowedSymbols(config.securities.allowedSymbols)
 
   // Start CCXT init in background — do NOT await here, letting everything else proceed immediately
   const cryptoInitPromise = createCryptoTradingEngine(config).catch((err) => {
@@ -312,7 +306,6 @@ async function main() {
     cryptoReconnecting = true
     try {
       const freshConfig = await loadConfig()
-      initCryptoAllowedSymbols(freshConfig.crypto.allowedSymbols)
 
       // Create new engine FIRST — if this fails, old engine stays functional
       const newResult = await createCryptoTradingEngine(freshConfig)
@@ -354,7 +347,6 @@ async function main() {
     secReconnecting = true
     try {
       const freshConfig = await loadConfig()
-      initSecAllowedSymbols(freshConfig.securities.allowedSymbols)
 
       const newResult = await createSecuritiesTradingEngine(freshConfig)
       await secResultRef?.close()

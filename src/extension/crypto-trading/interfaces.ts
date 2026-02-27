@@ -4,26 +4,6 @@
  * Only defines interfaces and data types; implementation is provided by external trading services
  */
 
-// ==================== Asset whitelist ====================
-
-export let CRYPTO_ALLOWED_SYMBOLS: readonly string[] = [
-  'BTC/USD',
-  'ETH/USD',
-  'SOL/USD',
-  'BNB/USD',
-  'APT/USD',
-  'SUI/USD',
-  'HYPE/USD',
-  'DOGE/USD',
-  'XRP/USD',
-];
-
-export function initCryptoAllowedSymbols(symbols: string[]): void {
-  CRYPTO_ALLOWED_SYMBOLS = Object.freeze([...symbols]);
-}
-
-export type CryptoAllowedSymbol = string;
-
 // ==================== Core interfaces ====================
 
 export interface ICryptoTradingEngine {

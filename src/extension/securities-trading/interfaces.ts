@@ -5,14 +5,6 @@
  * Semantic differences: no leverage/margin/liquidation price, uses portfolio instead of position
  */
 
-// ==================== Asset whitelist ====================
-
-export let SEC_ALLOWED_SYMBOLS: readonly string[] = [];
-
-export function initSecAllowedSymbols(symbols: string[]): void {
-  SEC_ALLOWED_SYMBOLS = Object.freeze([...symbols]);
-}
-
 // ==================== Core interfaces ====================
 
 export interface ISecuritiesTradingEngine {
