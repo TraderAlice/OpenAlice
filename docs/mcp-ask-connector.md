@@ -112,18 +112,18 @@ Read conversation history for a specific session.
 
 ## Configuration
 
-Add `askMcpPort` to `data/config/engine.json`:
+Enable and set the port in `data/config/connectors.json`:
 
 ```json
 {
-  "pairs": ["BTC/USD", "ETH/USD"],
-  "askMcpPort": 3003
+  "mcpAsk": {
+    "enabled": true,
+    "port": 3003
+  }
 }
 ```
 
-The port is optional. When omitted, the Ask connector is not started.
-
-You can also configure the port via the Web UI under **Settings > Connectivity > Ask MCP Port**.
+When `enabled` is `false` or `port` is omitted, the Ask connector is not started. You can also toggle it via the Web UI under **Connectors**.
 
 ## Session Management
 
