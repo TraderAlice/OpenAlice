@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { readFile, writeFile, mkdir } from 'fs/promises'
 import { resolve } from 'path'
+import { newsCollectorSchema } from '../extension/news-collector/config.js'
 
 const CONFIG_DIR = resolve('data/config')
 
@@ -189,6 +190,7 @@ export type Config = {
   heartbeat: z.infer<typeof heartbeatSchema>
   apiKeys: z.infer<typeof apiKeysSchema>
   connectors: z.infer<typeof connectorsSchema>
+  newsCollector: z.infer<typeof newsCollectorSchema>
 }
 
 // ==================== Loader ====================
@@ -216,11 +218,11 @@ async function parseAndSeed<T>(filename: string, schema: z.ZodType<T>, raw: unkn
 }
 
 export async function loadConfig(): Promise<Config> {
-  const files = ['engine.json', 'model.json', 'agent.json', 'crypto.json', 'securities.json', 'openbb.json', 'compaction.json', 'ai-provider.json', 'heartbeat.json', 'api-keys.json', 'connectors.json'] as const
+  const files = ['engine.json', 'model.json', 'agent.json', 'crypto.json', 'securities.json', 'openbb.json', 'compaction.json', 'ai-provider.json', 'heartbeat.json', 'api-keys.json', 'connectors.json', 'news-collector.json'] as const
   const raws = await Promise.all(files.map((f) => loadJsonFile(f)))
 
   // ---------- Migration: consolidate old telegram.json + engine port fields ----------
-  const connectorsRaw = raws[10]
+  const connectorsRaw = raws[10] as Record<string, unknown> | undefined
   if (connectorsRaw === undefined) {
     // First load after upgrade — migrate from old locations
     const oldTelegram = await loadJsonFile('telegram.json')
@@ -254,6 +256,7 @@ export async function loadConfig(): Promise<Config> {
     heartbeat:  await parseAndSeed(files[8], heartbeatSchema, raws[8]),
     apiKeys:    await parseAndSeed(files[9], apiKeysSchema, raws[9]),
     connectors: await parseAndSeed(files[10], connectorsSchema, raws[10]),
+    newsCollector: await parseAndSeed(files[11], newsCollectorSchema, raws[11]),
   }
 }
 
@@ -315,6 +318,7 @@ const sectionSchemas: Record<ConfigSection, z.ZodTypeAny> = {
   heartbeat: heartbeatSchema,
   apiKeys: apiKeysSchema,
   connectors: connectorsSchema,
+  newsCollector: newsCollectorSchema,
 }
 
 const sectionFiles: Record<ConfigSection, string> = {
@@ -329,6 +333,7 @@ const sectionFiles: Record<ConfigSection, string> = {
   heartbeat: 'heartbeat.json',
   apiKeys: 'api-keys.json',
   connectors: 'connectors.json',
+  newsCollector: 'news-collector.json',
 }
 
 /** Validate and write a config section to disk. Returns the validated config. */

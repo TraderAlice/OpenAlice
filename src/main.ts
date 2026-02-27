@@ -54,6 +54,7 @@ import { ClaudeCodeProvider } from './providers/claude-code/claude-code-provider
 import { createEventLog } from './core/event-log.js'
 import { createCronEngine, createCronListener, createCronTools } from './task/cron/index.js'
 import { createHeartbeat } from './task/heartbeat/index.js'
+import { NewsCollectorStore, NewsCollector, wrapNewsToolsForPiggyback, createNewsArchiveTools } from './extension/news-collector/index.js'
 
 const WALLET_FILE = resolve('data/crypto-trading/commit.json')
 const SEC_WALLET_FILE = resolve('data/securities-trading/commit.json')
@@ -203,6 +204,14 @@ async function main() {
 
   const cronEngine = createCronEngine({ eventLog })
 
+  // ==================== News Collector Store ====================
+
+  const newsStore = new NewsCollectorStore({
+    maxInMemory: config.newsCollector.maxInMemory,
+    retentionDays: config.newsCollector.retentionDays,
+  })
+  await newsStore.init()
+
   // ==================== OpenBB Clients ====================
 
   const providerKeys = config.openbb.providerKeys
@@ -233,10 +242,17 @@ async function main() {
   toolCenter.register(createEquityTools(symbolIndex, equityClient))
   toolCenter.register(createCryptoTools(cryptoClient))
   toolCenter.register(createCurrencyTools(currencyClient))
-  toolCenter.register(createNewsTools(newsClient, {
+  let newsTools = createNewsTools(newsClient, {
     companyProvider: providers.newsCompany,
     worldProvider: providers.newsWorld,
-  }))
+  })
+  if (config.newsCollector.piggybackOpenBB) {
+    newsTools = wrapNewsToolsForPiggyback(newsTools, newsStore)
+  }
+  toolCenter.register(newsTools)
+  if (config.newsCollector.enabled) {
+    toolCenter.register(createNewsArchiveTools(newsStore))
+  }
   toolCenter.register(createAnalysisTools(equityClient, cryptoClient, currencyClient))
 
   console.log(`tool-center: ${toolCenter.list().length} tools registered (crypto trading pending ccxt)`)
@@ -273,6 +289,19 @@ async function main() {
   await heartbeat.start()
   if (config.heartbeat.enabled) {
     console.log(`heartbeat: enabled (every ${config.heartbeat.every})`)
+  }
+
+  // ==================== News Collector ====================
+
+  let newsCollector: NewsCollector | null = null
+  if (config.newsCollector.enabled && config.newsCollector.feeds.length > 0) {
+    newsCollector = new NewsCollector({
+      store: newsStore,
+      feeds: config.newsCollector.feeds,
+      intervalMs: config.newsCollector.intervalMinutes * 60 * 1000,
+    })
+    newsCollector.start()
+    console.log(`news-collector: started (${config.newsCollector.feeds.length} feeds, every ${config.newsCollector.intervalMinutes}m)`)
   }
 
   // ==================== Engine Reconnect ====================
@@ -429,12 +458,14 @@ async function main() {
   let stopped = false
   const shutdown = async () => {
     stopped = true
+    newsCollector?.stop()
     heartbeat.stop()
     cronListener.stop()
     cronEngine.stop()
     for (const plugin of plugins) {
       await plugin.stop()
     }
+    await newsStore.close()
     await eventLog.close()
     await cryptoResultRef?.close()
     await secResultRef?.close()
