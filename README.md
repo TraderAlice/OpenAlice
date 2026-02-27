@@ -30,6 +30,26 @@ Your one-person Wall Street. Alice is an AI trading agent that gives you your ow
 - **Hot-reload** — enable/disable connectors (Telegram, MCP Ask) and reconnect trading engines at runtime without restart
 - **Web UI** — local chat interface with portfolio dashboard and full config management (trading, data sources, connectors, settings)
 
+## Key Concepts
+
+**Provider** — The AI backend that powers Alice. Claude Code (subprocess) or Vercel AI SDK (in-process). Switchable at runtime via `ai-provider.json`.
+
+**Extension** — A self-contained tool package registered in ToolCenter. Each extension owns its tools, state, and persistence. Examples: crypto-trading, brain, analysis-kit.
+
+**Wallet** — A git-like workflow for trading operations. You stage orders, commit with a message, then push to execute. Every commit gets an 8-char hash. Full history is reviewable via `walletLog` / `walletShow`.
+
+**Guard** — A pre-execution check that runs before every trading operation reaches the exchange. Guards enforce limits (max position size, max leverage, cooldown between trades) and can be configured per-asset.
+
+**Connector** — An external interface through which users interact with Alice. Built-in: Web UI, Telegram, MCP Ask. Connectors register with the ConnectorRegistry; delivery always goes to the channel of last interaction.
+
+**Brain** — Alice's persistent cognitive state. The frontal lobe stores working memory across rounds; emotion tracking logs sentiment shifts with rationale. Both are versioned as commits.
+
+**Heartbeat** — A periodic check-in where Alice reviews market conditions and decides whether to send you a message. Uses a structured protocol: `HEARTBEAT_OK` (nothing to report), `CHAT_YES` (has something to say), `CHAT_NO` (quiet).
+
+**EventLog** — A persistent append-only JSONL event bus. Cron fires, heartbeat results, and errors all flow through here. Supports real-time subscriptions and crash recovery.
+
+**Evolution Mode** — A permission escalation toggle. Off: Alice can only read/write `data/brain/`. On: full project access including Bash — Alice can modify her own source code.
+
 ## Architecture
 
 ```mermaid
@@ -111,37 +131,16 @@ graph LR
 
 ## Quick Start
 
-### Prerequisites
-
-- Node.js 22+
-- pnpm 10+
-
-### Setup
+Prerequisites: Node.js 22+, pnpm 10+, [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated.
 
 ```bash
 git clone https://github.com/TraderAlice/OpenAlice.git
 cd OpenAlice
-pnpm install
+pnpm install && pnpm build
+pnpm dev
 ```
 
-All API keys and credentials are configured through JSON files in `data/config/` — either via the Web UI or by editing the files directly. No `.env` file is needed.
-
-### AI Provider
-
-OpenAlice ships with two provider modes:
-
-- **Claude Code** (default) — spawns `claude -p` as a subprocess, giving the agent full Claude Code capabilities. Requires [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated on the host machine. No separate API key needed — uses your Claude Code login. To switch models, see [how to change Claude Code's model](https://docs.anthropic.com/en/docs/claude-code/settings#model-configuration).
-- **Vercel AI SDK** — runs the agent in-process. Supports any provider compatible with the [Vercel AI SDK](https://sdk.vercel.ai/docs) (Anthropic, OpenAI, Google, etc.). Swap the provider implementation in `src/providers/vercel-ai-sdk/` to use your preferred model. Requires an API key in `data/config/api-keys.json`.
-
-### Crypto Trading
-
-Powered by [CCXT](https://docs.ccxt.com/). Defaults to Bybit demo trading. Configure the exchange and API keys in `data/config/crypto.json` (or via the Web UI). Any CCXT-supported exchange can be used by modifying the provider implementation.
-
-### Securities Trading
-
-Powered by [Alpaca](https://alpaca.markets/). Supports paper and live trading — toggle via `data/config/securities.json` (or via the Web UI). Sign up at Alpaca and add your keys to the config. IBKR support is planned.
-
-### Run
+Open [localhost:3002](http://localhost:3002) and start chatting. No API keys or config needed — the default setup uses Claude Code as the AI backend with your existing login.
 
 ```bash
 pnpm dev        # start backend (port 3002) with watch mode
@@ -150,20 +149,17 @@ pnpm build      # production build (backend + UI)
 pnpm test       # run tests
 ```
 
-### Web UI
-
-The backend (port 3002) serves both the API and the built frontend from `dist/ui/`. During development, run `pnpm dev:ui` to start Vite's dev server on port 5173, which proxies API requests to port 3002 and provides hot module replacement.
-
-| Port | What | When |
-|------|------|------|
-| 5173 | Vite dev server (hot reload) | `pnpm dev:ui` |
-| 3002 | Backend API + built UI | `pnpm dev` / `pnpm build && node dist/main.js` |
-
-> **Note:** Port 3002 only serves the UI after `pnpm build` (or `pnpm build:ui`). If you haven't built yet, use port 5173 for frontend development.
+> **Note:** Port 3002 serves the UI only after `pnpm build`. For frontend development, use `pnpm dev:ui` (port 5173) which proxies to the backend and provides hot reload.
 
 ## Configuration
 
-All config lives in `data/config/` as JSON files with Zod validation. Missing files fall back to sensible defaults.
+All config lives in `data/config/` as JSON files with Zod validation. Missing files fall back to sensible defaults. You can edit these files directly or use the Web UI.
+
+**AI Provider** — The default provider is Claude Code (`claude -p` subprocess). To use the [Vercel AI SDK](https://sdk.vercel.ai/docs) instead (Anthropic, OpenAI, Google, etc.), switch `ai-provider.json` to `vercel-ai-sdk` and add your API key to `api-keys.json`.
+
+**Crypto Trading** — Powered by [CCXT](https://docs.ccxt.com/). Configure exchange and API keys in `crypto.json`. Any CCXT-supported exchange works (Bybit, OKX, Binance, etc.).
+
+**Securities Trading** — Powered by [Alpaca](https://alpaca.markets/). Configure broker and API keys in `securities.json`. Supports paper and live trading.
 
 | File | Purpose |
 |------|---------|
