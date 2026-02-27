@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { readFile, writeFile, mkdir } from 'fs/promises'
+import { readFile, writeFile, mkdir, unlink } from 'fs/promises'
 import { resolve } from 'path'
 import { newsCollectorSchema } from '../extension/news-collector/config.js'
 
@@ -13,9 +13,16 @@ const engineSchema = z.object({
   port: z.number().int().positive().default(3000),
 })
 
-const modelSchema = z.object({
+export const aiProviderSchema = z.object({
+  backend: z.enum(['claude-code', 'vercel-ai-sdk']).default('claude-code'),
   provider: z.string().default('anthropic'),
   model: z.string().default('claude-sonnet-4-6'),
+  baseUrl: z.string().min(1).optional(),
+  apiKeys: z.object({
+    anthropic: z.string().optional(),
+    openai: z.string().optional(),
+    google: z.string().optional(),
+  }).default({}),
 })
 
 const agentSchema = z.object({
@@ -135,15 +142,6 @@ const activeHoursSchema = z.object({
   timezone: z.string().default('local'),
 }).nullable().default(null)
 
-export const aiProviderSchema = z.object({
-  provider: z.enum(['claude-code', 'vercel-ai-sdk']).default('claude-code'),
-})
-
-const apiKeysSchema = z.object({
-  anthropic: z.string().optional(),
-  openai: z.string().optional(),
-  google: z.string().optional(),
-})
 
 const connectorsSchema = z.object({
   web: z.object({ port: z.number().int().positive().default(3002) }).default({ port: 3002 }),
@@ -173,7 +171,6 @@ const heartbeatSchema = z.object({
 
 export type Config = {
   engine: z.infer<typeof engineSchema>
-  model: z.infer<typeof modelSchema>
   agent: z.infer<typeof agentSchema>
   crypto: z.infer<typeof cryptoSchema>
   securities: z.infer<typeof securitiesSchema>
@@ -181,7 +178,6 @@ export type Config = {
   compaction: z.infer<typeof compactionSchema>
   aiProvider: z.infer<typeof aiProviderSchema>
   heartbeat: z.infer<typeof heartbeatSchema>
-  apiKeys: z.infer<typeof apiKeysSchema>
   connectors: z.infer<typeof connectorsSchema>
   newsCollector: z.infer<typeof newsCollectorSchema>
 }
@@ -200,6 +196,11 @@ async function loadJsonFile(filename: string): Promise<unknown | undefined> {
   }
 }
 
+/** Silently remove a config file (ignore if missing). */
+async function removeJsonFile(filename: string): Promise<void> {
+  try { await unlink(resolve(CONFIG_DIR, filename)) } catch { /* ENOENT ok */ }
+}
+
 /** Parse with Zod; if the file was missing, seed it to disk with defaults. */
 async function parseAndSeed<T>(filename: string, schema: z.ZodType<T>, raw: unknown | undefined): Promise<T> {
   const parsed = schema.parse(raw ?? {})
@@ -211,13 +212,32 @@ async function parseAndSeed<T>(filename: string, schema: z.ZodType<T>, raw: unkn
 }
 
 export async function loadConfig(): Promise<Config> {
-  const files = ['engine.json', 'model.json', 'agent.json', 'crypto.json', 'securities.json', 'openbb.json', 'compaction.json', 'ai-provider.json', 'heartbeat.json', 'api-keys.json', 'connectors.json', 'news-collector.json'] as const
+  const files = ['engine.json', 'agent.json', 'crypto.json', 'securities.json', 'openbb.json', 'compaction.json', 'ai-provider.json', 'heartbeat.json', 'connectors.json', 'news-collector.json'] as const
   const raws = await Promise.all(files.map((f) => loadJsonFile(f)))
 
+  // ---------- Migration: consolidate old ai-provider + model + api-keys → ai-provider ----------
+  const aiProviderRaw = raws[6] as Record<string, unknown> | undefined
+  if (aiProviderRaw && !('backend' in aiProviderRaw)) {
+    // Old format detected — merge model.json + api-keys.json into ai-provider.json
+    const oldModel = await loadJsonFile('model.json') as Record<string, unknown> | undefined
+    const oldKeys = await loadJsonFile('api-keys.json') as Record<string, unknown> | undefined
+    const migrated = {
+      backend: aiProviderRaw.provider ?? 'claude-code',
+      provider: oldModel?.provider ?? 'anthropic',
+      model: oldModel?.model ?? 'claude-sonnet-4-6',
+      ...(oldModel?.baseUrl ? { baseUrl: oldModel.baseUrl } : {}),
+      apiKeys: oldKeys ?? {},
+    }
+    raws[6] = migrated
+    await mkdir(CONFIG_DIR, { recursive: true })
+    await writeFile(resolve(CONFIG_DIR, 'ai-provider.json'), JSON.stringify(migrated, null, 2) + '\n')
+    await removeJsonFile('model.json')
+    await removeJsonFile('api-keys.json')
+  }
+
   // ---------- Migration: consolidate old telegram.json + engine port fields ----------
-  const connectorsRaw = raws[10] as Record<string, unknown> | undefined
+  const connectorsRaw = raws[8] as Record<string, unknown> | undefined
   if (connectorsRaw === undefined) {
-    // First load after upgrade — migrate from old locations
     const oldTelegram = await loadJsonFile('telegram.json')
     const oldEngine = raws[0] as Record<string, unknown> | undefined
     const migrated: Record<string, unknown> = {}
@@ -228,28 +248,25 @@ export async function loadConfig(): Promise<Config> {
       if (oldEngine.webPort !== undefined) migrated.web = { port: oldEngine.webPort }
       if (oldEngine.mcpPort !== undefined) migrated.mcp = { port: oldEngine.mcpPort }
       if (oldEngine.askMcpPort !== undefined) migrated.mcpAsk = { enabled: true, port: oldEngine.askMcpPort }
-      // Strip migrated fields from engine.json
       const { mcpPort: _m, askMcpPort: _a, webPort: _w, ...cleanEngine } = oldEngine
       raws[0] = cleanEngine
       await mkdir(CONFIG_DIR, { recursive: true })
       await writeFile(resolve(CONFIG_DIR, 'engine.json'), JSON.stringify(cleanEngine, null, 2) + '\n')
     }
-    raws[10] = Object.keys(migrated).length > 0 ? migrated : undefined
+    raws[8] = Object.keys(migrated).length > 0 ? migrated : undefined
   }
 
   return {
-    engine:     await parseAndSeed(files[0], engineSchema, raws[0]),
-    model:      await parseAndSeed(files[1], modelSchema, raws[1]),
-    agent:      await parseAndSeed(files[2], agentSchema, raws[2]),
-    crypto:     await parseAndSeed(files[3], cryptoSchema, raws[3]),
-    securities: await parseAndSeed(files[4], securitiesSchema, raws[4]),
-    openbb:     await parseAndSeed(files[5], openbbSchema, raws[5]),
-    compaction: await parseAndSeed(files[6], compactionSchema, raws[6]),
-    aiProvider: await parseAndSeed(files[7], aiProviderSchema, raws[7]),
-    heartbeat:  await parseAndSeed(files[8], heartbeatSchema, raws[8]),
-    apiKeys:    await parseAndSeed(files[9], apiKeysSchema, raws[9]),
-    connectors: await parseAndSeed(files[10], connectorsSchema, raws[10]),
-    newsCollector: await parseAndSeed(files[11], newsCollectorSchema, raws[11]),
+    engine:        await parseAndSeed(files[0], engineSchema, raws[0]),
+    agent:         await parseAndSeed(files[1], agentSchema, raws[1]),
+    crypto:        await parseAndSeed(files[2], cryptoSchema, raws[2]),
+    securities:    await parseAndSeed(files[3], securitiesSchema, raws[3]),
+    openbb:        await parseAndSeed(files[4], openbbSchema, raws[4]),
+    compaction:    await parseAndSeed(files[5], compactionSchema, raws[5]),
+    aiProvider:    await parseAndSeed(files[6], aiProviderSchema, raws[6]),
+    heartbeat:     await parseAndSeed(files[7], heartbeatSchema, raws[7]),
+    connectors:    await parseAndSeed(files[8], connectorsSchema, raws[8]),
+    newsCollector: await parseAndSeed(files[9], newsCollectorSchema, raws[9]),
   }
 }
 
@@ -265,13 +282,13 @@ export async function readAgentConfig() {
   }
 }
 
-/** Read model config from disk (called per-request for hot-reload). */
-export async function readModelConfig() {
+/** Read AI provider config from disk (called per-request for hot-reload). */
+export async function readAIProviderConfig() {
   try {
-    const raw = JSON.parse(await readFile(resolve(CONFIG_DIR, 'model.json'), 'utf-8'))
-    return modelSchema.parse(raw)
+    const raw = JSON.parse(await readFile(resolve(CONFIG_DIR, 'ai-provider.json'), 'utf-8'))
+    return aiProviderSchema.parse(raw)
   } catch {
-    return modelSchema.parse({})
+    return aiProviderSchema.parse({})
   }
 }
 
@@ -285,23 +302,12 @@ export async function readOpenbbConfig() {
   }
 }
 
-/** Read API keys config from disk (called per-request for hot-reload). */
-export async function readApiKeysConfig() {
-  try {
-    const raw = JSON.parse(await readFile(resolve(CONFIG_DIR, 'api-keys.json'), 'utf-8'))
-    return apiKeysSchema.parse(raw)
-  } catch {
-    return apiKeysSchema.parse({})
-  }
-}
-
 // ==================== Writer ====================
 
 export type ConfigSection = keyof Config
 
 const sectionSchemas: Record<ConfigSection, z.ZodTypeAny> = {
   engine: engineSchema,
-  model: modelSchema,
   agent: agentSchema,
   crypto: cryptoSchema,
   securities: securitiesSchema,
@@ -309,14 +315,12 @@ const sectionSchemas: Record<ConfigSection, z.ZodTypeAny> = {
   compaction: compactionSchema,
   aiProvider: aiProviderSchema,
   heartbeat: heartbeatSchema,
-  apiKeys: apiKeysSchema,
   connectors: connectorsSchema,
   newsCollector: newsCollectorSchema,
 }
 
 const sectionFiles: Record<ConfigSection, string> = {
   engine: 'engine.json',
-  model: 'model.json',
   agent: 'agent.json',
   crypto: 'crypto.json',
   securities: 'securities.json',
@@ -324,7 +328,6 @@ const sectionFiles: Record<ConfigSection, string> = {
   compaction: 'compaction.json',
   aiProvider: 'ai-provider.json',
   heartbeat: 'heartbeat.json',
-  apiKeys: 'api-keys.json',
   connectors: 'connectors.json',
   newsCollector: 'news-collector.json',
 }

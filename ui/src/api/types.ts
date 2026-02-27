@@ -23,10 +23,17 @@ export type ChatHistoryItem =
 
 // ==================== Config ====================
 
+export interface AIProviderConfig {
+  backend: string
+  provider: string
+  model: string
+  baseUrl?: string
+  apiKeys: { anthropic?: string; openai?: string; google?: string }
+}
+
 export interface AppConfig {
-  aiProvider: string
+  aiProvider: AIProviderConfig
   engine: Record<string, unknown>
-  model: { provider: string; model: string }
   agent: { evolutionMode: boolean; claudeCode: Record<string, unknown> }
   compaction: { maxContextTokens: number; maxOutputTokens: number }
   heartbeat: { enabled: boolean; every: string; prompt: string }

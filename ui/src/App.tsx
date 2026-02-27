@@ -4,6 +4,7 @@ import { ChatPage } from './pages/ChatPage'
 import { PortfolioPage } from './pages/PortfolioPage'
 import { EventsPage } from './pages/EventsPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { AIProviderPage } from './pages/AIProviderPage'
 import { DataSourcesPage } from './pages/DataSourcesPage'
 import { TradingPage } from './pages/TradingPage'
 import { SecuritiesPage } from './pages/SecuritiesPage'
@@ -13,7 +14,7 @@ export type Page =
   | 'chat' | 'portfolio' | 'events' | 'data-sources' | 'connectors'
   | 'trading/connection' | 'trading/guards'
   | 'securities/connection' | 'securities/guards'
-  | 'settings'
+  | 'ai-provider' | 'settings'
 
 export function App() {
   const [page, setPage] = useState<Page>('chat')
@@ -50,6 +51,7 @@ export function App() {
         {page === 'connectors' && <ConnectorsPage />}
         {page.startsWith('trading/') && <TradingPage tab={page.split('/')[1]} />}
         {page.startsWith('securities/') && <SecuritiesPage tab={page.split('/')[1]} />}
+        {page === 'ai-provider' && <AIProviderPage />}
         {page === 'settings' && <SettingsPage />}
       </main>
     </div>

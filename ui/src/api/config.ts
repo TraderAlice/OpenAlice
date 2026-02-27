@@ -8,13 +8,13 @@ export const configApi = {
     return res.json()
   },
 
-  async setProvider(provider: string): Promise<void> {
+  async setBackend(backend: string): Promise<void> {
     const res = await fetch('/api/config/ai-provider', {
       method: 'PUT',
       headers,
-      body: JSON.stringify({ provider }),
+      body: JSON.stringify({ backend }),
     })
-    if (!res.ok) throw new Error('Failed to switch provider')
+    if (!res.ok) throw new Error('Failed to switch backend')
   },
 
   async updateSection(section: string, data: unknown): Promise<unknown> {

@@ -9,8 +9,6 @@ import { cronApi } from './cron'
 import { heartbeatApi } from './heartbeat'
 import { tradingApi } from './trading'
 import { openbbApi } from './openbb'
-import { apiKeysApi } from './api-keys'
-
 export const api = {
   chat: chatApi,
   config: configApi,
@@ -19,7 +17,6 @@ export const api = {
   heartbeat: heartbeatApi,
   trading: tradingApi,
   openbb: openbbApi,
-  apiKeys: apiKeysApi,
 }
 
 // Re-export all types for convenience
@@ -29,6 +26,7 @@ export type {
   ToolCall,
   ChatHistoryItem,
   AppConfig,
+  AIProviderConfig,
   EventLogEntry,
   CronSchedule,
   CronJobState,

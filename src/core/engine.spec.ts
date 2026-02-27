@@ -4,7 +4,7 @@ import { MockLanguageModelV3 } from 'ai/test'
 import { Engine } from './engine.js'
 import { AgentCenter } from './agent-center.js'
 import { DEFAULT_COMPACTION_CONFIG, type CompactionConfig } from './compaction.js'
-import { VercelAIProvider } from '../providers/vercel-ai-sdk/vercel-provider.js'
+import { VercelAIProvider } from '../ai-providers/vercel-ai-sdk/vercel-provider.js'
 import { createModelFromConfig } from './model-factory.js'
 import type { SessionStore, SessionEntry } from './session.js'
 
