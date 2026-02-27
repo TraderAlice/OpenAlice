@@ -55,14 +55,16 @@ const PROVIDER_OPTIONS: Record<string, string[]> = {
   equity: ['yfinance', 'fmp', 'intrinio', 'tiingo', 'alpha_vantage'],
   crypto: ['yfinance', 'fmp', 'tiingo'],
   currency: ['yfinance', 'fmp', 'tiingo'],
-  news: ['fmp', 'benzinga', 'tiingo', 'biztoc', 'intrinio'],
+  newsCompany: ['yfinance', 'fmp', 'benzinga', 'intrinio'],
+  newsWorld: ['fmp', 'benzinga', 'tiingo', 'biztoc', 'intrinio'],
 }
 
 const ASSET_LABELS: Record<string, string> = {
   equity: 'Equity',
   crypto: 'Crypto',
   currency: 'Currency',
-  news: 'News',
+  newsCompany: 'News (Company)',
+  newsWorld: 'News (World)',
 }
 
 interface ConnectionSectionProps {
@@ -76,7 +78,7 @@ function ConnectionSection({ openbb, onChange, onChangeImmediate }: ConnectionSe
   const [testStatus, setTestStatus] = useState<'idle' | 'ok' | 'error'>('idle')
 
   const apiUrl = (openbb.apiUrl as string) || 'http://localhost:6900'
-  const providers = (openbb.providers ?? { equity: 'yfinance', crypto: 'yfinance', currency: 'yfinance', news: 'fmp' }) as Record<string, string>
+  const providers = (openbb.providers ?? { equity: 'yfinance', crypto: 'yfinance', currency: 'yfinance', newsCompany: 'yfinance', newsWorld: 'fmp' }) as Record<string, string>
 
   const testConnection = async () => {
     setTesting(true)

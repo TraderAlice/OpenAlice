@@ -230,6 +230,8 @@ export class OpenBBEconomyClient {
       throw new Error(`OpenBB API error ${res.status} on ${path}: ${body.slice(0, 200)}`)
     }
 
+    if (res.status === 204) return []
+
     const envelope = (await res.json()) as OBBjectResponse<T>
     return envelope.results ?? []
   }

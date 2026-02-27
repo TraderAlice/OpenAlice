@@ -9,7 +9,10 @@ import { tool } from 'ai'
 import { z } from 'zod'
 import type { OpenBBNewsClient } from '@/openbb/news/client'
 
-export function createNewsTools(newsClient: OpenBBNewsClient) {
+export function createNewsTools(
+  newsClient: OpenBBNewsClient,
+  providers: { companyProvider: string; worldProvider: string },
+) {
   return {
     newsGetWorld: tool({
       description: `Get world news headlines.
@@ -20,7 +23,7 @@ Useful for understanding macro sentiment, geopolitical events, and market-moving
         limit: z.number().int().positive().optional().describe('Number of articles to return (default: 20)'),
       }),
       execute: async ({ limit }) => {
-        const params: Record<string, unknown> = {}
+        const params: Record<string, unknown> = { provider: providers.worldProvider }
         if (limit) params.limit = limit
         return await newsClient.getWorldNews(params)
       },
@@ -38,7 +41,7 @@ Use equitySearch first to resolve the correct symbol.`,
         limit: z.number().int().positive().optional().describe('Number of articles to return (default: 20)'),
       }),
       execute: async ({ symbol, limit }) => {
-        const params: Record<string, unknown> = { symbol }
+        const params: Record<string, unknown> = { symbol, provider: providers.companyProvider }
         if (limit) params.limit = limit
         return await newsClient.getCompanyNews(params)
       },

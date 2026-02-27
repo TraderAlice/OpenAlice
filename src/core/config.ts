@@ -107,12 +107,14 @@ const openbbSchema = z.object({
     equity: z.string().default('yfinance'),
     crypto: z.string().default('yfinance'),
     currency: z.string().default('yfinance'),
-    news: z.string().default('fmp'),
+    newsCompany: z.string().default('yfinance'),
+    newsWorld: z.string().default('fmp'),
   }).default({
     equity: 'yfinance',
     crypto: 'yfinance',
     currency: 'yfinance',
-    news: 'fmp',
+    newsCompany: 'yfinance',
+    newsWorld: 'fmp',
   }),
   providerKeys: z.object({
     fred: z.string().optional(),

@@ -212,7 +212,7 @@ async function main() {
   const currencyClient = new OpenBBCurrencyClient(config.openbb.apiUrl, providers.currency, providerKeys)
   const commodityClient = new OpenBBCommodityClient(config.openbb.apiUrl, undefined, providerKeys)
   const economyClient = new OpenBBEconomyClient(config.openbb.apiUrl, undefined, providerKeys)
-  const newsClient = new OpenBBNewsClient(config.openbb.apiUrl, providers.news, providerKeys)
+  const newsClient = new OpenBBNewsClient(config.openbb.apiUrl, undefined, providerKeys)
 
   // ==================== Equity Symbol Index ====================
 
@@ -233,7 +233,10 @@ async function main() {
   toolCenter.register(createEquityTools(symbolIndex, equityClient))
   toolCenter.register(createCryptoTools(cryptoClient))
   toolCenter.register(createCurrencyTools(currencyClient))
-  toolCenter.register(createNewsTools(newsClient))
+  toolCenter.register(createNewsTools(newsClient, {
+    companyProvider: providers.newsCompany,
+    worldProvider: providers.newsWorld,
+  }))
   toolCenter.register(createAnalysisTools(equityClient, cryptoClient, currencyClient))
 
   console.log(`tool-center: ${toolCenter.list().length} tools registered (crypto trading pending ccxt)`)
