@@ -85,12 +85,8 @@ export function ConnectorsPage() {
                 <input
                   className={inputClass}
                   type="number"
-                  value={config.mcp.port ?? ''}
-                  onChange={(e) => {
-                    const v = e.target.value
-                    updateConfig({ mcp: { port: v ? Number(v) : undefined } })
-                  }}
-                  placeholder="e.g. 3001"
+                  value={config.mcp.port}
+                  onChange={(e) => updateConfig({ mcp: { port: Number(e.target.value) } })}
                 />
               </Field>
             </Section>

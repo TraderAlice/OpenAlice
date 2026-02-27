@@ -155,8 +155,8 @@ const apiKeysSchema = z.object({
 const connectorsSchema = z.object({
   web: z.object({ port: z.number().int().positive().default(3002) }).default({ port: 3002 }),
   mcp: z.object({
-    port: z.number().int().positive().optional(),
-  }).default({}),
+    port: z.number().int().positive().default(3001),
+  }).default({ port: 3001 }),
   mcpAsk: z.object({
     enabled: z.boolean().default(false),
     port: z.number().int().positive().optional(),
@@ -229,12 +229,12 @@ export async function loadConfig(): Promise<Config> {
     const oldEngine = raws[0] as Record<string, unknown> | undefined
     const migrated: Record<string, unknown> = {}
     if (oldTelegram && typeof oldTelegram === 'object') {
-      migrated.telegram = oldTelegram
+      migrated.telegram = { ...(oldTelegram as Record<string, unknown>), enabled: true }
     }
     if (oldEngine) {
       if (oldEngine.webPort !== undefined) migrated.web = { port: oldEngine.webPort }
       if (oldEngine.mcpPort !== undefined) migrated.mcp = { port: oldEngine.mcpPort }
-      if (oldEngine.askMcpPort !== undefined) migrated.mcpAsk = { port: oldEngine.askMcpPort }
+      if (oldEngine.askMcpPort !== undefined) migrated.mcpAsk = { enabled: true, port: oldEngine.askMcpPort }
       // Strip migrated fields from engine.json
       const { mcpPort: _m, askMcpPort: _a, webPort: _w, ...cleanEngine } = oldEngine
       raws[0] = cleanEngine
