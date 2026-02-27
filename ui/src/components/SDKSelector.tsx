@@ -1,5 +1,3 @@
-import type { ReactNode } from 'react'
-
 export interface SDKOption {
   id: string
   name: string
@@ -7,27 +5,58 @@ export interface SDKOption {
   badge: string          // Short text shown in the avatar circle (e.g. "CC", "AL")
   badgeColor: string     // Tailwind text color class for the badge
   comingSoon?: boolean
+  locked?: boolean       // Cannot be deselected (always active, multi-select only)
 }
 
-interface SDKSelectorProps {
+// Single-select mode (default): selected is a string, onSelect fires with the chosen id
+interface SDKSelectorSingleProps {
   options: SDKOption[]
   selected: string
   onSelect: (id: string) => void
 }
 
-export function SDKSelector({ options, selected, onSelect }: SDKSelectorProps) {
+// Multi-select mode: selected is a string[], onToggle fires when a toggleable card is clicked
+interface SDKSelectorMultiProps {
+  options: SDKOption[]
+  selected: string[]
+  onToggle: (id: string) => void
+}
+
+type SDKSelectorProps = SDKSelectorSingleProps | SDKSelectorMultiProps
+
+function isMulti(props: SDKSelectorProps): props is SDKSelectorMultiProps {
+  return Array.isArray(props.selected)
+}
+
+export function SDKSelector(props: SDKSelectorProps) {
+  const { options } = props
+  const multi = isMulti(props)
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
       {options.map((opt) => {
-        const isSelected = opt.id === selected
+        const isSelected = multi
+          ? props.selected.includes(opt.id)
+          : opt.id === props.selected
         const isDisabled = opt.comingSoon
+        const isLocked = multi && opt.locked
+
+        const handleClick = () => {
+          if (isDisabled) return
+          if (isLocked) return
+          if (multi) {
+            props.onToggle(opt.id)
+          } else {
+            ;(props as SDKSelectorSingleProps).onSelect(opt.id)
+          }
+        }
 
         return (
           <button
             key={opt.id}
             type="button"
             disabled={isDisabled}
-            onClick={() => !isDisabled && onSelect(opt.id)}
+            onClick={handleClick}
             className={`
               relative text-left rounded-lg border px-4 py-3.5 transition-all
               ${isSelected
@@ -36,6 +65,7 @@ export function SDKSelector({ options, selected, onSelect }: SDKSelectorProps) {
                   ? 'border-border/50 opacity-50 cursor-not-allowed'
                   : 'border-border hover:border-text-muted/40 hover:bg-bg-tertiary/30 cursor-pointer'
               }
+              ${isLocked ? 'cursor-default' : ''}
             `}
           >
             {/* Coming Soon badge */}
@@ -45,8 +75,15 @@ export function SDKSelector({ options, selected, onSelect }: SDKSelectorProps) {
               </span>
             )}
 
-            {/* Selected indicator */}
-            {isSelected && (
+            {/* Locked badge (always active) */}
+            {isLocked && !isDisabled && (
+              <span className="absolute top-2.5 right-2.5 text-[10px] font-medium text-accent/70 bg-accent/10 px-1.5 py-0.5 rounded">
+                Always On
+              </span>
+            )}
+
+            {/* Selected indicator (non-locked) */}
+            {isSelected && !isLocked && !isDisabled && (
               <span className="absolute top-2.5 right-2.5">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                   <circle cx="8" cy="8" r="8" className="fill-accent" />
@@ -149,5 +186,37 @@ export const SECURITIES_SDK_OPTIONS: SDKOption[] = [
     badge: 'TR',
     badgeColor: 'text-text-muted',
     comingSoon: true,
+  },
+]
+
+export const CONNECTOR_OPTIONS: SDKOption[] = [
+  {
+    id: 'web',
+    name: 'Web UI',
+    description: 'Browser-based chat and configuration interface.',
+    badge: 'WB',
+    badgeColor: 'text-accent',
+    locked: true,
+  },
+  {
+    id: 'mcp',
+    name: 'MCP Server',
+    description: 'Exposes tools via Model Context Protocol for external AI agents.',
+    badge: 'MC',
+    badgeColor: 'text-purple',
+  },
+  {
+    id: 'mcpAsk',
+    name: 'MCP Ask',
+    description: 'Multi-turn conversation endpoint for external agents.',
+    badge: 'MA',
+    badgeColor: 'text-blue',
+  },
+  {
+    id: 'telegram',
+    name: 'Telegram',
+    description: 'Mobile notifications and two-way chat via Telegram bot.',
+    badge: 'TG',
+    badgeColor: 'text-cyan',
   },
 ]
