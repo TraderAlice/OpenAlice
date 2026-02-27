@@ -3,6 +3,7 @@ import { SaveIndicator } from '../components/SaveIndicator'
 import { Toggle } from '../components/Toggle'
 import { Section, Field, inputClass } from '../components/form'
 import { GuardsSection, CRYPTO_GUARD_TYPES, type GuardEntry } from '../components/guards'
+import { SDKSelector, CRYPTO_SDK_OPTIONS } from '../components/SDKSelector'
 import { ReconnectButton } from '../components/ReconnectButton'
 import type { AppConfig } from '../api'
 
@@ -28,6 +29,17 @@ export function TradingPage() {
       extract: (full: AppConfig) => (full as Record<string, unknown>).crypto as CryptoConfig,
     })
 
+  const enabled = config?.provider.type !== 'none'
+
+  const handleToggle = (on: boolean) => {
+    if (on) {
+      // Re-enable with CCXT defaults
+      updateConfigImmediate({ provider: { ...config!.provider, type: 'ccxt' } })
+    } else {
+      updateConfigImmediate({ provider: { type: 'none' } })
+    }
+  }
+
   return (
     <div className="flex flex-col flex-1 min-h-0">
       {/* Header */}
@@ -47,18 +59,47 @@ export function TradingPage() {
       <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5">
         {config && (
           <div className="max-w-[640px] space-y-8">
-            <ExchangeSection
-              config={config}
-              onChange={updateConfig}
-              onChangeImmediate={updateConfigImmediate}
-            />
-            <GuardsSection
-              guards={config.guards || []}
-              guardTypes={CRYPTO_GUARD_TYPES}
-              description="Trading guards validate operations before they reach the exchange. Guards run in order — first rejection stops the operation."
-              onChange={(guards) => updateConfig({ guards })}
-              onChangeImmediate={(guards) => updateConfigImmediate({ guards })}
-            />
+            {/* Enable / SDK selection */}
+            <Section title="Trading Interface">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <p className="text-[13px] text-text">Enable Crypto Trading</p>
+                  <p className="text-[11px] text-text-muted/60">
+                    When disabled, the crypto trading engine and all related tools are unloaded.
+                  </p>
+                </div>
+                <Toggle checked={enabled} onChange={handleToggle} />
+              </div>
+
+              {enabled && (
+                <div className="mt-1">
+                  <p className="text-[12px] text-text-muted mb-3">Select a trading SDK to connect with your exchange.</p>
+                  <SDKSelector
+                    options={CRYPTO_SDK_OPTIONS}
+                    selected="ccxt"
+                    onSelect={() => {/* future: switch SDK */}}
+                  />
+                </div>
+              )}
+            </Section>
+
+            {/* Provider config — only when enabled */}
+            {enabled && (
+              <>
+                <ExchangeSection
+                  config={config}
+                  onChange={updateConfig}
+                  onChangeImmediate={updateConfigImmediate}
+                />
+                <GuardsSection
+                  guards={config.guards || []}
+                  guardTypes={CRYPTO_GUARD_TYPES}
+                  description="Trading guards validate operations before they reach the exchange. Guards run in order — first rejection stops the operation."
+                  onChange={(guards) => updateConfig({ guards })}
+                  onChangeImmediate={(guards) => updateConfigImmediate({ guards })}
+                />
+              </>
+            )}
           </div>
         )}
         {loadError && <p className="text-[13px] text-red">Failed to load configuration.</p>}
@@ -67,7 +108,7 @@ export function TradingPage() {
   )
 }
 
-// ==================== Exchange Section ====================
+// ==================== Exchange Section (CCXT-specific) ====================
 
 interface ExchangeSectionProps {
   config: CryptoConfig
@@ -77,7 +118,6 @@ interface ExchangeSectionProps {
 
 function ExchangeSection({ config, onChange, onChangeImmediate }: ExchangeSectionProps) {
   const provider = config.provider
-  const isCcxt = provider.type === 'ccxt'
 
   const patchProvider = (field: string, value: unknown, immediate: boolean) => {
     const patch = {
@@ -88,13 +128,13 @@ function ExchangeSection({ config, onChange, onChangeImmediate }: ExchangeSectio
 
   return (
     <Section
-      title="Exchange"
-      description="CCXT exchange connection settings. Save your credentials, then click Reconnect to apply."
+      title="Exchange Connection"
+      description="CCXT exchange credentials. Save your config, then click Reconnect to apply."
     >
       <Field label="Exchange">
         <input
           className={inputClass}
-          value={isCcxt ? provider.exchange || '' : ''}
+          value={provider.exchange || ''}
           onChange={(e) => patchProvider('exchange', e.target.value.trim(), false)}
           placeholder="bybit"
         />
@@ -103,7 +143,7 @@ function ExchangeSection({ config, onChange, onChangeImmediate }: ExchangeSectio
         <input
           className={inputClass}
           type="password"
-          value={isCcxt ? provider.apiKey || '' : ''}
+          value={provider.apiKey || ''}
           onChange={(e) => patchProvider('apiKey', e.target.value, false)}
           placeholder="Not configured"
         />
@@ -112,7 +152,7 @@ function ExchangeSection({ config, onChange, onChangeImmediate }: ExchangeSectio
         <input
           className={inputClass}
           type="password"
-          value={isCcxt ? provider.apiSecret || '' : ''}
+          value={provider.apiSecret || ''}
           onChange={(e) => patchProvider('apiSecret', e.target.value, false)}
           placeholder="Not configured"
         />
@@ -121,7 +161,7 @@ function ExchangeSection({ config, onChange, onChangeImmediate }: ExchangeSectio
         <input
           className={inputClass}
           type="password"
-          value={isCcxt ? provider.password || '' : ''}
+          value={provider.password || ''}
           onChange={(e) => patchProvider('password', e.target.value, false)}
           placeholder="Required by some exchanges (e.g. OKX)"
         />
@@ -129,7 +169,7 @@ function ExchangeSection({ config, onChange, onChangeImmediate }: ExchangeSectio
       <Field label="Market Type">
         <select
           className={inputClass}
-          value={isCcxt ? provider.defaultMarketType || 'swap' : 'swap'}
+          value={provider.defaultMarketType || 'swap'}
           onChange={(e) => patchProvider('defaultMarketType', e.target.value, true)}
         >
           <option value="swap">Perpetual Swap</option>
@@ -139,14 +179,14 @@ function ExchangeSection({ config, onChange, onChangeImmediate }: ExchangeSectio
       <div className="mb-3">
         <label className="flex items-center gap-2.5 cursor-pointer mb-2">
           <Toggle
-            checked={isCcxt ? provider.sandbox ?? false : false}
+            checked={provider.sandbox ?? false}
             onChange={(v) => patchProvider('sandbox', v, true)}
           />
           <span className="text-[13px] text-text">Sandbox Mode</span>
         </label>
         <label className="flex items-center gap-2.5 cursor-pointer mb-2">
           <Toggle
-            checked={isCcxt ? provider.demoTrading ?? true : true}
+            checked={provider.demoTrading ?? true}
             onChange={(v) => patchProvider('demoTrading', v, true)}
           />
           <span className="text-[13px] text-text">Demo Trading</span>
