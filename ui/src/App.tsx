@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { Sidebar } from './components/Sidebar'
 import { ChatPage } from './pages/ChatPage'
+import { PortfolioPage } from './pages/PortfolioPage'
 import { EventsPage } from './pages/EventsPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { DataSourcesPage } from './pages/DataSourcesPage'
 import { TradingPage } from './pages/TradingPage'
 import { SecuritiesPage } from './pages/SecuritiesPage'
 
-export type Page = 'chat' | 'events' | 'data-sources' | 'trading' | 'securities' | 'settings'
+export type Page = 'chat' | 'portfolio' | 'events' | 'data-sources' | 'trading' | 'securities' | 'settings'
 
 export function App() {
   const [page, setPage] = useState<Page>('chat')
@@ -38,6 +39,7 @@ export function App() {
           <span className="text-sm font-semibold text-text">Open Alice</span>
         </div>
         {page === 'chat' && <ChatPage onSSEStatus={setSseConnected} />}
+        {page === 'portfolio' && <PortfolioPage />}
         {page === 'events' && <EventsPage />}
         {page === 'data-sources' && <DataSourcesPage />}
         {page === 'trading' && <TradingPage />}

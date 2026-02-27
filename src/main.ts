@@ -155,6 +155,10 @@ async function main() {
     ? SecWallet.restore(secSavedState, secWalletConfig)
     : new SecWallet(secWalletConfig)
 
+  // Mutable wallet references — updated on reconnect so REST getters always return current instance
+  let currentCryptoWallet: InstanceType<typeof Wallet> | null = null
+  let currentSecWallet: InstanceType<typeof SecWallet> = secWallet
+
   // Kept for shutdown cleanup reference (populated when CCXT resolves)
   let cryptoResultRef: Awaited<ReturnType<typeof createCryptoTradingEngine>> = null
 
@@ -298,6 +302,7 @@ async function main() {
       const savedWallet = await readFile(WALLET_FILE, 'utf-8')
         .then((r) => JSON.parse(r) as WalletExportState).catch(() => undefined)
       const newWallet = savedWallet ? Wallet.restore(savedWallet, walletConfig) : new Wallet(walletConfig)
+      currentCryptoWallet = newWallet
 
       toolCenter.register(createCryptoTradingTools(newResult.engine, newWallet, bridge))
       console.log(`reconnect: crypto trading engine online (${toolCenter.list().length} tools)`)
@@ -338,6 +343,7 @@ async function main() {
       const savedWallet = await readFile(SEC_WALLET_FILE, 'utf-8')
         .then((r) => JSON.parse(r) as SecWalletExportState).catch(() => undefined)
       const newWallet = savedWallet ? SecWallet.restore(savedWallet, walletConfig) : new SecWallet(walletConfig)
+      currentSecWallet = newWallet
 
       toolCenter.register(createSecuritiesTradingTools(newResult.engine, newWallet, bridge))
       console.log(`reconnect: securities trading engine online (${toolCenter.list().length} tools)`)
@@ -374,7 +380,14 @@ async function main() {
     }))
   }
 
-  const ctx: EngineContext = { config, engine, cryptoEngine: null, eventLog, heartbeat, cronEngine, reconnectCrypto, reconnectSecurities }
+  const ctx: EngineContext = {
+    config, engine, cryptoEngine: null, eventLog, heartbeat, cronEngine,
+    reconnectCrypto, reconnectSecurities,
+    getCryptoEngine: () => cryptoResultRef?.engine ?? null,
+    getSecuritiesEngine: () => secResultRef?.engine ?? null,
+    getCryptoWallet: () => currentCryptoWallet,
+    getSecWallet: () => currentSecWallet,
+  }
 
   for (const plugin of plugins) {
     await plugin.start(ctx)
@@ -401,6 +414,7 @@ async function main() {
     const realWallet = savedState
       ? Wallet.restore(savedState, realWalletConfig)
       : new Wallet(realWalletConfig)
+    currentCryptoWallet = realWallet
     toolCenter.register(createCryptoTradingTools(cryptoResult.engine, realWallet, bridge))
     console.log(`ccxt: crypto trading tools online (${toolCenter.list().length} tools total)`)
   })
