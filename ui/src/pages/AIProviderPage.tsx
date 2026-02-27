@@ -26,7 +26,21 @@ const PROVIDERS = [
   { value: 'anthropic', label: 'Anthropic' },
   { value: 'openai', label: 'OpenAI' },
   { value: 'google', label: 'Google' },
+  { value: 'custom', label: 'Custom' },
 ]
+
+const SDK_FORMATS = [
+  { value: 'openai', label: 'OpenAI Compatible' },
+  { value: 'anthropic', label: 'Anthropic Compatible' },
+  { value: 'google', label: 'Google Compatible' },
+]
+
+/** Detect whether saved config should show as "Custom" in the UI. */
+function detectCustomMode(provider: string, model: string): boolean {
+  const presets = PROVIDER_MODELS[provider]
+  if (!presets) return true
+  return !presets.some((p) => p.value === model)
+}
 
 export function AIProviderPage() {
   const [config, setConfig] = useState<AppConfig | null>(null)
@@ -94,28 +108,35 @@ export function AIProviderPage() {
 // ==================== Model Form ====================
 
 function ModelForm({ aiProvider }: { aiProvider: AIProviderConfig }) {
-  const [provider, setProvider] = useState(aiProvider.provider || 'anthropic')
+  // Detect whether saved config should render as "Custom" in the UI
+  const initCustom = detectCustomMode(aiProvider.provider || 'anthropic', aiProvider.model || '')
+  const [uiProvider, setUiProvider] = useState(initCustom ? 'custom' : (aiProvider.provider || 'anthropic'))
+  const [sdkProvider, setSdkProvider] = useState(aiProvider.provider || 'openai')
   const [model, setModel] = useState(aiProvider.model || '')
-  const [customModel, setCustomModel] = useState('')
+  const [customModel, setCustomModel] = useState(initCustom ? (aiProvider.model || '') : '')
   const [baseUrl, setBaseUrl] = useState(aiProvider.baseUrl || '')
   const [showKeys, setShowKeys] = useState(false)
   const [keys, setKeys] = useState({ anthropic: '', openai: '', google: '' })
   const [keySaveStatus, setKeySaveStatus] = useState<SaveStatus>('idle')
   const keySavedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const presets = PROVIDER_MODELS[provider] || []
-  const isCustom = model !== '' && !presets.some((p) => p.value === model)
-  const effectiveModel = isCustom || model === '' ? customModel || model : model
+  const isCustomMode = uiProvider === 'custom'
+  const effectiveProvider = isCustomMode ? sdkProvider : uiProvider
+  const presets = PROVIDER_MODELS[uiProvider] || []
+  const isCustomModelInStandard = !isCustomMode && model !== '' && !presets.some((p) => p.value === model)
+  const effectiveModel = isCustomMode
+    ? customModel
+    : (isCustomModelInStandard ? customModel || model : model)
 
   // Auto-save model/provider/baseUrl (but NOT apiKeys — those use manual save)
   const modelData = useMemo(
     () => ({
       ...aiProvider,
-      provider,
+      provider: effectiveProvider,
       model: effectiveModel,
       ...(baseUrl ? { baseUrl } : { baseUrl: undefined }),
     }),
-    [aiProvider, provider, effectiveModel, baseUrl],
+    [aiProvider, effectiveProvider, effectiveModel, baseUrl],
   )
 
   const saveModel = useCallback(async (data: Record<string, unknown>) => {
@@ -142,15 +163,22 @@ function ModelForm({ aiProvider }: { aiProvider: AIProviderConfig }) {
     if (keySavedTimer.current) clearTimeout(keySavedTimer.current)
   }, [])
 
-  const handleProviderChange = (newProvider: string) => {
-    setProvider(newProvider)
+  const handleProviderChange = (newUiProvider: string) => {
+    setUiProvider(newUiProvider)
     setBaseUrl('')
-    const defaults = PROVIDER_MODELS[newProvider]
-    if (defaults?.length) {
-      setModel(defaults[0].value)
+    if (newUiProvider === 'custom') {
+      setSdkProvider('openai')
+      setModel('')
       setCustomModel('')
     } else {
-      setModel('')
+      setSdkProvider(newUiProvider)
+      const defaults = PROVIDER_MODELS[newUiProvider]
+      if (defaults?.length) {
+        setModel(defaults[0].value)
+        setCustomModel('')
+      } else {
+        setModel('')
+      }
     }
   }
 
@@ -191,15 +219,15 @@ function ModelForm({ aiProvider }: { aiProvider: AIProviderConfig }) {
     <>
       <Field label="Provider">
         <div className="flex border border-border rounded-lg overflow-hidden">
-          {PROVIDERS.map((p) => (
+          {PROVIDERS.map((p, i) => (
             <button
               key={p.value}
               onClick={() => handleProviderChange(p.value)}
               className={`flex-1 py-2 px-3 text-[13px] font-medium transition-colors ${
-                provider === p.value
+                uiProvider === p.value
                   ? 'bg-accent-dim text-accent'
                   : 'bg-bg text-text-muted hover:bg-bg-tertiary hover:text-text'
-              } ${p.value !== 'anthropic' ? 'border-l border-border' : ''}`}
+              } ${i > 0 ? 'border-l border-border' : ''}`}
             >
               {p.label}
             </button>
@@ -207,26 +235,48 @@ function ModelForm({ aiProvider }: { aiProvider: AIProviderConfig }) {
         </div>
       </Field>
 
-      <Field label="Model">
-        <select
-          className={inputClass}
-          value={isCustom || model === '' ? '__custom__' : model}
-          onChange={(e) => handleModelSelect(e.target.value)}
-        >
-          {presets.map((m) => (
-            <option key={m.value} value={m.value}>{m.label}</option>
-          ))}
-          <option value="__custom__">Custom...</option>
-        </select>
-      </Field>
+      {/* Custom mode: API format selector */}
+      {isCustomMode && (
+        <Field label="API Format">
+          <select
+            className={inputClass}
+            value={sdkProvider}
+            onChange={(e) => setSdkProvider(e.target.value)}
+          >
+            {SDK_FORMATS.map((f) => (
+              <option key={f.value} value={f.value}>{f.label}</option>
+            ))}
+          </select>
+          <p className="text-[11px] text-text-muted mt-1">
+            Which API protocol does your endpoint speak?
+          </p>
+        </Field>
+      )}
 
-      {(isCustom || model === '') && (
-        <Field label="Custom Model ID">
+      {/* Standard mode: preset model dropdown */}
+      {!isCustomMode && (
+        <Field label="Model">
+          <select
+            className={inputClass}
+            value={isCustomModelInStandard || model === '' ? '__custom__' : model}
+            onChange={(e) => handleModelSelect(e.target.value)}
+          >
+            {presets.map((m) => (
+              <option key={m.value} value={m.value}>{m.label}</option>
+            ))}
+            <option value="__custom__">Custom...</option>
+          </select>
+        </Field>
+      )}
+
+      {/* Free-text model ID — always shown in custom mode, or when "Custom..." selected in standard mode */}
+      {(isCustomMode || isCustomModelInStandard || (!isCustomMode && model === '')) && (
+        <Field label={isCustomMode ? 'Model ID' : 'Custom Model ID'}>
           <input
             className={inputClass}
             value={customModel || model}
             onChange={(e) => { setCustomModel(e.target.value); setModel(e.target.value) }}
-            placeholder="e.g. claude-sonnet-4-5-20250929"
+            placeholder={isCustomMode ? 'e.g. gpt-4o, claude-3-opus' : 'e.g. claude-sonnet-4-5-20250929'}
           />
         </Field>
       )}
@@ -236,10 +286,10 @@ function ModelForm({ aiProvider }: { aiProvider: AIProviderConfig }) {
           className={inputClass}
           value={baseUrl}
           onChange={(e) => setBaseUrl(e.target.value)}
-          placeholder="Leave empty for official API"
+          placeholder={isCustomMode ? 'https://your-relay.example.com/v1' : 'Leave empty for official API'}
         />
         <p className="text-[11px] text-text-muted mt-1">
-          Custom endpoint for proxy or relay.
+          {isCustomMode ? 'Your relay or proxy endpoint.' : 'Custom endpoint for proxy or relay.'}
         </p>
       </Field>
 
@@ -266,15 +316,20 @@ function ModelForm({ aiProvider }: { aiProvider: AIProviderConfig }) {
         {showKeys && (
           <div className="mt-3 space-y-3">
             <p className="text-[11px] text-text-muted">
-              Enter API keys below. Leave empty to keep existing value.
+              {isCustomMode
+                ? 'Enter the API key for your relay. It will be sent under the matching provider header.'
+                : 'Enter API keys below. Leave empty to keep existing value.'}
             </p>
-            {PROVIDERS.map((p) => (
-              <Field key={p.value} label={`${p.label} API Key`}>
+            {(isCustomMode
+              ? SDK_FORMATS.filter((f) => f.value === sdkProvider)
+              : PROVIDERS.filter((p) => p.value !== 'custom')
+            ).map((p) => (
+              <Field key={p.value} label={isCustomMode ? `API Key (${p.label})` : `${p.label} API Key`}>
                 <div className="relative">
                   <input
                     className={inputClass}
                     type="password"
-                    value={keys[p.value as keyof typeof keys]}
+                    value={keys[p.value as keyof typeof keys] ?? ''}
                     onChange={(e) => setKeys((k) => ({ ...k, [p.value]: e.target.value }))}
                     placeholder={liveKeyStatus[p.value as keyof typeof liveKeyStatus] ? '(configured)' : 'Not configured'}
                   />
