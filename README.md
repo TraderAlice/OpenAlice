@@ -19,12 +19,16 @@ Your one-person Wall Street. Alice is an AI trading agent that gives you your ow
 - **Dual AI provider** — switch between Claude Code CLI and Vercel AI SDK at runtime, no restart needed
 - **Crypto trading** — CCXT-based execution (Bybit, OKX, Binance, etc.) with a git-like wallet (stage, commit, push)
 - **Securities trading** — Alpaca integration for US equities with the same wallet workflow
+- **Guard pipeline** — extensible pre-execution safety checks for both crypto and securities (max position size, max leverage, cooldown between trades)
 - **Market data** — OpenBB-powered equity, crypto, commodity, and currency data layers with symbol search and technical indicator calculator
+- **Equity research** — company profiles, financial statements, ratios, analyst estimates, earnings calendar, insider trading, and market movers (top gainers, losers, most active)
+- **News collector** — background RSS collection from configurable feeds with archive search tools (`globNews`/`grepNews`/`readNews`). Also captures OpenBB news API results via piggyback
 - **Cognitive state** — persistent "brain" with frontal lobe memory, emotion tracking, and commit history
 - **Event log** — persistent append-only JSONL event log with real-time subscriptions and crash recovery
 - **Cron scheduling** — event-driven cron system with AI-powered job execution and automatic delivery to the last-interacted channel
 - **Evolution mode** — two-tier permission system. Normal mode sandboxes the AI to `data/brain/`; evolution mode gives full project access including Bash, enabling the agent to modify its own source code
-- **Web UI** — built-in local chat interface on port 3002, no Telegram account needed
+- **Hot-reload** — enable/disable connectors (Telegram, MCP Ask) and reconnect trading engines at runtime without restart
+- **Web UI** — local chat interface with portfolio dashboard and full config management (trading, data sources, connectors, settings)
 
 ## Architecture
 
@@ -50,6 +54,8 @@ graph LR
     AK[Analysis Kit]
     CT[Crypto Trading]
     ST[Securities Trading]
+    GD[Guards]
+    NC[News Collector]
     BR[Brain]
     BW[Browser]
   end
@@ -74,9 +80,13 @@ graph LR
   TC -->|Vercel tools| VS
   TC -->|MCP tools| MCP
   OBB --> AK
+  OBB --> NC
   AK --> TC
   CT --> TC
   ST --> TC
+  GD --> CT
+  GD --> ST
+  NC --> TC
   BR --> TC
   BW --> TC
   CRON --> EL
@@ -93,7 +103,7 @@ graph LR
 
 **Core** — `Engine` is a thin facade that delegates to `AgentCenter`, which routes all calls (both stateless and session-aware) through `ProviderRouter`. `ToolCenter` is a centralized tool registry — extensions register tools there, and it exports them in Vercel AI SDK and MCP formats. `EventLog` provides persistent append-only event storage (JSONL) with real-time subscriptions and crash recovery. `ConnectorRegistry` tracks which channel the user last spoke through.
 
-**Extensions** — domain-specific tool sets registered in `ToolCenter`. Each extension owns its tools, state, and persistence.
+**Extensions** — domain-specific tool sets registered in `ToolCenter`. Each extension owns its tools, state, and persistence. `Guards` enforce pre-execution safety checks (position size limits, leverage caps, trade cooldowns) on both crypto and securities operations. `NewsCollector` runs background RSS fetches and piggybacks OpenBB news calls into a persistent archive searchable by the agent.
 
 **Tasks** — scheduled background work. `CronEngine` manages jobs and fires `cron.fire` events into the EventLog on schedule; a listener picks them up, runs them through the AI engine, and delivers replies via the ConnectorRegistry. `Heartbeat` is a periodic health-check that uses a structured response protocol (HEARTBEAT_OK / CHAT_NO / CHAT_YES).
 
@@ -112,35 +122,24 @@ graph LR
 git clone https://github.com/TraderAlice/OpenAlice.git
 cd OpenAlice
 pnpm install
-cp .env.example .env    # then fill in your keys
 ```
+
+All API keys and credentials are configured through JSON files in `data/config/` — either via the Web UI or by editing the files directly. No `.env` file is needed.
 
 ### AI Provider
 
 OpenAlice ships with two provider modes:
 
 - **Claude Code** (default) — spawns `claude -p` as a subprocess, giving the agent full Claude Code capabilities. Requires [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated on the host machine. No separate API key needed — uses your Claude Code login. To switch models, see [how to change Claude Code's model](https://docs.anthropic.com/en/docs/claude-code/settings#model-configuration).
-- **Vercel AI SDK** — runs the agent in-process. Supports any provider compatible with the [Vercel AI SDK](https://sdk.vercel.ai/docs) (Anthropic, OpenAI, Google, etc.). Swap the provider implementation in `src/providers/vercel-ai-sdk/` to use your preferred model. Requires an API key for your chosen provider (e.g. `ANTHROPIC_API_KEY` for Anthropic).
+- **Vercel AI SDK** — runs the agent in-process. Supports any provider compatible with the [Vercel AI SDK](https://sdk.vercel.ai/docs) (Anthropic, OpenAI, Google, etc.). Swap the provider implementation in `src/providers/vercel-ai-sdk/` to use your preferred model. Requires an API key in `data/config/api-keys.json`.
 
 ### Crypto Trading
 
-Powered by [CCXT](https://docs.ccxt.com/). Defaults to Bybit demo trading. Configure the exchange and API keys in `data/config/crypto.json` and `.env`. Any CCXT-supported exchange can be used by modifying the provider implementation.
+Powered by [CCXT](https://docs.ccxt.com/). Defaults to Bybit demo trading. Configure the exchange and API keys in `data/config/crypto.json` (or via the Web UI). Any CCXT-supported exchange can be used by modifying the provider implementation.
 
 ### Securities Trading
 
-Powered by [Alpaca](https://alpaca.markets/). Supports paper and live trading — toggle via `data/config/securities.json`. Sign up at Alpaca and add your keys to `.env`. IBKR support is planned.
-
-### Environment Variables
-
-| Variable | Description |
-|----------|-------------|
-| `ANTHROPIC_API_KEY` | API key for Vercel AI SDK provider (not needed if using Claude Code CLI) |
-| `EXCHANGE_API_KEY` | Crypto exchange API key (optional) |
-| `EXCHANGE_API_SECRET` | Crypto exchange API secret (optional) |
-| `TELEGRAM_BOT_TOKEN` | Telegram bot token (optional) |
-| `TELEGRAM_CHAT_ID` | Comma-separated chat IDs to allow (optional) |
-| `ALPACA_API_KEY` | Alpaca API key for securities (optional) |
-| `ALPACA_SECRET_KEY` | Alpaca secret key for securities (optional) |
+Powered by [Alpaca](https://alpaca.markets/). Supports paper and live trading — toggle via `data/config/securities.json` (or via the Web UI). Sign up at Alpaca and add your keys to the config. IBKR support is planned.
 
 ### Run
 
@@ -168,14 +167,18 @@ All config lives in `data/config/` as JSON files with Zod validation. Missing fi
 
 | File | Purpose |
 |------|---------|
-| `engine.json` | Trading pairs, tick interval, HTTP/MCP ports, timeframe |
+| `engine.json` | Trading pairs, tick interval, timeframe |
 | `model.json` | AI model provider and model name |
 | `agent.json` | Max agent steps, evolution mode toggle, Claude Code tool permissions |
-| `crypto.json` | Allowed symbols, exchange provider (CCXT), demo trading flag |
-| `securities.json` | Allowed symbols, broker provider (Alpaca), paper trading flag |
+| `ai-provider.json` | Active AI provider (`vercel-ai-sdk` or `claude-code`), switchable at runtime |
+| `api-keys.json` | AI provider API keys (Anthropic, OpenAI, Google) — only needed for Vercel AI SDK mode |
+| `crypto.json` | Allowed symbols, CCXT exchange config + API keys, demo trading flag, guards |
+| `securities.json` | Allowed symbols, Alpaca broker config + API keys, paper trading flag, guards |
+| `connectors.json` | Web/MCP server ports, Telegram bot credentials + enable, MCP Ask enable |
+| `openbb.json` | OpenBB API URL, per-asset-class data providers, provider API keys |
+| `news-collector.json` | RSS feeds, fetch interval, retention period, OpenBB piggyback toggle |
 | `compaction.json` | Context window limits, auto-compaction thresholds |
 | `heartbeat.json` | Heartbeat enable/disable, interval, active hours |
-| `ai-provider.json` | Active AI provider (`vercel-ai-sdk` or `claude-code`), switchable at runtime |
 
 Persona and heartbeat prompts use a **default + user override** pattern:
 
@@ -209,20 +212,23 @@ src/
     vercel-ai-sdk/           # Vercel AI SDK ToolLoopAgent wrapper
   extension/
     analysis-kit/            # Indicator calculator and market data tools
-    archive-analysis/        # Legacy market data layer (KlineStore, NewsStore)
-    equity/                  # Equity search and data adapter
+    equity/                  # Equity search, fundamentals, and data adapter
     crypto/                  # Crypto search and data adapter
     currency/                # Currency search and data adapter
-    crypto-trading/          # CCXT integration, wallet, tools
-    securities-trading/      # Alpaca integration, wallet, tools
+    news/                    # OpenBB news tools (world + company headlines)
+    news-collector/          # RSS collector, piggyback wrapper, archive search tools
+    crypto-trading/          # CCXT integration, wallet, guard pipeline, tools
+    securities-trading/      # Alpaca integration, wallet, guard pipeline, tools
     thinking-kit/            # Reasoning and calculation tools
     brain/                   # Cognitive state (memory, emotion)
     browser/                 # Browser automation bridge (via OpenClaw)
   openbb/
     equity/                  # OpenBB equity data layer (price, fundamentals, estimates, etc.)
     crypto/                  # OpenBB crypto data layer
-    commodity/               # OpenBB commodity data layer (EIA, spot prices)
     currency/                # OpenBB currency data layer
+    commodity/               # OpenBB commodity data layer (EIA, spot prices)
+    economy/                 # OpenBB macro economy data layer
+    news/                    # OpenBB news data layer
   connectors/
     web/                     # Web UI chat (Hono, SSE push)
     telegram/                # Telegram bot (grammY, polling, commands)
@@ -233,14 +239,17 @@ src/
   plugins/
     http.ts                  # HTTP health/status endpoint
     mcp.ts                   # MCP server for tool exposure
+  skills/                    # Agent skill definitions
   openclaw/                  # Browser automation subsystem (frozen)
 data/
   config/                    # JSON configuration files
   default/                   # Factory defaults (persona, heartbeat prompts)
   sessions/                  # JSONL conversation histories
   brain/                     # Agent memory and emotion logs
+  cache/                     # API response caches
   crypto-trading/            # Crypto wallet commit history
   securities-trading/        # Securities wallet commit history
+  news-collector/            # Persistent news archive (JSONL)
   cron/                      # Cron job definitions (jobs.json)
   event-log/                 # Persistent event log (events.jsonl)
 docs/                        # Architecture documentation
