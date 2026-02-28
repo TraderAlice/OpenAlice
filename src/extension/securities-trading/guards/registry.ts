@@ -1,10 +1,12 @@
 import type { SecOperationGuard, SecGuardRegistryEntry } from './types.js';
 import { SecCooldownGuard } from './cooldown.js';
 import { SecMaxPositionSizeGuard } from './max-position-size.js';
+import { SecSymbolWhitelistGuard } from './symbol-whitelist.js';
 
 const builtinGuards: SecGuardRegistryEntry[] = [
   { type: 'max-position-size', create: (opts) => new SecMaxPositionSizeGuard(opts) },
   { type: 'cooldown',          create: (opts) => new SecCooldownGuard(opts) },
+  { type: 'symbol-whitelist',  create: (opts) => new SecSymbolWhitelistGuard(opts) },
 ];
 
 const registry = new Map<string, SecGuardRegistryEntry['create']>(

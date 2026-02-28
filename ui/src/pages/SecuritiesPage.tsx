@@ -8,7 +8,6 @@ import { ReconnectButton } from '../components/ReconnectButton'
 import type { AppConfig } from '../api'
 
 interface SecuritiesConfig {
-  allowedSymbols: string[]
   provider: {
     type: 'alpaca' | 'none'
     apiKey?: string

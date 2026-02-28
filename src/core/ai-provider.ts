@@ -8,7 +8,7 @@
 
 import type { SessionStore } from './session.js'
 import type { MediaAttachment } from './types.js'
-import { readAIConfig } from './ai-config.js'
+import { readAIProviderConfig } from './config.js'
 
 // ==================== Types ====================
 
@@ -44,16 +44,16 @@ export class ProviderRouter implements AIProvider {
   ) {}
 
   async ask(prompt: string): Promise<ProviderResult> {
-    const aiConfig = await readAIConfig()
-    if (aiConfig.provider === 'claude-code' && this.claudeCode) {
+    const config = await readAIProviderConfig()
+    if (config.backend === 'claude-code' && this.claudeCode) {
       return this.claudeCode.ask(prompt)
     }
     return this.vercel.ask(prompt)
   }
 
   async askWithSession(prompt: string, session: SessionStore, opts?: AskOptions): Promise<ProviderResult> {
-    const aiConfig = await readAIConfig()
-    if (aiConfig.provider === 'claude-code' && this.claudeCode) {
+    const config = await readAIProviderConfig()
+    if (config.backend === 'claude-code' && this.claudeCode) {
       return this.claudeCode.askWithSession(prompt, session, opts)
     }
     return this.vercel.askWithSession(prompt, session, opts)

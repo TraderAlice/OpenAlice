@@ -43,7 +43,6 @@ export async function createSecuritiesTradingEngine(
         apiKey,
         secretKey,
         paper: providerConfig.paper,
-        allowedSymbols: config.securities.allowedSymbols,
       });
 
       await engine.init();

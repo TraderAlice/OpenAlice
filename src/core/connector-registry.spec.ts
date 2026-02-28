@@ -7,16 +7,28 @@ import {
   listConnectors,
   hasConnectors,
   _resetForTest,
+  type Connector,
+  type SendPayload,
 } from './connector-registry.js'
 
 beforeEach(() => {
   _resetForTest()
 })
 
+function makeConnector(overrides: Partial<Connector> = {}): Connector {
+  return {
+    channel: 'test',
+    to: 'default',
+    capabilities: { push: true, media: false },
+    send: async () => ({ delivered: true }),
+    ...overrides,
+  }
+}
+
 describe('connector-registry', () => {
   describe('registerConnector', () => {
     it('should register and list connectors', () => {
-      registerConnector({ channel: 'telegram', to: '123', deliver: async () => {} })
+      registerConnector(makeConnector({ channel: 'telegram', to: '123' }))
 
       expect(hasConnectors()).toBe(true)
       expect(listConnectors()).toHaveLength(1)
@@ -24,26 +36,37 @@ describe('connector-registry', () => {
     })
 
     it('should replace existing registration for same channel', () => {
-      registerConnector({ channel: 'telegram', to: '123', deliver: async () => {} })
-      registerConnector({ channel: 'telegram', to: '456', deliver: async () => {} })
+      registerConnector(makeConnector({ channel: 'telegram', to: '123' }))
+      registerConnector(makeConnector({ channel: 'telegram', to: '456' }))
 
       expect(listConnectors()).toHaveLength(1)
       expect(listConnectors()[0].to).toBe('456')
     })
 
     it('should support multiple channels', () => {
-      registerConnector({ channel: 'telegram', to: '123', deliver: async () => {} })
-      registerConnector({ channel: 'discord', to: '#general', deliver: async () => {} })
+      registerConnector(makeConnector({ channel: 'telegram', to: '123' }))
+      registerConnector(makeConnector({ channel: 'discord', to: '#general' }))
 
       expect(listConnectors()).toHaveLength(2)
     })
 
     it('should return an unregister function', () => {
-      const unregister = registerConnector({ channel: 'telegram', to: '123', deliver: async () => {} })
+      const unregister = registerConnector(makeConnector({ channel: 'telegram', to: '123' }))
 
       expect(hasConnectors()).toBe(true)
       unregister()
       expect(hasConnectors()).toBe(false)
+    })
+
+    it('should expose capabilities', () => {
+      registerConnector(makeConnector({
+        channel: 'telegram',
+        capabilities: { push: true, media: true },
+      }))
+
+      const connector = listConnectors()[0]
+      expect(connector.capabilities.push).toBe(true)
+      expect(connector.capabilities.media).toBe(true)
     })
   })
 
@@ -70,21 +93,19 @@ describe('connector-registry', () => {
 
   describe('resolveDeliveryTarget', () => {
     it('should return last-interacted connector', () => {
-      const tgDeliver = async () => {}
-      const dcDeliver = async () => {}
-      registerConnector({ channel: 'telegram', to: '123', deliver: tgDeliver })
-      registerConnector({ channel: 'discord', to: '#general', deliver: dcDeliver })
+      registerConnector(makeConnector({ channel: 'telegram', to: '123' }))
+      const dc = makeConnector({ channel: 'discord', to: '#general' })
+      registerConnector(dc)
 
       touchInteraction('discord', '#general')
 
       const target = resolveDeliveryTarget()
       expect(target).not.toBeNull()
       expect(target!.channel).toBe('discord')
-      expect(target!.deliver).toBe(dcDeliver)
     })
 
     it('should fall back to first connector when no interaction yet', () => {
-      registerConnector({ channel: 'telegram', to: '123', deliver: async () => {} })
+      registerConnector(makeConnector({ channel: 'telegram', to: '123' }))
 
       const target = resolveDeliveryTarget()
       expect(target).not.toBeNull()
@@ -92,8 +113,8 @@ describe('connector-registry', () => {
     })
 
     it('should fall back when last-interacted channel was unregistered', () => {
-      const unregister = registerConnector({ channel: 'telegram', to: '123', deliver: async () => {} })
-      registerConnector({ channel: 'discord', to: '#general', deliver: async () => {} })
+      const unregister = registerConnector(makeConnector({ channel: 'telegram', to: '123' }))
+      registerConnector(makeConnector({ channel: 'discord', to: '#general' }))
 
       touchInteraction('telegram', '123')
       unregister()
@@ -113,6 +134,63 @@ describe('connector-registry', () => {
 
       const target = resolveDeliveryTarget()
       expect(target).toBeNull()
+    })
+  })
+
+  describe('send', () => {
+    it('should pass structured payload to connector', async () => {
+      const payloads: SendPayload[] = []
+      registerConnector(makeConnector({
+        channel: 'web',
+        send: async (payload) => {
+          payloads.push(payload)
+          return { delivered: true }
+        },
+      }))
+
+      const target = resolveDeliveryTarget()!
+      await target.send({ kind: 'notification', text: 'hello', source: 'heartbeat' })
+
+      expect(payloads).toHaveLength(1)
+      expect(payloads[0].text).toBe('hello')
+      expect(payloads[0].kind).toBe('notification')
+      expect(payloads[0].source).toBe('heartbeat')
+    })
+
+    it('should pass media in payload', async () => {
+      const payloads: SendPayload[] = []
+      registerConnector(makeConnector({
+        channel: 'web',
+        capabilities: { push: true, media: true },
+        send: async (payload) => {
+          payloads.push(payload)
+          return { delivered: true }
+        },
+      }))
+
+      const target = resolveDeliveryTarget()!
+      await target.send({
+        kind: 'notification',
+        text: 'chart',
+        media: [{ type: 'image', path: '/tmp/screenshot.png' }],
+        source: 'cron',
+      })
+
+      expect(payloads[0].media).toHaveLength(1)
+      expect(payloads[0].media![0].path).toBe('/tmp/screenshot.png')
+    })
+
+    it('should return delivered: false for pull-based connectors', async () => {
+      registerConnector(makeConnector({
+        channel: 'mcp-ask',
+        capabilities: { push: false, media: false },
+        send: async () => ({ delivered: false }),
+      }))
+
+      const target = resolveDeliveryTarget()!
+      const result = await target.send({ kind: 'notification', text: 'test' })
+
+      expect(result.delivered).toBe(false)
     })
   })
 })

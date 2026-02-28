@@ -8,7 +8,6 @@ import { ReconnectButton } from '../components/ReconnectButton'
 import type { AppConfig } from '../api'
 
 interface CryptoConfig {
-  allowedSymbols: string[]
   provider: {
     type: 'ccxt' | 'none'
     exchange?: string

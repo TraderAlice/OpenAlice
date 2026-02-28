@@ -49,7 +49,6 @@ export async function createCryptoTradingEngine(
         sandbox: providerConfig.sandbox,
         demoTrading: providerConfig.demoTrading,
         defaultMarketType: providerConfig.defaultMarketType,
-        allowedSymbols: config.crypto.allowedSymbols,
         options: providerConfig.options,
       });
 

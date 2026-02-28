@@ -29,7 +29,6 @@ export interface CcxtEngineConfig {
   sandbox: boolean;
   demoTrading?: boolean;
   defaultMarketType: 'spot' | 'swap';
-  allowedSymbols: string[];
   options?: Record<string, unknown>;
 }
 
@@ -64,7 +63,6 @@ export class CcxtTradingEngine implements ICryptoTradingEngine {
     }
 
     this.symbolMapper = new SymbolMapper(
-      config.allowedSymbols,
       config.defaultMarketType,
     );
   }

@@ -3,7 +3,6 @@ import { resolve, dirname } from 'path'
 import { Engine } from './core/engine.js'
 import { loadConfig } from './core/config.js'
 import type { Plugin, EngineContext, ReconnectResult } from './core/types.js'
-import { HttpPlugin } from './plugins/http.js'
 import { McpPlugin } from './plugins/mcp.js'
 import { TelegramPlugin } from './connectors/telegram/index.js'
 import { WebPlugin } from './connectors/web/index.js'
@@ -12,7 +11,6 @@ import { createThinkingTools } from './extension/thinking-kit/index.js'
 import type { WalletExportState } from './extension/crypto-trading/index.js'
 import {
   Wallet,
-  initCryptoAllowedSymbols,
   createCryptoTradingEngine,
   createCryptoTradingTools,
   createCryptoOperationDispatcher,
@@ -23,7 +21,6 @@ import {
 import type { SecOperation, SecWalletExportState } from './extension/securities-trading/index.js'
 import {
   SecWallet,
-  initSecAllowedSymbols,
   createSecuritiesTradingEngine,
   createSecuritiesTradingTools,
   createSecOperationDispatcher,
@@ -49,8 +46,8 @@ import { SessionStore } from './core/session.js'
 import { ToolCenter } from './core/tool-center.js'
 import { AgentCenter } from './core/agent-center.js'
 import { ProviderRouter } from './core/ai-provider.js'
-import { VercelAIProvider } from './providers/vercel-ai-sdk/vercel-provider.js'
-import { ClaudeCodeProvider } from './providers/claude-code/claude-code-provider.js'
+import { VercelAIProvider } from './ai-providers/vercel-ai-sdk/vercel-provider.js'
+import { ClaudeCodeProvider } from './ai-providers/claude-code/claude-code-provider.js'
 import { createEventLog } from './core/event-log.js'
 import { createCronEngine, createCronListener, createCronTools } from './task/cron/index.js'
 import { createHeartbeat } from './task/heartbeat/index.js'
@@ -81,10 +78,6 @@ async function main() {
   const config = await loadConfig()
 
   // ==================== Infrastructure ====================
-
-  // Initialize crypto trading symbol whitelist from config
-  initCryptoAllowedSymbols(config.crypto.allowedSymbols)
-  initSecAllowedSymbols(config.securities.allowedSymbols)
 
   // Start CCXT init in background — do NOT await here, letting everything else proceed immediately
   const cryptoInitPromise = createCryptoTradingEngine(config).catch((err) => {
@@ -312,7 +305,6 @@ async function main() {
     cryptoReconnecting = true
     try {
       const freshConfig = await loadConfig()
-      initCryptoAllowedSymbols(freshConfig.crypto.allowedSymbols)
 
       // Create new engine FIRST — if this fails, old engine stays functional
       const newResult = await createCryptoTradingEngine(freshConfig)
@@ -354,7 +346,6 @@ async function main() {
     secReconnecting = true
     try {
       const freshConfig = await loadConfig()
-      initSecAllowedSymbols(freshConfig.securities.allowedSymbols)
 
       const newResult = await createSecuritiesTradingEngine(freshConfig)
       await secResultRef?.close()
@@ -392,7 +383,7 @@ async function main() {
   // ==================== Plugins ====================
 
   // Core plugins — always-on, not toggleable at runtime
-  const corePlugins: Plugin[] = [new HttpPlugin()]
+  const corePlugins: Plugin[] = []
 
   // MCP Server is always active when a port is set — Claude Code provider depends on it for tools
   if (config.connectors.mcp.port) {

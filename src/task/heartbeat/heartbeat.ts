@@ -7,7 +7,7 @@
  *   2. AI call — engine.askWithSession(prompt, heartbeatSession)
  *   3. Ack token filter — skip if AI says "nothing to report"
  *   4. Dedup — skip if same text was sent within 24h
- *   5. Deliver — resolveDeliveryTarget()?.deliver(text)
+ *   5. Send — sendNotification(target, text)
  *
  * Events written to eventLog:
  *   - heartbeat.done  { reply, durationMs, delivered }
@@ -18,7 +18,7 @@
 import type { EventLog, EventLogEntry } from '../../core/event-log.js'
 import type { Engine } from '../../core/engine.js'
 import { SessionStore } from '../../core/session.js'
-import { resolveDeliveryTarget } from '../../core/connector-registry.js'
+import { resolveDeliveryTarget, sendNotification } from '../../core/connector-registry.js'
 import { writeConfigSection } from '../../core/config.js'
 import type { CronEngine, CronFirePayload } from '../cron/engine.js'
 
@@ -160,16 +160,19 @@ export function createHeartbeat(opts: HeartbeatOpts): Heartbeat {
         return
       }
 
-      // 5. Deliver
+      // 5. Send notification
       let delivered = false
       const target = resolveDeliveryTarget()
       if (target) {
         try {
-          await target.deliver(text)
-          delivered = true
-          dedup.record(text, now())
-        } catch (deliveryErr) {
-          console.warn('heartbeat: delivery failed:', deliveryErr)
+          const result2 = await sendNotification(target, text, {
+            media: result.media,
+            source: 'heartbeat',
+          })
+          delivered = result2.delivered
+          if (delivered) dedup.record(text, now())
+        } catch (sendErr) {
+          console.warn('heartbeat: send failed:', sendErr)
         }
       }
 

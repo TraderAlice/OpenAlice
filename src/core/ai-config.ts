@@ -1,22 +1,19 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import { aiProviderSchema } from './config.js'
+import { readAIProviderConfig } from './config.js'
 
-export type AIProvider = 'claude-code' | 'vercel-ai-sdk'
+export type AIBackend = 'claude-code' | 'vercel-ai-sdk'
 
 const CONFIG_PATH = resolve('data/config/ai-provider.json')
 
 export async function readAIConfig() {
-  try {
-    const raw = JSON.parse(await readFile(CONFIG_PATH, 'utf-8'))
-    return aiProviderSchema.parse(raw)
-  } catch {
-    // File missing or corrupt → return schema defaults
-    return aiProviderSchema.parse({})
-  }
+  const config = await readAIProviderConfig()
+  return { backend: config.backend }
 }
 
-export async function writeAIConfig(provider: AIProvider): Promise<void> {
+export async function writeAIConfig(backend: AIBackend): Promise<void> {
+  const current = await readAIProviderConfig()
+  const updated = { ...current, backend }
   await mkdir(resolve('data/config'), { recursive: true })
-  await writeFile(CONFIG_PATH, JSON.stringify({ provider }, null, 2) + '\n')
+  await writeFile(CONFIG_PATH, JSON.stringify(updated, null, 2) + '\n')
 }

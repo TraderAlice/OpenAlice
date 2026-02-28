@@ -1,25 +1,87 @@
 /**
- * Connector Registry — tracks active delivery channels and last user interaction.
+ * Connector Registry — tracks active send channels and last user interaction.
  *
- * Connectors (Telegram, webhook, Discord, etc.) register themselves on startup,
- * providing a deliver function. The scheduler uses this to route heartbeat/cron
- * responses back to the user through the last-interacted channel.
+ * Connectors (Telegram, Web, MCP-ask, etc.) implement the Connector interface
+ * and register themselves on startup. The scheduler uses this to route
+ * heartbeat/cron responses back to the user through the last-interacted channel.
  *
  * Design: single-tenant, multi-channel. One user, potentially reachable via
- * multiple connectors. Delivery target follows the "last" strategy — replies
+ * multiple connectors. Send target follows the "last" strategy — replies
  * go to whichever channel the user most recently interacted through.
  */
 
-// ==================== Types ====================
+import type { MediaAttachment } from './types.js'
 
-export interface ConnectorHandle {
-  /** Channel identifier, e.g. "telegram", "discord", "webhook". */
-  channel: string
-  /** Recipient identifier (chat id, webhook url, etc.). */
-  to: string
-  /** Send a text message through this connector. */
-  deliver: (text: string) => Promise<void>
+// ==================== Send Types ====================
+
+/** Structured payload for outbound send (heartbeat, cron, manual, etc.). */
+export interface SendPayload {
+  /** Whether this is a chat message or a notification. */
+  kind: 'message' | 'notification'
+  /** The text content to send. */
+  text: string
+  /** Media attachments (e.g. screenshots from tools). */
+  media?: MediaAttachment[]
+  /** Where this payload originated from. */
+  source?: 'heartbeat' | 'cron' | 'manual'
 }
+
+/** Result of a send() call. */
+export interface SendResult {
+  /** Whether the message was actually sent (false for pull-based connectors). */
+  delivered: boolean
+}
+
+// ==================== Connector Interface ====================
+
+/** Discoverable capabilities a connector may support. */
+export interface ConnectorCapabilities {
+  /** Can push messages proactively (heartbeat/cron). False for pull-based. */
+  push: boolean
+  /** Can send media attachments (images). */
+  media: boolean
+}
+
+/**
+ * A connector that can send outbound messages to a user.
+ *
+ * Each plugin (Telegram, Web, MCP-ask) implements this interface and
+ * registers itself with the ConnectorRegistry.
+ */
+export interface Connector {
+  /** Channel identifier, e.g. "telegram", "web", "mcp-ask". */
+  readonly channel: string
+  /** Recipient identifier (chat id, "default", session id, etc.). */
+  readonly to: string
+  /** What this connector can do. */
+  readonly capabilities: ConnectorCapabilities
+  /** Send a structured payload through this connector. */
+  send(payload: SendPayload): Promise<SendResult>
+}
+
+// ==================== Convenience Helpers ====================
+
+/** Options for sendMessage / sendNotification helpers. */
+export interface SendOptions {
+  media?: MediaAttachment[]
+  source?: 'heartbeat' | 'cron' | 'manual'
+}
+
+/** Send a chat message through a connector. */
+export function sendMessage(
+  connector: Connector, text: string, opts?: SendOptions,
+): Promise<SendResult> {
+  return connector.send({ kind: 'message', text, ...opts })
+}
+
+/** Send a notification through a connector. */
+export function sendNotification(
+  connector: Connector, text: string, opts?: SendOptions,
+): Promise<SendResult> {
+  return connector.send({ kind: 'notification', text, ...opts })
+}
+
+// ==================== Types ====================
 
 export interface LastInteraction {
   channel: string
@@ -29,13 +91,13 @@ export interface LastInteraction {
 
 // ==================== Registry ====================
 
-const connectors = new Map<string, ConnectorHandle>()
+const connectors = new Map<string, Connector>()
 let lastInteraction: LastInteraction | null = null
 
-/** Register a connector's delivery capability. Replaces any existing registration for this channel. */
-export function registerConnector(handle: ConnectorHandle): () => void {
-  connectors.set(handle.channel, handle)
-  return () => { connectors.delete(handle.channel) }
+/** Register a Connector instance. Replaces any existing registration for this channel. */
+export function registerConnector(connector: Connector): () => void {
+  connectors.set(connector.channel, connector)
+  return () => { connectors.delete(connector.channel) }
 }
 
 /** Record that the user just interacted via this channel. */
@@ -48,8 +110,8 @@ export function getLastInteraction(): LastInteraction | null {
   return lastInteraction
 }
 
-/** Resolve the delivery target: the connector the user last interacted with. */
-export function resolveDeliveryTarget(): ConnectorHandle | null {
+/** Resolve the send target: the connector the user last interacted with. */
+export function resolveDeliveryTarget(): Connector | null {
   if (!lastInteraction) {
     // No interaction yet — fall back to first registered connector
     const first = connectors.values().next()
@@ -57,8 +119,8 @@ export function resolveDeliveryTarget(): ConnectorHandle | null {
   }
 
   // Prefer the last-interacted channel
-  const handle = connectors.get(lastInteraction.channel)
-  if (handle) return handle
+  const connector = connectors.get(lastInteraction.channel)
+  if (connector) return connector
 
   // Channel was unregistered since — fall back to first available
   const first = connectors.values().next()
@@ -66,7 +128,7 @@ export function resolveDeliveryTarget(): ConnectorHandle | null {
 }
 
 /** List all registered connectors. */
-export function listConnectors(): ConnectorHandle[] {
+export function listConnectors(): Connector[] {
   return [...connectors.values()]
 }
 

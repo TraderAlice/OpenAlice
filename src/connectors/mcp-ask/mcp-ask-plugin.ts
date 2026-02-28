@@ -131,9 +131,10 @@ export class McpAskPlugin implements Plugin {
     this.unregisterConnector = registerConnector({
       channel: 'mcp-ask',
       to: 'default',
-      deliver: async (_text: string) => {
-        // MCP is pull-based; outbound delivery is a no-op.
-        // Callers retrieve responses by calling askWithSession.
+      capabilities: { push: false, media: false },
+      send: async () => {
+        // MCP is pull-based; outbound send is a no-op.
+        return { delivered: false }
       },
     })
 

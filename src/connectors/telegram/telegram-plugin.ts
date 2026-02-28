@@ -6,16 +6,16 @@ import type { Plugin, EngineContext, MediaAttachment } from '../../core/types.js
 import type { TelegramConfig, ParsedMessage } from './types.js'
 import { buildParsedMessage } from './helpers.js'
 import { MediaGroupMerger } from './media-group.js'
-import { askClaudeCode } from '../../providers/claude-code/index.js'
-import type { ClaudeCodeConfig } from '../../providers/claude-code/index.js'
+import { askClaudeCode } from '../../ai-providers/claude-code/index.js'
+import type { ClaudeCodeConfig } from '../../ai-providers/claude-code/index.js'
 import { SessionStore } from '../../core/session'
 import { forceCompact } from '../../core/compaction'
-import { readAIConfig, writeAIConfig, type AIProvider } from '../../core/ai-config'
-import { registerConnector, touchInteraction } from '../../core/connector-registry'
+import { readAIConfig, writeAIConfig, type AIBackend } from '../../core/ai-config'
+import { registerConnector, touchInteraction, type Connector } from '../../core/connector-registry'
 
 const MAX_MESSAGE_LENGTH = 4096
 
-const PROVIDER_LABELS: Record<AIProvider, string> = {
+const BACKEND_LABELS: Record<AIBackend, string> = {
   'claude-code': 'Claude Code',
   'vercel-ai-sdk': 'Vercel AI SDK',
 }
@@ -80,7 +80,7 @@ export class TelegramPlugin implements Plugin {
     bot.command('status', async (ctx) => {
       touchInteraction('telegram', String(ctx.chat.id))
       const aiConfig = await readAIConfig()
-      await this.sendReply(ctx.chat.id, `Engine is running. Provider: ${PROVIDER_LABELS[aiConfig.provider]}`)
+      await this.sendReply(ctx.chat.id, `Engine is running. Provider: ${BACKEND_LABELS[aiConfig.backend]}`)
     })
 
     bot.command('settings', async (ctx) => {
@@ -105,18 +105,18 @@ export class TelegramPlugin implements Plugin {
       const data = ctx.callbackQuery.data
       try {
         if (data.startsWith('provider:')) {
-          const provider = data.slice('provider:'.length) as AIProvider
-          await writeAIConfig(provider)
-          await ctx.answerCallbackQuery({ text: `Switched to ${PROVIDER_LABELS[provider]}` })
+          const backend = data.slice('provider:'.length) as AIBackend
+          await writeAIConfig(backend)
+          await ctx.answerCallbackQuery({ text: `Switched to ${BACKEND_LABELS[backend]}` })
 
           // Edit the original settings message in-place
-          const ccLabel = provider === 'claude-code' ? '> Claude Code' : 'Claude Code'
-          const aiLabel = provider === 'vercel-ai-sdk' ? '> Vercel AI SDK' : 'Vercel AI SDK'
+          const ccLabel = backend === 'claude-code' ? '> Claude Code' : 'Claude Code'
+          const aiLabel = backend === 'vercel-ai-sdk' ? '> Vercel AI SDK' : 'Vercel AI SDK'
           const keyboard = new InlineKeyboard()
             .text(ccLabel, 'provider:claude-code')
             .text(aiLabel, 'provider:vercel-ai-sdk')
           await ctx.editMessageText(
-            `Current provider: ${PROVIDER_LABELS[provider]}\n\nChoose default AI provider:`,
+            `Current provider: ${BACKEND_LABELS[backend]}\n\nChoose default AI provider:`,
             { reply_markup: keyboard },
           )
         } else if (data.startsWith('heartbeat:')) {
@@ -170,21 +170,12 @@ export class TelegramPlugin implements Plugin {
     // ── Initialize and get bot info ──
     await bot.init()
     const aiConfig = await readAIConfig()
-    console.log(`telegram plugin: connected as @${bot.botInfo.username} (provider: ${aiConfig.provider})`)
+    console.log(`telegram plugin: connected as @${bot.botInfo.username} (backend: ${aiConfig.backend})`)
 
     // ── Register connector for outbound delivery (heartbeat / cron responses) ──
     if (this.config.allowedChatIds.length > 0) {
       const deliveryChatId = this.config.allowedChatIds[0]
-      this.unregisterConnector = registerConnector({
-        channel: 'telegram',
-        to: String(deliveryChatId),
-        deliver: async (text: string) => {
-          const chunks = splitMessage(text, MAX_MESSAGE_LENGTH)
-          for (const chunk of chunks) {
-            await bot.api.sendMessage(deliveryChatId, chunk)
-          }
-        },
-      })
+      this.unregisterConnector = registerConnector(this.createConnector(bot, deliveryChatId))
     }
 
     // ── Start polling ──
@@ -201,6 +192,37 @@ export class TelegramPlugin implements Plugin {
     this.merger?.flush()
     await this.bot?.stop()
     this.unregisterConnector?.()
+  }
+
+  private createConnector(bot: Bot, chatId: number): Connector {
+    return {
+      channel: 'telegram',
+      to: String(chatId),
+      capabilities: { push: true, media: true },
+      send: async (payload) => {
+        // Send media first (photos)
+        if (payload.media && payload.media.length > 0) {
+          for (const attachment of payload.media) {
+            try {
+              const buf = await readFile(attachment.path)
+              await bot.api.sendPhoto(chatId, new InputFile(buf, 'screenshot.jpg'))
+            } catch (err) {
+              console.error('telegram: failed to send photo:', err)
+            }
+          }
+        }
+
+        // Send text with chunking
+        if (payload.text) {
+          const chunks = splitMessage(payload.text, MAX_MESSAGE_LENGTH)
+          for (const chunk of chunks) {
+            await bot.api.sendMessage(chatId, chunk)
+          }
+        }
+
+        return { delivered: true }
+      },
+    }
   }
 
   private async getSession(userId: number): Promise<SessionStore> {
@@ -298,8 +320,8 @@ export class TelegramPlugin implements Plugin {
 
   private async sendSettingsMenu(chatId: number) {
     const aiConfig = await readAIConfig()
-    const ccLabel = aiConfig.provider === 'claude-code' ? '> Claude Code' : 'Claude Code'
-    const aiLabel = aiConfig.provider === 'vercel-ai-sdk' ? '> Vercel AI SDK' : 'Vercel AI SDK'
+    const ccLabel = aiConfig.backend === 'claude-code' ? '> Claude Code' : 'Claude Code'
+    const aiLabel = aiConfig.backend === 'vercel-ai-sdk' ? '> Vercel AI SDK' : 'Vercel AI SDK'
 
     const keyboard = new InlineKeyboard()
       .text(ccLabel, 'provider:claude-code')
@@ -307,7 +329,7 @@ export class TelegramPlugin implements Plugin {
 
     await this.bot!.api.sendMessage(
       chatId,
-      `Current provider: ${PROVIDER_LABELS[aiConfig.provider]}\n\nChoose default AI provider:`,
+      `Current provider: ${BACKEND_LABELS[aiConfig.backend]}\n\nChoose default AI provider:`,
       { reply_markup: keyboard },
     )
   }

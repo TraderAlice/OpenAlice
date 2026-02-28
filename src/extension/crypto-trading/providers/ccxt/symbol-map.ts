@@ -3,7 +3,7 @@
  *
  * Internal symbol ("BTC/USD") <-> CCXT symbol ("BTC/USDT:USDT")
  *
- * Automatically discovers the best match from exchange.loadMarkets() results
+ * Automatically discovers all available symbols from exchange.loadMarkets() results
  */
 
 interface MarketInfo {
@@ -25,56 +25,22 @@ export class SymbolMapper {
   private precisionMap = new Map<string, { price: number; amount: number }>();
 
   constructor(
-    private allowedSymbols: string[],
     private defaultMarketType: 'spot' | 'swap',
   ) {}
 
   /**
    * Initialize mapping from ccxt exchange.markets
+   *
+   * Scans all exchange markets and builds a bidirectional mapping for every
+   * base asset that has a USD/USDT-quoted spot or swap market.
+   * For each base, picks the single best market using a priority scheme
+   * determined by defaultMarketType.
    */
   init(markets: Record<string, MarketInfo>): void {
-    for (const internalSymbol of this.allowedSymbols) {
-      const base = internalSymbol.split('/')[0];
-      if (!base) continue;
+    // Group by base asset, keep only the best candidate per base
+    const bestByBase = new Map<string, { ccxtSymbol: string; priority: number }>();
 
-      const ccxtSymbol = this.findBestMatch(base, markets);
-      if (!ccxtSymbol) {
-        // Skip if no match found; don't block other symbols
-        continue;
-      }
-
-      this.internalToCcxt.set(internalSymbol, ccxtSymbol);
-      this.ccxtToInternal.set(ccxtSymbol, internalSymbol);
-
-      const market = markets[ccxtSymbol];
-      if (market?.precision) {
-        this.precisionMap.set(internalSymbol, {
-          price: market.precision.price ?? 2,
-          amount: market.precision.amount ?? 8,
-        });
-      }
-    }
-  }
-
-  /**
-   * Find the best ccxt market for a given base asset
-   *
-   * Priority (defaultMarketType = 'swap'):
-   * 1. swap USDT-settled: "BTC/USDT:USDT"
-   * 2. swap USD-settled:  "BTC/USD:USD"
-   * 3. spot USDT:         "BTC/USDT"
-   * 4. spot USD:          "BTC/USD"
-   *
-   * Reversed when defaultMarketType = 'spot'
-   */
-  private findBestMatch(
-    base: string,
-    markets: Record<string, MarketInfo>,
-  ): string | null {
-    const candidates: Array<{ symbol: string; priority: number }> = [];
-
-    for (const [symbol, market] of Object.entries(markets)) {
-      if (market.base !== base) continue;
+    for (const [ccxtSymbol, market] of Object.entries(markets)) {
       if (market.active === false) continue;
 
       const isSwap = market.type === 'swap' || market.type === 'future';
@@ -98,12 +64,26 @@ export class SymbolMapper {
         else priority = 3;
       }
 
-      candidates.push({ symbol, priority });
+      const existing = bestByBase.get(market.base);
+      if (!existing || priority < existing.priority) {
+        bestByBase.set(market.base, { ccxtSymbol, priority });
+      }
     }
 
-    if (candidates.length === 0) return null;
-    candidates.sort((a, b) => a.priority - b.priority);
-    return candidates[0].symbol;
+    // Build bidirectional mappings
+    for (const [base, best] of bestByBase) {
+      const internalSymbol = `${base}/USD`;
+      this.internalToCcxt.set(internalSymbol, best.ccxtSymbol);
+      this.ccxtToInternal.set(best.ccxtSymbol, internalSymbol);
+
+      const market = markets[best.ccxtSymbol];
+      if (market?.precision) {
+        this.precisionMap.set(internalSymbol, {
+          price: market.precision.price ?? 2,
+          amount: market.precision.amount ?? 8,
+        });
+      }
+    }
   }
 
   /** Internal "BTC/USD" → CCXT "BTC/USDT:USDT" */

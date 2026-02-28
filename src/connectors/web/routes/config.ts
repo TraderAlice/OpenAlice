@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
-import { loadConfig, writeConfigSection, readApiKeysConfig, readOpenbbConfig, validSections, type ConfigSection } from '../../../core/config.js'
-import { readAIConfig, writeAIConfig, type AIProvider } from '../../../core/ai-config.js'
+import { loadConfig, writeConfigSection, readAIProviderConfig, readOpenbbConfig, validSections, type ConfigSection } from '../../../core/config.js'
+import { readAIConfig, writeAIConfig, type AIBackend } from '../../../core/ai-config.js'
 
 interface ConfigRouteOpts {
   onConnectorsChange?: () => Promise<void>
@@ -12,8 +12,8 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
 
   app.get('/', async (c) => {
     try {
-      const [config, aiConfig] = await Promise.all([loadConfig(), readAIConfig()])
-      return c.json({ ...config, aiProvider: aiConfig.provider })
+      const config = await loadConfig()
+      return c.json(config)
     } catch (err) {
       return c.json({ error: String(err) }, 500)
     }
@@ -21,13 +21,13 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
 
   app.put('/ai-provider', async (c) => {
     try {
-      const body = await c.req.json<{ provider?: string }>()
-      const provider = body.provider
-      if (provider !== 'claude-code' && provider !== 'vercel-ai-sdk') {
-        return c.json({ error: 'Invalid provider. Must be "claude-code" or "vercel-ai-sdk".' }, 400)
+      const body = await c.req.json<{ backend?: string }>()
+      const backend = body.backend
+      if (backend !== 'claude-code' && backend !== 'vercel-ai-sdk') {
+        return c.json({ error: 'Invalid backend. Must be "claude-code" or "vercel-ai-sdk".' }, 400)
       }
-      await writeAIConfig(provider as AIProvider)
-      return c.json({ provider })
+      await writeAIConfig(backend as AIBackend)
+      return c.json({ backend })
     } catch (err) {
       return c.json({ error: String(err) }, 500)
     }
@@ -56,11 +56,11 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
 
   app.get('/api-keys/status', async (c) => {
     try {
-      const keys = await readApiKeysConfig()
+      const config = await readAIProviderConfig()
       return c.json({
-        anthropic: !!keys.anthropic,
-        openai: !!keys.openai,
-        google: !!keys.google,
+        anthropic: !!config.apiKeys.anthropic,
+        openai: !!config.apiKeys.openai,
+        google: !!config.apiKeys.google,
       })
     } catch (err) {
       return c.json({ error: String(err) }, 500)
