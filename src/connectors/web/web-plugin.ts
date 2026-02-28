@@ -14,6 +14,7 @@ import { createCronRoutes } from './routes/cron.js'
 import { createHeartbeatRoutes } from './routes/heartbeat.js'
 import { createCryptoRoutes } from './routes/crypto.js'
 import { createSecuritiesRoutes } from './routes/securities.js'
+import { createDevRoutes } from './routes/dev.js'
 
 export interface WebConfig {
   port: number
@@ -50,6 +51,7 @@ export class WebPlugin implements Plugin {
     app.route('/api/heartbeat', createHeartbeatRoutes(ctx))
     app.route('/api/crypto', createCryptoRoutes(ctx))
     app.route('/api/securities', createSecuritiesRoutes(ctx))
+    app.route('/api/dev', createDevRoutes())
 
     // ==================== Serve UI (Vite build output) ====================
     const uiRoot = resolve('dist/ui')
@@ -81,7 +83,7 @@ export class WebPlugin implements Plugin {
       channel: 'web',
       to: 'default',
       capabilities: { push: true, media: true },
-      deliver: async (payload) => {
+      send: async (payload) => {
         // Map media file paths to serveable URLs
         const media = (payload.media ?? []).map((m) => {
           const id = randomUUID()
@@ -91,6 +93,7 @@ export class WebPlugin implements Plugin {
 
         const data = JSON.stringify({
           type: 'message',
+          kind: payload.kind,
           text: payload.text,
           media: media.length > 0 ? media : undefined,
           source: payload.source,

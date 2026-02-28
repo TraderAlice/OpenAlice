@@ -132,8 +132,8 @@ export class McpAskPlugin implements Plugin {
       channel: 'mcp-ask',
       to: 'default',
       capabilities: { push: false, media: false },
-      deliver: async () => {
-        // MCP is pull-based; outbound delivery is a no-op.
+      send: async () => {
+        // MCP is pull-based; outbound send is a no-op.
         return { delivered: false }
       },
     })

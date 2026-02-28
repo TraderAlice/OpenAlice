@@ -8,7 +8,7 @@ import {
   hasConnectors,
   _resetForTest,
   type Connector,
-  type DeliveryPayload,
+  type SendPayload,
 } from './connector-registry.js'
 
 beforeEach(() => {
@@ -20,7 +20,7 @@ function makeConnector(overrides: Partial<Connector> = {}): Connector {
     channel: 'test',
     to: 'default',
     capabilities: { push: true, media: false },
-    deliver: async () => ({ delivered: true }),
+    send: async () => ({ delivered: true }),
     ...overrides,
   }
 }
@@ -137,38 +137,40 @@ describe('connector-registry', () => {
     })
   })
 
-  describe('deliver', () => {
+  describe('send', () => {
     it('should pass structured payload to connector', async () => {
-      const payloads: DeliveryPayload[] = []
+      const payloads: SendPayload[] = []
       registerConnector(makeConnector({
         channel: 'web',
-        deliver: async (payload) => {
+        send: async (payload) => {
           payloads.push(payload)
           return { delivered: true }
         },
       }))
 
       const target = resolveDeliveryTarget()!
-      await target.deliver({ text: 'hello', source: 'heartbeat' })
+      await target.send({ kind: 'notification', text: 'hello', source: 'heartbeat' })
 
       expect(payloads).toHaveLength(1)
       expect(payloads[0].text).toBe('hello')
+      expect(payloads[0].kind).toBe('notification')
       expect(payloads[0].source).toBe('heartbeat')
     })
 
     it('should pass media in payload', async () => {
-      const payloads: DeliveryPayload[] = []
+      const payloads: SendPayload[] = []
       registerConnector(makeConnector({
         channel: 'web',
         capabilities: { push: true, media: true },
-        deliver: async (payload) => {
+        send: async (payload) => {
           payloads.push(payload)
           return { delivered: true }
         },
       }))
 
       const target = resolveDeliveryTarget()!
-      await target.deliver({
+      await target.send({
+        kind: 'notification',
         text: 'chart',
         media: [{ type: 'image', path: '/tmp/screenshot.png' }],
         source: 'cron',
@@ -182,11 +184,11 @@ describe('connector-registry', () => {
       registerConnector(makeConnector({
         channel: 'mcp-ask',
         capabilities: { push: false, media: false },
-        deliver: async () => ({ delivered: false }),
+        send: async () => ({ delivered: false }),
       }))
 
       const target = resolveDeliveryTarget()!
-      const result = await target.deliver({ text: 'test' })
+      const result = await target.send({ kind: 'notification', text: 'test' })
 
       expect(result.delivered).toBe(false)
     })

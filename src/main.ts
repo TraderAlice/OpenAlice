@@ -3,7 +3,6 @@ import { resolve, dirname } from 'path'
 import { Engine } from './core/engine.js'
 import { loadConfig } from './core/config.js'
 import type { Plugin, EngineContext, ReconnectResult } from './core/types.js'
-import { HttpPlugin } from './plugins/http.js'
 import { McpPlugin } from './plugins/mcp.js'
 import { TelegramPlugin } from './connectors/telegram/index.js'
 import { WebPlugin } from './connectors/web/index.js'
@@ -384,7 +383,7 @@ async function main() {
   // ==================== Plugins ====================
 
   // Core plugins — always-on, not toggleable at runtime
-  const corePlugins: Plugin[] = [new HttpPlugin()]
+  const corePlugins: Plugin[] = []
 
   // MCP Server is always active when a port is set — Claude Code provider depends on it for tools
   if (config.connectors.mcp.port) {

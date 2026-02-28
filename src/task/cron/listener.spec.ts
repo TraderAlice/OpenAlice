@@ -127,7 +127,7 @@ describe('cron listener', () => {
         channel: 'test',
         to: 'user1',
         capabilities: { push: true, media: false },
-        deliver: async (payload) => { delivered.push(payload.text); return { delivered: true } },
+        send: async (payload) => { delivered.push(payload.text); return { delivered: true } },
       })
       connectorRegistry.touchInteraction('test', 'user1')
 
@@ -151,7 +151,7 @@ describe('cron listener', () => {
         channel: 'test',
         to: 'user1',
         capabilities: { push: true, media: false },
-        deliver: async () => { throw new Error('delivery failed') },
+        send: async () => { throw new Error('send failed') },
       })
       connectorRegistry.touchInteraction('test', 'user1')
 

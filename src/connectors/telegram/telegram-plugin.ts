@@ -199,7 +199,7 @@ export class TelegramPlugin implements Plugin {
       channel: 'telegram',
       to: String(chatId),
       capabilities: { push: true, media: true },
-      deliver: async (payload) => {
+      send: async (payload) => {
         // Send media first (photos)
         if (payload.media && payload.media.length > 0) {
           for (const attachment of payload.media) {

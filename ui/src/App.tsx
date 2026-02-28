@@ -9,12 +9,13 @@ import { DataSourcesPage } from './pages/DataSourcesPage'
 import { TradingPage } from './pages/TradingPage'
 import { SecuritiesPage } from './pages/SecuritiesPage'
 import { ConnectorsPage } from './pages/ConnectorsPage'
+import { DevPage } from './pages/DevPage'
 
 export type Page =
   | 'chat' | 'portfolio' | 'events' | 'data-sources' | 'connectors'
   | 'trading/connection' | 'trading/guards'
   | 'securities/connection' | 'securities/guards'
-  | 'ai-provider' | 'settings'
+  | 'ai-provider' | 'settings' | 'dev'
 
 export function App() {
   const [page, setPage] = useState<Page>('chat')
@@ -53,6 +54,7 @@ export function App() {
         {page.startsWith('securities/') && <SecuritiesPage tab={page.split('/')[1]} />}
         {page === 'ai-provider' && <AIProviderPage />}
         {page === 'settings' && <SettingsPage />}
+        {page === 'dev' && <DevPage />}
       </main>
     </div>
   )

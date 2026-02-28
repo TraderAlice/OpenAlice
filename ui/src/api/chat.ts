@@ -21,7 +21,7 @@ export const chatApi = {
     return res.json()
   },
 
-  connectSSE(onMessage: (data: { type: string; text: string }) => void): EventSource {
+  connectSSE(onMessage: (data: { type: string; kind?: string; text: string }) => void): EventSource {
     const es = new EventSource('/api/chat/events')
     es.onmessage = (event) => {
       try {

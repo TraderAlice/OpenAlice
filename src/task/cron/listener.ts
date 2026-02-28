@@ -4,7 +4,7 @@
  *
  * Flow:
  *   eventLog 'cron.fire' → engine.askWithSession(payload, session)
- *                         → resolveDeliveryTarget()?.deliver(reply)
+ *                         → sendNotification(target, reply)
  *                         → eventLog 'cron.done' / 'cron.error'
  *
  * The listener owns a dedicated SessionStore for cron conversations,
@@ -14,7 +14,7 @@
 import type { EventLog, EventLogEntry } from '../../core/event-log.js'
 import type { Engine } from '../../core/engine.js'
 import { SessionStore } from '../../core/session.js'
-import { resolveDeliveryTarget } from '../../core/connector-registry.js'
+import { resolveDeliveryTarget, sendNotification } from '../../core/connector-registry.js'
 import type { CronFirePayload } from './engine.js'
 import { HEARTBEAT_JOB_NAME } from '../heartbeat/heartbeat.js'
 
@@ -62,17 +62,16 @@ export function createCronListener(opts: CronListenerOpts): CronListener {
         historyPreamble: 'The following is the recent cron session conversation. This is an automated cron job execution.',
       })
 
-      // Deliver the reply through the last-interacted connector
+      // Send notification through the last-interacted connector
       const target = resolveDeliveryTarget()
       if (target) {
         try {
-          await target.deliver({
-            text: result.text,
+          await sendNotification(target, result.text, {
             media: result.media,
             source: 'cron',
           })
-        } catch (deliveryErr) {
-          console.warn(`cron-listener: delivery failed for job ${payload.jobId}:`, deliveryErr)
+        } catch (sendErr) {
+          console.warn(`cron-listener: send failed for job ${payload.jobId}:`, sendErr)
         }
       }
 

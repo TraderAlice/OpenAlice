@@ -57,9 +57,10 @@ export function ChatPage({ onSSEStatus }: ChatPageProps) {
   useEffect(() => {
     const es = api.chat.connectSSE((data) => {
       if (data.type === 'message' && data.text) {
+        const role = data.kind === 'message' ? 'assistant' : 'notification'
         setMessages((prev) => [
           ...prev,
-          { kind: 'text', role: 'notification', text: data.text, _id: nextId.current++ },
+          { kind: 'text', role, text: data.text, _id: nextId.current++ },
         ])
       }
     })
