@@ -2,9 +2,10 @@ import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import { readFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
+import { extname, join } from 'node:path'
 import type { EngineContext } from '../../../core/types.js'
 import { SessionStore, toChatHistory } from '../../../core/session.js'
-import { touchInteraction } from '../../../core/connector-registry.js'
+import { persistMedia, resolveMediaPath } from '../../../core/media-store.js'
 
 export interface SSEClient {
   id: string
@@ -15,19 +16,16 @@ interface ChatDeps {
   ctx: EngineContext
   session: SessionStore
   sseClients: Map<string, SSEClient>
-  mediaMap: Map<string, string>
 }
 
 /** Chat routes: POST /, GET /history, GET /events (SSE) */
-export function createChatRoutes({ ctx, session, sseClients, mediaMap }: ChatDeps) {
+export function createChatRoutes({ ctx, session, sseClients }: ChatDeps) {
   const app = new Hono()
 
   app.post('/', async (c) => {
     const body = await c.req.json<{ message?: string }>()
     const message = body.message?.trim()
     if (!message) return c.json({ error: 'message is required' }, 400)
-
-    touchInteraction('web', 'default')
 
     const receivedEntry = await ctx.eventLog.append('message.received', {
       channel: 'web', to: 'default', prompt: message,
@@ -42,17 +40,11 @@ export function createChatRoutes({ ctx, session, sseClients, mediaMap }: ChatDep
       reply: result.text, durationMs: Date.now() - receivedEntry.ts,
     })
 
-    // Map media files to serveable URLs
-    const media = (result.media ?? []).map((m) => {
-      const id = randomUUID()
-      mediaMap.set(id, m.path)
-      return { type: 'image' as const, url: `/api/media/${id}` }
-    })
-
-    // Evict old media entries (keep last 200)
-    if (mediaMap.size > 200) {
-      const keys = [...mediaMap.keys()]
-      for (let i = 0; i < keys.length - 200; i++) mediaMap.delete(keys[i])
+    // Persist media files with content-addressable 3-word names
+    const media: Array<{ type: 'image'; url: string }> = []
+    for (const m of result.media ?? []) {
+      const name = await persistMedia(m.path)
+      media.push({ type: 'image', url: `/api/media/${name}` })
     }
 
     return c.json({ text: result.text, media })
@@ -88,24 +80,27 @@ export function createChatRoutes({ ctx, session, sseClients, mediaMap }: ChatDep
   return app
 }
 
-/** Media routes: GET /:id */
-export function createMediaRoutes(mediaMap: Map<string, string>) {
+/** Media routes: GET /:name — serves from data/media/ */
+export function createMediaRoutes() {
   const app = new Hono()
 
-  app.get('/:id', async (c) => {
-    const id = c.req.param('id')
-    const filePath = mediaMap.get(id)
-    if (!filePath) return c.notFound()
+  const MIME: Record<string, string> = {
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.webp': 'image/webp',
+    '.gif': 'image/gif',
+    '.svg': 'image/svg+xml',
+  }
+
+  app.get('/:date/:name', async (c) => {
+    const { date, name } = c.req.param()
+    const filePath = resolveMediaPath(join(date, name))
 
     try {
       const buf = await readFile(filePath)
-      const ext = filePath.split('.').pop()?.toLowerCase()
-      const mime =
-        ext === 'png' ? 'image/png'
-          : ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg'
-            : ext === 'webp' ? 'image/webp'
-              : ext === 'gif' ? 'image/gif'
-                : 'application/octet-stream'
+      const ext = extname(name).toLowerCase()
+      const mime = MIME[ext] ?? 'application/octet-stream'
       return c.body(buf, { headers: { 'Content-Type': mime } })
     } catch {
       return c.notFound()

@@ -20,7 +20,6 @@ import { glob } from 'node:fs/promises'
 import { join, basename } from 'node:path'
 import type { Plugin, EngineContext } from '../../core/types.js'
 import { SessionStore, toTextHistory } from '../../core/session.js'
-import { registerConnector, touchInteraction } from '../../core/connector-registry.js'
 
 export interface McpAskConfig {
   port: number
@@ -59,7 +58,6 @@ export class McpAskPlugin implements Plugin {
         { message: z.string().describe('The message to send to Alice'), sessionId: z.string().describe('Session identifier (caller-managed)') },
         async ({ message, sessionId }) => {
           const session = await plugin.getSession(sessionId)
-          touchInteraction('mcp-ask', sessionId)
 
           const result = await ctx.engine.askWithSession(message, session, {
             historyPreamble: 'The following is the conversation from an external MCP client. Use it as context if the caller references earlier messages.',
@@ -128,7 +126,7 @@ export class McpAskPlugin implements Plugin {
     })
 
     // Register as connector for outbound delivery (heartbeat/cron)
-    this.unregisterConnector = registerConnector({
+    this.unregisterConnector = ctx.connectorCenter.register({
       channel: 'mcp-ask',
       to: 'default',
       capabilities: { push: false, media: false },

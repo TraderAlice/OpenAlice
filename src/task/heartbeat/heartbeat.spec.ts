@@ -14,7 +14,7 @@ import {
   type HeartbeatConfig,
 } from './heartbeat.js'
 import { SessionStore } from '../../core/session.js'
-import * as connectorRegistry from '../../core/connector-registry.js'
+import { ConnectorCenter } from '../../core/connector-center.js'
 
 // Mock writeConfigSection to avoid disk writes in tests
 vi.mock('../../core/config.js', () => ({
@@ -58,6 +58,7 @@ describe('heartbeat', () => {
   let heartbeat: Heartbeat
   let mockEngine: ReturnType<typeof createMockEngine>
   let session: SessionStore
+  let connectorCenter: ConnectorCenter
 
   beforeEach(async () => {
     const logPath = tempPath('jsonl')
@@ -68,12 +69,12 @@ describe('heartbeat', () => {
 
     mockEngine = createMockEngine()
     session = new SessionStore(`test/heartbeat-${randomUUID()}`)
+    connectorCenter = new ConnectorCenter()
   })
 
   afterEach(async () => {
     heartbeat?.stop()
     cronEngine.stop()
-    connectorRegistry._resetForTest()
     await eventLog._resetForTest()
   })
 
@@ -83,7 +84,7 @@ describe('heartbeat', () => {
     it('should register a cron job on start', async () => {
       heartbeat = createHeartbeat({
         config: makeConfig(),
-        cronEngine, eventLog,
+        connectorCenter, cronEngine, eventLog,
         engine: mockEngine as any,
         session,
       })
@@ -99,7 +100,7 @@ describe('heartbeat', () => {
     it('should be idempotent (update existing job, not create duplicate)', async () => {
       heartbeat = createHeartbeat({
         config: makeConfig({ every: '30m' }),
-        cronEngine, eventLog,
+        connectorCenter, cronEngine, eventLog,
         engine: mockEngine as any,
         session,
       })
@@ -110,7 +111,7 @@ describe('heartbeat', () => {
       // Start again with different interval
       heartbeat = createHeartbeat({
         config: makeConfig({ every: '1h' }),
-        cronEngine, eventLog,
+        connectorCenter, cronEngine, eventLog,
         engine: mockEngine as any,
         session,
       })
@@ -125,7 +126,7 @@ describe('heartbeat', () => {
     it('should register disabled job when config.enabled is false', async () => {
       heartbeat = createHeartbeat({
         config: makeConfig({ enabled: false }),
-        cronEngine, eventLog,
+        connectorCenter, cronEngine, eventLog,
         engine: mockEngine as any,
         session,
       })
@@ -144,16 +145,15 @@ describe('heartbeat', () => {
   describe('event handling', () => {
     it('should call AI and write heartbeat.done on real response', async () => {
       const delivered: string[] = []
-      connectorRegistry.registerConnector({
+      connectorCenter.register({
         channel: 'test', to: 'user1',
         capabilities: { push: true, media: false },
         send: async (payload) => { delivered.push(payload.text); return { delivered: true } },
       })
-      connectorRegistry.touchInteraction('test', 'user1')
 
       heartbeat = createHeartbeat({
         config: makeConfig(),
-        cronEngine, eventLog,
+        connectorCenter, cronEngine, eventLog,
         engine: mockEngine as any,
         session,
       })
@@ -182,7 +182,7 @@ describe('heartbeat', () => {
 
       heartbeat = createHeartbeat({
         config: makeConfig(),
-        cronEngine, eventLog,
+        connectorCenter, cronEngine, eventLog,
         engine: mockEngine as any,
         session,
       })
@@ -207,7 +207,7 @@ describe('heartbeat', () => {
 
       heartbeat = createHeartbeat({
         config: makeConfig(),
-        cronEngine, eventLog,
+        connectorCenter, cronEngine, eventLog,
         engine: mockEngine as any,
         session,
       })
@@ -226,19 +226,18 @@ describe('heartbeat', () => {
 
     it('should deliver unparsed responses (fail-open)', async () => {
       const delivered: string[] = []
-      connectorRegistry.registerConnector({
+      connectorCenter.register({
         channel: 'test', to: 'user1',
         capabilities: { push: true, media: false },
         send: async (payload) => { delivered.push(payload.text); return { delivered: true } },
       })
-      connectorRegistry.touchInteraction('test', 'user1')
 
       // Raw text without structured format
       mockEngine.setResponse('BTC just crashed 15%, major liquidation event!')
 
       heartbeat = createHeartbeat({
         config: makeConfig(),
-        cronEngine, eventLog,
+        connectorCenter, cronEngine, eventLog,
         engine: mockEngine as any,
         session,
       })
@@ -258,7 +257,7 @@ describe('heartbeat', () => {
     it('should ignore non-heartbeat cron.fire events', async () => {
       heartbeat = createHeartbeat({
         config: makeConfig(),
-        cronEngine, eventLog,
+        connectorCenter, cronEngine, eventLog,
         engine: mockEngine as any,
         session,
       })
@@ -288,7 +287,7 @@ describe('heartbeat', () => {
         config: makeConfig({
           activeHours: { start: '09:00', end: '22:00', timezone: 'local' },
         }),
-        cronEngine, eventLog,
+        connectorCenter, cronEngine, eventLog,
         engine: mockEngine as any,
         session,
         now: () => fakeNow,
@@ -313,16 +312,15 @@ describe('heartbeat', () => {
   describe('dedup', () => {
     it('should suppress duplicate messages within 24h', async () => {
       const delivered: string[] = []
-      connectorRegistry.registerConnector({
+      connectorCenter.register({
         channel: 'test', to: 'user1',
         capabilities: { push: true, media: false },
         send: async (payload) => { delivered.push(payload.text); return { delivered: true } },
       })
-      connectorRegistry.touchInteraction('test', 'user1')
 
       heartbeat = createHeartbeat({
         config: makeConfig(),
-        cronEngine, eventLog,
+        connectorCenter, cronEngine, eventLog,
         engine: mockEngine as any,
         session,
       })
@@ -355,7 +353,7 @@ describe('heartbeat', () => {
 
       heartbeat = createHeartbeat({
         config: makeConfig(),
-        cronEngine, eventLog,
+        connectorCenter, cronEngine, eventLog,
         engine: mockEngine as any,
         session,
       })
@@ -373,16 +371,15 @@ describe('heartbeat', () => {
     })
 
     it('should handle delivery failure gracefully', async () => {
-      connectorRegistry.registerConnector({
+      connectorCenter.register({
         channel: 'test', to: 'user1',
         capabilities: { push: true, media: false },
         send: async () => { throw new Error('send failed') },
       })
-      connectorRegistry.touchInteraction('test', 'user1')
 
       heartbeat = createHeartbeat({
         config: makeConfig(),
-        cronEngine, eventLog,
+        connectorCenter, cronEngine, eventLog,
         engine: mockEngine as any,
         session,
       })
@@ -406,7 +403,7 @@ describe('heartbeat', () => {
     it('should stop listening after stop()', async () => {
       heartbeat = createHeartbeat({
         config: makeConfig(),
-        cronEngine, eventLog,
+        connectorCenter, cronEngine, eventLog,
         engine: mockEngine as any,
         session,
       })
@@ -426,7 +423,7 @@ describe('heartbeat', () => {
     it('should enable a previously disabled heartbeat', async () => {
       heartbeat = createHeartbeat({
         config: makeConfig({ enabled: false }),
-        cronEngine, eventLog,
+        connectorCenter, cronEngine, eventLog,
         engine: mockEngine as any,
         session,
       })
@@ -444,7 +441,7 @@ describe('heartbeat', () => {
     it('should disable an enabled heartbeat', async () => {
       heartbeat = createHeartbeat({
         config: makeConfig({ enabled: true }),
-        cronEngine, eventLog,
+        connectorCenter, cronEngine, eventLog,
         engine: mockEngine as any,
         session,
       })
@@ -463,7 +460,7 @@ describe('heartbeat', () => {
 
       heartbeat = createHeartbeat({
         config: makeConfig({ enabled: false }),
-        cronEngine, eventLog,
+        connectorCenter, cronEngine, eventLog,
         engine: mockEngine as any,
         session,
       })
@@ -475,16 +472,15 @@ describe('heartbeat', () => {
 
     it('should allow firing after setEnabled(true)', async () => {
       const delivered: string[] = []
-      connectorRegistry.registerConnector({
+      connectorCenter.register({
         channel: 'test', to: 'user1',
         capabilities: { push: true, media: false },
         send: async (payload) => { delivered.push(payload.text); return { delivered: true } },
       })
-      connectorRegistry.touchInteraction('test', 'user1')
 
       heartbeat = createHeartbeat({
         config: makeConfig({ enabled: false }),
-        cronEngine, eventLog,
+        connectorCenter, cronEngine, eventLog,
         engine: mockEngine as any,
         session,
       })

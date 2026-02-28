@@ -43,6 +43,7 @@ import { createCurrencyTools } from './extension/currency/index.js'
 import { createNewsTools } from './extension/news/index.js'
 import { createAnalysisTools } from './extension/analysis-kit/index.js'
 import { SessionStore } from './core/session.js'
+import { ConnectorCenter } from './core/connector-center.js'
 import { ToolCenter } from './core/tool-center.js'
 import { AgentCenter } from './core/agent-center.js'
 import { ProviderRouter } from './core/ai-provider.js'
@@ -264,12 +265,16 @@ async function main() {
   const agentCenter = new AgentCenter(router)
   const engine = new Engine({ agentCenter })
 
+  // ==================== Connector Center ====================
+
+  const connectorCenter = new ConnectorCenter(eventLog)
+
   // ==================== Cron Lifecycle ====================
 
   await cronEngine.start()
   const cronSession = new SessionStore('cron/default')
   await cronSession.restore()
-  const cronListener = createCronListener({ eventLog, engine, session: cronSession })
+  const cronListener = createCronListener({ connectorCenter, eventLog, engine, session: cronSession })
   cronListener.start()
   console.log('cron: engine + listener started')
 
@@ -277,7 +282,7 @@ async function main() {
 
   const heartbeat = createHeartbeat({
     config: config.heartbeat,
-    cronEngine, eventLog, engine,
+    connectorCenter, cronEngine, eventLog, engine,
   })
   await heartbeat.start()
   if (config.heartbeat.enabled) {
@@ -464,7 +469,7 @@ async function main() {
   }
 
   const ctx: EngineContext = {
-    config, engine, cryptoEngine: null, eventLog, heartbeat, cronEngine,
+    config, connectorCenter, engine, cryptoEngine: null, eventLog, heartbeat, cronEngine,
     reconnectCrypto, reconnectSecurities, reconnectConnectors,
     getCryptoEngine: () => cryptoResultRef?.engine ?? null,
     getSecuritiesEngine: () => secResultRef?.engine ?? null,

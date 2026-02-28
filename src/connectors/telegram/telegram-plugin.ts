@@ -11,7 +11,7 @@ import type { ClaudeCodeConfig } from '../../ai-providers/claude-code/index.js'
 import { SessionStore } from '../../core/session'
 import { forceCompact } from '../../core/compaction'
 import { readAIConfig, writeAIConfig, type AIBackend } from '../../core/ai-config'
-import { registerConnector, touchInteraction, type Connector } from '../../core/connector-registry'
+import type { ConnectorCenter, Connector } from '../../core/connector-center.js'
 
 const MAX_MESSAGE_LENGTH = 4096
 
@@ -25,6 +25,7 @@ export class TelegramPlugin implements Plugin {
   private config: TelegramConfig
   private claudeCodeConfig: ClaudeCodeConfig
   private bot: Bot | null = null
+  private connectorCenter: ConnectorCenter | null = null
   private merger: MediaGroupMerger | null = null
   private unregisterConnector?: () => void
 
@@ -43,6 +44,8 @@ export class TelegramPlugin implements Plugin {
   }
 
   async start(engineCtx: EngineContext) {
+    this.connectorCenter = engineCtx.connectorCenter
+
     // Inject agent config into Claude Code config (used by /compact command)
     this.claudeCodeConfig = {
       disallowedTools: engineCtx.config.agent.claudeCode.disallowedTools,
@@ -78,23 +81,19 @@ export class TelegramPlugin implements Plugin {
 
     // ── Commands ──
     bot.command('status', async (ctx) => {
-      touchInteraction('telegram', String(ctx.chat.id))
       const aiConfig = await readAIConfig()
       await this.sendReply(ctx.chat.id, `Engine is running. Provider: ${BACKEND_LABELS[aiConfig.backend]}`)
     })
 
     bot.command('settings', async (ctx) => {
-      touchInteraction('telegram', String(ctx.chat.id))
       await this.sendSettingsMenu(ctx.chat.id)
     })
 
     bot.command('heartbeat', async (ctx) => {
-      touchInteraction('telegram', String(ctx.chat.id))
       await this.sendHeartbeatMenu(ctx.chat.id, engineCtx)
     })
 
     bot.command('compact', async (ctx) => {
-      touchInteraction('telegram', String(ctx.chat.id))
       const userId = ctx.from?.id
       if (!userId) return
       await this.handleCompactCommand(ctx.chat.id, userId)
@@ -151,7 +150,6 @@ export class TelegramPlugin implements Plugin {
     const messageHandler = (msg: Message) => {
       const parsed = buildParsedMessage(msg)
       console.log(`telegram: [${parsed.chatId}] ${parsed.from.firstName}: ${parsed.text?.slice(0, 80) || '(media)'}`)
-      touchInteraction('telegram', String(parsed.chatId))
       this.merger!.push(parsed)
     }
 
@@ -175,7 +173,7 @@ export class TelegramPlugin implements Plugin {
     // ── Register connector for outbound delivery (heartbeat / cron responses) ──
     if (this.config.allowedChatIds.length > 0) {
       const deliveryChatId = this.config.allowedChatIds[0]
-      this.unregisterConnector = registerConnector(this.createConnector(bot, deliveryChatId))
+      this.unregisterConnector = this.connectorCenter!.register(this.createConnector(bot, deliveryChatId))
     }
 
     // ── Start polling ──
