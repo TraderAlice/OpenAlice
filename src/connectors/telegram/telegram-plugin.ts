@@ -11,7 +11,7 @@ import type { ClaudeCodeConfig } from '../../ai-providers/claude-code/index.js'
 import { SessionStore } from '../../core/session'
 import { forceCompact } from '../../core/compaction'
 import { readAIConfig, writeAIConfig, type AIBackend } from '../../core/ai-config'
-import { registerConnector, touchInteraction } from '../../core/connector-registry'
+import { registerConnector, touchInteraction, type Connector } from '../../core/connector-registry'
 
 const MAX_MESSAGE_LENGTH = 4096
 
@@ -175,16 +175,7 @@ export class TelegramPlugin implements Plugin {
     // ── Register connector for outbound delivery (heartbeat / cron responses) ──
     if (this.config.allowedChatIds.length > 0) {
       const deliveryChatId = this.config.allowedChatIds[0]
-      this.unregisterConnector = registerConnector({
-        channel: 'telegram',
-        to: String(deliveryChatId),
-        deliver: async (text: string) => {
-          const chunks = splitMessage(text, MAX_MESSAGE_LENGTH)
-          for (const chunk of chunks) {
-            await bot.api.sendMessage(deliveryChatId, chunk)
-          }
-        },
-      })
+      this.unregisterConnector = registerConnector(this.createConnector(bot, deliveryChatId))
     }
 
     // ── Start polling ──
@@ -201,6 +192,37 @@ export class TelegramPlugin implements Plugin {
     this.merger?.flush()
     await this.bot?.stop()
     this.unregisterConnector?.()
+  }
+
+  private createConnector(bot: Bot, chatId: number): Connector {
+    return {
+      channel: 'telegram',
+      to: String(chatId),
+      capabilities: { push: true, media: true },
+      deliver: async (payload) => {
+        // Send media first (photos)
+        if (payload.media && payload.media.length > 0) {
+          for (const attachment of payload.media) {
+            try {
+              const buf = await readFile(attachment.path)
+              await bot.api.sendPhoto(chatId, new InputFile(buf, 'screenshot.jpg'))
+            } catch (err) {
+              console.error('telegram: failed to send photo:', err)
+            }
+          }
+        }
+
+        // Send text with chunking
+        if (payload.text) {
+          const chunks = splitMessage(payload.text, MAX_MESSAGE_LENGTH)
+          for (const chunk of chunks) {
+            await bot.api.sendMessage(chatId, chunk)
+          }
+        }
+
+        return { delivered: true }
+      },
+    }
   }
 
   private async getSession(userId: number): Promise<SessionStore> {

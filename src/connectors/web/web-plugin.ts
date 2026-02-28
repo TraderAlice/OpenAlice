@@ -3,9 +3,10 @@ import { cors } from 'hono/cors'
 import { serve } from '@hono/node-server'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { resolve } from 'node:path'
+import { randomUUID } from 'node:crypto'
 import type { Plugin, EngineContext } from '../../core/types.js'
 import { SessionStore } from '../../core/session.js'
-import { registerConnector } from '../../core/connector-registry.js'
+import { registerConnector, type Connector } from '../../core/connector-registry.js'
 import { createChatRoutes, createMediaRoutes, type SSEClient } from './routes/chat.js'
 import { createConfigRoutes, createOpenbbRoutes } from './routes/config.js'
 import { createEventsRoutes } from './routes/events.js'
@@ -56,16 +57,9 @@ export class WebPlugin implements Plugin {
     app.get('*', serveStatic({ root: uiRoot, path: 'index.html' }))
 
     // ==================== Connector registration ====================
-    this.unregisterConnector = registerConnector({
-      channel: 'web',
-      to: 'default',
-      deliver: async (text: string) => {
-        const data = JSON.stringify({ type: 'message', text })
-        for (const client of this.sseClients.values()) {
-          try { client.send(data) } catch { /* client disconnected */ }
-        }
-      },
-    })
+    this.unregisterConnector = registerConnector(
+      this.createConnector(this.sseClients, mediaMap),
+    )
 
     // ==================== Start server ====================
     this.server = serve({ fetch: app.fetch, port: this.config.port }, (info) => {
@@ -77,5 +71,37 @@ export class WebPlugin implements Plugin {
     this.sseClients.clear()
     this.unregisterConnector?.()
     this.server?.close()
+  }
+
+  private createConnector(
+    sseClients: Map<string, SSEClient>,
+    mediaMap: Map<string, string>,
+  ): Connector {
+    return {
+      channel: 'web',
+      to: 'default',
+      capabilities: { push: true, media: true },
+      deliver: async (payload) => {
+        // Map media file paths to serveable URLs
+        const media = (payload.media ?? []).map((m) => {
+          const id = randomUUID()
+          mediaMap.set(id, m.path)
+          return { type: 'image' as const, url: `/api/media/${id}` }
+        })
+
+        const data = JSON.stringify({
+          type: 'message',
+          text: payload.text,
+          media: media.length > 0 ? media : undefined,
+          source: payload.source,
+        })
+
+        for (const client of sseClients.values()) {
+          try { client.send(data) } catch { /* client disconnected */ }
+        }
+
+        return { delivered: sseClients.size > 0 }
+      },
+    }
   }
 }

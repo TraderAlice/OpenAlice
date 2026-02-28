@@ -66,7 +66,11 @@ export function createCronListener(opts: CronListenerOpts): CronListener {
       const target = resolveDeliveryTarget()
       if (target) {
         try {
-          await target.deliver(result.text)
+          await target.deliver({
+            text: result.text,
+            media: result.media,
+            source: 'cron',
+          })
         } catch (deliveryErr) {
           console.warn(`cron-listener: delivery failed for job ${payload.jobId}:`, deliveryErr)
         }

@@ -165,9 +165,13 @@ export function createHeartbeat(opts: HeartbeatOpts): Heartbeat {
       const target = resolveDeliveryTarget()
       if (target) {
         try {
-          await target.deliver(text)
-          delivered = true
-          dedup.record(text, now())
+          const deliveryResult = await target.deliver({
+            text,
+            media: result.media,
+            source: 'heartbeat',
+          })
+          delivered = deliveryResult.delivered
+          if (delivered) dedup.record(text, now())
         } catch (deliveryErr) {
           console.warn('heartbeat: delivery failed:', deliveryErr)
         }
