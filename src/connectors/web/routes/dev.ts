@@ -8,29 +8,24 @@
  *   GET  /sessions  — list session JSONL files on disk
  *
  * The /send endpoint exercises the exact same code path as heartbeat
- * and cron: resolveDeliveryTarget() → connector.send(payload).
+ * and cron: connectorCenter.notify(text, opts).
  */
 import { Hono } from 'hono'
 import { readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
-import {
-  listConnectors,
-  resolveDeliveryTarget,
-  getLastInteraction,
-  type Connector,
-} from '../../../core/connector-registry.js'
+import type { ConnectorCenter } from '../../../core/connector-center.js'
 
-export function createDevRoutes() {
+export function createDevRoutes(connectorCenter: ConnectorCenter) {
   const app = new Hono()
 
   /** List all registered connectors + last interaction info. */
   app.get('/registry', (c) => {
-    const connectors = listConnectors().map((cn) => ({
+    const connectors = connectorCenter.list().map((cn) => ({
       channel: cn.channel,
       to: cn.to,
       capabilities: cn.capabilities,
     }))
-    return c.json({ connectors, lastInteraction: getLastInteraction() })
+    return c.json({ connectors, lastInteraction: connectorCenter.getLastInteraction() })
   })
 
   /** Manually send a test message through a connector. */
@@ -43,25 +38,24 @@ export function createDevRoutes() {
       source?: string
     }>()
 
-    let target: Connector | null
-    if (body.channel) {
-      target = listConnectors().find((cn) => cn.channel === body.channel) ?? null
-    } else {
-      target = resolveDeliveryTarget()
-    }
-
-    if (!target) {
-      return c.json({ error: 'No connector available' }, 404)
+    const opts = {
+      kind: body.kind ?? 'notification' as const,
+      media: body.media,
+      source: (body.source as 'heartbeat' | 'cron' | 'manual') ?? 'manual',
     }
 
     try {
-      const result = await target.send({
-        kind: body.kind ?? 'notification',
-        text: body.text,
-        media: body.media,
-        source: (body.source as 'heartbeat' | 'cron' | 'manual') ?? 'manual',
-      })
-      return c.json({ channel: target.channel, to: target.to, ...result })
+      if (body.channel) {
+        // Send to a specific channel
+        const target = connectorCenter.get(body.channel)
+        if (!target) return c.json({ error: `No connector for channel: ${body.channel}` }, 404)
+        const result = await target.send({ text: body.text, ...opts })
+        return c.json({ channel: target.channel, to: target.to, ...result })
+      }
+
+      // Default: notify via last-interacted connector
+      const result = await connectorCenter.notify(body.text, opts)
+      return c.json(result)
     } catch (err) {
       return c.json({ error: String(err) }, 500)
     }

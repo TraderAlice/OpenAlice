@@ -3,6 +3,7 @@ import type { ISecuritiesTradingEngine, SecWallet } from '../extension/securitie
 import type { CronEngine } from '../task/cron/engine.js'
 import type { Heartbeat } from '../task/heartbeat/index.js'
 import type { Config } from './config.js'
+import type { ConnectorCenter } from './connector-center.js'
 import type { Engine } from './engine.js'
 import type { EventLog } from './event-log.js'
 
@@ -22,6 +23,7 @@ export interface ReconnectResult {
 
 export interface EngineContext {
   config: Config
+  connectorCenter: ConnectorCenter
   cryptoEngine: ICryptoTradingEngine | null
   engine: Engine
   eventLog: EventLog

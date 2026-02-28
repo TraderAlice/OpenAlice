@@ -7,7 +7,7 @@
  *   2. AI call — engine.askWithSession(prompt, heartbeatSession)
  *   3. Ack token filter — skip if AI says "nothing to report"
  *   4. Dedup — skip if same text was sent within 24h
- *   5. Send — sendNotification(target, text)
+ *   5. Send — connectorCenter.notify(text)
  *
  * Events written to eventLog:
  *   - heartbeat.done  { reply, durationMs, delivered }
@@ -18,7 +18,7 @@
 import type { EventLog, EventLogEntry } from '../../core/event-log.js'
 import type { Engine } from '../../core/engine.js'
 import { SessionStore } from '../../core/session.js'
-import { resolveDeliveryTarget, sendNotification } from '../../core/connector-registry.js'
+import type { ConnectorCenter } from '../../core/connector-center.js'
 import { writeConfigSection } from '../../core/config.js'
 import type { CronEngine, CronFirePayload } from '../cron/engine.js'
 
@@ -74,6 +74,7 @@ CONTENT: BTC just dropped 8% in the last hour — now at $87,200. This may trigg
 
 export interface HeartbeatOpts {
   config: HeartbeatConfig
+  connectorCenter: ConnectorCenter
   cronEngine: CronEngine
   eventLog: EventLog
   engine: Engine
@@ -95,7 +96,7 @@ export interface Heartbeat {
 // ==================== Factory ====================
 
 export function createHeartbeat(opts: HeartbeatOpts): Heartbeat {
-  const { config, cronEngine, eventLog, engine } = opts
+  const { config, connectorCenter, cronEngine, eventLog, engine } = opts
   const session = opts.session ?? new SessionStore('heartbeat')
   const now = opts.now ?? Date.now
 
@@ -162,18 +163,15 @@ export function createHeartbeat(opts: HeartbeatOpts): Heartbeat {
 
       // 5. Send notification
       let delivered = false
-      const target = resolveDeliveryTarget()
-      if (target) {
-        try {
-          const result2 = await sendNotification(target, text, {
-            media: result.media,
-            source: 'heartbeat',
-          })
-          delivered = result2.delivered
-          if (delivered) dedup.record(text, now())
-        } catch (sendErr) {
-          console.warn('heartbeat: send failed:', sendErr)
-        }
+      try {
+        const result2 = await connectorCenter.notify(text, {
+          media: result.media,
+          source: 'heartbeat',
+        })
+        delivered = result2.delivered
+        if (delivered) dedup.record(text, now())
+      } catch (sendErr) {
+        console.warn('heartbeat: send failed:', sendErr)
       }
 
       console.log(`heartbeat: CHAT_YES — delivered=${delivered} (${durationMs}ms)`)

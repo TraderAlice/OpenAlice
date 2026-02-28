@@ -4,7 +4,7 @@
  *
  * Flow:
  *   eventLog 'cron.fire' → engine.askWithSession(payload, session)
- *                         → sendNotification(target, reply)
+ *                         → connectorCenter.notify(reply)
  *                         → eventLog 'cron.done' / 'cron.error'
  *
  * The listener owns a dedicated SessionStore for cron conversations,
@@ -14,13 +14,14 @@
 import type { EventLog, EventLogEntry } from '../../core/event-log.js'
 import type { Engine } from '../../core/engine.js'
 import { SessionStore } from '../../core/session.js'
-import { resolveDeliveryTarget, sendNotification } from '../../core/connector-registry.js'
+import type { ConnectorCenter } from '../../core/connector-center.js'
 import type { CronFirePayload } from './engine.js'
 import { HEARTBEAT_JOB_NAME } from '../heartbeat/heartbeat.js'
 
 // ==================== Types ====================
 
 export interface CronListenerOpts {
+  connectorCenter: ConnectorCenter
   eventLog: EventLog
   engine: Engine
   /** Optional: inject a session for testing. Otherwise creates a dedicated cron session. */
@@ -35,7 +36,7 @@ export interface CronListener {
 // ==================== Factory ====================
 
 export function createCronListener(opts: CronListenerOpts): CronListener {
-  const { eventLog, engine } = opts
+  const { connectorCenter, eventLog, engine } = opts
   const session = opts.session ?? new SessionStore('cron/default')
 
   let unsubscribe: (() => void) | null = null
@@ -63,16 +64,13 @@ export function createCronListener(opts: CronListenerOpts): CronListener {
       })
 
       // Send notification through the last-interacted connector
-      const target = resolveDeliveryTarget()
-      if (target) {
-        try {
-          await sendNotification(target, result.text, {
-            media: result.media,
-            source: 'cron',
-          })
-        } catch (sendErr) {
-          console.warn(`cron-listener: send failed for job ${payload.jobId}:`, sendErr)
-        }
+      try {
+        await connectorCenter.notify(result.text, {
+          media: result.media,
+          source: 'cron',
+        })
+      } catch (sendErr) {
+        console.warn(`cron-listener: send failed for job ${payload.jobId}:`, sendErr)
       }
 
       // Log success

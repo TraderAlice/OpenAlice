@@ -5,7 +5,6 @@ import { randomUUID } from 'node:crypto'
 import { extname, join } from 'node:path'
 import type { EngineContext } from '../../../core/types.js'
 import { SessionStore, toChatHistory } from '../../../core/session.js'
-import { touchInteraction } from '../../../core/connector-registry.js'
 import { persistMedia, resolveMediaPath } from '../../../core/media-store.js'
 
 export interface SSEClient {
@@ -28,7 +27,7 @@ export function createChatRoutes({ ctx, session, sseClients }: ChatDeps) {
     const message = body.message?.trim()
     if (!message) return c.json({ error: 'message is required' }, 400)
 
-    touchInteraction('web', 'default')
+    ctx.connectorCenter.touch('web', 'default')
 
     const receivedEntry = await ctx.eventLog.append('message.received', {
       channel: 'web', to: 'default', prompt: message,

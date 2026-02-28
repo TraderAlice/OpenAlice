@@ -5,7 +5,7 @@ import { serveStatic } from '@hono/node-server/serve-static'
 import { resolve } from 'node:path'
 import type { Plugin, EngineContext } from '../../core/types.js'
 import { SessionStore, type ContentBlock } from '../../core/session.js'
-import { registerConnector, type Connector } from '../../core/connector-registry.js'
+import type { ConnectorCenter, Connector } from '../../core/connector-center.js'
 import { persistMedia } from '../../core/media-store.js'
 import { createChatRoutes, createMediaRoutes, type SSEClient } from './routes/chat.js'
 import { createConfigRoutes, createOpenbbRoutes } from './routes/config.js'
@@ -48,7 +48,7 @@ export class WebPlugin implements Plugin {
     app.route('/api/heartbeat', createHeartbeatRoutes(ctx))
     app.route('/api/crypto', createCryptoRoutes(ctx))
     app.route('/api/securities', createSecuritiesRoutes(ctx))
-    app.route('/api/dev', createDevRoutes())
+    app.route('/api/dev', createDevRoutes(ctx.connectorCenter))
 
     // ==================== Serve UI (Vite build output) ====================
     const uiRoot = resolve('dist/ui')
@@ -56,7 +56,7 @@ export class WebPlugin implements Plugin {
     app.get('*', serveStatic({ root: uiRoot, path: 'index.html' }))
 
     // ==================== Connector registration ====================
-    this.unregisterConnector = registerConnector(
+    this.unregisterConnector = ctx.connectorCenter.register(
       this.createConnector(this.sseClients, session),
     )
 

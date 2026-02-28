@@ -6,7 +6,7 @@ import { createEventLog, type EventLog, type EventLogEntry } from '../../core/ev
 import { createCronListener, type CronListener } from './listener.js'
 import { SessionStore } from '../../core/session.js'
 import type { CronFirePayload } from './engine.js'
-import * as connectorRegistry from '../../core/connector-registry.js'
+import { ConnectorCenter } from '../../core/connector-center.js'
 
 function tempPath(ext: string): string {
   return join(tmpdir(), `cron-listener-test-${randomUUID()}.${ext}`)
@@ -39,14 +39,17 @@ describe('cron listener', () => {
   let mockEngine: ReturnType<typeof createMockEngine>
   let session: SessionStore
   let logPath: string
+  let connectorCenter: ConnectorCenter
 
   beforeEach(async () => {
     logPath = tempPath('jsonl')
     eventLog = await createEventLog({ logPath })
     mockEngine = createMockEngine()
     session = new SessionStore(`test/cron-${randomUUID()}`)
+    connectorCenter = new ConnectorCenter()
 
     listener = createCronListener({
+      connectorCenter,
       eventLog,
       engine: mockEngine as any,
       session,
@@ -55,7 +58,6 @@ describe('cron listener', () => {
 
   afterEach(async () => {
     listener.stop()
-    connectorRegistry._resetForTest()
     await eventLog._resetForTest()
   })
 
@@ -123,13 +125,13 @@ describe('cron listener', () => {
   describe('delivery', () => {
     it('should deliver reply through connector registry', async () => {
       const delivered: string[] = []
-      connectorRegistry.registerConnector({
+      connectorCenter.register({
         channel: 'test',
         to: 'user1',
         capabilities: { push: true, media: false },
         send: async (payload) => { delivered.push(payload.text); return { delivered: true } },
       })
-      connectorRegistry.touchInteraction('test', 'user1')
+      connectorCenter.touch('test', 'user1')
 
       listener.start()
 
@@ -147,13 +149,13 @@ describe('cron listener', () => {
     })
 
     it('should handle delivery failure gracefully', async () => {
-      connectorRegistry.registerConnector({
+      connectorCenter.register({
         channel: 'test',
         to: 'user1',
         capabilities: { push: true, media: false },
         send: async () => { throw new Error('send failed') },
       })
-      connectorRegistry.touchInteraction('test', 'user1')
+      connectorCenter.touch('test', 'user1')
 
       listener.start()
 
