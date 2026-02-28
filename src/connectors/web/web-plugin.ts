@@ -3,10 +3,10 @@ import { cors } from 'hono/cors'
 import { serve } from '@hono/node-server'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { resolve } from 'node:path'
-import { randomUUID } from 'node:crypto'
 import type { Plugin, EngineContext } from '../../core/types.js'
 import { SessionStore } from '../../core/session.js'
 import { registerConnector, type Connector } from '../../core/connector-registry.js'
+import { persistMedia } from '../../core/media-store.js'
 import { createChatRoutes, createMediaRoutes, type SSEClient } from './routes/chat.js'
 import { createConfigRoutes, createOpenbbRoutes } from './routes/config.js'
 import { createEventsRoutes } from './routes/events.js'
@@ -33,15 +33,12 @@ export class WebPlugin implements Plugin {
     const session = new SessionStore('web/default')
     await session.restore()
 
-    // Shared media map for file serving
-    const mediaMap = new Map<string, string>()
-
     const app = new Hono()
     app.use('/api/*', cors())
 
     // ==================== Mount route modules ====================
-    app.route('/api/chat', createChatRoutes({ ctx, session, sseClients: this.sseClients, mediaMap }))
-    app.route('/api/media', createMediaRoutes(mediaMap))
+    app.route('/api/chat', createChatRoutes({ ctx, session, sseClients: this.sseClients }))
+    app.route('/api/media', createMediaRoutes())
     app.route('/api/config', createConfigRoutes({
       onConnectorsChange: async () => { await ctx.reconnectConnectors?.() },
     }))
@@ -60,7 +57,7 @@ export class WebPlugin implements Plugin {
 
     // ==================== Connector registration ====================
     this.unregisterConnector = registerConnector(
-      this.createConnector(this.sseClients, mediaMap, session),
+      this.createConnector(this.sseClients, session),
     )
 
     // ==================== Start server ====================
@@ -77,7 +74,6 @@ export class WebPlugin implements Plugin {
 
   private createConnector(
     sseClients: Map<string, SSEClient>,
-    mediaMap: Map<string, string>,
     session: SessionStore,
   ): Connector {
     return {
@@ -85,12 +81,12 @@ export class WebPlugin implements Plugin {
       to: 'default',
       capabilities: { push: true, media: true },
       send: async (payload) => {
-        // Map media file paths to serveable URLs
-        const media = (payload.media ?? []).map((m) => {
-          const id = randomUUID()
-          mediaMap.set(id, m.path)
-          return { type: 'image' as const, url: `/api/media/${id}` }
-        })
+        // Persist media to data/media/ with 3-word names
+        const media: Array<{ type: 'image'; url: string }> = []
+        for (const m of payload.media ?? []) {
+          const name = await persistMedia(m.path)
+          media.push({ type: 'image', url: `/api/media/${name}` })
+        }
 
         const data = JSON.stringify({
           type: 'message',

@@ -67,6 +67,17 @@ export function ChatPage({ onSSEStatus }: ChatPageProps) {
           ...prev,
           { kind: 'text', role, text: data.text, _id: nextId.current++ },
         ])
+        if (data.media?.length) {
+          setMessages((prev) => [
+            ...prev,
+            ...data.media!.map((m): DisplayItem => ({
+              kind: 'text',
+              role,
+              text: `![image](${m.url})`,
+              _id: nextId.current++,
+            })),
+          ])
+        }
       }
     })
     es.onopen = () => onSSEStatus?.(true)
