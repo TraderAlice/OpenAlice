@@ -150,7 +150,6 @@ describe('heartbeat', () => {
         capabilities: { push: true, media: false },
         send: async (payload) => { delivered.push(payload.text); return { delivered: true } },
       })
-      connectorCenter.touch('test', 'user1')
 
       heartbeat = createHeartbeat({
         config: makeConfig(),
@@ -232,7 +231,6 @@ describe('heartbeat', () => {
         capabilities: { push: true, media: false },
         send: async (payload) => { delivered.push(payload.text); return { delivered: true } },
       })
-      connectorCenter.touch('test', 'user1')
 
       // Raw text without structured format
       mockEngine.setResponse('BTC just crashed 15%, major liquidation event!')
@@ -319,7 +317,6 @@ describe('heartbeat', () => {
         capabilities: { push: true, media: false },
         send: async (payload) => { delivered.push(payload.text); return { delivered: true } },
       })
-      connectorCenter.touch('test', 'user1')
 
       heartbeat = createHeartbeat({
         config: makeConfig(),
@@ -379,7 +376,6 @@ describe('heartbeat', () => {
         capabilities: { push: true, media: false },
         send: async () => { throw new Error('send failed') },
       })
-      connectorCenter.touch('test', 'user1')
 
       heartbeat = createHeartbeat({
         config: makeConfig(),
@@ -481,7 +477,6 @@ describe('heartbeat', () => {
         capabilities: { push: true, media: false },
         send: async (payload) => { delivered.push(payload.text); return { delivered: true } },
       })
-      connectorCenter.touch('test', 'user1')
 
       heartbeat = createHeartbeat({
         config: makeConfig({ enabled: false }),

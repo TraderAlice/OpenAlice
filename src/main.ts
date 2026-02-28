@@ -267,7 +267,7 @@ async function main() {
 
   // ==================== Connector Center ====================
 
-  const connectorCenter = new ConnectorCenter()
+  const connectorCenter = new ConnectorCenter(eventLog)
 
   // ==================== Cron Lifecycle ====================
 

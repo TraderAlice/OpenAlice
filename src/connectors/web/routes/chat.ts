@@ -27,8 +27,6 @@ export function createChatRoutes({ ctx, session, sseClients }: ChatDeps) {
     const message = body.message?.trim()
     if (!message) return c.json({ error: 'message is required' }, 400)
 
-    ctx.connectorCenter.touch('web', 'default')
-
     const receivedEntry = await ctx.eventLog.append('message.received', {
       channel: 'web', to: 'default', prompt: message,
     })

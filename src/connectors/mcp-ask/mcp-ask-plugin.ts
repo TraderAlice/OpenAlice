@@ -58,7 +58,6 @@ export class McpAskPlugin implements Plugin {
         { message: z.string().describe('The message to send to Alice'), sessionId: z.string().describe('Session identifier (caller-managed)') },
         async ({ message, sessionId }) => {
           const session = await plugin.getSession(sessionId)
-          ctx.connectorCenter.touch('mcp-ask', sessionId)
 
           const result = await ctx.engine.askWithSession(message, session, {
             historyPreamble: 'The following is the conversation from an external MCP client. Use it as context if the caller references earlier messages.',

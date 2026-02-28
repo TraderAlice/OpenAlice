@@ -131,7 +131,6 @@ describe('cron listener', () => {
         capabilities: { push: true, media: false },
         send: async (payload) => { delivered.push(payload.text); return { delivered: true } },
       })
-      connectorCenter.touch('test', 'user1')
 
       listener.start()
 
@@ -155,7 +154,6 @@ describe('cron listener', () => {
         capabilities: { push: true, media: false },
         send: async () => { throw new Error('send failed') },
       })
-      connectorCenter.touch('test', 'user1')
 
       listener.start()
 

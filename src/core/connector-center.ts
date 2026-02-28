@@ -11,6 +11,7 @@
  */
 
 import type { MediaAttachment } from './types.js'
+import type { EventLog } from './event-log.js'
 
 // ==================== Send Types ====================
 
@@ -88,6 +89,13 @@ export class ConnectorCenter {
   private connectors = new Map<string, Connector>()
   private lastInteraction: LastInteraction | null = null
 
+  constructor(eventLog?: EventLog) {
+    eventLog?.subscribeType('message.received', (entry) => {
+      const { channel, to } = entry.payload as { channel: string; to: string }
+      this.touch(channel, to)
+    })
+  }
+
   /** Register a Connector instance. Replaces any existing registration for this channel. */
   register(connector: Connector): () => void {
     this.connectors.set(connector.channel, connector)
@@ -95,7 +103,7 @@ export class ConnectorCenter {
   }
 
   /** Record that the user just interacted via this channel. */
-  touch(channel: string, to: string): void {
+  private touch(channel: string, to: string): void {
     this.lastInteraction = { channel, to, ts: Date.now() }
   }
 
