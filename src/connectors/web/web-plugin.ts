@@ -60,7 +60,7 @@ export class WebPlugin implements Plugin {
 
     // ==================== Connector registration ====================
     this.unregisterConnector = registerConnector(
-      this.createConnector(this.sseClients, mediaMap),
+      this.createConnector(this.sseClients, mediaMap, session),
     )
 
     // ==================== Start server ====================
@@ -78,6 +78,7 @@ export class WebPlugin implements Plugin {
   private createConnector(
     sseClients: Map<string, SSEClient>,
     mediaMap: Map<string, string>,
+    session: SessionStore,
   ): Connector {
     return {
       channel: 'web',
@@ -102,6 +103,12 @@ export class WebPlugin implements Plugin {
         for (const client of sseClients.values()) {
           try { client.send(data) } catch { /* client disconnected */ }
         }
+
+        // Persist to session so history survives page refresh
+        await session.appendAssistant(payload.text, 'engine', {
+          kind: payload.kind,
+          source: payload.source,
+        })
 
         return { delivered: sseClients.size > 0 }
       },

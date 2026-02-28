@@ -47,7 +47,12 @@ export function ChatPage({ onSSEStatus }: ChatPageProps) {
   // Load chat history
   useEffect(() => {
     api.chat.history(100).then(({ messages }) => {
-      setMessages(messages.map((m): DisplayItem => ({ ...m, _id: nextId.current++ })))
+      setMessages(messages.map((m): DisplayItem => {
+        if (m.kind === 'text' && m.metadata?.kind === 'notification') {
+          return { ...m, role: 'notification', _id: nextId.current++ }
+        }
+        return { ...m, _id: nextId.current++ }
+      }))
     }).catch((err) => {
       console.warn('Failed to load history:', err)
     })

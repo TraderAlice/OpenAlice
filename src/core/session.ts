@@ -38,6 +38,8 @@ export interface SessionEntry {
   /** Which provider generated this entry. */
   provider?: 'engine' | 'claude-code' | 'human' | 'compaction'
   cwd?: string
+  /** Arbitrary metadata attached to the entry (e.g. { kind: 'notification', source: 'heartbeat' }). */
+  metadata?: Record<string, unknown>
   /** Identifies a compact_boundary entry (type === 'system'). */
   subtype?: 'compact_boundary'
   /** Metadata attached to compact_boundary entries. */
@@ -82,11 +84,16 @@ export class SessionStore {
   }
 
   /** Append an assistant message to the session. */
-  async appendAssistant(content: string | ContentBlock[], provider: SessionEntry['provider'] = 'engine'): Promise<SessionEntry> {
+  async appendAssistant(
+    content: string | ContentBlock[],
+    provider: SessionEntry['provider'] = 'engine',
+    metadata?: Record<string, unknown>,
+  ): Promise<SessionEntry> {
     return this.append({
       type: 'assistant',
       message: { role: 'assistant', content },
       provider,
+      ...(metadata ? { metadata } : {}),
     })
   }
 
@@ -323,7 +330,7 @@ export function toTextHistory(entries: SessionEntry[]): Array<{ role: 'user' | '
 
 /** A display-ready chat history item — either plain text or a group of paired tool calls. */
 export type ChatHistoryItem =
-  | { kind: 'text'; role: 'user' | 'assistant'; text: string; timestamp?: string }
+  | { kind: 'text'; role: 'user' | 'assistant'; text: string; timestamp?: string; metadata?: Record<string, unknown> }
   | { kind: 'tool_calls'; calls: Array<{ name: string; input: string; result?: string }>; timestamp?: string }
 
 /** Strip common MCP tool-name prefixes for cleaner display. */
@@ -357,7 +364,7 @@ export function toChatHistory(entries: SessionEntry[]): ChatHistoryItem[] {
     // Plain string content — always text.
     if (typeof message.content === 'string') {
       if (message.content.trim()) {
-        items.push({ kind: 'text', role: message.role as 'user' | 'assistant', text: message.content, timestamp: entry.timestamp })
+        items.push({ kind: 'text', role: message.role as 'user' | 'assistant', text: message.content, timestamp: entry.timestamp, metadata: entry.metadata })
       }
       continue
     }
@@ -396,7 +403,7 @@ export function toChatHistory(entries: SessionEntry[]): ChatHistoryItem[] {
       // If there were also text blocks in this same entry, emit them separately.
       const text = textBlocks.map((b) => b.text).join('\n')
       if (text.trim()) {
-        items.push({ kind: 'text', role: message.role as 'user' | 'assistant', text, timestamp: entry.timestamp })
+        items.push({ kind: 'text', role: message.role as 'user' | 'assistant', text, timestamp: entry.timestamp, metadata: entry.metadata })
       }
       continue
     }
@@ -409,7 +416,7 @@ export function toChatHistory(entries: SessionEntry[]): ChatHistoryItem[] {
     // Text-only entry.
     const text = textBlocks.map((b) => b.text).join('\n')
     if (text.trim()) {
-      items.push({ kind: 'text', role: message.role as 'user' | 'assistant', text, timestamp: entry.timestamp })
+      items.push({ kind: 'text', role: message.role as 'user' | 'assistant', text, timestamp: entry.timestamp, metadata: entry.metadata })
     }
   }
 
