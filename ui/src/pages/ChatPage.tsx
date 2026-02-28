@@ -5,7 +5,7 @@ import { ChatInput } from '../components/ChatInput'
 
 /** Unified display item for the message list. */
 type DisplayItem =
-  | { kind: 'text'; role: 'user' | 'assistant' | 'notification'; text: string; timestamp?: string | null; _id: number }
+  | { kind: 'text'; role: 'user' | 'assistant' | 'notification'; text: string; timestamp?: string | null; media?: Array<{ type: string; url: string }>; _id: number }
   | { kind: 'tool_calls'; calls: ToolCall[]; timestamp?: string; _id: number }
 
 interface ChatPageProps {
@@ -65,19 +65,8 @@ export function ChatPage({ onSSEStatus }: ChatPageProps) {
         const role = data.kind === 'message' ? 'assistant' : 'notification'
         setMessages((prev) => [
           ...prev,
-          { kind: 'text', role, text: data.text, _id: nextId.current++ },
+          { kind: 'text', role, text: data.text, media: data.media, _id: nextId.current++ },
         ])
-        if (data.media?.length) {
-          setMessages((prev) => [
-            ...prev,
-            ...data.media!.map((m): DisplayItem => ({
-              kind: 'text',
-              role,
-              text: `![image](${m.url})`,
-              _id: nextId.current++,
-            })),
-          ])
-        }
       }
     })
     es.onopen = () => onSSEStatus?.(true)
@@ -93,21 +82,9 @@ export function ChatPage({ onSSEStatus }: ChatPageProps) {
     try {
       const data = await api.chat.send(text)
 
-      // Add media messages
-      if (data.media?.length) {
-        for (const m of data.media) {
-          if (m.type === 'image') {
-            setMessages((prev) => [
-              ...prev,
-              { kind: 'text', role: 'assistant', text: `![image](${m.url})`, _id: nextId.current++ },
-            ])
-          }
-        }
-      }
-
-      // Add text response
       if (data.text) {
-        setMessages((prev) => [...prev, { kind: 'text', role: 'assistant', text: data.text, _id: nextId.current++ }])
+        const media = data.media?.length ? data.media : undefined
+        setMessages((prev) => [...prev, { kind: 'text', role: 'assistant', text: data.text, media, _id: nextId.current++ }])
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error'
@@ -172,6 +149,7 @@ export function ChatPage({ onSSEStatus }: ChatPageProps) {
                   text={msg.text}
                   timestamp={msg.timestamp}
                   isGrouped={isGrouped}
+                  media={msg.media}
                 />
               </div>
             )

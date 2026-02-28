@@ -43,12 +43,23 @@ const WORDS = [
 
 const MEDIA_DIR = join(process.cwd(), 'data', 'media')
 
+/** YYYY-MM-DD date folder for today. */
+function datePath(): string {
+  const d = new Date()
+  const y = String(d.getFullYear())
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 /**
  * Copy a file into the persistent media store.
- * Returns the short name (e.g. `ace-fog-cup.png`) — caller builds the URL.
+ * Returns the relative path (e.g. `2026-02-28/pad-red-now.png`) — caller builds the URL.
  */
 export async function persistMedia(filePath: string): Promise<string> {
-  await mkdir(MEDIA_DIR, { recursive: true })
+  const dateDir = datePath()
+  const dir = join(MEDIA_DIR, dateDir)
+  await mkdir(dir, { recursive: true })
 
   const buf = await readFile(filePath)
   const hash = createHash('sha256').update(buf).digest()
@@ -59,16 +70,16 @@ export async function persistMedia(filePath: string): Promise<string> {
 
   const ext = extname(filePath).toLowerCase() || '.bin'
   const name = `${w1}-${w2}-${w3}${ext}`
-  const dest = join(MEDIA_DIR, name)
+  const dest = join(dir, name)
 
   if (!existsSync(dest)) {
     await copyFile(filePath, dest)
   }
 
-  return name
+  return join(dateDir, name)
 }
 
-/** Resolve a media name to its absolute path on disk. */
+/** Resolve a media relative path to its absolute path on disk. */
 export function resolveMediaPath(name: string): string {
   return join(MEDIA_DIR, name)
 }

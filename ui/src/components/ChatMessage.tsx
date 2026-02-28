@@ -25,6 +25,7 @@ interface ChatMessageProps {
   timestamp?: string | number | null
   /** True when this message follows another message of the same role — hides the label/avatar */
   isGrouped?: boolean
+  media?: Array<{ type: string; url: string }>
 }
 
 const COPY_ICON = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`
@@ -52,7 +53,7 @@ function addCodeBlockWrappers(html: string): string {
   )
 }
 
-export function ChatMessage({ role, text, timestamp, isGrouped }: ChatMessageProps) {
+export function ChatMessage({ role, text, timestamp, isGrouped, media }: ChatMessageProps) {
   const contentRef = useRef<HTMLDivElement>(null)
 
   const html = useMemo(() => {
@@ -88,6 +89,9 @@ export function ChatMessage({ role, text, timestamp, isGrouped }: ChatMessagePro
       <div className="flex flex-col items-center message-enter">
         <div className="max-w-[90%] px-4 py-2.5 bg-notification-bg border border-notification-border rounded-lg text-[13px] break-words">
           <div className="markdown-content" dangerouslySetInnerHTML={{ __html: `\ud83d\udd14 ${html}` }} />
+          {media?.map((m, i) => (
+            <img key={i} src={m.url} alt="" className="max-w-full rounded-lg mt-2" />
+          ))}
         </div>
       </div>
     )
@@ -119,6 +123,9 @@ export function ChatMessage({ role, text, timestamp, isGrouped }: ChatMessagePro
       )}
       <div ref={contentRef} className={`max-w-[90%] break-words leading-relaxed ${isGrouped ? 'ml-8' : 'ml-8'}`}>
         <div className="markdown-content" dangerouslySetInnerHTML={{ __html: html! }} />
+        {media?.map((m, i) => (
+          <img key={i} src={m.url} alt="" className="max-w-full rounded-lg mt-2" />
+        ))}
       </div>
       {timestamp && (
         <div className="text-[11px] text-text-muted mt-1 ml-8 opacity-0 group-hover:opacity-100 transition-opacity">

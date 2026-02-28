@@ -18,7 +18,7 @@ export interface ToolCall {
 }
 
 export type ChatHistoryItem =
-  | { kind: 'text'; role: 'user' | 'assistant'; text: string; timestamp?: string; metadata?: Record<string, unknown> }
+  | { kind: 'text'; role: 'user' | 'assistant'; text: string; timestamp?: string; metadata?: Record<string, unknown>; media?: Array<{ type: string; url: string }> }
   | { kind: 'tool_calls'; calls: ToolCall[]; timestamp?: string }
 
 // ==================== Config ====================

@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import { readFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
-import { extname } from 'node:path'
+import { extname, join } from 'node:path'
 import type { EngineContext } from '../../../core/types.js'
 import { SessionStore, toChatHistory } from '../../../core/session.js'
 import { touchInteraction } from '../../../core/connector-registry.js'
@@ -96,9 +96,9 @@ export function createMediaRoutes() {
     '.svg': 'image/svg+xml',
   }
 
-  app.get('/:name', async (c) => {
-    const name = c.req.param('name')
-    const filePath = resolveMediaPath(name)
+  app.get('/:date/:name', async (c) => {
+    const { date, name } = c.req.param()
+    const filePath = resolveMediaPath(join(date, name))
 
     try {
       const buf = await readFile(filePath)

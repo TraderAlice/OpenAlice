@@ -4,7 +4,7 @@ import { serve } from '@hono/node-server'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { resolve } from 'node:path'
 import type { Plugin, EngineContext } from '../../core/types.js'
-import { SessionStore } from '../../core/session.js'
+import { SessionStore, type ContentBlock } from '../../core/session.js'
 import { registerConnector, type Connector } from '../../core/connector-registry.js'
 import { persistMedia } from '../../core/media-store.js'
 import { createChatRoutes, createMediaRoutes, type SSEClient } from './routes/chat.js'
@@ -100,8 +100,12 @@ export class WebPlugin implements Plugin {
           try { client.send(data) } catch { /* client disconnected */ }
         }
 
-        // Persist to session so history survives page refresh
-        await session.appendAssistant(payload.text, 'engine', {
+        // Persist to session so history survives page refresh (text + image blocks)
+        const blocks: ContentBlock[] = [
+          { type: 'text', text: payload.text },
+          ...media.map((m) => ({ type: 'image' as const, url: m.url })),
+        ]
+        await session.appendAssistant(blocks, 'engine', {
           kind: payload.kind,
           source: payload.source,
         })

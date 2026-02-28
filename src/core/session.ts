@@ -51,6 +51,7 @@ export interface SessionEntry {
 /** Anthropic-style content blocks (compatible with Claude Code session format). */
 export type ContentBlock =
   | { type: 'text'; text: string }
+  | { type: 'image'; url: string }
   | { type: 'tool_use'; id: string; name: string; input: unknown }
   | { type: 'tool_result'; tool_use_id: string; content: string }
 
@@ -330,7 +331,7 @@ export function toTextHistory(entries: SessionEntry[]): Array<{ role: 'user' | '
 
 /** A display-ready chat history item — either plain text or a group of paired tool calls. */
 export type ChatHistoryItem =
-  | { kind: 'text'; role: 'user' | 'assistant'; text: string; timestamp?: string; metadata?: Record<string, unknown> }
+  | { kind: 'text'; role: 'user' | 'assistant'; text: string; timestamp?: string; metadata?: Record<string, unknown>; media?: Array<{ type: string; url: string }> }
   | { kind: 'tool_calls'; calls: Array<{ name: string; input: string; result?: string }>; timestamp?: string }
 
 /** Strip common MCP tool-name prefixes for cleaner display. */
@@ -371,8 +372,10 @@ export function toChatHistory(entries: SessionEntry[]): ChatHistoryItem[] {
 
     // Content block array — classify by block types present.
     const textBlocks = message.content.filter((b): b is Extract<ContentBlock, { type: 'text' }> => b.type === 'text')
+    const imageBlocks = message.content.filter((b): b is Extract<ContentBlock, { type: 'image' }> => b.type === 'image')
     const toolUseBlocks = message.content.filter((b): b is Extract<ContentBlock, { type: 'tool_use' }> => b.type === 'tool_use')
     const toolResultBlocks = message.content.filter((b): b is Extract<ContentBlock, { type: 'tool_result' }> => b.type === 'tool_result')
+    const media = imageBlocks.length > 0 ? imageBlocks.map((b) => ({ type: 'image', url: b.url })) : undefined
 
     // If this entry has tool_use blocks, pair them with tool_results from the next entry.
     if (toolUseBlocks.length > 0) {
@@ -402,8 +405,8 @@ export function toChatHistory(entries: SessionEntry[]): ChatHistoryItem[] {
 
       // If there were also text blocks in this same entry, emit them separately.
       const text = textBlocks.map((b) => b.text).join('\n')
-      if (text.trim()) {
-        items.push({ kind: 'text', role: message.role as 'user' | 'assistant', text, timestamp: entry.timestamp, metadata: entry.metadata })
+      if (text.trim() || media) {
+        items.push({ kind: 'text', role: message.role as 'user' | 'assistant', text, timestamp: entry.timestamp, metadata: entry.metadata, media })
       }
       continue
     }
@@ -413,10 +416,10 @@ export function toChatHistory(entries: SessionEntry[]): ChatHistoryItem[] {
       continue
     }
 
-    // Text-only entry.
+    // Text (+ optional image) entry.
     const text = textBlocks.map((b) => b.text).join('\n')
-    if (text.trim()) {
-      items.push({ kind: 'text', role: message.role as 'user' | 'assistant', text, timestamp: entry.timestamp, metadata: entry.metadata })
+    if (text.trim() || media) {
+      items.push({ kind: 'text', role: message.role as 'user' | 'assistant', text, timestamp: entry.timestamp, metadata: entry.metadata, media })
     }
   }
 
