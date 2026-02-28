@@ -34,6 +34,15 @@ export class WebPlugin implements Plugin {
     await session.restore()
 
     const app = new Hono()
+
+    app.onError((err, c) => {
+      if (err instanceof SyntaxError) {
+        return c.json({ error: 'Invalid JSON' }, 400)
+      }
+      console.error('web: unhandled error:', err)
+      return c.json({ error: err.message }, 500)
+    })
+
     app.use('/api/*', cors())
 
     // ==================== Mount route modules ====================

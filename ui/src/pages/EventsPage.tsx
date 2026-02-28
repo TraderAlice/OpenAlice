@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { api, type EventLogEntry, type CronJob, type CronSchedule } from '../api'
+import { useSSE } from '../hooks/useSSE'
 import { Toggle } from '../components/Toggle'
 
 // ==================== Helpers ====================
@@ -58,17 +59,17 @@ function EventLogSection() {
   }, [])
 
   // SSE for real-time events
-  useEffect(() => {
-    if (paused) return
-    const es = api.events.connectSSE((entry) => {
+  useSSE({
+    url: '/api/events/stream',
+    onMessage: (entry: EventLogEntry) => {
       lastSeqRef.current = Math.max(lastSeqRef.current, entry.seq)
       setEntries((prev) => {
         const next = [entry, ...prev]
         return next.length > 500 ? next.slice(0, 500) : next
       })
-    })
-    return () => es.close()
-  }, [paused])
+    },
+    enabled: !paused,
+  })
 
   const filtered = typeFilter
     ? entries.filter((e) => e.type.includes(typeFilter))

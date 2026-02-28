@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { api, type ChatHistoryItem, type ToolCall } from '../api'
+import { useSSE } from '../hooks/useSSE'
 import { ChatMessage, ToolCallGroup, ThinkingIndicator } from '../components/ChatMessage'
 import { ChatInput } from '../components/ChatInput'
 
@@ -59,8 +60,9 @@ export function ChatPage({ onSSEStatus }: ChatPageProps) {
   }, [])
 
   // Connect SSE for push notifications + report connection status
-  useEffect(() => {
-    const es = api.chat.connectSSE((data) => {
+  useSSE({
+    url: '/api/chat/events',
+    onMessage: (data) => {
       if (data.type === 'message' && data.text) {
         const role = data.kind === 'message' ? 'assistant' : 'notification'
         setMessages((prev) => [
@@ -68,11 +70,9 @@ export function ChatPage({ onSSEStatus }: ChatPageProps) {
           { kind: 'text', role, text: data.text, media: data.media, _id: nextId.current++ },
         ])
       }
-    })
-    es.onopen = () => onSSEStatus?.(true)
-    es.onerror = () => onSSEStatus?.(false)
-    return () => { es.close(); onSSEStatus?.(false) }
-  }, [onSSEStatus])
+    },
+    onStatus: onSSEStatus,
+  })
 
   // Send message
   const handleSend = useCallback(async (text: string) => {
