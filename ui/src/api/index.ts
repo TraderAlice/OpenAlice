@@ -43,3 +43,4 @@ export type {
   NewsCollectorConfig,
   NewsCollectorFeed,
 } from './types'
+export type { EventQueryResult } from './events'

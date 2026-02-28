@@ -5,10 +5,6 @@ import { Toggle } from '../components/Toggle'
 
 // ==================== Helpers ====================
 
-function formatTime(ts: number): string {
-  return new Date(ts).toLocaleTimeString('en-US', { hour12: false })
-}
-
 function formatDateTime(ts: number): string {
   const d = new Date(ts)
   const date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
@@ -43,40 +39,86 @@ function eventTypeColor(type: string): string {
 
 // ==================== EventLog Section ====================
 
+const PAGE_SIZE = 100
+
 function EventLogSection() {
   const [entries, setEntries] = useState<EventLogEntry[]>([])
   const [typeFilter, setTypeFilter] = useState('')
   const [paused, setPaused] = useState(false)
-  const lastSeqRef = useRef(0)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [types, setTypes] = useState<string[]>([])
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // Initial load
-  useEffect(() => {
-    api.events.recent({ limit: 200 }).then(({ entries, lastSeq }) => {
-      setEntries(entries.reverse()) // newest first
-      lastSeqRef.current = lastSeq
-    }).catch(console.warn)
+  // Fetch a page from disk
+  const fetchPage = useCallback(async (p: number, type?: string) => {
+    setLoading(true)
+    try {
+      const result = await api.events.query({
+        page: p,
+        pageSize: PAGE_SIZE,
+        type: type || undefined,
+      })
+      setEntries(result.entries)
+      setPage(result.page)
+      setTotalPages(result.totalPages)
+      setTotal(result.total)
+    } catch (err) {
+      console.warn('Failed to load events:', err)
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
-  // SSE for real-time events
+  // Initial load
+  useEffect(() => { fetchPage(1) }, [fetchPage])
+
+  // Track all seen event types (persists across page changes)
+  useEffect(() => {
+    if (entries.length > 0) {
+      setTypes((prev) => {
+        const next = new Set(prev)
+        for (const e of entries) next.add(e.type)
+        return [...next].sort()
+      })
+    }
+  }, [entries])
+
+  // SSE for real-time events — only affects page 1
   useSSE({
     url: '/api/events/stream',
     onMessage: (entry: EventLogEntry) => {
-      lastSeqRef.current = Math.max(lastSeqRef.current, entry.seq)
-      setEntries((prev) => {
-        const next = [entry, ...prev]
-        return next.length > 500 ? next.slice(0, 500) : next
+      // Always track new types
+      setTypes((prev) => {
+        if (prev.includes(entry.type)) return prev
+        return [...prev, entry.type].sort()
       })
+      // Increment total
+      setTotal((prev) => prev + 1)
+      // Only prepend to visible list when on page 1 and matching filter
+      if (page === 1) {
+        const matchesFilter = !typeFilter || entry.type === typeFilter
+        if (matchesFilter) {
+          setEntries((prev) => [entry, ...prev].slice(0, PAGE_SIZE))
+        }
+      }
     },
     enabled: !paused,
   })
 
-  const filtered = typeFilter
-    ? entries.filter((e) => e.type.includes(typeFilter))
-    : entries
+  // Type filter change → reset to page 1
+  const handleTypeChange = useCallback((type: string) => {
+    setTypeFilter(type)
+    fetchPage(1, type)
+  }, [fetchPage])
 
-  // Unique event types for filter dropdown
-  const types = [...new Set(entries.map((e) => e.type))].sort()
+  // Page navigation
+  const goToPage = useCallback((p: number) => {
+    fetchPage(p, typeFilter || undefined)
+    containerRef.current?.scrollTo(0, 0)
+  }, [fetchPage, typeFilter])
 
   return (
     <div className="flex flex-col gap-3 h-full">
@@ -84,7 +126,7 @@ function EventLogSection() {
       <div className="flex items-center gap-3 shrink-0">
         <select
           value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
+          onChange={(e) => handleTypeChange(e.target.value)}
           className="bg-bg-tertiary text-text text-sm rounded-md border border-border px-2 py-1.5 outline-none focus:border-accent"
         >
           <option value="">All types</option>
@@ -105,7 +147,11 @@ function EventLogSection() {
         </button>
 
         <span className="text-xs text-text-muted ml-auto">
-          {filtered.length} events{typeFilter && ` (filtered)`}
+          {total > 0
+            ? `Page ${page} of ${totalPages} · ${total} events`
+            : '0 events'
+          }
+          {typeFilter && ' (filtered)'}
         </span>
       </div>
 
@@ -114,26 +160,65 @@ function EventLogSection() {
         ref={containerRef}
         className="flex-1 min-h-0 bg-bg rounded-lg border border-border overflow-y-auto font-mono text-xs"
       >
-        {filtered.length === 0 ? (
+        {loading && entries.length === 0 ? (
+          <div className="px-4 py-8 text-center text-text-muted">Loading...</div>
+        ) : entries.length === 0 ? (
           <div className="px-4 py-8 text-center text-text-muted">No events yet</div>
         ) : (
           <table className="w-full">
             <thead className="sticky top-0 bg-bg-secondary">
               <tr className="text-text-muted text-left">
                 <th className="px-3 py-2 w-12">#</th>
-                <th className="px-3 py-2 w-20">Time</th>
+                <th className="px-3 py-2 w-36">Time</th>
                 <th className="px-3 py-2 w-40">Type</th>
                 <th className="px-3 py-2">Payload</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((entry) => (
+              {entries.map((entry) => (
                 <EventRow key={entry.seq} entry={entry} />
               ))}
             </tbody>
           </table>
         )}
       </div>
+
+      {/* Pagination controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 shrink-0">
+          <button
+            onClick={() => goToPage(1)}
+            disabled={page <= 1 || loading}
+            className="text-xs px-2 py-1 rounded border border-border text-text-muted hover:text-text hover:bg-bg-tertiary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            ««
+          </button>
+          <button
+            onClick={() => goToPage(page - 1)}
+            disabled={page <= 1 || loading}
+            className="text-xs px-2 py-1 rounded border border-border text-text-muted hover:text-text hover:bg-bg-tertiary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            «
+          </button>
+          <span className="text-xs text-text-muted px-2">
+            {page} / {totalPages}
+          </span>
+          <button
+            onClick={() => goToPage(page + 1)}
+            disabled={page >= totalPages || loading}
+            className="text-xs px-2 py-1 rounded border border-border text-text-muted hover:text-text hover:bg-bg-tertiary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            »
+          </button>
+          <button
+            onClick={() => goToPage(totalPages)}
+            disabled={page >= totalPages || loading}
+            className="text-xs px-2 py-1 rounded border border-border text-text-muted hover:text-text hover:bg-bg-tertiary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            »»
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -150,7 +235,7 @@ function EventRow({ entry }: { entry: EventLogEntry }) {
         onClick={() => isLong && setExpanded(!expanded)}
       >
         <td className="px-3 py-1.5 text-text-muted">{entry.seq}</td>
-        <td className="px-3 py-1.5 text-text-muted">{formatTime(entry.ts)}</td>
+        <td className="px-3 py-1.5 text-text-muted whitespace-nowrap">{formatDateTime(entry.ts)}</td>
         <td className={`px-3 py-1.5 ${eventTypeColor(entry.type)}`}>{entry.type}</td>
         <td className="px-3 py-1.5 text-text-muted truncate">
           {isLong ? payloadStr.slice(0, 120) + '...' : payloadStr}

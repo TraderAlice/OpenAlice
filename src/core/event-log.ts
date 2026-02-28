@@ -28,6 +28,14 @@ export interface EventLogEntry<T = unknown> {
 
 export type EventLogListener = (entry: EventLogEntry) => void
 
+export interface EventLogQueryResult {
+  entries: EventLogEntry[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
 export interface EventLog {
   /** Append an event. Returns the persisted entry (with seq/ts). */
   append<T>(type: string, payload: T): Promise<EventLogEntry<T>>
@@ -39,6 +47,14 @@ export interface EventLog {
    * - limit: max number of entries to return
    */
   read(opts?: { afterSeq?: number; limit?: number; type?: string }): Promise<EventLogEntry[]>
+
+  /**
+   * Paginated query from DISK. Returns entries newest-first (descending seq).
+   * - page: 1-indexed page number (default: 1)
+   * - pageSize: entries per page (default: 100)
+   * - type: only return entries matching this type
+   */
+  query(opts?: { page?: number; pageSize?: number; type?: string }): Promise<EventLogQueryResult>
 
   /**
    * Query the in-memory buffer (fast, no disk I/O).
@@ -172,6 +188,30 @@ export async function createEventLog(opts?: {
     return results
   }
 
+  // ---------- query (disk, paginated) ----------
+
+  async function query(queryOpts?: {
+    page?: number
+    pageSize?: number
+    type?: string
+  }): Promise<EventLogQueryResult> {
+    const page = Math.max(1, queryOpts?.page ?? 1)
+    const pageSize = Math.max(1, queryOpts?.pageSize ?? 100)
+    const filterType = queryOpts?.type
+
+    // Read all matching entries from disk
+    const all = await read({ type: filterType })
+    const total = all.length
+    const totalPages = Math.max(1, Math.ceil(total / pageSize))
+
+    // Paginate: page 1 = newest entries (end of array)
+    const start = Math.max(0, total - page * pageSize)
+    const end = total - (page - 1) * pageSize
+    const entries = all.slice(start, end).reverse()
+
+    return { entries, total, page, pageSize, totalPages }
+  }
+
   // ---------- recent (memory) ----------
 
   function recent(readOpts?: {
@@ -238,6 +278,7 @@ export async function createEventLog(opts?: {
   return {
     append,
     read,
+    query,
     recent,
     lastSeq: () => seq,
     subscribe,

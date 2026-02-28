@@ -2,10 +2,20 @@ import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import type { EngineContext } from '../../../core/types.js'
 
-/** Event log routes: GET /recent, GET /stream (SSE) */
+/** Event log routes: GET /, GET /recent, GET /stream (SSE) */
 export function createEventsRoutes(ctx: EngineContext) {
   const app = new Hono()
 
+  // Paginated query from disk (full history)
+  app.get('/', async (c) => {
+    const page = Number(c.req.query('page')) || 1
+    const pageSize = Number(c.req.query('pageSize')) || 100
+    const type = c.req.query('type') || undefined
+    const result = await ctx.eventLog.query({ page, pageSize, type })
+    return c.json(result)
+  })
+
+  // Fast in-memory query (ring buffer)
   app.get('/recent', (c) => {
     const afterSeq = Number(c.req.query('afterSeq')) || 0
     const limit = Number(c.req.query('limit')) || 100
