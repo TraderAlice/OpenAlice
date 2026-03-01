@@ -34,6 +34,8 @@ export interface HeartbeatConfig {
   every: string
   /** Prompt sent to the AI on each heartbeat. */
   prompt: string
+  /** How to deliver notifications. */
+  deliveryMode: 'notify' | 'broadcast'
   /** Active hours window. Null = always active. */
   activeHours: {
     start: string   // "HH:MM"
@@ -67,6 +69,7 @@ If you want to send a message:
 STATUS: CHAT_YES
 REASON: Significant price movement detected.
 CONTENT: BTC just dropped 8% in the last hour — now at $87,200. This may trigger stop-losses.`,
+  deliveryMode: 'notify',
   activeHours: null,
 }
 
@@ -164,11 +167,20 @@ export function createHeartbeat(opts: HeartbeatOpts): Heartbeat {
       // 5. Send notification
       let delivered = false
       try {
-        const result2 = await connectorCenter.notify(text, {
-          media: result.media,
-          source: 'heartbeat',
-        })
-        delivered = result2.delivered
+        // Use broadcast for all channels, or notify for last-interacted
+        if ((config as any).deliveryMode === 'broadcast') {
+          const results = await connectorCenter.broadcast(text, {
+            media: result.media,
+            source: 'heartbeat',
+          })
+          delivered = results.some((r) => r.delivered)
+        } else {
+          const result2 = await connectorCenter.notify(text, {
+            media: result.media,
+            source: 'heartbeat',
+          })
+          delivered = result2.delivered
+        }
         if (delivered) dedup.record(text, now())
       } catch (sendErr) {
         console.warn('heartbeat: send failed:', sendErr)
@@ -243,7 +255,11 @@ export function createHeartbeat(opts: HeartbeatOpts): Heartbeat {
       await ensureJobAndListener()
 
       // Persist to config file
-      await writeConfigSection('heartbeat', { ...config, enabled: newEnabled })
+      const current = { ...config, enabled: newEnabled }
+      if (!(current as any).deliveryMode) {
+        ;(current as any).deliveryMode = 'notify'
+      }
+      await writeConfigSection('heartbeat', current)
     },
 
     isEnabled() {

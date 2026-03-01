@@ -105,6 +105,7 @@ function CompactionForm({ config }: { config: AppConfig }) {
 function HeartbeatForm({ config }: { config: AppConfig }) {
   const [hbEnabled, setHbEnabled] = useState(config.heartbeat?.enabled || false)
   const [hbEvery, setHbEvery] = useState(config.heartbeat?.every || '30m')
+  const [deliveryMode, setDeliveryMode] = useState((config.heartbeat as any)?.deliveryMode || 'notify')
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
@@ -115,8 +116,8 @@ function HeartbeatForm({ config }: { config: AppConfig }) {
   }, [])
 
   const heartbeatData = useMemo(
-    () => ({ ...config.heartbeat, enabled: hbEnabled, every: hbEvery }),
-    [config.heartbeat, hbEnabled, hbEvery],
+    () => ({ ...config.heartbeat, enabled: hbEnabled, every: hbEvery, deliveryMode }),
+    [config.heartbeat, hbEnabled, hbEvery, deliveryMode],
   )
 
   const save = useCallback(async (d: Record<string, unknown>) => {
@@ -147,6 +148,15 @@ function HeartbeatForm({ config }: { config: AppConfig }) {
       </div>
       <Field label="Interval">
         <input className={inputClass} value={hbEvery} onChange={(e) => setHbEvery(e.target.value)} placeholder="30m" />
+      </Field>
+      <Field label="Delivery Mode">
+        <select className={inputClass} value={deliveryMode} onChange={(e) => setDeliveryMode(e.target.value)}>
+          <option value="notify">Notify Last Channel</option>
+          <option value="broadcast">Broadcast to All</option>
+        </select>
+        <p className="text-[11px] text-text-muted mt-1">
+          Choose whether to send notifications to all channels or only the most recently used one.
+        </p>
       </Field>
       <SaveIndicator status={status} onRetry={retry} />
     </>

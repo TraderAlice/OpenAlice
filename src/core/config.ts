@@ -169,6 +169,7 @@ const heartbeatSchema = z.object({
   enabled: z.boolean().default(false),
   every: z.string().default('30m'),
   prompt: z.string().default('Read data/brain/heartbeat.md (or data/default/heartbeat.default.md if not found) and follow the instructions inside.'),
+  deliveryMode: z.enum(['notify', 'broadcast']).default('notify'),
   activeHours: activeHoursSchema,
 })
 
