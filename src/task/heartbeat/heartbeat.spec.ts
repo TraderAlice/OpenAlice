@@ -202,28 +202,6 @@ describe('heartbeat', () => {
       expect(eventLog.recent({ type: 'heartbeat.done' })).toHaveLength(0)
     })
 
-    it('should skip CHAT_NO responses', async () => {
-      mockEngine.setResponse('STATUS: CHAT_NO\nREASON: Minor fluctuations, nothing worth reporting.')
-
-      heartbeat = createHeartbeat({
-        config: makeConfig(),
-        connectorCenter, cronEngine, eventLog,
-        engine: mockEngine as any,
-        session,
-      })
-      await heartbeat.start()
-
-      await cronEngine.runNow(cronEngine.list()[0].id)
-
-      await vi.waitFor(() => {
-        const skips = eventLog.recent({ type: 'heartbeat.skip' })
-        expect(skips).toHaveLength(1)
-      })
-
-      const skips = eventLog.recent({ type: 'heartbeat.skip' })
-      expect(skips[0].payload).toMatchObject({ reason: 'chat-no' })
-    })
-
     it('should deliver unparsed responses (fail-open)', async () => {
       const delivered: string[] = []
       connectorCenter.register({
@@ -510,12 +488,10 @@ describe('parseHeartbeatResponse', () => {
     expect(r.unparsed).toBe(false)
   })
 
-  it('should parse CHAT_NO', () => {
+  it('should treat former CHAT_NO as unparsed (fail-open to CHAT_YES)', () => {
     const r = parseHeartbeatResponse('STATUS: CHAT_NO\nREASON: Nothing worth reporting.')
-    expect(r.status).toBe('CHAT_NO')
-    expect(r.reason).toBe('Nothing worth reporting.')
-    expect(r.content).toBe('')
-    expect(r.unparsed).toBe(false)
+    expect(r.status).toBe('CHAT_YES')
+    expect(r.unparsed).toBe(true)
   })
 
   it('should parse CHAT_YES with content', () => {
@@ -542,8 +518,8 @@ describe('parseHeartbeatResponse', () => {
   })
 
   it('should handle extra whitespace', () => {
-    const r = parseHeartbeatResponse('  STATUS:   CHAT_NO  \n  REASON:   All quiet.  ')
-    expect(r.status).toBe('CHAT_NO')
+    const r = parseHeartbeatResponse('  STATUS:   HEARTBEAT_OK  \n  REASON:   All quiet.  ')
+    expect(r.status).toBe('HEARTBEAT_OK')
     expect(r.reason).toBe('All quiet.')
   })
 
