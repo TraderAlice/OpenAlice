@@ -167,6 +167,11 @@ const heartbeatSchema = z.object({
   activeHours: activeHoursSchema,
 })
 
+export const toolsSchema = z.object({
+  /** Tool names that are disabled. Tools not listed are enabled by default. */
+  disabled: z.array(z.string()).default([]),
+})
+
 // ==================== Unified Config Type ====================
 
 export type Config = {
@@ -180,6 +185,7 @@ export type Config = {
   heartbeat: z.infer<typeof heartbeatSchema>
   connectors: z.infer<typeof connectorsSchema>
   newsCollector: z.infer<typeof newsCollectorSchema>
+  tools: z.infer<typeof toolsSchema>
 }
 
 // ==================== Loader ====================
@@ -212,7 +218,7 @@ async function parseAndSeed<T>(filename: string, schema: z.ZodType<T>, raw: unkn
 }
 
 export async function loadConfig(): Promise<Config> {
-  const files = ['engine.json', 'agent.json', 'crypto.json', 'securities.json', 'openbb.json', 'compaction.json', 'ai-provider.json', 'heartbeat.json', 'connectors.json', 'news-collector.json'] as const
+  const files = ['engine.json', 'agent.json', 'crypto.json', 'securities.json', 'openbb.json', 'compaction.json', 'ai-provider.json', 'heartbeat.json', 'connectors.json', 'news-collector.json', 'tools.json'] as const
   const raws = await Promise.all(files.map((f) => loadJsonFile(f)))
 
   // ---------- Migration: consolidate old ai-provider + model + api-keys → ai-provider ----------
@@ -267,6 +273,7 @@ export async function loadConfig(): Promise<Config> {
     heartbeat:     await parseAndSeed(files[7], heartbeatSchema, raws[7]),
     connectors:    await parseAndSeed(files[8], connectorsSchema, raws[8]),
     newsCollector: await parseAndSeed(files[9], newsCollectorSchema, raws[9]),
+    tools:         await parseAndSeed(files[10], toolsSchema, raws[10]),
   }
 }
 
@@ -302,6 +309,16 @@ export async function readOpenbbConfig() {
   }
 }
 
+/** Read tools config from disk (called per-request for hot-reload). */
+export async function readToolsConfig() {
+  try {
+    const raw = JSON.parse(await readFile(resolve(CONFIG_DIR, 'tools.json'), 'utf-8'))
+    return toolsSchema.parse(raw)
+  } catch {
+    return toolsSchema.parse({})
+  }
+}
+
 // ==================== Writer ====================
 
 export type ConfigSection = keyof Config
@@ -317,6 +334,7 @@ const sectionSchemas: Record<ConfigSection, z.ZodTypeAny> = {
   heartbeat: heartbeatSchema,
   connectors: connectorsSchema,
   newsCollector: newsCollectorSchema,
+  tools: toolsSchema,
 }
 
 const sectionFiles: Record<ConfigSection, string> = {
@@ -330,6 +348,7 @@ const sectionFiles: Record<ConfigSection, string> = {
   heartbeat: 'heartbeat.json',
   connectors: 'connectors.json',
   newsCollector: 'news-collector.json',
+  tools: 'tools.json',
 }
 
 /** All valid config section names (derived from sectionSchemas). */

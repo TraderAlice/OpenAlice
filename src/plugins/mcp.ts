@@ -5,6 +5,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
 import type { Tool } from 'ai'
 import type { Plugin, EngineContext } from '../core/types.js'
+import type { ToolCenter } from '../core/tool-center.js'
 
 type McpContent =
   | { type: 'text'; text: string }
@@ -47,25 +48,25 @@ function toMcpContent(result: unknown): McpContent[] {
 }
 
 /**
- * MCP Plugin — exposes Vercel AI SDK tools via Streamable HTTP.
+ * MCP Plugin — exposes tools via Streamable HTTP.
  *
- * Stateless mode: each request creates a fresh transport + McpServer,
- * but all tool handlers share the same sandbox/wallet/tradingEngine
- * through closures in the pre-created tools.
+ * Holds a reference to ToolCenter and queries it per-request, so tool
+ * changes (reconnect, disable/enable) are picked up automatically.
  */
 export class McpPlugin implements Plugin {
   name = 'mcp'
   private server: ReturnType<typeof serve> | null = null
 
   constructor(
-    private tools: Record<string, Tool>,
+    private toolCenter: ToolCenter,
     private port: number,
   ) {}
 
   async start(_ctx: EngineContext) {
-    const tools = this.tools
+    const toolCenter = this.toolCenter
 
-    const createMcpServer = () => {
+    const createMcpServer = async () => {
+      const tools = await toolCenter.getMcpTools()
       const mcp = new McpServer({ name: 'open-alice', version: '1.0.0' })
 
       for (const [name, t] of Object.entries(tools)) {
@@ -107,7 +108,7 @@ export class McpPlugin implements Plugin {
 
     app.all('/mcp', async (c) => {
       const transport = new WebStandardStreamableHTTPServerTransport()
-      const mcp = createMcpServer()
+      const mcp = await createMcpServer()
       await mcp.connect(transport)
       return transport.handleRequest(c.req.raw)
     })

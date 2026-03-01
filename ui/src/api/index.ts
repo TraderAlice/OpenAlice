@@ -10,6 +10,7 @@ import { heartbeatApi } from './heartbeat'
 import { tradingApi } from './trading'
 import { openbbApi } from './openbb'
 import { devApi } from './dev'
+import { toolsApi } from './tools'
 export const api = {
   chat: chatApi,
   config: configApi,
@@ -19,6 +20,7 @@ export const api = {
   trading: tradingApi,
   openbb: openbbApi,
   dev: devApi,
+  tools: toolsApi,
 }
 
 // Re-export all types for convenience

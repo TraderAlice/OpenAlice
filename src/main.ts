@@ -225,17 +225,17 @@ async function main() {
   // ==================== Tool Center ====================
 
   const toolCenter = new ToolCenter()
-  toolCenter.register(createThinkingTools())
+  toolCenter.register(createThinkingTools(), 'thinking')
   // Crypto trading tools are injected later in the background when CCXT resolves
   if (secResultRef) {
-    toolCenter.register(createSecuritiesTradingTools(secResultRef.engine, secWallet, secWalletStateBridge))
+    toolCenter.register(createSecuritiesTradingTools(secResultRef.engine, secWallet, secWalletStateBridge), 'securities-trading')
   }
-  toolCenter.register(createBrainTools(brain))
-  toolCenter.register(createBrowserTools())
-  toolCenter.register(createCronTools(cronEngine))
-  toolCenter.register(createEquityTools(symbolIndex, equityClient))
-  toolCenter.register(createCryptoTools(cryptoClient))
-  toolCenter.register(createCurrencyTools(currencyClient))
+  toolCenter.register(createBrainTools(brain), 'brain')
+  toolCenter.register(createBrowserTools(), 'browser')
+  toolCenter.register(createCronTools(cronEngine), 'cron')
+  toolCenter.register(createEquityTools(symbolIndex, equityClient), 'equity')
+  toolCenter.register(createCryptoTools(cryptoClient), 'crypto-data')
+  toolCenter.register(createCurrencyTools(currencyClient), 'currency-data')
   let newsTools = createNewsTools(newsClient, {
     companyProvider: providers.newsCompany,
     worldProvider: providers.newsWorld,
@@ -243,11 +243,11 @@ async function main() {
   if (config.newsCollector.piggybackOpenBB) {
     newsTools = wrapNewsToolsForPiggyback(newsTools, newsStore)
   }
-  toolCenter.register(newsTools)
+  toolCenter.register(newsTools, 'news')
   if (config.newsCollector.enabled) {
-    toolCenter.register(createNewsArchiveTools(newsStore))
+    toolCenter.register(createNewsArchiveTools(newsStore), 'news-archive')
   }
-  toolCenter.register(createAnalysisTools(equityClient, cryptoClient, currencyClient))
+  toolCenter.register(createAnalysisTools(equityClient, cryptoClient, currencyClient), 'analysis')
 
   console.log(`tool-center: ${toolCenter.list().length} tools registered (crypto trading pending ccxt)`)
 
@@ -333,7 +333,7 @@ async function main() {
       const newWallet = savedWallet ? Wallet.restore(savedWallet, walletConfig) : new Wallet(walletConfig)
       currentCryptoWallet = newWallet
 
-      toolCenter.register(createCryptoTradingTools(newResult.engine, newWallet, bridge))
+      toolCenter.register(createCryptoTradingTools(newResult.engine, newWallet, bridge), 'crypto-trading')
       console.log(`reconnect: crypto trading engine online (${toolCenter.list().length} tools)`)
       return { success: true, message: 'Crypto trading engine reconnected' }
     } catch (err) {
@@ -373,7 +373,7 @@ async function main() {
       const newWallet = savedWallet ? SecWallet.restore(savedWallet, walletConfig) : new SecWallet(walletConfig)
       currentSecWallet = newWallet
 
-      toolCenter.register(createSecuritiesTradingTools(newResult.engine, newWallet, bridge))
+      toolCenter.register(createSecuritiesTradingTools(newResult.engine, newWallet, bridge), 'securities-trading')
       console.log(`reconnect: securities trading engine online (${toolCenter.list().length} tools)`)
       return { success: true, message: 'Securities trading engine reconnected' }
     } catch (err) {
@@ -392,7 +392,7 @@ async function main() {
 
   // MCP Server is always active when a port is set — Claude Code provider depends on it for tools
   if (config.connectors.mcp.port) {
-    corePlugins.push(new McpPlugin(toolCenter.getMcpTools(), config.connectors.mcp.port))
+    corePlugins.push(new McpPlugin(toolCenter, config.connectors.mcp.port))
   }
 
   // Web UI is always active (no enabled flag)
@@ -475,6 +475,7 @@ async function main() {
     getSecuritiesEngine: () => secResultRef?.engine ?? null,
     getCryptoWallet: () => currentCryptoWallet,
     getSecWallet: () => currentSecWallet,
+    toolCenter,
   }
 
   for (const plugin of [...corePlugins, ...optionalPlugins.values()]) {
@@ -503,7 +504,7 @@ async function main() {
       ? Wallet.restore(savedState, realWalletConfig)
       : new Wallet(realWalletConfig)
     currentCryptoWallet = realWallet
-    toolCenter.register(createCryptoTradingTools(cryptoResult.engine, realWallet, bridge))
+    toolCenter.register(createCryptoTradingTools(cryptoResult.engine, realWallet, bridge), 'crypto-trading')
     console.log(`ccxt: crypto trading tools online (${toolCenter.list().length} tools total)`)
   })
 
