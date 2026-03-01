@@ -200,7 +200,7 @@ function ModelForm({ aiProvider }: { aiProvider: AIProviderConfig }) {
       if (keys.anthropic) updatedKeys.anthropic = keys.anthropic
       if (keys.openai) updatedKeys.openai = keys.openai
       if (keys.google) updatedKeys.google = keys.google
-      await api.config.updateSection('aiProvider', { ...aiProvider, apiKeys: updatedKeys })
+      await api.config.updateSection('aiProvider', { ...modelData, apiKeys: updatedKeys })
       setLiveKeyStatus({
         anthropic: !!updatedKeys.anthropic,
         openai: !!updatedKeys.openai,

@@ -18,6 +18,7 @@ export function ConnectorsPage() {
         'mcp',
         ...(config.mcpAsk.enabled ? ['mcpAsk'] : []),
         ...(config.telegram.enabled ? ['telegram'] : []),
+        ...(config.discord.enabled ? ['discord'] : []),
       ]
     : ['web', 'mcp']
 
@@ -27,6 +28,8 @@ export function ConnectorsPage() {
       updateConfigImmediate({ mcpAsk: { ...config.mcpAsk, enabled: !config.mcpAsk.enabled } })
     } else if (id === 'telegram') {
       updateConfigImmediate({ telegram: { ...config.telegram, enabled: !config.telegram.enabled } })
+    } else if (id === 'discord') {
+      updateConfigImmediate({ discord: { ...config.discord, enabled: !config.discord.enabled } })
     }
   }
 
@@ -161,6 +164,40 @@ export function ConnectorsPage() {
                       })
                     }
                     placeholder="Comma-separated, e.g. 123456, 789012"
+                  />
+                </Field>
+              </Section>
+            )}
+
+            {/* Discord config */}
+            {config.discord.enabled && (
+              <Section
+                title="Discord"
+                description="Create a bot, paste the token below, and add your channel ID."
+              >
+                <Field label="Bot Token">
+                  <input
+                    className={inputClass}
+                    type="password"
+                    value={config.discord.botToken ?? ''}
+                    onChange={(e) =>
+                      updateConfig({
+                        discord: { ...config.discord, botToken: e.target.value || undefined },
+                      })
+                    }
+                    placeholder="Super-secret-token"
+                  />
+                </Field>
+                <Field label="Channel ID">
+                  <input
+                    className={inputClass}
+                    value={config.discord.channelId ?? ''}
+                    onChange={(e) =>
+                      updateConfig({
+                        discord: { ...config.discord, channelId: e.target.value || undefined },
+                      })
+                    }
+                    placeholder="123456789012345678"
                   />
                 </Field>
               </Section>

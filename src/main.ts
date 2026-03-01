@@ -7,6 +7,7 @@ import { McpPlugin } from './plugins/mcp.js'
 import { TelegramPlugin } from './connectors/telegram/index.js'
 import { WebPlugin } from './connectors/web/index.js'
 import { McpAskPlugin } from './connectors/mcp-ask/index.js'
+import { DiscordPlugin } from './connectors/discord/index.js'
 import { createThinkingTools } from './extension/thinking-kit/index.js'
 import type { WalletExportState } from './extension/crypto-trading/index.js'
 import {
@@ -414,6 +415,14 @@ async function main() {
     }))
   }
 
+  if (config.connectors.discord.enabled && config.connectors.discord.botToken) {
+    optionalPlugins.set('discord', new DiscordPlugin({
+      enabled: true,
+      botToken: config.connectors.discord.botToken,
+      channelId: config.connectors.discord.channelId,
+    }))
+  }
+
   // ==================== Connector Reconnect ====================
 
   let connectorsReconnecting = false
@@ -455,6 +464,24 @@ async function main() {
         changes.push('telegram started')
       }
 
+      // --- Discord ---
+      const discordWanted = fresh.connectors.discord.enabled && !!fresh.connectors.discord.botToken
+      const discordRunning = optionalPlugins.has('discord')
+      if (discordRunning && !discordWanted) {
+        await optionalPlugins.get('discord')!.stop()
+        optionalPlugins.delete('discord')
+        changes.push('discord stopped')
+      } else if (!discordRunning && discordWanted) {
+        const p = new DiscordPlugin({
+          enabled: true,
+          botToken: fresh.connectors.discord.botToken!,
+          channelId: fresh.connectors.discord.channelId,
+        })
+        await p.start(ctx)
+        optionalPlugins.set('discord', p)
+        changes.push('discord started')
+      }
+
       if (changes.length > 0) {
         console.log(`reconnect: connectors — ${changes.join(', ')}`)
       }
@@ -465,7 +492,7 @@ async function main() {
       return { success: false, error: msg }
     } finally {
       connectorsReconnecting = false
-    }
+    }    
   }
 
   const ctx: EngineContext = {
