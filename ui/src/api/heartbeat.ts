@@ -27,4 +27,19 @@ export const heartbeatApi = {
     }
     return res.json()
   },
+
+  async getPromptFile(): Promise<{ content: string; path: string }> {
+    const res = await fetch('/api/heartbeat/prompt-file')
+    if (!res.ok) throw new Error('Failed to load prompt file')
+    return res.json()
+  },
+
+  async updatePromptFile(content: string): Promise<void> {
+    const res = await fetch('/api/heartbeat/prompt-file', {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ content }),
+    })
+    if (!res.ok) throw new Error('Failed to save prompt file')
+  },
 }

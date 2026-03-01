@@ -24,7 +24,7 @@ export class VercelAIProvider implements AIProvider {
   private cachedAgent: Agent | null = null
 
   constructor(
-    private getTools: () => Record<string, Tool>,
+    private getTools: () => Promise<Record<string, Tool>>,
     private instructions: string,
     private maxSteps: number,
     private compaction: CompactionConfig,
@@ -33,7 +33,7 @@ export class VercelAIProvider implements AIProvider {
   /** Lazily create or return the cached agent, re-creating when config or tools change. */
   private async resolveAgent(): Promise<Agent> {
     const { model, key } = await createModelFromConfig()
-    const tools = this.getTools()
+    const tools = await this.getTools()
     const toolCount = Object.keys(tools).length
     if (key !== this.cachedKey || toolCount !== this.cachedToolCount) {
       this.cachedAgent = createAgent(model, tools, this.instructions, this.maxSteps)

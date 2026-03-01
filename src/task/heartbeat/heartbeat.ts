@@ -49,19 +49,20 @@ export const DEFAULT_HEARTBEAT_CONFIG: HeartbeatConfig = {
 
 ## Response Format
 
-STATUS: HEARTBEAT_OK | CHAT_YES | CHAT_NO
+STATUS: HEARTBEAT_OK | CHAT_YES
 REASON: <brief explanation of your decision>
 CONTENT: <message to deliver, only when STATUS is CHAT_YES>
+
+## Rules
+
+- If in doubt, prefer CHAT_YES over HEARTBEAT_OK — better to over-report than to miss something.
+- Keep CONTENT concise but actionable.
 
 ## Examples
 
 If nothing to report:
 STATUS: HEARTBEAT_OK
 REASON: All systems normal, no alerts or notable changes.
-
-If you decide not to message:
-STATUS: CHAT_NO
-REASON: Minor price fluctuations, nothing worth reporting.
 
 If you want to send a message:
 STATUS: CHAT_YES
@@ -118,7 +119,7 @@ export function createHeartbeat(opts: HeartbeatOpts): Heartbeat {
 
     processing = true
     const startMs = now()
-    console.log('heartbeat: firing...')
+    console.log(`heartbeat: firing at ${new Date(startMs).toISOString()}`)
 
     try {
       // 1. Active hours guard
@@ -137,10 +138,10 @@ export function createHeartbeat(opts: HeartbeatOpts): Heartbeat {
       // 3. Parse structured response
       const parsed = parseHeartbeatResponse(result.text)
 
-      if (parsed.status === 'HEARTBEAT_OK' || parsed.status === 'CHAT_NO') {
-        console.log(`heartbeat: ${parsed.status} — ${parsed.reason || 'no reason'} (${durationMs}ms)`)
+      if (parsed.status === 'HEARTBEAT_OK') {
+        console.log(`heartbeat: HEARTBEAT_OK — ${parsed.reason || 'no reason'} (${durationMs}ms)`)
         await eventLog.append('heartbeat.skip', {
-          reason: parsed.status === 'HEARTBEAT_OK' ? 'ack' : 'chat-no',
+          reason: 'ack',
           parsedReason: parsed.reason,
         })
         return
@@ -254,7 +255,7 @@ export function createHeartbeat(opts: HeartbeatOpts): Heartbeat {
 
 // ==================== Response Parser ====================
 
-export type HeartbeatStatus = 'HEARTBEAT_OK' | 'CHAT_YES' | 'CHAT_NO'
+export type HeartbeatStatus = 'HEARTBEAT_OK' | 'CHAT_YES'
 
 export interface ParsedHeartbeatResponse {
   status: HeartbeatStatus
@@ -268,7 +269,7 @@ export interface ParsedHeartbeatResponse {
  * Parse a structured heartbeat response from the AI.
  *
  * Expected format:
- *   STATUS: HEARTBEAT_OK | CHAT_YES | CHAT_NO
+ *   STATUS: HEARTBEAT_OK | CHAT_YES
  *   REASON: <text>
  *   CONTENT: <text>       (only for CHAT_YES)
  *
@@ -282,7 +283,7 @@ export function parseHeartbeatResponse(raw: string): ParsedHeartbeatResponse {
   }
 
   // Extract STATUS field (case-insensitive, allows leading whitespace on the line)
-  const statusMatch = /^\s*STATUS:\s*(HEARTBEAT_OK|CHAT_YES|CHAT_NO)\s*$/im.exec(trimmed)
+  const statusMatch = /^\s*STATUS:\s*(HEARTBEAT_OK|CHAT_YES)\s*$/im.exec(trimmed)
   if (!statusMatch) {
     // Fail-open: can't parse → treat as a message to deliver
     return { status: 'CHAT_YES', reason: 'unparsed response', content: trimmed, unparsed: true }

@@ -10,12 +10,14 @@ import { TradingPage } from './pages/TradingPage'
 import { SecuritiesPage } from './pages/SecuritiesPage'
 import { ConnectorsPage } from './pages/ConnectorsPage'
 import { DevPage } from './pages/DevPage'
+import { HeartbeatPage } from './pages/HeartbeatPage'
+import { ToolsPage } from './pages/ToolsPage'
 
 export type Page =
-  | 'chat' | 'portfolio' | 'events' | 'data-sources' | 'connectors'
+  | 'chat' | 'portfolio' | 'events' | 'heartbeat' | 'data-sources' | 'connectors'
   | 'trading/connection' | 'trading/guards'
   | 'securities/connection' | 'securities/guards'
-  | 'ai-provider' | 'settings' | 'dev'
+  | 'ai-provider' | 'settings' | 'tools' | 'dev'
 
 export function App() {
   const [page, setPage] = useState<Page>('chat')
@@ -48,12 +50,14 @@ export function App() {
         {page === 'chat' && <ChatPage onSSEStatus={setSseConnected} />}
         {page === 'portfolio' && <PortfolioPage />}
         {page === 'events' && <EventsPage />}
+        {page === 'heartbeat' && <HeartbeatPage />}
         {page === 'data-sources' && <DataSourcesPage />}
         {page === 'connectors' && <ConnectorsPage />}
         {page.startsWith('trading/') && <TradingPage tab={page.split('/')[1]} />}
         {page.startsWith('securities/') && <SecuritiesPage tab={page.split('/')[1]} />}
         {page === 'ai-provider' && <AIProviderPage />}
         {page === 'settings' && <SettingsPage />}
+        {page === 'tools' && <ToolsPage />}
         {page === 'dev' && <DevPage />}
       </main>
     </div>

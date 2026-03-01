@@ -6,6 +6,7 @@ import type { Config } from './config.js'
 import type { ConnectorCenter } from './connector-center.js'
 import type { Engine } from './engine.js'
 import type { EventLog } from './event-log.js'
+import type { ToolCenter } from './tool-center.js'
 
 export type { Config }
 
@@ -40,6 +41,8 @@ export interface EngineContext {
   getCryptoWallet?: () => Wallet | null
   /** Current securities wallet (updates on reconnect). */
   getSecWallet?: () => SecWallet | null
+  /** Central tool registry. */
+  toolCenter?: ToolCenter
 }
 
 /** A media attachment collected from tool results (e.g. browser screenshots). */

@@ -126,8 +126,14 @@ export function createBrowserTools(options?: BrowserToolOptions): Record<string,
     allowHostControl: options?.allowHostControl ?? true,
   });
 
+  const descriptionPrefix =
+    "IMPORTANT: Before first use, ask the user whether they have the OpenClaw Browser Relay Chrome extension installed. " +
+    'If YES → use profile="chrome" (operates on existing Chrome tabs; user must click the relay toolbar icon to attach a tab). ' +
+    'If NO → call action="start" first to launch a standalone Playwright browser (isolated, no existing cookies/sessions). ' +
+    "Do NOT attempt browser actions without clarifying this first.\n\n";
+
   const browserTool = tool({
-    description: piTool.description,
+    description: descriptionPrefix + piTool.description,
     inputSchema: BrowserToolParameters,
     execute: async (input, { toolCallId, abortSignal }) => {
       const result = await piTool.execute(toolCallId, input, abortSignal);

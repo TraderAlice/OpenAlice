@@ -15,6 +15,7 @@ import { createHeartbeatRoutes } from './routes/heartbeat.js'
 import { createCryptoRoutes } from './routes/crypto.js'
 import { createSecuritiesRoutes } from './routes/securities.js'
 import { createDevRoutes } from './routes/dev.js'
+import { createToolsRoutes } from './routes/tools.js'
 
 export interface WebConfig {
   port: number
@@ -58,6 +59,9 @@ export class WebPlugin implements Plugin {
     app.route('/api/crypto', createCryptoRoutes(ctx))
     app.route('/api/securities', createSecuritiesRoutes(ctx))
     app.route('/api/dev', createDevRoutes(ctx.connectorCenter))
+    if (ctx.toolCenter) {
+      app.route('/api/tools', createToolsRoutes(ctx.toolCenter))
+    }
 
     // ==================== Serve UI (Vite build output) ====================
     const uiRoot = resolve('dist/ui')
