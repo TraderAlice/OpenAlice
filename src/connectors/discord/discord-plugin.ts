@@ -71,7 +71,11 @@ export class DiscordPlugin implements Plugin {
         }
 
         if (result.text) {
-          await channel.send(result.text);
+          // split message into chunks of 2000 characters
+          const chunks = result.text.match(/[\s\S]{1,2000}/g) || [];
+          for (const chunk of chunks) {
+            await channel.send(chunk);
+          }
         }
       } catch (err) {
         stopTyping();
