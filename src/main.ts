@@ -8,7 +8,7 @@ import { TelegramPlugin } from './connectors/telegram/index.js'
 import { WebPlugin } from './connectors/web/index.js'
 import { McpAskPlugin } from './connectors/mcp-ask/index.js'
 import { createThinkingTools } from './extension/thinking-kit/index.js'
-import type { WalletExportState } from './extension/crypto-trading/index.js'
+import type { Operation as CryptoOperation, WalletExportState } from './extension/crypto-trading/index.js'
 import {
   Wallet,
   createCryptoTradingEngine,
@@ -30,6 +30,11 @@ import {
 } from './extension/securities-trading/index.js'
 import { Brain, createBrainTools } from './extension/brain/index.js'
 import type { BrainExportState } from './extension/brain/index.js'
+import {
+  createGovernanceService,
+  createGovernanceGatedDispatcher,
+} from './custom/governance/index.js'
+import { createLocalProcessGovernancePort } from './upstream-adapters/governance/index.js'
 import { createBrowserTools } from './extension/browser/index.js'
 import { OpenBBEquityClient, SymbolIndex } from './openbb/equity/index.js'
 import { createEquityTools } from './extension/equity/index.js'
@@ -77,6 +82,9 @@ async function readWithDefault(target: string, defaultFile: string): Promise<str
 
 async function main() {
   const config = await loadConfig()
+  const eventLog = await createEventLog()
+  const governancePort = createLocalProcessGovernancePort({ repoRoot: resolve('.') })
+  const governance = createGovernanceService({ port: governancePort })
 
   // ==================== Infrastructure ====================
 
@@ -125,17 +133,30 @@ async function main() {
     : undefined
 
   const secGuards = resolveSecGuards(config.securities.guards)
+  const secPaperTrading = config.securities.provider.type === 'alpaca'
+    ? config.securities.provider.paper
+    : true
 
   const secWalletConfig = secResultRef
-    ? {
-        executeOperation: createSecGuardPipeline(
-          createSecOperationDispatcher(secResultRef.engine),
-          secResultRef.engine,
-          secGuards,
-        ),
-        getWalletState: secWalletStateBridge!,
-        onCommit: onSecCommit,
-      }
+    ? (() => {
+        const rawDispatcher = createSecOperationDispatcher(secResultRef.engine)
+        const governedDispatcher = createGovernanceGatedDispatcher<SecOperation>({
+          market: 'securities',
+          paperTrading: secPaperTrading,
+          governance: config.governance,
+          eventLog,
+          dispatch: rawDispatcher,
+        })
+        return {
+          executeOperation: createSecGuardPipeline(
+            governedDispatcher,
+            secResultRef.engine,
+            secGuards,
+          ),
+          getWalletState: secWalletStateBridge!,
+          onCommit: onSecCommit,
+        }
+      })()
     : {
         executeOperation: async (_op: SecOperation) => {
           throw new Error('Securities trading service not connected')
@@ -189,10 +210,6 @@ async function main() {
     '',
     `**Emotion:** ${emotion}`,
   ].join('\n')
-
-  // ==================== Event Log ====================
-
-  const eventLog = await createEventLog()
 
   // ==================== Cron ====================
 
@@ -322,9 +339,19 @@ async function main() {
 
       const bridge = createCryptoWalletStateBridge(newResult.engine)
       const rawDispatcher = createCryptoOperationDispatcher(newResult.engine)
+      const cryptoPaperTrading = freshConfig.crypto.provider.type === 'ccxt'
+        ? freshConfig.crypto.provider.sandbox || freshConfig.crypto.provider.demoTrading
+        : true
+      const governedDispatcher = createGovernanceGatedDispatcher<CryptoOperation>({
+        market: 'crypto',
+        paperTrading: cryptoPaperTrading,
+        governance: freshConfig.governance,
+        eventLog,
+        dispatch: rawDispatcher,
+      })
       const guards = resolveGuards(freshConfig.crypto.guards)
       const walletConfig = {
-        executeOperation: createGuardPipeline(rawDispatcher, newResult.engine, guards),
+        executeOperation: createGuardPipeline(governedDispatcher, newResult.engine, guards),
         getWalletState: bridge,
         onCommit: onCryptoCommit,
       }
@@ -362,9 +389,19 @@ async function main() {
 
       const bridge = createSecWalletStateBridge(newResult.engine)
       const rawDispatcher = createSecOperationDispatcher(newResult.engine)
+      const secPaperTradingMode = freshConfig.securities.provider.type === 'alpaca'
+        ? freshConfig.securities.provider.paper
+        : true
+      const governedDispatcher = createGovernanceGatedDispatcher<SecOperation>({
+        market: 'securities',
+        paperTrading: secPaperTradingMode,
+        governance: freshConfig.governance,
+        eventLog,
+        dispatch: rawDispatcher,
+      })
       const guards = resolveSecGuards(freshConfig.securities.guards)
       const walletConfig = {
-        executeOperation: createSecGuardPipeline(rawDispatcher, newResult.engine, guards),
+        executeOperation: createSecGuardPipeline(governedDispatcher, newResult.engine, guards),
         getWalletState: bridge,
         onCommit: onSecCommit,
       }
@@ -470,6 +507,7 @@ async function main() {
 
   const ctx: EngineContext = {
     config, connectorCenter, engine, cryptoEngine: null, eventLog, heartbeat, cronEngine,
+    governance,
     reconnectCrypto, reconnectSecurities, reconnectConnectors,
     getCryptoEngine: () => cryptoResultRef?.engine ?? null,
     getSecuritiesEngine: () => secResultRef?.engine ?? null,
@@ -493,9 +531,19 @@ async function main() {
     if (!cryptoResult) return
     const bridge = createCryptoWalletStateBridge(cryptoResult.engine)
     const rawDispatcher = createCryptoOperationDispatcher(cryptoResult.engine)
+    const cryptoPaperTrading = config.crypto.provider.type === 'ccxt'
+      ? config.crypto.provider.sandbox || config.crypto.provider.demoTrading
+      : true
+    const governedDispatcher = createGovernanceGatedDispatcher<CryptoOperation>({
+      market: 'crypto',
+      paperTrading: cryptoPaperTrading,
+      governance: config.governance,
+      eventLog,
+      dispatch: rawDispatcher,
+    })
     const guards = resolveGuards(config.crypto.guards)
     const realWalletConfig = {
-      executeOperation: createGuardPipeline(rawDispatcher, cryptoResult.engine, guards),
+      executeOperation: createGuardPipeline(governedDispatcher, cryptoResult.engine, guards),
       getWalletState: bridge,
       onCommit: onCryptoCommit,
     }

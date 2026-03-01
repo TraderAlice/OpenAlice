@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GateCheckpointV1",
+  "type": "object",
+  "required": [
+    "version",
+    "gate",
+    "runId",
+    "attempt",
+    "status",
+    "startedAt",
+    "endedAt"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "v1"
+    },
+    "gate": {
+      "type": "string",
+      "pattern": "^G[0-4]$"
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "attempt": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "idempotencyKey": {
+      "type": "string"
+    },
+    "resumedFrom": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pass",
+        "policy_fail",
+        "tool_error",
+        "skipped"
+      ]
+    },
+    "reasonCodes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "blockingIssues": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "startedAt": {
+      "type": "string"
+    },
+    "endedAt": {
+      "type": "string"
+    },
+    "durationMs": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "profileHash": {
+      "type": "string"
+    },
+    "thresholdsHash": {
+      "type": "string"
+    },
+    "statisticsLockHash": {
+      "type": "string"
+    },
+    "registryVersion": {
+      "type": "string"
+    },
+    "metricVersions": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "datasetSnapshotHash": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "decisionWeight": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "limited",
+        "standard",
+        "high",
+        null
+      ]
+    },
+    "attestation": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "details": {
+      "type": "object"
+    }
+  }
+}

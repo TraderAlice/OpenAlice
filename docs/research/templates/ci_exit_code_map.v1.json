@@ -1,0 +1,51 @@
+{
+  "version": "v1",
+  "commands": {
+    "env:verify": {
+      "0": "PASS",
+      "2": "POLICY_FAIL",
+      "3": "TOOL_ERROR",
+      "127": "ENV_ERROR"
+    },
+    "freeze:verify": {
+      "0": "PASS",
+      "2": "POLICY_FAIL",
+      "3": "TOOL_ERROR",
+      "127": "ENV_ERROR"
+    },
+    "evidence:validate": {
+      "0": "PASS_OR_CONSTRAINED",
+      "2": "NO_GO",
+      "3": "TOOL_ERROR",
+      "127": "ENV_ERROR"
+    },
+    "runtime:replay-state": {
+      "0": "PASS",
+      "2": "REPLAY_INVALID",
+      "3": "TOOL_ERROR",
+      "127": "ENV_ERROR"
+    }
+  },
+  "pipelineRule": {
+    "ifAnyIn": {
+      "TOOL_ERROR": "error",
+      "ENV_ERROR": "error",
+      "POLICY_FAIL": "failed",
+      "NO_GO": "failed",
+      "REPLAY_INVALID": "failed"
+    },
+    "ifAllZeroReadVerdict": true
+  },
+  "verdictMapping": {
+    "GO": "passed",
+    "GO_WITH_CONSTRAINTS": "passed_with_constraints",
+    "NO_GO": "failed"
+  },
+  "constraintsRule": {
+    "requiredWhenGoWithConstraints": [
+      "decision.constraints",
+      "decision.rollbackTriggers",
+      "decision.expiryAt"
+    ]
+  }
+}

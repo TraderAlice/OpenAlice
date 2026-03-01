@@ -1,9 +1,45 @@
 import { Hono } from 'hono'
-import { loadConfig, writeConfigSection, readAIProviderConfig, readOpenbbConfig, validSections, type ConfigSection } from '../../../core/config.js'
+import {
+  loadConfig,
+  writeConfigSection,
+  readAIProviderConfig,
+  readOpenbbConfig,
+  validSections,
+  type Config,
+  type ConfigSection,
+} from '../../../core/config.js'
 import { readAIConfig, writeAIConfig, type AIBackend } from '../../../core/ai-config.js'
+import { normalizeGovernanceRouteRequest } from '../../../upstream-adapters/web/upstream-config-route-adapter.js'
 
 interface ConfigRouteOpts {
   onConnectorsChange?: () => Promise<void>
+}
+
+function normalizeGovernanceAliasPayload(
+  normalizedConfig: NonNullable<ReturnType<typeof normalizeGovernanceRouteRequest>>['config'],
+  baseConfig: Config['governance'],
+): Config['governance'] {
+  return {
+    ...baseConfig,
+    enabled: normalizedConfig.enabled,
+    fallbackConfigId: normalizedConfig.fallbackConfigId,
+    releaseGate: {
+      ...baseConfig.releaseGate,
+      enabled: normalizedConfig.liveGate.enabled,
+      maxStatusAgeHours: normalizedConfig.liveGate.releaseGateStatusAgeHoursMax,
+    },
+    liveGate: {
+      ...baseConfig.liveGate,
+      enabled: normalizedConfig.liveGate.enabled,
+      quoteAgeP95MsMax: normalizedConfig.liveGate.metrics.quoteAgeP95MsMax,
+      decisionToSubmitP95MsMax: normalizedConfig.liveGate.metrics.decisionToSubmitP95MsMax,
+      decisionToFirstFillP95MsMax: normalizedConfig.liveGate.metrics.decisionToFirstFillP95MsMax,
+    },
+    statsGate: {
+      ...baseConfig.statsGate,
+      fdrQMax: normalizedConfig.liveGate.metrics.fdrQMax,
+    },
+  }
 }
 
 /** Config routes: GET /, PUT /ai-provider, PUT /:section, GET /api-keys/status */
@@ -35,12 +71,30 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
 
   app.put('/:section', async (c) => {
     try {
-      const section = c.req.param('section') as ConfigSection
-      if (!validSections.includes(section)) {
-        return c.json({ error: `Invalid section "${section}". Valid: ${validSections.join(', ')}` }, 400)
-      }
+      const rawSection = c.req.param('section')
+      let section = rawSection as ConfigSection
       const body = await c.req.json()
-      const validated = await writeConfigSection(section, body)
+      let payload: unknown = body
+
+      const isCanonicalGovernanceSection = rawSection.trim().toLowerCase() === 'governance'
+      const normalizedGovernanceRequest = normalizeGovernanceRouteRequest({
+        section: rawSection,
+        body,
+      })
+      if (!isCanonicalGovernanceSection && normalizedGovernanceRequest) {
+        const currentConfig = await loadConfig()
+        section = 'governance'
+        payload = normalizeGovernanceAliasPayload(
+          normalizedGovernanceRequest.config,
+          currentConfig.governance,
+        )
+      }
+
+      if (!validSections.includes(section)) {
+        return c.json({ error: `Invalid section "${rawSection}". Valid: ${validSections.join(', ')}` }, 400)
+      }
+
+      const validated = await writeConfigSection(section, payload)
       // Hot-reload connectors when their config changes
       if (section === 'connectors') {
         await opts?.onConnectorsChange?.()

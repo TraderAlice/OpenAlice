@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GateVerdictV2",
+  "type": "object",
+  "required": [
+    "version",
+    "generatedAt",
+    "runId",
+    "result",
+    "decisionWeight",
+    "reasonCodes"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "v2"
+    },
+    "generatedAt": {
+      "type": "string"
+    },
+    "runId": {
+      "type": "string"
+    },
+    "result": {
+      "type": "string",
+      "enum": [
+        "NO_GO",
+        "PAPER_ONLY_GO",
+        "BLOCKED_WITH_RECOVERY_PLAN"
+      ]
+    },
+    "decisionWeight": {
+      "type": "string",
+      "enum": [
+        "limited",
+        "standard",
+        "high"
+      ]
+    },
+    "reasonCodes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "blockingIssues": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "profileHash": {
+      "type": "string"
+    },
+    "thresholdsHash": {
+      "type": "string"
+    },
+    "statisticsLockHash": {
+      "type": "string"
+    },
+    "registryVersion": {
+      "type": "string"
+    },
+    "metricVersions": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "attestationSummary": {
+      "type": [
+        "object",
+        "null"
+      ]
+    }
+  }
+}

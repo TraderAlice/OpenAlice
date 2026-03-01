@@ -1,5 +1,6 @@
 import type { ICryptoTradingEngine, Wallet } from '../extension/crypto-trading/index.js'
 import type { ISecuritiesTradingEngine, SecWallet } from '../extension/securities-trading/index.js'
+import type { GovernanceServiceContract } from '../custom/governance/types.js'
 import type { CronEngine } from '../task/cron/engine.js'
 import type { Heartbeat } from '../task/heartbeat/index.js'
 import type { Config } from './config.js'
@@ -40,6 +41,8 @@ export interface EngineContext {
   getCryptoWallet?: () => Wallet | null
   /** Current securities wallet (updates on reconnect). */
   getSecWallet?: () => SecWallet | null
+  /** Governance service (decision packet / verification pipeline). */
+  governance?: GovernanceServiceContract
 }
 
 /** A media attachment collected from tool results (e.g. browser screenshots). */

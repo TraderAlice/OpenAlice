@@ -1,0 +1,14 @@
+{
+  "version": "v1",
+  "description": "Execution environment lock for governance pipeline.",
+  "required": {
+    "node": "22.21.0",
+    "pnpm": "10.29.2",
+    "python": "3.14.3",
+    "jsonschema": "4.23.0"
+  },
+  "notes": [
+    "Mismatch returns POLICY_FAIL (exit 2).",
+    "Execution/runtime errors return TOOL_ERROR (exit 3)."
+  ]
+}

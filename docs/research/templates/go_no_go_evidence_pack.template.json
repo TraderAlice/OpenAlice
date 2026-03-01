@@ -1,0 +1,155 @@
+{
+  "evidencePackVersion": "v1",
+  "decisionDate": "2026-02-28",
+  "campaignId": "cvar24-campaign-001",
+  "generatedAt": null,
+  "protocolHash": "phash:v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "datasetSnapshotId": "dsnap:v1:bbbbbbbbbbbbbbbbbbbbbbbb",
+  "releaseGateStatus": {
+    "path": "data/runtime/release_gate_status.json",
+    "generatedAt": "2026-02-28T12:00:00.000Z",
+    "expiresAt": "2026-03-01T12:00:00.000Z",
+    "allowPaperTrading": true,
+    "allowLiveTrading": false
+  },
+  "artifacts": {
+    "manifest": "decision_packet/manifest.json",
+    "evidencePack": "decision_packet/evidence_pack.json",
+    "protocolSpec": "decision_packet/protocol_spec.json",
+    "protocolHashFile": "decision_packet/protocol_hash.txt",
+    "comparabilityReport": "decision_packet/comparability_report.json",
+    "championRegistrySnapshot": "decision_packet/champion_registry_snapshot.json",
+    "releaseGateStatus": "decision_packet/release_gate_status.json",
+    "offlineMetrics": "decision_packet/offline_metrics.json",
+    "liveShadowMetrics14d": "decision_packet/live_shadow_metrics_14d.json",
+    "stateMachineLog": "decision_packet/state_machine_log.jsonl",
+    "decisionMarkdown": "decision_packet/decision.md"
+  },
+  "artifactProvenance": {
+    "protocolSpec": {
+      "sourcePath": null,
+      "sha256": null,
+      "generatedAt": null,
+      "generatedBy": null,
+      "dataWindow": null
+    },
+    "protocolHashFile": {
+      "sourcePath": null,
+      "sha256": null,
+      "generatedAt": null,
+      "generatedBy": null,
+      "dataWindow": null
+    },
+    "comparabilityReport": {
+      "sourcePath": null,
+      "sha256": null,
+      "generatedAt": null,
+      "generatedBy": null,
+      "dataWindow": null
+    },
+    "championRegistrySnapshot": {
+      "sourcePath": null,
+      "sha256": null,
+      "generatedAt": null,
+      "generatedBy": null,
+      "dataWindow": null
+    },
+    "releaseGateStatus": {
+      "sourcePath": null,
+      "sha256": null,
+      "generatedAt": null,
+      "generatedBy": null,
+      "dataWindow": null
+    },
+    "offlineMetrics": {
+      "sourcePath": null,
+      "sha256": null,
+      "generatedAt": null,
+      "generatedBy": null,
+      "dataWindow": null
+    },
+    "liveShadowMetrics14d": {
+      "sourcePath": null,
+      "sha256": null,
+      "generatedAt": null,
+      "generatedBy": null,
+      "dataWindow": null
+    },
+    "stateMachineLog": {
+      "sourcePath": null,
+      "sha256": null,
+      "generatedAt": null,
+      "generatedBy": null,
+      "dataWindow": null
+    },
+    "decisionMarkdown": {
+      "sourcePath": null,
+      "sha256": null,
+      "generatedAt": null,
+      "generatedBy": null,
+      "dataWindow": null
+    }
+  },
+  "thresholds": {
+    "transferPassRatioRolling14dMin": 0.25,
+    "winnerEligibleRatioRolling14dMin": 0.35,
+    "meanPboMax": 0.2,
+    "meanDsrProbabilityMin": 0.5,
+    "fdrQMax": 0.1,
+    "quoteAgeP95MsMax": 2000,
+    "decisionToSubmitP95MsMax": 800,
+    "decisionToFirstFillP95MsMax": 2500,
+    "releaseGateStatusAgeHoursMax": 24
+  },
+  "measured": {
+    "transferPassRatioRolling14d": null,
+    "winnerEligibleRatioRolling14d": null,
+    "meanPbo": null,
+    "meanDsrProbability": null,
+    "fdrQ": null,
+    "quoteAgeP95Ms": null,
+    "decisionToSubmitP95Ms": null,
+    "decisionToFirstFillP95Ms": null,
+    "releaseGateStatusAgeHours": null
+  },
+  "hardGateChecks": [
+    {
+      "name": "comparability_all_runs_valid",
+      "passed": null,
+      "reason": ""
+    },
+    {
+      "name": "protocol_hash_matches_runtime",
+      "passed": null,
+      "reason": ""
+    },
+    {
+      "name": "champion_registry_schema_valid",
+      "passed": null,
+      "reason": ""
+    },
+    {
+      "name": "state_machine_drill_passed",
+      "passed": null,
+      "reason": ""
+    }
+  ],
+  "decision": {
+    "result": "NO_GO",
+    "mode": "hard_gate",
+    "verdictReasonCodes": [],
+    "notes": [],
+    "constraints": [],
+    "rollbackTriggers": [],
+    "expiryAt": null,
+    "maxDurationHours": null
+  },
+  "approvals": {
+    "dri": "",
+    "backup": "",
+    "onCall": "",
+    "techLead": "",
+    "riskLead": "",
+    "incidentCommander": ""
+  }
+}

@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openalice/freeze_manifest.schema.v1.json",
+  "title": "OpenAlice Freeze Manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "manifestVersion",
+    "frozenAt",
+    "versions",
+    "thresholds",
+    "raciSnapshot",
+    "incidentCommander",
+    "l2OverrideAllowlist",
+    "signOff"
+  ],
+  "properties": {
+    "manifestVersion": {
+      "type": "string",
+      "const": "v1"
+    },
+    "frozenAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "versions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sm", "stats", "hash", "evidence"],
+      "properties": {
+        "sm": { "type": "string", "minLength": 1 },
+        "stats": { "type": "string", "minLength": 1 },
+        "hash": { "type": "string", "minLength": 1 },
+        "evidence": { "type": "string", "minLength": 1 }
+      }
+    },
+    "thresholds": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": ["number", "string", "boolean"]
+      }
+    },
+    "raciSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["E7", "E8", "E9"],
+      "properties": {
+        "E7": { "$ref": "#/$defs/raciMember" },
+        "E8": { "$ref": "#/$defs/raciMember" },
+        "E9": { "$ref": "#/$defs/raciMember" }
+      }
+    },
+    "incidentCommander": {
+      "type": "string",
+      "minLength": 1
+    },
+    "l2OverrideAllowlist": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "signOff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["approvedBy", "approvedAt"],
+      "properties": {
+        "approvedBy": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "approvedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "raciMember": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dri", "backup", "nightOnCall"],
+      "properties": {
+        "dri": { "type": "string", "minLength": 1 },
+        "backup": { "type": "string", "minLength": 1 },
+        "nightOnCall": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

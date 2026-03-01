@@ -14,6 +14,7 @@ import { createCronRoutes } from './routes/cron.js'
 import { createHeartbeatRoutes } from './routes/heartbeat.js'
 import { createCryptoRoutes } from './routes/crypto.js'
 import { createSecuritiesRoutes } from './routes/securities.js'
+import { createGovernanceRoutes } from './routes/governance.js'
 import { createDevRoutes } from './routes/dev.js'
 
 export interface WebConfig {
@@ -57,6 +58,7 @@ export class WebPlugin implements Plugin {
     app.route('/api/heartbeat', createHeartbeatRoutes(ctx))
     app.route('/api/crypto', createCryptoRoutes(ctx))
     app.route('/api/securities', createSecuritiesRoutes(ctx))
+    app.route('/api/governance', createGovernanceRoutes(ctx))
     app.route('/api/dev', createDevRoutes(ctx.connectorCenter))
 
     // ==================== Serve UI (Vite build output) ====================

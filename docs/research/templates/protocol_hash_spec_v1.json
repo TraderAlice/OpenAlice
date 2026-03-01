@@ -1,0 +1,58 @@
+{
+  "specVersion": "v1",
+  "canonicalization": {
+    "method": "RFC8785-JCS",
+    "encoding": "utf-8",
+    "lineEnding": "\\n",
+    "bom": false
+  },
+  "hash": {
+    "algorithm": "sha256",
+    "protocolHashPrefix": "phash:v1:",
+    "datasetSnapshotIdPrefix": "dsnap:v1:"
+  },
+  "protocolInput": {
+    "requiredFieldsInOrder": [
+      "protocolVersion",
+      "splitSpec",
+      "seeds",
+      "timeframe",
+      "symbolAllowlist",
+      "costModel",
+      "profile",
+      "codeVersion",
+      "datasetSnapshotId"
+    ],
+    "fieldRules": {
+      "seeds": "array<int>, stable order as used in execution",
+      "symbolAllowlist": "array<string>, uppercase symbols, sorted ascending",
+      "timeframe": "string, lowercase canonical format",
+      "costModel": "object{feeRate, slippageBps, latencyBars}",
+      "codeVersion": "object{gitSha, dirty, toolVersion}"
+    }
+  },
+  "datasetSnapshotInput": {
+    "requiredFieldsInOrder": [
+      "dataProvider",
+      "venue",
+      "symbols",
+      "timeframe",
+      "timeRange",
+      "rowCount",
+      "sourceFiles"
+    ],
+    "fieldRules": {
+      "symbols": "array<string>, sorted ascending",
+      "timeRange": "object{startIso,endIso}",
+      "sourceFiles": "array<object{path,size,sha256}>, sorted by path"
+    }
+  },
+  "outputExamples": {
+    "protocolHash": "phash:v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "datasetSnapshotId": "dsnap:v1:bbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "compatibility": {
+    "crossLanguage": "python/typescript implementations must call one shared canonicalization utility",
+    "breakingChangeRule": "any field-set or serialization-rule change requires specVersion bump"
+  }
+}

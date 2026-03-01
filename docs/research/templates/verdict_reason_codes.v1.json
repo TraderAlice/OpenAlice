@@ -1,0 +1,190 @@
+{
+  "version": "v1",
+  "namingRule": "SEVERITY_SUBJECT_CONDITION (UPPER_SNAKE_CASE)",
+  "canonicalOnly": true,
+  "codes": [
+    {
+      "code": "HARD_MISSING_ARTIFACT",
+      "severity": "HARD",
+      "hardGate": true,
+      "descriptionZh": "必需证据工件缺失。",
+      "descriptionEn": "Required evidence artifact is missing."
+    },
+    {
+      "code": "HARD_ARTIFACT_PROVENANCE_MISSING",
+      "severity": "HARD",
+      "hardGate": true,
+      "descriptionZh": "工件 provenance 字段缺失或无效。",
+      "descriptionEn": "Artifact provenance metadata is missing or invalid."
+    },
+    {
+      "code": "HARD_TEMPLATE_PATH_UNSAFE",
+      "severity": "HARD",
+      "hardGate": true,
+      "descriptionZh": "模板工件路径不安全（绝对路径或目录穿越）。",
+      "descriptionEn": "Template artifact path is unsafe (absolute path or traversal)."
+    },
+    {
+      "code": "HARD_ENV_MISMATCH",
+      "severity": "HARD",
+      "hardGate": true,
+      "descriptionZh": "环境版本与锁文件不一致。",
+      "descriptionEn": "Execution environment does not match lock file."
+    },
+    {
+      "code": "HARD_IDEMPOTENCY_FAILED",
+      "severity": "HARD",
+      "hardGate": true,
+      "descriptionZh": "decision_packet 幂等性校验失败。",
+      "descriptionEn": "Decision packet idempotency check failed."
+    },
+    {
+      "code": "HARD_REASON_CODE_UNKNOWN",
+      "severity": "HARD",
+      "hardGate": true,
+      "descriptionZh": "发现未注册或已废弃的 reason code。",
+      "descriptionEn": "An unknown or deprecated reason code was found."
+    },
+    {
+      "code": "HARD_FREEZE_MANIFEST_INVALID",
+      "severity": "HARD",
+      "hardGate": true,
+      "descriptionZh": "freeze manifest 校验失败。",
+      "descriptionEn": "Freeze manifest validation failed."
+    },
+    {
+      "code": "HARD_HARD_GATE_CHECK_FAILED",
+      "severity": "HARD",
+      "hardGate": true,
+      "descriptionZh": "至少一个 hardGateChecks 条目失败。",
+      "descriptionEn": "At least one hardGateChecks item failed."
+    },
+    {
+      "code": "HARD_METRIC_MISSING",
+      "severity": "HARD",
+      "hardGate": true,
+      "descriptionZh": "阈值对比所需指标缺失。",
+      "descriptionEn": "A required metric for threshold evaluation is missing."
+    },
+    {
+      "code": "HARD_THRESHOLD_BREACH",
+      "severity": "HARD",
+      "hardGate": true,
+      "descriptionZh": "至少一个硬阈值被突破。",
+      "descriptionEn": "At least one hard threshold was breached."
+    },
+    {
+      "code": "HARD_INSUFFICIENT_SAMPLE",
+      "severity": "HARD",
+      "hardGate": true,
+      "descriptionZh": "统计样本量不足。",
+      "descriptionEn": "Minimum sample-size thresholds are not met."
+    },
+    {
+      "code": "HARD_STAT_METHOD_MISMATCH",
+      "severity": "HARD",
+      "hardGate": true,
+      "descriptionZh": "统计方法锁与注册表不一致。",
+      "descriptionEn": "Statistic method lock does not match registry configuration."
+    },
+    {
+      "code": "HARD_STRESS_METRIC_UNDEFINED",
+      "severity": "HARD",
+      "hardGate": true,
+      "descriptionZh": "压力指标定义缺失或输入不足。",
+      "descriptionEn": "Stress metric is undefined due to missing inputs."
+    },
+    {
+      "code": "HARD_DATASET_SNAPSHOT_DRIFT",
+      "severity": "HARD",
+      "hardGate": true,
+      "descriptionZh": "数据快照哈希与锁不一致。",
+      "descriptionEn": "Dataset snapshot hash drift was detected."
+    },
+    {
+      "code": "HARD_LEAKAGE_DETECTED",
+      "severity": "HARD",
+      "hardGate": true,
+      "descriptionZh": "检测到数据泄漏风险。",
+      "descriptionEn": "Data leakage signal was detected."
+    },
+    {
+      "code": "HARD_SOURCE_HEALTH_FAIL",
+      "severity": "HARD",
+      "hardGate": true,
+      "descriptionZh": "外部依赖健康检查失败。",
+      "descriptionEn": "External source health check failed."
+    },
+    {
+      "code": "HARD_BUDGET_HARD_CAP_HIT",
+      "severity": "HARD",
+      "hardGate": true,
+      "descriptionZh": "模型或 token 成本触发硬上限。",
+      "descriptionEn": "Model or token budget reached hard cap."
+    },
+    {
+      "code": "HARD_SECRETS_HYGIENE_FAIL",
+      "severity": "HARD",
+      "hardGate": true,
+      "descriptionZh": "检测到高置信明文密钥。",
+      "descriptionEn": "High-confidence plaintext secret was detected."
+    },
+    {
+      "code": "HARD_CLOCK_DRIFT_EXCEEDED",
+      "severity": "HARD",
+      "hardGate": true,
+      "descriptionZh": "系统时钟漂移超过阈值。",
+      "descriptionEn": "System clock drift exceeded configured threshold."
+    },
+    {
+      "code": "HARD_GATE_RUNNER_SELF_HEALTH_FAIL",
+      "severity": "HARD",
+      "hardGate": true,
+      "descriptionZh": "gate runner 自健康熔断打开。",
+      "descriptionEn": "Gate runner self-health circuit is open."
+    },
+    {
+      "code": "HARD_RELEASE_GATE_BLOCKED",
+      "severity": "HARD",
+      "hardGate": true,
+      "descriptionZh": "release gate 不允许 live。",
+      "descriptionEn": "Release gate does not allow live trading."
+    },
+    {
+      "code": "HARD_RELEASE_GATE_EXPIRED",
+      "severity": "HARD",
+      "hardGate": true,
+      "descriptionZh": "release gate 已过期或状态过旧。",
+      "descriptionEn": "Release gate is expired or status is stale."
+    },
+    {
+      "code": "HARD_CONSTRAINTS_INVALID",
+      "severity": "HARD",
+      "hardGate": true,
+      "descriptionZh": "GO_WITH_CONSTRAINTS 缺必要字段或无效。",
+      "descriptionEn": "GO_WITH_CONSTRAINTS is missing required fields or is invalid."
+    },
+    {
+      "code": "WARN_CONSTRAINTS_PRESENT",
+      "severity": "WARN",
+      "hardGate": false,
+      "descriptionZh": "存在上线约束条款。",
+      "descriptionEn": "Deployment constraints are present."
+    },
+    {
+      "code": "INFO_VALIDATION_PASSED",
+      "severity": "INFO",
+      "hardGate": false,
+      "descriptionZh": "所有校验通过。",
+      "descriptionEn": "All validations passed."
+    }
+  ],
+  "deprecatedAliases": [
+    {
+      "alias": "HARD_ARTIFACT_MISSING",
+      "canonical": "HARD_MISSING_ARTIFACT",
+      "status": "deprecated",
+      "strictReject": true
+    }
+  ]
+}

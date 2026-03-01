@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "V4toV5MigrationReportV1",
+  "type": "object",
+  "required": [
+    "version",
+    "generatedAt",
+    "sourcePath",
+    "targetPath",
+    "mappings",
+    "warnings"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "v1"
+    },
+    "generatedAt": {
+      "type": "string"
+    },
+    "sourcePath": {
+      "type": "string"
+    },
+    "targetPath": {
+      "type": "string"
+    },
+    "mappings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "from",
+          "to",
+          "status"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "mapped",
+              "dropped",
+              "defaulted"
+            ]
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

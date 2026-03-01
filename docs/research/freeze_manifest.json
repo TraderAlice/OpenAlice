@@ -1,0 +1,44 @@
+{
+  "manifestVersion": "v1",
+  "frozenAt": "",
+  "versions": {
+    "sm": "sm-v1",
+    "stats": "stats-v1",
+    "hash": "hash-v1",
+    "evidence": "evidence-v1"
+  },
+  "thresholds": {
+    "transferPassRatio_rolling14d_min": 0.25,
+    "winnerEligibleRatio_rolling14d_min": 0.35,
+    "meanPbo_max": 0.2,
+    "meanDsrProbability_min": 0.5,
+    "fdrQ_max": 0.1,
+    "quoteAgeP95Ms_max": 2000,
+    "decisionToSubmitP95Ms_max": 800,
+    "decisionToFirstFillP95Ms_max": 2500,
+    "releaseGateStatusAgeHours_max": 24
+  },
+  "raciSnapshot": {
+    "E7": {
+      "dri": "",
+      "backup": "",
+      "nightOnCall": ""
+    },
+    "E8": {
+      "dri": "",
+      "backup": "",
+      "nightOnCall": ""
+    },
+    "E9": {
+      "dri": "",
+      "backup": "",
+      "nightOnCall": ""
+    }
+  },
+  "incidentCommander": "",
+  "l2OverrideAllowlist": [],
+  "signOff": {
+    "approvedBy": [],
+    "approvedAt": ""
+  }
+}

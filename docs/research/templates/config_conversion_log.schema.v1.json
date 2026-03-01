@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ConfigConversionLogV1",
+  "type": "object",
+  "required": [
+    "version",
+    "generatedAt",
+    "entries"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "v1"
+    },
+    "generatedAt": {
+      "type": "string"
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "field",
+          "originalValue",
+          "convertedValue",
+          "ruleId"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "originalValue": {},
+          "convertedValue": {},
+          "ruleId": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warning"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

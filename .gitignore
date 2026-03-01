@@ -4,6 +4,12 @@ logs/
 /data/*
 !/data/default/
 !/data/default/**
+!/data/config/
+/data/config/*
+decision_packet/
+data/runtime/*_report.json
+data/runtime/environment_verify_report.json
+data/runtime/takeover_ready_report.json
 state.json
 *.log
 
@@ -22,6 +28,8 @@ Thumbs.db
 
 # Build cache
 *.tsbuildinfo
+__pycache__/
+*.pyc
 
 # Test
 coverage/

@@ -4,6 +4,7 @@ import { resolve } from 'path'
 import { newsCollectorSchema } from '../extension/news-collector/config.js'
 
 const CONFIG_DIR = resolve('data/config')
+const GOVERNANCE_CONFIG_MODE = (process.env.OPENALICE_GOVERNANCE_CONFIG_MODE ?? 'seed').toLowerCase()
 
 // ==================== Individual Schemas ====================
 
@@ -167,6 +168,46 @@ const heartbeatSchema = z.object({
   activeHours: activeHoursSchema,
 })
 
+const governanceSchema = z.object({
+  enabled: z.boolean().default(true),
+  fallbackConfigId: z.string().min(1).default('H0'),
+  releaseGate: z.object({
+    enabled: z.boolean().default(true),
+    statusPath: z.string().min(1).default('data/runtime/release_gate_status.json'),
+    maxStatusAgeHours: z.number().positive().default(24),
+    blockOnExpired: z.boolean().default(true),
+  }).default({
+    enabled: true,
+    statusPath: 'data/runtime/release_gate_status.json',
+    maxStatusAgeHours: 24,
+    blockOnExpired: true,
+  }),
+  liveGate: z.object({
+    enabled: z.boolean().default(true),
+    quoteAgeP95MsMax: z.number().nonnegative().default(2000),
+    decisionToSubmitP95MsMax: z.number().nonnegative().default(800),
+    decisionToFirstFillP95MsMax: z.number().nonnegative().default(2500),
+  }).default({
+    enabled: true,
+    quoteAgeP95MsMax: 2000,
+    decisionToSubmitP95MsMax: 800,
+    decisionToFirstFillP95MsMax: 2500,
+  }),
+  statsGate: z.object({
+    fdrQMax: z.number().min(0).max(1).default(0.10),
+    transferPassRatioRolling14dMin: z.number().min(0).max(1).default(0.25),
+    winnerEligibleRatioRolling14dMin: z.number().min(0).max(1).default(0.35),
+    meanPboMax: z.number().min(0).max(1).default(0.20),
+    meanDsrProbabilityMin: z.number().min(0).max(1).default(0.50),
+  }).default({
+    fdrQMax: 0.10,
+    transferPassRatioRolling14dMin: 0.25,
+    winnerEligibleRatioRolling14dMin: 0.35,
+    meanPboMax: 0.20,
+    meanDsrProbabilityMin: 0.50,
+  }),
+})
+
 // ==================== Unified Config Type ====================
 
 export type Config = {
@@ -180,6 +221,7 @@ export type Config = {
   heartbeat: z.infer<typeof heartbeatSchema>
   connectors: z.infer<typeof connectorsSchema>
   newsCollector: z.infer<typeof newsCollectorSchema>
+  governance: z.infer<typeof governanceSchema>
 }
 
 // ==================== Loader ====================
@@ -203,6 +245,9 @@ async function removeJsonFile(filename: string): Promise<void> {
 
 /** Parse with Zod; if the file was missing, seed it to disk with defaults. */
 async function parseAndSeed<T>(filename: string, schema: z.ZodType<T>, raw: unknown | undefined): Promise<T> {
+  if (raw === undefined && filename === 'governance.json' && (GOVERNANCE_CONFIG_MODE === 'hard_fail' || GOVERNANCE_CONFIG_MODE === 'hard-fail')) {
+    throw new Error('governance.json is required when OPENALICE_GOVERNANCE_CONFIG_MODE=hard_fail')
+  }
   const parsed = schema.parse(raw ?? {})
   if (raw === undefined) {
     await mkdir(CONFIG_DIR, { recursive: true })
@@ -212,7 +257,7 @@ async function parseAndSeed<T>(filename: string, schema: z.ZodType<T>, raw: unkn
 }
 
 export async function loadConfig(): Promise<Config> {
-  const files = ['engine.json', 'agent.json', 'crypto.json', 'securities.json', 'openbb.json', 'compaction.json', 'ai-provider.json', 'heartbeat.json', 'connectors.json', 'news-collector.json'] as const
+  const files = ['engine.json', 'agent.json', 'crypto.json', 'securities.json', 'openbb.json', 'compaction.json', 'ai-provider.json', 'heartbeat.json', 'connectors.json', 'news-collector.json', 'governance.json'] as const
   const raws = await Promise.all(files.map((f) => loadJsonFile(f)))
 
   // ---------- Migration: consolidate old ai-provider + model + api-keys → ai-provider ----------
@@ -267,6 +312,7 @@ export async function loadConfig(): Promise<Config> {
     heartbeat:     await parseAndSeed(files[7], heartbeatSchema, raws[7]),
     connectors:    await parseAndSeed(files[8], connectorsSchema, raws[8]),
     newsCollector: await parseAndSeed(files[9], newsCollectorSchema, raws[9]),
+    governance:    await parseAndSeed(files[10], governanceSchema, raws[10]),
   }
 }
 
@@ -317,6 +363,7 @@ const sectionSchemas: Record<ConfigSection, z.ZodTypeAny> = {
   heartbeat: heartbeatSchema,
   connectors: connectorsSchema,
   newsCollector: newsCollectorSchema,
+  governance: governanceSchema,
 }
 
 const sectionFiles: Record<ConfigSection, string> = {
@@ -330,6 +377,7 @@ const sectionFiles: Record<ConfigSection, string> = {
   heartbeat: 'heartbeat.json',
   connectors: 'connectors.json',
   newsCollector: 'news-collector.json',
+  governance: 'governance.json',
 }
 
 /** All valid config section names (derived from sectionSchemas). */
