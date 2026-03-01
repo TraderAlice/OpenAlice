@@ -545,83 +545,6 @@ function AddCronJobForm({ onClose, onCreated }: { onClose: () => void; onCreated
   )
 }
 
-// ==================== Heartbeat Section ====================
-
-function HeartbeatSection() {
-  const [enabled, setEnabled] = useState<boolean | null>(null)
-  const [triggering, setTriggering] = useState(false)
-  const [triggerResult, setTriggerResult] = useState<string | null>(null)
-
-  useEffect(() => {
-    api.heartbeat.status().then(({ enabled }) => setEnabled(enabled)).catch(console.warn)
-  }, [])
-
-  const [error, setError] = useState<string | null>(null)
-
-  const handleToggle = async (v: boolean) => {
-    try {
-      const result = await api.heartbeat.setEnabled(v)
-      setEnabled(result.enabled)
-    } catch {
-      setError('Failed to toggle heartbeat')
-      setTimeout(() => setError(null), 3000)
-    }
-  }
-
-  const handleTrigger = async () => {
-    setTriggering(true)
-    setTriggerResult(null)
-    try {
-      await api.heartbeat.trigger()
-      setTriggerResult('Heartbeat triggered!')
-      setTimeout(() => setTriggerResult(null), 3000)
-    } catch (err) {
-      setTriggerResult(err instanceof Error ? err.message : 'Trigger failed')
-      setTimeout(() => setTriggerResult(null), 5000)
-    } finally {
-      setTriggering(false)
-    }
-  }
-
-  return (
-    <div className="bg-bg rounded-lg border border-border p-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="text-lg">💓</span>
-          <div>
-            <div className="text-sm font-medium text-text">Heartbeat</div>
-            <div className="text-xs text-text-muted">
-              Periodic self-check and autonomous thinking
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {triggerResult && (
-            <span className={`text-xs ${triggerResult.includes('failed') || triggerResult.includes('not found') ? 'text-red' : 'text-green'}`}>
-              {triggerResult}
-            </span>
-          )}
-
-          {error && <span className="text-xs text-red">{error}</span>}
-
-          <button
-            onClick={handleTrigger}
-            disabled={triggering}
-            className="px-3 py-1.5 text-xs rounded-md bg-purple-dim text-purple border border-purple/30 hover:bg-purple/30 transition-colors disabled:opacity-50"
-          >
-            {triggering ? 'Triggering...' : 'Trigger Now'}
-          </button>
-
-          {enabled !== null && (
-            <Toggle checked={enabled} onChange={handleToggle} />
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ==================== Main Page ====================
 
 type Tab = 'events' | 'cron'
@@ -659,8 +582,7 @@ export function EventsPage() {
       </div>
 
       {/* Content area */}
-      <div className="flex-1 flex flex-col min-h-0 px-4 md:px-6 py-5 gap-4">
-        <HeartbeatSection />
+      <div className="flex-1 flex flex-col min-h-0 px-4 md:px-6 py-5">
         <div className="flex-1 min-h-0">
           {tab === 'events' ? <EventLogSection /> : <CronSection />}
         </div>

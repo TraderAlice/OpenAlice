@@ -5,12 +5,6 @@ import { SaveIndicator } from '../components/SaveIndicator'
 import { Section, Field, inputClass } from '../components/form'
 import { useAutoSave } from '../hooks/useAutoSave'
 
-const SECTIONS = [
-  { id: 'agent', label: 'Agent' },
-  { id: 'compaction', label: 'Compaction' },
-  { id: 'heartbeat', label: 'Heartbeat' },
-]
-
 export function SettingsPage() {
   const [config, setConfig] = useState<AppConfig | null>(null)
 
@@ -61,10 +55,7 @@ export function SettingsPage() {
               <CompactionForm config={config} />
             </Section>
 
-            {/* Heartbeat */}
-            <Section id="heartbeat" title="Heartbeat" description="Periodic self-check. Alice reviews markets, news and alerts at the configured interval, and only pushes a notification when there's something worth your attention. Interval format: 30m, 1h, 6h.">
-              <HeartbeatForm config={config} />
-            </Section>
+
           </div>
         )}
       </div>
@@ -102,53 +93,3 @@ function CompactionForm({ config }: { config: AppConfig }) {
   )
 }
 
-function HeartbeatForm({ config }: { config: AppConfig }) {
-  const [hbEnabled, setHbEnabled] = useState(config.heartbeat?.enabled || false)
-  const [hbEvery, setHbEvery] = useState(config.heartbeat?.every || '30m')
-  const [ready, setReady] = useState(false)
-
-  useEffect(() => {
-    api.heartbeat.status().then(({ enabled }) => {
-      setHbEnabled(enabled)
-      setReady(true)
-    }).catch(() => setReady(true))
-  }, [])
-
-  const heartbeatData = useMemo(
-    () => ({ ...config.heartbeat, enabled: hbEnabled, every: hbEvery }),
-    [config.heartbeat, hbEnabled, hbEvery],
-  )
-
-  const save = useCallback(async (d: Record<string, unknown>) => {
-    await api.config.updateSection('heartbeat', d)
-  }, [])
-
-  const { status, retry } = useAutoSave({
-    data: heartbeatData,
-    save,
-    enabled: ready,
-  })
-
-  return (
-    <>
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-sm">Enabled</span>
-        <Toggle
-          checked={hbEnabled}
-          onChange={async (v) => {
-            try {
-              await api.heartbeat.setEnabled(v)
-              setHbEnabled(v)
-            } catch {
-              // Toggle doesn't flip on failure
-            }
-          }}
-        />
-      </div>
-      <Field label="Interval">
-        <input className={inputClass} value={hbEvery} onChange={(e) => setHbEvery(e.target.value)} placeholder="30m" />
-      </Field>
-      <SaveIndicator status={status} onRetry={retry} />
-    </>
-  )
-}

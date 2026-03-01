@@ -118,7 +118,7 @@ export function createHeartbeat(opts: HeartbeatOpts): Heartbeat {
 
     processing = true
     const startMs = now()
-    console.log('heartbeat: firing...')
+    console.log(`heartbeat: firing at ${new Date(startMs).toISOString()}`)
 
     try {
       // 1. Active hours guard
