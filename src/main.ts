@@ -464,6 +464,24 @@ async function main() {
         changes.push('telegram started')
       }
 
+      // --- Discord ---
+      const discordWanted = fresh.connectors.discord.enabled && !!fresh.connectors.discord.botToken
+      const discordRunning = optionalPlugins.has('discord')
+      if (discordRunning && !discordWanted) {
+        await optionalPlugins.get('discord')!.stop()
+        optionalPlugins.delete('discord')
+        changes.push('discord stopped')
+      } else if (!discordRunning && discordWanted) {
+        const p = new DiscordPlugin({
+          enabled: true,
+          botToken: fresh.connectors.discord.botToken!,
+          channelId: fresh.connectors.discord.channelId,
+        })
+        await p.start(ctx)
+        optionalPlugins.set('discord', p)
+        changes.push('discord started')
+      }
+
       if (changes.length > 0) {
         console.log(`reconnect: connectors — ${changes.join(', ')}`)
       }
@@ -474,38 +492,7 @@ async function main() {
       return { success: false, error: msg }
     } finally {
       connectorsReconnecting = false
-    }
-  }
-
-  // --- Discord ---
-  const discordWanted = fresh.connectors.discord.enabled && !!fresh.connectors.discord.botToken
-  const discordRunning = optionalPlugins.has('discord')
-  if (discordRunning && !discordWanted) {
-    await optionalPlugins.get('discord')!.stop()
-    optionalPlugins.delete('discord')
-    changes.push('discord stopped')
-  } else if (!discordRunning && discordWanted) {
-    const p = new DiscordPlugin({
-      enabled: true,
-      botToken: fresh.connectors.discord.botToken!,
-      channelId: fresh.connectors.discord.channelId,
-    })
-    await p.start(ctx)
-    optionalPlugins.set('discord', p)
-    changes.push('discord started')
-  }
-
-  if (changes.length > 0) {
-    console.log(`reconnect: connectors — ${changes.join(', ')}`)
-  }
-  return { success: true, message: changes.length > 0 ? changes.join(', ') : 'no changes' }
-} catch (err) {
-  const msg = err instanceof Error ? err.message : String(err)
-  console.error('reconnect: connectors failed:', msg)
-  return { success: false, error: msg }
-} finally {
-  connectorsReconnecting = false
-}
+    }    
   }
 
   const ctx: EngineContext = {

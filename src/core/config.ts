@@ -158,6 +158,11 @@ const connectorsSchema = z.object({
     botUsername: z.string().optional(),
     chatIds: z.array(z.number()).default([]),
   }).default({ enabled: false, chatIds: [] }),
+  discord: z.object({
+    enabled: z.boolean().default(false),
+    botToken: z.string().optional(),
+    channelId: z.string().optional(),
+  }).default({ enabled: false }),
 })
 
 const heartbeatSchema = z.object({

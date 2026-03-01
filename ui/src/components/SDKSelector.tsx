@@ -237,4 +237,11 @@ export const CONNECTOR_OPTIONS: SDKOption[] = [
     badge: 'TG',
     badgeColor: 'text-cyan',
   },
+  {
+    id: 'discord',
+    name: 'Discord',
+    description: 'Two-way chat via Discord bot in a specified channel.',
+    badge: 'DC',
+    badgeColor: 'text-indigo',
+  },
 ]

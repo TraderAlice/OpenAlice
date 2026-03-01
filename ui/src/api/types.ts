@@ -51,6 +51,11 @@ export interface ConnectorsConfig {
     botUsername?: string
     chatIds: number[]
   }
+  discord: {
+    enabled: boolean
+    botToken?: string
+    channelId?: string
+  }
 }
 
 // ==================== News Collector ====================
