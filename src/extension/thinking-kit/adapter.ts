@@ -1,6 +1,8 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 import { calculate } from './tools/calculate.tool';
+import { readFile as fsReadFile } from 'fs/promises';
+import { resolve } from 'path';
 
 /**
  * Create thinking AI tools (cognition + utility, no data dependency)
@@ -9,6 +11,7 @@ import { calculate } from './tools/calculate.tool';
  * - think: Record observations and analysis
  * - plan: Record action plans
  * - calculate: Safe mathematical expression evaluation
+ * - readFile: Read the content of a local file
  * - reportWarning: Report anomalies or unexpected situations
  * - getConfirm: Request user confirmation before actions
  */
@@ -93,6 +96,30 @@ This commits you to a specific action plan before execution.
       }),
       execute: ({ expression }) => {
         return calculate(expression);
+      },
+    }),
+
+    readFile: tool({
+      description: 'Reads the entire content of a file at the given local path and returns it as a string. Use this to inspect local files like configuration or scripts.',
+      inputSchema: z.object({
+        path: z.string().describe('The relative or absolute path to the file.'),
+      }),
+      execute: async ({ path }) => {
+        try {
+          // Resolve path to be relative to the project root for security
+          const safePath = resolve(process.cwd(), path);
+          // Basic jailbreak prevention
+          if (!safePath.startsWith(process.cwd())) {
+            return { error: 'Access denied. Path is outside the project directory.' };
+          }
+          const content = await fsReadFile(safePath, 'utf-8');
+          return { content };
+        } catch (error: any) {
+          if (error.code === 'ENOENT') {
+            return { error: `File not found at ${path}` };
+          }
+          return { error: `Failed to read file: ${error.message}` };
+        }
       },
     }),
 
