@@ -39,6 +39,12 @@ export class DiscordPlugin implements Plugin {
 
     this.client.on('ready', () => {
       console.log(`discord plugin: connected as @${this.client.user?.tag}`);
+
+      // Register the connector only when the client is ready
+      if (this.config.channelId && !this.unregisterConnector) {
+        this.unregisterConnector = this.connectorCenter!.register(this.createConnector(this.client, this.config.channelId!));
+        console.log('discord: connector registered for push notifications');
+      }
     });
 
     this.client.on('messageCreate', async (message) => {
@@ -84,10 +90,6 @@ export class DiscordPlugin implements Plugin {
       }
     });
 
-    if (this.config.channelId) {
-      this.unregisterConnector = this.connectorCenter!.register(this.createConnector(this.client, this.config.channelId));
-    }
-
     await this.client.login(this.config.botToken);
   }
 
@@ -102,7 +104,7 @@ export class DiscordPlugin implements Plugin {
       to: channelId,
       capabilities: { push: true, media: true },
       send: async (payload) => {
-        const channel = await client.channels.fetch(channelId) as TextChannel;
+        const channel = await client.channels.fetch(channelId, { force: true, cache: true }) as TextChannel;
         if (!channel) {
           console.error(`discord: channel not found: ${channelId}`);
           return { delivered: false };

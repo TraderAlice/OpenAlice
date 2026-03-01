@@ -17,6 +17,7 @@ import { compactIfNeeded } from '../../core/compaction.js'
 import { extractMediaFromToolOutput } from '../../core/media.js'
 import { createModelFromConfig } from '../../core/model-factory.js'
 import { createAgent } from './agent.js'
+import type { EventLog } from '../../core/event-log.js';
 
 export class VercelAIProvider implements AIProvider {
   private cachedKey: string | null = null
@@ -28,6 +29,7 @@ export class VercelAIProvider implements AIProvider {
     private instructions: string,
     private maxSteps: number,
     private compaction: CompactionConfig,
+    private eventLog: EventLog,
   ) {}
 
   /** Lazily create or return the cached agent, re-creating when config or tools change. */
@@ -60,6 +62,12 @@ export class VercelAIProvider implements AIProvider {
 
   async askWithSession(prompt: string, session: SessionStore, _opts?: AskOptions): Promise<ProviderResult> {
     const agent = await this.resolveAgent()
+
+    // Fire event so ConnectorCenter can track the last-used channel
+    const [channel, to] = session.id.split('/');
+    if (channel && to) {
+      this.eventLog.append('message.received', { channel, to });
+    }
 
     await session.appendUser(prompt, 'human')
 

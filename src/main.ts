@@ -259,6 +259,7 @@ async function main() {
     instructions,
     config.agent.maxSteps,
     config.compaction,
+    eventLog,
   )
   const claudeCodeProvider = new ClaudeCodeProvider(config.compaction, instructions)
   const router = new ProviderRouter(vercelProvider, claudeCodeProvider)
