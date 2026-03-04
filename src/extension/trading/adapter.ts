@@ -3,7 +3,8 @@
  *
  * Creates ONE set of AI tools that route to accounts via `source` parameter.
  * Query tools default to all accounts (aggregated with source tags).
- * Mutation tools require an explicit `source`.
+ * Staging mutations (placeOrder, closePosition, cancelOrder) require explicit `source`.
+ * Git-flow mutations (tradingCommit, tradingPush, tradingSync) default to all accounts.
  *
  * Replaces the old per-account `createTradingTools(account, git)` pattern
  * and the separate `git/adapter.ts`.
@@ -260,9 +261,9 @@ Use this to check current prices before placing orders.`,
       },
     }),
 
-    // ==================== Wallet Log (query, aggregatable) ====================
+    // ==================== Trading Log (query, aggregatable) ====================
 
-    walletLog: tool({
+    tradingLog: tool({
       description: `View your trading decision history (like "git log --stat").
 
 IMPORTANT: Check this BEFORE making new trading decisions to:
@@ -278,7 +279,7 @@ Each commit includes:
 - timestamp: When the commit was made
 
 Use symbol parameter to filter commits for a specific ticker.
-Use walletShow(hash) for full details of a specific commit.`,
+Use tradingShow(hash) for full details of a specific commit.`,
       inputSchema: z.object({
         source: z.string().optional().describe(sourceDesc(false)),
         limit: z
@@ -319,15 +320,15 @@ Use walletShow(hash) for full details of a specific commit.`,
       },
     }),
 
-    // ==================== Wallet Show (query, auto-match by hash) ====================
+    // ==================== Trading Show (query, auto-match by hash) ====================
 
-    walletShow: tool({
-      description: `View details of a specific wallet commit (like "git show <hash>").
+    tradingShow: tool({
+      description: `View details of a specific trading commit (like "git show <hash>").
 
 Returns full commit information including:
 - All operations that were executed
 - Results of each operation (filled price, qty, errors)
-- Wallet state after the commit (holdings, cash)
+- Account state after the commit (holdings, cash)
 
 Use this to inspect what happened in a specific trading commit.`,
       inputSchema: z.object({
@@ -346,10 +347,10 @@ Use this to inspect what happened in a specific trading commit.`,
       },
     }),
 
-    // ==================== Wallet Status (query, aggregatable) ====================
+    // ==================== Trading Status (query, aggregatable) ====================
 
-    walletStatus: tool({
-      description: `View current wallet staging area status (like "git status").
+    tradingStatus: tool({
+      description: `View current trading staging area status (like "git status").
 
 Returns:
 - staged: List of operations waiting to be committed/pushed
@@ -429,10 +430,10 @@ IMPORTANT: This is READ-ONLY - it does NOT modify your actual holdings.`,
     // ==================== Place Order (mutation, source required) ====================
 
     placeOrder: tool({
-      description: `Stage an order in wallet (will execute on walletPush).
+      description: `Stage an order (will execute on tradingPush).
 
 BEFORE placing orders, you SHOULD:
-1. Check walletLog({ source }) to review your history for THIS source
+1. Check tradingLog({ source }) to review your history for THIS source
 2. Check getPortfolio to see current holdings
 3. Verify this trade aligns with your stated strategy
 
@@ -442,7 +443,7 @@ Supports two modes:
 
 For SELLING holdings, use closePosition tool instead.
 
-NOTE: This stages the operation. Call walletCommit + walletPush to execute.`,
+NOTE: This stages the operation. Call tradingCommit + tradingPush to execute.`,
       inputSchema: z.object({
         source: z.string().describe(sourceDesc(true)),
         symbol: z.string().describe('Ticker symbol, e.g. "AAPL", "SPY"'),
@@ -534,11 +535,11 @@ NOTE: This stages the operation. Call walletCommit + walletPush to execute.`,
     // ==================== Close Position (mutation, source required) ====================
 
     closePosition: tool({
-      description: `Stage a position close in wallet (will execute on walletPush).
+      description: `Stage a position close (will execute on tradingPush).
 
 This is the preferred way to sell holdings instead of using placeOrder with side="sell".
 
-NOTE: This stages the operation. Call walletCommit + walletPush to execute.`,
+NOTE: This stages the operation. Call tradingCommit + tradingPush to execute.`,
       inputSchema: z.object({
         source: z.string().describe(sourceDesc(true)),
         symbol: z.string().describe('Ticker symbol, e.g. "AAPL"'),
@@ -561,9 +562,9 @@ NOTE: This stages the operation. Call walletCommit + walletPush to execute.`,
     // ==================== Cancel Order (mutation, source required) ====================
 
     cancelOrder: tool({
-      description: `Stage an order cancellation in wallet (will execute on walletPush).
+      description: `Stage an order cancellation (will execute on tradingPush).
 
-NOTE: This stages the operation. Call walletCommit + walletPush to execute.`,
+NOTE: This stages the operation. Call tradingCommit + tradingPush to execute.`,
       inputSchema: z.object({
         source: z.string().describe(sourceDesc(true)),
         orderId: z.string().describe('Order ID to cancel'),
@@ -578,122 +579,149 @@ NOTE: This stages the operation. Call walletCommit + walletPush to execute.`,
       },
     }),
 
-    // ==================== Wallet Commit (mutation, source required) ====================
+    // ==================== Trading Commit (source optional — commits all if omitted) ====================
 
-    walletCommit: tool({
+    tradingCommit: tool({
       description: `Commit staged trading operations with a message (like "git commit -m").
 
 After staging operations with placeOrder/closePosition/etc., use this to:
 1. Add a commit message explaining WHY you're making these trades
 2. Prepare the operations for execution
 
-This does NOT execute the trades yet - call walletPush after this.
+This does NOT execute the trades yet - call tradingPush after this.
+
+If source is omitted, commits ALL accounts that have staged operations.
 
 Example workflow:
 1. placeOrder({ source: "alpaca", symbol: "AAPL", side: "buy", ... }) -> staged
-2. walletCommit({ source: "alpaca", message: "Buying AAPL on strong earnings beat" })
-3. walletPush({ source: "alpaca" }) -> executes and records`,
+2. tradingCommit({ message: "Buying AAPL on strong earnings beat" })
+3. tradingPush() -> executes and records`,
       inputSchema: z.object({
-        source: z.string().describe(sourceDesc(true)),
+        source: z.string().optional().describe(sourceDesc(false, 'If omitted, commits all accounts with staged operations.')),
         message: z
           .string()
           .describe('Commit message explaining your trading decision'),
       }),
       execute: ({ source, message }) => {
-        const { id } = resolveOne(accountManager, source)
-        const git = requireGit(resolver, id)
-        return git.commit(message)
+        const targets = resolveAccounts(accountManager, source)
+        const results: Array<Record<string, unknown>> = []
+
+        for (const { id } of targets) {
+          const git = resolver.getGit(id)
+          if (!git) continue
+          const status = git.status()
+          if (status.staged.length === 0) continue
+          results.push({ source: id, ...git.commit(message) })
+        }
+
+        if (results.length === 0) return { message: 'No staged operations to commit.' }
+        return results.length === 1 ? results[0] : results
       },
     }),
 
-    // ==================== Wallet Push (mutation, source required) ====================
+    // ==================== Trading Push (source optional — pushes all if omitted) ====================
 
-    walletPush: tool({
+    tradingPush: tool({
       description: `Execute all committed trading operations (like "git push").
 
 After staging operations and committing them, use this to:
 1. Execute all staged operations against the broker
-2. Record the commit with results to wallet history
+2. Record the commit with results to trading history
 
 Returns execution results for each operation (filled/pending/rejected).
 
-IMPORTANT: You must call walletCommit first before pushing.`,
+If source is omitted, pushes ALL accounts that have committed operations.
+
+IMPORTANT: You must call tradingCommit first before pushing.`,
       inputSchema: z.object({
-        source: z.string().describe(sourceDesc(true)),
+        source: z.string().optional().describe(sourceDesc(false, 'If omitted, pushes all accounts with committed operations.')),
       }),
       execute: async ({ source }) => {
-        const { id } = resolveOne(accountManager, source)
-        const git = requireGit(resolver, id)
-        return await git.push()
+        const targets = resolveAccounts(accountManager, source)
+        const results: Array<Record<string, unknown>> = []
+
+        for (const { id } of targets) {
+          const git = resolver.getGit(id)
+          if (!git) continue
+          const status = git.status()
+          if (!status.pendingMessage) continue
+          const result = await git.push()
+          results.push({ source: id, ...result })
+        }
+
+        if (results.length === 0) return { message: 'No committed operations to push.' }
+        return results.length === 1 ? results[0] : results
       },
     }),
 
-    // ==================== Wallet Sync (mutation, source required) ====================
+    // ==================== Trading Sync (source optional — syncs all if omitted) ====================
 
-    walletSync: tool({
+    tradingSync: tool({
       description: `Sync pending order statuses from broker (like "git pull").
 
 Checks all pending orders from previous commits and fetches their latest
 status from the broker. Creates a sync commit recording any changes.
 
+If source is omitted, syncs ALL accounts that have pending orders.
+
 Use this after placing limit/stop orders to check if they've been filled.`,
       inputSchema: z.object({
-        source: z.string().describe(sourceDesc(true)),
+        source: z.string().optional().describe(sourceDesc(false, 'If omitted, syncs all accounts with pending orders.')),
       }),
       execute: async ({ source }) => {
-        const { id, account } = resolveOne(accountManager, source)
-        const git = requireGit(resolver, id)
-        const getGitState = resolver.getGitState(id)
-        if (!getGitState) {
-          return { message: 'Trading account not connected. Cannot sync.', updatedCount: 0 }
-        }
+        const targets = resolveAccounts(accountManager, source)
+        const results: Array<Record<string, unknown>> = []
 
-        const pendingOrders = git.getPendingOrderIds()
-        if (pendingOrders.length === 0) {
-          return { message: 'No pending orders to sync.', updatedCount: 0 }
-        }
+        for (const { id, account } of targets) {
+          const git = resolver.getGit(id)
+          if (!git) continue
+          const gitState = resolver.getGitState(id)
+          if (!gitState) continue
 
-        const brokerOrders = await account.getOrders()
-        const updates: OrderStatusUpdate[] = []
+          const pendingOrders = git.getPendingOrderIds()
+          if (pendingOrders.length === 0) continue
 
-        for (const { orderId, symbol } of pendingOrders) {
-          const brokerOrder = brokerOrders.find((o) => o.id === orderId)
-          if (!brokerOrder) continue
+          const brokerOrders = await account.getOrders()
+          const updates: OrderStatusUpdate[] = []
 
-          const newStatus = brokerOrder.status
-          if (newStatus !== 'pending') {
-            updates.push({
-              orderId,
-              symbol,
-              previousStatus: 'pending',
-              currentStatus: newStatus,
-              filledPrice: brokerOrder.filledPrice,
-              filledQty: brokerOrder.filledQty,
-            })
+          for (const { orderId, symbol } of pendingOrders) {
+            const brokerOrder = brokerOrders.find((o) => o.id === orderId)
+            if (!brokerOrder) continue
+
+            const newStatus = brokerOrder.status
+            if (newStatus !== 'pending') {
+              updates.push({
+                orderId,
+                symbol,
+                previousStatus: 'pending',
+                currentStatus: newStatus,
+                filledPrice: brokerOrder.filledPrice,
+                filledQty: brokerOrder.filledQty,
+              })
+            }
           }
+
+          if (updates.length === 0) continue
+
+          const state = await gitState
+          const result = await git.sync(updates, state)
+          results.push({ source: id, ...result })
         }
 
-        if (updates.length === 0) {
-          return {
-            message: `All ${pendingOrders.length} order(s) still pending.`,
-            updatedCount: 0,
-          }
-        }
-
-        const state = await getGitState
-        return await git.sync(updates, state)
+        if (results.length === 0) return { message: 'No pending orders to sync.', updatedCount: 0 }
+        return results.length === 1 ? results[0] : results
       },
     }),
 
     // ==================== Adjust Leverage (mutation, source required) ====================
 
     adjustLeverage: tool({
-      description: `Stage a leverage adjustment in wallet (will execute on walletPush).
+      description: `Stage a leverage adjustment (will execute on tradingPush).
 
 Adjust leverage for an existing position without changing position size.
 This will adjust margin requirements.
 
-NOTE: This stages the operation. Call walletCommit + walletPush to execute.`,
+NOTE: This stages the operation. Call tradingCommit + tradingPush to execute.`,
       inputSchema: z.object({
         source: z.string().describe(sourceDesc(true)),
         symbol: z.string().describe('Trading pair symbol'),
