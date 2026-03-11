@@ -24,7 +24,13 @@ export function ChannelConfigModal({ channel, onClose, onSaved }: ChannelConfigM
   const [vBaseUrl, setVBaseUrl] = useState(channel.vercelAiSdk?.baseUrl ?? '')
   const [vApiKey, setVApiKey] = useState(channel.vercelAiSdk?.apiKey ?? '')
 
+  // Agent SDK override state
+  const [aModel, setAModel] = useState(channel.agentSdk?.model ?? '')
+  const [aBaseUrl, setABaseUrl] = useState(channel.agentSdk?.baseUrl ?? '')
+  const [aApiKey, setAApiKey] = useState(channel.agentSdk?.apiKey ?? '')
+
   const showVercelConfig = provider === 'vercel-ai-sdk'
+  const showAgentSdkConfig = provider === 'agent-sdk'
 
   useEffect(() => {
     api.tools.load().then(({ inventory }) => setTools(inventory)).catch(() => {})
@@ -43,11 +49,20 @@ export function ChannelConfigModal({ channel, onClose, onSaved }: ChannelConfigM
           }
         : undefined
 
+      const agentSdk = showAgentSdkConfig && aModel
+        ? {
+            model: aModel,
+            ...(aBaseUrl ? { baseUrl: aBaseUrl } : {}),
+            ...(aApiKey ? { apiKey: aApiKey } : {}),
+          }
+        : undefined
+
       const { channel: updated } = await api.channels.update(channel.id, {
         label: label.trim() || channel.label,
         systemPrompt: systemPrompt.trim() || undefined,
-        provider: (provider as 'claude-code' | 'vercel-ai-sdk') || undefined,
+        provider: (provider as 'claude-code' | 'vercel-ai-sdk' | 'agent-sdk') || undefined,
         vercelAiSdk: vercelAiSdk ?? (null as unknown as undefined),
+        agentSdk: agentSdk ?? (null as unknown as undefined),
         disabledTools: disabledTools.size > 0 ? [...disabledTools] : undefined,
       })
       onSaved(updated)
@@ -133,6 +148,7 @@ export function ChannelConfigModal({ channel, onClose, onSaved }: ChannelConfigM
               <option value="">Default (global)</option>
               <option value="vercel-ai-sdk">Vercel AI SDK</option>
               <option value="claude-code">Claude Code</option>
+              <option value="agent-sdk">Agent SDK</option>
             </select>
           </div>
 
@@ -185,6 +201,46 @@ export function ChannelConfigModal({ channel, onClose, onSaved }: ChannelConfigM
                   value={vApiKey}
                   onChange={(e) => setVApiKey(e.target.value)}
                   placeholder="sk-..."
+                  className={inputClass}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Agent SDK config — only when provider is agent-sdk */}
+          {showAgentSdkConfig && (
+            <div className="rounded-lg border border-border/50 bg-bg-secondary/30 p-3 space-y-3">
+              <p className="text-xs font-medium text-text-muted">Agent SDK Override</p>
+
+              <div>
+                <label className="block text-xs text-text-muted/70 mb-1">Model</label>
+                <input
+                  type="text"
+                  value={aModel}
+                  onChange={(e) => setAModel(e.target.value)}
+                  placeholder="e.g. claude-opus-4-6"
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-text-muted/70 mb-1">Base URL <span className="text-text-muted/40">(optional)</span></label>
+                <input
+                  type="text"
+                  value={aBaseUrl}
+                  onChange={(e) => setABaseUrl(e.target.value)}
+                  placeholder="Leave empty for default"
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-text-muted/70 mb-1">API Key <span className="text-text-muted/40">(optional, overrides global)</span></label>
+                <input
+                  type="password"
+                  value={aApiKey}
+                  onChange={(e) => setAApiKey(e.target.value)}
+                  placeholder="sk-ant-..."
                   className={inputClass}
                 />
               </div>

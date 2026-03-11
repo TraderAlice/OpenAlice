@@ -7,12 +7,19 @@ export interface VercelAiSdkOverride {
   apiKey?: string
 }
 
+export interface AgentSdkOverride {
+  model?: string
+  baseUrl?: string
+  apiKey?: string
+}
+
 export interface WebChannel {
   id: string
   label: string
   systemPrompt?: string
-  provider?: 'claude-code' | 'vercel-ai-sdk'
+  provider?: 'claude-code' | 'vercel-ai-sdk' | 'agent-sdk'
   vercelAiSdk?: VercelAiSdkOverride
+  agentSdk?: AgentSdkOverride
   disabledTools?: string[]
 }
 
