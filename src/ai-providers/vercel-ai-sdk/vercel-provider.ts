@@ -12,7 +12,7 @@ import type { GenerateProvider, GenerateInput, GenerateOpts } from '../../core/a
 import type { Agent } from './agent.js'
 import type { MediaAttachment } from '../../core/types.js'
 import { extractMediaFromToolOutput } from '../../core/media.js'
-import { createModelFromConfig, type ModelOverride } from '../../core/model-factory.js'
+import { createModelFromConfig, type ModelOverride } from './model-factory.js'
 import { createAgent } from './agent.js'
 import { createChannel } from '../../core/async-channel.js'
 

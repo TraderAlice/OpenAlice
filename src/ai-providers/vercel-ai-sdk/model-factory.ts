@@ -7,7 +7,7 @@
  */
 
 import type { LanguageModel } from 'ai'
-import { readAIProviderConfig } from './config.js'
+import { readAIProviderConfig } from '../../core/config.js'
 
 /** Result includes the model plus a cache key for change detection. */
 export interface ModelFromConfig {

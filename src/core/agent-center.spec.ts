@@ -5,7 +5,7 @@ import { AgentCenter } from './agent-center.js'
 import { GenerateRouter } from './ai-provider.js'
 import { DEFAULT_COMPACTION_CONFIG, type CompactionConfig } from './compaction.js'
 import { VercelAIProvider } from '../ai-providers/vercel-ai-sdk/vercel-provider.js'
-import { createModelFromConfig } from './model-factory.js'
+import { createModelFromConfig } from '../ai-providers/vercel-ai-sdk/model-factory.js'
 import type { SessionStore, SessionEntry } from './session.js'
 
 // ==================== Helpers ====================
@@ -43,7 +43,7 @@ function makeAgentCenter(overrides: MakeAgentCenterOpts = {}): AgentCenter {
   const compaction = overrides.compaction ?? DEFAULT_COMPACTION_CONFIG
 
   vi.mocked(createModelFromConfig).mockResolvedValue({ model, key: 'test:mock-model' })
-  const provider = new VercelAIProvider(() => tools, instructions, maxSteps)
+  const provider = new VercelAIProvider(async () => tools, instructions, maxSteps)
   const router = new GenerateRouter(provider, null)
 
   return new AgentCenter({ router, compaction })
@@ -88,7 +88,7 @@ function makeSessionMock(entries: SessionEntry[] = []): SessionStore {
 
 // ==================== Mock model-factory ====================
 
-vi.mock('./model-factory.js', () => ({
+vi.mock('../ai-providers/vercel-ai-sdk/model-factory.js', () => ({
   createModelFromConfig: vi.fn(),
 }))
 
