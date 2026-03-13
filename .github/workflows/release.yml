@@ -98,12 +98,23 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and publish
+      - name: Build
         if: steps.check.outputs.exists == 'false'
         working-directory: packages/opentypebb
         run: |
           pnpm install --frozen-lockfile
           pnpm build
-          npm publish
+
+      - name: Publish to GitHub Packages
+        if: steps.check.outputs.exists == 'false'
+        working-directory: packages/opentypebb
+        run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to npmjs
+        if: steps.check.outputs.exists == 'false'
+        working-directory: packages/opentypebb
+        run: npm publish --registry=https://registry.npmjs.org
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
