@@ -61,7 +61,7 @@ export interface AIProviderConfig {
   provider: string
   model: string
   baseUrl?: string
-  apiKeys: { anthropic?: string; openai?: string; google?: string }
+  apiKeys: { anthropic?: string; openai?: string; google?: string; minimax?: string }
 }
 
 export interface AppConfig {

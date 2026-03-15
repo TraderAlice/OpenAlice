@@ -22,6 +22,7 @@ export const aiProviderSchema = z.object({
     anthropic: z.string().optional(),
     openai: z.string().optional(),
     google: z.string().optional(),
+    minimax: z.string().optional(),
   }).default({}),
 })
 

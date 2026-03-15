@@ -60,6 +60,7 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
         anthropic: !!config.apiKeys.anthropic,
         openai: !!config.apiKeys.openai,
         google: !!config.apiKeys.google,
+        minimax: !!config.apiKeys.minimax,
       })
     } catch (err) {
       return c.json({ error: String(err) }, 500)

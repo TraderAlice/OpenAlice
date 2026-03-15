@@ -22,12 +22,17 @@ const PROVIDER_MODELS: Record<string, { label: string; value: string }[]> = {
     { label: 'Gemini 3 Flash', value: 'gemini-3-flash-preview' },
     { label: 'Gemini 2.5 Pro', value: 'gemini-2.5-pro' },
   ],
+  minimax: [
+    { label: 'MiniMax-M2.5', value: 'MiniMax-M2.5' },
+    { label: 'MiniMax-M2.5 Highspeed', value: 'MiniMax-M2.5-highspeed' },
+  ],
 }
 
 const PROVIDERS = [
   { value: 'anthropic', label: 'Anthropic' },
   { value: 'openai', label: 'OpenAI' },
   { value: 'google', label: 'Google' },
+  { value: 'minimax', label: 'MiniMax' },
   { value: 'custom', label: 'Custom' },
 ]
 
@@ -115,7 +120,7 @@ function ModelForm({ aiProvider }: { aiProvider: AIProviderConfig }) {
   const [customModel, setCustomModel] = useState(initCustom ? (aiProvider.model || '') : '')
   const [baseUrl, setBaseUrl] = useState(aiProvider.baseUrl || '')
   const [showKeys, setShowKeys] = useState(false)
-  const [keys, setKeys] = useState({ anthropic: '', openai: '', google: '' })
+  const [keys, setKeys] = useState({ anthropic: '', openai: '', google: '', minimax: '' })
   const [keySaveStatus, setKeySaveStatus] = useState<SaveStatus>('idle')
   const keySavedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -152,6 +157,7 @@ function ModelForm({ aiProvider }: { aiProvider: AIProviderConfig }) {
     anthropic: !!aiProvider.apiKeys?.anthropic,
     openai: !!aiProvider.apiKeys?.openai,
     google: !!aiProvider.apiKeys?.google,
+    minimax: !!aiProvider.apiKeys?.minimax,
   }), [aiProvider.apiKeys])
 
   const [liveKeyStatus, setLiveKeyStatus] = useState(keyStatus)
@@ -199,13 +205,15 @@ function ModelForm({ aiProvider }: { aiProvider: AIProviderConfig }) {
       if (keys.anthropic) updatedKeys.anthropic = keys.anthropic
       if (keys.openai) updatedKeys.openai = keys.openai
       if (keys.google) updatedKeys.google = keys.google
+      if (keys.minimax) updatedKeys.minimax = keys.minimax
       await api.config.updateSection('aiProvider', { ...aiProvider, apiKeys: updatedKeys })
       setLiveKeyStatus({
         anthropic: !!updatedKeys.anthropic,
         openai: !!updatedKeys.openai,
         google: !!updatedKeys.google,
+        minimax: !!updatedKeys.minimax,
       })
-      setKeys({ anthropic: '', openai: '', google: '' })
+      setKeys({ anthropic: '', openai: '', google: '', minimax: '' })
       setKeySaveStatus('saved')
       if (keySavedTimer.current) clearTimeout(keySavedTimer.current)
       keySavedTimer.current = setTimeout(() => setKeySaveStatus('idle'), 2000)
