@@ -169,6 +169,7 @@ export function ChannelConfigModal({ channel, onClose, onSaved }: ChannelConfigM
                     <option value="anthropic">Anthropic</option>
                     <option value="openai">OpenAI</option>
                     <option value="google">Google</option>
+                    <option value="minimax">MiniMax</option>
                   </select>
                 </div>
                 <div>

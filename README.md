@@ -154,7 +154,7 @@ pnpm test       # run tests
 
 All config lives in `data/config/` as JSON files with Zod validation. Missing files fall back to sensible defaults. You can edit these files directly or use the Web UI.
 
-**AI Provider** — The default provider is Claude Code (`claude -p` subprocess). To use the [Vercel AI SDK](https://sdk.vercel.ai/docs) instead (Anthropic, OpenAI, Google, etc.), switch `ai-provider.json` to `vercel-ai-sdk` and add your API key to `api-keys.json`. A third option, Agent SDK (`@anthropic-ai/claude-agent-sdk`), is also available via `agent-sdk`.
+**AI Provider** — The default provider is Claude Code (`claude -p` subprocess). To use the [Vercel AI SDK](https://sdk.vercel.ai/docs) instead (Anthropic, OpenAI, Google, [MiniMax](https://www.minimaxi.com/), etc.), switch `ai-provider.json` to `vercel-ai-sdk` and add your API key to `api-keys.json`. A third option, Agent SDK (`@anthropic-ai/claude-agent-sdk`), is also available via `agent-sdk`.
 
 **Trading** — Multi-account architecture. Crypto via [CCXT](https://docs.ccxt.com/) (Bybit, OKX, Binance, etc.) configured in `crypto.json`. US equities via [Alpaca](https://alpaca.markets/) configured in `securities.json`. Both use the same git-like trading workflow.
 
@@ -163,7 +163,7 @@ All config lives in `data/config/` as JSON files with Zod validation. Missing fi
 | `engine.json` | Trading pairs, tick interval, timeframe |
 | `agent.json` | Max agent steps, evolution mode toggle, Claude Code tool permissions |
 | `ai-provider.json` | Active AI provider (`claude-code`, `vercel-ai-sdk`, or `agent-sdk`), switchable at runtime |
-| `api-keys.json` | AI provider API keys (Anthropic, OpenAI, Google) — only needed for Vercel AI SDK mode |
+| `api-keys.json` | AI provider API keys (Anthropic, OpenAI, Google, MiniMax) — only needed for Vercel AI SDK mode |
 | `platforms.json` | Trading platform definitions (CCXT exchanges, Alpaca) |
 | `accounts.json` | Trading account credentials and guard config, references platforms |
 | `crypto.json` | CCXT exchange config + API keys, allowed symbols, guards |
