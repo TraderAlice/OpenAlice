@@ -12,9 +12,10 @@ import { ConnectorsPage } from './pages/ConnectorsPage'
 import { DevPage } from './pages/DevPage'
 import { HeartbeatPage } from './pages/HeartbeatPage'
 import { ToolsPage } from './pages/ToolsPage'
+import { AgentStatusPage } from './pages/AgentStatusPage'
 
 export type Page =
-  | 'chat' | 'portfolio' | 'events' | 'heartbeat' | 'data-sources' | 'connectors'
+  | 'chat' | 'portfolio' | 'events' | 'agent-status' | 'heartbeat' | 'data-sources' | 'connectors'
   | 'trading'
   | 'ai-provider' | 'settings' | 'tools' | 'dev'
 
@@ -23,6 +24,7 @@ export const ROUTES: Record<Page, string> = {
   'chat': '/',
   'portfolio': '/portfolio',
   'events': '/events',
+  'agent-status': '/agent-status',
   'heartbeat': '/heartbeat',
   'data-sources': '/data-sources',
   'connectors': '/connectors',
@@ -64,6 +66,7 @@ export function App() {
             <Route path="/" element={<ChatPage onSSEStatus={setSseConnected} />} />
             <Route path="/portfolio" element={<PortfolioPage />} />
             <Route path="/events" element={<EventsPage />} />
+            <Route path="/agent-status" element={<AgentStatusPage />} />
             <Route path="/heartbeat" element={<HeartbeatPage />} />
             <Route path="/data-sources" element={<DataSourcesPage />} />
             <Route path="/connectors" element={<ConnectorsPage />} />

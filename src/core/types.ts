@@ -5,6 +5,7 @@ import type { Config, WebChannel } from './config.js'
 import type { ConnectorCenter } from './connector-center.js'
 import type { AgentCenter } from './agent-center.js'
 import type { EventLog } from './event-log.js'
+import type { ToolCallLog } from './tool-call-log.js'
 import type { ToolCenter } from './tool-center.js'
 
 export type { Config, WebChannel }
@@ -26,6 +27,7 @@ export interface EngineContext {
   connectorCenter: ConnectorCenter
   agentCenter: AgentCenter
   eventLog: EventLog
+  toolCallLog: ToolCallLog
   heartbeat: Heartbeat
   cronEngine: CronEngine
   toolCenter: ToolCenter

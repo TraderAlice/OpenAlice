@@ -21,6 +21,7 @@ import type { MediaAttachment } from './types.js'
 import { extractMediaFromToolResultContent } from './media.js'
 import { persistMedia } from './media-store.js'
 import { logToolCall, stripImageData, DEFAULT_MAX_HISTORY } from '../ai-providers/utils.js'
+import type { ToolCallLog } from './tool-call-log.js'
 
 // ==================== Types ====================
 
@@ -31,6 +32,8 @@ export interface AgentCenterOpts {
   historyPreamble?: string
   /** Default max history entries for text-based providers. */
   maxHistoryEntries?: number
+  /** Structured tool call logger. */
+  toolCallLog?: ToolCallLog
 }
 
 // ==================== AgentCenter ====================
@@ -40,12 +43,14 @@ export class AgentCenter {
   private compaction: CompactionConfig
   private defaultPreamble?: string
   private defaultMaxHistory: number
+  private toolCallLog?: ToolCallLog
 
   constructor(opts: AgentCenterOpts) {
     this.router = opts.router
     this.compaction = opts.compaction
     this.defaultPreamble = opts.historyPreamble
     this.defaultMaxHistory = opts.maxHistoryEntries ?? DEFAULT_MAX_HISTORY
+    this.toolCallLog = opts.toolCallLog
   }
 
   /** Stateless prompt — routed through the configured AI provider. */
@@ -111,6 +116,7 @@ export class AgentCenter {
           }
           // Unified logging — all providers get this now
           logToolCall(event.name, event.input)
+          this.toolCallLog?.start(event.id, event.name, event.input, session.id)
           currentAssistantBlocks.push({
             type: 'tool_use',
             id: event.id,
@@ -137,6 +143,7 @@ export class AgentCenter {
             tool_use_id: event.tool_use_id,
             content: sessionContent,
           })
+          await this.toolCallLog?.complete(event.tool_use_id, sessionContent)
           yield event
           break
         }
@@ -156,6 +163,9 @@ export class AgentCenter {
           break
       }
     }
+
+    // Clean up any orphaned pending tool calls (e.g. stream error before result)
+    this.toolCallLog?.flushPending()
 
     // Flush any remaining user blocks (defensive — tool_result already flushes)
     // NOTE: Do NOT flush trailing assistant text blocks here — the authoritative

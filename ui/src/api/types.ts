@@ -105,7 +105,6 @@ export interface NewsCollectorConfig {
   intervalMinutes: number
   maxInMemory: number
   retentionDays: number
-  piggybackOpenBB: boolean
   feeds: NewsCollectorFeed[]
 }
 
@@ -197,6 +196,20 @@ export interface ReconnectResult {
   success: boolean
   error?: string
   message?: string
+}
+
+// ==================== Tool Call Log ====================
+
+export interface ToolCallRecord {
+  seq: number
+  id: string
+  sessionId: string
+  name: string
+  input: unknown
+  output: string
+  status: 'ok' | 'error'
+  durationMs: number
+  timestamp: number
 }
 
 // ==================== Trading Config ====================

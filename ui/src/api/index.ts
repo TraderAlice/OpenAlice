@@ -8,10 +8,11 @@ import { eventsApi } from './events'
 import { cronApi } from './cron'
 import { heartbeatApi } from './heartbeat'
 import { tradingApi } from './trading'
-import { openbbApi } from './openbb'
+import { marketDataApi } from './openbb'
 import { devApi } from './dev'
 import { toolsApi } from './tools'
 import { channelsApi } from './channels'
+import { agentStatusApi } from './agentStatus'
 export const api = {
   chat: chatApi,
   config: configApi,
@@ -19,10 +20,11 @@ export const api = {
   cron: cronApi,
   heartbeat: heartbeatApi,
   trading: tradingApi,
-  openbb: openbbApi,
+  marketData: marketDataApi,
   dev: devApi,
   tools: toolsApi,
   channels: channelsApi,
+  agentStatus: agentStatusApi,
 }
 
 // Re-export all types for convenience
@@ -48,5 +50,7 @@ export type {
   ConnectorsConfig,
   NewsCollectorConfig,
   NewsCollectorFeed,
+  ToolCallRecord,
 } from './types'
 export type { EventQueryResult } from './events'
+export type { ToolCallQueryResult } from './agentStatus'

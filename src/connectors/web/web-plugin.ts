@@ -17,6 +17,7 @@ import { createTradingRoutes } from './routes/trading.js'
 import { createTradingConfigRoutes } from './routes/trading-config.js'
 import { createDevRoutes } from './routes/dev.js'
 import { createToolsRoutes } from './routes/tools.js'
+import { createAgentStatusRoutes } from './routes/agent-status.js'
 
 export interface WebConfig {
   port: number
@@ -81,6 +82,7 @@ export class WebPlugin implements Plugin {
     app.route('/api/trading', createTradingRoutes(ctx))
     app.route('/api/dev', createDevRoutes(ctx.connectorCenter))
     app.route('/api/tools', createToolsRoutes(ctx.toolCenter))
+    app.route('/api/agent-status', createAgentStatusRoutes(ctx))
 
     // ==================== Serve UI (Vite build output) ====================
     const uiRoot = resolve('dist/ui')

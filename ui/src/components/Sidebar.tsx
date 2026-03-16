@@ -69,6 +69,16 @@ const NAV_ITEMS: NavItem[] = [
     ),
   },
   {
+    page: 'agent-status',
+    label: 'Agent Status',
+    icon: (active) => (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="4" y="4" width="16" height="16" rx="2" />
+        <path d="M4 12h4l2-4 4 8 2-4h4" />
+      </svg>
+    ),
+  },
+  {
     page: 'heartbeat',
     label: 'Heartbeat',
     icon: (active) => (
