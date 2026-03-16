@@ -54,7 +54,16 @@ export async function createModelFromConfig(override?: ModelOverride): Promise<M
       const client = createGoogleGenerativeAI({ apiKey: resolveApiKey('google'), baseURL: url || undefined })
       return { model: client(m), key }
     }
+    case 'minimax': {
+      const { createOpenAI } = await import('@ai-sdk/openai')
+      const client = createOpenAI({
+        apiKey: resolveApiKey('minimax') ?? process.env.MINIMAX_API_KEY,
+        baseURL: url || 'https://api.minimax.io/v1',
+        compatibility: 'compatible',
+      })
+      return { model: client.chat(m), key }
+    }
     default:
-      throw new Error(`Unsupported model provider: "${p}". Supported: anthropic, openai, google`)
+      throw new Error(`Unsupported model provider: "${p}". Supported: anthropic, openai, google, minimax`)
   }
 }
