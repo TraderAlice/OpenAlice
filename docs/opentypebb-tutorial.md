@@ -43,18 +43,16 @@ Open [http://localhost:3002](http://localhost:3002) and start chatting. No API k
 
 OpenTypeBB is the **default** data backend. You don't need to configure anything — it's already on.
 
-Under the hood, OpenAlice reads `data/config/openbb.json`. If that file doesn't exist yet, it falls back to these defaults:
+Under the hood, OpenAlice reads `data/config/market-data.json`. If that file doesn't exist yet, it falls back to these defaults:
 
 ```json
 {
   "enabled": true,
-  "dataBackend": "sdk",
+  "backend": "typebb-sdk",
   "providers": {
     "equity": "yfinance",
     "crypto": "yfinance",
-    "currency": "yfinance",
-    "newsCompany": "yfinance",
-    "newsWorld": "fmp"
+    "currency": "yfinance"
   },
   "providerKeys": {},
   "apiServer": {
@@ -66,8 +64,8 @@ Under the hood, OpenAlice reads `data/config/openbb.json`. If that file doesn't 
 
 Key settings:
 
-- **`dataBackend: "sdk"`** — This is the in-process mode. OpenTypeBB's `QueryExecutor` runs directly inside the Node.js process — no HTTP, no sidecar. This is the default.
-- **`dataBackend: "openbb"`** — Switches to making HTTP requests to an external OpenBB Platform API server (Python). You probably don't want this.
+- **`backend: "typebb-sdk"`** — This is the in-process mode. OpenTypeBB's `QueryExecutor` runs directly inside the Node.js process — no HTTP, no sidecar. This is the default.
+- **`backend: "openbb-api"`** — Switches to making HTTP requests to an external OpenBB-compatible API server. You probably don't want this.
 - **`providers`** — Which data provider to use per asset class. `yfinance` works out of the box with no API key.
 
 ## 4. Available Data Providers
@@ -95,7 +93,7 @@ OpenTypeBB ships with 14 providers:
 
 ## 5. Adding API Keys (Optional)
 
-To unlock additional providers (FMP, EIA, Intrinio, etc.), create or edit `data/config/openbb.json`:
+To unlock additional providers (FMP, EIA, Intrinio, etc.), create or edit `data/config/market-data.json`:
 
 ```json
 {
@@ -208,7 +206,7 @@ curl http://localhost:6901/widgets.json
 
 ### Embedded Server Mode
 
-You can also run the API server embedded inside OpenAlice (alongside the agent). Edit `data/config/openbb.json`:
+You can also run the API server embedded inside OpenAlice (alongside the agent). Edit `data/config/market-data.json`:
 
 ```json
 {
@@ -284,7 +282,7 @@ OpenAlice
 │   ├── market/                   # Unified symbol search
 │   └── news/                     # News tools
 │
-└── data/config/openbb.json       # Runtime configuration
+└── data/config/market-data.json       # Runtime configuration
 ```
 
 **Data flow (SDK mode):**
@@ -311,4 +309,4 @@ pnpm dev
 # Open http://localhost:3002 and ask Alice about any stock, crypto, or macro data
 ```
 
-Everything works out of the box. OpenTypeBB is the default data backend, `yfinance` is the default provider, and neither requires an API key. Add keys to `data/config/openbb.json` when you want to unlock more providers.
+Everything works out of the box. OpenTypeBB is the default data backend, `yfinance` is the default provider, and neither requires an API key. Add keys to `data/config/market-data.json` when you want to unlock more providers.

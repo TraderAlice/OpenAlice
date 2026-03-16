@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { loadConfig, writeConfigSection, readAIProviderConfig, readOpenbbConfig, validSections, writeAIBackend, type ConfigSection, type AIBackend } from '../../../core/config.js'
+import { loadConfig, writeConfigSection, readAIProviderConfig, readMarketDataConfig, validSections, writeAIBackend, type ConfigSection, type AIBackend } from '../../../core/config.js'
 
 interface ConfigRouteOpts {
   onConnectorsChange?: () => Promise<void>
@@ -41,7 +41,7 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
       const body = await c.req.json()
       const validated = await writeConfigSection(section, body)
       // Hot-reload connectors / OpenBB server when their config changes
-      if (section === 'connectors' || section === 'openbb') {
+      if (section === 'connectors' || section === 'marketData') {
         await opts?.onConnectorsChange?.()
       }
       return c.json(validated)
@@ -69,8 +69,8 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
   return app
 }
 
-/** OpenBB routes: POST /test-provider */
-export function createOpenbbRoutes() {
+/** Market data routes: POST /test-provider */
+export function createMarketDataRoutes() {
   const TEST_ENDPOINTS: Record<string, { credField: string; path: string }> = {
     fred:             { credField: 'fred_api_key',             path: '/api/v1/economy/fred_search?query=GDP&provider=fred' },
     bls:              { credField: 'bls_api_key',              path: '/api/v1/economy/survey/bls_search?query=unemployment&provider=bls' },
@@ -91,9 +91,9 @@ export function createOpenbbRoutes() {
       if (!endpoint) return c.json({ ok: false, error: `Unknown provider: ${provider}` }, 400)
       if (!key) return c.json({ ok: false, error: 'No API key provided' }, 400)
 
-      const openbbConfig = await readOpenbbConfig()
+      const marketDataConfig = await readMarketDataConfig()
       const credHeader = JSON.stringify({ [endpoint.credField]: key })
-      const url = `${openbbConfig.apiUrl}${endpoint.path}`
+      const url = `${marketDataConfig.apiUrl}${endpoint.path}`
 
       const res = await fetch(url, {
         signal: AbortSignal.timeout(15_000),

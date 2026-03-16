@@ -208,17 +208,17 @@ export const PLATFORM_TYPE_OPTIONS: SDKOption[] = [
 
 export const DATASOURCE_OPTIONS: SDKOption[] = [
   {
-    id: 'openbb',
-    name: 'OpenBB',
-    description: 'Market data, financials, and economic indicators via OpenBB sidecar API.',
-    badge: 'OB',
+    id: 'marketData',
+    name: 'Market Data',
+    description: 'Structured financial data — prices, fundamentals, macro indicators.',
+    badge: 'MD',
     badgeColor: 'text-green',
   },
   {
-    id: 'newsCollector',
-    name: 'News Collector',
-    description: 'RSS/Atom feed aggregation for crypto and financial news.',
-    badge: 'NC',
+    id: 'news',
+    name: 'News',
+    description: 'RSS/Atom feed aggregation and news archive search.',
+    badge: 'NW',
     badgeColor: 'text-purple',
   },
 ]

@@ -22,7 +22,7 @@ import {
   writeAIBackend,
   readToolsConfig,
   readAgentConfig,
-  readOpenbbConfig,
+  readMarketDataConfig,
   loadTradingConfig,
   writeConfigSection,
   readPlatformsConfig,
@@ -177,17 +177,17 @@ describe('readAgentConfig', () => {
 
 // ==================== readOpenbbConfig ====================
 
-describe('readOpenbbConfig', () => {
+describe('readMarketDataConfig', () => {
   it('returns defaults when file is missing', async () => {
     fileNotFound()
-    const cfg = await readOpenbbConfig()
+    const cfg = await readMarketDataConfig()
     expect(cfg.enabled).toBe(true)
-    expect(cfg.dataBackend).toBe('sdk')
+    expect(cfg.backend).toBe('typebb-sdk')
   })
 
   it('parses enabled flag from file', async () => {
     fileReturns({ enabled: false })
-    const cfg = await readOpenbbConfig()
+    const cfg = await readMarketDataConfig()
     expect(cfg.enabled).toBe(false)
   })
 })

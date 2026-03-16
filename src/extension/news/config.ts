@@ -1,7 +1,7 @@
 /**
  * News Collector — Zod configuration schema
  *
- * Loaded from data/config/news-collector.json (optional; defaults used if absent).
+ * Loaded from data/config/news.json (optional; defaults used if absent).
  */
 
 import { z } from 'zod'
@@ -22,8 +22,6 @@ export const newsCollectorSchema = z.object({
   maxInMemory: z.number().int().positive().default(2000),
   /** Items older than this are not loaded into memory on startup */
   retentionDays: z.number().int().positive().default(7),
-  /** Also capture results from newsGetWorld / newsGetCompany into the store */
-  piggybackOpenBB: z.boolean().default(true),
   /** RSS / Atom feed list */
   feeds: z.array(feedSchema).default([
     { name: 'CoinDesk', url: 'https://www.coindesk.com/arc/outboundfeeds/rss/', source: 'coindesk' },

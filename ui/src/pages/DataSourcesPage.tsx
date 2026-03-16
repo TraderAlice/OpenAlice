@@ -22,16 +22,12 @@ const PROVIDER_OPTIONS: Record<string, string[]> = {
   equity: ['yfinance', 'fmp', 'intrinio', 'tiingo', 'alpha_vantage'],
   crypto: ['yfinance', 'fmp', 'tiingo'],
   currency: ['yfinance', 'fmp', 'tiingo'],
-  newsCompany: ['yfinance', 'fmp', 'benzinga', 'intrinio'],
-  newsWorld: ['fmp', 'benzinga', 'tiingo', 'biztoc', 'intrinio'],
 }
 
 const ASSET_LABELS: Record<string, string> = {
   equity: 'Equity',
   crypto: 'Crypto',
   currency: 'Currency',
-  newsCompany: 'News (Company)',
-  newsWorld: 'News (World)',
 }
 
 /** Maps provider name → providerKeys key. null means free, no key required. */
@@ -114,7 +110,7 @@ function AssetProviderGrid({ providers, providerKeys, onProviderChange, onKeyCha
     if (!key) return
     setTestStatus((prev) => ({ ...prev, [keyName]: 'testing' }))
     try {
-      const result = await api.openbb.testProvider(provider, key)
+      const result = await api.marketData.testProvider(provider, key)
       setTestStatus((prev) => ({ ...prev, [keyName]: result.ok ? 'ok' : 'error' }))
     } catch {
       setTestStatus((prev) => ({ ...prev, [keyName]: 'error' }))
@@ -199,7 +195,7 @@ function UtilityProvidersSection({ providerKeys, onKeyChange }: UtilityProviders
     if (!key) return
     setTestStatus((prev) => ({ ...prev, [keyName]: 'testing' }))
     try {
-      const result = await api.openbb.testProvider(keyName, key)
+      const result = await api.marketData.testProvider(keyName, key)
       setTestStatus((prev) => ({ ...prev, [keyName]: result.ok ? 'ok' : 'error' }))
     } catch {
       setTestStatus((prev) => ({ ...prev, [keyName]: 'error' }))
@@ -274,11 +270,11 @@ function MarketDataZone({ openbb, enabled, onToggle, onChange, onChangeImmediate
   const [testing, setTesting] = useState(false)
   const [testStatus, setTestStatus] = useState<'idle' | 'ok' | 'error'>('idle')
 
-  const dataBackend = (openbb.dataBackend as string) || 'sdk'
+  const dataBackend = (openbb.backend as string) || 'typebb-sdk'
   const apiUrl = (openbb.apiUrl as string) || 'http://localhost:6900'
   const apiServer = (openbb.apiServer as { enabled: boolean; port: number } | undefined) ?? { enabled: false, port: 6901 }
   const providers = (openbb.providers ?? {
-    equity: 'yfinance', crypto: 'yfinance', currency: 'yfinance', newsCompany: 'yfinance', newsWorld: 'fmp',
+    equity: 'yfinance', crypto: 'yfinance', currency: 'yfinance',
   }) as Record<string, string>
   const providerKeys = (openbb.providerKeys ?? {}) as Record<string, string>
 
@@ -311,8 +307,8 @@ function MarketDataZone({ openbb, enabled, onToggle, onChange, onChangeImmediate
 
   return (
     <Zone
-      title="Market Data Engine"
-      subtitle="Structured financial data via OpenBB — configure once per asset class."
+      title="Market Data"
+      subtitle="Structured financial data — prices, fundamentals, macro indicators."
       enabled={enabled}
       onToggle={onToggle}
     >
@@ -320,10 +316,10 @@ function MarketDataZone({ openbb, enabled, onToggle, onChange, onChangeImmediate
       <div>
         <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wide mb-2">Data Backend</p>
         <div className="flex border border-border rounded-lg overflow-hidden w-fit">
-          {(['sdk', 'openbb'] as const).map((backend, i) => (
+          {(['typebb-sdk', 'openbb-api'] as const).map((backend, i) => (
             <button
               key={backend}
-              onClick={() => { onChangeImmediate({ dataBackend: backend }); setTestStatus('idle') }}
+              onClick={() => { onChangeImmediate({ backend }); setTestStatus('idle') }}
               className={`px-4 py-1.5 text-[12px] font-medium transition-colors cursor-pointer ${
                 i > 0 ? 'border-l border-border' : ''
               } ${
@@ -332,19 +328,19 @@ function MarketDataZone({ openbb, enabled, onToggle, onChange, onChangeImmediate
                   : 'text-text-muted hover:text-text'
               }`}
             >
-              {backend === 'sdk' ? 'Internal SDK' : 'External OpenBB'}
+              {backend === 'typebb-sdk' ? 'Built-in Engine (TypeBB)' : 'External OpenBB API'}
             </button>
           ))}
         </div>
         <p className="text-[11px] text-text-muted mt-1.5">
-          {dataBackend === 'sdk'
-            ? 'Uses the built-in TypeScript OpenBB engine. No external process required.'
-            : 'Connects to an external OpenBB HTTP server (Python sidecar or custom).'}
+          {dataBackend === 'typebb-sdk'
+            ? 'Uses the built-in TypeBB engine. No external process required.'
+            : 'Connects to an external OpenBB-compatible HTTP endpoint.'}
         </p>
       </div>
 
       {/* Connection — only shown for external OpenBB backend */}
-      {dataBackend === 'openbb' && (
+      {dataBackend === 'openbb-api' && (
         <div className="border-t border-border pt-4 mt-2">
           <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wide mb-2">Connection</p>
           <div className="flex items-center gap-2">
@@ -519,11 +515,11 @@ interface CompactNewsSettingsProps {
   onChangeImmediate: (patch: Partial<NewsCollectorConfig>) => void
 }
 
-function CompactNewsSettings({ config, onChange, onChangeImmediate }: CompactNewsSettingsProps) {
+function CompactNewsSettings({ config, onChange }: CompactNewsSettingsProps) {
   return (
     <div className="border-t border-border pt-4 mt-4">
       <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wide mb-3">Settings</p>
-      <div className="grid grid-cols-2 gap-3 mb-3">
+      <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-[11px] text-text-muted mb-0.5">Fetch interval (min)</label>
           <input
@@ -545,15 +541,6 @@ function CompactNewsSettings({ config, onChange, onChangeImmediate }: CompactNew
           />
         </div>
       </div>
-      <div className="flex items-center justify-between">
-        <div className="flex-1 mr-3">
-          <span className="text-[13px] text-text">Piggyback OpenBB</span>
-          <p className="text-[11px] text-text-muted mt-0.5">
-            Capture results from newsGetWorld / newsGetCompany into the news store.
-          </p>
-        </div>
-        <Toggle size="sm" checked={config.piggybackOpenBB} onChange={(v) => onChangeImmediate({ piggybackOpenBB: v })} />
-      </div>
     </div>
   )
 }
@@ -571,8 +558,8 @@ function OpenIntelligenceZone({ config, enabled, onToggle, onChange, onChangeImm
 
   return (
     <Zone
-      title="Open Intelligence"
-      subtitle="Accumulative news & feed store — keep adding sources, let AI do the mining."
+      title="News"
+      subtitle="RSS feeds & news archive — collect and search."
       badge={badge}
       enabled={enabled}
       onToggle={onToggle}
@@ -597,19 +584,18 @@ const DEFAULT_NEWS_CONFIG: NewsCollectorConfig = {
   intervalMinutes: 10,
   maxInMemory: 2000,
   retentionDays: 7,
-  piggybackOpenBB: true,
   feeds: [],
 }
 
 export function DataSourcesPage() {
   const openbb = useConfigPage<OpenbbConfig>({
-    section: 'openbb',
-    extract: (full: AppConfig) => (full as Record<string, unknown>).openbb as OpenbbConfig,
+    section: 'marketData',
+    extract: (full: AppConfig) => (full as Record<string, unknown>).marketData as OpenbbConfig,
   })
 
   const news = useConfigPage<NewsCollectorConfig>({
-    section: 'newsCollector',
-    extract: (full: AppConfig) => (full as Record<string, unknown>).newsCollector as NewsCollectorConfig,
+    section: 'news',
+    extract: (full: AppConfig) => (full as Record<string, unknown>).news as NewsCollectorConfig,
   })
 
   const status = combineStatus(openbb.status, news.status)
@@ -641,8 +627,8 @@ export function DataSourcesPage() {
             />
           ) : (
             <Zone
-              title="Market Data Engine"
-              subtitle="Structured financial data via OpenBB — configure once per asset class."
+              title="Market Data"
+              subtitle="Structured financial data — prices, fundamentals, macro indicators."
               enabled={true}
               onToggle={() => {}}
             >
@@ -661,8 +647,8 @@ export function DataSourcesPage() {
             />
           ) : (
             <Zone
-              title="Open Intelligence"
-              subtitle="Accumulative news & feed store — keep adding sources, let AI do the mining."
+              title="News"
+              subtitle="RSS feeds & news archive — collect and search."
               enabled={true}
               onToggle={() => {}}
             >

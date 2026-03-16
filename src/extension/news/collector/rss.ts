@@ -6,8 +6,8 @@
  */
 
 import { fetchAndParseFeed } from './rss-parser.js'
-import { computeDedupKey, type NewsCollectorStore } from './store.js'
-import type { RSSFeedConfig } from './types.js'
+import { computeDedupKey, type NewsCollectorStore } from '../store.js'
+import type { RSSFeedConfig } from '../types.js'
 
 export interface CollectorOpts {
   store: NewsCollectorStore

@@ -32,7 +32,3 @@ export interface CurrencyClientLike {
   getHistorical(params: Record<string, unknown>): Promise<Record<string, unknown>[]>
 }
 
-export interface NewsClientLike {
-  getWorldNews(params?: Record<string, unknown>): Promise<Record<string, unknown>[]>
-  getCompanyNews(params: Record<string, unknown>): Promise<Record<string, unknown>[]>
-}

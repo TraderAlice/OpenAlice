@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { globNews, grepNews, readNews, type NewsToolContext } from './tools'
-import type { NewsItem } from './types'
+import { globNews, grepNews, readNews, type NewsToolContext } from './archive'
+import type { NewsItem } from '../types'
 
 describe('news tools (pure functions)', () => {
   // Mock news data

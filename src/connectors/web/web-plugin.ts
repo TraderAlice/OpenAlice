@@ -9,7 +9,7 @@ import { WebConnector } from './web-connector.js'
 import { readWebSubchannels } from '../../core/config.js'
 import { createChatRoutes, createMediaRoutes, type SSEClient } from './routes/chat.js'
 import { createChannelsRoutes } from './routes/channels.js'
-import { createConfigRoutes, createOpenbbRoutes } from './routes/config.js'
+import { createConfigRoutes, createMarketDataRoutes } from './routes/config.js'
 import { createEventsRoutes } from './routes/events.js'
 import { createCronRoutes } from './routes/cron.js'
 import { createHeartbeatRoutes } from './routes/heartbeat.js'
@@ -74,7 +74,7 @@ export class WebPlugin implements Plugin {
     app.route('/api/config', createConfigRoutes({
       onConnectorsChange: async () => { await ctx.reconnectConnectors() },
     }))
-    app.route('/api/openbb', createOpenbbRoutes())
+    app.route('/api/market-data', createMarketDataRoutes())
     app.route('/api/events', createEventsRoutes(ctx))
     app.route('/api/cron', createCronRoutes(ctx))
     app.route('/api/heartbeat', createHeartbeatRoutes(ctx))

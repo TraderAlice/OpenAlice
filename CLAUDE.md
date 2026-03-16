@@ -39,13 +39,12 @@ src/
 │   ├── analysis-kit/          # Indicators, market data tools, sandbox
 │   ├── equity/                # Equity fundamentals
 │   ├── market/                # Unified symbol search
-│   ├── news/                  # OpenBB news tools
-│   ├── news-collector/        # RSS collector + archive search
+│   ├── news/                  # RSS collector + archive search
 │   ├── trading/               # Unified multi-account trading, guard pipeline, git-like commits
 │   ├── thinking-kit/          # Reasoning and calculation tools
 │   ├── brain/                 # Cognitive state (memory, emotion)
 │   └── browser/               # Browser automation bridge (OpenClaw)
-├── openbb/                    # In-process data SDK (equity, crypto, currency, commodity, economy, news)
+├── openbb/                    # In-process data SDK (equity, crypto, currency, commodity, economy)
 ├── connectors/
 │   ├── web/                   # Web UI (Hono, SSE streaming, sub-channels)
 │   ├── telegram/              # Telegram bot (grammY)

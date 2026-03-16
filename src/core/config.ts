@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { readFile, writeFile, mkdir, unlink } from 'fs/promises'
 import { resolve } from 'path'
-import { newsCollectorSchema } from '../extension/news-collector/config.js'
+import { newsCollectorSchema } from '../extension/news/config.js'
 
 const CONFIG_DIR = resolve('data/config')
 
@@ -93,21 +93,17 @@ const securitiesSchema = z.object({
   })).default([]),
 })
 
-const openbbSchema = z.object({
+const marketDataSchema = z.object({
   enabled: z.boolean().default(true),
   apiUrl: z.string().default('http://localhost:6900'),
   providers: z.object({
     equity: z.string().default('yfinance'),
     crypto: z.string().default('yfinance'),
     currency: z.string().default('yfinance'),
-    newsCompany: z.string().default('yfinance'),
-    newsWorld: z.string().default('fmp'),
   }).default({
     equity: 'yfinance',
     crypto: 'yfinance',
     currency: 'yfinance',
-    newsCompany: 'yfinance',
-    newsWorld: 'fmp',
   }),
   providerKeys: z.object({
     fred: z.string().optional(),
@@ -122,7 +118,7 @@ const openbbSchema = z.object({
     tiingo: z.string().optional(),
     biztoc: z.string().optional(),
   }).default({}),
-  dataBackend: z.enum(['sdk', 'openbb']).default('sdk'),
+  backend: z.enum(['typebb-sdk', 'openbb-api']).default('typebb-sdk'),
   apiServer: z.object({
     enabled: z.boolean().default(true),
     port: z.number().int().min(1024).max(65535).default(6901),
@@ -261,12 +257,12 @@ export type Config = {
   agent: z.infer<typeof agentSchema>
   crypto: z.infer<typeof cryptoSchema>
   securities: z.infer<typeof securitiesSchema>
-  openbb: z.infer<typeof openbbSchema>
+  marketData: z.infer<typeof marketDataSchema>
   compaction: z.infer<typeof compactionSchema>
   aiProvider: z.infer<typeof aiProviderSchema>
   heartbeat: z.infer<typeof heartbeatSchema>
   connectors: z.infer<typeof connectorsSchema>
-  newsCollector: z.infer<typeof newsCollectorSchema>
+  news: z.infer<typeof newsCollectorSchema>
   tools: z.infer<typeof toolsSchema>
 }
 
@@ -300,7 +296,7 @@ async function parseAndSeed<T>(filename: string, schema: z.ZodType<T>, raw: unkn
 }
 
 export async function loadConfig(): Promise<Config> {
-  const files = ['engine.json', 'agent.json', 'crypto.json', 'securities.json', 'openbb.json', 'compaction.json', 'ai-provider-manager.json', 'heartbeat.json', 'connectors.json', 'news-collector.json', 'tools.json'] as const
+  const files = ['engine.json', 'agent.json', 'crypto.json', 'securities.json', 'market-data.json', 'compaction.json', 'ai-provider-manager.json', 'heartbeat.json', 'connectors.json', 'news.json', 'tools.json'] as const
   const raws = await Promise.all(files.map((f) => loadJsonFile(f)))
 
   // TODO: remove all migration blocks before v1.0 — no stable release yet, breaking changes are fine
@@ -350,12 +346,12 @@ export async function loadConfig(): Promise<Config> {
     agent:         await parseAndSeed(files[1], agentSchema, raws[1]),
     crypto:        await parseAndSeed(files[2], cryptoSchema, raws[2]),
     securities:    await parseAndSeed(files[3], securitiesSchema, raws[3]),
-    openbb:        await parseAndSeed(files[4], openbbSchema, raws[4]),
+    marketData:    await parseAndSeed(files[4], marketDataSchema, raws[4]),
     compaction:    await parseAndSeed(files[5], compactionSchema, raws[5]),
     aiProvider:    await parseAndSeed(files[6], aiProviderSchema, raws[6]),
     heartbeat:     await parseAndSeed(files[7], heartbeatSchema, raws[7]),
     connectors:    await parseAndSeed(files[8], connectorsSchema, raws[8]),
-    newsCollector: await parseAndSeed(files[9], newsCollectorSchema, raws[9]),
+    news:          await parseAndSeed(files[9], newsCollectorSchema, raws[9]),
     tools:         await parseAndSeed(files[10], toolsSchema, raws[10]),
   }
 }
@@ -498,13 +494,13 @@ export async function readAIProviderConfig() {
   }
 }
 
-/** Read OpenBB config from disk (called per-request for hot-reload). */
-export async function readOpenbbConfig() {
+/** Read market data config from disk (called per-request for hot-reload). */
+export async function readMarketDataConfig() {
   try {
-    const raw = JSON.parse(await readFile(resolve(CONFIG_DIR, 'openbb.json'), 'utf-8'))
-    return openbbSchema.parse(raw)
+    const raw = JSON.parse(await readFile(resolve(CONFIG_DIR, 'market-data.json'), 'utf-8'))
+    return marketDataSchema.parse(raw)
   } catch {
-    return openbbSchema.parse({})
+    return marketDataSchema.parse({})
   }
 }
 
@@ -545,12 +541,12 @@ const sectionSchemas: Record<ConfigSection, z.ZodTypeAny> = {
   agent: agentSchema,
   crypto: cryptoSchema,
   securities: securitiesSchema,
-  openbb: openbbSchema,
+  marketData: marketDataSchema,
   compaction: compactionSchema,
   aiProvider: aiProviderSchema,
   heartbeat: heartbeatSchema,
   connectors: connectorsSchema,
-  newsCollector: newsCollectorSchema,
+  news: newsCollectorSchema,
   tools: toolsSchema,
 }
 
@@ -559,12 +555,12 @@ const sectionFiles: Record<ConfigSection, string> = {
   agent: 'agent.json',
   crypto: 'crypto.json',
   securities: 'securities.json',
-  openbb: 'openbb.json',
+  marketData: 'market-data.json',
   compaction: 'compaction.json',
   aiProvider: 'ai-provider-manager.json',
   heartbeat: 'heartbeat.json',
   connectors: 'connectors.json',
-  newsCollector: 'news-collector.json',
+  news: 'news.json',
   tools: 'tools.json',
 }
 

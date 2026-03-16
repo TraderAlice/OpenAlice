@@ -7,7 +7,7 @@
 
 import { tool } from 'ai'
 import { z } from 'zod'
-import type { INewsProvider, NewsItem } from './types.js'
+import type { INewsProvider, NewsItem } from '../types.js'
 
 const NEWS_LIMIT = 500
 

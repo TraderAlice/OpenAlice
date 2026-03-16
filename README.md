@@ -29,7 +29,7 @@ Your one-person Wall Street. Alice is an AI trading agent that gives you your ow
 - **Guard pipeline** — pre-execution safety checks (max position size, cooldown, symbol whitelist) that run inside each UTA before orders reach the broker
 - **Market data** — TypeScript-native OpenBB engine (`opentypebb`) with no external sidecar required. Covers equity, crypto, commodity, currency, and macro data with unified symbol search (`marketSearchForResearch`) and technical indicator calculator. Can also expose an embedded OpenBB-compatible HTTP API for external tools
 - **Equity research** — company profiles, financial statements, ratios, analyst estimates, earnings calendar, insider trading, and market movers (top gainers, losers, most active)
-- **News collector** — background RSS collection from configurable feeds with archive search tools (`globNews`/`grepNews`/`readNews`). Also captures OpenBB news API results via piggyback
+- **News** — background RSS collection from configurable feeds with archive search tools (`globNews`/`grepNews`/`readNews`)
 - **Cognitive state** — persistent "brain" with frontal lobe memory, emotion tracking, and commit history
 - **Event log** — persistent append-only JSONL event log with real-time subscriptions and crash recovery
 - **Cron scheduling** — event-driven cron system with AI-powered job execution and automatic delivery to the last-interacted channel
@@ -132,7 +132,7 @@ graph LR
 
 **Core** — `AgentCenter` is the top-level orchestration center that routes all calls (both stateless and session-aware) through `ProviderRouter`. `ToolCenter` is a centralized tool registry — extensions register tools there, and it exports them in Vercel AI SDK and MCP formats. `EventLog` provides persistent append-only event storage (JSONL) with real-time subscriptions and crash recovery. `ConnectorCenter` tracks which channel the user last spoke through.
 
-**Extensions** — domain-specific tool sets registered in `ToolCenter`. Each extension owns its tools, state, and persistence. The trading extension centers on `UnifiedTradingAccount` (UTA) — each UTA bundles a broker connection, git-like operation history, and guard pipeline into a single entity. Guards enforce pre-execution safety checks (position size limits, trade cooldowns, symbol whitelist) inside each UTA before orders reach the broker. `NewsCollector` runs background RSS fetches and piggybacks OpenBB news calls into a persistent archive searchable by the agent.
+**Extensions** — domain-specific tool sets registered in `ToolCenter`. Each extension owns its tools, state, and persistence. The trading extension centers on `UnifiedTradingAccount` (UTA) — each UTA bundles a broker connection, git-like operation history, and guard pipeline into a single entity. Guards enforce pre-execution safety checks (position size limits, trade cooldowns, symbol whitelist) inside each UTA before orders reach the broker. `NewsCollector` runs background RSS fetches into a persistent archive searchable by the agent.
 
 **Tasks** — scheduled background work. `CronEngine` manages jobs and fires `cron.fire` events into the EventLog on schedule; a listener picks them up, runs them through `AgentCenter`, and delivers replies via `ConnectorCenter`. `Heartbeat` is a periodic health-check that uses a structured response protocol (HEARTBEAT_OK / CHAT_NO / CHAT_YES).
 
@@ -182,8 +182,8 @@ All config lives in `data/config/` as JSON files with Zod validation. Missing fi
 | `telegram.json` | Telegram bot credentials + enable |
 | `web-subchannels.json` | Web UI sub-channel definitions with per-channel AI provider overrides |
 | `tools.json` | Tool enable/disable configuration |
-| `openbb.json` | Data backend (`sdk` / `openbb`), per-asset-class providers, provider API keys, embedded HTTP server config |
-| `news-collector.json` | RSS feeds, fetch interval, retention period, OpenBB piggyback toggle |
+| `market-data.json` | Data backend (`typebb-sdk` / `openbb-api`), per-asset-class providers, provider API keys, embedded HTTP server config |
+| `news.json` | RSS feeds, fetch interval, retention period |
 | `compaction.json` | Context window limits, auto-compaction thresholds |
 | `heartbeat.json` | Heartbeat enable/disable, interval, active hours |
 
@@ -225,8 +225,7 @@ src/
     analysis-kit/            # Indicator calculator and market data tools
     equity/                  # Equity fundamentals and data adapter
     market/                  # Unified symbol search across equity, crypto, currency
-    news/                    # OpenBB news tools (world + company headlines)
-    news-collector/          # RSS collector, piggyback wrapper, archive search tools
+    news/                    # RSS collector, archive search tools
     trading/                 # Unified Trading Account (UTA): brokers, git-like commits, guards, AI tool adapter
       UnifiedTradingAccount.ts  # UTA class — owns broker + git + guards
       brokers/               # IBroker interface + Alpaca/CCXT implementations
