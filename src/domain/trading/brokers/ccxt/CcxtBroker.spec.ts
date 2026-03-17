@@ -282,11 +282,11 @@ describe('CcxtBroker — getOrder', () => {
 
     // Seed the orderSymbolCache
     ;(acc as any).orderSymbolCache.set('ord-100', 'ETH/USDT:USDT')
-    ;(acc as any).exchange.fetchOpenOrders = vi.fn().mockResolvedValue([])
-    ;(acc as any).exchange.fetchClosedOrders = vi.fn().mockResolvedValue([{
+    ;(acc as any).exchange.fetchOpenOrder = vi.fn().mockRejectedValue(new Error('not open'))
+    ;(acc as any).exchange.fetchClosedOrder = vi.fn().mockResolvedValue({
       id: 'ord-100', symbol: 'ETH/USDT:USDT', side: 'sell', amount: 0.5,
       type: 'market', price: null, status: 'closed',
-    }])
+    })
 
     const result = await acc.getOrder('ord-100')
     expect(result).not.toBeNull()
@@ -302,12 +302,12 @@ describe('CcxtBroker — getOrder', () => {
     expect(result).toBeNull()
   })
 
-  it('returns null when order not found in open or closed', async () => {
+  it('returns null when order not found', async () => {
     const acc = makeAccount()
     setInitialized(acc, { 'ETH/USDT:USDT': makeSwapMarket('ETH', 'USDT', 'ETH/USDT:USDT') })
     ;(acc as any).orderSymbolCache.set('ord-404', 'ETH/USDT:USDT')
-    ;(acc as any).exchange.fetchOpenOrders = vi.fn().mockResolvedValue([])
-    ;(acc as any).exchange.fetchClosedOrders = vi.fn().mockResolvedValue([])
+    ;(acc as any).exchange.fetchOpenOrder = vi.fn().mockRejectedValue(new Error('not found'))
+    ;(acc as any).exchange.fetchClosedOrder = vi.fn().mockRejectedValue(new Error('not found'))
 
     const result = await acc.getOrder('ord-404')
     expect(result).toBeNull()
