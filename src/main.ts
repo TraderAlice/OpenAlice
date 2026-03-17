@@ -48,6 +48,8 @@ import { createCronEngine, createCronListener, createCronTools } from './task/cr
 import { createHeartbeat } from './task/heartbeat/index.js'
 import { NewsCollectorStore, NewsCollector } from './domain/news/index.js'
 import { createNewsArchiveTools } from './tool/news.js'
+import { createBacktestTools } from './extension/backtester/adapter.js'
+import type { CcxtAccountLike } from './extension/backtester/data.js'
 
 // ==================== Persistence paths ====================
 
@@ -272,6 +274,15 @@ async function main() {
     toolCenter.register(createNewsArchiveTools(newsStore), 'news')
   }
   toolCenter.register(createAnalysisTools(equityClient, cryptoClient, currencyClient), 'analysis')
+  toolCenter.register(
+    createBacktestTools(equityClient, cryptoClient, currencyClient, () => {
+      const uta = accountManager.resolve().find((u) => u.broker instanceof CcxtBroker)
+      if (!uta) return undefined
+      const broker = uta.broker
+      return 'fetchOHLCV' in broker ? broker as unknown as CcxtAccountLike : undefined
+    }),
+    'backtester',
+  )
 
   console.log(`tool-center: ${toolCenter.list().length} tools registered`)
 

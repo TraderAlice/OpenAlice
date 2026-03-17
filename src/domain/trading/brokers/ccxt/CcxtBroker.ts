@@ -568,6 +568,18 @@ export class CcxtBroker implements IBroker {
     }
   }
 
+  async fetchOHLCV(
+    symbol: string,
+    timeframe: string,
+    since?: number,
+    limit?: number,
+  ): Promise<Array<[number, number, number, number, number, number]>> {
+    this.ensureInit()
+    return this.exchange.fetchOHLCV(symbol, timeframe, since, limit) as Promise<
+      Array<[number, number, number, number, number, number]>
+    >
+  }
+
   async getOrderBook(contract: Contract, limit?: number): Promise<OrderBook> {
     this.ensureInit()
 
