@@ -46,18 +46,24 @@ function buildContext(
     getHistoricalData: async (symbol, interval) => {
       const start_date = buildStartDate(interval)
 
-      let results: OhlcvData[]
+      let raw: Array<Record<string, unknown>>
       switch (asset) {
         case 'equity':
-          results = await equityClient.getHistorical({ symbol, start_date, interval }) as OhlcvData[]
+          raw = await equityClient.getHistorical({ symbol, start_date, interval })
           break
         case 'crypto':
-          results = await cryptoClient.getHistorical({ symbol, start_date, interval }) as OhlcvData[]
+          raw = await cryptoClient.getHistorical({ symbol, start_date, interval })
           break
         case 'currency':
-          results = await currencyClient.getHistorical({ symbol, start_date, interval }) as OhlcvData[]
+          raw = await currencyClient.getHistorical({ symbol, start_date, interval })
           break
       }
+
+      // Filter out bars with null OHLC (yfinance returns null for incomplete/missing data)
+      const results = raw.filter(
+        (d): d is Record<string, unknown> & OhlcvData =>
+          d.close != null && d.open != null && d.high != null && d.low != null,
+      ) as OhlcvData[]
 
       results.sort((a, b) => a.date.localeCompare(b.date))
       return results

@@ -15,10 +15,10 @@ export type EquityHistoricalQueryParams = z.infer<typeof EquityHistoricalQueryPa
 
 export const EquityHistoricalDataSchema = z.object({
   date: z.string().describe('The date of the data.'),
-  open: z.number().describe('The open price.'),
-  high: z.number().describe('The high price.'),
-  low: z.number().describe('The low price.'),
-  close: z.number().describe('The close price.'),
+  open: z.number().nullable().default(null).describe('The open price.'),
+  high: z.number().nullable().default(null).describe('The high price.'),
+  low: z.number().nullable().default(null).describe('The low price.'),
+  close: z.number().nullable().default(null).describe('The close price.'),
   volume: z.number().nullable().default(null).describe('The trading volume.'),
   vwap: z.number().nullable().default(null).describe('Volume Weighted Average Price over the period.'),
 }).passthrough()
