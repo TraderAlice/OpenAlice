@@ -7,32 +7,33 @@ import { McpPlugin } from './server/mcp.js'
 import { TelegramPlugin } from './connectors/telegram/index.js'
 import { WebPlugin } from './connectors/web/index.js'
 import { McpAskPlugin } from './connectors/mcp-ask/index.js'
-import { createThinkingTools } from './extension/thinking-kit/index.js'
+import { createThinkingTools } from './tool/thinking.js'
 import {
   AccountManager,
   UnifiedTradingAccount,
   CcxtBroker,
   createCcxtProviderTools,
-  createTradingTools,
   createPlatformFromConfig,
   createBrokerFromConfig,
   validatePlatformRefs,
-} from './extension/trading/index.js'
-import type { GitExportState, IPlatform } from './extension/trading/index.js'
-import { Brain, createBrainTools } from './extension/brain/index.js'
-import type { BrainExportState } from './extension/brain/index.js'
-import { createBrowserTools } from './extension/browser/index.js'
-import { SymbolIndex } from './openbb/equity/index.js'
-import { createEquityTools } from './extension/equity/index.js'
-import { getSDKExecutor, buildRouteMap, SDKEquityClient, SDKCryptoClient, SDKCurrencyClient } from './openbb/sdk/index.js'
-import type { EquityClientLike, CryptoClientLike, CurrencyClientLike } from './openbb/sdk/types.js'
-import { buildSDKCredentials } from './openbb/credential-map.js'
-import { OpenBBEquityClient } from './openbb/equity/client.js'
-import { OpenBBCryptoClient } from './openbb/crypto/client.js'
-import { OpenBBCurrencyClient } from './openbb/currency/client.js'
+} from './domain/trading/index.js'
+import { createTradingTools } from './tool/trading.js'
+import type { GitExportState, IPlatform } from './domain/trading/index.js'
+import { Brain } from './domain/brain/index.js'
+import { createBrainTools } from './tool/brain.js'
+import type { BrainExportState } from './domain/brain/index.js'
+import { createBrowserTools } from './tool/browser.js'
+import { SymbolIndex } from './domain/market-data/equity/index.js'
+import { createEquityTools } from './tool/equity.js'
+import { getSDKExecutor, buildRouteMap, SDKEquityClient, SDKCryptoClient, SDKCurrencyClient } from './domain/market-data/client/typebb/index.js'
+import type { EquityClientLike, CryptoClientLike, CurrencyClientLike } from './domain/market-data/client/types.js'
+import { buildSDKCredentials } from './domain/market-data/credential-map.js'
+import { OpenBBEquityClient } from './domain/market-data/client/openbb-api/equity-client.js'
+import { OpenBBCryptoClient } from './domain/market-data/client/openbb-api/crypto-client.js'
+import { OpenBBCurrencyClient } from './domain/market-data/client/openbb-api/currency-client.js'
 import { OpenBBServerPlugin } from './server/opentypebb.js'
-import { createMarketSearchTools } from './extension/market/index.js'
-import { createAnalysisTools } from './extension/analysis-kit/index.js'
+import { createMarketSearchTools } from './tool/market.js'
+import { createAnalysisTools } from './tool/analysis.js'
 import { SessionStore } from './core/session.js'
 import { ConnectorCenter } from './core/connector-center.js'
 import { ToolCenter } from './core/tool-center.js'
@@ -45,7 +46,8 @@ import { createEventLog } from './core/event-log.js'
 import { createToolCallLog } from './core/tool-call-log.js'
 import { createCronEngine, createCronListener, createCronTools } from './task/cron/index.js'
 import { createHeartbeat } from './task/heartbeat/index.js'
-import { NewsCollectorStore, NewsCollector, createNewsArchiveTools } from './extension/news/index.js'
+import { NewsCollectorStore, NewsCollector } from './domain/news/index.js'
+import { createNewsArchiveTools } from './tool/news.js'
 
 // ==================== Persistence paths ====================
 

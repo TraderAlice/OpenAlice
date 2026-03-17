@@ -1,1 +1,0 @@
-export { createEquityTools } from './adapter'

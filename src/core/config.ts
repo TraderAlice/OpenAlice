@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { readFile, writeFile, mkdir, unlink } from 'fs/promises'
 import { resolve } from 'path'
-import { newsCollectorSchema } from '../extension/news/config.js'
+import { newsCollectorSchema } from '../domain/news/config.js'
 
 const CONFIG_DIR = resolve('data/config')
 
