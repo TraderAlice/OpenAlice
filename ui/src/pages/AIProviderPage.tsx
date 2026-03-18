@@ -23,6 +23,8 @@ const PROVIDER_MODELS: Record<string, { label: string; value: string }[]> = {
     { label: 'Gemini 2.5 Pro', value: 'gemini-2.5-pro' },
   ],
   minimax: [
+    { label: 'MiniMax-M2.7', value: 'MiniMax-M2.7' },
+    { label: 'MiniMax-M2.7-highspeed', value: 'MiniMax-M2.7-highspeed' },
     { label: 'MiniMax-M2.5', value: 'MiniMax-M2.5' },
     { label: 'MiniMax-M2.5-highspeed', value: 'MiniMax-M2.5-highspeed' },
   ],
