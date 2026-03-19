@@ -9,7 +9,7 @@
     "predev": "pnpm --filter opentypebb build && pnpm --filter @traderalice/ibkr build",
     "build": "pnpm --filter opentypebb build && pnpm --filter @traderalice/ibkr build && pnpm build:ui && pnpm build:backend",
     "build:ui": "pnpm --filter open-alice-ui build",
-    "build:backend": "tsup src/main.ts --format esm --dts",
+    "build:backend": "tsup src/main.ts --format esm --dts --external better-sqlite3",
     "start": "node dist/main.js",
     "test": "vitest run",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
@@ -44,6 +44,7 @@
     "@traderalice/opentypebb": "workspace:*",
     "ai": "^6.0.86",
     "ajv": "^8.18.0",
+    "better-sqlite3": "^11.8.0",
     "ccxt": "^4.5.38",
     "chalk": "^5.6.2",
     "decimal.js": "^10.6.0",
@@ -64,7 +65,14 @@
     "overrides": {
       "@alpacahq/alpaca-trade-api>axios": "^0.30.3",
       "@alpacahq/alpaca-trade-api>eslint": "-"
-    }
+    },
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "ccxt",
+      "esbuild",
+      "protobufjs",
+      "sharp"
+    ]
   },
   "devDependencies": {
     "@ai-sdk/provider": "^3.0.8",
