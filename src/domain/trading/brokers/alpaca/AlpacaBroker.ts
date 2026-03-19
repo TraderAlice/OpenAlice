@@ -166,11 +166,12 @@ export class AlpacaBroker implements IBroker {
         time_in_force: ibkrTifToAlpaca(order.tif),
       }
 
-      // Quantity: totalQuantity or cashQty (notional)
-      if (!order.totalQuantity.equals(UNSET_DECIMAL)) {
+      // Quantity: cashQty (notional) takes priority over totalQuantity (qty).
+      // Alpaca requires notional as a string and rejects requests that include qty alongside notional.
+      if (order.cashQty !== UNSET_DOUBLE) {
+        alpacaOrder.notional = String(order.cashQty)
+      } else if (!order.totalQuantity.equals(UNSET_DECIMAL)) {
         alpacaOrder.qty = parseFloat(order.totalQuantity.toString())
-      } else if (order.cashQty !== UNSET_DOUBLE) {
-        alpacaOrder.notional = order.cashQty
       }
 
       // Prices

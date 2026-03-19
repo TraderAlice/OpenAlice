@@ -16,14 +16,16 @@ import type { Connector, ConnectorCapabilities, SendPayload, SendResult } from '
 export const MAX_MESSAGE_LENGTH = 4096
 
 export class TelegramConnector implements Connector {
-  readonly channel = 'telegram'
+  readonly channel: string
   readonly to: string
   readonly capabilities: ConnectorCapabilities = { push: true, media: true }
 
   constructor(
     private readonly bot: Bot,
     private readonly chatId: number,
+    channel = 'telegram',
   ) {
+    this.channel = channel
     this.to = String(chatId)
   }
 

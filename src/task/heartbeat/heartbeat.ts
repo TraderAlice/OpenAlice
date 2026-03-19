@@ -162,14 +162,14 @@ export function createHeartbeat(opts: HeartbeatOpts): Heartbeat {
         return
       }
 
-      // 5. Send notification
+      // 5. Broadcast to all connectors (all Telegram chats + web)
       let delivered = false
       try {
-        const result2 = await connectorCenter.notify(text, {
+        const results = await connectorCenter.broadcast(text, {
           media: result.media,
           source: 'heartbeat',
         })
-        delivered = result2.delivered
+        delivered = results.some((r) => r.delivered)
         if (delivered) dedup.record(text, now())
       } catch (sendErr) {
         console.warn('heartbeat: send failed:', sendErr)

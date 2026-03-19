@@ -379,7 +379,10 @@ export class CcxtBroker implements IBroker {
 
   async getAccount(): Promise<AccountInfo> {
     this.ensureInit()
-    this.ensureWritable()
+
+    if (this.readOnly) {
+      return { netLiquidation: 0, totalCashValue: 0, unrealizedPnL: 0, realizedPnL: 0 }
+    }
 
     const [balance, rawPositions] = await Promise.all([
       this.exchange.fetchBalance(),

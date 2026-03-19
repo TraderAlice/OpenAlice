@@ -27,7 +27,7 @@ export class TelegramPlugin implements Plugin {
   private bot: Bot | null = null
   private connectorCenter: ConnectorCenter | null = null
   private merger: MediaGroupMerger | null = null
-  private unregisterConnector?: () => void
+  private unregisterConnectors: Array<() => void> = []
 
   /** Per-user unified session stores (keyed by userId). */
   private sessions = new Map<number, SessionStore>()
@@ -66,7 +66,8 @@ export class TelegramPlugin implements Plugin {
     // ── Middleware: auth guard (always active) ──
     bot.use(async (ctx, next) => {
       const chatId = ctx.chat?.id
-      if (!chatId) return
+      if (chatId == null) return
+      console.log(`telegram: auth chatId=${chatId} allowed=${JSON.stringify(this.config.allowedChatIds)} match=${this.config.allowedChatIds.includes(chatId)}`)
       if (this.config.allowedChatIds.includes(chatId)) return next()
 
       // Unauthorized — log chat ID for operator, throttle reply (60s)
@@ -172,11 +173,13 @@ export class TelegramPlugin implements Plugin {
     const aiConfig = await readAIBackend()
     console.log(`telegram plugin: connected as @${bot.botInfo.username} (backend: ${aiConfig.backend})`)
 
-    // ── Register connector for outbound delivery (heartbeat / cron responses) ──
-    if (this.config.allowedChatIds.length > 0) {
-      const deliveryChatId = this.config.allowedChatIds[0]
-      this.unregisterConnector = this.connectorCenter!.register(new TelegramConnector(bot, deliveryChatId))
-    }
+    // ── Register one connector per allowed chat (for broadcast delivery) ──
+    // First chatId uses channel name 'telegram' (matches lastInteraction for notify() replies).
+    // Subsequent chatIds use 'telegram:<chatId>' so they don't overwrite the primary.
+    this.unregisterConnectors = this.config.allowedChatIds.map((chatId, i) => {
+      const channel = i === 0 ? 'telegram' : `telegram:${chatId}`
+      return this.connectorCenter!.register(new TelegramConnector(bot, chatId, channel))
+    })
 
     // ── Start polling ──
     this.bot = bot
@@ -191,7 +194,7 @@ export class TelegramPlugin implements Plugin {
   async stop() {
     this.merger?.flush()
     await this.bot?.stop()
-    this.unregisterConnector?.()
+    for (const unregister of this.unregisterConnectors) unregister()
   }
 
   private async getSession(userId: number): Promise<SessionStore> {

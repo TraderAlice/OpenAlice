@@ -348,6 +348,22 @@ describe('TradingGit', () => {
       expect(log).toHaveLength(1)
       expect(log[0].message).toBe('Buy AAPL')
     })
+
+    it('log() does not crash after JSON serialization round-trip (plain-object Decimal)', async () => {
+      git.add(buyOp('AAPL'))
+      git.commit('Buy AAPL')
+      await git.push()
+
+      // Simulate what happens when state is persisted to disk and reloaded:
+      // Decimal instances become plain objects like { s: 1, e: 1, c: [10] }
+      const serialized = JSON.parse(JSON.stringify(git.exportState()))
+      const restored = TradingGit.restore(serialized, config)
+
+      // Must not throw "qty.equals is not a function"
+      expect(() => restored.log()).not.toThrow()
+      const log = restored.log()
+      expect(log).toHaveLength(1)
+    })
   })
 
   // ==================== setCurrentRound ====================

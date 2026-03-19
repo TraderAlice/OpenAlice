@@ -624,11 +624,15 @@ describe('CcxtBroker — getAccount', () => {
     expect(info.realizedPnL).toBe(150)
   })
 
-  it('throws when read-only', async () => {
+  it('returns zeros when read-only', async () => {
     const acc = new CcxtBroker({ exchange: 'bybit', apiKey: '', apiSecret: '', sandbox: false })
     ;(acc as any).initialized = true
 
-    await expect(acc.getAccount()).rejects.toThrow('read-only')
+    const info = await acc.getAccount()
+    expect(info.netLiquidation).toBe(0)
+    expect(info.totalCashValue).toBe(0)
+    expect(info.unrealizedPnL).toBe(0)
+    expect(info.realizedPnL).toBe(0)
   })
 })
 

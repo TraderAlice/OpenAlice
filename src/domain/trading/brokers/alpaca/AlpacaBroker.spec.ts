@@ -276,6 +276,78 @@ describe('AlpacaBroker — placeOrder()', () => {
   })
 })
 
+describe('AlpacaBroker — placeOrder notional', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('sends notional as string, no qty, when cashQty is set', async () => {
+    const acc = new AlpacaBroker({ apiKey: 'k', secretKey: 's', paper: true })
+    const createOrder = vi.fn().mockResolvedValue({ id: 'ord-notional', status: 'new' })
+    ;(acc as any).client = { createOrder }
+
+    const contract = new Contract()
+    contract.aliceId = 'alpaca-XLE'
+    contract.symbol = 'XLE'
+    contract.secType = 'STK'
+
+    const order = new Order()
+    order.action = 'BUY'
+    order.orderType = 'MKT'
+    order.tif = 'DAY'
+    order.cashQty = 7000 // notional order — no totalQuantity
+
+    await acc.placeOrder(contract, order)
+
+    const body = createOrder.mock.calls[0][0]
+    expect(body.notional).toBe('7000')
+    expect(body.qty).toBeUndefined()
+  })
+
+  it('sends qty, no notional, when only totalQuantity is set', async () => {
+    const acc = new AlpacaBroker({ apiKey: 'k', secretKey: 's', paper: true })
+    const createOrder = vi.fn().mockResolvedValue({ id: 'ord-qty', status: 'new' })
+    ;(acc as any).client = { createOrder }
+
+    const contract = new Contract()
+    contract.aliceId = 'alpaca-AAPL'
+    contract.symbol = 'AAPL'
+    contract.secType = 'STK'
+
+    const order = new Order()
+    order.action = 'BUY'
+    order.orderType = 'MKT'
+    order.totalQuantity = new Decimal(10)
+
+    await acc.placeOrder(contract, order)
+
+    const body = createOrder.mock.calls[0][0]
+    expect(body.qty).toBe(10)
+    expect(body.notional).toBeUndefined()
+  })
+
+  it('notional wins when both cashQty and totalQuantity are set', async () => {
+    const acc = new AlpacaBroker({ apiKey: 'k', secretKey: 's', paper: true })
+    const createOrder = vi.fn().mockResolvedValue({ id: 'ord-both', status: 'new' })
+    ;(acc as any).client = { createOrder }
+
+    const contract = new Contract()
+    contract.aliceId = 'alpaca-XLE'
+    contract.symbol = 'XLE'
+    contract.secType = 'STK'
+
+    const order = new Order()
+    order.action = 'BUY'
+    order.orderType = 'MKT'
+    order.cashQty = 7000
+    order.totalQuantity = new Decimal(5) // both set — cashQty must win
+
+    await acc.placeOrder(contract, order)
+
+    const body = createOrder.mock.calls[0][0]
+    expect(body.notional).toBe('7000')
+    expect(body.qty).toBeUndefined()
+  })
+})
+
 describe('AlpacaBroker — precision', () => {
   it('placeOrder sends precise qty (no float corruption)', async () => {
     const acc = new AlpacaBroker({ apiKey: 'k', secretKey: 's', paper: true })

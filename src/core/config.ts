@@ -151,7 +151,7 @@ const connectorsSchema = z.object({
     enabled: z.boolean().default(false),
     botToken: z.string().optional(),
     botUsername: z.string().optional(),
-    chatIds: z.array(z.number()).default([]),
+    chatIds: z.array(z.coerce.number()).default([]),
   }).default({ enabled: false, chatIds: [] }),
 })
 
