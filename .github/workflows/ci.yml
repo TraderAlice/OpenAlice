@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches: [master, dev]
-  workflow_dispatch: {}  # เพิ่ม
+  workflow_dispatch: {}
   pull_request:
     branches: [master]
 
@@ -26,3 +26,9 @@ jobs:
       - run: pnpm build
 
       - run: pnpm test
+
+      - name: Upload build files
+        uses: actions/upload-artifact@v4
+        with:
+          name: compiled-dist
+          path: dist/
