@@ -276,6 +276,37 @@ export class IndicatorCalculator {
         evaluatedArgs[2] as number[],
         evaluatedArgs[3] as number,
       )
+    if (name === 'STOCHRSI')
+      return Technical.STOCHRSI(
+        evaluatedArgs[0] as number[],
+        evaluatedArgs[1] as number,
+        evaluatedArgs[2] as number,
+      )
+    if (name === 'ADX')
+      return Technical.ADX(
+        evaluatedArgs[0] as number[],
+        evaluatedArgs[1] as number[],
+        evaluatedArgs[2] as number[],
+        evaluatedArgs[3] as number,
+      )
+    if (name === 'OBV')
+      return Technical.OBV(
+        evaluatedArgs[0] as number[],
+        evaluatedArgs[1] as number[],
+      )
+    if (name === 'VWAP')
+      return Technical.VWAP(
+        evaluatedArgs[0] as number[],
+        evaluatedArgs[1] as number[],
+        evaluatedArgs[2] as number[],
+        evaluatedArgs[3] as number[],
+      )
+    if (name === 'PIVOT')
+      return Technical.PIVOT(
+        evaluatedArgs[0] as number[],
+        evaluatedArgs[1] as number[],
+        evaluatedArgs[2] as number[],
+      )
 
     throw new Error(`Unknown function: ${name}`)
   }

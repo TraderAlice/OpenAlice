@@ -361,13 +361,14 @@ export class AlpacaBroker implements IBroker {
     if (o.time_in_force) order.tif = o.time_in_force.toUpperCase()
     if (o.extended_hours) order.outsideRth = true
     // Alpaca order IDs are UUIDs — IBKR's orderId field is number, so leave at default 0.
-    // The real string ID is preserved through PlaceOrderResult.orderId and getOrder(string).
+    // The real string ID is carried via nativeOrderId on OpenOrder.
     order.orderId = 0
 
     return {
       contract,
       order,
       orderState: makeOrderState(o.status, o.reject_reason ?? undefined),
+      nativeOrderId: o.id,
     }
   }
 }

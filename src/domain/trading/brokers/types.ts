@@ -48,6 +48,8 @@ export interface OpenOrder {
   contract: Contract
   order: Order
   orderState: OrderState
+  /** Broker-native order ID (string). IBKR Order.orderId is numeric and loses non-numeric IDs. */
+  nativeOrderId?: string
 }
 
 // ==================== Account info ====================

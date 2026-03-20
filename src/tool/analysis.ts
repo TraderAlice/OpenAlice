@@ -84,15 +84,25 @@ Asset classes: "equity" for stocks, "crypto" for cryptocurrencies, "currency" fo
 
 Data access: CLOSE('AAPL', '1d'), HIGH, LOW, OPEN, VOLUME — args: symbol, interval (e.g. '1d', '1w', '1h').
 Statistics: SMA(data, period), EMA, STDEV, MAX, MIN, SUM, AVERAGE.
-Technical: RSI(data, 14), BBANDS(data, 20, 2), MACD(data, 12, 26, 9), ATR(highs, lows, closes, 14).
+Technical indicators:
+  RSI(data, 14) — Relative Strength Index (0-100, >70 overbought, <30 oversold)
+  BBANDS(data, 20, 2) — Bollinger Bands {upper, middle, lower}
+  MACD(data, 12, 26, 9) — MACD {macd, signal, histogram}
+  ATR(highs, lows, closes, 14) — Average True Range (volatility)
+  STOCHRSI(data, 14, 14) — Stochastic RSI {stochRsi, k, d} (more sensitive than RSI)
+  ADX(highs, lows, closes, 14) — Average Directional Index {adx, plusDI, minusDI} (trend strength, >25 = strong)
+  OBV(closes, volumes) — On-Balance Volume (volume flow confirmation)
+  VWAP(highs, lows, closes, volumes) — Volume Weighted Average Price
+  PIVOT(highs, lows, closes) — Floor pivot points {pivot, r1, r2, r3, s1, s2, s3}
+
 Array access: CLOSE('AAPL', '1d')[-1] for latest price. Supports +, -, *, / operators.
 
 Examples:
-  asset="equity":   SMA(CLOSE('AAPL', '1d'), 50)
-  asset="crypto":   RSI(CLOSE('BTCUSD', '1d'), 14)
-  asset="currency": CLOSE('EURUSD', '1d')[-1]
-
-Use the corresponding search tool first to resolve the correct symbol.`,
+  SMA(CLOSE('AAPL', '1d'), 50)
+  RSI(CLOSE('AAPL', '1d'), 14)
+  ADX(HIGH('AAPL', '1d'), LOW('AAPL', '1d'), CLOSE('AAPL', '1d'), 14)
+  VWAP(HIGH('AAPL', '1h'), LOW('AAPL', '1h'), CLOSE('AAPL', '1h'), VOLUME('AAPL', '1h'))
+  PIVOT(HIGH('SPY', '1d'), LOW('SPY', '1d'), CLOSE('SPY', '1d'))`,
       inputSchema: z.object({
         asset: z.enum(['equity', 'crypto', 'currency']).describe('Asset class'),
         formula: z.string().describe("Formula expression, e.g. SMA(CLOSE('AAPL', '1d'), 50)"),

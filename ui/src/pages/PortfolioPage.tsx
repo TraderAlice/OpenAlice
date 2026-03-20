@@ -393,17 +393,20 @@ function TradeLog({ commits }: { commits: CommitWithAccount[] }) {
 
 // ==================== Formatting Helpers ====================
 
-function fmt(n: number): string {
+function fmt(n: number | null | undefined): string {
+  if (n == null) return '$0.00'
   return n >= 1000 ? `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     : `$${n.toFixed(2)}`
 }
 
-function fmtPnl(n: number): string {
-  const sign = n >= 0 ? '+' : ''
-  return `${sign}${fmt(n)}`
+function fmtPnl(n: number | null | undefined): string {
+  const v = n ?? 0
+  const sign = v >= 0 ? '+' : ''
+  return `${sign}${fmt(v)}`
 }
 
-function fmtNum(n: number): string {
+function fmtNum(n: number | null | undefined): string {
+  if (n == null) return '0'
   return n >= 1 ? n.toLocaleString('en-US', { maximumFractionDigits: 4 })
     : n.toPrecision(4)
 }

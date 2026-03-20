@@ -508,6 +508,7 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
       contract,
       order,
       orderState: makeOrderState(o.status),
+      nativeOrderId: o.id,
     }
   }
 

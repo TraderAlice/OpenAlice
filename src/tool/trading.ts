@@ -10,6 +10,7 @@ import { tool } from 'ai'
 import { z } from 'zod'
 import { Contract } from '@traderalice/ibkr'
 import type { AccountManager } from '@/domain/trading/account-manager.js'
+import { UnifiedTradingAccount } from '@/domain/trading/UnifiedTradingAccount.js'
 import '@/domain/trading/contract-ext.js'
 
 const sourceDesc = (required: boolean, extra?: string) => {
@@ -137,21 +138,29 @@ This is a BROKER-LEVEL search — it queries your connected trading accounts.`,
     }),
 
     getQuote: tool({
-      description: 'Query the latest quote/price for a contract.',
+      description: 'Query the latest quote/price for a contract. Use symbol for quick lookups, or aliceId from searchContracts for exact match.',
       inputSchema: z.object({
-        aliceId: z.string().describe('Contract identifier from searchContracts'),
+        symbol: z.string().optional().describe('Ticker symbol (e.g. "AAPL"). Preferred for simple lookups.'),
+        aliceId: z.string().optional().describe('Contract identifier from searchContracts (e.g. "alpaca-paper-1|AAPL")'),
         source: z.string().optional().describe(sourceDesc(false)),
       }),
-      execute: async ({ aliceId, source }) => {
+      execute: async ({ symbol, aliceId, source }) => {
+        if (!symbol && !aliceId) return { error: 'Provide either symbol or aliceId.' }
         const targets = manager.resolve(source)
         if (targets.length === 0) return { error: 'No accounts available.' }
         const query = new Contract()
-        query.aliceId = aliceId
+        if (aliceId) {
+          query.aliceId = aliceId
+          // Extract symbol from aliceId so brokers can resolve it
+          const parsed = UnifiedTradingAccount.parseAliceId(aliceId)
+          if (parsed) query.symbol = parsed.nativeKey
+        }
+        if (symbol) query.symbol = symbol
         const results: Array<Record<string, unknown>> = []
         for (const uta of targets) {
           try { results.push({ source: uta.id, ...await uta.getQuote(query) }) } catch { /* skip */ }
         }
-        if (results.length === 0) return { error: `No account could quote aliceId "${aliceId}".` }
+        if (results.length === 0) return { error: `No account could quote ${symbol ?? aliceId}.` }
         return results.length === 1 ? results[0] : results
       },
     }),

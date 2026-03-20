@@ -358,7 +358,7 @@ export class MockBroker implements IBroker {
     if (!internal) return null
     const orderState = new OrderState()
     orderState.status = internal.status
-    return { contract: internal.contract, order: internal.order, orderState }
+    return { contract: internal.contract, order: internal.order, orderState, nativeOrderId: orderId }
   }
 
   async getQuote(contract: Contract): Promise<Quote> {
