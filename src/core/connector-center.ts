@@ -24,6 +24,8 @@ export interface NotifyOpts {
   kind?: 'message' | 'notification'
   media?: MediaAttachment[]
   source?: 'heartbeat' | 'cron' | 'manual'
+  /** Override: deliver to this specific channel instead of last-interacted. */
+  channel?: string
 }
 
 /** Result of a notify() call. */
@@ -89,7 +91,7 @@ export class ConnectorCenter {
    * Falls back to the first registered connector if no interaction yet.
    */
   async notify(text: string, opts?: NotifyOpts): Promise<NotifyResult> {
-    const target = this.resolveTarget()
+    const target = opts?.channel ? this.get(opts.channel) : this.resolveTarget()
     if (!target) return { delivered: false }
 
     const payload = this.buildPayload(text, opts)
@@ -103,7 +105,7 @@ export class ConnectorCenter {
    * Otherwise drains the stream and falls back to send() with the completed result.
    */
   async notifyStream(stream: StreamableResult, opts?: NotifyOpts): Promise<NotifyResult> {
-    const target = this.resolveTarget()
+    const target = opts?.channel ? this.get(opts.channel) : this.resolveTarget()
     if (!target) {
       await stream // drain to prevent hanging generator
       return { delivered: false }

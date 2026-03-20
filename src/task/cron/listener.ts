@@ -63,11 +63,12 @@ export function createCronListener(opts: CronListenerOpts): CronListener {
         historyPreamble: 'The following is the recent cron session conversation. This is an automated cron job execution.',
       })
 
-      // Send notification through the last-interacted connector
+      // Send notification through the targeted connector (or last-interacted fallback)
       try {
         await connectorCenter.notify(result.text, {
           media: result.media,
           source: 'cron',
+          channel: payload.channel,
         })
       } catch (sendErr) {
         console.warn(`cron-listener: send failed for job ${payload.jobId}:`, sendErr)

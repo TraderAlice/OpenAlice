@@ -61,12 +61,13 @@ export function createCronTools(cronEngine: CronEngine) {
         payload: z.string().describe('The reminder/instruction text delivered to you when the job fires'),
         schedule: scheduleSchema.optional().describe('When the job should run'),
         enabled: z.boolean().optional().describe('Whether the job starts enabled (default: true)'),
+        channel: z.string().optional().describe('Deliver results to a specific connector channel (e.g. "telegram", "web"). Defaults to last-interacted.'),
         sessionTarget: z
           .enum(['main', 'isolated'])
           .optional()
           .describe('Where to run: "main" injects into heartbeat session (default), "isolated" runs in a fresh session'),
       }),
-      execute: async ({ name, payload, schedule, enabled }) => {
+      execute: async ({ name, payload, schedule, enabled, channel }) => {
         if (!schedule) {
           return { error: 'schedule is required' }
         }
@@ -75,6 +76,7 @@ export function createCronTools(cronEngine: CronEngine) {
           payload,
           schedule,
           enabled,
+          channel,
         })
         return { id }
       },
@@ -91,14 +93,15 @@ export function createCronTools(cronEngine: CronEngine) {
         payload: z.string().optional().describe('New payload text'),
         schedule: scheduleSchema.optional().describe('New schedule'),
         enabled: z.boolean().optional().describe('Enable or disable the job'),
+        channel: z.string().optional().describe('Deliver results to a specific connector channel (e.g. "telegram", "web").'),
         sessionTarget: z
           .enum(['main', 'isolated'])
           .optional()
           .describe('New session target'),
       }),
-      execute: async ({ id, name, payload, schedule, enabled }) => {
+      execute: async ({ id, name, payload, schedule, enabled, channel }) => {
         try {
-          await cronEngine.update(id, { name, payload, schedule, enabled })
+          await cronEngine.update(id, { name, payload, schedule, enabled, channel })
           return { ok: true }
         } catch (err) {
           return { error: err instanceof Error ? err.message : String(err) }

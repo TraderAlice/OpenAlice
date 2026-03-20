@@ -8,7 +8,7 @@ export const cronApi = {
     return res.json()
   },
 
-  async add(params: { name: string; payload: string; schedule: CronSchedule; enabled?: boolean }): Promise<{ id: string }> {
+  async add(params: { name: string; payload: string; schedule: CronSchedule; enabled?: boolean; channel?: string }): Promise<{ id: string }> {
     const res = await fetch('/api/cron/jobs', {
       method: 'POST',
       headers,
@@ -21,7 +21,7 @@ export const cronApi = {
     return res.json()
   },
 
-  async update(id: string, patch: Partial<{ name: string; payload: string; schedule: CronSchedule; enabled: boolean }>): Promise<void> {
+  async update(id: string, patch: Partial<{ name: string; payload: string; schedule: CronSchedule; enabled: boolean; channel: string }>): Promise<void> {
     const res = await fetch(`/api/cron/jobs/${id}`, {
       method: 'PUT',
       headers,
