@@ -13,6 +13,7 @@ import { forceCompact } from '../../core/compaction'
 import { readAIBackend, writeAIBackend, type AIBackend } from '../../core/config'
 import type { ConnectorCenter } from '../../core/connector-center.js'
 import { TelegramConnector, splitMessage, MAX_MESSAGE_LENGTH } from './telegram-connector.js'
+import { markdownToTelegramHtml } from './markdown-html.js'
 
 const BACKEND_LABELS: Record<AIBackend, string> = {
   'claude-code': 'Claude Code',
@@ -372,16 +373,26 @@ export class TelegramPlugin implements Plugin {
 
     // Send text — edit placeholder for first chunk, send the rest as new messages
     if (text) {
-      const chunks = splitMessage(text, MAX_MESSAGE_LENGTH)
+      const html = markdownToTelegramHtml(text)
+      const chunks = splitMessage(html, MAX_MESSAGE_LENGTH)
       let startIdx = 0
 
       if (placeholderMsgId && chunks.length > 0) {
-        const edited = await this.bot!.api.editMessageText(chatId, placeholderMsgId, chunks[0]).then(() => true).catch(() => false)
+        const edited = await this.bot!.api.editMessageText(chatId, placeholderMsgId, chunks[0], { parse_mode: 'HTML' })
+          .then(() => true)
+          .catch(async () => {
+            // Fallback: try without parse_mode
+            return this.bot!.api.editMessageText(chatId, placeholderMsgId!, chunks[0]).then(() => true).catch(() => false)
+          })
         if (edited) startIdx = 1
       }
 
       for (let i = startIdx; i < chunks.length; i++) {
-        await this.bot!.api.sendMessage(chatId, chunks[i])
+        try {
+          await this.bot!.api.sendMessage(chatId, chunks[i], { parse_mode: 'HTML' })
+        } catch {
+          await this.bot!.api.sendMessage(chatId, chunks[i])
+        }
       }
 
       // Placeholder was edited — done
@@ -396,9 +407,14 @@ export class TelegramPlugin implements Plugin {
 
   private async sendReply(chatId: number, text: string) {
     if (text) {
-      const chunks = splitMessage(text, MAX_MESSAGE_LENGTH)
+      const html = markdownToTelegramHtml(text)
+      const chunks = splitMessage(html, MAX_MESSAGE_LENGTH)
       for (const chunk of chunks) {
-        await this.bot!.api.sendMessage(chatId, chunk)
+        try {
+          await this.bot!.api.sendMessage(chatId, chunk, { parse_mode: 'HTML' })
+        } catch {
+          await this.bot!.api.sendMessage(chatId, chunk)
+        }
       }
     }
   }
