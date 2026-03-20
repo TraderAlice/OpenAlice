@@ -141,6 +141,7 @@ export interface CronJob {
   enabled: boolean
   schedule: CronSchedule
   payload: string
+  channel?: string
   state: CronJobState
   createdAt: number
 }

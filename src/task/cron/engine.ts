@@ -37,6 +37,8 @@ export interface CronJob {
   enabled: boolean
   schedule: CronSchedule
   payload: string
+  /** Deliver results to this specific connector channel (e.g. "telegram", "web"). */
+  channel?: string
   state: CronJobState
   createdAt: number
 }
@@ -45,6 +47,8 @@ export interface CronFirePayload {
   jobId: string
   jobName: string
   payload: string
+  /** Target connector channel for delivery. */
+  channel?: string
 }
 
 // ==================== CRUD Types ====================
@@ -54,6 +58,7 @@ export interface CronJobCreate {
   schedule: CronSchedule
   payload: string
   enabled?: boolean
+  channel?: string
 }
 
 export interface CronJobPatch {
@@ -61,6 +66,7 @@ export interface CronJobPatch {
   schedule?: CronSchedule
   payload?: string
   enabled?: boolean
+  channel?: string
 }
 
 // ==================== Engine Interface ====================
@@ -163,6 +169,7 @@ export function createCronEngine(opts: CronEngineOpts): CronEngine {
         jobId: job.id,
         jobName: job.name,
         payload: job.payload,
+        channel: job.channel,
       } satisfies CronFirePayload)
 
       job.state.lastStatus = 'ok'
@@ -220,6 +227,7 @@ export function createCronEngine(opts: CronEngineOpts): CronEngine {
         enabled: params.enabled ?? true,
         schedule: params.schedule,
         payload: params.payload,
+        channel: params.channel,
         state: {
           nextRunAtMs: computeNextRun(params.schedule, currentMs),
           lastRunAtMs: null,
@@ -246,6 +254,7 @@ export function createCronEngine(opts: CronEngineOpts): CronEngine {
       if (patch.name !== undefined) job.name = patch.name
       if (patch.payload !== undefined) job.payload = patch.payload
       if (patch.enabled !== undefined) job.enabled = patch.enabled
+      if (patch.channel !== undefined) job.channel = patch.channel
 
       if (patch.schedule !== undefined) {
         job.schedule = patch.schedule

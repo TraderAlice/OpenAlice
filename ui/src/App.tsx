@@ -12,11 +12,12 @@ import { TradingPage } from './pages/TradingPage'
 import { ConnectorsPage } from './pages/ConnectorsPage'
 import { DevPage } from './pages/DevPage'
 import { HeartbeatPage } from './pages/HeartbeatPage'
+import { CronPage } from './pages/CronPage'
 import { ToolsPage } from './pages/ToolsPage'
 import { AgentStatusPage } from './pages/AgentStatusPage'
 
 export type Page =
-  | 'chat' | 'portfolio' | 'events' | 'agent-status' | 'heartbeat' | 'market-data' | 'news' | 'connectors'
+  | 'chat' | 'portfolio' | 'events' | 'agent-status' | 'heartbeat' | 'cron' | 'market-data' | 'news' | 'connectors'
   | 'trading'
   | 'ai-provider' | 'settings' | 'tools' | 'dev'
 
@@ -27,6 +28,7 @@ export const ROUTES: Record<Page, string> = {
   'events': '/events',
   'agent-status': '/agent-status',
   'heartbeat': '/heartbeat',
+  'cron': '/cron',
   'market-data': '/market-data',
   'news': '/news',
   'connectors': '/connectors',
@@ -70,6 +72,7 @@ export function App() {
             <Route path="/events" element={<EventsPage />} />
             <Route path="/agent-status" element={<AgentStatusPage />} />
             <Route path="/heartbeat" element={<HeartbeatPage />} />
+            <Route path="/cron" element={<CronPage />} />
             <Route path="/market-data" element={<MarketDataPage />} />
             <Route path="/news" element={<NewsPage />} />
             <Route path="/data-sources" element={<Navigate to="/market-data" replace />} />
