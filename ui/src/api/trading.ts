@@ -1,5 +1,5 @@
 import { fetchJson } from './client'
-import type { TradingAccount, AccountSummary, AccountInfo, Position, WalletCommitLog, ReconnectResult, PlatformConfig, AccountConfig, WalletStatus, WalletPushResult, WalletRejectResult } from './types'
+import type { TradingAccount, AccountSummary, AccountInfo, Position, WalletCommitLog, ReconnectResult, PlatformConfig, AccountConfig, WalletStatus, WalletPushResult, WalletRejectResult, TestConnectionResult } from './types'
 
 // ==================== Unified Trading API ====================
 
@@ -125,5 +125,14 @@ export const tradingApi = {
       const body = await res.json().catch(() => ({}))
       throw new Error(body.error || `Failed to delete account (${res.status})`)
     }
+  },
+
+  async testConnection(platform: PlatformConfig, credentials: { apiKey: string; apiSecret: string; password?: string }): Promise<TestConnectionResult> {
+    const res = await fetch('/api/trading/config/test-connection', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ platform, credentials }),
+    })
+    return res.json()
   },
 }

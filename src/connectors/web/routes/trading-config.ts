@@ -5,6 +5,7 @@ import {
   readAccountsConfig, writeAccountsConfig,
   platformConfigSchema, accountConfigSchema,
 } from '../../../core/config.js'
+import { createPlatformFromConfig, createBrokerFromConfig } from '../../../domain/trading/brokers/factory.js'
 
 /** Mask a secret string: show last 4 chars, prefix with "****" */
 function mask(value: string | undefined): string | undefined {
@@ -150,6 +151,40 @@ export function createTradingConfigRoutes(ctx: EngineContext) {
       return c.json({ success: true })
     } catch (err) {
       return c.json({ error: String(err) }, 500)
+    }
+  })
+
+  // ==================== Test Connection ====================
+
+  app.post('/test-connection', async (c) => {
+    let broker: { init: () => Promise<void>; getAccount: () => Promise<unknown>; close: () => Promise<void> } | null = null
+    try {
+      const body = await c.req.json()
+      const platformConfig = platformConfigSchema.parse(body.platform)
+      const { apiKey, apiSecret, password } = body.credentials ?? {}
+
+      if (!apiKey || !apiSecret) {
+        return c.json({ success: false, error: 'API key and secret are required' }, 400)
+      }
+
+      const platform = createPlatformFromConfig(platformConfig)
+      broker = createBrokerFromConfig(platform, {
+        id: '__test__',
+        platformId: platformConfig.id,
+        apiKey,
+        apiSecret,
+        password,
+        guards: [],
+      })
+
+      await broker.init()
+      const account = await broker.getAccount()
+      return c.json({ success: true, account })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      return c.json({ success: false, error: msg }, 400)
+    } finally {
+      try { await broker?.close() } catch { /* best effort */ }
     }
   })
 

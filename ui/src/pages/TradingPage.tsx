@@ -7,7 +7,15 @@ import { ReconnectButton } from '../components/ReconnectButton'
 import { useTradingConfig } from '../hooks/useTradingConfig'
 import { useAccountHealth } from '../hooks/useAccountHealth'
 import { PageHeader } from '../components/PageHeader'
+import { api } from '../api'
 import type { PlatformConfig, CcxtPlatformConfig, AlpacaPlatformConfig, AccountConfig, BrokerHealthInfo } from '../api/types'
+
+// ==================== Constants ====================
+
+const CCXT_EXCHANGES = [
+  'binance', 'bybit', 'okx', 'bitget', 'gate', 'kucoin', 'coinbase',
+  'kraken', 'htx', 'mexc', 'bingx', 'phemex', 'woo', 'hyperliquid',
+] as const
 
 // ==================== Dialog state ====================
 
@@ -294,7 +302,6 @@ function CreateWizard({ existingAccountIds, onSave, onClose }: {
   // Connection fields
   const [id, setId] = useState('')
   const [exchange, setExchange] = useState('binance')
-  const [marketType, setMarketType] = useState<'swap' | 'spot'>('swap')
   const [sandbox, setSandbox] = useState(false)
   const [demoTrading, setDemoTrading] = useState(false)
   const [paper, setPaper] = useState(true)
@@ -326,10 +333,22 @@ function CreateWizard({ existingAccountIds, onSave, onClose }: {
       const platform: PlatformConfig = type === 'ccxt'
         ? { id: platformId, type: 'ccxt', exchange, sandbox, demoTrading }
         : { id: platformId, type: 'alpaca', paper }
+
+      // Step 1: Test connection before saving anything
+      const testResult = await api.trading.testConnection(platform, {
+        apiKey, apiSecret,
+        ...(password && type === 'ccxt' && { password }),
+      })
+      if (!testResult.success) {
+        setError(testResult.error || 'Connection failed — check your credentials')
+        setSaving(false)
+        return
+      }
+
+      // Step 2: Connection verified — now persist config and create UTA
       const account: AccountConfig = {
         id: finalId, platformId,
-        ...(apiKey && { apiKey }),
-        ...(apiSecret && { apiSecret }),
+        apiKey, apiSecret,
         ...(password && type === 'ccxt' && { password }),
         guards: [],
       }
@@ -377,12 +396,10 @@ function CreateWizard({ existingAccountIds, onSave, onClose }: {
                 {type === 'ccxt' && (
                   <>
                     <Field label="Exchange">
-                      <input className={inputClass} value={exchange} onChange={(e) => setExchange(e.target.value.trim())} placeholder="binance" />
-                    </Field>
-                    <Field label="Market Type">
-                      <select className={inputClass} value={marketType} onChange={(e) => setMarketType(e.target.value as 'swap' | 'spot')}>
-                        <option value="swap">Perpetual Swap</option>
-                        <option value="spot">Spot</option>
+                      <select className={inputClass} value={exchange} onChange={(e) => setExchange(e.target.value)}>
+                        {CCXT_EXCHANGES.map((ex) => (
+                          <option key={ex} value={ex}>{ex.charAt(0).toUpperCase() + ex.slice(1)}</option>
+                        ))}
                       </select>
                     </Field>
                     <div className="space-y-2 pt-1">
@@ -454,7 +471,7 @@ function CreateWizard({ existingAccountIds, onSave, onClose }: {
         )}
         {step === 2 && (
           <button onClick={handleCreate} disabled={saving || !apiKey.trim() || !apiSecret.trim()} className="btn-primary">
-            {saving ? 'Creating...' : 'Create Account'}
+            {saving ? 'Connecting...' : 'Create Account'}
           </button>
         )}
       </div>

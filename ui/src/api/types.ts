@@ -302,3 +302,9 @@ export interface GuardEntry {
   type: string
   options: Record<string, unknown>
 }
+
+export interface TestConnectionResult {
+  success: boolean
+  error?: string
+  account?: unknown
+}
