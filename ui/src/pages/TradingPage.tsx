@@ -2,20 +2,14 @@ import { useState, useEffect, useCallback } from 'react'
 import { Section, Field, inputClass } from '../components/form'
 import { Toggle } from '../components/Toggle'
 import { GuardsSection, CRYPTO_GUARD_TYPES, SECURITIES_GUARD_TYPES } from '../components/guards'
-import { SDKSelector, PLATFORM_TYPE_OPTIONS } from '../components/SDKSelector'
+import { SDKSelector } from '../components/SDKSelector'
+import type { SDKOption } from '../components/SDKSelector'
 import { ReconnectButton } from '../components/ReconnectButton'
 import { useTradingConfig } from '../hooks/useTradingConfig'
 import { useAccountHealth } from '../hooks/useAccountHealth'
 import { PageHeader } from '../components/PageHeader'
 import { api } from '../api'
-import type { AccountConfig, CcxtAccountConfig, AlpacaAccountConfig, IbkrAccountConfig, BrokerHealthInfo } from '../api/types'
-
-// ==================== Constants ====================
-
-const CCXT_EXCHANGES = [
-  'binance', 'bybit', 'okx', 'bitget', 'gate', 'kucoin', 'coinbase',
-  'kraken', 'htx', 'mexc', 'bingx', 'phemex', 'woo', 'hyperliquid',
-] as const
+import type { AccountConfig, BrokerTypeInfo, BrokerConfigField, BrokerHealthInfo } from '../api/types'
 
 // ==================== Dialog state ====================
 
@@ -30,6 +24,12 @@ export function TradingPage() {
   const tc = useTradingConfig()
   const healthMap = useAccountHealth()
   const [dialog, setDialog] = useState<DialogState>(null)
+  const [brokerTypes, setBrokerTypes] = useState<BrokerTypeInfo[]>([])
+
+  // Fetch broker type metadata on mount
+  useEffect(() => {
+    api.trading.getBrokerTypes().then(r => setBrokerTypes(r.brokerTypes)).catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (dialog?.kind === 'edit') {
@@ -66,6 +66,7 @@ export function TradingPage() {
                 <AccountCard
                   key={account.id}
                   account={account}
+                  brokerType={brokerTypes.find(bt => bt.type === account.type)}
                   health={healthMap[account.id]}
                   onClick={() => setDialog({ kind: 'edit', accountId: account.id })}
                 />
@@ -84,6 +85,7 @@ export function TradingPage() {
       {/* Create Wizard */}
       {dialog?.kind === 'add' && (
         <CreateWizard
+          brokerTypes={brokerTypes}
           existingAccountIds={tc.accounts.map((a) => a.id)}
           onSave={async (account) => {
             await tc.saveAccount(account)
@@ -104,6 +106,7 @@ export function TradingPage() {
         return (
           <EditDialog
             account={account}
+            brokerType={brokerTypes.find(bt => bt.type === account.type)}
             health={healthMap[account.id]}
             onSaveAccount={tc.saveAccount}
             onDelete={() => deleteAccount(account.id)}
@@ -210,25 +213,36 @@ function HealthBadge({ health, size = 'sm' }: { health?: BrokerHealthInfo; size?
   }
 }
 
+// ==================== Subtitle builder ====================
+
+function buildSubtitle(account: AccountConfig, brokerType?: BrokerTypeInfo): string {
+  if (!brokerType) return account.type
+  const bc = account.brokerConfig
+  const parts: string[] = []
+  for (const sf of brokerType.subtitleFields) {
+    const val = bc[sf.field]
+    if (typeof val === 'boolean') {
+      if (val && sf.label) parts.push(sf.label)
+      else if (!val && sf.falseLabel) parts.push(sf.falseLabel)
+    } else if (val != null && val !== '') {
+      parts.push(`${sf.prefix ?? ''}${val}`)
+    }
+  }
+  return parts.join(' · ') || brokerType.name
+}
+
 // ==================== Account Card ====================
 
-function AccountCard({ account, health, onClick }: {
+function AccountCard({ account, brokerType, health, onClick }: {
   account: AccountConfig
+  brokerType?: BrokerTypeInfo
   health?: BrokerHealthInfo
   onClick: () => void
 }) {
-  const isDisabled = health?.disabled
-  const badge = account.type === 'ccxt'
-    ? { text: 'CC', color: 'text-accent bg-accent/10' }
-    : account.type === 'ibkr'
-      ? { text: 'IB', color: 'text-orange-400 bg-orange-400/10' }
-      : { text: 'AL', color: 'text-green bg-green/10' }
-
-  const subtitle = account.type === 'ccxt'
-    ? [account.exchange, account.demoTrading && 'Demo', account.sandbox && 'Sandbox'].filter(Boolean).join(' · ')
-    : account.type === 'ibkr'
-      ? `TWS ${account.host ?? '127.0.0.1'}:${account.port ?? 7497}`
-      : account.paper ? 'Paper Trading' : 'Live Trading'
+  const isDisabled = health?.disabled || account.enabled === false
+  const badge = brokerType
+    ? { text: brokerType.badge, color: `${brokerType.badgeColor} ${brokerType.badgeColor.replace('text-', 'bg-')}/10` }
+    : { text: account.type.slice(0, 2).toUpperCase(), color: 'text-text-muted bg-text-muted/10' }
 
   return (
     <button
@@ -236,30 +250,84 @@ function AccountCard({ account, health, onClick }: {
       className={`w-full text-left rounded-lg border border-border px-4 py-3.5 transition-all hover:border-text-muted/40 hover:bg-bg-tertiary/20 ${isDisabled ? 'opacity-50' : ''}`}
     >
       <div className="flex items-center gap-3">
-        {/* Badge */}
         <span className={`text-[10px] font-bold px-2 py-1 rounded-md shrink-0 ${badge.color}`}>
           {badge.text}
         </span>
-
-        {/* Info */}
         <div className="flex-1 min-w-0">
           <div className="text-[13px] font-medium text-text truncate">{account.id}</div>
           <div className="text-[11px] text-text-muted truncate mt-0.5">
-            {subtitle}
+            {buildSubtitle(account, brokerType)}
             {account.guards.length > 0 && <span className="ml-2 text-text-muted/50">{account.guards.length} guard{account.guards.length > 1 ? 's' : ''}</span>}
           </div>
         </div>
-
-        {/* Health */}
         <div className="shrink-0">
-          <HealthBadge health={health} />
+          {account.enabled === false
+            ? <span className="text-[11px] text-text-muted">Disabled</span>
+            : <HealthBadge health={health} />
+          }
         </div>
       </div>
     </button>
   )
 }
 
-// ==================== Create Wizard (2-step) ====================
+// ==================== Dynamic Broker Fields ====================
+
+function DynamicBrokerFields({ fields, values, showSecrets, onChange }: {
+  fields: BrokerConfigField[]
+  values: Record<string, unknown>
+  showSecrets: boolean
+  onChange: (field: string, value: unknown) => void
+}) {
+  return (
+    <div className="space-y-3">
+      {fields.map((f) => {
+        switch (f.type) {
+          case 'boolean':
+            return (
+              <div key={f.name}>
+                <label className="flex items-center gap-2.5 cursor-pointer">
+                  <Toggle checked={Boolean(values[f.name] ?? f.default)} onChange={(v) => onChange(f.name, v)} />
+                  <span className="text-[13px] text-text">{f.label}</span>
+                </label>
+                {f.description && <p className="text-[11px] text-text-muted/60 mt-1">{f.description}</p>}
+              </div>
+            )
+          case 'select':
+            return (
+              <Field key={f.name} label={f.label}>
+                <select className={inputClass} value={String(values[f.name] ?? f.default ?? '')} onChange={(e) => onChange(f.name, e.target.value)}>
+                  {f.options?.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </Field>
+            )
+          case 'number':
+            return (
+              <Field key={f.name} label={f.label}>
+                <input className={inputClass} type="number" value={Number(values[f.name] ?? f.default ?? 0)} onChange={(e) => onChange(f.name, parseInt(e.target.value) || 0)} placeholder={f.placeholder} />
+              </Field>
+            )
+          case 'text':
+          case 'password':
+          default:
+            return (
+              <Field key={f.name} label={f.label}>
+                <input
+                  className={inputClass}
+                  type={f.sensitive && !showSecrets ? 'password' : 'text'}
+                  value={String(values[f.name] ?? f.default ?? '')}
+                  onChange={(e) => onChange(f.name, e.target.value)}
+                  placeholder={f.placeholder || (f.required ? 'Required' : '')}
+                />
+              </Field>
+            )
+        }
+      })}
+    </div>
+  )
+}
+
+// ==================== Create Wizard ====================
 
 function StepIndicator({ current, total }: { current: number; total: number }) {
   return (
@@ -276,40 +344,47 @@ function StepIndicator({ current, total }: { current: number; total: number }) {
   )
 }
 
-function CreateWizard({ existingAccountIds, onSave, onClose }: {
+function CreateWizard({ brokerTypes, existingAccountIds, onSave, onClose }: {
+  brokerTypes: BrokerTypeInfo[]
   existingAccountIds: string[]
   onSave: (account: AccountConfig) => Promise<void>
   onClose: () => void
 }) {
   const [step, setStep] = useState(1)
-  const [type, setType] = useState<AccountConfig['type'] | null>(null)
-
-  // Connection fields
+  const [type, setType] = useState<string | null>(null)
   const [id, setId] = useState('')
-  const [exchange, setExchange] = useState('binance')
-  const [sandbox, setSandbox] = useState(false)
-  const [demoTrading, setDemoTrading] = useState(false)
-  const [paper, setPaper] = useState(true)
-
-  // IBKR connection fields
-  const [ibkrHost, setIbkrHost] = useState('127.0.0.1')
-  const [ibkrPort, setIbkrPort] = useState(7497)
-  const [ibkrClientId, setIbkrClientId] = useState(0)
-  const [ibkrAccountId, setIbkrAccountId] = useState('')
-
-  // Credential fields (ccxt/alpaca only)
-  const [apiKey, setApiKey] = useState('')
-  const [apiSecret, setApiSecret] = useState('')
-  const [password, setPassword] = useState('')
+  const [brokerConfig, setBrokerConfig] = useState<Record<string, unknown>>({})
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  // IBKR has no credentials step — only 1 step needed
-  const needsCredentials = type === 'ccxt' || type === 'alpaca'
-  const totalSteps = needsCredentials ? 2 : 1
+  const bt = brokerTypes.find(b => b.type === type)
+  const hasSensitive = bt?.fields.some(f => f.sensitive) ?? false
+  const totalSteps = hasSensitive ? 2 : 1
 
-  const defaultId = type === 'ccxt' ? `${exchange}-main` : type === 'ibkr' ? 'ibkr-paper' : 'alpaca-paper'
+  // Split fields into connection (non-sensitive) and credential (sensitive)
+  const connectionFields = bt?.fields.filter(f => !f.sensitive) ?? []
+  const credentialFields = bt?.fields.filter(f => f.sensitive) ?? []
+
+  // Initialize defaults when type changes
+  useEffect(() => {
+    if (!bt) return
+    const defaults: Record<string, unknown> = {}
+    for (const f of bt.fields) {
+      if (f.default !== undefined) defaults[f.name] = f.default
+    }
+    setBrokerConfig(defaults)
+  }, [type])
+
+  const defaultId = type ? `${type}-main` : ''
   const finalId = id.trim() || defaultId
+
+  const platformOptions: SDKOption[] = brokerTypes.map(b => ({
+    id: b.type,
+    name: b.name,
+    description: b.description,
+    badge: b.badge,
+    badgeColor: b.badgeColor,
+  }))
 
   const handleNext = () => {
     if (!type) return
@@ -318,46 +393,18 @@ function CreateWizard({ existingAccountIds, onSave, onClose }: {
       return
     }
     setError('')
-    if (needsCredentials) {
+    if (hasSensitive) {
       setStep(2)
     } else {
       handleCreate()
     }
   }
 
-  const buildConfig = (): AccountConfig => {
-    switch (type) {
-      case 'ccxt':
-        return {
-          id: finalId, type: 'ccxt', exchange, sandbox, demoTrading,
-          apiKey, apiSecret,
-          ...(password && { password }),
-          guards: [],
-        }
-      case 'alpaca':
-        return {
-          id: finalId, type: 'alpaca', paper,
-          apiKey, apiSecret,
-          guards: [],
-        }
-      case 'ibkr':
-        return {
-          id: finalId, type: 'ibkr', paper,
-          host: ibkrHost, port: ibkrPort, clientId: ibkrClientId,
-          ...(ibkrAccountId && { accountId: ibkrAccountId }),
-          guards: [],
-        }
-      default:
-        throw new Error(`Unknown account type: ${type}`)
-    }
-  }
-
   const handleCreate = async () => {
     setSaving(true); setError('')
     try {
-      const account = buildConfig()
+      const account: AccountConfig = { id: finalId, type: type!, enabled: true, guards: [], brokerConfig }
 
-      // Test connection before saving
       const testResult = await api.trading.testConnection(account)
       if (!testResult.success) {
         setError(testResult.error || 'Connection failed')
@@ -365,7 +412,6 @@ function CreateWizard({ existingAccountIds, onSave, onClose }: {
         return
       }
 
-      // Connection verified — persist config and create UTA
       await onSave(account)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create account')
@@ -373,9 +419,9 @@ function CreateWizard({ existingAccountIds, onSave, onClose }: {
     }
   }
 
-  const typeBadge = type === 'ccxt' ? { text: 'CC', color: 'text-accent bg-accent/10' }
-    : type === 'ibkr' ? { text: 'IB', color: 'text-orange-400 bg-orange-400/10' }
-    : { text: 'AL', color: 'text-green bg-green/10' }
+  const canCreate = hasSensitive
+    ? credentialFields.filter(f => f.required).every(f => String(brokerConfig[f.name] ?? '').trim())
+    : true
 
   return (
     <Dialog onClose={onClose}>
@@ -396,104 +442,45 @@ function CreateWizard({ existingAccountIds, onSave, onClose }: {
       <div className="flex-1 overflow-y-auto px-6 py-6">
         {step === 1 && (
           <div className="space-y-5">
-            {/* Platform selection */}
             <div>
               <p className="text-[12px] font-medium text-text-muted uppercase tracking-wide mb-3">Platform</p>
-              <SDKSelector options={PLATFORM_TYPE_OPTIONS} selected={type ?? ''} onSelect={(t) => setType(t as AccountConfig['type'])} />
+              <SDKSelector options={platformOptions} selected={type ?? ''} onSelect={(t) => setType(t)} />
             </div>
 
-            {/* Connection config — expands after platform selection */}
-            {type && (
+            {type && bt && (
               <div className="space-y-3 pt-2 border-t border-border">
                 <p className="text-[12px] font-medium text-text-muted uppercase tracking-wide mb-1">Connection</p>
-
                 <Field label="Account ID">
                   <input className={inputClass} value={id} onChange={(e) => setId(e.target.value.trim())} placeholder={defaultId} />
                 </Field>
-
-                {type === 'ccxt' && (
-                  <>
-                    <Field label="Exchange">
-                      <select className={inputClass} value={exchange} onChange={(e) => setExchange(e.target.value)}>
-                        {CCXT_EXCHANGES.map((ex) => (
-                          <option key={ex} value={ex}>{ex.charAt(0).toUpperCase() + ex.slice(1)}</option>
-                        ))}
-                      </select>
-                    </Field>
-                    <div className="space-y-2 pt-1">
-                      <label className="flex items-center gap-2.5 cursor-pointer">
-                        <Toggle checked={sandbox} onChange={setSandbox} />
-                        <span className="text-[13px] text-text">Sandbox Mode</span>
-                      </label>
-                      <label className="flex items-center gap-2.5 cursor-pointer">
-                        <Toggle checked={demoTrading} onChange={setDemoTrading} />
-                        <span className="text-[13px] text-text">Demo Trading</span>
-                      </label>
-                    </div>
-                  </>
-                )}
-
-                {type === 'alpaca' && (
-                  <>
-                    <label className="flex items-center gap-2.5 cursor-pointer">
-                      <Toggle checked={paper} onChange={setPaper} />
-                      <span className="text-[13px] text-text">Paper Trading</span>
-                    </label>
-                    <p className="text-[11px] text-text-muted/60">When enabled, orders are routed to Alpaca's paper trading environment.</p>
-                  </>
-                )}
-
-                {type === 'ibkr' && (
-                  <>
-                    <Field label="Host">
-                      <input className={inputClass} value={ibkrHost} onChange={(e) => setIbkrHost(e.target.value)} placeholder="127.0.0.1" />
-                    </Field>
-                    <Field label="Port">
-                      <input className={inputClass} type="number" value={ibkrPort} onChange={(e) => setIbkrPort(parseInt(e.target.value) || 7497)} />
-                    </Field>
-                    <Field label="Client ID">
-                      <input className={inputClass} type="number" value={ibkrClientId} onChange={(e) => setIbkrClientId(parseInt(e.target.value) || 0)} />
-                    </Field>
-                    <Field label="Account ID (optional)">
-                      <input className={inputClass} value={ibkrAccountId} onChange={(e) => setIbkrAccountId(e.target.value)} placeholder="Auto-detected from TWS" />
-                    </Field>
-                    <label className="flex items-center gap-2.5 cursor-pointer">
-                      <Toggle checked={paper} onChange={setPaper} />
-                      <span className="text-[13px] text-text">Paper Trading</span>
-                    </label>
-                    <p className="text-[11px] text-text-muted/60">Authentication is handled by TWS/Gateway login — no API keys needed.</p>
-                  </>
-                )}
+                <DynamicBrokerFields
+                  fields={connectionFields}
+                  values={brokerConfig}
+                  showSecrets={false}
+                  onChange={(f, v) => setBrokerConfig(prev => ({ ...prev, [f]: v }))}
+                />
               </div>
             )}
             {error && <p className="text-[12px] text-red">{error}</p>}
           </div>
         )}
 
-        {step === 2 && (
+        {step === 2 && bt && (
           <div className="space-y-3">
             <div className="flex items-center gap-2 mb-4">
-              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${typeBadge.color}`}>
-                {typeBadge.text}
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${bt.badgeColor} ${bt.badgeColor.replace('text-', 'bg-')}/10`}>
+                {bt.badge}
               </span>
-              <span className="text-[13px] text-text-muted">
-                {type === 'ccxt' ? `${exchange} · CCXT` : `Alpaca · ${paper ? 'Paper' : 'Live'}`}
-              </span>
+              <span className="text-[13px] text-text-muted">{bt.name}</span>
             </div>
 
-            <p className="text-[12px] font-medium text-text-muted uppercase tracking-wide mb-1">API Credentials</p>
-
-            <Field label="API Key">
-              <input className={inputClass} type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="Required" />
-            </Field>
-            <Field label={type === 'alpaca' ? 'Secret Key' : 'API Secret'}>
-              <input className={inputClass} type="password" value={apiSecret} onChange={(e) => setApiSecret(e.target.value)} placeholder="Required" />
-            </Field>
-            {type === 'ccxt' && (
-              <Field label="Password">
-                <input className={inputClass} type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Required by some exchanges (e.g. OKX)" />
-              </Field>
-            )}
+            <p className="text-[12px] font-medium text-text-muted uppercase tracking-wide mb-1">Credentials</p>
+            <DynamicBrokerFields
+              fields={credentialFields}
+              values={brokerConfig}
+              showSecrets={false}
+              onChange={(f, v) => setBrokerConfig(prev => ({ ...prev, [f]: v }))}
+            />
             {error && <p className="text-[12px] text-red">{error}</p>}
           </div>
         )}
@@ -504,18 +491,18 @@ function CreateWizard({ existingAccountIds, onSave, onClose }: {
         <button onClick={step === 1 ? onClose : () => { setStep(1); setError('') }} className="btn-secondary">
           {step === 1 ? 'Cancel' : 'Back'}
         </button>
-        {step === 1 && !needsCredentials && type && (
+        {step === 1 && !hasSensitive && type && (
           <button onClick={handleNext} disabled={saving} className="btn-primary">
             {saving ? 'Connecting...' : 'Create Account'}
           </button>
         )}
-        {step === 1 && (needsCredentials || !type) && (
+        {step === 1 && (hasSensitive || !type) && (
           <button onClick={handleNext} disabled={!type} className="btn-primary">
             Next
           </button>
         )}
         {step === 2 && (
-          <button onClick={handleCreate} disabled={saving || !apiKey.trim() || !apiSecret.trim()} className="btn-primary">
+          <button onClick={handleCreate} disabled={saving || !canCreate} className="btn-primary">
             {saving ? 'Connecting...' : 'Create Account'}
           </button>
         )}
@@ -526,8 +513,9 @@ function CreateWizard({ existingAccountIds, onSave, onClose }: {
 
 // ==================== Edit Dialog ====================
 
-function EditDialog({ account, health, onSaveAccount, onDelete, onClose }: {
+function EditDialog({ account, brokerType, health, onSaveAccount, onDelete, onClose }: {
   account: AccountConfig
+  brokerType?: BrokerTypeInfo
   health?: BrokerHealthInfo
   onSaveAccount: (a: AccountConfig) => Promise<void>
   onDelete: () => Promise<void>
@@ -543,8 +531,12 @@ function EditDialog({ account, health, onSaveAccount, onDelete, onClose }: {
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(account)
 
-  const patch = (field: string, value: unknown) => {
-    setDraft((d) => ({ ...d, [field]: value }) as AccountConfig)
+  const patchBrokerConfig = (field: string, value: unknown) => {
+    setDraft(d => ({ ...d, brokerConfig: { ...d.brokerConfig, [field]: value } }))
+  }
+
+  const patchGuards = (guards: AccountConfig['guards']) => {
+    setDraft(d => ({ ...d, guards }))
   }
 
   const handleSave = async () => {
@@ -560,11 +552,13 @@ function EditDialog({ account, health, onSaveAccount, onDelete, onClose }: {
     }
   }
 
-  const guardTypes = account.type === 'ccxt' ? CRYPTO_GUARD_TYPES : SECURITIES_GUARD_TYPES
+  const fields = brokerType?.fields ?? []
+  const hasSensitive = fields.some(f => f.sensitive)
+  const guardTypes = (brokerType?.guardCategory === 'crypto') ? CRYPTO_GUARD_TYPES : SECURITIES_GUARD_TYPES
 
   return (
     <Dialog onClose={onClose} width="w-[560px]">
-      {/* Header — account id + health */}
+      {/* Header */}
       <div className="shrink-0 flex items-center justify-between px-6 py-4 border-b border-border">
         <div className="flex items-center gap-3 min-w-0">
           <h3 className="text-[14px] font-semibold text-text truncate">{account.id}</h3>
@@ -579,47 +573,26 @@ function EditDialog({ account, health, onSaveAccount, onDelete, onClose }: {
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
-        {/* Connection */}
-        <Section title="Connection">
+        <Section title="Configuration">
           <div className="mb-3">
             <span className="text-[12px] text-text-muted">Type</span>
-            <span className="ml-2 text-[12px] font-medium text-text">
-              {account.type === 'ccxt' ? 'CCXT' : account.type === 'ibkr' ? 'Interactive Brokers' : 'Alpaca'}
-            </span>
+            <span className="ml-2 text-[12px] font-medium text-text">{brokerType?.name ?? account.type}</span>
           </div>
-          {draft.type === 'ccxt' ? (
-            <CcxtConnectionFields draft={draft} onPatch={patch} />
-          ) : draft.type === 'alpaca' ? (
-            <AlpacaConnectionFields draft={draft} onPatch={patch} />
-          ) : (
-            <IbkrConnectionFields draft={draft as IbkrAccountConfig} onPatch={patch} />
-          )}
-        </Section>
-
-        {/* Credentials — per broker type. IBKR has no credentials (auth via TWS login). */}
-        {(account.type === 'ccxt' || account.type === 'alpaca') && <Section title={
-          <div className="flex items-center justify-between w-full">
-            <span>Credentials</span>
+          <DynamicBrokerFields
+            fields={fields}
+            values={draft.brokerConfig}
+            showSecrets={showKeys}
+            onChange={patchBrokerConfig}
+          />
+          {hasSensitive && (
             <button
               onClick={() => setShowKeys(!showKeys)}
-              className="text-[11px] text-text-muted hover:text-text font-normal normal-case tracking-normal transition-colors"
+              className="text-[11px] text-text-muted hover:text-text transition-colors mt-2"
             >
-              {showKeys ? 'Hide' : 'Show'}
+              {showKeys ? 'Hide secrets' : 'Show secrets'}
             </button>
-          </div>
-        }>
-          <Field label="API Key">
-            <input className={inputClass} type={showKeys ? 'text' : 'password'} value={(draft as CcxtAccountConfig | AlpacaAccountConfig).apiKey || ''} onChange={(e) => patch('apiKey', e.target.value)} placeholder="Not configured" />
-          </Field>
-          <Field label={account.type === 'alpaca' ? 'Secret Key' : 'API Secret'}>
-            <input className={inputClass} type={showKeys ? 'text' : 'password'} value={(draft as CcxtAccountConfig | AlpacaAccountConfig).apiSecret || ''} onChange={(e) => patch('apiSecret', e.target.value)} placeholder="Not configured" />
-          </Field>
-          {account.type === 'ccxt' && (
-            <Field label="Password (optional)">
-              <input className={inputClass} type={showKeys ? 'text' : 'password'} value={(draft as CcxtAccountConfig).password || ''} onChange={(e) => patch('password', e.target.value)} placeholder="Required by some exchanges (e.g. OKX)" />
-            </Field>
           )}
-        </Section>}
+        </Section>
 
         {/* Guards */}
         <div>
@@ -642,15 +615,15 @@ function EditDialog({ account, health, onSaveAccount, onDelete, onClose }: {
                 guards={draft.guards}
                 guardTypes={guardTypes}
                 description="Guards validate operations before execution. Order matters."
-                onChange={(guards) => patch('guards', guards)}
-                onChangeImmediate={(guards) => patch('guards', guards)}
+                onChange={patchGuards}
+                onChangeImmediate={patchGuards}
               />
             </div>
           )}
         </div>
       </div>
 
-      {/* Footer — Save/Reconnect left, Delete right */}
+      {/* Footer */}
       <div className="shrink-0 flex items-center px-6 py-4 border-t border-border">
         <div className="flex items-center gap-3">
           {dirty && (
@@ -658,77 +631,21 @@ function EditDialog({ account, health, onSaveAccount, onDelete, onClose }: {
               {saving ? 'Saving...' : 'Save'}
             </button>
           )}
-          <ReconnectButton accountId={account.id} />
+          {draft.enabled !== false && <ReconnectButton accountId={account.id} />}
+          <label className="flex items-center gap-2 cursor-pointer">
+            <Toggle checked={draft.enabled !== false} onChange={async (v) => {
+              const updated = { ...draft, enabled: v }
+              setDraft(updated)
+              await onSaveAccount(updated)
+            }} />
+            <span className="text-[12px] text-text-muted">{draft.enabled !== false ? 'Enabled' : 'Disabled'}</span>
+          </label>
           {msg && <span className="text-[12px] text-text-muted">{msg}</span>}
         </div>
         <div className="flex-1" />
         <DeleteButton label="Delete Account" onConfirm={onDelete} />
       </div>
     </Dialog>
-  )
-}
-
-// ==================== Connection Fields ====================
-
-function CcxtConnectionFields({ draft, onPatch }: {
-  draft: CcxtAccountConfig
-  onPatch: (field: string, value: unknown) => void
-}) {
-  return (
-    <>
-      <Field label="Exchange">
-        <input className={inputClass} value={draft.exchange} onChange={(e) => onPatch('exchange', e.target.value.trim())} placeholder="binance" />
-      </Field>
-      <div className="space-y-2">
-        <label className="flex items-center gap-2.5 cursor-pointer">
-          <Toggle checked={draft.sandbox} onChange={(v) => onPatch('sandbox', v)} />
-          <span className="text-[13px] text-text">Sandbox Mode</span>
-        </label>
-        <label className="flex items-center gap-2.5 cursor-pointer">
-          <Toggle checked={draft.demoTrading} onChange={(v) => onPatch('demoTrading', v)} />
-          <span className="text-[13px] text-text">Demo Trading</span>
-        </label>
-      </div>
-    </>
-  )
-}
-
-function AlpacaConnectionFields({ draft, onPatch }: {
-  draft: AlpacaAccountConfig
-  onPatch: (field: string, value: unknown) => void
-}) {
-  return (
-    <>
-      <label className="flex items-center gap-2.5 cursor-pointer">
-        <Toggle checked={draft.paper} onChange={(v) => onPatch('paper', v)} />
-        <span className="text-[13px] text-text">Paper Trading</span>
-      </label>
-      <p className="text-[11px] text-text-muted/60 mt-1">When enabled, orders are routed to Alpaca's paper trading environment.</p>
-    </>
-  )
-}
-
-function IbkrConnectionFields({ draft, onPatch }: {
-  draft: IbkrAccountConfig
-  onPatch: (field: string, value: unknown) => void
-}) {
-  const inputClass = 'w-full bg-bg border border-border rounded-md px-3 py-1.5 text-[13px] text-text placeholder:text-text-muted/40 focus:outline-none focus:ring-1 focus:ring-accent'
-  return (
-    <>
-      <Field label="Host">
-        <input className={inputClass} value={draft.host ?? '127.0.0.1'} onChange={(e) => onPatch('host', e.target.value)} placeholder="127.0.0.1" />
-      </Field>
-      <Field label="Port">
-        <input className={inputClass} type="number" value={draft.port ?? 7497} onChange={(e) => onPatch('port', parseInt(e.target.value) || 7497)} />
-      </Field>
-      <Field label="Client ID">
-        <input className={inputClass} type="number" value={draft.clientId ?? 0} onChange={(e) => onPatch('clientId', parseInt(e.target.value) || 0)} />
-      </Field>
-      <Field label="Account ID (optional)">
-        <input className={inputClass} value={draft.accountId ?? ''} onChange={(e) => onPatch('accountId', e.target.value || undefined)} placeholder="Auto-detected from TWS" />
-      </Field>
-      <p className="text-[11px] text-text-muted/60">Authentication is handled by TWS/Gateway login — no API keys needed.</p>
-    </>
   )
 }
 

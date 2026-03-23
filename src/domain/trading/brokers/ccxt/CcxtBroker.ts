@@ -6,6 +6,7 @@
  * aliceId format: "{exchange}-{encodedSymbol}" (e.g. "bybit-BTC_USDT.USDT").
  */
 
+import { z } from 'zod'
 import ccxt from 'ccxt'
 import Decimal from 'decimal.js'
 import type { Exchange, Order as CcxtOrder } from 'ccxt'
@@ -20,6 +21,7 @@ import {
   type OpenOrder,
   type Quote,
   type MarketClock,
+  type BrokerConfigField,
 } from '../types.js'
 import '../../contract-ext.js'
 import type { CcxtBrokerConfig, CcxtMarket, FundingRate, OrderBook, OrderBookLevel } from './ccxt-types.js'
@@ -46,6 +48,47 @@ export interface CcxtBrokerMeta {
 }
 
 export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
+  // ---- Self-registration ----
+
+  static configSchema = z.object({
+    exchange: z.string(),
+    sandbox: z.boolean().default(false),
+    demoTrading: z.boolean().default(false),
+    options: z.record(z.string(), z.unknown()).optional(),
+    apiKey: z.string().optional(),
+    apiSecret: z.string().optional(),
+    password: z.string().optional(),
+  })
+
+  static configFields: BrokerConfigField[] = [
+    { name: 'exchange', type: 'select', label: 'Exchange', required: true, options: [
+      'binance', 'bybit', 'okx', 'bitget', 'gate', 'kucoin', 'coinbase',
+      'kraken', 'htx', 'mexc', 'bingx', 'phemex', 'woo', 'hyperliquid',
+    ].map(e => ({ value: e, label: e.charAt(0).toUpperCase() + e.slice(1) })) },
+    { name: 'sandbox', type: 'boolean', label: 'Sandbox Mode', default: false },
+    { name: 'demoTrading', type: 'boolean', label: 'Demo Trading', default: false },
+    { name: 'apiKey', type: 'password', label: 'API Key', required: true, sensitive: true },
+    { name: 'apiSecret', type: 'password', label: 'API Secret', required: true, sensitive: true },
+    { name: 'password', type: 'password', label: 'Password', placeholder: 'Required by some exchanges (e.g. OKX)', sensitive: true },
+  ]
+
+  static fromConfig(config: { id: string; label?: string; brokerConfig: Record<string, unknown> }): CcxtBroker {
+    const bc = CcxtBroker.configSchema.parse(config.brokerConfig)
+    return new CcxtBroker({
+      id: config.id,
+      label: config.label,
+      exchange: bc.exchange,
+      sandbox: bc.sandbox,
+      demoTrading: bc.demoTrading,
+      options: bc.options,
+      apiKey: bc.apiKey ?? '',
+      apiSecret: bc.apiSecret ?? '',
+      password: bc.password,
+    })
+  }
+
+  // ---- Instance ----
+
   readonly id: string
   readonly label: string
   readonly meta: CcxtBrokerMeta

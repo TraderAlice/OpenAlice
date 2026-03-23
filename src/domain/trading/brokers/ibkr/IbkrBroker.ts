@@ -11,6 +11,7 @@
  * - Order IDs are numeric, assigned by TWS (nextValidId)
  */
 
+import { z } from 'zod'
 import Decimal from 'decimal.js'
 import {
   EClient,
@@ -31,6 +32,7 @@ import {
   type OpenOrder,
   type Quote,
   type MarketClock,
+  type BrokerConfigField,
 } from '../types.js'
 import '../../contract-ext.js'
 import { RequestBridge } from './request-bridge.js'
@@ -38,6 +40,38 @@ import { resolveSymbol } from './ibkr-contracts.js'
 import type { IbkrBrokerConfig, AccountDownloadResult } from './ibkr-types.js'
 
 export class IbkrBroker implements IBroker {
+  // ---- Self-registration ----
+
+  static configSchema = z.object({
+    host: z.string().default('127.0.0.1'),
+    port: z.number().int().default(7497),
+    clientId: z.number().int().default(0),
+    accountId: z.string().optional(),
+    paper: z.boolean().default(true),
+  })
+
+  static configFields: BrokerConfigField[] = [
+    { name: 'host', type: 'text', label: 'Host', default: '127.0.0.1', placeholder: '127.0.0.1' },
+    { name: 'port', type: 'number', label: 'Port', default: 7497 },
+    { name: 'clientId', type: 'number', label: 'Client ID', default: 0 },
+    { name: 'accountId', type: 'text', label: 'Account ID', placeholder: 'Auto-detected from TWS' },
+    { name: 'paper', type: 'boolean', label: 'Paper Trading', default: true, description: 'Authentication is handled by TWS/Gateway login — no API keys needed.' },
+  ]
+
+  static fromConfig(config: { id: string; label?: string; brokerConfig: Record<string, unknown> }): IbkrBroker {
+    const bc = IbkrBroker.configSchema.parse(config.brokerConfig)
+    return new IbkrBroker({
+      id: config.id,
+      label: config.label,
+      host: bc.host,
+      port: bc.port,
+      clientId: bc.clientId,
+      accountId: bc.accountId,
+    })
+  }
+
+  // ---- Instance ----
+
   readonly id: string
   readonly label: string
 

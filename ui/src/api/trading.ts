@@ -1,5 +1,5 @@
 import { fetchJson } from './client'
-import type { TradingAccount, AccountSummary, AccountInfo, Position, WalletCommitLog, ReconnectResult, AccountConfig, WalletStatus, WalletPushResult, WalletRejectResult, TestConnectionResult } from './types'
+import type { TradingAccount, AccountSummary, AccountInfo, Position, WalletCommitLog, ReconnectResult, AccountConfig, WalletStatus, WalletPushResult, WalletRejectResult, TestConnectionResult, BrokerTypeInfo } from './types'
 
 // ==================== Unified Trading API ====================
 
@@ -77,6 +77,12 @@ export const tradingApi = {
       throw new Error(body.error || `Push failed (${res.status})`)
     }
     return res.json()
+  },
+
+  // ==================== Broker Types ====================
+
+  async getBrokerTypes(): Promise<{ brokerTypes: BrokerTypeInfo[] }> {
+    return fetchJson('/api/trading/config/broker-types')
   },
 
   // ==================== Trading Config CRUD ====================

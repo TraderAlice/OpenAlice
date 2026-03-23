@@ -150,6 +150,22 @@ export interface AccountCapabilities {
   supportedOrderTypes: string[]
 }
 
+// ==================== Broker config field descriptor ====================
+
+/** Describes a single config field for a broker type — used by the frontend to dynamically render forms. */
+export interface BrokerConfigField {
+  name: string
+  type: 'text' | 'password' | 'number' | 'boolean' | 'select'
+  label: string
+  placeholder?: string
+  default?: unknown
+  required?: boolean
+  options?: Array<{ value: string; label: string }>
+  description?: string
+  /** True for secrets (apiKey, etc.) — backend masks these in API responses. */
+  sensitive?: boolean
+}
+
 // ==================== IBroker ====================
 
 export interface IBroker<TMeta = unknown> {

@@ -8,6 +8,7 @@
  * fillPendingOrder() to trigger fills in tests).
  */
 
+import { z } from 'zod'
 import Decimal from 'decimal.js'
 import { Contract, ContractDescription, ContractDetails, Order, OrderState, UNSET_DECIMAL, UNSET_DOUBLE } from '@traderalice/ibkr'
 import type {
@@ -122,6 +123,17 @@ export function makePlaceOrderResult(overrides: Partial<PlaceOrderResult> = {}):
 // ==================== MockBroker ====================
 
 export class MockBroker implements IBroker {
+  // ---- Self-registration ----
+
+  static configSchema = z.object({})
+  static configFields: import('../types.js').BrokerConfigField[] = []
+
+  static fromConfig(config: { id: string; label?: string; brokerConfig: Record<string, unknown> }): MockBroker {
+    return new MockBroker({ id: config.id, label: config.label })
+  }
+
+  // ---- Instance ----
+
   readonly id: string
   readonly label: string
 

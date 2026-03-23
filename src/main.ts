@@ -8,16 +8,8 @@ import { TelegramPlugin } from './connectors/telegram/index.js'
 import { WebPlugin } from './connectors/web/index.js'
 import { McpAskPlugin } from './connectors/mcp-ask/index.js'
 import { createThinkingTools } from './tool/thinking.js'
-import {
-  AccountManager,
-  UnifiedTradingAccount,
-  CcxtBroker,
-  createCcxtProviderTools,
-  createBroker,
-} from './domain/trading/index.js'
+import { AccountManager } from './domain/trading/index.js'
 import { createTradingTools } from './tool/trading.js'
-import type { GitExportState } from './domain/trading/index.js'
-import type { AccountConfig } from './core/config.js'
 import { Brain } from './domain/brain/index.js'
 import { createBrainTools } from './tool/brain.js'
 import type { BrainExportState } from './domain/brain/index.js'
@@ -51,16 +43,6 @@ import { createNewsArchiveTools } from './tool/news.js'
 
 const BRAIN_FILE = resolve('data/brain/commit.json')
 
-/** Per-account git state path. Falls back to legacy paths for backward compat.
- *  TODO: remove LEGACY_GIT_PATHS before v1.0 */
-function gitFilePath(accountId: string): string {
-  return resolve(`data/trading/${accountId}/commit.json`)
-}
-const LEGACY_GIT_PATHS: Record<string, string> = {
-  'bybit-main': resolve('data/crypto-trading/commit.json'),
-  'alpaca-paper': resolve('data/securities-trading/commit.json'),
-  'alpaca-live': resolve('data/securities-trading/commit.json'),
-}
 const FRONTAL_LOBE_FILE = resolve('data/brain/frontal-lobe.md')
 const EMOTION_LOG_FILE = resolve('data/brain/emotion-log.md')
 const PERSONA_FILE = resolve('data/brain/persona.md')
@@ -79,29 +61,6 @@ async function readWithDefault(target: string, defaultFile: string): Promise<str
   } catch { return '' }
 }
 
-/** Create a git commit persistence callback for a given file path. */
-function createGitPersister(filePath: string) {
-  return async (state: GitExportState) => {
-    await mkdir(dirname(filePath), { recursive: true })
-    await writeFile(filePath, JSON.stringify(state, null, 2))
-  }
-}
-
-/** Read saved git state from disk, trying primary path then legacy fallback. */
-async function loadGitState(accountId: string): Promise<GitExportState | undefined> {
-  const primary = gitFilePath(accountId)
-  try {
-    return JSON.parse(await readFile(primary, 'utf-8')) as GitExportState
-  } catch { /* try legacy */ }
-  const legacy = LEGACY_GIT_PATHS[accountId]
-  if (legacy) {
-    try {
-      return JSON.parse(await readFile(legacy, 'utf-8')) as GitExportState
-    } catch { /* no saved state */ }
-  }
-  return undefined
-}
-
 async function main() {
   const config = await loadConfig()
 
@@ -110,33 +69,20 @@ async function main() {
   const eventLog = await createEventLog()
   const toolCallLog = await createToolCallLog()
 
+  // ==================== Tool Center (created early — AccountManager needs it) ====================
+
+  const toolCenter = new ToolCenter()
+
   // ==================== Trading Account Manager ====================
 
-  const accountManager = new AccountManager()
-
-  // ==================== Account Init ====================
+  const accountManager = new AccountManager({ eventLog, toolCenter })
 
   const accountConfigs = await readAccountsConfig()
-
-  /** Create and register a UTA from account config. */
-  async function initAccount(accCfg: AccountConfig): Promise<UnifiedTradingAccount> {
-    const broker = createBroker(accCfg)
-    const savedState = await loadGitState(accCfg.id)
-    const uta = new UnifiedTradingAccount(broker, {
-      guards: accCfg.guards,
-      savedState,
-      onCommit: createGitPersister(gitFilePath(accCfg.id)),
-      onHealthChange: (accountId, health) => {
-        eventLog.append('account.health', { accountId, ...health })
-      },
-    })
-    accountManager.add(uta)
-    return uta
-  }
-
   for (const accCfg of accountConfigs) {
-    await initAccount(accCfg)
+    if (accCfg.enabled === false) continue
+    await accountManager.initAccount(accCfg)
   }
+  accountManager.registerCcxtToolsIfNeeded()
 
   // ==================== Brain ====================
 
@@ -218,9 +164,8 @@ async function main() {
   const symbolIndex = new SymbolIndex()
   await symbolIndex.load(equityClient)
 
-  // ==================== Tool Center ====================
+  // ==================== Tool Registration ====================
 
-  const toolCenter = new ToolCenter()
   toolCenter.register(createThinkingTools(), 'thinking')
 
   // One unified set of trading tools — routes via `source` parameter at runtime
@@ -295,56 +240,6 @@ async function main() {
     })
     newsCollector.start()
     console.log(`news-collector: started (${config.news.feeds.length} feeds, every ${config.news.intervalMinutes}m)`)
-  }
-
-  // ==================== Account Reconnect ====================
-
-  const reconnectingAccounts = new Set<string>()
-
-  const reconnectAccount = async (accountId: string): Promise<ReconnectResult> => {
-    if (reconnectingAccounts.has(accountId)) {
-      return { success: false, error: 'Reconnect already in progress' }
-    }
-    reconnectingAccounts.add(accountId)
-    try {
-      // Re-read config to pick up credential/guard changes
-      const freshAccounts = await readAccountsConfig()
-
-      // Close old account
-      const currentUta = accountManager.get(accountId)
-      if (currentUta) {
-        await currentUta.close()
-        accountManager.remove(accountId)
-      }
-
-      const accCfg = freshAccounts.find((a) => a.id === accountId)
-      if (!accCfg) {
-        return { success: true, message: `Account "${accountId}" not found in config (removed or disabled)` }
-      }
-
-      const uta = await initAccount(accCfg)
-
-      // Wait for broker.init() + broker.getAccount() to verify the connection
-      await uta.waitForConnect()
-
-      // Re-register CCXT-specific tools if this is a CCXT account
-      if (accCfg.type === 'ccxt') {
-        toolCenter.register(
-          createCcxtProviderTools(accountManager),
-          'trading-ccxt',
-        )
-      }
-
-      const label = uta.label ?? accountId
-      console.log(`reconnect: ${label} online`)
-      return { success: true, message: `${label} reconnected` }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      console.error(`reconnect: ${accountId} failed:`, msg)
-      return { success: false, error: msg }
-    } finally {
-      reconnectingAccounts.delete(accountId)
-    }
   }
 
   // ==================== Plugins ====================
@@ -463,7 +358,6 @@ async function main() {
   const ctx: EngineContext = {
     config, connectorCenter, agentCenter, eventLog, toolCallLog, heartbeat, cronEngine, toolCenter,
     accountManager,
-    reconnectAccount,
     reconnectConnectors,
   }
 
@@ -473,19 +367,6 @@ async function main() {
   }
 
   console.log('engine: started')
-
-  // ==================== CCXT Tools ====================
-  // All UTAs are registered synchronously — check if any are CCXT and register provider tools.
-  {
-    const hasCcxt = accountManager.resolve().some((uta) => uta.broker instanceof CcxtBroker)
-    if (hasCcxt) {
-      toolCenter.register(
-        createCcxtProviderTools(accountManager),
-        'trading-ccxt',
-      )
-      console.log('ccxt: provider tools registered')
-    }
-  }
 
   // ==================== Shutdown ====================
 

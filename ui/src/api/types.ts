@@ -266,43 +266,46 @@ export interface ToolCallRecord {
 
 // ==================== Trading Config ====================
 
-export interface CcxtAccountConfig {
+export interface AccountConfig {
   id: string
   label?: string
-  type: 'ccxt'
-  exchange: string
-  sandbox: boolean
-  demoTrading: boolean
-  options?: Record<string, unknown>
-  apiKey?: string
-  apiSecret?: string
-  password?: string
+  type: string
+  enabled: boolean
   guards: GuardEntry[]
+  brokerConfig: Record<string, unknown>
 }
 
-export interface AlpacaAccountConfig {
-  id: string
+// ==================== Broker Type Metadata (from /broker-types endpoint) ====================
+
+export interface BrokerConfigField {
+  name: string
+  type: 'text' | 'password' | 'number' | 'boolean' | 'select'
+  label: string
+  placeholder?: string
+  default?: unknown
+  required?: boolean
+  options?: Array<{ value: string; label: string }>
+  description?: string
+  sensitive?: boolean
+}
+
+export interface SubtitleField {
+  field: string
   label?: string
-  type: 'alpaca'
-  paper: boolean
-  apiKey?: string
-  apiSecret?: string
-  guards: GuardEntry[]
+  falseLabel?: string
+  prefix?: string
 }
 
-export interface IbkrAccountConfig {
-  id: string
-  label?: string
-  type: 'ibkr'
-  host: string
-  port: number
-  clientId: number
-  accountId?: string
-  paper: boolean
-  guards: GuardEntry[]
+export interface BrokerTypeInfo {
+  type: string
+  name: string
+  description: string
+  badge: string
+  badgeColor: string
+  fields: BrokerConfigField[]
+  subtitleFields: SubtitleField[]
+  guardCategory: 'crypto' | 'securities'
 }
-
-export type AccountConfig = CcxtAccountConfig | AlpacaAccountConfig | IbkrAccountConfig
 
 export interface GuardEntry {
   type: string

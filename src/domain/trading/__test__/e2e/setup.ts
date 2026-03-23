@@ -24,19 +24,23 @@ export interface TestAccount {
 
 /** Unified paper/sandbox check — E2E only runs non-live accounts. */
 function isPaper(acct: AccountConfig): boolean {
+  const bc = acct.brokerConfig
   switch (acct.type) {
-    case 'alpaca': return acct.paper
-    case 'ccxt':   return acct.sandbox || acct.demoTrading
-    case 'ibkr':   return acct.paper
+    case 'alpaca': return !!bc.paper
+    case 'ccxt':   return !!(bc.sandbox || bc.demoTrading)
+    case 'ibkr':   return !!bc.paper
+    default:       return false
   }
 }
 
 /** Check whether API credentials are configured (not applicable for all broker types). */
 function hasCredentials(acct: AccountConfig): boolean {
+  const bc = acct.brokerConfig
   switch (acct.type) {
     case 'alpaca':
-    case 'ccxt':   return !!acct.apiKey
+    case 'ccxt':   return !!bc.apiKey
     case 'ibkr':   return true  // no API key — auth via TWS/Gateway login
+    default:       return true
   }
 }
 
@@ -71,11 +75,15 @@ async function initAll(): Promise<TestAccount[]> {
     if (!isPaper(acct)) continue
     if (!hasCredentials(acct)) continue
 
+    // Skip disabled accounts
+    if (acct.enabled === false) continue
+
     // IBKR: check TWS/Gateway reachability before attempting connect
     if (acct.type === 'ibkr') {
-      const reachable = await isTcpReachable(acct.host ?? '127.0.0.1', acct.port ?? 7497)
+      const bc = acct.brokerConfig
+      const reachable = await isTcpReachable(String(bc.host ?? '127.0.0.1'), Number(bc.port ?? 7497))
       if (!reachable) {
-        console.warn(`e2e setup: ${acct.id} — TWS not reachable at ${acct.host ?? '127.0.0.1'}:${acct.port ?? 7497}, skipping`)
+        console.warn(`e2e setup: ${acct.id} — TWS not reachable at ${bc.host ?? '127.0.0.1'}:${bc.port ?? 7497}, skipping`)
         continue
       }
     }

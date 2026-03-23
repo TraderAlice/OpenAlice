@@ -255,14 +255,14 @@ describe('readAccountsConfig', () => {
 
 describe('writeAccountsConfig', () => {
   it('writes validated accounts to accounts.json', async () => {
-    await writeAccountsConfig([{ id: 'acc-1', type: 'alpaca', paper: true, guards: [] }])
+    await writeAccountsConfig([{ id: 'acc-1', type: 'alpaca', guards: [], brokerConfig: { paper: true } }])
     const filePath = mockWriteFile.mock.calls[0][0] as string
     expect(filePath).toMatch(/accounts\.json$/)
   })
 
-  it('throws ZodError for invalid account type', async () => {
+  it('throws ZodError for missing required fields', async () => {
     await expect(
-      writeAccountsConfig([{ id: 'bad', type: 'unknown-type' } as any])
+      writeAccountsConfig([{ type: 'alpaca' } as any])
     ).rejects.toThrow()
     expect(mockWriteFile).not.toHaveBeenCalled()
   })

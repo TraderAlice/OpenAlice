@@ -61,7 +61,7 @@ export function createTradingRoutes(ctx: EngineContext) {
   // Reconnect
   app.post('/accounts/:id/reconnect', async (c) => {
     const id = c.req.param('id')
-    const result = await ctx.reconnectAccount(id)
+    const result = await ctx.accountManager.reconnectAccount(id)
     return c.json(result, result.success ? 200 : 500)
   })
 

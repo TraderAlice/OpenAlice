@@ -34,8 +34,6 @@ export interface EngineContext {
 
   // Trading (unified account model)
   accountManager: AccountManager
-  /** Reconnect a specific trading account by ID. */
-  reconnectAccount: (accountId: string) => Promise<ReconnectResult>
   /** Reconnect connector plugins (Telegram, MCP-Ask, etc.). */
   reconnectConnectors: () => Promise<ReconnectResult>
 }

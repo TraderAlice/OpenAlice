@@ -8,6 +8,7 @@
  * Takes IBKR Order objects, reads relevant fields, ignores the rest.
  */
 
+import { z } from 'zod'
 import Alpaca from '@alpacahq/alpaca-trade-api'
 import Decimal from 'decimal.js'
 import { Contract, ContractDescription, ContractDetails, Order, OrderState, UNSET_DOUBLE, UNSET_DECIMAL } from '@traderalice/ibkr'
@@ -21,6 +22,7 @@ import {
   type OpenOrder,
   type Quote,
   type MarketClock,
+  type BrokerConfigField,
 } from '../types.js'
 import '../../contract-ext.js'
 import type {
@@ -58,6 +60,33 @@ function ibkrTifToAlpaca(tif: string): string {
 }
 
 export class AlpacaBroker implements IBroker {
+  // ---- Self-registration ----
+
+  static configSchema = z.object({
+    paper: z.boolean().default(true),
+    apiKey: z.string().optional(),
+    apiSecret: z.string().optional(),
+  })
+
+  static configFields: BrokerConfigField[] = [
+    { name: 'paper', type: 'boolean', label: 'Paper Trading', default: true, description: 'When enabled, orders are routed to Alpaca\'s paper trading environment.' },
+    { name: 'apiKey', type: 'password', label: 'API Key', required: true, sensitive: true },
+    { name: 'apiSecret', type: 'password', label: 'Secret Key', required: true, sensitive: true },
+  ]
+
+  static fromConfig(config: { id: string; label?: string; brokerConfig: Record<string, unknown> }): AlpacaBroker {
+    const bc = AlpacaBroker.configSchema.parse(config.brokerConfig)
+    return new AlpacaBroker({
+      id: config.id,
+      label: config.label,
+      apiKey: bc.apiKey ?? '',
+      secretKey: bc.apiSecret ?? '',
+      paper: bc.paper,
+    })
+  }
+
+  // ---- Instance ----
+
   readonly id: string
   readonly label: string
 

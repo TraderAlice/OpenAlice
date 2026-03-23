@@ -8,10 +8,13 @@ export type {
   Quote,
   MarketClock,
   AccountCapabilities,
+  BrokerConfigField,
 } from './types.js'
 
-// Factory
+// Factory + Registry
 export { createBroker } from './factory.js'
+export { BROKER_REGISTRY } from './registry.js'
+export type { BrokerRegistryEntry } from './registry.js'
 
 // Alpaca
 export { AlpacaBroker } from './alpaca/index.js'

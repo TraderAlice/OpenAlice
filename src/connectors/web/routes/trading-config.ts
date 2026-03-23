@@ -5,6 +5,7 @@ import {
   accountConfigSchema,
 } from '../../../core/config.js'
 import { createBroker } from '../../../domain/trading/brokers/factory.js'
+import { BROKER_REGISTRY } from '../../../domain/trading/brokers/registry.js'
 
 // ==================== Credential helpers ====================
 
@@ -17,18 +18,20 @@ function mask(value: string): string {
 /** Field names that contain sensitive values. Convention-based, not hardcoded per broker. */
 const SENSITIVE = /key|secret|password|token/i
 
-/** Mask all sensitive string fields in a config object. */
+/** Mask all sensitive string fields in a config object (recurses into nested objects). */
 function maskSecrets<T extends Record<string, unknown>>(obj: T): T {
   const result = { ...obj }
   for (const [k, v] of Object.entries(result)) {
     if (typeof v === 'string' && v.length > 0 && SENSITIVE.test(k)) {
       ;(result as Record<string, unknown>)[k] = mask(v)
+    } else if (v && typeof v === 'object' && !Array.isArray(v)) {
+      ;(result as Record<string, unknown>)[k] = maskSecrets(v as Record<string, unknown>)
     }
   }
   return result
 }
 
-/** Restore masked values (****...) from existing config. */
+/** Restore masked values (****...) from existing config (recurses into nested objects). */
 function unmaskSecrets(
   body: Record<string, unknown>,
   existing: Record<string, unknown>,
@@ -36,6 +39,8 @@ function unmaskSecrets(
   for (const [k, v] of Object.entries(body)) {
     if (typeof v === 'string' && v.startsWith('****') && typeof existing[k] === 'string') {
       body[k] = existing[k]
+    } else if (v && typeof v === 'object' && !Array.isArray(v) && existing[k] && typeof existing[k] === 'object') {
+      unmaskSecrets(v as Record<string, unknown>, existing[k] as Record<string, unknown>)
     }
   }
 }
@@ -45,6 +50,22 @@ function unmaskSecrets(
 /** Trading config CRUD routes: accounts */
 export function createTradingConfigRoutes(ctx: EngineContext) {
   const app = new Hono()
+
+  // ==================== Broker types (for dynamic UI rendering) ====================
+
+  app.get('/broker-types', (c) => {
+    const brokerTypes = Object.entries(BROKER_REGISTRY).map(([type, entry]) => ({
+      type,
+      name: entry.name,
+      description: entry.description,
+      badge: entry.badge,
+      badgeColor: entry.badgeColor,
+      fields: entry.configFields,
+      subtitleFields: entry.subtitleFields,
+      guardCategory: entry.guardCategory,
+    }))
+    return c.json({ brokerTypes })
+  })
 
   // ==================== Read all ====================
 
@@ -84,6 +105,18 @@ export function createTradingConfigRoutes(ctx: EngineContext) {
         accounts.push(validated)
       }
       await writeAccountsConfig(accounts)
+
+      // Handle enabled state changes at runtime
+      const wasEnabled = existing?.enabled !== false
+      const nowEnabled = validated.enabled !== false
+      if (wasEnabled && !nowEnabled) {
+        // Disabled — close running account
+        await ctx.accountManager.removeAccount(id)
+      } else if (!wasEnabled && nowEnabled) {
+        // Enabled — start account
+        ctx.accountManager.reconnectAccount(id).catch(() => {})
+      }
+
       return c.json(validated)
     } catch (err) {
       if (err instanceof Error && err.name === 'ZodError') {
@@ -102,12 +135,8 @@ export function createTradingConfigRoutes(ctx: EngineContext) {
         return c.json({ error: `Account "${id}" not found` }, 404)
       }
       await writeAccountsConfig(filtered)
-      // Close running account instance if any
-      if (ctx.accountManager.has(id)) {
-        const uta = ctx.accountManager.get(id)
-        ctx.accountManager.remove(id)
-        try { await uta?.close() } catch { /* best effort */ }
-      }
+      // Close and deregister running account instance if any
+      await ctx.accountManager.removeAccount(id)
       return c.json({ success: true })
     } catch (err) {
       return c.json({ error: String(err) }, 500)

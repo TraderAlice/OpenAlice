@@ -212,47 +212,14 @@ const guardConfigSchema = z.object({
   options: z.record(z.string(), z.unknown()).default({}),
 })
 
-const ccxtAccountSchema = z.object({
+export const accountConfigSchema = z.object({
   id: z.string(),
   label: z.string().optional(),
-  type: z.literal('ccxt'),
-  exchange: z.string(),
-  sandbox: z.boolean().default(false),
-  demoTrading: z.boolean().default(false),
-  options: z.record(z.string(), z.unknown()).optional(),
-  apiKey: z.string().optional(),
-  apiSecret: z.string().optional(),
-  password: z.string().optional(),
+  type: z.string(),
+  enabled: z.boolean().default(true),
   guards: z.array(guardConfigSchema).default([]),
-}).passthrough()
-
-const alpacaAccountSchema = z.object({
-  id: z.string(),
-  label: z.string().optional(),
-  type: z.literal('alpaca'),
-  paper: z.boolean().default(true),
-  apiKey: z.string().optional(),
-  apiSecret: z.string().optional(),
-  guards: z.array(guardConfigSchema).default([]),
+  brokerConfig: z.record(z.string(), z.unknown()).default({}),
 })
-
-const ibkrAccountSchema = z.object({
-  id: z.string(),
-  label: z.string().optional(),
-  type: z.literal('ibkr'),
-  host: z.string().default('127.0.0.1'),
-  port: z.number().int().default(7497),
-  clientId: z.number().int().default(0),
-  accountId: z.string().optional(),
-  paper: z.boolean().default(true),
-  guards: z.array(guardConfigSchema).default([]),
-})
-
-export const accountConfigSchema = z.discriminatedUnion('type', [
-  ccxtAccountSchema,
-  alpacaAccountSchema,
-  ibkrAccountSchema,
-])
 
 export const accountsFileSchema = z.array(accountConfigSchema)
 
@@ -374,6 +341,28 @@ export async function loadConfig(): Promise<Config> {
 
 // ==================== Account Config Loader ====================
 
+/** Common fields that live at the top level, not inside brokerConfig. */
+const BASE_FIELDS = new Set(['id', 'label', 'type', 'guards', 'brokerConfig'])
+
+/**
+ * Migrate flat account config (legacy) to nested brokerConfig format.
+ * Any field not in BASE_FIELDS gets moved into brokerConfig.
+ */
+function migrateAccountConfig(raw: Record<string, unknown>): Record<string, unknown> {
+  if (raw.brokerConfig) return raw  // already migrated
+  const migrated: Record<string, unknown> = {}
+  const brokerConfig: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(raw)) {
+    if (BASE_FIELDS.has(k)) {
+      migrated[k] = v
+    } else {
+      brokerConfig[k] = v
+    }
+  }
+  migrated.brokerConfig = brokerConfig
+  return migrated
+}
+
 export async function readAccountsConfig(): Promise<AccountConfig[]> {
   const raw = await loadJsonFile('accounts.json')
   if (raw === undefined) {
@@ -382,7 +371,9 @@ export async function readAccountsConfig(): Promise<AccountConfig[]> {
     await writeFile(resolve(CONFIG_DIR, 'accounts.json'), '[]\n')
     return []
   }
-  return accountsFileSchema.parse(raw)
+  // Migrate legacy flat format → nested brokerConfig
+  const migrated = (raw as unknown[]).map((item) => migrateAccountConfig(item as Record<string, unknown>))
+  return accountsFileSchema.parse(migrated)
 }
 
 export async function writeAccountsConfig(accounts: AccountConfig[]): Promise<void> {
