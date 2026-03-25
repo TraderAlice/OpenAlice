@@ -72,7 +72,7 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
 /** Market data routes: POST /test-provider */
 export function createMarketDataRoutes() {
   const TEST_ENDPOINTS: Record<string, { credField: string; path: string }> = {
-    fred:             { credField: 'fred_api_key',             path: '/api/v1/economy/fred_search?query=GDP&provider=fred' },
+    fred:             { credField: 'fred_api_key',             path: '/api/v1/economy/fred_search?query=GDP&provider=federal_reserve' },
     bls:              { credField: 'bls_api_key',              path: '/api/v1/economy/survey/bls_search?query=unemployment&provider=bls' },
     eia:              { credField: 'eia_api_key',              path: '/api/v1/commodity/short_term_energy_outlook?provider=eia' },
     econdb:           { credField: 'econdb_api_key',           path: '/api/v1/economy/available_indicators?provider=econdb' },
@@ -92,8 +92,17 @@ export function createMarketDataRoutes() {
       if (!key) return c.json({ ok: false, error: 'No API key provided' }, 400)
 
       const marketDataConfig = await readMarketDataConfig()
-      const credHeader = JSON.stringify({ [endpoint.credField]: key })
-      const url = `${marketDataConfig.apiUrl}${endpoint.path}`
+      const creds: Record<string, string> = { [endpoint.credField]: key }
+      // federal_reserve provider declares credentials: ['api_key'] but the
+      // canonical field is fred_api_key — include both so filterCredentials passes it through
+      if (endpoint.credField === 'fred_api_key') creds.api_key = key
+      const credHeader = JSON.stringify(creds)
+      // Use embedded API server if running typebb-sdk backend
+      const apiServerPort = marketDataConfig.apiServer?.port ?? 6901
+      const baseUrl = marketDataConfig.backend === 'typebb-sdk'
+        ? `http://localhost:${apiServerPort}`
+        : marketDataConfig.apiUrl
+      const url = `${baseUrl}${endpoint.path}`
 
       const res = await fetch(url, {
         signal: AbortSignal.timeout(15_000),

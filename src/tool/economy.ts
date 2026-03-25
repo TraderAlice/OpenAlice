@@ -31,7 +31,7 @@ Examples:
       execute: async ({ query, limit }) => {
         const results = await economyClient.fredSearch({
           query,
-          provider: 'fred',
+          provider: 'federal_reserve',
           limit: limit ?? 10,
         })
         if (results.length === 0) return { query, results: [], message: 'No matching FRED series found.' }
@@ -71,7 +71,7 @@ Common series IDs:
       execute: async ({ seriesId, startDate, endDate, limit }) => {
         const params: Record<string, unknown> = {
           symbol: seriesId,
-          provider: 'fred',
+          provider: 'federal_reserve',
         }
         if (startDate) params.start_date = startDate
         if (endDate) params.end_date = endDate
@@ -94,7 +94,7 @@ rising CPI → hawkish Fed → pressure on equities/bonds.`,
       execute: async ({ country }) => {
         return economyClient.getCPI({
           country: country ?? 'united_states',
-          provider: 'fred',
+          provider: 'federal_reserve',
         })
       },
     }),
@@ -108,7 +108,7 @@ Useful for:
 - Estimating discount rates for equity valuation`,
       inputSchema: z.object({}),
       execute: async () => {
-        return economyClient.getInterestRates({ provider: 'fred' })
+        return economyClient.getInterestRates({ provider: 'federal_reserve' })
       },
     }),
 
@@ -123,7 +123,7 @@ Falling unemployment → tight labor market, potential inflation pressure.`,
       execute: async ({ country }) => {
         return economyClient.getUnemployment({
           country: country ?? 'united_states',
-          provider: 'fred',
+          provider: 'federal_reserve',
         })
       },
     }),
@@ -141,7 +141,7 @@ GDP is the broadest measure of economic health.`,
         country: z.string().optional().describe('Country code (default: "united_states")'),
       }),
       execute: async ({ mode, country }) => {
-        const params = { country: country ?? 'united_states', provider: 'fred' }
+        const params = { country: country ?? 'united_states', provider: 'federal_reserve' }
         return mode === 'forecast'
           ? economyClient.getGdpForecast(params)
           : economyClient.getGdpReal(params)
@@ -176,11 +176,11 @@ These are leading indicators — sentiment shifts before economic data confirms.
       execute: async ({ survey }) => {
         switch (survey) {
           case 'michigan':
-            return economyClient.getUniversityOfMichigan({ provider: 'fred' })
+            return economyClient.getUniversityOfMichigan({ provider: 'federal_reserve' })
           case 'nonfarm':
-            return economyClient.getNonfarmPayrolls({ provider: 'fred' })
+            return economyClient.getNonfarmPayrolls({ provider: 'federal_reserve' })
           case 'inflation_expectations':
-            return economyClient.getInflationExpectations({ provider: 'fred' })
+            return economyClient.getInflationExpectations({ provider: 'federal_reserve' })
         }
       },
     }),
@@ -192,7 +192,7 @@ Returns meeting minutes, statements, and press conference transcripts.
 Essential for understanding current Fed policy direction and forward guidance.`,
       inputSchema: z.object({}),
       execute: async () => {
-        return economyClient.getFomcDocuments({ provider: 'fred' })
+        return economyClient.getFomcDocuments({ provider: 'federal_reserve' })
       },
     }),
   }

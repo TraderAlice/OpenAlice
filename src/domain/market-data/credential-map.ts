@@ -33,6 +33,11 @@ export function buildCredentialsHeader(
     if (v && keyMapping[k]) mapped[keyMapping[k]] = v
   }
 
+  // Same api_key alias for federal_reserve provider (see buildSDKCredentials)
+  if (mapped.fred_api_key && !mapped.api_key) {
+    mapped.api_key = mapped.fred_api_key
+  }
+
   return Object.keys(mapped).length > 0 ? JSON.stringify(mapped) : undefined
 }
 
@@ -49,6 +54,13 @@ export function buildSDKCredentials(
   const mapped: Record<string, string> = {}
   for (const [k, v] of Object.entries(providerKeys)) {
     if (v && keyMapping[k]) mapped[keyMapping[k]] = v
+  }
+
+  // federal_reserve provider declares credentials: ['api_key'] but getFredApiKey
+  // looks for fred_api_key first. Emit both so filterCredentials passes api_key
+  // through and getFredApiKey can resolve via either field.
+  if (mapped.fred_api_key && !mapped.api_key) {
+    mapped.api_key = mapped.fred_api_key
   }
 
   return mapped
