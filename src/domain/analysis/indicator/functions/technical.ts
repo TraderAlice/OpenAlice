@@ -155,14 +155,26 @@ export function STOCHRSI(
 
   const stochRsi = range === 0 ? 50 : ((currentRsi - minRsi) / range) * 100
 
-  // %K = SMA(stochRsi, 3), %D = SMA(%K, 3) — approximated from recent values
-  const k = stochRsi // Current value (full series would smooth this)
-  const d = SMA(rsiSeries.slice(-3).map((r) => {
-    const rr = recentRsi
-    const mx = Math.max(...rr)
-    const mn = Math.min(...rr)
-    return mx === mn ? 50 : ((r - mn) / (mx - mn)) * 100
-  }), 3)
+  // Compute full stochastic RSI series for smoothing
+  const stochSeries: number[] = []
+  for (let i = stochPeriod; i <= rsiSeries.length; i++) {
+    const window = rsiSeries.slice(i - stochPeriod, i)
+    const wMax = Math.max(...window)
+    const wMin = Math.min(...window)
+    const wRange = wMax - wMin
+    const val = rsiSeries[i - 1]
+    stochSeries.push(wRange === 0 ? 50 : ((val - wMin) / wRange) * 100)
+  }
+
+  // %K = SMA(stochRsiSeries, 3)
+  const kSeries: number[] = []
+  for (let i = 2; i < stochSeries.length; i++) {
+    kSeries.push(SMA(stochSeries.slice(i - 2, i + 1), 3))
+  }
+  const k = kSeries.length > 0 ? kSeries[kSeries.length - 1] : stochRsi
+
+  // %D = SMA(%K, 3)
+  const d = kSeries.length >= 3 ? SMA(kSeries.slice(-3), 3) : k
 
   return { stochRsi, k, d }
 }

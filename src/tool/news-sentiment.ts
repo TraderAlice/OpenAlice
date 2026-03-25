@@ -140,7 +140,12 @@ Examples:
           limit: 500,
         })
 
-        const regex = new RegExp(query, 'i')
+        let regex: RegExp
+        try {
+          regex = new RegExp(query, 'i')
+        } catch {
+          return { error: `Invalid query pattern: ${query}` }
+        }
         const matched = articles.filter(a => regex.test(a.title) || regex.test(a.content))
 
         if (matched.length === 0) {
