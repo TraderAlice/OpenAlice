@@ -32,6 +32,7 @@ import { createScreenerTools } from './tool/screener.js'
 import { createVolatilityTools } from './tool/volatility.js'
 import { createFearGreedTools } from './tool/fear-greed.js'
 import { createEconomyTools } from './tool/economy.js'
+import { createPredictionMarketTools } from './tool/prediction-markets.js'
 import { SessionStore } from './core/session.js'
 import { ConnectorCenter } from './core/connector-center.js'
 import { ToolCenter } from './core/tool-center.js'
@@ -207,6 +208,7 @@ async function main() {
   toolCenter.register(createVolatilityTools(equityClient), 'volatility')
   toolCenter.register(createFearGreedTools(equityClient), 'fear-greed')
   toolCenter.register(createEconomyTools(economyClient), 'economy')
+  toolCenter.register(createPredictionMarketTools(), 'prediction-markets')
 
   console.log(`tool-center: ${toolCenter.list().length} tools registered`)
 
