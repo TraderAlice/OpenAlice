@@ -91,19 +91,36 @@ Use this to assess overall portfolio health beyond individual position metrics.`
 
         if (includeSectors !== false && allPositions.length > 0) {
           const sectorMap: Record<string, { symbols: string[]; totalPercent: number }> = {}
-          const profilePromises = allPositions.map(async (pos) => {
-            try {
-              const profiles = await equityClient.getProfile({ symbol: pos.symbol, provider: 'yfinance' })
-              const profile = profiles[0] as Record<string, unknown> | undefined
-              const sector = (profile?.sector as string) ?? 'Unknown'
-              const industry = (profile?.industry as string) ?? 'Unknown'
-              return { symbol: pos.symbol, sector, industry, pctEquity: pos.percentOfEquity }
-            } catch {
-              return { symbol: pos.symbol, sector: 'Unknown', industry: 'Unknown', pctEquity: pos.percentOfEquity }
-            }
-          })
 
-          const profiles = await Promise.all(profilePromises)
+          // Deduplicate symbols — fetch each profile once, then map back to positions
+          const uniqueSymbols = [...new Set(allPositions.map(p => p.symbol))]
+          const profileCache = new Map<string, { sector: string; industry: string }>()
+
+          // Fetch profiles in chunks of 5 to avoid overwhelming the API
+          const CHUNK_SIZE = 5
+          for (let i = 0; i < uniqueSymbols.length; i += CHUNK_SIZE) {
+            const chunk = uniqueSymbols.slice(i, i + CHUNK_SIZE)
+            const results = await Promise.all(chunk.map(async (symbol) => {
+              try {
+                const profiles = await equityClient.getProfile({ symbol, provider: 'yfinance' })
+                const profile = profiles[0] as Record<string, unknown> | undefined
+                return {
+                  symbol,
+                  sector: (profile?.sector as string) ?? 'Unknown',
+                  industry: (profile?.industry as string) ?? 'Unknown',
+                }
+              } catch {
+                return { symbol, sector: 'Unknown', industry: 'Unknown' }
+              }
+            }))
+            for (const r of results) profileCache.set(r.symbol, r)
+          }
+
+          // Map cached profiles back to positions
+          const profiles = allPositions.map(pos => {
+            const cached = profileCache.get(pos.symbol) ?? { sector: 'Unknown', industry: 'Unknown' }
+            return { symbol: pos.symbol, ...cached, pctEquity: pos.percentOfEquity }
+          })
           for (const p of profiles) {
             if (!sectorMap[p.sector]) sectorMap[p.sector] = { symbols: [], totalPercent: 0 }
             sectorMap[p.sector].symbols.push(p.symbol)

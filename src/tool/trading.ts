@@ -10,7 +10,6 @@ import { tool, type Tool } from 'ai'
 import { z } from 'zod'
 import { Contract } from '@traderalice/ibkr'
 import type { AccountManager } from '@/domain/trading/account-manager.js'
-import { UnifiedTradingAccount } from '@/domain/trading/UnifiedTradingAccount.js'
 import { BrokerError } from '@/domain/trading/brokers/types.js'
 import '@/domain/trading/contract-ext.js'
 
@@ -180,9 +179,9 @@ If this tool returns an error with transient=true, wait a few seconds and retry 
         const query = new Contract()
         if (aliceId) {
           query.aliceId = aliceId
-          // Extract symbol from aliceId so brokers can resolve it
-          const parsed = UnifiedTradingAccount.parseAliceId(aliceId)
-          if (parsed) query.symbol = parsed.nativeKey
+          // Extract nativeKey from aliceId format "utaId|nativeKey"
+          const sep = aliceId.indexOf('|')
+          if (sep !== -1) query.symbol = aliceId.slice(sep + 1)
         }
         if (symbol) query.symbol = symbol
         const results: Array<Record<string, unknown>> = []
