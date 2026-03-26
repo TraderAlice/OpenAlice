@@ -212,6 +212,13 @@ export interface IBroker<TMeta = unknown> {
 
   getCapabilities(): AccountCapabilities
 
+  // ---- Streaming (optional) ----
+
+  /** Register a callback for real-time order status updates (fills, cancels).
+   *  Brokers with websocket support call this when order events arrive.
+   *  If not implemented, UTA falls back to polling via tradingSync. */
+  setOrderUpdateCallback?(cb: (update: { orderId: string; status: string; filledQty?: number; filledPrice?: number }) => void): void
+
   // ---- Contract identity ----
 
   /** Extract the broker-native unique key from a contract (for aliceId construction).

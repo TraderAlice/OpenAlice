@@ -95,6 +95,7 @@ export class AlpacaBroker implements IBroker {
   private readonly config: AlpacaBrokerConfig
   private readonly quoteCache = new QuoteCache()
   private streamConnected = false
+  private orderUpdateCallback?: (update: { orderId: string; status: string; filledQty?: number; filledPrice?: number }) => void
 
   constructor(config: AlpacaBrokerConfig) {
     this.config = config
@@ -161,7 +162,11 @@ export class AlpacaBroker implements IBroker {
     this.quoteCache.clear()
   }
 
-  /** Connect the Alpaca data stream for real-time quote updates. Best-effort — failures don't block trading. */
+  setOrderUpdateCallback(cb: (update: { orderId: string; status: string; filledQty?: number; filledPrice?: number }) => void): void {
+    this.orderUpdateCallback = cb
+  }
+
+  /** Connect the Alpaca data stream for real-time quote updates and trade status. Best-effort — failures don't block trading. */
   private connectDataStream(): void {
     try {
       const stream = this.client.data_stream_v2
@@ -213,6 +218,31 @@ export class AlpacaBroker implements IBroker {
       })
 
       stream.connect()
+
+      // Trade updates websocket — order fill/cancel notifications
+      try {
+        const tradeWs = this.client.trade_ws
+        tradeWs.onConnect(() => {
+          tradeWs.subscribe(['trade_updates'])
+          console.log(`AlpacaBroker[${this.id}]: trade updates stream connected`)
+        })
+        tradeWs.onOrderUpdate((update: { order?: { id?: string; status?: string; filled_qty?: string; filled_avg_price?: string } }) => {
+          if (!this.orderUpdateCallback || !update.order) return
+          const o = update.order
+          this.orderUpdateCallback({
+            orderId: o.id ?? '',
+            status: o.status ?? '',
+            filledQty: o.filled_qty ? parseFloat(o.filled_qty) : undefined,
+            filledPrice: o.filled_avg_price ? parseFloat(o.filled_avg_price) : undefined,
+          })
+        })
+        tradeWs.onError((err: Error) => {
+          console.warn(`AlpacaBroker[${this.id}]: trade updates error: ${err?.message ?? err}`)
+        })
+        tradeWs.connect()
+      } catch (err) {
+        console.warn(`AlpacaBroker[${this.id}]: failed to start trade updates stream: ${err instanceof Error ? err.message : err}`)
+      }
     } catch (err) {
       console.warn(`AlpacaBroker[${this.id}]: failed to start data stream: ${err instanceof Error ? err.message : err}`)
     }

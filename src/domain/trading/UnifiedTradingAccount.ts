@@ -190,6 +190,27 @@ export class UnifiedTradingAccount {
       ? TradingGit.restore(options.savedState, gitConfig)
       : new TradingGit(gitConfig)
 
+    // Wire up event-driven order sync if broker supports streaming order updates
+    if (broker.setOrderUpdateCallback) {
+      broker.setOrderUpdateCallback((update) => {
+        // Only auto-sync if this order is one we're tracking
+        const pending = this.git.getPendingOrderIds()
+        const tracked = pending.some(p => p.orderId === update.orderId)
+        if (!tracked) return
+
+        // Auto-sync after a short delay to let the broker settle
+        setTimeout(() => {
+          this.sync({ delayMs: 0 }).then(result => {
+            if (result.updatedCount > 0) {
+              console.log(`UTA[${this.id}]: auto-sync: ${result.updatedCount} order(s) updated via stream (${result.updates.map(u => `${u.symbol}:${u.currentStatus}`).join(', ')})`)
+            }
+          }).catch(err => {
+            console.warn(`UTA[${this.id}]: auto-sync failed:`, err instanceof Error ? err.message : err)
+          })
+        }, 500) // 500ms debounce — multiple events may fire for partial fills
+      })
+    }
+
     // Kick off broker connection asynchronously — UTA is usable immediately,
     // broker queries will fail (tracked by health) until init succeeds.
     const p = this._connect()
