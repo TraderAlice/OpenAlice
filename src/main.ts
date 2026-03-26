@@ -34,6 +34,7 @@ import { createFearGreedTools } from './tool/fear-greed.js'
 import { createEconomyTools } from './tool/economy.js'
 import { createPredictionMarketTools } from './tool/prediction-markets.js'
 import { createGDELTTools } from './tool/gdelt.js'
+import { createPaperAttributionTools } from './tool/paper-attribution.js'
 import { SessionStore } from './core/session.js'
 import { ConnectorCenter } from './core/connector-center.js'
 import { ToolCenter } from './core/tool-center.js'
@@ -212,6 +213,7 @@ async function main() {
   toolCenter.register(createEconomyTools(economyClient), 'economy')
   toolCenter.register(createPredictionMarketTools(), 'prediction-markets')
   toolCenter.register(createGDELTTools(), 'gdelt')
+  toolCenter.register(createPaperAttributionTools(accountManager), 'paper-attribution')
 
   console.log(`tool-center: ${toolCenter.list().length} tools registered`)
 
