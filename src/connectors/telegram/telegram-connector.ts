@@ -12,6 +12,7 @@
 import { readFile } from 'node:fs/promises'
 import { Bot, InputFile } from 'grammy'
 import type { Connector, ConnectorCapabilities, SendPayload, SendResult } from '../types.js'
+import { markdownToTelegramHtml } from './markdown-html.js'
 
 export const MAX_MESSAGE_LENGTH = 4096
 
@@ -40,11 +41,17 @@ export class TelegramConnector implements Connector {
       }
     }
 
-    // Send text with chunking
+    // Send text with chunking + HTML formatting
     if (payload.text) {
-      const chunks = splitMessage(payload.text, MAX_MESSAGE_LENGTH)
+      const html = markdownToTelegramHtml(payload.text)
+      const chunks = splitMessage(html, MAX_MESSAGE_LENGTH)
       for (const chunk of chunks) {
-        await this.bot.api.sendMessage(this.chatId, chunk)
+        try {
+          await this.bot.api.sendMessage(this.chatId, chunk, { parse_mode: 'HTML' })
+        } catch {
+          // Fallback to plain text if HTML parsing fails
+          await this.bot.api.sendMessage(this.chatId, chunk)
+        }
       }
     }
 
