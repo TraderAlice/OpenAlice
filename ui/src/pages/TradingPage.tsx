@@ -370,7 +370,13 @@ function CreateWizard({ brokerTypes, existingAccountIds, onSave, onClose }: {
     if (!bt) return
     const defaults: Record<string, unknown> = {}
     for (const f of bt.fields) {
-      if (f.default !== undefined) defaults[f.name] = f.default
+      if (f.default !== undefined) {
+        defaults[f.name] = f.default
+      } else if (f.type === 'select' && f.options?.length) {
+        // Controlled <select> with value "" does not fire onChange when the UI shows the
+        // first option — user must pick explicitly or we seed the first value here.
+        defaults[f.name] = f.options[0].value
+      }
     }
     setBrokerConfig(defaults)
   }, [type])
@@ -386,10 +392,18 @@ function CreateWizard({ brokerTypes, existingAccountIds, onSave, onClose }: {
     badgeColor: b.badgeColor,
   }))
 
+  const connectionRequiredOk = connectionFields
+    .filter(f => f.required)
+    .every(f => String(brokerConfig[f.name] ?? '').trim())
+
   const handleNext = () => {
     if (!type) return
     if (existingAccountIds.includes(finalId)) {
       setError(`Account "${finalId}" already exists`)
+      return
+    }
+    if (hasSensitive && !connectionRequiredOk) {
+      setError('Please complete all required connection fields')
       return
     }
     setError('')
@@ -420,7 +434,8 @@ function CreateWizard({ brokerTypes, existingAccountIds, onSave, onClose }: {
   }
 
   const canCreate = hasSensitive
-    ? credentialFields.filter(f => f.required).every(f => String(brokerConfig[f.name] ?? '').trim())
+    ? connectionRequiredOk &&
+      credentialFields.filter(f => f.required).every(f => String(brokerConfig[f.name] ?? '').trim())
     : true
 
   return (
@@ -497,7 +512,11 @@ function CreateWizard({ brokerTypes, existingAccountIds, onSave, onClose }: {
           </button>
         )}
         {step === 1 && (hasSensitive || !type) && (
-          <button onClick={handleNext} disabled={!type} className="btn-primary">
+          <button
+            onClick={handleNext}
+            disabled={!type || (hasSensitive && !connectionRequiredOk)}
+            className="btn-primary"
+          >
             Next
           </button>
         )}
