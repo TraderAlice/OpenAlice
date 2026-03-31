@@ -16,6 +16,7 @@ protoc \
   --ts_proto_opt=esModuleInterop=true \
   --ts_proto_opt=outputTypeRegistry=false \
   --ts_proto_opt=useExactTypes=false \
+  --ts_proto_opt=importSuffix=.js \
   --proto_path="$PROTO_DIR" \
   "$PROTO_DIR"/*.proto
 

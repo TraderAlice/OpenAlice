@@ -306,10 +306,12 @@ describe('heartbeat', () => {
 
       const jobId = cronEngine.list()[0].id
 
-      // First fire — should deliver
+      // First fire — should deliver. Wait for heartbeat.done to ensure
+      // the full handleFire cycle (including dedup.record) has completed
+      // before triggering the second fire.
       await cronEngine.runNow(jobId)
       await vi.waitFor(() => {
-        expect(delivered).toHaveLength(1)
+        expect(eventLog.recent({ type: 'heartbeat.done' })).toHaveLength(1)
       })
 
       // Second fire (same response) — should be suppressed

@@ -7,14 +7,14 @@
  *   applyAllHandlers(decoder)
  */
 
-import { Decoder } from './base'
-import { applyMarketDataHandlers } from './market-data'
-import { applyOrderHandlers } from './orders'
-import { applyAccountHandlers } from './account'
-import { applyContractHandlers } from './contract'
-import { applyExecutionHandlers } from './execution'
-import { applyHistoricalHandlers } from './historical'
-import { applyMiscHandlers } from './misc'
+import { Decoder } from './base.js'
+import { applyMarketDataHandlers } from './market-data.js'
+import { applyOrderHandlers } from './orders.js'
+import { applyAccountHandlers } from './account.js'
+import { applyContractHandlers } from './contract.js'
+import { applyExecutionHandlers } from './execution.js'
+import { applyHistoricalHandlers } from './historical.js'
+import { applyMiscHandlers } from './misc.js'
 
 export function applyAllHandlers(decoder: Decoder): void {
   applyMarketDataHandlers(decoder)

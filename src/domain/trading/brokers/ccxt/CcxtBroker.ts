@@ -33,6 +33,12 @@ import {
   marketToContract,
   contractToCcxt,
 } from './ccxt-contracts.js'
+import {
+  type CcxtExchangeOverrides,
+  exchangeOverrides,
+  defaultFetchOrderById,
+  defaultCancelOrderById,
+} from './overrides.js'
 
 /** Map IBKR orderType codes to CCXT order type strings. */
 function ibkrOrderTypeToCcxt(orderType: string): string {
@@ -96,12 +102,14 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
   private exchange: Exchange
   private exchangeName: string
   private initialized = false
+  private overrides: CcxtExchangeOverrides
   // orderId → ccxtSymbol cache (CCXT needs symbol to cancel)
   private orderSymbolCache = new Map<string, string>()
 
   constructor(config: CcxtBrokerConfig) {
     this.exchangeName = config.exchange
     this.meta = { exchange: config.exchange }
+    this.overrides = exchangeOverrides[config.exchange] ?? {}
     this.id = config.id ?? `${config.exchange}-main`
     this.label = config.label ?? `${config.exchange.charAt(0).toUpperCase() + config.exchange.slice(1)} ${config.sandbox ? 'Testnet' : 'Live'}`
 
@@ -338,7 +346,8 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
 
     try {
       const ccxtSymbol = this.orderSymbolCache.get(orderId)
-      await this.exchange.cancelOrder(orderId, ccxtSymbol)
+      const cancel = this.overrides.cancelOrderById ?? defaultCancelOrderById
+      await cancel(this.exchange, orderId, ccxtSymbol)
       const orderState = new OrderState()
       orderState.status = 'Cancelled'
       return { success: true, orderId, orderState }
@@ -356,8 +365,9 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
         return { success: false, error: `Unknown order ${orderId} — cannot resolve symbol for edit` }
       }
 
-      // editOrder requires type and side — fetch the original order to fill in defaults
-      const original = await this.exchange.fetchOrder(orderId, ccxtSymbol)
+      // editOrder requires type and side — fetch the original order to fill in defaults.
+      const fetch = this.overrides.fetchOrderById ?? defaultFetchOrderById
+      const original = await fetch(this.exchange, orderId, ccxtSymbol)
       const qty = changes.totalQuantity != null && !changes.totalQuantity.equals(UNSET_DECIMAL) ? parseFloat(changes.totalQuantity.toString()) : original.amount
       const price = changes.lmtPrice !== UNSET_DOUBLE ? changes.lmtPrice : original.price
 
@@ -512,22 +522,13 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
   async getOrder(orderId: string): Promise<OpenOrder | null> {
     this.ensureInit()
 
-
     const ccxtSymbol = this.orderSymbolCache.get(orderId)
     if (!ccxtSymbol) return null
 
+    const fetch = this.overrides.fetchOrderById ?? defaultFetchOrderById
     try {
-      // Use singular fetchOpenOrder / fetchClosedOrder — they query by orderId directly,
-      // instead of fetching a list and searching. Much more reliable on Bybit.
-      try {
-        const open = await (this.exchange as any).fetchOpenOrder(orderId, ccxtSymbol)
-        return this.convertCcxtOrder(open)
-      } catch { /* not an open order */ }
-      try {
-        const closed = await (this.exchange as any).fetchClosedOrder(orderId, ccxtSymbol)
-        return this.convertCcxtOrder(closed)
-      } catch { /* not found */ }
-      return null
+      const order = await fetch(this.exchange, orderId, ccxtSymbol)
+      return this.convertCcxtOrder(order)
     } catch {
       return null
     }

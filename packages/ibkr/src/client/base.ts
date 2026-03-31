@@ -8,7 +8,7 @@
 import { makeMsg, makeMsgProto, makeField, makeInitialMsg, readMsg, readFields } from '../comm.js'
 import { Connection } from '../connection.js'
 import { EReader } from '../reader.js'
-import { Decoder, applyAllHandlers } from '../decoder'
+import { Decoder, applyAllHandlers } from '../decoder/index.js'
 import type { EWrapper } from '../wrapper.js'
 import { OUT } from '../message.js'
 import {
