@@ -269,6 +269,59 @@ describe('AlpacaBroker — modifyOrder()', () => {
   })
 })
 
+// ==================== modifyOrder — null-check safety ====================
+
+describe('AlpacaBroker — modifyOrder null-check', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('does not send undefined lmtPrice/auxPrice/trailingPercent when only qty changes', async () => {
+    const acc = new AlpacaBroker({ apiKey: 'k', secretKey: 's', paper: true })
+    const replaceOrder = vi.fn().mockResolvedValue({ id: 'ord-mod', status: 'accepted' })
+    ;(acc as any).client = { replaceOrder }
+
+    // Partial<Order> — only totalQuantity set, everything else is undefined
+    const changes: Partial<Order> = { totalQuantity: new Decimal(20) }
+
+    await acc.modifyOrder('ord-1', changes)
+    const patch = replaceOrder.mock.calls[0][1]
+
+    expect(patch.qty).toBe(20)
+    // These should NOT be in the patch — they were undefined, not UNSET_DOUBLE
+    expect(patch).not.toHaveProperty('limit_price')
+    expect(patch).not.toHaveProperty('stop_price')
+    expect(patch).not.toHaveProperty('trail')
+  })
+
+  it('sends lmtPrice when explicitly set in changes', async () => {
+    const acc = new AlpacaBroker({ apiKey: 'k', secretKey: 's', paper: true })
+    const replaceOrder = vi.fn().mockResolvedValue({ id: 'ord-mod', status: 'accepted' })
+    ;(acc as any).client = { replaceOrder }
+
+    const changes: Partial<Order> = { lmtPrice: 155.50 }
+
+    await acc.modifyOrder('ord-1', changes)
+    const patch = replaceOrder.mock.calls[0][1]
+
+    expect(patch.limit_price).toBe(155.50)
+    expect(patch).not.toHaveProperty('stop_price')
+    expect(patch).not.toHaveProperty('trail')
+  })
+
+  it('sends auxPrice as stop_price when explicitly set', async () => {
+    const acc = new AlpacaBroker({ apiKey: 'k', secretKey: 's', paper: true })
+    const replaceOrder = vi.fn().mockResolvedValue({ id: 'ord-mod', status: 'accepted' })
+    ;(acc as any).client = { replaceOrder }
+
+    const changes: Partial<Order> = { auxPrice: 140 }
+
+    await acc.modifyOrder('ord-1', changes)
+    const patch = replaceOrder.mock.calls[0][1]
+
+    expect(patch.stop_price).toBe(140)
+    expect(patch).not.toHaveProperty('limit_price')
+  })
+})
+
 // ==================== cancelOrder ====================
 
 describe('AlpacaBroker — cancelOrder()', () => {

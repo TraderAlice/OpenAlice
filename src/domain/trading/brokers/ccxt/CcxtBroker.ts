@@ -380,7 +380,14 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
       const fetch = this.overrides.fetchOrderById ?? defaultFetchOrderById
       const original = await fetch(this.exchange, orderId, ccxtSymbol)
       const qty = changes.totalQuantity != null && !changes.totalQuantity.equals(UNSET_DECIMAL) ? parseFloat(changes.totalQuantity.toString()) : original.amount
-      const price = changes.lmtPrice !== UNSET_DOUBLE ? changes.lmtPrice : original.price
+      const price = changes.lmtPrice != null && changes.lmtPrice !== UNSET_DOUBLE ? changes.lmtPrice : original.price
+
+      // Extra params for fields that don't fit editOrder's positional arguments
+      const params: Record<string, unknown> = {}
+      if (changes.auxPrice != null && changes.auxPrice !== UNSET_DOUBLE) params.stopPrice = changes.auxPrice
+      if (changes.trailStopPrice != null && changes.trailStopPrice !== UNSET_DOUBLE) params.trailStopPrice = changes.trailStopPrice
+      if (changes.trailingPercent != null && changes.trailingPercent !== UNSET_DOUBLE) params.trailingPercent = changes.trailingPercent
+      if (changes.tif) params.timeInForce = changes.tif.toLowerCase()
 
       const result = await this.exchange.editOrder(
         orderId,
@@ -389,6 +396,7 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
         original.side,
         qty,
         price,
+        params,
       )
 
       return {

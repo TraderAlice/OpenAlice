@@ -617,6 +617,86 @@ describe('CcxtBroker — modifyOrder', () => {
   })
 })
 
+// ==================== modifyOrder — field forwarding ====================
+
+describe('CcxtBroker — modifyOrder field forwarding', () => {
+  it('uses original price when lmtPrice not in changes (Partial<Order>)', async () => {
+    const acc = makeAccount()
+    setInitialized(acc, { 'ETH/USDT:USDT': makeSwapMarket('ETH', 'USDT', 'ETH/USDT:USDT') })
+    ;(acc as any).orderSymbolCache.set('ord-200', 'ETH/USDT:USDT')
+    ;(acc as any).exchange.fetchOpenOrder = vi.fn().mockResolvedValue({
+      type: 'limit', side: 'buy', amount: 0.1, price: 1900,
+    })
+    ;(acc as any).exchange.editOrder = vi.fn().mockResolvedValue({ id: 'ord-200-edited', status: 'open' })
+
+    // Partial<Order> — only totalQuantity, no lmtPrice
+    const changes: Partial<Order> = { totalQuantity: new Decimal(0.2) }
+
+    await acc.modifyOrder('ord-200', changes)
+    const call = (acc as any).exchange.editOrder.mock.calls[0]
+
+    // Should use original price (1900), not undefined
+    expect(call[4]).toBe(0.2)    // amount
+    expect(call[5]).toBe(1900)   // price from original
+  })
+
+  it('forwards auxPrice as stopPrice in params', async () => {
+    const acc = makeAccount()
+    setInitialized(acc, { 'ETH/USDT:USDT': makeSwapMarket('ETH', 'USDT', 'ETH/USDT:USDT') })
+    ;(acc as any).orderSymbolCache.set('ord-300', 'ETH/USDT:USDT')
+    ;(acc as any).exchange.fetchOpenOrder = vi.fn().mockResolvedValue({
+      type: 'limit', side: 'sell', amount: 0.1, price: 2100,
+    })
+    ;(acc as any).exchange.editOrder = vi.fn().mockResolvedValue({ id: 'ord-300-edited', status: 'open' })
+
+    const changes: Partial<Order> = { auxPrice: 1850 }
+
+    await acc.modifyOrder('ord-300', changes)
+    const call = (acc as any).exchange.editOrder.mock.calls[0]
+
+    // 7th argument is the params object with extra fields
+    const params = call[6] ?? {}
+    expect(params.stopPrice).toBe(1850)
+  })
+
+  it('forwards tif in params', async () => {
+    const acc = makeAccount()
+    setInitialized(acc, { 'ETH/USDT:USDT': makeSwapMarket('ETH', 'USDT', 'ETH/USDT:USDT') })
+    ;(acc as any).orderSymbolCache.set('ord-400', 'ETH/USDT:USDT')
+    ;(acc as any).exchange.fetchOpenOrder = vi.fn().mockResolvedValue({
+      type: 'limit', side: 'buy', amount: 0.1, price: 1900,
+    })
+    ;(acc as any).exchange.editOrder = vi.fn().mockResolvedValue({ id: 'ord-400-edited', status: 'open' })
+
+    const changes: Partial<Order> = { tif: 'GTC' }
+
+    await acc.modifyOrder('ord-400', changes)
+    const call = (acc as any).exchange.editOrder.mock.calls[0]
+
+    const params = call[6] ?? {}
+    expect(params.timeInForce).toBe('gtc')
+  })
+
+  it('does not include undefined fields in params', async () => {
+    const acc = makeAccount()
+    setInitialized(acc, { 'ETH/USDT:USDT': makeSwapMarket('ETH', 'USDT', 'ETH/USDT:USDT') })
+    ;(acc as any).orderSymbolCache.set('ord-500', 'ETH/USDT:USDT')
+    ;(acc as any).exchange.fetchOpenOrder = vi.fn().mockResolvedValue({
+      type: 'limit', side: 'buy', amount: 0.1, price: 1900,
+    })
+    ;(acc as any).exchange.editOrder = vi.fn().mockResolvedValue({ id: 'ord-500-edited', status: 'open' })
+
+    // Only change qty — nothing else should appear in params
+    const changes: Partial<Order> = { totalQuantity: new Decimal(0.5) }
+
+    await acc.modifyOrder('ord-500', changes)
+    const call = (acc as any).exchange.editOrder.mock.calls[0]
+
+    const params = call[6] ?? {}
+    expect(params).toEqual({})
+  })
+})
+
 // ==================== closePosition ====================
 
 describe('CcxtBroker — closePosition', () => {

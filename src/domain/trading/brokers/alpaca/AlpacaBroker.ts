@@ -241,9 +241,9 @@ export class AlpacaBroker implements IBroker {
     try {
       const patch: Record<string, unknown> = {}
       if (changes.totalQuantity != null && !changes.totalQuantity.equals(UNSET_DECIMAL)) patch.qty = parseFloat(changes.totalQuantity.toString())
-      if (changes.lmtPrice !== UNSET_DOUBLE) patch.limit_price = changes.lmtPrice
-      if (changes.auxPrice !== UNSET_DOUBLE) patch.stop_price = changes.auxPrice
-      if (changes.trailingPercent !== UNSET_DOUBLE) patch.trail = changes.trailingPercent
+      if (changes.lmtPrice != null && changes.lmtPrice !== UNSET_DOUBLE) patch.limit_price = changes.lmtPrice
+      if (changes.auxPrice != null && changes.auxPrice !== UNSET_DOUBLE) patch.stop_price = changes.auxPrice
+      if (changes.trailingPercent != null && changes.trailingPercent !== UNSET_DOUBLE) patch.trail = changes.trailingPercent
       if (changes.tif) patch.time_in_force = ibkrTifToAlpaca(changes.tif)
 
       const result = await this.client.replaceOrder(orderId, patch) as AlpacaOrderRaw
