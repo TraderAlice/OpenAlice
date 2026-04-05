@@ -131,7 +131,7 @@ export function createHeartbeat(opts: HeartbeatOpts): Heartbeat {
 
       // 2. Call AI
       const result = await agentCenter.askWithSession(payload.payload, session, {
-        historyPreamble: 'The following is the recent heartbeat conversation history.',
+        historyPreamble: 'You are operating in the heartbeat monitoring context (session: heartbeat). The following is the recent heartbeat conversation history.',
       })
       const durationMs = now() - startMs
 

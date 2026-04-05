@@ -239,7 +239,7 @@ export class TelegramPlugin implements Plugin {
         // Route through AgentCenter → GenerateRouter → active provider
         const session = await this.getSession(message.from.id)
         const result = await engineCtx.agentCenter.askWithSession(prompt, session, {
-          historyPreamble: 'The following is the recent conversation from this Telegram chat. Use it as context if the user references earlier messages.',
+          historyPreamble: `You are operating via Telegram (session: telegram/${message.from.id}). The following is the recent conversation.`,
         })
         stopTyping()
         await this.sendReplyWithPlaceholder(message.chatId, result.text, result.media, placeholder?.message_id)

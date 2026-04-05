@@ -26,6 +26,7 @@ import { OpenBBCommodityClient } from './domain/market-data/client/openbb-api/co
 import { OpenBBServerPlugin } from './server/opentypebb.js'
 import { createMarketSearchTools } from './tool/market.js'
 import { createAnalysisTools } from './tool/analysis.js'
+import { createSessionTools } from './tool/session.js'
 import { SessionStore } from './core/session.js'
 import { ConnectorCenter } from './core/connector-center.js'
 import { ToolCenter } from './core/tool-center.js'
@@ -226,6 +227,9 @@ async function main() {
   // ==================== Connector Center ====================
 
   const connectorCenter = new ConnectorCenter(eventLog)
+
+  // Session awareness tools (registered here because they need connectorCenter)
+  toolCenter.register(createSessionTools(connectorCenter), 'session')
 
   // ==================== Cron Lifecycle ====================
 

@@ -63,7 +63,7 @@ export function createCronListener(opts: CronListenerOpts): CronListener {
     try {
       // Ask the AI engine with the cron payload
       const result = await agentCenter.askWithSession(payload.payload, session, {
-        historyPreamble: 'The following is the recent cron session conversation. This is an automated cron job execution.',
+        historyPreamble: `You are operating in the cron job context (session: cron/default, job: ${payload.jobName}). This is an automated cron job execution.`,
       })
 
       // Send notification through the last-interacted connector

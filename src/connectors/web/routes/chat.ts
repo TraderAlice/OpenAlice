@@ -35,7 +35,7 @@ export function createChatRoutes({ ctx, sessions, sseByChannel }: ChatDeps) {
 
     // Build AskOptions from channel config (if not default)
     const opts: AskOptions = {
-      historyPreamble: 'The following is the recent conversation from the Web UI. Use it as context if the user references earlier messages.',
+      historyPreamble: `You are operating via the Web UI (session: web/${channelId}). The following is the recent conversation.`,
     }
     if (channelId !== 'default') {
       const channels = await readWebSubchannels()
