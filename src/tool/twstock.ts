@@ -115,8 +115,20 @@ export function createTwstockTools(client: TwstockMcpClient) {
 
     // ==================== Trading Data ====================
 
+    twstockGetStockRealtimeQuote: tool({
+      description: `Get real-time intraday quote for a TWSE-listed stock.
+
+Returns current price, OHLC, volume, best 5 bid/ask, and price change.
+Updated every few seconds during market hours (09:00-13:30 TST).
+Use this instead of twstockGetStockDailyTrading when you need today's data before market close.`,
+      inputSchema: z.object({
+        code: z.string().describe('Stock code, e.g. "2330"'),
+      }),
+      execute: async ({ code }) => call('get_stock_realtime_quote', { code }),
+    }),
+
     twstockGetStockDailyTrading: tool({
-      description: 'Get daily trading information (open, high, low, close, volume) for a TWSE-listed stock.',
+      description: 'Get daily trading information (open, high, low, close, volume) for a TWSE-listed stock. Note: data updates after market close; for intraday data use twstockGetStockRealtimeQuote.',
       inputSchema: z.object({
         code: z.string().describe('Stock code, e.g. "2330"'),
       }),
