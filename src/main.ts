@@ -44,6 +44,8 @@ import { createNewsArchiveTools } from './tool/news.js'
 import { TwstockMcpClient } from './domain/twstock/client.js'
 import { createTwstockTools } from './tool/twstock.js'
 import { readTwstockConfig } from './domain/twstock/config.js'
+import { createFugleTools } from './tool/fugle.js'
+import { readFugleConfig } from './domain/fugle/config.js'
 
 // ==================== Persistence paths ====================
 
@@ -220,6 +222,14 @@ async function main() {
   if (twstockConfig.enabled && twstockConfig.mcpUrl) {
     twstockClient = new TwstockMcpClient(twstockConfig.mcpUrl)
     toolCenter.register(createTwstockTools(twstockClient), 'twstock')
+  }
+
+  // Fugle market data tools (remote MCP)
+  const fugleConfig = await readFugleConfig()
+  let fugleClient: TwstockMcpClient | null = null
+  if (fugleConfig.enabled && fugleConfig.mcpUrl) {
+    fugleClient = new TwstockMcpClient(fugleConfig.mcpUrl)
+    toolCenter.register(createFugleTools(fugleClient), 'fugle')
   }
 
   console.log(`tool-center: ${toolCenter.list().length} tools registered`)
@@ -440,6 +450,7 @@ async function main() {
     await eventLog.close()
     await accountManager.closeAll()
     await twstockClient?.close()
+    await fugleClient?.close()
     process.exit(0)
   }
   process.on('SIGINT', shutdown)
