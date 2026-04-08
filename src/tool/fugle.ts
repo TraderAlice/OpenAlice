@@ -107,6 +107,29 @@ IMPORTANT: When presenting K-line data, wrap the JSON in a \`\`\`kline code bloc
       execute: async ({ symbol }) => call('get_intraday_volumes', { symbol }),
     }),
 
+    // ==================== Volume Monitoring ====================
+
+    fugleCheckVolumeSpikes: tool({
+      description: `Check multiple stocks for volume spikes in today's intraday data.
+
+Compares the latest candle volume against the average of previous candles.
+Returns alerts for stocks exceeding the threshold (default: 2x average).
+
+Can be scheduled via cron for continuous monitoring during market hours.
+Example: check 2330,2317,2454 every 5 minutes for 2x volume spikes.`,
+      inputSchema: z.object({
+        symbols: z.string().describe('Comma-separated stock codes, e.g. "2330,2317,2454,2382"'),
+        timeframe: z.string().optional().describe('Candle interval in minutes (default: 5)'),
+        threshold: z.number().optional().describe('Volume spike multiplier (default: 2.0 = 2x average)'),
+      }),
+      execute: async ({ symbols, timeframe, threshold }) => {
+        const args: Record<string, unknown> = { symbols }
+        if (timeframe) args.timeframe = timeframe
+        if (threshold) args.threshold = threshold
+        return call('check_volume_spikes', args)
+      },
+    }),
+
     // Snapshot tools (movers, actives) require Fugle Developer plan — not registered for basic users.
   }
 }
