@@ -159,6 +159,23 @@ Use this instead of twstockGetStockDailyTrading when you need today's data befor
       execute: async ({ code }) => call('get_stock_monthly_average', { code }),
     }),
 
+    twstockGetStockKlineData: tool({
+      description: `Get historical daily OHLCV data for K-line (candlestick) chart rendering.
+
+Returns structured JSON with date, open, high, low, close, volume for each trading day.
+IMPORTANT: When presenting this data, wrap the entire JSON output in a \`\`\`kline code block
+so the frontend renders an interactive candlestick chart automatically.`,
+      inputSchema: z.object({
+        code: z.string().describe('Stock code, e.g. "2330"'),
+        months: z.number().int().optional().describe('Months of history (1-12, default: 3)'),
+      }),
+      execute: async ({ code, months }) => {
+        const args: Record<string, unknown> = { code }
+        if (months) args.months = months
+        return call('get_stock_kline_data', args)
+      },
+    }),
+
     twstockGetStockValuationRatios: tool({
       description: 'Get P/E ratio, dividend yield, and P/B ratio for a TWSE-listed stock.',
       inputSchema: z.object({

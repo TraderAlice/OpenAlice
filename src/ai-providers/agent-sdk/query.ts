@@ -122,6 +122,8 @@ export async function askAgentSdk(
   const isOAuthMode = loginMethod === 'claudeai'
 
   const env: Record<string, string | undefined> = { ...process.env }
+  // Prevent "nested session" detection when launched from within Claude Code
+  delete env.CLAUDECODE
   if (isOAuthMode) {
     // Force OAuth by removing any inherited API key
     delete env.ANTHROPIC_API_KEY
