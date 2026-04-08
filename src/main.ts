@@ -41,6 +41,9 @@ import { createCronEngine, createCronListener, createCronTools } from './task/cr
 import { createHeartbeat } from './task/heartbeat/index.js'
 import { NewsCollectorStore, NewsCollector } from './domain/news/index.js'
 import { createNewsArchiveTools } from './tool/news.js'
+import { TwstockMcpClient } from './domain/twstock/client.js'
+import { createTwstockTools } from './tool/twstock.js'
+import { readTwstockConfig } from './domain/twstock/config.js'
 
 // ==================== Persistence paths ====================
 
@@ -210,6 +213,14 @@ async function main() {
     toolCenter.register(createNewsArchiveTools(newsStore), 'news')
   }
   toolCenter.register(createAnalysisTools(equityClient, cryptoClient, currencyClient, commodityClient), 'analysis')
+
+  // Taiwan stock market tools (remote MCP)
+  const twstockConfig = await readTwstockConfig()
+  let twstockClient: TwstockMcpClient | null = null
+  if (twstockConfig.enabled && twstockConfig.mcpUrl) {
+    twstockClient = new TwstockMcpClient(twstockConfig.mcpUrl)
+    toolCenter.register(createTwstockTools(twstockClient), 'twstock')
+  }
 
   console.log(`tool-center: ${toolCenter.list().length} tools registered`)
 
@@ -428,6 +439,7 @@ async function main() {
     await toolCallLog.close()
     await eventLog.close()
     await accountManager.closeAll()
+    await twstockClient?.close()
     process.exit(0)
   }
   process.on('SIGINT', shutdown)
