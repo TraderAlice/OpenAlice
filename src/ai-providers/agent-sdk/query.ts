@@ -121,9 +121,19 @@ export async function askAgentSdk(
   const loginMethod = override?.loginMethod ?? 'api-key'
   const isOAuthMode = loginMethod === 'claudeai'
 
-  const env: Record<string, string | undefined> = { ...process.env }
+  // Only pass necessary env vars — avoid leaking unrelated secrets
+  const env: Record<string, string | undefined> = {
+    PATH: process.env.PATH,
+    HOME: process.env.HOME,
+    USER: process.env.USER,
+    SHELL: process.env.SHELL,
+    LANG: process.env.LANG,
+    TERM: process.env.TERM,
+    NODE_ENV: process.env.NODE_ENV,
+    CODEX_HOME: process.env.CODEX_HOME,
+  }
   if (isOAuthMode) {
-    // Force OAuth by removing any inherited API key
+    // Force OAuth by not setting any API key
     delete env.ANTHROPIC_API_KEY
   } else {
     const apiKey = override?.apiKey

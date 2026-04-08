@@ -234,6 +234,13 @@ export const toolsSchema = z.object({
   disabled: z.array(z.string()).default([]),
 })
 
+export const securitySchema = z.object({
+  /** Bearer token for API authentication. If unset, all requests are allowed (local-only mode). */
+  apiToken: z.string().optional(),
+  /** Allowed CORS origins. Defaults to localhost if unset. */
+  corsOrigins: z.array(z.string()).optional(),
+})
+
 export const webSubchannelSchema = z.object({
   /** URL-safe identifier. Used as session path segment: data/sessions/web/{id}.jsonl */
   id: z.string().regex(/^[a-z0-9-_]+$/, 'id must be lowercase alphanumeric with hyphens/underscores'),
@@ -285,6 +292,7 @@ export type Config = {
   connectors: z.infer<typeof connectorsSchema>
   news: z.infer<typeof newsCollectorSchema>
   tools: z.infer<typeof toolsSchema>
+  security: z.infer<typeof securitySchema>
 }
 
 // ==================== Loader ====================
@@ -317,7 +325,7 @@ async function parseAndSeed<T>(filename: string, schema: z.ZodType<T>, raw: unkn
 }
 
 export async function loadConfig(): Promise<Config> {
-  const files = ['engine.json', 'agent.json', 'crypto.json', 'securities.json', 'market-data.json', 'compaction.json', 'ai-provider-manager.json', 'heartbeat.json', 'snapshot.json', 'connectors.json', 'news.json', 'tools.json'] as const
+  const files = ['engine.json', 'agent.json', 'crypto.json', 'securities.json', 'market-data.json', 'compaction.json', 'ai-provider-manager.json', 'heartbeat.json', 'snapshot.json', 'connectors.json', 'news.json', 'tools.json', 'security.json'] as const
   const raws = await Promise.all(files.map((f) => loadJsonFile(f)))
 
   // TODO: remove all migration blocks before v1.0 — no stable release yet, breaking changes are fine
@@ -456,6 +464,7 @@ export async function loadConfig(): Promise<Config> {
     connectors:    await parseAndSeed(files[9], connectorsSchema, raws[9]),
     news:          await parseAndSeed(files[10], newsCollectorSchema, raws[10]),
     tools:         await parseAndSeed(files[11], toolsSchema, raws[11]),
+    security:      await parseAndSeed(files[12], securitySchema, raws[12]),
   }
 }
 
@@ -554,6 +563,16 @@ export async function readConnectorsConfig() {
   }
 }
 
+/** Read security config from disk (called per-request for hot-reload). */
+export async function readSecurityConfig() {
+  try {
+    const raw = JSON.parse(await readFile(resolve(CONFIG_DIR, 'security.json'), 'utf-8'))
+    return securitySchema.parse(raw)
+  } catch {
+    return securitySchema.parse({})
+  }
+}
+
 // ==================== Profile Helpers ====================
 
 /** Resolved profile with apiKey filled from global keys. */
@@ -639,6 +658,7 @@ const sectionSchemas: Record<ConfigSection, z.ZodTypeAny> = {
   connectors: connectorsSchema,
   news: newsCollectorSchema,
   tools: toolsSchema,
+  security: securitySchema,
 }
 
 const sectionFiles: Record<ConfigSection, string> = {
@@ -654,6 +674,7 @@ const sectionFiles: Record<ConfigSection, string> = {
   connectors: 'connectors.json',
   news: 'news.json',
   tools: 'tools.json',
+  security: 'security.json',
 }
 
 /** All valid config section names (derived from sectionSchemas). */

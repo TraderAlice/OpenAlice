@@ -1,11 +1,14 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
+import { createMiddleware } from 'hono/factory'
+import { timingSafeEqual } from 'node:crypto'
 import { serve } from '@hono/node-server'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
 import type { Plugin, EngineContext } from '../core/types.js'
 import type { ToolCenter } from '../core/tool-center.js'
 import { extractMcpShape, wrapToolExecute } from '../core/mcp-export.js'
+import { readSecurityConfig } from '../core/config.js'
 
 /**
  * MCP Plugin — exposes tools via Streamable HTTP.
@@ -43,10 +46,34 @@ export class McpPlugin implements Plugin {
 
     const app = new Hono()
 
+    // Auth middleware — require bearer token if configured
+    app.use('*', createMiddleware(async (c, next) => {
+      const { apiToken } = await readSecurityConfig()
+      if (!apiToken) return next()
+
+      const authHeader = c.req.header('Authorization')
+      if (!authHeader?.startsWith('Bearer ')) {
+        return c.json({ error: 'Unauthorized' }, 401)
+      }
+      const provided = authHeader.slice(7)
+      const aBuf = Buffer.from(provided)
+      const bBuf = Buffer.from(apiToken)
+      if (aBuf.length !== bBuf.length || !timingSafeEqual(aBuf, bBuf)) {
+        return c.json({ error: 'Unauthorized' }, 401)
+      }
+      return next()
+    }))
+
+    const securityConfig = await readSecurityConfig()
+    const corsOrigins = securityConfig.corsOrigins ?? [
+      `http://localhost:${this.port}`,
+      `http://127.0.0.1:${this.port}`,
+    ]
+
     app.use('*', cors({
-      origin: '*',
+      origin: corsOrigins,
       allowMethods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
-      allowHeaders: ['Content-Type', 'mcp-session-id', 'Last-Event-ID', 'mcp-protocol-version'],
+      allowHeaders: ['Content-Type', 'Authorization', 'mcp-session-id', 'Last-Event-ID', 'mcp-protocol-version'],
       exposeHeaders: ['mcp-session-id', 'mcp-protocol-version'],
     }))
 

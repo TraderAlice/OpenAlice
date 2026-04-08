@@ -1,12 +1,13 @@
 import { Hono, type Context } from 'hono'
 import { cors } from 'hono/cors'
+import { authMiddleware } from './middleware/auth.js'
 import { serve } from '@hono/node-server'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { resolve } from 'node:path'
 import type { Plugin, EngineContext } from '../../core/types.js'
 import { SessionStore } from '../../core/session.js'
 import { WebConnector } from './web-connector.js'
-import { readWebSubchannels } from '../../core/config.js'
+import { readWebSubchannels, readSecurityConfig } from '../../core/config.js'
 import { createChatRoutes, createMediaRoutes, type SSEClient } from './routes/chat.js'
 import { createChannelsRoutes } from './routes/channels.js'
 import { createConfigRoutes, createMarketDataRoutes } from './routes/config.js'
@@ -63,10 +64,24 @@ export class WebPlugin implements Plugin {
         return c.json({ error: 'Invalid JSON' }, 400)
       }
       console.error('web: unhandled error:', err)
-      return c.json({ error: err.message }, 500)
+      return c.json({ error: 'Internal server error' }, 500)
     })
 
-    app.use('/api/*', cors())
+    const securityConfig = await readSecurityConfig()
+    const corsOrigins = securityConfig.corsOrigins ?? [
+      `http://localhost:${this.config.port}`,
+      `http://127.0.0.1:${this.config.port}`,
+    ]
+
+    app.use('/api/*', authMiddleware())
+    app.use('/api/*', cors({ origin: corsOrigins }))
+
+    // Security headers
+    app.use('/api/*', async (c, next) => {
+      await next()
+      c.header('X-Content-Type-Options', 'nosniff')
+      c.header('X-Frame-Options', 'DENY')
+    })
 
     // ==================== Mount route modules ====================
     app.route('/api/chat', createChatRoutes({ ctx, sessions, sseByChannel: this.sseByChannel }))
