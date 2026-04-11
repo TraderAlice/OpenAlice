@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { readFile, writeFile, mkdir, unlink } from 'fs/promises'
 import { resolve } from 'path'
 import { newsCollectorSchema } from '../domain/news/config.js'
+import { explorationConfigSchema } from '../domain/exploration/types.js'
 
 const CONFIG_DIR = resolve('data/config')
 
@@ -286,6 +287,7 @@ export type Config = {
   connectors: z.infer<typeof connectorsSchema>
   news: z.infer<typeof newsCollectorSchema>
   tools: z.infer<typeof toolsSchema>
+  exploration: z.infer<typeof explorationConfigSchema>
 }
 
 // ==================== Loader ====================
@@ -318,7 +320,7 @@ async function parseAndSeed<T>(filename: string, schema: z.ZodType<T>, raw: unkn
 }
 
 export async function loadConfig(): Promise<Config> {
-  const files = ['engine.json', 'agent.json', 'crypto.json', 'securities.json', 'market-data.json', 'compaction.json', 'ai-provider-manager.json', 'heartbeat.json', 'snapshot.json', 'connectors.json', 'news.json', 'tools.json'] as const
+  const files = ['engine.json', 'agent.json', 'crypto.json', 'securities.json', 'market-data.json', 'compaction.json', 'ai-provider-manager.json', 'heartbeat.json', 'snapshot.json', 'connectors.json', 'news.json', 'tools.json', 'exploration.json'] as const
   const raws = await Promise.all(files.map((f) => loadJsonFile(f)))
 
   // TODO: remove all migration blocks before v1.0 — no stable release yet, breaking changes are fine
@@ -484,6 +486,7 @@ export async function loadConfig(): Promise<Config> {
     connectors:    await parseAndSeed(files[9], connectorsSchema, raws[9]),
     news:          await parseAndSeed(files[10], newsCollectorSchema, raws[10]),
     tools:         await parseAndSeed(files[11], toolsSchema, raws[11]),
+    exploration:   await parseAndSeed(files[12], explorationConfigSchema, raws[12]),
   }
 }
 
@@ -653,6 +656,7 @@ const sectionSchemas: Record<ConfigSection, z.ZodTypeAny> = {
   connectors: connectorsSchema,
   news: newsCollectorSchema,
   tools: toolsSchema,
+  exploration: explorationConfigSchema,
 }
 
 const sectionFiles: Record<ConfigSection, string> = {
@@ -668,6 +672,7 @@ const sectionFiles: Record<ConfigSection, string> = {
   connectors: 'connectors.json',
   news: 'news.json',
   tools: 'tools.json',
+  exploration: 'exploration.json',
 }
 
 /** All valid config section names (derived from sectionSchemas). */
