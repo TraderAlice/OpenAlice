@@ -29,12 +29,17 @@ export const explorationConfigSchema = z.object({
   sessionNamespace: z.string().default('exploration/autonomous'),
   schedule: z.object({
     enabled: z.boolean().default(false),
-    /** Cron expression (node-cron). Default: hourly during off-market hours TW. */
-    cronExpression: z.string().default('0 14-23,0-8 * * *'),
+    /**
+     * Cron expression (node-cron).
+     * Default: every 30 min during TW sleep hours (23:00–06:30).
+     * No runs during peak hours (台股盤中、美股盤中、白天活動時段).
+     * → ~16 runs/night, 0 runs during the day.
+     */
+    cronExpression: z.string().default('0,30 23,0-6 * * *'),
     timezone: z.string().default('Asia/Taipei'),
   }).default({
     enabled: false,
-    cronExpression: '0 14-23,0-8 * * *',
+    cronExpression: '0,30 23,0-6 * * *',
     timezone: 'Asia/Taipei',
   }),
   reflection: z.object({
