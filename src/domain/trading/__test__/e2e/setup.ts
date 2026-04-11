@@ -12,6 +12,7 @@ import net from 'node:net'
 import { readAccountsConfig, type AccountConfig } from '@/core/config.js'
 import type { IBroker } from '../../brokers/types.js'
 import { createBroker } from '../../brokers/factory.js'
+import { CCXT_CREDENTIAL_FIELDS } from '../../brokers/ccxt/ccxt-types.js'
 
 export interface TestAccount {
   id: string
@@ -38,9 +39,15 @@ function hasCredentials(acct: AccountConfig): boolean {
   const bc = acct.brokerConfig
   switch (acct.type) {
     case 'alpaca':
-    case 'ccxt':   return !!bc.apiKey
-    case 'ibkr':   return true  // no API key — auth via TWS/Gateway login
-    default:       return true
+      return !!bc.apiKey
+    case 'ccxt':
+      // CCXT exchanges use different credential schemes — apiKey/secret for most,
+      // walletAddress/privateKey for Hyperliquid, etc. Match any standard CCXT field.
+      return CCXT_CREDENTIAL_FIELDS.some(k => !!(bc as Record<string, unknown>)[k])
+    case 'ibkr':
+      return true  // no API key — auth via TWS/Gateway login
+    default:
+      return true
   }
 }
 

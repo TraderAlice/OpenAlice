@@ -39,6 +39,8 @@ import {
   exchangeOverrides,
   defaultFetchOrderById,
   defaultCancelOrderById,
+  defaultPlaceOrder,
+  defaultFetchPositions,
 } from './overrides.js'
 
 const STABLECOIN_TO_USD = new Set(['USDT', 'USDC', 'BUSD', 'DAI', 'TUSD'])
@@ -141,15 +143,13 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
       throw new BrokerError('CONFIG', `Unknown CCXT exchange: ${config.exchange}`)
     }
 
-    // Default: skip option markets to reduce concurrent requests during loadMarkets
-    const defaultOptions: Record<string, unknown> = {
-      fetchMarkets: { types: ['spot', 'linear', 'inverse'] },
-    }
-    const mergedOptions = { ...defaultOptions, ...config.options }
-
     // Pass through all CCXT standard credential fields. CCXT ignores undefined.
+    // Do NOT override the exchange's default fetchMarkets.types — each exchange
+    // has its own (e.g. bybit: spot/linear/inverse/option, hyperliquid: spot/swap/hip3).
+    // The init() wrapper below handles option-skipping uniformly via type filtering.
     const cfgRecord = config as unknown as Record<string, unknown>
-    const credentials: Record<string, unknown> = { options: mergedOptions }
+    const credentials: Record<string, unknown> = {}
+    if (config.options !== undefined) credentials.options = config.options
     for (const field of CCXT_CREDENTIAL_FIELDS) {
       const v = cfgRecord[field]
       if (v !== undefined) credentials[field] = v
@@ -202,7 +202,13 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
       const ex = this.exchange as unknown as Record<string, unknown>
       const opts = (ex['options'] ?? {}) as Record<string, unknown>
       const fmOpts = (opts['fetchMarkets'] ?? {}) as Record<string, unknown>
-      const types = (fmOpts['types'] ?? ['spot', 'linear', 'inverse']) as string[]
+      // Use the exchange's own default types (set in its CCXT class describe()).
+      // Skip 'option' type — option markets are typically thousands of contracts
+      // (Bybit alone has ~10k+) and rarely useful for automated trading.
+      const allTypes = (fmOpts['types'] ?? []) as string[]
+      const types = allTypes.length > 0
+        ? allTypes.filter(t => t !== 'option')
+        : ['spot', 'linear', 'inverse'] // fallback for exchanges that don't declare types
 
       const allMarkets: unknown[] = []
       for (const type of types) {
@@ -258,6 +264,8 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
 
     for (const market of Object.values(this.markets)) {
       if (market.active === false) continue
+      // Some exchanges (e.g. hyperliquid spot) have markets without base/quote populated
+      if (!market.base || !market.quote) continue
       if (market.base.toUpperCase() !== searchBase) continue
 
       const quote = market.quote.toUpperCase()
@@ -274,8 +282,8 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
       const aType = typeOrder[a.type as keyof typeof typeOrder] ?? 99
       const bType = typeOrder[b.type as keyof typeof typeOrder] ?? 99
       if (aType !== bType) return aType - bType
-      const aQuote = quoteOrder[a.quote.toUpperCase()] ?? 99
-      const bQuote = quoteOrder[b.quote.toUpperCase()] ?? 99
+      const aQuote = quoteOrder[(a.quote ?? '').toUpperCase()] ?? 99
+      const bQuote = quoteOrder[(b.quote ?? '').toUpperCase()] ?? 99
       return aQuote - bQuote
     })
 
@@ -358,15 +366,14 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
 
       const ccxtOrderType = ibkrOrderTypeToCcxt(order.orderType)
       const side = order.action.toLowerCase() as 'buy' | 'sell'
+      const refPrice = ccxtOrderType === 'limit' && order.lmtPrice !== UNSET_DOUBLE
+        ? order.lmtPrice
+        : undefined
 
-      const ccxtOrder = await this.exchange.createOrder(
-        ccxtSymbol,
-        ccxtOrderType,
-        side,
-        parseFloat(size),
-        ccxtOrderType === 'limit' && order.lmtPrice !== UNSET_DOUBLE ? order.lmtPrice : undefined,
-        params,
-      )
+      const placeOverride = this.overrides.placeOrder
+      const ccxtOrder = placeOverride
+        ? await placeOverride(this.exchange, ccxtSymbol, ccxtOrderType, side, parseFloat(size), refPrice, params, defaultPlaceOrder)
+        : await defaultPlaceOrder(this.exchange, ccxtSymbol, ccxtOrderType, side, parseFloat(size), refPrice, params)
 
       // Cache orderId → symbol
       if (ccxtOrder.id) {
@@ -388,8 +395,12 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
 
     try {
       const ccxtSymbol = this.orderSymbolCache.get(orderId)
-      const cancel = this.overrides.cancelOrderById ?? defaultCancelOrderById
-      await cancel(this.exchange, orderId, ccxtSymbol)
+      const cancelOverride = this.overrides.cancelOrderById
+      if (cancelOverride) {
+        await cancelOverride(this.exchange, orderId, ccxtSymbol, defaultCancelOrderById)
+      } else {
+        await defaultCancelOrderById(this.exchange, orderId, ccxtSymbol)
+      }
       const orderState = new OrderState()
       orderState.status = 'Cancelled'
       return { success: true, orderId, orderState }
@@ -408,8 +419,10 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
       }
 
       // editOrder requires type and side — fetch the original order to fill in defaults.
-      const fetch = this.overrides.fetchOrderById ?? defaultFetchOrderById
-      const original = await fetch(this.exchange, orderId, ccxtSymbol)
+      const fetchOverride = this.overrides.fetchOrderById
+      const original = fetchOverride
+        ? await fetchOverride(this.exchange, orderId, ccxtSymbol, defaultFetchOrderById)
+        : await defaultFetchOrderById(this.exchange, orderId, ccxtSymbol)
       const qty = changes.totalQuantity != null && !changes.totalQuantity.equals(UNSET_DECIMAL) ? parseFloat(changes.totalQuantity.toString()) : original.amount
       const price = changes.lmtPrice != null && changes.lmtPrice !== UNSET_DOUBLE ? changes.lmtPrice : original.price
 
@@ -522,7 +535,10 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
     this.ensureInit()
 
     try {
-      const raw = await this.exchange.fetchPositions()
+      const fetchOverride = this.overrides.fetchPositions
+      const raw = fetchOverride
+        ? await fetchOverride(this.exchange, defaultFetchPositions)
+        : await defaultFetchPositions(this.exchange)
       const result: Position[] = []
 
       for (const p of raw) {
@@ -577,9 +593,11 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
     const ccxtSymbol = this.orderSymbolCache.get(orderId)
     if (!ccxtSymbol) return null
 
-    const fetch = this.overrides.fetchOrderById ?? defaultFetchOrderById
+    const fetchOverride = this.overrides.fetchOrderById
     try {
-      const order = await fetch(this.exchange, orderId, ccxtSymbol)
+      const order = fetchOverride
+        ? await fetchOverride(this.exchange, orderId, ccxtSymbol, defaultFetchOrderById)
+        : await defaultFetchOrderById(this.exchange, orderId, ccxtSymbol)
       return this.convertCcxtOrder(order)
     } catch {
       return null

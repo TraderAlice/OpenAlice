@@ -11,7 +11,7 @@ import type { Exchange, Order as CcxtOrder } from 'ccxt'
 import type { CcxtExchangeOverrides } from '../overrides.js'
 
 export const bybitOverrides: CcxtExchangeOverrides = {
-  async fetchOrderById(exchange: Exchange, orderId: string, symbol: string): Promise<CcxtOrder> {
+  async fetchOrderById(exchange: Exchange, orderId: string, symbol: string, _defaultImpl): Promise<CcxtOrder> {
     // Try open regular → open conditional → closed regular → closed conditional
     try {
       return await (exchange as any).fetchOpenOrder(orderId, symbol)
