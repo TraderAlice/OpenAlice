@@ -157,26 +157,22 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
     this.exchange = new ExchangeClass(credentials)
 
     if (config.sandbox) {
-      if (this.exchangeName === 'okx' || this.exchangeName === 'bybit') {
-        // OKX and Bybit use enableDemoTrading for their sandbox-like environment
-        const ex = this.exchange as unknown as { enableDemoTrading?: (enable: boolean) => void }
-        if (typeof ex.enableDemoTrading === 'function') {
-          ex.enableDemoTrading(true)
-        } else {
-          this.exchange.setSandboxMode(true)
-        }
-      } else {
-        this.exchange.setSandboxMode(true)
-      }
+      this.exchange.setSandboxMode(true)
     }
 
     if (config.demoTrading && !config.sandbox) {
-      const ex = this.exchange as unknown as { enableDemoTrading?: (enable: boolean) => void; urls?: Record<string, unknown> }
-      if (typeof ex.enableDemoTrading === 'function') {
-        try {
-          ex.enableDemoTrading(true)
-        } catch (err) {
-          console.warn(`CcxtBroker[${this.id}]: enableDemoTrading failed:`, err instanceof Error ? err.message : String(err))
+      if (this.exchangeName === 'okx') {
+        // OKX demo trading is activated via setSandboxMode in CCXT (adds x-simulated-trading header)
+        // Calling the inherited enableDemoTrading blindly will crash OKX by deleting urls.api.
+        this.exchange.setSandboxMode(true)
+      } else {
+        const ex = this.exchange as unknown as { enableDemoTrading?: (enable: boolean) => void }
+        if (typeof ex.enableDemoTrading === 'function') {
+          try {
+            ex.enableDemoTrading(true)
+          } catch (err) {
+            console.warn(`CcxtBroker[${this.id}]: enableDemoTrading failed:`, err instanceof Error ? err.message : String(err))
+          }
         }
       }
     }
