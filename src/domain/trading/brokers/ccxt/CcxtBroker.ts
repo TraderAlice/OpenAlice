@@ -157,11 +157,28 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
     this.exchange = new ExchangeClass(credentials)
 
     if (config.sandbox) {
-      this.exchange.setSandboxMode(true)
+      if (this.exchangeName === 'okx' || this.exchangeName === 'bybit') {
+        // OKX and Bybit use enableDemoTrading for their sandbox-like environment
+        const ex = this.exchange as unknown as { enableDemoTrading?: (enable: boolean) => void }
+        if (typeof ex.enableDemoTrading === 'function') {
+          ex.enableDemoTrading(true)
+        } else {
+          this.exchange.setSandboxMode(true)
+        }
+      } else {
+        this.exchange.setSandboxMode(true)
+      }
     }
 
-    if (config.demoTrading) {
-      (this.exchange as unknown as { enableDemoTrading: (enable: boolean) => void }).enableDemoTrading(true)
+    if (config.demoTrading && !config.sandbox) {
+      const ex = this.exchange as unknown as { enableDemoTrading?: (enable: boolean) => void; urls?: Record<string, unknown> }
+      if (typeof ex.enableDemoTrading === 'function') {
+        try {
+          ex.enableDemoTrading(true)
+        } catch (err) {
+          console.warn(`CcxtBroker[${this.id}]: enableDemoTrading failed:`, err instanceof Error ? err.message : String(err))
+        }
+      }
     }
   }
 
@@ -216,7 +233,8 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
           try {
             const prevTypes = fmOpts['types']
             fmOpts['types'] = [type]
-            const markets = await origFetchMarkets(params)
+            // Pass the type in params so exchanges like OKX map it to instType correctly
+            const markets = await origFetchMarkets({ ...params, type })
             fmOpts['types'] = prevTypes
             allMarkets.push(...markets)
             break
