@@ -40,6 +40,8 @@ import { createEventLog } from './core/event-log.js'
 import { createToolCallLog } from './core/tool-call-log.js'
 import { createCronEngine, createCronListener, createCronTools } from './task/cron/index.js'
 import { createHeartbeat } from './task/heartbeat/index.js'
+import { createExplorer, createExplorationScheduler, createSkillCurator } from './domain/exploration/index.js'
+import { createExplorationTools } from './tool/exploration.js'
 import { NewsCollectorStore, NewsCollector } from './domain/news/index.js'
 import { createNewsArchiveTools } from './tool/news.js'
 
@@ -275,6 +277,30 @@ async function main() {
   await heartbeat.start()
   if (config.heartbeat.enabled) {
     console.log(`heartbeat: enabled (every ${config.heartbeat.every})`)
+  }
+
+  // ==================== Exploration Loop (Hermes-style self-exploration) ====================
+
+  const skillCurator = createSkillCurator({ skillsDir: config.exploration.skillsDir })
+  const explorer = createExplorer({
+    agentCenter,
+    eventLog,
+    connectorCenter,
+    brain,
+    skillCurator,
+    config: config.exploration,
+  })
+  const explorationScheduler = createExplorationScheduler({
+    explorer,
+    config: config.exploration,
+  })
+  explorationScheduler.start()
+  toolCenter.register(
+    createExplorationTools(explorer, explorationScheduler, skillCurator, eventLog),
+    'exploration',
+  )
+  if (config.exploration.enabled) {
+    console.log(`exploration: loop enabled (model=${config.exploration.model}, skillsDir=${config.exploration.skillsDir})`)
   }
 
   // ==================== News Collector ====================
