@@ -58,9 +58,41 @@ describe('yfinance — ETF & index', () => {
   it('AvailableIndices', async () => { expect((await exec('AvailableIndices')).length).toBeGreaterThan(0) })
 })
 
-describe('yfinance — derivatives & commodity', () => {
+describe('yfinance — derivatives', () => {
   it('OptionsChains', async () => { expect((await exec('OptionsChains', { symbol: 'AAPL' })).length).toBeGreaterThan(0) })
   it('FuturesHistorical', async () => { expect((await exec('FuturesHistorical', { symbol: 'ES=F' })).length).toBeGreaterThan(0) })
   it('FuturesCurve', async () => { expect((await exec('FuturesCurve', { symbol: 'ES' })).length).toBeGreaterThan(0) })
-  it('CommoditySpotPrice', async () => { expect((await exec('CommoditySpotPrice', { symbol: 'GC=F' })).length).toBeGreaterThan(0) })
+})
+
+describe('yfinance — commodity (canonical names)', () => {
+  // Precious metals
+  it('gold',      async () => { expect((await exec('CommoditySpotPrice', { symbol: 'gold' })).length).toBeGreaterThan(0) })
+  it('silver',    async () => { expect((await exec('CommoditySpotPrice', { symbol: 'silver' })).length).toBeGreaterThan(0) })
+  it('platinum',  async () => { expect((await exec('CommoditySpotPrice', { symbol: 'platinum' })).length).toBeGreaterThan(0) })
+  it('palladium', async () => { expect((await exec('CommoditySpotPrice', { symbol: 'palladium' })).length).toBeGreaterThan(0) })
+
+  // Industrial metals
+  it('copper', async () => { expect((await exec('CommoditySpotPrice', { symbol: 'copper' })).length).toBeGreaterThan(0) })
+
+  // Energy
+  it('crude_oil',   async () => { expect((await exec('CommoditySpotPrice', { symbol: 'crude_oil' })).length).toBeGreaterThan(0) })
+  it('brent',       async () => { expect((await exec('CommoditySpotPrice', { symbol: 'brent' })).length).toBeGreaterThan(0) })
+  it('natural_gas', async () => { expect((await exec('CommoditySpotPrice', { symbol: 'natural_gas' })).length).toBeGreaterThan(0) })
+  it('heating_oil', async () => { expect((await exec('CommoditySpotPrice', { symbol: 'heating_oil' })).length).toBeGreaterThan(0) })
+  it('gasoline',    async () => { expect((await exec('CommoditySpotPrice', { symbol: 'gasoline' })).length).toBeGreaterThan(0) })
+
+  // Agriculture (CBOT) — yfinance coverage historically flaky
+  it('corn',     async () => { expect((await exec('CommoditySpotPrice', { symbol: 'corn' })).length).toBeGreaterThan(0) })
+  it('wheat',    async () => { expect((await exec('CommoditySpotPrice', { symbol: 'wheat' })).length).toBeGreaterThan(0) })
+  it('soybeans', async () => { expect((await exec('CommoditySpotPrice', { symbol: 'soybeans' })).length).toBeGreaterThan(0) })
+
+  // Softs (ICE)
+  it('sugar',  async () => { expect((await exec('CommoditySpotPrice', { symbol: 'sugar' })).length).toBeGreaterThan(0) })
+  it('coffee', async () => { expect((await exec('CommoditySpotPrice', { symbol: 'coffee' })).length).toBeGreaterThan(0) })
+  it('cocoa',  async () => { expect((await exec('CommoditySpotPrice', { symbol: 'cocoa' })).length).toBeGreaterThan(0) })
+  it('cotton', async () => { expect((await exec('CommoditySpotPrice', { symbol: 'cotton' })).length).toBeGreaterThan(0) })
+
+  // Livestock
+  it('live_cattle', async () => { expect((await exec('CommoditySpotPrice', { symbol: 'live_cattle' })).length).toBeGreaterThan(0) })
+  it('lean_hogs',   async () => { expect((await exec('CommoditySpotPrice', { symbol: 'lean_hogs' })).length).toBeGreaterThan(0) })
 })

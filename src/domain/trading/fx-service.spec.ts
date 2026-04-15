@@ -136,15 +136,15 @@ describe('FxService', () => {
 
   it('converts amount to USD using live rate — no warning', async () => {
     const fx = new FxService(client)
-    const result = await fx.convertToUsd(80000, 'HKD')
-    expect(result.usd).toBeCloseTo(80000 * 0.1282, 2)
+    const result = await fx.convertToUsd('80000', 'HKD')
+    expect(Number(result.usd)).toBeCloseTo(80000 * 0.1282, 2)
     expect(result.fxWarning).toBeUndefined()
   })
 
   it('returns fxWarning only when using default rate', async () => {
     const fx = new FxService() // no client → default table
-    const result = await fx.convertToUsd(80000, 'HKD')
-    expect(result.usd).toBeCloseTo(80000 * 0.128, 2)
+    const result = await fx.convertToUsd('80000', 'HKD')
+    expect(Number(result.usd)).toBeCloseTo(80000 * 0.128, 2)
     expect(result.fxWarning).toMatch(/HKD.*default/)
   })
 
@@ -154,14 +154,14 @@ describe('FxService', () => {
     await new Promise(r => setTimeout(r, 150))
     client.getSnapshots = vi.fn().mockRejectedValue(new Error('down'))
 
-    const result = await fx.convertToUsd(80000, 'HKD')
+    const result = await fx.convertToUsd('80000', 'HKD')
     expect(result.fxWarning).toBeUndefined()
   })
 
   it('returns zero without warning for zero amount', async () => {
     const fx = new FxService(client)
-    const result = await fx.convertToUsd(0, 'HKD')
-    expect(result.usd).toBe(0)
+    const result = await fx.convertToUsd('0', 'HKD')
+    expect(result.usd).toBe('0')
     expect(result.fxWarning).toBeUndefined()
   })
 

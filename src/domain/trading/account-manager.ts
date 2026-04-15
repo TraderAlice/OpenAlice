@@ -5,6 +5,7 @@
  * Also provides cross-account operations (aggregated equity, contract search).
  */
 
+import Decimal from 'decimal.js'
 import type { Contract, ContractDescription, ContractDetails } from '@traderalice/ibkr'
 import type { AccountCapabilities, BrokerHealth, BrokerHealthInfo } from './brokers/types.js'
 import { CcxtBroker } from './brokers/ccxt/CcxtBroker.js'
@@ -31,19 +32,19 @@ export interface AccountSummary {
 // ==================== Aggregated equity ====================
 
 export interface AggregatedEquity {
-  totalEquity: number
-  totalCash: number
-  totalUnrealizedPnL: number
-  totalRealizedPnL: number
+  totalEquity: string
+  totalCash: string
+  totalUnrealizedPnL: string
+  totalRealizedPnL: string
   /** Present when one or more accounts used fallback FX rates. */
   fxWarnings?: string[]
   accounts: Array<{
     id: string
     label: string
     baseCurrency: string
-    equity: number
-    cash: number
-    unrealizedPnL: number
+    equity: string
+    cash: string
+    unrealizedPnL: string
     health: BrokerHealth
   }>
 }
@@ -243,10 +244,10 @@ export class AccountManager {
       }),
     )
 
-    let totalEquity = 0
-    let totalCash = 0
-    let totalUnrealizedPnL = 0
-    let totalRealizedPnL = 0
+    let totalEquity = new Decimal(0)
+    let totalCash = new Decimal(0)
+    let totalUnrealizedPnL = new Decimal(0)
+    let totalRealizedPnL = new Decimal(0)
     const fxWarnings: string[] = []
     const accounts: AggregatedEquity['accounts'] = []
 
@@ -259,31 +260,32 @@ export class AccountManager {
             this.fxService.convertToUsd(info.netLiquidation, baseCurrency),
             this.fxService.convertToUsd(info.totalCashValue, baseCurrency),
             this.fxService.convertToUsd(info.unrealizedPnL, baseCurrency),
-            this.fxService.convertToUsd(info.realizedPnL ?? 0, baseCurrency),
+            this.fxService.convertToUsd(info.realizedPnL ?? '0', baseCurrency),
           ])
-          totalEquity += eqR.usd
-          totalCash += cashR.usd
-          totalUnrealizedPnL += pnlR.usd
-          totalRealizedPnL += rpnlR.usd
+          totalEquity = totalEquity.plus(eqR.usd)
+          totalCash = totalCash.plus(cashR.usd)
+          totalUnrealizedPnL = totalUnrealizedPnL.plus(pnlR.usd)
+          totalRealizedPnL = totalRealizedPnL.plus(rpnlR.usd)
           // Collect warnings (deduplicate — same currency produces same warning)
           const w = eqR.fxWarning
           if (w && !fxWarnings.includes(w)) fxWarnings.push(w)
           accounts.push({ id, label, baseCurrency, equity: eqR.usd, cash: cashR.usd, unrealizedPnL: pnlR.usd, health })
         } else {
           // Already USD or no FxService — pass through
-          totalEquity += info.netLiquidation
-          totalCash += info.totalCashValue
-          totalUnrealizedPnL += info.unrealizedPnL
-          totalRealizedPnL += info.realizedPnL ?? 0
+          totalEquity = totalEquity.plus(info.netLiquidation)
+          totalCash = totalCash.plus(info.totalCashValue)
+          totalUnrealizedPnL = totalUnrealizedPnL.plus(info.unrealizedPnL)
+          totalRealizedPnL = totalRealizedPnL.plus(info.realizedPnL ?? '0')
           accounts.push({ id, label, baseCurrency, equity: info.netLiquidation, cash: info.totalCashValue, unrealizedPnL: info.unrealizedPnL, health })
         }
       } else {
-        accounts.push({ id, label, baseCurrency, equity: 0, cash: 0, unrealizedPnL: 0, health })
+        accounts.push({ id, label, baseCurrency, equity: '0', cash: '0', unrealizedPnL: '0', health })
       }
     }
 
     return {
-      totalEquity, totalCash, totalUnrealizedPnL, totalRealizedPnL,
+      totalEquity: totalEquity.toString(), totalCash: totalCash.toString(),
+      totalUnrealizedPnL: totalUnrealizedPnL.toString(), totalRealizedPnL: totalRealizedPnL.toString(),
       fxWarnings: fxWarnings.length > 0 ? fxWarnings : undefined,
       accounts,
     }

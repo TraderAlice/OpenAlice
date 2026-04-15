@@ -103,20 +103,20 @@ describe('AccountManager', () => {
 
   describe('getAggregatedEquity', () => {
     it('aggregates equity across accounts', async () => {
-      manager.add(makeUta(new MockBroker({ id: 'a1', label: 'A', accountInfo: { netLiquidation: 50_000, totalCashValue: 30_000, unrealizedPnL: 2_000, realizedPnL: 500 } })))
-      manager.add(makeUta(new MockBroker({ id: 'a2', label: 'B', accountInfo: { netLiquidation: 75_000, totalCashValue: 60_000, unrealizedPnL: 3_000, realizedPnL: 1_000 } })))
+      manager.add(makeUta(new MockBroker({ id: 'a1', label: 'A', accountInfo: { netLiquidation: '50000', totalCashValue: '30000', unrealizedPnL: '2000', realizedPnL: '500' } })))
+      manager.add(makeUta(new MockBroker({ id: 'a2', label: 'B', accountInfo: { netLiquidation: '75000', totalCashValue: '60000', unrealizedPnL: '3000', realizedPnL: '1000' } })))
 
       const result = await manager.getAggregatedEquity()
-      expect(result.totalEquity).toBe(125_000)
-      expect(result.totalCash).toBe(90_000)
-      expect(result.totalUnrealizedPnL).toBe(5_000)
-      expect(result.totalRealizedPnL).toBe(1_500)
+      expect(result.totalEquity).toBe('125000')
+      expect(result.totalCash).toBe('90000')
+      expect(result.totalUnrealizedPnL).toBe('5000')
+      expect(result.totalRealizedPnL).toBe('1500')
       expect(result.accounts).toHaveLength(2)
     })
 
     it('returns zeros when no accounts', async () => {
       const result = await manager.getAggregatedEquity()
-      expect(result.totalEquity).toBe(0)
+      expect(result.totalEquity).toBe('0')
       expect(result.accounts).toHaveLength(0)
     })
   })

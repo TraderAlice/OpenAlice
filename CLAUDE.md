@@ -1,4 +1,4 @@
-# Open Alice
+# OpenAlice
 
 File-driven AI trading agent. All state (sessions, config, logs) stored as files — no database.
 

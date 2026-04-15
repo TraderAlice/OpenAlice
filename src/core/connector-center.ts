@@ -59,7 +59,7 @@ export class ConnectorCenter {
 
     // Subscribe to future interactions
     eventLog?.subscribeType('message.received', (entry) => {
-      const { channel, to } = entry.payload as { channel: string; to: string }
+      const { channel, to } = entry.payload
       this.touch(channel, to)
     })
   }

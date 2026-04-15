@@ -185,7 +185,7 @@ describe('UTA — getState', () => {
   })
 
   it('assembles GitState from broker data', async () => {
-    broker.setAccountInfo({ totalCashValue: 50_000, netLiquidation: 55_000, unrealizedPnL: 3_000, realizedPnL: 800 })
+    broker.setAccountInfo({ totalCashValue: '50000', netLiquidation: '55000', unrealizedPnL: '3000', realizedPnL: '800' })
     broker.setPositions([makePosition()])
 
     // Push a limit order to create a pending entry in git history
@@ -195,10 +195,10 @@ describe('UTA — getState', () => {
 
     const state = await uta.getState()
 
-    expect(state.totalCashValue).toBe(50_000)
-    expect(state.netLiquidation).toBe(55_000)
-    expect(state.unrealizedPnL).toBe(3_000)
-    expect(state.realizedPnL).toBe(800)
+    expect(state.totalCashValue).toBe('50000')
+    expect(state.netLiquidation).toBe('55000')
+    expect(state.unrealizedPnL).toBe('3000')
+    expect(state.realizedPnL).toBe('800')
     expect(state.positions).toHaveLength(1)
     // Limit order is pending (Submitted) — found via getOrders([pendingId])
     expect(state.pendingOrders).toHaveLength(1)

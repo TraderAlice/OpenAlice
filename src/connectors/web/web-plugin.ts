@@ -19,6 +19,7 @@ import { createDevRoutes } from './routes/dev.js'
 import { createToolsRoutes } from './routes/tools.js'
 import { createAgentStatusRoutes } from './routes/agent-status.js'
 import { createPersonaRoutes } from './routes/persona.js'
+import { createNewsRoutes } from './routes/news.js'
 
 export interface WebConfig {
   port: number
@@ -85,6 +86,7 @@ export class WebPlugin implements Plugin {
     app.route('/api/dev', createDevRoutes(ctx.connectorCenter))
     app.route('/api/tools', createToolsRoutes(ctx.toolCenter))
     app.route('/api/agent-status', createAgentStatusRoutes(ctx))
+    app.route('/api/news', createNewsRoutes(ctx))
     app.route('/api/persona', createPersonaRoutes())
 
     // ==================== Serve UI (Vite build output) ====================

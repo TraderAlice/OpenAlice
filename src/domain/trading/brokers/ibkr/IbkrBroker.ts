@@ -266,31 +266,31 @@ export class IbkrBroker implements IBroker {
     const download = this.bridge.getAccountCache()
     if (!download) throw new BrokerError('NETWORK', 'Account data not yet available')
 
-    const totalCashValue = parseFloat(download.values.get('TotalCashValue') ?? '0')
-    let totalMarketValue = 0
-    let positionUnrealizedPnL = 0
+    const totalCashValue = new Decimal(download.values.get('TotalCashValue') ?? '0')
+    let totalMarketValue = new Decimal(0)
+    let positionUnrealizedPnL = new Decimal(0)
     for (const pos of download.positions) {
-      totalMarketValue += pos.marketValue
-      positionUnrealizedPnL += pos.unrealizedPnL
+      totalMarketValue = totalMarketValue.plus(pos.marketValue)
+      positionUnrealizedPnL = positionUnrealizedPnL.plus(pos.unrealizedPnL)
     }
 
     const netLiquidation = download.positions.length > 0
-      ? totalCashValue + totalMarketValue
-      : parseFloat(download.values.get('NetLiquidation') ?? '0')
+      ? totalCashValue.plus(totalMarketValue)
+      : new Decimal(download.values.get('NetLiquidation') ?? '0')
 
     const unrealizedPnL = download.positions.length > 0
       ? positionUnrealizedPnL
-      : parseFloat(download.values.get('UnrealizedPnL') ?? '0')
+      : new Decimal(download.values.get('UnrealizedPnL') ?? '0')
 
     return {
       baseCurrency: download.values.get('BaseCurrency') ?? 'USD',
-      netLiquidation,
-      totalCashValue,
-      unrealizedPnL,
-      realizedPnL: parseFloat(download.values.get('RealizedPnL') ?? '0'),
-      buyingPower: parseFloat(download.values.get('BuyingPower') ?? '0'),
-      initMarginReq: parseFloat(download.values.get('InitMarginReq') ?? '0'),
-      maintMarginReq: parseFloat(download.values.get('MaintMarginReq') ?? '0'),
+      netLiquidation: netLiquidation.toString(),
+      totalCashValue: totalCashValue.toString(),
+      unrealizedPnL: unrealizedPnL.toString(),
+      realizedPnL: new Decimal(download.values.get('RealizedPnL') ?? '0').toString(),
+      buyingPower: new Decimal(download.values.get('BuyingPower') ?? '0').toString(),
+      initMarginReq: new Decimal(download.values.get('InitMarginReq') ?? '0').toString(),
+      maintMarginReq: new Decimal(download.values.get('MaintMarginReq') ?? '0').toString(),
       dayTradesRemaining: parseInt(download.values.get('DayTradesRemaining') ?? '0', 10),
     }
   }

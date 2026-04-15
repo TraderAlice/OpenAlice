@@ -16,11 +16,12 @@
  */
 
 import type { EventLog, EventLogEntry } from '../../core/event-log.js'
+import type { CronFirePayload } from '../../core/agent-event.js'
 import type { AgentCenter } from '../../core/agent-center.js'
 import { SessionStore } from '../../core/session.js'
 import type { ConnectorCenter } from '../../core/connector-center.js'
 import { writeConfigSection } from '../../core/config.js'
-import type { CronEngine, CronFirePayload } from '../cron/engine.js'
+import type { CronEngine } from '../cron/engine.js'
 
 // ==================== Constants ====================
 
@@ -108,8 +109,8 @@ export function createHeartbeat(opts: HeartbeatOpts): Heartbeat {
 
   const dedup = new HeartbeatDedup()
 
-  async function handleFire(entry: EventLogEntry): Promise<void> {
-    const payload = entry.payload as CronFirePayload
+  async function handleFire(entry: EventLogEntry<CronFirePayload>): Promise<void> {
+    const payload = entry.payload
 
     // Only handle our own job
     if (payload.jobName !== HEARTBEAT_JOB_NAME) return

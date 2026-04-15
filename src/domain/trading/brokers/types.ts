@@ -71,11 +71,12 @@ export interface Position {
   currency: string
   side: 'long' | 'short'
   quantity: Decimal
-  avgCost: number
-  marketPrice: number
-  marketValue: number
-  unrealizedPnL: number
-  realizedPnL: number
+  /** All monetary fields are strings to prevent IEEE 754 floating-point artifacts. Use Decimal for arithmetic. */
+  avgCost: string
+  marketPrice: string
+  marketValue: string
+  unrealizedPnL: string
+  realizedPnL: string
 }
 
 // ==================== Order result ====================
@@ -103,17 +104,17 @@ export interface OpenOrder {
 
 // ==================== Account info ====================
 
-/** Field names aligned with IBKR AccountSummaryTags. */
+/** Field names aligned with IBKR AccountSummaryTags. All monetary fields are strings to prevent IEEE 754 artifacts. */
 export interface AccountInfo {
   /** Base currency of this account — all monetary fields are denominated in this currency. */
   baseCurrency: string
-  netLiquidation: number
-  totalCashValue: number
-  unrealizedPnL: number
-  realizedPnL?: number
-  buyingPower?: number
-  initMarginReq?: number
-  maintMarginReq?: number
+  netLiquidation: string
+  totalCashValue: string
+  unrealizedPnL: string
+  realizedPnL?: string
+  buyingPower?: string
+  initMarginReq?: string
+  maintMarginReq?: string
   dayTradesRemaining?: number
 }
 

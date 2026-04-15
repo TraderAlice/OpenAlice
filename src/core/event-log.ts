@@ -12,6 +12,8 @@
 
 import { appendFile, readFile, mkdir, unlink } from 'node:fs/promises'
 import { dirname } from 'node:path'
+import type { AgentEventMap } from './agent-event.js'
+import { validateEventPayload } from './agent-event.js'
 
 // ==================== Types ====================
 
@@ -37,7 +39,9 @@ export interface EventLogQueryResult {
 }
 
 export interface EventLog {
-  /** Append an event. Returns the persisted entry (with seq/ts). */
+  /** Append a typed event (registered in AgentEventMap). Validates payload at runtime. */
+  append<K extends keyof AgentEventMap>(type: K, payload: AgentEventMap[K]): Promise<EventLogEntry<AgentEventMap[K]>>
+  /** Append an unregistered event (no runtime validation). */
   append<T>(type: string, payload: T): Promise<EventLogEntry<T>>
 
   /**
@@ -72,7 +76,9 @@ export interface EventLog {
   /** Subscribe to new events (real-time, on append). Returns unsubscribe fn. */
   subscribe(listener: EventLogListener): () => void
 
-  /** Subscribe to new events of a specific type. Returns unsubscribe fn. */
+  /** Subscribe to events of a registered type (typed listener). Returns unsubscribe fn. */
+  subscribeType<K extends keyof AgentEventMap>(type: K, listener: (entry: EventLogEntry<AgentEventMap[K]>) => void): () => void
+  /** Subscribe to events of any type (untyped listener). Returns unsubscribe fn. */
   subscribeType(type: string, listener: EventLogListener): () => void
 
   /** Close the log (clear listeners and buffer). */
@@ -118,6 +124,7 @@ export async function createEventLog(opts?: {
   // ---------- append ----------
 
   async function append<T>(type: string, payload: T): Promise<EventLogEntry<T>> {
+    validateEventPayload(type, payload)
     seq += 1
     const entry: EventLogEntry<T> = {
       seq,

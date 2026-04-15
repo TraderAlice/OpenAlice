@@ -490,41 +490,41 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
       ])
 
       const bal = balance as unknown as Record<string, Record<string, unknown>>
-      const free = parseFloat(String(bal['free']?.['USDT'] ?? bal['free']?.['USD'] ?? 0))
-      const used = parseFloat(String(bal['used']?.['USDT'] ?? bal['used']?.['USD'] ?? 0))
+      const free = new Decimal(String(bal['free']?.['USDT'] ?? bal['free']?.['USD'] ?? 0))
+      const used = new Decimal(String(bal['used']?.['USDT'] ?? bal['used']?.['USD'] ?? 0))
 
       // Aggregate P&L and market value from positions.
       // We use position-level markPrice (which is fresh from the exchange's
       // websocket feed) rather than balance.total (which is a cached wallet
       // snapshot that may not update between funding/settlement cycles).
-      let unrealizedPnL = 0
-      let realizedPnL = 0
-      let totalPositionValue = 0
+      let unrealizedPnL = new Decimal(0)
+      let realizedPnL = new Decimal(0)
+      let totalPositionValue = new Decimal(0)
       for (const p of rawPositions) {
-        unrealizedPnL += parseFloat(String(p.unrealizedPnl ?? 0))
-        realizedPnL += parseFloat(String((p as unknown as Record<string, unknown>).realizedPnl ?? 0))
+        unrealizedPnL = unrealizedPnL.plus(new Decimal(String(p.unrealizedPnl ?? 0)))
+        realizedPnL = realizedPnL.plus(new Decimal(String((p as unknown as Record<string, unknown>).realizedPnl ?? 0)))
 
         // Compute position market value from fresh markPrice
         const contracts = new Decimal(String(p.contracts ?? 0)).abs()
         const contractSize = new Decimal(String(p.contractSize ?? 1))
         const quantity = contracts.mul(contractSize)
-        const markPrice = parseFloat(String(p.markPrice ?? 0))
-        totalPositionValue += quantity.toNumber() * markPrice
+        const markPrice = new Decimal(String(p.markPrice ?? 0))
+        totalPositionValue = totalPositionValue.plus(quantity.mul(markPrice))
       }
 
       // Reconstruct netLiquidation from fresh components:
       //   netLiq = available cash + total position market value
       // This gives a real-time equity figure that tracks markPrice movements,
       // unlike balance.total which only updates on exchange settlement.
-      const netLiquidation = free + totalPositionValue
+      const netLiquidation = free.plus(totalPositionValue)
 
       return {
         baseCurrency: 'USD',
-        netLiquidation,
-        totalCashValue: free,
-        unrealizedPnL,
-        realizedPnL,
-        initMarginReq: used,
+        netLiquidation: netLiquidation.toString(),
+        totalCashValue: free.toString(),
+        unrealizedPnL: unrealizedPnL.toString(),
+        realizedPnL: realizedPnL.toString(),
+        initMarginReq: used.toString(),
       }
     } catch (err) {
       throw BrokerError.from(err)
@@ -551,21 +551,21 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
         const quantity = contracts.mul(contractSize)
         if (quantity.isZero()) continue
 
-        const markPrice = parseFloat(String(p.markPrice ?? 0))
-        const entryPrice = parseFloat(String(p.entryPrice ?? 0))
-        const marketValue = quantity.toNumber() * markPrice
-        const unrealizedPnL = parseFloat(String(p.unrealizedPnl ?? 0))
+        const markPrice = new Decimal(String(p.markPrice ?? 0))
+        const entryPrice = new Decimal(String(p.entryPrice ?? 0))
+        const marketValue = quantity.mul(markPrice)
+        const unrealizedPnL = new Decimal(String(p.unrealizedPnl ?? 0))
 
         result.push({
           contract: marketToContract(market, this.exchangeName),
           currency: normalizeQuoteCurrency(market.quote ?? 'USDT'),
           side: p.side === 'long' ? 'long' : 'short',
           quantity,
-          avgCost: entryPrice,
-          marketPrice: markPrice,
-          marketValue,
-          unrealizedPnL,
-          realizedPnL: parseFloat(String((p as unknown as Record<string, unknown>).realizedPnl ?? 0)),
+          avgCost: entryPrice.toString(),
+          marketPrice: markPrice.toString(),
+          marketValue: marketValue.toString(),
+          unrealizedPnL: unrealizedPnL.toString(),
+          realizedPnL: new Decimal(String((p as unknown as Record<string, unknown>).realizedPnl ?? 0)).toString(),
         })
       }
 

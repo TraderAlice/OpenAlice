@@ -134,7 +134,7 @@ export class UnifiedTradingAccount {
         netLiquidation: accountInfo.netLiquidation,
         totalCashValue: accountInfo.totalCashValue,
         unrealizedPnL: accountInfo.unrealizedPnL,
-        realizedPnL: accountInfo.realizedPnL ?? 0,
+        realizedPnL: accountInfo.realizedPnL ?? '0',
         positions,
         pendingOrders: orders.filter(o => o.orderState.status === 'Submitted' || o.orderState.status === 'PreSubmitted'),
       }

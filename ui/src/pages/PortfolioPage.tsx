@@ -11,12 +11,12 @@ import { Toggle } from '../components/Toggle'
 // ==================== Types ====================
 
 interface AggregatedEquity {
-  totalEquity: number
-  totalCash: number
-  totalUnrealizedPnL: number
-  totalRealizedPnL: number
+  totalEquity: string
+  totalCash: string
+  totalUnrealizedPnL: string
+  totalRealizedPnL: string
   fxWarnings?: string[]
-  accounts: Array<{ id: string; label: string; baseCurrency?: string; equity: number; cash: number; health?: string }>
+  accounts: Array<{ id: string; label: string; baseCurrency?: string; equity: string; cash: string; unrealizedPnL?: string; health?: string }>
 }
 
 interface AccountData {
@@ -143,7 +143,7 @@ export function PortfolioPage() {
   // Merge equity per-account data with provider info + per-account unrealizedPnL from positions
   const accountSources = (data.equity?.accounts ?? []).map(eq => {
     const acct = data.accounts.find(a => a.id === eq.id)
-    const unrealizedPnL = acct?.positions.reduce((sum, p) => sum + p.unrealizedPnL, 0) ?? 0
+    const unrealizedPnL = acct?.positions.reduce((sum, p) => sum + Number(p.unrealizedPnL), 0) ?? 0
     const hInfo = healthMap[eq.id]
     return { ...eq, provider: acct?.provider ?? '', unrealizedPnL, error: acct?.error, health: eq.health, disabled: hInfo?.disabled ?? false }
   })
@@ -278,10 +278,10 @@ function HeroMetrics({ equity }: { equity: AggregatedEquity | null }) {
   return (
     <div className="border border-border rounded-lg bg-bg-secondary p-5">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <HeroItem label="Total Equity" value={fmt(equity.totalEquity)} />
-        <HeroItem label="Cash" value={fmt(equity.totalCash)} />
-        <HeroItem label="Unrealized PnL" value={fmtPnl(equity.totalUnrealizedPnL)} pnl={equity.totalUnrealizedPnL} />
-        <HeroItem label="Realized PnL" value={fmtPnl(equity.totalRealizedPnL)} pnl={equity.totalRealizedPnL} />
+        <HeroItem label="Total Equity" value={fmt(Number(equity.totalEquity))} />
+        <HeroItem label="Cash" value={fmt(Number(equity.totalCash))} />
+        <HeroItem label="Unrealized PnL" value={fmtPnl(Number(equity.totalUnrealizedPnL))} pnl={Number(equity.totalUnrealizedPnL)} />
+        <HeroItem label="Realized PnL" value={fmtPnl(Number(equity.totalRealizedPnL))} pnl={Number(equity.totalRealizedPnL)} />
       </div>
     </div>
   )
@@ -305,7 +305,7 @@ const HEALTH_DOT: Record<string, string> = {
   offline: 'bg-red',
 }
 
-function AccountStrip({ sources }: { sources: Array<{ id: string; label: string; provider: string; equity: number; unrealizedPnL: number; error?: string; health?: string; disabled?: boolean }> }) {
+function AccountStrip({ sources }: { sources: Array<{ id: string; label: string; provider: string; equity: string; unrealizedPnL: number; error?: string; health?: string; disabled?: boolean }> }) {
   return (
     <div className="flex flex-wrap gap-2">
       {sources.map(s => {
@@ -323,7 +323,7 @@ function AccountStrip({ sources }: { sources: Array<{ id: string; label: string;
               : isOffline
                 ? <span className="text-red text-[11px]">Reconnecting...</span>
                 : <>
-                    <span className="text-text-muted">{fmt(s.equity)}</span>
+                    <span className="text-text-muted">{fmt(Number(s.equity))}</span>
                     {s.unrealizedPnL !== 0 && (
                       <span className={s.unrealizedPnL >= 0 ? 'text-green' : 'text-red'}>
                         {fmtPnl(s.unrealizedPnL)}
@@ -406,7 +406,7 @@ function PositionsTable({ positions, fxRates }: { positions: PositionWithAccount
               const deriv = isDerivative(p)
               const ccy = p.currency ?? 'USD'
               const fxRate = ccy === 'USD' ? 1 : (rateMap[ccy] ?? 1)
-              const usdValue = p.marketValue * fxRate
+              const usdValue = Number(p.marketValue) * fxRate
 
               return (
                 <tr key={i} className="border-t border-border hover:bg-bg-tertiary/30 transition-colors">
@@ -426,21 +426,21 @@ function PositionsTable({ positions, fxRates }: { positions: PositionWithAccount
                   </td>
                   <td className="px-3 py-2 text-center text-text-muted text-[11px]">{ccy}</td>
                   <td className="px-3 py-2 text-right text-text">{fmtNum(Number(p.quantity))}</td>
-                  <td className="px-3 py-2 text-right text-text-muted">{fmt(p.avgCost, p.currency)}</td>
-                  <td className="px-3 py-2 text-right text-text">{fmt(p.marketPrice, p.currency)}</td>
-                  <td className="px-3 py-2 text-right text-text">{fmt(p.marketValue, p.currency)}</td>
+                  <td className="px-3 py-2 text-right text-text-muted">{fmt(Number(p.avgCost), p.currency)}</td>
+                  <td className="px-3 py-2 text-right text-text">{fmt(Number(p.marketPrice), p.currency)}</td>
+                  <td className="px-3 py-2 text-right text-text">{fmt(Number(p.marketValue), p.currency)}</td>
                   {hasNonUsd && (
                     <td className="px-3 py-2 text-right text-text-muted">
                       {ccy === 'USD' ? '—' : fmt(usdValue)}
                     </td>
                   )}
-                  <td className={`px-3 py-2 text-right font-medium ${p.unrealizedPnL >= 0 ? 'text-green' : 'text-red'}`}>
-                    {fmtPnl(p.unrealizedPnL, p.currency)}
+                  <td className={`px-3 py-2 text-right font-medium ${Number(p.unrealizedPnL) >= 0 ? 'text-green' : 'text-red'}`}>
+                    {fmtPnl(Number(p.unrealizedPnL), p.currency)}
                   </td>
-                  <td className={`px-3 py-2 text-right ${p.unrealizedPnL >= 0 ? 'text-green' : 'text-red'}`}>
+                  <td className={`px-3 py-2 text-right ${Number(p.unrealizedPnL) >= 0 ? 'text-green' : 'text-red'}`}>
                     {(() => {
-                      const cost = p.avgCost * Number(p.quantity)
-                      const pct = cost > 0 ? (p.unrealizedPnL / cost) * 100 : 0
+                      const cost = Number(p.avgCost) * Number(p.quantity)
+                      const pct = cost > 0 ? (Number(p.unrealizedPnL) / cost) * 100 : 0
                       return `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`
                     })()}
                   </td>

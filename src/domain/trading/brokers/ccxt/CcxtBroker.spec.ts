@@ -845,11 +845,11 @@ describe('CcxtBroker — getAccount', () => {
 
     const info = await acc.getAccount()
     // netLiq = free (8000) + position market values (1500 + 500 = 2000) = 10000
-    expect(info.netLiquidation).toBe(10000)
-    expect(info.totalCashValue).toBe(8000)
-    expect(info.initMarginReq).toBe(2000)
-    expect(info.unrealizedPnL).toBe(300)
-    expect(info.realizedPnL).toBe(150)
+    expect(info.netLiquidation).toBe('10000')
+    expect(info.totalCashValue).toBe('8000')
+    expect(info.initMarginReq).toBe('2000')
+    expect(info.unrealizedPnL).toBe('300')
+    expect(info.realizedPnL).toBe('150')
   })
 
   it('throws BrokerError when no API credentials', async () => {
@@ -887,8 +887,8 @@ describe('CcxtBroker — getPositions', () => {
     expect(positions[0].quantity).toBeInstanceOf(Decimal)
     expect(positions[0].quantity.toNumber()).toBe(2)
     expect(positions[0].side).toBe('long')
-    expect(positions[0].avgCost).toBe(58000)
-    expect(positions[0].marketPrice).toBe(60000)
+    expect(positions[0].avgCost).toBe('58000')
+    expect(positions[0].marketPrice).toBe('60000')
   })
 
   it('skips zero-size positions', async () => {

@@ -129,7 +129,7 @@ describe('placeOrder', () => {
     expect(positions).toHaveLength(1)
     expect(positions[0].side).toBe('long')
     expect(positions[0].quantity.toNumber()).toBe(10)
-    expect(positions[0].avgCost).toBe(150)
+    expect(positions[0].avgCost).toBe('150')
   })
 
   it('updates existing position on additional buy (avg cost recalc)', async () => {
@@ -153,7 +153,7 @@ describe('placeOrder', () => {
     expect(positions).toHaveLength(1)
     expect(positions[0].quantity.toNumber()).toBe(20)
     // avg cost = (10*150 + 10*160) / 20 = 155
-    expect(positions[0].avgCost).toBe(155)
+    expect(positions[0].avgCost).toBe('155')
   })
 })
 
@@ -303,7 +303,7 @@ describe('fillPendingOrder', () => {
     // Position should be created
     const positions = await broker.getPositions()
     expect(positions).toHaveLength(1)
-    expect(positions[0].avgCost).toBe(139.50)
+    expect(positions[0].avgCost).toBe('139.5')
   })
 })
 
@@ -312,9 +312,9 @@ describe('fillPendingOrder', () => {
 describe('getAccount', () => {
   it('starts with configured cash', async () => {
     const account = await broker.getAccount()
-    expect(account.netLiquidation).toBe(100_000)
-    expect(account.totalCashValue).toBe(100_000)
-    expect(account.unrealizedPnL).toBe(0)
+    expect(account.netLiquidation).toBe('100000')
+    expect(account.totalCashValue).toBe('100000')
+    expect(account.unrealizedPnL).toBe('0')
   })
 
   it('cash decreases after buy, equity includes unrealized PnL', async () => {
@@ -330,11 +330,11 @@ describe('getAccount', () => {
     broker.setQuote('AAPL', 160)
     const account = await broker.getAccount()
     // cash = 100000 - 10*150 = 98500
-    expect(account.totalCashValue).toBe(98_500)
+    expect(account.totalCashValue).toBe('98500')
     // unrealized = 10 * (160 - 150) = 100
-    expect(account.unrealizedPnL).toBe(100)
+    expect(account.unrealizedPnL).toBe('100')
     // equity = cash + market value = 98500 + 10*160 = 100100
-    expect(account.netLiquidation).toBe(100_100)
+    expect(account.netLiquidation).toBe('100100')
   })
 })
 
@@ -383,12 +383,12 @@ describe('call tracking', () => {
 
 describe('accountInfo constructor option', () => {
   it('overrides getAccount return value', async () => {
-    const b = new MockBroker({ accountInfo: { netLiquidation: 50_000, totalCashValue: 30_000, unrealizedPnL: 2_000, realizedPnL: 500 } })
+    const b = new MockBroker({ accountInfo: { netLiquidation: '50000', totalCashValue: '30000', unrealizedPnL: '2000', realizedPnL: '500' } })
     const account = await b.getAccount()
-    expect(account.netLiquidation).toBe(50_000)
-    expect(account.totalCashValue).toBe(30_000)
-    expect(account.unrealizedPnL).toBe(2_000)
-    expect(account.realizedPnL).toBe(500)
+    expect(account.netLiquidation).toBe('50000')
+    expect(account.totalCashValue).toBe('30000')
+    expect(account.unrealizedPnL).toBe('2000')
+    expect(account.realizedPnL).toBe('500')
   })
 })
 

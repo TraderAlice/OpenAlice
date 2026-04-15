@@ -36,9 +36,9 @@ describe('AlpacaBroker — connectivity', () => {
 
   it('fetches account info with positive equity', async () => {
     const account = await broker!.getAccount()
-    expect(account.netLiquidation).toBeGreaterThan(0)
-    expect(account.totalCashValue).toBeGreaterThan(0)
-    console.log(`  equity: $${account.netLiquidation.toFixed(2)}, cash: $${account.totalCashValue.toFixed(2)}, buying_power: $${account.buyingPower?.toFixed(2)}`)
+    expect(Number(account.netLiquidation)).toBeGreaterThan(0)
+    expect(Number(account.totalCashValue)).toBeGreaterThan(0)
+    console.log(`  equity: $${Number(account.netLiquidation).toFixed(2)}, cash: $${Number(account.totalCashValue).toFixed(2)}, buying_power: $${account.buyingPower ? Number(account.buyingPower).toFixed(2) : undefined}`)
   })
 
   it('fetches market clock', async () => {
@@ -60,9 +60,9 @@ describe('AlpacaBroker — connectivity', () => {
     for (const p of positions) {
       console.log(`  ${p.contract.symbol}: qty=${p.quantity}, avg=${p.avgCost}, mkt=${p.marketPrice}`)
       expect(p.quantity).toBeInstanceOf(Decimal)
-      expect(typeof p.avgCost).toBe('number')
-      expect(typeof p.marketPrice).toBe('number')
-      expect(typeof p.unrealizedPnL).toBe('number')
+      expect(typeof p.avgCost).toBe('string')
+      expect(typeof p.marketPrice).toBe('string')
+      expect(typeof p.unrealizedPnL).toBe('string')
     }
   })
 })

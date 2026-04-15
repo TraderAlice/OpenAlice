@@ -316,14 +316,14 @@ export class AlpacaBroker implements IBroker {
       const unrealizedPnL = positions.reduce(
         (sum, p) => sum.plus(new Decimal(p.unrealized_pl)),
         new Decimal(0),
-      ).toNumber()
+      )
 
       return {
         baseCurrency: 'USD',
-        netLiquidation: parseFloat(account.equity),
-        totalCashValue: parseFloat(account.cash),
-        unrealizedPnL,
-        buyingPower: parseFloat(account.buying_power),
+        netLiquidation: new Decimal(account.equity).toString(),
+        totalCashValue: new Decimal(account.cash).toString(),
+        unrealizedPnL: unrealizedPnL.toString(),
+        buyingPower: new Decimal(account.buying_power).toString(),
         dayTradesRemaining: account.daytrade_count != null ? Math.max(0, 3 - account.daytrade_count) : undefined,
       }
     } catch (err) {
@@ -340,11 +340,11 @@ export class AlpacaBroker implements IBroker {
         currency: 'USD',
         side: p.side === 'long' ? 'long' as const : 'short' as const,
         quantity: new Decimal(p.qty),
-        avgCost: parseFloat(p.avg_entry_price),
-        marketPrice: parseFloat(p.current_price),
-        marketValue: Math.abs(parseFloat(p.market_value)),
-        unrealizedPnL: parseFloat(p.unrealized_pl),
-        realizedPnL: 0,
+        avgCost: new Decimal(p.avg_entry_price).toString(),
+        marketPrice: new Decimal(p.current_price).toString(),
+        marketValue: new Decimal(p.market_value).abs().toString(),
+        unrealizedPnL: new Decimal(p.unrealized_pl).toString(),
+        realizedPnL: '0',
       }))
     } catch (err) {
       throw BrokerError.from(err)

@@ -16,6 +16,7 @@ import { createBrainTools } from './tool/brain.js'
 import type { BrainExportState } from './domain/brain/index.js'
 import { createBrowserTools } from './tool/browser.js'
 import { SymbolIndex } from './domain/market-data/equity/index.js'
+import { CommodityCatalog } from './domain/market-data/commodity/index.js'
 import { createEquityTools } from './tool/equity.js'
 import { getSDKExecutor, buildRouteMap, SDKEquityClient, SDKCryptoClient, SDKCurrencyClient, SDKEtfClient, SDKIndexClient, SDKDerivativesClient, SDKCommodityClient } from './domain/market-data/client/typebb/index.js'
 import type { EquityClientLike, CryptoClientLike, CurrencyClientLike, EtfClientLike, IndexClientLike, DerivativesClientLike, CommodityClientLike } from './domain/market-data/client/types.js'
@@ -171,7 +172,7 @@ async function main() {
     equityClient = new OpenBBEquityClient(url, providers.equity, keys)
     cryptoClient = new OpenBBCryptoClient(url, providers.crypto, keys)
     currencyClient = new OpenBBCurrencyClient(url, providers.currency, keys)
-    commodityClient = new OpenBBCommodityClient(url, providers.equity, keys)
+    commodityClient = new OpenBBCommodityClient(url, providers.commodity, keys)
   } else {
     const executor = getSDKExecutor()
     const routeMap = buildRouteMap()
@@ -179,7 +180,7 @@ async function main() {
     equityClient = new SDKEquityClient(executor, 'equity', providers.equity, credentials, routeMap)
     cryptoClient = new SDKCryptoClient(executor, 'crypto', providers.crypto, credentials, routeMap)
     currencyClient = new SDKCurrencyClient(executor, 'currency', providers.currency, credentials, routeMap)
-    commodityClient = new SDKCommodityClient(executor, 'commodity', providers.equity, credentials, routeMap)
+    commodityClient = new SDKCommodityClient(executor, 'commodity', providers.commodity, credentials, routeMap)
     etfClient = new SDKEtfClient(executor, 'etf', providers.equity, credentials, routeMap)
     indexClient = new SDKIndexClient(executor, 'index', providers.equity, credentials, routeMap)
     derivativesClient = new SDKDerivativesClient(executor, 'derivatives', providers.equity, credentials, routeMap)
@@ -197,6 +198,9 @@ async function main() {
   const symbolIndex = new SymbolIndex()
   await symbolIndex.load(equityClient)
 
+  const commodityCatalog = new CommodityCatalog()
+  commodityCatalog.load()
+
   // ==================== Tool Registration ====================
 
   toolCenter.register(createThinkingTools(), 'thinking')
@@ -210,7 +214,7 @@ async function main() {
   toolCenter.register(createBrainTools(brain), 'brain')
   toolCenter.register(createBrowserTools(), 'browser')
   toolCenter.register(createCronTools(cronEngine), 'cron')
-  toolCenter.register(createMarketSearchTools(symbolIndex, cryptoClient, currencyClient), 'market-search')
+  toolCenter.register(createMarketSearchTools(symbolIndex, cryptoClient, currencyClient, commodityCatalog), 'market-search')
   toolCenter.register(createEquityTools(equityClient), 'equity')
   if (config.news.enabled) {
     toolCenter.register(createNewsArchiveTools(newsStore), 'news')
@@ -407,6 +411,7 @@ async function main() {
     config, connectorCenter, agentCenter, eventLog, toolCallLog, heartbeat, cronEngine, toolCenter,
     bbEngine: getSDKExecutor(),
     accountManager, fxService, snapshotService,
+    newsProvider: newsStore,
     reconnectConnectors,
   }
 

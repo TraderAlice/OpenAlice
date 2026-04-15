@@ -13,19 +13,25 @@ import { tool } from 'ai'
 import { z } from 'zod'
 import type { SymbolIndex } from '@/domain/market-data/equity/symbol-index'
 import type { CryptoClientLike, CurrencyClientLike } from '@/domain/market-data/client/types'
+import type { CommodityCatalog } from '@/domain/market-data/commodity/commodity-catalog'
 
 export function createMarketSearchTools(
   symbolIndex: SymbolIndex,
   cryptoClient: CryptoClientLike,
   currencyClient: CurrencyClientLike,
+  commodityCatalog: CommodityCatalog,
 ) {
   return {
     marketSearchForResearch: tool({
-      description: `Search for symbols across all asset classes (equities, crypto, currencies) for market data research.
+      description: `Search for symbols across all asset classes (equities, crypto, currencies, commodities) for market data research.
 
-Returns matching symbols with assetClass attribution ("equity", "crypto", or "currency").
+Returns matching symbols with assetClass attribution ("equity", "crypto", "currency", or "commodity").
 Equity results come from SEC/TMX listings (~13k US/CA stocks); crypto and currency results
-come from Yahoo Finance fuzzy search. Currency results are filtered to XXXUSD pairs only.
+come from Yahoo Finance fuzzy search; commodity results come from a canonical catalog (~25 items).
+Currency results are filtered to XXXUSD pairs only.
+
+For commodities, use the canonical id (e.g. "gold", "crude_oil", "copper") with calculateIndicator
+and other tools — provider-specific tickers (GC=F, GCUSD) are resolved automatically.
 
 If unsure about the symbol, use this to find the correct one for market data tools
 (equityGetProfile, equityGetFinancials, calculateIndicator, etc.).
@@ -37,8 +43,9 @@ This is NOT for trading — use searchContracts to find broker-tradeable contrac
       execute: async ({ query, limit }) => {
         const cap = limit ?? 20
 
-        // equity: 本地同步搜索
+        // equity + commodity: 本��同步搜索
         const equityResults = symbolIndex.search(query, cap).map((r) => ({ ...r, assetClass: 'equity' as const }))
+        const commodityResults = commodityCatalog.search(query, cap).map((r) => ({ ...r, assetClass: 'commodity' as const }))
 
         // crypto + currency: yfinance 在线搜索，并行，容错
         const [cryptoSettled, currencySettled] = await Promise.allSettled([
@@ -58,7 +65,7 @@ This is NOT for trading — use searchContracts to find broker-tradeable contrac
           })
           .map((r) => ({ ...r, assetClass: 'currency' as const }))
 
-        const results = [...equityResults, ...cryptoResults, ...currencyResults]
+        const results = [...equityResults, ...cryptoResults, ...currencyResults, ...commodityResults]
         if (results.length === 0) {
           return { results: [], message: `No symbols matching "${query}". Try a different keyword.` }
         }

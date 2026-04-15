@@ -35,8 +35,8 @@ describe('CcxtBroker — Bybit e2e', () => {
 
   it('fetches account info with positive equity', async () => {
     const account = await b().getAccount()
-    expect(account.netLiquidation).toBeGreaterThan(0)
-    console.log(`  equity: $${account.netLiquidation.toFixed(2)}, cash: $${account.totalCashValue.toFixed(2)}`)
+    expect(Number(account.netLiquidation)).toBeGreaterThan(0)
+    console.log(`  equity: $${Number(account.netLiquidation).toFixed(2)}, cash: $${Number(account.totalCashValue).toFixed(2)}`)
   })
 
   it('fetches positions', async () => {

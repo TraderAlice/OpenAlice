@@ -20,10 +20,10 @@ function makeContract(overrides: { aliceId?: string; symbol?: string } = {}): Co
 
 function makeGitState(overrides: Partial<GitState> = {}): GitState {
   return {
-    totalCashValue: 100_000,
-    netLiquidation: 105_000,
-    unrealizedPnL: 5_000,
-    realizedPnL: 1_000,
+    totalCashValue: '100000',
+    netLiquidation: '105000',
+    unrealizedPnL: '5000',
+    realizedPnL: '1000',
     positions: [],
     pendingOrders: [],
     ...overrides,
@@ -574,7 +574,7 @@ describe('TradingGit', () => {
     it('returns empty state when no positions', async () => {
       const result = await git.simulatePriceChange([{ symbol: 'AAPL', change: '-10%' }])
       expect(result.success).toBe(true)
-      expect(result.summary.totalPnLChange).toBe(0)
+      expect(result.summary.totalPnLChange).toBe('0')
     })
 
     it('simulates relative price change on long position', async () => {
@@ -585,11 +585,11 @@ describe('TradingGit', () => {
             currency: 'USD',
             side: 'long',
             quantity: new Decimal(10),
-            avgCost: 150,
-            marketPrice: 160,
-            marketValue: 1600,
-            unrealizedPnL: 100,
-            realizedPnL: 0,
+            avgCost: '150',
+            marketPrice: '160',
+            marketValue: '1600',
+            unrealizedPnL: '100',
+            realizedPnL: '0',
 
           },
         ],
@@ -603,9 +603,9 @@ describe('TradingGit', () => {
       expect(result.success).toBe(true)
       // Price drops 10%: 160 -> 144
       const simPos = result.simulatedState.positions[0]
-      expect(simPos.simulatedPrice).toBe(144)
+      expect(simPos.simulatedPrice).toBe('144')
       // PnL: (144 - 150) * 10 = -60
-      expect(simPos.unrealizedPnL).toBe(-60)
+      expect(simPos.unrealizedPnL).toBe('-60')
     })
 
     it('simulates absolute price change', async () => {
@@ -616,11 +616,11 @@ describe('TradingGit', () => {
             currency: 'USD',
             side: 'long',
             quantity: new Decimal(10),
-            avgCost: 150,
-            marketPrice: 160,
-            marketValue: 1600,
-            unrealizedPnL: 100,
-            realizedPnL: 0,
+            avgCost: '150',
+            marketPrice: '160',
+            marketValue: '1600',
+            unrealizedPnL: '100',
+            realizedPnL: '0',
 
           },
         ],
@@ -632,9 +632,9 @@ describe('TradingGit', () => {
 
       const result = await simGit.simulatePriceChange([{ symbol: 'AAPL', change: '@200' }])
       expect(result.success).toBe(true)
-      expect(result.simulatedState.positions[0].simulatedPrice).toBe(200)
+      expect(result.simulatedState.positions[0].simulatedPrice).toBe('200')
       // PnL: (200 - 150) * 10 = 500
-      expect(result.simulatedState.positions[0].unrealizedPnL).toBe(500)
+      expect(result.simulatedState.positions[0].unrealizedPnL).toBe('500')
     })
 
     it('simulates "all" positions', async () => {
@@ -642,13 +642,13 @@ describe('TradingGit', () => {
         positions: [
           {
             contract: makeContract({ symbol: 'AAPL' }),
-            currency: 'USD', side: 'long', quantity: new Decimal(10), avgCost: 100, marketPrice: 100,
-            marketValue: 1000, unrealizedPnL: 0, realizedPnL: 0,
+            currency: 'USD', side: 'long', quantity: new Decimal(10), avgCost: '100', marketPrice: '100',
+            marketValue: '1000', unrealizedPnL: '0', realizedPnL: '0',
           },
           {
             contract: makeContract({ symbol: 'GOOG' }),
-            currency: 'USD', side: 'long', quantity: new Decimal(5), avgCost: 200, marketPrice: 200,
-            marketValue: 1000, unrealizedPnL: 0, realizedPnL: 0,
+            currency: 'USD', side: 'long', quantity: new Decimal(5), avgCost: '200', marketPrice: '200',
+            marketValue: '1000', unrealizedPnL: '0', realizedPnL: '0',
           },
         ],
       })
@@ -658,8 +658,8 @@ describe('TradingGit', () => {
       const result = await simGit.simulatePriceChange([{ symbol: 'all', change: '+10%' }])
       expect(result.success).toBe(true)
       expect(result.simulatedState.positions).toHaveLength(2)
-      expect(result.simulatedState.positions[0].simulatedPrice).toBeCloseTo(110)
-      expect(result.simulatedState.positions[1].simulatedPrice).toBeCloseTo(220)
+      expect(Number(result.simulatedState.positions[0].simulatedPrice)).toBeCloseTo(110)
+      expect(Number(result.simulatedState.positions[1].simulatedPrice)).toBeCloseTo(220)
     })
 
     it('returns error for invalid price change format', async () => {
@@ -667,8 +667,8 @@ describe('TradingGit', () => {
         positions: [
           {
             contract: makeContract({ symbol: 'AAPL' }),
-            currency: 'USD', side: 'long', quantity: new Decimal(10), avgCost: 100, marketPrice: 100,
-            marketValue: 1000, unrealizedPnL: 0, realizedPnL: 0,
+            currency: 'USD', side: 'long', quantity: new Decimal(10), avgCost: '100', marketPrice: '100',
+            marketValue: '1000', unrealizedPnL: '0', realizedPnL: '0',
           },
         ],
       })

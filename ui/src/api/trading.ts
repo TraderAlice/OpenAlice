@@ -14,7 +14,7 @@ export const tradingApi = {
     return fetchJson('/api/trading/accounts')
   },
 
-  async equity(): Promise<{ totalEquity: number; totalCash: number; totalUnrealizedPnL: number; totalRealizedPnL: number; accounts: Array<{ id: string; label: string; equity: number; cash: number }> }> {
+  async equity(): Promise<{ totalEquity: string; totalCash: string; totalUnrealizedPnL: string; totalRealizedPnL: string; accounts: Array<{ id: string; label: string; equity: string; cash: string }> }> {
     return fetchJson('/api/trading/equity')
   },
 

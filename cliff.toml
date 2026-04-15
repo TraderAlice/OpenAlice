@@ -2,7 +2,7 @@
 header = """
 # Changelog
 
-All notable changes to Open Alice will be documented in this file.\n
+All notable changes to OpenAlice will be documented in this file.\n
 """
 body = """
 {%- macro remote_url() -%}

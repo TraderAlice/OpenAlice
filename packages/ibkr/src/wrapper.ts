@@ -170,11 +170,11 @@ export interface EWrapper {
   updatePortfolio(
     contract: Contract,
     position: Decimal,
-    marketPrice: number,
-    marketValue: number,
-    averageCost: number,
-    unrealizedPNL: number,
-    realizedPNL: number,
+    marketPrice: string,
+    marketValue: string,
+    averageCost: string,
+    unrealizedPNL: string,
+    realizedPNL: string,
     accountName: string,
   ): void;
 
@@ -713,11 +713,11 @@ export class DefaultEWrapper implements EWrapper {
   updatePortfolio(
     _contract: Contract,
     _position: Decimal,
-    _marketPrice: number,
-    _marketValue: number,
-    _averageCost: number,
-    _unrealizedPNL: number,
-    _realizedPNL: number,
+    _marketPrice: string,
+    _marketValue: string,
+    _averageCost: string,
+    _unrealizedPNL: string,
+    _realizedPNL: string,
     _accountName: string,
   ): void {}
 

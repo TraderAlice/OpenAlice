@@ -183,10 +183,10 @@ describe('AlpacaBroker — getPositions()', () => {
     expect(positions).toHaveLength(1)
     expect(positions[0].contract.symbol).toBe('AAPL')
     expect(positions[0].quantity.toNumber()).toBe(10)
-    expect(positions[0].avgCost).toBe(150)
-    expect(positions[0].marketPrice).toBe(160)
-    expect(positions[0].marketValue).toBe(1600)
-    expect(positions[0].unrealizedPnL).toBe(100)
+    expect(positions[0].avgCost).toBe('150')
+    expect(positions[0].marketPrice).toBe('160')
+    expect(positions[0].marketValue).toBe('1600')
+    expect(positions[0].unrealizedPnL).toBe('100')
     expect(positions[0].side).toBe('long')
   })
 })
@@ -446,10 +446,10 @@ describe('AlpacaBroker — getAccount()', () => {
     }
 
     const info = await acc.getAccount()
-    expect(info.netLiquidation).toBe(100000)
-    expect(info.totalCashValue).toBe(50000)
-    expect(info.buyingPower).toBe(200000)
-    expect(info.unrealizedPnL).toBe(350) // 100 + 250
+    expect(info.netLiquidation).toBe('100000')
+    expect(info.totalCashValue).toBe('50000')
+    expect(info.buyingPower).toBe('200000')
+    expect(info.unrealizedPnL).toBe('350') // 100 + 250
     expect(info.realizedPnL).toBeUndefined()
     expect(info.dayTradesRemaining).toBe(2) // 3 - 1
   })
@@ -472,7 +472,7 @@ describe('AlpacaBroker — getAccount() precision', () => {
 
     const info = await acc.getAccount()
     // 0.1 + 0.2 + 0.3 = 0.6 (with floats: 0.6000000000000001)
-    expect(info.unrealizedPnL).toBe(0.6)
+    expect(info.unrealizedPnL).toBe('0.6')
   })
 })
 

@@ -45,12 +45,12 @@ export interface OperationResult {
 
 // ==================== Wallet State ====================
 
-/** State snapshot taken after each commit. */
+/** State snapshot taken after each commit. All monetary fields are strings to prevent IEEE 754 artifacts. */
 export interface GitState {
-  netLiquidation: number
-  totalCashValue: number
-  unrealizedPnL: number
-  realizedPnL: number
+  netLiquidation: string
+  totalCashValue: string
+  unrealizedPnL: string
+  realizedPnL: string
   positions: Position[]
   pendingOrders: OpenOrder[]
 }
@@ -157,22 +157,22 @@ export interface PriceChangeInput {
 export interface SimulationPositionCurrent {
   symbol: string
   side: 'long' | 'short'
-  qty: number
-  avgCost: number
-  marketPrice: number
-  unrealizedPnL: number
-  marketValue: number
+  qty: string
+  avgCost: string
+  marketPrice: string
+  unrealizedPnL: string
+  marketValue: string
 }
 
 export interface SimulationPositionAfter {
   symbol: string
   side: 'long' | 'short'
-  qty: number
-  avgCost: number
-  simulatedPrice: number
-  unrealizedPnL: number
-  marketValue: number
-  pnlChange: number
+  qty: string
+  avgCost: string
+  simulatedPrice: string
+  unrealizedPnL: string
+  marketValue: string
+  pnlChange: string
   priceChangePercent: string
 }
 
@@ -180,20 +180,20 @@ export interface SimulatePriceChangeResult {
   success: boolean
   error?: string
   currentState: {
-    equity: number
-    unrealizedPnL: number
-    totalPnL: number
+    equity: string
+    unrealizedPnL: string
+    totalPnL: string
     positions: SimulationPositionCurrent[]
   }
   simulatedState: {
-    equity: number
-    unrealizedPnL: number
-    totalPnL: number
+    equity: string
+    unrealizedPnL: string
+    totalPnL: string
     positions: SimulationPositionAfter[]
   }
   summary: {
-    totalPnLChange: number
-    equityChange: number
+    totalPnLChange: string
+    equityChange: string
     equityChangePercent: string
     worstCase: string
   }

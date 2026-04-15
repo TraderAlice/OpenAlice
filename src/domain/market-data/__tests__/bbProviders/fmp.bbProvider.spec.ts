@@ -88,8 +88,25 @@ describe('fmp — index', () => {
   it('RiskPremium', async () => { expect((await exec('RiskPremium')).length).toBeGreaterThan(0) })
 })
 
-describe('fmp — commodity', () => {
+describe('fmp — commodity (direct FMP tickers)', () => {
   beforeEach(({ skip }) => { if (!hasCredential(ctx.credentials, 'fmp')) skip('no fmp_api_key') })
 
-  it('CommoditySpotPrice', async () => { expect((await exec('CommoditySpotPrice', { symbol: 'GCUSD' })).length).toBeGreaterThan(0) })
+  it('CommoditySpotPrice — GCUSD', async () => { expect((await exec('CommoditySpotPrice', { symbol: 'GCUSD' })).length).toBeGreaterThan(0) })
+})
+
+describe('fmp — commodity (canonical names via COMMODITY_MAP)', () => {
+  beforeEach(({ skip }) => { if (!hasCredential(ctx.credentials, 'fmp')) skip('no fmp_api_key') })
+
+  // Verified working on FMP Starter (2026-04-13)
+  it('gold',   async () => { expect((await exec('CommoditySpotPrice', { symbol: 'gold' })).length).toBeGreaterThan(0) })
+  it('silver', async () => { expect((await exec('CommoditySpotPrice', { symbol: 'silver' })).length).toBeGreaterThan(0) })
+  it('brent',  async () => { expect((await exec('CommoditySpotPrice', { symbol: 'brent' })).length).toBeGreaterThan(0) })
+
+  // Premium restricted on FMP Starter (verified 2026-04-13)
+  it.skip('crude_oil — premium',   async () => { expect((await exec('CommoditySpotPrice', { symbol: 'crude_oil' })).length).toBeGreaterThan(0) })
+  it.skip('natural_gas — premium', async () => { expect((await exec('CommoditySpotPrice', { symbol: 'natural_gas' })).length).toBeGreaterThan(0) })
+  it.skip('copper — premium',     async () => { expect((await exec('CommoditySpotPrice', { symbol: 'copper' })).length).toBeGreaterThan(0) })
+  it.skip('platinum — premium',   async () => { expect((await exec('CommoditySpotPrice', { symbol: 'platinum' })).length).toBeGreaterThan(0) })
+  it.skip('corn — premium (USX)', async () => { expect((await exec('CommoditySpotPrice', { symbol: 'corn' })).length).toBeGreaterThan(0) })
+  it.skip('wheat — premium (USX)', async () => { expect((await exec('CommoditySpotPrice', { symbol: 'wheat' })).length).toBeGreaterThan(0) })
 })

@@ -3,34 +3,32 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { Sidebar } from './components/Sidebar'
 import { ChatPage } from './pages/ChatPage'
 import { PortfolioPage } from './pages/PortfolioPage'
-import { EventsPage } from './pages/EventsPage'
+import { AutomationPage } from './pages/AutomationPage'
+import { LogsPage } from './pages/LogsPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { AIProviderPage } from './pages/AIProviderPage'
 import { MarketDataPage } from './pages/MarketDataPage'
 import { NewsPage } from './pages/NewsPage'
+import { NewsCollectorPage } from './pages/NewsCollectorPage'
 import { TradingPage } from './pages/TradingPage'
 import { ConnectorsPage } from './pages/ConnectorsPage'
 import { DevPage } from './pages/DevPage'
-import { HeartbeatPage } from './pages/HeartbeatPage'
-import { ToolsPage } from './pages/ToolsPage'
-import { AgentStatusPage } from './pages/AgentStatusPage'
 
 export type Page =
-  | 'chat' | 'portfolio' | 'events' | 'agent-status' | 'heartbeat' | 'market-data' | 'news' | 'connectors'
+  | 'chat' | 'portfolio' | 'news' | 'automation' | 'logs' | 'market-data' | 'news-collector' | 'connectors'
   | 'trading'
-  | 'ai-provider' | 'settings' | 'tools' | 'dev'
+  | 'ai-provider' | 'settings' | 'dev'
 
 /** Page type → URL path mapping. Chat is the root, everything else maps to /slug. */
 export const ROUTES: Record<Page, string> = {
   'chat': '/',
   'portfolio': '/portfolio',
-  'events': '/events',
-  'agent-status': '/agent-status',
-  'heartbeat': '/heartbeat',
+  'automation': '/automation',
+  'logs': '/logs',
   'market-data': '/market-data',
+  'news-collector': '/news-collector',
   'news': '/news',
   'connectors': '/connectors',
-  'tools': '/tools',
   'trading': '/trading',
   'ai-provider': '/ai-provider',
   'settings': '/settings',
@@ -61,20 +59,25 @@ export function App() {
               <path d="M3 5h14M3 10h14M3 15h14" />
             </svg>
           </button>
-          <span className="text-sm font-semibold text-text">Open Alice</span>
+          <span className="text-sm font-semibold text-text">OpenAlice</span>
         </div>
         <div key={location.pathname} className="page-fade-in flex-1 flex flex-col min-h-0">
           <Routes>
             <Route path="/" element={<ChatPage onSSEStatus={setSseConnected} />} />
             <Route path="/portfolio" element={<PortfolioPage />} />
-            <Route path="/events" element={<EventsPage />} />
-            <Route path="/agent-status" element={<AgentStatusPage />} />
-            <Route path="/heartbeat" element={<HeartbeatPage />} />
+            <Route path="/automation" element={<AutomationPage />} />
+            <Route path="/logs" element={<LogsPage />} />
             <Route path="/market-data" element={<MarketDataPage />} />
+            <Route path="/news-collector" element={<NewsCollectorPage />} />
             <Route path="/news" element={<NewsPage />} />
+            {/* Redirects for old URLs */}
+            <Route path="/events" element={<Navigate to="/logs" replace />} />
+            <Route path="/heartbeat" element={<Navigate to="/automation" replace />} />
+            <Route path="/scheduler" element={<Navigate to="/automation" replace />} />
+            <Route path="/agent-status" element={<Navigate to="/logs" replace />} />
             <Route path="/data-sources" element={<Navigate to="/market-data" replace />} />
             <Route path="/connectors" element={<ConnectorsPage />} />
-            <Route path="/tools" element={<ToolsPage />} />
+            <Route path="/tools" element={<Navigate to="/settings" replace />} />
             <Route path="/trading" element={<TradingPage />} />
             <Route path="/ai-provider" element={<AIProviderPage />} />
             <Route path="/settings" element={<SettingsPage />} />

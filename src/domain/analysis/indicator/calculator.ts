@@ -16,18 +16,29 @@ import type {
   FunctionNode,
   BinaryOpNode,
   ArrayAccessNode,
+  DataSourceMeta,
+  TrackedValues,
 } from './types'
+import { toValues } from './types'
 import * as DataAccess from './functions/data-access'
 import * as Statistics from './functions/statistics'
 import * as Technical from './functions/technical'
 
+export interface CalculateOutput {
+  value: number | number[] | Record<string, number>
+  dataRange: Record<string, DataSourceMeta>
+}
+
 export class IndicatorCalculator {
+  private dataSources: Record<string, DataSourceMeta> = {}
+
   constructor(private context: IndicatorContext) {}
 
   async calculate(
     formula: string,
     precision: number = 4,
-  ): Promise<number | number[] | Record<string, number>> {
+  ): Promise<CalculateOutput> {
+    this.dataSources = {}
     const ast = this.parse(formula)
     const result = await this.evaluate(ast)
 
@@ -35,18 +46,28 @@ export class IndicatorCalculator {
       throw new Error(`Invalid formula: result cannot be a string. Got: "${result}"`)
     }
 
-    return this.applyPrecision(result, precision)
+    return {
+      value: this.applyPrecision(result, precision),
+      dataRange: this.dataSources,
+    }
   }
 
   private applyPrecision(
-    result: number | number[] | Record<string, number>,
+    result: CalculationResult,
     precision: number,
   ): number | number[] | Record<string, number> {
     if (typeof result === 'number') {
       return parseFloat(result.toFixed(precision))
     }
+    // TrackedValues — apply precision to values array
+    if (!Array.isArray(result) && typeof result === 'object' && 'values' in result && 'source' in result) {
+      return (result as TrackedValues).values.map((v) => parseFloat(v.toFixed(precision)))
+    }
     if (Array.isArray(result)) {
       return result.map((v) => parseFloat(v.toFixed(precision)))
+    }
+    if (typeof result === 'string') {
+      throw new Error(`Invalid formula: result cannot be a string. Got: "${result}"`)
     }
     const rounded: Record<string, number> = {}
     for (const [key, value] of Object.entries(result)) {
@@ -233,47 +254,50 @@ export class IndicatorCalculator {
     }
   }
 
+  private collectSource(result: CalculationResult): void {
+    if (result && typeof result === 'object' && 'source' in result && 'values' in result) {
+      const tracked = result as TrackedValues
+      this.dataSources[tracked.source.symbol] = tracked.source
+    }
+  }
+
   private async executeFunction(node: FunctionNode): Promise<CalculationResult> {
     const { name, args } = node
     const evaluatedArgs = await Promise.all(args.map((arg) => this.evaluate(arg)))
 
-    // Data access functions: FUNC('symbol', 'interval')
-    if (name === 'CLOSE')
-      return await DataAccess.CLOSE(evaluatedArgs[0] as string, evaluatedArgs[1] as string, this.context)
-    if (name === 'HIGH')
-      return await DataAccess.HIGH(evaluatedArgs[0] as string, evaluatedArgs[1] as string, this.context)
-    if (name === 'LOW')
-      return await DataAccess.LOW(evaluatedArgs[0] as string, evaluatedArgs[1] as string, this.context)
-    if (name === 'OPEN')
-      return await DataAccess.OPEN(evaluatedArgs[0] as string, evaluatedArgs[1] as string, this.context)
-    if (name === 'VOLUME')
-      return await DataAccess.VOLUME(evaluatedArgs[0] as string, evaluatedArgs[1] as string, this.context)
+    // Data access functions: FUNC('symbol', 'interval') → TrackedValues
+    if (name === 'CLOSE' || name === 'HIGH' || name === 'LOW' || name === 'OPEN' || name === 'VOLUME') {
+      const fn = DataAccess[name]
+      const result = await fn(evaluatedArgs[0] as string, evaluatedArgs[1] as string, this.context)
+      this.collectSource(result)
+      return result
+    }
 
-    // Statistics functions
-    if (name === 'SMA') return Statistics.SMA(evaluatedArgs[0] as number[], evaluatedArgs[1] as number)
-    if (name === 'EMA') return Statistics.EMA(evaluatedArgs[0] as number[], evaluatedArgs[1] as number)
-    if (name === 'STDEV') return Statistics.STDEV(evaluatedArgs[0] as number[])
-    if (name === 'MAX') return Statistics.MAX(evaluatedArgs[0] as number[])
-    if (name === 'MIN') return Statistics.MIN(evaluatedArgs[0] as number[])
-    if (name === 'SUM') return Statistics.SUM(evaluatedArgs[0] as number[])
-    if (name === 'AVERAGE') return Statistics.AVERAGE(evaluatedArgs[0] as number[])
+    // Statistics functions — accept number[] | TrackedValues
+    if (name === 'SMA') return Statistics.SMA(evaluatedArgs[0] as number[] | TrackedValues, evaluatedArgs[1] as number)
+    if (name === 'EMA') return Statistics.EMA(evaluatedArgs[0] as number[] | TrackedValues, evaluatedArgs[1] as number)
+    if (name === 'STDEV') return Statistics.STDEV(evaluatedArgs[0] as number[] | TrackedValues)
+    if (name === 'MAX') return Statistics.MAX(evaluatedArgs[0] as number[] | TrackedValues)
+    if (name === 'MIN') return Statistics.MIN(evaluatedArgs[0] as number[] | TrackedValues)
+    if (name === 'SUM') return Statistics.SUM(evaluatedArgs[0] as number[] | TrackedValues)
+    if (name === 'AVERAGE') return Statistics.AVERAGE(evaluatedArgs[0] as number[] | TrackedValues)
 
-    // Technical indicator functions
-    if (name === 'RSI') return Technical.RSI(evaluatedArgs[0] as number[], evaluatedArgs[1] as number)
+    // Technical indicator functions — accept number[] | TrackedValues
+    if (name === 'RSI') return Technical.RSI(evaluatedArgs[0] as number[] | TrackedValues, evaluatedArgs[1] as number)
     if (name === 'BBANDS')
-      return Technical.BBANDS(evaluatedArgs[0] as number[], evaluatedArgs[1] as number, evaluatedArgs[2] as number)
+      return Technical.BBANDS(evaluatedArgs[0] as number[] | TrackedValues, evaluatedArgs[1] as number, evaluatedArgs[2] as number)
     if (name === 'MACD')
       return Technical.MACD(
-        evaluatedArgs[0] as number[],
+        evaluatedArgs[0] as number[] | TrackedValues,
         evaluatedArgs[1] as number,
         evaluatedArgs[2] as number,
         evaluatedArgs[3] as number,
       )
     if (name === 'ATR')
       return Technical.ATR(
-        evaluatedArgs[0] as number[],
-        evaluatedArgs[1] as number[],
-        evaluatedArgs[2] as number[],
+        evaluatedArgs[0] as number[] | TrackedValues,
+        evaluatedArgs[1] as number[] | TrackedValues,
+        evaluatedArgs[2] as number[] | TrackedValues,
         evaluatedArgs[3] as number,
       )
 
@@ -285,7 +309,9 @@ export class IndicatorCalculator {
     const right = await this.evaluate(node.right)
 
     if (typeof left !== 'number' || typeof right !== 'number') {
-      throw new Error(`Binary operations require numbers, got ${typeof left} and ${typeof right}`)
+      const leftType = left && typeof left === 'object' && 'values' in left ? 'TrackedValues' : typeof left
+      const rightType = right && typeof right === 'object' && 'values' in right ? 'TrackedValues' : typeof right
+      throw new Error(`Binary operations require numbers, got ${leftType} and ${rightType}`)
     }
 
     switch (node.operator) {
@@ -304,18 +330,21 @@ export class IndicatorCalculator {
     const array = await this.evaluate(node.array)
     const index = await this.evaluate(node.index)
 
-    if (!Array.isArray(array)) {
+    // Extract values from TrackedValues or use raw array
+    const values = toValues(array as number[] | TrackedValues)
+
+    if (!Array.isArray(values)) {
       throw new Error(`Array access requires an array, got ${typeof array}`)
     }
     if (typeof index !== 'number') {
       throw new Error(`Array index must be a number, got ${typeof index}`)
     }
 
-    const actualIndex = index < 0 ? array.length + index : index
-    if (actualIndex < 0 || actualIndex >= array.length) {
+    const actualIndex = index < 0 ? values.length + index : index
+    if (actualIndex < 0 || actualIndex >= values.length) {
       throw new Error(`Array index out of bounds: ${index}`)
     }
 
-    return array[actualIndex]
+    return values[actualIndex]
   }
 }

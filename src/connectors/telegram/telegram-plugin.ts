@@ -477,7 +477,7 @@ export class TelegramPlugin implements Plugin {
       let equityStr = ''
       try {
         const acc = await uta.getAccount()
-        equityStr = `  $${acc.netLiquidation.toFixed(0)}`
+        equityStr = `  $${Number(acc.netLiquidation).toFixed(0)}`
       } catch { /* skip */ }
       lines.push(`${healthIcon} ${uta.label}${equityStr}${pendingTag}`)
       keyboard.text(uta.label, `trading:view:${uta.id}`)
@@ -497,8 +497,9 @@ export class TelegramPlugin implements Plugin {
     // Account info
     try {
       const acc = await uta.getAccount()
-      const pnl = acc.unrealizedPnL >= 0 ? `+$${acc.unrealizedPnL.toFixed(0)}` : `-$${Math.abs(acc.unrealizedPnL).toFixed(0)}`
-      lines.push(`Equity $${acc.netLiquidation.toFixed(0)}  Cash $${acc.totalCashValue.toFixed(0)}  PnL ${pnl}`)
+      const pnlNum = Number(acc.unrealizedPnL)
+      const pnl = pnlNum >= 0 ? `+$${pnlNum.toFixed(0)}` : `-$${Math.abs(pnlNum).toFixed(0)}`
+      lines.push(`Equity $${Number(acc.netLiquidation).toFixed(0)}  Cash $${Number(acc.totalCashValue).toFixed(0)}  PnL ${pnl}`)
     } catch {
       lines.push('(account data unavailable)')
     }

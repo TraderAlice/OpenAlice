@@ -436,18 +436,21 @@ export class TradingGit implements ITradingGit {
     priceChanges: PriceChangeInput[],
   ): Promise<SimulatePriceChangeResult> {
     const state = await this.config.getGitState()
-    const { positions, netLiquidation: equity, unrealizedPnL, totalCashValue: cash } = state
+    const { positions } = state
+    const equity = new Decimal(state.netLiquidation)
+    const unrealizedPnL = new Decimal(state.unrealizedPnL)
+    const cash = new Decimal(state.totalCashValue)
 
-    const currentTotalPnL = cash > 0 ? ((equity - cash) / cash) * 100 : 0
+    const currentTotalPnL = cash.gt(0) ? equity.minus(cash).div(cash).mul(100) : new Decimal(0)
 
     if (positions.length === 0) {
       return {
         success: true,
-        currentState: { equity, unrealizedPnL, totalPnL: currentTotalPnL, positions: [] },
-        simulatedState: { equity, unrealizedPnL, totalPnL: currentTotalPnL, positions: [] },
+        currentState: { equity: equity.toString(), unrealizedPnL: unrealizedPnL.toString(), totalPnL: currentTotalPnL.toString(), positions: [] },
+        simulatedState: { equity: equity.toString(), unrealizedPnL: unrealizedPnL.toString(), totalPnL: currentTotalPnL.toString(), positions: [] },
         summary: {
-          totalPnLChange: 0,
-          equityChange: 0,
+          totalPnLChange: '0',
+          equityChange: '0',
           equityChangePercent: '0.0%',
           worstCase: 'No positions to simulate.',
         },
@@ -455,7 +458,7 @@ export class TradingGit implements ITradingGit {
     }
 
     // Parse price changes → target price map
-    const priceMap = new Map<string, number>()
+    const priceMap = new Map<string, Decimal>()
 
     for (const { symbol, change } of priceChanges) {
       const parsed = this.parsePriceChange(change)
@@ -463,31 +466,29 @@ export class TradingGit implements ITradingGit {
         return {
           success: false,
           error: `Invalid change format for ${symbol}: "${change}". Use "@150" for absolute or "+10%" / "-5%" for relative.`,
-          currentState: { equity, unrealizedPnL, totalPnL: currentTotalPnL, positions: [] },
-          simulatedState: { equity, unrealizedPnL, totalPnL: currentTotalPnL, positions: [] },
-          summary: { totalPnLChange: 0, equityChange: 0, equityChangePercent: '0.0%', worstCase: '' },
+          currentState: { equity: equity.toString(), unrealizedPnL: unrealizedPnL.toString(), totalPnL: currentTotalPnL.toString(), positions: [] },
+          simulatedState: { equity: equity.toString(), unrealizedPnL: unrealizedPnL.toString(), totalPnL: currentTotalPnL.toString(), positions: [] },
+          summary: { totalPnLChange: '0', equityChange: '0', equityChangePercent: '0.0%', worstCase: '' },
         }
       }
 
       if (symbol === 'all') {
         for (const pos of positions) {
-          priceMap.set(pos.contract.symbol || 'unknown', this.applyPriceChange(pos.marketPrice, parsed.type, parsed.value))
+          priceMap.set(pos.contract.symbol || 'unknown', this.applyPriceChange(new Decimal(pos.marketPrice), parsed.type, parsed.value))
         }
       } else {
         const pos = positions.find((p) => (p.contract.symbol || p.contract.aliceId) === symbol)
         if (pos) {
-          priceMap.set(symbol, this.applyPriceChange(pos.marketPrice, parsed.type, parsed.value))
+          priceMap.set(symbol, this.applyPriceChange(new Decimal(pos.marketPrice), parsed.type, parsed.value))
         }
       }
     }
-
-    const qty = (pos: typeof positions[0]) => pos.quantity.toNumber()
 
     // Current state
     const currentPositions = positions.map((pos) => ({
       symbol: pos.contract.symbol || pos.contract.aliceId || 'unknown',
       side: pos.side,
-      qty: qty(pos),
+      qty: pos.quantity.toString(),
       avgCost: pos.avgCost,
       marketPrice: pos.marketPrice,
       unrealizedPnL: pos.unrealizedPnL,
@@ -495,63 +496,65 @@ export class TradingGit implements ITradingGit {
     }))
 
     // Simulated state
-    let simulatedUnrealizedPnL = 0
+    let simulatedUnrealizedPnL = new Decimal(0)
     const simulatedPositions = positions.map((pos) => {
       const sym = pos.contract.symbol || pos.contract.aliceId || 'unknown'
-      const simulatedPrice = priceMap.get(sym) ?? pos.marketPrice
-      const priceChange = simulatedPrice - pos.marketPrice
-      const priceChangePct = pos.marketPrice > 0 ? (priceChange / pos.marketPrice) * 100 : 0
-      const q = qty(pos)
+      const mktPrice = new Decimal(pos.marketPrice)
+      const simulatedPrice = priceMap.get(sym) ?? mktPrice
+      const priceChange = simulatedPrice.minus(mktPrice)
+      const priceChangePct = mktPrice.gt(0) ? priceChange.div(mktPrice).mul(100) : new Decimal(0)
+      const q = pos.quantity
+      const avgCost = new Decimal(pos.avgCost)
 
       const newPnL =
         pos.side === 'long'
-          ? (simulatedPrice - pos.avgCost) * q
-          : (pos.avgCost - simulatedPrice) * q
+          ? simulatedPrice.minus(avgCost).mul(q)
+          : avgCost.minus(simulatedPrice).mul(q)
 
-      const pnlChange = newPnL - pos.unrealizedPnL
-      simulatedUnrealizedPnL += newPnL
+      const pnlChange = newPnL.minus(pos.unrealizedPnL)
+      simulatedUnrealizedPnL = simulatedUnrealizedPnL.plus(newPnL)
 
       return {
         symbol: sym,
         side: pos.side,
-        qty: q,
+        qty: q.toString(),
         avgCost: pos.avgCost,
-        simulatedPrice,
-        unrealizedPnL: newPnL,
-        marketValue: simulatedPrice * q,
-        pnlChange,
-        priceChangePercent: `${priceChangePct >= 0 ? '+' : ''}${priceChangePct.toFixed(2)}%`,
+        simulatedPrice: simulatedPrice.toString(),
+        unrealizedPnL: newPnL.toString(),
+        marketValue: simulatedPrice.mul(q).toString(),
+        pnlChange: pnlChange.toString(),
+        priceChangePercent: `${priceChangePct.gte(0) ? '+' : ''}${priceChangePct.toFixed(2)}%`,
       }
     })
 
-    const pnlDiff = simulatedUnrealizedPnL - unrealizedPnL
-    const simulatedEquity = equity + pnlDiff
-    const simulatedTotalPnL = cash > 0 ? ((simulatedEquity - cash) / cash) * 100 : 0
-    const equityChangePct = equity > 0 ? (pnlDiff / equity) * 100 : 0
+    const pnlDiff = simulatedUnrealizedPnL.minus(unrealizedPnL)
+    const simulatedEquity = equity.plus(pnlDiff)
+    const simulatedTotalPnL = cash.gt(0) ? simulatedEquity.minus(cash).div(cash).mul(100) : new Decimal(0)
+    const equityChangePct = equity.gt(0) ? pnlDiff.div(equity).mul(100) : new Decimal(0)
 
     const worst = simulatedPositions.reduce(
-      (w, p) => (p.pnlChange < w.pnlChange ? p : w),
-      simulatedPositions[0],
+      (w, p) => (new Decimal(p.pnlChange).lt(w.pnlChange) ? { ...p, pnlChange: new Decimal(p.pnlChange) } : w),
+      { ...simulatedPositions[0], pnlChange: new Decimal(simulatedPositions[0].pnlChange) },
     )
 
     const worstCase =
-      worst.pnlChange < 0
-        ? `${worst.symbol} would lose $${Math.abs(worst.pnlChange).toFixed(2)} (${worst.priceChangePercent})`
+      worst.pnlChange.lt(0)
+        ? `${worst.symbol} would lose $${worst.pnlChange.abs().toFixed(2)} (${worst.priceChangePercent})`
         : 'All positions would profit or break even.'
 
     return {
       success: true,
-      currentState: { equity, unrealizedPnL, totalPnL: currentTotalPnL, positions: currentPositions },
+      currentState: { equity: equity.toString(), unrealizedPnL: unrealizedPnL.toString(), totalPnL: currentTotalPnL.toString(), positions: currentPositions },
       simulatedState: {
-        equity: simulatedEquity,
-        unrealizedPnL: simulatedUnrealizedPnL,
-        totalPnL: simulatedTotalPnL,
+        equity: simulatedEquity.toString(),
+        unrealizedPnL: simulatedUnrealizedPnL.toString(),
+        totalPnL: simulatedTotalPnL.toString(),
         positions: simulatedPositions,
       },
       summary: {
-        totalPnLChange: pnlDiff,
-        equityChange: pnlDiff,
-        equityChangePercent: `${equityChangePct >= 0 ? '+' : ''}${equityChangePct.toFixed(2)}%`,
+        totalPnLChange: pnlDiff.toString(),
+        equityChange: pnlDiff.toString(),
+        equityChangePercent: `${equityChangePct.gte(0) ? '+' : ''}${equityChangePct.toFixed(2)}%`,
         worstCase,
       },
     }
@@ -578,11 +581,11 @@ export class TradingGit implements ITradingGit {
   }
 
   private applyPriceChange(
-    currentPrice: number,
+    currentPrice: Decimal,
     type: 'absolute' | 'relative',
     value: number,
-  ): number {
-    return type === 'absolute' ? value : currentPrice * (1 + value / 100)
+  ): Decimal {
+    return type === 'absolute' ? new Decimal(value) : currentPrice.mul(new Decimal(1).plus(new Decimal(value).div(100)))
   }
 
   // ==================== Internal ====================

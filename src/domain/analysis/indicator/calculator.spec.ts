@@ -2,11 +2,11 @@
  * Indicator Calculator unit tests
  *
  * 覆盖：四则运算、运算符优先级、数据访问、统计函数、技术指标、
- * 数组索引、嵌套表达式、精度控制、错误处理。
+ * 数组索引、嵌套表达式、精度控制、错误处理、数据溯源（dataRange）。
  */
 import { describe, it, expect } from 'vitest'
 import { IndicatorCalculator } from './calculator'
-import type { IndicatorContext, OhlcvData } from './types'
+import type { IndicatorContext, OhlcvData, TrackedValues } from './types'
 
 // Mock: 50 根日线，收盘价 100~149，volume 第 48 根为 null 测边界
 const mockData: OhlcvData[] = Array.from({ length: 50 }, (_, i) => ({
@@ -20,12 +20,18 @@ const mockData: OhlcvData[] = Array.from({ length: 50 }, (_, i) => ({
 }))
 
 const mockContext: IndicatorContext = {
-  getHistoricalData: async (_symbol: string, _interval: string) => {
-    return mockData
-  },
+  getHistoricalData: async (_symbol: string, _interval: string) => ({
+    data: mockData,
+    meta: {
+      symbol: _symbol,
+      from: mockData[0].date,
+      to: mockData[mockData.length - 1].date,
+      bars: mockData.length,
+    },
+  }),
 }
 
-function calc(formula: string, precision?: number) {
+async function calc(formula: string, precision?: number) {
   const calculator = new IndicatorCalculator(mockContext)
   return calculator.calculate(formula, precision)
 }
@@ -34,48 +40,47 @@ function calc(formula: string, precision?: number) {
 
 describe('arithmetic', () => {
   it('addition', async () => {
-    expect(await calc('2 + 3')).toBe(5)
+    expect((await calc('2 + 3')).value).toBe(5)
   })
 
   it('subtraction', async () => {
-    expect(await calc('10 - 4')).toBe(6)
+    expect((await calc('10 - 4')).value).toBe(6)
   })
 
   it('multiplication', async () => {
-    expect(await calc('3 * 7')).toBe(21)
+    expect((await calc('3 * 7')).value).toBe(21)
   })
 
   it('division', async () => {
-    expect(await calc('15 / 4')).toBe(3.75)
+    expect((await calc('15 / 4')).value).toBe(3.75)
   })
 
   it('operator precedence: * before +', async () => {
-    expect(await calc('2 + 3 * 4')).toBe(14)
+    expect((await calc('2 + 3 * 4')).value).toBe(14)
   })
 
   it('operator precedence: / before -', async () => {
-    expect(await calc('10 - 6 / 2')).toBe(7)
+    expect((await calc('10 - 6 / 2')).value).toBe(7)
   })
 
   it('parentheses override precedence', async () => {
-    expect(await calc('(2 + 3) * 4')).toBe(20)
+    expect((await calc('(2 + 3) * 4')).value).toBe(20)
   })
 
   it('nested parentheses', async () => {
-    expect(await calc('((1 + 2) * (3 + 4))')).toBe(21)
+    expect((await calc('((1 + 2) * (3 + 4))')).value).toBe(21)
   })
 
   it('negative numbers', async () => {
-    expect(await calc('-5 + 3')).toBe(-2)
+    expect((await calc('-5 + 3')).value).toBe(-2)
   })
 
   it('decimal numbers', async () => {
-    expect(await calc('1.5 * 2.0')).toBe(3)
+    expect((await calc('1.5 * 2.0')).value).toBe(3)
   })
 
   it('chained operations left to right', async () => {
-    // 10 - 3 - 2 = 5 (left-associative)
-    expect(await calc('10 - 3 - 2')).toBe(5)
+    expect((await calc('10 - 3 - 2')).value).toBe(5)
   })
 
   it('division by zero throws', async () => {
@@ -87,8 +92,8 @@ describe('arithmetic', () => {
 // mockData 返回全量 50 根：close 100..149, high 102..151, low 99..148, open 100..149
 
 describe('data access', () => {
-  it('CLOSE returns all 50 bars', async () => {
-    const result = (await calc("CLOSE('AAPL', '1d')")) as number[]
+  it('CLOSE returns TrackedValues with 50 bars', async () => {
+    const result = (await calc("CLOSE('AAPL', '1d')")).value as number[]
     expect(Array.isArray(result)).toBe(true)
     expect(result.length).toBe(50)
     expect(result[0]).toBe(100)
@@ -96,26 +101,25 @@ describe('data access', () => {
   })
 
   it('HIGH returns correct values', async () => {
-    const result = (await calc("HIGH('AAPL', '1d')")) as number[]
+    const result = (await calc("HIGH('AAPL', '1d')")).value as number[]
     expect(result[0]).toBe(102)
     expect(result[49]).toBe(151)
   })
 
   it('LOW returns correct values', async () => {
-    const result = (await calc("LOW('AAPL', '1d')")) as number[]
+    const result = (await calc("LOW('AAPL', '1d')")).value as number[]
     expect(result[0]).toBe(99)
     expect(result[49]).toBe(148)
   })
 
   it('OPEN returns correct values', async () => {
-    const result = (await calc("OPEN('AAPL', '1d')")) as number[]
+    const result = (await calc("OPEN('AAPL', '1d')")).value as number[]
     expect(result[0]).toBe(100)
     expect(result[49]).toBe(149)
   })
 
   it('VOLUME handles null as 0', async () => {
-    // mockData[48].volume = null, mockData[49].volume = 1490
-    const result = (await calc("VOLUME('AAPL', '1d')")) as number[]
+    const result = (await calc("VOLUME('AAPL', '1d')")).value as number[]
     expect(result[48]).toBe(0)
     expect(result[49]).toBe(1490)
   })
@@ -125,15 +129,15 @@ describe('data access', () => {
 
 describe('array access', () => {
   it('positive index', async () => {
-    expect(await calc("CLOSE('AAPL', '1d')[0]")).toBe(100)
+    expect((await calc("CLOSE('AAPL', '1d')[0]")).value).toBe(100)
   })
 
   it('negative index (-1 = last)', async () => {
-    expect(await calc("CLOSE('AAPL', '1d')[-1]")).toBe(149)
+    expect((await calc("CLOSE('AAPL', '1d')[-1]")).value).toBe(149)
   })
 
   it('negative index (-2 = second to last)', async () => {
-    expect(await calc("CLOSE('AAPL', '1d')[-2]")).toBe(148)
+    expect((await calc("CLOSE('AAPL', '1d')[-2]")).value).toBe(148)
   })
 
   it('out of bounds throws', async () => {
@@ -146,42 +150,37 @@ describe('array access', () => {
 
 describe('statistics', () => {
   it('SMA', async () => {
-    // SMA(10) of 50 bars: average of last 10 = (140+...+149)/10 = 144.5
-    expect(await calc("SMA(CLOSE('AAPL', '1d'), 10)")).toBe(144.5)
+    expect((await calc("SMA(CLOSE('AAPL', '1d'), 10)")).value).toBe(144.5)
   })
 
   it('EMA', async () => {
-    const result = await calc("EMA(CLOSE('AAPL', '1d'), 10)")
+    const result = (await calc("EMA(CLOSE('AAPL', '1d'), 10)")).value as number
     expect(typeof result).toBe('number')
     expect(result).toBeGreaterThan(140)
   })
 
   it('STDEV', async () => {
-    // stdev of 100..149 ≈ 14.43
-    const result = await calc("STDEV(CLOSE('AAPL', '1d'))")
+    const result = (await calc("STDEV(CLOSE('AAPL', '1d'))")).value
     expect(result).toBeCloseTo(14.43, 1)
   })
 
   it('MAX', async () => {
-    expect(await calc("MAX(CLOSE('AAPL', '1d'))")).toBe(149)
+    expect((await calc("MAX(CLOSE('AAPL', '1d'))")).value).toBe(149)
   })
 
   it('MIN', async () => {
-    expect(await calc("MIN(CLOSE('AAPL', '1d'))")).toBe(100)
+    expect((await calc("MIN(CLOSE('AAPL', '1d'))")).value).toBe(100)
   })
 
   it('SUM', async () => {
-    // 100+101+...+149 = 50 * (100+149)/2 = 6225
-    expect(await calc("SUM(CLOSE('AAPL', '1d'))")).toBe(6225)
+    expect((await calc("SUM(CLOSE('AAPL', '1d'))")).value).toBe(6225)
   })
 
   it('AVERAGE', async () => {
-    // (100+...+149)/50 = 124.5
-    expect(await calc("AVERAGE(CLOSE('AAPL', '1d'))")).toBe(124.5)
+    expect((await calc("AVERAGE(CLOSE('AAPL', '1d'))")).value).toBe(124.5)
   })
 
   it('SMA insufficient data throws', async () => {
-    // 50 bars but SMA(100) needs 100
     await expect(calc("SMA(CLOSE('AAPL', '1d'), 100)")).rejects.toThrow('at least 100')
   })
 })
@@ -190,15 +189,14 @@ describe('statistics', () => {
 
 describe('technical indicators', () => {
   it('RSI returns 0-100, trending up → high RSI', async () => {
-    const result = (await calc("RSI(CLOSE('AAPL', '1d'), 14)")) as number
+    const result = (await calc("RSI(CLOSE('AAPL', '1d'), 14)")).value as number
     expect(result).toBeGreaterThanOrEqual(0)
     expect(result).toBeLessThanOrEqual(100)
-    // 连续上涨，RSI 应接近 100
     expect(result).toBeGreaterThan(90)
   })
 
   it('BBANDS returns { upper, middle, lower }', async () => {
-    const result = (await calc("BBANDS(CLOSE('AAPL', '1d'), 20, 2)")) as Record<string, number>
+    const result = (await calc("BBANDS(CLOSE('AAPL', '1d'), 20, 2)")).value as Record<string, number>
     expect(result).toHaveProperty('upper')
     expect(result).toHaveProperty('middle')
     expect(result).toHaveProperty('lower')
@@ -207,7 +205,7 @@ describe('technical indicators', () => {
   })
 
   it('MACD returns { macd, signal, histogram }', async () => {
-    const result = (await calc("MACD(CLOSE('AAPL', '1d'), 12, 26, 9)")) as Record<string, number>
+    const result = (await calc("MACD(CLOSE('AAPL', '1d'), 12, 26, 9)")).value as Record<string, number>
     expect(result).toHaveProperty('macd')
     expect(result).toHaveProperty('signal')
     expect(result).toHaveProperty('histogram')
@@ -215,7 +213,7 @@ describe('technical indicators', () => {
   })
 
   it('ATR returns positive number', async () => {
-    const result = (await calc("ATR(HIGH('AAPL', '1d'), LOW('AAPL', '1d'), CLOSE('AAPL', '1d'), 14)")) as number
+    const result = (await calc("ATR(HIGH('AAPL', '1d'), LOW('AAPL', '1d'), CLOSE('AAPL', '1d'), 14)")).value as number
     expect(typeof result).toBe('number')
     expect(result).toBeGreaterThan(0)
   })
@@ -225,22 +223,19 @@ describe('technical indicators', () => {
 
 describe('complex expressions', () => {
   it('price deviation from MA (%)', async () => {
-    // latest close = 149, SMA(50) of 100..149 = average of last 50 = 124.5
-    // (149 - 124.5) / 124.5 * 100 ≈ 19.68%
-    const result = await calc(
+    const result = (await calc(
       "(CLOSE('AAPL', '1d')[-1] - SMA(CLOSE('AAPL', '1d'), 50)) / SMA(CLOSE('AAPL', '1d'), 50) * 100",
-    )
+    )).value
     expect(result).toBeCloseTo(19.68, 1)
   })
 
   it('arithmetic on function results', async () => {
-    // MAX - MIN of all 50 closes = 149 - 100 = 49
-    const result = await calc("MAX(CLOSE('AAPL', '1d')) - MIN(CLOSE('AAPL', '1d'))")
+    const result = (await calc("MAX(CLOSE('AAPL', '1d')) - MIN(CLOSE('AAPL', '1d'))")).value
     expect(result).toBe(49)
   })
 
   it('double-quoted strings work', async () => {
-    const result = await calc('CLOSE("AAPL", "1d")')
+    const result = (await calc('CLOSE("AAPL", "1d")')).value
     expect(Array.isArray(result)).toBe(true)
     expect((result as number[]).length).toBe(50)
   })
@@ -250,32 +245,51 @@ describe('complex expressions', () => {
 
 describe('precision', () => {
   it('default precision = 4', async () => {
-    const result = (await calc('10 / 3')) as number
-    expect(result).toBe(3.3333)
+    expect((await calc('10 / 3')).value).toBe(3.3333)
   })
 
   it('custom precision = 2', async () => {
-    const result = (await calc('10 / 3', 2)) as number
-    expect(result).toBe(3.33)
+    expect((await calc('10 / 3', 2)).value).toBe(3.33)
   })
 
   it('precision = 0 rounds to integer', async () => {
-    const result = (await calc('10 / 3', 0)) as number
-    expect(result).toBe(3)
+    expect((await calc('10 / 3', 0)).value).toBe(3)
   })
 
-  it('precision applies to arrays', async () => {
-    const result = (await calc("STDEV(CLOSE('AAPL', '1d'))", 0)) as number
-    expect(result).toBe(14)
+  it('precision applies to scalars from functions', async () => {
+    expect((await calc("STDEV(CLOSE('AAPL', '1d'))", 0)).value).toBe(14)
   })
 
   it('precision applies to record values', async () => {
-    const result = (await calc("BBANDS(CLOSE('AAPL', '1d'), 20, 2)", 2)) as Record<string, number>
-    // 所有值应只有 2 位小数
+    const result = (await calc("BBANDS(CLOSE('AAPL', '1d'), 20, 2)", 2)).value as Record<string, number>
     for (const v of Object.values(result)) {
       const decimals = v.toString().split('.')[1]?.length ?? 0
       expect(decimals).toBeLessThanOrEqual(2)
     }
+  })
+})
+
+// ==================== dataRange 溯源 ====================
+
+describe('dataRange', () => {
+  it('calculate returns dataRange with symbol metadata', async () => {
+    const { value, dataRange } = await calc("CLOSE('AAPL', '1d')[-1]")
+    expect(value).toBe(149)
+    expect(dataRange).toHaveProperty('AAPL')
+    expect(dataRange.AAPL.from).toBe(mockData[0].date)
+    expect(dataRange.AAPL.to).toBe(mockData[49].date)
+    expect(dataRange.AAPL.bars).toBe(50)
+  })
+
+  it('multiple symbols produce multiple dataRange entries', async () => {
+    // ATR uses HIGH, LOW, CLOSE — all same symbol, should produce one entry
+    const { dataRange } = await calc("ATR(HIGH('AAPL', '1d'), LOW('AAPL', '1d'), CLOSE('AAPL', '1d'), 14)")
+    expect(Object.keys(dataRange)).toEqual(['AAPL'])
+  })
+
+  it('pure arithmetic has empty dataRange', async () => {
+    const { dataRange } = await calc('2 + 3')
+    expect(Object.keys(dataRange).length).toBe(0)
   })
 })
 

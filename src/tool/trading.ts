@@ -8,6 +8,7 @@
 
 import { tool, type Tool } from 'ai'
 import { z } from 'zod'
+import Decimal from 'decimal.js'
 import { Contract, UNSET_DOUBLE, UNSET_DECIMAL } from '@traderalice/ibkr'
 import type { AccountManager } from '@/domain/trading/account-manager.js'
 import { BrokerError, type OpenOrder } from '@/domain/trading/brokers/types.js'
@@ -148,35 +149,35 @@ If this tool returns an error with transient=true, wait a few seconds and retry 
             const accountInfo = await uta.getAccount()
 
             // Convert position market values to USD for cross-currency percentage calculations
-            let totalMarketValueUsd = 0
-            const posUsdValues: number[] = []
+            let totalMarketValueUsd = new Decimal(0)
+            const posUsdValues: Decimal[] = []
             for (const pos of positions) {
               if (fxService && pos.currency !== 'USD') {
                 const r = await fxService.convertToUsd(pos.marketValue, pos.currency)
-                posUsdValues.push(r.usd)
+                posUsdValues.push(new Decimal(r.usd))
                 if (r.fxWarning && !fxWarnings.includes(r.fxWarning)) fxWarnings.push(r.fxWarning)
               } else {
-                posUsdValues.push(pos.marketValue)
+                posUsdValues.push(new Decimal(pos.marketValue))
               }
-              totalMarketValueUsd += posUsdValues[posUsdValues.length - 1]
+              totalMarketValueUsd = totalMarketValueUsd.plus(posUsdValues[posUsdValues.length - 1])
             }
 
             // Account netLiq in USD for equity percentage
-            let netLiqUsd = accountInfo.netLiquidation
+            let netLiqUsd = new Decimal(accountInfo.netLiquidation)
             if (fxService && accountInfo.baseCurrency !== 'USD') {
               const r = await fxService.convertToUsd(accountInfo.netLiquidation, accountInfo.baseCurrency)
-              netLiqUsd = r.usd
+              netLiqUsd = new Decimal(r.usd)
             }
 
             let idx = 0
             for (const pos of positions) {
               if (symbol && symbol !== 'all' && pos.contract.symbol !== symbol) { idx++; continue }
               const mvUsd = posUsdValues[idx]
-              const percentOfEquity = netLiqUsd > 0 ? (mvUsd / netLiqUsd) * 100 : 0
-              const percentOfPortfolio = totalMarketValueUsd > 0 ? (mvUsd / totalMarketValueUsd) * 100 : 0
+              const percentOfEquity = netLiqUsd.gt(0) ? mvUsd.div(netLiqUsd).mul(100) : new Decimal(0)
+              const percentOfPortfolio = totalMarketValueUsd.gt(0) ? mvUsd.div(totalMarketValueUsd).mul(100) : new Decimal(0)
               allPositions.push({
                 source: uta.id, symbol: pos.contract.symbol, currency: pos.currency, side: pos.side,
-                quantity: pos.quantity.toNumber(), avgCost: pos.avgCost, marketPrice: pos.marketPrice,
+                quantity: pos.quantity.toString(), avgCost: pos.avgCost, marketPrice: pos.marketPrice,
                 marketValue: pos.marketValue, unrealizedPnL: pos.unrealizedPnL, realizedPnL: pos.realizedPnL,
                 percentageOfEquity: `${percentOfEquity.toFixed(1)}%`,
                 percentageOfPortfolio: `${percentOfPortfolio.toFixed(1)}%`,

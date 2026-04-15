@@ -9,6 +9,7 @@
  * Lookup priority: live (fresh) → live (stale cache) → default table → 1:1 fallback.
  */
 
+import Decimal from 'decimal.js'
 import type { CurrencyClientLike } from '../market-data/client/types.js'
 
 // ==================== Types ====================
@@ -32,8 +33,8 @@ export interface FxRate {
 }
 
 export interface ConvertResult {
-  /** Amount converted to USD. */
-  usd: number
+  /** Amount converted to USD (string to prevent IEEE 754 artifacts). */
+  usd: string
   /** Present only when a default (hardcoded) rate was used. Includes the updatedAt date. */
   fxWarning?: string
 }
@@ -158,10 +159,11 @@ export class FxService {
    * Convert an amount in the given currency to USD.
    * Returns a warning only when the default (hardcoded) table is used.
    */
-  async convertToUsd(amount: number, currency: string): Promise<ConvertResult> {
-    if (amount === 0) return { usd: 0 }
+  async convertToUsd(amount: string, currency: string): Promise<ConvertResult> {
+    const d = new Decimal(amount)
+    if (d.isZero()) return { usd: '0' }
     const fx = await this.getRate(currency)
-    const usd = amount * fx.rate
+    const usd = d.mul(fx.rate).toString()
     if (fx.source === 'default') {
       return { usd, fxWarning: `${currency}: using default rate ${fx.rate} (last updated ${fx.updatedAt})` }
     }

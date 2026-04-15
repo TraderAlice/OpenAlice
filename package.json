@@ -4,7 +4,7 @@
   "description": "File-based trading agent engine",
   "type": "module",
   "scripts": {
-    "dev": "tsx src/main.ts",
+    "dev": "tsx watch src/main.ts",
     "dev:ui": "corepack pnpm --filter open-alice-ui dev",
     "dev:codex": "powershell -ExecutionPolicy Bypass -File ./scripts/start-openalice.ps1",
     "build:deps": "corepack pnpm --filter @traderalice/opentypebb build && corepack pnpm --filter @traderalice/ibkr build",
@@ -25,7 +25,7 @@
     "securities",
     "file-driven"
   ],
-  "author": "Open Alice Contributors",
+  "author": "OpenAlice Contributors",
   "license": "AGPL-3.0-only",
   "repository": {
     "type": "git",

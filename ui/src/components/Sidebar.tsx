@@ -47,11 +47,14 @@ const NAV_SECTIONS: NavSection[] = [
         ),
       },
       {
-        page: 'events',
-        label: 'Events',
+        page: 'news',
+        label: 'News',
         icon: (active) => (
           <svg width="18" height="18" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+            <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2zm0 0a2 2 0 0 1-2-2v-9h4" />
+            <path d="M10 7h8" />
+            <path d="M10 11h8" />
+            <path d="M10 15h4" />
           </svg>
         ),
       },
@@ -61,21 +64,11 @@ const NAV_SECTIONS: NavSection[] = [
     sectionLabel: 'Agent',
     items: [
       {
-        page: 'agent-status',
-        label: 'Agent Status',
+        page: 'automation',
+        label: 'Automation',
         icon: (active) => (
           <svg width="18" height="18" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="4" y="4" width="16" height="16" rx="2" />
-            <path d="M4 12h4l2-4 4 8 2-4h4" />
-          </svg>
-        ),
-      },
-      {
-        page: 'heartbeat',
-        label: 'Heartbeat',
-        icon: (active) => (
-          <svg width="18" height="18" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z" />
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
           </svg>
         ),
       },
@@ -96,21 +89,20 @@ const NAV_SECTIONS: NavSection[] = [
         ),
       },
       {
-        page: 'news',
-        label: 'News',
+        page: 'news-collector',
+        label: 'News Collector',
         icon: (active) => (
           <svg width="18" height="18" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2zm0 0a2 2 0 0 1-2-2v-9h4" />
-            <path d="M10 7h8" />
-            <path d="M10 11h8" />
-            <path d="M10 15h4" />
+            <path d="M4 11a9 9 0 0 1 9 9" />
+            <path d="M4 4a16 16 0 0 1 16 16" />
+            <circle cx="5" cy="19" r="1" />
           </svg>
         ),
       },
     ],
   },
   {
-    sectionLabel: 'System',
+    sectionLabel: 'Integration',
     items: [
       {
         page: 'connectors',
@@ -124,17 +116,8 @@ const NAV_SECTIONS: NavSection[] = [
         ),
       },
       {
-        page: 'tools',
-        label: 'Tools',
-        icon: (active) => (
-          <svg width="18" height="18" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-          </svg>
-        ),
-      },
-      {
         page: 'trading' as const,
-        label: 'Trading',
+        label: 'Trading Account',
         icon: (active: boolean) => (
           <svg width="18" height="18" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M2 20h20" />
@@ -152,6 +135,20 @@ const NAV_SECTIONS: NavSection[] = [
           <svg width="18" height="18" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73v1.27h1a7 7 0 0 1 7 7h1.27c.34-.6.99-1 1.73-1a2 2 0 1 1 0 4c-.74 0-1.39-.4-1.73-1H21a7 7 0 0 1-7 7v1.27c.6.34 1 .99 1 1.73a2 2 0 1 1-4 0c0-.74.4-1.39 1-1.73V21a7 7 0 0 1-7-7H2.73c-.34.6-.99 1-1.73 1a2 2 0 1 1 0-4c.74 0 1.39.4 1.73 1H4a7 7 0 0 1 7-7V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z" />
             <circle cx="12" cy="14" r="3" />
+          </svg>
+        ),
+      },
+    ],
+  },
+  {
+    sectionLabel: 'System',
+    items: [
+      {
+        page: 'logs',
+        label: 'Logs',
+        icon: (active) => (
+          <svg width="18" height="18" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
           </svg>
         ),
       },
@@ -227,7 +224,7 @@ export function Sidebar({ sseConnected, open, onClose }: SidebarProps) {
             className="w-7 h-7 rounded-lg ring-1 ring-accent/25 shadow-[0_0_8px_rgba(88,166,255,0.15)]"
             draggable={false}
           />
-          <h1 className="text-[15px] font-semibold text-text">Open Alice</h1>
+          <h1 className="text-[15px] font-semibold text-text">OpenAlice</h1>
         </div>
 
         {/* Navigation */}

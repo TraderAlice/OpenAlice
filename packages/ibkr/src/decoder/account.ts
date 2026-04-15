@@ -120,11 +120,11 @@ export function applyAccountHandlers(decoder: Decoder): void {
     }
 
     const position = decodeDecimal(fields)
-    const marketPrice = decodeFloat(fields)
-    const marketValue = decodeFloat(fields)
-    const averageCost = decodeFloat(fields) // ver 3
-    const unrealizedPNL = decodeFloat(fields) // ver 3
-    const realizedPNL = decodeFloat(fields) // ver 3
+    const marketPrice = decodeDecimal(fields).toString()
+    const marketValue = decodeDecimal(fields).toString()
+    const averageCost = decodeDecimal(fields).toString() // ver 3
+    const unrealizedPNL = decodeDecimal(fields).toString() // ver 3
+    const realizedPNL = decodeDecimal(fields).toString() // ver 3
     const accountName = decodeStr(fields) // ver 4
 
     if (version === 6 && d.serverVersion === 39) {
@@ -144,11 +144,11 @@ export function applyAccountHandlers(decoder: Decoder): void {
     const contract = decodeContractProto(proto.contract)
 
     const position = proto.position !== undefined ? new Decimal(proto.position) : UNSET_DECIMAL
-    const marketPrice = proto.marketPrice ?? 0
-    const marketValue = proto.marketValue ?? 0
-    const averageCost = proto.averageCost ?? 0
-    const unrealizedPNL = proto.unrealizedPNL ?? 0
-    const realizedPNL = proto.realizedPNL ?? 0
+    const marketPrice = String(proto.marketPrice ?? 0)
+    const marketValue = String(proto.marketValue ?? 0)
+    const averageCost = String(proto.averageCost ?? 0)
+    const unrealizedPNL = String(proto.unrealizedPNL ?? 0)
+    const realizedPNL = String(proto.realizedPNL ?? 0)
     const accountName = proto.accountName ?? ''
 
     d.wrapper.updatePortfolio(

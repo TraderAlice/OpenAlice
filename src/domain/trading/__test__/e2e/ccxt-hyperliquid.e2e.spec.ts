@@ -54,8 +54,8 @@ describe('CcxtBroker — Hyperliquid e2e', () => {
   it('fetches account info with USD baseCurrency', async () => {
     const account = await b().getAccount()
     expect(account.baseCurrency).toBeDefined()
-    expect(account.netLiquidation).toBeGreaterThanOrEqual(0)
-    console.log(`  equity: $${account.netLiquidation.toFixed(2)}, cash: $${account.totalCashValue.toFixed(2)}, base=${account.baseCurrency}`)
+    expect(Number(account.netLiquidation)).toBeGreaterThanOrEqual(0)
+    console.log(`  equity: $${Number(account.netLiquidation).toFixed(2)}, cash: $${Number(account.totalCashValue).toFixed(2)}, base=${account.baseCurrency}`)
   })
 
   it('fetches positions with currency field', async () => {
@@ -66,9 +66,9 @@ describe('CcxtBroker — Hyperliquid e2e', () => {
       expect(p.currency).toBeDefined()
       // Regression: hyperliquid's CCXT parsePosition leaves markPrice undefined.
       // Our override recovers it from notional / contracts — verify it's > 0.
-      expect(p.marketPrice, `marketPrice missing for ${p.contract.symbol}`).toBeGreaterThan(0)
+      expect(Number(p.marketPrice), `marketPrice missing for ${p.contract.symbol}`).toBeGreaterThan(0)
       // marketValue should equal qty × markPrice
-      expect(p.marketValue).toBeCloseTo(p.quantity.toNumber() * p.marketPrice, 2)
+      expect(Number(p.marketValue)).toBeCloseTo(p.quantity.toNumber() * Number(p.marketPrice), 2)
       console.log(`    ${p.contract.symbol}: ${p.side} ${p.quantity} @ ${p.marketPrice} ${p.currency}`)
     }
   })

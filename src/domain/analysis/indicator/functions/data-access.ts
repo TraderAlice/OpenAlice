@@ -8,49 +8,49 @@
  * 数据拉取量由 adapter 层按 interval 决定，公式层不关心。
  */
 
-import type { IndicatorContext } from '../types'
+import type { IndicatorContext, TrackedValues } from '../types'
 
 export async function CLOSE(
   symbol: string,
   interval: string,
   context: IndicatorContext,
-): Promise<number[]> {
-  const data = await context.getHistoricalData(symbol, interval)
-  return data.map((d) => d.close)
+): Promise<TrackedValues> {
+  const { data, meta } = await context.getHistoricalData(symbol, interval)
+  return { values: data.map((d) => d.close), source: meta }
 }
 
 export async function HIGH(
   symbol: string,
   interval: string,
   context: IndicatorContext,
-): Promise<number[]> {
-  const data = await context.getHistoricalData(symbol, interval)
-  return data.map((d) => d.high)
+): Promise<TrackedValues> {
+  const { data, meta } = await context.getHistoricalData(symbol, interval)
+  return { values: data.map((d) => d.high), source: meta }
 }
 
 export async function LOW(
   symbol: string,
   interval: string,
   context: IndicatorContext,
-): Promise<number[]> {
-  const data = await context.getHistoricalData(symbol, interval)
-  return data.map((d) => d.low)
+): Promise<TrackedValues> {
+  const { data, meta } = await context.getHistoricalData(symbol, interval)
+  return { values: data.map((d) => d.low), source: meta }
 }
 
 export async function OPEN(
   symbol: string,
   interval: string,
   context: IndicatorContext,
-): Promise<number[]> {
-  const data = await context.getHistoricalData(symbol, interval)
-  return data.map((d) => d.open)
+): Promise<TrackedValues> {
+  const { data, meta } = await context.getHistoricalData(symbol, interval)
+  return { values: data.map((d) => d.open), source: meta }
 }
 
 export async function VOLUME(
   symbol: string,
   interval: string,
   context: IndicatorContext,
-): Promise<number[]> {
-  const data = await context.getHistoricalData(symbol, interval)
-  return data.map((d) => d.volume ?? 0)
+): Promise<TrackedValues> {
+  const { data, meta } = await context.getHistoricalData(symbol, interval)
+  return { values: data.map((d) => d.volume ?? 0), source: meta }
 }

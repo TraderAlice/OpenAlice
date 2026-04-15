@@ -8,7 +8,8 @@
  */
 
 import type { EventLog, EventLogEntry } from '../../../core/event-log.js'
-import type { CronEngine, CronFirePayload } from '../../../task/cron/engine.js'
+import type { CronFirePayload } from '../../../core/agent-event.js'
+import type { CronEngine } from '../../../task/cron/engine.js'
 import type { SnapshotService } from './service.js'
 
 const SNAPSHOT_JOB_NAME = '__snapshot__'
@@ -34,8 +35,8 @@ export function createSnapshotScheduler(deps: {
   let unsubscribe: (() => void) | null = null
   let processing = false
 
-  async function handleFire(entry: EventLogEntry): Promise<void> {
-    const payload = entry.payload as CronFirePayload
+  async function handleFire(entry: EventLogEntry<CronFirePayload>): Promise<void> {
+    const payload = entry.payload
     if (payload.jobName !== SNAPSHOT_JOB_NAME) return
     if (processing) return
 

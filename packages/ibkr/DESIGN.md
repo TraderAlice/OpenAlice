@@ -4,7 +4,7 @@ This document captures the exploration, decisions, and trade-offs made during th
 
 ## Background
 
-Open Alice needed IBKR trading support. The Unified Trading Account system was already designed in IBKR's style, so the data model was a natural fit. The question was how to connect.
+OpenAlice needed IBKR trading support. The Unified Trading Account system was already designed in IBKR's style, so the data model was a natural fit. The question was how to connect.
 
 ## Evaluating Connection Options
 
@@ -13,7 +13,7 @@ Open Alice needed IBKR trading support. The Unified Trading Account system was a
 A community TypeScript implementation of the TWS socket protocol.
 
 - **Pros**: Ready to use, npm install and go.
-- **Cons**: 340 GitHub stars at the time of evaluation. Open Alice itself had 1100+. Depending on a smaller project for a critical path (real-money trading) was deemed too risky. Supply chain concerns: single maintainer, infrequent updates, unclear maintenance commitment.
+- **Cons**: 340 GitHub stars at the time of evaluation. OpenAlice itself had 1100+. Depending on a smaller project for a critical path (real-money trading) was deemed too risky. Supply chain concerns: single maintainer, infrequent updates, unclear maintenance commitment.
 
 **Decision**: Rejected due to supply chain risk.
 
