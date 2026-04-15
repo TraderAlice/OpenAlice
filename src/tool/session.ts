@@ -9,6 +9,10 @@ import { toTextHistory, type SessionEntry } from '@/core/session.js'
 
 const DEFAULT_SESSIONS_DIR = join(process.cwd(), 'data', 'sessions')
 
+function toPosixPath(path: string): string {
+  return path.replace(/\\/g, '/')
+}
+
 /**
  * Create session awareness tools — cross-session visibility for the AI.
  *
@@ -145,7 +149,7 @@ async function findJsonlFiles(
         results.push(...await findJsonlFiles(fullPath, base))
       } else if (entry.name.endsWith('.jsonl')) {
         const s = await stat(fullPath)
-        const id = relative(base, fullPath).replace(/\.jsonl$/, '')
+        const id = toPosixPath(relative(base, fullPath).replace(/\.jsonl$/, ''))
         results.push({ id, sizeBytes: s.size, lastModified: s.mtime.toISOString() })
       }
     }

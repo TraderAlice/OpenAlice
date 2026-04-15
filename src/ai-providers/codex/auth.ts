@@ -1,9 +1,9 @@
 /**
- * Codex OAuth authentication — reads ~/.codex/auth.json and manages token refresh.
+ * Codex authentication — reads ~/.codex/auth.json and manages token refresh.
  *
  * Users authenticate via `codex login` (OpenAI Codex CLI). This module reads
- * the cached OAuth tokens and refreshes them when expired, writing updates back
- * to disk so the Codex CLI stays in sync.
+ * either the cached OAuth tokens or API key mode credentials, writing refreshed
+ * OAuth tokens back to disk so the Codex CLI stays in sync.
  */
 
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
@@ -32,6 +32,14 @@ export interface CodexAuthFile {
     account_id?: string
   }
   last_refresh?: string
+}
+
+/** Read API key mode credentials from auth.json when Codex CLI is configured with an API key. */
+export async function getApiKeyFromAuthFile(): Promise<string | null> {
+  const auth = await readAuthFile()
+  if (auth.auth_mode !== 'apikey') return null
+  const apiKey = auth.OPENAI_API_KEY?.trim()
+  return apiKey ? apiKey : null
 }
 
 // ==================== Helpers ====================
@@ -160,6 +168,18 @@ export async function getAccessToken(): Promise<string> {
   refreshPromise = (async () => {
     try {
       const auth = await readAuthFile()
+
+      if (auth.auth_mode === 'apikey') {
+        const apiKey = auth.OPENAI_API_KEY?.trim()
+        if (!apiKey) {
+          throw new Error('Codex auth.json is in API key mode but has no OPENAI_API_KEY set.')
+        }
+        cachedToken = {
+          token: apiKey,
+          expiresAt: Date.now() / 1000 + 3600,
+        }
+        return cachedToken.token
+      }
 
       if (!auth.tokens?.access_token) {
         throw new Error('Codex auth.json has no tokens. Run `codex login` to authenticate.')

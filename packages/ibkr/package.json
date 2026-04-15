@@ -18,7 +18,7 @@
     "directory": "packages/ibkr"
   },
   "scripts": {
-    "build": "rm -rf dist && tsc",
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc",
     "test": "vitest run --config vitest.config.ts",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "test:all": "vitest run --config vitest.config.ts && vitest run --config vitest.e2e.config.ts",

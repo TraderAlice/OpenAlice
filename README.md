@@ -23,7 +23,7 @@ Your one-person Wall Street. Alice is an AI trading agent that gives you your ow
 
 ## Features
 
-- **Multi-provider AI** — switch between Claude (via Agent SDK with OAuth or API key) and Vercel AI SDK at runtime, no restart needed
+- **Multi-provider AI** — switch between Codex CLI, Claude (via Agent SDK with OAuth or API key), and Vercel AI SDK at runtime, no restart needed
 - **Unified Trading Account (UTA)** — each trading account is a self-contained entity that owns its broker connection, git-like operation history, and guard pipeline. AI interacts with UTAs, never with brokers directly. All order types use IBKR's type system (`@traderalice/ibkr`) as the single source of truth. Supported brokers: CCXT (100+ crypto exchanges), Alpaca (US equities), Interactive Brokers (stocks, options, futures, bonds via TWS/Gateway). Each broker self-registers its config schema and UI field descriptors — adding a new broker requires zero changes to the framework
 - **Trading-as-Git** — stage orders, commit with a message, push to execute. Every commit gets an 8-char hash. Full history reviewable via `tradingLog` / `tradingShow`
 - **Guard pipeline** — pre-execution safety checks (max position size, cooldown, symbol whitelist) that run inside each UTA before orders reach the broker
@@ -40,7 +40,7 @@ Your one-person Wall Street. Alice is an AI trading agent that gives you your ow
 
 ## Key Concepts
 
-**Provider** — The AI backend that powers Alice. Claude (via `@anthropic-ai/claude-agent-sdk`, supports OAuth login or API key) or Vercel AI SDK (direct API calls to Anthropic, OpenAI, Google). Switchable at runtime via `ai-provider.json`.
+**Provider** — The AI backend that powers Alice. The default is Codex CLI (`codex exec`) with Alice's MCP tools mounted into the local Codex session. Claude (via `@anthropic-ai/claude-agent-sdk`) and Vercel AI SDK are also available. Switchable at runtime via `ai-provider-manager.json`.
 
 **Domain** — Business logic layer (`src/domain/`). Each domain module (trading, market-data, analysis, news, brain, thinking) owns its state and persistence. **Tool** (`src/tool/`) is a thin bridge layer that registers domain capabilities as AI tools in ToolCenter.
 
@@ -65,6 +65,7 @@ Your one-person Wall Street. Alice is an AI trading agent that gives you your ow
 ```mermaid
 graph LR
   subgraph Providers
+    CX[Codex CLI]
     AS[Claude / Agent SDK]
     VS[Vercel AI SDK]
   end
@@ -103,6 +104,7 @@ graph LR
     MCP[MCP Server]
   end
 
+  CX --> PR
   AS --> PR
   VS --> PR
   PR --> AC
@@ -129,7 +131,7 @@ graph LR
   MCP --> AC
 ```
 
-**Providers** — interchangeable AI backends. Claude (Agent SDK) uses `@anthropic-ai/claude-agent-sdk` with tools delivered via in-process MCP — supports Claude Pro/Max OAuth login or API key. Vercel AI SDK runs a `ToolLoopAgent` in-process with direct API calls. `ProviderRouter` reads `ai-provider.json` on each call to select the active backend at runtime.
+**Providers** — interchangeable AI backends. Codex uses the local `codex exec` CLI and mounts Alice's MCP server into the Codex run, so the agent is genuinely Codex-driven. Claude (Agent SDK) uses `@anthropic-ai/claude-agent-sdk` with tools delivered via in-process MCP. Vercel AI SDK runs a `ToolLoopAgent` in-process with direct API calls. `ProviderRouter` reads `ai-provider-manager.json` on each call to select the active backend at runtime.
 
 **Core** — `AgentCenter` is the top-level orchestration center that routes all calls (both stateless and session-aware) through `ProviderRouter`. `ToolCenter` is a centralized tool registry — `tool/` files register domain capabilities there, and it exports them in Vercel AI SDK and MCP formats. `EventLog` provides persistent append-only event storage (JSONL) with real-time subscriptions and crash recovery. `ConnectorCenter` tracks which channel the user last spoke through.
 
@@ -141,31 +143,64 @@ graph LR
 
 ## Quick Start
 
-Prerequisites: Node.js 22+, pnpm 10+, [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated.
+Prerequisites: Node.js 22+, pnpm 10+, [Codex CLI](https://developers.openai.com/codex/cli) installed and authenticated.
 
 ```bash
 git clone https://github.com/TraderAlice/OpenAlice.git
 cd OpenAlice
-pnpm install && pnpm build
-pnpm dev
+codex login
+corepack pnpm install && corepack pnpm build
+corepack pnpm dev
 ```
 
-Open [localhost:3002](http://localhost:3002) and start chatting. No API keys or config needed — the default setup uses your local Claude Code login (Claude Pro/Max subscription).
+Open [localhost:3002](http://localhost:3002) and start chatting. No API keys or extra provider setup needed — the default profile uses your local Codex CLI session.
 
 ```bash
-pnpm dev        # start backend (port 3002) with watch mode
-pnpm dev:ui     # start frontend dev server (port 5173) with hot reload
-pnpm build      # production build (backend + UI)
-pnpm test       # run tests
+corepack pnpm dev        # start backend (port 3002) with watch mode
+corepack pnpm dev:ui     # start frontend dev server (port 5173) with hot reload
+corepack pnpm build      # production build (backend + UI)
+corepack pnpm test       # run tests
 ```
 
 > **Note:** Port 3002 serves the UI only after `pnpm build`. For frontend development, use `pnpm dev:ui` (port 5173) which proxies to the backend and provides hot reload.
+
+## Daily Workflow
+
+For normal daily use, the shortest path is:
+
+```bash
+cd OpenAlice
+codex login   # only when needed
+corepack pnpm dev
+```
+
+Then open [localhost:3002](http://localhost:3002) and chat with the default profile. That profile now routes every turn through local Codex CLI, and Codex reaches Alice's trading, research, browser, and session tools through the built-in MCP server on port `3001`.
+
+If you want a different backend later, open the AI Provider page in the Web UI and switch profiles there. No restart is required.
+
+On Windows, you can use the bundled launcher instead:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\start-openalice.ps1
+```
+
+Or just run:
+
+```bat
+.\scripts\start-openalice.cmd
+```
+
+Or, if you prefer npm scripts:
+
+```bash
+corepack pnpm dev:codex
+```
 
 ## Configuration
 
 All config lives in `data/config/` as JSON files with Zod validation. Missing files fall back to sensible defaults. You can edit these files directly or use the Web UI.
 
-**AI Provider** — The default provider is Claude (Agent SDK), which uses your local Claude Code login — no API key needed. To use the [Vercel AI SDK](https://sdk.vercel.ai/docs) instead (Anthropic, OpenAI, Google, etc.), switch `ai-provider.json` to `vercel-ai-sdk` and add your API key. Both can be switched at runtime via the Web UI.
+**AI Provider** — The default provider is Codex CLI, which uses your local `codex login` session and runs Alice through `codex exec` with Alice's MCP tools attached automatically. To use Claude Agent SDK or the [Vercel AI SDK](https://sdk.vercel.ai/docs) instead, switch `ai-provider-manager.json` or use the Web UI. Providers can be switched at runtime with no restart.
 
 **Trading** — Unified Trading Account (UTA) architecture. Each account in `accounts.json` becomes a UTA with its own broker connection, git history, and guard config. Broker-specific settings live in the `brokerConfig` field — each broker type declares its own schema and validates it internally.
 
@@ -173,7 +208,7 @@ All config lives in `data/config/` as JSON files with Zod validation. Missing fi
 |------|---------|
 | `engine.json` | Trading pairs, tick interval, timeframe |
 | `agent.json` | Max agent steps, evolution mode toggle, Claude Code tool permissions |
-| `ai-provider.json` | Active AI provider (`agent-sdk` or `vercel-ai-sdk`), login method, switchable at runtime |
+| `ai-provider-manager.json` | Active AI provider profile (`codex`, `agent-sdk`, or `vercel-ai-sdk`), login method, switchable at runtime |
 | `accounts.json` | Trading accounts with `type`, `enabled`, `guards`, and `brokerConfig` (broker-specific settings) |
 | `connectors.json` | Web/MCP server ports, MCP Ask enable |
 | `telegram.json` | Telegram bot credentials + enable |
