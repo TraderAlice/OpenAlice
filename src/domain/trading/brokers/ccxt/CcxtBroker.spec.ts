@@ -12,11 +12,23 @@ import { Contract, Order, UNSET_DOUBLE, UNSET_DECIMAL } from '@traderalice/ibkr'
 // Mock ccxt BEFORE importing CcxtBroker
 vi.mock('ccxt', () => {
   // Create a fake exchange class that can be used as a constructor
-  const MockExchange = vi.fn(function (this: any) {
+  const MockExchange = vi.fn(function (this: any, credentials: any) {
+    Object.assign(this, credentials)
+    this.id = 'mock'
     this.markets = {}
     this.options = { fetchMarkets: { types: ['spot', 'linear'] } }
+    this.requiredCredentials = { apiKey: true, secret: true }
     this.setSandboxMode = vi.fn()
-    this.loadMarkets = vi.fn().mockResolvedValue({})
+    this.enableDemoTrading = vi.fn()
+    this.checkRequiredCredentials = vi.fn().mockImplementation(() => {
+      if (!this.apiKey || !this.secret) {
+        throw new Error('Missing credentials')
+      }
+    })
+    this.loadMarkets = vi.fn().mockImplementation(async () => {
+      this.markets = { 'BTC/USDT': { symbol: 'BTC/USDT', type: 'spot', active: true, base: 'BTC', quote: 'USDT' } }
+      return this.markets
+    })
     this.fetchMarkets = vi.fn().mockResolvedValue([])
     this.fetchTicker = vi.fn()
     this.fetchBalance = vi.fn()
@@ -37,6 +49,7 @@ vi.mock('ccxt', () => {
     default: {
       bybit: MockExchange,
       binance: MockExchange,
+      okx: MockExchange,
     },
   }
 })
@@ -1055,5 +1068,97 @@ describe('CcxtBroker — close', () => {
   it('resolves without error (no-op)', async () => {
     const acc = makeAccount()
     await expect(acc.close()).resolves.toBeUndefined()
+  })
+})
+
+// ==================== sandbox & demoTrading ====================
+
+describe('CcxtBroker — sandbox & demoTrading', () => {
+  it('calls setSandboxMode(true) when sandbox is enabled for non-OKX/Bybit', () => {
+    const acc = new CcxtBroker({ exchange: 'binance', apiKey: 'k', secret: 's', sandbox: true })
+    expect((acc as any).exchange.setSandboxMode).toHaveBeenCalledWith(true)
+  })
+
+  it('calls enableDemoTrading(true) for OKX/Bybit when sandbox is enabled', () => {
+    const bybitAcc = new CcxtBroker({ exchange: 'bybit', apiKey: 'k', secret: 's', sandbox: true })
+    expect((bybitAcc as any).exchange.enableDemoTrading).toHaveBeenCalledWith(true)
+    expect((bybitAcc as any).exchange.setSandboxMode).not.toHaveBeenCalled()
+
+    const okxAcc = new CcxtBroker({ exchange: 'okx', apiKey: 'k', secret: 's', sandbox: true })
+    expect((okxAcc as any).exchange.enableDemoTrading).toHaveBeenCalledWith(true)
+    expect((okxAcc as any).exchange.setSandboxMode).not.toHaveBeenCalled()
+  })
+
+  it('calls setSandboxMode(true) for OKX when demoTrading is enabled', () => {
+    const acc = new CcxtBroker({ exchange: 'okx', apiKey: 'k', secret: 's', demoTrading: true })
+    expect((acc as any).exchange.setSandboxMode).toHaveBeenCalledWith(true)
+  })
+
+  it('calls enableDemoTrading(true) for Bybit when demoTrading is enabled', () => {
+    const acc = new CcxtBroker({ exchange: 'bybit', apiKey: 'k', secret: 's', demoTrading: true })
+    expect((acc as any).exchange.enableDemoTrading).toHaveBeenCalledWith(true)
+  })
+
+  it('safely handles missing enableDemoTrading method', () => {
+    const ccxt = require('ccxt').default
+    const originalBybit = ccxt.bybit
+    ccxt.bybit = vi.fn().mockImplementation(function(this: any) {
+      this.id = 'bybit'
+      this.options = { fetchMarkets: { types: ['spot'] } }
+      this.setSandboxMode = vi.fn()
+      this.requiredCredentials = {}
+      this.checkRequiredCredentials = vi.fn()
+      // No enableDemoTrading
+    })
+
+    expect(() => new CcxtBroker({ exchange: 'bybit', apiKey: 'k', secret: 's', demoTrading: true })).not.toThrow()
+    
+    ccxt.bybit = originalBybit
+  })
+
+  it('safely handles enableDemoTrading throwing an error', () => {
+    const ccxt = require('ccxt').default
+    const originalBybit = ccxt.bybit
+    ccxt.bybit = vi.fn().mockImplementation(function(this: any) {
+      this.id = 'bybit'
+      this.options = { fetchMarkets: { types: ['spot'] } }
+      this.setSandboxMode = vi.fn()
+      this.requiredCredentials = {}
+      this.checkRequiredCredentials = vi.fn()
+      this.enableDemoTrading = vi.fn().mockImplementation(() => { throw new Error('fail') })
+    })
+
+    expect(() => new CcxtBroker({ exchange: 'bybit', apiKey: 'k', secret: 's', demoTrading: true })).not.toThrow()
+    
+    ccxt.bybit = originalBybit
+  })
+})
+
+// ==================== init — fetchMarkets ====================
+
+describe('CcxtBroker — init fetchMarkets', () => {
+  it('passes { type } in params to fetchMarkets', async () => {
+    const acc = makeAccount()
+    const ex = (acc as any).exchange
+    const fetchMarketsMock = vi.fn().mockResolvedValue([])
+    ex.fetchMarkets = fetchMarketsMock
+    
+    // We need loadMarkets to succeed and markets to be populated
+    ex.loadMarkets = vi.fn().mockImplementation(async () => {
+      // During loadMarkets, CCXT calls fetchMarkets. 
+      // In CcxtBroker, we wrap fetchMarkets and call origFetchMarkets.
+      // But loadMarkets will call the WRAPPER.
+      const result = await ex.fetchMarkets()
+      ex.markets = { 'BTC/USDT': { symbol: 'BTC/USDT', type: 'spot', active: true, base: 'BTC', quote: 'USDT' } }
+      return result
+    })
+
+    await acc.init()
+    
+    // The wrapper should have called the original fetchMarkets (our fetchMarketsMock)
+    // with the 'type' field added to the params for each type in types.
+    // Default types are ['spot', 'linear'].
+    expect(fetchMarketsMock).toHaveBeenCalledWith(expect.objectContaining({ type: 'spot' }))
+    expect(fetchMarketsMock).toHaveBeenCalledWith(expect.objectContaining({ type: 'linear' }))
   })
 })

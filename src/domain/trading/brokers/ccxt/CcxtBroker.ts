@@ -157,7 +157,18 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
     this.exchange = new ExchangeClass(credentials)
 
     if (config.sandbox) {
-      this.exchange.setSandboxMode(true)
+      if (this.exchangeName === 'okx' || this.exchangeName === 'bybit') {
+        const ex = this.exchange as unknown as { enableDemoTrading?: (enable: boolean) => void }
+        if (typeof ex.enableDemoTrading === 'function') {
+          try {
+            ex.enableDemoTrading(true)
+          } catch (err) {
+            console.warn(`CcxtBroker[${this.id}]: enableDemoTrading failed:`, err instanceof Error ? err.message : String(err))
+          }
+        }
+      } else {
+        this.exchange.setSandboxMode(true)
+      }
     }
 
     if (config.demoTrading && !config.sandbox) {

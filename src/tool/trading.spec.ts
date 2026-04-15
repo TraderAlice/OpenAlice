@@ -251,3 +251,137 @@ describe('createTradingTools — getOrders summarization', () => {
     expect(result['mock-paper|ETH'].orders).toHaveLength(1)
   })
 })
+
+// ==================== Decimal Serialization ====================
+
+describe('createTradingTools — Decimal serialization', () => {
+  let broker: MockBroker
+  let mgr: AccountManager
+  let tools: Record<string, any>
+
+  beforeEach(() => {
+    broker = new MockBroker({ id: 'mock-paper' })
+    mgr = makeManager(broker)
+    tools = createTradingTools(mgr)
+  })
+
+  it('tradingStatus serializes Decimal objects in staged operations', async () => {
+    const uta = mgr.resolveOne('mock-paper')
+    uta.stagePlaceOrder({
+      aliceId: 'mock-paper|AAPL',
+      action: 'BUY',
+      orderType: 'LMT',
+      totalQuantity: 10,
+      lmtPrice: 150,
+    })
+
+    const result = await (tools.tradingStatus.execute as Function)({ source: 'mock-paper' })
+    const staged = result.staged[0]
+
+    expect(typeof staged.order.totalQuantity).toBe('string')
+    expect(staged.order.totalQuantity).toBe('10')
+  })
+
+  it('placeOrder returns serialized Decimal in operation', async () => {
+    const result = await (tools.placeOrder.execute as Function)({
+      source: 'mock-paper',
+      aliceId: 'mock-paper|AAPL',
+      action: 'BUY',
+      orderType: 'LMT',
+      totalQuantity: 10,
+      lmtPrice: 150,
+    })
+
+    expect(typeof result.operation.order.totalQuantity).toBe('string')
+    expect(result.operation.order.totalQuantity).toBe('10')
+  })
+
+  it('modifyOrder returns serialized Decimal in operation', async () => {
+    // First place an order to have something to modify
+    const uta = mgr.resolveOne('mock-paper')
+    uta.stagePlaceOrder({
+      aliceId: 'mock-paper|AAPL',
+      action: 'BUY',
+      orderType: 'LMT',
+      totalQuantity: 10,
+      lmtPrice: 150,
+    })
+    uta.commit('buy')
+    await uta.push()
+
+    // Get the order ID
+    const pending = uta.getPendingOrderIds()
+    const orderId = pending[0].orderId
+
+    const result = await (tools.modifyOrder.execute as Function)({
+      source: 'mock-paper',
+      orderId,
+      totalQuantity: 20,
+    })
+
+    expect(typeof result.operation.changes.totalQuantity).toBe('string')
+    expect(result.operation.changes.totalQuantity).toBe('20')
+  })
+
+  it('closePosition returns serialized Decimal in operation', async () => {
+    // Inject a position into MockBroker
+    broker.setPositions([{
+      contract: makeContract({ symbol: 'AAPL', aliceId: 'mock-paper|AAPL' }),
+      currency: 'USD',
+      side: 'long',
+      quantity: new Decimal(10),
+      avgCost: 140,
+      marketPrice: 150,
+      marketValue: 1500,
+      unrealizedPnL: 100,
+      realizedPnL: 0,
+    }])
+
+    const result = await (tools.closePosition.execute as Function)({
+      source: 'mock-paper',
+      aliceId: 'mock-paper|AAPL',
+      qty: 5,
+    })
+
+    expect(typeof result.operation.quantity).toBe('string')
+    expect(result.operation.quantity).toBe('5')
+  })
+
+  it('tradingPush serializes Decimal objects in staged operations (when uncommitted)', async () => {
+    const uta = mgr.resolveOne('mock-paper')
+    uta.stagePlaceOrder({
+      aliceId: 'mock-paper|AAPL',
+      action: 'BUY',
+      orderType: 'LMT',
+      totalQuantity: 10,
+      lmtPrice: 150,
+    })
+
+    const result = await (tools.tradingPush.execute as Function)({ source: 'mock-paper' })
+    expect(result.error).toContain('staged operations that are NOT committed yet')
+    const uncommitted = result.uncommitted[0]
+    const staged = uncommitted.staged[0]
+
+    expect(typeof staged.order.totalQuantity).toBe('string')
+    expect(staged.order.totalQuantity).toBe('10')
+  })
+
+  it('tradingPush serializes Decimal objects in pending operations (when committed)', async () => {
+    const uta = mgr.resolveOne('mock-paper')
+    uta.stagePlaceOrder({
+      aliceId: 'mock-paper|AAPL',
+      action: 'BUY',
+      orderType: 'LMT',
+      totalQuantity: 10,
+      lmtPrice: 150,
+    })
+    uta.commit('buy')
+
+    const result = await (tools.tradingPush.execute as Function)({ source: 'mock-paper' })
+    const pending = result.pending[0]
+    const staged = pending.staged[0]
+
+    expect(typeof staged.order.totalQuantity).toBe('string')
+    expect(staged.order.totalQuantity).toBe('10')
+  })
+})

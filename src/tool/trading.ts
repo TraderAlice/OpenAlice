@@ -28,6 +28,41 @@ function handleBrokerError(err: unknown): { error: string; code: string; transie
   }
 }
 
+function decimalMaxString(val: Decimal): string {
+  return val.equals(UNSET_DECIMAL) ? '' : val.toString()
+}
+
+/** Summarize an Operation into a serializable plain object for AI consumption. */
+function summarizeOperation(op: any) {
+  const result: any = { action: op.action }
+  if (op.contract) {
+    result.symbol = op.contract.symbol || op.contract.localSymbol || ''
+    result.aliceId = op.contract.aliceId || ''
+  }
+  if (op.order) {
+    result.order = {
+      action: op.order.action,
+      orderType: op.order.orderType,
+      totalQuantity: decimalMaxString(op.order.totalQuantity),
+      tif: op.order.tif,
+      ...(op.order.lmtPrice !== UNSET_DOUBLE && { lmtPrice: op.order.lmtPrice }),
+      ...(op.order.auxPrice !== UNSET_DOUBLE && { auxPrice: op.order.auxPrice }),
+    }
+  }
+  if (op.changes) {
+    result.changes = { ...op.changes }
+    if (op.changes.totalQuantity instanceof Object && 'equals' in op.changes.totalQuantity) {
+      result.changes.totalQuantity = decimalMaxString(op.changes.totalQuantity)
+    }
+  }
+  if (op.orderId) result.orderId = op.orderId
+  if (op.quantity && op.quantity instanceof Object && 'equals' in op.quantity) {
+    result.quantity = decimalMaxString(op.quantity)
+  }
+  if (op.tpsl) result.tpsl = op.tpsl
+  return result
+}
+
 /** Summarize an OpenOrder into a compact object for AI consumption. */
 function summarizeOrder(o: OpenOrder, source: string, stringOrderId?: string) {
   const order = o.order
@@ -38,7 +73,7 @@ function summarizeOrder(o: OpenOrder, source: string, stringOrderId?: string) {
     symbol: o.contract.symbol || o.contract.localSymbol || '',
     action: order.action,
     orderType: order.orderType,
-    totalQuantity: order.totalQuantity.equals(UNSET_DECIMAL) ? '0' : order.totalQuantity.toFixed(),
+    totalQuantity: decimalMaxString(order.totalQuantity),
     status: o.orderState.status,
     ...(!order.lmtPrice.equals(UNSET_DECIMAL) && { lmtPrice: order.lmtPrice.toFixed() }),
     ...(!order.auxPrice.equals(UNSET_DECIMAL) && { auxPrice: order.auxPrice.toFixed() }),
@@ -320,7 +355,17 @@ IMPORTANT: Check this BEFORE making new trading decisions.`,
       inputSchema: z.object({ source: z.string().optional().describe(sourceDesc(false)) }),
       execute: ({ source }) => {
         const targets = manager.resolve(source)
-        const results = targets.map((uta) => ({ source: uta.id, ...uta.status() }))
+        const results = targets.map((uta) => {
+          const status = uta.status()
+          return {
+            source: uta.id,
+            staged: status.staged.map(summarizeOperation),
+            pendingMessage: status.pendingMessage,
+            pendingHash: status.pendingHash,
+            head: status.head,
+            commitCount: status.commitCount,
+          }
+        })
         return results.length === 1 ? results[0] : results
       },
     }),
@@ -383,7 +428,13 @@ Optional: attach takeProfit and/or stopLoss for automatic exit orders.`,
           limitPrice: z.string().optional().describe('Limit price for stop-limit SL (omit for stop-market)'),
         }).optional().describe('Stop loss order (single-level, full quantity)'),
       }),
-      execute: ({ source, ...params }) => manager.resolveOne(source).stagePlaceOrder(params),
+      execute: ({ source, ...params }) => {
+        const result = manager.resolveOne(source).stagePlaceOrder(params)
+        return {
+          ...result,
+          operation: summarizeOperation(result.operation),
+        }
+      },
     }),
 
     modifyOrder: tool({
@@ -400,7 +451,13 @@ Optional: attach takeProfit and/or stopLoss for automatic exit orders.`,
         tif: z.enum(['DAY', 'GTC', 'IOC', 'FOK', 'OPG', 'GTD']).optional().describe('New time in force'),
         goodTillDate: z.string().optional().describe('New expiration date'),
       }),
-      execute: ({ source, ...params }) => manager.resolveOne(source).stageModifyOrder(params),
+      execute: ({ source, ...params }) => {
+        const result = manager.resolveOne(source).stageModifyOrder(params)
+        return {
+          ...result,
+          operation: summarizeOperation(result.operation),
+        }
+      },
     }),
 
     closePosition: tool({
@@ -411,7 +468,13 @@ Optional: attach takeProfit and/or stopLoss for automatic exit orders.`,
         symbol: z.string().optional().describe('Human-readable symbol. Optional.'),
         qty: z.number().positive().optional().describe('Number of shares to sell (default: sell all)'),
       }),
-      execute: ({ source, ...params }) => manager.resolveOne(source).stageClosePosition(params),
+      execute: ({ source, ...params }) => {
+        const result = manager.resolveOne(source).stageClosePosition(params)
+        return {
+          ...result,
+          operation: summarizeOperation(result.operation),
+        }
+      },
     }),
 
     cancelOrder: tool({
@@ -420,7 +483,13 @@ Optional: attach takeProfit and/or stopLoss for automatic exit orders.`,
         source: z.string().describe(sourceDesc(true)),
         orderId: z.string().describe('Order ID to cancel'),
       }),
-      execute: ({ source, orderId }) => manager.resolveOne(source).stageCancelOrder({ orderId }),
+      execute: ({ source, orderId }) => {
+        const result = manager.resolveOne(source).stageCancelOrder({ orderId })
+        return {
+          ...result,
+          operation: summarizeOperation(result.operation),
+        }
+      },
     }),
 
     tradingCommit: tool({
@@ -454,17 +523,27 @@ Optional: attach takeProfit and/or stopLoss for automatic exit orders.`,
           if (uncommitted.length > 0) {
             return {
               error: 'You have staged operations that are NOT committed yet. Call tradingCommit first, then tradingPush.',
-              uncommitted: uncommitted.map(uta => ({ source: uta.id, staged: uta.status().staged })),
+              uncommitted: uncommitted.map(uta => ({
+                source: uta.id,
+                staged: uta.status().staged.map(summarizeOperation),
+              })),
             }
           }
           return { message: 'No committed operations to push.' }
         }
         return {
           message: 'Push requires manual approval. The user can approve pending operations from any connected channel (Web UI, Telegram /trading, etc).',
-          pending: pending.map(uta => ({
-            source: uta.id,
-            ...uta.status(),
-          })),
+          pending: pending.map(uta => {
+            const status = uta.status()
+            return {
+              source: uta.id,
+              staged: status.staged.map(summarizeOperation),
+              pendingMessage: status.pendingMessage,
+              pendingHash: status.pendingHash,
+              head: status.head,
+              commitCount: status.commitCount,
+            }
+          }),
         }
       },
     }),
