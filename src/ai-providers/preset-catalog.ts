@@ -76,11 +76,11 @@ export const CLAUDE_API: PresetDef = {
 
 export const CODEX_OAUTH: PresetDef = {
   id: 'codex-oauth',
-  label: 'OpenAI Codex (Subscription)',
-  description: 'Use your ChatGPT subscription',
+  label: 'Codex CLI (Subscription)',
+  description: 'Use your local Codex CLI login and ChatGPT subscription',
   category: 'official',
-  defaultName: 'OpenAI Codex (Subscription)',
-  hint: 'Requires Codex CLI login. Run `codex login` in your terminal first.',
+  defaultName: 'Codex CLI (Subscription)',
+  hint: 'Requires Codex CLI login. Run `codex login` in your terminal first. Open Alice will call local `codex exec` and attach Alice tools over MCP.',
   zodSchema: z.object({
     backend: z.literal('codex'),
     loginMethod: z.literal('codex-oauth'),
@@ -94,10 +94,10 @@ export const CODEX_OAUTH: PresetDef = {
 
 export const CODEX_API: PresetDef = {
   id: 'codex-api',
-  label: 'OpenAI (API Key)',
-  description: 'Pay per token via OpenAI API',
+  label: 'Codex CLI (API Key)',
+  description: 'Use local Codex CLI with an OpenAI API key',
   category: 'official',
-  defaultName: 'OpenAI (API Key)',
+  defaultName: 'Codex CLI (API Key)',
   zodSchema: z.object({
     backend: z.literal('codex'),
     loginMethod: z.literal('api-key'),

@@ -60,11 +60,11 @@ export function AIProviderPage() {
     setProfiles((p) => p ? { ...p, [slug]: profile } : p)
   }
 
-  if (!profiles) return <div className="flex flex-col flex-1 min-h-0"><PageHeader title="AI Provider" description="Manage AI provider profiles." /><PageLoading /></div>
+  if (!profiles) return <div className="flex flex-col flex-1 min-h-0"><PageHeader title="AI Provider" description="Manage AI provider profiles. Codex CLI is the default." /><PageLoading /></div>
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <PageHeader title="AI Provider" description="Manage AI provider profiles." />
+      <PageHeader title="AI Provider" description="Manage AI provider profiles. Codex CLI is the default." />
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6">
         <div className="max-w-[640px] mx-auto space-y-3">
           {Object.entries(profiles).map(([slug, profile]) => {
@@ -77,7 +77,7 @@ export function AIProviderPage() {
                     <span className="text-[13px] font-semibold text-text truncate">{slug}</span>
                     {isActive && <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent/20 text-accent font-medium shrink-0">Active</span>}
                   </div>
-                  <p className="text-[11px] text-text-muted truncate">{profile.model || 'Auto (subscription plan)'}</p>
+                  <p className="text-[11px] text-text-muted truncate">{profile.model || 'Auto (CLI session)'}</p>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   {!isActive && <button onClick={() => handleSetActive(slug)} className="text-[11px] px-2 py-1 rounded-md border border-border text-text-muted hover:text-accent hover:border-accent transition-colors">Set Default</button>}

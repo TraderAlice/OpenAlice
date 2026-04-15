@@ -43,6 +43,10 @@ const WORDS = [
 
 const MEDIA_DIR = join(process.cwd(), 'data', 'media')
 
+function toPosixPath(path: string): string {
+  return path.replace(/\\/g, '/')
+}
+
 /** YYYY-MM-DD date folder for today. */
 function datePath(): string {
   const d = new Date()
@@ -76,10 +80,10 @@ export async function persistMedia(filePath: string): Promise<string> {
     await copyFile(filePath, dest)
   }
 
-  return join(dateDir, name)
+  return toPosixPath(join(dateDir, name))
 }
 
 /** Resolve a media relative path to its absolute path on disk. */
 export function resolveMediaPath(name: string): string {
-  return join(MEDIA_DIR, name)
+  return toPosixPath(join(MEDIA_DIR, name))
 }
