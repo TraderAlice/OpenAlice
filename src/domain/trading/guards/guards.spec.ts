@@ -127,28 +127,38 @@ describe('CooldownGuard', () => {
     expect(guard.check(ctx)).toBeNull()
   })
 
-  it('rejects rapid repeat trade for same symbol', () => {
+  it('rejects repeat trade for same symbol only after onSuccess', () => {
     const guard = new CooldownGuard({ minIntervalMs: 60_000 })
     const ctx = makeContext()
 
-    guard.check(ctx) // first — allowed
+    expect(guard.check(ctx)).toBeNull() // first — allowed
+    guard.onSuccess!(ctx) // simulate successful execution
+
     const result = guard.check(ctx) // second — rejected
     expect(result).not.toBeNull()
     expect(result).toContain('Cooldown active')
     expect(result).toContain('AAPL')
   })
 
+  it('allows repeat trade if first one was NOT success (no onSuccess call)', () => {
+    const guard = new CooldownGuard({ minIntervalMs: 60_000 })
+    const ctx = makeContext()
+
+    expect(guard.check(ctx)).toBeNull()
+    // No onSuccess call (e.g. broker error)
+
+    expect(guard.check(ctx)).toBeNull() // still allowed
+  })
+
   it('allows trade for different symbol', () => {
     const guard = new CooldownGuard({ minIntervalMs: 60_000 })
 
-    guard.check(makeContext({
-      operation: makePlaceOrderOp({ symbol: 'AAPL' }),
-    }))
+    const ctx1 = makeContext({ operation: makePlaceOrderOp({ symbol: 'AAPL' }) })
+    guard.check(ctx1)
+    guard.onSuccess!(ctx1)
 
-    const result = guard.check(makeContext({
-      operation: makePlaceOrderOp({ symbol: 'GOOG' }),
-    }))
-    expect(result).toBeNull()
+    const ctx2 = makeContext({ operation: makePlaceOrderOp({ symbol: 'GOOG' }) })
+    expect(guard.check(ctx2)).toBeNull()
   })
 
   it('skips non-placeOrder operations', () => {
@@ -263,6 +273,49 @@ describe('createGuardPipeline', () => {
     expect(capturedCtx).toBeDefined()
     expect(capturedCtx!.positions).toHaveLength(1)
     expect(capturedCtx!.account.netLiquidation).toBe('105000')
+  })
+
+  it('calls onSuccess on successful execution', async () => {
+    const dispatcher = vi.fn().mockResolvedValue({ success: true })
+    const account = new MockBroker()
+    const guard: OperationGuard = {
+      name: 'test',
+      check: () => null,
+      onSuccess: vi.fn(),
+    }
+
+    const pipeline = createGuardPipeline(dispatcher, account, [guard])
+    await pipeline(makePlaceOrderOp())
+
+    expect(guard.onSuccess).toHaveBeenCalled()
+  })
+
+  it('does NOT call onSuccess on execution failure', async () => {
+    const dispatcher = vi.fn().mockResolvedValue({ success: false, error: 'Fail' })
+    const account = new MockBroker()
+    const guard: OperationGuard = {
+      name: 'test',
+      check: () => null,
+      onSuccess: vi.fn(),
+    }
+
+    const pipeline = createGuardPipeline(dispatcher, account, [guard])
+    await pipeline(makePlaceOrderOp())
+
+    expect(guard.onSuccess).not.toHaveBeenCalled()
+  })
+
+  it('does NOT call onSuccess when guard rejects', async () => {
+    const dispatcher = vi.fn().mockResolvedValue({ success: true })
+    const account = new MockBroker()
+    const guardA: OperationGuard = { name: 'A', check: () => 'Stop' }
+    const guardB: OperationGuard = { name: 'B', check: () => null, onSuccess: vi.fn() }
+
+    const pipeline = createGuardPipeline(dispatcher, account, [guardA, guardB])
+    await pipeline(makePlaceOrderOp())
+
+    expect(guardB.onSuccess).not.toHaveBeenCalled()
+    expect(dispatcher).not.toHaveBeenCalled()
   })
 })
 

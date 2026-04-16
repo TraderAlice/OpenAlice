@@ -159,13 +159,27 @@ export class TelegramPlugin implements Plugin {
               await ctx.editMessageText(text, { reply_markup: keyboard }).catch(() => {})
               return
             }
+
+            // Provide immediate feedback to prevent double-clicks
+            await ctx.answerCallbackQuery({ text: action === 'push' ? 'Pushing...' : 'Rejecting...' })
+            const processingText = action === 'push' ? '🚀 Pushing...' : '❌ Rejecting...'
+            await ctx.editMessageText(
+              `${processingText}\n\n${status.pendingMessage}`,
+              { reply_markup: new InlineKeyboard() },
+            ).catch(() => {})
+
             if (action === 'push') {
-              const result = await uta.push()
-              await ctx.answerCallbackQuery({ text: `${result.submitted.length} submitted, ${result.rejected.length} rejected` })
+              try {
+                const result = await uta.push()
+                const summary = `${result.submitted.length} submitted, ${result.rejected.length} rejected`
+                console.log(`telegram: [${accountId}] push result: ${summary}`)
+              } catch (err) {
+                console.error(`telegram: [${accountId}] push failed:`, err)
+              }
             } else {
               await uta.reject()
-              await ctx.answerCallbackQuery({ text: 'Rejected' })
             }
+
             // Refresh panel after action
             const { text, keyboard } = await this.buildAccountPanel(engineCtx.accountManager, accountId)
             await ctx.editMessageText(text, { reply_markup: keyboard }).catch(() => {})

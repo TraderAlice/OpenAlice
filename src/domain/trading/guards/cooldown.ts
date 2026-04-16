@@ -27,7 +27,12 @@ export class CooldownGuard implements OperationGuard {
       }
     }
 
-    this.lastTradeTime.set(symbol, now)
     return null
+  }
+
+  onSuccess(ctx: GuardContext): void {
+    if (ctx.operation.action !== 'placeOrder') return
+    const symbol = getOperationSymbol(ctx.operation)
+    this.lastTradeTime.set(symbol, Date.now())
   }
 }

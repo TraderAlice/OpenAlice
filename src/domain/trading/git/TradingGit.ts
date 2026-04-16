@@ -44,6 +44,7 @@ export class TradingGit implements ITradingGit {
   private commits: GitCommit[] = []
   private head: CommitHash | null = null
   private currentRound: number | undefined = undefined
+  private isPushing = false
   private readonly config: TradingGitConfig
 
   constructor(config: TradingGitConfig) {
@@ -84,6 +85,9 @@ export class TradingGit implements ITradingGit {
   }
 
   async push(): Promise<PushResult> {
+    if (this.isPushing) {
+      throw new Error('Operation in progress: another push or reject is already running')
+    }
     if (this.stagingArea.length === 0) {
       throw new Error('Nothing to push: staging area is empty')
     }
@@ -91,57 +95,65 @@ export class TradingGit implements ITradingGit {
       throw new Error('Nothing to push: please commit first')
     }
 
-    const operations = [...this.stagingArea]
-    const message = this.pendingMessage
-    const hash = this.pendingHash
+    this.isPushing = true
+    try {
+      const operations = [...this.stagingArea]
+      const message = this.pendingMessage
+      const hash = this.pendingHash
 
-    // Execute all operations
-    const results: OperationResult[] = []
-    for (const op of operations) {
-      try {
-        const raw = await this.config.executeOperation(op)
-        results.push(this.parseOperationResult(op, raw))
-      } catch (error) {
-        results.push({
-          action: op.action,
-          success: false,
-          status: 'rejected',
-          error: error instanceof Error ? error.message : String(error),
-        })
+      // Execute all operations
+      const results: OperationResult[] = []
+      for (const op of operations) {
+        try {
+          const raw = await this.config.executeOperation(op)
+          results.push(this.parseOperationResult(op, raw))
+        } catch (error) {
+          results.push({
+            action: op.action,
+            success: false,
+            status: 'rejected',
+            error: error instanceof Error ? error.message : String(error),
+          })
+        }
       }
+
+      // Snapshot state after execution
+      const stateAfter = await this.config.getGitState()
+
+      const commit: GitCommit = {
+        hash,
+        parentHash: this.head,
+        message,
+        operations,
+        results,
+        stateAfter,
+        timestamp: new Date().toISOString(),
+        round: this.currentRound,
+      }
+
+      this.commits.push(commit)
+      this.head = hash
+
+      await this.config.onCommit?.(this.exportState())
+
+      // Clear staging
+      this.stagingArea = []
+      this.pendingMessage = null
+      this.pendingHash = null
+
+      const rejected = results.filter((r) => !r.success)
+      const submitted = results.filter((r) => r.success)
+
+      return { hash, message, operationCount: operations.length, submitted, rejected }
+    } finally {
+      this.isPushing = false
     }
-
-    // Snapshot state after execution
-    const stateAfter = await this.config.getGitState()
-
-    const commit: GitCommit = {
-      hash,
-      parentHash: this.head,
-      message,
-      operations,
-      results,
-      stateAfter,
-      timestamp: new Date().toISOString(),
-      round: this.currentRound,
-    }
-
-    this.commits.push(commit)
-    this.head = hash
-
-    await this.config.onCommit?.(this.exportState())
-
-    // Clear staging
-    this.stagingArea = []
-    this.pendingMessage = null
-    this.pendingHash = null
-
-    const rejected = results.filter((r) => !r.success)
-    const submitted = results.filter((r) => r.success)
-
-    return { hash, message, operationCount: operations.length, submitted, rejected }
   }
 
   async reject(reason?: string): Promise<RejectResult> {
+    if (this.isPushing) {
+      throw new Error('Operation in progress: another push or reject is already running')
+    }
     if (this.stagingArea.length === 0) {
       throw new Error('Nothing to reject: staging area is empty')
     }
@@ -149,40 +161,45 @@ export class TradingGit implements ITradingGit {
       throw new Error('Nothing to reject: please commit first')
     }
 
-    const operations = [...this.stagingArea]
-    const message = `[rejected] ${this.pendingMessage}${reason ? ` — ${reason}` : ''}`
-    const hash = this.pendingHash
+    this.isPushing = true
+    try {
+      const operations = [...this.stagingArea]
+      const message = `[rejected] ${this.pendingMessage}${reason ? ` — ${reason}` : ''}`
+      const hash = this.pendingHash
 
-    const results: OperationResult[] = operations.map((op) => ({
-      action: op.action,
-      success: false,
-      status: 'user-rejected' as const,
-      error: reason || 'Rejected by user',
-    }))
+      const results: OperationResult[] = operations.map((op) => ({
+        action: op.action,
+        success: false,
+        status: 'user-rejected' as const,
+        error: reason || 'Rejected by user',
+      }))
 
-    const stateAfter = await this.config.getGitState()
+      const stateAfter = await this.config.getGitState()
 
-    const commit: GitCommit = {
-      hash,
-      parentHash: this.head,
-      message,
-      operations,
-      results,
-      stateAfter,
-      timestamp: new Date().toISOString(),
-      round: this.currentRound,
+      const commit: GitCommit = {
+        hash,
+        parentHash: this.head,
+        message,
+        operations,
+        results,
+        stateAfter,
+        timestamp: new Date().toISOString(),
+        round: this.currentRound,
+      }
+
+      this.commits.push(commit)
+      this.head = hash
+      await this.config.onCommit?.(this.exportState())
+
+      // Clear staging
+      this.stagingArea = []
+      this.pendingMessage = null
+      this.pendingHash = null
+
+      return { hash, message, operationCount: operations.length }
+    } finally {
+      this.isPushing = false
     }
-
-    this.commits.push(commit)
-    this.head = hash
-    await this.config.onCommit?.(this.exportState())
-
-    // Clear staging
-    this.stagingArea = []
-    this.pendingMessage = null
-    this.pendingHash = null
-
-    return { hash, message, operationCount: operations.length }
   }
 
   // ==================== git log / show / status ====================

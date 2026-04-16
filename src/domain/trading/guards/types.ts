@@ -12,6 +12,8 @@ export interface GuardContext {
 export interface OperationGuard {
   readonly name: string
   check(ctx: GuardContext): Promise<string | null> | string | null
+  /** Optional hook called after the operation is successfully executed by the broker. */
+  onSuccess?(ctx: GuardContext): Promise<void> | void
 }
 
 /** Registry entry: type identifier + factory function. */

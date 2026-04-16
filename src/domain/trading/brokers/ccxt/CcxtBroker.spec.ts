@@ -1090,12 +1090,12 @@ describe('CcxtBroker — sandbox & demoTrading', () => {
   })
 
   it('calls setSandboxMode(true) for OKX when demoTrading is enabled', () => {
-    const acc = new CcxtBroker({ exchange: 'okx', apiKey: 'k', secret: 's', demoTrading: true })
+    const acc = new CcxtBroker({ exchange: 'okx', apiKey: 'k', secret: 's', demoTrading: true, sandbox: false })
     expect((acc as any).exchange.setSandboxMode).toHaveBeenCalledWith(true)
   })
 
   it('calls enableDemoTrading(true) for Bybit when demoTrading is enabled', () => {
-    const acc = new CcxtBroker({ exchange: 'bybit', apiKey: 'k', secret: 's', demoTrading: true })
+    const acc = new CcxtBroker({ exchange: 'bybit', apiKey: 'k', secret: 's', demoTrading: true, sandbox: false })
     expect((acc as any).exchange.enableDemoTrading).toHaveBeenCalledWith(true)
   })
 
@@ -1111,7 +1111,7 @@ describe('CcxtBroker — sandbox & demoTrading', () => {
       // No enableDemoTrading
     })
 
-    expect(() => new CcxtBroker({ exchange: 'bybit', apiKey: 'k', secret: 's', demoTrading: true })).not.toThrow()
+    expect(() => new CcxtBroker({ exchange: 'bybit', apiKey: 'k', secret: 's', demoTrading: true, sandbox: false })).not.toThrow()
     
     ccxt.bybit = originalBybit
   })
@@ -1128,7 +1128,7 @@ describe('CcxtBroker — sandbox & demoTrading', () => {
       this.enableDemoTrading = vi.fn().mockImplementation(() => { throw new Error('fail') })
     })
 
-    expect(() => new CcxtBroker({ exchange: 'bybit', apiKey: 'k', secret: 's', demoTrading: true })).not.toThrow()
+    expect(() => new CcxtBroker({ exchange: 'bybit', apiKey: 'k', secret: 's', demoTrading: true, sandbox: false })).not.toThrow()
     
     ccxt.bybit = originalBybit
   })

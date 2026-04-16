@@ -32,6 +32,21 @@ export function createGuardPipeline(
       }
     }
 
-    return dispatcher(op)
+    const result = await dispatcher(op)
+
+    // Notify all guards of success so they can update state (e.g. cooldown)
+    if (result && typeof result === 'object' && (result as any).success !== false) {
+      for (const guard of guards) {
+        if (guard.onSuccess) {
+          try {
+            await guard.onSuccess(ctx)
+          } catch (err) {
+            console.error(`[guard:${guard.name}] onSuccess failed:`, err)
+          }
+        }
+      }
+    }
+
+    return result
   }
 }
