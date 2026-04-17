@@ -429,6 +429,7 @@ async function main() {
 
   const ctx: EngineContext = {
     config, connectorCenter, agentCenter, eventLog, toolCallLog, heartbeat, cronEngine, toolCenter,
+    listenerRegistry,
     bbEngine: getSDKExecutor(),
     accountManager, fxService, snapshotService,
     newsProvider: newsStore,

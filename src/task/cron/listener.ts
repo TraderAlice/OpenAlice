@@ -5,18 +5,18 @@
  * Flow:
  *   eventLog 'cron.fire' → agentCenter.askWithSession(payload, session)
  *                         → connectorCenter.notify(reply)
- *                         → eventLog 'cron.done' / 'cron.error'
+ *                         → ctx.emit 'cron.done' / 'cron.error'
  *
  * The listener owns a dedicated SessionStore for cron conversations,
  * independent of user chat sessions (Telegram, Web, etc.).
  */
 
-import type { EventLog, EventLogEntry } from '../../core/event-log.js'
+import type { EventLogEntry } from '../../core/event-log.js'
 import type { CronFirePayload } from '../../core/agent-event.js'
 import type { AgentCenter } from '../../core/agent-center.js'
 import { SessionStore } from '../../core/session.js'
 import type { ConnectorCenter } from '../../core/connector-center.js'
-import type { Listener } from '../../core/listener.js'
+import type { Listener, ListenerContext } from '../../core/listener.js'
 import type { ListenerRegistry } from '../../core/listener-registry.js'
 
 /** Internal jobs (prefixed with __) have dedicated handlers and should not be routed to the AI. */
@@ -25,6 +25,9 @@ function isInternalJob(name: string): boolean {
 }
 
 // ==================== Types ====================
+
+const CRON_EMITS = ['cron.done', 'cron.error'] as const
+type CronEmits = typeof CRON_EMITS
 
 export interface CronListenerOpts {
   connectorCenter: ConnectorCenter
@@ -41,7 +44,7 @@ export interface CronListener {
   /** Unregister the listener from the registry. */
   stop(): void
   /** Expose the raw Listener object (for testing `handle()` directly). */
-  readonly listener: Listener<'cron.fire'>
+  readonly listener: Listener<'cron.fire', CronEmits>
 }
 
 // ==================== Factory ====================
@@ -53,10 +56,14 @@ export function createCronListener(opts: CronListenerOpts): CronListener {
   let processing = false
   let registered = false
 
-  const listener: Listener<'cron.fire'> = {
+  const listener: Listener<'cron.fire', CronEmits> = {
     name: 'cron-router',
     eventType: 'cron.fire',
-    async handle(entry: EventLogEntry<CronFirePayload>, eventLog: EventLog): Promise<void> {
+    emits: CRON_EMITS,
+    async handle(
+      entry: EventLogEntry<CronFirePayload>,
+      ctx: ListenerContext<CronEmits>,
+    ): Promise<void> {
       const payload = entry.payload
 
       // Guard: internal jobs (__heartbeat__, __snapshot__, etc.) have dedicated handlers
@@ -88,22 +95,21 @@ export function createCronListener(opts: CronListenerOpts): CronListener {
         }
 
         // Log success
-        await eventLog.append('cron.done', {
+        await ctx.emit('cron.done', {
           jobId: payload.jobId,
           jobName: payload.jobName,
           reply: result.text,
           durationMs: Date.now() - startMs,
-        }, { causedBy: entry.seq })
+        })
       } catch (err) {
         console.error(`cron-listener: error processing job ${payload.jobId}:`, err)
 
-        // Log error
-        await eventLog.append('cron.error', {
+        await ctx.emit('cron.error', {
           jobId: payload.jobId,
           jobName: payload.jobName,
           error: err instanceof Error ? err.message : String(err),
           durationMs: Date.now() - startMs,
-        }, { causedBy: entry.seq })
+        })
       } finally {
         processing = false
       }

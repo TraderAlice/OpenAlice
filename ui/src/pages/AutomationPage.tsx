@@ -5,6 +5,7 @@ import { SaveIndicator } from '../components/SaveIndicator'
 import { ConfigSection, Field, inputClass } from '../components/form'
 import { useAutoSave } from '../hooks/useAutoSave'
 import { PageHeader } from '../components/PageHeader'
+import { AutomationFlowSection } from './AutomationFlowSection'
 
 // ==================== Helpers ====================
 
@@ -596,15 +597,16 @@ function AddCronJobForm({ onClose, onCreated }: { onClose: () => void; onCreated
 
 // ==================== Page ====================
 
-type Tab = 'heartbeat' | 'cron'
+type Tab = 'flow' | 'heartbeat' | 'cron'
 
 const TABS: { key: Tab; label: string }[] = [
+  { key: 'flow', label: 'Flow' },
   { key: 'heartbeat', label: 'Heartbeat' },
   { key: 'cron', label: 'Cron Jobs' },
 ]
 
 export function AutomationPage() {
-  const [tab, setTab] = useState<Tab>('heartbeat')
+  const [tab, setTab] = useState<Tab>('flow')
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
@@ -634,7 +636,13 @@ export function AutomationPage() {
 
       <div className="flex-1 flex flex-col min-h-0 px-4 md:px-6 py-5">
         <div className="flex-1 min-h-0">
-          {tab === 'heartbeat' ? <HeartbeatSection /> : <CronSection />}
+          {tab === 'flow' ? (
+            <AutomationFlowSection />
+          ) : tab === 'heartbeat' ? (
+            <HeartbeatSection />
+          ) : (
+            <CronSection />
+          )}
         </div>
       </div>
     </div>

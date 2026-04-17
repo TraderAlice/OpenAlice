@@ -43,7 +43,7 @@ describe('ListenerRegistry', () => {
 
       const infos = registry.list()
       expect(infos).toHaveLength(1)
-      expect(infos[0]).toEqual({ name: 'test', eventType: 'cron.fire' })
+      expect(infos[0]).toEqual({ name: 'test', eventType: 'cron.fire', emits: [] })
     })
 
     it('should throw on duplicate name', () => {
@@ -192,6 +192,141 @@ describe('ListenerRegistry', () => {
       await flush()
 
       expect(received).toEqual(['j2'])
+    })
+  })
+
+  // ==================== ctx.emit ====================
+
+  describe('ctx.emit', () => {
+    it('should allow emitting declared types and auto-set causedBy', async () => {
+      registry.register({
+        name: 'cron-echo',
+        eventType: 'cron.fire',
+        emits: ['cron.done'] as const,
+        async handle(entry, ctx) {
+          await ctx.emit('cron.done', {
+            jobId: entry.payload.jobId,
+            jobName: entry.payload.jobName,
+            reply: 'ok',
+            durationMs: 10,
+          })
+        },
+      })
+      await registry.start()
+
+      const parent = await eventLog.append('cron.fire', {
+        jobId: 'j1', jobName: 'x', payload: 'p',
+      })
+      await flush()
+
+      const done = eventLog.recent({ type: 'cron.done' })
+      expect(done).toHaveLength(1)
+      expect(done[0].causedBy).toBe(parent.seq)
+      expect(done[0].payload).toMatchObject({ jobId: 'j1', reply: 'ok' })
+    })
+
+    it('should reject emit of un-declared event type at runtime', async () => {
+      const errors: unknown[] = []
+      const origErr = console.error
+      console.error = (...a: unknown[]) => { errors.push(a) }
+      try {
+        registry.register({
+          name: 'naughty',
+          eventType: 'cron.fire',
+          emits: ['cron.done'] as const,
+          async handle(_entry, ctx) {
+            // Cast past the type system to simulate a misuse
+            await (ctx.emit as unknown as (t: string, p: unknown) => Promise<unknown>)(
+              'heartbeat.done',
+              { reply: 'x', reason: '', durationMs: 0, delivered: false },
+            )
+          },
+        })
+        await registry.start()
+
+        await eventLog.append('cron.fire', { jobId: 'j1', jobName: 'x', payload: 'p' })
+        await flush()
+
+        // Error was caught by registry's error isolation and logged
+        expect(errors.length).toBeGreaterThan(0)
+        const msg = String((errors[0] as unknown[])[1])
+        expect(msg).toMatch(/naughty.*heartbeat\.done.*declared emits.*cron\.done/)
+      } finally {
+        console.error = origErr
+      }
+    })
+
+    it('should reject all emit calls when listener has no emits declared', async () => {
+      const errors: unknown[] = []
+      const origErr = console.error
+      console.error = (...a: unknown[]) => { errors.push(a) }
+      try {
+        registry.register({
+          name: 'silent',
+          eventType: 'cron.fire',
+          async handle(_entry, ctx) {
+            await (ctx.emit as unknown as (t: string, p: unknown) => Promise<unknown>)(
+              'cron.done',
+              { jobId: '', jobName: '', reply: '', durationMs: 0 },
+            )
+          },
+        })
+        await registry.start()
+
+        await eventLog.append('cron.fire', { jobId: 'j1', jobName: 'x', payload: 'p' })
+        await flush()
+
+        expect(errors.length).toBeGreaterThan(0)
+        const msg = String((errors[0] as unknown[])[1])
+        expect(msg).toMatch(/silent.*declared emits: \(none\)/)
+      } finally {
+        console.error = origErr
+      }
+    })
+
+    it('should allow overriding causedBy explicitly via opts', async () => {
+      registry.register({
+        name: 'cron-override',
+        eventType: 'cron.fire',
+        emits: ['cron.done'] as const,
+        async handle(_entry, ctx) {
+          await ctx.emit(
+            'cron.done',
+            { jobId: 'j1', jobName: 'x', reply: 'ok', durationMs: 0 },
+            { causedBy: 999 },
+          )
+        },
+      })
+      await registry.start()
+
+      await eventLog.append('cron.fire', { jobId: 'j1', jobName: 'x', payload: 'p' })
+      await flush()
+
+      const [done] = eventLog.recent({ type: 'cron.done' })
+      expect(done.causedBy).toBe(999)
+    })
+  })
+
+  // ==================== ctx.events ====================
+
+  describe('ctx.events', () => {
+    it('should expose read-only event log access', async () => {
+      await eventLog.append('cron.fire', { jobId: 'older', jobName: 'x', payload: 'p' })
+
+      let recentSeen: number | undefined
+      registry.register({
+        name: 'snoop',
+        eventType: 'cron.fire',
+        async handle(_entry, ctx) {
+          recentSeen = ctx.events.recent({ type: 'cron.fire' }).length
+        },
+      })
+      await registry.start()
+
+      await eventLog.append('cron.fire', { jobId: 'newer', jobName: 'x', payload: 'p' })
+      await flush()
+
+      expect(recentSeen).toBe(2)
     })
   })
 })

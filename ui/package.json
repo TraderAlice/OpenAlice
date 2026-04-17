@@ -8,6 +8,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@xyflow/react": "^12.10.2",
     "dompurify": "^3.3.1",
     "highlight.js": "^11.11.1",
     "marked": "^15.0.12",

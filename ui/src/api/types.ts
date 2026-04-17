@@ -124,6 +124,19 @@ export interface ConnectorsConfig {
   }
 }
 
+// ==================== Topology ====================
+
+export interface TopologyListener {
+  name: string
+  eventType: string
+  emits: string[]
+}
+
+export interface TopologyResponse {
+  eventTypes: string[]
+  listeners: TopologyListener[]
+}
+
 // ==================== News Collector ====================
 
 export interface NewsCollectorFeed {

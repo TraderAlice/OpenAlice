@@ -16,6 +16,7 @@ import { agentStatusApi } from './agentStatus'
 import { personaApi } from './persona'
 import { newsApi } from './news'
 import { diaryApi } from './diary'
+import { topologyApi } from './topology'
 export const api = {
   chat: chatApi,
   config: configApi,
@@ -31,6 +32,7 @@ export const api = {
   persona: personaApi,
   news: newsApi,
   diary: diaryApi,
+  topology: topologyApi,
 }
 
 // Re-export all types for convenience
@@ -65,6 +67,8 @@ export type {
   EquityCurvePoint,
   NewsArticle,
   NewsListResponse,
+  TopologyResponse,
+  TopologyListener,
 } from './types'
 export type { EventQueryResult } from './events'
 export type { ToolCallQueryResult } from './agentStatus'

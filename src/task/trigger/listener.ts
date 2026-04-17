@@ -5,19 +5,21 @@
  * Triggers come from external sources (webhook, HTTP ingest, any producer
  * calling eventLog.append('trigger', ...)). This is the default routing
  * listener — it builds a prompt from the payload, asks the AI, notifies
- * via the connector center, and emits trigger.done / trigger.error events
- * linked back to the source via `causedBy`.
+ * via the connector center, and emits trigger.done / trigger.error events.
  */
 
-import type { EventLog, EventLogEntry } from '../../core/event-log.js'
+import type { EventLogEntry } from '../../core/event-log.js'
 import type { TriggerPayload } from '../../core/agent-event.js'
 import type { AgentCenter } from '../../core/agent-center.js'
 import { SessionStore } from '../../core/session.js'
 import type { ConnectorCenter } from '../../core/connector-center.js'
-import type { Listener } from '../../core/listener.js'
+import type { Listener, ListenerContext } from '../../core/listener.js'
 import type { ListenerRegistry } from '../../core/listener-registry.js'
 
 // ==================== Types ====================
+
+const TRIGGER_EMITS = ['trigger.done', 'trigger.error'] as const
+type TriggerEmits = typeof TRIGGER_EMITS
 
 export interface TriggerListenerOpts {
   connectorCenter: ConnectorCenter
@@ -34,7 +36,7 @@ export interface TriggerListener {
   /** Unregister the listener from the registry. */
   stop(): void
   /** Expose the raw Listener object (for testing `handle()` directly). */
-  readonly listener: Listener<'trigger'>
+  readonly listener: Listener<'trigger', TriggerEmits>
 }
 
 // ==================== Prompt ====================
@@ -60,10 +62,14 @@ export function createTriggerListener(opts: TriggerListenerOpts): TriggerListene
   let processing = false
   let registered = false
 
-  const listener: Listener<'trigger'> = {
+  const listener: Listener<'trigger', TriggerEmits> = {
     name: 'trigger-router',
     eventType: 'trigger',
-    async handle(entry: EventLogEntry<TriggerPayload>, eventLog: EventLog): Promise<void> {
+    emits: TRIGGER_EMITS,
+    async handle(
+      entry: EventLogEntry<TriggerPayload>,
+      ctx: ListenerContext<TriggerEmits>,
+    ): Promise<void> {
       const payload = entry.payload
 
       // Guard: skip if already processing (serial execution)
@@ -90,20 +96,20 @@ export function createTriggerListener(opts: TriggerListenerOpts): TriggerListene
           console.warn(`trigger-listener: send failed for ${payload.source}/${payload.name}:`, sendErr)
         }
 
-        await eventLog.append('trigger.done', {
+        await ctx.emit('trigger.done', {
           source: payload.source,
           name: payload.name,
           reply: result.text,
           durationMs: Date.now() - startMs,
-        }, { causedBy: entry.seq })
+        })
       } catch (err) {
         console.error(`trigger-listener: error processing ${payload.source}/${payload.name}:`, err)
-        await eventLog.append('trigger.error', {
+        await ctx.emit('trigger.error', {
           source: payload.source,
           name: payload.name,
           error: err instanceof Error ? err.message : String(err),
           durationMs: Date.now() - startMs,
-        }, { causedBy: entry.seq })
+        })
       } finally {
         processing = false
       }
