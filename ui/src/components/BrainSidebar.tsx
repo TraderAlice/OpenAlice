@@ -11,12 +11,12 @@ type Variant = 'sidebar' | 'flat'
 // ==================== Public wrapper ====================
 
 /**
- * Brain state panel — read-only dashboard showing current frontal lobe + emotion
- * with a click-to-expand history dialog for each dimension.
+ * Brain state panel — read-only dashboard showing the current frontal-lobe
+ * note with a click-to-expand history dialog for previous versions.
  *
  * Two variants:
  *   - sidebar: always-expanded, rendered as a right-side column on wide screens
- *   - flat: default-collapsed panels, rendered above the feed on narrow screens
+ *   - flat: default-collapsed panel, rendered above the feed on narrow screens
  */
 export function BrainSidebar({ variant }: { variant: Variant }) {
   const [state, setState] = useState<BrainState | null>(null)
@@ -47,14 +47,7 @@ export function BrainSidebar({ variant }: { variant: Variant }) {
     return () => window.removeEventListener('focus', onFocus)
   }, [fetchState])
 
-  const frontalCommits = useMemo(
-    () => (state?.commits ?? []).filter((c) => c.type === 'frontal_lobe'),
-    [state],
-  )
-  const emotionCommits = useMemo(
-    () => (state?.commits ?? []).filter((c) => c.type === 'emotion'),
-    [state],
-  )
+  const commits = useMemo(() => state?.commits ?? [], [state])
 
   if (error) {
     return (
@@ -69,12 +62,8 @@ export function BrainSidebar({ variant }: { variant: Variant }) {
       <FrontalLobePanel
         variant={variant}
         current={state?.frontalLobe ?? ''}
-        commits={frontalCommits}
-      />
-      <EmotionPanel
-        variant={variant}
-        current={state?.emotion ?? 'neutral'}
-        commits={emotionCommits}
+        updatedAt={commits.at(-1)?.timestamp ?? null}
+        commits={commits}
       />
     </div>
   )
@@ -85,10 +74,12 @@ export function BrainSidebar({ variant }: { variant: Variant }) {
 function FrontalLobePanel({
   variant,
   current,
+  updatedAt,
   commits,
 }: {
   variant: Variant
   current: string
+  updatedAt: string | null
   commits: BrainCommit[]
 }) {
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -97,12 +88,21 @@ function FrontalLobePanel({
     ? <MarkdownContent text={current} />
     : <span className="text-[12px] text-text-muted/50 italic">(empty)</span>
 
+  // The "written Nh ago" cue lines up with what Alice sees in her own system
+  // prompt, so the user can reason about the same staleness she does.
+  const ageLabel = updatedAt ? formatRelativeAge(updatedAt) : null
+  const subtitle = ageLabel
+    ? `${commits.length} version${commits.length === 1 ? '' : 's'} · written ${ageLabel}`
+    : commits.length > 0
+      ? `${commits.length} version${commits.length === 1 ? '' : 's'}`
+      : undefined
+
   return (
     <>
       <CollapsiblePanel
         variant={variant}
         title="Frontal Lobe"
-        subtitle={commits.length > 0 ? `${commits.length} version${commits.length === 1 ? '' : 's'}` : undefined}
+        subtitle={subtitle}
         onExpand={commits.length > 0 ? () => setDialogOpen(true) : undefined}
       >
         <div className="text-[13px] leading-relaxed text-text/90">
@@ -135,66 +135,6 @@ function FrontalLobePanel({
   )
 }
 
-// ==================== Emotion panel ====================
-
-function EmotionPanel({
-  variant,
-  current,
-  commits,
-}: {
-  variant: Variant
-  current: string
-  commits: BrainCommit[]
-}) {
-  const [dialogOpen, setDialogOpen] = useState(false)
-
-  return (
-    <>
-      <CollapsiblePanel
-        variant={variant}
-        title="Emotion"
-        subtitle={commits.length > 0 ? `${commits.length} change${commits.length === 1 ? '' : 's'}` : undefined}
-        onExpand={commits.length > 0 ? () => setDialogOpen(true) : undefined}
-      >
-        <div className="flex items-center">
-          <EmotionChip emotion={current} />
-        </div>
-      </CollapsiblePanel>
-      {dialogOpen && (
-        <HistoryDialog
-          title="Emotion — history"
-          onClose={() => setDialogOpen(false)}
-        >
-          {commits.slice().reverse().map((c, i, arr) => {
-            // Walk the reversed list: the "from" is the stateAfter of the next (older) commit.
-            const prev = arr[i + 1]?.stateAfter.emotion ?? 'unknown'
-            return (
-              <article
-                key={c.hash}
-                className="rounded-lg border border-border/40 bg-bg-secondary/30 p-3"
-              >
-                <header className="flex items-center gap-2 text-[11px] text-text-muted/70 mb-2">
-                  <span className="tabular-nums">{formatTimestamp(c.timestamp)}</span>
-                </header>
-                <div className="flex items-center gap-2 mb-2 text-[12px]">
-                  <EmotionChip emotion={prev} muted />
-                  <span className="text-text-muted/60">→</span>
-                  <EmotionChip emotion={c.stateAfter.emotion} />
-                </div>
-                {c.message && (
-                  <div className="text-[12.5px] leading-relaxed text-text/80">
-                    {c.message}
-                  </div>
-                )}
-              </article>
-            )
-          })}
-        </HistoryDialog>
-      )}
-    </>
-  )
-}
-
 // ==================== CollapsiblePanel ====================
 
 function CollapsiblePanel({
@@ -210,8 +150,8 @@ function CollapsiblePanel({
   onExpand?: () => void
   children: ReactNode
 }) {
-  // On narrow screens, panels fold by default so they don't steal scroll space above the feed.
-  // On wide screens, the sidebar panels stay open.
+  // On narrow screens, the panel folds by default so it doesn't steal scroll
+  // space above the feed. On wide screens, the sidebar stays open.
   const [open, setOpen] = useState(variant === 'sidebar')
 
   return (
@@ -319,28 +259,6 @@ function HistoryDialog({
   )
 }
 
-// ==================== EmotionChip ====================
-
-function EmotionChip({ emotion, muted = false }: { emotion: string; muted?: boolean }) {
-  const tone = emotionTone(emotion)
-  const base = 'inline-flex items-center px-2 py-0.5 rounded-full text-[11.5px] font-medium border tabular-nums'
-  const mutedCls = 'border-border/40 text-text-muted/70'
-  const cls = muted ? `${base} ${mutedCls}` : `${base} ${tone}`
-  return <span className={cls}>{emotion}</span>
-}
-
-// Loose keyword-based tone mapping — keeps visual variety without a hardcoded enum.
-// Alice writes free-form emotion strings (fearful, cautious, neutral, confident, euphoric, ...),
-// so we pattern-match rather than switch on exact values.
-function emotionTone(emotion: string): string {
-  const e = emotion.toLowerCase()
-  if (/(euphor|elat|excit|bullish)/.test(e)) return 'border-accent/50 text-accent bg-accent/10'
-  if (/(confident|optim|steady|calm)/.test(e)) return 'border-accent/40 text-accent bg-accent/5'
-  if (/(caut|worr|uncert|anxi)/.test(e)) return 'border-amber-500/40 text-amber-500 bg-amber-500/5'
-  if (/(fear|panic|bear|scared)/.test(e)) return 'border-red/40 text-red bg-red/5'
-  return 'border-border/40 text-text-muted'
-}
-
 // ==================== Helpers ====================
 
 function formatTimestamp(iso: string): string {
@@ -357,4 +275,16 @@ function formatTimestamp(iso: string): string {
   } catch {
     return iso
   }
+}
+
+/** Mirror of server-side formatter in main.ts so UI and prompt agree on staleness cue. */
+function formatRelativeAge(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime()
+  if (diffMs < 60_000) return 'just now'
+  const mins = Math.floor(diffMs / 60_000)
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
 }

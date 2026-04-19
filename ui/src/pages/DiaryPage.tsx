@@ -340,11 +340,7 @@ export function DiaryPage() {
 
       {/* Wide-screen Brain sidebar — always-expanded panels on the right. */}
       <aside className="hidden lg:flex flex-col shrink-0 w-72 xl:w-80 border-l border-border/30 bg-bg-secondary/10">
-        <div className="flex items-center gap-2 px-4 pt-6 pb-4 shrink-0">
-          <h2 className="text-[13px] font-semibold text-text tracking-tight">Brain</h2>
-          <span className="text-[11px] text-text-muted/60">Alice's inner state</span>
-        </div>
-        <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-6">
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-6 pb-6">
           <BrainSidebar variant="sidebar" />
         </div>
       </aside>

@@ -1,4 +1,4 @@
-export type BrainCommitType = 'frontal_lobe' | 'emotion'
+export type BrainCommitType = 'frontal_lobe'
 
 export interface BrainCommit {
   hash: string
@@ -6,12 +6,11 @@ export interface BrainCommit {
   timestamp: string
   type: BrainCommitType
   message: string
-  stateAfter: { frontalLobe: string; emotion: string }
+  stateAfter: { frontalLobe: string }
 }
 
 export interface BrainState {
   frontalLobe: string
-  emotion: string
   commits: BrainCommit[]
 }
 

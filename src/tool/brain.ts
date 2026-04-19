@@ -3,34 +3,31 @@ import { z } from 'zod';
 import type { Brain } from '@/domain/brain/Brain';
 
 /**
- * Create brain AI tools (cognition + emotion)
+ * Frontal-lobe tools — read/write Alice's personal notes that persist across
+ * rounds (surviving session compaction).
  *
- * Tools:
- * - getFrontalLobe: Read working memory
- * - updateFrontalLobe: Update working memory (creates brain commit)
- * - getEmotion: Read emotional state + recent changes
- * - updateEmotion: Change emotional state with reason (creates brain commit)
- * - getBrainLog: View brain commit history
+ * The strict rule enforced in these descriptions: these notes must be about
+ * HER (commitments, attention targets, self-constraints, operating stances),
+ * never about the WORLD (facts, predictions, market state). World-referring
+ * content goes stale and pollutes later reasoning; self-referring content
+ * stays valid until she chooses to change it.
  */
 export function createBrainTools(brain: Brain) {
   return {
     getFrontalLobe: tool({
       description: `
-Read your own "memory space" from the last round - your self-assessment and notes that YOU wrote.
+Read your previous personal notes — things YOU committed to in earlier rounds.
 
-This is YOUR frontal lobe, where you previously saved:
-- Your market trend assessment (bullish/bearish/uncertain)
-- Current portfolio health evaluation
-- Key predictions or expectations for upcoming rounds
-- Important reminders to yourself (e.g., "Watch BTC support at $95k")
+These are *your* rules, attention targets, self-constraints, and operating
+stances, not facts about the market. They persist across rounds so you can
+maintain continuity in what you've decided to do, what you're watching for,
+and the frame you've been working under.
 
-Use this FIRST in every round to maintain continuity in your thinking.
-This helps you remember:
-- What was your market view last round?
-- What were you planning or expecting?
-- Any important levels or conditions you were watching?
+Use this at the start of a round to recover the context of your own prior
+decisions — what rules are still armed, what events you were waiting for,
+what constraints you put on yourself.
 
-Returns: Your previous self-assessment as a string (empty if this is the first round).
+Returns: your notes as a string (empty if nothing is set yet).
       `.trim(),
       inputSchema: z.object({}),
       execute: () => {
@@ -40,24 +37,37 @@ Returns: Your previous self-assessment as a string (empty if this is the first r
 
     updateFrontalLobe: tool({
       description: `
-Update your "frontal lobe" memory space with your current self-assessment.
+Update your personal notes — things that belong to YOU, not to the world.
 
-Use this at the END of each round (after executing actions and writing summary) to save:
-- Your current view on market trend (bullish/bearish/uncertain)
-- Your assessment of portfolio health
-- Key predictions or expectations for next rounds
-- Important reminders to yourself (e.g., "Watch BTC support at $95k", "Plan to take profit at $100k")
+These notes persist across rounds, so the rule is strict: write only content
+that the world cannot falsify. World-referring content goes stale between
+rounds and will pollute your future reasoning.
 
-This is YOUR personal memory that persists across rounds. Write it clearly and concisely (2-5 sentences) so your future self can quickly understand the current situation.
+✅ Write:
+- Conditional rules you've committed to: "If ETH reclaims 3800, add 10%"
+- Events you're waiting on: "FOMC Thursday 14:00 — check policy signal"
+- Self-constraints: "No new entries until macro clarity"
+- Operating stances: "Running under consolidation assumption for BTC range"
 
-Example:
-"Market is in strong uptrend, BTC holding above $97k support. Current long position is healthy with +15% PnL. Expecting continuation to $100k, will take partial profit there. Watch for reversal if we break below $95k."
+❌ Do NOT write:
+- Market state: "Market is in strong uptrend" — will be false by next round
+- Derivable facts: "Position is +15% PnL" — query the tool instead
+- Predictions: "BTC should reach 100k" — pollutes next round's reasoning
+- Emotion/confidence: "Feeling confident about this" — not decision-relevant
+
+Your notes replace the previous ones entirely each time — drop rules that
+fired or expired, carry forward ones still active, add new ones.
+
+Example (all self-referring, no world claims):
+"If ETH reclaims 3800, add 10% to the long. Waiting on FOMC Thursday 14:00.
+Holding off new entries until macro clarity. Running under consolidation
+assumption for BTC range — flip if we break 98k or lose 94k."
       `.trim(),
       inputSchema: z.object({
         content: z
           .string()
           .describe(
-            'Your self-assessment and notes (2-5 sentences, concise but informative)',
+            'Your personal notes (rules, attention targets, self-constraints, stances — not facts or predictions)',
           ),
       }),
       execute: ({ content }) => {
@@ -65,42 +75,9 @@ Example:
       },
     }),
 
-    getEmotion: tool({
-      description:
-        'Get your current emotional state and recent emotion changes. Use this to understand your own sentiment trajectory.',
-      inputSchema: z.object({}),
-      execute: () => {
-        return brain.getEmotion();
-      },
-    }),
-
-    updateEmotion: tool({
-      description: `
-Update your emotional state when you sense a shift in market sentiment or confidence level.
-Record WHY the emotion changed — this creates a permanent commit in your brain log.
-
-Common states: fearful, cautious, neutral, confident, euphoric
-
-Example: updateEmotion("cautious", "BTC rejected at $100k resistance with declining volume")
-      `.trim(),
-      inputSchema: z.object({
-        emotion: z
-          .string()
-          .describe(
-            'New emotional state (e.g., "fearful", "cautious", "neutral", "confident", "euphoric")',
-          ),
-        reason: z
-          .string()
-          .describe('Why this emotional shift occurred'),
-      }),
-      execute: ({ emotion, reason }) => {
-        return brain.updateEmotion(emotion, reason);
-      },
-    }),
-
     getBrainLog: tool({
       description:
-        'View your brain commit history — a timeline of all cognitive state changes (frontal lobe updates and emotion shifts).',
+        'View the history of your frontal-lobe updates — a timeline of how your committed rules, attention, and stances have evolved.',
       inputSchema: z.object({
         limit: z
           .number()

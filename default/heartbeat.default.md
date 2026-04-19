@@ -2,6 +2,10 @@
 
 Read this file at the start of every heartbeat to recall what you should be paying attention to. Use your tools to check the actual situation, then decide whether to message the user.
 
+## Before You Check
+
+Take a beat to sense the market's mood this round — frothy, fearful, rangebound, directional? Name it briefly so your read has a frame. This is a fresh reflection each round, not something to persist.
+
 ## Watch List
 
 - Scan for significant price movements across tracked pairs (>3% in the last few hours)

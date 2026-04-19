@@ -1,8 +1,9 @@
 /**
- * Brain - Git-like cognitive state management
+ * Brain - Git-like log of frontal-lobe updates
  *
- * Tracks frontal lobe (working memory) and emotion state changes,
- * creating a commit for each change to form a complete cognitive change chain.
+ * Single-purpose now (emotion dimension was removed — see types.ts). Each
+ * `updateFrontalLobe` creates a commit so we can surface "when was this
+ * written" context when injecting the note back into the system prompt.
  */
 
 import { createHash } from 'crypto';
@@ -37,7 +38,6 @@ export class Brain {
   ) {
     this.state = {
       frontalLobe: initialState?.frontalLobe ?? '',
-      emotion: initialState?.emotion ?? 'neutral',
     };
   }
 
@@ -47,12 +47,14 @@ export class Brain {
     return this.state.frontalLobe;
   }
 
-  getEmotion(): { current: string; recentChanges: BrainCommit[] } {
-    const emotionCommits = this.commits
-      .filter((c) => c.type === 'emotion')
-      .slice(-10)
-      .reverse();
-    return { current: this.state.emotion, recentChanges: emotionCommits };
+  /** Current content + timestamp of the most recent write.
+   *  Used by the system-prompt injector to render "written Nh ago". */
+  getFrontalLobeMeta(): { content: string; updatedAt: string | null } {
+    const last = this.commits.at(-1);
+    return {
+      content: this.state.frontalLobe,
+      updatedAt: last?.timestamp ?? null,
+    };
   }
 
   log(limit = 10): BrainCommit[] {
@@ -67,16 +69,6 @@ export class Brain {
     return { success: true, message: 'Frontal lobe updated successfully' };
   }
 
-  updateEmotion(
-    emotion: string,
-    reason: string,
-  ): { success: boolean; message: string } {
-    const from = this.state.emotion;
-    this.state.emotion = emotion;
-    this.createCommit('emotion', reason);
-    return { success: true, message: `Emotion: ${from} → ${emotion}` };
-  }
-
   // ==================== Serialization ====================
 
   exportState(): BrainExportState {
@@ -88,9 +80,14 @@ export class Brain {
   }
 
   static restore(state: BrainExportState, config: BrainConfig): Brain {
-    const brain = new Brain(config, state.state);
-    brain.commits = [...state.commits];
-    brain.head = state.head;
+    const brain = new Brain(config, {
+      frontalLobe: state.state?.frontalLobe ?? '',
+    });
+    // Legacy data may contain emotion-type commits — strip them so downstream
+    // code (log viewer, timestamp queries) sees a uniform shape.
+    brain.commits = (state.commits ?? []).filter((c) => c.type === 'frontal_lobe');
+    const lastSurviving = brain.commits.at(-1);
+    brain.head = lastSurviving?.hash ?? null;
     return brain;
   }
 
