@@ -4,9 +4,8 @@
  * Pure functions parameterized by (markets, exchangeName) —
  * no dependency on the CcxtBroker instance.
  *
- * aliceId format: "{exchange}-{encodedSymbol}"
- * where encodedSymbol = market.symbol with / → _ and : → .
- * e.g. "bybit-ETH_USDT.USDT" for "ETH/USDT:USDT"
+ * aliceId is managed by UTA: "{utaId}|{nativeKey}"
+ * where nativeKey is market.symbol (localSymbol).
  */
 
 import { Contract, OrderState } from '@traderalice/ibkr'

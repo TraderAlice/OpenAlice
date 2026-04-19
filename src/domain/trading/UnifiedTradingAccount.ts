@@ -334,6 +334,29 @@ export class UnifiedTradingAccount {
     return { utaId: aliceId.slice(0, sep), nativeKey: aliceId.slice(sep + 1) }
   }
 
+  /**
+   * Resolve aliceId in contract if present.
+   * If contract has only aliceId, it fills in broker-native fields (conId, localSymbol, etc.)
+   * so the broker can recognize it.
+   */
+  private resolveContract(contract: Contract): Contract {
+    if (contract.aliceId) {
+      const parsed = UnifiedTradingAccount.parseAliceId(contract.aliceId)
+      if (parsed) {
+        if (parsed.utaId !== this.id) {
+          // Cross-account quoting is allowed in the tool layer, but this UTA can only
+          // resolve its own IDs. If it doesn't match, we return the original and let
+          // the broker try to resolve other fields (or fail).
+          return contract
+        }
+        const resolved = this.broker.resolveNativeKey(parsed.nativeKey)
+        resolved.aliceId = contract.aliceId
+        return resolved
+      }
+    }
+    return contract
+  }
+
   // ==================== Stage operations ====================
 
   stagePlaceOrder(params: StagePlaceOrderParams): AddResult {
@@ -515,7 +538,8 @@ export class UnifiedTradingAccount {
   }
 
   async getQuote(contract: Contract): Promise<Quote> {
-    const quote = await this._callBroker(() => this.broker.getQuote(contract))
+    const query = this.resolveContract(contract)
+    const quote = await this._callBroker(() => this.broker.getQuote(query))
     this.stampAliceId(quote.contract)
     return quote
   }
@@ -531,7 +555,8 @@ export class UnifiedTradingAccount {
   }
 
   async getContractDetails(query: Contract): Promise<ContractDetails | null> {
-    const details = await this._callBroker(() => this.broker.getContractDetails(query))
+    const resolved = this.resolveContract(query)
+    const details = await this._callBroker(() => this.broker.getContractDetails(resolved))
     if (details) this.stampAliceId(details.contract)
     return details
   }

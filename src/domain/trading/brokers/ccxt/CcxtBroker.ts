@@ -3,7 +3,7 @@
  *
  * Direct implementation against ccxt unified API.
  * Takes IBKR Order objects, reads relevant fields, ignores the rest.
- * aliceId format: "{exchange}-{encodedSymbol}" (e.g. "bybit-BTC_USDT.USDT").
+ * aliceId is managed by UTA: "{utaId}|{nativeKey}" (e.g. "okx-main|ETH/USDT").
  */
 
 import { z } from 'zod'

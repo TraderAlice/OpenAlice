@@ -330,11 +330,11 @@ describe('createTradingTools — Decimal serialization', () => {
       currency: 'USD',
       side: 'long',
       quantity: new Decimal(10),
-      avgCost: 140,
-      marketPrice: 150,
-      marketValue: 1500,
-      unrealizedPnL: 100,
-      realizedPnL: 0,
+      avgCost: '140',
+      marketPrice: '150',
+      marketValue: '1500',
+      unrealizedPnL: '100',
+      realizedPnL: '0',
     }])
 
     const result = await (tools.closePosition.execute as Function)({
