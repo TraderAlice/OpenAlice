@@ -32,5 +32,8 @@ packages/ibkr/ref/samples/Java/
 packages/ibkr/ref/samples/Cpp/
 packages/ibkr/ref/CMakeLists.txt
 
+# Local services (cloned repos)
+services/
+
 # Turborepo
 .turbo/
