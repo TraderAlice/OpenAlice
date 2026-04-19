@@ -17,6 +17,7 @@ vi.mock('ccxt', () => {
     this.id = 'mock'
     this.markets = {}
     this.options = { fetchMarkets: { types: ['spot', 'linear'] } }
+    this.has = { fetchTickers: true }
     this.requiredCredentials = { apiKey: true, secret: true }
     this.setSandboxMode = vi.fn()
     this.enableDemoTrading = vi.fn()
@@ -30,14 +31,15 @@ vi.mock('ccxt', () => {
       return this.markets
     })
     this.fetchMarkets = vi.fn().mockResolvedValue([])
-    this.fetchTicker = vi.fn()
-    this.fetchBalance = vi.fn()
-    this.fetchPositions = vi.fn()
-    this.fetchOpenOrders = vi.fn()
-    this.fetchClosedOrders = vi.fn()
-    this.createOrder = vi.fn()
-    this.cancelOrder = vi.fn()
-    this.editOrder = vi.fn()
+    this.fetchTicker = vi.fn().mockResolvedValue({ last: 100 })
+    this.fetchTickers = vi.fn().mockResolvedValue({})
+    this.fetchBalance = vi.fn().mockResolvedValue({ total: {}, free: {}, used: {} })
+    this.fetchPositions = vi.fn().mockResolvedValue([])
+    this.fetchOpenOrders = vi.fn().mockResolvedValue([])
+    this.fetchClosedOrders = vi.fn().mockResolvedValue([])
+    this.createOrder = vi.fn().mockResolvedValue({ id: '1' })
+    this.cancelOrder = vi.fn().mockResolvedValue({ id: '1' })
+    this.editOrder = vi.fn().mockResolvedValue({ id: '2' })
     this.fetchOrder = vi.fn()
     this.fetchOpenOrder = vi.fn()
     this.fetchClosedOrder = vi.fn()
@@ -857,12 +859,33 @@ describe('CcxtBroker — getAccount', () => {
     ])
 
     const info = await acc.getAccount()
-    // netLiq = free (8000) + position market values (1500 + 500 = 2000) = 10000
-    expect(info.netLiquidation).toBe('10000')
+    // netLiq = total wallet balance (10000) + unrealized PnL (300) = 10300
+    expect(info.netLiquidation).toBe('10300')
     expect(info.totalCashValue).toBe('8000')
     expect(info.initMarginReq).toBe('2000')
     expect(info.unrealizedPnL).toBe('300')
     expect(info.realizedPnL).toBe('150')
+  })
+
+  it('includes non-stable Spot balances in netLiquidation', async () => {
+    const acc = makeAccount()
+    const btcMarket = makeSpotMarket('BTC', 'USDT')
+    setInitialized(acc, { 'BTC/USDT': btcMarket })
+
+    ;(acc as any).exchange.fetchBalance = vi.fn().mockResolvedValue({
+      total: { USDT: 1000, BTC: 1 },
+      free: { USDT: 1000, BTC: 1 },
+      used: { USDT: 0, BTC: 0 },
+    })
+    ;(acc as any).exchange.fetchTickers = vi.fn().mockResolvedValue({
+      'BTC/USDT': { last: 60000 },
+    })
+    ;(acc as any).exchange.fetchPositions = vi.fn().mockResolvedValue([])
+
+    const info = await acc.getAccount()
+    // netLiq = 1000 (USDT) + 1 * 60000 (BTC) = 61000
+    expect(info.netLiquidation).toBe('61000')
+    expect(info.totalCashValue).toBe('1000')
   })
 
   it('throws BrokerError when no API credentials', async () => {
@@ -902,6 +925,27 @@ describe('CcxtBroker — getPositions', () => {
     expect(positions[0].side).toBe('long')
     expect(positions[0].avgCost).toBe('58000')
     expect(positions[0].marketPrice).toBe('60000')
+  })
+
+  it('merges Spot balances into getPositions', async () => {
+    const acc = makeAccount()
+    const ethMarket = makeSpotMarket('ETH', 'USDT')
+    setInitialized(acc, { 'ETH/USDT': ethMarket })
+
+    ;(acc as any).exchange.fetchBalance = vi.fn().mockResolvedValue({
+      total: { ETH: 2 },
+    })
+    ;(acc as any).exchange.fetchTickers = vi.fn().mockResolvedValue({
+      'ETH/USDT': { last: 3000 },
+    })
+    ;(acc as any).exchange.fetchPositions = vi.fn().mockResolvedValue([])
+
+    const positions = await acc.getPositions()
+    expect(positions).toHaveLength(1)
+    expect(positions[0].contract.symbol).toBe('ETH')
+    expect(positions[0].quantity.toString()).toBe('2')
+    expect(positions[0].marketValue).toBe('6000')
+    expect(positions[0].side).toBe('long')
   })
 
   it('skips zero-size positions', async () => {

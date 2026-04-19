@@ -519,41 +519,45 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
       ])
 
       const bal = balance as unknown as Record<string, Record<string, unknown>>
-      const free = new Decimal(String(bal['free']?.['USDT'] ?? bal['free']?.['USD'] ?? 0))
-      const used = new Decimal(String(bal['used']?.['USDT'] ?? bal['used']?.['USD'] ?? 0))
+      
+      // Calculate total cash (available stablecoins)
+      let totalCashValue = new Decimal(0)
+      let initMarginReq = new Decimal(0)
+      for (const coin of STABLECOIN_TO_USD) {
+        if (bal['free']?.[coin]) {
+          totalCashValue = totalCashValue.plus(new Decimal(String(bal['free'][coin])))
+        }
+        if (bal['used']?.[coin]) {
+          initMarginReq = initMarginReq.plus(new Decimal(String(bal['used'][coin])))
+        }
+      }
 
-      // Aggregate P&L and market value from positions.
-      // We use position-level markPrice (which is fresh from the exchange's
-      // websocket feed) rather than balance.total (which is a cached wallet
-      // snapshot that may not update between funding/settlement cycles).
+      // Get spot balances as positions to get their market value
+      const spotPositions = await this.fetchSpotBalancesAsPositions(balance)
+      let totalSpotValue = new Decimal(0)
+      for (const p of spotPositions) {
+        totalSpotValue = totalSpotValue.plus(new Decimal(p.marketValue))
+      }
+
+      // Aggregate P&L from futures positions.
       let unrealizedPnL = new Decimal(0)
       let realizedPnL = new Decimal(0)
-      let totalPositionValue = new Decimal(0)
       for (const p of rawPositions) {
         unrealizedPnL = unrealizedPnL.plus(new Decimal(String(p.unrealizedPnl ?? 0)))
         realizedPnL = realizedPnL.plus(new Decimal(String((p as unknown as Record<string, unknown>).realizedPnl ?? 0)))
-
-        // Compute position market value from fresh markPrice
-        const contracts = new Decimal(String(p.contracts ?? 0)).abs()
-        const contractSize = new Decimal(String(p.contractSize ?? 1))
-        const quantity = contracts.mul(contractSize)
-        const markPrice = new Decimal(String(p.markPrice ?? 0))
-        totalPositionValue = totalPositionValue.plus(quantity.mul(markPrice))
       }
 
-      // Reconstruct netLiquidation from fresh components:
-      //   netLiq = available cash + total position market value
-      // This gives a real-time equity figure that tracks markPrice movements,
-      // unlike balance.total which only updates on exchange settlement.
-      const netLiquidation = free.plus(totalPositionValue)
+      // netLiquidation = Total value of all spot assets + unrealized PnL of futures
+      // (Total value of spot assets ALREADY includes stablecoins via fetchSpotBalancesAsPositions)
+      const netLiquidation = totalSpotValue.plus(unrealizedPnL)
 
       return {
         baseCurrency: 'USD',
         netLiquidation: netLiquidation.toString(),
-        totalCashValue: free.toString(),
+        totalCashValue: totalCashValue.toString(),
         unrealizedPnL: unrealizedPnL.toString(),
         realizedPnL: realizedPnL.toString(),
-        initMarginReq: used.toString(),
+        initMarginReq: initMarginReq.toString(),
       }
     } catch (err) {
       throw BrokerError.from(err)
@@ -564,13 +568,17 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
     this.ensureInit()
 
     try {
-      const fetchOverride = this.overrides.fetchPositions
-      const raw = fetchOverride
-        ? await fetchOverride(this.exchange, defaultFetchPositions)
-        : await defaultFetchPositions(this.exchange)
-      const result: Position[] = []
+      const [balance, rawFutures] = await Promise.all([
+        this.exchange.fetchBalance().catch(() => ({})), // Robustness for exchanges/tests without balance
+        this.overrides.fetchPositions
+          ? this.overrides.fetchPositions(this.exchange, defaultFetchPositions)
+          : defaultFetchPositions(this.exchange),
+      ])
 
-      for (const p of raw) {
+      const spotPositions = await this.fetchSpotBalancesAsPositions(balance)
+      const result: Position[] = [...spotPositions]
+
+      for (const p of rawFutures) {
         const market = this.markets[p.symbol]
         if (!market) continue
 
@@ -602,6 +610,100 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
     } catch (err) {
       throw BrokerError.from(err)
     }
+  }
+
+  /**
+   * Helper: Merge Spot balances from fetchBalance() into a position-like structure.
+   * This ensures non-derivative holdings (like BTC, ETH in Spot wallet) are visible
+   * in the portfolio and contribute to netLiquidation.
+   */
+  private async fetchSpotBalancesAsPositions(balance: any): Promise<Position[]> {
+    if (!balance || typeof balance !== 'object') return []
+    const bal = balance as unknown as Record<string, Record<string, unknown>>
+    const total = bal['total'] ?? {}
+    const assets = Object.keys(total).filter(asset => {
+      const amount = new Decimal(String(total[asset] ?? 0))
+      return amount.gt(0)
+    })
+
+    if (assets.length === 0) return []
+
+    // 1. Identify non-stablecoin assets that need pricing
+    const toPrice: string[] = []
+    const assetToSymbol: Record<string, string> = {}
+
+    for (const asset of assets) {
+      if (STABLECOIN_TO_USD.has(asset.toUpperCase())) continue
+
+      // Look for a spot market to get the price
+      const symbol = `${asset}/USDT`
+      const symbolUsdc = `${asset}/USDC`
+      const symbolUsd = `${asset}/USD`
+
+      if (this.markets[symbol] && this.markets[symbol].type === 'spot') {
+        toPrice.push(symbol)
+        assetToSymbol[asset] = symbol
+      } else if (this.markets[symbolUsdc] && this.markets[symbolUsdc].type === 'spot') {
+        toPrice.push(symbolUsdc)
+        assetToSymbol[asset] = symbolUsdc
+      } else if (this.markets[symbolUsd] && this.markets[symbolUsd].type === 'spot') {
+        toPrice.push(symbolUsd)
+        assetToSymbol[asset] = symbolUsd
+      }
+    }
+
+    // 2. Batch fetch prices
+    let tickers: Record<string, any> = {}
+    if (toPrice.length > 0) {
+      try {
+        if (this.exchange.has['fetchTickers']) {
+          tickers = await this.exchange.fetchTickers(toPrice)
+        } else {
+          // Fallback to sequential for exchanges without fetchTickers
+          for (const symbol of toPrice) {
+            tickers[symbol] = await this.exchange.fetchTicker(symbol)
+          }
+        }
+      } catch (err) {
+        console.warn(`CcxtBroker[${this.id}]: failed to fetch spot prices:`, err)
+      }
+    }
+
+    // 3. Construct Position objects
+    const result: Position[] = []
+    for (const asset of assets) {
+      const amount = new Decimal(String(total[asset] ?? 0))
+      let price = new Decimal(1)
+      let market: CcxtMarket | undefined
+
+      if (STABLECOIN_TO_USD.has(asset.toUpperCase())) {
+        // Use a dummy "USD" quote for stables
+        market = { symbol: `${asset}/USD`, base: asset, quote: 'USD', type: 'spot', active: true } as any
+      } else {
+        const symbol = assetToSymbol[asset]
+        if (!symbol || !tickers[symbol]) continue // skip assets we can't price
+        price = new Decimal(String(tickers[symbol].last ?? 0))
+        market = this.markets[symbol]
+      }
+
+      const marketValue = amount.mul(price)
+      // Hide dust (< $1 USD)
+      if (marketValue.lt(1)) continue
+
+      result.push({
+        contract: marketToContract(market!, this.exchangeName),
+        currency: normalizeQuoteCurrency(market!.quote ?? 'USDT'),
+        side: 'long',
+        quantity: amount,
+        avgCost: price.toString(), // We don't have historical cost for spot, use current
+        marketPrice: price.toString(),
+        marketValue: marketValue.toString(),
+        unrealizedPnL: '0',
+        realizedPnL: '0',
+      })
+    }
+
+    return result
   }
 
   async getOrders(orderIds: string[]): Promise<OpenOrder[]> {
