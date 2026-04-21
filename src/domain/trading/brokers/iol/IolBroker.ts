@@ -291,6 +291,11 @@ export class IolBroker implements IBroker {
       body.precio = order.lmtPrice
     }
 
+    const action = (order.action ?? '').toUpperCase()
+    if (action !== 'BUY' && action !== 'SELL') {
+      return { success: false, error: `Unsupported order action: ${order.action}` }
+    }
+
     if (this.sandbox) {
       return {
         success: true,
@@ -298,11 +303,6 @@ export class IolBroker implements IBroker {
         orderState: makeOrderState('pendiente'),
         message: 'DRY-RUN — no order sent',
       }
-    }
-
-    const action = (order.action ?? '').toUpperCase()
-    if (action !== 'BUY' && action !== 'SELL') {
-      return { success: false, error: `Unsupported order action: ${order.action}` }
     }
 
     try {
