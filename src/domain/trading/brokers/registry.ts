@@ -11,6 +11,7 @@ import type { AccountConfig } from '../../../core/config.js'
 import { CcxtBroker } from './ccxt/CcxtBroker.js'
 import { AlpacaBroker } from './alpaca/AlpacaBroker.js'
 import { IbkrBroker } from './ibkr/IbkrBroker.js'
+import { IolBroker } from './iol/IolBroker.js'
 
 // ==================== Subtitle field descriptor ====================
 
@@ -112,5 +113,30 @@ Before connecting:
 4. Add 127.0.0.1 to "Trusted IPs" if running locally
 
 Paper trading requires a separate paper account login in TWS.`,
+  },
+  iol: {
+    configSchema: IolBroker.configSchema,
+    configFields: IolBroker.configFields,
+    fromConfig: IolBroker.fromConfig,
+    name: 'InvertirOnline (IOL)',
+    description: 'Argentine broker — BYMA equities, CEDEARs, sovereign bonds, FCIs, and US markets.',
+    badge: 'IO',
+    badgeColor: 'text-blue-400',
+    subtitleFields: [
+      { field: 'market' },
+      { field: 'sandbox', label: 'Dry-run' },
+    ],
+    guardCategory: 'securities',
+    setupGuide: `InvertirOnline (IOL) is an Argentine retail broker with a REST API at api.invertironline.com. Authentication uses your IOL username and password via OAuth2 password grant — the same credentials you use to log in at invertironline.com.
+
+Credentials can be supplied in three ways (checked in order):
+
+1. Literal values in the Username / Password fields below — stored in data/config/accounts.json (gitignored).
+2. Environment-variable references like "$env:MY_IOL_PASSWORD" in either field — OpenAlice reads process.env at init time.
+3. Leave both fields blank and export IOL_USERNAME and IOL_PASSWORD in your shell (or a .env file loaded by your process manager).
+
+The third pattern keeps credentials entirely out of config files and out of any agent context — useful when the agent itself should never see them.
+
+Default Market controls where quotes and orders go when a contract does not specify one. "Dry-run" mode short-circuits placeOrder so you can verify the wiring without sending real orders.`,
   },
 }
