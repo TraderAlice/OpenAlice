@@ -18,7 +18,11 @@ export function createMarketRoutes(ctx: EngineContext): Hono {
     const query = c.req.query('query') ?? ''
     const limitRaw = c.req.query('limit')
     const limit = limitRaw ? Math.max(1, Math.min(100, Number(limitRaw) || 20)) : 20
-    const results = await aggregateSymbolSearch(ctx.marketSearch, query, limit)
+    const marketRaw = c.req.query('market')
+    const market = marketRaw === 'global' || marketRaw === 'argentina' || marketRaw === 'merval' || marketRaw === 'byma'
+      ? marketRaw
+      : undefined
+    const results = await aggregateSymbolSearch(ctx.marketSearch, query, limit, { market })
     return c.json({ results, count: results.length })
   })
 

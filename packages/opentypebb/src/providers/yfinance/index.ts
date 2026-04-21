@@ -8,6 +8,7 @@
 import { Provider } from '../../core/provider/abstract/provider.js'
 
 import { YFinanceEquityQuoteFetcher } from './models/equity-quote.js'
+import { YFinanceEquitySearchFetcher } from './models/equity-search.js'
 import { YFinanceEquityProfileFetcher } from './models/equity-profile.js'
 import { YFinanceEquityHistoricalFetcher } from './models/equity-historical.js'
 import { YFinanceCompanyNewsFetcher } from './models/company-news.js'
@@ -47,6 +48,7 @@ export const yfinanceProvider = new Provider({
     'data, and tools for investors and individuals interested in tracking ' +
     'and analyzing financial markets and assets.',
   fetcherDict: {
+    EquitySearch: YFinanceEquitySearchFetcher,
     EquityQuote: YFinanceEquityQuoteFetcher,
     EquityInfo: YFinanceEquityProfileFetcher,
     EquityHistorical: YFinanceEquityHistoricalFetcher,

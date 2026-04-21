@@ -5,19 +5,20 @@
  * provider config. Used both by the AI tool (marketSearchForResearch) and the
  * HTTP route (/api/market/search) — both surfaces must return the same thing.
  *
- * equity    — SymbolIndex (SEC/TMX local cache, regex, zero-latency)
+ * equity    — SymbolIndex (SEC/TMX local cache, regex) + yfinance fuzzy search
  * commodity — CommodityCatalog (canonical catalog, ~25 items)
  * crypto    — cryptoClient.search on yfinance (online fuzzy)
  * currency  — currencyClient.search on yfinance (online fuzzy, XXXUSD filter)
  */
 import type { SymbolIndex } from './equity/symbol-index.js'
 import type { CommodityCatalog } from './commodity/commodity-catalog.js'
-import type { CryptoClientLike, CurrencyClientLike } from './client/types.js'
+import type { EquityClientLike, CryptoClientLike, CurrencyClientLike } from './client/types.js'
 
 export type AssetClass = 'equity' | 'crypto' | 'currency' | 'commodity'
 
 export interface MarketSearchDeps {
   symbolIndex: SymbolIndex
+  equityClient: EquityClientLike
   cryptoClient: CryptoClientLike
   currencyClient: CurrencyClientLike
   commodityCatalog: CommodityCatalog
@@ -65,22 +66,41 @@ export async function aggregateSymbolSearch(
   deps: MarketSearchDeps,
   query: string,
   limit = 20,
+  opts: { market?: 'global' | 'argentina' | 'merval' | 'byma' } = {},
 ): Promise<MarketSearchResult[]> {
   const q = query.trim()
   if (!q) return []
 
-  const equityResults = deps.symbolIndex
-    .search(q, limit)
-    .map((r) => ({ ...r, assetClass: 'equity' as const }))
+  const marketFocus = opts.market && opts.market !== 'global' ? opts.market : undefined
+
+  const localEquityResults = marketFocus
+    ? []
+    : deps.symbolIndex
+      .search(q, limit)
+      .map((r) => ({ ...r, assetClass: 'equity' as const }))
 
   const commodityResults = deps.commodityCatalog
     .search(q, limit)
     .map((r) => ({ ...r, assetClass: 'commodity' as const }))
 
-  const [cryptoSettled, currencySettled] = await Promise.allSettled([
+  const [equitySettled, cryptoSettled, currencySettled] = await Promise.allSettled([
+    deps.equityClient.search({
+      query: q,
+      provider: 'yfinance',
+      limit,
+      ...(marketFocus && { market: marketFocus }),
+    }),
     deps.cryptoClient.search({ query: q, provider: 'yfinance' }),
     deps.currencyClient.search({ query: q, provider: 'yfinance' }),
   ])
+
+  const onlineEquityResults = (equitySettled.status === 'fulfilled' ? equitySettled.value : [])
+    .map((r): MarketSearchResult => ({
+      ...r,
+      ...(r.symbol == null ? { symbol: undefined } : { symbol: r.symbol }),
+      ...(r.name == null ? { name: undefined } : { name: r.name }),
+      assetClass: 'equity' as const,
+    }))
 
   const cryptoResults = (cryptoSettled.status === 'fulfilled' ? cryptoSettled.value : []).map(
     (r) => ({ ...r, assetClass: 'crypto' as const }),
@@ -94,7 +114,7 @@ export async function aggregateSymbolSearch(
     .map((r) => ({ ...r, assetClass: 'currency' as const }))
 
   const all: MarketSearchResult[] = [
-    ...equityResults,
+    ...dedupeBySymbol([...onlineEquityResults, ...localEquityResults]).slice(0, limit),
     ...cryptoResults,
     ...currencyResults,
     ...commodityResults,
@@ -105,4 +125,16 @@ export async function aggregateSymbolSearch(
     .map((r, i) => ({ r, i, s: matchScore(q, r) }))
     .sort((a, b) => b.s - a.s || a.i - b.i)
     .map((x) => x.r)
+}
+
+function dedupeBySymbol<T extends MarketSearchResult>(rows: T[]): T[] {
+  const out: T[] = []
+  const seen = new Set<string>()
+  for (const row of rows) {
+    const key = String(row.symbol ?? row.id ?? JSON.stringify(row)).toUpperCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(row)
+  }
+  return out
 }

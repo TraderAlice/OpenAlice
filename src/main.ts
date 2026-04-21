@@ -213,7 +213,7 @@ async function main() {
   const commodityCatalog = new CommodityCatalog()
   commodityCatalog.load()
 
-  const marketSearch = { symbolIndex, cryptoClient, currencyClient, commodityCatalog }
+  const marketSearch = { symbolIndex, equityClient, cryptoClient, currencyClient, commodityCatalog }
 
   // ==================== Tool Registration ====================
 
