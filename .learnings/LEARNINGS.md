@@ -118,3 +118,64 @@ State updates for guards must happen only after successful execution using an `o
 ### Resolution
 - **Resolved**: 2026-04-15
 - **Notes**: Added `onSuccess` hook to `OperationGuard` and refactored `CooldownGuard`. Added `isPushing` flag to `TradingGit`. Implemented visual feedback for Telegram plugin.
+
+---
+
+## [LRN-20260419-001] Broker Contract Resolution from aliceId
+
+**Logged**: 2026-04-19T10:20:00Z
+**Priority**: high
+**Status**: resolved
+**Area**: backend | trading
+
+### Summary
+When an AI tool passes a `Contract` object containing only an `aliceId` (e.g., `ccxt-okx-test|ETH/USDT`), it must be explicitly resolved into broker-native fields (like `localSymbol` or `symbol`) before being sent to the broker adapter (like `CcxtBroker`), otherwise the broker cannot identify the market and fails.
+
+### Details
+- The AI uses `aliceId` to uniquely identify an asset across different accounts (format: `{utaId}|{nativeKey}`).
+- Broker adapters (like `CcxtBroker` and `AlpacaBroker`) rely on `localSymbol`, `symbol`, or `conId` to perform API calls (e.g., fetching quotes or contract details).
+- If `getQuote` or `getContractDetails` simply passes the `Contract` object down to the broker without parsing the `aliceId`, the broker's internal mapping logic (like `contractToCcxt`) will return `null` or throw an error.
+
+### Suggested Action
+Always use a central helper method (e.g., `resolveContract` in `UnifiedTradingAccount`) to parse the `aliceId` and populate the `Contract` object via the broker's `resolveNativeKey()` method before dispatching calls like `getQuote` or `getContractDetails`.
+
+### Metadata
+- Source: error
+- Related Files: src/domain/trading/UnifiedTradingAccount.ts, src/domain/trading/brokers/ccxt/CcxtBroker.ts
+- Tags: aliceId, resolution, ccxt, getQuote, getContractDetails
+- Pattern-Key: broker.contract.resolution
+
+### Resolution
+- **Resolved**: 2026-04-19
+- **Notes**: Added `resolveContract` helper to `UnifiedTradingAccount` and updated `getQuote` and `getContractDetails` to use it. Corrected out-of-date CCXT documentation regarding the `aliceId` format.
+
+---
+## [LRN-20260419-001] ccxt-spot-balances
+
+**Logged**: 2026-04-19T11:25:00Z
+**Priority**: high
+**Status**: resolved
+**Area**: backend
+
+### Summary
+CcxtBroker ignored Spot balances in portfolio view and equity calculation.
+
+### Details
+- The original CcxtBroker implementation only fetched futures/margin positions via `fetchPositions()`.
+- Spot holdings (e.g. BTC, ETH in Spot wallet) were invisible to the user and their market value was not included in `netLiquidation`.
+- This led to misleading account equity and "missing" assets after spot trades.
+
+### Suggested Action
+Merge Spot balances from `fetchBalance()` into the results of `getPositions()` and `getAccount()`. Use `fetchTickers()` to batch-fetch current prices for non-stablecoin assets to calculate their USD market value. Filter out "dust" balances (< $1 USD) to keep the view clean.
+
+### Metadata
+- Source: user_feedback
+- Related Files: src/domain/trading/brokers/ccxt/CcxtBroker.ts, src/domain/trading/brokers/ccxt/CcxtBroker.spec.ts
+- Tags: ccxt, spot, balance, equity, okx, bybit
+- Pattern-Key: broker.ccxt.spot-visibility
+
+### Resolution
+- **Resolved**: 2026-04-19
+- **Notes**: Implemented `fetchSpotBalancesAsPositions` helper in CcxtBroker. Updated `getAccount` and `getPositions` to merge spot assets and include them in equity calculations. Added unit tests to verify.
+
+---

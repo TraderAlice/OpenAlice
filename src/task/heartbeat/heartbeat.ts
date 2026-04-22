@@ -95,6 +95,8 @@ export interface HeartbeatOpts {
 export interface Heartbeat {
   start(): Promise<void>
   stop(): void
+  /** Update configuration at runtime (e.g. after UI changes). */
+  updateConfig(newConfig: HeartbeatConfig): Promise<void>
   /** Hot-toggle heartbeat on/off (persists to config + updates cron job). */
   setEnabled(enabled: boolean): Promise<void>
   /** Current enabled state. */
@@ -106,13 +108,14 @@ export interface Heartbeat {
 // ==================== Factory ====================
 
 export function createHeartbeat(opts: HeartbeatOpts): Heartbeat {
-  const { config, connectorCenter, cronEngine, agentCenter, registry } = opts
+  const { connectorCenter, cronEngine, agentCenter, registry } = opts
+  let currentConfig = opts.config
   const session = opts.session ?? new SessionStore('heartbeat')
   const now = opts.now ?? Date.now
 
   let jobId: string | null = null
   let processing = false
-  let enabled = config.enabled
+  let enabled = currentConfig.enabled
   let registered = false
 
   const dedup = new HeartbeatDedup()
@@ -131,11 +134,11 @@ export function createHeartbeat(opts: HeartbeatOpts): Heartbeat {
 
     processing = true
     const startMs = now()
-    console.log(`heartbeat: firing at ${new Date(startMs).toISOString()}`)
+    console.log(`heartbeat: firing at ${new Date(startMs).toISOString()} (activeHours: ${JSON.stringify(currentConfig.activeHours)})`)
 
     try {
       // 1. Active hours guard
-      if (!isWithinActiveHours(config.activeHours, now())) {
+      if (!isWithinActiveHours(currentConfig.activeHours, now())) {
         console.log('heartbeat: skipped (outside active hours)')
         await ctx.emit('heartbeat.skip', { reason: 'outside-active-hours' })
         return
@@ -221,15 +224,15 @@ export function createHeartbeat(opts: HeartbeatOpts): Heartbeat {
     if (existing) {
       jobId = existing.id
       await cronEngine.update(existing.id, {
-        schedule: { kind: 'every', every: config.every },
-        payload: config.prompt,
+        schedule: { kind: 'every', every: currentConfig.every },
+        payload: currentConfig.prompt,
         enabled,
       })
     } else {
       jobId = await cronEngine.add({
         name: HEARTBEAT_JOB_NAME,
-        schedule: { kind: 'every', every: config.every },
-        payload: config.prompt,
+        schedule: { kind: 'every', every: currentConfig.every },
+        payload: currentConfig.prompt,
         enabled,
       })
     }
@@ -257,14 +260,21 @@ export function createHeartbeat(opts: HeartbeatOpts): Heartbeat {
       }
     },
 
+    async updateConfig(newConfig: HeartbeatConfig) {
+      currentConfig = newConfig
+      enabled = newConfig.enabled
+      await ensureJobAndListener()
+    },
+
     async setEnabled(newEnabled: boolean) {
       enabled = newEnabled
+      currentConfig.enabled = newEnabled
 
       // Ensure infrastructure exists (handles cold enable when start() was called with disabled)
       await ensureJobAndListener()
 
       // Persist to config file
-      await writeConfigSection('heartbeat', { ...config, enabled: newEnabled })
+      await writeConfigSection('heartbeat', { ...currentConfig, enabled: newEnabled })
     },
 
     isEnabled() {

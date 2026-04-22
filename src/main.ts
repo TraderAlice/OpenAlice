@@ -397,6 +397,11 @@ async function main() {
       if (changes.length > 0) {
         console.log(`reconnect: connectors — ${changes.join(', ')}`)
       }
+
+      // --- Heartbeat ---
+      // Update heartbeat config even if connectors didn't change (long-term fix for heartbeat.skip staleness)
+      await heartbeat.updateConfig(fresh.heartbeat)
+
       return { success: true, message: changes.length > 0 ? changes.join(', ') : 'no changes' }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
