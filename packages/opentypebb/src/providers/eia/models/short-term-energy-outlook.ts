@@ -51,7 +51,9 @@ export class EIAShortTermEnergyOutlookFetcher extends Fetcher {
       frequency: 'monthly',
       'data[0]': 'value',
       'facets[seriesId][]': catInfo.series,
-      sort: JSON.stringify([{ column: 'period', direction: 'desc' }]),
+      sort: 'period',
+      'sort[0][column]': 'period',
+      'sort[0][direction]': 'desc',
       length: '120', // ~10 years of monthly data
     })
 
@@ -70,7 +72,7 @@ export class EIAShortTermEnergyOutlookFetcher extends Fetcher {
       if (obs.value == null) continue
       results.push({
         date: `${obs.period}-01`,
-        value: obs.value,
+        value: typeof obs.value === 'number' ? obs.value : parseFloat(String(obs.value)),
         category: query.category,
         unit: catInfo.unit,
         forecast: obs.period > currentPeriod,

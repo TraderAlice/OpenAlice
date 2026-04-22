@@ -217,5 +217,5 @@ export function multiSeriesToRecords(
  * Get credentials helper — extracts FRED API key.
  */
 export function getFredApiKey(credentials: Record<string, string> | null): string {
-  return credentials?.fred_api_key ?? credentials?.api_key ?? ''
+  return credentials?.fred_api_key ?? credentials?.api_key ?? credentials?.federal_reserve_api_key ?? ''
 }

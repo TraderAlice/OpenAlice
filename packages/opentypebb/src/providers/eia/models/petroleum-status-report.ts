@@ -52,7 +52,9 @@ export class EIAPetroleumStatusReportFetcher extends Fetcher {
       frequency: 'weekly',
       'data[0]': 'value',
       'facets[series][]': catInfo.series,
-      sort: JSON.stringify([{ column: 'period', direction: 'desc' }]),
+      sort: 'period',
+      'sort[0][column]': 'period',
+      'sort[0][direction]': 'desc',
       length: '260', // ~5 years of weekly data
     })
 
@@ -67,7 +69,7 @@ export class EIAPetroleumStatusReportFetcher extends Fetcher {
       if (obs.value == null) continue
       results.push({
         date: obs.period,
-        value: obs.value,
+        value: typeof obs.value === 'number' ? obs.value : parseFloat(String(obs.value)),
         category: query.category,
         unit: catInfo.unit,
       })
