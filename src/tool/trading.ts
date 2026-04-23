@@ -9,7 +9,7 @@
 import { tool, type Tool } from 'ai'
 import { z } from 'zod'
 import Decimal from 'decimal.js'
-import { Contract, UNSET_DECIMAL } from '@traderalice/ibkr'
+import { Contract, UNSET_DECIMAL, UNSET_DOUBLE } from '@traderalice/ibkr'
 import type { AccountManager } from '@/domain/trading/account-manager.js'
 import { BrokerError, type OpenOrder } from '@/domain/trading/brokers/types.js'
 import type { FxService } from '@/domain/trading/fx-service.js'

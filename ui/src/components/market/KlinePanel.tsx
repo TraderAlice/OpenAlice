@@ -186,8 +186,8 @@ export function KlinePanel({ selection }: Props) {
     // 60s for intraday intervals (1m/5m/1h) because each tick is a fresh bar;
     // 5min for daily because a refresh within a single day is cosmetic.
     const pollMs = INTRADAY.has(interval) ? 60_000 : 300_000
-    const timer = setInterval(() => fetch(false), pollMs)
-    return () => { cancelled = true; clearInterval(timer) }
+    const timer = window.setInterval(() => fetch(false), pollMs)
+    return () => { cancelled = true; window.clearInterval(timer) }
   }, [selection, interval, tf])
 
   // Push bars into chart and fit.
