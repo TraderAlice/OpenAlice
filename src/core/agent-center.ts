@@ -17,7 +17,7 @@ import type { ResolvedProfile } from './config.js'
 import { GenerateRouter, StreamableResult } from './ai-provider-manager.js'
 import type { ISessionStore, ContentBlock } from './session.js'
 import type { CompactionConfig } from './compaction.js'
-import { compactIfNeeded } from './compaction.js'
+import { compactIfNeeded, forceCompact } from './compaction.js'
 import type { MediaAttachment } from './types.js'
 import { extractMediaFromToolResultContent } from './media.js'
 import { persistMedia } from './media-store.js'
@@ -72,6 +72,15 @@ export class AgentCenter {
   /** Prompt with session history — full orchestration pipeline. */
   askWithSession(prompt: string, session: ISessionStore, opts?: AskOptions): StreamableResult {
     return new StreamableResult(this._generate(prompt, session, opts))
+  }
+
+  /** Force a manual compaction using the active provider. */
+  async forceCompact(session: ISessionStore): Promise<{ preTokens: number } | null> {
+    const { provider } = await this.router.resolve()
+    return forceCompact(
+      session,
+      async (prompt) => (await provider.ask(prompt)).text,
+    )
   }
 
   // ==================== Pipeline ====================

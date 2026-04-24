@@ -6,11 +6,9 @@ import type { Plugin, EngineContext, MediaAttachment } from '../../core/types.js
 import type { TelegramConfig, ParsedMessage } from './types.js'
 import { buildParsedMessage } from './helpers.js'
 import { MediaGroupMerger } from './media-group.js'
-import { askAgentSdk } from '../../ai-providers/agent-sdk/query.js'
-import type { AgentSdkConfig } from '../../ai-providers/agent-sdk/query.js'
 import { SessionStore } from '../../core/session'
-import { forceCompact } from '../../core/compaction'
 import { readAIProviderConfig, setActiveProfile, readConnectorsConfig } from '../../core/config'
+import type { AgentCenter } from '../../core/agent-center.js'
 import type { ConnectorCenter } from '../../core/connector-center.js'
 import { TelegramConnector, splitMessage, MAX_MESSAGE_LENGTH } from './telegram-connector.js'
 import type { AccountManager } from '../../domain/trading/index.js'
@@ -26,9 +24,9 @@ function profileLabel(name: string, profile: { model: string }): string {
 export class TelegramPlugin implements Plugin {
   name = 'telegram'
   private config: TelegramConfig
-  private agentSdkConfig: AgentSdkConfig
   private bot: Bot | null = null
   private connectorCenter: ConnectorCenter | null = null
+  private agentCenter: AgentCenter | null = null
   private merger: MediaGroupMerger | null = null
   private unregisterConnector?: () => void
 
@@ -41,22 +39,14 @@ export class TelegramPlugin implements Plugin {
 
   constructor(
     config: Omit<TelegramConfig, 'pollingTimeout'> & { pollingTimeout?: number },
-    agentSdkConfig: AgentSdkConfig = {},
   ) {
     this.config = { pollingTimeout: 30, ...config }
-    this.agentSdkConfig = agentSdkConfig
   }
 
   async start(engineCtx: EngineContext) {
     this.connectorCenter = engineCtx.connectorCenter
+    this.agentCenter = engineCtx.agentCenter
     this.webPort = engineCtx.config.connectors.web.port
-
-    // Inject agent config into Claude Code config (used by /compact command)
-    this.agentSdkConfig = {
-      disallowedTools: engineCtx.config.agent.claudeCode.disallowedTools,
-      maxTurns: engineCtx.config.agent.claudeCode.maxTurns,
-      ...this.agentSdkConfig,
-    }
 
     const bot = new Bot(this.config.token)
 
@@ -334,16 +324,11 @@ export class TelegramPlugin implements Plugin {
   }
 
   private async handleCompactCommand(chatId: number, userId: number) {
+    if (!this.agentCenter) return
     const session = await this.getSession(userId)
     await this.sendReply(chatId, '> Compacting session...')
 
-    const result = await forceCompact(
-      session,
-      async (summarizePrompt) => {
-        const r = await askAgentSdk(summarizePrompt, { ...this.agentSdkConfig, maxTurns: 1 })
-        return r.text
-      },
-    )
+    const result = await this.agentCenter.forceCompact(session)
 
     if (!result) {
       await this.sendReply(chatId, 'Session is empty, nothing to compact.')
