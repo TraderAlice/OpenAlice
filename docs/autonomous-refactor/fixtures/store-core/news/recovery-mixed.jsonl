@@ -1,0 +1,6 @@
+{"seq":3,"ts":1764547200000,"pubTs":1764547200000,"dedupKey":"guid:old-retained-dedup","title":"Old retained dedup only","content":"Outside retention but still blocks duplicate dedup keys.","metadata":{"source":"archive"}}
+not-json
+{"seq":10,"ts":1767916800000,"pubTs":1767949200000,"dedupKey":"guid:recent-late","title":"Recent late item","content":"Later publication time.","metadata":{"source":"recovery"}}
+{"seq":11,"ts":
+{"seq":11,"ts":1767830400000,"pubTs":1767859200000,"dedupKey":"guid:recent-early","title":"Recent early item","content":"Earlier publication time.","metadata":{"source":"recovery"}}
+{"seq":12,"ts":1768046460000,"pubTs":1768046460000,"dedupKey":"guid:after-recovery","title":"Recovered append continues seq","content":"Appended after malformed-line recovery.","metadata":{"source":"recovery"}}

@@ -1,0 +1,5 @@
+{"seq":7,"ts":1767312000000,"type":"task.requested","payload":{"prompt":"recover valid first line"}}
+{"seq":8,"ts":
+not-json-at-all
+{"seq":8,"ts":1767312001000,"type":"task.done","payload":{"prompt":"recover valid first line","reply":"done","durationMs":1},"causedBy":7}
+{"seq":9,"ts":1767312002000,"type":"task.error","payload":{"prompt":"recover valid first line","error":"fixture error","durationMs":2},"causedBy":7}

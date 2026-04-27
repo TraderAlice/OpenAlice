@@ -1,0 +1,6 @@
+{"seq":1,"ts":1767258000000,"type":"message.received","payload":{"channel":"web","to":"default","prompt":"Check BTC and ETH risk."}}
+{"seq":2,"ts":1767258001000,"type":"message.sent","payload":{"channel":"web","to":"default","prompt":"Check BTC and ETH risk.","reply":"BTC momentum is firm; ETH gas fees are lower.","durationMs":1234},"causedBy":1}
+{"seq":3,"ts":1767258300000,"type":"heartbeat.done","payload":{"reply":"Portfolio heartbeat delivered.","reason":"scheduled","durationMs":250,"delivered":true}}
+{"seq":4,"ts":1767258600000,"type":"task.requested","payload":{"prompt":"Summarize archive search behavior."}}
+{"seq":5,"ts":1767258602000,"type":"task.done","payload":{"prompt":"Summarize archive search behavior.","reply":"Archive search remains JS-regex based.","durationMs":2000},"causedBy":4}
+{"seq":6,"ts":1767258900000,"type":"heartbeat.skip","payload":{"reason":"HEARTBEAT_OK","parsedReason":"duplicate"}}

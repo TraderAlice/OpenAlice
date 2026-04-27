@@ -1,0 +1,552 @@
+{
+  "schemaVersion": 1,
+  "moduleId": "store_core",
+  "capturedFrom": "legacy TypeScript path",
+  "sourceCommit": "8efdd96fe680792974ca2381e536afac1c606a10",
+  "generatedAt": "2026-04-28T02:25:00+09:00",
+  "normalizedFields": {
+    "session/append-probe-session.jsonl": {
+      "cwd": "<fixture-cwd>"
+    }
+  },
+  "fixtures": {
+    "eventLog": {
+      "fixtureFile": "event-log/legacy-events.jsonl",
+      "appendDiskLineTerminator": "\\n",
+      "recoveredRecentBeforeAppend": [
+        3,
+        4,
+        5
+      ],
+      "readAllSeqs": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "readAfterSeq3": [
+        4,
+        5,
+        6
+      ],
+      "readTypeMessageSent": [
+        2
+      ],
+      "readTypeTaskDoneAfterSeq3Limit1": [
+        5
+      ],
+      "recentAfterRecoveryAppend": [
+        4,
+        5,
+        6
+      ],
+      "recentTypeHeartbeatLimit2": [
+        6
+      ],
+      "queryPage1Size2": {
+        "entries": [
+          {
+            "seq": 6,
+            "ts": 1767258900000,
+            "type": "heartbeat.skip",
+            "payload": {
+              "reason": "HEARTBEAT_OK",
+              "parsedReason": "duplicate"
+            }
+          },
+          {
+            "seq": 5,
+            "ts": 1767258602000,
+            "type": "task.done",
+            "payload": {
+              "prompt": "Summarize archive search behavior.",
+              "reply": "Archive search remains JS-regex based.",
+              "durationMs": 2000
+            },
+            "causedBy": 4
+          }
+        ],
+        "total": 6,
+        "page": 1,
+        "pageSize": 2,
+        "totalPages": 3
+      },
+      "lastSeq": 6
+    },
+    "missingEventLog": {
+      "read": [],
+      "recent": [],
+      "lastSeq": 0
+    },
+    "malformedEventLogRecovery": {
+      "fixtureFile": "event-log/recovery-mixed.jsonl",
+      "beforeAppend": {
+        "readSeqs": [
+          7,
+          8
+        ],
+        "recentSeqs": [
+          7,
+          8
+        ],
+        "lastSeq": 8
+      },
+      "appendAfterRecoverySeq": 9,
+      "afterAppendReadSeqs": [
+        7,
+        8,
+        9
+      ]
+    },
+    "sessionStore": {
+      "fixtureFile": "session/legacy-session.jsonl",
+      "appendProbeFixtureFile": "session/append-probe-session.jsonl",
+      "malformedFixtureFile": "session/malformed-session.jsonl",
+      "appendRawDiskLineTerminator": "\\n",
+      "readAllUuids": [
+        "sess-u1",
+        "sess-a1",
+        "sess-b1",
+        "sess-s1",
+        "sess-a2",
+        "sess-u2",
+        "sess-a3"
+      ],
+      "readAllTypes": [
+        "user",
+        "assistant",
+        "system",
+        "user",
+        "assistant",
+        "user",
+        "assistant"
+      ],
+      "readActiveUuids": [
+        "sess-b1",
+        "sess-s1",
+        "sess-a2",
+        "sess-u2",
+        "sess-a3"
+      ],
+      "readActiveIncludesCompactBoundary": true,
+      "readAllExcludesMeta": true,
+      "restoreAppendParentUuid": "sess-a3",
+      "restoreAppendParentEqualsLastPersistedUuidBeforeAppend": true,
+      "convertersFromActive": {
+        "toModelMessages": [
+          {
+            "role": "user",
+            "content": "This session is being continued from a previous conversation. The summary below covers the earlier portion of the conversation.\n\n<summary>BTC and ETH archive search was requested.</summary>"
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "text",
+                "text": "Searching again after compaction."
+              },
+              {
+                "type": "tool-call",
+                "toolCallId": "tool-2",
+                "toolName": "Search",
+                "input": {
+                  "q": "Bitcoin interest rate"
+                }
+              }
+            ]
+          },
+          {
+            "role": "tool",
+            "content": [
+              {
+                "type": "tool-result",
+                "toolCallId": "tool-2",
+                "toolName": "unknown",
+                "output": {
+                  "type": "text",
+                  "value": "Found two matching articles."
+                }
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "text",
+                "text": "Bitcoin appeared in two archive records."
+              }
+            ]
+          }
+        ],
+        "toResponsesInput": [
+          {
+            "role": "user",
+            "content": "This session is being continued from a previous conversation. The summary below covers the earlier portion of the conversation.\n\n<summary>BTC and ETH archive search was requested.</summary>"
+          },
+          {
+            "role": "assistant",
+            "content": "Searching again after compaction."
+          },
+          {
+            "type": "function_call",
+            "call_id": "tool-2",
+            "name": "Search",
+            "arguments": "{\"q\":\"Bitcoin interest rate\"}"
+          },
+          {
+            "type": "function_call_output",
+            "call_id": "tool-2",
+            "output": "Found two matching articles."
+          },
+          {
+            "role": "assistant",
+            "content": "Bitcoin appeared in two archive records."
+          }
+        ],
+        "toTextHistory": [
+          {
+            "role": "user",
+            "text": "This session is being continued from a previous conversation. The summary below covers the earlier portion of the conversation.\n\n<summary>BTC and ETH archive search was requested.</summary>"
+          },
+          {
+            "role": "assistant",
+            "text": "Searching again after compaction.\n[Tool: Search {\"q\":\"Bitcoin interest rate\"}]"
+          },
+          {
+            "role": "user",
+            "text": "[Result: Found two matching articles.]"
+          },
+          {
+            "role": "assistant",
+            "text": "Bitcoin appeared in two archive records."
+          }
+        ],
+        "toChatHistory": [
+          {
+            "kind": "text",
+            "role": "user",
+            "text": "This session is being continued from a previous conversation. The summary below covers the earlier portion of the conversation.\n\n<summary>BTC and ETH archive search was requested.</summary>",
+            "timestamp": "2026-01-01T10:05:01.000Z",
+            "cursor": "sess-s1"
+          },
+          {
+            "kind": "text",
+            "role": "assistant",
+            "text": "Searching again after compaction.",
+            "timestamp": "2026-01-01T10:05:02.000Z",
+            "cursor": "sess-a2"
+          },
+          {
+            "kind": "tool_calls",
+            "calls": [
+              {
+                "name": "Search",
+                "input": "{\"q\":\"Bitcoin interest rate\"}",
+                "result": "Found two matching articles."
+              }
+            ],
+            "timestamp": "2026-01-01T10:05:02.000Z",
+            "cursor": "sess-a2"
+          },
+          {
+            "kind": "text",
+            "role": "assistant",
+            "text": "Bitcoin appeared in two archive records.",
+            "timestamp": "2026-01-01T10:05:04.000Z",
+            "metadata": {
+              "kind": "analysis"
+            },
+            "media": [
+              {
+                "type": "image",
+                "url": "media://chart/btc.png"
+              }
+            ],
+            "cursor": "sess-a3"
+          }
+        ]
+      },
+      "appendProbe": {
+        "rawLineCount": 3,
+        "generatedUuidPattern": true,
+        "parentChain": [
+          null,
+          "61edd188-36fb-46d9-9338-96215040217c",
+          "ed190e7d-735c-4098-9e6d-1b87e53d5027"
+        ],
+        "secondParentEqualsFirstUuid": true,
+        "thirdParentEqualsSecondUuid": true,
+        "timestamps": [
+          "2026-01-01T11:00:00.000Z",
+          "2026-01-01T11:00:01.000Z",
+          "2026-01-01T11:00:02.000Z"
+        ],
+        "cwdWasWritten": true,
+        "fixtureCwdNormalizedTo": "<fixture-cwd>"
+      },
+      "malformedReadAll": {
+        "threw": true,
+        "name": "SyntaxError",
+        "messageIncludes": "Expected property name or"
+      },
+      "missingReadAll": [],
+      "rawLineCountBeforeRestoreAppend": 8
+    },
+    "newsCollectorStore": {
+      "fixtureFile": "news/legacy-news.jsonl",
+      "recoveryFixtureFile": "news/recovery-mixed.jsonl",
+      "ingestResults": [
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "duplicateIngestResult": false,
+      "diskLineCountAfterDuplicate": 5,
+      "count": 5,
+      "dedupCount": 5,
+      "hasGuidBtc1": true,
+      "getNewsExclusiveStartInclusiveEnd": [
+        {
+          "time": "2026-01-01T12:00:00.000Z",
+          "title": "Market analysis report",
+          "content": "Analysts predict bullish trend for Bitcoin and altcoins. Interest rate decisions may impact crypto liquidity.",
+          "metadata": {
+            "source": "analyst",
+            "category": "analysis",
+            "desk": "macro"
+          }
+        },
+        {
+          "time": "2026-01-02T06:00:00.000Z",
+          "title": "",
+          "content": "Asian markets show positive sentiment. BTC trading volume surges in Korea.",
+          "metadata": {
+            "source": "news",
+            "category": "market",
+            "region": "apac"
+          }
+        }
+      ],
+      "getNewsV2Lookback2d": [
+        {
+          "time": "2026-01-01T12:00:00.000Z",
+          "title": "Market analysis report",
+          "content": "Analysts predict bullish trend for Bitcoin and altcoins. Interest rate decisions may impact crypto liquidity.",
+          "metadata": {
+            "source": "analyst",
+            "category": "analysis",
+            "desk": "macro"
+          }
+        },
+        {
+          "time": "2026-01-02T06:00:00.000Z",
+          "title": "",
+          "content": "Asian markets show positive sentiment. BTC trading volume surges in Korea.",
+          "metadata": {
+            "source": "news",
+            "category": "market",
+            "region": "apac"
+          }
+        },
+        {
+          "time": "2026-01-03T09:00:00.000Z",
+          "title": "Fed speakers discuss liquidity",
+          "content": "Federal Reserve speakers said liquidity remains ample while investors debate interest rate timing.",
+          "metadata": {
+            "source": "wire",
+            "category": "macro",
+            "summary": "Federal Reserve commentary with a deliberately long metadata field for truncation checks"
+          }
+        }
+      ],
+      "getNewsV2Limit2": [
+        {
+          "time": "2026-01-02T06:00:00.000Z",
+          "title": "",
+          "content": "Asian markets show positive sentiment. BTC trading volume surges in Korea.",
+          "metadata": {
+            "source": "news",
+            "category": "market",
+            "region": "apac"
+          }
+        },
+        {
+          "time": "2026-01-03T09:00:00.000Z",
+          "title": "Fed speakers discuss liquidity",
+          "content": "Federal Reserve speakers said liquidity remains ample while investors debate interest rate timing.",
+          "metadata": {
+            "source": "wire",
+            "category": "macro",
+            "summary": "Federal Reserve commentary with a deliberately long metadata field for truncation checks"
+          }
+        }
+      ],
+      "getNewsV2StartTimeLimit3": [
+        {
+          "time": "2026-01-01T12:00:00.000Z",
+          "title": "Market analysis report",
+          "content": "Analysts predict bullish trend for Bitcoin and altcoins. Interest rate decisions may impact crypto liquidity.",
+          "metadata": {
+            "source": "analyst",
+            "category": "analysis",
+            "desk": "macro"
+          }
+        },
+        {
+          "time": "2026-01-02T06:00:00.000Z",
+          "title": "",
+          "content": "Asian markets show positive sentiment. BTC trading volume surges in Korea.",
+          "metadata": {
+            "source": "news",
+            "category": "market",
+            "region": "apac"
+          }
+        },
+        {
+          "time": "2026-01-03T09:00:00.000Z",
+          "title": "Fed speakers discuss liquidity",
+          "content": "Federal Reserve speakers said liquidity remains ample while investors debate interest rate timing.",
+          "metadata": {
+            "source": "wire",
+            "category": "macro",
+            "summary": "Federal Reserve commentary with a deliberately long metadata field for truncation checks"
+          }
+        }
+      ],
+      "archiveSearch": {
+        "globBtcEth": [
+          {
+            "index": 0,
+            "title": "BTC breaks 50k resistance",
+            "contentLength": 106,
+            "metadata": "{\"source\":\"official\",\"category\":\"cryp..."
+          },
+          {
+            "index": 1,
+            "title": "ETH upgrade announcement",
+            "contentLength": 81,
+            "metadata": "{\"source\":\"official\",\"category\":\"cryp..."
+          }
+        ],
+        "globOfficialLimit10": [
+          {
+            "index": 0,
+            "title": "BTC breaks 50k resistance",
+            "contentLength": 106,
+            "metadata": "{\"source\":\"official\",\"category\":\"cryp..."
+          },
+          {
+            "index": 1,
+            "title": "ETH upgrade announcement",
+            "contentLength": 81,
+            "metadata": "{\"source\":\"official\",\"category\":\"cryp..."
+          }
+        ],
+        "globLongMetadataTruncates": [
+          {
+            "index": 4,
+            "title": "Fed speakers discuss liquidity",
+            "contentLength": 98,
+            "metadata": "{\"source\":\"wire\",\"category\":\"macro\",\"..."
+          }
+        ],
+        "grepInterestRateContext12": [
+          {
+            "index": 2,
+            "title": "Market analysis report",
+            "matchedText": "...d altcoins. Interest rate decisions m...",
+            "contentLength": 109,
+            "metadata": "{\"source\":\"analyst\",\"category\":\"analy..."
+          },
+          {
+            "index": 4,
+            "title": "Fed speakers discuss liquidity",
+            "matchedText": "...tors debate interest rate timing.",
+            "contentLength": 98,
+            "metadata": "{\"source\":\"wire\",\"category\":\"macro\",\"..."
+          }
+        ],
+        "grepBitcoinCaseInsensitive": [
+          {
+            "index": 0,
+            "title": "BTC breaks 50k resistance",
+            "matchedText": "BTC breaks 50k resistance\nBitcoin has broken the 50k resistance level after weeks o...",
+            "contentLength": 106,
+            "metadata": "{\"source\":\"official\",\"category\":\"cryp..."
+          },
+          {
+            "index": 2,
+            "title": "Market analysis report",
+            "matchedText": "...nalysis report\nAnalysts predict bullish trend for Bitcoin and altcoins. Interest rate decisions may impact ...",
+            "contentLength": 109,
+            "metadata": "{\"source\":\"analyst\",\"category\":\"analy..."
+          }
+        ],
+        "grepUntitledKorea": [
+          {
+            "index": 3,
+            "title": "",
+            "matchedText": "... positive sentiment. BTC trading volume surges in Korea.",
+            "contentLength": 74,
+            "metadata": "{\"source\":\"news\",\"category\":\"market\",..."
+          }
+        ],
+        "grepMacroLimit1": [
+          {
+            "index": 4,
+            "title": "Fed speakers discuss liquidity",
+            "matchedText": "Fed speakers discuss liquidity\nFederal Reserve speakers said liquidity remains a...",
+            "contentLength": 98,
+            "metadata": "{\"source\":\"wire\",\"category\":\"macro\",\"..."
+          }
+        ],
+        "readIndex1": {
+          "time": "2026-01-01T10:00:00.000Z",
+          "title": "ETH upgrade announcement",
+          "content": "Ethereum announces a Q2 upgrade. Gas fees are expected to decrease significantly.",
+          "metadata": {
+            "source": "official",
+            "category": "crypto",
+            "link": "https://example.test/eth-upgrade",
+            "guid": null
+          }
+        },
+        "readInvalidIndex": null,
+        "emptyGlob": [],
+        "emptyGrep": [],
+        "emptyRead": null
+      },
+      "recovery": {
+        "beforeAppend": {
+          "count": 2,
+          "dedupCount": 3,
+          "hasOldDedup": true,
+          "recoveredTitlesByPubTs": [
+            "Recent early item",
+            "Recent late item"
+          ]
+        },
+        "duplicateOldDedup": false,
+        "appendNewResult": true,
+        "validSeqsAfterAppend": [
+          3,
+          10,
+          11,
+          12
+        ],
+        "lastValidSeqAfterAppend": 12
+      }
+    }
+  },
+  "implementationPrepRecommendation": [
+    "Add a TypeScript parity harness that reads these JSONL fixtures before wiring any Rust reader.",
+    "Implement Rust read-only scan/replay kernels for event log, session, and news archive before any append path.",
+    "Gate Rust append behind an opt-in flag only after TypeScript can read Rust-written JSONL and Rust can read these legacy files.",
+    "Treat JavaScript regex archive behavior as a compatibility surface; add an explicit shim or approval before changing accepted patterns."
+  ]
+}
