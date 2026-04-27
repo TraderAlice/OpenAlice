@@ -1,0 +1,287 @@
+version: 1
+project:
+  name: OpenAlice Rust Refactor Studio
+  playbook_path: docs/autonomous-refactor/PAPERCLIP_OPENALICE_RUST_REFACTOR_PLAYBOOK.md
+  repo_layout_root: docs/autonomous-refactor
+  source_repo: TraderAlice/OpenAlice
+  orchestration: Paperclip
+  execution_mode: self_hosted
+  canonical_branch: master
+  fallback_branch: main
+workspace:
+  type: project_primary
+  requires_isolated_worktrees: true
+  provision_command: pnpm install && cargo metadata --no-deps >/dev/null
+  required_paths:
+    - docs/autonomous-refactor/
+    - crates/
+    - packages/node-bindings/
+adapter_strategy:
+  preferred:
+    - built_in_supported_adapter
+    - external_custom_adapter
+  custom_adapter_name: robotstudio_local
+  custom_adapter_package_layout:
+    - packages/adapters/robotstudio-local/src/index.ts
+    - packages/adapters/robotstudio-local/src/server/execute.ts
+    - packages/adapters/robotstudio-local/src/server/parse.ts
+    - packages/adapters/robotstudio-local/src/server/test.ts
+    - packages/adapters/robotstudio-local/src/ui/parse-stdout.ts
+    - packages/adapters/robotstudio-local/src/ui/build-config.ts
+    - packages/adapters/robotstudio-local/src/cli/format-event.ts
+org_chart:
+  board:
+    type: human
+    responsibilities:
+      - final_approval
+      - budget_control
+      - release_governance
+  agents:
+    - id: cto_orchestrator
+      role: CTO / Program Orchestrator
+      responsibilities:
+        - decompose_work
+        - assign_issues
+        - enforce_scope
+        - request_approvals
+    - id: architecture_lead
+      role: Architecture Lead
+      responsibilities:
+        - own_module_contracts
+        - write_adrs
+        - approve_boundaries
+    - id: adapter_tooling_engineer
+      role: Adapter & Tooling Engineer
+      responsibilities:
+        - adapter_integration
+        - workspace_bootstrap
+        - feature_flags
+    - id: analysis_engineer
+      role: Analysis Engineer
+      responsibilities:
+        - analysis_core
+    - id: trading_engineer
+      role: Trading Core Engineer
+      responsibilities:
+        - trading_core
+    - id: storage_engineer
+      role: Storage Engineer
+      responsibilities:
+        - store_core
+    - id: qa_benchmark_engineer
+      role: QA & Benchmark Engineer
+      responsibilities:
+        - regression_tests
+        - parity_tests
+        - benchmarks
+    - id: docs_release_engineer
+      role: Docs & Release Engineer
+      responsibilities:
+        - migration_docs
+        - release_notes
+        - rollback_docs
+budgets:
+  relative_allocation:
+    cto_orchestrator: 20
+    architecture_lead: 10
+    adapter_tooling_engineer: 15
+    analysis_engineer: 15
+    trading_engineer: 20
+    storage_engineer: 10
+    qa_benchmark_engineer: 7
+    docs_release_engineer: 3
+modules:
+  - id: analysis_core
+    priority: 1
+    openalice_paths:
+      - src/domain/analysis/
+      - src/domain/thinking/
+      - src/tool/analysis.ts
+      - src/tool/thinking.ts
+    rust_paths:
+      - crates/analysis-core/
+      - packages/node-bindings/analysis-core/
+    status: planned
+    public_behavior_rule: keep_tool_surface_stable
+    acceptance:
+      - formula_parity
+      - indicator_parity
+      - invalid_expression_rejection
+      - no_tool_schema_change
+      - benchmark_recorded
+  - id: trading_core
+    priority: 2
+    openalice_paths:
+      - src/domain/trading/git/
+      - src/domain/trading/guards/
+      - src/domain/trading/snapshot/
+      - src/domain/trading/account-manager.ts
+    excluded_paths:
+      - src/domain/trading/brokers/
+      - src/connectors/
+      - ui/
+    rust_paths:
+      - crates/trading-core/
+      - packages/node-bindings/trading-core/
+    status: planned
+    public_behavior_rule: preserve_stage_commit_push_workflow
+    acceptance:
+      - state_machine_parity
+      - guard_parity
+      - snapshot_math_parity
+      - no_precision_regression
+      - rollback_flag_verified
+  - id: store_core
+    priority: 3
+    openalice_paths:
+      - src/core/event-log.ts
+      - src/core/session.ts
+      - src/domain/news/
+    rust_paths:
+      - crates/store-core/
+      - packages/node-bindings/store-core/
+    status: planned
+    public_behavior_rule: preserve_jsonl_compatibility
+    acceptance:
+      - existing_jsonl_readable
+      - append_order_preserved
+      - replay_recovery_parity
+      - archive_search_parity
+      - benchmark_recorded
+  - id: symbol_index
+    priority: 4
+    optional: true
+    openalice_paths:
+      - src/domain/market-data/equity/
+    status: deferred
+phases:
+  - id: phase_0_bootstrap
+    owner: cto_orchestrator
+    outputs:
+      - github_playbook_committed
+      - company_created
+      - project_workspace_configured
+      - approvals_configured
+      - adapter_validated
+  - id: phase_1_baseline
+    owner: architecture_lead
+    outputs:
+      - baseline_report
+      - module_contracts
+      - golden_fixtures
+  - id: phase_2_analysis
+    owner: analysis_engineer
+    outputs:
+      - analysis_core_crate
+      - node_binding
+      - parity_tests
+      - benchmark_report
+  - id: phase_3_trading
+    owner: trading_engineer
+    outputs:
+      - trading_core_crate
+      - node_binding
+      - parity_tests
+      - rollback_flag
+  - id: phase_4_store
+    owner: storage_engineer
+    outputs:
+      - store_core_crate
+      - compatibility_tests
+      - benchmark_report
+  - id: phase_5_hardening
+    owner: qa_benchmark_engineer
+    outputs:
+      - regression_matrix
+      - rollout_report
+      - release_checklist
+issue_template:
+  required_sections:
+    - objective
+    - scope
+    - non_goals
+    - allowed_files
+    - dependencies
+    - commands_to_run
+    - acceptance_criteria
+    - expected_artifacts
+    - rollback_note
+    - playbook_links
+approval_gates:
+  - architecture_review
+  - integration_review
+  - release_review
+  - trading_safety_review
+execution_loop:
+  preflight:
+    - read_playbook
+    - read_manifest
+    - read_module_contract
+    - validate_workspace
+    - validate_branch
+    - run_scope_baseline
+  implementation:
+    - smallest_testable_slice
+    - keep_within_allowed_files
+    - update_issue_progress
+  pre_review:
+    - run_required_tests
+    - record_results
+    - record_benchmark_delta
+    - update_module_contract
+    - request_approval
+  blocked:
+    - set_status_blocked
+    - record_exact_blocker
+    - record_unblock_owner
+commands:
+  openalice:
+    build: pnpm build
+    test: pnpm test
+    test_e2e: pnpm test:e2e
+    test_bbprovider: pnpm test:bbProvider
+  rust:
+    test: cargo test --workspace
+    fmt_check: cargo fmt --all --check
+    clippy: cargo clippy --workspace -- -D warnings
+  paperclip_if_modified:
+    test: pnpm test
+    typecheck: pnpm typecheck
+    test_e2e: pnpm test:e2e
+routines:
+  - id: nightly_regression
+    trigger: cron
+    owner: qa_benchmark_engineer
+    purpose: baseline_build_and_contract_regression
+    concurrency_policy: skip_if_running
+    catch_up_policy: none
+  - id: weekly_upstream_sync
+    trigger: cron
+    owner: cto_orchestrator
+    purpose: inspect_upstream_drift_and_open_sync_issue
+    concurrency_policy: queue_one
+    catch_up_policy: none
+  - id: benchmark_audit
+    trigger: api_or_manual
+    owner: qa_benchmark_engineer
+    purpose: refresh_benchmark_reports
+  - id: documentation_drift_audit
+    trigger: cron
+    owner: docs_release_engineer
+    purpose: ensure_docs_match_codepaths
+risk_register:
+  - id: attachment_context_gap
+    mitigation: keep_canonical_docs_in_repo_and_reference_paths_in_issue_body
+  - id: workspace_misconfiguration
+    mitigation: explicit_project_workspace_and_worktree_policy
+  - id: ffi_boundary_drift
+    mitigation: dto_contract_tests_and_feature_flags
+  - id: precision_regression
+    mitigation: golden_fixtures_and_state_machine_parity_tests
+  - id: imported_company_heartbeats_disabled
+    mitigation: manual_post_import_heartbeat_enablement
+success_criteria:
+  - deterministic_modules_migrated_without_outer_api_breakage
+  - feature_flags_exist_for_every_rust_path
+  - regression_and_benchmark_reports_checked_in
+  - robot_can_execute_end_to_end_from_issue_to_review
