@@ -3,14 +3,15 @@
 ## Contract metadata
 
 - Module ID: `store_core`
-- Status: contract draft for architecture review
+- Status: canonical Phase 1 contract; architecture approved
 - Canonical path: `docs/autonomous-refactor/module-contracts/store-core.md`
 - Source playbook: `docs/autonomous-refactor/PAPERCLIP_OPENALICE_RUST_REFACTOR_PLAYBOOK.md`
 - Source manifest: `docs/autonomous-refactor/openalice-rust-refactor.manifest.yaml`
 - Baseline report: `docs/autonomous-refactor/reports/baseline/phase-1-baseline-report.md`
 
 This contract defines the stable boundary for a future Rust `store_core`
-migration. It does not authorize source code edits by itself. Every
+migration and has been accepted as the canonical Phase 1 store-core contract.
+It does not authorize source code edits by itself. Every
 implementation issue must restate its exact allowed files before editing and
 must keep the legacy TypeScript path available until parity, rollback, QA, and
 release gates pass.
