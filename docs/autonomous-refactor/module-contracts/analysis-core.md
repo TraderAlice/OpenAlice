@@ -3,7 +3,8 @@
 ## Contract metadata
 
 - Module ID: `analysis_core`
-- Status: contract draft for architecture review
+- Status: canonical Phase 1 contract; architecture approved
+- Approval evidence: human architecture review on Paperclip issue [OPE-3](/OPE/issues/OPE-3) recorded at 2026-04-27T09:50:19Z accepting this file as the canonical Phase 1 `analysis_core` contract. No source edits are authorized by this approval alone.
 - Reader: the Analysis Engineer, Architecture Lead, QA & Benchmark Engineer, and future agents implementing or reviewing analysis-core migration work.
 - Post-read action: open a scoped implementation issue for `analysis_core`, verify that its allowed-file list matches this contract, and implement or review the first Rust migration slice without changing OpenAlice's outer tool behavior.
 - Canonical sources:

@@ -3,7 +3,8 @@
 ## Contract metadata
 
 - Module ID: `trading_core`
-- Status: contract captured; Rust implementation not started
+- Status: canonical Phase 1 contract; architecture approved; Rust implementation not started
+- Approval evidence: human architecture review on Paperclip issue [OPE-4](/OPE/issues/OPE-4) recorded at 2026-04-27T10:09:08Z accepting this file as the canonical Phase 1 `trading_core` contract, followed by the 2026-04-27T10:34:09Z post-approval clarification confirming `OPENALICE_RUST_TRADING_CORE=0` as the default legacy path and `OPENALICE_RUST_TRADING_CORE=1` as approved opt-in/canary execution. No source edits are authorized by this approval alone.
 - Canonical path: `docs/autonomous-refactor/module-contracts/trading-core.md`
 - Source playbook: `docs/autonomous-refactor/PAPERCLIP_OPENALICE_RUST_REFACTOR_PLAYBOOK.md`
 - Source manifest: `docs/autonomous-refactor/openalice-rust-refactor.manifest.yaml`
