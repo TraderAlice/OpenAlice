@@ -5,4 +5,10 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 publish = false
-description = "OpenAlice analysis_core kernel crate (bootstrap shell, no domain logic)."
+description = "OpenAlice analysis_core kernel crate (Phase 2 parser slice; no evaluator yet)."
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1"

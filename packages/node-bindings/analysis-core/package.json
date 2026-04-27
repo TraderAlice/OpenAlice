@@ -2,7 +2,8 @@
   "name": "@openalice/node-bindings-analysis-core",
   "version": "0.0.0",
   "private": true,
-  "description": "OpenAlice analysis_core Node-API binding (bootstrap shell). The napi-rs bridge, DTO conversion, and platform .node artifact land under a separate scoped issue per docs/autonomous-refactor/adr/ADR-003-binding-strategy.md.",
+  "type": "module",
+  "description": "OpenAlice analysis_core Node binding. Phase 2 first parity slice ships a CLI fallback shell (parser-only) until the napi-rs bridge described in docs/autonomous-refactor/adr/ADR-003-binding-strategy.md lands.",
   "license": "AGPL-3.0-only",
   "main": "index.js",
   "types": "index.d.ts",
@@ -12,6 +13,8 @@
     "README.md"
   ],
   "scripts": {
-    "test": "node -e \"require('./index.js').bootstrapHealthcheck()\""
+    "build:bin": "cargo build --release --bin analysis-core-parse -p analysis-core-node-binding",
+    "build:bin:debug": "cargo build --bin analysis-core-parse -p analysis-core-node-binding",
+    "test": "node --input-type=module -e \"import('./index.js').then(m => { if (m.bootstrapHealthcheck() !== 'analysis_core:bootstrap') process.exit(1); })\""
   }
 }

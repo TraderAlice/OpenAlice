@@ -23,10 +23,30 @@ import { toValues } from './types'
 import * as DataAccess from './functions/data-access'
 import * as Statistics from './functions/statistics'
 import * as Technical from './functions/technical'
+// Phase 2 first parity slice: parser-only routing behind
+// OPENALICE_RUST_ANALYSIS=1. The binding lives in the workspace at
+// packages/node-bindings/analysis-core/. The relative-path import keeps
+// the integration explicit; this is the only place authorized to call
+// across the binding boundary for analysis_core today (per the
+// allowed-files policy on OPE-16).
+import { parseFormulaSync as parseFormulaSyncRust } from '../../../../packages/node-bindings/analysis-core/index.js'
 
 export interface CalculateOutput {
   value: number | number[] | Record<string, number>
   dataRange: Record<string, DataSourceMeta>
+}
+
+/**
+ * Strict OPENALICE_RUST_ANALYSIS flag parser per ADR-002.
+ *
+ * Only the literal string "1" (after trimming whitespace) enables the
+ * Rust parser. Every other state — unset, empty string, "0", "true",
+ * "yes", or any other value — must use the legacy TypeScript path.
+ */
+function shouldUseRustParser(): boolean {
+  const raw = process.env.OPENALICE_RUST_ANALYSIS
+  if (typeof raw !== 'string') return false
+  return raw.trim() === '1'
 }
 
 export class IndicatorCalculator {
@@ -39,7 +59,9 @@ export class IndicatorCalculator {
     precision: number = 4,
   ): Promise<CalculateOutput> {
     this.dataSources = {}
-    const ast = this.parse(formula)
+    const ast = shouldUseRustParser()
+      ? (parseFormulaSyncRust(formula) as ASTNode)
+      : this.parse(formula)
     const result = await this.evaluate(ast)
 
     if (typeof result === 'string') {
