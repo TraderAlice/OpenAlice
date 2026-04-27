@@ -1,0 +1,591 @@
+{
+  "schemaVersion": 1,
+  "module": "analysis_core",
+  "sourceCommit": "a427f9f242c0e00e5f5b660487ebd4594e4448f5",
+  "contractPath": "docs/autonomous-refactor/module-contracts/analysis-core.md",
+  "sourcePathsRead": [
+    "src/domain/analysis/index.ts",
+    "src/domain/analysis/indicator/calculator.ts",
+    "src/domain/analysis/indicator/functions/data-access.ts",
+    "src/domain/analysis/indicator/functions/statistics.ts",
+    "src/domain/analysis/indicator/functions/technical.ts",
+    "src/domain/analysis/indicator/types.ts",
+    "src/domain/thinking/tools/calculate.tool.ts",
+    "src/tool/analysis.ts",
+    "src/tool/thinking.ts"
+  ],
+  "publicSurfaces": {
+    "calculateIndicatorTool": {
+      "path": "src/tool/analysis.ts",
+      "factory": "createAnalysisTools",
+      "toolName": "calculateIndicator",
+      "inputShape": {
+        "asset": {
+          "type": "enum",
+          "required": true,
+          "values": ["equity", "crypto", "currency", "commodity"]
+        },
+        "formula": {
+          "type": "string",
+          "required": true
+        },
+        "precision": {
+          "type": "integer",
+          "required": false,
+          "min": 0,
+          "max": 10,
+          "effectiveDefault": 4
+        }
+      },
+      "outputShape": {
+        "value": "number | number[] | Record<string, number>",
+        "dataRange": "Record<string, { symbol: string; from: string; to: string; bars: number }>"
+      }
+    },
+    "indicatorCalculator": {
+      "path": "src/domain/analysis/indicator/calculator.ts",
+      "className": "IndicatorCalculator",
+      "method": "calculate(formula: string, precision = 4)",
+      "outputShape": {
+        "value": "number | number[] | Record<string, number>",
+        "dataRange": "Record<string, DataSourceMeta>"
+      }
+    },
+    "thinkingCalculateTool": {
+      "path": "src/tool/thinking.ts",
+      "factory": "createThinkingTools",
+      "toolName": "calculate",
+      "inputShape": {
+        "expression": {
+          "type": "string",
+          "required": true
+        }
+      },
+      "outputShape": "number"
+    },
+    "thinkingCalculateFunction": {
+      "path": "src/domain/thinking/tools/calculate.tool.ts",
+      "functionName": "calculate(expression: string)",
+      "outputShape": "number"
+    }
+  },
+  "datasets": {
+    "linear50Ohlcv": {
+      "description": "50 sorted daily OHLCV bars matching the legacy IndicatorCalculator unit-test fixture.",
+      "generator": {
+        "length": 50,
+        "date": "2025-{month = floor(index / 28) + 1}-{day = (index % 28) + 1}, zero-padded",
+        "open": "100 + index",
+        "high": "102 + index",
+        "low": "99 + index",
+        "close": "100 + index",
+        "volume": "index === 48 ? null : 1000 + index * 10",
+        "vwap": null
+      },
+      "metaForSymbolAAPL": {
+        "symbol": "AAPL",
+        "from": "2025-01-01",
+        "to": "2025-02-22",
+        "bars": 50
+      }
+    },
+    "short3Ohlcv": {
+      "description": "Three sorted bars used to freeze insufficient-data errors.",
+      "bars": [
+        {
+          "date": "2025-03-01",
+          "open": 50,
+          "high": 51,
+          "low": 49,
+          "close": 50,
+          "volume": 500,
+          "vwap": null
+        },
+        {
+          "date": "2025-03-02",
+          "open": 51,
+          "high": 52,
+          "low": 50,
+          "close": 51,
+          "volume": 505,
+          "vwap": null
+        },
+        {
+          "date": "2025-03-03",
+          "open": 52,
+          "high": 53,
+          "low": 51,
+          "close": 52,
+          "volume": 510,
+          "vwap": null
+        }
+      ]
+    },
+    "emptyOhlcv": {
+      "description": "No bars, with empty from/to metadata.",
+      "bars": []
+    },
+    "toolShimUnsortedRawBars": {
+      "description": "Per-asset raw provider data for createAnalysisTools. Includes out-of-order bars, one bar with null open filtered by the shim, and one null volume normalized by VOLUME.",
+      "byAsset": {
+        "equity": [
+          { "date": "2025-04-03", "open": 103, "high": 105, "low": 102, "close": 104, "volume": 1030 },
+          { "date": "2025-04-01", "open": 100, "high": 101, "low": 99, "close": 100, "volume": 1000 },
+          { "date": "2025-04-02", "open": null, "high": 103, "low": 101, "close": 102, "volume": 1020 },
+          { "date": "2025-04-04", "open": 104, "high": 106, "low": 103, "close": 105, "volume": null }
+        ],
+        "crypto": [
+          { "date": "2025-04-03", "open": 203, "high": 205, "low": 202, "close": 204, "volume": 2030 },
+          { "date": "2025-04-01", "open": 200, "high": 201, "low": 199, "close": 200, "volume": 2000 },
+          { "date": "2025-04-02", "open": null, "high": 203, "low": 201, "close": 202, "volume": 2020 },
+          { "date": "2025-04-04", "open": 204, "high": 206, "low": 203, "close": 205, "volume": null }
+        ],
+        "currency": [
+          { "date": "2025-04-03", "open": 1.13, "high": 1.15, "low": 1.12, "close": 1.14, "volume": 1130 },
+          { "date": "2025-04-01", "open": 1.1, "high": 1.11, "low": 1.09, "close": 1.1, "volume": 1100 },
+          { "date": "2025-04-02", "open": null, "high": 1.13, "low": 1.11, "close": 1.12, "volume": 1120 },
+          { "date": "2025-04-04", "open": 1.14, "high": 1.16, "low": 1.13, "close": 1.15, "volume": null }
+        ],
+        "commodity": [
+          { "date": "2025-04-03", "open": 2048, "high": 2050, "low": 2047, "close": 2049, "volume": 20480 },
+          { "date": "2025-04-01", "open": 2045, "high": 2046, "low": 2044, "close": 2045, "volume": 20450 },
+          { "date": "2025-04-02", "open": null, "high": 2048, "low": 2046, "close": 2047, "volume": 20470 },
+          { "date": "2025-04-04", "open": 2049, "high": 2051, "low": 2048, "close": 2050, "volume": null }
+        ]
+      }
+    }
+  },
+  "indicatorCalculatorCases": [
+    {
+      "id": "indicator-arithmetic-precedence",
+      "entryPoint": "IndicatorCalculator.calculate",
+      "dataset": "linear50Ohlcv",
+      "input": { "formula": "2 + 3 * 4" },
+      "result": { "ok": true, "output": { "value": 14, "dataRange": {} } }
+    },
+    {
+      "id": "indicator-parentheses",
+      "entryPoint": "IndicatorCalculator.calculate",
+      "dataset": "linear50Ohlcv",
+      "input": { "formula": "(2 + 3) * 4" },
+      "result": { "ok": true, "output": { "value": 20, "dataRange": {} } }
+    },
+    {
+      "id": "indicator-default-precision",
+      "entryPoint": "IndicatorCalculator.calculate",
+      "dataset": "linear50Ohlcv",
+      "input": { "formula": "10 / 3" },
+      "result": { "ok": true, "output": { "value": 3.3333, "dataRange": {} } }
+    },
+    {
+      "id": "indicator-custom-precision",
+      "entryPoint": "IndicatorCalculator.calculate",
+      "dataset": "linear50Ohlcv",
+      "input": { "formula": "10 / 3", "precision": 2 },
+      "result": { "ok": true, "output": { "value": 3.33, "dataRange": {} } }
+    },
+    {
+      "id": "indicator-close-series",
+      "entryPoint": "IndicatorCalculator.calculate",
+      "dataset": "linear50Ohlcv",
+      "input": { "formula": "CLOSE('AAPL', '1d')" },
+      "result": {
+        "ok": true,
+        "output": {
+          "value": [100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149],
+          "dataRange": {
+            "AAPL": { "symbol": "AAPL", "from": "2025-01-01", "to": "2025-02-22", "bars": 50 }
+          }
+        }
+      }
+    },
+    {
+      "id": "indicator-latest-close-negative-index",
+      "entryPoint": "IndicatorCalculator.calculate",
+      "dataset": "linear50Ohlcv",
+      "input": { "formula": "CLOSE('AAPL', '1d')[-1]" },
+      "result": {
+        "ok": true,
+        "output": {
+          "value": 149,
+          "dataRange": {
+            "AAPL": { "symbol": "AAPL", "from": "2025-01-01", "to": "2025-02-22", "bars": 50 }
+          }
+        }
+      }
+    },
+    {
+      "id": "indicator-null-volume-normalized-to-zero",
+      "entryPoint": "IndicatorCalculator.calculate",
+      "dataset": "linear50Ohlcv",
+      "input": { "formula": "VOLUME('AAPL', '1d')[-2]" },
+      "result": {
+        "ok": true,
+        "output": {
+          "value": 0,
+          "dataRange": {
+            "AAPL": { "symbol": "AAPL", "from": "2025-01-01", "to": "2025-02-22", "bars": 50 }
+          }
+        }
+      }
+    },
+    {
+      "id": "indicator-sma",
+      "entryPoint": "IndicatorCalculator.calculate",
+      "dataset": "linear50Ohlcv",
+      "input": { "formula": "SMA(CLOSE('AAPL', '1d'), 10)" },
+      "result": {
+        "ok": true,
+        "output": {
+          "value": 144.5,
+          "dataRange": {
+            "AAPL": { "symbol": "AAPL", "from": "2025-01-01", "to": "2025-02-22", "bars": 50 }
+          }
+        }
+      }
+    },
+    {
+      "id": "indicator-ema",
+      "entryPoint": "IndicatorCalculator.calculate",
+      "dataset": "linear50Ohlcv",
+      "input": { "formula": "EMA(CLOSE('AAPL', '1d'), 10)" },
+      "result": {
+        "ok": true,
+        "output": {
+          "value": 144.5,
+          "dataRange": {
+            "AAPL": { "symbol": "AAPL", "from": "2025-01-01", "to": "2025-02-22", "bars": 50 }
+          }
+        }
+      }
+    },
+    {
+      "id": "indicator-stdev",
+      "entryPoint": "IndicatorCalculator.calculate",
+      "dataset": "linear50Ohlcv",
+      "input": { "formula": "STDEV(CLOSE('AAPL', '1d'))" },
+      "result": {
+        "ok": true,
+        "output": {
+          "value": 14.4309,
+          "dataRange": {
+            "AAPL": { "symbol": "AAPL", "from": "2025-01-01", "to": "2025-02-22", "bars": 50 }
+          }
+        }
+      }
+    },
+    {
+      "id": "indicator-max-minus-min",
+      "entryPoint": "IndicatorCalculator.calculate",
+      "dataset": "linear50Ohlcv",
+      "input": { "formula": "MAX(CLOSE('AAPL', '1d')) - MIN(CLOSE('AAPL', '1d'))" },
+      "result": {
+        "ok": true,
+        "output": {
+          "value": 49,
+          "dataRange": {
+            "AAPL": { "symbol": "AAPL", "from": "2025-01-01", "to": "2025-02-22", "bars": 50 }
+          }
+        }
+      }
+    },
+    {
+      "id": "indicator-rsi",
+      "entryPoint": "IndicatorCalculator.calculate",
+      "dataset": "linear50Ohlcv",
+      "input": { "formula": "RSI(CLOSE('AAPL', '1d'), 14)" },
+      "result": {
+        "ok": true,
+        "output": {
+          "value": 100,
+          "dataRange": {
+            "AAPL": { "symbol": "AAPL", "from": "2025-01-01", "to": "2025-02-22", "bars": 50 }
+          }
+        }
+      }
+    },
+    {
+      "id": "indicator-bbands",
+      "entryPoint": "IndicatorCalculator.calculate",
+      "dataset": "linear50Ohlcv",
+      "input": { "formula": "BBANDS(CLOSE('AAPL', '1d'), 20, 2)" },
+      "result": {
+        "ok": true,
+        "output": {
+          "value": { "upper": 151.0326, "middle": 139.5, "lower": 127.9674 },
+          "dataRange": {
+            "AAPL": { "symbol": "AAPL", "from": "2025-01-01", "to": "2025-02-22", "bars": 50 }
+          }
+        }
+      }
+    },
+    {
+      "id": "indicator-macd",
+      "entryPoint": "IndicatorCalculator.calculate",
+      "dataset": "linear50Ohlcv",
+      "input": { "formula": "MACD(CLOSE('AAPL', '1d'), 12, 26, 9)" },
+      "result": {
+        "ok": true,
+        "output": {
+          "value": { "macd": 7, "signal": 7, "histogram": 0 },
+          "dataRange": {
+            "AAPL": { "symbol": "AAPL", "from": "2025-01-01", "to": "2025-02-22", "bars": 50 }
+          }
+        }
+      }
+    },
+    {
+      "id": "indicator-atr",
+      "entryPoint": "IndicatorCalculator.calculate",
+      "dataset": "linear50Ohlcv",
+      "input": { "formula": "ATR(HIGH('AAPL', '1d'), LOW('AAPL', '1d'), CLOSE('AAPL', '1d'), 14)" },
+      "result": {
+        "ok": true,
+        "output": {
+          "value": 3,
+          "dataRange": {
+            "AAPL": { "symbol": "AAPL", "from": "2025-01-01", "to": "2025-02-22", "bars": 50 }
+          }
+        }
+      }
+    },
+    {
+      "id": "indicator-complex-price-deviation-percent",
+      "entryPoint": "IndicatorCalculator.calculate",
+      "dataset": "linear50Ohlcv",
+      "input": { "formula": "(CLOSE('AAPL', '1d')[-1] - SMA(CLOSE('AAPL', '1d'), 50)) / SMA(CLOSE('AAPL', '1d'), 50) * 100" },
+      "result": {
+        "ok": true,
+        "output": {
+          "value": 19.6787,
+          "dataRange": {
+            "AAPL": { "symbol": "AAPL", "from": "2025-01-01", "to": "2025-02-22", "bars": 50 }
+          }
+        }
+      }
+    },
+    {
+      "id": "indicator-empty-series",
+      "entryPoint": "IndicatorCalculator.calculate",
+      "dataset": "emptyOhlcv",
+      "input": { "formula": "CLOSE('EMPTY', '1d')" },
+      "result": {
+        "ok": true,
+        "output": {
+          "value": [],
+          "dataRange": {
+            "EMPTY": { "symbol": "EMPTY", "from": "", "to": "", "bars": 0 }
+          }
+        }
+      }
+    },
+    {
+      "id": "indicator-string-result-error",
+      "entryPoint": "IndicatorCalculator.calculate",
+      "dataset": "linear50Ohlcv",
+      "input": { "formula": "'AAPL'" },
+      "result": {
+        "ok": false,
+        "error": { "name": "Error", "message": "Invalid formula: result cannot be a string. Got: \"AAPL\"" }
+      }
+    },
+    {
+      "id": "indicator-unknown-function-error",
+      "entryPoint": "IndicatorCalculator.calculate",
+      "dataset": "linear50Ohlcv",
+      "input": { "formula": "FAKE('AAPL', '1d')" },
+      "result": {
+        "ok": false,
+        "error": { "name": "Error", "message": "Unknown function: FAKE" }
+      }
+    },
+    {
+      "id": "indicator-division-by-zero-error",
+      "entryPoint": "IndicatorCalculator.calculate",
+      "dataset": "linear50Ohlcv",
+      "input": { "formula": "10 / 0" },
+      "result": {
+        "ok": false,
+        "error": { "name": "Error", "message": "Division by zero" }
+      }
+    },
+    {
+      "id": "indicator-insufficient-sma-error",
+      "entryPoint": "IndicatorCalculator.calculate",
+      "dataset": "short3Ohlcv",
+      "input": { "formula": "SMA(CLOSE('SHORT', '1d'), 5)" },
+      "result": {
+        "ok": false,
+        "error": { "name": "Error", "message": "SMA requires at least 5 data points, got 3" }
+      }
+    },
+    {
+      "id": "indicator-binary-tracked-values-error",
+      "entryPoint": "IndicatorCalculator.calculate",
+      "dataset": "linear50Ohlcv",
+      "input": { "formula": "CLOSE('AAPL', '1d') + 1" },
+      "result": {
+        "ok": false,
+        "error": { "name": "Error", "message": "Binary operations require numbers, got TrackedValues and number" }
+      }
+    },
+    {
+      "id": "indicator-array-out-of-bounds-error",
+      "entryPoint": "IndicatorCalculator.calculate",
+      "dataset": "linear50Ohlcv",
+      "input": { "formula": "CLOSE('AAPL', '1d')[100]" },
+      "result": {
+        "ok": false,
+        "error": { "name": "Error", "message": "Array index out of bounds: 100" }
+      }
+    },
+    {
+      "id": "indicator-missing-closing-paren-error",
+      "entryPoint": "IndicatorCalculator.calculate",
+      "dataset": "linear50Ohlcv",
+      "input": { "formula": "SMA(CLOSE('AAPL', '1d'), 5" },
+      "result": {
+        "ok": false,
+        "error": { "name": "Error", "message": "Expected ')' at position 26" }
+      }
+    }
+  ],
+  "analysisToolShimCases": [
+    {
+      "id": "analysis-tool-equity-latest-close",
+      "entryPoint": "createAnalysisTools().calculateIndicator.execute",
+      "dataset": "toolShimUnsortedRawBars",
+      "input": { "asset": "equity", "formula": "CLOSE('AAPL', '1d')[-1]" },
+      "result": {
+        "ok": true,
+        "output": {
+          "value": 105,
+          "dataRange": {
+            "AAPL": { "symbol": "AAPL", "from": "2025-04-01", "to": "2025-04-04", "bars": 3 }
+          }
+        }
+      }
+    },
+    {
+      "id": "analysis-tool-crypto-null-volume-normalized-to-zero",
+      "entryPoint": "createAnalysisTools().calculateIndicator.execute",
+      "dataset": "toolShimUnsortedRawBars",
+      "input": { "asset": "crypto", "formula": "VOLUME('BTCUSD', '1d')[-1]" },
+      "result": {
+        "ok": true,
+        "output": {
+          "value": 0,
+          "dataRange": {
+            "BTCUSD": { "symbol": "BTCUSD", "from": "2025-04-01", "to": "2025-04-04", "bars": 3 }
+          }
+        }
+      }
+    },
+    {
+      "id": "analysis-tool-currency-sma-sorted-filtered-bars",
+      "entryPoint": "createAnalysisTools().calculateIndicator.execute",
+      "dataset": "toolShimUnsortedRawBars",
+      "input": { "asset": "currency", "formula": "SMA(CLOSE('EURUSD', '1d'), 3)", "precision": 4 },
+      "result": {
+        "ok": true,
+        "output": {
+          "value": 1.13,
+          "dataRange": {
+            "EURUSD": { "symbol": "EURUSD", "from": "2025-04-01", "to": "2025-04-04", "bars": 3 }
+          }
+        }
+      }
+    },
+    {
+      "id": "analysis-tool-commodity-latest-close",
+      "entryPoint": "createAnalysisTools().calculateIndicator.execute",
+      "dataset": "toolShimUnsortedRawBars",
+      "input": { "asset": "commodity", "formula": "CLOSE('gold', '1d')[-1]" },
+      "result": {
+        "ok": true,
+        "output": {
+          "value": 2050,
+          "dataRange": {
+            "gold": { "symbol": "gold", "from": "2025-04-01", "to": "2025-04-04", "bars": 3 }
+          }
+        }
+      }
+    }
+  ],
+  "thinkingCalculateCases": [
+    {
+      "id": "thinking-arithmetic-precedence",
+      "entryPoint": "calculate(expression)",
+      "input": { "expression": "1 + 2 * 3" },
+      "result": { "ok": true, "output": 7 }
+    },
+    {
+      "id": "thinking-parentheses",
+      "entryPoint": "calculate(expression)",
+      "input": { "expression": "(1 + 2) * 3" },
+      "result": { "ok": true, "output": 9 }
+    },
+    {
+      "id": "thinking-default-rounding",
+      "entryPoint": "calculate(expression)",
+      "input": { "expression": "10 / 3" },
+      "result": { "ok": true, "output": 3.3333 }
+    },
+    {
+      "id": "thinking-floating-point-normalization",
+      "entryPoint": "calculate(expression)",
+      "input": { "expression": "0.1 + 0.2" },
+      "result": { "ok": true, "output": 0.3 }
+    },
+    {
+      "id": "thinking-negative-result",
+      "entryPoint": "calculate(expression)",
+      "input": { "expression": "1 - 5" },
+      "result": { "ok": true, "output": -4 }
+    },
+    {
+      "id": "thinking-invalid-identifier-error",
+      "entryPoint": "calculate(expression)",
+      "input": { "expression": "Math.PI" },
+      "result": {
+        "ok": false,
+        "error": { "name": "Error", "message": "Calculation error: Invalid expression: only numbers and basic operators allowed" }
+      }
+    },
+    {
+      "id": "thinking-injection-error",
+      "entryPoint": "calculate(expression)",
+      "input": { "expression": "alert(1)" },
+      "result": {
+        "ok": false,
+        "error": { "name": "Error", "message": "Calculation error: Invalid expression: only numbers and basic operators allowed" }
+      }
+    },
+    {
+      "id": "thinking-non-finite-error",
+      "entryPoint": "calculate(expression)",
+      "input": { "expression": "1 / 0" },
+      "result": {
+        "ok": false,
+        "error": { "name": "Error", "message": "Calculation error: Invalid calculation result" }
+      }
+    }
+  ],
+  "thinkingToolShimCases": [
+    {
+      "id": "thinking-tool-valid-expression",
+      "entryPoint": "createThinkingTools().calculate.execute",
+      "input": { "expression": "(1000 * 0.1) / 2" },
+      "result": { "ok": true, "output": 50 }
+    },
+    {
+      "id": "thinking-tool-invalid-expression-error",
+      "entryPoint": "createThinkingTools().calculate.execute",
+      "input": { "expression": "console.log(1)" },
+      "result": {
+        "ok": false,
+        "error": { "name": "Error", "message": "Calculation error: Invalid expression: only numbers and basic operators allowed" }
+      }
+    }
+  ]
+}
