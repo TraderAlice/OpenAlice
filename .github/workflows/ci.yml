@@ -20,7 +20,21 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - name: Install Rust toolchain (pinned by rust-toolchain.toml)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.95.0
+          components: rustfmt, clippy
+
+      - run: cargo --version && rustc --version
+
       - run: pnpm install --frozen-lockfile
+
+      - run: cargo fmt --all --check
+
+      - run: cargo clippy --workspace -- -D warnings
+
+      - run: cargo test --workspace
 
       - run: pnpm build
 

@@ -1,0 +1,17 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/analysis-core",
+    "packages/node-bindings/analysis-core",
+]
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.95.0"
+license = "Apache-2.0"
+publish = false
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1

@@ -1,0 +1,17 @@
+{
+  "name": "@openalice/node-bindings-analysis-core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "OpenAlice analysis_core Node-API binding (bootstrap shell). The napi-rs bridge, DTO conversion, and platform .node artifact land under a separate scoped issue per docs/autonomous-refactor/adr/ADR-003-binding-strategy.md.",
+  "license": "Apache-2.0",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node -e \"require('./index.js').bootstrapHealthcheck()\""
+  }
+}
