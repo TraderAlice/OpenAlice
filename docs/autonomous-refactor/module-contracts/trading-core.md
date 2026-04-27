@@ -177,8 +177,10 @@ existing OpenAlice public surface.
 ## Feature Flag Expectation
 
 - The Rust path must be guarded by `OPENALICE_RUST_TRADING_CORE=0|1`.
-- Default behavior remains the legacy TypeScript path until parity, rollback,
-  QA, trading safety, and release gates pass.
+- `OPENALICE_RUST_TRADING_CORE=0` is the default legacy TypeScript path until
+  parity, rollback, QA, trading safety, and release gates pass.
+- `OPENALICE_RUST_TRADING_CORE=1` is allowed only for approved opt-in/canary
+  Rust execution during parity validation and staged rollout.
 - The flag must be reversible without data migration.
 - Tests must exercise both legacy and Rust paths while the flag exists.
 - Rollout must support: disabled, opt-in/canary, staged enablement, and default
@@ -219,7 +221,7 @@ Future implementation issues must provide evidence for:
 If the Rust migration causes parity failure, precision regression, performance
 collapse, or operational instability:
 
-1. Disable `OPENALICE_RUST_TRADING_CORE`.
+1. Set `OPENALICE_RUST_TRADING_CORE=0`.
 2. Route all trading-core behavior back to the legacy TypeScript path.
 3. Preserve the failing fixture, command output, and benchmark or regression
    evidence.
