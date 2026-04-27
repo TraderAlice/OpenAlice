@@ -1,0 +1,11 @@
+command	exit_code	duration_sec
+pwd	0	0
+git rev-parse --show-toplevel	0	0
+git status --short	0	0
+node -v	0	0
+pnpm -v	0	0
+pnpm install	0	7
+git status --short	0	0
+pnpm build	0	10
+pnpm test	0	6
+pnpm test:e2e	1	22
