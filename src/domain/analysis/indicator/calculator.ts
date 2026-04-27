@@ -40,8 +40,8 @@ export interface CalculateOutput {
  * Strict OPENALICE_RUST_ANALYSIS flag parser per ADR-002.
  *
  * Only the literal string "1" (after trimming whitespace) enables the
- * Rust parser. Every other state — unset, empty string, "0", "true",
- * "yes", or any other value — must use the legacy TypeScript path.
+ * Rust parser. Every other state - unset, empty string, "0", "true",
+ * "yes", or any other value - must use the legacy TypeScript path.
  */
 function shouldUseRustParser(): boolean {
   const raw = process.env.OPENALICE_RUST_ANALYSIS

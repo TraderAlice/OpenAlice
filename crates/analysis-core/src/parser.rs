@@ -291,7 +291,7 @@ impl<'a> Parser<'a> {
                 break;
             }
         }
-        match num_str.parse::<f64>() {
+        match parse_legacy_float_prefix(&num_str) {
             Ok(value) => Ok(AstNode::Number { value }),
             Err(_) => Err(ParseError::new(
                 format!("Unexpected character '{}' at position {}", num_str, start),
@@ -332,6 +332,33 @@ impl<'a> Parser<'a> {
     }
 }
 
+fn parse_legacy_float_prefix(num_str: &str) -> Result<f64, std::num::ParseFloatError> {
+    let mut end = 0;
+    let bytes = num_str.as_bytes();
+
+    if bytes.get(end) == Some(&b'-') {
+        end += 1;
+    }
+
+    let integer_start = end;
+    while bytes.get(end).is_some_and(u8::is_ascii_digit) {
+        end += 1;
+    }
+    let mut has_digit = end > integer_start;
+
+    if bytes.get(end) == Some(&b'.') {
+        end += 1;
+        let fraction_start = end;
+        while bytes.get(end).is_some_and(u8::is_ascii_digit) {
+            end += 1;
+        }
+        has_digit = has_digit || end > fraction_start;
+    }
+
+    let parse_end = if has_digit { end } else { num_str.len() };
+    num_str[..parse_end].parse::<f64>()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -365,6 +392,18 @@ mod tests {
         assert_eq!(
             parse_json("-.5"),
             json!({ "type": "number", "value": -0.5 })
+        );
+    }
+
+    #[test]
+    fn parses_legacy_parse_float_prefix_for_multiple_dots() {
+        assert_eq!(
+            parse_json("1.2.3"),
+            json!({ "type": "number", "value": 1.2 })
+        );
+        assert_eq!(
+            parse_json("1..2"),
+            json!({ "type": "number", "value": 1.0 })
         );
     }
 

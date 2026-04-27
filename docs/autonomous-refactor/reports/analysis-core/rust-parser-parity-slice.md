@@ -95,23 +95,20 @@ path import.
   (expected message `Expected ')' at position 26`) is locked by both
   the Rust unit suite and the new TS parity spec.
 
-### Documented divergences (parser only)
+### Compatibility notes (parser only)
 
-- **Numeric literal corner case `parseFloat('1.2.3')`.** The legacy
-  parser accepts the chars `1.2.3` and runs them through
-  `parseFloat`, which truncates at the second dot and returns `1.2`.
-  The Rust parser, by contrast, accumulates `1.2.3` and rejects it via
-  `f64::from_str` with an `Unexpected character` error. No legacy
-  fixture exercises this edge case, and the legacy unit suite does not
-  pin the truncation behavior. This is recorded as a deliberate parser
-  divergence; eligible for follow-up only if a new fixture or runtime
-  observation locks the truncation semantics.
+- **Numeric literal multiple-dot compatibility.** The legacy parser
+  consumes all consecutive digit / dot characters and then runs the
+  accumulated string through `parseFloat`, so formulas such as `1.2.3`
+  evaluate as `1.2` and `1..2` evaluates as `1`. The Rust parser now
+  preserves that legacy prefix behavior for finite numeric values; the
+  Rust unit suite locks both cases.
 - **Identifier without call.** Bare identifiers (e.g. `AAPL`) raise
   `Unknown identifier 'AAPL' at position 4` in the Rust parser, matching
   the legacy parser. No fixture currently asserts this exact message;
   the new Rust unit suite locks it as a regression-prevention boundary.
 
-No other parser divergences were observed by the cross-spec runs.
+No parser divergences were observed by the cross-spec runs.
 
 ## Binding strategy
 
@@ -195,17 +192,16 @@ request behavior because every call is its own check). The TS
 evaluator remains authoritative regardless of flag state.
 
 The flag does not change tool names, input schemas, output schemas,
-precision behavior, dataRange semantics, or error surfaces (with the
-narrow `parseFloat('1.2.3')` divergence documented above as a
-non-fixture-locked corner case).
+precision behavior, dataRange semantics, or error surfaces.
 
 ## Tests
 
 ### Rust unit tests (parser)
 
-`crates/analysis-core/src/parser.rs` ships 25 parser unit tests covering:
+`crates/analysis-core/src/parser.rs` ships 26 parser unit tests covering:
 
-- integer, decimal, and negative numeric literals (incl. `-.5`)
+- integer, decimal, negative, and legacy multiple-dot numeric literals
+  (incl. `-.5`, `1.2.3`, and `1..2`)
 - single- and double-quoted string literals
 - arithmetic precedence (`+`/`-` vs. `*`/`/`)
 - parenthesized and nested-parenthesized expressions
@@ -219,9 +215,9 @@ non-fixture-locked corner case).
 - camelCase JSON discriminator tags for compound nodes (regression
   guard for the TS evaluator handoff)
 
-A 26th test (the inherited `bootstrap_healthcheck`) lives at the crate
+A 27th test (the inherited `bootstrap_healthcheck`) lives at the crate
 root. The binding crate retains 2 tests (healthcheck + parser
-re-export). Total: **28 Rust tests; all pass.**
+re-export). Total: **29 Rust tests; all pass.**
 
 ### TypeScript parity tests
 
@@ -268,7 +264,7 @@ $ cargo clippy --workspace -- -D warnings
     Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.03s
 
 $ cargo test --workspace
-test result: ok. 26 passed; 0 failed; ...   (analysis_core lib unit tests)
+test result: ok. 27 passed; 0 failed; ...   (analysis_core lib unit tests)
 test result: ok.  2 passed; 0 failed; ...   (analysis_core_node_binding lib)
 test result: ok.  0 passed; 0 failed; ...   (binary suite has no in-source tests)
 (no doctests; all suites green)
@@ -286,8 +282,8 @@ Lockfile is up to date, resolution step is skipped
 Already up to date
 
 $ pnpm build
-ESM ⚡️ Build success in 56ms
-DTS ⚡️ Build success in 3027ms
+ESM Build success in 56ms
+DTS Build success in 3027ms
 
 $ pnpm test
 Test Files  59 passed (59)
