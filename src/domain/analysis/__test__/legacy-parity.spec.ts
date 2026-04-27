@@ -9,8 +9,16 @@
  * Run as a TypeScript-only suite with OPENALICE_RUST_ANALYSIS pinned to "0", which forces
  * the legacy code path per docs/autonomous-refactor/module-contracts/analysis-core.md.
  */
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { IndicatorCalculator } from '../indicator/calculator'
+import type {
+  HistoricalDataResult,
+  IndicatorContext,
+  OhlcvData,
+} from '../indicator/types'
 import { createAnalysisTools } from '@/tool/analysis'
 import type {
   CommodityClientLike,
@@ -18,12 +26,92 @@ import type {
   CurrencyClientLike,
   EquityClientLike,
 } from '@/domain/market-data/client/types'
-import {
-  buildContextForDataset,
-  loadLegacyFixture,
-  type FixtureCase,
-  type FixtureFile,
-} from './legacy-fixture-loader'
+
+interface FixtureCase {
+  id: string
+  entryPoint: string
+  dataset?: string
+  input: Record<string, unknown>
+  result:
+    | { ok: true; output: unknown }
+    | { ok: false; error: { name: string; message: string } }
+}
+
+interface FixtureFile {
+  datasets: {
+    linear50Ohlcv: { metaForSymbolAAPL: { symbol: string; from: string; to: string; bars: number } }
+    short3Ohlcv: { bars: OhlcvData[] }
+    emptyOhlcv: { bars: OhlcvData[] }
+    toolShimUnsortedRawBars: {
+      byAsset: Record<string, Array<{ date: string; open: number | null; high: number; low: number; close: number; volume: number | null }>>
+    }
+  }
+  indicatorCalculatorCases: FixtureCase[]
+  analysisToolShimCases: FixtureCase[]
+}
+
+function loadLegacyFixture(): FixtureFile {
+  const here = dirname(fileURLToPath(import.meta.url))
+  const repoRoot = resolve(here, '..', '..', '..', '..')
+  const path = resolve(
+    repoRoot,
+    'docs/autonomous-refactor/fixtures/analysis-core/legacy-calculation-fixtures.json',
+  )
+  return JSON.parse(readFileSync(path, 'utf8')) as FixtureFile
+}
+
+function buildLinear50Ohlcv(): OhlcvData[] {
+  return Array.from({ length: 50 }, (_, i) => ({
+    date: `2025-${String(Math.floor(i / 28) + 1).padStart(2, '0')}-${String((i % 28) + 1).padStart(2, '0')}`,
+    open: 100 + i,
+    high: 102 + i,
+    low: 99 + i,
+    close: 100 + i,
+    volume: i === 48 ? null : 1000 + i * 10,
+    vwap: null,
+  }))
+}
+
+function buildContextForDataset(
+  dataset: 'linear50Ohlcv' | 'short3Ohlcv' | 'emptyOhlcv',
+  fixture: FixtureFile,
+): IndicatorContext {
+  switch (dataset) {
+    case 'linear50Ohlcv': {
+      const data = buildLinear50Ohlcv()
+      const meta = fixture.datasets.linear50Ohlcv.metaForSymbolAAPL
+      return {
+        getHistoricalData: async (symbol: string): Promise<HistoricalDataResult> => ({
+          data,
+          meta: { ...meta, symbol },
+        }),
+      }
+    }
+    case 'short3Ohlcv': {
+      const data = fixture.datasets.short3Ohlcv.bars
+      return {
+        getHistoricalData: async (symbol: string): Promise<HistoricalDataResult> => ({
+          data,
+          meta: {
+            symbol,
+            from: data[0].date,
+            to: data[data.length - 1].date,
+            bars: data.length,
+          },
+        }),
+      }
+    }
+    case 'emptyOhlcv': {
+      const data = fixture.datasets.emptyOhlcv.bars
+      return {
+        getHistoricalData: async (symbol: string): Promise<HistoricalDataResult> => ({
+          data,
+          meta: { symbol, from: '', to: '', bars: 0 },
+        }),
+      }
+    }
+  }
+}
 
 const fixture: FixtureFile = loadLegacyFixture()
 

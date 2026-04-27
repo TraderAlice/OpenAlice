@@ -159,12 +159,15 @@ up by the existing `vitest.config.ts` `node` project (`include:
   commodity). Other interface methods throw, so a routing regression in
   `src/tool/analysis.ts` would surface immediately.
 
-Files added (test-only, inside the issue's allowed paths):
+Files added (test-only `*.spec.ts`, inside the issue's allowed paths):
 
-- `src/domain/analysis/__test__/legacy-fixture-loader.ts`
 - `src/domain/analysis/__test__/legacy-parity.spec.ts`
 - `src/domain/thinking/__test__/legacy-parity.spec.ts`
 - `docs/autonomous-refactor/reports/analysis-core/entrypoint-parity-harness.md` (this report)
+
+The fixture loader and OHLCV dataset builder live inline in
+`legacy-parity.spec.ts` to keep every file under `__test__/` a `*.spec.ts`,
+matching the issue's allowed-files policy.
 
 No production source, package, lockfile, dependency, or CI files were
 modified. No Rust crates, node-bindings, or Cargo files were created.
