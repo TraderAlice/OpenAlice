@@ -106,6 +106,10 @@ export interface IolCotizacion {
   moneda?: string
 }
 
+export type IolCotizacionesResponse = unknown
+export type IolCotizacionInstrumentosResponse = unknown
+export type IolCotizacionPanelesResponse = unknown
+
 export interface IolOperacion {
   numero: number
   fechaOrden: string

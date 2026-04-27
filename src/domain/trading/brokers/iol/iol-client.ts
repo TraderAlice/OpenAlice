@@ -12,6 +12,9 @@ import type {
   IolEstadoCuenta,
   IolPortafolio,
   IolCotizacion,
+  IolCotizacionesResponse,
+  IolCotizacionInstrumentosResponse,
+  IolCotizacionPanelesResponse,
   IolOperacion,
   IolPlaceOrderBody,
   IolPlaceOrderResponse,
@@ -166,6 +169,18 @@ export class IolApiClient {
 
   getCotizacion(market: string, symbol: string): Promise<IolCotizacion> {
     return this.request('GET', `/api/v2/${encodeURIComponent(market)}/Titulos/${encodeURIComponent(symbol)}/Cotizacion`)
+  }
+
+  getCotizaciones(instrumento: string, panel: string, pais = 'argentina'): Promise<IolCotizacionesResponse> {
+    return this.request('GET', `/api/v2/Cotizaciones/${encodeURIComponent(instrumento)}/${encodeURIComponent(panel)}/${encodeURIComponent(pais)}`)
+  }
+
+  getCotizacionInstrumentos(pais = 'argentina'): Promise<IolCotizacionInstrumentosResponse> {
+    return this.request('GET', `/api/v2/${encodeURIComponent(pais)}/Titulos/Cotizacion/Instrumentos`)
+  }
+
+  getCotizacionPaneles(instrumento: string, pais = 'argentina'): Promise<IolCotizacionPanelesResponse> {
+    return this.request('GET', `/api/v2/${encodeURIComponent(pais)}/Titulos/Cotizacion/Paneles/${encodeURIComponent(instrumento)}`)
   }
 
   comprar(body: IolPlaceOrderBody): Promise<IolPlaceOrderResponse> {

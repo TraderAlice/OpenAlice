@@ -5,20 +5,22 @@
  * provider config. Used both by the AI tool (marketSearchForResearch) and the
  * HTTP route (/api/market/search) — both surfaces must return the same thing.
  *
- * equity    — SymbolIndex (SEC/TMX local cache, regex) + yfinance fuzzy search
- * commodity — CommodityCatalog (canonical catalog, ~25 items)
- * crypto    — cryptoClient.search on yfinance (online fuzzy)
- * currency  — currencyClient.search on yfinance (online fuzzy, XXXUSD filter)
+ * equity       — SymbolIndex (SEC/TMX local cache, regex) + yfinance fuzzy search
+ * fixed income — broker/API-backed bond discovery where configured
+ * commodity    — CommodityCatalog (canonical catalog, ~25 items)
+ * crypto       — cryptoClient.search on yfinance (online fuzzy)
+ * currency     — currencyClient.search on yfinance (online fuzzy, XXXUSD filter)
  */
 import type { SymbolIndex } from './equity/symbol-index.js'
 import type { CommodityCatalog } from './commodity/commodity-catalog.js'
-import type { EquityClientLike, CryptoClientLike, CurrencyClientLike } from './client/types.js'
+import type { EquityClientLike, CryptoClientLike, CurrencyClientLike, FixedIncomeClientLike } from './client/types.js'
 
-export type AssetClass = 'equity' | 'crypto' | 'currency' | 'commodity'
+export type AssetClass = 'equity' | 'fixed_income' | 'crypto' | 'currency' | 'commodity'
 
 export interface MarketSearchDeps {
   symbolIndex: SymbolIndex
   equityClient: EquityClientLike
+  fixedIncomeClient: FixedIncomeClientLike
   cryptoClient: CryptoClientLike
   currencyClient: CurrencyClientLike
   commodityCatalog: CommodityCatalog
@@ -83,10 +85,15 @@ export async function aggregateSymbolSearch(
     .search(q, limit)
     .map((r) => ({ ...r, assetClass: 'commodity' as const }))
 
-  const [equitySettled, cryptoSettled, currencySettled] = await Promise.allSettled([
+  const [equitySettled, fixedIncomeSettled, cryptoSettled, currencySettled] = await Promise.allSettled([
     deps.equityClient.search({
       query: q,
       provider: 'yfinance',
+      limit,
+      ...(marketFocus && { market: marketFocus }),
+    }),
+    deps.fixedIncomeClient.search({
+      query: q,
       limit,
       ...(marketFocus && { market: marketFocus }),
     }),
@@ -106,6 +113,10 @@ export async function aggregateSymbolSearch(
     (r) => ({ ...r, assetClass: 'crypto' as const }),
   )
 
+  const fixedIncomeResults = (fixedIncomeSettled.status === 'fulfilled' ? fixedIncomeSettled.value : []).map(
+    (r) => ({ ...r, assetClass: 'fixed_income' as const }),
+  )
+
   const currencyResults = (currencySettled.status === 'fulfilled' ? currencySettled.value : [])
     .filter((r) => {
       const sym = (r as Record<string, unknown>).symbol as string | undefined
@@ -115,6 +126,7 @@ export async function aggregateSymbolSearch(
 
   const all: MarketSearchResult[] = [
     ...dedupeBySymbol([...onlineEquityResults, ...localEquityResults]).slice(0, limit),
+    ...dedupeBySymbol(fixedIncomeResults).slice(0, limit),
     ...cryptoResults,
     ...currencyResults,
     ...commodityResults,

@@ -131,6 +131,31 @@ describe('IolApiClient', () => {
       }),
     }))
   })
+
+  it('builds quote-panel discovery endpoint paths', async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({
+        access_token: 'access-1',
+        refresh_token: 'refresh-1',
+        token_type: 'bearer',
+        expires_in: 3600,
+      }))
+      .mockResolvedValueOnce(jsonResponse({ titulos: [] }))
+      .mockResolvedValueOnce(jsonResponse({ instrumentos: [] }))
+      .mockResolvedValueOnce(jsonResponse({ paneles: [] }))
+
+    const client = new IolApiClient('user', 'pass', 'https://iol.test')
+    await client.getCotizaciones('bonos', 'todos', 'argentina')
+    await client.getCotizacionInstrumentos('argentina')
+    await client.getCotizacionPaneles('bonos', 'argentina')
+
+    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://iol.test/api/v2/Cotizaciones/bonos/todos/argentina', expect.objectContaining({
+      method: 'GET',
+      headers: expect.objectContaining({ Authorization: 'Bearer access-1' }),
+    }))
+    expect(fetchMock).toHaveBeenNthCalledWith(3, 'https://iol.test/api/v2/argentina/Titulos/Cotizacion/Instrumentos', expect.any(Object))
+    expect(fetchMock).toHaveBeenNthCalledWith(4, 'https://iol.test/api/v2/argentina/Titulos/Cotizacion/Paneles/bonos', expect.any(Object))
+  })
 })
 
 describe('IolBroker', () => {

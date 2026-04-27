@@ -17,6 +17,7 @@ import type { BrainExportState } from './domain/brain/index.js'
 import { createBrowserTools } from './tool/browser.js'
 import { SymbolIndex } from './domain/market-data/equity/index.js'
 import { CommodityCatalog } from './domain/market-data/commodity/index.js'
+import { createIolFixedIncomeClientFromAccounts } from './domain/market-data/fixed-income/index.js'
 import { createEquityTools } from './tool/equity.js'
 import { getSDKExecutor, buildRouteMap, SDKEquityClient, SDKCryptoClient, SDKCurrencyClient, SDKEtfClient, SDKIndexClient, SDKDerivativesClient, SDKCommodityClient } from './domain/market-data/client/typebb/index.js'
 import type { EquityClientLike, CryptoClientLike, CurrencyClientLike, EtfClientLike, IndexClientLike, DerivativesClientLike, CommodityClientLike } from './domain/market-data/client/types.js'
@@ -213,7 +214,8 @@ async function main() {
   const commodityCatalog = new CommodityCatalog()
   commodityCatalog.load()
 
-  const marketSearch = { symbolIndex, equityClient, cryptoClient, currencyClient, commodityCatalog }
+  const fixedIncomeClient = createIolFixedIncomeClientFromAccounts(accountConfigs)
+  const marketSearch = { symbolIndex, equityClient, fixedIncomeClient, cryptoClient, currencyClient, commodityCatalog }
 
   // ==================== Tool Registration ====================
 

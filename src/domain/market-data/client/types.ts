@@ -82,6 +82,26 @@ export interface CommodityClientLike {
   getSpotPrices(params: Record<string, unknown>): Promise<CommoditySpotPriceData[]>
 }
 
+export interface FixedIncomeSearchData {
+  symbol: string
+  name?: string | null
+  market?: string | null
+  country?: string | null
+  exchange?: string | null
+  issuer?: string | null
+  currency?: string | null
+  maturityDate?: string | null
+  coupon?: number | null
+  instrumentType?: string | null
+  isin?: string | null
+  source?: string | null
+  [key: string]: unknown
+}
+
+export interface FixedIncomeClientLike {
+  search(params: Record<string, unknown>): Promise<FixedIncomeSearchData[]>
+}
+
 export interface DerivativesClientLike {
   getFuturesHistorical(params: Record<string, unknown>): Promise<FuturesHistoricalData[]>
   getFuturesCurve(params: Record<string, unknown>): Promise<FuturesCurveData[]>
