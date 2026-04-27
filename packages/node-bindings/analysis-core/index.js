@@ -1,4 +1,4 @@
-// OpenAlice analysis_core Node-API binding — bootstrap shell.
+// OpenAlice analysis_core Node-API binding - bootstrap shell.
 //
 // The napi-rs bridge and platform `.node` artifact land under a separate
 // scoped issue (see docs/autonomous-refactor/adr/ADR-003-binding-strategy.md).

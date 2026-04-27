@@ -1,4 +1,4 @@
-//! OpenAlice `analysis_core` crate — bootstrap shell.
+//! OpenAlice `analysis_core` crate - bootstrap shell.
 //!
 //! This crate exists so the Rust workspace, toolchain pin, and CI checks can
 //! be wired up before any Phase 2 implementation begins. It must not contain

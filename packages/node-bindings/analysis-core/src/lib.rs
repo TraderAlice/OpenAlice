@@ -1,4 +1,4 @@
-//! OpenAlice `analysis_core` Node-API binding — bootstrap shell.
+//! OpenAlice `analysis_core` Node-API binding - bootstrap shell.
 //!
 //! The actual `napi-rs` bridge, DTO conversion, and `cdylib` `.node` build
 //! land under a separate scoped implementation issue (see

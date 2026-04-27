@@ -1,4 +1,4 @@
-# Adapter & Tooling Bootstrap Report — analysis_core
+# Adapter & Tooling Bootstrap Report - analysis_core
 
 - Issue: [OPE-15](/OPE/issues/OPE-15)
 - Owner: Adapter & Tooling Engineer (delegated to CTO / Program Orchestrator for this run)
@@ -55,11 +55,11 @@ packages/
 pnpm-workspace.yaml                              # adds packages/node-bindings/* glob
 ```
 
-Constraints honored from [ADR-003](../../adr/ADR-003-binding-strategy.md) §"Package layout":
+Constraints honored from [ADR-003](../../adr/ADR-003-binding-strategy.md) section "Package layout":
 
 - The pure crate at `crates/analysis-core/` does not reference `napi`, `neon`, or `node` types.
 - Only `packages/node-bindings/analysis-core/` is allowed to know about Node-API; for bootstrap it ships a `bootstrap_healthcheck` JS export and a stable TypeScript declaration so the workspace shape can be exercised without a committed native artifact.
-- No `.node` artifact is built or committed. The actual `napi-rs` bridge, DTO conversion, and platform-specific binary distribution land under a separate scoped issue per [ADR-003](../../adr/ADR-003-binding-strategy.md) §"Build, distribution, and CI" and the Rejected-alternatives discussion of prebuilt binaries.
+- No `.node` artifact is built or committed. The actual `napi-rs` bridge, DTO conversion, and platform-specific binary distribution land under a separate scoped issue per [ADR-003](../../adr/ADR-003-binding-strategy.md) section "Build, distribution, and CI" and the Rejected-alternatives discussion of prebuilt binaries.
 
 Constraints honored from this issue's allowed-files list:
 
@@ -76,14 +76,14 @@ All commands run from repo root on `aarch64-apple-darwin`. Output summarized; ra
 | `pwd` | `/Users/opcw05/newtest/001/OpenAlice` |
 | `git rev-parse --show-toplevel` | `/Users/opcw05/newtest/001/OpenAlice` |
 | `git status --short` (pre-commit) | new Cargo workspace files + 3 modified files in allowed list |
-| `git log --oneline -10` | latest is `74b34f6 test: inline analysis_core fixture loader …` |
+| `git log --oneline -10` | latest is `74b34f6 test: inline analysis_core fixture loader ...` |
 | `node -v` | `v25.9.0` |
 | `pnpm -v` | `9.15.4` |
 | `which rustc cargo rustup` (pre-install) | not found |
 | `rustc --version` (post-install) | `rustc 1.95.0 (59807616e 2026-04-14)` |
 | `cargo --version` (post-install) | `cargo 1.95.0 (f2d3ce0bd 2026-03-21)` |
 | `rustup --version` (post-install) | `rustup 1.29.0 (28d1352db 2026-03-05)` |
-| `pnpm install` | `Lockfile is up to date, resolution step is skipped — Already up to date` |
+| `pnpm install` | `Lockfile is up to date, resolution step is skipped - Already up to date` |
 | `cargo metadata --no-deps >/dev/null` | exit 0 (warns about implicit `--format-version`; informational only) |
 | `cargo fmt --all --check` | exit 0 |
 | `cargo clippy --workspace -- -D warnings` | exit 0 |
