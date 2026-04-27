@@ -1,0 +1,451 @@
+{
+  "fixtureVersion": 1,
+  "fixture": "trading-core/guard-outcomes",
+  "module": "trading_core",
+  "legacyRuntime": "TypeScript",
+  "capturedAt": "2026-01-02T03:04:05.678Z",
+  "fixedClock": "2026-01-02T03:04:05.678Z",
+  "capturedBy": "docs/autonomous-refactor/fixtures/trading-core/capture-trading-core-fixtures.ts",
+  "sourcePaths": [
+    "src/domain/trading/git/**",
+    "src/domain/trading/guards/**",
+    "src/domain/trading/snapshot/**",
+    "src/domain/trading/account-manager.ts",
+    "src/domain/trading/UnifiedTradingAccount.ts",
+    "src/domain/trading/brokers/mock/**"
+  ],
+  "cases": {
+    "directGuards": [
+      {
+        "name": "max-position-size allow below limit",
+        "guard": "max-position-size",
+        "input": {
+          "operation": {
+            "action": "placeOrder",
+            "contract": {
+              "aliceId": "mock-paper|AAPL",
+              "symbol": "AAPL",
+              "secType": "STK",
+              "exchange": "MOCK",
+              "currency": "USD"
+            },
+            "order": {
+              "action": "BUY",
+              "orderType": "MKT",
+              "tif": "",
+              "ocaGroup": "",
+              "totalQuantity": {
+                "value": "10",
+                "valueType": "Decimal",
+                "jsonType": "string"
+              },
+              "cashQty": {
+                "value": "20000",
+                "valueType": "Decimal",
+                "jsonType": "string"
+              }
+            }
+          },
+          "positions": [],
+          "account": {
+            "values": {
+              "baseCurrency": "USD",
+              "netLiquidation": "100000",
+              "totalCashValue": "100000",
+              "unrealizedPnL": "0",
+              "realizedPnL": "0"
+            },
+            "fieldTypes": {
+              "baseCurrency": "string",
+              "netLiquidation": "string",
+              "totalCashValue": "string",
+              "unrealizedPnL": "string",
+              "realizedPnL": "string"
+            }
+          }
+        },
+        "outcome": {
+          "allowed": true,
+          "rejection": null,
+          "rejectionType": "null"
+        }
+      },
+      {
+        "name": "max-position-size reject above limit",
+        "guard": "max-position-size",
+        "input": {
+          "operation": {
+            "action": "placeOrder",
+            "contract": {
+              "aliceId": "mock-paper|AAPL",
+              "symbol": "AAPL",
+              "secType": "STK",
+              "exchange": "MOCK",
+              "currency": "USD"
+            },
+            "order": {
+              "action": "BUY",
+              "orderType": "MKT",
+              "tif": "",
+              "ocaGroup": "",
+              "totalQuantity": {
+                "value": "10",
+                "valueType": "Decimal",
+                "jsonType": "string"
+              },
+              "cashQty": {
+                "value": "30000",
+                "valueType": "Decimal",
+                "jsonType": "string"
+              }
+            }
+          },
+          "positions": [],
+          "account": {
+            "values": {
+              "baseCurrency": "USD",
+              "netLiquidation": "100000",
+              "totalCashValue": "100000",
+              "unrealizedPnL": "0",
+              "realizedPnL": "0"
+            },
+            "fieldTypes": {
+              "baseCurrency": "string",
+              "netLiquidation": "string",
+              "totalCashValue": "string",
+              "unrealizedPnL": "string",
+              "realizedPnL": "string"
+            }
+          }
+        },
+        "outcome": {
+          "allowed": false,
+          "rejection": "Position for AAPL would be 30.0% of equity (limit: 25%)",
+          "rejectionType": "string"
+        }
+      },
+      {
+        "name": "max-position-size reject existing-plus-new position",
+        "guard": "max-position-size",
+        "input": {
+          "operation": {
+            "action": "placeOrder",
+            "contract": {
+              "aliceId": "mock-paper|AAPL",
+              "symbol": "AAPL",
+              "secType": "STK",
+              "exchange": "MOCK",
+              "currency": "USD"
+            },
+            "order": {
+              "action": "BUY",
+              "orderType": "MKT",
+              "tif": "",
+              "ocaGroup": "",
+              "totalQuantity": {
+                "value": "10",
+                "valueType": "Decimal",
+                "jsonType": "string"
+              },
+              "cashQty": {
+                "value": "10000",
+                "valueType": "Decimal",
+                "jsonType": "string"
+              }
+            }
+          },
+          "positions": [
+            {
+              "contract": {
+                "aliceId": "mock-paper|AAPL",
+                "symbol": "AAPL",
+                "secType": "STK",
+                "exchange": "MOCK",
+                "currency": "USD"
+              },
+              "currency": "USD",
+              "side": "long",
+              "quantity": {
+                "value": "10",
+                "valueType": "Decimal",
+                "jsonType": "string"
+              },
+              "avgCost": "150",
+              "marketPrice": "160",
+              "marketValue": "20000",
+              "unrealizedPnL": "100",
+              "realizedPnL": "0",
+              "fieldTypes": {
+                "avgCost": "string",
+                "marketPrice": "string",
+                "marketValue": "string",
+                "unrealizedPnL": "string",
+                "realizedPnL": "string"
+              }
+            }
+          ],
+          "account": {
+            "values": {
+              "baseCurrency": "USD",
+              "netLiquidation": "100000",
+              "totalCashValue": "100000",
+              "unrealizedPnL": "0",
+              "realizedPnL": "0"
+            },
+            "fieldTypes": {
+              "baseCurrency": "string",
+              "netLiquidation": "string",
+              "totalCashValue": "string",
+              "unrealizedPnL": "string",
+              "realizedPnL": "string"
+            }
+          }
+        },
+        "outcome": {
+          "allowed": false,
+          "rejection": "Position for AAPL would be 30.0% of equity (limit: 25%)",
+          "rejectionType": "string"
+        }
+      },
+      {
+        "name": "symbol-whitelist allow listed symbol",
+        "guard": "symbol-whitelist",
+        "input": {
+          "operation": {
+            "action": "placeOrder",
+            "contract": {
+              "aliceId": "mock-paper|AAPL",
+              "symbol": "AAPL",
+              "secType": "STK",
+              "exchange": "MOCK",
+              "currency": "USD"
+            },
+            "order": {
+              "action": "BUY",
+              "orderType": "MKT",
+              "tif": "",
+              "ocaGroup": "",
+              "totalQuantity": {
+                "value": "10",
+                "valueType": "Decimal",
+                "jsonType": "string"
+              }
+            }
+          },
+          "positions": [],
+          "account": {
+            "values": {
+              "baseCurrency": "USD",
+              "netLiquidation": "100000",
+              "totalCashValue": "100000",
+              "unrealizedPnL": "0",
+              "realizedPnL": "0"
+            },
+            "fieldTypes": {
+              "baseCurrency": "string",
+              "netLiquidation": "string",
+              "totalCashValue": "string",
+              "unrealizedPnL": "string",
+              "realizedPnL": "string"
+            }
+          }
+        },
+        "outcome": {
+          "allowed": true,
+          "rejection": null,
+          "rejectionType": "null"
+        }
+      },
+      {
+        "name": "symbol-whitelist reject unlisted symbol",
+        "guard": "symbol-whitelist",
+        "input": {
+          "operation": {
+            "action": "placeOrder",
+            "contract": {
+              "aliceId": "mock-paper|TSLA",
+              "symbol": "TSLA",
+              "secType": "STK",
+              "exchange": "MOCK",
+              "currency": "USD"
+            },
+            "order": {
+              "action": "BUY",
+              "orderType": "MKT",
+              "tif": "",
+              "ocaGroup": "",
+              "totalQuantity": {
+                "value": "10",
+                "valueType": "Decimal",
+                "jsonType": "string"
+              }
+            }
+          },
+          "positions": [],
+          "account": {
+            "values": {
+              "baseCurrency": "USD",
+              "netLiquidation": "100000",
+              "totalCashValue": "100000",
+              "unrealizedPnL": "0",
+              "realizedPnL": "0"
+            },
+            "fieldTypes": {
+              "baseCurrency": "string",
+              "netLiquidation": "string",
+              "totalCashValue": "string",
+              "unrealizedPnL": "string",
+              "realizedPnL": "string"
+            }
+          }
+        },
+        "outcome": {
+          "allowed": false,
+          "rejection": "Symbol TSLA is not in the allowed list",
+          "rejectionType": "string"
+        }
+      },
+      {
+        "name": "cooldown first trade allowed and repeat rejected",
+        "guard": "cooldown",
+        "options": {
+          "minIntervalMs": 60000
+        },
+        "input": {
+          "operation": {
+            "action": "placeOrder",
+            "contract": {
+              "aliceId": "mock-paper|AAPL",
+              "symbol": "AAPL",
+              "secType": "STK",
+              "exchange": "MOCK",
+              "currency": "USD"
+            },
+            "order": {
+              "action": "BUY",
+              "orderType": "MKT",
+              "tif": "",
+              "ocaGroup": "",
+              "totalQuantity": {
+                "value": "10",
+                "valueType": "Decimal",
+                "jsonType": "string"
+              }
+            }
+          },
+          "positions": [],
+          "account": {
+            "values": {
+              "baseCurrency": "USD",
+              "netLiquidation": "100000",
+              "totalCashValue": "100000",
+              "unrealizedPnL": "0",
+              "realizedPnL": "0"
+            },
+            "fieldTypes": {
+              "baseCurrency": "string",
+              "netLiquidation": "string",
+              "totalCashValue": "string",
+              "unrealizedPnL": "string",
+              "realizedPnL": "string"
+            }
+          }
+        },
+        "outcomes": [
+          {
+            "allowed": true,
+            "rejection": null,
+            "rejectionType": "null"
+          },
+          {
+            "allowed": false,
+            "rejection": "Cooldown active for AAPL: 60s remaining",
+            "rejectionType": "string"
+          }
+        ]
+      }
+    ],
+    "pipelineThroughUnifiedTradingAccount": {
+      "allowListedSymbol": {
+        "pushResult": {
+          "hash": "f7bfd970",
+          "message": "guard allowed AAPL",
+          "operationCount": 1,
+          "submitted": [
+            {
+              "action": "placeOrder",
+              "success": true,
+              "orderId": "mock-ord-1",
+              "status": "filled",
+              "orderStateStatus": "Filled"
+            }
+          ],
+          "rejected": []
+        },
+        "brokerPlaceOrderCalls": 1,
+        "positions": [
+          {
+            "contract": {
+              "aliceId": "mock-paper|AAPL",
+              "symbol": "AAPL",
+              "secType": "STK",
+              "exchange": "",
+              "currency": ""
+            },
+            "currency": "USD",
+            "side": "long",
+            "quantity": {
+              "value": "1",
+              "valueType": "Decimal",
+              "jsonType": "string"
+            },
+            "avgCost": "150",
+            "marketPrice": "150",
+            "marketValue": "150",
+            "unrealizedPnL": "0",
+            "realizedPnL": "0",
+            "fieldTypes": {
+              "avgCost": "string",
+              "marketPrice": "string",
+              "marketValue": "string",
+              "unrealizedPnL": "string",
+              "realizedPnL": "string"
+            }
+          }
+        ]
+      },
+      "rejectUnlistedSymbol": {
+        "pushResult": {
+          "hash": "85c46ca6",
+          "message": "guard rejected TSLA",
+          "operationCount": 1,
+          "submitted": [],
+          "rejected": [
+            {
+              "action": "placeOrder",
+              "success": false,
+              "status": "rejected",
+              "error": "[guard:symbol-whitelist] Symbol TSLA is not in the allowed list"
+            }
+          ]
+        },
+        "brokerPlaceOrderCalls": 0,
+        "positions": [],
+        "note": "guard rejection returns a rejected operation result and skips broker.placeOrder"
+      }
+    },
+    "registry": {
+      "builtinNames": [
+        "max-position-size",
+        "symbol-whitelist",
+        "cooldown"
+      ],
+      "unknownGuardResolution": {
+        "resultCount": 0,
+        "warnings": [
+          "guard: unknown type \"nonexistent\", skipped"
+        ]
+      }
+    }
+  }
+}

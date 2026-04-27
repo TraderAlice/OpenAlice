@@ -1,0 +1,178 @@
+{
+  "fixtureVersion": 1,
+  "fixture": "trading-core/snapshot-accounting-precision",
+  "module": "trading_core",
+  "legacyRuntime": "TypeScript",
+  "capturedAt": "2026-01-02T03:04:05.678Z",
+  "fixedClock": "2026-01-02T03:04:05.678Z",
+  "capturedBy": "docs/autonomous-refactor/fixtures/trading-core/capture-trading-core-fixtures.ts",
+  "sourcePaths": [
+    "src/domain/trading/git/**",
+    "src/domain/trading/guards/**",
+    "src/domain/trading/snapshot/**",
+    "src/domain/trading/account-manager.ts",
+    "src/domain/trading/UnifiedTradingAccount.ts",
+    "src/domain/trading/brokers/mock/**"
+  ],
+  "cases": {
+    "snapshotWithPositionAndPendingOrder": {
+      "accountId": "mock-paper",
+      "timestamp": "2026-01-02T03:04:05.678Z",
+      "trigger": "manual",
+      "account": {
+        "values": {
+          "baseCurrency": "USD",
+          "netLiquidation": "100000",
+          "totalCashValue": "98500",
+          "unrealizedPnL": "0",
+          "realizedPnL": "0"
+        },
+        "fieldTypes": {
+          "baseCurrency": "string",
+          "netLiquidation": "string",
+          "totalCashValue": "string",
+          "unrealizedPnL": "string",
+          "realizedPnL": "string"
+        }
+      },
+      "positions": [
+        {
+          "aliceId": "mock-paper|AAPL",
+          "currency": "USD",
+          "side": "long",
+          "quantity": "10",
+          "avgCost": "150",
+          "marketPrice": "150",
+          "marketValue": "1500",
+          "unrealizedPnL": "0",
+          "realizedPnL": "0",
+          "fieldTypes": {
+            "quantity": "string",
+            "avgCost": "string",
+            "marketPrice": "string",
+            "marketValue": "string",
+            "unrealizedPnL": "string",
+            "realizedPnL": "string"
+          }
+        }
+      ],
+      "openOrders": [
+        {
+          "orderId": "2",
+          "aliceId": "mock-paper|AAPL",
+          "action": "BUY",
+          "orderType": "LMT",
+          "totalQuantity": "5",
+          "limitPrice": "140",
+          "status": "Submitted",
+          "fieldTypes": {
+            "orderId": "string",
+            "aliceId": "string",
+            "totalQuantity": "string",
+            "limitPrice": "string"
+          }
+        }
+      ],
+      "health": "healthy",
+      "headCommit": "491787e5",
+      "pendingCommits": []
+    },
+    "lifecycleMonetaryStringBoundaries": {
+      "marketBuyCash": {
+        "totalCashValue": "98500",
+        "valueType": "string",
+        "expectedLegacyValue": "98500"
+      },
+      "limitFillAverageCost": {
+        "avgCost": "144",
+        "valueType": "string",
+        "expectedLegacyValue": "144"
+      },
+      "fullCloseCash": {
+        "totalCashValue": "100000",
+        "valueType": "string",
+        "expectedLegacyValue": "100000"
+      }
+    },
+    "stagedOrderJsonPrecision": {
+      "lmtPriceFromNumberInput": {
+        "value": "145.25",
+        "valueType": "string",
+        "totalQuantity": "10",
+        "totalQuantityType": "string"
+      },
+      "cryptoScaleStringInput": {
+        "wireTotalQuantity": "0.12345678",
+        "wireTotalQuantityType": "string",
+        "wireLimitPrice": "0.00001234",
+        "wireLimitPriceType": "string",
+        "brokerOrder": {
+          "contract": {
+            "aliceId": "mock-paper|ETH",
+            "symbol": "ETH",
+            "secType": "STK",
+            "exchange": "",
+            "currency": ""
+          },
+          "order": {
+            "action": "BUY",
+            "orderType": "LMT",
+            "tif": "DAY",
+            "orderId": 1,
+            "ocaGroup": "",
+            "totalQuantity": {
+              "value": "0.12345678",
+              "valueType": "Decimal",
+              "jsonType": "string"
+            },
+            "lmtPrice": {
+              "value": "0.00001234",
+              "valueType": "Decimal",
+              "jsonType": "string"
+            }
+          },
+          "orderStateStatus": "Submitted"
+        }
+      },
+      "cleanDecimalString": {
+        "input": "0.3",
+        "brokerOrderLimitPrice": "0.3",
+        "decimalEqualsInput": true
+      }
+    },
+    "accountManagerAggregation": {
+      "result": {
+        "totalEquity": "125000",
+        "totalCash": "90000",
+        "totalUnrealizedPnL": "5000",
+        "totalRealizedPnL": "1500",
+        "accounts": [
+          {
+            "id": "a1",
+            "label": "Paper A",
+            "baseCurrency": "USD",
+            "equity": "50000",
+            "cash": "30000",
+            "unrealizedPnL": "2000",
+            "health": "healthy"
+          },
+          {
+            "id": "a2",
+            "label": "Paper B",
+            "baseCurrency": "USD",
+            "equity": "75000",
+            "cash": "60000",
+            "unrealizedPnL": "3000",
+            "health": "healthy"
+          }
+        ]
+      },
+      "fieldTypes": {
+        "totalEquity": "string",
+        "totalCash": "string",
+        "totalUnrealizedPnL": "string",
+        "totalRealizedPnL": "string"
+      }
+    }
+  }
+}

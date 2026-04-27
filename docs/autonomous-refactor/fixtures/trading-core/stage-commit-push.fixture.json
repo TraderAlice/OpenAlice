@@ -1,0 +1,724 @@
+{
+  "fixtureVersion": 1,
+  "fixture": "trading-core/stage-commit-push",
+  "module": "trading_core",
+  "legacyRuntime": "TypeScript",
+  "capturedAt": "2026-01-02T03:04:05.678Z",
+  "fixedClock": "2026-01-02T03:04:05.678Z",
+  "capturedBy": "docs/autonomous-refactor/fixtures/trading-core/capture-trading-core-fixtures.ts",
+  "sourcePaths": [
+    "src/domain/trading/git/**",
+    "src/domain/trading/guards/**",
+    "src/domain/trading/snapshot/**",
+    "src/domain/trading/account-manager.ts",
+    "src/domain/trading/UnifiedTradingAccount.ts",
+    "src/domain/trading/brokers/mock/**"
+  ],
+  "cases": {
+    "marketBuyStageCommitPush": {
+      "input": {
+        "stageParams": {
+          "aliceId": "mock-paper|AAPL",
+          "symbol": "AAPL",
+          "action": "BUY",
+          "orderType": "MKT",
+          "totalQuantity": 10
+        },
+        "quote": {
+          "symbol": "AAPL",
+          "price": 150
+        }
+      },
+      "before": {
+        "account": {
+          "values": {
+            "baseCurrency": "USD",
+            "netLiquidation": "100000",
+            "totalCashValue": "100000",
+            "unrealizedPnL": "0",
+            "realizedPnL": "0"
+          },
+          "fieldTypes": {
+            "baseCurrency": "string",
+            "netLiquidation": "string",
+            "totalCashValue": "string",
+            "unrealizedPnL": "string",
+            "realizedPnL": "string"
+          }
+        }
+      },
+      "afterStage": {
+        "addResult": {
+          "staged": true,
+          "index": 0,
+          "operation": {
+            "action": "placeOrder",
+            "contract": {
+              "aliceId": "mock-paper|AAPL",
+              "symbol": "AAPL",
+              "secType": "STK",
+              "exchange": "",
+              "currency": ""
+            },
+            "order": {
+              "action": "BUY",
+              "orderType": "MKT",
+              "tif": "DAY",
+              "ocaGroup": "",
+              "totalQuantity": {
+                "value": "10",
+                "valueType": "Decimal",
+                "jsonType": "string"
+              }
+            }
+          }
+        },
+        "status": {
+          "staged": [
+            {
+              "action": "placeOrder",
+              "contract": {
+                "aliceId": "mock-paper|AAPL",
+                "symbol": "AAPL",
+                "secType": "STK",
+                "exchange": "",
+                "currency": ""
+              },
+              "order": {
+                "action": "BUY",
+                "orderType": "MKT",
+                "tif": "DAY",
+                "ocaGroup": "",
+                "totalQuantity": {
+                  "value": "10",
+                  "valueType": "Decimal",
+                  "jsonType": "string"
+                }
+              }
+            }
+          ],
+          "pendingMessage": null,
+          "pendingHash": null,
+          "head": null,
+          "commitCount": 0
+        },
+        "account": {
+          "values": {
+            "baseCurrency": "USD",
+            "netLiquidation": "100000",
+            "totalCashValue": "100000",
+            "unrealizedPnL": "0",
+            "realizedPnL": "0"
+          },
+          "fieldTypes": {
+            "baseCurrency": "string",
+            "netLiquidation": "string",
+            "totalCashValue": "string",
+            "unrealizedPnL": "string",
+            "realizedPnL": "string"
+          }
+        },
+        "brokerPlaceOrderCalls": 0,
+        "note": "stage records intent only; it does not call broker.placeOrder"
+      },
+      "afterCommit": {
+        "commitResult": {
+          "prepared": true,
+          "hash": "b2c4ee70",
+          "message": "buy 10 AAPL",
+          "operationCount": 1
+        },
+        "status": {
+          "staged": [
+            {
+              "action": "placeOrder",
+              "contract": {
+                "aliceId": "mock-paper|AAPL",
+                "symbol": "AAPL",
+                "secType": "STK",
+                "exchange": "",
+                "currency": ""
+              },
+              "order": {
+                "action": "BUY",
+                "orderType": "MKT",
+                "tif": "DAY",
+                "ocaGroup": "",
+                "totalQuantity": {
+                  "value": "10",
+                  "valueType": "Decimal",
+                  "jsonType": "string"
+                }
+              }
+            }
+          ],
+          "pendingMessage": "buy 10 AAPL",
+          "pendingHash": "b2c4ee70",
+          "head": null,
+          "commitCount": 0
+        },
+        "brokerPlaceOrderCalls": 0,
+        "note": "commit prepares an auditable pending hash/message without broker side effects"
+      },
+      "afterPush": {
+        "pushResult": {
+          "hash": "b2c4ee70",
+          "message": "buy 10 AAPL",
+          "operationCount": 1,
+          "submitted": [
+            {
+              "action": "placeOrder",
+              "success": true,
+              "orderId": "mock-ord-1",
+              "status": "filled",
+              "orderStateStatus": "Filled"
+            }
+          ],
+          "rejected": []
+        },
+        "status": {
+          "staged": [],
+          "pendingMessage": null,
+          "pendingHash": null,
+          "head": "b2c4ee70",
+          "commitCount": 1
+        },
+        "brokerPlaceOrderCalls": 1,
+        "account": {
+          "values": {
+            "baseCurrency": "USD",
+            "netLiquidation": "100000",
+            "totalCashValue": "98500",
+            "unrealizedPnL": "0",
+            "realizedPnL": "0"
+          },
+          "fieldTypes": {
+            "baseCurrency": "string",
+            "netLiquidation": "string",
+            "totalCashValue": "string",
+            "unrealizedPnL": "string",
+            "realizedPnL": "string"
+          }
+        },
+        "positions": [
+          {
+            "contract": {
+              "aliceId": "mock-paper|AAPL",
+              "symbol": "AAPL",
+              "secType": "STK",
+              "exchange": "",
+              "currency": ""
+            },
+            "currency": "USD",
+            "side": "long",
+            "quantity": {
+              "value": "10",
+              "valueType": "Decimal",
+              "jsonType": "string"
+            },
+            "avgCost": "150",
+            "marketPrice": "150",
+            "marketValue": "1500",
+            "unrealizedPnL": "0",
+            "realizedPnL": "0",
+            "fieldTypes": {
+              "avgCost": "string",
+              "marketPrice": "string",
+              "marketValue": "string",
+              "unrealizedPnL": "string",
+              "realizedPnL": "string"
+            }
+          }
+        ],
+        "log": [
+          {
+            "hash": "b2c4ee70",
+            "parentHash": null,
+            "message": "buy 10 AAPL",
+            "timestamp": "2026-01-02T03:04:05.678Z",
+            "operations": [
+              {
+                "symbol": "AAPL",
+                "action": "placeOrder",
+                "change": "BUY 10",
+                "status": "filled"
+              }
+            ]
+          }
+        ],
+        "showHead": {
+          "hash": "b2c4ee70",
+          "parentHash": null,
+          "message": "buy 10 AAPL",
+          "operations": [
+            {
+              "action": "placeOrder",
+              "contract": {
+                "aliceId": "mock-paper|AAPL",
+                "symbol": "AAPL",
+                "secType": "STK",
+                "exchange": "",
+                "currency": ""
+              },
+              "order": {
+                "action": "BUY",
+                "orderType": "MKT",
+                "tif": "DAY",
+                "ocaGroup": "",
+                "totalQuantity": {
+                  "value": "10",
+                  "valueType": "Decimal",
+                  "jsonType": "string"
+                }
+              }
+            }
+          ],
+          "results": [
+            {
+              "action": "placeOrder",
+              "success": true,
+              "orderId": "mock-ord-1",
+              "status": "filled",
+              "orderStateStatus": "Filled"
+            }
+          ],
+          "stateAfter": {
+            "account": {
+              "values": {
+                "baseCurrency": "USD",
+                "netLiquidation": "100000",
+                "totalCashValue": "98500",
+                "unrealizedPnL": "0",
+                "realizedPnL": "0"
+              },
+              "fieldTypes": {
+                "baseCurrency": "string",
+                "netLiquidation": "string",
+                "totalCashValue": "string",
+                "unrealizedPnL": "string",
+                "realizedPnL": "string"
+              }
+            },
+            "positions": [
+              {
+                "contract": {
+                  "aliceId": "mock-paper|AAPL",
+                  "symbol": "AAPL",
+                  "secType": "STK",
+                  "exchange": "",
+                  "currency": ""
+                },
+                "currency": "USD",
+                "side": "long",
+                "quantity": {
+                  "value": "10",
+                  "valueType": "Decimal",
+                  "jsonType": "string"
+                },
+                "avgCost": "150",
+                "marketPrice": "150",
+                "marketValue": "1500",
+                "unrealizedPnL": "0",
+                "realizedPnL": "0",
+                "fieldTypes": {
+                  "avgCost": "string",
+                  "marketPrice": "string",
+                  "marketValue": "string",
+                  "unrealizedPnL": "string",
+                  "realizedPnL": "string"
+                }
+              }
+            ],
+            "pendingOrders": []
+          },
+          "timestamp": "2026-01-02T03:04:05.678Z"
+        },
+        "exportState": {
+          "head": "b2c4ee70",
+          "commits": [
+            {
+              "hash": "b2c4ee70",
+              "parentHash": null,
+              "message": "buy 10 AAPL",
+              "operations": [
+                {
+                  "action": "placeOrder",
+                  "contract": {
+                    "aliceId": "mock-paper|AAPL",
+                    "symbol": "AAPL",
+                    "secType": "STK",
+                    "exchange": "",
+                    "currency": ""
+                  },
+                  "order": {
+                    "action": "BUY",
+                    "orderType": "MKT",
+                    "tif": "DAY",
+                    "ocaGroup": "",
+                    "totalQuantity": {
+                      "value": "10",
+                      "valueType": "Decimal",
+                      "jsonType": "string"
+                    }
+                  }
+                }
+              ],
+              "results": [
+                {
+                  "action": "placeOrder",
+                  "success": true,
+                  "orderId": "mock-ord-1",
+                  "status": "filled",
+                  "orderStateStatus": "Filled"
+                }
+              ],
+              "stateAfter": {
+                "account": {
+                  "values": {
+                    "baseCurrency": "USD",
+                    "netLiquidation": "100000",
+                    "totalCashValue": "98500",
+                    "unrealizedPnL": "0",
+                    "realizedPnL": "0"
+                  },
+                  "fieldTypes": {
+                    "baseCurrency": "string",
+                    "netLiquidation": "string",
+                    "totalCashValue": "string",
+                    "unrealizedPnL": "string",
+                    "realizedPnL": "string"
+                  }
+                },
+                "positions": [
+                  {
+                    "contract": {
+                      "aliceId": "mock-paper|AAPL",
+                      "symbol": "AAPL",
+                      "secType": "STK",
+                      "exchange": "",
+                      "currency": ""
+                    },
+                    "currency": "USD",
+                    "side": "long",
+                    "quantity": {
+                      "value": "10",
+                      "valueType": "Decimal",
+                      "jsonType": "string"
+                    },
+                    "avgCost": "150",
+                    "marketPrice": "150",
+                    "marketValue": "1500",
+                    "unrealizedPnL": "0",
+                    "realizedPnL": "0",
+                    "fieldTypes": {
+                      "avgCost": "string",
+                      "marketPrice": "string",
+                      "marketValue": "string",
+                      "unrealizedPnL": "string",
+                      "realizedPnL": "string"
+                    }
+                  }
+                ],
+                "pendingOrders": []
+              },
+              "timestamp": "2026-01-02T03:04:05.678Z"
+            }
+          ]
+        }
+      }
+    },
+    "limitOrderPushAndSync": {
+      "input": {
+        "stageParams": {
+          "aliceId": "mock-paper|AAPL",
+          "symbol": "AAPL",
+          "action": "BUY",
+          "orderType": "LMT",
+          "totalQuantity": 5,
+          "lmtPrice": 145
+        },
+        "fillPrice": 144
+      },
+      "afterCommit": {
+        "commitResult": {
+          "prepared": true,
+          "hash": "145beeb4",
+          "message": "limit buy 5 AAPL",
+          "operationCount": 1
+        }
+      },
+      "afterPush": {
+        "pushResult": {
+          "hash": "145beeb4",
+          "message": "limit buy 5 AAPL",
+          "operationCount": 1,
+          "submitted": [
+            {
+              "action": "placeOrder",
+              "success": true,
+              "orderId": "mock-ord-1",
+              "status": "submitted",
+              "orderStateStatus": "Submitted"
+            }
+          ],
+          "rejected": []
+        },
+        "pendingOrderIds": [
+          {
+            "orderId": "mock-ord-1",
+            "symbol": "AAPL"
+          }
+        ],
+        "syncBeforeFill": {
+          "hash": "",
+          "updatedCount": 0,
+          "updates": []
+        }
+      },
+      "afterFillAndSync": {
+        "syncResult": {
+          "hash": "222b8b81",
+          "updatedCount": 1,
+          "updates": [
+            {
+              "orderId": "mock-ord-1",
+              "symbol": "AAPL",
+              "previousStatus": "submitted",
+              "currentStatus": "filled"
+            }
+          ]
+        },
+        "pendingOrderIds": [],
+        "positions": [
+          {
+            "contract": {
+              "aliceId": "mock-paper|AAPL",
+              "symbol": "AAPL",
+              "secType": "STK",
+              "exchange": "",
+              "currency": ""
+            },
+            "currency": "USD",
+            "side": "long",
+            "quantity": {
+              "value": "5",
+              "valueType": "Decimal",
+              "jsonType": "string"
+            },
+            "avgCost": "144",
+            "marketPrice": "150",
+            "marketValue": "750",
+            "unrealizedPnL": "30",
+            "realizedPnL": "0",
+            "fieldTypes": {
+              "avgCost": "string",
+              "marketPrice": "string",
+              "marketValue": "string",
+              "unrealizedPnL": "string",
+              "realizedPnL": "string"
+            }
+          }
+        ],
+        "log": [
+          {
+            "hash": "222b8b81",
+            "parentHash": "145beeb4",
+            "message": "[sync] 1 order(s) updated",
+            "timestamp": "2026-01-02T03:04:05.678Z",
+            "operations": [
+              {
+                "symbol": "unknown",
+                "action": "syncOrders",
+                "change": "synced → filled",
+                "status": "filled"
+              }
+            ]
+          },
+          {
+            "hash": "145beeb4",
+            "parentHash": null,
+            "message": "limit buy 5 AAPL",
+            "timestamp": "2026-01-02T03:04:05.678Z",
+            "operations": [
+              {
+                "symbol": "AAPL",
+                "action": "placeOrder",
+                "change": "BUY 5 (submitted)",
+                "status": "submitted"
+              }
+            ]
+          }
+        ],
+        "showSyncCommit": {
+          "hash": "222b8b81",
+          "parentHash": "145beeb4",
+          "message": "[sync] 1 order(s) updated",
+          "operations": [
+            {
+              "action": "syncOrders"
+            }
+          ],
+          "results": [
+            {
+              "action": "syncOrders",
+              "success": true,
+              "orderId": "mock-ord-1",
+              "status": "filled"
+            }
+          ],
+          "stateAfter": {
+            "account": {
+              "values": {
+                "baseCurrency": "USD",
+                "netLiquidation": "100030",
+                "totalCashValue": "99280",
+                "unrealizedPnL": "30",
+                "realizedPnL": "0"
+              },
+              "fieldTypes": {
+                "baseCurrency": "string",
+                "netLiquidation": "string",
+                "totalCashValue": "string",
+                "unrealizedPnL": "string",
+                "realizedPnL": "string"
+              }
+            },
+            "positions": [
+              {
+                "contract": {
+                  "aliceId": "mock-paper|AAPL",
+                  "symbol": "AAPL",
+                  "secType": "STK",
+                  "exchange": "",
+                  "currency": ""
+                },
+                "currency": "USD",
+                "side": "long",
+                "quantity": {
+                  "value": "5",
+                  "valueType": "Decimal",
+                  "jsonType": "string"
+                },
+                "avgCost": "144",
+                "marketPrice": "150",
+                "marketValue": "750",
+                "unrealizedPnL": "30",
+                "realizedPnL": "0",
+                "fieldTypes": {
+                  "avgCost": "string",
+                  "marketPrice": "string",
+                  "marketValue": "string",
+                  "unrealizedPnL": "string",
+                  "realizedPnL": "string"
+                }
+              }
+            ],
+            "pendingOrders": []
+          },
+          "timestamp": "2026-01-02T03:04:05.678Z"
+        }
+      }
+    },
+    "manualReject": {
+      "afterCommit": {
+        "commitResult": {
+          "prepared": true,
+          "hash": "03f50913",
+          "message": "buy 1 AAPL pending human review",
+          "operationCount": 1
+        },
+        "status": {
+          "staged": [],
+          "pendingMessage": null,
+          "pendingHash": null,
+          "head": "03f50913",
+          "commitCount": 1
+        }
+      },
+      "afterReject": {
+        "rejectResult": {
+          "hash": "03f50913",
+          "message": "[rejected] buy 1 AAPL pending human review — manual risk veto",
+          "operationCount": 1
+        },
+        "status": {
+          "staged": [],
+          "pendingMessage": null,
+          "pendingHash": null,
+          "head": "03f50913",
+          "commitCount": 1
+        },
+        "brokerPlaceOrderCalls": 0,
+        "showRejectedCommit": {
+          "hash": "03f50913",
+          "parentHash": null,
+          "message": "[rejected] buy 1 AAPL pending human review — manual risk veto",
+          "operations": [
+            {
+              "action": "placeOrder",
+              "contract": {
+                "aliceId": "mock-paper|AAPL",
+                "symbol": "AAPL",
+                "secType": "STK",
+                "exchange": "",
+                "currency": ""
+              },
+              "order": {
+                "action": "BUY",
+                "orderType": "MKT",
+                "tif": "DAY",
+                "ocaGroup": "",
+                "totalQuantity": {
+                  "value": "1",
+                  "valueType": "Decimal",
+                  "jsonType": "string"
+                }
+              }
+            }
+          ],
+          "results": [
+            {
+              "action": "placeOrder",
+              "success": false,
+              "status": "user-rejected",
+              "error": "manual risk veto"
+            }
+          ],
+          "stateAfter": {
+            "account": {
+              "values": {
+                "baseCurrency": "USD",
+                "netLiquidation": "100000",
+                "totalCashValue": "100000",
+                "unrealizedPnL": "0",
+                "realizedPnL": "0"
+              },
+              "fieldTypes": {
+                "baseCurrency": "string",
+                "netLiquidation": "string",
+                "totalCashValue": "string",
+                "unrealizedPnL": "string",
+                "realizedPnL": "string"
+              }
+            },
+            "positions": [],
+            "pendingOrders": []
+          },
+          "timestamp": "2026-01-02T03:04:05.678Z"
+        }
+      }
+    },
+    "preconditionErrors": {
+      "commitWithoutStagedOperations": {
+        "threw": true,
+        "name": "Error",
+        "message": "Nothing to commit: staging area is empty"
+      },
+      "pushWithoutCommit": {
+        "threw": true,
+        "name": "Error",
+        "message": "Nothing to push: please commit first"
+      }
+    }
+  }
+}
