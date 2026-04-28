@@ -43,7 +43,7 @@ Out of scope (deferred):
   - `bootstrapHealthcheck()` — bootstrap marker.
   - `parseFormulaToJson(formula)` — returns the parse envelope as a JSON string.
   - `__triggerPanicForTest(message)` — test-only hook to drive the panic boundary.
-- Wraps the parser in `std::panic::catch_unwind` and re-emits panics as `napi::Error` with `Status::GenericFailure` whose message starts with the literal sentinel `INTERNAL_RUST_PANIC: ...`.
+- Wraps the parser in `std::panic::catch_unwind`, temporarily suppresses Rust's default panic hook while the boundary is catching a panic, and re-emits panics as `napi::Error` with `Status::GenericFailure` whose message starts with the literal sentinel `INTERNAL_RUST_PANIC: ...`.
 - Crate is `#![deny(unsafe_code)]` (not `forbid`) because the `#[napi]` macro expands to FFI that needs `unsafe`. Hand-rolled `unsafe` blocks still fail the build.
 
 `packages/node-bindings/analysis-core/build.rs`

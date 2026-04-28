@@ -42,7 +42,8 @@
 // macro-generated `unsafe` is allowed via the macro's own `allow`.
 #![deny(unsafe_code)]
 
-use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::panic::{self, AssertUnwindSafe, UnwindSafe};
+use std::sync::{Mutex, OnceLock};
 
 use napi::bindgen_prelude::{Error, Result, Status};
 use napi_derive::napi;
@@ -59,7 +60,7 @@ pub fn bootstrap_healthcheck_napi() -> &'static str {
 /// Parse a formula and return a JSON-encoded envelope (see crate docs).
 #[napi(js_name = "parseFormulaToJson")]
 pub fn parse_formula_to_json(formula: String) -> Result<String> {
-    let outcome = catch_unwind(AssertUnwindSafe(|| build_envelope(&formula)));
+    let outcome = catch_unwind_quiet(AssertUnwindSafe(|| build_envelope(&formula)));
     match outcome {
         Ok(envelope) => serde_json::to_string(&envelope).map_err(|err| {
             Error::new(
@@ -78,7 +79,7 @@ pub fn parse_formula_to_json(formula: String) -> Result<String> {
 /// caught at the binding edge and surfaced as `INTERNAL_RUST_PANIC`.
 #[napi(js_name = "__triggerPanicForTest")]
 pub fn trigger_panic_for_test(message: String) -> Result<()> {
-    let outcome = catch_unwind(AssertUnwindSafe(|| {
+    let outcome = catch_unwind_quiet(AssertUnwindSafe(|| {
         panic!("{}", message);
     }));
     match outcome {
@@ -115,6 +116,19 @@ fn panic_message(payload: Box<dyn std::any::Any + Send>) -> String {
         return s.clone();
     }
     String::from("(unknown panic payload)")
+}
+
+fn catch_unwind_quiet<F, T>(f: F) -> std::thread::Result<T>
+where
+    F: FnOnce() -> T + UnwindSafe,
+{
+    static HOOK_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    let _guard = HOOK_LOCK.get_or_init(|| Mutex::new(())).lock().unwrap();
+    let previous_hook = panic::take_hook();
+    panic::set_hook(Box::new(|_| {}));
+    let outcome = panic::catch_unwind(f);
+    panic::set_hook(previous_hook);
+    outcome
 }
 
 #[cfg(test)]
