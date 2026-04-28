@@ -34,3 +34,11 @@ packages/ibkr/ref/CMakeLists.txt
 
 # Turborepo
 .turbo/
+
+# Rust + native binding build outputs (OPE-15/16/17). Crates and the
+# napi-rs binding compile to platform-specific artifacts under target/
+# and `.node` files in the binding package. None of those are checked in;
+# the JS loader rebuilds the binding on demand via
+# `pnpm --filter @openalice/node-bindings-analysis-core build:napi`.
+target/
+**/*.node

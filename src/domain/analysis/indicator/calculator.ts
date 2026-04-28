@@ -23,12 +23,19 @@ import { toValues } from './types'
 import * as DataAccess from './functions/data-access'
 import * as Statistics from './functions/statistics'
 import * as Technical from './functions/technical'
-// Phase 2 first parity slice: parser-only routing behind
-// OPENALICE_RUST_ANALYSIS=1. The binding lives in the workspace at
-// packages/node-bindings/analysis-core/. The relative-path import keeps
-// the integration explicit; this is the only place authorized to call
+// Phase 2 parser routing behind OPENALICE_RUST_ANALYSIS=1. The binding
+// lives in the workspace at packages/node-bindings/analysis-core/ and
+// loads the in-process napi-rs `.node` artifact built from
+// crates/analysis-core. This is the only place authorized to call
 // across the binding boundary for analysis_core today (per the
-// allowed-files policy on OPE-16).
+// allowed-files policy on OPE-16/OPE-17).
+//
+// Failure modes from the binding propagate as typed errors
+// (BindingLoadError, BindingParseError, RustPanicError); their
+// `.message` matches the legacy TypeScript parser exactly for parser
+// failures, so existing `.rejects.toThrow(message)` assertions and the
+// tool-shim normalization in src/tool/analysis.ts keep working
+// unchanged.
 import { parseFormulaSync as parseFormulaSyncRust } from '../../../../packages/node-bindings/analysis-core/index.js'
 
 export interface CalculateOutput {

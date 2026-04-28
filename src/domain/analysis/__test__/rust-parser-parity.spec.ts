@@ -17,6 +17,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import os from 'node:os'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { IndicatorCalculator } from '../indicator/calculator'
 import type {
@@ -108,14 +109,47 @@ function buildContextForDataset(
   }
 }
 
-function ensureRustParseBinaryBuilt(): void {
-  const debugBin = resolve(REPO_ROOT, 'target', 'debug', 'analysis-core-parse')
-  const releaseBin = resolve(REPO_ROOT, 'target', 'release', 'analysis-core-parse')
-  if (existsSync(debugBin) || existsSync(releaseBin)) return
-  // Build once at suite start so per-test spawns do not race.
+const NATIVE_BINDING_PATH = resolve(
+  REPO_ROOT,
+  'packages',
+  'node-bindings',
+  'analysis-core',
+  'analysis-core.node',
+)
+
+function resolveCargoBin(): string {
+  if (process.env.CARGO) return process.env.CARGO
+  const sep = process.platform === 'win32' ? ';' : ':'
+  const onPath = (process.env.PATH || '').split(sep)
+  const exe = process.platform === 'win32' ? 'cargo.exe' : 'cargo'
+  for (const dir of onPath) {
+    if (!dir) continue
+    const candidate = resolve(dir, exe)
+    if (existsSync(candidate)) return candidate
+  }
+  const home = os.homedir()
+  if (home) {
+    const fallback = resolve(home, '.cargo', 'bin', exe)
+    if (existsSync(fallback)) return fallback
+  }
+  return 'cargo'
+}
+
+// Build both the napi-rs `.node` artifact (the OPE-17 normal path) and
+// the OPE-16 CLI binary (still exercised by the binding-overhead
+// benchmark and the explicit CLI-fallback regression test). Both come
+// out of the same crate, so a single `cargo build` covers both.
+function ensureRustArtifactsBuilt(): void {
+  if (existsSync(NATIVE_BINDING_PATH)) return
+  const cargoBin = resolveCargoBin()
   execFileSync(
-    'cargo',
-    ['build', '--bin', 'analysis-core-parse', '-p', 'analysis-core-node-binding'],
+    cargoBin,
+    ['build', '-p', 'analysis-core-node-binding'],
+    { cwd: REPO_ROOT, stdio: 'inherit' },
+  )
+  execFileSync(
+    process.execPath,
+    [resolve(REPO_ROOT, 'packages/node-bindings/analysis-core/scripts/build-native.mjs')],
     { cwd: REPO_ROOT, stdio: 'inherit' },
   )
 }
@@ -125,10 +159,10 @@ const fixture: FixtureFile = loadLegacyFixture()
 let originalFlag: string | undefined
 
 beforeAll(() => {
-  ensureRustParseBinaryBuilt()
+  ensureRustArtifactsBuilt()
   originalFlag = process.env.OPENALICE_RUST_ANALYSIS
   process.env.OPENALICE_RUST_ANALYSIS = '1'
-}, 120_000)
+}, 180_000)
 
 afterAll(() => {
   if (originalFlag === undefined) {

@@ -36,6 +36,18 @@ jobs:
 
       - run: cargo test --workspace
 
+      # Build the analysis_core napi-rs binding before running pnpm tests
+      # so the OPE-17 boundary spec finds an `analysis-core.node` artifact
+      # without invoking cargo from inside vitest. The boundary spec also
+      # rebuilds on demand if the artifact is missing, but doing it once
+      # here keeps test runtime predictable.
+      - run: node packages/node-bindings/analysis-core/scripts/build-native.mjs
+
       - run: pnpm build
 
       - run: pnpm test
+
+      - name: vitest with OPENALICE_RUST_ANALYSIS=1 (analysis_core only)
+        env:
+          OPENALICE_RUST_ANALYSIS: '1'
+        run: pnpm test -- src/domain/analysis
