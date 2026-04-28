@@ -23,20 +23,30 @@ import { toValues } from './types'
 import * as DataAccess from './functions/data-access'
 import * as Statistics from './functions/statistics'
 import * as Technical from './functions/technical'
-// Phase 2 parser routing behind OPENALICE_RUST_ANALYSIS=1. The binding
-// lives in the workspace at packages/node-bindings/analysis-core/ and
-// loads the in-process napi-rs `.node` artifact built from
-// crates/analysis-core. This is the only place authorized to call
-// across the binding boundary for analysis_core today (per the
-// allowed-files policy on OPE-16/OPE-17).
+// Phase 2 routing behind OPENALICE_RUST_ANALYSIS=1. The binding lives in
+// the workspace at packages/node-bindings/analysis-core/ and loads the
+// in-process napi-rs `.node` artifact built from crates/analysis-core.
+// This is the only place authorized to call across the binding boundary
+// for analysis_core today (per the allowed-files policy on
+// OPE-16/OPE-17/OPE-18).
+//
+// OPE-16/OPE-17 ported the parser; OPE-18 adds the smallest useful
+// evaluator slice on top of it. Under flag=1 we call
+// `evaluateFormulaSync` first: arithmetic-only formulas
+// (numeric literals + `+ - * /`) evaluate fully in Rust and return a
+// number; anything else returns the parsed AST so we can hand it
+// straight to the legacy TypeScript evaluator without re-parsing the
+// formula. With flag unset/0/invalid we stay entirely on the legacy
+// TypeScript parse + evaluate path per ADR-002.
 //
 // Failure modes from the binding propagate as typed errors
-// (BindingLoadError, BindingParseError, RustPanicError); their
-// `.message` matches the legacy TypeScript parser exactly for parser
-// failures, so existing `.rejects.toThrow(message)` assertions and the
+// (BindingLoadError, BindingParseError, BindingEvaluateError,
+// RustPanicError); their `.message` matches the legacy TypeScript
+// implementation exactly for parser- and arithmetic-runtime-relevant
+// cases, so existing `.rejects.toThrow(message)` assertions and the
 // tool-shim normalization in src/tool/analysis.ts keep working
 // unchanged.
-import { parseFormulaSync as parseFormulaSyncRust } from '../../../../packages/node-bindings/analysis-core/index.js'
+import { evaluateFormulaSync as evaluateFormulaSyncRust } from '../../../../packages/node-bindings/analysis-core/index.js'
 
 export interface CalculateOutput {
   value: number | number[] | Record<string, number>
@@ -66,9 +76,29 @@ export class IndicatorCalculator {
     precision: number = 4,
   ): Promise<CalculateOutput> {
     this.dataSources = {}
-    const ast = shouldUseRustParser()
-      ? (parseFormulaSyncRust(formula) as ASTNode)
-      : this.parse(formula)
+
+    let ast: ASTNode
+    if (shouldUseRustParser()) {
+      // Try Rust parse + arithmetic-only evaluate first. Arithmetic-only
+      // formulas come back as `{ kind: 'value', value }` and we apply
+      // the existing precision wrapper directly with an empty dataRange
+      // (no data access happens for arithmetic-only formulas).
+      // Anything else comes back as `{ kind: 'unsupported', ast }`, and
+      // we hand the already-parsed AST to the legacy TypeScript
+      // evaluator without re-parsing. Parser/eval failures are typed
+      // errors whose `.message` matches the legacy implementation.
+      const outcome = evaluateFormulaSyncRust(formula)
+      if (outcome.kind === 'value') {
+        return {
+          value: this.applyPrecision(outcome.value, precision),
+          dataRange: this.dataSources,
+        }
+      }
+      ast = outcome.ast as ASTNode
+    } else {
+      ast = this.parse(formula)
+    }
+
     const result = await this.evaluate(ast)
 
     if (typeof result === 'string') {

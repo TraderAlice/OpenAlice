@@ -1,17 +1,27 @@
-// OpenAlice analysis_core Node binding — Phase 2 napi-rs bridge (OPE-17).
+// OpenAlice analysis_core Node binding — Phase 2 napi-rs bridge
+// (OPE-17 parser, OPE-18 arithmetic evaluator).
 //
 // This module is the only authorized boundary between the TypeScript
-// adapters in `src/domain/analysis/` and the Rust `analysis_core` parser
+// adapters in `src/domain/analysis/` and the Rust `analysis_core`
 // kernel. It is intentionally small:
 //
-//   - `parseFormulaSync(formula)` is the sole public parser entry point.
+//   - `parseFormulaSync(formula)` is the legacy parser entry point.
 //     It loads the in-process napi-rs `.node` artifact built from
 //     `packages/node-bindings/analysis-core/src/lib.rs`, calls the Rust
 //     parser, JSON-decodes the envelope, and returns the AST DTO.
+//   - `evaluateFormulaSync(formula)` is the OPE-18 entry point. It
+//     parses *and* evaluates the formula in Rust when the AST is
+//     arithmetic-only (numeric literals and `+ - * /`); for any other
+//     shape it returns the parsed AST so the caller can hand it to
+//     the legacy TypeScript evaluator without re-parsing. Returns
+//     `{ kind: 'value', value: number }` or `{ kind: 'unsupported',
+//     ast: AstNode }`. Throws `BindingParseError` on parse failure
+//     and `BindingEvaluateError` on arithmetic-only runtime errors
+//     (e.g. division by zero).
 //   - `bootstrapHealthcheck()` returns the bootstrap marker. Used by
 //     workspace smoke tests and the `pnpm test` script in this package.
-//   - `BindingLoadError`, `BindingParseError`, `RustPanicError` are
-//     typed JS errors; the TypeScript shim in
+//   - `BindingLoadError`, `BindingParseError`, `BindingEvaluateError`,
+//     `RustPanicError` are typed JS errors; the TypeScript shim in
 //     `src/domain/analysis/indicator/calculator.ts` consumes them via
 //     duck-typing on `name`/`code`.
 //
@@ -67,6 +77,14 @@ export class BindingParseError extends Error {
   }
 }
 
+export class BindingEvaluateError extends Error {
+  constructor(message) {
+    super(message)
+    this.name = 'BindingEvaluateError'
+    this.code = 'ANALYSIS_CORE_EVALUATE_ERROR'
+  }
+}
+
 export class RustPanicError extends Error {
   constructor(message, cause) {
     super(message)
@@ -100,7 +118,7 @@ function loadNative() {
     )
     throw nativeLoadError
   }
-  for (const fn of ['bootstrapHealthcheck', 'parseFormulaToJson']) {
+  for (const fn of ['bootstrapHealthcheck', 'parseFormulaToJson', 'evaluateFormulaToJson']) {
     if (typeof nativeBinding[fn] !== 'function') {
       nativeLoadError = new BindingLoadError(
         `analysis_core: native binding at ${NATIVE_PATH} is missing required export "${fn}".`,
@@ -166,6 +184,52 @@ function callNative(formula) {
     throw err
   }
   return decodeEnvelope(raw)
+}
+
+function decodeEvaluateEnvelope(rawJson) {
+  let envelope
+  try {
+    envelope = JSON.parse(rawJson)
+  } catch (err) {
+    throw new BindingLoadError(
+      `analysis_core: native binding produced invalid evaluate JSON envelope: ${err.message}; raw: ${rawJson}`,
+      err,
+    )
+  }
+  if (envelope && envelope.ok === true) {
+    if (envelope.kind === 'value' && typeof envelope.value === 'number') {
+      return { kind: 'value', value: envelope.value }
+    }
+    if (envelope.kind === 'unsupported' && envelope.ast && typeof envelope.ast === 'object') {
+      return { kind: 'unsupported', ast: envelope.ast }
+    }
+  }
+  if (envelope && envelope.ok === false && envelope.error) {
+    const { kind, message, position } = envelope.error
+    if (kind === 'parse' && typeof message === 'string') {
+      throw new BindingParseError(message, typeof position === 'number' ? position : -1)
+    }
+    if (kind === 'evaluate' && typeof message === 'string') {
+      throw new BindingEvaluateError(message)
+    }
+  }
+  throw new BindingLoadError(
+    `analysis_core: native binding returned unrecognized evaluate envelope: ${rawJson}`,
+  )
+}
+
+function callNativeEvaluate(formula) {
+  const native = loadNative()
+  let raw
+  try {
+    raw = native.evaluateFormulaToJson(formula)
+  } catch (err) {
+    if (isPanicError(err)) {
+      throw new RustPanicError(panicMessageFromNative(err.message), err)
+    }
+    throw err
+  }
+  return decodeEvaluateEnvelope(raw)
 }
 
 // ============================================================================
@@ -284,6 +348,31 @@ export function parseFormulaSync(formula) {
   }
   if (shouldUseCliFallback()) return callCliFallback(formula)
   return callNative(formula)
+}
+
+/**
+ * Synchronously parse + arithmetic-only evaluate a formula via the
+ * Rust `analysis_core` kernel.
+ *
+ * Returns one of:
+ *   - `{ kind: 'value', value: number }` when the AST is arithmetic-only
+ *     (numeric literals + `+ - * /`) and evaluation succeeds.
+ *   - `{ kind: 'unsupported', ast: AstNode }` when the AST contains any
+ *     non-arithmetic node. The caller is expected to hand `ast` to the
+ *     legacy TypeScript evaluator without re-parsing.
+ *
+ * The CLI fallback is intentionally not wired here. The CLI binary
+ * exposes only the parser (OPE-16 surface); the OPE-18 evaluator slice
+ * exists exclusively on the in-process napi-rs route.
+ *
+ * @param {string} formula
+ * @returns {{ kind: 'value', value: number } | { kind: 'unsupported', ast: object }}
+ */
+export function evaluateFormulaSync(formula) {
+  if (typeof formula !== 'string') {
+    throw new TypeError('evaluateFormulaSync expects a string formula')
+  }
+  return callNativeEvaluate(formula)
 }
 
 /**

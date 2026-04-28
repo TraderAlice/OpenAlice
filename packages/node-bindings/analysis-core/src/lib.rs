@@ -16,6 +16,21 @@
 //!   instances whose `.message` matches the legacy TypeScript parser
 //!   exactly so existing callers, tests, and tool-shim error
 //!   normalization continue to work unchanged.
+//! - `evaluateFormulaToJson(formula)` parses *and* evaluates the
+//!   formula in Rust when the AST is arithmetic-only (numeric literals
+//!   and `+ - * /`). It returns one of four envelopes:
+//!     * `{ "ok": true, "kind": "value", "value": <f64> }` on
+//!       arithmetic success
+//!     * `{ "ok": true, "kind": "unsupported", "ast": <AstNode> }`
+//!       when any non-arithmetic node is present so the caller can
+//!       hand the AST to the legacy TypeScript evaluator without
+//!       re-parsing
+//!     * `{ "ok": false, "error": { "kind": "parse", "message": ...,
+//!       "position": ... } }` for parse failures (identical shape to
+//!       `parseFormulaToJson`)
+//!     * `{ "ok": false, "error": { "kind": "evaluate", "message":
+//!       "Division by zero" } }` for arithmetic-only runtime errors
+//!       whose `.message` matches the legacy TypeScript evaluator.
 //!
 //! ## Failure isolation (per ADR-003)
 //!
@@ -48,7 +63,9 @@ use std::sync::{Mutex, OnceLock};
 use napi::bindgen_prelude::{Error, Result, Status};
 use napi_derive::napi;
 
-pub use analysis_core::{bootstrap_healthcheck, parse, AstNode, ParseError};
+pub use analysis_core::{
+    bootstrap_healthcheck, evaluate_arithmetic_only, parse, AstNode, EvalOutcome, ParseError,
+};
 
 const PANIC_SENTINEL: &str = "INTERNAL_RUST_PANIC";
 
@@ -66,6 +83,32 @@ pub fn parse_formula_to_json(formula: String) -> Result<String> {
             Error::new(
                 Status::GenericFailure,
                 format!("analysis_core: failed to serialize parse envelope: {}", err),
+            )
+        }),
+        Err(payload) => Err(Error::new(
+            Status::GenericFailure,
+            format!("{}: {}", PANIC_SENTINEL, panic_message(payload)),
+        )),
+    }
+}
+
+/// Parse + arithmetic-only evaluate; return a JSON-encoded envelope.
+///
+/// See the crate docs for the four possible envelope shapes. Panics in
+/// either the parser or the evaluator are caught at the binding edge
+/// and re-emitted as `INTERNAL_RUST_PANIC: ...` napi errors so Node
+/// never crashes from a Rust panic.
+#[napi(js_name = "evaluateFormulaToJson")]
+pub fn evaluate_formula_to_json(formula: String) -> Result<String> {
+    let outcome = catch_unwind_quiet(AssertUnwindSafe(|| build_evaluate_envelope(&formula)));
+    match outcome {
+        Ok(envelope) => serde_json::to_string(&envelope).map_err(|err| {
+            Error::new(
+                Status::GenericFailure,
+                format!(
+                    "analysis_core: failed to serialize evaluate envelope: {}",
+                    err,
+                ),
             )
         }),
         Err(payload) => Err(Error::new(
@@ -103,6 +146,41 @@ fn build_envelope(formula: &str) -> serde_json::Value {
                 "kind": "parse",
                 "message": err.message,
                 "position": err.position,
+            },
+        }),
+    }
+}
+
+fn build_evaluate_envelope(formula: &str) -> serde_json::Value {
+    let ast = match parse(formula) {
+        Ok(ast) => ast,
+        Err(err) => {
+            return serde_json::json!({
+                "ok": false,
+                "error": {
+                    "kind": "parse",
+                    "message": err.message,
+                    "position": err.position,
+                },
+            });
+        }
+    };
+    match evaluate_arithmetic_only(&ast) {
+        EvalOutcome::Value(value) => serde_json::json!({
+            "ok": true,
+            "kind": "value",
+            "value": value,
+        }),
+        EvalOutcome::Unsupported => serde_json::json!({
+            "ok": true,
+            "kind": "unsupported",
+            "ast": ast,
+        }),
+        EvalOutcome::Error(err) => serde_json::json!({
+            "ok": false,
+            "error": {
+                "kind": "evaluate",
+                "message": err.message,
             },
         }),
     }
@@ -153,6 +231,42 @@ mod tests {
         let envelope = build_envelope("1 + 2");
         assert_eq!(envelope["ok"], serde_json::Value::Bool(true));
         assert_eq!(envelope["ast"]["type"], "binaryOp");
+    }
+
+    #[test]
+    fn build_evaluate_envelope_arithmetic_value_shape() {
+        let envelope = build_evaluate_envelope("2 + 3 * 4");
+        assert_eq!(envelope["ok"], serde_json::Value::Bool(true));
+        assert_eq!(envelope["kind"], "value");
+        assert_eq!(envelope["value"], serde_json::json!(14.0));
+    }
+
+    #[test]
+    fn build_evaluate_envelope_unsupported_includes_ast() {
+        let envelope = build_evaluate_envelope("CLOSE('AAPL', '1d')[-1]");
+        assert_eq!(envelope["ok"], serde_json::Value::Bool(true));
+        assert_eq!(envelope["kind"], "unsupported");
+        assert_eq!(envelope["ast"]["type"], "arrayAccess");
+    }
+
+    #[test]
+    fn build_evaluate_envelope_division_by_zero_shape() {
+        let envelope = build_evaluate_envelope("10 / 0");
+        assert_eq!(envelope["ok"], serde_json::Value::Bool(false));
+        assert_eq!(envelope["error"]["kind"], "evaluate");
+        assert_eq!(envelope["error"]["message"], "Division by zero");
+    }
+
+    #[test]
+    fn build_evaluate_envelope_parse_error_shape() {
+        let envelope = build_evaluate_envelope("@");
+        assert_eq!(envelope["ok"], serde_json::Value::Bool(false));
+        assert_eq!(envelope["error"]["kind"], "parse");
+        assert_eq!(
+            envelope["error"]["message"],
+            "Unexpected character '@' at position 0",
+        );
+        assert_eq!(envelope["error"]["position"], 0);
     }
 
     #[test]

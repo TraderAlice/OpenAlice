@@ -1,5 +1,8 @@
 /**
- * OpenAlice analysis_core Node binding — Phase 2 napi-rs bridge (OPE-17).
+ * OpenAlice analysis_core Node binding — Phase 2 napi-rs bridge.
+ *
+ * - OPE-17: parser slice (`parseFormulaSync`).
+ * - OPE-18: arithmetic-only evaluator slice (`evaluateFormulaSync`).
  *
  * The exposed AST shape matches the legacy TypeScript `ASTNode`
  * discriminated-union exactly so the TypeScript evaluator can consume
@@ -79,6 +82,19 @@ export declare class RustPanicError extends Error {
   readonly cause?: unknown
 }
 
+/**
+ * Thrown when the Rust arithmetic-only evaluator surfaces a runtime
+ * error whose `.message` is parity-locked with the legacy TypeScript
+ * evaluator (e.g. `"Division by zero"`). Only emitted by
+ * `evaluateFormulaSync` when the AST is fully arithmetic-only; trees
+ * with non-arithmetic nodes are returned as `{ kind: 'unsupported' }`
+ * so the legacy TypeScript evaluator owns full evaluation semantics.
+ */
+export declare class BindingEvaluateError extends Error {
+  readonly name: 'BindingEvaluateError'
+  readonly code: 'ANALYSIS_CORE_EVALUATE_ERROR'
+}
+
 export declare function bootstrapHealthcheck(): 'analysis_core:bootstrap'
 
 /**
@@ -96,6 +112,41 @@ export declare function bootstrapHealthcheck(): 'analysis_core:bootstrap'
  *  - `RustPanicError`       - Rust panic caught at the binding edge.
  */
 export declare function parseFormulaSync(formula: string): AstNode
+
+/**
+ * Outcome of `evaluateFormulaSync`. Either the formula evaluated to a
+ * number under the arithmetic-only Rust evaluator, or the AST contains
+ * a non-arithmetic node and the caller must hand `ast` to the legacy
+ * TypeScript evaluator.
+ */
+export type EvaluateOutcome =
+  | { kind: 'value'; value: number }
+  | { kind: 'unsupported'; ast: AstNode }
+
+/**
+ * Synchronously parse + arithmetic-only evaluate a formula via the Rust
+ * `analysis_core` kernel.
+ *
+ * This is the OPE-18 entry point. Numeric literals and `+ - * /` between
+ * numbers evaluate in Rust and return `{ kind: 'value', value }`. Trees
+ * containing any non-arithmetic node return `{ kind: 'unsupported',
+ * ast }` so the caller can fall back to the legacy TypeScript evaluator
+ * without re-parsing the formula.
+ *
+ * Errors:
+ *  - `BindingLoadError`     - native artifact missing or unloadable.
+ *  - `BindingParseError`    - parser rejected the formula. `.message`
+ *                             matches the legacy TypeScript parser.
+ *  - `BindingEvaluateError` - arithmetic-only runtime error (e.g.
+ *                             `Division by zero`); `.message` matches
+ *                             the legacy TypeScript evaluator.
+ *  - `RustPanicError`       - Rust panic caught at the binding edge.
+ *
+ * The CLI fallback (`OPENALICE_ANALYSIS_CORE_USE_CLI=1`) is intentionally
+ * not honored here; the OPE-18 evaluator slice exists only on the
+ * in-process napi-rs path.
+ */
+export declare function evaluateFormulaSync(formula: string): EvaluateOutcome
 
 /**
  * Test-only hook: triggers a Rust panic inside the binding to exercise
