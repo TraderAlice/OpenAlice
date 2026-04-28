@@ -1,0 +1,50 @@
+{
+  "name": "@traderalice/alice-decimal",
+  "version": "0.1.0",
+  "private": true,
+  "main": "ts/dist/index.js",
+  "types": "ts/dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./ts/dist/index.d.ts",
+      "import": "./ts/dist/index.js",
+      "require": "./ts/dist/index.js"
+    }
+  },
+  "napi": {
+    "name": "alice-decimal",
+    "triples": {
+      "defaults": false,
+      "additional": [
+        "x86_64-apple-darwin",
+        "aarch64-apple-darwin",
+        "x86_64-unknown-linux-gnu",
+        "aarch64-unknown-linux-gnu",
+        "x86_64-pc-windows-msvc"
+      ]
+    }
+  },
+  "scripts": {
+    "build": "napi build --platform --release && tsc -p ts/tsconfig.json && node ts/dist-mark-esm.js",
+    "build:debug": "napi build --platform && tsc -p ts/tsconfig.json && node ts/dist-mark-esm.js",
+    "build:napi": "napi build --platform --release",
+    "build:ts": "tsc -p ts/tsconfig.json && node ts/dist-mark-esm.js",
+    "test": "cargo test --release",
+    "test:rust": "cargo test --release",
+    "prepublishOnly": "napi prepublish -t npm"
+  },
+  "dependencies": {
+    "decimal.js": "^10.6.0"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^2.18.0",
+    "typescript": "^5.9.3"
+  },
+  "files": [
+    "ts/dist",
+    "index.js",
+    "index.d.ts",
+    "alice-decimal.*.node",
+    "README.md"
+  ]
+}
