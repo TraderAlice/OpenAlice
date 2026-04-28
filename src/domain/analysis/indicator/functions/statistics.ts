@@ -6,22 +6,27 @@
  */
 
 import { toValues, type TrackedValues } from '../types'
-// OPE-19 finite-`number[]` reductions slice. Under
-// `OPENALICE_RUST_ANALYSIS=1` the four reductions below
-// (`MIN`, `MAX`, `SUM`, `AVERAGE`) route through the Rust
-// `analysis_core` kernel after `toValues(...)` has produced a plain
-// `number[]`. With the flag unset/`0`/invalid, the legacy TypeScript
-// reductions remain authoritative per ADR-002. Non-finite arrays
-// (`NaN` / `+/-Infinity`) come back as `{ kind: 'unsupported' }`
-// and we silently fall back to the legacy TypeScript reduction so
-// existing call sites behave identically.
+// OPE-19 / OPE-20 analysis_core kernel routing.
 //
-// `SMA`, `EMA`, `STDEV`, and the technical indicators stay on the
-// TypeScript path for OPE-19; this slice intentionally only covers the
-// four bare reductions per the issue scope.
+// Under `OPENALICE_RUST_ANALYSIS=1`:
+//   - `MIN`/`MAX`/`SUM`/`AVERAGE` (OPE-19) route through the Rust
+//     reduction kernel after `toValues(...)` has produced a plain
+//     `number[]`.
+//   - `SMA`/`EMA` (OPE-20) route through the Rust rolling-window
+//     moving-average kernel after `toValues(...)` has produced a plain
+//     `number[]`.
+//
+// With the flag unset/`0`/invalid, the legacy TypeScript implementations
+// remain authoritative per ADR-002. Non-finite arrays
+// (`NaN` / `+/-Infinity`) come back as `{ kind: 'unsupported' }` and we
+// silently fall back to the legacy TypeScript path so existing call
+// sites behave identically. `STDEV` and every technical indicator
+// (`RSI`, `BBANDS`, `MACD`, `ATR`) stay on the TypeScript path.
 import {
+  movingAverageSync as movingAverageSyncRust,
   reduceNumbersSync as reduceNumbersSyncRust,
   type ReductionKind,
+  type RollingKind,
 } from '../../../../../packages/node-bindings/analysis-core/index.js'
 
 type NumericInput = number[] | TrackedValues
@@ -41,6 +46,11 @@ function shouldUseRustReductions(): boolean {
   return raw.trim() === '1'
 }
 
+/** OPE-20: same flag predicate as reductions; aliased for readability. */
+function shouldUseRustRolling(): boolean {
+  return shouldUseRustReductions()
+}
+
 /**
  * Helper: under the flag, hand `values` (already `number[]`) to the
  * Rust kernel. On the `unsupported` envelope (non-finite elements) or
@@ -56,9 +66,32 @@ function reduceViaRust(kind: ReductionKind, values: number[]): number | null {
   return null
 }
 
+/**
+ * Helper: under the flag, hand `values` (already `number[]`) and
+ * `period` to the Rust rolling kernel. On `unsupported` (non-finite
+ * elements OR a non-positive / non-integer period) returns `null` so
+ * the caller stays on the legacy TypeScript implementation. We do not
+ * catch `BindingRollingError` here — its `.message` is parity-locked
+ * with the legacy `Error(...)`, so propagating it preserves the exact
+ * existing too-short-input error semantics.
+ */
+function movingAverageViaRust(
+  kind: RollingKind,
+  values: number[],
+  period: number,
+): number | null {
+  const outcome = movingAverageSyncRust(kind, values, period)
+  if (outcome.kind === 'value') return outcome.value
+  return null
+}
+
 /** Simple Moving Average */
 export function SMA(data: NumericInput, period: number): number {
   const v = toValues(data)
+  if (shouldUseRustRolling()) {
+    const rust = movingAverageViaRust('SMA', v, period)
+    if (rust !== null) return rust
+  }
   if (v.length < period) {
     throw new Error(`SMA requires at least ${period} data points, got ${v.length}`)
   }
@@ -70,6 +103,10 @@ export function SMA(data: NumericInput, period: number): number {
 /** Exponential Moving Average */
 export function EMA(data: NumericInput, period: number): number {
   const v = toValues(data)
+  if (shouldUseRustRolling()) {
+    const rust = movingAverageViaRust('EMA', v, period)
+    if (rust !== null) return rust
+  }
   if (v.length < period) {
     throw new Error(`EMA requires at least ${period} data points, got ${v.length}`)
   }

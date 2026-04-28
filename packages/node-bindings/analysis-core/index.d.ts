@@ -4,6 +4,8 @@
  * - OPE-17: parser slice (`parseFormulaSync`).
  * - OPE-18: arithmetic-only evaluator slice (`evaluateFormulaSync`).
  * - OPE-19: finite `number[]` reductions slice (`reduceNumbersSync`).
+ * - OPE-20: finite `number[]` rolling-window moving-average slice
+ *   (`movingAverageSync` for `SMA` and `EMA`).
  *
  * The exposed AST shape matches the legacy TypeScript `ASTNode`
  * discriminated-union exactly so the TypeScript evaluator can consume
@@ -106,6 +108,18 @@ export declare class BindingEvaluateError extends Error {
 export declare class BindingReduceError extends Error {
   readonly name: 'BindingReduceError'
   readonly code: 'ANALYSIS_CORE_REDUCE_ERROR'
+}
+
+/**
+ * Thrown when a Rust rolling-window moving average (`SMA` / `EMA`)
+ * surfaces a runtime error whose `.message` is parity-locked with the
+ * legacy TypeScript implementation
+ * (e.g. `"SMA requires at least 5 data points, got 3"`). Only emitted
+ * by `movingAverageSync` when `values.length < period`.
+ */
+export declare class BindingRollingError extends Error {
+  readonly name: 'BindingRollingError'
+  readonly code: 'ANALYSIS_CORE_ROLLING_ERROR'
 }
 
 /**
@@ -215,6 +229,52 @@ export declare function reduceNumbersSync(
   kind: ReductionKind,
   values: number[] | Float64Array,
 ): ReduceOutcome
+
+/**
+ * Supported rolling-window moving-average kind. Anything outside this
+ * union is rejected by `movingAverageSync` with `BindingArgumentError`
+ * before any data crosses the binding boundary.
+ */
+export type RollingKind = 'SMA' | 'EMA'
+
+/**
+ * Outcome of `movingAverageSync`. Either the kernel produced a finite
+ * `f64` moving-average value, or the inputs were classified as
+ * unsupported (non-finite element, or `period` is not a positive safe
+ * integer) and the caller must hand the moving average back to the
+ * legacy TypeScript implementation.
+ */
+export type RollingOutcome =
+  | { kind: 'value'; value: number }
+  | { kind: 'unsupported' }
+
+/**
+ * Synchronously apply the finite-`number[]` rolling-window moving
+ * average identified by `kind` (one of `SMA`/`EMA`) to `values` with
+ * the given positive integer `period`, via the Rust `analysis_core`
+ * kernel. The TypeScript caller is expected to keep `toValues(...)`
+ * and `TrackedValues` metadata authoritative on the JS side; this
+ * entry point only consumes a plain finite `number[]` plus a
+ * `period`.
+ *
+ * Returns `{ kind: 'value', value }` for successful moving averages,
+ * or `{ kind: 'unsupported' }` when `period` is not a positive safe
+ * integer or `values` contains a non-finite element.
+ *
+ * Errors:
+ *  - `BindingRollingError`    - `values.length < period`. The message
+ *                               is parity-locked with the legacy TS
+ *                               implementation.
+ *  - `BindingArgumentError`   - `kind` not one of `SMA`/`EMA`, or
+ *                               `values` not an array / `Float64Array`.
+ *  - `BindingLoadError`       - native artifact missing or unloadable.
+ *  - `RustPanicError`         - Rust panic caught at the binding edge.
+ */
+export declare function movingAverageSync(
+  kind: RollingKind,
+  values: number[] | Float64Array,
+  period: number,
+): RollingOutcome
 
 /**
  * Test-only hook: triggers a Rust panic inside the binding to exercise

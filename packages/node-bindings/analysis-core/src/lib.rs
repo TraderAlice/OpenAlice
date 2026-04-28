@@ -48,6 +48,23 @@
 //!     * `{ "ok": false, "error": { "kind": "argument", "message":
 //!       <"unknown reduction kind: X"> } }` when `kind` does not parse
 //!       to one of the four supported reductions.
+//! - `movingAverageToJson(kind, values, period)` (OPE-20) applies the
+//!   finite-`number[]` rolling-window moving average `kind` (`"SMA"` or
+//!   `"EMA"`) over a `Float64Array` of finite `f64`s with a positive
+//!   `u32` period. It returns one of four envelopes:
+//!     * `{ "ok": true, "kind": "value", "value": <f64> }` on success.
+//!     * `{ "ok": true, "kind": "unsupported" }` when the slice contains
+//!       any non-finite element or `period == 0`. The JS wrapper
+//!       pre-screens for non-finite values and for non-integer / non-
+//!       positive periods; this envelope is a defensive second check on
+//!       the Rust side.
+//!     * `{ "ok": false, "error": { "kind": "rolling", "message":
+//!       <legacy-format string> } }` when `values.len() < period`. The
+//!       message matches the legacy TS implementation
+//!       (`"<KIND> requires at least <period> data points, got <len>"`).
+//!     * `{ "ok": false, "error": { "kind": "argument", "message":
+//!       <"unknown moving-average kind: X"> } }` when `kind` does not
+//!       parse to one of the two supported moving averages.
 //!
 //! ## Failure isolation (per ADR-003)
 //!
@@ -81,8 +98,8 @@ use napi::bindgen_prelude::{Error, Float64Array, Result, Status};
 use napi_derive::napi;
 
 pub use analysis_core::{
-    bootstrap_healthcheck, evaluate_arithmetic_only, parse, reduce, AstNode, EvalOutcome,
-    ParseError, ReductionKind, ReductionOutcome,
+    bootstrap_healthcheck, evaluate_arithmetic_only, moving_average, parse, reduce, AstNode,
+    EvalOutcome, ParseError, ReductionKind, ReductionOutcome, RollingKind, RollingOutcome,
 };
 
 const PANIC_SENTINEL: &str = "INTERNAL_RUST_PANIC";
@@ -150,6 +167,34 @@ pub fn reduce_numbers_to_json(kind: String, values: Float64Array) -> Result<Stri
                 Status::GenericFailure,
                 format!(
                     "analysis_core: failed to serialize reduce envelope: {}",
+                    err,
+                ),
+            )
+        }),
+        Err(payload) => Err(Error::new(
+            Status::GenericFailure,
+            format!("{}: {}", PANIC_SENTINEL, panic_message(payload)),
+        )),
+    }
+}
+
+/// Apply a finite `number[]` rolling-window moving average (`SMA` /
+/// `EMA`) to a `Float64Array` plus a positive `u32` period and return a
+/// JSON-encoded envelope (see crate docs for the four envelope shapes,
+/// including the `unsupported` defensive branch for non-finite elements
+/// or `period == 0`). Panics in the kernel are caught at the binding
+/// edge and re-emitted as `INTERNAL_RUST_PANIC: ...`.
+#[napi(js_name = "movingAverageToJson")]
+pub fn moving_average_to_json(kind: String, values: Float64Array, period: u32) -> Result<String> {
+    let outcome = catch_unwind_quiet(AssertUnwindSafe(|| {
+        build_rolling_envelope(&kind, &values, period)
+    }));
+    match outcome {
+        Ok(envelope) => serde_json::to_string(&envelope).map_err(|err| {
+            Error::new(
+                Status::GenericFailure,
+                format!(
+                    "analysis_core: failed to serialize rolling envelope: {}",
                     err,
                 ),
             )
@@ -256,6 +301,39 @@ fn build_reduce_envelope(kind: &str, values: &[f64]) -> serde_json::Value {
             "ok": false,
             "error": {
                 "kind": "reduce",
+                "message": err.message,
+            },
+        }),
+    }
+}
+
+fn build_rolling_envelope(kind: &str, values: &[f64], period: u32) -> serde_json::Value {
+    let parsed = match RollingKind::parse(kind) {
+        Some(k) => k,
+        None => {
+            return serde_json::json!({
+                "ok": false,
+                "error": {
+                    "kind": "argument",
+                    "message": format!("unknown moving-average kind: {}", kind),
+                },
+            });
+        }
+    };
+    match moving_average(parsed, values, period as usize) {
+        RollingOutcome::Value(value) => serde_json::json!({
+            "ok": true,
+            "kind": "value",
+            "value": value,
+        }),
+        RollingOutcome::Unsupported => serde_json::json!({
+            "ok": true,
+            "kind": "unsupported",
+        }),
+        RollingOutcome::Error(err) => serde_json::json!({
+            "ok": false,
+            "error": {
+                "kind": "rolling",
                 "message": err.message,
             },
         }),
@@ -404,6 +482,58 @@ mod tests {
     #[test]
     fn build_reduce_envelope_non_finite_is_unsupported() {
         let envelope = build_reduce_envelope("SUM", &[1.0, f64::NAN, 3.0]);
+        assert_eq!(envelope["ok"], serde_json::Value::Bool(true));
+        assert_eq!(envelope["kind"], "unsupported");
+    }
+
+    #[test]
+    fn build_rolling_envelope_sma_value_shape() {
+        let envelope = build_rolling_envelope("SMA", &[1.0, 2.0, 3.0, 4.0, 5.0], 3);
+        assert_eq!(envelope["ok"], serde_json::Value::Bool(true));
+        assert_eq!(envelope["kind"], "value");
+        assert_eq!(envelope["value"], serde_json::json!(4.0));
+    }
+
+    #[test]
+    fn build_rolling_envelope_ema_value_shape() {
+        let envelope = build_rolling_envelope("EMA", &[1.0, 2.0, 3.0, 4.0, 5.0], 3);
+        assert_eq!(envelope["ok"], serde_json::Value::Bool(true));
+        assert_eq!(envelope["kind"], "value");
+        assert_eq!(envelope["value"], serde_json::json!(4.0));
+    }
+
+    #[test]
+    fn build_rolling_envelope_too_short_emits_legacy_message() {
+        let envelope = build_rolling_envelope("SMA", &[1.0, 2.0], 5);
+        assert_eq!(envelope["ok"], serde_json::Value::Bool(false));
+        assert_eq!(envelope["error"]["kind"], "rolling");
+        assert_eq!(
+            envelope["error"]["message"],
+            "SMA requires at least 5 data points, got 2",
+        );
+    }
+
+    #[test]
+    fn build_rolling_envelope_unknown_kind_is_argument_error() {
+        let envelope = build_rolling_envelope("STDEV", &[1.0, 2.0, 3.0], 2);
+        assert_eq!(envelope["ok"], serde_json::Value::Bool(false));
+        assert_eq!(envelope["error"]["kind"], "argument");
+        assert_eq!(
+            envelope["error"]["message"],
+            "unknown moving-average kind: STDEV",
+        );
+    }
+
+    #[test]
+    fn build_rolling_envelope_non_finite_is_unsupported() {
+        let envelope = build_rolling_envelope("EMA", &[1.0, f64::NAN, 3.0, 4.0, 5.0], 3);
+        assert_eq!(envelope["ok"], serde_json::Value::Bool(true));
+        assert_eq!(envelope["kind"], "unsupported");
+    }
+
+    #[test]
+    fn build_rolling_envelope_period_zero_is_unsupported() {
+        let envelope = build_rolling_envelope("SMA", &[1.0, 2.0, 3.0], 0);
         assert_eq!(envelope["ok"], serde_json::Value::Bool(true));
         assert_eq!(envelope["kind"], "unsupported");
     }

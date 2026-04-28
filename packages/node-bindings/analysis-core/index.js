@@ -1,6 +1,6 @@
 // OpenAlice analysis_core Node binding — Phase 2 napi-rs bridge
 // (OPE-17 parser, OPE-18 arithmetic evaluator, OPE-19 finite number[]
-// reductions).
+// reductions, OPE-20 rolling-window moving averages).
 //
 // This module is the only authorized boundary between the TypeScript
 // adapters in `src/domain/analysis/` and the Rust `analysis_core`
@@ -94,6 +94,14 @@ export class BindingReduceError extends Error {
   }
 }
 
+export class BindingRollingError extends Error {
+  constructor(message) {
+    super(message)
+    this.name = 'BindingRollingError'
+    this.code = 'ANALYSIS_CORE_ROLLING_ERROR'
+  }
+}
+
 export class BindingArgumentError extends Error {
   constructor(message) {
     super(message)
@@ -140,6 +148,7 @@ function loadNative() {
     'parseFormulaToJson',
     'evaluateFormulaToJson',
     'reduceNumbersToJson',
+    'movingAverageToJson',
   ]) {
     if (typeof nativeBinding[fn] !== 'function') {
       nativeLoadError = new BindingLoadError(
@@ -300,6 +309,54 @@ function callNativeReduce(kind, values) {
     throw err
   }
   return decodeReduceEnvelope(raw)
+}
+
+const ROLLING_KIND_SET = new Set(['SMA', 'EMA'])
+
+function decodeRollingEnvelope(rawJson) {
+  let envelope
+  try {
+    envelope = JSON.parse(rawJson)
+  } catch (err) {
+    throw new BindingLoadError(
+      `analysis_core: native binding produced invalid rolling JSON envelope: ${err.message}; raw: ${rawJson}`,
+      err,
+    )
+  }
+  if (envelope && envelope.ok === true) {
+    if (envelope.kind === 'value' && typeof envelope.value === 'number') {
+      return { kind: 'value', value: envelope.value }
+    }
+    if (envelope.kind === 'unsupported') {
+      return { kind: 'unsupported' }
+    }
+  }
+  if (envelope && envelope.ok === false && envelope.error) {
+    const { kind, message } = envelope.error
+    if (kind === 'rolling' && typeof message === 'string') {
+      throw new BindingRollingError(message)
+    }
+    if (kind === 'argument' && typeof message === 'string') {
+      throw new BindingArgumentError(message)
+    }
+  }
+  throw new BindingLoadError(
+    `analysis_core: native binding returned unrecognized rolling envelope: ${rawJson}`,
+  )
+}
+
+function callNativeMovingAverage(kind, values, period) {
+  const native = loadNative()
+  let raw
+  try {
+    raw = native.movingAverageToJson(kind, values, period)
+  } catch (err) {
+    if (isPanicError(err)) {
+      throw new RustPanicError(panicMessageFromNative(err.message), err)
+    }
+    throw err
+  }
+  return decodeRollingEnvelope(raw)
 }
 
 // ============================================================================
@@ -502,6 +559,84 @@ export function reduceNumbersSync(kind, values) {
     )
   }
   return callNativeReduce(kind, buffer)
+}
+
+/**
+ * Synchronously apply a finite-`number[]` rolling-window moving average
+ * (`SMA` or `EMA`) via the Rust `analysis_core` kernel.
+ *
+ * Returns one of:
+ *   - `{ kind: 'value', value: number }` on a successful moving-average
+ *     calculation. Semantics are parity-locked with the legacy
+ *     TypeScript implementations:
+ *     * `SMA(values, period)` averages the trailing `period` values.
+ *     * `EMA(values, period)` seeds from the SMA of the first `period`
+ *       values and applies the
+ *       `ema = (v[i] - ema) * multiplier + ema` recurrence with
+ *       `multiplier = 2 / (period + 1)` left-to-right over the rest.
+ *   - `{ kind: 'unsupported' }` when:
+ *     * `period` is not a positive safe integer; OR
+ *     * `values` contains a non-finite element (`NaN` / `+/-Infinity`).
+ *     The caller is expected to fall back to the legacy TypeScript
+ *     implementation in `statistics.ts` so existing `dataRange` and
+ *     `TrackedValues` semantics stay authoritative.
+ *
+ * Throws:
+ *   - `BindingRollingError`    - `values.length < period`. `.message` is
+ *                                parity-locked with the legacy TS error
+ *                                (`"<KIND> requires at least <period>
+ *                                data points, got <len>"`).
+ *   - `BindingArgumentError`   - `kind` is not one of `SMA`/`EMA`, or
+ *                                `values` is not an array / `Float64Array`.
+ *   - `BindingLoadError`       - native artifact missing or unloadable.
+ *   - `RustPanicError`         - Rust panic caught at the binding edge.
+ *
+ * @param {'SMA'|'EMA'} kind
+ * @param {number[]|Float64Array} values  Plain finite `number[]`. The
+ *   wrapper converts a JS `number[]` to a `Float64Array` once before
+ *   crossing the binding boundary so the Rust kernel sees a contiguous
+ *   `&[f64]` slice without re-allocating per element.
+ * @param {number} period  Positive safe integer.
+ * @returns {{ kind: 'value', value: number } | { kind: 'unsupported' }}
+ */
+export function movingAverageSync(kind, values, period) {
+  if (typeof kind !== 'string' || !ROLLING_KIND_SET.has(kind)) {
+    throw new BindingArgumentError(`unknown moving-average kind: ${String(kind)}`)
+  }
+  // Period guard: only positive safe integers route through Rust. Any
+  // other shape (zero, negative, non-integer, non-finite, NaN, > 2^32-1)
+  // returns `unsupported` so the caller stays on the legacy TS path
+  // rather than introducing new validation behavior in this slice.
+  if (
+    typeof period !== 'number'
+    || !Number.isSafeInteger(period)
+    || period < 1
+    || period > 0xffffffff
+  ) {
+    return { kind: 'unsupported' }
+  }
+  let buffer
+  if (values instanceof Float64Array) {
+    // Float64Array can carry NaN/Infinity, so we still need the
+    // pre-screen below; do it on a typed-array iteration.
+    for (let i = 0; i < values.length; i += 1) {
+      if (!Number.isFinite(values[i])) return { kind: 'unsupported' }
+    }
+    buffer = values
+  } else if (Array.isArray(values)) {
+    for (let i = 0; i < values.length; i += 1) {
+      const v = values[i]
+      if (typeof v !== 'number' || !Number.isFinite(v)) {
+        return { kind: 'unsupported' }
+      }
+    }
+    buffer = Float64Array.from(values)
+  } else {
+    throw new BindingArgumentError(
+      `movingAverageSync expects a number[] or Float64Array, got ${typeof values}`,
+    )
+  }
+  return callNativeMovingAverage(kind, buffer, period)
 }
 
 /**

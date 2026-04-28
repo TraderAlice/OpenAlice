@@ -5,10 +5,11 @@
 //! evaluation for numeric literals and `+ - * /` between numbers, with
 //! parity-locked `Division by zero` semantics. OPE-19 adds finite
 //! `number[]` reductions for `MIN`, `MAX`, `SUM`, and `AVERAGE` on top of
-//! a plain `&[f64]` (TypeScript still owns `toValues(...)`, the
-//! `TrackedValues` metadata, data-access, rolling-window indicators, and
-//! technical indicators). Strings, function calls, array access,
-//! rolling-window indicators, technical indicators, data-access
+//! a plain `&[f64]`. OPE-20 adds finite-`number[]` rolling-window moving
+//! averages for `SMA` and `EMA` on top of `&[f64] + usize period`
+//! (TypeScript still owns `toValues(...)`, the `TrackedValues` metadata,
+//! data-access, `STDEV`, and every technical indicator). Strings,
+//! function calls, array access, technical indicators, data-access
 //! functions, and the public tool surface remain authoritative on the
 //! TypeScript side until later slices port them.
 //!
@@ -21,10 +22,12 @@
 pub mod evaluator;
 pub mod parser;
 pub mod reductions;
+pub mod rolling;
 
 pub use evaluator::{evaluate_arithmetic_only, EvalError, EvalOutcome};
 pub use parser::{parse, AstNode, ParseError};
 pub use reductions::{reduce, ReductionError, ReductionKind, ReductionOutcome};
+pub use rolling::{moving_average, RollingError, RollingKind, RollingOutcome};
 
 /// Bootstrap healthcheck retained from the OPE-15 toolchain shell so the
 /// binding crate, JS package, and CI smoke checks keep a stable, no-op
