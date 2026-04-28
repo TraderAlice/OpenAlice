@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/traderalice-openalice-badge.png)](https://mseep.ai/app/traderalice-openalice)
+
 <p align="center">
   <img src="docs/images/alice-full.png" alt="OpenAlice" width="140">
 </p>
