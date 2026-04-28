@@ -1,0 +1,28 @@
+[package]
+name = "alice-analysis"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.77"
+license = "AGPL-3.0-only"
+description = "OpenAlice indicator + formula engine (Rust port, NAPI-RS bindings)"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+napi = { version = "2.16", default-features = false, features = ["napi8", "tokio_rt"] }
+napi-derive = "2.16"
+tokio = { version = "1", default-features = false, features = ["rt", "sync", "macros"] }
+# rust_decimal moved to packages/alice-decimal alongside the codec (task #11
+# Q-EXTRACT). No analysis-side Rust code uses Decimal — analysis math is
+# f64 throughout — so the dep can drop.
+
+[build-dependencies]
+napi-build = "2.1"
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+strip = "symbols"
