@@ -31,6 +31,23 @@
 //!     * `{ "ok": false, "error": { "kind": "evaluate", "message":
 //!       "Division by zero" } }` for arithmetic-only runtime errors
 //!       whose `.message` matches the legacy TypeScript evaluator.
+//! - `reduceNumbersToJson(kind, values)` (OPE-19) applies the finite
+//!   `number[]` reduction `kind` (`"MIN"`, `"MAX"`, `"SUM"`, or
+//!   `"AVERAGE"`) to a `Float64Array` of finite `f64`s and returns one of
+//!   four envelopes:
+//!     * `{ "ok": true, "kind": "value", "value": <f64> }` on success
+//!     * `{ "ok": true, "kind": "unsupported" }` when the slice contains
+//!       any non-finite element. The JS wrapper pre-screens for this so
+//!       callers can route non-finite arrays back to the legacy
+//!       TypeScript reductions; this envelope is a defensive second
+//!       check on the Rust side.
+//!     * `{ "ok": false, "error": { "kind": "reduce", "message":
+//!       <legacy-format string> } }` for `MIN`/`MAX`/`AVERAGE` on an
+//!       empty slice (`SUM([])` returns `Value(0.0)` to mirror
+//!       `[].reduce((a, v) => a + v, 0)`).
+//!     * `{ "ok": false, "error": { "kind": "argument", "message":
+//!       <"unknown reduction kind: X"> } }` when `kind` does not parse
+//!       to one of the four supported reductions.
 //!
 //! ## Failure isolation (per ADR-003)
 //!
@@ -60,11 +77,12 @@
 use std::panic::{self, AssertUnwindSafe, UnwindSafe};
 use std::sync::{Mutex, OnceLock};
 
-use napi::bindgen_prelude::{Error, Result, Status};
+use napi::bindgen_prelude::{Error, Float64Array, Result, Status};
 use napi_derive::napi;
 
 pub use analysis_core::{
-    bootstrap_healthcheck, evaluate_arithmetic_only, parse, AstNode, EvalOutcome, ParseError,
+    bootstrap_healthcheck, evaluate_arithmetic_only, parse, reduce, AstNode, EvalOutcome,
+    ParseError, ReductionKind, ReductionOutcome,
 };
 
 const PANIC_SENTINEL: &str = "INTERNAL_RUST_PANIC";
@@ -107,6 +125,31 @@ pub fn evaluate_formula_to_json(formula: String) -> Result<String> {
                 Status::GenericFailure,
                 format!(
                     "analysis_core: failed to serialize evaluate envelope: {}",
+                    err,
+                ),
+            )
+        }),
+        Err(payload) => Err(Error::new(
+            Status::GenericFailure,
+            format!("{}: {}", PANIC_SENTINEL, panic_message(payload)),
+        )),
+    }
+}
+
+/// Apply a finite `number[]` reduction (`MIN`/`MAX`/`SUM`/`AVERAGE`) to
+/// a `Float64Array` and return a JSON-encoded envelope (see crate docs
+/// for the four envelope shapes, including the `unsupported` defensive
+/// branch for non-finite elements). Panics in the kernel are caught at
+/// the binding edge and re-emitted as `INTERNAL_RUST_PANIC: ...`.
+#[napi(js_name = "reduceNumbersToJson")]
+pub fn reduce_numbers_to_json(kind: String, values: Float64Array) -> Result<String> {
+    let outcome = catch_unwind_quiet(AssertUnwindSafe(|| build_reduce_envelope(&kind, &values)));
+    match outcome {
+        Ok(envelope) => serde_json::to_string(&envelope).map_err(|err| {
+            Error::new(
+                Status::GenericFailure,
+                format!(
+                    "analysis_core: failed to serialize reduce envelope: {}",
                     err,
                 ),
             )
@@ -180,6 +223,39 @@ fn build_evaluate_envelope(formula: &str) -> serde_json::Value {
             "ok": false,
             "error": {
                 "kind": "evaluate",
+                "message": err.message,
+            },
+        }),
+    }
+}
+
+fn build_reduce_envelope(kind: &str, values: &[f64]) -> serde_json::Value {
+    let parsed = match ReductionKind::parse(kind) {
+        Some(k) => k,
+        None => {
+            return serde_json::json!({
+                "ok": false,
+                "error": {
+                    "kind": "argument",
+                    "message": format!("unknown reduction kind: {}", kind),
+                },
+            });
+        }
+    };
+    match reduce(parsed, values) {
+        ReductionOutcome::Value(value) => serde_json::json!({
+            "ok": true,
+            "kind": "value",
+            "value": value,
+        }),
+        ReductionOutcome::Unsupported => serde_json::json!({
+            "ok": true,
+            "kind": "unsupported",
+        }),
+        ReductionOutcome::Error(err) => serde_json::json!({
+            "ok": false,
+            "error": {
+                "kind": "reduce",
                 "message": err.message,
             },
         }),
@@ -279,6 +355,57 @@ mod tests {
             "Unexpected character '@' at position 0"
         );
         assert_eq!(envelope["error"]["position"], 0);
+    }
+
+    #[test]
+    fn build_reduce_envelope_value_shape() {
+        let envelope = build_reduce_envelope("SUM", &[1.0, 2.0, 3.0]);
+        assert_eq!(envelope["ok"], serde_json::Value::Bool(true));
+        assert_eq!(envelope["kind"], "value");
+        assert_eq!(envelope["value"], serde_json::json!(6.0));
+    }
+
+    #[test]
+    fn build_reduce_envelope_min_shape() {
+        let envelope = build_reduce_envelope("MIN", &[3.0, 1.0, 2.0]);
+        assert_eq!(envelope["kind"], "value");
+        assert_eq!(envelope["value"], serde_json::json!(1.0));
+    }
+
+    #[test]
+    fn build_reduce_envelope_empty_min_emits_legacy_message() {
+        let envelope = build_reduce_envelope("MIN", &[]);
+        assert_eq!(envelope["ok"], serde_json::Value::Bool(false));
+        assert_eq!(envelope["error"]["kind"], "reduce");
+        assert_eq!(
+            envelope["error"]["message"],
+            "MIN requires at least 1 data point",
+        );
+    }
+
+    #[test]
+    fn build_reduce_envelope_empty_sum_returns_zero() {
+        let envelope = build_reduce_envelope("SUM", &[]);
+        assert_eq!(envelope["kind"], "value");
+        assert_eq!(envelope["value"], serde_json::json!(0.0));
+    }
+
+    #[test]
+    fn build_reduce_envelope_unknown_kind_is_argument_error() {
+        let envelope = build_reduce_envelope("STDEV", &[1.0]);
+        assert_eq!(envelope["ok"], serde_json::Value::Bool(false));
+        assert_eq!(envelope["error"]["kind"], "argument");
+        assert_eq!(
+            envelope["error"]["message"],
+            "unknown reduction kind: STDEV"
+        );
+    }
+
+    #[test]
+    fn build_reduce_envelope_non_finite_is_unsupported() {
+        let envelope = build_reduce_envelope("SUM", &[1.0, f64::NAN, 3.0]);
+        assert_eq!(envelope["ok"], serde_json::Value::Bool(true));
+        assert_eq!(envelope["kind"], "unsupported");
     }
 
     #[test]

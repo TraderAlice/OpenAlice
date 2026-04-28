@@ -3,6 +3,7 @@
  *
  * - OPE-17: parser slice (`parseFormulaSync`).
  * - OPE-18: arithmetic-only evaluator slice (`evaluateFormulaSync`).
+ * - OPE-19: finite `number[]` reductions slice (`reduceNumbersSync`).
  *
  * The exposed AST shape matches the legacy TypeScript `ASTNode`
  * discriminated-union exactly so the TypeScript evaluator can consume
@@ -95,6 +96,31 @@ export declare class BindingEvaluateError extends Error {
   readonly code: 'ANALYSIS_CORE_EVALUATE_ERROR'
 }
 
+/**
+ * Thrown when a Rust finite-`number[]` reduction surfaces a runtime
+ * error whose `.message` is parity-locked with the legacy TypeScript
+ * implementation (e.g. `"MIN requires at least 1 data point"`). Only
+ * emitted by `reduceNumbersSync` for `MIN`/`MAX`/`AVERAGE` on an empty
+ * slice (`SUM([])` returns `{ kind: 'value', value: 0 }`).
+ */
+export declare class BindingReduceError extends Error {
+  readonly name: 'BindingReduceError'
+  readonly code: 'ANALYSIS_CORE_REDUCE_ERROR'
+}
+
+/**
+ * Thrown when a binding entry point receives an argument that does not
+ * match its contract (e.g. `reduceNumbersSync` called with a `kind` that
+ * is not one of `MIN`/`MAX`/`SUM`/`AVERAGE`, or with a non-array
+ * `values` argument). Distinct from `BindingReduceError` so the JS
+ * caller can route argument-shape failures separately from
+ * legacy-format reduction errors.
+ */
+export declare class BindingArgumentError extends Error {
+  readonly name: 'BindingArgumentError'
+  readonly code: 'ANALYSIS_CORE_ARGUMENT_ERROR'
+}
+
 export declare function bootstrapHealthcheck(): 'analysis_core:bootstrap'
 
 /**
@@ -147,6 +173,48 @@ export type EvaluateOutcome =
  * in-process napi-rs path.
  */
 export declare function evaluateFormulaSync(formula: string): EvaluateOutcome
+
+/**
+ * Supported reduction kind identifier. Anything outside this union is
+ * rejected by `reduceNumbersSync` with `BindingArgumentError` before any
+ * data crosses the binding boundary.
+ */
+export type ReductionKind = 'MIN' | 'MAX' | 'SUM' | 'AVERAGE'
+
+/**
+ * Outcome of `reduceNumbersSync`. Either the kernel produced a finite
+ * `f64` reduction value, or the slice contained at least one non-finite
+ * element (`NaN` / `+/-Infinity`) and the caller must hand the
+ * reduction back to the legacy TypeScript implementation.
+ */
+export type ReduceOutcome =
+  | { kind: 'value'; value: number }
+  | { kind: 'unsupported' }
+
+/**
+ * Synchronously apply the finite-`number[]` reduction identified by
+ * `kind` (one of `MIN`/`MAX`/`SUM`/`AVERAGE`) to `values` via the Rust
+ * `analysis_core` kernel. The TypeScript caller is expected to keep
+ * `toValues(...)` and `TrackedValues` metadata authoritative on the JS
+ * side; this entry point only consumes a plain finite `number[]`.
+ *
+ * Returns `{ kind: 'value', value }` for successful reductions, or
+ * `{ kind: 'unsupported' }` for slices containing non-finite elements.
+ *
+ * Errors:
+ *  - `BindingReduceError`     - `MIN`/`MAX`/`AVERAGE` on `[]`. The
+ *                               message is parity-locked with the legacy
+ *                               TypeScript reduction.
+ *  - `BindingArgumentError`   - `kind` not one of the four supported
+ *                               reductions, or `values` not an array /
+ *                               `Float64Array`.
+ *  - `BindingLoadError`       - native artifact missing or unloadable.
+ *  - `RustPanicError`         - Rust panic caught at the binding edge.
+ */
+export declare function reduceNumbersSync(
+  kind: ReductionKind,
+  values: number[] | Float64Array,
+): ReduceOutcome
 
 /**
  * Test-only hook: triggers a Rust panic inside the binding to exercise

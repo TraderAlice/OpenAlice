@@ -1,5 +1,6 @@
 // OpenAlice analysis_core Node binding — Phase 2 napi-rs bridge
-// (OPE-17 parser, OPE-18 arithmetic evaluator).
+// (OPE-17 parser, OPE-18 arithmetic evaluator, OPE-19 finite number[]
+// reductions).
 //
 // This module is the only authorized boundary between the TypeScript
 // adapters in `src/domain/analysis/` and the Rust `analysis_core`
@@ -85,6 +86,22 @@ export class BindingEvaluateError extends Error {
   }
 }
 
+export class BindingReduceError extends Error {
+  constructor(message) {
+    super(message)
+    this.name = 'BindingReduceError'
+    this.code = 'ANALYSIS_CORE_REDUCE_ERROR'
+  }
+}
+
+export class BindingArgumentError extends Error {
+  constructor(message) {
+    super(message)
+    this.name = 'BindingArgumentError'
+    this.code = 'ANALYSIS_CORE_ARGUMENT_ERROR'
+  }
+}
+
 export class RustPanicError extends Error {
   constructor(message, cause) {
     super(message)
@@ -118,7 +135,12 @@ function loadNative() {
     )
     throw nativeLoadError
   }
-  for (const fn of ['bootstrapHealthcheck', 'parseFormulaToJson', 'evaluateFormulaToJson']) {
+  for (const fn of [
+    'bootstrapHealthcheck',
+    'parseFormulaToJson',
+    'evaluateFormulaToJson',
+    'reduceNumbersToJson',
+  ]) {
     if (typeof nativeBinding[fn] !== 'function') {
       nativeLoadError = new BindingLoadError(
         `analysis_core: native binding at ${NATIVE_PATH} is missing required export "${fn}".`,
@@ -230,6 +252,54 @@ function callNativeEvaluate(formula) {
     throw err
   }
   return decodeEvaluateEnvelope(raw)
+}
+
+const REDUCE_KIND_SET = new Set(['MIN', 'MAX', 'SUM', 'AVERAGE'])
+
+function decodeReduceEnvelope(rawJson) {
+  let envelope
+  try {
+    envelope = JSON.parse(rawJson)
+  } catch (err) {
+    throw new BindingLoadError(
+      `analysis_core: native binding produced invalid reduce JSON envelope: ${err.message}; raw: ${rawJson}`,
+      err,
+    )
+  }
+  if (envelope && envelope.ok === true) {
+    if (envelope.kind === 'value' && typeof envelope.value === 'number') {
+      return { kind: 'value', value: envelope.value }
+    }
+    if (envelope.kind === 'unsupported') {
+      return { kind: 'unsupported' }
+    }
+  }
+  if (envelope && envelope.ok === false && envelope.error) {
+    const { kind, message } = envelope.error
+    if (kind === 'reduce' && typeof message === 'string') {
+      throw new BindingReduceError(message)
+    }
+    if (kind === 'argument' && typeof message === 'string') {
+      throw new BindingArgumentError(message)
+    }
+  }
+  throw new BindingLoadError(
+    `analysis_core: native binding returned unrecognized reduce envelope: ${rawJson}`,
+  )
+}
+
+function callNativeReduce(kind, values) {
+  const native = loadNative()
+  let raw
+  try {
+    raw = native.reduceNumbersToJson(kind, values)
+  } catch (err) {
+    if (isPanicError(err)) {
+      throw new RustPanicError(panicMessageFromNative(err.message), err)
+    }
+    throw err
+  }
+  return decodeReduceEnvelope(raw)
 }
 
 // ============================================================================
@@ -373,6 +443,65 @@ export function evaluateFormulaSync(formula) {
     throw new TypeError('evaluateFormulaSync expects a string formula')
   }
   return callNativeEvaluate(formula)
+}
+
+/**
+ * Synchronously apply a finite-`number[]` reduction (`MIN`, `MAX`,
+ * `SUM`, or `AVERAGE`) via the Rust `analysis_core` kernel.
+ *
+ * Returns one of:
+ *   - `{ kind: 'value', value: number }` on a successful reduction or
+ *     on `SUM([])` (which returns `0` to mirror the legacy
+ *     `[].reduce((a, v) => a + v, 0)` semantics).
+ *   - `{ kind: 'unsupported' }` when the slice contains a non-finite
+ *     element (`NaN` / `+/-Infinity`). The JS wrapper pre-screens for
+ *     these — JSON cannot encode them losslessly — so the caller is
+ *     expected to route those slices back to the legacy TypeScript
+ *     reduction and keep `dataRange`/`TrackedValues` semantics
+ *     authoritative on the TypeScript side.
+ *
+ * Throws:
+ *   - `BindingReduceError`     - `MIN`/`MAX`/`AVERAGE` on an empty slice;
+ *                                `.message` is parity-locked with the
+ *                                legacy TypeScript implementation
+ *                                (e.g. `"MIN requires at least 1 data point"`).
+ *   - `BindingArgumentError`   - `kind` is not one of `MIN`/`MAX`/`SUM`/`AVERAGE`.
+ *   - `BindingLoadError`       - native artifact missing or unloadable.
+ *   - `RustPanicError`         - Rust panic caught at the binding edge.
+ *
+ * @param {'MIN'|'MAX'|'SUM'|'AVERAGE'} kind
+ * @param {number[]|Float64Array} values  Plain finite `number[]`. The
+ *   wrapper converts a JS `number[]` to a `Float64Array` once before
+ *   crossing the binding boundary so the Rust kernel sees a contiguous
+ *   `&[f64]` slice without re-allocating per element.
+ * @returns {{ kind: 'value', value: number } | { kind: 'unsupported' }}
+ */
+export function reduceNumbersSync(kind, values) {
+  if (typeof kind !== 'string' || !REDUCE_KIND_SET.has(kind)) {
+    throw new BindingArgumentError(`unknown reduction kind: ${String(kind)}`)
+  }
+  let buffer
+  if (values instanceof Float64Array) {
+    buffer = values
+  } else if (Array.isArray(values)) {
+    // Defensive pre-screen for non-finite elements. The Rust kernel
+    // also screens, but JSON cannot losslessly carry NaN/+/-Infinity,
+    // so we keep these on the legacy TypeScript path. Returning the
+    // `unsupported` envelope here avoids a wasted FFI hop and matches
+    // the documented semantics exactly.
+    for (let i = 0; i < values.length; i += 1) {
+      const v = values[i]
+      if (typeof v !== 'number' || !Number.isFinite(v)) {
+        return { kind: 'unsupported' }
+      }
+    }
+    buffer = Float64Array.from(values)
+  } else {
+    throw new BindingArgumentError(
+      `reduceNumbersSync expects a number[] or Float64Array, got ${typeof values}`,
+    )
+  }
+  return callNativeReduce(kind, buffer)
 }
 
 /**
