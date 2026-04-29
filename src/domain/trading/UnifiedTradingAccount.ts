@@ -78,7 +78,8 @@ export interface StageModifyOrderParams {
 export interface StageClosePositionParams {
   aliceId: string
   symbol?: string
-  qty?: number
+  /** Accepts string (preferred — preserves Decimal precision) or number. Empty / undefined closes the full position. */
+  qty?: number | string
 }
 
 // ==================== UnifiedTradingAccount ====================

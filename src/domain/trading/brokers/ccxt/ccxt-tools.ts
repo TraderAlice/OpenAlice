@@ -7,11 +7,11 @@
 import { tool } from 'ai'
 import { z } from 'zod'
 import { Contract } from '@traderalice/ibkr'
-import type { AccountManager } from '../../account-manager.js'
+import type { UTAManager } from '../../uta-manager.js'
 import { CcxtBroker } from './CcxtBroker.js'
 import '../../contract-ext.js'
 
-export function createCcxtProviderTools(manager: AccountManager) {
+export function createCcxtProviderTools(manager: UTAManager) {
   /** Resolve to exactly one CcxtBroker. Returns error object if unable. */
   const resolveCcxtOne = (source?: string): { broker: CcxtBroker; id: string } | { error: string } => {
     const targets = manager.resolve(source)

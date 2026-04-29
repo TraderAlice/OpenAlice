@@ -10,7 +10,7 @@ import { tool, type Tool } from 'ai'
 import { z } from 'zod'
 import Decimal from 'decimal.js'
 import { Contract, UNSET_DECIMAL } from '@traderalice/ibkr'
-import type { AccountManager } from '@/domain/trading/account-manager.js'
+import type { UTAManager } from '@/domain/trading/uta-manager.js'
 import { BrokerError, type OpenOrder } from '@/domain/trading/brokers/types.js'
 import type { FxService } from '@/domain/trading/fx-service.js'
 import { normalizeBrokerSearchPattern } from '@/domain/trading/contract-search-rules.js'
@@ -80,12 +80,12 @@ const positiveNumeric = z
     { message: 'must be a positive number or positive numeric string' },
   )
 
-export function createTradingTools(manager: AccountManager, fxService?: FxService): Record<string, Tool> {
+export function createTradingTools(manager: UTAManager, fxService?: FxService): Record<string, Tool> {
   return {
-    listAccounts: tool({
+    listUTAs: tool({
       description: 'List all registered trading accounts with their id, provider, label, and capabilities.',
       inputSchema: z.object({}),
-      execute: () => manager.listAccounts(),
+      execute: () => manager.listUTAs(),
     }),
 
     searchContracts: tool({

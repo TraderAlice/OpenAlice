@@ -237,7 +237,7 @@ export interface BrokerHealthInfo {
   disabled: boolean
 }
 
-export interface AccountSummary {
+export interface UTASummary {
   id: string
   label: string
   capabilities: { supportedSecTypes: string[]; supportedOrderTypes: string[] }
@@ -348,7 +348,12 @@ export interface ToolCallRecord {
 
 // ==================== Trading Config ====================
 
-export interface AccountConfig {
+/**
+ * One Unified Trading Account configuration record. The user-facing
+ * concept that wraps a broker connection — distinct from `AccountInfo`,
+ * which is broker-side (cash, equity, margin returned by the broker).
+ */
+export interface UTAConfig {
   id: string
   label?: string
   /** Broker preset id — resolves to engine + form schema on the backend. */
@@ -399,6 +404,52 @@ export interface TestConnectionResult {
   error?: string
   account?: AccountInfo
   positions?: Position[]
+}
+
+// ==================== Order entry (frontend manual surface) ====================
+//
+// Numeric fields are strings on the wire — the backend uses
+// new Decimal(String(x)) to preserve precision; mirroring the type
+// here keeps frontend → backend aligned and avoids float roundtrip.
+
+export interface PlaceOrderRequest {
+  aliceId: string
+  symbol?: string
+  action: 'BUY' | 'SELL'
+  orderType: string
+  totalQuantity?: string
+  cashQty?: string
+  lmtPrice?: string
+  auxPrice?: string
+  trailStopPrice?: string
+  trailingPercent?: string
+  tif?: string
+  goodTillDate?: string
+  outsideRth?: boolean
+  parentId?: string
+  ocaGroup?: string
+  takeProfit?: { price: string }
+  stopLoss?: { price: string; limitPrice?: string }
+  message: string
+}
+
+export interface ClosePositionRequest {
+  aliceId: string
+  symbol?: string
+  qty?: string
+  message: string
+}
+
+export interface CancelOrderRequest {
+  orderId: string
+  message: string
+}
+
+/** Error response shape from one-shot order endpoints (when status !== 200). */
+export interface OrderErrorResponse {
+  error: string
+  /** Which step blew up — useful for surfacing where the failure happened. */
+  phase?: 'validate' | 'stage' | 'commit' | 'push'
 }
 
 // ==================== Snapshots ====================

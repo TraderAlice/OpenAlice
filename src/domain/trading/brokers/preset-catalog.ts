@@ -34,7 +34,7 @@ export interface SubtitleSegment {
 }
 
 export interface BrokerPresetDef {
-  /** Stable id stored on disk in AccountConfig.presetId. */
+  /** Stable id stored on disk in UTAConfig.presetId. */
   id: string
   /** User-facing label in the wizard. */
   label: string

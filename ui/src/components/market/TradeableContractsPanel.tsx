@@ -23,7 +23,7 @@ const COLLAPSED_LIMIT = 3
 
 export function TradeableContractsPanel({ symbol, assetClass }: Props) {
   const [hits, setHits] = useState<ContractSearchHit[] | null>(null)
-  const [accountsConfigured, setAccountsConfigured] = useState<number | null>(null)
+  const [utasConfigured, setAccountsConfigured] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(false)
@@ -37,7 +37,7 @@ export function TradeableContractsPanel({ symbol, assetClass }: Props) {
       .then((res) => {
         if (cancelled) return
         setHits(res.results)
-        setAccountsConfigured(res.accountsConfigured ?? null)
+        setAccountsConfigured(res.utasConfigured ?? null)
       })
       .catch((e) => { if (!cancelled) setError(e instanceof Error ? e.message : String(e)) })
       .finally(() => { if (!cancelled) setLoading(false) })
@@ -55,7 +55,7 @@ export function TradeableContractsPanel({ symbol, assetClass }: Props) {
       {loading && <div className="text-[12px] text-text-muted">Searching brokers…</div>}
       {error && !loading && <div className="text-[12px] text-red-400">{error}</div>}
 
-      {!loading && !error && accountsConfigured === 0 && (
+      {!loading && !error && utasConfigured === 0 && (
         <div className="text-[12px] text-text-muted">
           No trading accounts configured.{' '}
           <Link to="/trading" className="text-accent hover:underline">
@@ -65,7 +65,7 @@ export function TradeableContractsPanel({ symbol, assetClass }: Props) {
         </div>
       )}
 
-      {!loading && !error && accountsConfigured !== 0 && hits && hits.length === 0 && (
+      {!loading && !error && utasConfigured !== 0 && hits && hits.length === 0 && (
         <div className="text-[12px] text-text-muted">
           No tradeable contracts matching <span className="font-mono">{symbol}</span> on your configured brokers.
         </div>
@@ -133,6 +133,12 @@ function byInstrumentFamiliarity(a: ContractSearchHit, b: ContractSearchHit): nu
 function ContractRow({ hit }: { hit: ContractSearchHit }) {
   const c = hit.contract
   const aliceId = c.aliceId as string | undefined
+  // Bridge to the UTA detail page's order entry — clicking jumps the
+  // user from "I see this contract on this UTA" to "place an order
+  // against it" with the alice id pre-filled.
+  const orderHref = aliceId
+    ? `/uta/${encodeURIComponent(hit.source)}?aliceId=${encodeURIComponent(aliceId)}`
+    : null
   return (
     <li className="px-3 py-2 flex items-baseline gap-3 text-[12px] hover:bg-bg-tertiary/40 transition-colors">
       <span className="font-mono font-semibold text-text">{c.symbol ?? '—'}</span>
@@ -154,6 +160,15 @@ function ContractRow({ hit }: { hit: ContractSearchHit }) {
         >
           {aliceId}
         </code>
+      )}
+      {orderHref && (
+        <Link
+          to={orderHref}
+          className="text-[11px] text-accent hover:underline shrink-0"
+          title="Open order entry on the UTA"
+        >
+          Order →
+        </Link>
       )}
     </li>
   )

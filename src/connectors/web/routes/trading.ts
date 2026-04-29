@@ -1,10 +1,97 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
+import { z } from 'zod'
 import type { EngineContext } from '../../../core/types.js'
 import { BrokerError } from '../../../domain/trading/brokers/types.js'
 import type { UnifiedTradingAccount } from '../../../domain/trading/UnifiedTradingAccount.js'
 import { searchTradeableContracts } from '../../../domain/trading/contract-search.js'
 import type { AssetClassHint } from '../../../domain/trading/contract-search-rules.js'
+
+// ==================== Order entry schemas ====================
+//
+// All numeric fields use string on the wire (matching the
+// new Decimal(String(x)) pattern in UnifiedTradingAccount.ts) — keeps
+// frontend/backend aligned on Decimal precision and avoids IEEE-754
+// rounding artifacts in JSON serialization.
+
+const numericString = z.string().min(1)
+const message = z.string().min(1, { message: 'Commit message is required' })
+
+const placeOrderSchema = z.object({
+  aliceId: z.string().min(1),
+  symbol: z.string().optional(),
+  action: z.enum(['BUY', 'SELL']),
+  orderType: z.string().min(1),
+  totalQuantity: numericString.optional(),
+  cashQty: numericString.optional(),
+  lmtPrice: numericString.optional(),
+  auxPrice: numericString.optional(),
+  trailStopPrice: numericString.optional(),
+  trailingPercent: numericString.optional(),
+  tif: z.string().optional(),
+  goodTillDate: z.string().optional(),
+  outsideRth: z.boolean().optional(),
+  parentId: z.string().optional(),
+  ocaGroup: z.string().optional(),
+  takeProfit: z.object({ price: numericString }).optional(),
+  stopLoss: z.object({ price: numericString, limitPrice: numericString.optional() }).optional(),
+  message,
+}).refine(
+  (d) => d.totalQuantity != null || d.cashQty != null,
+  { message: 'Either totalQuantity or cashQty is required' },
+)
+
+const closePositionSchema = z.object({
+  aliceId: z.string().min(1),
+  symbol: z.string().optional(),
+  qty: numericString.optional(),
+  message,
+})
+
+const cancelOrderSchema = z.object({
+  orderId: z.string().min(1),
+  message,
+})
+
+/**
+ * Combine stage → commit → push into one HTTP roundtrip. The
+ * underlying TradingGit phases stay separate; this is a route-layer
+ * convenience for the frontend's manual order entry surface. Returns
+ * the full PushResult (including per-op submitted/rejected breakdown
+ * with fills + errors) so the user can see async behavior end-to-end.
+ *
+ * On error, the response carries `phase` so the frontend can label
+ * which step failed (stage → guards bounced; commit → invalid state;
+ * push → broker exception before any per-op result).
+ */
+async function executeOneShot<T>(
+  c: Context,
+  uta: UnifiedTradingAccount,
+  message: string,
+  stage: () => T,
+): Promise<Response> {
+  // Stage
+  try {
+    stage()
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : String(err), phase: 'stage' }, 400)
+  }
+  // Commit
+  try {
+    uta.commit(message)
+  } catch (err) {
+    // Roll back the staging area so the next attempt starts clean.
+    try { await uta.reject('auto-rollback after commit error') } catch { /* best effort */ }
+    return c.json({ error: err instanceof Error ? err.message : String(err), phase: 'commit' }, 400)
+  }
+  // Push
+  try {
+    const result = await uta.push()
+    return c.json(result)
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : String(err), phase: 'push' }, 500)
+  }
+}
 
 const ALLOWED_ASSET_CLASSES: ReadonlySet<AssetClassHint> = new Set([
   'equity', 'crypto', 'currency', 'commodity', 'unknown',
@@ -14,7 +101,7 @@ const ALLOWED_ASSET_CLASSES: ReadonlySet<AssetClassHint> = new Set([
 function resolveAccount(ctx: EngineContext, c: Context): UnifiedTradingAccount | null {
   const id = c.req.param('id')
   if (!id) return null
-  return ctx.accountManager.get(id) ?? null
+  return ctx.utaManager.get(id) ?? null
 }
 
 /**
@@ -51,16 +138,16 @@ async function queryAccount<T>(
 export function createTradingRoutes(ctx: EngineContext) {
   const app = new Hono()
 
-  // ==================== Accounts listing ====================
+  // ==================== UTA listing ====================
 
-  app.get('/accounts', (c) => {
-    return c.json({ accounts: ctx.accountManager.listAccounts() })
+  app.get('/uta', (c) => {
+    return c.json({ utas: ctx.utaManager.listUTAs() })
   })
 
   // ==================== Aggregated equity ====================
 
   app.get('/equity', async (c) => {
-    const equity = await ctx.accountManager.getAggregatedEquity()
+    const equity = await ctx.utaManager.getAggregatedEquity()
     return c.json(equity)
   })
 
@@ -72,9 +159,9 @@ export function createTradingRoutes(ctx: EngineContext) {
   app.get('/contracts/search', async (c) => {
     const pattern = (c.req.query('pattern') ?? c.req.query('query') ?? '').trim()
     if (!pattern) return c.json({ results: [], count: 0 })
-    const accounts = ctx.accountManager.listAccounts()
-    if (accounts.length === 0) {
-      return c.json({ results: [], count: 0, accountsConfigured: 0 })
+    const utas = ctx.utaManager.listUTAs()
+    if (utas.length === 0) {
+      return c.json({ results: [], count: 0, utasConfigured: 0 })
     }
     // Caller may hint the data-vendor asset class so the rule set in
     // contract-search-rules.ts can pick the right normalization
@@ -82,8 +169,8 @@ export function createTradingRoutes(ctx: EngineContext) {
     // 'unknown' — identity passthrough — when omitted or invalid.
     const rawAc = c.req.query('assetClass') as AssetClassHint | undefined
     const assetClass: AssetClassHint = rawAc && ALLOWED_ASSET_CLASSES.has(rawAc) ? rawAc : 'unknown'
-    const hits = await searchTradeableContracts(ctx.accountManager, pattern, assetClass)
-    return c.json({ results: hits, count: hits.length, accountsConfigured: accounts.length })
+    const hits = await searchTradeableContracts(ctx.utaManager, pattern, assetClass)
+    return c.json({ results: hits, count: hits.length, utasConfigured: utas.length })
   })
 
   // ==================== FX rates ====================
@@ -91,7 +178,7 @@ export function createTradingRoutes(ctx: EngineContext) {
   app.get('/fx-rates', async (c) => {
     // Collect all unique currencies from positions across all accounts
     const currencies = new Set<string>()
-    for (const uta of ctx.accountManager.resolve()) {
+    for (const uta of ctx.utaManager.resolve()) {
       if (uta.health === 'offline') continue
       try {
         const positions = await uta.getPositions()
@@ -114,28 +201,28 @@ export function createTradingRoutes(ctx: EngineContext) {
   // ==================== Per-account routes ====================
 
   // Reconnect
-  app.post('/accounts/:id/reconnect', async (c) => {
+  app.post('/uta/:id/reconnect', async (c) => {
     const id = c.req.param('id')
-    const result = await ctx.accountManager.reconnectAccount(id)
+    const result = await ctx.utaManager.reconnectUTA(id)
     return c.json(result, result.success ? 200 : 500)
   })
 
   // Account info
-  app.get('/accounts/:id/account', async (c) => {
+  app.get('/uta/:id/account', async (c) => {
     const account = resolveAccount(ctx, c)
     if (!account) return c.json({ error: 'Account not found' }, 404)
     return queryAccount(c, account, () => account.getAccount())
   })
 
   // Positions
-  app.get('/accounts/:id/positions', async (c) => {
+  app.get('/uta/:id/positions', async (c) => {
     const account = resolveAccount(ctx, c)
     if (!account) return c.json({ error: 'Account not found' }, 404)
     return queryAccount(c, account, async () => ({ positions: await account.getPositions() }))
   })
 
   // Orders
-  app.get('/accounts/:id/orders', async (c) => {
+  app.get('/uta/:id/orders', async (c) => {
     const account = resolveAccount(ctx, c)
     if (!account) return c.json({ error: 'Account not found' }, 404)
     return queryAccount(c, account, async () => {
@@ -147,14 +234,14 @@ export function createTradingRoutes(ctx: EngineContext) {
   })
 
   // Market clock
-  app.get('/accounts/:id/market-clock', async (c) => {
+  app.get('/uta/:id/market-clock', async (c) => {
     const account = resolveAccount(ctx, c)
     if (!account) return c.json({ error: 'Account not found' }, 404)
     return queryAccount(c, account, () => account.getMarketClock())
   })
 
   // Quote
-  app.get('/accounts/:id/quote/:symbol', async (c) => {
+  app.get('/uta/:id/quote/:symbol', async (c) => {
     const account = resolveAccount(ctx, c)
     if (!account) return c.json({ error: 'Account not found' }, 404)
     return queryAccount(c, account, async () => {
@@ -167,31 +254,31 @@ export function createTradingRoutes(ctx: EngineContext) {
 
   // ==================== Per-account wallet/git routes ====================
 
-  app.get('/accounts/:id/wallet/log', (c) => {
-    const uta = ctx.accountManager.get(c.req.param('id'))
+  app.get('/uta/:id/wallet/log', (c) => {
+    const uta = ctx.utaManager.get(c.req.param('id'))
     if (!uta) return c.json({ error: 'Account not found' }, 404)
     const limit = Number(c.req.query('limit')) || 20
     const symbol = c.req.query('symbol') || undefined
     return c.json({ commits: uta.log({ limit, symbol }) })
   })
 
-  app.get('/accounts/:id/wallet/show/:hash', (c) => {
-    const uta = ctx.accountManager.get(c.req.param('id'))
+  app.get('/uta/:id/wallet/show/:hash', (c) => {
+    const uta = ctx.utaManager.get(c.req.param('id'))
     if (!uta) return c.json({ error: 'Account not found' }, 404)
     const commit = uta.show(c.req.param('hash'))
     if (!commit) return c.json({ error: 'Commit not found' }, 404)
     return c.json(commit)
   })
 
-  app.get('/accounts/:id/wallet/status', (c) => {
-    const uta = ctx.accountManager.get(c.req.param('id'))
+  app.get('/uta/:id/wallet/status', (c) => {
+    const uta = ctx.utaManager.get(c.req.param('id'))
     if (!uta) return c.json({ error: 'Account not found' }, 404)
     return c.json(uta.status())
   })
 
   // Reject (records a user-rejected commit, clears staging)
-  app.post('/accounts/:id/wallet/reject', async (c) => {
-    const uta = ctx.accountManager.get(c.req.param('id'))
+  app.post('/uta/:id/wallet/reject', async (c) => {
+    const uta = ctx.utaManager.get(c.req.param('id'))
     if (!uta) return c.json({ error: 'Account not found' }, 404)
     if (!uta.status().pendingMessage) return c.json({ error: 'Nothing to reject' }, 400)
     try {
@@ -205,8 +292,8 @@ export function createTradingRoutes(ctx: EngineContext) {
   })
 
   // Push (manual approval — the AI tool is hollowed out, only humans can push)
-  app.post('/accounts/:id/wallet/push', async (c) => {
-    const uta = ctx.accountManager.get(c.req.param('id'))
+  app.post('/uta/:id/wallet/push', async (c) => {
+    const uta = ctx.utaManager.get(c.req.param('id'))
     if (!uta) return c.json({ error: 'Account not found' }, 404)
     if (!uta.status().pendingMessage) return c.json({ error: 'Nothing to push' }, 400)
     try {
@@ -217,10 +304,61 @@ export function createTradingRoutes(ctx: EngineContext) {
     }
   })
 
+  // ==================== One-shot order entry ====================
+  //
+  // Combine stage → commit → push for the frontend's manual order
+  // surface. The TradingGit primitives stay separate underneath; this
+  // is a route-layer convenience.
+
+  app.post('/uta/:id/wallet/place-order', async (c) => {
+    const uta = ctx.utaManager.get(c.req.param('id'))
+    if (!uta) return c.json({ error: 'UTA not found' }, 404)
+    let body: z.infer<typeof placeOrderSchema>
+    try {
+      body = placeOrderSchema.parse(await c.req.json())
+    } catch (err) {
+      return c.json({ error: err instanceof z.ZodError ? err.message : String(err), phase: 'validate' }, 400)
+    }
+    return executeOneShot(c, uta, body.message, () => {
+      const { message: _msg, ...stageParams } = body
+      uta.stagePlaceOrder(stageParams)
+    })
+  })
+
+  app.post('/uta/:id/wallet/close-position', async (c) => {
+    const uta = ctx.utaManager.get(c.req.param('id'))
+    if (!uta) return c.json({ error: 'UTA not found' }, 404)
+    let body: z.infer<typeof closePositionSchema>
+    try {
+      body = closePositionSchema.parse(await c.req.json())
+    } catch (err) {
+      return c.json({ error: err instanceof z.ZodError ? err.message : String(err), phase: 'validate' }, 400)
+    }
+    return executeOneShot(c, uta, body.message, () => {
+      const { message: _msg, ...stageParams } = body
+      // qty stays a string all the way to Decimal — no float roundtrip.
+      uta.stageClosePosition(stageParams)
+    })
+  })
+
+  app.post('/uta/:id/wallet/cancel-order', async (c) => {
+    const uta = ctx.utaManager.get(c.req.param('id'))
+    if (!uta) return c.json({ error: 'UTA not found' }, 404)
+    let body: z.infer<typeof cancelOrderSchema>
+    try {
+      body = cancelOrderSchema.parse(await c.req.json())
+    } catch (err) {
+      return c.json({ error: err instanceof z.ZodError ? err.message : String(err), phase: 'validate' }, 400)
+    }
+    return executeOneShot(c, uta, body.message, () => {
+      uta.stageCancelOrder({ orderId: body.orderId })
+    })
+  })
+
   // ==================== Snapshot routes ====================
 
   // Per-account snapshots
-  app.get('/accounts/:id/snapshots', async (c) => {
+  app.get('/uta/:id/snapshots', async (c) => {
     if (!ctx.snapshotService) return c.json({ snapshots: [] })
     const id = c.req.param('id')
     const limit = Number(c.req.query('limit')) || 100
@@ -232,7 +370,7 @@ export function createTradingRoutes(ctx: EngineContext) {
     }
   })
 
-  app.delete('/accounts/:id/snapshots/:timestamp', async (c) => {
+  app.delete('/uta/:id/snapshots/:timestamp', async (c) => {
     if (!ctx.snapshotService) return c.json({ error: 'Snapshot service not available' }, 503)
     const id = c.req.param('id')
     const timestamp = decodeURIComponent(c.req.param('timestamp'))
@@ -247,7 +385,7 @@ export function createTradingRoutes(ctx: EngineContext) {
     const limit = Number(c.req.query('limit')) || 200
 
     try {
-      const accounts = ctx.accountManager.resolve()
+      const accounts = ctx.utaManager.resolve()
       // Gather snapshots per account
       const perAccount = await Promise.all(
         accounts.map(async (uta) => {

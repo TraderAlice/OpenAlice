@@ -3,7 +3,7 @@ import Decimal from 'decimal.js'
 import { ContractDescription, Order, OrderState, UNSET_DOUBLE, UNSET_DECIMAL } from '@traderalice/ibkr'
 import type { OpenOrder } from '../domain/trading/brokers/types.js'
 import { MockBroker, makeContract } from '../domain/trading/brokers/mock/index.js'
-import { AccountManager } from '../domain/trading/account-manager.js'
+import { UTAManager } from '../domain/trading/uta-manager.js'
 import { UnifiedTradingAccount } from '../domain/trading/UnifiedTradingAccount.js'
 import { createTradingTools } from './trading.js'
 import '../domain/trading/contract-ext.js'
@@ -12,16 +12,16 @@ function makeUta(broker: MockBroker): UnifiedTradingAccount {
   return new UnifiedTradingAccount(broker)
 }
 
-function makeManager(...brokers: MockBroker[]): AccountManager {
-  const mgr = new AccountManager()
+function makeManager(...brokers: MockBroker[]): UTAManager {
+  const mgr = new UTAManager()
   for (const b of brokers) mgr.add(makeUta(b))
   return mgr
 }
 
-// ==================== AccountManager.resolve ====================
+// ==================== UTAManager.resolve ====================
 
-describe('AccountManager.resolve', () => {
-  let mgr: AccountManager
+describe('UTAManager.resolve', () => {
+  let mgr: UTAManager
 
   beforeEach(() => {
     mgr = makeManager(
@@ -49,8 +49,8 @@ describe('AccountManager.resolve', () => {
 
 // ==================== resolveOne ====================
 
-describe('AccountManager.resolveOne', () => {
-  let mgr: AccountManager
+describe('UTAManager.resolveOne', () => {
+  let mgr: UTAManager
 
   beforeEach(() => {
     mgr = makeManager(
@@ -65,17 +65,17 @@ describe('AccountManager.resolveOne', () => {
   })
 
   it('throws when no UTA matches', () => {
-    expect(() => mgr.resolveOne('unknown-id')).toThrow('No account found matching source "unknown-id"')
+    expect(() => mgr.resolveOne('unknown-id')).toThrow('No UTA found matching source "unknown-id"')
   })
 })
 
-// ==================== createTradingTools: listAccounts ====================
+// ==================== createTradingTools: listUTAs ====================
 
-describe('createTradingTools — listAccounts', () => {
+describe('createTradingTools — listUTAs', () => {
   it('returns summaries for all registered UTAs', async () => {
     const mgr = makeManager(new MockBroker({ id: 'acc1', label: 'Test' }))
     const tools = createTradingTools(mgr)
-    const result = await (tools.listAccounts.execute as Function)({})
+    const result = await (tools.listUTAs.execute as Function)({})
     expect(Array.isArray(result)).toBe(true)
     expect(result[0].id).toBe('acc1')
   })

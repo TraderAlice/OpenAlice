@@ -1,8 +1,8 @@
 import { Hono } from 'hono'
 import type { EngineContext } from '../../../core/types.js'
 import {
-  readAccountsConfig, writeAccountsConfig,
-  accountConfigSchema,
+  readUTAsConfig, writeUTAsConfig,
+  utaConfigSchema,
 } from '../../../core/config.js'
 import { createBroker } from '../../../domain/trading/brokers/factory.js'
 import { BUILTIN_BROKER_PRESETS } from '../../../domain/trading/brokers/presets.js'
@@ -61,17 +61,17 @@ export function createTradingConfigRoutes(ctx: EngineContext) {
 
   app.get('/', async (c) => {
     try {
-      const accounts = await readAccountsConfig()
-      const maskedAccounts = accounts.map((a) => maskSecrets({ ...a }))
-      return c.json({ accounts: maskedAccounts })
+      const utas = await readUTAsConfig()
+      const maskedUTAs = utas.map((a) => maskSecrets({ ...a }))
+      return c.json({ utas: maskedUTAs })
     } catch (err) {
       return c.json({ error: String(err) }, 500)
     }
   })
 
-  // ==================== Accounts CRUD ====================
+  // ==================== UTA CRUD ====================
 
-  app.put('/accounts/:id', async (c) => {
+  app.put('/uta/:id', async (c) => {
     try {
       const id = c.req.param('id')
       const body = await c.req.json()
@@ -80,13 +80,13 @@ export function createTradingConfigRoutes(ctx: EngineContext) {
       }
 
       // Restore masked credentials from existing config
-      const accounts = await readAccountsConfig()
+      const accounts = await readUTAsConfig()
       const existing = accounts.find((a) => a.id === id)
       if (existing) {
         unmaskSecrets(body, existing as unknown as Record<string, unknown>)
       }
 
-      const validated = accountConfigSchema.parse(body)
+      const validated = utaConfigSchema.parse(body)
 
       const idx = accounts.findIndex((a) => a.id === id)
       if (idx >= 0) {
@@ -94,17 +94,17 @@ export function createTradingConfigRoutes(ctx: EngineContext) {
       } else {
         accounts.push(validated)
       }
-      await writeAccountsConfig(accounts)
+      await writeUTAsConfig(accounts)
 
       // Handle enabled state changes at runtime
       const wasEnabled = existing?.enabled !== false
       const nowEnabled = validated.enabled !== false
       if (wasEnabled && !nowEnabled) {
         // Disabled — close running account
-        await ctx.accountManager.removeAccount(id)
+        await ctx.utaManager.removeUTA(id)
       } else if (!wasEnabled && nowEnabled) {
         // Enabled — start account
-        ctx.accountManager.reconnectAccount(id).catch(() => {})
+        ctx.utaManager.reconnectUTA(id).catch(() => {})
       }
 
       return c.json(validated)
@@ -116,17 +116,17 @@ export function createTradingConfigRoutes(ctx: EngineContext) {
     }
   })
 
-  app.delete('/accounts/:id', async (c) => {
+  app.delete('/uta/:id', async (c) => {
     try {
       const id = c.req.param('id')
-      const accounts = await readAccountsConfig()
+      const accounts = await readUTAsConfig()
       const filtered = accounts.filter((a) => a.id !== id)
       if (filtered.length === accounts.length) {
         return c.json({ error: `Account "${id}" not found` }, 404)
       }
-      await writeAccountsConfig(filtered)
+      await writeUTAsConfig(filtered)
       // Close and deregister running account instance if any
-      await ctx.accountManager.removeAccount(id)
+      await ctx.utaManager.removeUTA(id)
       return c.json({ success: true })
     } catch (err) {
       return c.json({ error: String(err) }, 500)
@@ -144,9 +144,9 @@ export function createTradingConfigRoutes(ctx: EngineContext) {
     } | null = null
     try {
       const body = await c.req.json()
-      const accountConfig = accountConfigSchema.parse({ ...body, id: body.id ?? '__test__' })
+      const utaConfig = utaConfigSchema.parse({ ...body, id: body.id ?? '__test__' })
 
-      broker = createBroker(accountConfig)
+      broker = createBroker(utaConfig)
       await broker.init()
       // Run both calls in parallel — getAccount proves auth, getPositions
       // exercises the data path the user actually cares about (e.g. for OKX

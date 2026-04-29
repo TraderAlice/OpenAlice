@@ -11,9 +11,9 @@ export function useAccountHealth() {
   const [healthMap, setHealthMap] = useState<Record<string, BrokerHealthInfo>>({})
 
   useEffect(() => {
-    api.trading.listAccountSummaries().then(({ accounts }) => {
+    api.trading.listUTASummaries().then(({ utas }) => {
       const map: Record<string, BrokerHealthInfo> = {}
-      for (const a of accounts) map[a.id] = a.health
+      for (const a of utas) map[a.id] = a.health
       setHealthMap(map)
     }).catch(() => {})
   }, [])

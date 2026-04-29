@@ -8,7 +8,7 @@
  * Store instances are cached per account to ensure writes are serialized.
  */
 
-import type { AccountManager } from '../account-manager.js'
+import type { UTAManager } from '../uta-manager.js'
 import type { EventLog } from '../../../core/event-log.js'
 import type { SnapshotStore } from './store.js'
 import type { UTASnapshot, SnapshotTrigger } from './types.js'
@@ -25,12 +25,12 @@ export interface SnapshotService {
 }
 
 export function createSnapshotService(deps: {
-  accountManager: AccountManager
+  utaManager: UTAManager
   eventLog?: EventLog
   /** Override storage base directory (tests use tmpdir). */
   baseDir?: string
 }): SnapshotService {
-  const { accountManager, eventLog, baseDir } = deps
+  const { utaManager, eventLog, baseDir } = deps
   const stores = new Map<string, SnapshotStore>()
 
   function getStore(accountId: string): SnapshotStore {
@@ -44,7 +44,7 @@ export function createSnapshotService(deps: {
 
   return {
     async takeSnapshot(accountId, trigger) {
-      const uta = accountManager.get(accountId)
+      const uta = utaManager.get(accountId)
       if (!uta) return null
 
       try {
@@ -76,7 +76,7 @@ export function createSnapshotService(deps: {
     },
 
     async takeAllSnapshots(trigger) {
-      const accounts = accountManager.resolve()
+      const accounts = utaManager.resolve()
 
       // First round — try all accounts
       const results = await Promise.allSettled(

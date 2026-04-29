@@ -14,6 +14,7 @@ import { MarketDetailPage } from './pages/MarketDetailPage'
 import { NewsPage } from './pages/NewsPage'
 import { NewsCollectorPage } from './pages/NewsCollectorPage'
 import { TradingPage } from './pages/TradingPage'
+import { UTADetailPage } from './pages/UTADetailPage'
 import { ConnectorsPage } from './pages/ConnectorsPage'
 import { DevPage } from './pages/DevPage'
 
@@ -87,6 +88,7 @@ export function App() {
             <Route path="/connectors" element={<ConnectorsPage />} />
             <Route path="/tools" element={<Navigate to="/settings" replace />} />
             <Route path="/trading" element={<TradingPage />} />
+            <Route path="/uta/:id" element={<UTADetailPage />} />
             <Route path="/ai-provider" element={<AIProviderPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/dev" element={<DevPage />} />

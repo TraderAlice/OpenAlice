@@ -14,7 +14,7 @@
  */
 
 import type { ContractDescription } from '@traderalice/ibkr'
-import type { AccountManager } from './account-manager.js'
+import type { UTAManager } from './uta-manager.js'
 import {
   normalizeBrokerSearchPattern,
   type AssetClassHint,
@@ -28,7 +28,7 @@ export interface ContractSearchHit {
 }
 
 export async function searchTradeableContracts(
-  manager: AccountManager,
+  manager: UTAManager,
   pattern: string,
   assetClass: AssetClassHint = 'unknown',
 ): Promise<ContractSearchHit[]> {

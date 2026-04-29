@@ -1,8 +1,8 @@
 /**
- * AccountManager — UTA lifecycle management, registry, and aggregation.
+ * UTAManager — UTA lifecycle management, registry, and aggregation.
  *
- * Owns the full account lifecycle: create → register → reconnect → remove → close.
- * Also provides cross-account operations (aggregated equity, contract search).
+ * Owns the full UTA lifecycle: create → register → reconnect → remove → close.
+ * Also provides cross-UTA operations (aggregated equity, contract search).
  */
 
 import Decimal from 'decimal.js'
@@ -14,16 +14,16 @@ import { createBroker } from './brokers/factory.js'
 import { getBrokerPreset } from './brokers/preset-catalog.js'
 import { UnifiedTradingAccount } from './UnifiedTradingAccount.js'
 import { loadGitState, createGitPersister } from './git-persistence.js'
-import { readAccountsConfig, type AccountConfig } from '../../core/config.js'
+import { readUTAsConfig, type UTAConfig } from '../../core/config.js'
 import type { EventLog } from '../../core/event-log.js'
 import type { ToolCenter } from '../../core/tool-center.js'
 import type { ReconnectResult } from '../../core/types.js'
 import type { FxService } from './fx-service.js'
 import './contract-ext.js'
 
-// ==================== Account summary ====================
+// ==================== UTA summary ====================
 
-export interface AccountSummary {
+export interface UTASummary {
   id: string
   label: string
   capabilities: AccountCapabilities
@@ -57,14 +57,14 @@ export interface ContractSearchResult {
   results: ContractDescription[]
 }
 
-// ==================== AccountManager ====================
+// ==================== UTAManager ====================
 
 export interface SnapshotHooks {
-  onPostPush?: (accountId: string) => void | Promise<void>
-  onPostReject?: (accountId: string) => void | Promise<void>
+  onPostPush?: (utaId: string) => void | Promise<void>
+  onPostReject?: (utaId: string) => void | Promise<void>
 }
 
-export class AccountManager {
+export class UTAManager {
   private entries = new Map<string, UnifiedTradingAccount>()
   private reconnecting = new Set<string>()
 
@@ -89,16 +89,16 @@ export class AccountManager {
 
   // ==================== Lifecycle ====================
 
-  /** Create a UTA from account config, register it, and start async broker connection. */
-  async initAccount(accCfg: AccountConfig): Promise<UnifiedTradingAccount> {
-    const broker = createBroker(accCfg)
-    const savedState = await loadGitState(accCfg.id)
+  /** Create a UTA from config, register it, and start async broker connection. */
+  async initUTA(cfg: UTAConfig): Promise<UnifiedTradingAccount> {
+    const broker = createBroker(cfg)
+    const savedState = await loadGitState(cfg.id)
     const uta = new UnifiedTradingAccount(broker, {
-      guards: accCfg.guards,
+      guards: cfg.guards,
       savedState,
-      onCommit: createGitPersister(accCfg.id),
-      onHealthChange: (accountId, health) => {
-        this.eventLog?.append('account.health', { accountId, ...health })
+      onCommit: createGitPersister(cfg.id),
+      onHealthChange: (utaId, health) => {
+        this.eventLog?.append('account.health', { accountId: utaId, ...health })
       },
       onPostPush: this._snapshotHooks?.onPostPush,
       onPostReject: this._snapshotHooks?.onPostReject,
@@ -107,54 +107,54 @@ export class AccountManager {
     return uta
   }
 
-  /** Reconnect an account: close old → re-read config → create new → verify connection. */
-  async reconnectAccount(accountId: string): Promise<ReconnectResult> {
-    if (this.reconnecting.has(accountId)) {
+  /** Reconnect a UTA: close old → re-read config → create new → verify connection. */
+  async reconnectUTA(utaId: string): Promise<ReconnectResult> {
+    if (this.reconnecting.has(utaId)) {
       return { success: false, error: 'Reconnect already in progress' }
     }
-    this.reconnecting.add(accountId)
+    this.reconnecting.add(utaId)
     try {
       // Re-read config to pick up credential/guard changes
-      const freshAccounts = await readAccountsConfig()
+      const freshUTAs = await readUTAsConfig()
 
-      // Close old account
-      await this.removeAccount(accountId)
+      // Close old UTA
+      await this.removeUTA(utaId)
 
-      const accCfg = freshAccounts.find((a) => a.id === accountId)
-      if (!accCfg) {
-        return { success: true, message: `Account "${accountId}" not found in config (removed or disabled)` }
+      const cfg = freshUTAs.find((a) => a.id === utaId)
+      if (!cfg) {
+        return { success: true, message: `UTA "${utaId}" not found in config (removed or disabled)` }
       }
 
-      const uta = await this.initAccount(accCfg)
+      const uta = await this.initUTA(cfg)
 
       // Wait for broker.init() + broker.getAccount() to verify the connection
       await uta.waitForConnect()
 
-      // Re-register CCXT-specific tools if this account routes to the CCXT engine.
-      if (getBrokerPreset(accCfg.presetId).engine === 'ccxt') {
+      // Re-register CCXT-specific tools if this UTA routes to the CCXT engine.
+      if (getBrokerPreset(cfg.presetId).engine === 'ccxt') {
         this.toolCenter?.register(
           createCcxtProviderTools(this),
           'trading-ccxt',
         )
       }
 
-      const label = uta.label ?? accountId
+      const label = uta.label ?? utaId
       console.log(`reconnect: ${label} online`)
       return { success: true, message: `${label} reconnected` }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      console.error(`reconnect: ${accountId} failed:`, msg)
+      console.error(`reconnect: ${utaId} failed:`, msg)
       return { success: false, error: msg }
     } finally {
-      this.reconnecting.delete(accountId)
+      this.reconnecting.delete(utaId)
     }
   }
 
-  /** Close and deregister an account. No-op if account doesn't exist. */
-  async removeAccount(accountId: string): Promise<void> {
-    const uta = this.entries.get(accountId)
+  /** Close and deregister a UTA. No-op if UTA doesn't exist. */
+  async removeUTA(utaId: string): Promise<void> {
+    const uta = this.entries.get(utaId)
     if (!uta) return
-    this.entries.delete(accountId)
+    this.entries.delete(utaId)
     try { await uta.close() } catch { /* best effort */ }
   }
 
@@ -171,7 +171,7 @@ export class AccountManager {
 
   add(uta: UnifiedTradingAccount): void {
     if (this.entries.has(uta.id)) {
-      throw new Error(`Account "${uta.id}" already registered`)
+      throw new Error(`UTA "${uta.id}" already registered`)
     }
     this.entries.set(uta.id, uta)
   }
@@ -186,7 +186,7 @@ export class AccountManager {
     return this.entries.get(id)
   }
 
-  listAccounts(): AccountSummary[] {
+  listUTAs(): UTASummary[] {
     return Array.from(this.entries.values()).map((uta) => ({
       id: uta.id,
       label: uta.label,
@@ -217,11 +217,11 @@ export class AccountManager {
   resolveOne(source: string): UnifiedTradingAccount {
     const results = this.resolve(source)
     if (results.length === 0) {
-      throw new Error(`No account found matching source "${source}". Use listAccounts to see available accounts.`)
+      throw new Error(`No UTA found matching source "${source}". Use listUTAs to see available UTAs.`)
     }
     if (results.length > 1) {
       throw new Error(
-        `Multiple accounts match source "${source}": ${results.map((r) => r.id).join(', ')}. Use account id for exact match.`,
+        `Multiple UTAs match source "${source}": ${results.map((r) => r.id).join(', ')}. Use UTA id for exact match.`,
       )
     }
     return results[0]

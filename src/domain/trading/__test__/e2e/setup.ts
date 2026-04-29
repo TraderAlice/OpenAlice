@@ -1,7 +1,7 @@
 /**
  * E2E test setup — shared, lazily-initialized broker instances.
  *
- * Uses the same code path as main.ts: readAccountsConfig → createBroker.
+ * Uses the same code path as main.ts: readUTAsConfig → createBroker.
  * Only selects accounts in paper/sandbox/demo environments (isPaper check).
  *
  * Singleton: first call loads config + inits all brokers. Subsequent calls
@@ -9,7 +9,7 @@
  */
 
 import net from 'node:net'
-import { readAccountsConfig, type AccountConfig } from '@/core/config.js'
+import { readUTAsConfig, type UTAConfig } from '@/core/config.js'
 import type { IBroker } from '../../brokers/types.js'
 import { createBroker } from '../../brokers/factory.js'
 import { getBrokerPreset, isPaperPreset, type BrokerEngine } from '../../brokers/preset-catalog.js'
@@ -25,12 +25,12 @@ export interface TestAccount {
 // ==================== Safety ====================
 
 /** Unified paper/sandbox check — E2E only runs non-live accounts. Routed through preset.isPaper. */
-function isPaper(acct: AccountConfig): boolean {
+function isPaper(acct: UTAConfig): boolean {
   return isPaperPreset(acct.presetId, acct.presetConfig)
 }
 
 /** Check whether API credentials are configured (not applicable for all broker types). */
-function hasCredentials(acct: AccountConfig): boolean {
+function hasCredentials(acct: UTAConfig): boolean {
   const engine = getBrokerPreset(acct.presetId).engine
   const pc = acct.presetConfig as Record<string, unknown>
   switch (engine) {
@@ -71,7 +71,7 @@ export function getTestAccounts(): Promise<TestAccount[]> {
 }
 
 async function initAll(): Promise<TestAccount[]> {
-  const accounts = await readAccountsConfig()
+  const accounts = await readUTAsConfig()
   const result: TestAccount[] = []
 
   for (const acct of accounts) {

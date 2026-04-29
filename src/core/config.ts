@@ -264,14 +264,21 @@ export const webSubchannelsSchema = z.array(webSubchannelSchema)
 
 export type WebChannel = z.infer<typeof webSubchannelSchema>
 
-// ==================== Account Config ====================
+// ==================== UTA Config ====================
 
 const guardConfigSchema = z.object({
   type: z.string(),
   options: z.record(z.string(), z.unknown()).default({}),
 })
 
-export const accountConfigSchema = z.object({
+/**
+ * One Unified Trading Account. The user-facing concept — one preset
+ * (OKX, Bybit, IBKR, …) plus credentials, guards, and an enabled flag.
+ *
+ * Distinct from `AccountInfo` (which is broker-side: cash, equity,
+ * margin returned by `IBroker.getAccount()`). Two different "account"s.
+ */
+export const utaConfigSchema = z.object({
   id: z.string(),
   label: z.string().optional(),
   /** Broker preset id — resolves to engine + form schema via BROKER_PRESET_CATALOG. */
@@ -282,9 +289,9 @@ export const accountConfigSchema = z.object({
   presetConfig: z.record(z.string(), z.unknown()).default({}),
 })
 
-export const accountsFileSchema = z.array(accountConfigSchema)
+export const utasFileSchema = z.array(utaConfigSchema)
 
-export type AccountConfig = z.infer<typeof accountConfigSchema>
+export type UTAConfig = z.infer<typeof utaConfigSchema>
 
 // ==================== Unified Config Type ====================
 
@@ -504,7 +511,7 @@ export async function loadConfig(): Promise<Config> {
   }
 }
 
-// ==================== Account Config Loader ====================
+// ==================== UTA Config Loader ====================
 
 /** Single legacy record carries `type` (removed) without `presetId` (new). */
 function isLegacyRecord(o: Record<string, unknown>): boolean {
@@ -522,7 +529,7 @@ function isLegacyRecord(o: Record<string, unknown>): boolean {
  * from the pre-preset schema. Tracked alongside the AI-side migration
  * cleanup at the top of this file.
  */
-function migrateLegacyAccount(raw: Record<string, unknown>): Record<string, unknown> | null {
+function migrateLegacyUTA(raw: Record<string, unknown>): Record<string, unknown> | null {
   const id = String(raw['id'] ?? '')
   const label = raw['label'] as string | undefined
   const enabled = raw['enabled'] as boolean | undefined
@@ -617,7 +624,10 @@ function migrateLegacyAccount(raw: Record<string, unknown>): Record<string, unkn
   return null
 }
 
-export async function readAccountsConfig(): Promise<AccountConfig[]> {
+// File name on disk stays `accounts.json` — internal-only, never
+// user-visible. Renaming would require another migration block; cost
+// outweighs benefit. The on-disk schema is the new UTA shape.
+export async function readUTAsConfig(): Promise<UTAConfig[]> {
   const raw = await loadJsonFile('accounts.json')
   if (raw === undefined) {
     // Seed empty file on first run
@@ -639,7 +649,7 @@ export async function readAccountsConfig(): Promise<AccountConfig[]> {
     for (const item of raw as Record<string, unknown>[]) {
       // Already in new shape — keep verbatim.
       if (!isLegacyRecord(item)) { migrated.push(item); continue }
-      const next = migrateLegacyAccount(item)
+      const next = migrateLegacyUTA(item)
       if (next) {
         migrated.push(next)
       } else {
@@ -653,16 +663,16 @@ export async function readAccountsConfig(): Promise<AccountConfig[]> {
       (skipped.length ? ` Skipped (unknown engine, recreate manually): ${skipped.join(', ')}.` : ''),
     )
 
-    const validated = accountsFileSchema.parse(migrated)
+    const validated = utasFileSchema.parse(migrated)
     await writeFile(resolve(CONFIG_DIR, 'accounts.json'), JSON.stringify(validated, null, 2) + '\n')
     return validated
   }
 
-  return accountsFileSchema.parse(raw)
+  return utasFileSchema.parse(raw)
 }
 
-export async function writeAccountsConfig(accounts: AccountConfig[]): Promise<void> {
-  const validated = accountsFileSchema.parse(accounts)
+export async function writeUTAsConfig(utas: UTAConfig[]): Promise<void> {
+  const validated = utasFileSchema.parse(utas)
   await mkdir(CONFIG_DIR, { recursive: true })
   await writeFile(resolve(CONFIG_DIR, 'accounts.json'), JSON.stringify(validated, null, 2) + '\n')
 }
