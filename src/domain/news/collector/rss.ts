@@ -20,6 +20,12 @@ export class NewsCollector {
   private store: NewsCollectorStore
   private feeds: RSSFeedConfig[]
   private intervalMs: number
+  /**
+   * In-flight guard: if a fetchAll is already running when the next interval
+   * tick fires, share the existing promise instead of starting a second pass.
+   * Prevents duplicate HTTP work when network latency exceeds intervalMs.
+   */
+  private fetchInFlight: Promise<{ total: number; new: number }> | null = null
 
   constructor(opts: CollectorOpts) {
     this.store = opts.store
@@ -48,8 +54,22 @@ export class NewsCollector {
     }
   }
 
-  /** Fetch all active feeds once. Disabled feeds are skipped. Returns counts. */
+  /**
+   * Fetch all active feeds once. Disabled feeds are skipped. Returns counts.
+   *
+   * Concurrent calls share the in-flight promise (no overlapping fetch passes).
+   */
   async fetchAll(): Promise<{ total: number; new: number }> {
+    if (this.fetchInFlight) return this.fetchInFlight
+    this.fetchInFlight = this._fetchAllImpl()
+    try {
+      return await this.fetchInFlight
+    } finally {
+      this.fetchInFlight = null
+    }
+  }
+
+  private async _fetchAllImpl(): Promise<{ total: number; new: number }> {
     let totalItems = 0
     let totalNew = 0
 

@@ -129,10 +129,10 @@ describe('createIolFixedIncomeClientFromAccounts', () => {
     const client = createIolFixedIncomeClientFromAccounts([
       {
         id: 'iol-main',
-        type: 'iol',
+        presetId: 'iol',
         enabled: true,
         guards: [],
-        brokerConfig: {
+        presetConfig: {
           username: '$env:IOL_TEST_USER',
           password: '$env:IOL_TEST_PASS',
         },

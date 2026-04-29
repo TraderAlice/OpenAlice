@@ -312,8 +312,8 @@ function SnapshotsTab() {
 
   // Load accounts list
   useEffect(() => {
-    api.trading.listAccounts().then(r => {
-      const list = r.accounts.map(a => ({ id: a.id, label: a.label }))
+    api.trading.listUTAs().then(r => {
+      const list = r.utas.map(a => ({ id: a.id, label: a.label }))
       setAccounts(list)
       if (list.length > 0 && !selectedAccount) setSelectedAccount(list[0].id)
     }).catch(() => {})

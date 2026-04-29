@@ -8,7 +8,7 @@ import { Order, OrderState } from '@traderalice/ibkr'
 import { UnifiedTradingAccount } from '../UnifiedTradingAccount.js'
 import type { UnifiedTradingAccountOptions } from '../UnifiedTradingAccount.js'
 import { MockBroker, makeContract, makePosition, makeOpenOrder } from '../brokers/mock/index.js'
-import { AccountManager } from '../account-manager.js'
+import { UTAManager } from '../uta-manager.js'
 import { createEventLog, type EventLog } from '../../../core/event-log.js'
 import { createListenerRegistry, type ListenerRegistry } from '../../../core/listener-registry.js'
 import { createCronEngine, type CronEngine } from '../../../task/cron/engine.js'
@@ -340,13 +340,13 @@ describe('Snapshot Store', () => {
 // ==================== Service Tests ====================
 
 describe('Snapshot Service', () => {
-  let manager: AccountManager
+  let manager: UTAManager
   let eventLog: EventLog
   let service: SnapshotService
   let serviceDir: string
 
   beforeEach(async () => {
-    manager = new AccountManager()
+    manager = new UTAManager()
     const logPath = tempPath('jsonl')
     eventLog = await createEventLog({ logPath })
     serviceDir = tempDir()
@@ -355,7 +355,7 @@ describe('Snapshot Service', () => {
     const uta = new UnifiedTradingAccount(broker)
     manager.add(uta)
 
-    service = createSnapshotService({ accountManager: manager, eventLog, baseDir: serviceDir })
+    service = createSnapshotService({ utaManager: manager, eventLog, baseDir: serviceDir })
   })
 
   afterEach(async () => {

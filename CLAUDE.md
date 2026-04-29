@@ -162,3 +162,61 @@ Centralized registry. `tool/` files register tools via `ToolCenter.register()`, 
 - `archive/dev-pre-beta6` is a historical snapshot — do not modify or delete
 - **After merging a PR**, always `git pull origin master` to sync local master. Stale local master causes confusion about what's merged and what's not.
 - **Before creating a PR**, always `git fetch origin master` to check what's already merged. Use `git log --oneline origin/master..HEAD` to verify only the intended commits are ahead. Stale local refs cause PRs with wrong diff.
+
+### Rolling dev → master PR convention
+
+Multiple Claude sessions hit `dev` in parallel; GitHub allows only **one
+open PR per (head, base) pair** anyway. So we keep a single rolling PR
+from `dev → master` and **append** to its body each session instead of
+opening fresh — otherwise each new PR loses the context of what other
+sessions did.
+
+**Before opening a new PR, always check first:**
+
+```bash
+gh pr list --base master --head dev --state open --json number,title,body
+```
+
+- **If a PR exists** → append your section to its body with
+  `gh pr edit <num> --body-file <(...)`. Don't open a new one.
+- **If none exists** → open with `gh pr create` using the template below.
+
+**PR body template:**
+
+```markdown
+## Summary
+<rolling thematic summary — latest session may rewrite this when new
+work meaningfully shifts the PR's framing>
+
+## Per-session contributions
+### YYYY-MM-DD — <session theme, e.g. "Market workbench tradeable card">
+- What changed (1–3 bullets)
+- Why
+- Key commits: `<sha-short>`, `<sha-short>`
+
+### YYYY-MM-DD — <prior session theme>
+…(append on top, keep prior sessions verbatim — never edit other sessions' entries)…
+
+## Full commit log
+<output of: git log --oneline origin/master..HEAD>
+(regenerate from scratch on each body update)
+
+## Test plan
+- [ ] tsc --noEmit clean
+- [ ] pnpm test passes
+- [ ] (session-specific manual verifications)
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
+
+**When you append:**
+
+1. Refresh the "Full commit log" section from `git log --oneline origin/master..HEAD`.
+2. Add your "Per-session contributions" entry on top of the list, with today's date.
+3. Don't edit other sessions' entries — that's their record.
+4. Update "Summary" only if your work actually changes the PR's framing
+   (e.g., what was a "frontend tweak" PR becomes a "frontend + new domain
+   service" PR after your work).
+
+This keeps the PR description as a faithful audit trail across sessions,
+and lets reviewers see who-did-what without trawling the commit log alone.

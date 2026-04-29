@@ -1,7 +1,7 @@
 /**
  * E2E test setup — shared, lazily-initialized broker instances.
  *
- * Uses the same code path as main.ts: readAccountsConfig → createBroker.
+ * Uses the same code path as main.ts: readUTAsConfig → createBroker.
  * Only selects accounts in paper/sandbox/demo environments (isPaper check).
  *
  * Singleton: first call loads config + inits all brokers. Subsequent calls
@@ -9,41 +9,37 @@
  */
 
 import net from 'node:net'
-import { readAccountsConfig, type AccountConfig } from '@/core/config.js'
+import { readUTAsConfig, type UTAConfig } from '@/core/config.js'
 import type { IBroker } from '../../brokers/types.js'
 import { createBroker } from '../../brokers/factory.js'
+import { getBrokerPreset, isPaperPreset, type BrokerEngine } from '../../brokers/preset-catalog.js'
 import { CCXT_CREDENTIAL_FIELDS } from '../../brokers/ccxt/ccxt-types.js'
 
 export interface TestAccount {
   id: string
   label: string
-  provider: AccountConfig['type']
+  provider: BrokerEngine
   broker: IBroker
 }
 
 // ==================== Safety ====================
 
-/** Unified paper/sandbox check — E2E only runs non-live accounts. */
-function isPaper(acct: AccountConfig): boolean {
-  const bc = acct.brokerConfig
-  switch (acct.type) {
-    case 'alpaca': return !!bc.paper
-    case 'ccxt':   return !!(bc.sandbox || bc.demoTrading)
-    case 'ibkr':   return !!bc.paper
-    default:       return false
-  }
+/** Unified paper/sandbox check — E2E only runs non-live accounts. Routed through preset.isPaper. */
+function isPaper(acct: UTAConfig): boolean {
+  return isPaperPreset(acct.presetId, acct.presetConfig)
 }
 
 /** Check whether API credentials are configured (not applicable for all broker types). */
-function hasCredentials(acct: AccountConfig): boolean {
-  const bc = acct.brokerConfig
-  switch (acct.type) {
+function hasCredentials(acct: UTAConfig): boolean {
+  const engine = getBrokerPreset(acct.presetId).engine
+  const pc = acct.presetConfig as Record<string, unknown>
+  switch (engine) {
     case 'alpaca':
-      return !!bc.apiKey
+      return !!pc.apiKey
     case 'ccxt':
-      // CCXT exchanges use different credential schemes — apiKey/secret for most,
-      // walletAddress/privateKey for Hyperliquid, etc. Match any standard CCXT field.
-      return CCXT_CREDENTIAL_FIELDS.some(k => !!(bc as Record<string, unknown>)[k])
+      // Different exchanges use different credential schemes — apiKey/secret for
+      // most, walletAddress/privateKey for Hyperliquid. Either side counts.
+      return CCXT_CREDENTIAL_FIELDS.some(k => !!pc[k]) || !!pc.walletAddress
     case 'ibkr':
       return true  // no API key — auth via TWS/Gateway login
     default:
@@ -75,7 +71,7 @@ export function getTestAccounts(): Promise<TestAccount[]> {
 }
 
 async function initAll(): Promise<TestAccount[]> {
-  const accounts = await readAccountsConfig()
+  const accounts = await readUTAsConfig()
   const result: TestAccount[] = []
 
   for (const acct of accounts) {
@@ -85,12 +81,15 @@ async function initAll(): Promise<TestAccount[]> {
     // Skip disabled accounts
     if (acct.enabled === false) continue
 
+    const engine = getBrokerPreset(acct.presetId).engine
     // IBKR: check TWS/Gateway reachability before attempting connect
-    if (acct.type === 'ibkr') {
-      const bc = acct.brokerConfig
-      const reachable = await isTcpReachable(String(bc.host ?? '127.0.0.1'), Number(bc.port ?? 7497))
+    if (engine === 'ibkr') {
+      const pc = acct.presetConfig as Record<string, unknown>
+      const host = String(pc.host ?? '127.0.0.1')
+      const port = Number(pc.port ?? 7497)
+      const reachable = await isTcpReachable(host, port)
       if (!reachable) {
-        console.warn(`e2e setup: ${acct.id} — TWS not reachable at ${bc.host ?? '127.0.0.1'}:${bc.port ?? 7497}, skipping`)
+        console.warn(`e2e setup: ${acct.id} — TWS not reachable at ${host}:${port}, skipping`)
         continue
       }
     }
@@ -107,7 +106,7 @@ async function initAll(): Promise<TestAccount[]> {
     result.push({
       id: acct.id,
       label: acct.label ?? acct.id,
-      provider: acct.type,
+      provider: engine,
       broker,
     })
   }
@@ -115,7 +114,7 @@ async function initAll(): Promise<TestAccount[]> {
   return result
 }
 
-/** Filter test accounts by provider type. */
-export function filterByProvider(accounts: TestAccount[], provider: AccountConfig['type']): TestAccount[] {
+/** Filter test accounts by provider engine. */
+export function filterByProvider(accounts: TestAccount[], provider: BrokerEngine): TestAccount[] {
   return accounts.filter(a => a.provider === provider)
 }

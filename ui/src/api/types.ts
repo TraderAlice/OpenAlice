@@ -237,7 +237,7 @@ export interface BrokerHealthInfo {
   disabled: boolean
 }
 
-export interface AccountSummary {
+export interface UTASummary {
   id: string
   label: string
   capabilities: { supportedSecTypes: string[]; supportedOrderTypes: string[] }
@@ -348,27 +348,27 @@ export interface ToolCallRecord {
 
 // ==================== Trading Config ====================
 
-export interface AccountConfig {
+/**
+ * One Unified Trading Account configuration record. The user-facing
+ * concept that wraps a broker connection — distinct from `AccountInfo`,
+ * which is broker-side (cash, equity, margin returned by the broker).
+ */
+export interface UTAConfig {
   id: string
   label?: string
-  type: string
+  /** Broker preset id — resolves to engine + form schema on the backend. */
+  presetId: string
   enabled: boolean
   guards: GuardEntry[]
-  brokerConfig: Record<string, unknown>
+  /** User-filled form values for the preset's schema. */
+  presetConfig: Record<string, unknown>
 }
 
-// ==================== Broker Type Metadata (from /broker-types endpoint) ====================
+// ==================== Broker Preset Metadata (from /broker-presets endpoint) ====================
 
-export interface BrokerConfigField {
-  name: string
-  type: 'text' | 'password' | 'number' | 'boolean' | 'select'
+export interface ModeOption {
+  id: string
   label: string
-  placeholder?: string
-  default?: unknown
-  required?: boolean
-  options?: Array<{ value: string; label: string }>
-  description?: string
-  sensitive?: boolean
 }
 
 export interface SubtitleField {
@@ -378,17 +378,20 @@ export interface SubtitleField {
   prefix?: string
 }
 
-export interface BrokerTypeInfo {
-  type: string
-  name: string
+export interface BrokerPreset {
+  id: string
+  label: string
   description: string
-  /** Multi-line setup guide shown in the New Account wizard. Paragraphs separated by `\n\n`. */
-  setupGuide?: string
+  category: 'crypto' | 'securities' | 'custom'
+  hint?: string
+  defaultName: string
   badge: string
   badgeColor: string
-  fields: BrokerConfigField[]
-  subtitleFields: SubtitleField[]
+  engine: 'ccxt' | 'alpaca' | 'ibkr'
   guardCategory: 'crypto' | 'securities'
+  modes?: ModeOption[]
+  subtitleFields: SubtitleField[]
+  schema: JsonSchema
 }
 
 export interface GuardEntry {
@@ -399,7 +402,54 @@ export interface GuardEntry {
 export interface TestConnectionResult {
   success: boolean
   error?: string
-  account?: unknown
+  account?: AccountInfo
+  positions?: Position[]
+}
+
+// ==================== Order entry (frontend manual surface) ====================
+//
+// Numeric fields are strings on the wire — the backend uses
+// new Decimal(String(x)) to preserve precision; mirroring the type
+// here keeps frontend → backend aligned and avoids float roundtrip.
+
+export interface PlaceOrderRequest {
+  aliceId: string
+  symbol?: string
+  action: 'BUY' | 'SELL'
+  orderType: string
+  totalQuantity?: string
+  cashQty?: string
+  lmtPrice?: string
+  auxPrice?: string
+  trailStopPrice?: string
+  trailingPercent?: string
+  tif?: string
+  goodTillDate?: string
+  outsideRth?: boolean
+  parentId?: string
+  ocaGroup?: string
+  takeProfit?: { price: string }
+  stopLoss?: { price: string; limitPrice?: string }
+  message: string
+}
+
+export interface ClosePositionRequest {
+  aliceId: string
+  symbol?: string
+  qty?: string
+  message: string
+}
+
+export interface CancelOrderRequest {
+  orderId: string
+  message: string
+}
+
+/** Error response shape from one-shot order endpoints (when status !== 200). */
+export interface OrderErrorResponse {
+  error: string
+  /** Which step blew up — useful for surfacing where the failure happened. */
+  phase?: 'validate' | 'stage' | 'commit' | 'push'
 }
 
 // ==================== Snapshots ====================

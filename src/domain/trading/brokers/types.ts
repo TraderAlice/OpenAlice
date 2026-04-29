@@ -204,6 +204,17 @@ export interface IBroker<TMeta = unknown> {
   searchContracts(pattern: string): Promise<ContractDescription[]>
   getContractDetails(query: Contract): Promise<ContractDetails | null>
 
+  /**
+   * Refresh the broker's local catalog cache from upstream.
+   * Optional — only EnumeratingCatalog brokers (Alpaca / CCXT / Mock)
+   * implement this. SearchingCatalog brokers (IBKR via reqMatchingSymbols)
+   * leave it undefined; the cron loop in main.ts skips them via `?.`.
+   *
+   * Implementations should keep the prior cache on failure and let the
+   * exception propagate so the caller can log.
+   */
+  refreshCatalog?(): Promise<void>
+
   // ---- Trading operations (IBKR Order as source of truth) ----
 
   placeOrder(contract: Contract, order: Order, tpsl?: TpSlParams): Promise<PlaceOrderResult>

@@ -35,6 +35,17 @@ import type {
   AlpacaClockRaw,
 } from './alpaca-types.js'
 import { makeContract, resolveSymbol, mapAlpacaOrderStatus, makeOrderState } from './alpaca-contracts.js'
+import { fuzzyRankContracts, type FuzzyRankInput } from '../fuzzy-rank.js'
+
+/** Subset of Alpaca's `/v2/assets` row we actually use for catalog matching. */
+interface AlpacaAssetRaw {
+  symbol: string
+  name?: string
+  class?: string         // 'us_equity' | 'crypto'
+  exchange?: string
+  tradable?: boolean
+  status?: string        // 'active' | 'inactive'
+}
 
 /** Map IBKR orderType codes to Alpaca API order type strings. */
 function ibkrOrderTypeToAlpaca(orderType: string): string {
@@ -93,6 +104,12 @@ export class AlpacaBroker implements IBroker {
 
   private client!: InstanceType<typeof Alpaca>
   private readonly config: AlpacaBrokerConfig
+  /**
+   * Local cache of Alpaca's tradeable asset list. Pulled at connect-time and
+   * (eventually) refreshed by a 6h cron in main.ts. Empty array (rather than
+   * null) means "we tried and got nothing" — null means "haven't tried yet".
+   */
+  private catalog: AlpacaAssetRaw[] | null = null
 
   constructor(config: AlpacaBrokerConfig) {
     this.config = config
@@ -127,6 +144,12 @@ export class AlpacaBroker implements IBroker {
         console.log(
           `AlpacaBroker[${this.id}]: connected (paper=${this.config.paper}, equity=$${parseFloat(account.equity).toFixed(2)})`,
         )
+        // Pull the asset catalog opportunistically — failure here is
+        // non-fatal because searchContracts can fall back to echoing the
+        // ticker, and the 6h cron will retry. Still log so the user knows.
+        this.refreshCatalog().catch((err) => {
+          console.warn(`AlpacaBroker[${this.id}]: initial catalog load failed:`, err instanceof Error ? err.message : err)
+        })
         return
       } catch (err) {
         lastErr = err
@@ -152,16 +175,53 @@ export class AlpacaBroker implements IBroker {
     // Alpaca SDK has no explicit close
   }
 
-  // ---- Contract search ----
+  // ---- Contract search (EnumeratingCatalog model) ----
+
+  /**
+   * Pull Alpaca's full active asset list and atomically replace the local
+   * cache. Failure preserves the previous cache (better stale than empty).
+   *
+   * Called once at init() and periodically by main.ts's 6h cron.
+   */
+  async refreshCatalog(): Promise<void> {
+    try {
+      const raw = await (this.client as unknown as {
+        getAssets: (opts?: { status?: string }) => Promise<AlpacaAssetRaw[]>
+      }).getAssets({ status: 'active' })
+      // Filter to tradable assets only — there's no point surfacing a
+      // contract the broker won't accept orders for.
+      const next = (raw ?? []).filter((a) => a.tradable !== false)
+      this.catalog = next
+      console.log(`AlpacaBroker[${this.id}]: catalog loaded (${next.length} active tradable assets)`)
+    } catch (err) {
+      // Re-throw so the caller (init / cron) can decide whether to log or
+      // swallow. We don't clobber `this.catalog` on failure.
+      throw err
+    }
+  }
 
   async searchContracts(pattern: string): Promise<ContractDescription[]> {
     if (!pattern) return []
 
-    // Alpaca tickers are unique for stocks — pattern is treated as exact ticker match
-    const ticker = pattern.toUpperCase()
-    const desc = new ContractDescription()
-    desc.contract = makeContract(ticker)
-    return [desc]
+    // Catalog hasn't loaded yet (init still running, or first load failed).
+    // Fall back to a single echo so the broker isn't dead in the water —
+    // this is the pre-catalog behaviour, kept as a safety net.
+    if (this.catalog == null) {
+      const desc = new ContractDescription()
+      desc.contract = makeContract(pattern.toUpperCase())
+      return [desc]
+    }
+
+    const entries: FuzzyRankInput[] = this.catalog.map((a) => {
+      const c = makeContract(a.symbol)
+      // Stash the asset name in `description` so panels that render it
+      // (e.g. TradeableContractsPanel) can show "Teucrium Commodity Trust"
+      // alongside the ticker.
+      if (a.name) c.description = a.name
+      if (a.exchange) c.primaryExchange = a.exchange
+      return { contract: c, name: a.name }
+    })
+    return fuzzyRankContracts(entries, pattern)
   }
 
   async getContractDetails(query: Contract): Promise<ContractDetails | null> {

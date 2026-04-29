@@ -1,4 +1,4 @@
-import type { AccountConfig } from '../../../core/config.js'
+import type { UTAConfig } from '../../../core/config.js'
 import { IolApiClient } from '../../trading/brokers/iol/iol-client.js'
 import type { FixedIncomeClientLike, FixedIncomeSearchData } from '../client/types.js'
 
@@ -138,14 +138,14 @@ export class IolFixedIncomeClient implements FixedIncomeClientLike {
   }
 }
 
-export function createIolFixedIncomeClientFromAccounts(accounts: AccountConfig[]): FixedIncomeClientLike {
-  const iolAccount = accounts.find((account) => account.enabled !== false && account.type === 'iol')
+export function createIolFixedIncomeClientFromAccounts(accounts: UTAConfig[]): FixedIncomeClientLike {
+  const iolAccount = accounts.find((account) => account.enabled !== false && account.presetId === 'iol')
   const username = resolveSecret(
-    typeof iolAccount?.brokerConfig.username === 'string' ? iolAccount.brokerConfig.username : undefined,
+    typeof iolAccount?.presetConfig['username'] === 'string' ? iolAccount.presetConfig['username'] : undefined,
     ENV_USERNAME,
   )
   const password = resolveSecret(
-    typeof iolAccount?.brokerConfig.password === 'string' ? iolAccount.brokerConfig.password : undefined,
+    typeof iolAccount?.presetConfig['password'] === 'string' ? iolAccount.presetConfig['password'] : undefined,
     ENV_PASSWORD,
   )
 

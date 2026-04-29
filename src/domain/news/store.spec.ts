@@ -132,6 +132,29 @@ describe('NewsCollectorStore', () => {
     expect(store.count).toBe(2)
   })
 
+  it('serializes concurrent ingest of the same dedupKey (no duplicate writes)', async () => {
+    const item = {
+      title: 'Race',
+      content: 'Concurrent ingest',
+      pubTime: new Date('2026-02-27T10:00:00Z'),
+      dedupKey: 'guid:race',
+      metadata: { source: 'test' },
+    }
+
+    const results = await Promise.all(Array.from({ length: 50 }, () => store.ingest(item)))
+
+    // Exactly one ingest reports "new", all others see the dedup
+    expect(results.filter((r) => r === true)).toHaveLength(1)
+    expect(results.filter((r) => r === false)).toHaveLength(49)
+    expect(store.count).toBe(1)
+    expect(store.dedupCount).toBe(1)
+
+    // Disk has exactly one record
+    const raw = await readFile(TEST_LOG_PATH, 'utf-8')
+    const lines = raw.split('\n').filter((l) => l.trim())
+    expect(lines).toHaveLength(1)
+  })
+
   it('respects maxInMemory', async () => {
     const smallStore = new NewsCollectorStore({ logPath: TEST_LOG_PATH, maxInMemory: 3, retentionDays: 7 })
     await smallStore.init()
@@ -166,12 +189,12 @@ describe('NewsCollectorStore', () => {
       }
     })
 
-    it('getNews filters by time range', async () => {
+    it('getNewsV2 with explicit start/end filters by time range', async () => {
       const base = new Date('2026-02-27T00:00:00Z').getTime()
-      const items = await store.getNews(
-        new Date(base + 2 * 3600_000), // after news 2
-        new Date(base + 5 * 3600_000), // up to news 5
-      )
+      const items = await store.getNewsV2({
+        startTime: new Date(base + 2 * 3600_000), // after news 2
+        endTime: new Date(base + 5 * 3600_000),   // up to news 5
+      })
       expect(items).toHaveLength(3) // news 3, 4, 5
       expect(items[0].title).toBe('News 3')
       expect(items[2].title).toBe('News 5')

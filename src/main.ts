@@ -1,14 +1,14 @@
 import { readFile, writeFile, mkdir } from 'fs/promises'
 import { resolve, dirname } from 'path'
 // Engine removed — AgentCenter is the top-level AI entry point
-import { loadConfig, readAccountsConfig } from './core/config.js'
+import { loadConfig, readUTAsConfig } from './core/config.js'
 import type { Plugin, EngineContext, ReconnectResult } from './core/types.js'
 import { McpPlugin } from './server/mcp.js'
 import { TelegramPlugin } from './connectors/telegram/index.js'
 import { WebPlugin } from './connectors/web/index.js'
 import { McpAskPlugin } from './connectors/mcp-ask/index.js'
 import { createThinkingTools } from './tool/thinking.js'
-import { AccountManager, createSnapshotService, createSnapshotScheduler } from './domain/trading/index.js'
+import { UTAManager, createSnapshotService, createSnapshotScheduler } from './domain/trading/index.js'
 import { FxService } from './domain/trading/fx-service.js'
 import { createTradingTools } from './tool/trading.js'
 import { Brain } from './domain/brain/index.js'
@@ -96,25 +96,25 @@ async function main() {
 
   const listenerRegistry = createListenerRegistry(eventLog)
 
-  // ==================== Tool Center (created early — AccountManager needs it) ====================
+  // ==================== Tool Center (created early — UTAManager needs it) ====================
 
   const toolCenter = new ToolCenter()
 
   // ==================== Trading Account Manager ====================
 
-  const accountManager = new AccountManager({ eventLog, toolCenter })
+  const utaManager = new UTAManager({ eventLog, toolCenter })
 
-  const accountConfigs = await readAccountsConfig()
-  for (const accCfg of accountConfigs) {
+  const utaConfigs = await readUTAsConfig()
+  for (const accCfg of utaConfigs) {
     if (accCfg.enabled === false) continue
-    await accountManager.initAccount(accCfg)
+    await utaManager.initUTA(accCfg)
   }
-  accountManager.registerCcxtToolsIfNeeded()
+  utaManager.registerCcxtToolsIfNeeded()
 
   // ==================== Snapshot ====================
 
-  const snapshotService = createSnapshotService({ accountManager, eventLog })
-  accountManager.setSnapshotHooks({
+  const snapshotService = createSnapshotService({ utaManager, eventLog })
+  utaManager.setSnapshotHooks({
     onPostPush: (id) => { snapshotService.takeSnapshot(id, 'post-push') },
     onPostReject: (id) => { snapshotService.takeSnapshot(id, 'post-reject') },
   })
@@ -204,7 +204,7 @@ async function main() {
   // ==================== FX Service ====================
 
   const fxService = new FxService(currencyClient)
-  accountManager.setFxService(fxService)
+  utaManager.setFxService(fxService)
 
   // ==================== Equity Symbol Index ====================
 
@@ -214,7 +214,7 @@ async function main() {
   const commodityCatalog = new CommodityCatalog()
   commodityCatalog.load()
 
-  const fixedIncomeClient = createIolFixedIncomeClientFromAccounts(accountConfigs)
+  const fixedIncomeClient = createIolFixedIncomeClientFromAccounts(utaConfigs)
   const marketSearch = { symbolIndex, equityClient, fixedIncomeClient, cryptoClient, currencyClient, commodityCatalog }
 
   // ==================== Tool Registration ====================
@@ -223,7 +223,7 @@ async function main() {
 
   // One unified set of trading tools — routes via `source` parameter at runtime
   toolCenter.register(
-    createTradingTools(accountManager, fxService),
+    createTradingTools(utaManager, fxService),
     'trading',
   )
 
@@ -417,7 +417,7 @@ async function main() {
     fire: createEventBus(eventLog),
     bbEngine: getSDKExecutor(),
     marketSearch,
-    accountManager, fxService, snapshotService,
+    utaManager, fxService, snapshotService,
     newsProvider: newsStore,
     reconnectConnectors,
   }
@@ -429,11 +429,29 @@ async function main() {
 
   console.log('engine: started')
 
+  // ==================== Broker catalog refresh ====================
+  // Brokers that cache their catalog locally (Alpaca, CCXT, Mock) need
+  // periodic refreshes so newly listed assets surface in search and
+  // delisted ones drop. The optional `refreshCatalog` is a no-op for
+  // brokers that don't cache (IBKR — server-side reqMatchingSymbols).
+  const CATALOG_REFRESH_MS = 6 * 60 * 60 * 1000  // 6h
+  const catalogRefreshTimer = setInterval(() => {
+    for (const uta of utaManager.resolve()) {
+      uta.refreshCatalog().catch((err) => {
+        console.warn(`[catalog-refresh] ${uta.id} failed:`, err instanceof Error ? err.message : err)
+      })
+    }
+  }, CATALOG_REFRESH_MS)
+  // Don't keep the process alive just for the refresh loop — shutdown logic
+  // below clears it anyway, this is belt-and-braces for clean Node exit.
+  catalogRefreshTimer.unref?.()
+
   // ==================== Shutdown ====================
 
   let stopped = false
   const shutdown = async () => {
     stopped = true
+    clearInterval(catalogRefreshTimer)
     newsCollector?.stop()
     snapshotScheduler.stop()
     heartbeat.stop()
@@ -448,7 +466,7 @@ async function main() {
     await newsStore.close()
     await toolCallLog.close()
     await eventLog.close()
-    await accountManager.closeAll()
+    await utaManager.closeAll()
     process.exit(0)
   }
   process.on('SIGINT', shutdown)

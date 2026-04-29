@@ -5,14 +5,14 @@ import './contract-ext.js'
 export { UnifiedTradingAccount } from './UnifiedTradingAccount.js'
 export type { UnifiedTradingAccountOptions, StagePlaceOrderParams, StageModifyOrderParams, StageClosePositionParams } from './UnifiedTradingAccount.js'
 
-// AccountManager
-export { AccountManager } from './account-manager.js'
+// UTAManager
+export { UTAManager } from './uta-manager.js'
 export type {
-  AccountSummary,
+  UTASummary,
   AggregatedEquity,
   ContractSearchResult,
   SnapshotHooks,
-} from './account-manager.js'
+} from './uta-manager.js'
 
 // Brokers (types + implementations + factory)
 export type {

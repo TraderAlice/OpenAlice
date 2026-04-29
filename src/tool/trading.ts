@@ -10,9 +10,10 @@ import { tool, type Tool } from 'ai'
 import { z } from 'zod'
 import Decimal from 'decimal.js'
 import { Contract, UNSET_DECIMAL } from '@traderalice/ibkr'
-import type { AccountManager } from '@/domain/trading/account-manager.js'
+import type { UTAManager } from '@/domain/trading/uta-manager.js'
 import { BrokerError, type OpenOrder } from '@/domain/trading/brokers/types.js'
 import type { FxService } from '@/domain/trading/fx-service.js'
+import { normalizeBrokerSearchPattern } from '@/domain/trading/contract-search-rules.js'
 import '@/domain/trading/contract-ext.js'
 
 /** Classify a broker error into a structured response for AI consumption. */
@@ -79,33 +80,47 @@ const positiveNumeric = z
     { message: 'must be a positive number or positive numeric string' },
   )
 
-export function createTradingTools(manager: AccountManager, fxService?: FxService): Record<string, Tool> {
+export function createTradingTools(manager: UTAManager, fxService?: FxService): Record<string, Tool> {
   return {
-    listAccounts: tool({
+    listUTAs: tool({
       description: 'List all registered trading accounts with their id, provider, label, and capabilities.',
       inputSchema: z.object({}),
-      execute: () => manager.listAccounts(),
+      execute: () => manager.listUTAs(),
     }),
 
     searchContracts: tool({
       description: `Search broker accounts for tradeable contracts matching a pattern.
-This is a BROKER-LEVEL search — it queries your connected trading accounts.`,
+This is a BROKER-LEVEL search — it queries your connected trading accounts.
+
+Pass \`assetClass\` when known (especially "crypto" or "currency") so the
+data-vendor symbol is normalized into a broker-friendly pattern — e.g. a
+search for "BTCUSD" with assetClass="crypto" is rewritten to "BTC" before
+hitting the broker, which otherwise expects the bare base ticker.`,
       inputSchema: z.object({
         pattern: z.string().describe('Symbol or keyword to search'),
+        assetClass: z.enum(['equity', 'crypto', 'currency', 'commodity', 'unknown']).optional()
+          .describe('Asset class hint. Improves matching for crypto/currency where data symbols concatenate quote currency.'),
         source: z.string().optional().describe(sourceDesc(false)),
       }),
-      execute: async ({ pattern, source }) => {
+      execute: async ({ pattern, assetClass, source }) => {
+        // Symbol → broker pattern: see src/domain/trading/contract-search-rules.md
+        // for what the normalization does and why.
+        const brokerPattern = normalizeBrokerSearchPattern(pattern, assetClass ?? 'unknown')
+        if (!brokerPattern) return { results: [], message: 'Empty pattern.' }
+        // Source-scoped: when the caller pinned an account, only that one is
+        // hit; otherwise fan out to all configured accounts.
         const targets = manager.resolve(source)
         if (targets.length === 0) return { error: 'No accounts available.' }
-        const allResults: Array<Record<string, unknown>> = []
-        for (const uta of targets) {
-          try {
-            const descriptions = await uta.searchContracts(pattern)
-            for (const desc of descriptions) allResults.push({ source: uta.id, ...desc })
-          } catch { /* skip */ }
+        const all: Array<Record<string, unknown>> = []
+        const settled = await Promise.allSettled(
+          targets.map(async (uta) => ({ id: uta.id, results: await uta.searchContracts(brokerPattern) })),
+        )
+        for (const r of settled) {
+          if (r.status !== 'fulfilled') continue
+          for (const desc of r.value.results) all.push({ source: r.value.id, ...desc })
         }
-        if (allResults.length === 0) return { results: [], message: `No contracts found matching "${pattern}".` }
-        return allResults
+        if (all.length === 0) return { results: [], message: `No contracts found matching "${brokerPattern}" (input: "${pattern}").` }
+        return all
       },
     }),
 

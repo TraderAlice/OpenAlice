@@ -78,7 +78,8 @@ export interface StageModifyOrderParams {
 export interface StageClosePositionParams {
   aliceId: string
   symbol?: string
-  qty?: number
+  /** Accepts string (preferred — preserves Decimal precision) or number. Empty / undefined closes the full position. */
+  qty?: number | string
 }
 
 // ==================== UnifiedTradingAccount ====================
@@ -528,6 +529,18 @@ export class UnifiedTradingAccount {
     const results = await this._callBroker(() => this.broker.searchContracts(pattern))
     for (const desc of results) this.stampAliceId(desc.contract)
     return results
+  }
+
+  /**
+   * Optional broker-side catalog refresh (Alpaca, CCXT, Mock — those that
+   * cache an enumerable list locally). No-op for brokers that source search
+   * server-side (IBKR). Caller — typically a cron job — gets a resolved
+   * promise either way and a thrown exception if the broker tried and
+   * failed to refresh.
+   */
+  async refreshCatalog(): Promise<void> {
+    if (typeof this.broker.refreshCatalog !== 'function') return
+    await this._callBroker(() => this.broker.refreshCatalog!())
   }
 
   async getContractDetails(query: Contract): Promise<ContractDetails | null> {

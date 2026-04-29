@@ -50,6 +50,13 @@ export class NewsCollectorStore implements INewsProvider {
   private dedupSet: Set<string> = new Set()
   /** Monotonic sequence counter */
   private seq: number = 0
+  /**
+   * Promise-chain mutex: serialize ingest() so the dedup-check / appendFile /
+   * dedup-add sequence is atomic across concurrent callers. Without this, two
+   * ingests of the same key both pass has(), both appendFile, and the JSONL
+   * gets duplicate lines (recovery dedups them, but the file is dirty).
+   */
+  private writeChain: Promise<unknown> = Promise.resolve()
 
   constructor(opts?: NewsCollectorStoreOpts) {
     this.logPath = opts?.logPath ?? DEFAULT_LOG_PATH
@@ -112,8 +119,23 @@ export class NewsCollectorStore implements INewsProvider {
 
   /**
    * Ingest a single news item. Returns true if new (not a duplicate).
+   *
+   * Serialized via writeChain so that concurrent callers cannot both pass the
+   * dedup check before either writes to disk.
    */
   async ingest(item: {
+    title: string
+    content: string
+    pubTime: Date
+    dedupKey: string
+    metadata: Record<string, string | null>
+  }): Promise<boolean> {
+    const next = this.writeChain.then(() => this._ingestImpl(item))
+    this.writeChain = next.catch(() => {})
+    return next
+  }
+
+  private async _ingestImpl(item: {
     title: string
     content: string
     pubTime: Date
@@ -185,18 +207,6 @@ export class NewsCollectorStore implements INewsProvider {
   }
 
   // ==================== INewsProvider ====================
-
-  async getNews(startTime: Date, endTime: Date): Promise<NewsItem[]> {
-    const startMs = startTime.getTime()
-    const endMs = endTime.getTime()
-
-    const filtered = this.buffer.filter(
-      (r) => r.pubTs > startMs && r.pubTs <= endMs,
-    )
-
-    filtered.sort((a, b) => a.pubTs - b.pubTs)
-    return filtered.map(recordToNewsItem)
-  }
 
   async getNewsV2(options: GetNewsV2Options): Promise<NewsItem[]> {
     const { endTime, startTime, lookback, limit } = options

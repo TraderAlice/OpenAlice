@@ -34,6 +34,7 @@ import {
   marketToContract,
   contractToCcxt,
 } from './ccxt-contracts.js'
+import { fuzzyRankContracts } from '../fuzzy-rank.js'
 import {
   type CcxtExchangeOverrides,
   exchangeOverrides,
@@ -43,7 +44,26 @@ import {
   defaultFetchPositions,
 } from './overrides.js'
 
-const STABLECOIN_TO_USD = new Set(['USDT', 'USDC', 'BUSD', 'DAI', 'TUSD'])
+// Treated as cash (1:1 to USD) when computing balances and as ineligible
+// for spot-position synthesis. Compared against `coin.toUpperCase()` so
+// CCXT's mixed-case codes like 'USDe' normalize correctly.
+const STABLECOIN_TO_USD = new Set([
+  'USDT', 'USDC', 'BUSD', 'DAI', 'TUSD',
+  'FDUSD',  // First Digital USD — Binance's primary post-BUSD stablecoin
+  'PYUSD',  // PayPal USD
+  'USDE',   // Ethena synthetic USD
+  'USDP',   // Paxos USD
+])
+
+// Top-level keys CCXT returns alongside per-currency entries in fetchBalance.
+// Skipping these prevents us from treating 'free'/'used'/'total' aggregates
+// as if they were a coin called "free".
+const BALANCE_RESERVED_KEYS = new Set(['free', 'used', 'total', 'info', 'timestamp', 'datetime'])
+
+// Quote currencies tried, in order, when looking for a market to price a
+// spot holding. USDT first because it has the densest coverage across
+// CCXT exchanges; USDC/USD as fallbacks.
+const SPOT_QUOTE_PREFERENCE = ['USDT', 'USDC', 'USD'] as const
 
 /** Normalize stablecoin quote currencies to 'USD' so they don't trigger FX conversion. */
 function normalizeQuoteCurrency(quote: string): string {
@@ -253,32 +273,46 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
     // CCXT exchanges typically don't need explicit closing
   }
 
+  /**
+   * Re-pull the exchange market list. CCXT's `loadMarkets(true)` (the
+   * `reload=true` overload) bypasses the cached snapshot it built during
+   * init. Call from a cron periodically — newly listed pairs and
+   * delistings come along for the ride.
+   */
+  async refreshCatalog(): Promise<void> {
+    this.ensureInit()
+    await this.exchange.loadMarkets(true)
+    const marketCount = Object.keys(this.exchange.markets).length
+    console.log(`CcxtBroker[${this.id}]: catalog refreshed (${marketCount} markets)`)
+  }
+
   // ---- Contract search ----
 
   async searchContracts(pattern: string): Promise<ContractDescription[]> {
     this.ensureInit()
     if (!pattern) return []
 
-    const searchBase = pattern.toUpperCase()
-    const matchedMarkets: CcxtMarket[] = []
-
+    // Eligible candidate set: active markets with both legs of the pair, and
+    // quoted in a stablecoin / USD. This is the same filter the strict
+    // implementation used; we keep it so a "tesla" fuzzy hit doesn't drag in
+    // exotic-quote pairs the user almost certainly doesn't want.
+    const candidates: CcxtMarket[] = []
     for (const market of Object.values(this.markets)) {
       if (market.active === false) continue
-      // Some exchanges (e.g. hyperliquid spot) have markets without base/quote populated
       if (!market.base || !market.quote) continue
-      if (market.base.toUpperCase() !== searchBase) continue
-
       const quote = market.quote.toUpperCase()
       if (quote !== 'USDT' && quote !== 'USD' && quote !== 'USDC') continue
-
-      matchedMarkets.push(market)
+      candidates.push(market)
     }
 
-    // Sort: derivatives first (more common for trading), then stablecoin preference
+    // Pre-sort candidates by the broker's own preference (swap > future >
+    // spot > option, USDT > USD > USDC). fuzzyRankContracts is a stable sort
+    // and uses the input order as a tiebreaker, so this carries through —
+    // exact base matches keep showing up in the familiar derivative-first
+    // order, fuzzy hits inherit the same preference.
     const typeOrder: Record<string, number> = { swap: 0, future: 1, spot: 2, option: 3 }
     const quoteOrder: Record<string, number> = { USDT: 0, USD: 1, USDC: 2 }
-
-    matchedMarkets.sort((a, b) => {
+    candidates.sort((a, b) => {
       const aType = typeOrder[a.type as keyof typeof typeOrder] ?? 99
       const bType = typeOrder[b.type as keyof typeof typeOrder] ?? 99
       if (aType !== bType) return aType - bType
@@ -287,22 +321,37 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
       return aQuote - bQuote
     })
 
-    // Collect derivative types available for this base asset
+    // Run candidates through the shared fuzzy ranker. Exact-base hits land in
+    // tier 100 (preserves the strict-matcher's behaviour for power users who
+    // type "BTC" and expect every BTC market); substring / name hits show up
+    // afterward so partial keywords (e.g. "tesl", "popcorn") still surface
+    // something useful.
+    const ranked = fuzzyRankContracts(
+      candidates.map((m) => {
+        const c = marketToContract(m, this.exchangeName)
+        return { contract: c, base: m.base, quote: m.quote, name: m.id ?? m.symbol }
+      }),
+      pattern,
+    )
+
+    // Index original markets by symbol so we can look up derivative-type
+    // metadata from each ranked hit.
+    const marketBySymbol = new Map<string, CcxtMarket>()
+    for (const m of candidates) marketBySymbol.set(m.symbol, m)
+
+    // derivativeSecTypes — surface what derivative product types appear in
+    // the result set, same shape as before.
     const derivativeTypes = new Set<string>()
-    for (const m of matchedMarkets) {
+    for (const desc of ranked) {
+      const m = marketBySymbol.get(desc.contract.localSymbol ?? '')
+      if (!m) continue
       if (m.type === 'future') derivativeTypes.add('FUT')
       if (m.type === 'option') derivativeTypes.add('OPT')
     }
-    const derivativeSecTypes: string[] | undefined = derivativeTypes.size > 0
-      ? Array.from(derivativeTypes)
-      : undefined
+    const derivativeSecTypes: string[] = derivativeTypes.size > 0 ? Array.from(derivativeTypes) : []
+    for (const desc of ranked) desc.derivativeSecTypes = derivativeSecTypes
 
-    return matchedMarkets.map(market => {
-      const desc = new ContractDescription()
-      desc.contract = marketToContract(market, this.exchangeName)
-      desc.derivativeSecTypes = derivativeSecTypes ?? []
-      return desc
-    })
+    return ranked
   }
 
   async getContractDetails(query: Contract): Promise<ContractDetails | null> {
@@ -484,6 +533,102 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
 
   // ---- Queries ----
 
+  /**
+   * Synthesize spot holdings (BTC/ETH/etc balances) into Position records.
+   *
+   * CCXT's fetchPositions() only returns derivative positions
+   * (SWAP/FUTURES/MARGIN/OPTION); spot assets sit in fetchBalance() as
+   * per-currency entries. Without this synthesis, a UTA user holding only
+   * spot would see an empty positions list and a netLiquidation that
+   * reflects only their stablecoin balance.
+   *
+   * Treated as long positions priced at the current ticker — consistent
+   * with how IBKR exposes equity holdings. avgCost is set to markPrice
+   * because reconstructing historic fill cost would require fetchMyTrades,
+   * which is too expensive for a snapshot path.
+   */
+  private async fetchSpotHoldings(prefetched?: Awaited<ReturnType<Exchange['fetchBalance']>>): Promise<Position[]> {
+    const balance = prefetched ?? await this.exchange.fetchBalance()
+    const bal = balance as unknown as Record<string, unknown>
+
+    type Holding = { coin: string; quantity: Decimal; ccxtSymbol: string; market: CcxtMarket }
+    const holdings: Holding[] = []
+
+    for (const [coin, entry] of Object.entries(bal)) {
+      if (BALANCE_RESERVED_KEYS.has(coin)) continue
+      if (STABLECOIN_TO_USD.has(coin.toUpperCase())) continue
+      if (typeof entry !== 'object' || entry === null) continue
+
+      const e = entry as Record<string, unknown>
+      const free = new Decimal(String(e['free'] ?? 0))
+      const used = new Decimal(String(e['used'] ?? 0))
+      const quantity = free.plus(used)
+      if (quantity.lte(0)) continue
+
+      // Find the most preferred quote market for pricing this holding.
+      let resolved: { ccxtSymbol: string; market: CcxtMarket } | null = null
+      for (const quote of SPOT_QUOTE_PREFERENCE) {
+        const candidate = `${coin}/${quote}`
+        const m = this.markets[candidate]
+        if (m && m.active !== false && m.type === 'spot') {
+          resolved = { ccxtSymbol: candidate, market: m }
+          break
+        }
+      }
+      if (!resolved) {
+        console.warn(`CcxtBroker[${this.id}]: spot holding ${coin} (${quantity.toString()}) — no <COIN>/USDT|USDC|USD spot market, skipping`)
+        continue
+      }
+
+      holdings.push({ coin, quantity, ...resolved })
+    }
+
+    if (holdings.length === 0) return []
+
+    // Bulk fetch tickers — one HTTP call instead of N. Some exchanges
+    // don't support multi-symbol fetchTickers; fall back to per-symbol on
+    // failure so we don't lose the entire spot view over an API quirk.
+    const symbols = holdings.map(h => h.ccxtSymbol)
+    let tickers: Record<string, { last?: number | null }> = {}
+    try {
+      tickers = await this.exchange.fetchTickers(symbols) as unknown as Record<string, { last?: number | null }>
+    } catch {
+      for (const s of symbols) {
+        try {
+          tickers[s] = await this.exchange.fetchTicker(s) as unknown as { last?: number | null }
+        } catch {
+          // skip — warned per-holding below
+        }
+      }
+    }
+
+    const result: Position[] = []
+    for (const h of holdings) {
+      const last = tickers[h.ccxtSymbol]?.last
+      if (last == null) {
+        console.warn(`CcxtBroker[${this.id}]: spot holding ${h.coin} — no ticker for ${h.ccxtSymbol}, skipping`)
+        continue
+      }
+      const markPrice = new Decimal(String(last))
+      const marketValue = h.quantity.mul(markPrice)
+
+      result.push({
+        contract: marketToContract(h.market, this.exchangeName),
+        currency: normalizeQuoteCurrency(h.market.quote ?? 'USDT'),
+        side: 'long',
+        quantity: h.quantity,
+        // markPrice as cost basis — historic cost would need fetchMyTrades
+        avgCost: markPrice.toString(),
+        marketPrice: markPrice.toString(),
+        marketValue: marketValue.toString(),
+        unrealizedPnL: '0',
+        realizedPnL: '0',
+      })
+    }
+
+    return result
+  }
+
   async getAccount(): Promise<AccountInfo> {
     this.ensureInit()
 
@@ -493,11 +638,23 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
         this.exchange.fetchPositions(),
       ])
 
-      const bal = balance as unknown as Record<string, Record<string, unknown>>
-      const free = new Decimal(String(bal['free']?.['USDT'] ?? bal['free']?.['USD'] ?? 0))
-      const used = new Decimal(String(bal['used']?.['USDT'] ?? bal['used']?.['USD'] ?? 0))
+      const bal = balance as unknown as Record<string, unknown>
 
-      // Aggregate P&L and market value from positions.
+      // Sum every stablecoin entry — not just USDT — into cash. OKX UTA
+      // and Binance both quote against multiple stablecoins (USDT, USDC,
+      // FDUSD, …) and a user can hold any of them.
+      let free = new Decimal(0)
+      let used = new Decimal(0)
+      for (const [coin, entry] of Object.entries(bal)) {
+        if (BALANCE_RESERVED_KEYS.has(coin)) continue
+        if (!STABLECOIN_TO_USD.has(coin.toUpperCase())) continue
+        if (typeof entry !== 'object' || entry === null) continue
+        const e = entry as Record<string, unknown>
+        free = free.plus(new Decimal(String(e['free'] ?? 0)))
+        used = used.plus(new Decimal(String(e['used'] ?? 0)))
+      }
+
+      // Aggregate P&L and market value from derivative positions.
       // We use position-level markPrice (which is fresh from the exchange's
       // websocket feed) rather than balance.total (which is a cached wallet
       // snapshot that may not update between funding/settlement cycles).
@@ -508,7 +665,6 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
         unrealizedPnL = unrealizedPnL.plus(new Decimal(String(p.unrealizedPnl ?? 0)))
         realizedPnL = realizedPnL.plus(new Decimal(String((p as unknown as Record<string, unknown>).realizedPnl ?? 0)))
 
-        // Compute position market value from fresh markPrice
         const contracts = new Decimal(String(p.contracts ?? 0)).abs()
         const contractSize = new Decimal(String(p.contractSize ?? 1))
         const quantity = contracts.mul(contractSize)
@@ -516,10 +672,14 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
         totalPositionValue = totalPositionValue.plus(quantity.mul(markPrice))
       }
 
-      // Reconstruct netLiquidation from fresh components:
-      //   netLiq = available cash + total position market value
-      // This gives a real-time equity figure that tracks markPrice movements,
-      // unlike balance.total which only updates on exchange settlement.
+      // Fold spot holdings (BTC/ETH/etc balances) into position value.
+      // They behave like long positions — capital converted from cash into
+      // an asset — so they count toward netLiquidation, not totalCashValue.
+      const spotHoldings = await this.fetchSpotHoldings(balance)
+      for (const sp of spotHoldings) {
+        totalPositionValue = totalPositionValue.plus(new Decimal(sp.marketValue))
+      }
+
       const netLiquidation = free.plus(totalPositionValue)
 
       return {
@@ -540,9 +700,12 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
 
     try {
       const fetchOverride = this.overrides.fetchPositions
-      const raw = fetchOverride
-        ? await fetchOverride(this.exchange, defaultFetchPositions)
-        : await defaultFetchPositions(this.exchange)
+      const [raw, spotHoldings] = await Promise.all([
+        fetchOverride
+          ? fetchOverride(this.exchange, defaultFetchPositions)
+          : defaultFetchPositions(this.exchange),
+        this.fetchSpotHoldings(),
+      ])
       const result: Position[] = []
 
       for (const p of raw) {
@@ -573,7 +736,10 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
         })
       }
 
-      return result
+      // Spot holdings carry distinct contract identity (no settle suffix
+      // in aliceId), so they coexist with derivative positions on the
+      // same underlying — same model as ETF vs futures in IBKR.
+      return [...result, ...spotHoldings]
     } catch (err) {
       throw BrokerError.from(err)
     }

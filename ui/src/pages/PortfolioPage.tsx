@@ -234,21 +234,21 @@ export function PortfolioPage() {
 
 async function fetchPortfolioData(): Promise<PortfolioData> {
   try {
-    const [equityResult, accountsResult, fxResult] = await Promise.allSettled([
+    const [equityResult, utasResult, fxResult] = await Promise.allSettled([
       api.trading.equity(),
-      api.trading.listAccounts(),
+      api.trading.listUTAs(),
       api.trading.fxRates(),
     ])
 
     const equity = equityResult.status === 'fulfilled' ? equityResult.value : null
-    const accountsList = accountsResult.status === 'fulfilled' ? accountsResult.value.accounts : []
+    const utasList = utasResult.status === 'fulfilled' ? utasResult.value.utas : []
     const fxRates = fxResult.status === 'fulfilled' ? fxResult.value.rates : []
 
     const accounts = await Promise.all(
-      accountsList.map(async (acct): Promise<AccountData> => {
+      utasList.map(async (acct): Promise<AccountData> => {
         try {
           const [posResp, logResp] = await Promise.all([
-            api.trading.positions(acct.id),
+            api.trading.utaPositions(acct.id),
             api.trading.walletLog(acct.id, 10),
           ])
           return { ...acct, positions: posResp.positions, walletLog: logResp.commits }

@@ -12,7 +12,7 @@ export function ReconnectButton({ accountId }: { accountId: string }) {
     setStatus('loading')
     setMessage('')
     try {
-      const result = await api.trading.reconnectAccount(accountId)
+      const result = await api.trading.reconnectUTA(accountId)
       if (result.success) {
         setStatus('success')
         setMessage(result.message || 'Connected')

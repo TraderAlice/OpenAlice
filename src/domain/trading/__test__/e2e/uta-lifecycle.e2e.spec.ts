@@ -45,9 +45,9 @@ describe('UTA — full trading lifecycle', () => {
     expect(positions[0].contract.symbol).toBe('AAPL')
     expect(positions[0].quantity.toNumber()).toBe(10)
 
-    // Cash decreased
+    // Cash decreased — monetary fields are strings (post Decimal migration).
     const account = await broker.getAccount()
-    expect(account.totalCashValue).toBe(100_000 - 10 * 150)
+    expect(account.totalCashValue).toBe(String(100_000 - 10 * 150))
   })
 
   it('market buy fills at push time — no sync needed', async () => {
@@ -77,7 +77,7 @@ describe('UTA — full trading lifecycle', () => {
     const state = await uta.getState()
     expect(state.positions).toHaveLength(1)
     expect(state.pendingOrders).toHaveLength(1)
-    expect(state.totalCashValue).toBe(100_000 - 10 * 150)
+    expect(state.totalCashValue).toBe(String(100_000 - 10 * 150))
   })
 
   it('limit order → submitted → fill → sync detects filled', async () => {
@@ -104,7 +104,7 @@ describe('UTA — full trading lifecycle', () => {
     const positions = await broker.getPositions()
     expect(positions).toHaveLength(1)
     expect(positions[0].quantity.toNumber()).toBe(5)
-    expect(positions[0].avgCost).toBe(144)
+    expect(positions[0].avgCost).toBe('144')
   })
 
   it('partial close reduces position', async () => {
@@ -133,7 +133,7 @@ describe('UTA — full trading lifecycle', () => {
 
     expect(await broker.getPositions()).toHaveLength(0)
     const account = await broker.getAccount()
-    expect(account.totalCashValue).toBe(100_000)
+    expect(account.totalCashValue).toBe('100000')
   })
 
   it('cancel pending order', async () => {
