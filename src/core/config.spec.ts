@@ -229,13 +229,41 @@ describe('readAccountsConfig', () => {
     expect(accounts[1].presetId).toBe('alpaca')
   })
 
-  it('refuses pre-preset (legacy) shape with a clear error and backs up the file', async () => {
-    fileReturns([{ id: 'bybit-main', type: 'ccxt', enabled: true, guards: [], brokerConfig: { exchange: 'bybit', apiKey: 'k', apiSecret: 's' } }])
-    await expect(readAccountsConfig()).rejects.toThrow(/pre-preset format/)
-    // Should write both the backup file and the empty replacement
+  it('auto-migrates pre-preset (legacy) ccxt shape and backs up the original', async () => {
+    fileReturns([
+      { id: 'okx-live', type: 'ccxt', enabled: true, guards: [], brokerConfig: { exchange: 'okx', sandbox: false, apiKey: 'k', apiSecret: 's', password: 'p' } },
+      { id: 'okx-demo', type: 'ccxt', enabled: true, guards: [], brokerConfig: { exchange: 'okx', sandbox: true, apiKey: 'k', apiSecret: 's', password: 'p' } },
+      { id: 'bybit-test', type: 'ccxt', enabled: true, guards: [], brokerConfig: { exchange: 'bybit', sandbox: true, apiKey: 'k', apiSecret: 's' } },
+    ])
+    const accounts = await readAccountsConfig()
+    expect(accounts).toHaveLength(3)
+    expect(accounts[0]).toMatchObject({ id: 'okx-live', presetId: 'okx', presetConfig: { mode: 'live' } })
+    expect(accounts[1]).toMatchObject({ id: 'okx-demo', presetId: 'okx', presetConfig: { mode: 'demo' } })
+    expect(accounts[2]).toMatchObject({ id: 'bybit-test', presetId: 'bybit', presetConfig: { mode: 'testnet' } })
+    // CCXT secret alias (apiSecret → secret)
+    expect(accounts[0].presetConfig.secret).toBe('s')
+    // Backup + rewritten accounts.json both written
     const writePaths = mockWriteFile.mock.calls.map((c) => c[0] as string)
     expect(writePaths.some((p) => p.endsWith('accounts.json.backup-pre-preset'))).toBe(true)
     expect(writePaths.some((p) => p.endsWith('accounts.json'))).toBe(true)
+  })
+
+  it('migrates legacy alpaca + ibkr accounts', async () => {
+    fileReturns([
+      { id: 'alp', type: 'alpaca', enabled: true, guards: [], brokerConfig: { paper: true, apiKey: 'k', apiSecret: 's' } },
+      { id: 'ibk', type: 'ibkr', enabled: true, guards: [], brokerConfig: { host: '127.0.0.1', port: 7497, clientId: 0 } },
+    ])
+    const accounts = await readAccountsConfig()
+    expect(accounts[0]).toMatchObject({ presetId: 'alpaca', presetConfig: { mode: 'paper' } })
+    expect(accounts[1]).toMatchObject({ presetId: 'ibkr-tws', presetConfig: { host: '127.0.0.1', port: 7497 } })
+  })
+
+  it('falls back to ccxt-custom for unknown ccxt exchanges', async () => {
+    fileReturns([
+      { id: 'kc', type: 'ccxt', enabled: true, guards: [], brokerConfig: { exchange: 'kucoin', apiKey: 'k', apiSecret: 's', password: 'p' } },
+    ])
+    const accounts = await readAccountsConfig()
+    expect(accounts[0]).toMatchObject({ presetId: 'ccxt-custom', presetConfig: { exchange: 'kucoin', secret: 's' } })
   })
 })
 

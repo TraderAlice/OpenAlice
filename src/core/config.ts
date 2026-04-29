@@ -506,16 +506,115 @@ export async function loadConfig(): Promise<Config> {
 
 // ==================== Account Config Loader ====================
 
+/** Single legacy record carries `type` (removed) without `presetId` (new). */
+function isLegacyRecord(o: Record<string, unknown>): boolean {
+  return typeof o['type'] === 'string' && typeof o['presetId'] !== 'string'
+}
+
 /**
- * Detect the pre-preset (legacy) account shape: presence of `type` field
- * (now removed) without the new `presetId` field. Returns true if any
- * record matches.
+ * Best-effort migration from the pre-preset shape ({type, brokerConfig})
+ * to the preset shape ({presetId, presetConfig}).
+ *
+ * Returns null when the legacy record can't be mapped (unknown engine /
+ * missing exchange) — caller logs and skips.
+ *
+ * TODO(v0.10 → v1.0): remove this migration once nobody is upgrading
+ * from the pre-preset schema. Tracked alongside the AI-side migration
+ * cleanup at the top of this file.
  */
-function isLegacyAccountShape(raw: unknown[]): boolean {
-  return raw.some((r) => {
-    const o = r as Record<string, unknown>
-    return typeof o['type'] === 'string' && typeof o['presetId'] !== 'string'
+function migrateLegacyAccount(raw: Record<string, unknown>): Record<string, unknown> | null {
+  const id = String(raw['id'] ?? '')
+  const label = raw['label'] as string | undefined
+  const enabled = raw['enabled'] as boolean | undefined
+  const guards = raw['guards'] as unknown[] | undefined
+  const type = String(raw['type'] ?? '')
+  const bc = (raw['brokerConfig'] ?? {}) as Record<string, unknown>
+
+  const base = (presetId: string, presetConfig: Record<string, unknown>) => ({
+    id,
+    ...(label !== undefined && { label }),
+    presetId,
+    enabled: enabled ?? true,
+    guards: guards ?? [],
+    presetConfig,
   })
+
+  // CCXT — derive preset from exchange + flags
+  if (type === 'ccxt') {
+    const exchange = String(bc['exchange'] ?? '').toLowerCase()
+    const apiKey = bc['apiKey'] as string | undefined
+    // Legacy used both `secret` and `apiSecret` (alias); new presets use `secret`.
+    const secret = (bc['secret'] ?? bc['apiSecret']) as string | undefined
+    const password = bc['password'] as string | undefined
+    const sandbox = Boolean(bc['sandbox'])
+    const demoTrading = Boolean(bc['demoTrading'])
+    const walletAddress = bc['walletAddress'] as string | undefined
+    const privateKey = bc['privateKey'] as string | undefined
+
+    switch (exchange) {
+      case 'okx':
+        // OKX old configs that set demoTrading: true were broken (the engine
+        // would set urls['api'] = undefined). We treat any non-live flag as
+        // mode=demo so the migrated account actually works.
+        return base('okx', {
+          mode: (sandbox || demoTrading) ? 'demo' : 'live',
+          ...(apiKey && { apiKey }),
+          ...(secret && { secret }),
+          ...(password && { password }),
+        })
+      case 'bybit':
+        return base('bybit', {
+          mode: sandbox ? 'testnet' : (demoTrading ? 'demo' : 'live'),
+          ...(apiKey && { apiKey }),
+          ...(secret && { secret }),
+        })
+      case 'hyperliquid':
+        return base('hyperliquid', {
+          mode: sandbox ? 'testnet' : 'live',
+          ...(walletAddress && { walletAddress }),
+          ...(privateKey && { privateKey }),
+        })
+      case 'bitget':
+        return base('bitget', {
+          mode: demoTrading ? 'demo' : 'live',
+          ...(apiKey && { apiKey }),
+          ...(secret && { secret }),
+          ...(password && { password }),
+        })
+      default:
+        // Unknown / untested exchange — keep functional via the escape hatch.
+        if (!exchange) return null
+        return base('ccxt-custom', {
+          exchange,
+          sandbox,
+          demoTrading,
+          ...(apiKey && { apiKey }),
+          ...(secret && { secret }),
+          ...(password && { password }),
+          ...(walletAddress && { walletAddress }),
+          ...(privateKey && { privateKey }),
+        })
+    }
+  }
+
+  if (type === 'alpaca') {
+    return base('alpaca', {
+      mode: bc['paper'] === false ? 'live' : 'paper',
+      ...(bc['apiKey'] !== undefined && { apiKey: bc['apiKey'] }),
+      ...(bc['apiSecret'] !== undefined && { apiSecret: bc['apiSecret'] }),
+    })
+  }
+
+  if (type === 'ibkr') {
+    return base('ibkr-tws', {
+      ...(bc['host'] !== undefined && { host: bc['host'] }),
+      ...(bc['port'] !== undefined && { port: bc['port'] }),
+      ...(bc['clientId'] !== undefined && { clientId: bc['clientId'] }),
+      ...(bc['accountId'] !== undefined && { accountId: bc['accountId'] }),
+    })
+  }
+
+  return null
 }
 
 export async function readAccountsConfig(): Promise<AccountConfig[]> {
@@ -527,24 +626,36 @@ export async function readAccountsConfig(): Promise<AccountConfig[]> {
     return []
   }
 
-  // Pre-preset shape used `type` + `brokerConfig`; current shape uses
-  // `presetId` + `presetConfig`. We don't auto-migrate (per design — the
-  // mapping from old { type:'ccxt', brokerConfig:{exchange:'okx', ...} }
-  // to new { presetId:'okx', presetConfig:{mode:..., ...} } would have
-  // to invent values like `mode` from sandbox/demoTrading flags, and
-  // we'd rather have the user re-create accounts in the new wizard than
-  // silently mis-translate credentials.
-  if (Array.isArray(raw) && isLegacyAccountShape(raw as unknown[])) {
+  // Auto-migrate the pre-preset shape ({type, brokerConfig}) into the
+  // current shape ({presetId, presetConfig}). We back the original up
+  // first (so a bad migration is never destructive) and write the
+  // translated records to disk so subsequent reads skip this branch.
+  if (Array.isArray(raw) && (raw as unknown[]).some((r) => isLegacyRecord(r as Record<string, unknown>))) {
     const backupPath = resolve(CONFIG_DIR, 'accounts.json.backup-pre-preset')
     await writeFile(backupPath, JSON.stringify(raw, null, 2) + '\n')
-    await writeFile(resolve(CONFIG_DIR, 'accounts.json'), '[]\n')
-    throw new Error(
-      `accounts.json is in the pre-preset format (records with "type" + "brokerConfig"). ` +
-      `The trading account schema changed in v0.10 to a preset-based system — see ` +
-      `src/domain/trading/brokers/preset-catalog.ts for the new shape. ` +
-      `Your previous config has been backed up to ${backupPath} and accounts.json has been ` +
-      `reset to empty. Restart and re-create your accounts via the new wizard at /trading.`,
+
+    const migrated: Record<string, unknown>[] = []
+    const skipped: string[] = []
+    for (const item of raw as Record<string, unknown>[]) {
+      // Already in new shape — keep verbatim.
+      if (!isLegacyRecord(item)) { migrated.push(item); continue }
+      const next = migrateLegacyAccount(item)
+      if (next) {
+        migrated.push(next)
+      } else {
+        skipped.push(String(item['id'] ?? '<unknown>'))
+      }
+    }
+
+    console.warn(
+      `accounts.json: migrated ${migrated.length - skipped.length} legacy record(s) to preset shape ` +
+      `(backup: ${backupPath}).` +
+      (skipped.length ? ` Skipped (unknown engine, recreate manually): ${skipped.join(', ')}.` : ''),
     )
+
+    const validated = accountsFileSchema.parse(migrated)
+    await writeFile(resolve(CONFIG_DIR, 'accounts.json'), JSON.stringify(validated, null, 2) + '\n')
+    return validated
   }
 
   return accountsFileSchema.parse(raw)
