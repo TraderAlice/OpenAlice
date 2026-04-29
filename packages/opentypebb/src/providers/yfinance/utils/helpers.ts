@@ -242,11 +242,21 @@ export async function searchYahooFinance(
 }
 
 /**
- * Convert a camelCase string to snake_case.
- * Maps to: openbb_core.provider.utils.helpers.to_snake_case
+ * Convert a camelCase string to snake_case, preserving acronyms.
+ * `EBITDA` → `ebitda` (not `e_b_i_t_d_a`),
+ * `totalRevenue` → `total_revenue`,
+ * `EBITDAMargin` → `ebitda_margin`.
+ *
+ * Maps to: openbb_core.provider.utils.helpers.to_snake_case.
  */
 function toSnakeCase(s: string): string {
-  return s.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '')
+  return s
+    // boundary between a run of caps and a following word (EBITDAMargin → EBITDA_Margin)
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2')
+    // boundary between a lowercase/digit and an uppercase (totalRevenue → total_Revenue)
+    .replace(/([a-z\d])([A-Z])/g, '$1_$2')
+    .toLowerCase()
+    .replace(/^_/, '')
 }
 
 /**

@@ -228,6 +228,32 @@ export const KIMI: PresetDef = {
   writeOnlyFields: ['apiKey'],
 }
 
+// ==================== Third-party: DeepSeek ====================
+
+export const DEEPSEEK: PresetDef = {
+  id: 'deepseek',
+  label: 'DeepSeek',
+  description: 'DeepSeek models via Claude Agent SDK (Anthropic-compatible)',
+  category: 'third-party',
+  defaultName: 'DeepSeek',
+  hint: 'Get your API key at platform.deepseek.com. Single platform — no regional split. Cached prompt input is heavily discounted ($0.03/M).',
+  zodSchema: z.object({
+    backend: z.literal('agent-sdk'),
+    loginMethod: z.literal('api-key'),
+    baseUrl: z.string().default('https://api.deepseek.com/anthropic').describe('API endpoint'),
+    model: z.string().default('deepseek-v4-pro').describe('Model'),
+    apiKey: z.string().min(1).describe('DeepSeek API key'),
+  }),
+  endpoints: [
+    { id: 'https://api.deepseek.com/anthropic', label: 'DeepSeek (api.deepseek.com)' },
+  ],
+  models: [
+    { id: 'deepseek-v4-pro', label: 'DeepSeek V4 Pro (flagship)' },
+    { id: 'deepseek-v4-flash', label: 'DeepSeek V4 Flash (cheap/fast)' },
+  ],
+  writeOnlyFields: ['apiKey'],
+}
+
 // ==================== Custom ====================
 
 export const CUSTOM: PresetDef = {
@@ -258,5 +284,6 @@ export const PRESET_CATALOG: PresetDef[] = [
   MINIMAX,
   GLM,
   KIMI,
+  DEEPSEEK,
   CUSTOM,
 ]

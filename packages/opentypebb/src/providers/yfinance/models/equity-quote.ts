@@ -22,10 +22,16 @@ const ALIAS_DICT: Record<string, string> = {
   open: 'regularMarketOpen',
   volume: 'regularMarketVolume',
   prev_close: 'regularMarketPreviousClose',
+  change: 'regularMarketChange',
+  change_percent: 'regularMarketChangePercent',
+  last_timestamp: 'regularMarketTime',
   year_high: 'fiftyTwoWeekHigh',
   year_low: 'fiftyTwoWeekLow',
-  ma_50d: 'fiftyDayAverage',
-  ma_200d: 'twoHundredDayAverage',
+  // ma50 / ma200 match the canonical names used by FMP; keeps cross-provider
+  // consumers free of per-provider key guessing.
+  ma50: 'fiftyDayAverage',
+  ma200: 'twoHundredDayAverage',
+  market_cap: 'marketCap',
   volume_average: 'averageVolume',
   volume_average_10d: 'averageDailyVolume10Day',
   bid_size: 'bidSize',
@@ -37,8 +43,9 @@ export const YFinanceEquityQuoteQueryParamsSchema = EquityQuoteQueryParamsSchema
 export type YFinanceEquityQuoteQueryParams = z.infer<typeof YFinanceEquityQuoteQueryParamsSchema>
 
 export const YFinanceEquityQuoteDataSchema = EquityQuoteDataSchema.extend({
-  ma_50d: z.number().nullable().default(null).describe('50-day moving average price.'),
-  ma_200d: z.number().nullable().default(null).describe('200-day moving average price.'),
+  ma50: z.number().nullable().default(null).describe('50-day moving average price.'),
+  ma200: z.number().nullable().default(null).describe('200-day moving average price.'),
+  market_cap: z.number().nullable().default(null).describe('Market capitalization of the company.'),
   volume_average: z.number().nullable().default(null).describe('Average daily trading volume.'),
   volume_average_10d: z.number().nullable().default(null).describe('Average daily trading volume in the last 10 days.'),
   currency: z.string().nullable().default(null).describe('Currency of the price.'),

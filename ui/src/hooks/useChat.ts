@@ -7,8 +7,8 @@ import { useSSE } from './useSSE'
 // ==================== Types ====================
 
 export type DisplayItem =
-  | { kind: 'text'; role: 'user' | 'assistant' | 'notification'; text: string; timestamp?: string | null; media?: Array<{ type: string; url: string }>; _id: number }
-  | { kind: 'tool_calls'; calls: ToolCall[]; timestamp?: string; _id: number }
+  | { kind: 'text'; role: 'user' | 'assistant' | 'notification'; text: string; timestamp?: string | null; media?: Array<{ type: string; url: string }>; _id: number; cursor?: string }
+  | { kind: 'tool_calls'; calls: ToolCall[]; timestamp?: string; _id: number; cursor?: string }
 
 export type StreamSegment =
   | { kind: 'text'; text: string }
@@ -102,31 +102,76 @@ export interface UseChatReturn {
   isWaiting: boolean
   send: (text: string) => Promise<void>
   abort: () => void
+  /** Fetch the next older page of history. No-op while in flight or when no more to load. */
+  loadMore: () => Promise<void>
+  hasMore: boolean
+  isLoadingMore: boolean
 }
+
+const INITIAL_PAGE_SIZE = 50
+const PAGE_SIZE = 50
 
 export function useChat({ channel, onSSEStatus }: UseChatOptions): UseChatReturn {
   const [messages, setMessages] = useState<DisplayItem[]>([])
   const [streamSegments, setStreamSegments] = useState<StreamSegment[]>([])
   const [isWaiting, setIsWaiting] = useState(false)
+  const [hasMore, setHasMore] = useState(false)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
   const nextId = useRef(0)
   const channelRef = useRef(channel)
   channelRef.current = channel
 
+  // Refs so loadMore stays referentially stable (ChatPage attaches a
+  // scroll listener in a useEffect with [] deps and captures this once).
+  const messagesRef = useRef<DisplayItem[]>([])
+  messagesRef.current = messages
+  const hasMoreRef = useRef(false)
+  hasMoreRef.current = hasMore
+  const isLoadingMoreRef = useRef(false)
+
+  const toDisplayItem = useCallback((m: import('../api/types').ChatHistoryItem): DisplayItem => {
+    if (m.kind === 'text' && m.metadata?.kind === 'notification') {
+      return { ...m, role: 'notification', _id: nextId.current++ }
+    }
+    return { ...m, _id: nextId.current++ }
+  }, [])
+
   // Load chat history when channel changes
   useEffect(() => {
     const ch = channel === 'default' ? undefined : channel
-    chatApi.history(100, ch).then(({ messages: msgs }) => {
-      setMessages(msgs.map((m): DisplayItem => {
-        if (m.kind === 'text' && m.metadata?.kind === 'notification') {
-          return { ...m, role: 'notification', _id: nextId.current++ }
-        }
-        return { ...m, _id: nextId.current++ }
-      }))
+    // Reset pagination on channel switch.
+    setMessages([])
+    setHasMore(false)
+    isLoadingMoreRef.current = false
+    chatApi.history(INITIAL_PAGE_SIZE, ch).then(({ messages: msgs, hasMore: more }) => {
+      setMessages(msgs.map(toDisplayItem))
+      setHasMore(more)
     }).catch((err) => {
       console.warn('Failed to load history:', err)
     })
-  }, [channel])
+  }, [channel, toDisplayItem])
+
+  const loadMore = useCallback(async () => {
+    if (isLoadingMoreRef.current || !hasMoreRef.current) return
+    const oldestCursor = messagesRef.current[0]?.cursor
+    if (!oldestCursor) return
+    isLoadingMoreRef.current = true
+    setIsLoadingMore(true)
+    try {
+      const ch = channelRef.current === 'default' ? undefined : channelRef.current
+      const { messages: older, hasMore: more } = await chatApi.history(PAGE_SIZE, ch, oldestCursor)
+      if (older.length > 0) {
+        setMessages((prev) => [...older.map(toDisplayItem), ...prev])
+      }
+      setHasMore(more)
+    } catch (err) {
+      console.warn('Failed to load older messages:', err)
+    } finally {
+      isLoadingMoreRef.current = false
+      setIsLoadingMore(false)
+    }
+  }, [toDisplayItem])
 
   // SSE for push notifications (heartbeat, cron, multi-tab sync)
   const sseChannel = channel === 'default' ? undefined : channel
@@ -194,5 +239,5 @@ export function useChat({ channel, onSSEStatus }: UseChatOptions): UseChatReturn
 
   const abortFn = useCallback(() => { abortRef.current?.abort() }, [])
 
-  return { messages, streamSegments, isWaiting, send, abort: abortFn }
+  return { messages, streamSegments, isWaiting, send, abort: abortFn, loadMore, hasMore, isLoadingMore }
 }

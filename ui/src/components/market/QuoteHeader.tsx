@@ -13,14 +13,20 @@ export function QuoteHeader({ symbol }: Props) {
 
   useEffect(() => {
     let cancelled = false
-    setError(null)
-    marketApi.equity.quote(symbol).then((res) => {
-      if (cancelled) return
-      if (res.error) setError(res.error)
-      setQuote(res.results?.[0] ?? null)
-      setProvider(res.provider || null)
-    }).catch((e) => { if (!cancelled) setError(e instanceof Error ? e.message : String(e)) })
-    return () => { cancelled = true }
+    const fetch = () => {
+      setError(null)
+      marketApi.equity.quote(symbol).then((res) => {
+        if (cancelled) return
+        if (res.error) setError(res.error)
+        setQuote(res.results?.[0] ?? null)
+        setProvider(res.provider || null)
+      }).catch((e) => { if (!cancelled) setError(e instanceof Error ? e.message : String(e)) })
+    }
+    fetch()
+    // Quote is price-sensitive; re-poll every 60s so a tab left open overnight
+    // doesn't show yesterday's last print as if it were live.
+    const timer = setInterval(fetch, 60_000)
+    return () => { cancelled = true; clearInterval(timer) }
   }, [symbol])
 
   const name = quote?.name as string | undefined

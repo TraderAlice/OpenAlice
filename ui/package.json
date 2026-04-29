@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@xyflow/react": "^12.10.2",
-    "dompurify": "^3.3.1",
+    "dompurify": "^3.4.0",
     "highlight.js": "^11.11.1",
     "lightweight-charts": "^5.1.0",
     "marked": "^15.0.12",

@@ -285,10 +285,10 @@ export class IolBroker implements IBroker {
       validez: defaultValidez(),
     }
     if (tipo === 'precioLimite') {
-      if (order.lmtPrice === UNSET_DOUBLE || order.lmtPrice == null) {
+      if (order.lmtPrice.equals(UNSET_DECIMAL) || order.lmtPrice == null) {
         return { success: false, error: 'LMT orders require lmtPrice' }
       }
-      body.precio = order.lmtPrice
+      body.precio = order.lmtPrice.toNumber()
     }
 
     const action = (order.action ?? '').toUpperCase()
@@ -458,7 +458,7 @@ export class IolBroker implements IBroker {
     order.action = (o.tipo ?? '').toLowerCase().startsWith('c') ? 'BUY' : 'SELL'
     order.totalQuantity = new Decimal(o.cantidad ?? 0)
     order.orderType = o.modalidad === 'precioMercado' ? 'MKT' : 'LMT'
-    if (o.precio != null) order.lmtPrice = o.precio
+    if (o.precio != null) order.lmtPrice = new Decimal(o.precio)
     order.tif = 'DAY'
     order.orderId = 0  // IOL ids are numbers but not compatible with IBKR's 32-bit space
     if (o.cantidadOperada != null) order.filledQuantity = new Decimal(o.cantidadOperada)

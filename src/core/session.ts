@@ -540,8 +540,8 @@ export function toResponsesInput(entries: SessionEntry[]): ResponsesInputItem[] 
 
 /** A display-ready chat history item — either plain text or a group of paired tool calls. */
 export type ChatHistoryItem =
-  | { kind: 'text'; role: 'user' | 'assistant'; text: string; timestamp?: string; metadata?: Record<string, unknown>; media?: Array<{ type: string; url: string }> }
-  | { kind: 'tool_calls'; calls: Array<{ name: string; input: string; result?: string }>; timestamp?: string }
+  | { kind: 'text'; role: 'user' | 'assistant'; text: string; timestamp?: string; metadata?: Record<string, unknown>; media?: Array<{ type: string; url: string }>; cursor: string }
+  | { kind: 'tool_calls'; calls: Array<{ name: string; input: string; result?: string }>; timestamp?: string; cursor: string }
 
 /** Strip common MCP tool-name prefixes for cleaner display. */
 function shortToolName(name: string): string {
@@ -574,7 +574,7 @@ export function toChatHistory(entries: SessionEntry[]): ChatHistoryItem[] {
     // Plain string content — always text.
     if (typeof message.content === 'string') {
       if (message.content.trim()) {
-        items.push({ kind: 'text', role: message.role as 'user' | 'assistant', text: message.content, timestamp: entry.timestamp, metadata: entry.metadata })
+        items.push({ kind: 'text', role: message.role as 'user' | 'assistant', text: message.content, timestamp: entry.timestamp, metadata: entry.metadata, cursor: entry.uuid })
       }
       continue
     }
@@ -613,10 +613,10 @@ export function toChatHistory(entries: SessionEntry[]): ChatHistoryItem[] {
       // Text before tools (边想边做 — thinking then doing).
       const text = textBlocks.map((b) => b.text).join('\n')
       if (text.trim() || media) {
-        items.push({ kind: 'text', role: message.role as 'user' | 'assistant', text, timestamp: entry.timestamp, metadata: entry.metadata, media })
+        items.push({ kind: 'text', role: message.role as 'user' | 'assistant', text, timestamp: entry.timestamp, metadata: entry.metadata, media, cursor: entry.uuid })
       }
 
-      items.push({ kind: 'tool_calls', calls, timestamp: entry.timestamp })
+      items.push({ kind: 'tool_calls', calls, timestamp: entry.timestamp, cursor: entry.uuid })
       continue
     }
 
@@ -628,7 +628,7 @@ export function toChatHistory(entries: SessionEntry[]): ChatHistoryItem[] {
     // Text (+ optional image) entry.
     const text = textBlocks.map((b) => b.text).join('\n')
     if (text.trim() || media) {
-      items.push({ kind: 'text', role: message.role as 'user' | 'assistant', text, timestamp: entry.timestamp, metadata: entry.metadata, media })
+      items.push({ kind: 'text', role: message.role as 'user' | 'assistant', text, timestamp: entry.timestamp, metadata: entry.metadata, media, cursor: entry.uuid })
     }
   }
 

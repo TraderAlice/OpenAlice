@@ -82,8 +82,8 @@ export interface StreamingToolCall {
 }
 
 export type ChatHistoryItem =
-  | { kind: 'text'; role: 'user' | 'assistant'; text: string; timestamp?: string; metadata?: Record<string, unknown>; media?: Array<{ type: string; url: string }> }
-  | { kind: 'tool_calls'; calls: ToolCall[]; timestamp?: string }
+  | { kind: 'text'; role: 'user' | 'assistant'; text: string; timestamp?: string; metadata?: Record<string, unknown>; media?: Array<{ type: string; url: string }>; cursor: string }
+  | { kind: 'tool_calls'; calls: ToolCall[]; timestamp?: string; cursor: string }
 
 // ==================== Config ====================
 

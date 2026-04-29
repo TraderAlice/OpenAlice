@@ -319,4 +319,108 @@ describe('ConnectorCenter', () => {
       expect(cc.getLastInteraction()).toBeNull()
     })
   })
+
+  describe('shared connectors producer', () => {
+    let eventLog: EventLog
+    let listenerRegistry: ReturnType<typeof createListenerRegistry>
+    let cc: ConnectorCenter
+
+    beforeEach(async () => {
+      const logPath = join(tmpdir(), `cc-test-${randomUUID()}.jsonl`)
+      eventLog = await createEventLog({ logPath })
+      listenerRegistry = createListenerRegistry(eventLog)
+      await listenerRegistry.start()
+      cc = new ConnectorCenter({ eventLog, listenerRegistry })
+    })
+
+    afterEach(async () => {
+      cc.stop()
+      await listenerRegistry.stop()
+      await eventLog._resetForTest()
+    })
+
+    it('declares a single `connectors` producer on construction', () => {
+      const producers = listenerRegistry.listProducers()
+      const connectorsProducer = producers.find((p) => p.name === 'connectors')
+
+      expect(connectorsProducer).toBeDefined()
+      expect(connectorsProducer!.emits).toEqual(['message.received', 'message.sent'])
+      expect(connectorsProducer!.emitsWildcard).toBe(false)
+
+      // And nobody else owns the old per-plugin names
+      expect(producers.find((p) => p.name === 'web-chat')).toBeUndefined()
+      expect(producers.find((p) => p.name === 'telegram-connector')).toBeUndefined()
+    })
+
+    it('emitMessageReceived appends a message.received event', async () => {
+      const entry = await cc.emitMessageReceived({
+        channel: 'web', to: 'default', prompt: 'hi',
+      })
+
+      expect(entry.type).toBe('message.received')
+      expect(entry.payload).toEqual({ channel: 'web', to: 'default', prompt: 'hi' })
+      expect(entry.seq).toBeGreaterThan(0)
+
+      const recent = eventLog.recent({ type: 'message.received' })
+      expect(recent).toHaveLength(1)
+    })
+
+    it('emitMessageSent appends a message.sent event', async () => {
+      const entry = await cc.emitMessageSent({
+        channel: 'telegram', to: '123', prompt: 'hi', reply: 'hello', durationMs: 42,
+      })
+
+      expect(entry.type).toBe('message.sent')
+      expect(entry.payload).toMatchObject({ channel: 'telegram', reply: 'hello', durationMs: 42 })
+    })
+
+    it('emitMessageReceived from any channel is picked up by the interaction tracker', async () => {
+      await cc.emitMessageReceived({ channel: 'discord', to: '#general', prompt: 'hi' })
+
+      const last = cc.getLastInteraction()
+      expect(last).not.toBeNull()
+      expect(last!.channel).toBe('discord')
+      expect(last!.to).toBe('#general')
+    })
+
+    it('stop() disposes the producer so the name is free again', () => {
+      expect(listenerRegistry.listProducers().some((p) => p.name === 'connectors')).toBe(true)
+      cc.stop()
+      expect(listenerRegistry.listProducers().some((p) => p.name === 'connectors')).toBe(false)
+
+      // Name is free — a fresh center on the same registry can be constructed again
+      const cc2 = new ConnectorCenter({ eventLog, listenerRegistry })
+      expect(listenerRegistry.listProducers().some((p) => p.name === 'connectors')).toBe(true)
+      cc2.stop()
+    })
+
+    it('stop() unregisters the interaction-tracker listener', () => {
+      const beforeCount = listenerRegistry.list().filter((l) => l.name === 'connector-interaction-tracker').length
+      expect(beforeCount).toBe(1)
+      cc.stop()
+      const afterCount = listenerRegistry.list().filter((l) => l.name === 'connector-interaction-tracker').length
+      expect(afterCount).toBe(0)
+    })
+  })
+
+  describe('without a listener registry', () => {
+    it('emitMessageReceived throws with a clear message', async () => {
+      const cc = new ConnectorCenter()
+      await expect(
+        cc.emitMessageReceived({ channel: 'web', to: 'default', prompt: 'x' }),
+      ).rejects.toThrow(/no ListenerRegistry/)
+    })
+
+    it('emitMessageSent throws with a clear message', async () => {
+      const cc = new ConnectorCenter()
+      await expect(
+        cc.emitMessageSent({ channel: 'web', to: 'default', prompt: 'x', reply: 'y', durationMs: 1 }),
+      ).rejects.toThrow(/no ListenerRegistry/)
+    })
+
+    it('stop() is a no-op (safe to call)', () => {
+      const cc = new ConnectorCenter()
+      expect(() => cc.stop()).not.toThrow()
+    })
+  })
 })

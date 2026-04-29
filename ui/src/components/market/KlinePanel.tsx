@@ -63,7 +63,9 @@ export function KlinePanel({ selection }: Props) {
   const interval = parseInterval(searchParams.get('interval'))
   const tf = parseTimeframe(searchParams.get('range'))
 
-  const setInterval = (iv: Interval) => {
+  // Local setter named `selectInterval` rather than `setInterval` so it
+  // doesn't shadow the global timer function we use for polling below.
+  const selectInterval = (iv: Interval) => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev)
       if (iv === DEFAULT_INTERVAL) next.delete('interval')
@@ -140,7 +142,8 @@ export function KlinePanel({ selection }: Props) {
     chartRef.current?.timeScale().applyOptions({ timeVisible: INTRADAY.has(interval) })
   }, [interval])
 
-  // Fetch bars on any of: symbol, interval, timeframe.
+  // Fetch bars on any of: symbol, interval, timeframe. Re-polls periodically
+  // so a long-open tab doesn't show yesterday's bars as if they were live.
   useEffect(() => {
     if (!selection) { setBars(null); setProvider(null); setError(null); return }
     if (selection.assetClass === 'commodity') {
@@ -149,29 +152,42 @@ export function KlinePanel({ selection }: Props) {
       setError('Commodity K-line support is coming in the next step.')
       return
     }
-    setLoading(true)
-    setError(null)
-    const days = daysForTimeframe(tf)
-    const opts: { interval: string; startDate?: string } = { interval }
-    if (days != null) opts.startDate = startDateFromToday(days)
+    let cancelled = false
+    const fetch = (isInitial: boolean) => {
+      if (isInitial) setLoading(true)
+      setError(null)
+      const days = daysForTimeframe(tf)
+      const opts: { interval: string; startDate?: string } = { interval }
+      if (days != null) opts.startDate = startDateFromToday(days)
 
-    marketApi.historical(selection.assetClass, selection.symbol, opts)
-      .then((res) => {
-        if (res.error || !res.results) {
-          setError(res.error ?? 'No data returned.')
-          setBars(null)
-          setProvider(null)
-        } else if (res.results.length === 0) {
-          setError('No bars in this range.')
-          setBars([])
-          setProvider(res.provider || null)
-        } else {
-          setBars(res.results)
-          setProvider(res.provider || null)
-        }
-      })
-      .catch((e) => { setError(e instanceof Error ? e.message : String(e)); setBars(null); setProvider(null) })
-      .finally(() => setLoading(false))
+      marketApi.historical(selection.assetClass, selection.symbol, opts)
+        .then((res) => {
+          if (cancelled) return
+          if (res.error || !res.results) {
+            setError(res.error ?? 'No data returned.')
+            setBars(null)
+            setProvider(null)
+          } else if (res.results.length === 0) {
+            setError('No bars in this range.')
+            setBars([])
+            setProvider(res.provider || null)
+          } else {
+            setBars(res.results)
+            setProvider(res.provider || null)
+          }
+        })
+        .catch((e) => {
+          if (cancelled) return
+          setError(e instanceof Error ? e.message : String(e)); setBars(null); setProvider(null)
+        })
+        .finally(() => { if (!cancelled && isInitial) setLoading(false) })
+    }
+    fetch(true)
+    // 60s for intraday intervals (1m/5m/1h) because each tick is a fresh bar;
+    // 5min for daily because a refresh within a single day is cosmetic.
+    const pollMs = INTRADAY.has(interval) ? 60_000 : 300_000
+    const timer = setInterval(() => fetch(false), pollMs)
+    return () => { cancelled = true; clearInterval(timer) }
   }, [selection, interval, tf])
 
   // Push bars into chart and fit.
@@ -229,7 +245,7 @@ export function KlinePanel({ selection }: Props) {
               {INTERVALS.map((iv, i) => (
                 <button
                   key={iv}
-                  onClick={() => setInterval(iv)}
+                  onClick={() => selectInterval(iv)}
                   className={`px-2 py-1 text-[12px] transition-colors cursor-pointer ${
                     i > 0 ? 'border-l border-border' : ''
                   } ${interval === iv ? 'bg-bg-tertiary text-text' : 'text-text-muted hover:text-text'}`}

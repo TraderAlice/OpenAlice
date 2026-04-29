@@ -20,8 +20,15 @@ export type YFinanceCashFlowStatementQueryParams = z.infer<typeof YFinanceCashFl
 
 // --- Data ---
 
+// Names mirror FMP's canonical output so a single key-lookup works across
+// providers. Activity-level cash flow lines get the most attention because
+// every statement-reading UI wants them.
 const ALIAS_DICT: Record<string, string> = {
-  investments_in_property_plant_and_equipment: 'purchase_of_p_p_e',
+  net_cash_from_operating_activities: 'operating_cash_flow',
+  net_cash_from_investing_activities: 'investing_cash_flow',
+  net_cash_from_financing_activities: 'financing_cash_flow',
+  cash_at_end_of_period: 'end_cash_position',
+  investments_in_property_plant_and_equipment: 'purchase_of_ppe',
   issuance_of_common_equity: 'common_stock_issuance',
   repurchase_of_common_equity: 'common_stock_payments',
   cash_dividends_paid: 'payment_of_dividends',

@@ -255,8 +255,8 @@ describe('toChatHistory', () => {
       assistantText('hello'),
     ])
     expect(items).toEqual([
-      { kind: 'text', role: 'user', text: 'hi', timestamp: '2026-01-01T00:00:00Z', metadata: undefined },
-      { kind: 'text', role: 'assistant', text: 'hello', timestamp: '2026-01-01T00:00:00Z', metadata: undefined },
+      { kind: 'text', role: 'user', text: 'hi', timestamp: '2026-01-01T00:00:00Z', metadata: undefined, cursor: 'u1' },
+      { kind: 'text', role: 'assistant', text: 'hello', timestamp: '2026-01-01T00:00:00Z', metadata: undefined, cursor: 'u1' },
     ])
   })
 

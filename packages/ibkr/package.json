@@ -28,7 +28,7 @@
   "dependencies": {
     "@bufbuild/protobuf": "^2.11.0",
     "decimal.js": "^10.6.0",
-    "protobufjs": "^7.4.0"
+    "protobufjs": "^7.5.5"
   },
   "devDependencies": {
     "@types/node": "^22.13.4",

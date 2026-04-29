@@ -38,7 +38,6 @@ export class WebPlugin implements Plugin {
   /** SSE clients grouped by channel ID. Default channel: 'default'. */
   private sseByChannel = new Map<string, Map<string, SSEClient>>()
   private unregisterConnector?: () => void
-  private chatProducer?: ProducerHandle<readonly ['message.received', 'message.sent']>
   private ingestProducer?: ProducerHandle<readonly ['task.requested']>
 
   constructor(private config: WebConfig) {}
@@ -79,11 +78,9 @@ export class WebPlugin implements Plugin {
     app.use('/api/*', cors())
 
     // ==================== Producers ====================
-    // web-chat: emits message.received/sent from the Hono chat routes
-    this.chatProducer = ctx.listenerRegistry.declareProducer({
-      name: 'web-chat',
-      emits: ['message.received', 'message.sent'] as const,
-    })
+    // Chat message.received/sent events go through ConnectorCenter's shared
+    // `connectors` producer — see `ctx.connectorCenter.emitMessage*`.
+    //
     // webhook-ingest: POST /api/events/ingest — enumerates its concrete emits so
     // each external type shows up on the Flow graph as a real injection edge.
     // Extend this tuple when adding new `external: true` event types.
@@ -93,7 +90,7 @@ export class WebPlugin implements Plugin {
     })
 
     // ==================== Mount route modules ====================
-    app.route('/api/chat', createChatRoutes({ ctx, sessions, sseByChannel: this.sseByChannel, producer: this.chatProducer }))
+    app.route('/api/chat', createChatRoutes({ ctx, sessions, sseByChannel: this.sseByChannel }))
     app.route('/api/channels', createChannelsRoutes({ sessions, sseByChannel: this.sseByChannel }))
     app.route('/api/media', createMediaRoutes())
     app.route('/api/config', createConfigRoutes({
@@ -148,8 +145,6 @@ export class WebPlugin implements Plugin {
   async stop() {
     this.sseByChannel.clear()
     this.unregisterConnector?.()
-    this.chatProducer?.dispose()
-    this.chatProducer = undefined
     this.ingestProducer?.dispose()
     this.ingestProducer = undefined
     this.server?.close()

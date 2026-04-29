@@ -66,7 +66,7 @@ interface Props {
   symbol: string
 }
 
-type CacheEntry = { rows: FinancialStatementRow[]; error?: string }
+type CacheEntry = { rows: FinancialStatementRow[]; provider?: string; error?: string }
 
 export function FinancialStatementsPanel({ symbol }: Props) {
   const [tab, setTab] = useState<Tab>('income')
@@ -87,7 +87,7 @@ export function FinancialStatementsPanel({ symbol }: Props) {
       if (cancelled) return
       setCache((prev) => ({
         ...prev,
-        [tab]: { rows: res.results ?? [], error: res.error },
+        [tab]: { rows: res.results ?? [], provider: res.provider, error: res.error },
       }))
     })
       .catch((e) => {
@@ -102,9 +102,22 @@ export function FinancialStatementsPanel({ symbol }: Props) {
   const rows = entry?.rows ?? []
   const rowDefs = ROWS[tab]
 
+  const endpointFor: Record<Tab, string> = {
+    balance: '/equity/fundamental/balance',
+    income: '/equity/fundamental/income',
+    cashflow: '/equity/fundamental/cash',
+  }
+  const info = [
+    entry?.provider ? `Source: ${entry.provider}` : 'Source: (unknown)',
+    `Endpoint: /api/market-data-v1${endpointFor[tab]}`,
+    'Annual periods, most recent first. Values scaled (K / M / B / T).',
+    'Blank cells are line items this provider doesn\u2019t report for the current period.',
+  ].join('\n')
+
   return (
     <Card
       title="Financial Statements"
+      info={info}
       contentClassName="overflow-x-auto p-0"
       right={
         <div className="flex border border-border rounded overflow-hidden">

@@ -24,7 +24,7 @@ function makeOrder(action = 'BUY', orderType = 'LMT'): Order {
   order.action = action
   order.orderType = orderType
   order.totalQuantity = new Decimal(10)
-  order.lmtPrice = 125.5
+  order.lmtPrice = new Decimal(125.5)
   order.tif = 'DAY'
   return order
 }

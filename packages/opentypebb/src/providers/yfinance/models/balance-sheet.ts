@@ -20,14 +20,19 @@ export type YFinanceBalanceSheetQueryParams = z.infer<typeof YFinanceBalanceShee
 
 // --- Data ---
 
-// yahoo-finance2 camelCase → standard snake_case aliases
+// yahoo-finance2 keys → canonical snake_case aliases. Names are picked to
+// match what FMP emits after its own alias pass, so consumers see one
+// schema across providers.
 const ALIAS_DICT: Record<string, string> = {
   short_term_investments: 'other_short_term_investments',
   net_receivables: 'receivables',
   inventories: 'inventory',
   total_current_assets: 'current_assets',
-  plant_property_equipment_gross: 'gross_p_p_e',
-  plant_property_equipment_net: 'net_p_p_e',
+  total_current_liabilities: 'current_liabilities',
+  short_term_debt: 'current_debt',
+  total_liabilities: 'total_liabilities_net_minority_interest',
+  plant_property_equipment_gross: 'gross_ppe',
+  plant_property_equipment_net: 'net_ppe',
   total_common_equity: 'stockholders_equity',
   total_equity_non_controlling_interests: 'total_equity_gross_minority_interest',
 }

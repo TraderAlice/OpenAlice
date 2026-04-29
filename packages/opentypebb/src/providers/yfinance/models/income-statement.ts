@@ -20,15 +20,21 @@ export type YFinanceIncomeStatementQueryParams = z.infer<typeof YFinanceIncomeSt
 
 // --- Data ---
 
+// Canonical names chosen to match FMP's post-alias output so downstream
+// consumers can read one key per concept regardless of provider.
 const ALIAS_DICT: Record<string, string> = {
+  revenue: 'total_revenue',
   selling_general_and_admin_expense: 'selling_general_and_administration',
   research_and_development_expense: 'research_and_development',
+  total_operating_income: 'total_operating_income_as_reported',
+  income_tax_expense: 'tax_provision',
+  consolidated_net_income: 'net_income',
   total_pre_tax_income: 'pretax_income',
   net_income_attributable_to_common_shareholders: 'net_income_common_stockholders',
   weighted_average_basic_shares_outstanding: 'basic_average_shares',
   weighted_average_diluted_shares_outstanding: 'diluted_average_shares',
-  basic_earnings_per_share: 'basic_e_p_s',
-  diluted_earnings_per_share: 'diluted_e_p_s',
+  basic_earnings_per_share: 'basic_eps',
+  diluted_earnings_per_share: 'diluted_eps',
 }
 
 export const YFinanceIncomeStatementDataSchema = IncomeStatementDataSchema.extend({}).passthrough()

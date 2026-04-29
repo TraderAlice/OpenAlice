@@ -63,9 +63,14 @@ export const chatApi = {
     }
   },
 
-  async history(limit = 100, channel?: string): Promise<{ messages: ChatHistoryItem[] }> {
+  async history(
+    limit = 100,
+    channel?: string,
+    before?: string,
+  ): Promise<{ messages: ChatHistoryItem[]; hasMore: boolean }> {
     const params = new URLSearchParams({ limit: String(limit) })
     if (channel) params.set('channel', channel)
+    if (before) params.set('before', before)
     const res = await fetch(`/api/chat/history?${params}`)
     if (!res.ok) throw new Error('Failed to load history')
     return res.json()

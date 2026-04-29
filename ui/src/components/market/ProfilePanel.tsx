@@ -9,6 +9,7 @@ interface Props {
 
 export function ProfilePanel({ symbol }: Props) {
   const [profile, setProfile] = useState<EquityProfile | null>(null)
+  const [provider, setProvider] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -20,6 +21,7 @@ export function ProfilePanel({ symbol }: Props) {
       if (cancelled) return
       if (res.error) setError(res.error)
       setProfile(res.results?.[0] ?? null)
+      setProvider(res.provider || null)
     })
       .catch((e) => { if (!cancelled) setError(e instanceof Error ? e.message : String(e)) })
       .finally(() => { if (!cancelled) setLoading(false) })
@@ -37,8 +39,15 @@ export function ProfilePanel({ symbol }: Props) {
   const desc = (profile?.long_description ?? profile?.short_description) as string | undefined
   const hq = [hqCity, hqState, hqCountry].filter(Boolean).join(', ') || undefined
 
+  const info = [
+    provider ? `Source: ${provider}` : 'Source: (unknown)',
+    'Endpoint: /api/market-data-v1/equity/profile',
+    'Company overview: sector, industry, leadership, location, headcount.',
+    'Field coverage varies by provider; blank rows are fields the source doesn\u2019t report.',
+  ].join('\n')
+
   return (
-    <Card title="Profile">
+    <Card title="Profile" info={info}>
       {loading && <div className="text-[12px] text-text-muted">Loading…</div>}
       {error && !loading && <div className="text-[12px] text-red-400">{error}</div>}
       {!loading && !error && profile && (

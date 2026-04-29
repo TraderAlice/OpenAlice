@@ -10,12 +10,14 @@
  * replies go to whichever channel the user most recently interacted through.
  */
 
-import type { EventLog } from './event-log.js'
+import type { AppendOpts, EventLog, EventLogEntry } from './event-log.js'
 import type { MediaAttachment } from './types.js'
 import type { StreamableResult } from './ai-provider-manager.js'
 import type { Connector, SendPayload, SendResult } from '../connectors/types.js'
 import type { Listener } from './listener.js'
 import type { ListenerRegistry } from './listener-registry.js'
+import type { ProducerHandle } from './producer.js'
+import type { MessageReceivedPayload, MessageSentPayload } from './agent-event.js'
 
 export type { Connector, SendPayload, SendResult, ConnectorCapabilities } from '../connectors/types.js'
 
@@ -52,6 +54,14 @@ export interface ConnectorCenterOpts {
 export class ConnectorCenter {
   private connectors = new Map<string, Connector>()
   private lastInteraction: LastInteraction | null = null
+  private listenerRegistry: ListenerRegistry | null = null
+  /** Shared producer for `message.received` / `message.sent` across every
+   *  connector. Declared once on construction when a registry is available;
+   *  null when ConnectorCenter runs without a registry (legacy test setup). */
+  private producer: ProducerHandle<readonly ['message.received', 'message.sent']> | null = null
+  /** Name under which the interaction-tracking listener was registered, so
+   *  `stop()` can unregister it symmetrically. */
+  private interactionListenerName: string | null = null
 
   constructor(opts?: ConnectorCenterOpts | EventLog) {
     // Backward-compat: accept bare EventLog for tests that pre-date the options shape
@@ -72,8 +82,14 @@ export class ConnectorCenter {
       }
     }
 
-    // Register interaction-tracking listener with the registry
+    // Register interaction-tracking listener + declare the shared message
+    // producer. Both require a registry; when absent (legacy test doubles)
+    // ConnectorCenter still works for delivery but can't emit messaging
+    // events — callers that try hit a loud error from emitMessageReceived /
+    // emitMessageSent rather than silently dropping.
     if (listenerRegistry) {
+      this.listenerRegistry = listenerRegistry
+
       const listener: Listener<'message.received'> = {
         name: 'connector-interaction-tracker',
         subscribes: 'message.received',
@@ -82,6 +98,12 @@ export class ConnectorCenter {
         },
       }
       listenerRegistry.register(listener)
+      this.interactionListenerName = listener.name
+
+      this.producer = listenerRegistry.declareProducer({
+        name: 'connectors',
+        emits: ['message.received', 'message.sent'] as const,
+      })
     }
   }
 
@@ -89,6 +111,49 @@ export class ConnectorCenter {
   register(connector: Connector): () => void {
     this.connectors.set(connector.channel, connector)
     return () => { this.connectors.delete(connector.channel) }
+  }
+
+  /** Emit a `message.received` event on behalf of any connector. The
+   *  payload's `channel` field carries source attribution (`'web'`,
+   *  `'telegram'`, etc.). Throws if the center was constructed without
+   *  a ListenerRegistry — emitting messages without a bus is a bug. */
+  async emitMessageReceived(
+    payload: MessageReceivedPayload,
+    opts?: AppendOpts,
+  ): Promise<EventLogEntry<MessageReceivedPayload>> {
+    if (!this.producer) {
+      throw new Error(
+        'ConnectorCenter: cannot emit message.received — no ListenerRegistry was supplied at construction',
+      )
+    }
+    return this.producer.emit('message.received', payload, opts)
+  }
+
+  /** Emit a `message.sent` event on behalf of any connector. See
+   *  {@link emitMessageReceived} for the `listenerRegistry` requirement. */
+  async emitMessageSent(
+    payload: MessageSentPayload,
+    opts?: AppendOpts,
+  ): Promise<EventLogEntry<MessageSentPayload>> {
+    if (!this.producer) {
+      throw new Error(
+        'ConnectorCenter: cannot emit message.sent — no ListenerRegistry was supplied at construction',
+      )
+    }
+    return this.producer.emit('message.sent', payload, opts)
+  }
+
+  /** Tear down registry-held resources: dispose the shared producer and
+   *  unregister the interaction-tracking listener. Safe to call on a
+   *  registry-less center (no-op). Call before `listenerRegistry.stop()`
+   *  during shutdown. */
+  stop(): void {
+    this.producer?.dispose()
+    this.producer = null
+    if (this.interactionListenerName && this.listenerRegistry) {
+      this.listenerRegistry.unregister(this.interactionListenerName)
+      this.interactionListenerName = null
+    }
   }
 
   /** Record that the user just interacted via this channel. */

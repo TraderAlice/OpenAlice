@@ -440,6 +440,7 @@ async function main() {
     metricsListener.stop()
     cronListener.stop()
     cronEngine.stop()
+    connectorCenter.stop()
     await listenerRegistry.stop()
     for (const plugin of [...corePlugins, ...optionalPlugins.values()]) {
       await plugin.stop()
