@@ -48,7 +48,7 @@ describe('UTA — Bybit demo (ETH perp)', () => {
     console.log(`  initial ETH qty=${initialQty}`)
 
     // Stage + Commit + Push: buy 0.01 ETH
-    uta!.stagePlaceOrder({ aliceId: ethAliceId, action: 'BUY', orderType: 'MKT', totalQuantity: 0.01 })
+    uta!.stagePlaceOrder({ aliceId: ethAliceId, action: 'BUY', orderType: 'MKT', totalQuantity: '0.01' })
     uta!.commit('e2e: buy 0.01 ETH')
     const pushResult = await uta!.push()
     expect(pushResult.submitted).toHaveLength(1)
@@ -72,7 +72,7 @@ describe('UTA — Bybit demo (ETH perp)', () => {
     console.log(`  position: qty=${ethPos!.quantity}`)
 
     // Close
-    uta!.stageClosePosition({ aliceId: ethAliceId, qty: 0.01 })
+    uta!.stageClosePosition({ aliceId: ethAliceId, qty: '0.01' })
     uta!.commit('e2e: close 0.01 ETH')
     const closePush = await uta!.push()
     expect(closePush.submitted).toHaveLength(1)
@@ -99,11 +99,11 @@ describe('UTA — Bybit demo (ETH perp)', () => {
 
   it('buy with TPSL → getOrder returns tpsl', async () => {
     const quote = await broker!.getQuote(broker!.resolveNativeKey(ethAliceId.split('|')[1]))
-    const tpPrice = Math.round(quote.last * 1.5)
-    const slPrice = Math.round(quote.last * 0.5)
+    const tpPrice = Math.round(Number(quote.last) * 1.5)
+    const slPrice = Math.round(Number(quote.last) * 0.5)
 
     uta!.stagePlaceOrder({
-      aliceId: ethAliceId, action: 'BUY', orderType: 'MKT', totalQuantity: 0.01,
+      aliceId: ethAliceId, action: 'BUY', orderType: 'MKT', totalQuantity: '0.01',
       takeProfit: { price: String(tpPrice) },
       stopLoss: { price: String(slPrice) },
     })
@@ -128,14 +128,14 @@ describe('UTA — Bybit demo (ETH perp)', () => {
     }
 
     // Clean up
-    uta!.stageClosePosition({ aliceId: ethAliceId, qty: 0.01 })
+    uta!.stageClosePosition({ aliceId: ethAliceId, qty: '0.01' })
     uta!.commit('e2e: close TPSL position')
     await uta!.push()
   }, 60_000)
 
   it('reject records user-rejected commit and clears staging', async () => {
     // Stage + Commit (but don't push)
-    uta!.stagePlaceOrder({ aliceId: ethAliceId, action: 'BUY', orderType: 'MKT', totalQuantity: 0.01 })
+    uta!.stagePlaceOrder({ aliceId: ethAliceId, action: 'BUY', orderType: 'MKT', totalQuantity: '0.01' })
     const commitResult = uta!.commit('e2e: buy to be rejected')
     expect(commitResult.prepared).toBe(true)
 
@@ -167,7 +167,7 @@ describe('UTA — Bybit demo (ETH perp)', () => {
   }, 30_000)
 
   it('reject without reason still works', async () => {
-    uta!.stagePlaceOrder({ aliceId: ethAliceId, action: 'SELL', orderType: 'LMT', totalQuantity: 0.01, lmtPrice: 99999 })
+    uta!.stagePlaceOrder({ aliceId: ethAliceId, action: 'SELL', orderType: 'LMT', totalQuantity: '0.01', lmtPrice: '99999' })
     uta!.commit('e2e: sell to be rejected silently')
 
     const result = await uta!.reject()

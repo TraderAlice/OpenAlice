@@ -397,10 +397,10 @@ export class MockBroker implements IBroker {
     const price = this._quotes.get(contract.symbol ?? '') ?? 100
     return {
       contract,
-      last: price,
-      bid: price - 0.01,
-      ask: price + 0.01,
-      volume: 1_000_000,
+      last: String(price),
+      bid: String(price - 0.01),
+      ask: String(price + 0.01),
+      volume: '1000000',
       timestamp: new Date(),
     }
   }

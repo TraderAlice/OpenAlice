@@ -104,7 +104,7 @@ describe('createTradingTools — searchContracts', () => {
 // ==================== getOrders — summarization ====================
 
 describe('createTradingTools — getOrders summarization', () => {
-  function makeOpenOrder(overrides?: Partial<{ action: string; orderType: string; qty: number; lmtPrice: number; status: string; symbol: string }>): OpenOrder {
+  function makeOpenOrder(overrides?: Partial<{ action: string; orderType: string; qty: number | string; lmtPrice: number | string; status: string; symbol: string }>): OpenOrder {
     const contract = makeContract({ symbol: overrides?.symbol ?? 'AAPL' })
     contract.aliceId = `mock-paper|${overrides?.symbol ?? 'AAPL'}`
     const order = new Order()
@@ -123,7 +123,7 @@ describe('createTradingTools — getOrders summarization', () => {
     const mgr = makeManager(broker)
     const uta = mgr.resolve('mock-paper')[0]
 
-    uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: 10 })
+    uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '10' })
     uta.commit('buy')
     await uta.push()
 
@@ -182,7 +182,7 @@ describe('createTradingTools — getOrders summarization', () => {
 
     const uta = mgr.resolve('mock-paper')[0]
     vi.spyOn(uta, 'getPendingOrderIds').mockReturnValue([{ orderId: 'ord-2', symbol: 'AAPL' }])
-    const openOrder = makeOpenOrder({ lmtPrice: 150, orderType: 'LMT' })
+    const openOrder = makeOpenOrder({ lmtPrice: '150', orderType: 'LMT' })
     openOrder.tpsl = { takeProfit: { price: '160' }, stopLoss: { price: '140' } }
     vi.spyOn(uta, 'getOrders').mockResolvedValue([openOrder])
 
@@ -237,7 +237,7 @@ describe('createTradingTools — getOrders summarization', () => {
     ])
     vi.spyOn(uta, 'getOrders').mockResolvedValue([
       makeOpenOrder({ symbol: 'AAPL', action: 'BUY' }),
-      makeOpenOrder({ symbol: 'AAPL', action: 'SELL', orderType: 'LMT', lmtPrice: 160 }),
+      makeOpenOrder({ symbol: 'AAPL', action: 'SELL', orderType: 'LMT', lmtPrice: '160' }),
       makeOpenOrder({ symbol: 'ETH', action: 'BUY' }),
     ])
 

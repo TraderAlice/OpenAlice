@@ -37,8 +37,10 @@ export interface OperationResult {
   status: OperationStatus
   execution?: Execution
   orderState?: OrderState
-  filledQty?: number
-  filledPrice?: number
+  /** Decimal as string — sub-satoshi fills must round-trip without loss. */
+  filledQty?: string
+  /** Decimal as string — see filledQty. */
+  filledPrice?: string
   error?: string
   raw?: unknown
 }
@@ -135,8 +137,9 @@ export interface OrderStatusUpdate {
   symbol: string
   previousStatus: OperationStatus
   currentStatus: OperationStatus
-  filledPrice?: number
-  filledQty?: number
+  /** Decimal as string — same precision invariant as OperationResult. */
+  filledPrice?: string
+  filledQty?: string
 }
 
 export interface SyncResult {

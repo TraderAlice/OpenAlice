@@ -822,12 +822,12 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
         contract: market
           ? marketToContract(market, this.exchangeName)
           : contract,
-        last: ticker.last ?? 0,
-        bid: ticker.bid ?? 0,
-        ask: ticker.ask ?? 0,
-        volume: ticker.baseVolume ?? 0,
-        high: ticker.high ?? undefined,
-        low: ticker.low ?? undefined,
+        last: String(ticker.last ?? 0),
+        bid: String(ticker.bid ?? 0),
+        ask: String(ticker.ask ?? 0),
+        volume: String(ticker.baseVolume ?? 0),
+        high: ticker.high != null ? String(ticker.high) : undefined,
+        low: ticker.low != null ? String(ticker.low) : undefined,
         timestamp: new Date(ticker.timestamp ?? Date.now()),
       }
     } catch (err) {

@@ -1192,12 +1192,12 @@ describe('CcxtBroker — getQuote', () => {
     contract.localSymbol = 'BTC/USDT:USDT'
 
     const quote = await acc.getQuote(contract)
-    expect(quote.last).toBe(60000)
-    expect(quote.bid).toBe(59990)
-    expect(quote.ask).toBe(60010)
-    expect(quote.volume).toBe(1234.5)
-    expect(quote.high).toBe(61000)
-    expect(quote.low).toBe(59000)
+    expect(quote.last).toBe('60000')
+    expect(quote.bid).toBe('59990')
+    expect(quote.ask).toBe('60010')
+    expect(quote.volume).toBe('1234.5')
+    expect(quote.high).toBe('61000')
+    expect(quote.low).toBe('59000')
     expect(quote.timestamp).toEqual(new Date(now))
   })
 

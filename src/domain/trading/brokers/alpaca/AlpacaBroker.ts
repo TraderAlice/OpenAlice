@@ -440,10 +440,10 @@ export class AlpacaBroker implements IBroker {
 
       return {
         contract: makeContract(symbol),
-        last: snapshot.LatestTrade.Price,
-        bid: snapshot.LatestQuote.BidPrice,
-        ask: snapshot.LatestQuote.AskPrice,
-        volume: snapshot.DailyBar.Volume,
+        last: String(snapshot.LatestTrade.Price),
+        bid: String(snapshot.LatestQuote.BidPrice),
+        ask: String(snapshot.LatestQuote.AskPrice),
+        volume: String(snapshot.DailyBar.Volume),
         timestamp: new Date(snapshot.LatestTrade.Timestamp),
       }
     } catch (err) {

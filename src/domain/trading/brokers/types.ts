@@ -96,8 +96,13 @@ export interface OpenOrder {
   contract: Contract
   order: Order
   orderState: OrderState
-  /** Average fill price — from orderStatus callback or broker-specific source. */
-  avgFillPrice?: number
+  /**
+   * Average fill price — from orderStatus callback or broker-specific
+   * source. String to preserve Decimal precision end-to-end (sub-tick
+   * fills + sub-satoshi accounting in OKX/Bybit unified accounts can
+   * lose information through float).
+   */
+  avgFillPrice?: string
   /** Attached take-profit / stop-loss (CCXT: from order fields; Alpaca: from bracket legs). */
   tpsl?: TpSlParams
 }
@@ -120,14 +125,20 @@ export interface AccountInfo {
 
 // ==================== Market data ====================
 
+/**
+ * Real-time tick data from the broker. Monetary fields are strings —
+ * trading-side numerics stay in Decimal-as-string end-to-end.
+ * (Distinct from `domain/market-data` Quote types, which serve the
+ * read-only analysis surface and stay number-typed there.)
+ */
 export interface Quote {
   contract: Contract
-  last: number
-  bid: number
-  ask: number
-  volume: number
-  high?: number
-  low?: number
+  last: string
+  bid: string
+  ask: string
+  volume: string
+  high?: string
+  low?: string
   timestamp: Date
 }
 
