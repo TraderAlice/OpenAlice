@@ -8,6 +8,34 @@
     "open-alice-ui#build": {
       "dependsOn": [],
       "outputs": []
+    },
+    "@traderalice/alice-analysis#build": {
+      "dependsOn": ["@traderalice/alice-decimal#build"],
+      "inputs": [
+        "Cargo.toml",
+        "Cargo.lock",
+        "build.rs",
+        "src/**/*.rs",
+        "ts/src/**/*.ts",
+        "ts/tsconfig.json",
+        "ts/dist-mark-esm.js",
+        "package.json"
+      ],
+      "outputs": ["index.js", "index.d.ts", "*.node", "ts/dist/**", "npm/**"]
+    },
+    "@traderalice/alice-decimal#build": {
+      "dependsOn": [],
+      "inputs": [
+        "Cargo.toml",
+        "Cargo.lock",
+        "build.rs",
+        "src/**/*.rs",
+        "ts/src/**/*.ts",
+        "ts/tsconfig.json",
+        "ts/dist-mark-esm.js",
+        "package.json"
+      ],
+      "outputs": ["index.js", "index.d.ts", "*.node", "ts/dist/**", "npm/**"]
     }
   }
 }

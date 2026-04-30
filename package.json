@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/main.ts",
     "dev:ui": "pnpm --filter open-alice-ui dev",
-    "predev": "turbo run build --filter=@traderalice/opentypebb --filter=@traderalice/ibkr",
+    "predev": "turbo run build --filter=@traderalice/opentypebb --filter=@traderalice/ibkr --filter=@traderalice/alice-decimal --filter=@traderalice/alice-analysis",
     "build": "turbo run build && tsup src/main.ts --format esm --dts",
     "start": "node dist/main.js",
     "test": "vitest run",
@@ -39,6 +39,7 @@
     "@hono/node-server": "^2.0.0",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@sinclair/typebox": "0.34.48",
+    "@traderalice/alice-analysis": "workspace:*",
     "@traderalice/ibkr": "workspace:*",
     "@traderalice/opentypebb": "workspace:*",
     "ai": "^6.0.86",

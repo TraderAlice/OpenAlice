@@ -1,0 +1,1785 @@
+{
+  "timestamp": "2026-04-28T13:42:45.233Z",
+  "counts": {
+    "matrix": {
+      "total": 55,
+      "passed": 55,
+      "failed": 0
+    },
+    "stress": {
+      "total": 16,
+      "passed": 16,
+      "failed": 0
+    },
+    "publicApiBitExact": 55
+  },
+  "perf": {
+    "totalMsTs": 14.402118999999999,
+    "totalMsRust": 11.244242999999997,
+    "wallSeconds": 0.054
+  },
+  "matrix": [
+    {
+      "indicator": "SMA",
+      "fixture": "mock_50bar",
+      "formula": "SMA(CLOSE('MOCK', '1d'), 50)",
+      "pass": true,
+      "details": "PASS (value: exact=0)",
+      "raw": {
+        "ts": 124.5,
+        "rust": 124.5
+      },
+      "rounded": {
+        "ts": 124.5,
+        "rust": 124.5
+      },
+      "deltas": {
+        "value": {
+          "metric": "exact",
+          "delta": 0,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.43204200000000004,
+      "msRust": 1.5734160000000001
+    },
+    {
+      "indicator": "EMA",
+      "fixture": "mock_50bar",
+      "formula": "EMA(CLOSE('MOCK', '1d'), 20)",
+      "pass": true,
+      "details": "PASS (value: releps=0)",
+      "raw": {
+        "ts": 139.5,
+        "rust": 139.5
+      },
+      "rounded": {
+        "ts": 139.5,
+        "rust": 139.5
+      },
+      "deltas": {
+        "value": {
+          "metric": "releps",
+          "delta": 0,
+          "bound": 1e-12,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.0645,
+      "msRust": 0.075917
+    },
+    {
+      "indicator": "STDEV",
+      "fixture": "mock_50bar",
+      "formula": "STDEV(CLOSE('MOCK', '1d'))",
+      "pass": true,
+      "details": "PASS (value: ulp=0)",
+      "raw": {
+        "ts": 14.430869689661812,
+        "rust": 14.430869689661812
+      },
+      "rounded": {
+        "ts": 14.4309,
+        "rust": 14.4309
+      },
+      "deltas": {
+        "value": {
+          "metric": "ulp",
+          "delta": 0,
+          "bound": 4,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.055458999999999994,
+      "msRust": 0.064083
+    },
+    {
+      "indicator": "MAX",
+      "fixture": "mock_50bar",
+      "formula": "MAX(CLOSE('MOCK', '1d'))",
+      "pass": true,
+      "details": "PASS (value: exact=0)",
+      "raw": {
+        "ts": 149,
+        "rust": 149
+      },
+      "rounded": {
+        "ts": 149,
+        "rust": 149
+      },
+      "deltas": {
+        "value": {
+          "metric": "exact",
+          "delta": 0,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.042290999999999995,
+      "msRust": 0.074833
+    },
+    {
+      "indicator": "MIN",
+      "fixture": "mock_50bar",
+      "formula": "MIN(CLOSE('MOCK', '1d'))",
+      "pass": true,
+      "details": "PASS (value: exact=0)",
+      "raw": {
+        "ts": 100,
+        "rust": 100
+      },
+      "rounded": {
+        "ts": 100,
+        "rust": 100
+      },
+      "deltas": {
+        "value": {
+          "metric": "exact",
+          "delta": 0,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.037833,
+      "msRust": 0.06125
+    },
+    {
+      "indicator": "SUM",
+      "fixture": "mock_50bar",
+      "formula": "SUM(CLOSE('MOCK', '1d'))",
+      "pass": true,
+      "details": "PASS (value: exact=0)",
+      "raw": {
+        "ts": 6225,
+        "rust": 6225
+      },
+      "rounded": {
+        "ts": 6225,
+        "rust": 6225
+      },
+      "deltas": {
+        "value": {
+          "metric": "exact",
+          "delta": 0,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.047166,
+      "msRust": 0.062708
+    },
+    {
+      "indicator": "AVERAGE",
+      "fixture": "mock_50bar",
+      "formula": "AVERAGE(CLOSE('MOCK', '1d'))",
+      "pass": true,
+      "details": "PASS (value: exact=0)",
+      "raw": {
+        "ts": 124.5,
+        "rust": 124.5
+      },
+      "rounded": {
+        "ts": 124.5,
+        "rust": 124.5
+      },
+      "deltas": {
+        "value": {
+          "metric": "exact",
+          "delta": 0,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.038166,
+      "msRust": 0.053917
+    },
+    {
+      "indicator": "RSI",
+      "fixture": "mock_50bar",
+      "formula": "RSI(CLOSE('MOCK', '1d'), 14)",
+      "pass": true,
+      "details": "PASS (value: releps=0)",
+      "raw": {
+        "ts": 100,
+        "rust": 100
+      },
+      "rounded": {
+        "ts": 100,
+        "rust": 100
+      },
+      "deltas": {
+        "value": {
+          "metric": "releps",
+          "delta": 0,
+          "bound": 1e-12,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.089916,
+      "msRust": 0.054292
+    },
+    {
+      "indicator": "BBANDS",
+      "fixture": "mock_50bar",
+      "formula": "BBANDS(CLOSE('MOCK', '1d'), 20, 2)",
+      "pass": true,
+      "details": "PASS (upper: ulp=0, middle: exact=0, lower: ulp=0)",
+      "raw": {
+        "ts": {
+          "upper": 151.0325625946708,
+          "middle": 139.5,
+          "lower": 127.9674374053292
+        },
+        "rust": {
+          "upper": 151.0325625946708,
+          "middle": 139.5,
+          "lower": 127.9674374053292
+        }
+      },
+      "rounded": {
+        "ts": {
+          "upper": 151.0326,
+          "middle": 139.5,
+          "lower": 127.9674
+        },
+        "rust": {
+          "lower": 127.9674,
+          "middle": 139.5,
+          "upper": 151.0326
+        }
+      },
+      "deltas": {
+        "upper": {
+          "metric": "ulp",
+          "delta": 0,
+          "bound": 4,
+          "pass": true
+        },
+        "middle": {
+          "metric": "exact",
+          "delta": 0,
+          "pass": true
+        },
+        "lower": {
+          "metric": "ulp",
+          "delta": 0,
+          "bound": 4,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.065124,
+      "msRust": 0.056124999999999994
+    },
+    {
+      "indicator": "MACD",
+      "fixture": "mock_50bar",
+      "formula": "MACD(CLOSE('MOCK', '1d'), 12, 26, 9)",
+      "pass": true,
+      "details": "PASS (macd: releps=0, signal: releps=0, histogram: releps=0)",
+      "raw": {
+        "ts": {
+          "macd": 7,
+          "signal": 7,
+          "histogram": 0
+        },
+        "rust": {
+          "macd": 7,
+          "signal": 7,
+          "histogram": 0
+        }
+      },
+      "rounded": {
+        "ts": {
+          "macd": 7,
+          "signal": 7,
+          "histogram": 0
+        },
+        "rust": {
+          "histogram": 0,
+          "macd": 7,
+          "signal": 7
+        }
+      },
+      "deltas": {
+        "macd": {
+          "metric": "releps",
+          "delta": 0,
+          "bound": 1e-11,
+          "pass": true
+        },
+        "signal": {
+          "metric": "releps",
+          "delta": 0,
+          "bound": 1e-11,
+          "pass": true
+        },
+        "histogram": {
+          "metric": "releps",
+          "delta": 0,
+          "bound": 1e-11,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.149457,
+      "msRust": 0.067041
+    },
+    {
+      "indicator": "ATR",
+      "fixture": "mock_50bar",
+      "formula": "ATR(HIGH('MOCK', '1d'), LOW('MOCK', '1d'), CLOSE('MOCK', '1d'), 14)",
+      "pass": true,
+      "details": "PASS (value: releps=0)",
+      "raw": {
+        "ts": 3,
+        "rust": 3
+      },
+      "rounded": {
+        "ts": 3,
+        "rust": 3
+      },
+      "deltas": {
+        "value": {
+          "metric": "releps",
+          "delta": 0,
+          "bound": 1e-12,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.113667,
+      "msRust": 0.079333
+    },
+    {
+      "indicator": "SMA",
+      "fixture": "AAPL_daily",
+      "formula": "SMA(CLOSE('AAPL', '1d'), 50)",
+      "pass": true,
+      "details": "PASS (value: exact=0)",
+      "raw": {
+        "ts": 68.89291103999999,
+        "rust": 68.89291103999999
+      },
+      "rounded": {
+        "ts": 68.8929,
+        "rust": 68.8929
+      },
+      "deltas": {
+        "value": {
+          "metric": "exact",
+          "delta": 0,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.035042000000000004,
+      "msRust": 0.059042000000000004
+    },
+    {
+      "indicator": "EMA",
+      "fixture": "AAPL_daily",
+      "formula": "EMA(CLOSE('AAPL', '1d'), 20)",
+      "pass": true,
+      "details": "PASS (value: releps=0)",
+      "raw": {
+        "ts": 66.39513459463956,
+        "rust": 66.39513459463956
+      },
+      "rounded": {
+        "ts": 66.3951,
+        "rust": 66.3951
+      },
+      "deltas": {
+        "value": {
+          "metric": "releps",
+          "delta": 0,
+          "bound": 1e-12,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.060542,
+      "msRust": 0.046666
+    },
+    {
+      "indicator": "STDEV",
+      "fixture": "AAPL_daily",
+      "formula": "STDEV(CLOSE('AAPL', '1d'))",
+      "pass": true,
+      "details": "PASS (value: ulp=0)",
+      "raw": {
+        "ts": 25.08113951986617,
+        "rust": 25.08113951986617
+      },
+      "rounded": {
+        "ts": 25.0811,
+        "rust": 25.0811
+      },
+      "deltas": {
+        "value": {
+          "metric": "ulp",
+          "delta": 0,
+          "bound": 4,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.060749,
+      "msRust": 0.043583000000000004
+    },
+    {
+      "indicator": "MAX",
+      "fixture": "AAPL_daily",
+      "formula": "MAX(CLOSE('AAPL', '1d'))",
+      "pass": true,
+      "details": "PASS (value: exact=0)",
+      "raw": {
+        "ts": 164.276046,
+        "rust": 164.276046
+      },
+      "rounded": {
+        "ts": 164.276,
+        "rust": 164.276
+      },
+      "deltas": {
+        "value": {
+          "metric": "exact",
+          "delta": 0,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.030208,
+      "msRust": 0.039541
+    },
+    {
+      "indicator": "MIN",
+      "fixture": "AAPL_daily",
+      "formula": "MIN(CLOSE('AAPL', '1d'))",
+      "pass": true,
+      "details": "PASS (value: exact=0)",
+      "raw": {
+        "ts": 63.410933,
+        "rust": 63.410933
+      },
+      "rounded": {
+        "ts": 63.4109,
+        "rust": 63.4109
+      },
+      "deltas": {
+        "value": {
+          "metric": "exact",
+          "delta": 0,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.022375,
+      "msRust": 0.040749
+    },
+    {
+      "indicator": "SUM",
+      "fixture": "AAPL_daily",
+      "formula": "SUM(CLOSE('AAPL', '1d'))",
+      "pass": true,
+      "details": "PASS (value: exact=0)",
+      "raw": {
+        "ts": 88477.26816900003,
+        "rust": 88477.26816900003
+      },
+      "rounded": {
+        "ts": 88477.2682,
+        "rust": 88477.2682
+      },
+      "deltas": {
+        "value": {
+          "metric": "exact",
+          "delta": 0,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.041292,
+      "msRust": 0.037583
+    },
+    {
+      "indicator": "AVERAGE",
+      "fixture": "AAPL_daily",
+      "formula": "AVERAGE(CLOSE('AAPL', '1d'))",
+      "pass": true,
+      "details": "PASS (value: exact=0)",
+      "raw": {
+        "ts": 121.20173721780826,
+        "rust": 121.20173721780826
+      },
+      "rounded": {
+        "ts": 121.2017,
+        "rust": 121.2017
+      },
+      "deltas": {
+        "value": {
+          "metric": "exact",
+          "delta": 0,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.032958,
+      "msRust": 0.050333
+    },
+    {
+      "indicator": "RSI",
+      "fixture": "AAPL_daily",
+      "formula": "RSI(CLOSE('AAPL', '1d'), 14)",
+      "pass": true,
+      "details": "PASS (value: releps=0)",
+      "raw": {
+        "ts": 35.32627801147392,
+        "rust": 35.32627801147392
+      },
+      "rounded": {
+        "ts": 35.3263,
+        "rust": 35.3263
+      },
+      "deltas": {
+        "value": {
+          "metric": "releps",
+          "delta": 0,
+          "bound": 1e-12,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.180583,
+      "msRust": 0.297959
+    },
+    {
+      "indicator": "BBANDS",
+      "fixture": "AAPL_daily",
+      "formula": "BBANDS(CLOSE('AAPL', '1d'), 20, 2)",
+      "pass": true,
+      "details": "PASS (upper: ulp=0, middle: exact=0, lower: ulp=0)",
+      "raw": {
+        "ts": {
+          "upper": 69.57652366515087,
+          "middle": 66.25290620000001,
+          "lower": 62.92928873484915
+        },
+        "rust": {
+          "upper": 69.57652366515087,
+          "middle": 66.25290620000001,
+          "lower": 62.92928873484915
+        }
+      },
+      "rounded": {
+        "ts": {
+          "upper": 69.5765,
+          "middle": 66.2529,
+          "lower": 62.9293
+        },
+        "rust": {
+          "lower": 62.9293,
+          "middle": 66.2529,
+          "upper": 69.5765
+        }
+      },
+      "deltas": {
+        "upper": {
+          "metric": "ulp",
+          "delta": 0,
+          "bound": 4,
+          "pass": true
+        },
+        "middle": {
+          "metric": "exact",
+          "delta": 0,
+          "pass": true
+        },
+        "lower": {
+          "metric": "ulp",
+          "delta": 0,
+          "bound": 4,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.047125,
+      "msRust": 0.110333
+    },
+    {
+      "indicator": "MACD",
+      "fixture": "AAPL_daily",
+      "formula": "MACD(CLOSE('AAPL', '1d'), 12, 26, 9)",
+      "pass": true,
+      "details": "PASS (macd: releps=0, signal: releps=0, histogram: releps=0)",
+      "raw": {
+        "ts": {
+          "macd": -1.1191680368046804,
+          "signal": -0.9646865078405635,
+          "histogram": -0.15448152896411682
+        },
+        "rust": {
+          "macd": -1.1191680368046804,
+          "signal": -0.9646865078405635,
+          "histogram": -0.15448152896411682
+        }
+      },
+      "rounded": {
+        "ts": {
+          "macd": -1.1192,
+          "signal": -0.9647,
+          "histogram": -0.1545
+        },
+        "rust": {
+          "histogram": -0.1545,
+          "macd": -1.1192,
+          "signal": -0.9647
+        }
+      },
+      "deltas": {
+        "macd": {
+          "metric": "releps",
+          "delta": 0,
+          "bound": 1e-11,
+          "pass": true
+        },
+        "signal": {
+          "metric": "releps",
+          "delta": 0,
+          "bound": 1e-11,
+          "pass": true
+        },
+        "histogram": {
+          "metric": "releps",
+          "delta": 0,
+          "bound": 1e-11,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 3.784625,
+      "msRust": 2.178083
+    },
+    {
+      "indicator": "ATR",
+      "fixture": "AAPL_daily",
+      "formula": "ATR(HIGH('AAPL', '1d'), LOW('AAPL', '1d'), CLOSE('AAPL', '1d'), 14)",
+      "pass": true,
+      "details": "PASS (value: releps=0)",
+      "raw": {
+        "ts": 2.2621294156496927,
+        "rust": 2.2621294156496927
+      },
+      "rounded": {
+        "ts": 2.2621,
+        "rust": 2.2621
+      },
+      "deltas": {
+        "value": {
+          "metric": "releps",
+          "delta": 0,
+          "bound": 1e-12,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.196917,
+      "msRust": 0.12187500000000001
+    },
+    {
+      "indicator": "SMA",
+      "fixture": "BTCUSD_daily",
+      "formula": "SMA(CLOSE('BTCUSD', '1d'), 50)",
+      "pass": true,
+      "details": "PASS (value: exact=0)",
+      "raw": {
+        "ts": 41562.07005633999,
+        "rust": 41562.07005633999
+      },
+      "rounded": {
+        "ts": 41562.0701,
+        "rust": 41562.0701
+      },
+      "deltas": {
+        "value": {
+          "metric": "exact",
+          "delta": 0,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.025082999999999998,
+      "msRust": 0.060417
+    },
+    {
+      "indicator": "EMA",
+      "fixture": "BTCUSD_daily",
+      "formula": "EMA(CLOSE('BTCUSD', '1d'), 20)",
+      "pass": true,
+      "details": "PASS (value: releps=0)",
+      "raw": {
+        "ts": 39355.48007423967,
+        "rust": 39355.48007423967
+      },
+      "rounded": {
+        "ts": 39355.4801,
+        "rust": 39355.4801
+      },
+      "deltas": {
+        "value": {
+          "metric": "releps",
+          "delta": 0,
+          "bound": 1e-12,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.0225,
+      "msRust": 0.055125
+    },
+    {
+      "indicator": "STDEV",
+      "fixture": "BTCUSD_daily",
+      "formula": "STDEV(CLOSE('BTCUSD', '1d'))",
+      "pass": true,
+      "details": "PASS (value: ulp=0)",
+      "raw": {
+        "ts": 22171.865629668737,
+        "rust": 22171.865629668737
+      },
+      "rounded": {
+        "ts": 22171.8656,
+        "rust": 22171.8656
+      },
+      "deltas": {
+        "value": {
+          "metric": "ulp",
+          "delta": 0,
+          "bound": 4,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.063792,
+      "msRust": 0.056042
+    },
+    {
+      "indicator": "MAX",
+      "fixture": "BTCUSD_daily",
+      "formula": "MAX(CLOSE('BTCUSD', '1d'))",
+      "pass": true,
+      "details": "PASS (value: exact=0)",
+      "raw": {
+        "ts": 120629.937068,
+        "rust": 120629.937068
+      },
+      "rounded": {
+        "ts": 120629.9371,
+        "rust": 120629.9371
+      },
+      "deltas": {
+        "value": {
+          "metric": "exact",
+          "delta": 0,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.025500000000000002,
+      "msRust": 0.041707
+    },
+    {
+      "indicator": "MIN",
+      "fixture": "BTCUSD_daily",
+      "formula": "MIN(CLOSE('BTCUSD', '1d'))",
+      "pass": true,
+      "details": "PASS (value: exact=0)",
+      "raw": {
+        "ts": 27332.771501,
+        "rust": 27332.771501
+      },
+      "rounded": {
+        "ts": 27332.7715,
+        "rust": 27332.7715
+      },
+      "deltas": {
+        "value": {
+          "metric": "exact",
+          "delta": 0,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.019166000000000002,
+      "msRust": 0.035958000000000004
+    },
+    {
+      "indicator": "SUM",
+      "fixture": "BTCUSD_daily",
+      "formula": "SUM(CLOSE('BTCUSD', '1d'))",
+      "pass": true,
+      "details": "PASS (value: exact=0)",
+      "raw": {
+        "ts": 50470572.602733925,
+        "rust": 50470572.602733925
+      },
+      "rounded": {
+        "ts": 50470572.6027,
+        "rust": 50470572.6027
+      },
+      "deltas": {
+        "value": {
+          "metric": "exact",
+          "delta": 0,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.033166,
+      "msRust": 0.0365
+    },
+    {
+      "indicator": "AVERAGE",
+      "fixture": "BTCUSD_daily",
+      "formula": "AVERAGE(CLOSE('BTCUSD', '1d'))",
+      "pass": true,
+      "details": "PASS (value: exact=0)",
+      "raw": {
+        "ts": 69137.77068867661,
+        "rust": 69137.77068867661
+      },
+      "rounded": {
+        "ts": 69137.7707,
+        "rust": 69137.7707
+      },
+      "deltas": {
+        "value": {
+          "metric": "exact",
+          "delta": 0,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.025458,
+      "msRust": 0.035708000000000004
+    },
+    {
+      "indicator": "RSI",
+      "fixture": "BTCUSD_daily",
+      "formula": "RSI(CLOSE('BTCUSD', '1d'), 14)",
+      "pass": true,
+      "details": "PASS (value: releps=0)",
+      "raw": {
+        "ts": 45.05673992834851,
+        "rust": 45.05673992834851
+      },
+      "rounded": {
+        "ts": 45.0567,
+        "rust": 45.0567
+      },
+      "deltas": {
+        "value": {
+          "metric": "releps",
+          "delta": 0,
+          "bound": 1e-12,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.13916699999999999,
+      "msRust": 0.045167
+    },
+    {
+      "indicator": "BBANDS",
+      "fixture": "BTCUSD_daily",
+      "formula": "BBANDS(CLOSE('BTCUSD', '1d'), 20, 2)",
+      "pass": true,
+      "details": "PASS (upper: ulp=0, middle: exact=0, lower: ulp=0)",
+      "raw": {
+        "ts": {
+          "upper": 46395.556937492765,
+          "middle": 40286.02511434999,
+          "lower": 34176.49329120722
+        },
+        "rust": {
+          "upper": 46395.556937492765,
+          "middle": 40286.02511434999,
+          "lower": 34176.49329120722
+        }
+      },
+      "rounded": {
+        "ts": {
+          "upper": 46395.5569,
+          "middle": 40286.0251,
+          "lower": 34176.4933
+        },
+        "rust": {
+          "lower": 34176.4933,
+          "middle": 40286.0251,
+          "upper": 46395.5569
+        }
+      },
+      "deltas": {
+        "upper": {
+          "metric": "ulp",
+          "delta": 0,
+          "bound": 4,
+          "pass": true
+        },
+        "middle": {
+          "metric": "exact",
+          "delta": 0,
+          "pass": true
+        },
+        "lower": {
+          "metric": "ulp",
+          "delta": 0,
+          "bound": 4,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.025,
+      "msRust": 0.048583
+    },
+    {
+      "indicator": "MACD",
+      "fixture": "BTCUSD_daily",
+      "formula": "MACD(CLOSE('BTCUSD', '1d'), 12, 26, 9)",
+      "pass": true,
+      "details": "PASS (macd: releps=0, signal: releps=0, histogram: releps=0)",
+      "raw": {
+        "ts": {
+          "macd": -1336.919907765434,
+          "signal": -1306.3126088221857,
+          "histogram": -30.607298943248225
+        },
+        "rust": {
+          "macd": -1336.919907765434,
+          "signal": -1306.3126088221857,
+          "histogram": -30.607298943248225
+        }
+      },
+      "rounded": {
+        "ts": {
+          "macd": -1336.9199,
+          "signal": -1306.3126,
+          "histogram": -30.6073
+        },
+        "rust": {
+          "histogram": -30.6073,
+          "macd": -1336.9199,
+          "signal": -1306.3126
+        }
+      },
+      "deltas": {
+        "macd": {
+          "metric": "releps",
+          "delta": 0,
+          "bound": 1e-11,
+          "pass": true
+        },
+        "signal": {
+          "metric": "releps",
+          "delta": 0,
+          "bound": 1e-11,
+          "pass": true
+        },
+        "histogram": {
+          "metric": "releps",
+          "delta": 0,
+          "bound": 1e-11,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 2.57325,
+      "msRust": 1.5640830000000001
+    },
+    {
+      "indicator": "ATR",
+      "fixture": "BTCUSD_daily",
+      "formula": "ATR(HIGH('BTCUSD', '1d'), LOW('BTCUSD', '1d'), CLOSE('BTCUSD', '1d'), 14)",
+      "pass": true,
+      "details": "PASS (value: releps=0)",
+      "raw": {
+        "ts": 3046.56124250626,
+        "rust": 3046.56124250626
+      },
+      "rounded": {
+        "ts": 3046.5612,
+        "rust": 3046.5612
+      },
+      "deltas": {
+        "value": {
+          "metric": "releps",
+          "delta": 0,
+          "bound": 1e-12,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.16612500000000002,
+      "msRust": 0.10700000000000001
+    },
+    {
+      "indicator": "SMA",
+      "fixture": "gold_daily",
+      "formula": "SMA(CLOSE('gold', '1d'), 50)",
+      "pass": true,
+      "details": "PASS (value: exact=0)",
+      "raw": {
+        "ts": 2011.8356170399993,
+        "rust": 2011.8356170399993
+      },
+      "rounded": {
+        "ts": 2011.8356,
+        "rust": 2011.8356
+      },
+      "deltas": {
+        "value": {
+          "metric": "exact",
+          "delta": 0,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.023083,
+      "msRust": 0.040334
+    },
+    {
+      "indicator": "EMA",
+      "fixture": "gold_daily",
+      "formula": "EMA(CLOSE('gold', '1d'), 20)",
+      "pass": true,
+      "details": "PASS (value: releps=0)",
+      "raw": {
+        "ts": 2043.1505814671882,
+        "rust": 2043.1505814671882
+      },
+      "rounded": {
+        "ts": 2043.1506,
+        "rust": 2043.1506
+      },
+      "deltas": {
+        "value": {
+          "metric": "releps",
+          "delta": 0,
+          "bound": 1e-12,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.019083000000000003,
+      "msRust": 0.037125000000000005
+    },
+    {
+      "indicator": "STDEV",
+      "fixture": "gold_daily",
+      "formula": "STDEV(CLOSE('gold', '1d'))",
+      "pass": true,
+      "details": "PASS (value: ulp=0)",
+      "raw": {
+        "ts": 151.54365362022682,
+        "rust": 151.54365362022682
+      },
+      "rounded": {
+        "ts": 151.5437,
+        "rust": 151.5437
+      },
+      "deltas": {
+        "value": {
+          "metric": "ulp",
+          "delta": 0,
+          "bound": 4,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.05474999999999999,
+      "msRust": 0.028333999999999998
+    },
+    {
+      "indicator": "MAX",
+      "fixture": "gold_daily",
+      "formula": "MAX(CLOSE('gold', '1d'))",
+      "pass": true,
+      "details": "PASS (value: exact=0)",
+      "raw": {
+        "ts": 2136.278663,
+        "rust": 2136.278663
+      },
+      "rounded": {
+        "ts": 2136.2787,
+        "rust": 2136.2787
+      },
+      "deltas": {
+        "value": {
+          "metric": "exact",
+          "delta": 0,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.017125,
+      "msRust": 0.029041
+    },
+    {
+      "indicator": "MIN",
+      "fixture": "gold_daily",
+      "formula": "MIN(CLOSE('gold', '1d'))",
+      "pass": true,
+      "details": "PASS (value: exact=0)",
+      "raw": {
+        "ts": 1515.50964,
+        "rust": 1515.50964
+      },
+      "rounded": {
+        "ts": 1515.5096,
+        "rust": 1515.5096
+      },
+      "deltas": {
+        "value": {
+          "metric": "exact",
+          "delta": 0,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.017957,
+      "msRust": 0.030083000000000002
+    },
+    {
+      "indicator": "SUM",
+      "fixture": "gold_daily",
+      "formula": "SUM(CLOSE('gold', '1d'))",
+      "pass": true,
+      "details": "PASS (value: exact=0)",
+      "raw": {
+        "ts": 1319210.6417850011,
+        "rust": 1319210.6417850011
+      },
+      "rounded": {
+        "ts": 1319210.6418,
+        "rust": 1319210.6418
+      },
+      "deltas": {
+        "value": {
+          "metric": "exact",
+          "delta": 0,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.02375,
+      "msRust": 0.026583000000000002
+    },
+    {
+      "indicator": "AVERAGE",
+      "fixture": "gold_daily",
+      "formula": "AVERAGE(CLOSE('gold', '1d'))",
+      "pass": true,
+      "details": "PASS (value: exact=0)",
+      "raw": {
+        "ts": 1807.1378654589057,
+        "rust": 1807.1378654589057
+      },
+      "rounded": {
+        "ts": 1807.1379,
+        "rust": 1807.1379
+      },
+      "deltas": {
+        "value": {
+          "metric": "exact",
+          "delta": 0,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.024,
+      "msRust": 0.033874
+    },
+    {
+      "indicator": "RSI",
+      "fixture": "gold_daily",
+      "formula": "RSI(CLOSE('gold', '1d'), 14)",
+      "pass": true,
+      "details": "PASS (value: releps=0)",
+      "raw": {
+        "ts": 57.24735517141697,
+        "rust": 57.24735517141697
+      },
+      "rounded": {
+        "ts": 57.2474,
+        "rust": 57.2474
+      },
+      "deltas": {
+        "value": {
+          "metric": "releps",
+          "delta": 0,
+          "bound": 1e-12,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.119084,
+      "msRust": 0.042581999999999995
+    },
+    {
+      "indicator": "BBANDS",
+      "fixture": "gold_daily",
+      "formula": "BBANDS(CLOSE('gold', '1d'), 20, 2)",
+      "pass": true,
+      "details": "PASS (upper: ulp=0, middle: exact=0, lower: ulp=0)",
+      "raw": {
+        "ts": {
+          "upper": 2087.247459518031,
+          "middle": 2041.4652239,
+          "lower": 1995.682988281969
+        },
+        "rust": {
+          "upper": 2087.247459518031,
+          "middle": 2041.4652239,
+          "lower": 1995.682988281969
+        }
+      },
+      "rounded": {
+        "ts": {
+          "upper": 2087.2475,
+          "middle": 2041.4652,
+          "lower": 1995.683
+        },
+        "rust": {
+          "lower": 1995.683,
+          "middle": 2041.4652,
+          "upper": 2087.2475
+        }
+      },
+      "deltas": {
+        "upper": {
+          "metric": "ulp",
+          "delta": 0,
+          "bound": 4,
+          "pass": true
+        },
+        "middle": {
+          "metric": "exact",
+          "delta": 0,
+          "pass": true
+        },
+        "lower": {
+          "metric": "ulp",
+          "delta": 0,
+          "bound": 4,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.026542,
+      "msRust": 0.032499
+    },
+    {
+      "indicator": "MACD",
+      "fixture": "gold_daily",
+      "formula": "MACD(CLOSE('gold', '1d'), 12, 26, 9)",
+      "pass": true,
+      "details": "PASS (macd: releps=0, signal: releps=0, histogram: releps=0)",
+      "raw": {
+        "ts": {
+          "macd": 15.836419779772086,
+          "signal": 12.99592648953753,
+          "histogram": 2.8404932902345568
+        },
+        "rust": {
+          "macd": 15.836419779772086,
+          "signal": 12.99592648953753,
+          "histogram": 2.8404932902345568
+        }
+      },
+      "rounded": {
+        "ts": {
+          "macd": 15.8364,
+          "signal": 12.9959,
+          "histogram": 2.8405
+        },
+        "rust": {
+          "histogram": 2.8405,
+          "macd": 15.8364,
+          "signal": 12.9959
+        }
+      },
+      "deltas": {
+        "macd": {
+          "metric": "releps",
+          "delta": 0,
+          "bound": 1e-11,
+          "pass": true
+        },
+        "signal": {
+          "metric": "releps",
+          "delta": 0,
+          "bound": 1e-11,
+          "pass": true
+        },
+        "histogram": {
+          "metric": "releps",
+          "delta": 0,
+          "bound": 1e-11,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 2.496751,
+      "msRust": 1.544043
+    },
+    {
+      "indicator": "ATR",
+      "fixture": "gold_daily",
+      "formula": "ATR(HIGH('gold', '1d'), LOW('gold', '1d'), CLOSE('gold', '1d'), 14)",
+      "pass": true,
+      "details": "PASS (value: releps=0)",
+      "raw": {
+        "ts": 44.02830637831791,
+        "rust": 44.02830637831791
+      },
+      "rounded": {
+        "ts": 44.0283,
+        "rust": 44.0283
+      },
+      "deltas": {
+        "value": {
+          "metric": "releps",
+          "delta": 0,
+          "bound": 1e-12,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.057334,
+      "msRust": 0.07266700000000001
+    },
+    {
+      "indicator": "SMA",
+      "fixture": "crude_oil_daily",
+      "formula": "SMA(CLOSE('crude_oil', '1d'), 50)",
+      "pass": true,
+      "details": "PASS (value: exact=0)",
+      "raw": {
+        "ts": 78.01515653999999,
+        "rust": 78.01515653999999
+      },
+      "rounded": {
+        "ts": 78.0152,
+        "rust": 78.0152
+      },
+      "deltas": {
+        "value": {
+          "metric": "exact",
+          "delta": 0,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.028166,
+      "msRust": 0.030250000000000003
+    },
+    {
+      "indicator": "EMA",
+      "fixture": "crude_oil_daily",
+      "formula": "EMA(CLOSE('crude_oil', '1d'), 20)",
+      "pass": true,
+      "details": "PASS (value: releps=0)",
+      "raw": {
+        "ts": 80.84529960376541,
+        "rust": 80.84529960376541
+      },
+      "rounded": {
+        "ts": 80.8453,
+        "rust": 80.8453
+      },
+      "deltas": {
+        "value": {
+          "metric": "releps",
+          "delta": 0,
+          "bound": 1e-12,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.01725,
+      "msRust": 0.030958999999999997
+    },
+    {
+      "indicator": "STDEV",
+      "fixture": "crude_oil_daily",
+      "formula": "STDEV(CLOSE('crude_oil', '1d'))",
+      "pass": true,
+      "details": "PASS (value: ulp=0)",
+      "raw": {
+        "ts": 11.195537001931235,
+        "rust": 11.195537001931235
+      },
+      "rounded": {
+        "ts": 11.1955,
+        "rust": 11.1955
+      },
+      "deltas": {
+        "value": {
+          "metric": "ulp",
+          "delta": 0,
+          "bound": 4,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.057248999999999994,
+      "msRust": 0.036750000000000005
+    },
+    {
+      "indicator": "MAX",
+      "fixture": "crude_oil_daily",
+      "formula": "MAX(CLOSE('crude_oil', '1d'))",
+      "pass": true,
+      "details": "PASS (value: exact=0)",
+      "raw": {
+        "ts": 117.283616,
+        "rust": 117.283616
+      },
+      "rounded": {
+        "ts": 117.2836,
+        "rust": 117.2836
+      },
+      "deltas": {
+        "value": {
+          "metric": "exact",
+          "delta": 0,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.020959,
+      "msRust": 0.029916
+    },
+    {
+      "indicator": "MIN",
+      "fixture": "crude_oil_daily",
+      "formula": "MIN(CLOSE('crude_oil', '1d'))",
+      "pass": true,
+      "details": "PASS (value: exact=0)",
+      "raw": {
+        "ts": 57.826683,
+        "rust": 57.826683
+      },
+      "rounded": {
+        "ts": 57.8267,
+        "rust": 57.8267
+      },
+      "deltas": {
+        "value": {
+          "metric": "exact",
+          "delta": 0,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.019,
+      "msRust": 0.029125
+    },
+    {
+      "indicator": "SUM",
+      "fixture": "crude_oil_daily",
+      "formula": "SUM(CLOSE('crude_oil', '1d'))",
+      "pass": true,
+      "details": "PASS (value: exact=0)",
+      "raw": {
+        "ts": 58550.029191999965,
+        "rust": 58550.029191999965
+      },
+      "rounded": {
+        "ts": 58550.0292,
+        "rust": 58550.0292
+      },
+      "deltas": {
+        "value": {
+          "metric": "exact",
+          "delta": 0,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.025582999999999998,
+      "msRust": 0.027833
+    },
+    {
+      "indicator": "AVERAGE",
+      "fixture": "crude_oil_daily",
+      "formula": "AVERAGE(CLOSE('crude_oil', '1d'))",
+      "pass": true,
+      "details": "PASS (value: exact=0)",
+      "raw": {
+        "ts": 80.20551944109584,
+        "rust": 80.20551944109584
+      },
+      "rounded": {
+        "ts": 80.2055,
+        "rust": 80.2055
+      },
+      "deltas": {
+        "value": {
+          "metric": "exact",
+          "delta": 0,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.025333,
+      "msRust": 0.028501
+    },
+    {
+      "indicator": "RSI",
+      "fixture": "crude_oil_daily",
+      "formula": "RSI(CLOSE('crude_oil', '1d'), 14)",
+      "pass": true,
+      "details": "PASS (value: releps=0)",
+      "raw": {
+        "ts": 42.56624423198158,
+        "rust": 42.56624423198158
+      },
+      "rounded": {
+        "ts": 42.5662,
+        "rust": 42.5662
+      },
+      "deltas": {
+        "value": {
+          "metric": "releps",
+          "delta": 0,
+          "bound": 1e-12,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.070542,
+      "msRust": 0.035667
+    },
+    {
+      "indicator": "BBANDS",
+      "fixture": "crude_oil_daily",
+      "formula": "BBANDS(CLOSE('crude_oil', '1d'), 20, 2)",
+      "pass": true,
+      "details": "PASS (upper: ulp=0, middle: exact=0, lower: ulp=0)",
+      "raw": {
+        "ts": {
+          "upper": 85.49572755931742,
+          "middle": 81.7047654,
+          "lower": 77.91380324068258
+        },
+        "rust": {
+          "upper": 85.49572755931742,
+          "middle": 81.7047654,
+          "lower": 77.91380324068258
+        }
+      },
+      "rounded": {
+        "ts": {
+          "upper": 85.4957,
+          "middle": 81.7048,
+          "lower": 77.9138
+        },
+        "rust": {
+          "lower": 77.9138,
+          "middle": 81.7048,
+          "upper": 85.4957
+        }
+      },
+      "deltas": {
+        "upper": {
+          "metric": "ulp",
+          "delta": 0,
+          "bound": 4,
+          "pass": true
+        },
+        "middle": {
+          "metric": "exact",
+          "delta": 0,
+          "pass": true
+        },
+        "lower": {
+          "metric": "ulp",
+          "delta": 0,
+          "bound": 4,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.027083,
+      "msRust": 0.105667
+    },
+    {
+      "indicator": "MACD",
+      "fixture": "crude_oil_daily",
+      "formula": "MACD(CLOSE('crude_oil', '1d'), 12, 26, 9)",
+      "pass": true,
+      "details": "PASS (macd: releps=0, signal: releps=0, histogram: releps=0)",
+      "raw": {
+        "ts": {
+          "macd": -0.005120834556635145,
+          "signal": 0.8583958442542151,
+          "histogram": -0.8635166788108503
+        },
+        "rust": {
+          "macd": -0.005120834556635145,
+          "signal": 0.8583958442542151,
+          "histogram": -0.8635166788108503
+        }
+      },
+      "rounded": {
+        "ts": {
+          "macd": -0.0051,
+          "signal": 0.8584,
+          "histogram": -0.8635
+        },
+        "rust": {
+          "histogram": -0.8635,
+          "macd": -0.0051,
+          "signal": 0.8584
+        }
+      },
+      "deltas": {
+        "macd": {
+          "metric": "releps",
+          "delta": 0,
+          "bound": 1e-11,
+          "pass": true
+        },
+        "signal": {
+          "metric": "releps",
+          "delta": 0,
+          "bound": 1e-11,
+          "pass": true
+        },
+        "histogram": {
+          "metric": "releps",
+          "delta": 0,
+          "bound": 1e-11,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 2.42675,
+      "msRust": 1.5609579999999998
+    },
+    {
+      "indicator": "ATR",
+      "fixture": "crude_oil_daily",
+      "formula": "ATR(HIGH('crude_oil', '1d'), LOW('crude_oil', '1d'), CLOSE('crude_oil', '1d'), 14)",
+      "pass": true,
+      "details": "PASS (value: releps=0)",
+      "raw": {
+        "ts": 4.492652534230958,
+        "rust": 4.492652534230958
+      },
+      "rounded": {
+        "ts": 4.4927,
+        "rust": 4.4927
+      },
+      "deltas": {
+        "value": {
+          "metric": "releps",
+          "delta": 0,
+          "bound": 1e-12,
+          "pass": true
+        }
+      },
+      "publicApiBitExact": true,
+      "msTs": 0.058501,
+      "msRust": 0.0765
+    }
+  ],
+  "stress": [
+    {
+      "name": "SUM([]) returns 0 (TS source) on both sides",
+      "pass": true,
+      "observed": "tsFull=6225; tsEmpty=0; rustEmpty=0"
+    },
+    {
+      "name": "period==0 — Rust raises clearer error than TS (silent NaN)",
+      "pass": true,
+      "observed": "ts: value=Infinity; rust: throw: SMA period must be > 0"
+    },
+    {
+      "name": "MACD perf on 2000-bar series (preserves O(N²) signal computation)",
+      "pass": true,
+      "observed": "tsRun=8.36ms; rustRun=6.40ms; ts={\"macd\":0.2551,\"signal\":0.4446,\"histogram\":-0.1895}; rust={\"histogram\":-0.1895,\"macd\":0.2551,\"signal\":0.4446}"
+    },
+    {
+      "name": "MAX with NaN in input",
+      "pass": true,
+      "observed": "ts=NaN; rust=NaN"
+    },
+    {
+      "name": "MIN with NaN in input",
+      "pass": true,
+      "observed": "ts=NaN; rust=NaN"
+    },
+    {
+      "name": "ATR with NaN-in-high",
+      "pass": true,
+      "observed": "ts=NaN; rust=NaN"
+    },
+    {
+      "name": "ATR ignores bar-0 H/L (only c[0] used as prev-close)",
+      "pass": true,
+      "observed": "tsBase=3 tsOut=3 (Δ=0); ruBase=3 ruOut=3 (Δ=0)"
+    },
+    {
+      "name": "lexer: 1.2.3 — TS silently truncates (legacy), Rust rejects (improvement)",
+      "pass": true,
+      "observed": "ts: silently truncated → 124.1667; rust: \"Invalid number literal '1.2.3' at position 22 at position 22\""
+    },
+    {
+      "name": "unary minus: '-5+3' — both impls agree",
+      "pass": true,
+      "observed": "ts: value=-2; rust: value=-2"
+    },
+    {
+      "name": "unary minus: '-(1+2)' — both impls agree",
+      "pass": true,
+      "observed": "ts: Unexpected character '-' at position 0; rust: Unexpected character '-' at position 0"
+    },
+    {
+      "name": "unary minus: '--5' — both impls agree",
+      "pass": true,
+      "observed": "ts: Unexpected character '-' at position 0; rust: Unexpected character '-' at position 0"
+    },
+    {
+      "name": "unary minus: '- 5' — both impls agree",
+      "pass": true,
+      "observed": "ts: Unexpected character '-' at position 0; rust: Unexpected character '-' at position 0"
+    },
+    {
+      "name": "thinking safeCalculate(1/0) → \"Invalid calculation result\"",
+      "pass": true,
+      "observed": "code=EVAL_ERROR; message=\"Calculation error: Invalid calculation result\""
+    },
+    {
+      "name": "array binary-op error message exact match",
+      "pass": true,
+      "observed": "ts: \"Binary operations require numbers, got TrackedValues and number\"; rust: \"Binary operations require numbers, got TrackedValues and number\""
+    },
+    {
+      "name": "float array indices behave consistently across impls",
+      "pass": true,
+      "observed": "[0] ts: 100; rust: 100 | [0.7] ts: 100; rust: 100 | [1.5] ts: 101; rust: 101 | [-1.7] ts: 149; rust: 149 | [49.9] ts: 149; rust: 149"
+    },
+    {
+      "name": "js_to_fixed boundary at xxxx.xxxx5 (SMA of 12.3456/12.3457 → 12.34565)",
+      "pass": true,
+      "observed": "ts=12.3456; rust=12.3456; tsBits=c.58793dd97f628; rustBits=c.58793dd97f628"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+[package]
+name = "alice-decimal"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.77"
+license = "AGPL-3.0-only"
+description = "OpenAlice shared decimal codec (string wire format <-> rust_decimal::Decimal) + NAPI helpers"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# Default-on: alice-decimal's own cdylib build registers napi exports
+# (`version`, `validateWireDecimal`, `addWireDecimals`). Downstream Rust
+# crates that consume alice-decimal as an `rlib` (e.g. alice-trading-core
+# at task #12) MUST disable this feature with `default-features = false`,
+# otherwise their own napi-derive collector picks up alice-decimal's
+# `#[napi]` symbols and leaks them — including a name-clashing `version()`.
+default = ["napi"]
+napi = ["dep:napi", "dep:napi-derive"]
+
+[dependencies]
+napi = { version = "2.16", default-features = false, features = ["napi8"], optional = true }
+napi-derive = { version = "2.16", optional = true }
+rust_decimal = "1.36"
+
+[build-dependencies]
+napi-build = "2.1"
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+strip = "symbols"

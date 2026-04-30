@@ -7,6 +7,11 @@
  * - SMA(CLOSE('AAPL', '1d'), 50)
  * - RSI(CLOSE('BTCUSD', '1d'), 14)
  * - (CLOSE('EURUSD', '1d')[-1] - SMA(CLOSE('EURUSD', '1d'), 50)) / SMA(CLOSE('EURUSD', '1d'), 50) * 100
+ *
+ * Migration switch (per `_rust-port/02-design.md` §5.4): when
+ * `ALICE_RUST_INDICATORS` selects all indicators referenced in the formula,
+ * evaluation is routed to the Rust crate `@traderalice/alice-analysis`.
+ * Otherwise, the original TS implementation runs unchanged.
  */
 
 import type {
@@ -23,11 +28,18 @@ import { toValues } from './types'
 import * as DataAccess from './functions/data-access'
 import * as Statistics from './functions/statistics'
 import * as Technical from './functions/technical'
+import { shouldUseRustForIndicators, allRustEnabled } from './rust-adapter'
+import { evaluateWithRust } from './rust-evaluator'
 
 export interface CalculateOutput {
   value: number | number[] | Record<string, number>
   dataRange: Record<string, DataSourceMeta>
 }
+
+const INDICATOR_NAMES = new Set([
+  'SMA', 'EMA', 'STDEV', 'MAX', 'MIN', 'SUM', 'AVERAGE',
+  'RSI', 'BBANDS', 'MACD', 'ATR',
+])
 
 export class IndicatorCalculator {
   private dataSources: Record<string, DataSourceMeta> = {}
@@ -38,8 +50,17 @@ export class IndicatorCalculator {
     formula: string,
     precision: number = 4,
   ): Promise<CalculateOutput> {
+    // Migration gate: route to Rust when the env flag enables every indicator
+    // this formula references. The Rust evaluator runs the whole formula end
+    // to end (parser, evaluator, kernels), not just the leaf indicator calls,
+    // so the flag must allow the entire indicator set in the AST. If any one
+    // is excluded we fall back to the TS implementation.
     this.dataSources = {}
     const ast = this.parse(formula)
+    if (allRustEnabled() || this.canRouteAllToRust(ast)) {
+      const result = await evaluateWithRust(formula, this.context, precision)
+      return result
+    }
     const result = await this.evaluate(ast)
 
     if (typeof result === 'string') {
@@ -50,6 +71,43 @@ export class IndicatorCalculator {
       value: this.applyPrecision(result, precision),
       dataRange: this.dataSources,
     }
+  }
+
+  /**
+   * Walk the parsed AST and check that every indicator name it references is
+   * enabled by the migration flag. Data-access functions (CLOSE/HIGH/.../VOLUME)
+   * always go through the Rust path's pre-fetch callback, so they're not
+   * gated; only the indicator/statistic calls are.
+   */
+  private canRouteAllToRust(ast: ASTNode): boolean {
+    let allowed = true
+    const visit = (node: ASTNode): void => {
+      if (!allowed) return
+      switch (node.type) {
+        case 'function': {
+          if (INDICATOR_NAMES.has(node.name)) {
+            if (!shouldUseRustForIndicators([node.name as Parameters<typeof shouldUseRustForIndicators>[0][number]])) {
+              allowed = false
+              return
+            }
+          }
+          for (const a of node.args) visit(a)
+          break
+        }
+        case 'binaryOp':
+          visit(node.left)
+          visit(node.right)
+          break
+        case 'arrayAccess':
+          visit(node.array)
+          visit(node.index)
+          break
+        default:
+          break
+      }
+    }
+    visit(ast)
+    return allowed
   }
 
   private applyPrecision(
