@@ -95,6 +95,8 @@ export interface HeartbeatOpts {
 export interface Heartbeat {
   start(): Promise<void>
   stop(): void
+  /** Update heartbeat config (interval, prompt, etc.) and sync with cron job. */
+  updateConfig(newConfig: HeartbeatConfig): Promise<void>
   /** Hot-toggle heartbeat on/off (persists to config + updates cron job). */
   setEnabled(enabled: boolean): Promise<void>
   /** Current enabled state. */
@@ -106,7 +108,8 @@ export interface Heartbeat {
 // ==================== Factory ====================
 
 export function createHeartbeat(opts: HeartbeatOpts): Heartbeat {
-  const { config, connectorCenter, cronEngine, agentCenter, registry } = opts
+  let { config } = opts
+  const { connectorCenter, cronEngine, agentCenter, registry } = opts
   const session = opts.session ?? new SessionStore('heartbeat')
   const now = opts.now ?? Date.now
 
@@ -262,8 +265,15 @@ export function createHeartbeat(opts: HeartbeatOpts): Heartbeat {
       }
     },
 
+    async updateConfig(newConfig: HeartbeatConfig) {
+      config = { ...newConfig }
+      enabled = config.enabled
+      await ensureJobAndListener()
+    },
+
     async setEnabled(newEnabled: boolean) {
       enabled = newEnabled
+      config.enabled = newEnabled
 
       // Ensure infrastructure exists (handles cold enable when start() was called with disabled)
       await ensureJobAndListener()
