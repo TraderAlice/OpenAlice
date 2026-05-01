@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/main.ts",
     "dev:ui": "pnpm --filter open-alice-ui dev",
-    "predev": "turbo run build --filter=@traderalice/opentypebb --filter=@traderalice/ibkr",
+    "predev": "turbo run build --filter=@traderalice/opentypebb --filter=@traderalice/ibkr-types --filter=@traderalice/ibkr-client --filter=@traderalice/ibkr",
     "build": "turbo run build && tsup src/main.ts --format esm --dts",
     "start": "node dist/main.js",
     "test": "vitest run",
