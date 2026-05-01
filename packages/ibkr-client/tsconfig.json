@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "esModuleInterop": true,
+    "strict": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "sourceMap": true
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist", "ref", "**/*.test.ts", "**/*.spec.ts"]
+}

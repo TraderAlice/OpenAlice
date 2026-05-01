@@ -1,0 +1,37 @@
+{
+  "name": "@traderalice/ibkr-types",
+  "version": "0.1.0",
+  "description": "TypeScript IBKR TWS API — pure data models, sentinels, enums (no I/O)",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TraderAlice/OpenAlice.git",
+    "directory": "packages/ibkr-types"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc",
+    "test": "vitest run --config vitest.config.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "decimal.js": "^10.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.6"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "license": "AGPL-3.0"
+}
