@@ -1,0 +1,52 @@
+{
+  "category": "adversarial",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "filled",
+  "name": "SELL LMT adversarial qty-8dp on TSLA — btc-style 8dp",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "aliceId": "alpaca-paper|TSLA",
+      "currency": "USD",
+      "exchange": "NASDAQ",
+      "secType": "STK",
+      "symbol": "TSLA"
+    },
+    "order": {
+      "action": "SELL",
+      "auxPrice": {
+        "kind": "unset"
+      },
+      "cashQty": {
+        "kind": "unset"
+      },
+      "lmtPrice": {
+        "kind": "value",
+        "value": "67000"
+      },
+      "orderType": "LMT",
+      "tif": "GTC",
+      "totalQuantity": {
+        "kind": "value",
+        "value": "0.12345678"
+      },
+      "trailStopPrice": {
+        "kind": "unset"
+      },
+      "trailingPercent": {
+        "kind": "unset"
+      }
+    }
+  },
+  "tags": [
+    "SELL",
+    "LMT",
+    "adversarial",
+    "qty-8dp",
+    "STK",
+    "pass"
+  ]
+}

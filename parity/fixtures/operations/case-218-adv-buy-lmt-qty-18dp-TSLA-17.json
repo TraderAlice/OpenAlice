@@ -1,0 +1,52 @@
+{
+  "category": "adversarial",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "filled",
+  "name": "BUY LMT adversarial qty-18dp on TSLA — eth-style 18dp",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "aliceId": "alpaca-paper|TSLA",
+      "currency": "USD",
+      "exchange": "NASDAQ",
+      "secType": "STK",
+      "symbol": "TSLA"
+    },
+    "order": {
+      "action": "BUY",
+      "auxPrice": {
+        "kind": "unset"
+      },
+      "cashQty": {
+        "kind": "unset"
+      },
+      "lmtPrice": {
+        "kind": "value",
+        "value": "3500"
+      },
+      "orderType": "LMT",
+      "tif": "DAY",
+      "totalQuantity": {
+        "kind": "value",
+        "value": "0.000000000000000001"
+      },
+      "trailStopPrice": {
+        "kind": "unset"
+      },
+      "trailingPercent": {
+        "kind": "unset"
+      }
+    }
+  },
+  "tags": [
+    "BUY",
+    "LMT",
+    "adversarial",
+    "qty-18dp",
+    "STK",
+    "pass"
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "category": "adversarial",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "filled",
+  "name": "SELL LMT adversarial price-12dp on AAPL — 12dp price",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "aliceId": "alpaca-paper|AAPL",
+      "currency": "USD",
+      "exchange": "NASDAQ",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "SELL",
+      "auxPrice": {
+        "kind": "unset"
+      },
+      "cashQty": {
+        "kind": "unset"
+      },
+      "lmtPrice": {
+        "kind": "value",
+        "value": "0.000000123456"
+      },
+      "orderType": "LMT",
+      "tif": "GTC",
+      "totalQuantity": {
+        "kind": "value",
+        "value": "1"
+      },
+      "trailStopPrice": {
+        "kind": "unset"
+      },
+      "trailingPercent": {
+        "kind": "unset"
+      }
+    }
+  },
+  "tags": [
+    "SELL",
+    "LMT",
+    "adversarial",
+    "price-12dp",
+    "STK",
+    "pass"
+  ]
+}

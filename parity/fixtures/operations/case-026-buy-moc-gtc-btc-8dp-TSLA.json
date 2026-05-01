@@ -1,0 +1,50 @@
+{
+  "category": "core-buy",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "filled",
+  "name": "BUY MOC GTC on TSLA (btc-8dp)",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "aliceId": "alpaca-paper|TSLA",
+      "currency": "USD",
+      "exchange": "NASDAQ",
+      "secType": "STK",
+      "symbol": "TSLA"
+    },
+    "order": {
+      "action": "BUY",
+      "auxPrice": {
+        "kind": "unset"
+      },
+      "cashQty": {
+        "kind": "unset"
+      },
+      "lmtPrice": {
+        "kind": "unset"
+      },
+      "orderType": "MOC",
+      "tif": "GTC",
+      "totalQuantity": {
+        "kind": "value",
+        "value": "0.00012345"
+      },
+      "trailStopPrice": {
+        "kind": "unset"
+      },
+      "trailingPercent": {
+        "kind": "unset"
+      }
+    }
+  },
+  "tags": [
+    "BUY",
+    "MOC",
+    "GTC",
+    "btc-8dp",
+    "STK"
+  ]
+}

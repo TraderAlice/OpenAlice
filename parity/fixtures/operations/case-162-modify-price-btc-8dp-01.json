@@ -1,0 +1,24 @@
+{
+  "category": "modifyOrder",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "submitted",
+  "name": "modifyOrder price change (btc-8dp) #1",
+  "operation": {
+    "action": "modifyOrder",
+    "changes": {
+      "lmtPrice": {
+        "kind": "value",
+        "value": "67234.5"
+      }
+    },
+    "orderId": "mock-1001"
+  },
+  "tags": [
+    "modifyOrder",
+    "price",
+    "btc-8dp"
+  ]
+}

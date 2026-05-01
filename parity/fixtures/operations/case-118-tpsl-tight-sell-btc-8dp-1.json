@@ -1,0 +1,67 @@
+{
+  "category": "tpsl-extra",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "filled",
+  "name": "SELL LMT GTC tight bracket #1",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "aliceId": "alpaca-paper|TSLA",
+      "currency": "USD",
+      "exchange": "NASDAQ",
+      "secType": "STK",
+      "symbol": "TSLA"
+    },
+    "order": {
+      "action": "SELL",
+      "auxPrice": {
+        "kind": "unset"
+      },
+      "cashQty": {
+        "kind": "unset"
+      },
+      "lmtPrice": {
+        "kind": "value",
+        "value": "67234.5"
+      },
+      "orderType": "LMT",
+      "tif": "GTC",
+      "totalQuantity": {
+        "kind": "value",
+        "value": "0.00012345"
+      },
+      "trailStopPrice": {
+        "kind": "unset"
+      },
+      "trailingPercent": {
+        "kind": "unset"
+      }
+    },
+    "tpsl": {
+      "stopLoss": {
+        "price": {
+          "kind": "value",
+          "value": "60511.05"
+        }
+      },
+      "takeProfit": {
+        "price": {
+          "kind": "value",
+          "value": "73957.95"
+        }
+      }
+    }
+  },
+  "tags": [
+    "SELL",
+    "LMT",
+    "GTC",
+    "TP+SL",
+    "btc-8dp",
+    "STK",
+    "tight"
+  ]
+}

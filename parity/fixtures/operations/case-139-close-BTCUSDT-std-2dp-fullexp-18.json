@@ -1,0 +1,29 @@
+{
+  "category": "closePosition",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "filled",
+  "name": "closePosition full-explicit BTC/USDT (std-2dp) #18",
+  "operation": {
+    "action": "closePosition",
+    "contract": {
+      "aliceId": "bybit-main|BTC/USDT",
+      "currency": "USDT",
+      "exchange": "bybit",
+      "secType": "CRYPTO",
+      "symbol": "BTC/USDT"
+    },
+    "quantity": {
+      "kind": "value",
+      "value": "100"
+    }
+  },
+  "tags": [
+    "closePosition",
+    "std-2dp",
+    "CRYPTO",
+    "full-explicit"
+  ]
+}

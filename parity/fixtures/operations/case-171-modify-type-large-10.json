@@ -1,0 +1,25 @@
+{
+  "category": "modifyOrder",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "submitted",
+  "name": "modifyOrder type change (large) #10",
+  "operation": {
+    "action": "modifyOrder",
+    "changes": {
+      "lmtPrice": {
+        "kind": "value",
+        "value": "1.5"
+      },
+      "orderType": "LMT"
+    },
+    "orderId": "mock-1010"
+  },
+  "tags": [
+    "modifyOrder",
+    "type",
+    "large"
+  ]
+}

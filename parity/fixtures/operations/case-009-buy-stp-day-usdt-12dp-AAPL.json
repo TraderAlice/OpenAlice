@@ -1,0 +1,51 @@
+{
+  "category": "core-buy",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "filled",
+  "name": "BUY STP DAY on AAPL (usdt-12dp)",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "aliceId": "alpaca-paper|AAPL",
+      "currency": "USD",
+      "exchange": "NASDAQ",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "BUY",
+      "auxPrice": {
+        "kind": "value",
+        "value": "0.999875"
+      },
+      "cashQty": {
+        "kind": "unset"
+      },
+      "lmtPrice": {
+        "kind": "unset"
+      },
+      "orderType": "STP",
+      "tif": "DAY",
+      "totalQuantity": {
+        "kind": "value",
+        "value": "0.000000123456"
+      },
+      "trailStopPrice": {
+        "kind": "unset"
+      },
+      "trailingPercent": {
+        "kind": "unset"
+      }
+    }
+  },
+  "tags": [
+    "BUY",
+    "STP",
+    "DAY",
+    "usdt-12dp",
+    "STK"
+  ]
+}

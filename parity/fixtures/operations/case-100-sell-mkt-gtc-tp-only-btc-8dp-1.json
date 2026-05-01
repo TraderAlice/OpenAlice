@@ -1,0 +1,59 @@
+{
+  "category": "tpsl",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "filled",
+  "name": "SELL MKT GTC TP-only on ETH/USDT (btc-8dp) #1",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "aliceId": "bybit-main|ETH/USDT",
+      "currency": "USDT",
+      "exchange": "bybit",
+      "secType": "CRYPTO",
+      "symbol": "ETH/USDT"
+    },
+    "order": {
+      "action": "SELL",
+      "auxPrice": {
+        "kind": "unset"
+      },
+      "cashQty": {
+        "kind": "unset"
+      },
+      "lmtPrice": {
+        "kind": "unset"
+      },
+      "orderType": "MKT",
+      "tif": "GTC",
+      "totalQuantity": {
+        "kind": "value",
+        "value": "0.00012345"
+      },
+      "trailStopPrice": {
+        "kind": "unset"
+      },
+      "trailingPercent": {
+        "kind": "unset"
+      }
+    },
+    "tpsl": {
+      "takeProfit": {
+        "price": {
+          "kind": "value",
+          "value": "70596.225"
+        }
+      }
+    }
+  },
+  "tags": [
+    "SELL",
+    "MKT",
+    "GTC",
+    "TP-only",
+    "btc-8dp",
+    "CRYPTO"
+  ]
+}

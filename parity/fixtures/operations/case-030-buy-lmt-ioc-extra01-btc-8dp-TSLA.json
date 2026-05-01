@@ -1,0 +1,52 @@
+{
+  "category": "core-buy-extra",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "filled",
+  "name": "BUY LMT IOC extra 1 on TSLA (btc-8dp)",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "aliceId": "alpaca-paper|TSLA",
+      "currency": "USD",
+      "exchange": "NASDAQ",
+      "secType": "STK",
+      "symbol": "TSLA"
+    },
+    "order": {
+      "action": "BUY",
+      "auxPrice": {
+        "kind": "unset"
+      },
+      "cashQty": {
+        "kind": "unset"
+      },
+      "lmtPrice": {
+        "kind": "value",
+        "value": "67234.5"
+      },
+      "orderType": "LMT",
+      "tif": "IOC",
+      "totalQuantity": {
+        "kind": "value",
+        "value": "0.00012345"
+      },
+      "trailStopPrice": {
+        "kind": "unset"
+      },
+      "trailingPercent": {
+        "kind": "unset"
+      }
+    }
+  },
+  "tags": [
+    "BUY",
+    "LMT",
+    "IOC",
+    "btc-8dp",
+    "STK",
+    "extra"
+  ]
+}

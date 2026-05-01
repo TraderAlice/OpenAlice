@@ -1,0 +1,51 @@
+{
+  "category": "core-buy",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "filled",
+  "name": "BUY TRAIL DAY on AAPL (large)",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "aliceId": "alpaca-paper|AAPL",
+      "currency": "USD",
+      "exchange": "NASDAQ",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "BUY",
+      "auxPrice": {
+        "kind": "unset"
+      },
+      "cashQty": {
+        "kind": "unset"
+      },
+      "lmtPrice": {
+        "kind": "unset"
+      },
+      "orderType": "TRAIL",
+      "tif": "DAY",
+      "totalQuantity": {
+        "kind": "value",
+        "value": "1000000000000000000000000000000"
+      },
+      "trailStopPrice": {
+        "kind": "unset"
+      },
+      "trailingPercent": {
+        "kind": "value",
+        "value": "1.5"
+      }
+    }
+  },
+  "tags": [
+    "BUY",
+    "TRAIL",
+    "DAY",
+    "large",
+    "STK"
+  ]
+}

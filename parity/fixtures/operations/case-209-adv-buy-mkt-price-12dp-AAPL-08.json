@@ -1,0 +1,51 @@
+{
+  "category": "adversarial",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "filled",
+  "name": "BUY MKT adversarial price-12dp on AAPL — 12dp price",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "aliceId": "alpaca-paper|AAPL",
+      "currency": "USD",
+      "exchange": "NASDAQ",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "BUY",
+      "auxPrice": {
+        "kind": "unset"
+      },
+      "cashQty": {
+        "kind": "unset"
+      },
+      "lmtPrice": {
+        "kind": "unset"
+      },
+      "orderType": "MKT",
+      "tif": "DAY",
+      "totalQuantity": {
+        "kind": "value",
+        "value": "1"
+      },
+      "trailStopPrice": {
+        "kind": "unset"
+      },
+      "trailingPercent": {
+        "kind": "unset"
+      }
+    }
+  },
+  "tags": [
+    "BUY",
+    "MKT",
+    "adversarial",
+    "price-12dp",
+    "STK",
+    "pass"
+  ]
+}

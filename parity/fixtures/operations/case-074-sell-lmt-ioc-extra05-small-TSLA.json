@@ -1,0 +1,52 @@
+{
+  "category": "core-sell-extra",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "filled",
+  "name": "SELL LMT IOC extra 5 on TSLA (small)",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "aliceId": "alpaca-paper|TSLA",
+      "currency": "USD",
+      "exchange": "NASDAQ",
+      "secType": "STK",
+      "symbol": "TSLA"
+    },
+    "order": {
+      "action": "SELL",
+      "auxPrice": {
+        "kind": "unset"
+      },
+      "cashQty": {
+        "kind": "unset"
+      },
+      "lmtPrice": {
+        "kind": "value",
+        "value": "0.0001"
+      },
+      "orderType": "LMT",
+      "tif": "IOC",
+      "totalQuantity": {
+        "kind": "value",
+        "value": "0.000000000000000000000000000001"
+      },
+      "trailStopPrice": {
+        "kind": "unset"
+      },
+      "trailingPercent": {
+        "kind": "unset"
+      }
+    }
+  },
+  "tags": [
+    "SELL",
+    "LMT",
+    "IOC",
+    "small",
+    "STK",
+    "extra"
+  ]
+}

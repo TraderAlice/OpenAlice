@@ -1,0 +1,21 @@
+{
+  "category": "modifyOrder",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "submitted",
+  "name": "modifyOrder tif change (btc-8dp) #19",
+  "operation": {
+    "action": "modifyOrder",
+    "changes": {
+      "tif": "GTC"
+    },
+    "orderId": "mock-1019"
+  },
+  "tags": [
+    "modifyOrder",
+    "tif",
+    "btc-8dp"
+  ]
+}

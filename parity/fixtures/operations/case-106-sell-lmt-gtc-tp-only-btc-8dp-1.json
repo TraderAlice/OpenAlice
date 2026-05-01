@@ -1,0 +1,60 @@
+{
+  "category": "tpsl",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "filled",
+  "name": "SELL LMT GTC TP-only on TSLA (btc-8dp) #1",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "aliceId": "alpaca-paper|TSLA",
+      "currency": "USD",
+      "exchange": "NASDAQ",
+      "secType": "STK",
+      "symbol": "TSLA"
+    },
+    "order": {
+      "action": "SELL",
+      "auxPrice": {
+        "kind": "unset"
+      },
+      "cashQty": {
+        "kind": "unset"
+      },
+      "lmtPrice": {
+        "kind": "value",
+        "value": "67234.5"
+      },
+      "orderType": "LMT",
+      "tif": "GTC",
+      "totalQuantity": {
+        "kind": "value",
+        "value": "0.00012345"
+      },
+      "trailStopPrice": {
+        "kind": "unset"
+      },
+      "trailingPercent": {
+        "kind": "unset"
+      }
+    },
+    "tpsl": {
+      "takeProfit": {
+        "price": {
+          "kind": "value",
+          "value": "70596.225"
+        }
+      }
+    }
+  },
+  "tags": [
+    "SELL",
+    "LMT",
+    "GTC",
+    "TP-only",
+    "btc-8dp",
+    "STK"
+  ]
+}

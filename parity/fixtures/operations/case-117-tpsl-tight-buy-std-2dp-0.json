@@ -1,0 +1,67 @@
+{
+  "category": "tpsl-extra",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "filled",
+  "name": "BUY LMT GTC tight bracket #0",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "aliceId": "alpaca-paper|AAPL",
+      "currency": "USD",
+      "exchange": "NASDAQ",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "BUY",
+      "auxPrice": {
+        "kind": "unset"
+      },
+      "cashQty": {
+        "kind": "unset"
+      },
+      "lmtPrice": {
+        "kind": "value",
+        "value": "50.25"
+      },
+      "orderType": "LMT",
+      "tif": "GTC",
+      "totalQuantity": {
+        "kind": "value",
+        "value": "100"
+      },
+      "trailStopPrice": {
+        "kind": "unset"
+      },
+      "trailingPercent": {
+        "kind": "unset"
+      }
+    },
+    "tpsl": {
+      "stopLoss": {
+        "price": {
+          "kind": "value",
+          "value": "45.225"
+        }
+      },
+      "takeProfit": {
+        "price": {
+          "kind": "value",
+          "value": "55.275"
+        }
+      }
+    }
+  },
+  "tags": [
+    "BUY",
+    "LMT",
+    "GTC",
+    "TP+SL",
+    "std-2dp",
+    "STK",
+    "tight"
+  ]
+}

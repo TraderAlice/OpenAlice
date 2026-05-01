@@ -1,0 +1,60 @@
+{
+  "category": "tpsl",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "filled",
+  "name": "BUY STP GTC TP-only on AAPL (std-2dp) #0",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "aliceId": "alpaca-paper|AAPL",
+      "currency": "USD",
+      "exchange": "NASDAQ",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "BUY",
+      "auxPrice": {
+        "kind": "value",
+        "value": "50.25"
+      },
+      "cashQty": {
+        "kind": "unset"
+      },
+      "lmtPrice": {
+        "kind": "unset"
+      },
+      "orderType": "STP",
+      "tif": "GTC",
+      "totalQuantity": {
+        "kind": "value",
+        "value": "100"
+      },
+      "trailStopPrice": {
+        "kind": "unset"
+      },
+      "trailingPercent": {
+        "kind": "unset"
+      }
+    },
+    "tpsl": {
+      "takeProfit": {
+        "price": {
+          "kind": "value",
+          "value": "52.7625"
+        }
+      }
+    }
+  },
+  "tags": [
+    "BUY",
+    "STP",
+    "GTC",
+    "TP-only",
+    "std-2dp",
+    "STK"
+  ]
+}

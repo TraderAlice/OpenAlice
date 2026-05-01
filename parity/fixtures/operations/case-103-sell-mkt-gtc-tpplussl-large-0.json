@@ -1,0 +1,65 @@
+{
+  "category": "tpsl",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "filled",
+  "name": "SELL MKT GTC TP+SL on BTC/USDT (large) #0",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "aliceId": "bybit-main|BTC/USDT",
+      "currency": "USDT",
+      "exchange": "bybit",
+      "secType": "CRYPTO",
+      "symbol": "BTC/USDT"
+    },
+    "order": {
+      "action": "SELL",
+      "auxPrice": {
+        "kind": "unset"
+      },
+      "cashQty": {
+        "kind": "unset"
+      },
+      "lmtPrice": {
+        "kind": "unset"
+      },
+      "orderType": "MKT",
+      "tif": "GTC",
+      "totalQuantity": {
+        "kind": "value",
+        "value": "1000000000000000000000000000000"
+      },
+      "trailStopPrice": {
+        "kind": "unset"
+      },
+      "trailingPercent": {
+        "kind": "unset"
+      }
+    },
+    "tpsl": {
+      "stopLoss": {
+        "price": {
+          "kind": "value",
+          "value": "1.425"
+        }
+      },
+      "takeProfit": {
+        "price": {
+          "kind": "value",
+          "value": "1.575"
+        }
+      }
+    }
+  },
+  "tags": [
+    "SELL",
+    "MKT",
+    "GTC",
+    "TP+SL",
+    "large",
+    "CRYPTO"
+  ]
+}

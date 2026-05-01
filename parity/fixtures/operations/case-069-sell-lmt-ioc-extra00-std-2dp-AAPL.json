@@ -1,0 +1,52 @@
+{
+  "category": "core-sell-extra",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "filled",
+  "name": "SELL LMT IOC extra 0 on AAPL (std-2dp)",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "aliceId": "alpaca-paper|AAPL",
+      "currency": "USD",
+      "exchange": "NASDAQ",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "SELL",
+      "auxPrice": {
+        "kind": "unset"
+      },
+      "cashQty": {
+        "kind": "unset"
+      },
+      "lmtPrice": {
+        "kind": "value",
+        "value": "50.25"
+      },
+      "orderType": "LMT",
+      "tif": "IOC",
+      "totalQuantity": {
+        "kind": "value",
+        "value": "100"
+      },
+      "trailStopPrice": {
+        "kind": "unset"
+      },
+      "trailingPercent": {
+        "kind": "unset"
+      }
+    }
+  },
+  "tags": [
+    "SELL",
+    "LMT",
+    "IOC",
+    "std-2dp",
+    "STK",
+    "extra"
+  ]
+}

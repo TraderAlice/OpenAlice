@@ -1,0 +1,51 @@
+{
+  "category": "core-sell",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "filled",
+  "name": "SELL STP GTD on ETH/USDT (small)",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "aliceId": "bybit-main|ETH/USDT",
+      "currency": "USDT",
+      "exchange": "bybit",
+      "secType": "CRYPTO",
+      "symbol": "ETH/USDT"
+    },
+    "order": {
+      "action": "SELL",
+      "auxPrice": {
+        "kind": "value",
+        "value": "0.0001"
+      },
+      "cashQty": {
+        "kind": "unset"
+      },
+      "lmtPrice": {
+        "kind": "unset"
+      },
+      "orderType": "STP",
+      "tif": "GTD",
+      "totalQuantity": {
+        "kind": "value",
+        "value": "0.000000000000000000000000000001"
+      },
+      "trailStopPrice": {
+        "kind": "unset"
+      },
+      "trailingPercent": {
+        "kind": "unset"
+      }
+    }
+  },
+  "tags": [
+    "SELL",
+    "STP",
+    "GTD",
+    "small",
+    "CRYPTO"
+  ]
+}

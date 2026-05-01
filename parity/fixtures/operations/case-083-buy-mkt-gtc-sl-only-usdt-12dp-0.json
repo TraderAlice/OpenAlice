@@ -1,0 +1,59 @@
+{
+  "category": "tpsl",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "filled",
+  "name": "BUY MKT GTC SL-only on BTC/USDT (usdt-12dp) #0",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "aliceId": "bybit-main|BTC/USDT",
+      "currency": "USDT",
+      "exchange": "bybit",
+      "secType": "CRYPTO",
+      "symbol": "BTC/USDT"
+    },
+    "order": {
+      "action": "BUY",
+      "auxPrice": {
+        "kind": "unset"
+      },
+      "cashQty": {
+        "kind": "unset"
+      },
+      "lmtPrice": {
+        "kind": "unset"
+      },
+      "orderType": "MKT",
+      "tif": "GTC",
+      "totalQuantity": {
+        "kind": "value",
+        "value": "0.000000123456"
+      },
+      "trailStopPrice": {
+        "kind": "unset"
+      },
+      "trailingPercent": {
+        "kind": "unset"
+      }
+    },
+    "tpsl": {
+      "stopLoss": {
+        "price": {
+          "kind": "value",
+          "value": "0.94988125"
+        }
+      }
+    }
+  },
+  "tags": [
+    "BUY",
+    "MKT",
+    "GTC",
+    "SL-only",
+    "usdt-12dp",
+    "CRYPTO"
+  ]
+}

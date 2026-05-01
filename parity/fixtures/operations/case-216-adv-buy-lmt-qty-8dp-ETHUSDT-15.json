@@ -1,0 +1,52 @@
+{
+  "category": "adversarial",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "filled",
+  "name": "BUY LMT adversarial qty-8dp on ETH/USDT — btc-style 8dp",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "aliceId": "bybit-main|ETH/USDT",
+      "currency": "USDT",
+      "exchange": "bybit",
+      "secType": "CRYPTO",
+      "symbol": "ETH/USDT"
+    },
+    "order": {
+      "action": "BUY",
+      "auxPrice": {
+        "kind": "unset"
+      },
+      "cashQty": {
+        "kind": "unset"
+      },
+      "lmtPrice": {
+        "kind": "value",
+        "value": "67000"
+      },
+      "orderType": "LMT",
+      "tif": "DAY",
+      "totalQuantity": {
+        "kind": "value",
+        "value": "0.12345678"
+      },
+      "trailStopPrice": {
+        "kind": "unset"
+      },
+      "trailingPercent": {
+        "kind": "unset"
+      }
+    }
+  },
+  "tags": [
+    "BUY",
+    "LMT",
+    "adversarial",
+    "qty-8dp",
+    "CRYPTO",
+    "pass"
+  ]
+}

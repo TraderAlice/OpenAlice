@@ -1,0 +1,52 @@
+{
+  "category": "core-sell",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "filled",
+  "name": "SELL TRAIL_LIMIT IOC on BTC/USDT (large)",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "aliceId": "bybit-main|BTC/USDT",
+      "currency": "USDT",
+      "exchange": "bybit",
+      "secType": "CRYPTO",
+      "symbol": "BTC/USDT"
+    },
+    "order": {
+      "action": "SELL",
+      "auxPrice": {
+        "kind": "unset"
+      },
+      "cashQty": {
+        "kind": "unset"
+      },
+      "lmtPrice": {
+        "kind": "unset"
+      },
+      "orderType": "TRAIL_LIMIT",
+      "tif": "IOC",
+      "totalQuantity": {
+        "kind": "value",
+        "value": "1000000000000000000000000000000"
+      },
+      "trailStopPrice": {
+        "kind": "value",
+        "value": "1.5"
+      },
+      "trailingPercent": {
+        "kind": "value",
+        "value": "2"
+      }
+    }
+  },
+  "tags": [
+    "SELL",
+    "TRAIL_LIMIT",
+    "IOC",
+    "large",
+    "CRYPTO"
+  ]
+}

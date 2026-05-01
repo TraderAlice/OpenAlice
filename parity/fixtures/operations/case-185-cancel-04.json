@@ -1,0 +1,16 @@
+{
+  "category": "cancelOrder",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "none"
+  },
+  "expectedStatus": "cancelled",
+  "name": "cancelOrder #4",
+  "operation": {
+    "action": "cancelOrder",
+    "orderId": "mock-2004"
+  },
+  "tags": [
+    "cancelOrder"
+  ]
+}

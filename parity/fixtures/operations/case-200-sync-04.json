@@ -1,0 +1,15 @@
+{
+  "category": "syncOrders",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "none"
+  },
+  "expectedStatus": "submitted",
+  "name": "syncOrders #4",
+  "operation": {
+    "action": "syncOrders"
+  },
+  "tags": [
+    "syncOrders"
+  ]
+}

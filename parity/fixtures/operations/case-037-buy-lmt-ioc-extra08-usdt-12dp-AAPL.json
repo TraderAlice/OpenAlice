@@ -1,0 +1,52 @@
+{
+  "category": "core-buy-extra",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "filled",
+  "name": "BUY LMT IOC extra 8 on AAPL (usdt-12dp)",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "aliceId": "alpaca-paper|AAPL",
+      "currency": "USD",
+      "exchange": "NASDAQ",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "BUY",
+      "auxPrice": {
+        "kind": "unset"
+      },
+      "cashQty": {
+        "kind": "unset"
+      },
+      "lmtPrice": {
+        "kind": "value",
+        "value": "0.999875"
+      },
+      "orderType": "LMT",
+      "tif": "IOC",
+      "totalQuantity": {
+        "kind": "value",
+        "value": "0.000000123456"
+      },
+      "trailStopPrice": {
+        "kind": "unset"
+      },
+      "trailingPercent": {
+        "kind": "unset"
+      }
+    }
+  },
+  "tags": [
+    "BUY",
+    "LMT",
+    "IOC",
+    "usdt-12dp",
+    "STK",
+    "extra"
+  ]
+}

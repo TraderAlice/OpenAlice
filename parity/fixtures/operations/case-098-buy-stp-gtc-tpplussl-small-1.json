@@ -1,0 +1,66 @@
+{
+  "category": "tpsl",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "filled",
+  "name": "BUY STP GTC TP+SL on TSLA (small) #1",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "aliceId": "alpaca-paper|TSLA",
+      "currency": "USD",
+      "exchange": "NASDAQ",
+      "secType": "STK",
+      "symbol": "TSLA"
+    },
+    "order": {
+      "action": "BUY",
+      "auxPrice": {
+        "kind": "value",
+        "value": "0.0001"
+      },
+      "cashQty": {
+        "kind": "unset"
+      },
+      "lmtPrice": {
+        "kind": "unset"
+      },
+      "orderType": "STP",
+      "tif": "GTC",
+      "totalQuantity": {
+        "kind": "value",
+        "value": "0.000000000000000000000000000001"
+      },
+      "trailStopPrice": {
+        "kind": "unset"
+      },
+      "trailingPercent": {
+        "kind": "unset"
+      }
+    },
+    "tpsl": {
+      "stopLoss": {
+        "price": {
+          "kind": "value",
+          "value": "0.000095"
+        }
+      },
+      "takeProfit": {
+        "price": {
+          "kind": "value",
+          "value": "0.000105"
+        }
+      }
+    }
+  },
+  "tags": [
+    "BUY",
+    "STP",
+    "GTC",
+    "TP+SL",
+    "small",
+    "STK"
+  ]
+}

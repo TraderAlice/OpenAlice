@@ -1,0 +1,51 @@
+{
+  "category": "core-buy",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "filled",
+  "name": "BUY STP IOC on BTC/USDT (large)",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "aliceId": "bybit-main|BTC/USDT",
+      "currency": "USDT",
+      "exchange": "bybit",
+      "secType": "CRYPTO",
+      "symbol": "BTC/USDT"
+    },
+    "order": {
+      "action": "BUY",
+      "auxPrice": {
+        "kind": "value",
+        "value": "1.5"
+      },
+      "cashQty": {
+        "kind": "unset"
+      },
+      "lmtPrice": {
+        "kind": "unset"
+      },
+      "orderType": "STP",
+      "tif": "IOC",
+      "totalQuantity": {
+        "kind": "value",
+        "value": "1000000000000000000000000000000"
+      },
+      "trailStopPrice": {
+        "kind": "unset"
+      },
+      "trailingPercent": {
+        "kind": "unset"
+      }
+    }
+  },
+  "tags": [
+    "BUY",
+    "STP",
+    "IOC",
+    "large",
+    "CRYPTO"
+  ]
+}

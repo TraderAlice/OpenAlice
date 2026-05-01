@@ -1,0 +1,25 @@
+{
+  "category": "modifyOrder",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "submitted",
+  "name": "modifyOrder type change (usdt-12dp) #2",
+  "operation": {
+    "action": "modifyOrder",
+    "changes": {
+      "lmtPrice": {
+        "kind": "value",
+        "value": "0.999875"
+      },
+      "orderType": "LMT"
+    },
+    "orderId": "mock-1002"
+  },
+  "tags": [
+    "modifyOrder",
+    "type",
+    "usdt-12dp"
+  ]
+}

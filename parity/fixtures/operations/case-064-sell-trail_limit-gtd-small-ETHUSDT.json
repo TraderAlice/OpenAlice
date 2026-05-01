@@ -1,0 +1,52 @@
+{
+  "category": "core-sell",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "filled",
+  "name": "SELL TRAIL_LIMIT GTD on ETH/USDT (small)",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "aliceId": "bybit-main|ETH/USDT",
+      "currency": "USDT",
+      "exchange": "bybit",
+      "secType": "CRYPTO",
+      "symbol": "ETH/USDT"
+    },
+    "order": {
+      "action": "SELL",
+      "auxPrice": {
+        "kind": "unset"
+      },
+      "cashQty": {
+        "kind": "unset"
+      },
+      "lmtPrice": {
+        "kind": "unset"
+      },
+      "orderType": "TRAIL_LIMIT",
+      "tif": "GTD",
+      "totalQuantity": {
+        "kind": "value",
+        "value": "0.000000000000000000000000000001"
+      },
+      "trailStopPrice": {
+        "kind": "value",
+        "value": "0.0001"
+      },
+      "trailingPercent": {
+        "kind": "value",
+        "value": "2"
+      }
+    }
+  },
+  "tags": [
+    "SELL",
+    "TRAIL_LIMIT",
+    "GTD",
+    "small",
+    "CRYPTO"
+  ]
+}
