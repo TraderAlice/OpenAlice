@@ -278,10 +278,75 @@ must encode "field absent" differently from "field present and unset".
 - Files under `packages/ibkr/src/decoder/`, `packages/ibkr/src/protobuf/`, `packages/ibkr/src/client/` — wire-protocol internals, sentinel-handling encapsulated within the package boundary.
 - `request-bridge.ts` Decimal usage (lines 86, 210, 448, 511, 553, 554) — internal-only; not on the persistence/hashing/FFI boundary.
 
+## Phase 1c followups — `.toFixed()` / `.toString()` audit
+
+These are the sites that produce class-(c) `Decimal-as-string` values
+(or class-(b) sentinel-bearing values that get string-encoded for an
+external API) using ad-hoc `.toFixed()` / `.toString()` instead of the
+`toCanonicalDecimalString` formatter that Phase 1c will introduce.
+Phase 1c must replace each of these to guarantee uniform canonical
+output across the persistence/hashing/FFI boundary. Sites that only
+format for log output (templates, error messages) do **not** need
+canonicalization and are excluded from this list.
+
+### Persistence/hash boundary — MUST switch to `toCanonicalDecimalString` in Phase 1c
+
+| File | Line(s) | What it does | Why it matters |
+|---|---|---|---|
+| `src/domain/trading/UnifiedTradingAccount.ts` | 476 | `filledQty = orderFilledQty.toFixed()` — feeds `OperationResult.filledQty` and from there into the persisted commit. | The whole point of (c) computed-only — must be canonical so v2 hashes (Phase 2) and Rust persistence (Phase 4d) verify. |
+| `src/domain/trading/brokers/alpaca/AlpacaBroker.ts` | 259, 261, 265, 269, 271, 274, 305, 306, 307, 308 | Order field stringification before sending to Alpaca (`qty`, `notional`, `limit_price`, `stop_price`, `trail_price`, `trail_percent`); modify-order patch builder. | Goes out over the wire to Alpaca and into persisted records; today uses bare `.toFixed()`. Sentinel checks present (`!order.lmtPrice.equals(UNSET_DECIMAL)`) but the formatter itself doesn't enforce no-exponent / canonical-zero rules. |
+| `src/domain/trading/brokers/alpaca/AlpacaBroker.ts` | 385, 386, 388, 405, 406 | `AccountInfo.{netLiquidation,totalCashValue,buyingPower}` and `Position.{avgCost,marketPrice}` via `new Decimal(...).toString()`. | Class (c) computed; flows into `GitState.netLiquidation` etc. on every `git push`. |
+| `src/domain/trading/brokers/ccxt/CcxtBroker.ts` | 387, 399, 734, 735 | `order.totalQuantity.toFixed()`, `order.cashQty.div(price).toFixed()` (qty-from-cash conversion), `unrealizedPnL.toString()`, `realizedPnL.toString()`. | CCXT-side (c) computed values bound for `GitState`. The qty-from-cash conversion is particularly sensitive — sub-satoshi precision matters on OKX/Bybit unified accounts. |
+| `src/domain/trading/brokers/ibkr/IbkrBroker.ts` | 289, 290, 291, 292, 293 | `unrealizedPnL`, `realizedPnL`, `buyingPower`, `initMarginReq`, `maintMarginReq` via `new Decimal(...).toString()`. | Class (c) computed; flows into `GitState` via `getAccountInfo()`. |
+| `src/domain/trading/brokers/ibkr/request-bridge.ts` | 466 | `marketValue: new Decimal(marketValue).abs().toString()`. | Class (c); flows into `Position.marketValue`. |
+
+Total: **~24 callsites** across 5 files (Alpaca, CCXT, IBKR brokers + UTA). All in the broker layer + UTA fill-extraction; none in `TradingGit` itself today (TradingGit just forwards what brokers produce).
+
+### Internal-only — stays as `.toFixed()` / `.toString()` in Phase 1c
+
+These are intentional and do **not** need canonicalization:
+
+| File | Line(s) | What it does | Why exempt |
+|---|---|---|---|
+| `packages/ibkr/src/utils.ts` | 135, 149 | TWS wire encoding helper (`val.toFixed(8)`, `val.toFixed()`). | TWS protocol-level wire encoding, kept inside the IBKR client package boundary. |
+| `packages/ibkr/src/comm.ts` | 62-64 | TWS protocol field encoder. | Same — IBKR wire-protocol internals. |
+| `packages/ibkr/src/decoder/account.ts` | 122-127 | TWS account-update decoder. | Internal to the IBKR decoder; resulting strings are re-wrapped in `new Decimal(...)` upstream and re-canonicalized at the broker→trading boundary in `IbkrBroker.getAccountInfo()` (already in the list above). |
+| `packages/ibkr/src/{order,contract,order-state}.ts` | various | `decimalMaxString(val)` helper for `toString()` debug output. | Used in class `toString()` methods for human display only — never on the wire to disk/FFI. |
+| `src/domain/trading/git/TradingGit.ts` | 245, 543, 559, 574 | Display-only formatting: commit message templates (`$${cashQty.toFixed()}`), price-change percent, worst-case message, equity-change percent. | These are user-facing message strings, not persisted scalars. Phase 1c does not need to touch them. |
+| `src/domain/trading/guards/max-position-size.ts` | 44 | Guard error message `${percent.toFixed(1)}%`. | Display-only error text. |
+| `src/domain/trading/__test__/e2e/*.ts` | various | Test-side `.toFixed()` for assertions and console logging. | Test code; not part of the production boundary. |
+| `src/domain/trading/git/TradingGit.spec.ts`, `UnifiedTradingAccount.spec.ts` | various | Test assertions on `Decimal.toFixed()`. | Test-side assertions; Phase 1c may want to migrate them to `toCanonicalDecimalString` for clarity but it is not required for parity. |
+
+### Why this matters for Phase 1c's audit
+
+The (c)-computed pattern today is:
+1. Broker SDK returns a string (or Number).
+2. Broker layer wraps it in `new Decimal(...)` for arithmetic.
+3. Broker layer emits `.toString()` or `.toFixed()` on the result.
+4. Result flows into `OperationResult` / `GitState` / `Position` strings.
+5. `TradingGit.push()` writes the resulting commit to disk.
+
+Step 3 is the leak. `.toString()` on a `Decimal` produces scientific
+notation for very small / very large values (`1e-30`, `1e30`);
+`.toFixed()` without an explicit dp count uses the value's own
+precision, which may or may not match the canonical no-exponent form.
+Both differ from `toCanonicalDecimalString` for adversarial inputs
+already covered by Phase 0 fixtures (`adversarial-decimal` cases in
+`parity/fixtures/operations/case-201..case-240`).
+
+Phase 1c's deliverable PR should:
+1. Add `import { toCanonicalDecimalString } from '@/domain/trading/canonical-decimal'` to each file in the "MUST switch" table.
+2. Replace each `.toFixed()` / `.toString()` callsite with `toCanonicalDecimalString(d)`.
+3. Verify by re-running `parity/run-ts.ts` on the operations fixtures and `diff`-ing the output before/after — the diff should be non-empty (Phase 1c is the moment canonical form first applies on the live path) and every changed line should be a normalization, not a correctness change.
+
 ## How this list was produced
 
 ```bash
 bash parity/scripts/scan-decimals.sh > /tmp/decimal-scan.txt
+# Plus a focused .toFixed() / .toString() sweep for the Phase 1c
+# followups section:
+rg -n '\.toFixed\(' packages/ibkr/src/ src/domain/trading/
+rg -n -B1 'Decimal.*\.toString\(' packages/ibkr/src/ src/domain/trading/
 # Then manual classification per the rubric, with cross-checks against:
 #   - packages/ibkr/src/{order,contract,execution,order-state}.ts
 #   - src/domain/trading/git/types.ts
