@@ -21,7 +21,7 @@ export default defineConfig({
         test: {
           name: 'node',
           environment: 'node',
-          include: ['src/**/*.spec.*', 'packages/**/*.spec.*'],
+          include: ['src/**/*.spec.*', 'packages/**/*.spec.*', 'parity/**/*.spec.*'],
           exclude: ['**/*.e2e.spec.*', '**/*.bbProvider.spec.*', '**/node_modules/**'],
         },
       },
