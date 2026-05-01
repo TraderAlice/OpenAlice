@@ -19,14 +19,21 @@ export { type TickType, TickTypeEnum, tickTypeToString } from './tick-type.js'
 export { AccountSummaryTags, AllTags } from './account-summary-tags.js'
 export { IneligibilityReason } from './ineligibility-reason.js'
 
-// Data models
-export { Contract, ContractDetails, ComboLeg, DeltaNeutralContract, ContractDescription } from './contract.js'
-export { Order, OrderComboLeg } from './order.js'
-export { OrderState, OrderAllocation } from './order-state.js'
-export { OrderCancel } from './order-cancel.js'
-export { Execution, ExecutionFilter } from './execution.js'
-export { CommissionAndFeesReport } from './commission-and-fees-report.js'
-export { ScannerSubscription, ScanData } from './scanner.js'
+// Data models — full file re-export so the wire-layer package and any future
+// consumer can pull every symbol (e.g. OrderCondition subclasses, FundAssetType,
+// COMPETE_AGAINST_BEST_OFFSET_UP_TO_MID, OptionExerciseType, etc.) without
+// chasing per-file named lists. The original @traderalice/ibkr package's
+// public surface was named-only, but those names suffice because consumers
+// (the OpenAlice host) never imported the auxiliary symbols. The wire-layer
+// package does need them, so widen the surface here.
+export * from './contract.js'
+export * from './order.js'
+export * from './order-state.js'
+export * from './order-cancel.js'
+export * from './order-condition.js'
+export * from './execution.js'
+export * from './commission-and-fees-report.js'
+export * from './scanner.js'
 export * from './common.js'
 
 // EWrapper interface (callback contract — no I/O implementation)

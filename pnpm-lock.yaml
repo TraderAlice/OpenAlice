@@ -156,31 +156,19 @@ importers:
 
   packages/ibkr:
     dependencies:
-      '@bufbuild/protobuf':
-        specifier: ^2.11.0
-        version: 2.11.0
-      decimal.js:
-        specifier: ^10.6.0
-        version: 10.6.0
-      protobufjs:
-        specifier: ^7.5.5
-        version: 7.5.5
+      '@traderalice/ibkr-client':
+        specifier: workspace:*
+        version: link:../ibkr-client
+      '@traderalice/ibkr-types':
+        specifier: workspace:*
+        version: link:../ibkr-types
     devDependencies:
       '@types/node':
         specifier: ^22.13.4
         version: 22.19.15
-      ts-proto:
-        specifier: ^2.11.5
-        version: 2.11.5
-      tsup:
-        specifier: ^8.4.0
-        version: 8.5.1(jiti@2.6.1)(postcss@8.5.10)(tsx@4.21.0)(typescript@5.9.3)
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
-      vitest:
-        specifier: ^3.0.6
-        version: 3.2.4(@types/node@22.19.15)(jiti@2.6.1)(jsdom@29.0.0)(lightningcss@1.32.0)(tsx@4.21.0)
 
   packages/ibkr-client:
     dependencies:

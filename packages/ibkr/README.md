@@ -1,8 +1,26 @@
 # @traderalice/ibkr
 
-TypeScript port of the official IBKR TWS API v10.44.01.
-
-Translated from the [official Python client](https://interactivebrokers.github.io/) — not a wrapper around a third-party library. Zero supply chain risk.
+> **Re-export shim.** Phase 1a of the Rust migration plan
+> ([RUST_MIGRATION_PLAN.v3.md](../../RUST_MIGRATION_PLAN.v3.md) §5) split
+> the original `@traderalice/ibkr` package into two:
+>
+> - [`@traderalice/ibkr-types`](../ibkr-types/README.md) — pure data
+>   models, sentinels, enums (no I/O).
+> - [`@traderalice/ibkr-client`](../ibkr-client/README.md) — wire
+>   protocol, connection, reader, decoder, request bridge, protobuf
+>   wrappers.
+>
+> This package now contains only `src/index.ts`, which re-exports both.
+> Existing call sites do not change:
+>
+> ```typescript
+> import { EClient, DefaultEWrapper, Contract } from '@traderalice/ibkr'
+> ```
+>
+> still resolves to the same symbols. The shim is intended to remain for
+> at least one minor release per Phase 8 of the migration plan, after
+> which it will be removed and consumers migrated to the two split
+> packages directly.
 
 ## Quick Start
 
@@ -31,101 +49,13 @@ contract.currency = 'USD'
 client.reqContractDetails(1, contract)
 ```
 
-## Architecture
+For documentation on the wire protocol, the dual text/protobuf protocol,
+the `client/` and `decoder/` subdivisions, the protobuf generator, the
+e2e test harness, and the reference source, see
+[`@traderalice/ibkr-client`](../ibkr-client/README.md). For documentation
+on the data models, sentinels, and enums, see
+[`@traderalice/ibkr-types`](../ibkr-types/README.md).
 
-```
-EClient  ──send──►  TWS/IB Gateway  ──respond──►  Decoder  ──call──►  EWrapper
-(requests)          (localhost TCP)                (parse)             (callbacks)
-```
+## License
 
-**EClient** encodes and sends requests. **Decoder** parses responses (text or protobuf) and calls methods on your **EWrapper** implementation. You override only the callbacks you care about.
-
-### Dual Protocol
-
-TWS v201+ uses protobuf for most messages. Older versions use a text protocol (`\0`-delimited fields). Both are fully implemented. The protocol is negotiated at handshake — you don't need to think about it.
-
-## Project Structure
-
-```
-src/
-├── client/                  # EClient — request encoding
-│   ├── base.ts              # Connection, handshake, sendMsg
-│   ├── encode.ts            # Shared contract field serialization
-│   ├── market-data.ts       # reqMktData, reqTickByTick, etc.
-│   ├── orders.ts            # placeOrder, cancelOrder, reqOpenOrders
-│   ├── account.ts           # reqAccountSummary, reqPositions, reqPnL
-│   ├── historical.ts        # reqHistoricalData, reqScanner, reqNews
-│   └── index.ts             # Assembles mixins onto EClient
-│
-├── decoder/                 # Decoder — response parsing
-│   ├── base.ts              # Decoder class, interpret(), processProtoBuf()
-│   ├── market-data.ts       # Tick, depth, market data type handlers
-│   ├── orders.ts            # Order status, open/completed order handlers
-│   ├── account.ts           # Account, position, PnL handlers
-│   ├── contract.ts          # Contract details, symbol samples handlers
-│   ├── execution.ts         # Execution, commission report handlers
-│   ├── historical.ts        # Historical data, realtime bars handlers
-│   ├── misc.ts              # News, scanner, verify, WSH, config handlers
-│   └── index.ts             # Assembles all handler groups
-│
-├── protobuf/                # Auto-generated from .proto (not in git)
-│   └── *.ts                 # 203 files, generated via `pnpm generate:proto`
-│
-├── wrapper.ts               # EWrapper interface + DefaultEWrapper
-├── order-decoder.ts         # Version-gated order field extraction
-├── comm.ts                  # Message framing (length prefix + NULL fields)
-├── connection.ts            # TCP socket wrapper (net.Socket)
-├── reader.ts                # Socket data → framed messages
-├── utils.ts                 # Field decode, formatting, validation
-│
-├── contract.ts, order.ts, execution.ts, ...  # Data models
-├── const.ts, errors.ts, server-versions.ts   # Constants
-├── message.ts               # IN/OUT message ID enums
-└── index.ts                 # Public API re-exports
-```
-
-### Why the split?
-
-Both `client/` and `decoder/` are split by message category (market-data, orders, account, etc.) instead of being single monolithic files. This keeps each file under 500 lines — manageable for both humans and AI-assisted development.
-
-## Reference Source
-
-`ref/` contains the official IBKR TWS API distribution (v10.44.01):
-
-- `ref/source/proto/` — 203 `.proto` files (protocol source of truth)
-- `ref/source/pythonclient/ibapi/` — Python client (translation reference)
-- `ref/samples/Python/Testbed/` — Usage examples
-
-Java/C++ sources are in `.gitignore` (available locally after extracting the TWS API zip).
-
-## Testing
-
-```bash
-pnpm test          # Unit tests (56 tests, no external deps)
-pnpm test:e2e      # Integration tests (needs TWS/IB Gateway running)
-pnpm test:all      # Both
-```
-
-E2e tests share a single TWS connection via `tests/e2e/setup.ts`. If TWS is not running, e2e tests skip automatically.
-
-### TWS Ports
-
-| Mode | TWS | IB Gateway |
-|------|-----|------------|
-| Paper | 7497 | 4002 |
-| Live | 7496 | 4001 |
-
-Configure via env: `TWS_HOST=127.0.0.1 TWS_PORT=7497`
-
-## Protobuf Generation
-
-The `src/protobuf/` directory is auto-generated and git-ignored. To regenerate:
-
-```bash
-brew install protobuf          # needs protoc
-pnpm generate:proto            # runs protoc with ts-proto plugin
-```
-
-## Relationship to Official API
-
-This is a mechanical translation of the official Python `ibapi` package. Method names, field names, and message IDs are kept identical for cross-reference. When debugging, you can compare any handler against the same-named method in `ref/source/pythonclient/ibapi/`.
+AGPL-3.0

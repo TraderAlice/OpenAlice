@@ -1,7 +1,7 @@
 {
   "name": "@traderalice/ibkr",
   "version": "0.1.0",
-  "description": "TypeScript port of IBKR TWS API v10.44.01",
+  "description": "Re-export shim for @traderalice/ibkr-types + @traderalice/ibkr-client (split in Phase 1a)",
   "type": "module",
   "exports": {
     ".": {
@@ -19,23 +19,15 @@
   },
   "scripts": {
     "build": "rm -rf dist && tsc",
-    "test": "vitest run --config vitest.config.ts",
-    "test:e2e": "vitest run --config vitest.e2e.config.ts",
-    "test:all": "vitest run --config vitest.config.ts && vitest run --config vitest.e2e.config.ts",
-    "typecheck": "tsc --noEmit",
-    "generate:proto": "bash generate-proto.sh"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@bufbuild/protobuf": "^2.11.0",
-    "decimal.js": "^10.6.0",
-    "protobufjs": "^7.5.5"
+    "@traderalice/ibkr-client": "workspace:*",
+    "@traderalice/ibkr-types": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.13.4",
-    "ts-proto": "^2.11.5",
-    "tsup": "^8.4.0",
-    "typescript": "^5.7.3",
-    "vitest": "^3.0.6"
+    "typescript": "^5.7.3"
   },
   "engines": {
     "node": ">=20.0.0"
