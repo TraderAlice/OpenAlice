@@ -229,4 +229,47 @@ the item when done — git log is the history.
       Those should be fixed independently regardless of whether the
       watcher project ever lands.
 
+## Rust trading-core migration
+
+- [ ] **[migration][env-blocker]** `pnpm test` cannot start vitest on macOS
+      Sequoia (Darwin 25.x) because `dlopen` rejects the prebuilt
+      `@rollup/rollup-darwin-arm64.node` with `not valid for use in
+      process: mapping process and mapped file (non-platform) have
+      different Team IDs`. Reproduces on a clean `master` checkout (not
+      caused by Phase-0 migration work — `pnpm test --
+      src/domain/trading/git/TradingGit.spec.ts` fails identically).
+
+      **Diagnosis:** the rollup native is hard-linked into pnpm's
+      content-addressed store at
+      `/Users/opcw05/Library/pnpm/store/v3` and carries
+      `com.apple.provenance`. macOS Sequoia treats binaries flagged with
+      provenance from a non-matching Team ID as un-mappable into a
+      hardened-runtime Node process.
+
+      **Tried (none worked):** (1) re-extract just
+      `@rollup+rollup-darwin-arm64`, (2) `xattr -c` + `codesign --force
+      --sign -` (signing succeeds, dlopen still rejects because pnpm's
+      hard links share the inode + xattr), (3) copy-out / delete /
+      copy-back to break the hard link + strip xattr + re-sign — same
+      result, (4) full `rm -rf node_modules pnpm-lock.yaml && pnpm
+      install` — same result.
+
+      **Impact on Phase-0 verification:** local `pnpm test` (DoD 0.V4) is
+      red. All other Phase-0 DoD checks (0.V1, 0.V2, 0.V3, 0.V5–0.V8)
+      verified locally via `pnpm tsx`-based scripts that bypass rollup.
+      The canonical-decimal-temp formatter is verified by
+      `pnpm tsx parity/check-canonical-decimal-temp.ts` (24 assertions
+      passing). When the env issue is resolved, the existing
+      `vitest.config.ts` already includes `parity/**/*.spec.*` so future
+      Phase-0+ specs auto-discover.
+
+      **Possible fixes for the maintainer to try:** (a) switch to
+      `pnpm config set node-linker hoisted` for the OpenAlice tree,
+      forcing real copies instead of content-store hard links;
+      (b) `xattr -d com.apple.provenance` recursively against the pnpm
+      store dir (`/Users/opcw05/Library/pnpm/store/v3`) before
+      `pnpm install`; (c) move to a vitest version whose native deps
+      ship without provenance; (d) accept that local CI is the source
+      of truth for `pnpm test` in Phase-0.
+
 ## (seed more areas as they come up)
