@@ -246,45 +246,61 @@ the item when done — git log is the history.
       for the full breakdown. Action: update PHASE0_PLAN.md §4 matrix
       to reflect actual class membership.
 
-- [ ] **[migration][env-blocker]** `pnpm test` cannot start vitest on macOS
-      Sequoia (Darwin 25.x) because `dlopen` rejects the prebuilt
-      `@rollup/rollup-darwin-arm64.node` with `not valid for use in
-      process: mapping process and mapped file (non-platform) have
-      different Team IDs`. Reproduces on a clean `master` checkout (not
-      caused by Phase-0 migration work — `pnpm test --
-      src/domain/trading/git/TradingGit.spec.ts` fails identically).
+- [ ] **[migration][platform-note]** Native-module dlopen requires a
+      Node binary built without hardened runtime + library validation.
+      Documented here so future migration phases shipping native modules
+      (Phase 3 napi-rs `.node` artifacts, Phase 4f event stream) don't
+      re-rediscover this from scratch.
 
-      **Diagnosis:** the rollup native is hard-linked into pnpm's
-      content-addressed store at
-      `/Users/opcw05/Library/pnpm/store/v3` and carries
-      `com.apple.provenance`. macOS Sequoia treats binaries flagged with
-      provenance from a non-matching Team ID as un-mappable into a
-      hardened-runtime Node process.
+      **Symptom (originally observed in Phase 0):** on macOS Sequoia
+      (Darwin 25.x), `pnpm test` failed to start vitest because `dlopen`
+      rejected the prebuilt `@rollup/rollup-darwin-arm64.node` with
+      `not valid for use in process: mapping process and mapped file
+      (non-platform) have different Team IDs`. Reproduced on a clean
+      `master` checkout — not Phase-0-induced.
 
-      **Tried (none worked):** (1) re-extract just
-      `@rollup+rollup-darwin-arm64`, (2) `xattr -c` + `codesign --force
-      --sign -` (signing succeeds, dlopen still rejects because pnpm's
-      hard links share the inode + xattr), (3) copy-out / delete /
-      copy-back to break the hard link + strip xattr + re-sign — same
-      result, (4) full `rm -rf node_modules pnpm-lock.yaml && pnpm
-      install` — same result.
+      **Root cause:** the offending Node binary at the front of `PATH`
+      (Codex Node v24, `/Users/opcw05/.local/bin/node`) was built with
+      `flags=runtime` (hardened runtime) and *without* the
+      `com.apple.security.cs.disable-library-validation` entitlement.
+      macOS Sequoia's library-validation policy then refuses any
+      third-party native module whose code signature does not chain to
+      the same Team ID as the host binary. `@rollup/rollup-darwin-arm64`
+      is ad-hoc-signed (no Team ID), so library validation rejects it.
+      pnpm's content-addressed store + `com.apple.provenance` xattr are
+      red herrings — they show up in the diagnostics but are not the
+      cause.
 
-      **Impact on Phase-0 verification:** local `pnpm test` (DoD 0.V4) is
-      red. All other Phase-0 DoD checks (0.V1, 0.V2, 0.V3, 0.V5–0.V8)
-      verified locally via `pnpm tsx`-based scripts that bypass rollup.
-      The canonical-decimal-temp formatter is verified by
-      `pnpm tsx parity/check-canonical-decimal-temp.ts` (24 assertions
-      passing). When the env issue is resolved, the existing
-      `vitest.config.ts` already includes `parity/**/*.spec.*` so future
-      Phase-0+ specs auto-discover.
+      **Resolved 2026-05-02:** install Homebrew Node 22
+      (`brew install node@22`) and put `/opt/homebrew/opt/node@22/bin`
+      ahead of any hardened-runtime Node on `PATH`. Homebrew Node is
+      ad-hoc signed without hardened runtime, so library validation
+      doesn't apply. `pnpm test src/domain/trading/git/TradingGit.spec.ts`
+      → 45/45 passed in ~500ms. `npx tsc --noEmit` likewise unblocked
+      because opentypebb's tsup uses the same rollup chain.
 
-      **Possible fixes for the maintainer to try:** (a) switch to
-      `pnpm config set node-linker hoisted` for the OpenAlice tree,
-      forcing real copies instead of content-store hard links;
-      (b) `xattr -d com.apple.provenance` recursively against the pnpm
-      store dir (`/Users/opcw05/Library/pnpm/store/v3`) before
-      `pnpm install`; (c) move to a vitest version whose native deps
-      ship without provenance; (d) accept that local CI is the source
-      of truth for `pnpm test` in Phase-0.
+      **Things that did NOT work** (kept for institutional memory):
+        1. Re-extracting just `@rollup+rollup-darwin-arm64`.
+        2. `xattr -c` + `codesign --force --sign -` (signing succeeds,
+           but library validation in the host process still rejects).
+        3. Copy-out / delete / copy-back to break the hard link + strip
+           xattr + re-sign.
+        4. Full `rm -rf node_modules pnpm-lock.yaml && pnpm install`.
+
+      **Forward guidance for future native-module phases:**
+        - The dev-machine Node must be ad-hoc signed without hardened
+          runtime, OR signed with the
+          `com.apple.security.cs.disable-library-validation` entitlement.
+          Homebrew Node and `nvm`-installed Node both qualify by default;
+          notarized/distributed Node binaries (Codex Node, anaconda Node,
+          some IDE-bundled Nodes) typically do not.
+        - Phase 3 (napi-rs) ships its own `.node` artifact built locally
+          via `cargo build` + `napi build`. Locally-built artifacts are
+          ad-hoc signed and load fine. The risk surface is *prebuilt*
+          third-party native modules pulled by transitive deps (rollup,
+          esbuild's native fallback paths, etc.).
+        - Document this as a precondition in any per-phase setup doc
+          that says "install Node and pnpm" — be explicit about Node
+          provenance.
 
 ## (seed more areas as they come up)

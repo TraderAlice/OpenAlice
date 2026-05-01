@@ -8,28 +8,57 @@ source and are invoked via `pnpm tsx`.
 The `parity/` tree is committed to the repository (it is reviewed in PRs and
 re-run by future migration phases) but is excluded from production bundling.
 
-## Known environment issue: `pnpm test` blocked on macOS Sequoia
+## Platform note: Node provenance and prebuilt native modules
 
-`pnpm test` (DoD command `0.V4`) currently cannot start vitest on this
-machine because macOS Sequoia rejects `dlopen` on the prebuilt
-`@rollup/rollup-darwin-arm64.node` with "Team IDs different". Reproduces
-on a clean `master` checkout — *not* a side-effect of the Phase-0 work.
-Full diagnosis + things-tried logged in [/TODO.md](../TODO.md) under the
-`[migration][env-blocker]` tag.
+Vitest 4 (and tsup, used by `@traderalice/opentypebb`'s build) pulls in
+prebuilt native `.node` files such as `@rollup/rollup-darwin-arm64`. On
+macOS, those prebuilts are ad-hoc signed and have no Team ID. If the
+*Node binary running them* is built with the hardened runtime and lacks
+the `com.apple.security.cs.disable-library-validation` entitlement,
+library validation refuses the load with an opaque `dlopen ... not
+valid for use in process: mapping process and mapped file (non-platform)
+have different Team IDs` error.
 
-**Workaround for Phase-0 local verification:** the canonical-decimal
-formatter is verified by a stand-alone `tsx` script that does not pull
-in vitest:
+This is a *platform constraint*, not a project bug. `xattr -c`,
+`codesign --force --sign -`, fresh installs, and pnpm-store gymnastics
+do **not** fix it — library validation runs at load time inside the
+host process, and the host process's signing flags decide policy.
+
+**Recommended setup:** use a Node binary built without hardened
+runtime — Homebrew (`brew install node@22`) or `nvm`-installed Node
+both qualify. Verify with:
 
 ```bash
-pnpm tsx parity/check-canonical-decimal-temp.ts
+codesign -dv "$(which node)" 2>&1 | grep -E 'flags|TeamIdentifier'
+# Want flags without `runtime`, or TeamIdentifier=not set.
+# If you see flags=0x10000(runtime) without an entitlement, swap Node.
 ```
 
-Exits 0 with `24 passed, 0 failed`. This is *not* a vitest spec
-(`*.spec.ts`) on purpose — it runs locally even when vitest is blocked.
-Once the env issue is resolved, the `vitest.config.ts` `node` project
-include glob already covers `parity/**/*.spec.*`, so any future Phase-0+
-specs are auto-discovered without further config changes.
+Notarized / distributed Node binaries (some IDE-bundled Nodes, agent
+tooling Nodes like Codex Node) typically have hardened runtime
+*enabled* without the disable-library-validation entitlement and will
+fail to load prebuilt third-party native modules. If that's your only
+option, prepend a Homebrew Node ahead of it on `PATH`:
+
+```bash
+export PATH="/opt/homebrew/opt/node@22/bin:$PATH"
+which node && node --version   # confirm Homebrew node@22 wins
+pnpm test                       # now works
+```
+
+If you can't change Node, the Phase 0 deliverables ship `tsx`-based
+verifiers that bypass vitest's native chain entirely:
+
+```bash
+pnpm tsx parity/check-canonical-decimal-temp.ts   # 24 passed, 0 failed
+pnpm tsx parity/load-legacy.ts                     # 7 passed, 0 failed
+pnpm tsx parity/run-ts.ts <fixture.json>           # deterministic harness
+```
+
+The full diagnosis (kept as institutional memory for future
+native-module phases — Phase 3 napi-rs and Phase 4f event stream will
+re-encounter the same constraint) is in [/TODO.md](../TODO.md) under
+the `[migration][platform-note]` tag.
 
 ## Layout
 
