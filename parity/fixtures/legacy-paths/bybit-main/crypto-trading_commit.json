@@ -1,0 +1,104 @@
+{
+  "commits": [
+    {
+      "hash": "aaaa1111",
+      "message": "BTC swing entry — sub-satoshi BUY MKT",
+      "operations": [
+        {
+          "action": "placeOrder",
+          "contract": {
+            "aliceId": "bybit-main|BTC/USDT",
+            "currency": "USDT",
+            "exchange": "bybit",
+            "secType": "CRYPTO",
+            "symbol": "BTC/USDT"
+          },
+          "order": {
+            "action": "BUY",
+            "orderType": "MKT",
+            "tif": "GTC",
+            "totalQuantity": "0.00012345"
+          }
+        }
+      ],
+      "parentHash": null,
+      "results": [
+        {
+          "action": "placeOrder",
+          "filledPrice": "67234.50",
+          "filledQty": "0.00012345",
+          "orderId": "1",
+          "status": "filled",
+          "success": true
+        }
+      ],
+      "stateAfter": {
+        "netLiquidation": "8.30307",
+        "pendingOrders": [],
+        "positions": [
+          {
+            "accountId": "bybit-main",
+            "avgCost": "67234.50",
+            "marketPrice": "67234.50",
+            "marketValue": "8.30307",
+            "quantity": "0.00012345",
+            "symbol": "BTC/USDT",
+            "unrealizedPnL": "0"
+          }
+        ],
+        "realizedPnL": "0",
+        "totalCashValue": "0.00074",
+        "unrealizedPnL": "0"
+      },
+      "timestamp": "2026-04-15T10:30:00.000Z"
+    },
+    {
+      "hash": "bbbb2222",
+      "message": "close BTC partial — realize tiny PnL",
+      "operations": [
+        {
+          "action": "closePosition",
+          "contract": {
+            "aliceId": "bybit-main|BTC/USDT",
+            "currency": "USDT",
+            "exchange": "bybit",
+            "secType": "CRYPTO",
+            "symbol": "BTC/USDT"
+          },
+          "quantity": "0.00006172"
+        }
+      ],
+      "parentHash": "aaaa1111",
+      "results": [
+        {
+          "action": "closePosition",
+          "filledPrice": "67500.00",
+          "filledQty": "0.00006172",
+          "orderId": "2",
+          "status": "filled",
+          "success": true
+        }
+      ],
+      "stateAfter": {
+        "netLiquidation": "8.32",
+        "pendingOrders": [],
+        "positions": [
+          {
+            "accountId": "bybit-main",
+            "avgCost": "67234.50",
+            "marketPrice": "67500.00",
+            "marketValue": "4.165",
+            "quantity": "0.00006173",
+            "symbol": "BTC/USDT",
+            "unrealizedPnL": "0.0163"
+          }
+        ],
+        "realizedPnL": "0.01636",
+        "totalCashValue": "4.165",
+        "unrealizedPnL": "0.0163"
+      },
+      "timestamp": "2026-04-15T11:15:00.000Z"
+    }
+  ],
+  "head": "aaaa1111"
+}
