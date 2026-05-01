@@ -303,4 +303,16 @@ the item when done — git log is the history.
           that says "install Node and pnpm" — be explicit about Node
           provenance.
 
+- [ ] **[migration]** `git-persistence.ts:18-22` — `LEGACY_GIT_PATHS` is
+      captured at module-load via bare `resolve()`, so tests can't
+      retarget the loader against a tmp directory via `process.chdir()`
+      without dynamic re-import gymnastics. Lift into a function
+      `getLegacyGitPaths(): Record<string, string>` (or `(cwd?: string)`
+      overload) so test harnesses can drive the loader against arbitrary
+      cwds cleanly. Phase 4d (Rust persistence) will re-own this layer;
+      the function form maps cleanly to a Rust
+      `LegacyGitPaths::resolve(cwd: &Path)`. Surfaced by phase0-impl
+      during T09 (`parity/load-legacy.ts`), which currently works around
+      the issue with a dynamic-import-after-chdir comment.
+
 ## (seed more areas as they come up)
