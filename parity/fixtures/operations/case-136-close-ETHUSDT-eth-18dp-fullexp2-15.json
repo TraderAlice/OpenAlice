@@ -1,0 +1,29 @@
+{
+  "category": "closePosition",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "filled",
+  "name": "closePosition full-explicit-2 ETH/USDT (eth-18dp) #15",
+  "operation": {
+    "action": "closePosition",
+    "contract": {
+      "aliceId": "bybit-main|ETH/USDT",
+      "currency": "USDT",
+      "exchange": "bybit",
+      "secType": "CRYPTO",
+      "symbol": "ETH/USDT"
+    },
+    "quantity": {
+      "kind": "value",
+      "value": "0.000000000000000001"
+    }
+  },
+  "tags": [
+    "closePosition",
+    "eth-18dp",
+    "CRYPTO",
+    "full-explicit-2"
+  ]
+}

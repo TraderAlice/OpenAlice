@@ -1,0 +1,29 @@
+{
+  "category": "closePosition",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "filled",
+  "name": "closePosition partial TSLA (btc-8dp) #37",
+  "operation": {
+    "action": "closePosition",
+    "contract": {
+      "aliceId": "alpaca-paper|TSLA",
+      "currency": "USD",
+      "exchange": "NASDAQ",
+      "secType": "STK",
+      "symbol": "TSLA"
+    },
+    "quantity": {
+      "kind": "value",
+      "value": "0.000061725"
+    }
+  },
+  "tags": [
+    "closePosition",
+    "btc-8dp",
+    "STK",
+    "partial"
+  ]
+}

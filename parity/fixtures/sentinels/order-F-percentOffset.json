@@ -1,0 +1,21 @@
+{
+  "carrier": "Order",
+  "field": "percentOffset",
+  "name": "Order.percentOffset = UNSET_DOUBLE",
+  "raw": {
+    "action": "BUY",
+    "clientId": 0,
+    "orderId": 0,
+    "orderType": "MKT",
+    "percentOffset": 1.7976931348623157e+308,
+    "permId": 0,
+    "tif": "DAY"
+  },
+  "sentinel": "UNSET_DOUBLE",
+  "wireExpected": {
+    "emit": {
+      "kind": "unset"
+    },
+    "field": "percentOffset"
+  }
+}

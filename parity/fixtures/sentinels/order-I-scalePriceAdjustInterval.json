@@ -1,0 +1,21 @@
+{
+  "carrier": "Order",
+  "field": "scalePriceAdjustInterval",
+  "name": "Order.scalePriceAdjustInterval = UNSET_INTEGER",
+  "raw": {
+    "action": "BUY",
+    "clientId": 0,
+    "orderId": 0,
+    "orderType": "MKT",
+    "permId": 0,
+    "scalePriceAdjustInterval": 2147483647,
+    "tif": "DAY"
+  },
+  "sentinel": "UNSET_INTEGER",
+  "wireExpected": {
+    "emit": {
+      "kind": "unset"
+    },
+    "field": "scalePriceAdjustInterval"
+  }
+}

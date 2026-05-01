@@ -1,0 +1,121 @@
+{
+  "commits": [
+    {
+      "hash": "cccc3333",
+      "message": "BUY 100 AAPL MKT (paper)",
+      "operations": [
+        {
+          "action": "placeOrder",
+          "contract": {
+            "aliceId": "alpaca-paper|AAPL",
+            "currency": "USD",
+            "exchange": "NASDAQ",
+            "primaryExchange": "NASDAQ",
+            "secType": "STK",
+            "symbol": "AAPL"
+          },
+          "order": {
+            "action": "BUY",
+            "orderType": "MKT",
+            "tif": "DAY",
+            "totalQuantity": "100"
+          }
+        }
+      ],
+      "parentHash": null,
+      "results": [
+        {
+          "action": "placeOrder",
+          "filledPrice": "180.50",
+          "filledQty": "100",
+          "orderId": "paper-1",
+          "status": "filled",
+          "success": true
+        }
+      ],
+      "stateAfter": {
+        "netLiquidation": "99950",
+        "pendingOrders": [],
+        "positions": [
+          {
+            "accountId": "alpaca-paper",
+            "avgCost": "180.50",
+            "marketPrice": "180.50",
+            "marketValue": "18050",
+            "quantity": "100",
+            "symbol": "AAPL",
+            "unrealizedPnL": "0"
+          }
+        ],
+        "realizedPnL": "0",
+        "totalCashValue": "81900",
+        "unrealizedPnL": "0"
+      },
+      "timestamp": "2026-04-16T14:30:00.000Z"
+    },
+    {
+      "hash": "dddd4444",
+      "message": "BUY 50 AAPL LMT @181 (paper)",
+      "operations": [
+        {
+          "action": "placeOrder",
+          "contract": {
+            "aliceId": "alpaca-paper|AAPL",
+            "currency": "USD",
+            "exchange": "NASDAQ",
+            "primaryExchange": "NASDAQ",
+            "secType": "STK",
+            "symbol": "AAPL"
+          },
+          "order": {
+            "action": "BUY",
+            "lmtPrice": "181",
+            "orderType": "LMT",
+            "tif": "GTC",
+            "totalQuantity": "50"
+          }
+        }
+      ],
+      "parentHash": "cccc3333",
+      "results": [
+        {
+          "action": "placeOrder",
+          "orderId": "paper-2",
+          "status": "submitted",
+          "success": true
+        }
+      ],
+      "stateAfter": {
+        "netLiquidation": "100050",
+        "pendingOrders": [
+          {
+            "accountId": "alpaca-paper",
+            "action": "BUY",
+            "lmtPrice": "181",
+            "orderId": "paper-2",
+            "orderType": "LMT",
+            "status": "submitted",
+            "symbol": "AAPL",
+            "totalQuantity": "50"
+          }
+        ],
+        "positions": [
+          {
+            "accountId": "alpaca-paper",
+            "avgCost": "180.50",
+            "marketPrice": "181.50",
+            "marketValue": "18150",
+            "quantity": "100",
+            "symbol": "AAPL",
+            "unrealizedPnL": "100"
+          }
+        ],
+        "realizedPnL": "0",
+        "totalCashValue": "72850",
+        "unrealizedPnL": "100"
+      },
+      "timestamp": "2026-04-16T15:00:00.000Z"
+    }
+  ],
+  "head": "cccc3333"
+}

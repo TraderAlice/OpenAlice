@@ -1,0 +1,14 @@
+{
+  "carrier": "OrderAllocation",
+  "name": "OrderAllocation populated",
+  "raw": {
+    "account": "paper-account-1",
+    "allowedAllocQty": "10",
+    "desiredAllocQty": "10",
+    "isMonetary": false,
+    "position": "100",
+    "positionAfter": "110",
+    "positionDesired": "110"
+  },
+  "stringified": "{\"account\":\"paper-account-1\",\"position\":\"100\",\"positionDesired\":\"110\",\"positionAfter\":\"110\",\"desiredAllocQty\":\"10\",\"allowedAllocQty\":\"10\",\"isMonetary\":false}"
+}

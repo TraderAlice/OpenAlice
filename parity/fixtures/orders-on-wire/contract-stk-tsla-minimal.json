@@ -1,0 +1,28 @@
+{
+  "carrier": "Contract",
+  "name": "Contract STK TSLA minimal",
+  "raw": {
+    "comboLegs": [],
+    "comboLegsDescrip": "",
+    "conId": 0,
+    "currency": "USD",
+    "deltaNeutralContract": null,
+    "description": "",
+    "exchange": "SMART",
+    "includeExpired": false,
+    "issuerId": "",
+    "lastTradeDate": "",
+    "lastTradeDateOrContractMonth": "",
+    "localSymbol": "",
+    "multiplier": "",
+    "primaryExchange": "NASDAQ",
+    "right": "",
+    "secId": "",
+    "secIdType": "",
+    "secType": "STK",
+    "strike": 1.7976931348623157e+308,
+    "symbol": "TSLA",
+    "tradingClass": ""
+  },
+  "stringified": "{\"conId\":0,\"symbol\":\"TSLA\",\"secType\":\"STK\",\"lastTradeDateOrContractMonth\":\"\",\"lastTradeDate\":\"\",\"strike\":1.7976931348623157e+308,\"right\":\"\",\"multiplier\":\"\",\"exchange\":\"SMART\",\"primaryExchange\":\"NASDAQ\",\"currency\":\"USD\",\"localSymbol\":\"\",\"tradingClass\":\"\",\"includeExpired\":false,\"secIdType\":\"\",\"secId\":\"\",\"description\":\"\",\"issuerId\":\"\",\"comboLegsDescrip\":\"\",\"comboLegs\":[],\"deltaNeutralContract\":null}"
+}

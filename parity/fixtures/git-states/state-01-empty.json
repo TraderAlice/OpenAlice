@@ -1,0 +1,8 @@
+{
+  "fakeClockInstant": "2026-05-02T00:00:00.000Z",
+  "hashFromFakeClock": true,
+  "state": {
+    "commits": [],
+    "head": null
+  }
+}

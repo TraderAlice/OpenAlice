@@ -1,0 +1,21 @@
+{
+  "carrier": "Order",
+  "field": "basisPointsType",
+  "name": "Order.basisPointsType = UNSET_INTEGER",
+  "raw": {
+    "action": "BUY",
+    "basisPointsType": 2147483647,
+    "clientId": 0,
+    "orderId": 0,
+    "orderType": "MKT",
+    "permId": 0,
+    "tif": "DAY"
+  },
+  "sentinel": "UNSET_INTEGER",
+  "wireExpected": {
+    "emit": {
+      "kind": "unset"
+    },
+    "field": "basisPointsType"
+  }
+}

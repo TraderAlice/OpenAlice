@@ -1,0 +1,16 @@
+{
+  "carrier": "OrderState",
+  "field": "maintMarginAfterOutsideRTH",
+  "name": "OrderState.maintMarginAfterOutsideRTH = UNSET_DOUBLE",
+  "raw": {
+    "maintMarginAfterOutsideRTH": 1.7976931348623157e+308,
+    "status": "PreSubmitted"
+  },
+  "sentinel": "UNSET_DOUBLE",
+  "wireExpected": {
+    "emit": {
+      "kind": "unset"
+    },
+    "field": "maintMarginAfterOutsideRTH"
+  }
+}

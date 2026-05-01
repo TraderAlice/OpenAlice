@@ -1,0 +1,32 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "**/*.ts",
+    "../src/domain/trading/**/*.ts",
+    "../packages/ibkr/src/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "../node_modules",
+    "../dist",
+    "../packages/ibkr/dist",
+    "../packages/opentypebb",
+    "../src/domain/market-data",
+    "../src/server",
+    "../src/core",
+    "../src/ai-providers",
+    "../src/connectors",
+    "../src/plugins",
+    "../src/task",
+    "../src/skills",
+    "../src/openclaw",
+    "../src/tool",
+    "../src/main.ts",
+    "**/*.spec.ts"
+  ]
+}

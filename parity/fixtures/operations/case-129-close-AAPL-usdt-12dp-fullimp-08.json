@@ -1,0 +1,25 @@
+{
+  "category": "closePosition",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "filled",
+  "name": "closePosition full-implicit AAPL (usdt-12dp) #8",
+  "operation": {
+    "action": "closePosition",
+    "contract": {
+      "aliceId": "alpaca-paper|AAPL",
+      "currency": "USD",
+      "exchange": "NASDAQ",
+      "secType": "STK",
+      "symbol": "AAPL"
+    }
+  },
+  "tags": [
+    "closePosition",
+    "usdt-12dp",
+    "STK",
+    "full-implicit"
+  ]
+}

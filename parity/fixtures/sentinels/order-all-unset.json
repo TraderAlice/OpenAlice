@@ -1,0 +1,205 @@
+{
+  "carrier": "Order",
+  "name": "Order — every sentinel-bearing field is UNSET (corner case)",
+  "raw": {
+    "action": "BUY",
+    "adjustedStopLimitPrice": 1.7976931348623157e+308,
+    "adjustedStopPrice": 1.7976931348623157e+308,
+    "adjustedTrailingAmount": 1.7976931348623157e+308,
+    "auxPrice": {
+      "__decimal__": "170141183460469231731687303715884105727"
+    },
+    "basisPoints": 1.7976931348623157e+308,
+    "basisPointsType": 2147483647,
+    "cashQty": {
+      "__decimal__": "170141183460469231731687303715884105727"
+    },
+    "clientId": 0,
+    "competeAgainstBestOffset": 1.7976931348623157e+308,
+    "delta": 1.7976931348623157e+308,
+    "deltaNeutralAuxPrice": 1.7976931348623157e+308,
+    "duration": 2147483647,
+    "filledQuantity": {
+      "__decimal__": "170141183460469231731687303715884105727"
+    },
+    "lmtPrice": {
+      "__decimal__": "170141183460469231731687303715884105727"
+    },
+    "lmtPriceOffset": 1.7976931348623157e+308,
+    "manualOrderIndicator": 2147483647,
+    "midOffsetAtHalf": 1.7976931348623157e+308,
+    "midOffsetAtWhole": 1.7976931348623157e+308,
+    "minCompeteSize": 2147483647,
+    "minQty": 2147483647,
+    "minTradeQty": 2147483647,
+    "orderId": 0,
+    "orderType": "MKT",
+    "percentOffset": 1.7976931348623157e+308,
+    "permId": 0,
+    "postToAts": 2147483647,
+    "ptOrderId": 2147483647,
+    "referencePriceType": 2147483647,
+    "scaleInitFillQty": 2147483647,
+    "scaleInitLevelSize": 2147483647,
+    "scaleInitPosition": 2147483647,
+    "scalePriceAdjustInterval": 2147483647,
+    "scalePriceAdjustValue": 1.7976931348623157e+308,
+    "scalePriceIncrement": 1.7976931348623157e+308,
+    "scaleProfitOffset": 1.7976931348623157e+308,
+    "scaleSubsLevelSize": 2147483647,
+    "slOrderId": 2147483647,
+    "startingPrice": 1.7976931348623157e+308,
+    "stockRangeLower": 1.7976931348623157e+308,
+    "stockRangeUpper": 1.7976931348623157e+308,
+    "stockRefPrice": 1.7976931348623157e+308,
+    "tif": "DAY",
+    "totalQuantity": {
+      "__decimal__": "170141183460469231731687303715884105727"
+    },
+    "trailStopPrice": {
+      "__decimal__": "170141183460469231731687303715884105727"
+    },
+    "trailingPercent": {
+      "__decimal__": "170141183460469231731687303715884105727"
+    },
+    "triggerPrice": 1.7976931348623157e+308,
+    "volatility": 1.7976931348623157e+308,
+    "volatilityType": 2147483647,
+    "whatIfType": 2147483647
+  },
+  "variant": "all-unset",
+  "wireExpected": {
+    "adjustedStopLimitPrice": {
+      "kind": "unset"
+    },
+    "adjustedStopPrice": {
+      "kind": "unset"
+    },
+    "adjustedTrailingAmount": {
+      "kind": "unset"
+    },
+    "auxPrice": {
+      "kind": "unset"
+    },
+    "basisPoints": {
+      "kind": "unset"
+    },
+    "basisPointsType": {
+      "kind": "unset"
+    },
+    "cashQty": {
+      "kind": "unset"
+    },
+    "competeAgainstBestOffset": {
+      "kind": "unset"
+    },
+    "delta": {
+      "kind": "unset"
+    },
+    "deltaNeutralAuxPrice": {
+      "kind": "unset"
+    },
+    "duration": {
+      "kind": "unset"
+    },
+    "filledQuantity": {
+      "kind": "unset"
+    },
+    "lmtPrice": {
+      "kind": "unset"
+    },
+    "lmtPriceOffset": {
+      "kind": "unset"
+    },
+    "manualOrderIndicator": {
+      "kind": "unset"
+    },
+    "midOffsetAtHalf": {
+      "kind": "unset"
+    },
+    "midOffsetAtWhole": {
+      "kind": "unset"
+    },
+    "minCompeteSize": {
+      "kind": "unset"
+    },
+    "minQty": {
+      "kind": "unset"
+    },
+    "minTradeQty": {
+      "kind": "unset"
+    },
+    "percentOffset": {
+      "kind": "unset"
+    },
+    "postToAts": {
+      "kind": "unset"
+    },
+    "ptOrderId": {
+      "kind": "unset"
+    },
+    "referencePriceType": {
+      "kind": "unset"
+    },
+    "scaleInitFillQty": {
+      "kind": "unset"
+    },
+    "scaleInitLevelSize": {
+      "kind": "unset"
+    },
+    "scaleInitPosition": {
+      "kind": "unset"
+    },
+    "scalePriceAdjustInterval": {
+      "kind": "unset"
+    },
+    "scalePriceAdjustValue": {
+      "kind": "unset"
+    },
+    "scalePriceIncrement": {
+      "kind": "unset"
+    },
+    "scaleProfitOffset": {
+      "kind": "unset"
+    },
+    "scaleSubsLevelSize": {
+      "kind": "unset"
+    },
+    "slOrderId": {
+      "kind": "unset"
+    },
+    "startingPrice": {
+      "kind": "unset"
+    },
+    "stockRangeLower": {
+      "kind": "unset"
+    },
+    "stockRangeUpper": {
+      "kind": "unset"
+    },
+    "stockRefPrice": {
+      "kind": "unset"
+    },
+    "totalQuantity": {
+      "kind": "unset"
+    },
+    "trailStopPrice": {
+      "kind": "unset"
+    },
+    "trailingPercent": {
+      "kind": "unset"
+    },
+    "triggerPrice": {
+      "kind": "unset"
+    },
+    "volatility": {
+      "kind": "unset"
+    },
+    "volatilityType": {
+      "kind": "unset"
+    },
+    "whatIfType": {
+      "kind": "unset"
+    }
+  }
+}

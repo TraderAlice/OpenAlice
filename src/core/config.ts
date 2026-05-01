@@ -264,25 +264,34 @@ export const webSubchannelsSchema = z.array(webSubchannelSchema)
 
 export type WebChannel = z.infer<typeof webSubchannelSchema>
 
-// ==================== Account Config ====================
+// ==================== UTA Config ====================
 
 const guardConfigSchema = z.object({
   type: z.string(),
   options: z.record(z.string(), z.unknown()).default({}),
 })
 
-export const accountConfigSchema = z.object({
+/**
+ * One Unified Trading Account. The user-facing concept — one preset
+ * (OKX, Bybit, IBKR, …) plus credentials, guards, and an enabled flag.
+ *
+ * Distinct from `AccountInfo` (which is broker-side: cash, equity,
+ * margin returned by `IBroker.getAccount()`). Two different "account"s.
+ */
+export const utaConfigSchema = z.object({
   id: z.string(),
   label: z.string().optional(),
-  type: z.string(),
+  /** Broker preset id — resolves to engine + form schema via BROKER_PRESET_CATALOG. */
+  presetId: z.string(),
   enabled: z.boolean().default(true),
   guards: z.array(guardConfigSchema).default([]),
-  brokerConfig: z.record(z.string(), z.unknown()).default({}),
+  /** User-filled form values, validated against the preset's own zodSchema. */
+  presetConfig: z.record(z.string(), z.unknown()).default({}),
 })
 
-export const accountsFileSchema = z.array(accountConfigSchema)
+export const utasFileSchema = z.array(utaConfigSchema)
 
-export type AccountConfig = z.infer<typeof accountConfigSchema>
+export type UTAConfig = z.infer<typeof utaConfigSchema>
 
 // ==================== Unified Config Type ====================
 
@@ -502,31 +511,123 @@ export async function loadConfig(): Promise<Config> {
   }
 }
 
-// ==================== Account Config Loader ====================
+// ==================== UTA Config Loader ====================
 
-/** Common fields that live at the top level, not inside brokerConfig. */
-const BASE_FIELDS = new Set(['id', 'label', 'type', 'guards', 'brokerConfig'])
-
-/**
- * Migrate flat account config (legacy) to nested brokerConfig format.
- * Any field not in BASE_FIELDS gets moved into brokerConfig.
- */
-function migrateAccountConfig(raw: Record<string, unknown>): Record<string, unknown> {
-  if (raw.brokerConfig) return raw  // already migrated
-  const migrated: Record<string, unknown> = {}
-  const brokerConfig: Record<string, unknown> = {}
-  for (const [k, v] of Object.entries(raw)) {
-    if (BASE_FIELDS.has(k)) {
-      migrated[k] = v
-    } else {
-      brokerConfig[k] = v
-    }
-  }
-  migrated.brokerConfig = brokerConfig
-  return migrated
+/** Single legacy record carries `type` (removed) without `presetId` (new). */
+function isLegacyRecord(o: Record<string, unknown>): boolean {
+  return typeof o['type'] === 'string' && typeof o['presetId'] !== 'string'
 }
 
-export async function readAccountsConfig(): Promise<AccountConfig[]> {
+/**
+ * Best-effort migration from the pre-preset shape ({type, brokerConfig})
+ * to the preset shape ({presetId, presetConfig}).
+ *
+ * Returns null when the legacy record can't be mapped (unknown engine /
+ * missing exchange) — caller logs and skips.
+ *
+ * TODO(v0.10 → v1.0): remove this migration once nobody is upgrading
+ * from the pre-preset schema. Tracked alongside the AI-side migration
+ * cleanup at the top of this file.
+ */
+function migrateLegacyUTA(raw: Record<string, unknown>): Record<string, unknown> | null {
+  const id = String(raw['id'] ?? '')
+  const label = raw['label'] as string | undefined
+  const enabled = raw['enabled'] as boolean | undefined
+  const guards = raw['guards'] as unknown[] | undefined
+  const type = String(raw['type'] ?? '')
+  const bc = (raw['brokerConfig'] ?? {}) as Record<string, unknown>
+
+  const base = (presetId: string, presetConfig: Record<string, unknown>) => ({
+    id,
+    ...(label !== undefined && { label }),
+    presetId,
+    enabled: enabled ?? true,
+    guards: guards ?? [],
+    presetConfig,
+  })
+
+  // CCXT — derive preset from exchange + flags
+  if (type === 'ccxt') {
+    const exchange = String(bc['exchange'] ?? '').toLowerCase()
+    const apiKey = bc['apiKey'] as string | undefined
+    // Legacy used both `secret` and `apiSecret` (alias); new presets use `secret`.
+    const secret = (bc['secret'] ?? bc['apiSecret']) as string | undefined
+    const password = bc['password'] as string | undefined
+    const sandbox = Boolean(bc['sandbox'])
+    const demoTrading = Boolean(bc['demoTrading'])
+    const walletAddress = bc['walletAddress'] as string | undefined
+    const privateKey = bc['privateKey'] as string | undefined
+
+    switch (exchange) {
+      case 'okx':
+        // OKX old configs that set demoTrading: true were broken (the engine
+        // would set urls['api'] = undefined). We treat any non-live flag as
+        // mode=demo so the migrated account actually works.
+        return base('okx', {
+          mode: (sandbox || demoTrading) ? 'demo' : 'live',
+          ...(apiKey && { apiKey }),
+          ...(secret && { secret }),
+          ...(password && { password }),
+        })
+      case 'bybit':
+        return base('bybit', {
+          mode: sandbox ? 'testnet' : (demoTrading ? 'demo' : 'live'),
+          ...(apiKey && { apiKey }),
+          ...(secret && { secret }),
+        })
+      case 'hyperliquid':
+        return base('hyperliquid', {
+          mode: sandbox ? 'testnet' : 'live',
+          ...(walletAddress && { walletAddress }),
+          ...(privateKey && { privateKey }),
+        })
+      case 'bitget':
+        return base('bitget', {
+          mode: demoTrading ? 'demo' : 'live',
+          ...(apiKey && { apiKey }),
+          ...(secret && { secret }),
+          ...(password && { password }),
+        })
+      default:
+        // Unknown / untested exchange — keep functional via the escape hatch.
+        if (!exchange) return null
+        return base('ccxt-custom', {
+          exchange,
+          sandbox,
+          demoTrading,
+          ...(apiKey && { apiKey }),
+          ...(secret && { secret }),
+          ...(password && { password }),
+          ...(walletAddress && { walletAddress }),
+          ...(privateKey && { privateKey }),
+        })
+    }
+  }
+
+  if (type === 'alpaca') {
+    return base('alpaca', {
+      mode: bc['paper'] === false ? 'live' : 'paper',
+      ...(bc['apiKey'] !== undefined && { apiKey: bc['apiKey'] }),
+      ...(bc['apiSecret'] !== undefined && { apiSecret: bc['apiSecret'] }),
+    })
+  }
+
+  if (type === 'ibkr') {
+    return base('ibkr-tws', {
+      ...(bc['host'] !== undefined && { host: bc['host'] }),
+      ...(bc['port'] !== undefined && { port: bc['port'] }),
+      ...(bc['clientId'] !== undefined && { clientId: bc['clientId'] }),
+      ...(bc['accountId'] !== undefined && { accountId: bc['accountId'] }),
+    })
+  }
+
+  return null
+}
+
+// File name on disk stays `accounts.json` — internal-only, never
+// user-visible. Renaming would require another migration block; cost
+// outweighs benefit. The on-disk schema is the new UTA shape.
+export async function readUTAsConfig(): Promise<UTAConfig[]> {
   const raw = await loadJsonFile('accounts.json')
   if (raw === undefined) {
     // Seed empty file on first run
@@ -534,13 +635,44 @@ export async function readAccountsConfig(): Promise<AccountConfig[]> {
     await writeFile(resolve(CONFIG_DIR, 'accounts.json'), '[]\n')
     return []
   }
-  // Migrate legacy flat format → nested brokerConfig
-  const migrated = (raw as unknown[]).map((item) => migrateAccountConfig(item as Record<string, unknown>))
-  return accountsFileSchema.parse(migrated)
+
+  // Auto-migrate the pre-preset shape ({type, brokerConfig}) into the
+  // current shape ({presetId, presetConfig}). We back the original up
+  // first (so a bad migration is never destructive) and write the
+  // translated records to disk so subsequent reads skip this branch.
+  if (Array.isArray(raw) && (raw as unknown[]).some((r) => isLegacyRecord(r as Record<string, unknown>))) {
+    const backupPath = resolve(CONFIG_DIR, 'accounts.json.backup-pre-preset')
+    await writeFile(backupPath, JSON.stringify(raw, null, 2) + '\n')
+
+    const migrated: Record<string, unknown>[] = []
+    const skipped: string[] = []
+    for (const item of raw as Record<string, unknown>[]) {
+      // Already in new shape — keep verbatim.
+      if (!isLegacyRecord(item)) { migrated.push(item); continue }
+      const next = migrateLegacyUTA(item)
+      if (next) {
+        migrated.push(next)
+      } else {
+        skipped.push(String(item['id'] ?? '<unknown>'))
+      }
+    }
+
+    console.warn(
+      `accounts.json: migrated ${migrated.length - skipped.length} legacy record(s) to preset shape ` +
+      `(backup: ${backupPath}).` +
+      (skipped.length ? ` Skipped (unknown engine, recreate manually): ${skipped.join(', ')}.` : ''),
+    )
+
+    const validated = utasFileSchema.parse(migrated)
+    await writeFile(resolve(CONFIG_DIR, 'accounts.json'), JSON.stringify(validated, null, 2) + '\n')
+    return validated
+  }
+
+  return utasFileSchema.parse(raw)
 }
 
-export async function writeAccountsConfig(accounts: AccountConfig[]): Promise<void> {
-  const validated = accountsFileSchema.parse(accounts)
+export async function writeUTAsConfig(utas: UTAConfig[]): Promise<void> {
+  const validated = utasFileSchema.parse(utas)
   await mkdir(CONFIG_DIR, { recursive: true })
   await writeFile(resolve(CONFIG_DIR, 'accounts.json'), JSON.stringify(validated, null, 2) + '\n')
 }

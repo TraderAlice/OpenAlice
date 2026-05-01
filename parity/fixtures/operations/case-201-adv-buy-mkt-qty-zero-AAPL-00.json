@@ -1,0 +1,51 @@
+{
+  "category": "adversarial",
+  "config": {
+    "expectGuardReject": true,
+    "fillPolicy": "none"
+  },
+  "expectedStatus": "user-rejected",
+  "name": "BUY MKT adversarial qty-zero on AAPL — qty must be positive",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "aliceId": "alpaca-paper|AAPL",
+      "currency": "USD",
+      "exchange": "NASDAQ",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "BUY",
+      "auxPrice": {
+        "kind": "unset"
+      },
+      "cashQty": {
+        "kind": "unset"
+      },
+      "lmtPrice": {
+        "kind": "unset"
+      },
+      "orderType": "MKT",
+      "tif": "DAY",
+      "totalQuantity": {
+        "kind": "value",
+        "value": "0"
+      },
+      "trailStopPrice": {
+        "kind": "unset"
+      },
+      "trailingPercent": {
+        "kind": "unset"
+      }
+    }
+  },
+  "tags": [
+    "BUY",
+    "MKT",
+    "adversarial",
+    "qty-zero",
+    "STK",
+    "guard-reject"
+  ]
+}

@@ -12,10 +12,14 @@ export type {
   TpSlParams,
 } from './types.js'
 
-// Factory + Registry
+// Factory
 export { createBroker } from './factory.js'
-export { BROKER_REGISTRY } from './registry.js'
-export type { BrokerRegistryEntry } from './registry.js'
+
+// Presets (the user-facing surface — many presets, few engines)
+export { BROKER_PRESET_CATALOG, getBrokerPreset, isPaperPreset } from './preset-catalog.js'
+export type { BrokerPresetDef, BrokerEngine, ModeOption, SubtitleSegment } from './preset-catalog.js'
+export { BUILTIN_BROKER_PRESETS } from './presets.js'
+export type { SerializedBrokerPreset } from './presets.js'
 
 // Alpaca
 export { AlpacaBroker } from './alpaca/index.js'

@@ -1,0 +1,16 @@
+{
+  "carrier": "ExecutionFilter",
+  "name": "ExecutionFilter default (UNSET_INTEGER lastNDays)",
+  "raw": {
+    "acctCode": "",
+    "clientId": 0,
+    "exchange": "",
+    "lastNDays": 2147483647,
+    "secType": "",
+    "side": "",
+    "specificDates": null,
+    "symbol": "",
+    "time": ""
+  },
+  "stringified": "{\"clientId\":0,\"acctCode\":\"\",\"time\":\"\",\"symbol\":\"\",\"secType\":\"\",\"exchange\":\"\",\"side\":\"\",\"lastNDays\":2147483647,\"specificDates\":null}"
+}

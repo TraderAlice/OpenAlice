@@ -1,0 +1,18 @@
+{
+  "carrier": "Contract",
+  "name": "Contract — every sentinel-bearing field is SET (corner case)",
+  "raw": {
+    "aliceId": "mock|MOCK",
+    "currency": "USD",
+    "exchange": "SMART",
+    "secType": "STK",
+    "strike": 0.25,
+    "symbol": "MOCK"
+  },
+  "variant": "all-set",
+  "wireExpected": {
+    "strike": {
+      "kind": "value"
+    }
+  }
+}

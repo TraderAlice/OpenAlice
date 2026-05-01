@@ -215,7 +215,7 @@ describe('UTA health — offline behavior', () => {
       await expect(uta.getAccount()).rejects.toThrow()
     }
 
-    uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: 10 })
+    uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '10' })
     uta.commit('buy AAPL')
     await expect(uta.push()).rejects.toThrow(/offline/)
     await uta.close()
@@ -231,7 +231,7 @@ describe('UTA health — offline behavior', () => {
     }
 
     // Staging is a local operation — should work even when offline
-    const result = uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: 10 })
+    const result = uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '10' })
     expect(result.staged).toBe(true)
 
     const commit = uta.commit('buy while offline')

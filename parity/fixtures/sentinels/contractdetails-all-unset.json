@@ -1,0 +1,49 @@
+{
+  "carrier": "ContractDetails",
+  "name": "ContractDetails — every sentinel-bearing field is UNSET (corner case)",
+  "raw": {
+    "contract": {
+      "secType": "STK",
+      "symbol": "MOCK"
+    },
+    "lastPricePrecision": {
+      "__decimal__": "170141183460469231731687303715884105727"
+    },
+    "lastSizePrecision": {
+      "__decimal__": "170141183460469231731687303715884105727"
+    },
+    "minAlgoSize": {
+      "__decimal__": "170141183460469231731687303715884105727"
+    },
+    "minSize": {
+      "__decimal__": "170141183460469231731687303715884105727"
+    },
+    "sizeIncrement": {
+      "__decimal__": "170141183460469231731687303715884105727"
+    },
+    "suggestedSizeIncrement": {
+      "__decimal__": "170141183460469231731687303715884105727"
+    }
+  },
+  "variant": "all-unset",
+  "wireExpected": {
+    "lastPricePrecision": {
+      "kind": "unset"
+    },
+    "lastSizePrecision": {
+      "kind": "unset"
+    },
+    "minAlgoSize": {
+      "kind": "unset"
+    },
+    "minSize": {
+      "kind": "unset"
+    },
+    "sizeIncrement": {
+      "kind": "unset"
+    },
+    "suggestedSizeIncrement": {
+      "kind": "unset"
+    }
+  }
+}

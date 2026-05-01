@@ -1,0 +1,41 @@
+{
+  "carrier": "OrderAllocation",
+  "name": "OrderAllocation — every sentinel-bearing field is SET (corner case)",
+  "raw": {
+    "account": "",
+    "allowedAllocQty": {
+      "__decimal__": "1.5"
+    },
+    "desiredAllocQty": {
+      "__decimal__": "1.5"
+    },
+    "isMonetary": false,
+    "position": {
+      "__decimal__": "1.5"
+    },
+    "positionAfter": {
+      "__decimal__": "1.5"
+    },
+    "positionDesired": {
+      "__decimal__": "1.5"
+    }
+  },
+  "variant": "all-set",
+  "wireExpected": {
+    "allowedAllocQty": {
+      "kind": "value"
+    },
+    "desiredAllocQty": {
+      "kind": "value"
+    },
+    "position": {
+      "kind": "value"
+    },
+    "positionAfter": {
+      "kind": "value"
+    },
+    "positionDesired": {
+      "kind": "value"
+    }
+  }
+}

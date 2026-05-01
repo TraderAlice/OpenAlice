@@ -49,8 +49,8 @@ describe('UTA — IBKR order lifecycle', () => {
       symbol: 'AAPL',
       action: 'BUY',
       orderType: 'LMT',
-      lmtPrice: 1.00,
-      totalQuantity: 1,
+      lmtPrice: '1.00',
+      totalQuantity: '1',
       tif: 'GTC',
     })
     expect(addResult.staged).toBe(true)
@@ -92,7 +92,7 @@ describe('UTA — IBKR TPSL pass-through', () => {
     // Stage limit order with TPSL — IBKR ignores tpsl but it should not error
     uta!.stagePlaceOrder({
       aliceId, symbol: 'AAPL', action: 'BUY', orderType: 'LMT',
-      lmtPrice: 1.00, totalQuantity: 1, tif: 'GTC',
+      lmtPrice: '1.00', totalQuantity: '1', tif: 'GTC',
       takeProfit: { price: '300' },
       stopLoss: { price: '100' },
     })
@@ -135,7 +135,7 @@ describe('UTA — IBKR fill flow (AAPL)', () => {
       symbol: 'AAPL',
       action: 'BUY',
       orderType: 'MKT',
-      totalQuantity: 1,
+      totalQuantity: '1',
     })
     expect(addResult.staged).toBe(true)
 
@@ -168,7 +168,7 @@ describe('UTA — IBKR fill flow (AAPL)', () => {
     // === Close 1 AAPL ===
     // Wait for TWS to update positions after the buy fill
     await new Promise(r => setTimeout(r, 3000))
-    uta!.stageClosePosition({ aliceId, qty: 1 })
+    uta!.stageClosePosition({ aliceId, qty: '1' })
     uta!.commit('e2e: close 1 AAPL')
     const closePush = await uta!.push()
     console.log(`  close pushed: status=${closePush.submitted[0]?.status}`)

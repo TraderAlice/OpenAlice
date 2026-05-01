@@ -1,0 +1,28 @@
+{
+  "carrier": "Contract",
+  "name": "Contract OPT AAPL 250C 2026-06-20",
+  "raw": {
+    "comboLegs": [],
+    "comboLegsDescrip": "",
+    "conId": 0,
+    "currency": "USD",
+    "deltaNeutralContract": null,
+    "description": "",
+    "exchange": "SMART",
+    "includeExpired": false,
+    "issuerId": "",
+    "lastTradeDate": "",
+    "lastTradeDateOrContractMonth": "20260620",
+    "localSymbol": "",
+    "multiplier": "100",
+    "primaryExchange": "",
+    "right": "C",
+    "secId": "",
+    "secIdType": "",
+    "secType": "OPT",
+    "strike": 250,
+    "symbol": "AAPL",
+    "tradingClass": ""
+  },
+  "stringified": "{\"conId\":0,\"symbol\":\"AAPL\",\"secType\":\"OPT\",\"lastTradeDateOrContractMonth\":\"20260620\",\"lastTradeDate\":\"\",\"strike\":250,\"right\":\"C\",\"multiplier\":\"100\",\"exchange\":\"SMART\",\"primaryExchange\":\"\",\"currency\":\"USD\",\"localSymbol\":\"\",\"tradingClass\":\"\",\"includeExpired\":false,\"secIdType\":\"\",\"secId\":\"\",\"description\":\"\",\"issuerId\":\"\",\"comboLegsDescrip\":\"\",\"comboLegs\":[],\"deltaNeutralContract\":null}"
+}

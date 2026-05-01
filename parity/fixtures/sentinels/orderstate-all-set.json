@@ -1,0 +1,64 @@
+{
+  "carrier": "OrderState",
+  "name": "OrderState — every sentinel-bearing field is SET (corner case)",
+  "raw": {
+    "commissionAndFees": 0.25,
+    "equityWithLoanAfterOutsideRTH": 0.25,
+    "equityWithLoanBeforeOutsideRTH": 0.25,
+    "equityWithLoanChangeOutsideRTH": 0.25,
+    "initMarginAfterOutsideRTH": 0.25,
+    "initMarginBeforeOutsideRTH": 0.25,
+    "initMarginChangeOutsideRTH": 0.25,
+    "maintMarginAfterOutsideRTH": 0.25,
+    "maintMarginBeforeOutsideRTH": 0.25,
+    "maintMarginChangeOutsideRTH": 0.25,
+    "maxCommissionAndFees": 0.25,
+    "minCommissionAndFees": 0.25,
+    "status": "PreSubmitted",
+    "suggestedSize": {
+      "__decimal__": "1.5"
+    }
+  },
+  "variant": "all-set",
+  "wireExpected": {
+    "commissionAndFees": {
+      "kind": "value"
+    },
+    "equityWithLoanAfterOutsideRTH": {
+      "kind": "value"
+    },
+    "equityWithLoanBeforeOutsideRTH": {
+      "kind": "value"
+    },
+    "equityWithLoanChangeOutsideRTH": {
+      "kind": "value"
+    },
+    "initMarginAfterOutsideRTH": {
+      "kind": "value"
+    },
+    "initMarginBeforeOutsideRTH": {
+      "kind": "value"
+    },
+    "initMarginChangeOutsideRTH": {
+      "kind": "value"
+    },
+    "maintMarginAfterOutsideRTH": {
+      "kind": "value"
+    },
+    "maintMarginBeforeOutsideRTH": {
+      "kind": "value"
+    },
+    "maintMarginChangeOutsideRTH": {
+      "kind": "value"
+    },
+    "maxCommissionAndFees": {
+      "kind": "value"
+    },
+    "minCommissionAndFees": {
+      "kind": "value"
+    },
+    "suggestedSize": {
+      "kind": "value"
+    }
+  }
+}

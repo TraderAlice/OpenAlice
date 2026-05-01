@@ -79,10 +79,13 @@ export class FMPEquityProfileFetcher extends Fetcher {
         if (result && result.length > 0) {
           results.push(result[0])
         } else {
-          console.warn(`Symbol Error: No data found for ${symbol}`)
+          // FMP returned an empty array — usually means delisted, never
+          // listed, or simply outside FMP's coverage (some international
+          // tickers, very obscure assets).
+          console.info(`fmp/profile: no profile for ${symbol} (delisted, unsupported region, or outside FMP coverage)`)
         }
-      } catch {
-        console.warn(`Symbol Error: No data found for ${symbol}`)
+      } catch (err) {
+        console.warn(`fmp/profile: request failed for ${symbol}:`, err instanceof Error ? err.message : err)
       }
     }
 

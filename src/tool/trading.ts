@@ -10,9 +10,10 @@ import { tool, type Tool } from 'ai'
 import { z } from 'zod'
 import Decimal from 'decimal.js'
 import { Contract, UNSET_DECIMAL } from '@traderalice/ibkr'
-import type { AccountManager } from '@/domain/trading/account-manager.js'
+import type { UTAManager } from '@/domain/trading/uta-manager.js'
 import { BrokerError, type OpenOrder } from '@/domain/trading/brokers/types.js'
 import type { FxService } from '@/domain/trading/fx-service.js'
+import { normalizeBrokerSearchPattern } from '@/domain/trading/contract-search-rules.js'
 import '@/domain/trading/contract-ext.js'
 
 /** Classify a broker error into a structured response for AI consumption. */
@@ -66,46 +67,69 @@ const sourceDesc = (required: boolean, extra?: string) => {
  * String form preserves precision beyond JS double (crypto satoshi-scale).
  * Internal pipeline wraps to Decimal regardless.
  */
+/**
+ * Positive numeric value as a decimal string. **String only** — no
+ * number accepted. Forces LLM output through Decimal serialization
+ * end-to-end so precision is preserved into the staging layer (the
+ * persisted git records, ultimately). LLMs reliably emit strings
+ * when the schema demands them; permissive `union([number, string])`
+ * is unnecessary and re-opens the precision-loss path that this
+ * whole sweep was meant to close.
+ */
 const positiveNumeric = z
-  .union([z.number(), z.string()])
+  .string()
   .refine(
     (v) => {
       try {
-        return new Decimal(String(v)).gt(0) && new Decimal(String(v)).isFinite()
+        return new Decimal(v).gt(0) && new Decimal(v).isFinite()
       } catch {
         return false
       }
     },
-    { message: 'must be a positive number or positive numeric string' },
+    { message: 'must be a positive numeric string (e.g. "0.001", "150")' },
   )
 
-export function createTradingTools(manager: AccountManager, fxService?: FxService): Record<string, Tool> {
+export function createTradingTools(manager: UTAManager, fxService?: FxService): Record<string, Tool> {
   return {
-    listAccounts: tool({
+    listUTAs: tool({
       description: 'List all registered trading accounts with their id, provider, label, and capabilities.',
       inputSchema: z.object({}),
-      execute: () => manager.listAccounts(),
+      execute: () => manager.listUTAs(),
     }),
 
     searchContracts: tool({
       description: `Search broker accounts for tradeable contracts matching a pattern.
-This is a BROKER-LEVEL search — it queries your connected trading accounts.`,
+This is a BROKER-LEVEL search — it queries your connected trading accounts.
+
+Pass \`assetClass\` when known (especially "crypto" or "currency") so the
+data-vendor symbol is normalized into a broker-friendly pattern — e.g. a
+search for "BTCUSD" with assetClass="crypto" is rewritten to "BTC" before
+hitting the broker, which otherwise expects the bare base ticker.`,
       inputSchema: z.object({
         pattern: z.string().describe('Symbol or keyword to search'),
+        assetClass: z.enum(['equity', 'crypto', 'currency', 'commodity', 'unknown']).optional()
+          .describe('Asset class hint. Improves matching for crypto/currency where data symbols concatenate quote currency.'),
         source: z.string().optional().describe(sourceDesc(false)),
       }),
-      execute: async ({ pattern, source }) => {
+      execute: async ({ pattern, assetClass, source }) => {
+        // Symbol → broker pattern: see src/domain/trading/contract-search-rules.md
+        // for what the normalization does and why.
+        const brokerPattern = normalizeBrokerSearchPattern(pattern, assetClass ?? 'unknown')
+        if (!brokerPattern) return { results: [], message: 'Empty pattern.' }
+        // Source-scoped: when the caller pinned an account, only that one is
+        // hit; otherwise fan out to all configured accounts.
         const targets = manager.resolve(source)
         if (targets.length === 0) return { error: 'No accounts available.' }
-        const allResults: Array<Record<string, unknown>> = []
-        for (const uta of targets) {
-          try {
-            const descriptions = await uta.searchContracts(pattern)
-            for (const desc of descriptions) allResults.push({ source: uta.id, ...desc })
-          } catch { /* skip */ }
+        const all: Array<Record<string, unknown>> = []
+        const settled = await Promise.allSettled(
+          targets.map(async (uta) => ({ id: uta.id, results: await uta.searchContracts(brokerPattern) })),
+        )
+        for (const r of settled) {
+          if (r.status !== 'fulfilled') continue
+          for (const desc of r.value.results) all.push({ source: r.value.id, ...desc })
         }
-        if (allResults.length === 0) return { results: [], message: `No contracts found matching "${pattern}".` }
-        return allResults
+        if (all.length === 0) return { results: [], message: `No contracts found matching "${brokerPattern}" (input: "${pattern}").` }
+        return all
       },
     }),
 
@@ -364,9 +388,9 @@ Optional: attach takeProfit and/or stopLoss for automatic exit orders.`,
         symbol: z.string().optional().describe('Human-readable symbol (optional, for display only)'),
         action: z.enum(['BUY', 'SELL']).describe('Order direction'),
         orderType: z.enum(['MKT', 'LMT', 'STP', 'STP LMT', 'TRAIL', 'TRAIL LIMIT', 'MOC']).describe('Order type'),
-        totalQuantity: positiveNumeric.optional().describe('Number of shares/contracts (mutually exclusive with cashQty). Accepts number or decimal string.'),
+        totalQuantity: positiveNumeric.optional().describe('Number of shares/contracts as a decimal string (e.g. "0.001"). Mutually exclusive with cashQty.'),
         cashQty: positiveNumeric.optional().describe('Notional dollar amount (mutually exclusive with totalQuantity).'),
-        lmtPrice: positiveNumeric.optional().describe('Limit price (required for LMT, STP LMT, TRAIL LIMIT). Accepts number or decimal string for satoshi-scale prices.'),
+        lmtPrice: positiveNumeric.optional().describe('Limit price as a decimal string (required for LMT, STP LMT, TRAIL LIMIT). String preserves satoshi-scale precision.'),
         auxPrice: positiveNumeric.optional().describe('Stop trigger price for STP/STP LMT; trailing offset amount for TRAIL/TRAIL LIMIT.'),
         trailStopPrice: positiveNumeric.optional().describe('Initial trailing stop price (TRAIL/TRAIL LIMIT only).'),
         trailingPercent: positiveNumeric.optional().describe('Trailing stop percentage offset (alternative to auxPrice for TRAIL).'),
@@ -391,11 +415,11 @@ Optional: attach takeProfit and/or stopLoss for automatic exit orders.`,
       inputSchema: z.object({
         source: z.string().describe(sourceDesc(true)),
         orderId: z.string().describe('Order ID to modify'),
-        totalQuantity: positiveNumeric.optional().describe('New quantity. Accepts number or decimal string.'),
-        lmtPrice: positiveNumeric.optional().describe('New limit price. Accepts number or decimal string.'),
-        auxPrice: positiveNumeric.optional().describe('New stop trigger price or trailing offset (depends on order type).'),
-        trailStopPrice: positiveNumeric.optional().describe('New initial trailing stop price.'),
-        trailingPercent: positiveNumeric.optional().describe('New trailing stop percentage.'),
+        totalQuantity: positiveNumeric.optional().describe('New quantity. Decimal string (e.g. "0.001").'),
+        lmtPrice: positiveNumeric.optional().describe('New limit price. Decimal string.'),
+        auxPrice: positiveNumeric.optional().describe('New stop trigger price or trailing offset (depends on order type). Decimal string.'),
+        trailStopPrice: positiveNumeric.optional().describe('New initial trailing stop price. Decimal string.'),
+        trailingPercent: positiveNumeric.optional().describe('New trailing stop percentage. Decimal string.'),
         orderType: z.enum(['MKT', 'LMT', 'STP', 'STP LMT', 'TRAIL', 'TRAIL LIMIT', 'MOC']).optional().describe('New order type'),
         tif: z.enum(['DAY', 'GTC', 'IOC', 'FOK', 'OPG', 'GTD']).optional().describe('New time in force'),
         goodTillDate: z.string().optional().describe('New expiration date'),
@@ -409,7 +433,7 @@ Optional: attach takeProfit and/or stopLoss for automatic exit orders.`,
         source: z.string().describe(sourceDesc(true)),
         aliceId: z.string().describe('Contract ID (format: accountId|nativeKey, from searchContracts)'),
         symbol: z.string().optional().describe('Human-readable symbol. Optional.'),
-        qty: z.number().positive().optional().describe('Number of shares to sell (default: sell all)'),
+        qty: positiveNumeric.optional().describe('Number of shares to sell. Decimal string. Default: sell all.'),
       }),
       execute: ({ source, ...params }) => manager.resolveOne(source).stageClosePosition(params),
     }),

@@ -1,0 +1,28 @@
+{
+  "carrier": "Contract",
+  "name": "Contract default (strike=UNSET_DOUBLE)",
+  "raw": {
+    "comboLegs": [],
+    "comboLegsDescrip": "",
+    "conId": 0,
+    "currency": "",
+    "deltaNeutralContract": null,
+    "description": "",
+    "exchange": "",
+    "includeExpired": false,
+    "issuerId": "",
+    "lastTradeDate": "",
+    "lastTradeDateOrContractMonth": "",
+    "localSymbol": "",
+    "multiplier": "",
+    "primaryExchange": "",
+    "right": "",
+    "secId": "",
+    "secIdType": "",
+    "secType": "",
+    "strike": 1.7976931348623157e+308,
+    "symbol": "",
+    "tradingClass": ""
+  },
+  "stringified": "{\"conId\":0,\"symbol\":\"\",\"secType\":\"\",\"lastTradeDateOrContractMonth\":\"\",\"lastTradeDate\":\"\",\"strike\":1.7976931348623157e+308,\"right\":\"\",\"multiplier\":\"\",\"exchange\":\"\",\"primaryExchange\":\"\",\"currency\":\"\",\"localSymbol\":\"\",\"tradingClass\":\"\",\"includeExpired\":false,\"secIdType\":\"\",\"secId\":\"\",\"description\":\"\",\"issuerId\":\"\",\"comboLegsDescrip\":\"\",\"comboLegs\":[],\"deltaNeutralContract\":null}"
+}

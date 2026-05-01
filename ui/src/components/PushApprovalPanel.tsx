@@ -117,7 +117,7 @@ export function PushApprovalPanel() {
 
   const poll = useCallback(async () => {
     try {
-      const { accounts: accts } = await api.trading.listAccounts()
+      const { utas: accts } = await api.trading.listUTAs()
       setAccounts(accts)
 
       const stagedResults: StagedAccount[] = []

@@ -1,0 +1,29 @@
+{
+  "category": "closePosition",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "filled",
+  "name": "closePosition partial TSLA (eth-18dp) #9",
+  "operation": {
+    "action": "closePosition",
+    "contract": {
+      "aliceId": "alpaca-paper|TSLA",
+      "currency": "USD",
+      "exchange": "NASDAQ",
+      "secType": "STK",
+      "symbol": "TSLA"
+    },
+    "quantity": {
+      "kind": "value",
+      "value": "0.000000000000000001"
+    }
+  },
+  "tags": [
+    "closePosition",
+    "eth-18dp",
+    "STK",
+    "partial"
+  ]
+}

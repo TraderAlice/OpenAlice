@@ -47,10 +47,12 @@ export class FMPPriceTargetConsensusFetcher extends Fetcher {
         if (result && result.length > 0) {
           results.push(...result)
         } else {
-          console.warn(`Symbol Error: No data found for ${symbol}`)
+          // No analyst price targets — common for ETFs, small-caps without
+          // sell-side coverage, or recently IPO'd tickers. Not an error.
+          console.info(`fmp/price-target-consensus: no analyst targets for ${symbol}`)
         }
-      } catch {
-        console.warn(`Symbol Error: No data found for ${symbol}`)
+      } catch (err) {
+        console.warn(`fmp/price-target-consensus: request failed for ${symbol}:`, err instanceof Error ? err.message : err)
       }
     }
 

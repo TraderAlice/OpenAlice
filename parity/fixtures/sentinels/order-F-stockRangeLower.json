@@ -1,0 +1,21 @@
+{
+  "carrier": "Order",
+  "field": "stockRangeLower",
+  "name": "Order.stockRangeLower = UNSET_DOUBLE",
+  "raw": {
+    "action": "BUY",
+    "clientId": 0,
+    "orderId": 0,
+    "orderType": "MKT",
+    "permId": 0,
+    "stockRangeLower": 1.7976931348623157e+308,
+    "tif": "DAY"
+  },
+  "sentinel": "UNSET_DOUBLE",
+  "wireExpected": {
+    "emit": {
+      "kind": "unset"
+    },
+    "field": "stockRangeLower"
+  }
+}

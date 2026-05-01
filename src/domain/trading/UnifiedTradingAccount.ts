@@ -43,17 +43,24 @@ export interface UnifiedTradingAccountOptions {
 
 // ==================== Stage param types ====================
 
+/**
+ * All numeric fields are strings — Decimal precision must be
+ * preserved through the staging layer into the persisted git
+ * operation records. Callers (AI tools, HTTP routes) that have a
+ * number must convert via `String(x)` at the boundary; that's
+ * deliberate friction so the precision-loss point is explicit.
+ */
 export interface StagePlaceOrderParams {
   aliceId: string
   symbol?: string
   action: 'BUY' | 'SELL'
   orderType: string
-  totalQuantity?: number | string
-  cashQty?: number | string
-  lmtPrice?: number | string
-  auxPrice?: number | string
-  trailStopPrice?: number | string
-  trailingPercent?: number | string
+  totalQuantity?: string
+  cashQty?: string
+  lmtPrice?: string
+  auxPrice?: string
+  trailStopPrice?: string
+  trailingPercent?: string
   tif?: string
   goodTillDate?: string
   outsideRth?: boolean
@@ -65,11 +72,11 @@ export interface StagePlaceOrderParams {
 
 export interface StageModifyOrderParams {
   orderId: string
-  totalQuantity?: number | string
-  lmtPrice?: number | string
-  auxPrice?: number | string
-  trailStopPrice?: number | string
-  trailingPercent?: number | string
+  totalQuantity?: string
+  lmtPrice?: string
+  auxPrice?: string
+  trailStopPrice?: string
+  trailingPercent?: string
   orderType?: string
   tif?: string
   goodTillDate?: string
@@ -78,7 +85,8 @@ export interface StageModifyOrderParams {
 export interface StageClosePositionParams {
   aliceId: string
   symbol?: string
-  qty?: number
+  /** Empty / undefined closes the full position. */
+  qty?: string
 }
 
 // ==================== UnifiedTradingAccount ====================
@@ -459,10 +467,13 @@ export class UnifiedTradingAccount {
 
       const status = brokerOrder.orderState.status
       if (status !== 'Submitted' && status !== 'PreSubmitted') {
-        // Extract fill data when available
+        // Extract fill data when available — `.toFixed()` (not
+        // `.toNumber()`) so sub-satoshi qty (OKX-style accounting)
+        // round-trips into the persisted git operation record without
+        // IEEE-754 truncation.
         const orderFilledQty = brokerOrder.order.filledQuantity
         const filledQty = orderFilledQty && !orderFilledQty.equals(UNSET_DECIMAL)
-          ? orderFilledQty.toNumber()
+          ? orderFilledQty.toFixed()
           : undefined
 
         updates.push({
@@ -528,6 +539,18 @@ export class UnifiedTradingAccount {
     const results = await this._callBroker(() => this.broker.searchContracts(pattern))
     for (const desc of results) this.stampAliceId(desc.contract)
     return results
+  }
+
+  /**
+   * Optional broker-side catalog refresh (Alpaca, CCXT, Mock — those that
+   * cache an enumerable list locally). No-op for brokers that source search
+   * server-side (IBKR). Caller — typically a cron job — gets a resolved
+   * promise either way and a thrown exception if the broker tried and
+   * failed to refresh.
+   */
+  async refreshCatalog(): Promise<void> {
+    if (typeof this.broker.refreshCatalog !== 'function') return
+    await this._callBroker(() => this.broker.refreshCatalog!())
   }
 
   async getContractDetails(query: Contract): Promise<ContractDetails | null> {

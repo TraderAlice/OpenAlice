@@ -102,10 +102,15 @@ export class FMPKeyMetricsFetcher extends Fetcher {
         if (result.length > 0) {
           results.push(...result)
         } else {
-          console.warn(`Symbol Error: No data found for ${symbol}.`)
+          // Empty-but-successful: the asset legitimately has no key-metrics
+          // data on FMP. Common for ETFs / partnerships / commodity pools
+          // (Teucrium CORN, GLD, etc.) — they don't report standard company
+          // metrics. info, not warn — this is degradation, not an error.
+          console.info(`fmp/key-metrics: no rows for ${symbol} (typical for ETFs / partnerships without conventional fundamentals)`)
         }
-      } catch {
-        console.warn(`Symbol Error: No data found for ${symbol}.`)
+      } catch (err) {
+        // Real failure path — preserve the cause so it's debuggable.
+        console.warn(`fmp/key-metrics: request failed for ${symbol}:`, err instanceof Error ? err.message : err)
       }
     }
 

@@ -1,0 +1,16 @@
+{
+  "carrier": "ExecutionFilter",
+  "name": "ExecutionFilter with lastNDays=30",
+  "raw": {
+    "acctCode": "",
+    "clientId": 0,
+    "exchange": "",
+    "lastNDays": 30,
+    "secType": "",
+    "side": "",
+    "specificDates": null,
+    "symbol": "",
+    "time": ""
+  },
+  "stringified": "{\"clientId\":0,\"acctCode\":\"\",\"time\":\"\",\"symbol\":\"\",\"secType\":\"\",\"exchange\":\"\",\"side\":\"\",\"lastNDays\":30,\"specificDates\":null}"
+}

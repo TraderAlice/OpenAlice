@@ -126,10 +126,12 @@ export class FMPFinancialRatiosFetcher extends Fetcher {
         if (result.length > 0) {
           results.push(...result)
         } else {
-          console.warn(`Symbol Error: No data found for ${symbol}.`)
+          // Asset has no traditional financial ratios on FMP — typical for
+          // ETFs, commodity pools, and other non-operating-company structures.
+          console.info(`fmp/ratios: no rows for ${symbol} (typical for ETFs / partnerships without conventional fundamentals)`)
         }
-      } catch {
-        console.warn(`Symbol Error: No data found for ${symbol}.`)
+      } catch (err) {
+        console.warn(`fmp/ratios: request failed for ${symbol}:`, err instanceof Error ? err.message : err)
       }
     }
 

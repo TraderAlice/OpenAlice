@@ -1,0 +1,26 @@
+{
+  "carrier": "Execution",
+  "name": "Execution — every sentinel-bearing field is SET (corner case)",
+  "raw": {
+    "clientId": 0,
+    "cumQty": {
+      "__decimal__": "1.5"
+    },
+    "execId": "exec-0",
+    "orderId": 0,
+    "permId": 0,
+    "shares": {
+      "__decimal__": "1.5"
+    },
+    "side": "BOT"
+  },
+  "variant": "all-set",
+  "wireExpected": {
+    "cumQty": {
+      "kind": "value"
+    },
+    "shares": {
+      "kind": "value"
+    }
+  }
+}

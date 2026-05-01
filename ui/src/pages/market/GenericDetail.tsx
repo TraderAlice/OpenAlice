@@ -1,4 +1,5 @@
 import { KlinePanel } from '../../components/market/KlinePanel'
+import { TradeableContractsPanel } from '../../components/market/TradeableContractsPanel'
 import type { AssetClass } from '../../api/market'
 
 interface Props {
@@ -26,6 +27,8 @@ export function GenericDetail({ symbol, assetClass }: Props) {
       <div className="flex-1 min-h-[420px]">
         <KlinePanel selection={{ symbol, assetClass }} />
       </div>
+
+      <TradeableContractsPanel symbol={symbol} assetClass={assetClass} />
     </div>
   )
 }

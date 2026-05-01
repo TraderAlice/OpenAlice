@@ -1,0 +1,21 @@
+{
+  "carrier": "Order",
+  "field": "postToAts",
+  "name": "Order.postToAts = UNSET_INTEGER",
+  "raw": {
+    "action": "BUY",
+    "clientId": 0,
+    "orderId": 0,
+    "orderType": "MKT",
+    "permId": 0,
+    "postToAts": 2147483647,
+    "tif": "DAY"
+  },
+  "sentinel": "UNSET_INTEGER",
+  "wireExpected": {
+    "emit": {
+      "kind": "unset"
+    },
+    "field": "postToAts"
+  }
+}

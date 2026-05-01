@@ -1,0 +1,22 @@
+{
+  "carrier": "Execution",
+  "field": "shares",
+  "name": "Execution.shares = UNSET_DECIMAL",
+  "raw": {
+    "clientId": 0,
+    "execId": "exec-0",
+    "orderId": 0,
+    "permId": 0,
+    "shares": {
+      "__decimal__": "170141183460469231731687303715884105727"
+    },
+    "side": "BOT"
+  },
+  "sentinel": "UNSET_DECIMAL",
+  "wireExpected": {
+    "emit": {
+      "kind": "unset"
+    },
+    "field": "shares"
+  }
+}

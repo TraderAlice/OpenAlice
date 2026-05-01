@@ -1,0 +1,24 @@
+{
+  "category": "modifyOrder",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "submitted",
+  "name": "modifyOrder qty change (large) #4",
+  "operation": {
+    "action": "modifyOrder",
+    "changes": {
+      "totalQuantity": {
+        "kind": "value",
+        "value": "1000000000000000000000000000000"
+      }
+    },
+    "orderId": "mock-1004"
+  },
+  "tags": [
+    "modifyOrder",
+    "qty",
+    "large"
+  ]
+}

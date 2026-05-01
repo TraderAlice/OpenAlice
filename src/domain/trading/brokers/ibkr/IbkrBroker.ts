@@ -337,11 +337,12 @@ export class IbkrBroker implements IBroker {
   /** Attach avgFillPrice from cached orderStatus data if available. */
   private enrichWithFillData(o: import('./ibkr-types.js').CollectedOpenOrder): OpenOrder {
     const fillData = this.bridge.getFillData(o.order.orderId)
+    const rawAvg = fillData?.avgFillPrice ?? o.avgFillPrice
     return {
       contract: o.contract,
       order: o.order,
       orderState: o.orderState,
-      avgFillPrice: fillData?.avgFillPrice ?? o.avgFillPrice,
+      avgFillPrice: rawAvg != null ? String(rawAvg) : undefined,
     }
   }
 
@@ -367,12 +368,12 @@ export class IbkrBroker implements IBroker {
 
     return {
       contract,
-      last: snap.last ?? 0,
-      bid: snap.bid ?? 0,
-      ask: snap.ask ?? 0,
-      volume: snap.volume ?? 0,
-      high: snap.high,
-      low: snap.low,
+      last: String(snap.last ?? 0),
+      bid: String(snap.bid ?? 0),
+      ask: String(snap.ask ?? 0),
+      volume: String(snap.volume ?? 0),
+      high: snap.high != null ? String(snap.high) : undefined,
+      low: snap.low != null ? String(snap.low) : undefined,
       timestamp: snap.lastTimestamp ? new Date(snap.lastTimestamp * 1000) : new Date(),
     }
   }

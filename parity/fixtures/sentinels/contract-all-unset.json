@@ -1,0 +1,18 @@
+{
+  "carrier": "Contract",
+  "name": "Contract — every sentinel-bearing field is UNSET (corner case)",
+  "raw": {
+    "aliceId": "mock|MOCK",
+    "currency": "USD",
+    "exchange": "SMART",
+    "secType": "STK",
+    "strike": 1.7976931348623157e+308,
+    "symbol": "MOCK"
+  },
+  "variant": "all-unset",
+  "wireExpected": {
+    "strike": {
+      "kind": "unset"
+    }
+  }
+}

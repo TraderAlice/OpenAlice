@@ -72,16 +72,7 @@ export interface GetNewsV2Options {
 /** News data provider interface */
 export interface INewsProvider {
   /**
-   * Get news within a time range
-   *
-   * @param startTime - Start time (exclusive)
-   * @param endTime - End time (inclusive)
-   * @returns News within the time range (ascending by time)
-   */
-  getNews(startTime: Date, endTime: Date): Promise<NewsItem[]>
-
-  /**
-   * Get news (V2, supports semantic time and count limit)
+   * Get news (supports semantic time and count limit)
    *
    * @param options - Query options
    * @returns News list (ascending by time, newest last)

@@ -64,10 +64,14 @@ export class FMPEquityQuoteFetcher extends Fetcher {
         if (result && result.length > 0) {
           results.push(...result)
         } else {
-          console.warn(`Symbol Error: No data found for ${symbol}`)
+          // No quote means delisted, halted, or outside FMP coverage. Not
+          // an error — quote is the most basic endpoint, so empty here is
+          // a strong "we don't carry this asset" signal worth logging at
+          // info level.
+          console.info(`fmp/quote: no quote for ${symbol} (likely delisted or outside FMP coverage)`)
         }
-      } catch {
-        console.warn(`Symbol Error: No data found for ${symbol}`)
+      } catch (err) {
+        console.warn(`fmp/quote: request failed for ${symbol}:`, err instanceof Error ? err.message : err)
       }
     }
 

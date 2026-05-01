@@ -149,8 +149,8 @@ describe('CcxtBroker — Bybit e2e', () => {
 
     // Get current price to set reasonable TP/SL
     const quote = await b().getQuote(ethPerp.contract)
-    const tpPrice = Math.round(quote.last * 1.5)  // 50% above — won't trigger
-    const slPrice = Math.round(quote.last * 0.5)  // 50% below — won't trigger
+    const tpPrice = Math.round(Number(quote.last) * 1.5)  // 50% above — won't trigger
+    const slPrice = Math.round(Number(quote.last) * 0.5)  // 50% below — won't trigger
 
     const placed = await b().placeOrder(ethPerp.contract, order, {
       takeProfit: { price: String(tpPrice) },
@@ -200,7 +200,7 @@ describe('CcxtBroker — Bybit e2e', () => {
 
     // Get current price to set a trigger far away (won't execute)
     const quote = await b().getQuote(ethPerp.contract)
-    const triggerPrice = Math.round(quote.last * 0.5) // 50% below — will never trigger
+    const triggerPrice = Math.round(Number(quote.last) * 0.5) // 50% below — will never trigger
 
     // Place a conditional sell order via raw CCXT (with triggerPrice).
     // Bybit requires triggerDirection: price falling below trigger = "descending".

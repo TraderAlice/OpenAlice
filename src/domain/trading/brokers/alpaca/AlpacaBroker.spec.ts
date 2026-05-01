@@ -676,10 +676,10 @@ describe('AlpacaBroker — getQuote()', () => {
 
     const quote = await acc.getQuote(contract)
     expect(quote.contract.symbol).toBe('AAPL')
-    expect(quote.last).toBe(155.25)
-    expect(quote.bid).toBe(155.20)
-    expect(quote.ask).toBe(155.30)
-    expect(quote.volume).toBe(1_000_000)
+    expect(quote.last).toBe('155.25')
+    expect(quote.bid).toBe('155.2')
+    expect(quote.ask).toBe('155.3')
+    expect(quote.volume).toBe('1000000')
     expect(quote.timestamp).toEqual(new Date('2025-01-01T10:00:00Z'))
   })
 

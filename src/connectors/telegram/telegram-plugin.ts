@@ -13,7 +13,7 @@ import { forceCompact } from '../../core/compaction'
 import { readAIProviderConfig, setActiveProfile, readConnectorsConfig } from '../../core/config'
 import type { ConnectorCenter } from '../../core/connector-center.js'
 import { TelegramConnector, splitMessage, MAX_MESSAGE_LENGTH } from './telegram-connector.js'
-import type { AccountManager } from '../../domain/trading/index.js'
+import type { UTAManager } from '../../domain/trading/index.js'
 import type { Operation } from '../../domain/trading/git/types.js'
 import { getOperationSymbol } from '../../domain/trading/git/types.js'
 import { UNSET_DECIMAL } from '@traderalice/ibkr'
@@ -109,7 +109,7 @@ export class TelegramPlugin implements Plugin {
     })
 
     bot.command('trading', async (ctx) => {
-      await this.handleTradingCommand(ctx.chat.id, engineCtx.accountManager)
+      await this.handleTradingCommand(ctx.chat.id, engineCtx.utaManager)
     })
 
     // ── Callback queries (inline keyboard presses) ──
@@ -141,21 +141,21 @@ export class TelegramPlugin implements Plugin {
 
           if (action === 'back') {
             // Return to overview
-            const { text, keyboard } = await this.buildTradingOverview(engineCtx.accountManager)
+            const { text, keyboard } = await this.buildTradingOverview(engineCtx.utaManager)
             await ctx.answerCallbackQuery()
             await ctx.editMessageText(text, { reply_markup: keyboard }).catch(() => {})
           } else if (action === 'view') {
-            const { text, keyboard } = await this.buildAccountPanel(engineCtx.accountManager, accountId)
+            const { text, keyboard } = await this.buildAccountPanel(engineCtx.utaManager, accountId)
             await ctx.answerCallbackQuery()
             await ctx.editMessageText(text, { reply_markup: keyboard }).catch(() => {})
           } else if (action === 'push' || action === 'reject') {
-            const uta = engineCtx.accountManager.get(accountId)
+            const uta = engineCtx.utaManager.get(accountId)
             if (!uta) { await ctx.answerCallbackQuery({ text: 'Account not found' }); return }
             const status = uta.status()
             if (!status.pendingMessage) {
               await ctx.answerCallbackQuery({ text: 'No pending commit' })
               // Refresh panel
-              const { text, keyboard } = await this.buildAccountPanel(engineCtx.accountManager, accountId)
+              const { text, keyboard } = await this.buildAccountPanel(engineCtx.utaManager, accountId)
               await ctx.editMessageText(text, { reply_markup: keyboard }).catch(() => {})
               return
             }
@@ -167,7 +167,7 @@ export class TelegramPlugin implements Plugin {
               await ctx.answerCallbackQuery({ text: 'Rejected' })
             }
             // Refresh panel after action
-            const { text, keyboard } = await this.buildAccountPanel(engineCtx.accountManager, accountId)
+            const { text, keyboard } = await this.buildAccountPanel(engineCtx.utaManager, accountId)
             await ctx.editMessageText(text, { reply_markup: keyboard }).catch(() => {})
           }
         } else if (data.startsWith('heartbeat:')) {
@@ -447,8 +447,8 @@ export class TelegramPlugin implements Plugin {
 
   // ── Trading command ──
 
-  private async handleTradingCommand(chatId: number, accountManager: AccountManager) {
-    const accounts = accountManager.resolve()
+  private async handleTradingCommand(chatId: number, utaManager: UTAManager) {
+    const accounts = utaManager.resolve()
     if (accounts.length === 0) {
       await this.sendReply(chatId, 'No trading accounts configured.')
       return
@@ -456,18 +456,18 @@ export class TelegramPlugin implements Plugin {
 
     // Single account — skip overview, show panel directly
     if (accounts.length === 1) {
-      const { text, keyboard } = await this.buildAccountPanel(accountManager, accounts[0].id)
+      const { text, keyboard } = await this.buildAccountPanel(utaManager, accounts[0].id)
       await this.bot!.api.sendMessage(chatId, text, { reply_markup: keyboard })
       return
     }
 
     // Multiple accounts — show overview with account selector
-    const { text, keyboard } = await this.buildTradingOverview(accountManager)
+    const { text, keyboard } = await this.buildTradingOverview(utaManager)
     await this.bot!.api.sendMessage(chatId, text, { reply_markup: keyboard })
   }
 
-  private async buildTradingOverview(accountManager: AccountManager): Promise<{ text: string; keyboard: InlineKeyboard }> {
-    const accounts = accountManager.resolve()
+  private async buildTradingOverview(utaManager: UTAManager): Promise<{ text: string; keyboard: InlineKeyboard }> {
+    const accounts = utaManager.resolve()
     const lines: string[] = ['Trading Panel', '']
     const keyboard = new InlineKeyboard()
 
@@ -487,8 +487,8 @@ export class TelegramPlugin implements Plugin {
     return { text: lines.join('\n'), keyboard }
   }
 
-  private async buildAccountPanel(accountManager: AccountManager, accountId: string): Promise<{ text: string; keyboard: InlineKeyboard }> {
-    const uta = accountManager.get(accountId)
+  private async buildAccountPanel(utaManager: UTAManager, accountId: string): Promise<{ text: string; keyboard: InlineKeyboard }> {
+    const uta = utaManager.get(accountId)
     if (!uta) return { text: 'Account not found.', keyboard: new InlineKeyboard() }
 
     const healthIcon = uta.health === 'healthy' ? '🟢' : uta.health === 'degraded' ? '🟡' : '🔴'
@@ -537,7 +537,7 @@ export class TelegramPlugin implements Plugin {
     }
 
     // Back button only if multiple accounts
-    if (accountManager.size > 1) {
+    if (utaManager.size > 1) {
       keyboard.text('← Back', 'trading:back:')
     }
 

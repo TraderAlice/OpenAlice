@@ -1,0 +1,18 @@
+{
+  "carrier": "OrderState",
+  "field": "suggestedSize",
+  "name": "OrderState.suggestedSize = UNSET_DECIMAL",
+  "raw": {
+    "status": "PreSubmitted",
+    "suggestedSize": {
+      "__decimal__": "170141183460469231731687303715884105727"
+    }
+  },
+  "sentinel": "UNSET_DECIMAL",
+  "wireExpected": {
+    "emit": {
+      "kind": "unset"
+    },
+    "field": "suggestedSize"
+  }
+}

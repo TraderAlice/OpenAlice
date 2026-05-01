@@ -1,0 +1,21 @@
+{
+  "carrier": "ContractDetails",
+  "field": "lastPricePrecision",
+  "name": "ContractDetails.lastPricePrecision = UNSET_DECIMAL",
+  "raw": {
+    "contract": {
+      "secType": "STK",
+      "symbol": "MOCK"
+    },
+    "lastPricePrecision": {
+      "__decimal__": "170141183460469231731687303715884105727"
+    }
+  },
+  "sentinel": "UNSET_DECIMAL",
+  "wireExpected": {
+    "emit": {
+      "kind": "unset"
+    },
+    "field": "lastPricePrecision"
+  }
+}

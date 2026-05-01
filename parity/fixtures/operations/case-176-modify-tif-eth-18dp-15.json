@@ -1,0 +1,21 @@
+{
+  "category": "modifyOrder",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "submitted",
+  "name": "modifyOrder tif change (eth-18dp) #15",
+  "operation": {
+    "action": "modifyOrder",
+    "changes": {
+      "tif": "GTC"
+    },
+    "orderId": "mock-1015"
+  },
+  "tags": [
+    "modifyOrder",
+    "tif",
+    "eth-18dp"
+  ]
+}

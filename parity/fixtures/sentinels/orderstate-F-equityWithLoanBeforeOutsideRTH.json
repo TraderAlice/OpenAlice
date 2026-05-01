@@ -1,0 +1,16 @@
+{
+  "carrier": "OrderState",
+  "field": "equityWithLoanBeforeOutsideRTH",
+  "name": "OrderState.equityWithLoanBeforeOutsideRTH = UNSET_DOUBLE",
+  "raw": {
+    "equityWithLoanBeforeOutsideRTH": 1.7976931348623157e+308,
+    "status": "PreSubmitted"
+  },
+  "sentinel": "UNSET_DOUBLE",
+  "wireExpected": {
+    "emit": {
+      "kind": "unset"
+    },
+    "field": "equityWithLoanBeforeOutsideRTH"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "category": "modifyOrder",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "submitted",
+  "name": "modifyOrder type change (std-2dp) #6",
+  "operation": {
+    "action": "modifyOrder",
+    "changes": {
+      "lmtPrice": {
+        "kind": "value",
+        "value": "50.25"
+      },
+      "orderType": "LMT"
+    },
+    "orderId": "mock-1006"
+  },
+  "tags": [
+    "modifyOrder",
+    "type",
+    "std-2dp"
+  ]
+}

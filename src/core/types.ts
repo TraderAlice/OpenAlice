@@ -1,5 +1,5 @@
 import type { QueryExecutor } from '@traderalice/opentypebb'
-import type { AccountManager } from '../domain/trading/index.js'
+import type { UTAManager } from '../domain/trading/index.js'
 import type { FxService } from '../domain/trading/fx-service.js'
 import type { SnapshotService } from '../domain/trading/snapshot/index.js'
 import type { INewsProvider } from '../domain/news/types.js'
@@ -50,7 +50,7 @@ export interface EngineContext {
   marketSearch: MarketSearchDeps
 
   // Trading (unified account model)
-  accountManager: AccountManager
+  utaManager: UTAManager
   fxService: FxService
   snapshotService?: SnapshotService
   newsProvider?: INewsProvider

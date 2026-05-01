@@ -1,0 +1,96 @@
+{
+  "commits": [
+    {
+      "hash": "eeee5555",
+      "message": "BUY 100 AAPL MKT (LIVE)",
+      "operations": [
+        {
+          "action": "placeOrder",
+          "contract": {
+            "aliceId": "alpaca-live|AAPL",
+            "currency": "USD",
+            "exchange": "NASDAQ",
+            "primaryExchange": "NASDAQ",
+            "secType": "STK",
+            "symbol": "AAPL"
+          },
+          "order": {
+            "action": "BUY",
+            "orderType": "MKT",
+            "tif": "DAY",
+            "totalQuantity": "100"
+          }
+        }
+      ],
+      "parentHash": null,
+      "results": [
+        {
+          "action": "placeOrder",
+          "filledPrice": "180.50",
+          "filledQty": "100",
+          "orderId": "live-1",
+          "status": "filled",
+          "success": true
+        }
+      ],
+      "stateAfter": {
+        "netLiquidation": "99950",
+        "pendingOrders": [],
+        "positions": [
+          {
+            "accountId": "alpaca-live",
+            "avgCost": "180.50",
+            "marketPrice": "180.50",
+            "marketValue": "18050",
+            "quantity": "100",
+            "symbol": "AAPL",
+            "unrealizedPnL": "0"
+          }
+        ],
+        "realizedPnL": "0",
+        "totalCashValue": "81900",
+        "unrealizedPnL": "0"
+      },
+      "timestamp": "2026-04-16T14:30:00.000Z"
+    },
+    {
+      "hash": "ffff6666",
+      "message": "closePosition AAPL all (LIVE)",
+      "operations": [
+        {
+          "action": "closePosition",
+          "contract": {
+            "aliceId": "alpaca-live|AAPL",
+            "currency": "USD",
+            "exchange": "NASDAQ",
+            "primaryExchange": "NASDAQ",
+            "secType": "STK",
+            "symbol": "AAPL"
+          },
+          "quantity": "100"
+        }
+      ],
+      "parentHash": "eeee5555",
+      "results": [
+        {
+          "action": "closePosition",
+          "filledPrice": "181.00",
+          "filledQty": "100",
+          "orderId": "live-2",
+          "status": "filled",
+          "success": true
+        }
+      ],
+      "stateAfter": {
+        "netLiquidation": "100050",
+        "pendingOrders": [],
+        "positions": [],
+        "realizedPnL": "50",
+        "totalCashValue": "100050",
+        "unrealizedPnL": "0"
+      },
+      "timestamp": "2026-04-16T16:00:00.000Z"
+    }
+  ],
+  "head": "eeee5555"
+}

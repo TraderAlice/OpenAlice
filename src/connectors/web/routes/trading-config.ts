@@ -1,29 +1,11 @@
 import { Hono } from 'hono'
-import ccxt from 'ccxt'
 import type { EngineContext } from '../../../core/types.js'
 import {
-  readAccountsConfig, writeAccountsConfig,
-  accountConfigSchema,
+  readUTAsConfig, writeUTAsConfig,
+  utaConfigSchema,
 } from '../../../core/config.js'
 import { createBroker } from '../../../domain/trading/brokers/factory.js'
-import { BROKER_REGISTRY } from '../../../domain/trading/brokers/registry.js'
-import type { BrokerConfigField } from '../../../domain/trading/brokers/types.js'
-
-// ==================== CCXT credential field metadata ====================
-
-/** Map of CCXT standard credential field name → UI display metadata. */
-const CCXT_CREDENTIAL_LABELS: Record<string, { label: string; type: BrokerConfigField['type']; sensitive: boolean; placeholder?: string }> = {
-  apiKey:        { label: 'API Key',        type: 'password', sensitive: true },
-  secret:        { label: 'API Secret',     type: 'password', sensitive: true },
-  uid:           { label: 'User ID',        type: 'text',     sensitive: false },
-  accountId:     { label: 'Account ID',     type: 'text',     sensitive: false },
-  login:         { label: 'Login',          type: 'text',     sensitive: false },
-  password:      { label: 'Passphrase',     type: 'password', sensitive: true, placeholder: 'Required by some exchanges (e.g. OKX)' },
-  twofa:         { label: '2FA Secret',     type: 'password', sensitive: true },
-  privateKey:    { label: 'Private Key',    type: 'password', sensitive: true, placeholder: 'Wallet private key (for Hyperliquid, dYdX, etc.)' },
-  walletAddress: { label: 'Wallet Address', type: 'text',     sensitive: false, placeholder: '0x...' },
-  token:         { label: 'Token',          type: 'password', sensitive: true },
-}
+import { BUILTIN_BROKER_PRESETS } from '../../../domain/trading/brokers/presets.js'
 
 // ==================== Credential helpers ====================
 
@@ -69,76 +51,27 @@ function unmaskSecrets(
 export function createTradingConfigRoutes(ctx: EngineContext) {
   const app = new Hono()
 
-  // ==================== Broker types (for dynamic UI rendering) ====================
+  // ==================== Broker presets (for the wizard) ====================
 
-  app.get('/broker-types', (c) => {
-    const brokerTypes = Object.entries(BROKER_REGISTRY).map(([type, entry]) => ({
-      type,
-      name: entry.name,
-      description: entry.description,
-      setupGuide: entry.setupGuide,
-      badge: entry.badge,
-      badgeColor: entry.badgeColor,
-      fields: entry.configFields,
-      subtitleFields: entry.subtitleFields,
-      guardCategory: entry.guardCategory,
-    }))
-    return c.json({ brokerTypes })
-  })
-
-  // ==================== CCXT dynamic exchange + credential metadata ====================
-
-  /** List all CCXT-supported exchanges (dynamically from the ccxt package). */
-  app.get('/ccxt/exchanges', (c) => {
-    const exchanges = (ccxt as unknown as { exchanges: string[] }).exchanges ?? []
-    return c.json({ exchanges })
-  })
-
-  /** Return the credential fields a given CCXT exchange requires (read from its requiredCredentials map). */
-  app.get('/ccxt/exchanges/:name/credentials', (c) => {
-    const name = c.req.param('name')
-    const exchanges = ccxt as unknown as Record<string, new (opts?: Record<string, unknown>) => { requiredCredentials?: Record<string, boolean> }>
-    const ExchangeClass = exchanges[name]
-    if (!ExchangeClass) return c.json({ error: `Unknown exchange: ${name}` }, 404)
-
-    try {
-      const inst = new ExchangeClass()
-      const required = inst.requiredCredentials ?? {}
-      const fields: BrokerConfigField[] = []
-      for (const [key, needed] of Object.entries(required)) {
-        if (!needed) continue
-        const meta = CCXT_CREDENTIAL_LABELS[key]
-        if (!meta) continue // skip unknown credential names (CCXT may add new ones)
-        fields.push({
-          name: key,
-          type: meta.type,
-          label: meta.label,
-          required: true,
-          sensitive: meta.sensitive,
-          placeholder: meta.placeholder,
-        })
-      }
-      return c.json({ fields })
-    } catch (err) {
-      return c.json({ error: err instanceof Error ? err.message : String(err) }, 500)
-    }
+  app.get('/broker-presets', (c) => {
+    return c.json({ presets: BUILTIN_BROKER_PRESETS })
   })
 
   // ==================== Read all ====================
 
   app.get('/', async (c) => {
     try {
-      const accounts = await readAccountsConfig()
-      const maskedAccounts = accounts.map((a) => maskSecrets({ ...a }))
-      return c.json({ accounts: maskedAccounts })
+      const utas = await readUTAsConfig()
+      const maskedUTAs = utas.map((a) => maskSecrets({ ...a }))
+      return c.json({ utas: maskedUTAs })
     } catch (err) {
       return c.json({ error: String(err) }, 500)
     }
   })
 
-  // ==================== Accounts CRUD ====================
+  // ==================== UTA CRUD ====================
 
-  app.put('/accounts/:id', async (c) => {
+  app.put('/uta/:id', async (c) => {
     try {
       const id = c.req.param('id')
       const body = await c.req.json()
@@ -147,13 +80,13 @@ export function createTradingConfigRoutes(ctx: EngineContext) {
       }
 
       // Restore masked credentials from existing config
-      const accounts = await readAccountsConfig()
+      const accounts = await readUTAsConfig()
       const existing = accounts.find((a) => a.id === id)
       if (existing) {
         unmaskSecrets(body, existing as unknown as Record<string, unknown>)
       }
 
-      const validated = accountConfigSchema.parse(body)
+      const validated = utaConfigSchema.parse(body)
 
       const idx = accounts.findIndex((a) => a.id === id)
       if (idx >= 0) {
@@ -161,17 +94,17 @@ export function createTradingConfigRoutes(ctx: EngineContext) {
       } else {
         accounts.push(validated)
       }
-      await writeAccountsConfig(accounts)
+      await writeUTAsConfig(accounts)
 
       // Handle enabled state changes at runtime
       const wasEnabled = existing?.enabled !== false
       const nowEnabled = validated.enabled !== false
       if (wasEnabled && !nowEnabled) {
         // Disabled — close running account
-        await ctx.accountManager.removeAccount(id)
+        await ctx.utaManager.removeUTA(id)
       } else if (!wasEnabled && nowEnabled) {
         // Enabled — start account
-        ctx.accountManager.reconnectAccount(id).catch(() => {})
+        ctx.utaManager.reconnectUTA(id).catch(() => {})
       }
 
       return c.json(validated)
@@ -183,17 +116,17 @@ export function createTradingConfigRoutes(ctx: EngineContext) {
     }
   })
 
-  app.delete('/accounts/:id', async (c) => {
+  app.delete('/uta/:id', async (c) => {
     try {
       const id = c.req.param('id')
-      const accounts = await readAccountsConfig()
+      const accounts = await readUTAsConfig()
       const filtered = accounts.filter((a) => a.id !== id)
       if (filtered.length === accounts.length) {
         return c.json({ error: `Account "${id}" not found` }, 404)
       }
-      await writeAccountsConfig(filtered)
+      await writeUTAsConfig(filtered)
       // Close and deregister running account instance if any
-      await ctx.accountManager.removeAccount(id)
+      await ctx.utaManager.removeUTA(id)
       return c.json({ success: true })
     } catch (err) {
       return c.json({ error: String(err) }, 500)
@@ -203,15 +136,26 @@ export function createTradingConfigRoutes(ctx: EngineContext) {
   // ==================== Test Connection ====================
 
   app.post('/test-connection', async (c) => {
-    let broker: { init: () => Promise<void>; getAccount: () => Promise<unknown>; close: () => Promise<void> } | null = null
+    let broker: {
+      init: () => Promise<void>
+      getAccount: () => Promise<unknown>
+      getPositions: () => Promise<unknown>
+      close: () => Promise<void>
+    } | null = null
     try {
       const body = await c.req.json()
-      const accountConfig = accountConfigSchema.parse({ ...body, id: body.id ?? '__test__' })
+      const utaConfig = utaConfigSchema.parse({ ...body, id: body.id ?? '__test__' })
 
-      broker = createBroker(accountConfig)
+      broker = createBroker(utaConfig)
       await broker.init()
-      const account = await broker.getAccount()
-      return c.json({ success: true, account })
+      // Run both calls in parallel — getAccount proves auth, getPositions
+      // exercises the data path the user actually cares about (e.g. for OKX
+      // UTA, this is what surfaces spot holdings via fetchSpotHoldings).
+      const [account, positions] = await Promise.all([
+        broker.getAccount(),
+        broker.getPositions(),
+      ])
+      return c.json({ success: true, account, positions })
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       return c.json({ success: false, error: msg }, 400)

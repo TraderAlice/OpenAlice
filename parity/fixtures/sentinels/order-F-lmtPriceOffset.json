@@ -1,0 +1,21 @@
+{
+  "carrier": "Order",
+  "field": "lmtPriceOffset",
+  "name": "Order.lmtPriceOffset = UNSET_DOUBLE",
+  "raw": {
+    "action": "BUY",
+    "clientId": 0,
+    "lmtPriceOffset": 1.7976931348623157e+308,
+    "orderId": 0,
+    "orderType": "MKT",
+    "permId": 0,
+    "tif": "DAY"
+  },
+  "sentinel": "UNSET_DOUBLE",
+  "wireExpected": {
+    "emit": {
+      "kind": "unset"
+    },
+    "field": "lmtPriceOffset"
+  }
+}

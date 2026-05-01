@@ -146,13 +146,15 @@ export function createNewsArchiveTools(provider: INewsProvider) {
 Returns matching headlines with index, title, content length, and metadata preview.
 Use this to quickly scan what's been happening in the market.
 
-Time range control:
-- lookback: "1h", "2h", "12h", "1d", "7d" (default: all available news)
+Search pool: the most recent ${NEWS_LIMIT} items within \`lookback\` (or the
+most recent ${NEWS_LIMIT} overall when \`lookback\` is omitted). Older items
+within the lookback window are NOT searched. Your \`limit\` then bounds the
+match count returned from that pool.
 
 Example: globNews({ pattern: "BTC|Bitcoin", lookback: "1d" })`,
       inputSchema: z.object({
         pattern: z.string().describe('Regex to match against news titles'),
-        lookback: z.string().optional().describe('Time range: "1h", "12h", "1d", "7d"'),
+        lookback: z.string().optional().describe(`Time range: "1h", "12h", "1d", "7d" (searches up to ${NEWS_LIMIT} most recent items in the window)`),
         metadataFilter: z.record(z.string(), z.string()).optional().describe('Filter by metadata key-value'),
         limit: z.number().int().positive().optional().describe('Max results'),
       }),
@@ -170,10 +172,14 @@ Example: globNews({ pattern: "BTC|Bitcoin", lookback: "1d" })`,
 Returns matched text with surrounding context.
 Use this to find specific mentions in news articles.
 
+Search pool: the most recent ${NEWS_LIMIT} items within \`lookback\` (or the
+most recent ${NEWS_LIMIT} overall when \`lookback\` is omitted). Older items
+within the lookback window are NOT searched.
+
 Example: grepNews({ pattern: "interest rate", lookback: "2d" })`,
       inputSchema: z.object({
         pattern: z.string().describe('Regex to search in title and content'),
-        lookback: z.string().optional().describe('Time range: "1h", "12h", "1d", "7d"'),
+        lookback: z.string().optional().describe(`Time range: "1h", "12h", "1d", "7d" (searches up to ${NEWS_LIMIT} most recent items in the window)`),
         contextChars: z.number().int().positive().optional().describe('Context chars around match (default: 50)'),
         metadataFilter: z.record(z.string(), z.string()).optional().describe('Filter by metadata key-value'),
         limit: z.number().int().positive().optional().describe('Max results'),
@@ -189,11 +195,12 @@ Example: grepNews({ pattern: "interest rate", lookback: "2d" })`,
     readNews: tool({
       description: `Read full content of a collected news item by index (like "cat").
 
-Use after globNews/grepNews to read a specific article.
-Use the same lookback as your previous query for consistent indices.`,
+Use after globNews/grepNews to read a specific article. The index addresses the
+same ${NEWS_LIMIT}-item search pool used by globNews/grepNews — pass the SAME
+\`lookback\` you used in the prior call, otherwise the indices will not align.`,
       inputSchema: z.object({
         index: z.number().int().nonnegative().describe('News index from globNews/grepNews results'),
-        lookback: z.string().optional().describe('Match the lookback from your prior globNews/grepNews call'),
+        lookback: z.string().optional().describe(`Match the lookback from your prior globNews/grepNews call (addresses the same ${NEWS_LIMIT}-item pool)`),
       }),
       execute: async ({ index, lookback }) => {
         const result = await readNews(

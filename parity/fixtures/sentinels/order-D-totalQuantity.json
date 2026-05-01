@@ -1,0 +1,23 @@
+{
+  "carrier": "Order",
+  "field": "totalQuantity",
+  "name": "Order.totalQuantity = UNSET_DECIMAL",
+  "raw": {
+    "action": "BUY",
+    "clientId": 0,
+    "orderId": 0,
+    "orderType": "MKT",
+    "permId": 0,
+    "tif": "DAY",
+    "totalQuantity": {
+      "__decimal__": "170141183460469231731687303715884105727"
+    }
+  },
+  "sentinel": "UNSET_DECIMAL",
+  "wireExpected": {
+    "emit": {
+      "kind": "unset"
+    },
+    "field": "totalQuantity"
+  }
+}

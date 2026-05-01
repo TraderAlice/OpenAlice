@@ -1,0 +1,29 @@
+{
+  "category": "closePosition",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "filled",
+  "name": "closePosition full-explicit-2 ETH/USDT (btc-8dp) #19",
+  "operation": {
+    "action": "closePosition",
+    "contract": {
+      "aliceId": "bybit-main|ETH/USDT",
+      "currency": "USDT",
+      "exchange": "bybit",
+      "secType": "CRYPTO",
+      "symbol": "ETH/USDT"
+    },
+    "quantity": {
+      "kind": "value",
+      "value": "0.00012345"
+    }
+  },
+  "tags": [
+    "closePosition",
+    "btc-8dp",
+    "CRYPTO",
+    "full-explicit-2"
+  ]
+}

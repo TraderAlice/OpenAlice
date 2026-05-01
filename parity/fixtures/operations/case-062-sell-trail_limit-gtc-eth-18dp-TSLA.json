@@ -1,0 +1,52 @@
+{
+  "category": "core-sell",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "filled",
+  "name": "SELL TRAIL_LIMIT GTC on TSLA (eth-18dp)",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "aliceId": "alpaca-paper|TSLA",
+      "currency": "USD",
+      "exchange": "NASDAQ",
+      "secType": "STK",
+      "symbol": "TSLA"
+    },
+    "order": {
+      "action": "SELL",
+      "auxPrice": {
+        "kind": "unset"
+      },
+      "cashQty": {
+        "kind": "unset"
+      },
+      "lmtPrice": {
+        "kind": "unset"
+      },
+      "orderType": "TRAIL_LIMIT",
+      "tif": "GTC",
+      "totalQuantity": {
+        "kind": "value",
+        "value": "0.000000000000000001"
+      },
+      "trailStopPrice": {
+        "kind": "value",
+        "value": "3500.123456789012345"
+      },
+      "trailingPercent": {
+        "kind": "value",
+        "value": "2"
+      }
+    }
+  },
+  "tags": [
+    "SELL",
+    "TRAIL_LIMIT",
+    "GTC",
+    "eth-18dp",
+    "STK"
+  ]
+}

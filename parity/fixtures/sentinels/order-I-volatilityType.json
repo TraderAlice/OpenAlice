@@ -1,0 +1,21 @@
+{
+  "carrier": "Order",
+  "field": "volatilityType",
+  "name": "Order.volatilityType = UNSET_INTEGER",
+  "raw": {
+    "action": "BUY",
+    "clientId": 0,
+    "orderId": 0,
+    "orderType": "MKT",
+    "permId": 0,
+    "tif": "DAY",
+    "volatilityType": 2147483647
+  },
+  "sentinel": "UNSET_INTEGER",
+  "wireExpected": {
+    "emit": {
+      "kind": "unset"
+    },
+    "field": "volatilityType"
+  }
+}

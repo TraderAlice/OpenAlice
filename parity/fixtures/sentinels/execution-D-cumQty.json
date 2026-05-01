@@ -1,0 +1,22 @@
+{
+  "carrier": "Execution",
+  "field": "cumQty",
+  "name": "Execution.cumQty = UNSET_DECIMAL",
+  "raw": {
+    "clientId": 0,
+    "cumQty": {
+      "__decimal__": "170141183460469231731687303715884105727"
+    },
+    "execId": "exec-0",
+    "orderId": 0,
+    "permId": 0,
+    "side": "BOT"
+  },
+  "sentinel": "UNSET_DECIMAL",
+  "wireExpected": {
+    "emit": {
+      "kind": "unset"
+    },
+    "field": "cumQty"
+  }
+}

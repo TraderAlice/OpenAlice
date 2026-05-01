@@ -1,0 +1,47 @@
+{
+  "carrier": "OrderState",
+  "name": "OrderState all-set Filled (with allocations)",
+  "raw": {
+    "commissionAndFees": 2,
+    "commissionAndFeesCurrency": "",
+    "completedStatus": "",
+    "completedTime": "",
+    "equityWithLoanAfter": "",
+    "equityWithLoanAfterOutsideRTH": 4955,
+    "equityWithLoanBefore": "",
+    "equityWithLoanBeforeOutsideRTH": 5000,
+    "equityWithLoanChange": "",
+    "equityWithLoanChangeOutsideRTH": -45,
+    "initMarginAfter": "",
+    "initMarginAfterOutsideRTH": 1050,
+    "initMarginBefore": "",
+    "initMarginBeforeOutsideRTH": 1000,
+    "initMarginChange": "",
+    "initMarginChangeOutsideRTH": 50,
+    "maintMarginAfter": "",
+    "maintMarginAfterOutsideRTH": 840,
+    "maintMarginBefore": "",
+    "maintMarginBeforeOutsideRTH": 800,
+    "maintMarginChange": "",
+    "maintMarginChangeOutsideRTH": 40,
+    "marginCurrency": "",
+    "maxCommissionAndFees": 2.05,
+    "minCommissionAndFees": 1.95,
+    "orderAllocations": [
+      {
+        "account": "paper-account-1",
+        "allowedAllocQty": "10",
+        "desiredAllocQty": "10",
+        "isMonetary": false,
+        "position": "100",
+        "positionAfter": "110",
+        "positionDesired": "110"
+      }
+    ],
+    "rejectReason": "",
+    "status": "Filled",
+    "suggestedSize": "100",
+    "warningText": ""
+  },
+  "stringified": "{\"status\":\"Filled\",\"initMarginBefore\":\"\",\"maintMarginBefore\":\"\",\"equityWithLoanBefore\":\"\",\"initMarginChange\":\"\",\"maintMarginChange\":\"\",\"equityWithLoanChange\":\"\",\"initMarginAfter\":\"\",\"maintMarginAfter\":\"\",\"equityWithLoanAfter\":\"\",\"commissionAndFees\":2,\"minCommissionAndFees\":1.95,\"maxCommissionAndFees\":2.05,\"commissionAndFeesCurrency\":\"\",\"marginCurrency\":\"\",\"initMarginBeforeOutsideRTH\":1000,\"maintMarginBeforeOutsideRTH\":800,\"equityWithLoanBeforeOutsideRTH\":5000,\"initMarginChangeOutsideRTH\":50,\"maintMarginChangeOutsideRTH\":40,\"equityWithLoanChangeOutsideRTH\":-45,\"initMarginAfterOutsideRTH\":1050,\"maintMarginAfterOutsideRTH\":840,\"equityWithLoanAfterOutsideRTH\":4955,\"suggestedSize\":\"100\",\"rejectReason\":\"\",\"orderAllocations\":[{\"account\":\"paper-account-1\",\"position\":\"100\",\"positionDesired\":\"110\",\"positionAfter\":\"110\",\"desiredAllocQty\":\"10\",\"allowedAllocQty\":\"10\",\"isMonetary\":false}],\"warningText\":\"\",\"completedTime\":\"\",\"completedStatus\":\"\"}"
+}

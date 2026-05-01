@@ -1,0 +1,20 @@
+{
+  "carrier": "Contract",
+  "field": "strike",
+  "name": "Contract.strike = UNSET_DOUBLE",
+  "raw": {
+    "aliceId": "mock|MOCK",
+    "currency": "USD",
+    "exchange": "SMART",
+    "secType": "STK",
+    "strike": 1.7976931348623157e+308,
+    "symbol": "MOCK"
+  },
+  "sentinel": "UNSET_DOUBLE",
+  "wireExpected": {
+    "emit": {
+      "kind": "unset"
+    },
+    "field": "strike"
+  }
+}

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { ContractDescription } from '@traderalice/ibkr'
-import { AccountManager } from './account-manager.js'
+import { UTAManager } from './uta-manager.js'
 import { UnifiedTradingAccount } from './UnifiedTradingAccount.js'
 import {
   MockBroker,
@@ -12,11 +12,11 @@ function makeUta(broker: MockBroker): UnifiedTradingAccount {
   return new UnifiedTradingAccount(broker)
 }
 
-describe('AccountManager', () => {
-  let manager: AccountManager
+describe('UTAManager', () => {
+  let manager: UTAManager
 
   beforeEach(() => {
-    manager = new AccountManager()
+    manager = new UTAManager()
   })
 
   // ==================== Registration ====================
@@ -50,14 +50,14 @@ describe('AccountManager', () => {
     })
   })
 
-  // ==================== listAccounts ====================
+  // ==================== listUTAs ====================
 
-  describe('listAccounts', () => {
+  describe('listUTAs', () => {
     it('returns summaries of all accounts', () => {
       manager.add(makeUta(new MockBroker({ id: 'a1', label: 'Paper' })))
       manager.add(makeUta(new MockBroker({ id: 'a2', label: 'Bybit' })))
 
-      const list = manager.listAccounts()
+      const list = manager.listUTAs()
       expect(list).toHaveLength(2)
       expect(list[0].id).toBe('a1')
       expect(list[1].id).toBe('a2')
@@ -87,7 +87,7 @@ describe('AccountManager', () => {
     })
 
     it('resolveOne throws on zero matches', () => {
-      expect(() => manager.resolveOne('nope')).toThrow('No account found')
+      expect(() => manager.resolveOne('nope')).toThrow('No UTA found')
     })
 
     it('resolveOne throws on multiple matches via resolve override', () => {

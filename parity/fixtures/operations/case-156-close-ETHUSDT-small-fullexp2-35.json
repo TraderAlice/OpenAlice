@@ -1,0 +1,29 @@
+{
+  "category": "closePosition",
+  "config": {
+    "expectGuardReject": false,
+    "fillPolicy": "full"
+  },
+  "expectedStatus": "filled",
+  "name": "closePosition full-explicit-2 ETH/USDT (small) #35",
+  "operation": {
+    "action": "closePosition",
+    "contract": {
+      "aliceId": "bybit-main|ETH/USDT",
+      "currency": "USDT",
+      "exchange": "bybit",
+      "secType": "CRYPTO",
+      "symbol": "ETH/USDT"
+    },
+    "quantity": {
+      "kind": "value",
+      "value": "0.000000000000000000000000000001"
+    }
+  },
+  "tags": [
+    "closePosition",
+    "small",
+    "CRYPTO",
+    "full-explicit-2"
+  ]
+}

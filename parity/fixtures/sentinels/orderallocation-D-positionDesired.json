@@ -1,0 +1,19 @@
+{
+  "carrier": "OrderAllocation",
+  "field": "positionDesired",
+  "name": "OrderAllocation.positionDesired = UNSET_DECIMAL",
+  "raw": {
+    "account": "",
+    "isMonetary": false,
+    "positionDesired": {
+      "__decimal__": "170141183460469231731687303715884105727"
+    }
+  },
+  "sentinel": "UNSET_DECIMAL",
+  "wireExpected": {
+    "emit": {
+      "kind": "unset"
+    },
+    "field": "positionDesired"
+  }
+}
