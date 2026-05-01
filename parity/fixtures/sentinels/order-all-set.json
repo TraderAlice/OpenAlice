@@ -1,0 +1,205 @@
+{
+  "carrier": "Order",
+  "name": "Order — every sentinel-bearing field is SET (corner case)",
+  "raw": {
+    "action": "BUY",
+    "adjustedStopLimitPrice": 0.25,
+    "adjustedStopPrice": 0.25,
+    "adjustedTrailingAmount": 0.25,
+    "auxPrice": {
+      "__decimal__": "1.5"
+    },
+    "basisPoints": 0.25,
+    "basisPointsType": 100,
+    "cashQty": {
+      "__decimal__": "1.5"
+    },
+    "clientId": 0,
+    "competeAgainstBestOffset": 0.25,
+    "delta": 0.25,
+    "deltaNeutralAuxPrice": 0.25,
+    "duration": 100,
+    "filledQuantity": {
+      "__decimal__": "1.5"
+    },
+    "lmtPrice": {
+      "__decimal__": "1.5"
+    },
+    "lmtPriceOffset": 0.25,
+    "manualOrderIndicator": 100,
+    "midOffsetAtHalf": 0.25,
+    "midOffsetAtWhole": 0.25,
+    "minCompeteSize": 100,
+    "minQty": 100,
+    "minTradeQty": 100,
+    "orderId": 0,
+    "orderType": "MKT",
+    "percentOffset": 0.25,
+    "permId": 0,
+    "postToAts": 100,
+    "ptOrderId": 100,
+    "referencePriceType": 100,
+    "scaleInitFillQty": 100,
+    "scaleInitLevelSize": 100,
+    "scaleInitPosition": 100,
+    "scalePriceAdjustInterval": 100,
+    "scalePriceAdjustValue": 0.25,
+    "scalePriceIncrement": 0.25,
+    "scaleProfitOffset": 0.25,
+    "scaleSubsLevelSize": 100,
+    "slOrderId": 100,
+    "startingPrice": 0.25,
+    "stockRangeLower": 0.25,
+    "stockRangeUpper": 0.25,
+    "stockRefPrice": 0.25,
+    "tif": "DAY",
+    "totalQuantity": {
+      "__decimal__": "1.5"
+    },
+    "trailStopPrice": {
+      "__decimal__": "1.5"
+    },
+    "trailingPercent": {
+      "__decimal__": "1.5"
+    },
+    "triggerPrice": 0.25,
+    "volatility": 0.25,
+    "volatilityType": 100,
+    "whatIfType": 100
+  },
+  "variant": "all-set",
+  "wireExpected": {
+    "adjustedStopLimitPrice": {
+      "kind": "value"
+    },
+    "adjustedStopPrice": {
+      "kind": "value"
+    },
+    "adjustedTrailingAmount": {
+      "kind": "value"
+    },
+    "auxPrice": {
+      "kind": "value"
+    },
+    "basisPoints": {
+      "kind": "value"
+    },
+    "basisPointsType": {
+      "kind": "value"
+    },
+    "cashQty": {
+      "kind": "value"
+    },
+    "competeAgainstBestOffset": {
+      "kind": "value"
+    },
+    "delta": {
+      "kind": "value"
+    },
+    "deltaNeutralAuxPrice": {
+      "kind": "value"
+    },
+    "duration": {
+      "kind": "value"
+    },
+    "filledQuantity": {
+      "kind": "value"
+    },
+    "lmtPrice": {
+      "kind": "value"
+    },
+    "lmtPriceOffset": {
+      "kind": "value"
+    },
+    "manualOrderIndicator": {
+      "kind": "value"
+    },
+    "midOffsetAtHalf": {
+      "kind": "value"
+    },
+    "midOffsetAtWhole": {
+      "kind": "value"
+    },
+    "minCompeteSize": {
+      "kind": "value"
+    },
+    "minQty": {
+      "kind": "value"
+    },
+    "minTradeQty": {
+      "kind": "value"
+    },
+    "percentOffset": {
+      "kind": "value"
+    },
+    "postToAts": {
+      "kind": "value"
+    },
+    "ptOrderId": {
+      "kind": "value"
+    },
+    "referencePriceType": {
+      "kind": "value"
+    },
+    "scaleInitFillQty": {
+      "kind": "value"
+    },
+    "scaleInitLevelSize": {
+      "kind": "value"
+    },
+    "scaleInitPosition": {
+      "kind": "value"
+    },
+    "scalePriceAdjustInterval": {
+      "kind": "value"
+    },
+    "scalePriceAdjustValue": {
+      "kind": "value"
+    },
+    "scalePriceIncrement": {
+      "kind": "value"
+    },
+    "scaleProfitOffset": {
+      "kind": "value"
+    },
+    "scaleSubsLevelSize": {
+      "kind": "value"
+    },
+    "slOrderId": {
+      "kind": "value"
+    },
+    "startingPrice": {
+      "kind": "value"
+    },
+    "stockRangeLower": {
+      "kind": "value"
+    },
+    "stockRangeUpper": {
+      "kind": "value"
+    },
+    "stockRefPrice": {
+      "kind": "value"
+    },
+    "totalQuantity": {
+      "kind": "value"
+    },
+    "trailStopPrice": {
+      "kind": "value"
+    },
+    "trailingPercent": {
+      "kind": "value"
+    },
+    "triggerPrice": {
+      "kind": "value"
+    },
+    "volatility": {
+      "kind": "value"
+    },
+    "volatilityType": {
+      "kind": "value"
+    },
+    "whatIfType": {
+      "kind": "value"
+    }
+  }
+}

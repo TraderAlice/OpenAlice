@@ -1,0 +1,23 @@
+{
+  "carrier": "Order",
+  "field": "cashQty",
+  "name": "Order.cashQty = UNSET_DECIMAL",
+  "raw": {
+    "action": "BUY",
+    "cashQty": {
+      "__decimal__": "170141183460469231731687303715884105727"
+    },
+    "clientId": 0,
+    "orderId": 0,
+    "orderType": "MKT",
+    "permId": 0,
+    "tif": "DAY"
+  },
+  "sentinel": "UNSET_DECIMAL",
+  "wireExpected": {
+    "emit": {
+      "kind": "unset"
+    },
+    "field": "cashQty"
+  }
+}

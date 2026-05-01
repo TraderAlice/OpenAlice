@@ -1,0 +1,21 @@
+{
+  "carrier": "Order",
+  "field": "triggerPrice",
+  "name": "Order.triggerPrice = UNSET_DOUBLE",
+  "raw": {
+    "action": "BUY",
+    "clientId": 0,
+    "orderId": 0,
+    "orderType": "MKT",
+    "permId": 0,
+    "tif": "DAY",
+    "triggerPrice": 1.7976931348623157e+308
+  },
+  "sentinel": "UNSET_DOUBLE",
+  "wireExpected": {
+    "emit": {
+      "kind": "unset"
+    },
+    "field": "triggerPrice"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "carrier": "OrderState",
+  "field": "minCommissionAndFees",
+  "name": "OrderState.minCommissionAndFees = UNSET_DOUBLE",
+  "raw": {
+    "minCommissionAndFees": 1.7976931348623157e+308,
+    "status": "PreSubmitted"
+  },
+  "sentinel": "UNSET_DOUBLE",
+  "wireExpected": {
+    "emit": {
+      "kind": "unset"
+    },
+    "field": "minCommissionAndFees"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "carrier": "OrderState",
+  "field": "desiredAllocQty",
+  "name": "OrderState.desiredAllocQty = UNSET_DECIMAL",
+  "raw": {
+    "desiredAllocQty": {
+      "__decimal__": "170141183460469231731687303715884105727"
+    },
+    "status": "PreSubmitted"
+  },
+  "sentinel": "UNSET_DECIMAL",
+  "wireExpected": {
+    "emit": {
+      "kind": "unset"
+    },
+    "field": "desiredAllocQty"
+  }
+}

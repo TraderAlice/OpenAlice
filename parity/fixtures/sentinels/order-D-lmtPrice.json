@@ -1,0 +1,23 @@
+{
+  "carrier": "Order",
+  "field": "lmtPrice",
+  "name": "Order.lmtPrice = UNSET_DECIMAL",
+  "raw": {
+    "action": "BUY",
+    "clientId": 0,
+    "lmtPrice": {
+      "__decimal__": "170141183460469231731687303715884105727"
+    },
+    "orderId": 0,
+    "orderType": "MKT",
+    "permId": 0,
+    "tif": "DAY"
+  },
+  "sentinel": "UNSET_DECIMAL",
+  "wireExpected": {
+    "emit": {
+      "kind": "unset"
+    },
+    "field": "lmtPrice"
+  }
+}

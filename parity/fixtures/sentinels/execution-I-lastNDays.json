@@ -1,0 +1,20 @@
+{
+  "carrier": "Execution",
+  "field": "lastNDays",
+  "name": "Execution.lastNDays = UNSET_INTEGER",
+  "raw": {
+    "clientId": 0,
+    "execId": "exec-0",
+    "lastNDays": 2147483647,
+    "orderId": 0,
+    "permId": 0,
+    "side": "BOT"
+  },
+  "sentinel": "UNSET_INTEGER",
+  "wireExpected": {
+    "emit": {
+      "kind": "unset"
+    },
+    "field": "lastNDays"
+  }
+}

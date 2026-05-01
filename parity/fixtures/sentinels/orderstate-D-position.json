@@ -1,0 +1,18 @@
+{
+  "carrier": "OrderState",
+  "field": "position",
+  "name": "OrderState.position = UNSET_DECIMAL",
+  "raw": {
+    "position": {
+      "__decimal__": "170141183460469231731687303715884105727"
+    },
+    "status": "PreSubmitted"
+  },
+  "sentinel": "UNSET_DECIMAL",
+  "wireExpected": {
+    "emit": {
+      "kind": "unset"
+    },
+    "field": "position"
+  }
+}

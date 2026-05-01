@@ -1,0 +1,94 @@
+{
+  "carrier": "OrderState",
+  "name": "OrderState — every sentinel-bearing field is SET (corner case)",
+  "raw": {
+    "allowedAllocQty": {
+      "__decimal__": "1.5"
+    },
+    "commissionAndFees": 0.25,
+    "desiredAllocQty": {
+      "__decimal__": "1.5"
+    },
+    "equityWithLoanAfterOutsideRTH": 0.25,
+    "equityWithLoanBeforeOutsideRTH": 0.25,
+    "equityWithLoanChangeOutsideRTH": 0.25,
+    "initMarginAfterOutsideRTH": 0.25,
+    "initMarginBeforeOutsideRTH": 0.25,
+    "initMarginChangeOutsideRTH": 0.25,
+    "maintMarginAfterOutsideRTH": 0.25,
+    "maintMarginBeforeOutsideRTH": 0.25,
+    "maintMarginChangeOutsideRTH": 0.25,
+    "maxCommissionAndFees": 0.25,
+    "minCommissionAndFees": 0.25,
+    "position": {
+      "__decimal__": "1.5"
+    },
+    "positionAfter": {
+      "__decimal__": "1.5"
+    },
+    "positionDesired": {
+      "__decimal__": "1.5"
+    },
+    "status": "PreSubmitted",
+    "suggestedSize": {
+      "__decimal__": "1.5"
+    }
+  },
+  "variant": "all-set",
+  "wireExpected": {
+    "allowedAllocQty": {
+      "kind": "value"
+    },
+    "commissionAndFees": {
+      "kind": "value"
+    },
+    "desiredAllocQty": {
+      "kind": "value"
+    },
+    "equityWithLoanAfterOutsideRTH": {
+      "kind": "value"
+    },
+    "equityWithLoanBeforeOutsideRTH": {
+      "kind": "value"
+    },
+    "equityWithLoanChangeOutsideRTH": {
+      "kind": "value"
+    },
+    "initMarginAfterOutsideRTH": {
+      "kind": "value"
+    },
+    "initMarginBeforeOutsideRTH": {
+      "kind": "value"
+    },
+    "initMarginChangeOutsideRTH": {
+      "kind": "value"
+    },
+    "maintMarginAfterOutsideRTH": {
+      "kind": "value"
+    },
+    "maintMarginBeforeOutsideRTH": {
+      "kind": "value"
+    },
+    "maintMarginChangeOutsideRTH": {
+      "kind": "value"
+    },
+    "maxCommissionAndFees": {
+      "kind": "value"
+    },
+    "minCommissionAndFees": {
+      "kind": "value"
+    },
+    "position": {
+      "kind": "value"
+    },
+    "positionAfter": {
+      "kind": "value"
+    },
+    "positionDesired": {
+      "kind": "value"
+    },
+    "suggestedSize": {
+      "kind": "value"
+    }
+  }
+}

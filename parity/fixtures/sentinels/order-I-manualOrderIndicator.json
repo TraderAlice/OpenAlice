@@ -1,0 +1,21 @@
+{
+  "carrier": "Order",
+  "field": "manualOrderIndicator",
+  "name": "Order.manualOrderIndicator = UNSET_INTEGER",
+  "raw": {
+    "action": "BUY",
+    "clientId": 0,
+    "manualOrderIndicator": 2147483647,
+    "orderId": 0,
+    "orderType": "MKT",
+    "permId": 0,
+    "tif": "DAY"
+  },
+  "sentinel": "UNSET_INTEGER",
+  "wireExpected": {
+    "emit": {
+      "kind": "unset"
+    },
+    "field": "manualOrderIndicator"
+  }
+}
