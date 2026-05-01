@@ -1,0 +1,19 @@
+{
+  "carrier": "ExecutionFilter",
+  "name": "ExecutionFilter — every sentinel-bearing field is SET (corner case)",
+  "raw": {
+    "acctCode": "",
+    "clientId": 0,
+    "exchange": "",
+    "lastNDays": 100,
+    "secType": "",
+    "side": "",
+    "symbol": ""
+  },
+  "variant": "all-set",
+  "wireExpected": {
+    "lastNDays": {
+      "kind": "value"
+    }
+  }
+}

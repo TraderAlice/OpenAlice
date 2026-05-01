@@ -14,17 +14,15 @@
     "lastTradeDate": "",
     "lastTradeDateOrContractMonth": "",
     "localSymbol": "",
-    "minSize": "0.0001",
     "multiplier": "",
     "primaryExchange": "",
     "right": "",
     "secId": "",
     "secIdType": "",
     "secType": "CRYPTO",
-    "sizeIncrement": "0.0001",
     "strike": 1.7976931348623157e+308,
     "symbol": "BTC/USDT",
     "tradingClass": ""
   },
-  "stringified": "{\"conId\":0,\"symbol\":\"BTC/USDT\",\"secType\":\"CRYPTO\",\"lastTradeDateOrContractMonth\":\"\",\"lastTradeDate\":\"\",\"strike\":1.7976931348623157e+308,\"right\":\"\",\"multiplier\":\"\",\"exchange\":\"bybit\",\"primaryExchange\":\"\",\"currency\":\"USDT\",\"localSymbol\":\"\",\"tradingClass\":\"\",\"includeExpired\":false,\"secIdType\":\"\",\"secId\":\"\",\"description\":\"\",\"issuerId\":\"\",\"comboLegsDescrip\":\"\",\"comboLegs\":[],\"deltaNeutralContract\":null,\"minSize\":\"0.0001\",\"sizeIncrement\":\"0.0001\"}"
+  "stringified": "{\"conId\":0,\"symbol\":\"BTC/USDT\",\"secType\":\"CRYPTO\",\"lastTradeDateOrContractMonth\":\"\",\"lastTradeDate\":\"\",\"strike\":1.7976931348623157e+308,\"right\":\"\",\"multiplier\":\"\",\"exchange\":\"bybit\",\"primaryExchange\":\"\",\"currency\":\"USDT\",\"localSymbol\":\"\",\"tradingClass\":\"\",\"includeExpired\":false,\"secIdType\":\"\",\"secId\":\"\",\"description\":\"\",\"issuerId\":\"\",\"comboLegsDescrip\":\"\",\"comboLegs\":[],\"deltaNeutralContract\":null}"
 }

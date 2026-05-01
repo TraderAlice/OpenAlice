@@ -26,7 +26,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const FIXTURE_ROOT = resolve(__dirname, '../fixtures/sentinels')
 
 type SentinelKind = 'UNSET_DECIMAL' | 'UNSET_DOUBLE' | 'UNSET_INTEGER'
-type Carrier = 'Order' | 'Contract' | 'Execution' | 'OrderState'
+// PHASE0_PLAN.md §4 lists fields under Contract/Execution/OrderState but
+// in actual source they're nested on ContractDetails/ExecutionFilter/
+// OrderAllocation. We use the correct class names here — fixtures match
+// reality, not the (incorrect) plan text. Phase-0 finding: the plan
+// matrix attributed those fields to the wrong carriers.
+type Carrier = 'Order' | 'Contract' | 'ContractDetails' | 'Execution' | 'ExecutionFilter' | 'OrderState' | 'OrderAllocation'
 
 interface FieldEntry {
   carrier: Carrier
@@ -84,27 +89,32 @@ const MATRIX: FieldEntry[] = [
   { carrier: 'Order', field: 'whatIfType',              sentinel: 'UNSET_INTEGER' },
   { carrier: 'Order', field: 'slOrderId',               sentinel: 'UNSET_INTEGER' },
   { carrier: 'Order', field: 'ptOrderId',               sentinel: 'UNSET_INTEGER' },
-  // Contract — UNSET_DECIMAL fields
-  { carrier: 'Contract', field: 'minSize',                 sentinel: 'UNSET_DECIMAL' },
-  { carrier: 'Contract', field: 'sizeIncrement',           sentinel: 'UNSET_DECIMAL' },
-  { carrier: 'Contract', field: 'suggestedSizeIncrement',  sentinel: 'UNSET_DECIMAL' },
-  { carrier: 'Contract', field: 'minAlgoSize',             sentinel: 'UNSET_DECIMAL' },
-  { carrier: 'Contract', field: 'lastPricePrecision',      sentinel: 'UNSET_DECIMAL' },
-  { carrier: 'Contract', field: 'lastSizePrecision',       sentinel: 'UNSET_DECIMAL' },
-  // Contract — UNSET_DOUBLE fields
+  // Contract — UNSET_DOUBLE fields (only `strike` is on Contract itself)
   { carrier: 'Contract', field: 'strike',                  sentinel: 'UNSET_DOUBLE' },
+  // ContractDetails — UNSET_DECIMAL fields (Phase-0 finding: PHASE0_PLAN.md §4
+  // attributed these to Contract; they actually live on ContractDetails.)
+  { carrier: 'ContractDetails', field: 'minSize',                 sentinel: 'UNSET_DECIMAL' },
+  { carrier: 'ContractDetails', field: 'sizeIncrement',           sentinel: 'UNSET_DECIMAL' },
+  { carrier: 'ContractDetails', field: 'suggestedSizeIncrement',  sentinel: 'UNSET_DECIMAL' },
+  { carrier: 'ContractDetails', field: 'minAlgoSize',             sentinel: 'UNSET_DECIMAL' },
+  { carrier: 'ContractDetails', field: 'lastPricePrecision',      sentinel: 'UNSET_DECIMAL' },
+  { carrier: 'ContractDetails', field: 'lastSizePrecision',       sentinel: 'UNSET_DECIMAL' },
   // Execution — UNSET_DECIMAL fields
   { carrier: 'Execution', field: 'shares',                 sentinel: 'UNSET_DECIMAL' },
   { carrier: 'Execution', field: 'cumQty',                 sentinel: 'UNSET_DECIMAL' },
-  // Execution — UNSET_INTEGER fields
-  { carrier: 'Execution', field: 'lastNDays',              sentinel: 'UNSET_INTEGER' },
-  // OrderState — UNSET_DECIMAL fields
-  { carrier: 'OrderState', field: 'position',              sentinel: 'UNSET_DECIMAL' },
-  { carrier: 'OrderState', field: 'positionDesired',       sentinel: 'UNSET_DECIMAL' },
-  { carrier: 'OrderState', field: 'positionAfter',         sentinel: 'UNSET_DECIMAL' },
-  { carrier: 'OrderState', field: 'desiredAllocQty',       sentinel: 'UNSET_DECIMAL' },
-  { carrier: 'OrderState', field: 'allowedAllocQty',       sentinel: 'UNSET_DECIMAL' },
+  // ExecutionFilter — UNSET_INTEGER fields (Phase-0 finding: PHASE0_PLAN.md §4
+  // attributed lastNDays to Execution; it actually lives on ExecutionFilter.)
+  { carrier: 'ExecutionFilter', field: 'lastNDays',        sentinel: 'UNSET_INTEGER' },
+  // OrderState — UNSET_DECIMAL fields (only suggestedSize is on OrderState itself)
   { carrier: 'OrderState', field: 'suggestedSize',         sentinel: 'UNSET_DECIMAL' },
+  // OrderAllocation — UNSET_DECIMAL fields (Phase-0 finding: PHASE0_PLAN.md §4
+  // attributed these to OrderState; they actually live on OrderAllocation,
+  // a nested array element on OrderState.orderAllocations.)
+  { carrier: 'OrderAllocation', field: 'position',         sentinel: 'UNSET_DECIMAL' },
+  { carrier: 'OrderAllocation', field: 'positionDesired',  sentinel: 'UNSET_DECIMAL' },
+  { carrier: 'OrderAllocation', field: 'positionAfter',    sentinel: 'UNSET_DECIMAL' },
+  { carrier: 'OrderAllocation', field: 'desiredAllocQty',  sentinel: 'UNSET_DECIMAL' },
+  { carrier: 'OrderAllocation', field: 'allowedAllocQty',  sentinel: 'UNSET_DECIMAL' },
   // OrderState — UNSET_DOUBLE fields
   { carrier: 'OrderState', field: 'commissionAndFees',                sentinel: 'UNSET_DOUBLE' },
   { carrier: 'OrderState', field: 'minCommissionAndFees',             sentinel: 'UNSET_DOUBLE' },
@@ -170,6 +180,9 @@ const NEUTRAL: Record<Carrier, Record<string, unknown>> = {
     exchange: 'SMART',
     currency: 'USD',
   },
+  ContractDetails: {
+    contract: { symbol: 'MOCK', secType: 'STK' },
+  },
   Execution: {
     execId: 'exec-0',
     orderId: 0,
@@ -177,8 +190,20 @@ const NEUTRAL: Record<Carrier, Record<string, unknown>> = {
     permId: 0,
     side: 'BOT',
   },
+  ExecutionFilter: {
+    clientId: 0,
+    acctCode: '',
+    symbol: '',
+    secType: '',
+    exchange: '',
+    side: '',
+  },
   OrderState: {
     status: 'PreSubmitted',
+  },
+  OrderAllocation: {
+    account: '',
+    isMonetary: false,
   },
 }
 
@@ -317,8 +342,8 @@ function main(): void {
     count += 1
   }
 
-  // Corner fixtures
-  const carriers: Carrier[] = ['Order', 'Contract', 'Execution', 'OrderState']
+  // Corner fixtures (only for carriers with at least one ✓ in MATRIX)
+  const carriers: Carrier[] = ['Order', 'Contract', 'ContractDetails', 'Execution', 'ExecutionFilter', 'OrderState', 'OrderAllocation']
   for (const c of carriers) {
     const allUnset = cornerAllUnset(c)
     writeFileSync(

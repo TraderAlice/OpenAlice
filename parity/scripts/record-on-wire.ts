@@ -28,12 +28,15 @@ import { writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import Decimal from 'decimal.js'
-import { Order, Contract, Execution, OrderState, UNSET_DECIMAL } from '@traderalice/ibkr'
+import { Order, Contract, ContractDetails, Execution, ExecutionFilter, OrderState, OrderAllocation, UNSET_DECIMAL } from '@traderalice/ibkr'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const FIXTURE_ROOT = resolve(__dirname, '../fixtures/orders-on-wire')
 
-type Carrier = 'Order' | 'Contract' | 'Execution' | 'OrderState'
+// Phase-0 finding: PHASE0_PLAN.md §4 attributed minSize/sizeIncrement/etc.
+// to Contract, but they live on ContractDetails. Same for OrderState
+// position fields (→ OrderAllocation) and Execution.lastNDays (→ ExecutionFilter).
+type Carrier = 'Order' | 'Contract' | 'ContractDetails' | 'Execution' | 'ExecutionFilter' | 'OrderState' | 'OrderAllocation'
 
 interface OnWireFixture {
   name: string
@@ -73,9 +76,18 @@ function makeCryptoContract(): Contract {
   c.secType = 'CRYPTO'
   c.exchange = 'bybit'
   c.currency = 'USDT'
-  c.minSize = new Decimal('0.0001')
-  c.sizeIncrement = new Decimal('0.0001')
   return c
+}
+
+function makeCryptoContractDetails(): ContractDetails {
+  const cd = new ContractDetails()
+  cd.contract = makeCryptoContract()
+  cd.minSize = new Decimal('0.0001')
+  cd.sizeIncrement = new Decimal('0.0001')
+  cd.suggestedSizeIncrement = new Decimal('0.0001')
+  cd.lastPricePrecision = new Decimal('2')
+  cd.lastSizePrecision = new Decimal('8')
+  return cd
 }
 
 function makeOrderMktBuy(qty: string): Order {
@@ -142,10 +154,19 @@ function makeOrderStateBasic(): OrderState {
   s.commissionAndFees = 1.25
   s.minCommissionAndFees = 1.0
   s.maxCommissionAndFees = 1.5
-  s.position = new Decimal('100')
-  s.positionDesired = new Decimal('110')
-  s.positionAfter = new Decimal('110')
+  s.suggestedSize = new Decimal('100')
   return s
+}
+
+function makeOrderAllocation(): OrderAllocation {
+  const a = new OrderAllocation()
+  a.account = 'paper-account-1'
+  a.position = new Decimal('100')
+  a.positionDesired = new Decimal('110')
+  a.positionAfter = new Decimal('110')
+  a.desiredAllocQty = new Decimal('10')
+  a.allowedAllocQty = new Decimal('10')
+  return a
 }
 
 function makeOrderStateAllUnset(): OrderState {
@@ -168,12 +189,8 @@ function makeOrderStateAllSet(): OrderState {
   s.initMarginAfterOutsideRTH = 1050
   s.maintMarginAfterOutsideRTH = 840
   s.equityWithLoanAfterOutsideRTH = 4955
-  s.position = new Decimal('100')
-  s.positionDesired = new Decimal('100')
-  s.positionAfter = new Decimal('100')
-  s.desiredAllocQty = new Decimal('100')
-  s.allowedAllocQty = new Decimal('100')
   s.suggestedSize = new Decimal('100')
+  s.orderAllocations = [makeOrderAllocation()]
   return s
 }
 
@@ -192,7 +209,10 @@ const SPECS: Spec[] = [
   { name: 'Contract STK TSLA minimal',          filename: 'contract-stk-tsla-minimal.json',     carrier: 'Contract', build: () => makeStockContract('TSLA') },
   { name: 'Contract OPT AAPL 250C 2026-06-20',  filename: 'contract-opt-aapl-call.json',        carrier: 'Contract', build: makeOptionContract },
   { name: 'Contract CRYPTO BTC/USDT bybit',     filename: 'contract-crypto-btc.json',           carrier: 'Contract', build: makeCryptoContract },
-  { name: 'Contract default (all-unset Decimals)', filename: 'contract-default.json',           carrier: 'Contract', build: () => new Contract() },
+  { name: 'Contract default (strike=UNSET_DOUBLE)', filename: 'contract-default.json',          carrier: 'Contract', build: () => new Contract() },
+  // ContractDetails (Phase-0 finding: minSize/sizeIncrement/etc. live here, not on Contract)
+  { name: 'ContractDetails CRYPTO with precision', filename: 'contract-details-crypto.json',    carrier: 'ContractDetails', build: makeCryptoContractDetails },
+  { name: 'ContractDetails default (UNSET_DECIMAL precision fields)', filename: 'contract-details-default.json', carrier: 'ContractDetails', build: () => new ContractDetails() },
 
   // Orders — order-type coverage
   { name: 'Order BUY MKT DAY 100 shares',       filename: 'order-mkt-buy-100.json',             carrier: 'Order',    build: () => makeOrderMktBuy('100') },
@@ -220,13 +240,18 @@ const SPECS: Spec[] = [
   { name: 'Execution 100 shares @ 150.25',      filename: 'execution-100-shares.json',          carrier: 'Execution', build: () => makeExecution('100', 150.25) },
   { name: 'Execution sub-satoshi 0.00012345',   filename: 'execution-sub-satoshi.json',         carrier: 'Execution', build: () => makeExecution('0.00012345', 67234.5) },
   { name: 'Execution default (UNSET_DECIMAL fields)', filename: 'execution-default.json',       carrier: 'Execution', build: () => new Execution() },
-  { name: 'Execution with lastNDays set',       filename: 'execution-lastndays.json',           carrier: 'Execution', build: () => { const e = makeExecution('10', 50); e.lastNDays = 30; return e } },
+  // ExecutionFilter (Phase-0 finding: lastNDays lives here, not on Execution)
+  { name: 'ExecutionFilter with lastNDays=30',  filename: 'executionfilter-lastndays.json',     carrier: 'ExecutionFilter', build: () => { const f = new ExecutionFilter(); f.lastNDays = 30; return f } },
+  { name: 'ExecutionFilter default (UNSET_INTEGER lastNDays)', filename: 'executionfilter-default.json', carrier: 'ExecutionFilter', build: () => new ExecutionFilter() },
 
   // OrderStates
   { name: 'OrderState basic PreSubmitted',      filename: 'orderstate-presubmitted.json',       carrier: 'OrderState', build: makeOrderStateBasic },
   { name: 'OrderState all-unset (default)',     filename: 'orderstate-all-unset.json',          carrier: 'OrderState', build: makeOrderStateAllUnset },
-  { name: 'OrderState all-set Filled',          filename: 'orderstate-all-set.json',            carrier: 'OrderState', build: makeOrderStateAllSet },
-  { name: 'OrderState Cancelled',               filename: 'orderstate-cancelled.json',          carrier: 'OrderState', build: () => { const s = new OrderState(); s.status = 'Cancelled'; s.position = new Decimal('0'); s.positionDesired = new Decimal('0'); s.positionAfter = new Decimal('0'); return s } },
+  { name: 'OrderState all-set Filled (with allocations)', filename: 'orderstate-all-set.json',  carrier: 'OrderState', build: makeOrderStateAllSet },
+  { name: 'OrderState Cancelled',               filename: 'orderstate-cancelled.json',          carrier: 'OrderState', build: () => { const s = new OrderState(); s.status = 'Cancelled'; s.suggestedSize = new Decimal('0'); return s } },
+  // OrderAllocation (Phase-0 finding: position/positionDesired/etc. live here, not on OrderState)
+  { name: 'OrderAllocation populated',          filename: 'orderallocation-set.json',           carrier: 'OrderAllocation', build: makeOrderAllocation },
+  { name: 'OrderAllocation default (all UNSET_DECIMAL)', filename: 'orderallocation-default.json', carrier: 'OrderAllocation', build: () => new OrderAllocation() },
 
   // Round-trip-fragile case: UNSET_DECIMAL preserved verbatim
   { name: 'Order with explicit UNSET_DECIMAL',  filename: 'order-explicit-unset.json',          carrier: 'Order',    build: () => { const o = new Order(); o.action = 'BUY'; o.orderType = 'MKT'; o.tif = 'DAY'; o.totalQuantity = UNSET_DECIMAL; return o } },

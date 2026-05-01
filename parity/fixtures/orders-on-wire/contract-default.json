@@ -1,6 +1,6 @@
 {
   "carrier": "Contract",
-  "name": "Contract default (all-unset Decimals)",
+  "name": "Contract default (strike=UNSET_DOUBLE)",
   "raw": {
     "comboLegs": [],
     "comboLegsDescrip": "",

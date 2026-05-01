@@ -84,6 +84,20 @@ Phase 1b builds the `WireOrder` adapter — combo legs may need a nested
 | Line | Field | Class | Wire type | Notes |
 |---|---|---|---|---|
 | 62  | `strike`                | b | `WireDouble`  | options/futures only |
+
+**Contract subtotal:** 0 (a) · 1 (b) · 0 (c) · **1 field**
+
+**Phase-0 finding:** PHASE0_PLAN.md §4 attributed `minSize`,
+`sizeIncrement`, `suggestedSizeIncrement`, `minAlgoSize`,
+`lastPricePrecision`, `lastSizePrecision` to `Contract`. They actually
+live on `ContractDetails` (see below), a separate carrier returned by
+`reqContractDetails()`. The plan's matrix is incorrect; my fixtures
+correctly target `ContractDetails`.
+
+## `ContractDetails` ([packages/ibkr/src/contract.ts](../packages/ibkr/src/contract.ts))
+
+| Line | Field | Class | Wire type | Notes |
+|---|---|---|---|---|
 | 162 | `minSize`               | b | `WireDecimal` | crypto/forex |
 | 163 | `sizeIncrement`         | b | `WireDecimal` | crypto/forex |
 | 164 | `suggestedSizeIncrement` | b | `WireDecimal` | crypto/forex |
@@ -91,7 +105,7 @@ Phase 1b builds the `WireOrder` adapter — combo legs may need a nested
 | 166 | `lastPricePrecision`    | b | `WireDecimal` | display precision |
 | 167 | `lastSizePrecision`     | b | `WireDecimal` | display precision |
 
-**Contract subtotal:** 0 (a) · 7 (b) · 0 (c) · **7 fields**
+**ContractDetails subtotal:** 0 (a) · 6 (b) · 0 (c) · **6 fields**
 
 ## `Execution` ([packages/ibkr/src/execution.ts](../packages/ibkr/src/execution.ts))
 
@@ -99,9 +113,21 @@ Phase 1b builds the `WireOrder` adapter — combo legs may need a nested
 |---|---|---|---|---|
 | 51  | `shares`     | b | `WireDecimal` | per-fill quantity |
 | 57  | `cumQty`     | b | `WireDecimal` | cumulative qty |
+
+**Execution subtotal:** 0 (a) · 2 (b) · 0 (c) · **2 fields**
+
+**Phase-0 finding:** PHASE0_PLAN.md §4 attributed `lastNDays` to
+`Execution`. It actually lives on `ExecutionFilter`, a separate carrier
+used to *query* executions — not the executions themselves. My
+fixtures correctly target `ExecutionFilter`.
+
+## `ExecutionFilter` ([packages/ibkr/src/execution.ts](../packages/ibkr/src/execution.ts))
+
+| Line | Field | Class | Wire type | Notes |
+|---|---|---|---|---|
 | 92  | `lastNDays`  | b | `WireInteger` | filter window |
 
-**Execution subtotal:** 0 (a) · 3 (b) · 0 (c) · **3 fields**
+**ExecutionFilter subtotal:** 0 (a) · 1 (b) · 0 (c) · **1 field**
 
 (Execution does *not* carry `commission` directly; commission is on
 `OrderState` and `CommissionAndFeesReport`. Confirmed by re-grep:
@@ -112,11 +138,6 @@ UNSET_*` lines beyond the three above.)
 
 | Line | Field | Class | Wire type | Notes |
 |---|---|---|---|---|
-| 18  | `position`                          | b | `WireDecimal` | model position |
-| 19  | `positionDesired`                   | b | `WireDecimal` | model |
-| 20  | `positionAfter`                     | b | `WireDecimal` | model |
-| 21  | `desiredAllocQty`                   | b | `WireDecimal` | allocation |
-| 22  | `allowedAllocQty`                   | b | `WireDecimal` | allocation |
 | 50  | `commissionAndFees`                 | b | `WireDouble`  | margin |
 | 51  | `minCommissionAndFees`              | b | `WireDouble`  | margin |
 | 52  | `maxCommissionAndFees`              | b | `WireDouble`  | margin |
@@ -131,7 +152,26 @@ UNSET_*` lines beyond the three above.)
 | 63  | `equityWithLoanAfterOutsideRTH`     | b | `WireDouble`  | margin |
 | 64  | `suggestedSize`                     | b | `WireDecimal` | model |
 
-**OrderState subtotal:** 0 (a) · 18 (b) · 0 (c) · **18 fields**
+**OrderState subtotal:** 0 (a) · 13 (b) · 0 (c) · **13 fields**
+
+**Phase-0 finding:** PHASE0_PLAN.md §4 attributed `position`,
+`positionDesired`, `positionAfter`, `desiredAllocQty`, `allowedAllocQty`
+to `OrderState`. They actually live on `OrderAllocation`, a nested
+array element on `OrderState.orderAllocations`. My fixtures correctly
+target `OrderAllocation`. Phase 1b's `WireOrderState` adapter must
+recursively wire-type the nested `OrderAllocation[]`.
+
+## `OrderAllocation` ([packages/ibkr/src/order-state.ts](../packages/ibkr/src/order-state.ts))
+
+| Line | Field | Class | Wire type | Notes |
+|---|---|---|---|---|
+| 18  | `position`         | b | `WireDecimal` | model position |
+| 19  | `positionDesired`  | b | `WireDecimal` | model |
+| 20  | `positionAfter`    | b | `WireDecimal` | model |
+| 21  | `desiredAllocQty`  | b | `WireDecimal` | allocation |
+| 22  | `allowedAllocQty`  | b | `WireDecimal` | allocation |
+
+**OrderAllocation subtotal:** 0 (a) · 5 (b) · 0 (c) · **5 fields**
 
 ## Trading-domain monetary fields (`Decimal` and `Decimal-as-string`)
 
@@ -197,22 +237,32 @@ must encode "field absent" differently from "field present and unset".
 
 ## Summary by carrier
 
-| Carrier              | (a) value-only | (b) value-or-unset | (c) computed-only | Total |
+| Carrier               | (a) value-only | (b) value-or-unset | (c) computed-only | Total |
 |---|---|---|---|---|
-| `Order`              | 0 | 44 | 0 | 44 |
-| `Contract`           | 0 |  7 | 0 |  7 |
-| `Execution`          | 0 |  3 | 0 |  3 |
-| `OrderState`         | 0 | 18 | 0 | 18 |
-| `Position`           | 1 |  0 | 5 |  6 |
-| `OperationResult`    | 0 |  0 | 2 |  2 |
-| `OpenOrder`          | 0 |  0 | 1 |  1 |
-| `GitState`           | 0 |  0 | 4 |  4 |
-| `OrderStatusUpdate`  | 0 |  0 | 2 |  2 |
-| `Simulation*`        | 0 |  0 | ~12 | ~12 |
-| `Operation closePosition` | 0 | 1 | 0 | 1 |
-| **Total**            | **1** | **73** | **~26** | **~100** |
+| `Order`               | 0 | 44 | 0 | 44 |
+| `Contract`            | 0 |  1 | 0 |  1 |
+| `ContractDetails`     | 0 |  6 | 0 |  6 |
+| `Execution`           | 0 |  2 | 0 |  2 |
+| `ExecutionFilter`     | 0 |  1 | 0 |  1 |
+| `OrderState`          | 0 | 13 | 0 | 13 |
+| `OrderAllocation`     | 0 |  5 | 0 |  5 |
+| `Position`            | 1 |  0 | 5 |  6 |
+| `OperationResult`     | 0 |  0 | 2 |  2 |
+| `OpenOrder`           | 0 |  0 | 1 |  1 |
+| `GitState`            | 0 |  0 | 4 |  4 |
+| `OrderStatusUpdate`   | 0 |  0 | 2 |  2 |
+| `Simulation*`         | 0 |  0 | ~12 | ~12 |
+| `Operation closePosition` | 0 |  1 | 0 |  1 |
+| **Total**             | **1** | **73** | **~26** | **~100** |
 
 ## Cross-cuts to flag for Phase 1b
+
+0. **PHASE0_PLAN.md §4 carrier matrix is incorrect** for three sets of
+   fields — Phase 0 fixtures correct it. The plan must be updated
+   (or Phase 1b's adapter spec must reference this inventory instead):
+   - `Contract.{minSize, sizeIncrement, suggestedSizeIncrement, minAlgoSize, lastPricePrecision, lastSizePrecision}` → actually on `ContractDetails`
+   - `Execution.lastNDays` → actually on `ExecutionFilter`
+   - `OrderState.{position, positionDesired, positionAfter, desiredAllocQty, allowedAllocQty}` → actually on `OrderAllocation` (nested in `OrderState.orderAllocations[]`)
 
 1. **All sentinel-bearing fields → `WireDecimal | WireDouble | WireInteger`** per v3 §6.1. The (b) column above is the to-do list for the wire-type adapter.
 2. **(c) computed-only fields stay as `string`** on the wire (already canonical). Phase 1b must verify every callsite that produces a (c) value passes the source `Decimal` through `toCanonicalDecimalString` instead of `Decimal.toString()`. Today, `OperationResult.filledQty` / `filledPrice` are written via ad-hoc `.toFixed()` / `.toString()` calls in broker code — that's drift waiting to happen and Phase 1c will replace it.

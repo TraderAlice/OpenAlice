@@ -1,0 +1,14 @@
+{
+  "carrier": "OrderAllocation",
+  "name": "OrderAllocation default (all UNSET_DECIMAL)",
+  "raw": {
+    "account": "",
+    "allowedAllocQty": "1.70141183460469231731687303715884105727e+38",
+    "desiredAllocQty": "1.70141183460469231731687303715884105727e+38",
+    "isMonetary": false,
+    "position": "1.70141183460469231731687303715884105727e+38",
+    "positionAfter": "1.70141183460469231731687303715884105727e+38",
+    "positionDesired": "1.70141183460469231731687303715884105727e+38"
+  },
+  "stringified": "{\"account\":\"\",\"position\":\"1.70141183460469231731687303715884105727e+38\",\"positionDesired\":\"1.70141183460469231731687303715884105727e+38\",\"positionAfter\":\"1.70141183460469231731687303715884105727e+38\",\"desiredAllocQty\":\"1.70141183460469231731687303715884105727e+38\",\"allowedAllocQty\":\"1.70141183460469231731687303715884105727e+38\",\"isMonetary\":false}"
+}

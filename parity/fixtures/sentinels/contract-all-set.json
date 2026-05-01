@@ -5,49 +5,13 @@
     "aliceId": "mock|MOCK",
     "currency": "USD",
     "exchange": "SMART",
-    "lastPricePrecision": {
-      "__decimal__": "1.5"
-    },
-    "lastSizePrecision": {
-      "__decimal__": "1.5"
-    },
-    "minAlgoSize": {
-      "__decimal__": "1.5"
-    },
-    "minSize": {
-      "__decimal__": "1.5"
-    },
     "secType": "STK",
-    "sizeIncrement": {
-      "__decimal__": "1.5"
-    },
     "strike": 0.25,
-    "suggestedSizeIncrement": {
-      "__decimal__": "1.5"
-    },
     "symbol": "MOCK"
   },
   "variant": "all-set",
   "wireExpected": {
-    "lastPricePrecision": {
-      "kind": "value"
-    },
-    "lastSizePrecision": {
-      "kind": "value"
-    },
-    "minAlgoSize": {
-      "kind": "value"
-    },
-    "minSize": {
-      "kind": "value"
-    },
-    "sizeIncrement": {
-      "kind": "value"
-    },
     "strike": {
-      "kind": "value"
-    },
-    "suggestedSizeIncrement": {
       "kind": "value"
     }
   }

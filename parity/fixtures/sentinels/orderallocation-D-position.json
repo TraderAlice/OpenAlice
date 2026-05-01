@@ -1,12 +1,13 @@
 {
-  "carrier": "OrderState",
+  "carrier": "OrderAllocation",
   "field": "position",
-  "name": "OrderState.position = UNSET_DECIMAL",
+  "name": "OrderAllocation.position = UNSET_DECIMAL",
   "raw": {
+    "account": "",
+    "isMonetary": false,
     "position": {
       "__decimal__": "170141183460469231731687303715884105727"
-    },
-    "status": "PreSubmitted"
+    }
   },
   "sentinel": "UNSET_DECIMAL",
   "wireExpected": {

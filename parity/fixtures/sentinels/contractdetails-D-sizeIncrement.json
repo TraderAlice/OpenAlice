@@ -1,16 +1,15 @@
 {
-  "carrier": "Contract",
+  "carrier": "ContractDetails",
   "field": "sizeIncrement",
-  "name": "Contract.sizeIncrement = UNSET_DECIMAL",
+  "name": "ContractDetails.sizeIncrement = UNSET_DECIMAL",
   "raw": {
-    "aliceId": "mock|MOCK",
-    "currency": "USD",
-    "exchange": "SMART",
-    "secType": "STK",
+    "contract": {
+      "secType": "STK",
+      "symbol": "MOCK"
+    },
     "sizeIncrement": {
       "__decimal__": "170141183460469231731687303715884105727"
-    },
-    "symbol": "MOCK"
+    }
   },
   "sentinel": "UNSET_DECIMAL",
   "wireExpected": {

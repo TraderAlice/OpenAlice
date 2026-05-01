@@ -63,15 +63,22 @@ Plus corner fixtures: `order-all-unset.json`, `order-all-set.json`.
 
 | Field | UNSET_DECIMAL | UNSET_DOUBLE | UNSET_INTEGER | Fixture file |
 |---|---|---|---|---|
-| `minSize` | ✓ |  |  | `contract-D-minSize.json` |
-| `sizeIncrement` | ✓ |  |  | `contract-D-sizeIncrement.json` |
-| `suggestedSizeIncrement` | ✓ |  |  | `contract-D-suggestedSizeIncrement.json` |
-| `minAlgoSize` | ✓ |  |  | `contract-D-minAlgoSize.json` |
-| `lastPricePrecision` | ✓ |  |  | `contract-D-lastPricePrecision.json` |
-| `lastSizePrecision` | ✓ |  |  | `contract-D-lastSizePrecision.json` |
 | `strike` |  | ✓ |  | `contract-F-strike.json` |
 
 Plus corner fixtures: `contract-all-unset.json`, `contract-all-set.json`.
+
+## ContractDetails
+
+| Field | UNSET_DECIMAL | UNSET_DOUBLE | UNSET_INTEGER | Fixture file |
+|---|---|---|---|---|
+| `minSize` | ✓ |  |  | `contractdetails-D-minSize.json` |
+| `sizeIncrement` | ✓ |  |  | `contractdetails-D-sizeIncrement.json` |
+| `suggestedSizeIncrement` | ✓ |  |  | `contractdetails-D-suggestedSizeIncrement.json` |
+| `minAlgoSize` | ✓ |  |  | `contractdetails-D-minAlgoSize.json` |
+| `lastPricePrecision` | ✓ |  |  | `contractdetails-D-lastPricePrecision.json` |
+| `lastSizePrecision` | ✓ |  |  | `contractdetails-D-lastSizePrecision.json` |
+
+Plus corner fixtures: `contractdetails-all-unset.json`, `contractdetails-all-set.json`.
 
 ## Execution
 
@@ -79,19 +86,21 @@ Plus corner fixtures: `contract-all-unset.json`, `contract-all-set.json`.
 |---|---|---|---|---|
 | `shares` | ✓ |  |  | `execution-D-shares.json` |
 | `cumQty` | ✓ |  |  | `execution-D-cumQty.json` |
-| `lastNDays` |  |  | ✓ | `execution-I-lastNDays.json` |
 
 Plus corner fixtures: `execution-all-unset.json`, `execution-all-set.json`.
+
+## ExecutionFilter
+
+| Field | UNSET_DECIMAL | UNSET_DOUBLE | UNSET_INTEGER | Fixture file |
+|---|---|---|---|---|
+| `lastNDays` |  |  | ✓ | `executionfilter-I-lastNDays.json` |
+
+Plus corner fixtures: `executionfilter-all-unset.json`, `executionfilter-all-set.json`.
 
 ## OrderState
 
 | Field | UNSET_DECIMAL | UNSET_DOUBLE | UNSET_INTEGER | Fixture file |
 |---|---|---|---|---|
-| `position` | ✓ |  |  | `orderstate-D-position.json` |
-| `positionDesired` | ✓ |  |  | `orderstate-D-positionDesired.json` |
-| `positionAfter` | ✓ |  |  | `orderstate-D-positionAfter.json` |
-| `desiredAllocQty` | ✓ |  |  | `orderstate-D-desiredAllocQty.json` |
-| `allowedAllocQty` | ✓ |  |  | `orderstate-D-allowedAllocQty.json` |
 | `suggestedSize` | ✓ |  |  | `orderstate-D-suggestedSize.json` |
 | `commissionAndFees` |  | ✓ |  | `orderstate-F-commissionAndFees.json` |
 | `minCommissionAndFees` |  | ✓ |  | `orderstate-F-minCommissionAndFees.json` |
@@ -108,10 +117,22 @@ Plus corner fixtures: `execution-all-unset.json`, `execution-all-set.json`.
 
 Plus corner fixtures: `orderstate-all-unset.json`, `orderstate-all-set.json`.
 
+## OrderAllocation
+
+| Field | UNSET_DECIMAL | UNSET_DOUBLE | UNSET_INTEGER | Fixture file |
+|---|---|---|---|---|
+| `position` | ✓ |  |  | `orderallocation-D-position.json` |
+| `positionDesired` | ✓ |  |  | `orderallocation-D-positionDesired.json` |
+| `positionAfter` | ✓ |  |  | `orderallocation-D-positionAfter.json` |
+| `desiredAllocQty` | ✓ |  |  | `orderallocation-D-desiredAllocQty.json` |
+| `allowedAllocQty` | ✓ |  |  | `orderallocation-D-allowedAllocQty.json` |
+
+Plus corner fixtures: `orderallocation-all-unset.json`, `orderallocation-all-set.json`.
+
 ---
 
 **Total single-cell fixtures:** 72
-**Plus corner fixtures (2 × 4 carriers):** 8
-**Total fixture files:** 80
+**Plus corner fixtures (2 × 7 carriers):** 14
+**Total fixture files:** 86
 
 Verification: `find parity/fixtures/sentinels -name "*.json" | wc -l` ≥ 80.

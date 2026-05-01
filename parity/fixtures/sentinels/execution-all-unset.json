@@ -7,7 +7,6 @@
       "__decimal__": "170141183460469231731687303715884105727"
     },
     "execId": "exec-0",
-    "lastNDays": 2147483647,
     "orderId": 0,
     "permId": 0,
     "shares": {
@@ -18,9 +17,6 @@
   "variant": "all-unset",
   "wireExpected": {
     "cumQty": {
-      "kind": "unset"
-    },
-    "lastNDays": {
       "kind": "unset"
     },
     "shares": {

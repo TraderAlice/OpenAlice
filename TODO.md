@@ -231,6 +231,21 @@ the item when done — git log is the history.
 
 ## Rust trading-core migration
 
+- [ ] **[migration]** PHASE0_PLAN.md §4 sentinel-coverage matrix attributes
+      6 fields to `Contract` that actually live on `ContractDetails`
+      (`minSize`, `sizeIncrement`, `suggestedSizeIncrement`, `minAlgoSize`,
+      `lastPricePrecision`, `lastSizePrecision`); 1 field to `Execution`
+      that actually lives on `ExecutionFilter` (`lastNDays`); and 5 fields
+      to `OrderState` that actually live on `OrderAllocation` (`position`,
+      `positionDesired`, `positionAfter`, `desiredAllocQty`, `allowedAllocQty`).
+      Phase 0 fixtures correctly target `ContractDetails`/`ExecutionFilter`/
+      `OrderAllocation`, so the deliverables are correct, but the plan
+      document needs to be updated before Phase 1b (whose adapters will
+      otherwise look for these fields on the wrong carriers). See
+      parity/decimal-inventory.md "Cross-cuts to flag for Phase 1b" §0
+      for the full breakdown. Action: update PHASE0_PLAN.md §4 matrix
+      to reflect actual class membership.
+
 - [ ] **[migration][env-blocker]** `pnpm test` cannot start vitest on macOS
       Sequoia (Darwin 25.x) because `dlopen` rejects the prebuilt
       `@rollup/rollup-darwin-arm64.node` with `not valid for use in

@@ -2,12 +2,10 @@
   "carrier": "OrderState",
   "name": "OrderState negative margin change",
   "raw": {
-    "allowedAllocQty": "100",
     "commissionAndFees": 2,
     "commissionAndFeesCurrency": "",
     "completedStatus": "",
     "completedTime": "",
-    "desiredAllocQty": "100",
     "equityWithLoanAfter": "",
     "equityWithLoanAfterOutsideRTH": 4955,
     "equityWithLoanBefore": "",
@@ -29,14 +27,21 @@
     "marginCurrency": "",
     "maxCommissionAndFees": 2.05,
     "minCommissionAndFees": 1.95,
-    "orderAllocations": null,
-    "position": "100",
-    "positionAfter": "100",
-    "positionDesired": "100",
+    "orderAllocations": [
+      {
+        "account": "paper-account-1",
+        "allowedAllocQty": "10",
+        "desiredAllocQty": "10",
+        "isMonetary": false,
+        "position": "100",
+        "positionAfter": "110",
+        "positionDesired": "110"
+      }
+    ],
     "rejectReason": "",
     "status": "Filled",
     "suggestedSize": "100",
     "warningText": ""
   },
-  "stringified": "{\"status\":\"Filled\",\"initMarginBefore\":\"\",\"maintMarginBefore\":\"\",\"equityWithLoanBefore\":\"\",\"initMarginChange\":\"\",\"maintMarginChange\":\"\",\"equityWithLoanChange\":\"\",\"initMarginAfter\":\"\",\"maintMarginAfter\":\"\",\"equityWithLoanAfter\":\"\",\"commissionAndFees\":2,\"minCommissionAndFees\":1.95,\"maxCommissionAndFees\":2.05,\"commissionAndFeesCurrency\":\"\",\"marginCurrency\":\"\",\"initMarginBeforeOutsideRTH\":1000,\"maintMarginBeforeOutsideRTH\":800,\"equityWithLoanBeforeOutsideRTH\":5000,\"initMarginChangeOutsideRTH\":-100,\"maintMarginChangeOutsideRTH\":40,\"equityWithLoanChangeOutsideRTH\":-1234.56,\"initMarginAfterOutsideRTH\":1050,\"maintMarginAfterOutsideRTH\":840,\"equityWithLoanAfterOutsideRTH\":4955,\"suggestedSize\":\"100\",\"rejectReason\":\"\",\"orderAllocations\":null,\"warningText\":\"\",\"completedTime\":\"\",\"completedStatus\":\"\",\"position\":\"100\",\"positionDesired\":\"100\",\"positionAfter\":\"100\",\"desiredAllocQty\":\"100\",\"allowedAllocQty\":\"100\"}"
+  "stringified": "{\"status\":\"Filled\",\"initMarginBefore\":\"\",\"maintMarginBefore\":\"\",\"equityWithLoanBefore\":\"\",\"initMarginChange\":\"\",\"maintMarginChange\":\"\",\"equityWithLoanChange\":\"\",\"initMarginAfter\":\"\",\"maintMarginAfter\":\"\",\"equityWithLoanAfter\":\"\",\"commissionAndFees\":2,\"minCommissionAndFees\":1.95,\"maxCommissionAndFees\":2.05,\"commissionAndFeesCurrency\":\"\",\"marginCurrency\":\"\",\"initMarginBeforeOutsideRTH\":1000,\"maintMarginBeforeOutsideRTH\":800,\"equityWithLoanBeforeOutsideRTH\":5000,\"initMarginChangeOutsideRTH\":-100,\"maintMarginChangeOutsideRTH\":40,\"equityWithLoanChangeOutsideRTH\":-1234.56,\"initMarginAfterOutsideRTH\":1050,\"maintMarginAfterOutsideRTH\":840,\"equityWithLoanAfterOutsideRTH\":4955,\"suggestedSize\":\"100\",\"rejectReason\":\"\",\"orderAllocations\":[{\"account\":\"paper-account-1\",\"position\":\"100\",\"positionDesired\":\"110\",\"positionAfter\":\"110\",\"desiredAllocQty\":\"10\",\"allowedAllocQty\":\"10\",\"isMonetary\":false}],\"warningText\":\"\",\"completedTime\":\"\",\"completedStatus\":\"\"}"
 }

@@ -1,14 +1,15 @@
 {
-  "carrier": "Execution",
+  "carrier": "ExecutionFilter",
   "field": "lastNDays",
-  "name": "Execution.lastNDays = UNSET_INTEGER",
+  "name": "ExecutionFilter.lastNDays = UNSET_INTEGER",
   "raw": {
+    "acctCode": "",
     "clientId": 0,
-    "execId": "exec-0",
+    "exchange": "",
     "lastNDays": 2147483647,
-    "orderId": 0,
-    "permId": 0,
-    "side": "BOT"
+    "secType": "",
+    "side": "",
+    "symbol": ""
   },
   "sentinel": "UNSET_INTEGER",
   "wireExpected": {

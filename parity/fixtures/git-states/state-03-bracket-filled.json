@@ -213,16 +213,10 @@
             },
             "tpsl": {
               "stopLoss": {
-                "price": {
-                  "kind": "value",
-                  "value": "171"
-                }
+                "price": "171"
               },
               "takeProfit": {
-                "price": {
-                  "kind": "value",
-                  "value": "189"
-                }
+                "price": "189"
               }
             }
           }

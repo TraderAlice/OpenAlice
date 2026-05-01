@@ -59,7 +59,10 @@ function installFakeClock(): void {
   fakeDate.now = () => FAKE_MS
   fakeDate.parse = RealDate.parse.bind(RealDate)
   fakeDate.UTC = RealDate.UTC.bind(RealDate)
-  fakeDate.prototype = RealDate.prototype
+  // `prototype` on the function object is a writable own property; TS marks
+  // it readonly on `DateConstructor`, so cast to bypass and let the runtime
+  // reassign do its job.
+  ;(fakeDate as { prototype: typeof Date.prototype }).prototype = RealDate.prototype
   globalThis.Date = fakeDate
 }
 

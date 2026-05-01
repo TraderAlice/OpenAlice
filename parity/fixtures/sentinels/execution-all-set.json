@@ -7,7 +7,6 @@
       "__decimal__": "1.5"
     },
     "execId": "exec-0",
-    "lastNDays": 100,
     "orderId": 0,
     "permId": 0,
     "shares": {
@@ -18,9 +17,6 @@
   "variant": "all-set",
   "wireExpected": {
     "cumQty": {
-      "kind": "value"
-    },
-    "lastNDays": {
       "kind": "value"
     },
     "shares": {

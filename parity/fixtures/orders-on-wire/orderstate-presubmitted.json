@@ -28,13 +28,10 @@
     "maxCommissionAndFees": 1.5,
     "minCommissionAndFees": 1,
     "orderAllocations": null,
-    "position": "100",
-    "positionAfter": "110",
-    "positionDesired": "110",
     "rejectReason": "",
     "status": "PreSubmitted",
-    "suggestedSize": "1.70141183460469231731687303715884105727e+38",
+    "suggestedSize": "100",
     "warningText": ""
   },
-  "stringified": "{\"status\":\"PreSubmitted\",\"initMarginBefore\":\"\",\"maintMarginBefore\":\"\",\"equityWithLoanBefore\":\"\",\"initMarginChange\":\"\",\"maintMarginChange\":\"\",\"equityWithLoanChange\":\"\",\"initMarginAfter\":\"\",\"maintMarginAfter\":\"\",\"equityWithLoanAfter\":\"\",\"commissionAndFees\":1.25,\"minCommissionAndFees\":1,\"maxCommissionAndFees\":1.5,\"commissionAndFeesCurrency\":\"\",\"marginCurrency\":\"\",\"initMarginBeforeOutsideRTH\":1.7976931348623157e+308,\"maintMarginBeforeOutsideRTH\":1.7976931348623157e+308,\"equityWithLoanBeforeOutsideRTH\":1.7976931348623157e+308,\"initMarginChangeOutsideRTH\":1.7976931348623157e+308,\"maintMarginChangeOutsideRTH\":1.7976931348623157e+308,\"equityWithLoanChangeOutsideRTH\":1.7976931348623157e+308,\"initMarginAfterOutsideRTH\":1.7976931348623157e+308,\"maintMarginAfterOutsideRTH\":1.7976931348623157e+308,\"equityWithLoanAfterOutsideRTH\":1.7976931348623157e+308,\"suggestedSize\":\"1.70141183460469231731687303715884105727e+38\",\"rejectReason\":\"\",\"orderAllocations\":null,\"warningText\":\"\",\"completedTime\":\"\",\"completedStatus\":\"\",\"position\":\"100\",\"positionDesired\":\"110\",\"positionAfter\":\"110\"}"
+  "stringified": "{\"status\":\"PreSubmitted\",\"initMarginBefore\":\"\",\"maintMarginBefore\":\"\",\"equityWithLoanBefore\":\"\",\"initMarginChange\":\"\",\"maintMarginChange\":\"\",\"equityWithLoanChange\":\"\",\"initMarginAfter\":\"\",\"maintMarginAfter\":\"\",\"equityWithLoanAfter\":\"\",\"commissionAndFees\":1.25,\"minCommissionAndFees\":1,\"maxCommissionAndFees\":1.5,\"commissionAndFeesCurrency\":\"\",\"marginCurrency\":\"\",\"initMarginBeforeOutsideRTH\":1.7976931348623157e+308,\"maintMarginBeforeOutsideRTH\":1.7976931348623157e+308,\"equityWithLoanBeforeOutsideRTH\":1.7976931348623157e+308,\"initMarginChangeOutsideRTH\":1.7976931348623157e+308,\"maintMarginChangeOutsideRTH\":1.7976931348623157e+308,\"equityWithLoanChangeOutsideRTH\":1.7976931348623157e+308,\"initMarginAfterOutsideRTH\":1.7976931348623157e+308,\"maintMarginAfterOutsideRTH\":1.7976931348623157e+308,\"equityWithLoanAfterOutsideRTH\":1.7976931348623157e+308,\"suggestedSize\":\"100\",\"rejectReason\":\"\",\"orderAllocations\":null,\"warningText\":\"\",\"completedTime\":\"\",\"completedStatus\":\"\"}"
 }

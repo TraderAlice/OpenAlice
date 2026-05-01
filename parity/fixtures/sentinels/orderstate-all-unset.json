@@ -2,13 +2,7 @@
   "carrier": "OrderState",
   "name": "OrderState — every sentinel-bearing field is UNSET (corner case)",
   "raw": {
-    "allowedAllocQty": {
-      "__decimal__": "170141183460469231731687303715884105727"
-    },
     "commissionAndFees": 1.7976931348623157e+308,
-    "desiredAllocQty": {
-      "__decimal__": "170141183460469231731687303715884105727"
-    },
     "equityWithLoanAfterOutsideRTH": 1.7976931348623157e+308,
     "equityWithLoanBeforeOutsideRTH": 1.7976931348623157e+308,
     "equityWithLoanChangeOutsideRTH": 1.7976931348623157e+308,
@@ -20,15 +14,6 @@
     "maintMarginChangeOutsideRTH": 1.7976931348623157e+308,
     "maxCommissionAndFees": 1.7976931348623157e+308,
     "minCommissionAndFees": 1.7976931348623157e+308,
-    "position": {
-      "__decimal__": "170141183460469231731687303715884105727"
-    },
-    "positionAfter": {
-      "__decimal__": "170141183460469231731687303715884105727"
-    },
-    "positionDesired": {
-      "__decimal__": "170141183460469231731687303715884105727"
-    },
     "status": "PreSubmitted",
     "suggestedSize": {
       "__decimal__": "170141183460469231731687303715884105727"
@@ -36,13 +21,7 @@
   },
   "variant": "all-unset",
   "wireExpected": {
-    "allowedAllocQty": {
-      "kind": "unset"
-    },
     "commissionAndFees": {
-      "kind": "unset"
-    },
-    "desiredAllocQty": {
       "kind": "unset"
     },
     "equityWithLoanAfterOutsideRTH": {
@@ -76,15 +55,6 @@
       "kind": "unset"
     },
     "minCommissionAndFees": {
-      "kind": "unset"
-    },
-    "position": {
-      "kind": "unset"
-    },
-    "positionAfter": {
-      "kind": "unset"
-    },
-    "positionDesired": {
       "kind": "unset"
     },
     "suggestedSize": {

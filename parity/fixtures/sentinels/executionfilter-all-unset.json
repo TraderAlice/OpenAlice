@@ -1,0 +1,19 @@
+{
+  "carrier": "ExecutionFilter",
+  "name": "ExecutionFilter — every sentinel-bearing field is UNSET (corner case)",
+  "raw": {
+    "acctCode": "",
+    "clientId": 0,
+    "exchange": "",
+    "lastNDays": 2147483647,
+    "secType": "",
+    "side": "",
+    "symbol": ""
+  },
+  "variant": "all-unset",
+  "wireExpected": {
+    "lastNDays": {
+      "kind": "unset"
+    }
+  }
+}

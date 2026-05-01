@@ -1,16 +1,15 @@
 {
-  "carrier": "Contract",
+  "carrier": "ContractDetails",
   "field": "lastPricePrecision",
-  "name": "Contract.lastPricePrecision = UNSET_DECIMAL",
+  "name": "ContractDetails.lastPricePrecision = UNSET_DECIMAL",
   "raw": {
-    "aliceId": "mock|MOCK",
-    "currency": "USD",
-    "exchange": "SMART",
+    "contract": {
+      "secType": "STK",
+      "symbol": "MOCK"
+    },
     "lastPricePrecision": {
       "__decimal__": "170141183460469231731687303715884105727"
-    },
-    "secType": "STK",
-    "symbol": "MOCK"
+    }
   },
   "sentinel": "UNSET_DECIMAL",
   "wireExpected": {

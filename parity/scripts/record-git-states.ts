@@ -45,7 +45,7 @@ function installFakeClock(): void {
   fakeDate.now = () => FAKE_MS
   fakeDate.parse = RealDate.parse.bind(RealDate)
   fakeDate.UTC = RealDate.UTC.bind(RealDate)
-  fakeDate.prototype = RealDate.prototype
+  ;(fakeDate as { prototype: typeof Date.prototype }).prototype = RealDate.prototype
   globalThis.Date = fakeDate
 }
 
@@ -227,8 +227,8 @@ const SCENARIOS: Scenario[] = [
         action: 'placeOrder',
         contract: aapl,
         order: makeOrder('BUY', 'LMT', 'GTC', '100', '180'),
-        tpsl: { takeProfit: { price: new Decimal('189') }, stopLoss: { price: new Decimal('171') } },
-      } as Operation)
+        tpsl: { takeProfit: { price: '189' }, stopLoss: { price: '171' } },
+      })
       git.commit('BUY 100 AAPL LMT @180 with TP/SL')
       await git.push()
       return git
