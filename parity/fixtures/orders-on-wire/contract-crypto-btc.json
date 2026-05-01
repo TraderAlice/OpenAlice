@@ -1,0 +1,30 @@
+{
+  "carrier": "Contract",
+  "name": "Contract CRYPTO BTC/USDT bybit",
+  "raw": {
+    "comboLegs": [],
+    "comboLegsDescrip": "",
+    "conId": 0,
+    "currency": "USDT",
+    "deltaNeutralContract": null,
+    "description": "",
+    "exchange": "bybit",
+    "includeExpired": false,
+    "issuerId": "",
+    "lastTradeDate": "",
+    "lastTradeDateOrContractMonth": "",
+    "localSymbol": "",
+    "minSize": "0.0001",
+    "multiplier": "",
+    "primaryExchange": "",
+    "right": "",
+    "secId": "",
+    "secIdType": "",
+    "secType": "CRYPTO",
+    "sizeIncrement": "0.0001",
+    "strike": 1.7976931348623157e+308,
+    "symbol": "BTC/USDT",
+    "tradingClass": ""
+  },
+  "stringified": "{\"conId\":0,\"symbol\":\"BTC/USDT\",\"secType\":\"CRYPTO\",\"lastTradeDateOrContractMonth\":\"\",\"lastTradeDate\":\"\",\"strike\":1.7976931348623157e+308,\"right\":\"\",\"multiplier\":\"\",\"exchange\":\"bybit\",\"primaryExchange\":\"\",\"currency\":\"USDT\",\"localSymbol\":\"\",\"tradingClass\":\"\",\"includeExpired\":false,\"secIdType\":\"\",\"secId\":\"\",\"description\":\"\",\"issuerId\":\"\",\"comboLegsDescrip\":\"\",\"comboLegs\":[],\"deltaNeutralContract\":null,\"minSize\":\"0.0001\",\"sizeIncrement\":\"0.0001\"}"
+}

@@ -1,0 +1,31 @@
+{
+  "carrier": "Execution",
+  "name": "Execution default (UNSET_DECIMAL fields)",
+  "raw": {
+    "acctNumber": "",
+    "avgPrice": 0,
+    "clientId": 0,
+    "cumQty": "1.70141183460469231731687303715884105727e+38",
+    "evMultiplier": 0,
+    "evRule": "",
+    "exchange": "",
+    "execId": "",
+    "lastLiquidity": 0,
+    "liquidation": 0,
+    "modelCode": "",
+    "optExerciseOrLapseType": {
+      "label": "None",
+      "value": -1
+    },
+    "orderId": 0,
+    "orderRef": "",
+    "pendingPriceRevision": false,
+    "permId": 0,
+    "price": 0,
+    "shares": "1.70141183460469231731687303715884105727e+38",
+    "side": "",
+    "submitter": "",
+    "time": ""
+  },
+  "stringified": "{\"execId\":\"\",\"time\":\"\",\"acctNumber\":\"\",\"exchange\":\"\",\"side\":\"\",\"shares\":\"1.70141183460469231731687303715884105727e+38\",\"price\":0,\"permId\":0,\"clientId\":0,\"orderId\":0,\"liquidation\":0,\"cumQty\":\"1.70141183460469231731687303715884105727e+38\",\"avgPrice\":0,\"orderRef\":\"\",\"evRule\":\"\",\"evMultiplier\":0,\"modelCode\":\"\",\"lastLiquidity\":0,\"pendingPriceRevision\":false,\"submitter\":\"\",\"optExerciseOrLapseType\":{\"value\":-1,\"label\":\"None\"}}"
+}

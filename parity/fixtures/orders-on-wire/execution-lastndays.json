@@ -1,0 +1,32 @@
+{
+  "carrier": "Execution",
+  "name": "Execution with lastNDays set",
+  "raw": {
+    "acctNumber": "",
+    "avgPrice": 0,
+    "clientId": 0,
+    "cumQty": "10",
+    "evMultiplier": 0,
+    "evRule": "",
+    "exchange": "",
+    "execId": "exec-12345",
+    "lastLiquidity": 0,
+    "lastNDays": 30,
+    "liquidation": 0,
+    "modelCode": "",
+    "optExerciseOrLapseType": {
+      "label": "None",
+      "value": -1
+    },
+    "orderId": 1,
+    "orderRef": "",
+    "pendingPriceRevision": false,
+    "permId": 999,
+    "price": 50,
+    "shares": "10",
+    "side": "BOT",
+    "submitter": "",
+    "time": ""
+  },
+  "stringified": "{\"execId\":\"exec-12345\",\"time\":\"\",\"acctNumber\":\"\",\"exchange\":\"\",\"side\":\"BOT\",\"shares\":\"10\",\"price\":50,\"permId\":999,\"clientId\":0,\"orderId\":1,\"liquidation\":0,\"cumQty\":\"10\",\"avgPrice\":0,\"orderRef\":\"\",\"evRule\":\"\",\"evMultiplier\":0,\"modelCode\":\"\",\"lastLiquidity\":0,\"pendingPriceRevision\":false,\"submitter\":\"\",\"optExerciseOrLapseType\":{\"value\":-1,\"label\":\"None\"},\"lastNDays\":30}"
+}
