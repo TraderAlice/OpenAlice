@@ -8,8 +8,8 @@
 
 import net from 'node:net'
 import { EventEmitter } from 'node:events'
-import { NO_VALID_ID } from './const.js'
-import { FAIL_CREATE_SOCK, CONNECT_FAIL } from './errors.js'
+import { NO_VALID_ID } from '@traderalice/ibkr-types'
+import { FAIL_CREATE_SOCK, CONNECT_FAIL } from '@traderalice/ibkr-types'
 import { currentTimeMillis } from './utils.js'
 
 export interface ConnectionWrapper {

@@ -4,9 +4,9 @@
  */
 
 import Decimal from 'decimal.js'
-import { UNSET_INTEGER, UNSET_DOUBLE, UNSET_DECIMAL, DOUBLE_INFINITY, INFINITY_STR } from './const.js'
+import { UNSET_INTEGER, UNSET_DOUBLE, UNSET_DECIMAL, DOUBLE_INFINITY, INFINITY_STR } from '@traderalice/ibkr-types'
 import { ClientException, isAsciiPrintable } from './utils.js'
-import { INVALID_SYMBOL } from './errors.js'
+import { INVALID_SYMBOL } from '@traderalice/ibkr-types'
 
 /**
  * Wrap protobuf data with 4-byte big-endian length prefix and msgId.

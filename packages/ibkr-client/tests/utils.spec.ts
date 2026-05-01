@@ -9,8 +9,8 @@ import {
   floatMaxString, intMaxString, decimalMaxString,
   isAsciiPrintable, BadMessage,
 } from '../src/utils.js'
-import { UNSET_DOUBLE, UNSET_INTEGER, UNSET_DECIMAL, DOUBLE_INFINITY } from '../src/const.js'
-import { TickTypeEnum, tickTypeToString } from '../src/tick-type.js'
+import { UNSET_DOUBLE, UNSET_INTEGER, UNSET_DECIMAL, DOUBLE_INFINITY } from '@traderalice/ibkr-types'
+import { TickTypeEnum, tickTypeToString } from '@traderalice/ibkr-types'
 
 function iter(arr: string[]): Iterator<string> {
   return arr[Symbol.iterator]()

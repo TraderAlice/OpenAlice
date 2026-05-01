@@ -3,14 +3,14 @@
  */
 
 import Decimal from 'decimal.js'
-import { UNSET_DOUBLE, UNSET_INTEGER, UNSET_DECIMAL } from './const.js'
-import { Contract, ComboLeg, DeltaNeutralContract } from './contract.js'
-import { Order, OrderComboLeg } from './order.js'
-import { OrderState, OrderAllocation } from './order-state.js'
-import { OrderCondition, Create as createOrderCondition } from './order-condition.js'
-import { SoftDollarTier } from './softdollartier.js'
-import { TagValue } from './tag-value.js'
-import { IneligibilityReason } from './ineligibility-reason.js'
+import { UNSET_DOUBLE, UNSET_INTEGER, UNSET_DECIMAL } from '@traderalice/ibkr-types'
+import { Contract, ComboLeg, DeltaNeutralContract } from '@traderalice/ibkr-types'
+import { Order, OrderComboLeg } from '@traderalice/ibkr-types'
+import { OrderState, OrderAllocation } from '@traderalice/ibkr-types'
+import { OrderCondition, Create as createOrderCondition } from '@traderalice/ibkr-types'
+import { SoftDollarTier } from '@traderalice/ibkr-types'
+import { TagValue } from '@traderalice/ibkr-types'
+import { IneligibilityReason } from '@traderalice/ibkr-types'
 import {
   decodeStr,
   decodeInt,
@@ -43,7 +43,7 @@ import {
   MIN_SERVER_VER_CME_TAGGING_FIELDS_IN_OPEN_ORDER,
   MIN_SERVER_VER_FULL_ORDER_PREVIEW_FIELDS,
   MIN_SERVER_VER_SUBMITTER,
-} from './server-versions.js'
+} from '@traderalice/ibkr-types'
 
 export class OrderDecoder {
   contract: Contract

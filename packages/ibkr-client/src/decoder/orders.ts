@@ -13,8 +13,8 @@
 
 import Decimal from 'decimal.js'
 import type { Decoder } from './base.js'
-import { IN } from '../message.js'
-import { UNSET_INTEGER, UNSET_DOUBLE, UNSET_DECIMAL } from '../const.js'
+import { IN } from '@traderalice/ibkr-types'
+import { UNSET_INTEGER, UNSET_DOUBLE, UNSET_DECIMAL } from '@traderalice/ibkr-types'
 import {
   decodeStr,
   decodeInt,
@@ -29,13 +29,13 @@ import {
   MIN_SERVER_VER_ORDER_CONTAINER,
   MIN_SERVER_VER_AUTO_CANCEL_PARENT,
   MIN_SERVER_VER_IMBALANCE_ONLY,
-} from '../server-versions.js'
+} from '@traderalice/ibkr-types'
 import { OrderDecoder } from '../order-decoder.js'
-import { Contract, ComboLeg, DeltaNeutralContract } from '../contract.js'
-import { Order, OrderComboLeg } from '../order.js'
-import { OrderState, OrderAllocation } from '../order-state.js'
-import { SoftDollarTier } from '../softdollartier.js'
-import { TagValue } from '../tag-value.js'
+import { Contract, ComboLeg, DeltaNeutralContract } from '@traderalice/ibkr-types'
+import { Order, OrderComboLeg } from '@traderalice/ibkr-types'
+import { OrderState, OrderAllocation } from '@traderalice/ibkr-types'
+import { SoftDollarTier } from '@traderalice/ibkr-types'
+import { TagValue } from '@traderalice/ibkr-types'
 import {
   OrderCondition,
   PriceCondition,
@@ -44,7 +44,7 @@ import {
   ExecutionCondition,
   VolumeCondition,
   PercentChangeCondition,
-} from '../order-condition.js'
+} from '@traderalice/ibkr-types'
 
 // Protobuf message types
 import { OrderStatus as OrderStatusProto } from '../protobuf/OrderStatus.js'

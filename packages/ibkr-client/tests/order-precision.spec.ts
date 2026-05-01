@@ -9,8 +9,8 @@
 
 import { describe, it, expect } from 'vitest'
 import Decimal from 'decimal.js'
-import { Order } from '../src/order.js'
-import { UNSET_DECIMAL } from '../src/const.js'
+import { Order } from '@traderalice/ibkr-types'
+import { UNSET_DECIMAL } from '@traderalice/ibkr-types'
 import { makeField, makeFieldHandleEmpty } from '../src/comm.js'
 import { decodeDecimal } from '../src/utils.js'
 

@@ -6,8 +6,8 @@
 
 import Decimal from 'decimal.js'
 import type { Decoder } from './base.js'
-import { IN } from '../message.js'
-import { NO_VALID_ID, UNSET_DECIMAL } from '../const.js'
+import { IN } from '@traderalice/ibkr-types'
+import { NO_VALID_ID, UNSET_DECIMAL } from '@traderalice/ibkr-types'
 import {
   decodeStr,
   decodeInt,
@@ -18,7 +18,7 @@ import {
 import {
   MIN_SERVER_VER_SYNT_REALTIME_BARS,
   MIN_SERVER_VER_HISTORICAL_DATA_END,
-} from '../server-versions.js'
+} from '@traderalice/ibkr-types'
 import {
   BarData,
   RealTimeBar,
@@ -29,7 +29,7 @@ import {
   HistoricalSession,
   TickAttribBidAsk,
   TickAttribLast,
-} from '../common.js'
+} from '@traderalice/ibkr-types'
 // Protobuf message types
 import { HistoricalData as HistoricalDataProto } from '../protobuf/HistoricalData.js'
 import { HistoricalDataUpdate as HistoricalDataUpdateProto } from '../protobuf/HistoricalDataUpdate.js'

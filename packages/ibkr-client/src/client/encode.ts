@@ -4,9 +4,9 @@
  */
 
 import { makeField, makeFieldHandleEmpty } from '../comm.js'
-import type { Contract } from '../contract.js'
+import type { Contract } from '@traderalice/ibkr-types'
 import type { EClient } from './base.js'
-import * as SV from '../server-versions.js'
+import * as SV from '@traderalice/ibkr-types'
 
 /**
  * Encode the standard contract fields used by most request methods.

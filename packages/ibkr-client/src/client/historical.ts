@@ -7,15 +7,15 @@
 
 import { EClient } from './base.js'
 import { makeField, makeFieldHandleEmpty } from '../comm.js'
-import { OUT } from '../message.js'
-import * as SV from '../server-versions.js'
-import { NO_VALID_ID, UNSET_INTEGER } from '../const.js'
-import * as errors from '../errors.js'
+import { OUT } from '@traderalice/ibkr-types'
+import * as SV from '@traderalice/ibkr-types'
+import { NO_VALID_ID, UNSET_INTEGER } from '@traderalice/ibkr-types'
+import * as errors from '@traderalice/ibkr-types'
 import { currentTimeMillis } from '../utils.js'
-import type { Contract } from '../contract.js'
-import type { ScannerSubscription } from '../scanner.js'
-import type { TagValueList } from '../tag-value.js'
-import type { WshEventData } from '../common.js'
+import type { Contract } from '@traderalice/ibkr-types'
+import type { ScannerSubscription } from '@traderalice/ibkr-types'
+import type { TagValueList } from '@traderalice/ibkr-types'
+import type { WshEventData } from '@traderalice/ibkr-types'
 
 declare module './base.js' {
   interface EClient {

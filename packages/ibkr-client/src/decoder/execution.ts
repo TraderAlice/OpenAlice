@@ -9,7 +9,7 @@
 
 import Decimal from 'decimal.js'
 import type { Decoder } from './base.js'
-import { IN } from '../message.js'
+import { IN } from '@traderalice/ibkr-types'
 import {
   decodeStr,
   decodeInt,
@@ -22,11 +22,11 @@ import {
   MIN_SERVER_VER_MODELS_SUPPORT,
   MIN_SERVER_VER_PENDING_PRICE_REVISION,
   MIN_SERVER_VER_SUBMITTER,
-} from '../server-versions.js'
-import { NO_VALID_ID } from '../const.js'
-import { Contract, ComboLeg, DeltaNeutralContract } from '../contract.js'
-import { Execution, OptionExerciseType } from '../execution.js'
-import { CommissionAndFeesReport } from '../commission-and-fees-report.js'
+} from '@traderalice/ibkr-types'
+import { NO_VALID_ID } from '@traderalice/ibkr-types'
+import { Contract, ComboLeg, DeltaNeutralContract } from '@traderalice/ibkr-types'
+import { Execution, OptionExerciseType } from '@traderalice/ibkr-types'
+import { CommissionAndFeesReport } from '@traderalice/ibkr-types'
 
 // Protobuf message types
 import { ExecutionDetails as ExecutionDetailsProto } from '../protobuf/ExecutionDetails.js'

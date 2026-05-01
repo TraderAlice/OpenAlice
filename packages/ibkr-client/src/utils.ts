@@ -11,7 +11,7 @@ import {
   UNSET_DECIMAL,
   DOUBLE_INFINITY,
   INFINITY_STR,
-} from './const.js'
+} from '@traderalice/ibkr-types'
 
 export class BadMessage extends Error {
   constructor(text: string) {

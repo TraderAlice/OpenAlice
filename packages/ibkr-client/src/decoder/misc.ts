@@ -36,8 +36,8 @@
  */
 
 import type { Decoder } from './base.js'
-import { IN } from '../message.js'
-import { NO_VALID_ID } from '../const.js'
+import { IN } from '@traderalice/ibkr-types'
+import { NO_VALID_ID } from '@traderalice/ibkr-types'
 import {
   decodeStr,
   decodeInt,
@@ -48,16 +48,16 @@ import {
   MIN_SERVER_VER_ADVANCED_ORDER_REJECT,
   MIN_SERVER_VER_ERROR_TIME,
   MIN_SERVER_VER_SERVICE_DATA_TYPE,
-} from '../server-versions.js'
-import { SoftDollarTier } from '../softdollartier.js'
+} from '@traderalice/ibkr-types'
+import { SoftDollarTier } from '@traderalice/ibkr-types'
 import {
   FamilyCode,
   SmartComponent,
   DepthMktDataDescription,
   NewsProvider,
-} from '../common.js'
-import { ScanData } from '../scanner.js'
-import { ContractDetails, Contract } from '../contract.js'
+} from '@traderalice/ibkr-types'
+import { ScanData } from '@traderalice/ibkr-types'
+import { ContractDetails, Contract } from '@traderalice/ibkr-types'
 
 // Protobuf message types
 import { CurrentTime as CurrentTimeProto } from '../protobuf/CurrentTime.js'
