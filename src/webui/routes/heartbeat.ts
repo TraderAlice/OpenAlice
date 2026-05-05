@@ -16,8 +16,8 @@ export function createHeartbeatRoutes(ctx: EngineContext) {
 
   app.post('/trigger', async (c) => {
     try {
-      const jobs = ctx.cronEngine.list()
-      const hbJob = jobs.find((j) => j.name === '__heartbeat__')
+      const jobs = await ctx.cronEngine.list()
+      const hbJob = jobs.find((j: any) => j.name === '__heartbeat__')
       if (!hbJob) {
         return c.json({ error: 'Heartbeat cron job not found. Is heartbeat enabled?' }, 404)
       }

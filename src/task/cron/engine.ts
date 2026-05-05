@@ -72,9 +72,9 @@ export interface CronEngine {
   add(params: CronJobCreate): Promise<string>
   update(id: string, patch: CronJobPatch): Promise<void>
   remove(id: string): Promise<void>
-  list(): CronJob[]
+  list(): Promise<CronJob[]>
   runNow(id: string): Promise<void>
-  get(id: string): CronJob | undefined
+  get(id: string): Promise<CronJob | undefined>
 }
 
 export interface CronEngineOpts {
@@ -102,8 +102,15 @@ export function createCronEngine(opts: CronEngineOpts): CronEngine {
   let jobs: CronJob[] = []
   let timer: ReturnType<typeof setTimeout> | null = null
   let stopped = false
+  let booted = false
 
   // ---------- persistence ----------
+
+  async function ensureLoaded(): Promise<void> {
+    if (booted) return
+    await load()
+    booted = true
+  }
 
   async function load(): Promise<void> {
     try {
@@ -111,7 +118,7 @@ export function createCronEngine(opts: CronEngineOpts): CronEngine {
       const data = JSON.parse(raw)
       jobs = Array.isArray(data.jobs) ? data.jobs : []
     } catch (err: unknown) {
-      if (err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code === 'ENOENT') {
+      if (err instanceof Error && "code" in err && (err as NodeJS.ErrnoException).code === "ENOENT") {
         jobs = []
         return
       }
@@ -124,7 +131,7 @@ export function createCronEngine(opts: CronEngineOpts): CronEngine {
     // Unique tmp filename per call — prevents rename races when save() is
     // called concurrently (e.g. onTick save vs UI-triggered add/update).
     const tmp = `${storePath}.${process.pid}.${randomUUID().slice(0, 8)}.tmp`
-    await writeFile(tmp, JSON.stringify({ jobs }, null, 2), 'utf-8')
+    await writeFile(tmp, JSON.stringify({ jobs }, null, 2), "utf-8")
     await rename(tmp, storePath)
   }
 
@@ -199,7 +206,7 @@ export function createCronEngine(opts: CronEngineOpts): CronEngine {
 
   return {
     async start() {
-      await load()
+      await ensureLoaded()
 
       const currentMs = now()
       for (const job of jobs) {
@@ -223,6 +230,7 @@ export function createCronEngine(opts: CronEngineOpts): CronEngine {
     },
 
     async add(params) {
+      await ensureLoaded()
       const id = randomUUID().slice(0, 8)
       const currentMs = now()
 
@@ -252,6 +260,7 @@ export function createCronEngine(opts: CronEngineOpts): CronEngine {
     },
 
     async update(id, patch) {
+      await ensureLoaded()
       const job = jobs.find((j) => j.id === id)
       if (!job) throw new Error(`cron job not found: ${id}`)
 
@@ -271,24 +280,28 @@ export function createCronEngine(opts: CronEngineOpts): CronEngine {
     },
 
     async remove(id) {
+      await ensureLoaded()
       const idx = jobs.findIndex((j) => j.id === id)
       if (idx === -1) throw new Error(`cron job not found: ${id}`)
       jobs.splice(idx, 1)
       await save()
     },
 
-    list() {
+    async list() {
+      await ensureLoaded()
       return [...jobs]
     },
 
     async runNow(id) {
+      await ensureLoaded()
       const job = jobs.find((j) => j.id === id)
       if (!job) throw new Error(`cron job not found: ${id}`)
       await fireJob(job, now())
       await save()
     },
 
-    get(id) {
+    async get(id) {
+      await ensureLoaded()
       return jobs.find((j) => j.id === id)
     },
   }

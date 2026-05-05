@@ -99,7 +99,7 @@ describe('heartbeat', () => {
 
       await heartbeat.start()
 
-      const jobs = cronEngine.list()
+      const jobs = await cronEngine.list()
       expect(jobs).toHaveLength(1)
       expect(jobs[0].name).toBe(HEARTBEAT_JOB_NAME)
       expect(jobs[0].schedule).toEqual({ kind: 'every', every: '30m' })
@@ -126,7 +126,7 @@ describe('heartbeat', () => {
 
       await heartbeat.start()
 
-      const jobs = cronEngine.list()
+      const jobs = await cronEngine.list()
       expect(jobs).toHaveLength(1) // not 2
       expect(jobs[0].schedule).toEqual({ kind: 'every', every: '1h' })
     })
@@ -141,7 +141,7 @@ describe('heartbeat', () => {
 
       await heartbeat.start()
 
-      const jobs = cronEngine.list()
+      const jobs = await cronEngine.list()
       expect(jobs).toHaveLength(1)
       expect(jobs[0].enabled).toBe(false)
       expect(heartbeat.isEnabled()).toBe(false)
@@ -164,7 +164,7 @@ describe('heartbeat', () => {
       await heartbeat.start()
 
       // Simulate cron.fire for heartbeat
-      await cronEngine.runNow(cronEngine.list()[0].id)
+      await cronEngine.runNow((await cronEngine.list())[0].id)
 
       await vi.waitFor(() => {
         const done = eventLog.recent({ type: 'heartbeat.done' })
@@ -192,7 +192,7 @@ describe('heartbeat', () => {
       })
       await heartbeat.start()
 
-      await cronEngine.runNow(cronEngine.list()[0].id)
+      await cronEngine.runNow((await cronEngine.list())[0].id)
 
       await vi.waitFor(() => {
         const skips = eventLog.recent({ type: 'heartbeat.skip' })
@@ -221,7 +221,7 @@ describe('heartbeat', () => {
       })
       await heartbeat.start()
 
-      await cronEngine.runNow(cronEngine.list()[0].id)
+      await cronEngine.runNow((await cronEngine.list())[0].id)
 
       await vi.waitFor(() => {
         const done = eventLog.recent({ type: 'heartbeat.done' })
@@ -272,7 +272,7 @@ describe('heartbeat', () => {
       })
       await heartbeat.start()
 
-      await cronEngine.runNow(cronEngine.list()[0].id)
+      await cronEngine.runNow((await cronEngine.list())[0].id)
 
       await vi.waitFor(() => {
         const skips = eventLog.recent({ type: 'heartbeat.skip' })
@@ -300,7 +300,7 @@ describe('heartbeat', () => {
       })
       await heartbeat.start()
 
-      const jobId = cronEngine.list()[0].id
+      const jobId = (await cronEngine.list())[0].id
 
       // First fire — should deliver. Wait for heartbeat.done to ensure
       // the full handleFire cycle (including dedup.record) has completed
@@ -335,7 +335,7 @@ describe('heartbeat', () => {
       })
       await heartbeat.start()
 
-      await cronEngine.runNow(cronEngine.list()[0].id)
+      await cronEngine.runNow((await cronEngine.list())[0].id)
 
       await vi.waitFor(() => {
         const errors = eventLog.recent({ type: 'heartbeat.error' })
@@ -361,7 +361,7 @@ describe('heartbeat', () => {
       })
       await heartbeat.start()
 
-      await cronEngine.runNow(cronEngine.list()[0].id)
+      await cronEngine.runNow((await cronEngine.list())[0].id)
 
       await vi.waitFor(() => {
         const done = eventLog.recent({ type: 'heartbeat.done' })
@@ -388,7 +388,7 @@ describe('heartbeat', () => {
       await heartbeat.start()
       heartbeat.stop()
 
-      await cronEngine.runNow(cronEngine.list()[0].id)
+      await cronEngine.runNow((await cronEngine.list())[0].id)
       await new Promise((r) => setTimeout(r, 50))
 
       expect(mockEngine.askWithSession).not.toHaveBeenCalled()
@@ -408,12 +408,12 @@ describe('heartbeat', () => {
       await heartbeat.start()
 
       expect(heartbeat.isEnabled()).toBe(false)
-      expect(cronEngine.list()[0].enabled).toBe(false)
+      expect((await cronEngine.list())[0].enabled).toBe(false)
 
       await heartbeat.setEnabled(true)
 
       expect(heartbeat.isEnabled()).toBe(true)
-      expect(cronEngine.list()[0].enabled).toBe(true)
+      expect((await cronEngine.list())[0].enabled).toBe(true)
     })
 
     it('should disable an enabled heartbeat', async () => {
@@ -430,7 +430,7 @@ describe('heartbeat', () => {
       await heartbeat.setEnabled(false)
 
       expect(heartbeat.isEnabled()).toBe(false)
-      expect(cronEngine.list()[0].enabled).toBe(false)
+      expect((await cronEngine.list())[0].enabled).toBe(false)
     })
 
     it('should persist config via writeConfigSection', async () => {
@@ -464,7 +464,7 @@ describe('heartbeat', () => {
       await heartbeat.setEnabled(true)
 
       // Fire — should process since now enabled
-      await cronEngine.runNow(cronEngine.list()[0].id)
+      await cronEngine.runNow((await cronEngine.list())[0].id)
 
       await vi.waitFor(() => {
         expect(delivered).toHaveLength(1)

@@ -225,7 +225,8 @@ export function createHeartbeat(opts: HeartbeatOpts): Heartbeat {
   /** Ensure the cron job exists and listener is registered (idempotent). */
   async function ensureJobAndListener(): Promise<void> {
     // Idempotent: find existing heartbeat job or create one
-    const existing = cronEngine.list().find((j) => j.name === HEARTBEAT_JOB_NAME)
+    const jobs = await cronEngine.list()
+    const existing = jobs.find((j) => j.name === HEARTBEAT_JOB_NAME)
     if (existing) {
       jobId = existing.id
       await cronEngine.update(existing.id, {

@@ -6,8 +6,8 @@ import type { CronSchedule } from '../../task/cron/engine.js'
 export function createCronRoutes(ctx: EngineContext) {
   const app = new Hono()
 
-  app.get('/jobs', (c) => {
-    return c.json({ jobs: ctx.cronEngine.list() })
+  app.get('/jobs', async (c) => {
+    return c.json({ jobs: await ctx.cronEngine.list() })
   })
 
   app.post('/jobs', async (c) => {
