@@ -31,40 +31,48 @@ function loadStoredWidth(): number {
  * Hosts the activity-specific navigator (channel list, file tree, search results,
  * deploy panel, etc.). Desktop only — hidden on mobile.
  *
- * Width is internally managed and persisted to localStorage. A resize handle
- * on the right edge lets users drag to adjust; double-click resets to default.
+ * Performance note: during drag, width is updated **directly on the DOM ref**
+ * (bypassing React) so heavy children like PushApprovalPanel don't re-render
+ * 60+ times per second. State only commits on drag end (for localStorage
+ * persistence and so the next mount picks it up).
  */
 export function Sidebar({ title, actions, children }: SidebarProps) {
-  const [width, setWidth] = useState(loadStoredWidth)
+  const asideRef = useRef<HTMLElement>(null)
+  const [persistedWidth, setPersistedWidth] = useState(loadStoredWidth)
+  const dragStartWidthRef = useRef(persistedWidth)
 
-  // Keep a ref synced with width so drag-start can read the latest value
-  // without re-binding callbacks on every render.
-  const widthRef = useRef(width)
-  useEffect(() => { widthRef.current = width }, [width])
-
-  // Persist whenever width changes (debounced is unnecessary — change rate is
-  // bounded by user drag speed and only the final value matters).
+  // Persist whenever the committed width changes.
   useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, String(width))
-  }, [width])
-
-  const dragStartWidthRef = useRef(DEFAULT_WIDTH)
+    window.localStorage.setItem(STORAGE_KEY, String(persistedWidth))
+  }, [persistedWidth])
 
   const handleResize = useCallback((delta: number, phase: 'start' | 'move' | 'end') => {
+    const aside = asideRef.current
+    if (!aside) return
     if (phase === 'start') {
-      dragStartWidthRef.current = widthRef.current
+      // Capture the width at drag start. Read from DOM (authoritative during drag).
+      dragStartWidthRef.current = aside.offsetWidth
     } else if (phase === 'move') {
-      setWidth(clamp(dragStartWidthRef.current + delta, MIN_WIDTH, MAX_WIDTH))
+      const next = clamp(dragStartWidthRef.current + delta, MIN_WIDTH, MAX_WIDTH)
+      aside.style.width = `${next}px`
+    } else if (phase === 'end') {
+      // Commit the final DOM width back to React state so the next mount /
+      // localStorage write reflects it.
+      setPersistedWidth(aside.offsetWidth)
     }
-    // 'end' — width already settled; localStorage useEffect handles persistence.
   }, [])
 
-  const handleReset = useCallback(() => setWidth(DEFAULT_WIDTH), [])
+  const handleReset = useCallback(() => {
+    const aside = asideRef.current
+    if (aside) aside.style.width = `${DEFAULT_WIDTH}px`
+    setPersistedWidth(DEFAULT_WIDTH)
+  }, [])
 
   return (
     <aside
+      ref={asideRef}
       className="hidden md:flex h-full flex-col bg-bg-secondary shrink-0 relative"
-      style={{ width }}
+      style={{ width: persistedWidth }}
     >
       <div className="flex items-center justify-between px-3 h-10 shrink-0">
         <h2 className="text-[13px] font-medium text-text">{title}</h2>
