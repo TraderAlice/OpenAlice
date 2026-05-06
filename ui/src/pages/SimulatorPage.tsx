@@ -15,13 +15,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Section } from '../components/form'
-import { EmptyState, Spinner } from '../components/StateViews'
+import { Spinner } from '../components/StateViews'
 import { useToast } from '../components/Toast'
 import {
   simulatorApi,
   type SimulatorState,
   type SimulatorUTAEntry,
 } from '../api/simulator'
+import { api } from '../api'
 
 const POLL_INTERVAL_MS = 3000
 
@@ -35,14 +36,23 @@ export function SimulatorPage() {
   const [loading, setLoading] = useState(false)
   const toast = useToast()
 
-  // Load UTA list once
-  useEffect(() => {
-    simulatorApi.listUtas().then((r) => {
+  const refreshUtaList = useCallback(async () => {
+    try {
+      const r = await simulatorApi.listUtas()
       setUtas(r.utas)
-      if (r.utas.length > 0) setSelected(r.utas[0].id)
-    }).catch((err) => {
+      // If currently selected vanished, fall back to first
+      if (r.utas.length > 0 && !r.utas.some(u => u.id === selected)) setSelected(r.utas[0].id)
+      else if (r.utas.length === 0) setSelected('')
+      return r.utas
+    } catch (err) {
       toast.error(`Failed to list simulators: ${err instanceof Error ? err.message : err}`)
-    })
+      return []
+    }
+  }, [selected, toast])
+
+  // Load UTA list once on mount
+  useEffect(() => {
+    refreshUtaList()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -79,37 +89,38 @@ export function SimulatorPage() {
     }
   }, [selected, toast, refresh])
 
-  if (utas.length === 0) {
-    return (
-      <div className="px-4 md:px-6 py-5 max-w-[860px]">
-        <EmptyState
-          title="No simulator UTAs."
-          description="Create one from Settings → Trading → 'Simulator (testing only)'."
-        />
-      </div>
-    )
-  }
-
   return (
     <div className="px-4 md:px-6 py-5 max-w-[960px] space-y-5">
-      <div className="flex items-center gap-3">
-        <label className="text-[13px] text-text-muted">Account</label>
-        <select
-          value={selected}
-          onChange={(e) => setSelected(e.target.value)}
-          className="px-2.5 py-1 bg-bg text-text border border-border rounded text-sm outline-none focus:border-accent"
-        >
-          {utas.map(u => <option key={u.id} value={u.id}>{u.label} ({u.id})</option>)}
-        </select>
-        <button
-          onClick={refresh}
-          className="px-2.5 py-1 text-xs bg-bg-tertiary text-text-muted rounded hover:text-text transition-colors"
-        >
-          Refresh
-        </button>
-      </div>
+      <CreateSimulatorSection
+        existingIds={utas.map(u => u.id)}
+        onCreated={async (newId) => {
+          const list = await refreshUtaList()
+          if (list.some(u => u.id === newId)) setSelected(newId)
+        }}
+      />
 
-      {state ? (
+      {utas.length === 0 ? (
+        <p className="text-sm text-text-muted">No simulator account yet — create one above.</p>
+      ) : (
+        <div className="flex items-center gap-3">
+          <label className="text-[13px] text-text-muted">Account</label>
+          <select
+            value={selected}
+            onChange={(e) => setSelected(e.target.value)}
+            className="px-2.5 py-1 bg-bg text-text border border-border rounded text-sm outline-none focus:border-accent"
+          >
+            {utas.map(u => <option key={u.id} value={u.id}>{u.label} ({u.id})</option>)}
+          </select>
+          <button
+            onClick={refresh}
+            className="px-2.5 py-1 text-xs bg-bg-tertiary text-text-muted rounded hover:text-text transition-colors"
+          >
+            Refresh
+          </button>
+        </div>
+      )}
+
+      {selected && (state ? (
         <>
           <Section title="Cash" description="Available USD balance.">
             <p className="font-mono text-lg text-text">${Number(state.cash).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
@@ -140,8 +151,109 @@ export function SimulatorPage() {
         </>
       ) : (
         <div className="flex justify-center py-12"><Spinner /></div>
-      )}
+      ))}
     </div>
+  )
+}
+
+// ==================== Create Simulator UTA ====================
+
+function CreateSimulatorSection({ existingIds, onCreated }: {
+  existingIds: string[]
+  onCreated: (id: string) => Promise<void>
+}) {
+  const [open, setOpen] = useState(false)
+  const [id, setId] = useState('')
+  const [cash, setCash] = useState('100000')
+  const [busy, setBusy] = useState(false)
+  const toast = useToast()
+
+  // Default id: simulator, simulator-2, simulator-3, …
+  const defaultId = useMemo(() => {
+    if (!existingIds.includes('simulator')) return 'simulator'
+    let i = 2
+    while (existingIds.includes(`simulator-${i}`)) i++
+    return `simulator-${i}`
+  }, [existingIds])
+
+  const submit = async () => {
+    const finalId = (id || defaultId).trim()
+    if (!finalId) return
+    if (existingIds.includes(finalId)) {
+      toast.error(`Account "${finalId}" already exists`)
+      return
+    }
+    const cashNum = Number(cash)
+    if (!Number.isFinite(cashNum) || cashNum < 0) {
+      toast.error('Cash must be a non-negative number')
+      return
+    }
+    setBusy(true)
+    try {
+      await api.trading.upsertUTA({
+        id: finalId,
+        label: finalId,
+        presetId: 'mock-simulator',
+        enabled: true,
+        guards: [],
+        presetConfig: { cash: cashNum },
+      })
+      // Engine load: PUT skips reconnect for brand-new accounts (no
+      // wasEnabled→nowEnabled transition), so kick it ourselves.
+      await api.trading.reconnectUTA(finalId).catch(() => {})
+      toast.success(`Created ${finalId}`)
+      setOpen(false)
+      setId('')
+      setCash('100000')
+      await onCreated(finalId)
+    } catch (err) {
+      toast.error(`Create failed: ${err instanceof Error ? err.message : err}`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="btn-secondary-sm"
+      >
+        + New simulator account
+      </button>
+    )
+  }
+
+  return (
+    <Section
+      title="Create simulator account"
+      description="In-memory only — wiped on dev server restart. For repro & regression testing."
+    >
+      <div className="flex items-center gap-2 flex-wrap">
+        <input
+          className="px-2 py-1 bg-bg text-text border border-border rounded font-mono text-xs outline-none transition-colors focus:border-accent w-44"
+          placeholder={defaultId}
+          value={id}
+          onChange={(e) => setId(e.target.value.trim())}
+        />
+        <input
+          className="px-2 py-1 bg-bg text-text border border-border rounded font-mono text-xs outline-none transition-colors focus:border-accent w-32"
+          placeholder="cash (USD)"
+          value={cash}
+          onChange={(e) => setCash(e.target.value)}
+        />
+        <button disabled={busy} onClick={submit} className="btn-primary-sm">
+          {busy ? 'Creating…' : 'Create'}
+        </button>
+        <button
+          disabled={busy}
+          onClick={() => { setOpen(false); setId(''); setCash('100000') }}
+          className="btn-secondary-sm"
+        >
+          Cancel
+        </button>
+      </div>
+    </Section>
   )
 }
 

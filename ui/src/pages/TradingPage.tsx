@@ -235,16 +235,15 @@ function CreateWizard({ presets, existingUTAIds, onSave, onClose }: {
     badgeColor: p.badgeColor,
   })
 
+  // 'testing' category presets (Simulator) are intentionally excluded — their
+  // creation entry lives in Dev → Simulator so users picking a real broker
+  // here don't see "Simulator" alongside Bybit / Alpaca / IBKR.
   const recommendedOptions: SDKOption[] = useMemo(
     () => presets.filter(p => p.category === 'recommended').map(toOption),
     [presets],
   )
   const cryptoOptions: SDKOption[] = useMemo(
     () => presets.filter(p => p.category === 'crypto').map(toOption),
-    [presets],
-  )
-  const testingOptions: SDKOption[] = useMemo(
-    () => presets.filter(p => p.category === 'testing').map(toOption),
     [presets],
   )
 
@@ -336,12 +335,6 @@ function CreateWizard({ presets, existingUTAIds, onSave, onClose }: {
               <section className="space-y-3">
                 <PickerSectionHeader title="Crypto" />
                 <SDKSelector options={cryptoOptions} selected={presetId ?? ''} onSelect={handlePick} />
-              </section>
-            )}
-            {testingOptions.length > 0 && (
-              <section className="space-y-3">
-                <PickerSectionHeader title="Testing" />
-                <SDKSelector options={testingOptions} selected={presetId ?? ''} onSelect={handlePick} />
               </section>
             )}
           </div>
