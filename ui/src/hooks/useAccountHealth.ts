@@ -1,31 +1,14 @@
-import { useState, useEffect, useCallback } from 'react'
-import { api } from '../api'
-import { useSSE } from './useSSE'
 import type { BrokerHealthInfo } from '../api/types'
+import { accountHealthLive } from '../live/account-health'
 
 /**
- * Fetches account health on mount and subscribes to SSE for real-time updates.
- * Returns a map of accountId → BrokerHealthInfo.
+ * Returns the live broker-health map (accountId → BrokerHealthInfo).
+ *
+ * Backed by the shared `accountHealthLive` LiveStore — every component
+ * that calls this hook reads from the same in-memory state and shares
+ * one SSE connection to `/api/events/stream`. Connection opens on first
+ * subscriber, closes on last unmount.
  */
-export function useAccountHealth() {
-  const [healthMap, setHealthMap] = useState<Record<string, BrokerHealthInfo>>({})
-
-  useEffect(() => {
-    api.trading.listUTASummaries().then(({ utas }) => {
-      const map: Record<string, BrokerHealthInfo> = {}
-      for (const a of utas) map[a.id] = a.health
-      setHealthMap(map)
-    }).catch(() => {})
-  }, [])
-
-  const handleSSE = useCallback((entry: { type?: string; payload?: { accountId?: string } & BrokerHealthInfo }) => {
-    if (entry.type === 'account.health' && entry.payload?.accountId) {
-      const { accountId, ...health } = entry.payload
-      setHealthMap((prev) => ({ ...prev, [accountId]: health as BrokerHealthInfo }))
-    }
-  }, [])
-
-  useSSE({ url: '/api/events/stream', onMessage: handleSSE })
-
-  return healthMap
+export function useAccountHealth(): Record<string, BrokerHealthInfo> {
+  return accountHealthLive.useStore((s) => s)
 }
