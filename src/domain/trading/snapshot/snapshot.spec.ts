@@ -489,7 +489,7 @@ describe('Snapshot Scheduler', () => {
   it('registers __snapshot__ cron job on start', async () => {
     await scheduler.start()
 
-    const jobs = cronEngine.list()
+    const jobs = await cronEngine.list()
     const snapshotJob = jobs.find(j => j.name === '__snapshot__')
     expect(snapshotJob).toBeDefined()
     expect(snapshotJob!.enabled).toBe(true)
@@ -498,10 +498,10 @@ describe('Snapshot Scheduler', () => {
   // #27
   it('reuses existing job on repeated start (idempotent)', async () => {
     await scheduler.start()
-    const jobsBefore = cronEngine.list().filter(j => j.name === '__snapshot__')
+    const jobsBefore = (await cronEngine.list()).filter(j => j.name === '__snapshot__')
 
     await scheduler.start()
-    const jobsAfter = cronEngine.list().filter(j => j.name === '__snapshot__')
+    const jobsAfter = (await cronEngine.list()).filter(j => j.name === '__snapshot__')
 
     expect(jobsBefore).toHaveLength(1)
     expect(jobsAfter).toHaveLength(1)
@@ -513,7 +513,7 @@ describe('Snapshot Scheduler', () => {
     await scheduler.start()
 
     // Trigger the cron job manually
-    const job = cronEngine.list().find(j => j.name === '__snapshot__')!
+    const job = (await cronEngine.list()).find(j => j.name === '__snapshot__')!
     await cronEngine.runNow(job.id)
 
     // Give the async handler time to complete
@@ -549,7 +549,7 @@ describe('Snapshot Scheduler', () => {
     })
 
     await scheduler.start()
-    const job = cronEngine.list().find(j => j.name === '__snapshot__')!
+    const job = (await cronEngine.list()).find(j => j.name === '__snapshot__')!
 
     // Fire twice quickly
     await cronEngine.runNow(job.id)
@@ -569,7 +569,7 @@ describe('Snapshot Scheduler', () => {
     await scheduler.start()
     scheduler.stop()
 
-    const job = cronEngine.list().find(j => j.name === '__snapshot__')!
+    const job = (await cronEngine.list()).find(j => j.name === '__snapshot__')!
     await cronEngine.runNow(job.id)
     await new Promise(r => setTimeout(r, 50))
 

@@ -330,6 +330,28 @@ export class UnifiedTradingAccount {
 
   // ==================== aliceId management ====================
 
+  /**
+   * Resolve a Contract to its full broker-native form.
+   * If contract.aliceId is present but native fields (conId, localSymbol) are
+   * missing, it parses the nativeKey from aliceId and asks the broker to resolve it.
+   */
+  resolveContract(contract: Contract): Contract {
+    if (contract.aliceId && !contract.conId && !contract.localSymbol) {
+      const parsed = UnifiedTradingAccount.parseAliceId(contract.aliceId)
+      if (parsed && parsed.utaId === this.id) {
+        const resolved = this.broker.resolveNativeKey(parsed.nativeKey)
+        // Copy resolved fields into original object to preserve reference
+        contract.conId = resolved.conId
+        contract.localSymbol = resolved.localSymbol
+        contract.symbol = contract.symbol || resolved.symbol
+        contract.secType = contract.secType || resolved.secType
+        contract.currency = contract.currency || resolved.currency
+        contract.exchange = contract.exchange || resolved.exchange
+      }
+    }
+    return contract
+  }
+
   /** Construct aliceId: "{utaId}|{nativeKey}" using broker's native identity. */
   private stampAliceId(contract: Contract): void {
     const nativeKey = this.broker.getNativeKey(contract)
@@ -588,6 +610,7 @@ export class UnifiedTradingAccount {
   }
 
   async getQuote(contract: Contract): Promise<Quote> {
+    this.resolveContract(contract)
     const quote = await this._callBroker(() => this.broker.getQuote(contract))
     this.stampAliceId(quote.contract)
     return quote
@@ -616,6 +639,7 @@ export class UnifiedTradingAccount {
   }
 
   async getContractDetails(query: Contract): Promise<ContractDetails | null> {
+    this.resolveContract(query)
     const details = await this._callBroker(() => this.broker.getContractDetails(query))
     if (details) this.stampAliceId(details.contract)
     return details

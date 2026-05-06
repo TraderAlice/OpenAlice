@@ -50,7 +50,7 @@ describe('cron engine', () => {
       })
 
       expect(id).toHaveLength(8)
-      const jobs = engine.list()
+      const jobs = await engine.list()
       expect(jobs).toHaveLength(1)
       expect(jobs[0]).toMatchObject({
         id,
@@ -68,7 +68,7 @@ describe('cron engine', () => {
         payload: 'x',
       })
 
-      const job = engine.get(id)
+      const job = await engine.get(id)
       expect(job).toBeDefined()
       expect(job!.name).toBe('get-test')
     })
@@ -82,7 +82,7 @@ describe('cron engine', () => {
 
       await engine.update(id, { name: 'after', payload: 'new' })
 
-      const job = engine.get(id)
+      const job = await engine.get(id)
       expect(job!.name).toBe('after')
       expect(job!.payload).toBe('new')
     })
@@ -94,11 +94,11 @@ describe('cron engine', () => {
         payload: 'x',
       })
 
-      const before = engine.get(id)!.state.nextRunAtMs
+      const before = (await engine.get(id))!.state.nextRunAtMs
 
       await engine.update(id, { schedule: { kind: 'every', every: '2h' } })
 
-      const after = engine.get(id)!.state.nextRunAtMs
+      const after = (await engine.get(id))!.state.nextRunAtMs
       expect(after).not.toBe(before)
     })
 
@@ -110,7 +110,7 @@ describe('cron engine', () => {
       })
 
       await engine.remove(id)
-      expect(engine.list()).toHaveLength(0)
+      expect(await engine.list()).toHaveLength(0)
     })
 
     it('should throw on update of nonexistent job', async () => {
@@ -129,7 +129,7 @@ describe('cron engine', () => {
         enabled: false,
       })
 
-      expect(engine.get(id)!.enabled).toBe(false)
+      expect((await engine.get(id))!.enabled).toBe(false)
     })
   })
 
@@ -163,7 +163,7 @@ describe('cron engine', () => {
 
       await engine.runNow(id)
 
-      const job = engine.get(id)!
+      const job = (await engine.get(id))!
       expect(job.state.lastRunAtMs).toBe(clock)
       expect(job.state.lastStatus).toBe('ok')
     })
@@ -193,7 +193,7 @@ describe('cron engine', () => {
       })
       await engine2.start()
 
-      const jobs = engine2.list()
+      const jobs = await engine2.list()
       expect(jobs).toHaveLength(1)
       expect(jobs[0].name).toBe('persist-me')
 
@@ -214,7 +214,7 @@ describe('cron engine', () => {
 
       await engine.runNow(id)
 
-      const job = engine.get(id)!
+      const job = (await engine.get(id))!
       expect(job.enabled).toBe(false)
       expect(job.state.nextRunAtMs).toBeNull()
     })
@@ -227,7 +227,7 @@ describe('cron engine', () => {
         payload: 'x',
       })
 
-      expect(engine.get(id)!.state.nextRunAtMs).toBeNull()
+      expect((await engine.get(id))!.state.nextRunAtMs).toBeNull()
     })
   })
 })

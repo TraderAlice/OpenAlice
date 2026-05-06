@@ -63,7 +63,8 @@ export function createSnapshotScheduler(deps: {
     listener,
     async start() {
       // Find or create the cron job
-      const existing = cronEngine.list().find(j => j.name === SNAPSHOT_JOB_NAME)
+      const jobs = await cronEngine.list()
+      const existing = jobs.find(j => j.name === SNAPSHOT_JOB_NAME)
       if (existing) {
         await cronEngine.update(existing.id, {
           schedule: { kind: 'every', every: config.every },

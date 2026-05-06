@@ -139,6 +139,9 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
       if (section === 'connectors' || section === 'marketData') {
         await opts?.onConnectorsChange?.()
       }
+      if (section === 'heartbeat' && opts?.ctx) {
+        await opts.ctx.heartbeat.updateConfig(opts.ctx.config.heartbeat)
+      }
       return c.json(validated)
     } catch (err) {
       if (err instanceof Error && err.name === 'ZodError') {

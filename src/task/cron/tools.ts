@@ -42,7 +42,7 @@ export function createCronTools(cronEngine: CronEngine) {
         '- state: Runtime info (nextRunAtMs, lastRunAtMs, lastStatus, consecutiveErrors)',
       inputSchema: z.object({}),
       execute: async () => {
-        return cronEngine.list()
+        return await cronEngine.list()
       },
     }),
 
