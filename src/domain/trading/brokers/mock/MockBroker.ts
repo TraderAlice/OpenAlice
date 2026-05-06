@@ -242,7 +242,6 @@ export class MockBroker implements IBroker {
     const isMarket = order.orderType === 'MKT'
     const side = order.action.toUpperCase()
     const qty = !order.totalQuantity.equals(UNSET_DECIMAL) ? order.totalQuantity : new Decimal(0)
-    const symbol = contract.aliceId ?? contract.symbol ?? 'unknown'
 
     if (isMarket) {
       const price = this._markPriceFor(contract) ?? new Decimal(100)
@@ -325,10 +324,10 @@ export class MockBroker implements IBroker {
 
   async closePosition(contract: Contract, quantity?: Decimal): Promise<PlaceOrderResult> {
     this._record('closePosition', [contract, quantity])
-    const symbol = contract.aliceId ?? contract.symbol ?? 'unknown'
-    const pos = this._positions.get(symbol)
+    const key = this.getNativeKey(contract)
+    const pos = this._positions.get(key)
     if (!pos) {
-      return { success: false, error: `No open position for ${symbol}` }
+      return { success: false, error: `No open position for ${key}` }
     }
 
     const order = new Order()
@@ -767,7 +766,11 @@ export class MockBroker implements IBroker {
   // ==================== Internal ====================
 
   private _applyFill(contract: Contract, side: string, qty: Decimal, price: Decimal): void {
-    const key = contract.aliceId ?? contract.symbol ?? 'unknown'
+    // All position map operations key by `getNativeKey(contract)` so that
+    // orders placed via the IBroker pipeline (with UTA-stamped aliceId) and
+    // simulator-direct calls (externalDeposit/externalTrade — keyed by
+    // user-supplied nativeKey, e.g. "BTC") land in the same map slot.
+    const key = this.getNativeKey(contract)
     const existing = this._positions.get(key)
 
     if (!existing) {

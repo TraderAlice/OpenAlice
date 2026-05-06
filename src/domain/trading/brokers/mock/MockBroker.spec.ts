@@ -425,3 +425,96 @@ describe('factory helpers', () => {
     expect(r.orderId).toBe('order-1')
   })
 })
+
+// ==================== Position-key consistency ====================
+//
+// Regression: positions placed via the IBroker pipeline (where UTA stamps
+// `aliceId` like "simulator|BTC") and positions injected via the simulator
+// surface (`externalDeposit`, keyed by user-supplied nativeKey "BTC")
+// must land in the same map slot. Previously _applyFill used
+// `aliceId ?? symbol` while externalDeposit used the bare nativeKey, so
+// the same logical asset showed up as TWO positions in the simulator UI.
+
+describe('position keying — placeOrder and externalDeposit converge', () => {
+  it('externalDeposit + market BUY on same symbol merge into one position', async () => {
+    const Decimal = (await import('decimal.js')).default
+    const { Order, Contract } = await import('@traderalice/ibkr')
+
+    const acc = new MockBroker({ id: 'mock-paper', cash: 100_000 })
+    acc.setMarkPrice('BTC', 80_000)
+
+    // Step 1: external deposit (transfer-in / 空投) of 1 BTC.
+    acc.externalDeposit({ nativeKey: 'BTC', quantity: 1 })
+
+    // Step 2: market BUY 0.5 BTC via the IBroker pipeline. Mimic UTA by
+    // stamping aliceId on the contract before placing.
+    const contract = new Contract()
+    contract.symbol = 'BTC'
+    contract.secType = 'CRYPTO'
+    contract.exchange = 'MOCK'
+    contract.currency = 'USD'
+    contract.aliceId = 'mock-paper|BTC'   // what UTA.stampAliceId would write
+    const order = new Order()
+    order.action = 'BUY'
+    order.orderType = 'MKT'
+    order.totalQuantity = new Decimal('0.5')
+    await acc.placeOrder(contract, order)
+
+    const positions = await acc.getPositions()
+    expect(positions).toHaveLength(1)
+    expect(positions[0].quantity.toString()).toBe('1.5')
+  })
+
+  it('closePosition resolves a position originally created by externalDeposit', async () => {
+    const Decimal = (await import('decimal.js')).default
+    const { Contract } = await import('@traderalice/ibkr')
+
+    const acc = new MockBroker({ id: 'mock-paper', cash: 100_000 })
+    acc.setMarkPrice('BTC', 80_000)
+    acc.externalDeposit({ nativeKey: 'BTC', quantity: 2 })
+
+    const contract = new Contract()
+    contract.symbol = 'BTC'
+    contract.secType = 'CRYPTO'
+    contract.exchange = 'MOCK'
+    contract.currency = 'USD'
+    contract.aliceId = 'mock-paper|BTC'
+    const result = await acc.closePosition(contract, new Decimal(1))
+    expect(result.success).toBe(true)
+
+    const positions = await acc.getPositions()
+    expect(positions).toHaveLength(1)
+    expect(positions[0].quantity.toString()).toBe('1')
+  })
+
+  it('pending limit order matches against externalDeposit position on the same nativeKey', async () => {
+    const Decimal = (await import('decimal.js')).default
+    const { Order, Contract } = await import('@traderalice/ibkr')
+
+    const acc = new MockBroker({ id: 'mock-paper', cash: 100_000 })
+    acc.setMarkPrice('BTC', 80_000)
+    acc.externalDeposit({ nativeKey: 'BTC', quantity: 1 })
+
+    const contract = new Contract()
+    contract.symbol = 'BTC'
+    contract.secType = 'CRYPTO'
+    contract.exchange = 'MOCK'
+    contract.currency = 'USD'
+    contract.aliceId = 'mock-paper|BTC'
+    const order = new Order()
+    order.action = 'BUY'
+    order.orderType = 'LMT'
+    order.totalQuantity = new Decimal('0.5')
+    order.lmtPrice = new Decimal(75_000)
+    await acc.placeOrder(contract, order)
+
+    expect(acc.getSimulatorState().pendingOrders).toHaveLength(1)
+
+    const filled = acc.setMarkPrice('BTC', 75_000)
+    expect(filled).toHaveLength(1)
+
+    const positions = await acc.getPositions()
+    expect(positions).toHaveLength(1)
+    expect(positions[0].quantity.toString()).toBe('1.5')
+  })
+})
