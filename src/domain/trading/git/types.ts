@@ -31,10 +31,14 @@ export type Operation =
       // bootstrap, external transfer, staking reward, off-platform trade).
       // Treated as a virtual market buy/sell at observed price for cost-basis
       // purposes — sign of quantityDelta determines direction.
+      //
+      // Numeric fields stored as Decimal-as-string so they survive JSON
+      // round-trip through git-persistence; reconstruct via `new Decimal(...)`
+      // at consumption sites.
       action: 'reconcileBalance'
       aliceId: string
-      quantityDelta: Decimal
-      markPrice: Decimal
+      quantityDelta: string
+      markPrice: string
     }
 
 // ==================== Operation Result ====================

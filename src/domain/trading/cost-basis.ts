@@ -113,7 +113,7 @@ function fillDirection(op: Operation): 'buy' | 'sell' {
       // closePosition on a long spot holding sells; we don't model short closes.
       return 'sell'
     case 'reconcileBalance':
-      return op.quantityDelta.gte(0) ? 'buy' : 'sell'
+      return new Decimal(op.quantityDelta).gte(0) ? 'buy' : 'sell'
     default:
       // Unreachable — caller pre-filters via matchesAliceId.
       return 'buy'

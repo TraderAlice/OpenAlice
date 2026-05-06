@@ -51,8 +51,8 @@ function reconcile(aliceId: string, delta: number, mark: number): { op: Operatio
     op: {
       action: 'reconcileBalance',
       aliceId,
-      quantityDelta: new Decimal(delta),
-      markPrice: new Decimal(mark),
+      quantityDelta: String(delta),
+      markPrice: String(mark),
     },
     result: {
       action: 'reconcileBalance',

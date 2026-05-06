@@ -207,11 +207,14 @@ export class TradingGit implements ITradingGit {
     const { aliceId, quantityDelta, markPrice, stateAfter } = params
     const timestamp = new Date().toISOString()
 
+    const qtyStr = quantityDelta.toFixed()
+    const priceStr = markPrice.toFixed()
+
     const operation: Operation = {
       action: 'reconcileBalance',
       aliceId,
-      quantityDelta,
-      markPrice,
+      quantityDelta: qtyStr,
+      markPrice: priceStr,
     }
 
     const result: OperationResult = {
@@ -219,12 +222,12 @@ export class TradingGit implements ITradingGit {
       success: true,
       status: 'filled',
       filledQty: quantityDelta.abs().toFixed(),
-      filledPrice: markPrice.toFixed(),
+      filledPrice: priceStr,
     }
 
     const direction = quantityDelta.gte(0) ? 'observed' : 'released'
     const message = params.message
-      ?? `reconcile: ${direction} ${quantityDelta.abs().toFixed()} ${aliceId} @ ${markPrice.toFixed()}`
+      ?? `reconcile: ${direction} ${quantityDelta.abs().toFixed()} ${aliceId} @ ${priceStr}`
 
     const hash = generateCommitHash({
       message,
@@ -347,8 +350,9 @@ export class TradingGit implements ITradingGit {
       }
 
       case 'reconcileBalance': {
-        const direction = op.quantityDelta.gte(0) ? 'observed' : 'released'
-        return `${direction} ${op.quantityDelta.abs().toFixed()} @${op.markPrice.toFixed()}`
+        const delta = new Decimal(op.quantityDelta)
+        const direction = delta.gte(0) ? 'observed' : 'released'
+        return `${direction} ${delta.abs().toFixed()} @${op.markPrice}`
       }
     }
   }

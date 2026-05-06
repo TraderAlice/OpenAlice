@@ -819,7 +819,7 @@ describe('UTA — getPositions wallet reconciliation', () => {
     expect(reconciles).toHaveLength(1)
     const op = reconciles[0].operations[0] as Extract<Operation, { action: 'reconcileBalance' }>
     expect(op.aliceId).toBe('mock-paper|BTC')
-    expect(op.quantityDelta.toNumber()).toBeCloseTo(1.0093, 4)
+    expect(new Decimal(op.quantityDelta).toNumber()).toBeCloseTo(1.0093, 4)
   })
 
   it('uses markPrice drift to compute true PnL after first observation', async () => {
