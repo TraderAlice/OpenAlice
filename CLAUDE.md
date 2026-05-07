@@ -279,3 +279,10 @@ is currently ahead of `dev` (because a refactor branch just landed
 there), do `git checkout dev && git merge origin/master` *before*
 starting any new feature work. Otherwise your new commits will land
 on a stale baseline.
+
+**Parallel work happens in the cloud, not in local worktrees.** For a
+project this size, spinning up multiple local worktrees costs more
+in `pnpm install` / `data/` copying / port juggling than it saves.
+Hand parallel tracks off to cloud Claude sessions instead — each
+gets its own sandbox, returns a PR, and doesn't touch the local
+working tree.
