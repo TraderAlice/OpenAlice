@@ -1,7 +1,7 @@
 import { readFile, writeFile, mkdir } from 'fs/promises'
 import { resolve, dirname } from 'path'
 // Engine removed — AgentCenter is the top-level AI entry point
-import { loadConfig, readUTAsConfig } from './core/config.js'
+import { loadConfig, readUTAsConfig, purgeEphemeralUTAs } from './core/config.js'
 import type { Plugin, EngineContext, ReconnectResult } from './core/types.js'
 import { McpPlugin } from './server/mcp.js'
 import { TelegramPlugin } from './connectors/telegram/index.js'
@@ -104,8 +104,11 @@ async function main() {
 
   const utaManager = new UTAManager({ eventLog, toolCenter })
 
-  const utaConfigs = await readUTAsConfig()
-  for (const accCfg of utaConfigs) {
+  // Ephemeral test UTAs from a previous session are purged before init —
+  // their config rows are removed and `data/trading/<id>/` is wiped, so
+  // fixture-driven tests start each session from a clean slate.
+  const survivors = await purgeEphemeralUTAs(await readUTAsConfig())
+  for (const accCfg of survivors) {
     if (accCfg.enabled === false) continue
     await utaManager.initUTA(accCfg)
   }

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { readFile, writeFile, mkdir, unlink } from 'fs/promises'
+import { readFile, writeFile, mkdir, unlink, rm } from 'fs/promises'
 import { resolve } from 'path'
 import { newsCollectorSchema } from '../domain/news/config.js'
 
@@ -287,6 +287,18 @@ export const utaConfigSchema = z.object({
   guards: z.array(guardConfigSchema).default([]),
   /** User-filled form values, validated against the preset's own zodSchema. */
   presetConfig: z.record(z.string(), z.unknown()).default({}),
+  /**
+   * Test/throwaway UTA — purged at every server startup (config entry
+   * removed + `data/trading/<id>/` wiped) and dropped immediately when
+   * deleted via the UTA-config DELETE endpoint. For fixture-based testing:
+   * each session starts from a clean slate, no cross-session cost-basis
+   * pollution. Only allowed on `mock-simulator` preset; setting it on a
+   * real broker would silently destroy account history on next boot.
+   */
+  ephemeral: z.boolean().optional(),
+}).refine((u) => u.ephemeral !== true || u.presetId === 'mock-simulator', {
+  message: 'ephemeral: true is only allowed on mock-simulator UTAs (would destroy real broker history at next boot)',
+  path: ['ephemeral'],
 })
 
 export const utasFileSchema = z.array(utaConfigSchema)
@@ -675,6 +687,40 @@ export async function writeUTAsConfig(utas: UTAConfig[]): Promise<void> {
   const validated = utasFileSchema.parse(utas)
   await mkdir(CONFIG_DIR, { recursive: true })
   await writeFile(resolve(CONFIG_DIR, 'accounts.json'), JSON.stringify(validated, null, 2) + '\n')
+}
+
+/**
+ * Wipe a UTA's persistent trading state (`data/trading/<id>/`). Used when
+ * destroying ephemeral UTAs — boot-time purge AND mid-session DELETE both
+ * funnel here so commit history / snapshots don't outlive the UTA.
+ *
+ * No-op if the directory doesn't exist; never touches `data/config/`.
+ */
+export async function wipeUTATradingData(id: string): Promise<void> {
+  const dir = resolve('data', 'trading', id)
+  await rm(dir, { recursive: true, force: true })
+}
+
+/**
+ * Purge ephemeral UTAs at server startup: remove their entries from
+ * `accounts.json` AND wipe their `data/trading/<id>/` dirs. Called once
+ * from the boot path before UTAManager starts initializing UTAs, so
+ * ephemeral residue from the previous session never reaches the manager.
+ *
+ * Returns the surviving non-ephemeral UTAs (caller iterates these for
+ * normal init).
+ */
+export async function purgeEphemeralUTAs(utas: UTAConfig[]): Promise<UTAConfig[]> {
+  const ephemeral = utas.filter((u) => u.ephemeral === true)
+  if (ephemeral.length === 0) return utas
+
+  for (const u of ephemeral) {
+    console.log(`startup: purging ephemeral UTA ${u.id}${u.label ? ` (${u.label})` : ''}`)
+    await wipeUTATradingData(u.id)
+  }
+  const survivors = utas.filter((u) => u.ephemeral !== true)
+  await writeUTAsConfig(survivors)
+  return survivors
 }
 
 // ==================== Hot-read helpers ====================

@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import type { EngineContext } from '../../core/types.js'
 import {
   readUTAsConfig, writeUTAsConfig,
-  utaConfigSchema,
+  utaConfigSchema, wipeUTATradingData,
 } from '../../core/config.js'
 import { createBroker } from '../../domain/trading/brokers/factory.js'
 import { BUILTIN_BROKER_PRESETS } from '../../domain/trading/brokers/presets.js'
@@ -121,6 +121,7 @@ export function createTradingConfigRoutes(ctx: EngineContext) {
         enabled: body.enabled !== false,
         guards: Array.isArray(body.guards) ? body.guards : [],
         presetConfig,
+        ...(body.ephemeral === true ? { ephemeral: true as const } : {}),
       }
       const validated = utaConfigSchema.parse(candidate)
       accounts.push(validated)
@@ -192,14 +193,23 @@ export function createTradingConfigRoutes(ctx: EngineContext) {
     try {
       const id = c.req.param('id')
       const accounts = await readUTAsConfig()
-      const filtered = accounts.filter((a) => a.id !== id)
-      if (filtered.length === accounts.length) {
+      const target = accounts.find((a) => a.id === id)
+      if (!target) {
         return c.json({ error: `Account "${id}" not found` }, 404)
       }
+      const filtered = accounts.filter((a) => a.id !== id)
       await writeUTAsConfig(filtered)
       // Close and deregister running account instance if any
       await ctx.utaManager.removeUTA(id)
-      return c.json({ success: true })
+      // Ephemeral UTAs also have their persistent trading state wiped — the
+      // whole point of `ephemeral: true` is that nothing about the test
+      // account survives its destruction. Real broker UTAs keep their
+      // commit history (delete-from-config means "stop trading from here",
+      // not "erase what already happened").
+      if (target.ephemeral) {
+        await wipeUTATradingData(id)
+      }
+      return c.json({ success: true, ephemeral: target.ephemeral === true })
     } catch (err) {
       return c.json({ error: String(err) }, 500)
     }
