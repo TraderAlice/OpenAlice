@@ -28,7 +28,7 @@ describe('UTA — Bybit demo (ETH perp)', () => {
     broker = bybit.broker
 
     const results = await broker.searchContracts('ETH')
-    const perp = results.find(r => r.contract.localSymbol?.includes('USDT:USDT'))
+    const perp = results.find(r => r.contract.secType === 'CRYPTO_PERP')
     if (!perp) {
       console.log('e2e: No ETH/USDT perp found, skipping')
       broker = null
@@ -44,7 +44,7 @@ describe('UTA — Bybit demo (ETH perp)', () => {
 
   it('buy → sync → close → sync (full lifecycle)', async () => {
     const initialPositions = await broker!.getPositions()
-    const initialQty = initialPositions.find(p => p.contract.localSymbol?.includes('USDT:USDT'))?.quantity.toNumber() ?? 0
+    const initialQty = initialPositions.find(p => p.contract.secType === 'CRYPTO_PERP')?.quantity.toNumber() ?? 0
     console.log(`  initial ETH qty=${initialQty}`)
 
     // Stage + Commit + Push: buy 0.01 ETH
@@ -88,7 +88,7 @@ describe('UTA — Bybit demo (ETH perp)', () => {
 
     // Verify final qty
     const finalPositions = await broker!.getPositions()
-    const finalQty = finalPositions.find(p => p.contract.localSymbol?.includes('USDT:USDT'))?.quantity.toNumber() ?? 0
+    const finalQty = finalPositions.find(p => p.contract.secType === 'CRYPTO_PERP')?.quantity.toNumber() ?? 0
     expect(Math.abs(finalQty - initialQty)).toBeLessThan(0.02)
     console.log(`  final ETH qty=${finalQty} (initial=${initialQty})`)
 

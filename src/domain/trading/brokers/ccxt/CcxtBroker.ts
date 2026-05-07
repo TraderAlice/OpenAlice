@@ -34,7 +34,6 @@ import {
   makeOrderState,
   marketToContract,
   contractToCcxt,
-  canonicalLocalSymbol,
 } from './ccxt-contracts.js'
 import { fuzzyRankContracts } from '../fuzzy-rank.js'
 import {
@@ -328,24 +327,30 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
     // type "BTC" and expect every BTC market); substring / name hits show up
     // afterward so partial keywords (e.g. "tesl", "popcorn") still surface
     // something useful.
+    // Skip CCXT markets that fail strict contract validation (typically
+    // dated FUT/OPT entries with missing expiry or multiplier in the
+    // exchange's market metadata). One bad market shouldn't drop the
+    // entire search; surface a one-line warning so the gap is visible
+    // without being noisy.
     const ranked = fuzzyRankContracts(
-      candidates.map((m) => {
-        const c = marketToContract(m, this.exchangeName)
-        return { contract: c, base: m.base, quote: m.quote, name: m.id ?? m.symbol }
+      candidates.flatMap((m) => {
+        try {
+          const c = marketToContract(m, this.exchangeName)
+          return [{ contract: c, base: m.base, quote: m.quote, name: m.id ?? m.symbol }]
+        } catch (err) {
+          console.warn(`ccxt[${this.exchangeName}]: skipping market ${m.symbol}: ${err instanceof Error ? err.message : String(err)}`)
+          return []
+        }
       }),
       pattern,
     )
 
-    // Index by canonical localSymbol — that's what `marketToContract`
-    // emits onto each ranked hit's Contract, so this is the join key.
-    // (The CCXT wire `m.symbol` no longer appears on Contract.localSymbol
-    // post-Phase-3.)
-    const marketByCanonical = new Map<string, CcxtMarket>()
-    for (const m of candidates) marketByCanonical.set(canonicalLocalSymbol(m), m)
-
+    // Each ranked hit's Contract carries `localSymbol = market.symbol`
+    // (CCXT's wire format), so direct `markets[localSymbol]` lookup is
+    // the join key — matches the broker's own primary index.
     const derivativeTypes = new Set<string>()
     for (const desc of ranked) {
-      const m = marketByCanonical.get(desc.contract.localSymbol ?? '')
+      const m = desc.contract.localSymbol ? this.markets[desc.contract.localSymbol] : undefined
       if (!m) continue
       if (m.type === 'future') derivativeTypes.add('FUT')
       if (m.type === 'option') derivativeTypes.add('OPT')
@@ -880,9 +885,16 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
   }
 
   resolveNativeKey(nativeKey: string): Contract {
+    // CCXT's nativeKey IS the unified wire symbol (e.g. "BTC/USDT:USDT"),
+    // which is also the markets-table key. Direct lookup is the only
+    // path needed — no normalization, no reverse-mapping.
     const market = this.markets[nativeKey]
     if (market) return marketToContract(market, this.exchange.id)
-    // Fallback: construct minimal contract from symbol string
+
+    // Last-resort skeletal contract for an unknown nativeKey. Operations
+    // that need market metadata (placeOrder / getQuote / closePosition)
+    // will fail downstream — that's the loud failure we want rather than
+    // a silent half-broken contract.
     const c = new Contract()
     c.localSymbol = nativeKey
     c.symbol = nativeKey.split('/')[0] ?? nativeKey

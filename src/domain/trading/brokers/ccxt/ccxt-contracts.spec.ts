@@ -1,14 +1,14 @@
 /**
  * Tests for the CCXT-side contract translators.
  *
- * Phase 3 of the IBKR-as-truth refactor moved canonical localSymbol
- * generation here — these tests pin the per-secType formats so we don't
- * regress to dumping CCXT's wire format ("BTC/USDT:USDT") onto Contract.
+ * `marketToContract` writes CCXT's wire symbol (`market.symbol`) into
+ * `Contract.localSymbol` directly — that string is CCXT's own uniqueness
+ * primitive (encodes base/quote/settle) and feeds straight into
+ * `getNativeKey` → aliceId. No normalization across brokers.
  */
 
 import { describe, it, expect } from 'vitest'
 import {
-  canonicalLocalSymbol,
   marketToContract,
   contractToCcxt,
   ccxtTypeToSecType,
@@ -23,58 +23,50 @@ function makeMarket(overrides: Partial<CcxtMarket> & { type: CcxtMarket['type'];
   } as CcxtMarket
 }
 
-describe('canonicalLocalSymbol', () => {
-  it('spot → base only', () => {
-    expect(canonicalLocalSymbol(makeMarket({
-      type: 'spot', base: 'BTC', quote: 'USDT', symbol: 'BTC/USDT',
-    }))).toBe('BTC')
-  })
-
-  it('swap → base-PERP (no settle suffix, no quote)', () => {
-    expect(canonicalLocalSymbol(makeMarket({
-      type: 'swap', base: 'BTC', quote: 'USDT', symbol: 'BTC/USDT:USDT', settle: 'USDT',
-    }))).toBe('BTC-PERP')
-  })
-
-  it('dated future → base-FUT-YYYYMM from market.expiry epoch', () => {
-    expect(canonicalLocalSymbol(makeMarket({
-      type: 'future', base: 'BTC', quote: 'USDT', symbol: 'BTC/USDT:USDT-220929',
-      // 2022-09-29 UTC = 1664409600000
-      expiry: 1664409600000,
-    } as Partial<CcxtMarket> & { type: 'future'; base: string; quote: string; symbol: string }))).toBe('BTC-FUT-202209')
-  })
-
-  it('dated future without epoch — falls back to symbol tail', () => {
-    expect(canonicalLocalSymbol(makeMarket({
-      type: 'future', base: 'BTC', quote: 'USDT', symbol: 'BTC/USDT:USDT-220929',
-    }))).toBe('BTC-FUT-220929')
-  })
-
-  it('option preserves wire format (out of scope for Phase 3)', () => {
-    expect(canonicalLocalSymbol(makeMarket({
-      type: 'option', base: 'BTC', quote: 'USDT', symbol: 'BTC/USDT:USDT-240920-50000-C',
-    }))).toBe('BTC/USDT:USDT-240920-50000-C')
-  })
-})
-
-describe('marketToContract — emits canonical Contract', () => {
-  it('spot Contract has canonical localSymbol', () => {
+describe('marketToContract — preserves CCXT wire format', () => {
+  it('spot Contract.localSymbol matches market.symbol', () => {
     const c = marketToContract(makeMarket({
       type: 'spot', base: 'BTC', quote: 'USDT', symbol: 'BTC/USDT',
     }), 'bybit')
     expect(c.symbol).toBe('BTC')
-    expect(c.localSymbol).toBe('BTC')
+    expect(c.localSymbol).toBe('BTC/USDT')
     expect(c.secType).toBe('CRYPTO')
     expect(c.exchange).toBe('bybit')
     expect(c.currency).toBe('USDT')
   })
 
-  it('perp Contract gets canonical -PERP suffix', () => {
+  it('perp Contract.localSymbol carries :settle suffix (USDT-margined)', () => {
     const c = marketToContract(makeMarket({
       type: 'swap', base: 'ETH', quote: 'USDT', symbol: 'ETH/USDT:USDT', settle: 'USDT',
     }), 'bybit')
-    expect(c.localSymbol).toBe('ETH-PERP')
+    expect(c.localSymbol).toBe('ETH/USDT:USDT')
     expect(c.secType).toBe('CRYPTO_PERP')
+  })
+
+  it('USDC-margined perp stays distinct from USDT-margined perp', () => {
+    // Same underlying (ETH), different settle currency = different products
+    // — wire format encodes this distinction; canonicalization would erase it.
+    const usdt = marketToContract(makeMarket({
+      type: 'swap', base: 'ETH', quote: 'USDT', symbol: 'ETH/USDT:USDT', settle: 'USDT',
+    }), 'bybit')
+    const usdc = marketToContract(makeMarket({
+      type: 'swap', base: 'ETH', quote: 'USDC', symbol: 'ETH/USDC:USDC', settle: 'USDC',
+    }), 'bybit')
+    expect(usdt.localSymbol).not.toBe(usdc.localSymbol)
+    expect(usdt.localSymbol).toBe('ETH/USDT:USDT')
+    expect(usdc.localSymbol).toBe('ETH/USDC:USDC')
+  })
+
+  it('FUT carries expiry derived from market.expiry (ms epoch)', () => {
+    const c = marketToContract(makeMarket({
+      type: 'future', base: 'BTC', quote: 'USDT', symbol: 'BTC/USDT:USDT-220929',
+      // 2022-09-29 UTC = 1664409600000
+      expiry: 1664409600000,
+      contractSize: 1,
+    } as Partial<CcxtMarket> & { type: 'future'; base: string; quote: string; symbol: string }), 'bybit')
+    expect(c.localSymbol).toBe('BTC/USDT:USDT-220929')
+    expect(c.lastTradeDateOrContractMonth).toBe('20220929')
+    expect(c.multiplier).toBe('1')
   })
 
   it('contracts pass assertContract — no missing universal fields', () => {
@@ -84,35 +76,33 @@ describe('marketToContract — emits canonical Contract', () => {
   })
 })
 
-describe('contractToCcxt — canonical → wire format derivation', () => {
+describe('contractToCcxt — wire-format Contract resolves directly via markets table', () => {
   const markets: Record<string, CcxtMarket> = {
     'BTC/USDT': makeMarket({ type: 'spot', base: 'BTC', quote: 'USDT', symbol: 'BTC/USDT' }),
     'BTC/USDT:USDT': makeMarket({ type: 'swap', base: 'BTC', quote: 'USDT', symbol: 'BTC/USDT:USDT', settle: 'USDT' }),
     'ETH/USDT': makeMarket({ type: 'spot', base: 'ETH', quote: 'USDT', symbol: 'ETH/USDT' }),
   }
 
-  it('canonical spot Contract resolves to spot wire symbol via base+secType+currency search', () => {
+  it('spot Contract.localSymbol === market.symbol → direct hit', () => {
     const c = marketToContract(markets['BTC/USDT'], 'bybit')
-    // c.localSymbol = 'BTC', not 'BTC/USDT' — direct lookup misses, falls
-    // back to resolveContractSync which finds the spot market.
     expect(contractToCcxt(c, markets, 'bybit')).toBe('BTC/USDT')
   })
 
-  it('canonical perp Contract resolves to perp wire symbol', () => {
+  it('perp Contract.localSymbol === wire format → direct hit', () => {
     const c = marketToContract(markets['BTC/USDT:USDT'], 'bybit')
     expect(contractToCcxt(c, markets, 'bybit')).toBe('BTC/USDT:USDT')
   })
 
-  it('legacy wire-format localSymbol still resolves (back-compat for user-supplied contracts)', () => {
-    // User constructs Contract with wire-format localSymbol — direct hit.
-    const c = makeMarket({ type: 'spot', base: 'BTC', quote: 'USDT', symbol: 'BTC/USDT' })
-    const wireContract = marketToContract(c, 'bybit')
-    wireContract.localSymbol = 'BTC/USDT'  // simulate legacy
-    expect(contractToCcxt(wireContract, markets, 'bybit')).toBe('BTC/USDT')
+  it('user-supplied Contract with no localSymbol falls back to base+secType+currency search', () => {
+    // Some callers construct Contract from scratch (symbol only). The
+    // resolveContractSync fallback handles this path.
+    const c = marketToContract(markets['BTC/USDT'], 'bybit')
+    c.localSymbol = ''  // simulate user-constructed contract
+    expect(contractToCcxt(c, markets, 'bybit')).toBe('BTC/USDT')
   })
 })
 
-describe('ccxtTypeToSecType (already covered, sanity)', () => {
+describe('ccxtTypeToSecType (sanity)', () => {
   it('spot/swap/future/option', () => {
     expect(ccxtTypeToSecType('spot')).toBe('CRYPTO')
     expect(ccxtTypeToSecType('swap')).toBe('CRYPTO_PERP')

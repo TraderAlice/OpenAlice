@@ -79,7 +79,7 @@ describe('CcxtBroker — Hyperliquid e2e', () => {
     const results = await b().searchContracts('BTC')
     expect(results.length).toBeGreaterThan(0)
     // Hyperliquid uses USDC as the perpetual settle currency
-    const perp = results.find(r => r.contract.localSymbol?.includes('USDC:USDC'))
+    const perp = results.find(r => r.contract.secType === 'CRYPTO_PERP')
     expect(perp, `BTC perp not found. Results: ${results.slice(0, 5).map(r => r.contract.localSymbol).join(', ')}`).toBeDefined()
     console.log(`  found ${results.length} BTC contracts, perp: ${perp!.contract.localSymbol}`)
   })
@@ -87,7 +87,7 @@ describe('CcxtBroker — Hyperliquid e2e', () => {
   it('searches ETH contracts and finds a perpetual', async () => {
     const results = await b().searchContracts('ETH')
     expect(results.length).toBeGreaterThan(0)
-    const perp = results.find(r => r.contract.localSymbol?.includes('USDC:USDC'))
+    const perp = results.find(r => r.contract.secType === 'CRYPTO_PERP')
     expect(perp).toBeDefined()
     console.log(`  found ${results.length} ETH contracts, perp: ${perp!.contract.localSymbol}`)
   })
@@ -96,7 +96,7 @@ describe('CcxtBroker — Hyperliquid e2e', () => {
 
   it('places market buy 0.001 BTC perp → execution returned', async ({ skip }) => {
     const matches = await b().searchContracts('BTC')
-    const btcPerp = matches.find(m => m.contract.localSymbol?.includes('USDC:USDC'))
+    const btcPerp = matches.find(m => m.contract.secType === 'CRYPTO_PERP')
     if (!btcPerp) return skip('BTC perp not found')
 
     // Hyperliquid minimum order value: $10. At ~$60k BTC, 0.001 = $60 (well above min).
@@ -130,7 +130,7 @@ describe('CcxtBroker — Hyperliquid e2e', () => {
 
   it('closes BTC position with reduceOnly', async ({ skip }) => {
     const matches = await b().searchContracts('BTC')
-    const btcPerp = matches.find(m => m.contract.localSymbol?.includes('USDC:USDC'))
+    const btcPerp = matches.find(m => m.contract.secType === 'CRYPTO_PERP')
     if (!btcPerp) return skip('BTC perp not found')
 
     const result = await b().closePosition(btcPerp.contract, new Decimal('0.001'))
@@ -140,7 +140,7 @@ describe('CcxtBroker — Hyperliquid e2e', () => {
 
   it('queries order by ID after place', async ({ skip }) => {
     const matches = await b().searchContracts('BTC')
-    const btcPerp = matches.find(m => m.contract.localSymbol?.includes('USDC:USDC'))
+    const btcPerp = matches.find(m => m.contract.secType === 'CRYPTO_PERP')
     if (!btcPerp) return skip('BTC perp not found')
 
     const order = new Order()

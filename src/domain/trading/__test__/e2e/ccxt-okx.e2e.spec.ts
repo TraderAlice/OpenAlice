@@ -96,7 +96,7 @@ describe('CcxtBroker — OKX e2e', () => {
   it('searches ETH contracts and finds a perpetual', async () => {
     const results = await b().searchContracts('ETH')
     expect(results.length).toBeGreaterThan(0)
-    const perp = results.find(r => r.contract.localSymbol?.includes('USDT:USDT'))
+    const perp = results.find(r => r.contract.localSymbol === 'ETH/USDT:USDT')
     expect(perp).toBeDefined()
     console.log(`  found ${results.length} ETH contracts, perp: ${perp!.contract.localSymbol}`)
   })

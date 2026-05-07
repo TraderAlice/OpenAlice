@@ -1011,7 +1011,7 @@ describe('CcxtBroker — getPositions', () => {
     expect(btc.avgCost).toBe('60000')        // markPrice placeholder; UTA replaces via wallet ledger
     expect(btc.marketValue).toBe('30000')
     expect(btc.unrealizedPnL).toBe('0')
-    expect(btc.contract.localSymbol).toBe('BTC')       // canonical (no broker-flavored encoding)
+    expect(btc.contract.localSymbol).toBe('BTC/USDT')   // CCXT wire format (broker-native uniqueness)
     expect(btc.avgCostSource).toBe('wallet')           // signals UTA to reconstruct cost
   })
 
@@ -1111,10 +1111,11 @@ describe('CcxtBroker — getPositions', () => {
     const positions = await acc.getPositions()
     expect(positions).toHaveLength(2)
     // Distinct contract identities — same underlying, different products.
-    // Canonical localSymbols disambiguate without leaking CCXT wire format.
+    // CCXT wire format encodes the distinction directly (`:settle` suffix
+    // separates spot from perp, also USDC-margined from USDT-margined).
     const localSymbols = positions.map(p => p.contract.localSymbol)
-    expect(localSymbols).toContain('BTC')        // spot
-    expect(localSymbols).toContain('BTC-PERP')   // perp
+    expect(localSymbols).toContain('BTC/USDT')        // spot
+    expect(localSymbols).toContain('BTC/USDT:USDT')   // perp
   })
 
   it('falls back to per-symbol fetchTicker when fetchTickers throws', async () => {

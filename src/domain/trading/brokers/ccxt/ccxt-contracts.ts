@@ -27,55 +27,6 @@ export function decodeSymbol(encoded: string): string {
   return encoded.replace(/_/g, '/').replace(/\./g, ':')
 }
 
-// ---- Canonical localSymbol (Phase 3 of IBKR-as-truth refactor) ----
-
-/**
- * Build the canonical Contract.localSymbol for a CCXT market — IBKR-shaped
- * (broker-agnostic) instead of CCXT's wire format (`BTC/USDT:USDT`).
- *
- * The canonical form lets aliceIds and downstream consumers stop
- * special-casing CCXT's wire encoding. CCXT's wire format itself stays
- * a CcxtBroker-internal concern: `contractToCcxt` now derives wire from
- * the canonical Contract via `resolveContractSync`'s base+secType+currency
- * search, which already existed as a fallback.
- *
- * Format per market.type:
- *   - spot:   `${base}`                      (e.g. `BTC`)
- *   - swap:   `${base}-PERP`                 (e.g. `BTC-PERP`)
- *   - future: `${base}-FUT-${expiryYYYYMM}`  (e.g. `BTC-FUT-202609`)
- *   - option: `${base}-OPT-...`              (skipped — CCXT options are niche)
- *
- * Multi-quote disambiguation (BTC/USDT vs BTC/USDC spot held simultaneously)
- * is left for a follow-up — most users hold one quote per underlying, and
- * `Contract.currency` differentiates them within the same UTA.
- */
-export function canonicalLocalSymbol(market: CcxtMarket): string {
-  const base = market.base
-  switch (market.type) {
-    case 'spot':   return base
-    case 'swap':   return `${base}-PERP`
-    case 'future': return `${base}-FUT-${ccxtExpiryToCanonical(market)}`
-    case 'option': return market.symbol  // out of scope; preserve wire format
-    default:       return market.symbol
-  }
-}
-
-/** Best-effort YYYYMM extraction from a CCXT future market's expiry. */
-function ccxtExpiryToCanonical(market: CcxtMarket): string {
-  // CCXT exposes `expiry` (ms epoch) on dated futures. Fall back to whatever
-  // is encoded in the symbol if not present.
-  const ms = (market as unknown as { expiry?: number }).expiry
-  if (typeof ms === 'number') {
-    const d = new Date(ms)
-    const m = String(d.getUTCMonth() + 1).padStart(2, '0')
-    return `${d.getUTCFullYear()}${m}`
-  }
-  // Fallback: tail of `BTC/USDT:USDT-220929` after the trailing dash.
-  const dash = market.symbol.lastIndexOf('-')
-  if (dash >= 0) return market.symbol.slice(dash + 1)
-  return 'unknown'
-}
-
 // ---- Type mapping ----
 
 export function ccxtTypeToSecType(type: string): string {
@@ -110,20 +61,59 @@ export function makeOrderState(ccxtStatus: string | undefined): OrderState {
 // ---- Contract ↔ CCXT symbol conversion ----
 
 /**
- * Convert a CcxtMarket to an IBKR Contract with a canonical localSymbol.
- * CCXT's wire format ("BTC/USDT:USDT") is no longer on the Contract —
- * `contractToCcxt` derives it from `(base, secType, currency)` via the
- * markets table when CCXT-side talk is needed.
+ * Convert a CcxtMarket to an IBKR Contract.
+ *
+ * `Contract.localSymbol` is set to `market.symbol` — CCXT's unified wire
+ * format (`BTC/USDT:USDT`, `BTC/USDT`, `BTC/USDT:USDT-220929`). That's
+ * CCXT's own uniqueness primitive: it encodes base + quote + (optional)
+ * settle + (optional) expiry in one string, distinguishing every product
+ * the exchange offers. We do not normalize this across brokers —
+ * `aliceId`'s `{utaId}|` prefix already scopes per-broker, and each
+ * broker's `getNativeKey` reads its own native key out of Contract.
+ *
+ * For FUT/OPT/FOP markets, derives `lastTradeDateOrContractMonth` from
+ * `market.expiry` (CCXT exposes it as ms epoch on dated derivatives) and
+ * `multiplier` from `market.contractSize`. CCXT-typed `optionType` and
+ * `strike` populate the OPT-specific fields. `assertContract` (called
+ * inside `buildContract`) verifies all required taxonomy fields are
+ * present — malformed market data throws here so callers can decide
+ * whether to skip or surface the error.
  */
 export function marketToContract(market: CcxtMarket, exchangeName: string): Contract {
-  return buildContract({
+  const secType = ccxtTypeToSecType(market.type) as SecType
+  // CcxtMarket only types the universal subset; CCXT actually exposes
+  // expiry / contractSize / strike / optionType on derivative markets.
+  const m = market as unknown as {
+    expiry?: number
+    contractSize?: number
+    strike?: number
+    optionType?: 'call' | 'put'
+  }
+
+  const params: Parameters<typeof buildContract>[0] = {
     symbol: market.base,
-    secType: ccxtTypeToSecType(market.type) as SecType,
+    secType,
     exchange: exchangeName,
     currency: market.quote,
-    localSymbol: canonicalLocalSymbol(market),
+    localSymbol: market.symbol,
     description: `${market.base}/${market.quote} ${market.type}${market.settle ? ` (${market.settle} settled)` : ''}`,
-  })
+  }
+
+  if (secType === 'FUT' || secType === 'OPT' || secType === 'FOP') {
+    if (m.expiry) {
+      const d = new Date(m.expiry)
+      params.lastTradeDateOrContractMonth =
+        `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(d.getUTCDate()).padStart(2, '0')}`
+    }
+    params.multiplier = m.contractSize != null ? String(m.contractSize) : '1'
+  }
+  if (secType === 'OPT' || secType === 'FOP') {
+    if (m.strike != null) params.strike = m.strike
+    if (m.optionType === 'call') params.right = 'C'
+    else if (m.optionType === 'put') params.right = 'P'
+  }
+
+  return buildContract(params)
 }
 
 /** Parse aliceId → CCXT unified symbol. */
@@ -178,6 +168,10 @@ export function resolveContractSync(
 
   for (const market of Object.values(markets)) {
     if (market.active === false) continue
+    // Some exchange-supplied market entries are skeletal (delisted /
+    // synthetic / index-only) and lack base or quote — skip those rather
+    // than crash on .toUpperCase().
+    if (!market.base || !market.quote) continue
     if (market.base.toUpperCase() !== searchBase) continue
 
     if (query.secType) {
