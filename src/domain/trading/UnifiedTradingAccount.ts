@@ -12,6 +12,7 @@ import { Contract, Order, ContractDescription, ContractDetails, UNSET_DECIMAL } 
 import { BrokerError, type IBroker, type AccountInfo, type Position, type OpenOrder, type PlaceOrderResult, type Quote, type MarketClock, type AccountCapabilities, type BrokerHealth, type BrokerHealthInfo, type TpSlParams } from './brokers/types.js'
 import { TradingGit } from './git/TradingGit.js'
 import { recomputeCostBasisFromCommits } from './cost-basis.js'
+import { pnlOf } from './position-math.js'
 import type {
   Operation,
   AddResult,
@@ -558,12 +559,16 @@ export class UnifiedTradingAccount {
       if (!final) continue  // Should be unreachable — reconcile would seed it.
 
       p.avgCost = final.avgCost.toString()
-      // Per IBroker.Position contract, unrealizedPnL is multiplier-applied;
-      // cost-basis WAC operates on per-unit prices, so the multiplier has
-      // to be reapplied here. Defaults to 1 for stocks / crypto.
-      const multiplier = p.multiplier && p.multiplier !== '' ? new Decimal(p.multiplier) : new Decimal(1)
-      const pnl = p.quantity.mul(new Decimal(p.marketPrice).minus(final.avgCost)).mul(multiplier)
-      p.unrealizedPnL = pnl.toString()
+      // Cost-basis WAC operates on per-unit prices; the IBroker.Position
+      // contract requires unrealizedPnL to be multiplier-applied.
+      // `pnlOf` enforces the rule (defaults multiplier to '1' if absent).
+      p.unrealizedPnL = pnlOf({
+        quantity: p.quantity,
+        marketPrice: p.marketPrice,
+        avgCost: final.avgCost,
+        multiplier: p.multiplier || '1',
+        side: p.side,
+      })
     }
   }
 

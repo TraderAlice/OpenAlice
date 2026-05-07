@@ -17,7 +17,8 @@ export { AccountSummaryTags, AllTags } from './account-summary-tags.js'
 export { IneligibilityReason } from './ineligibility-reason.js'
 
 // Data models
-export { Contract, ContractDetails, ComboLeg, DeltaNeutralContract, ContractDescription } from './contract.js'
+export { Contract, ContractDetails, ComboLeg, DeltaNeutralContract, ContractDescription, coerceSecType } from './contract.js'
+export type { SecType } from './contract.js'
 export { Order, OrderComboLeg } from './order.js'
 export { OrderState, OrderAllocation } from './order-state.js'
 export { OrderCancel } from './order-cancel.js'

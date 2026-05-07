@@ -24,7 +24,7 @@ import {
   MIN_SERVER_VER_SUBMITTER,
 } from '../server-versions.js'
 import { NO_VALID_ID } from '../const.js'
-import { Contract, ComboLeg, DeltaNeutralContract } from '../contract.js'
+import { Contract, ComboLeg, DeltaNeutralContract, coerceSecType } from '../contract.js'
 import { Execution, OptionExerciseType } from '../execution.js'
 import { CommissionAndFeesReport } from '../commission-and-fees-report.js'
 
@@ -43,7 +43,7 @@ function decodeContractFromProto(cp: ContractProtoType): Contract {
   const contract = new Contract()
   if (cp.conId !== undefined) contract.conId = cp.conId
   if (cp.symbol !== undefined) contract.symbol = cp.symbol
-  if (cp.secType !== undefined) contract.secType = cp.secType
+  if (cp.secType !== undefined) 
   if (cp.lastTradeDateOrContractMonth !== undefined) contract.lastTradeDateOrContractMonth = cp.lastTradeDateOrContractMonth
   if (cp.strike !== undefined) contract.strike = cp.strike
   if (cp.right !== undefined) contract.right = cp.right
@@ -140,7 +140,7 @@ export function applyExecutionHandlers(decoder: Decoder): void {
     const contract = new Contract()
     contract.conId = decodeInt(fields) // ver 5
     contract.symbol = decodeStr(fields)
-    contract.secType = decodeStr(fields)
+    contract.secType = coerceSecType(decodeStr(fields))
     contract.lastTradeDateOrContractMonth = decodeStr(fields)
     contract.strike = decodeFloat(fields)
     contract.right = decodeStr(fields)

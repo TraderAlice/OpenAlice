@@ -8,20 +8,17 @@
 import { Contract } from '@traderalice/ibkr'
 import { BrokerError, type BrokerErrorCode } from '../types.js'
 import '../../contract-ext.js'
+import { buildContract } from '../contract-builder.js'
+import type { SecType } from '../../contract-discipline.js'
 
 /** Build a standard IBKR Contract (defaults: STK + SMART + USD). */
 export function makeContract(
   symbol: string,
-  secType = 'STK',
+  secType: SecType = 'STK',
   exchange = 'SMART',
   currency = 'USD',
 ): Contract {
-  const c = new Contract()
-  c.symbol = symbol
-  c.secType = secType
-  c.exchange = exchange
-  c.currency = currency
-  return c
+  return buildContract({ symbol, secType, exchange, currency })
 }
 
 /**

@@ -675,7 +675,7 @@ describe('TradingGit', () => {
             marketValue: '1600',
             unrealizedPnL: '100',
             realizedPnL: '0',
-
+            multiplier: '1',
           },
         ],
       })
@@ -706,7 +706,7 @@ describe('TradingGit', () => {
             marketValue: '1600',
             unrealizedPnL: '100',
             realizedPnL: '0',
-
+            multiplier: '1',
           },
         ],
       })
@@ -728,12 +728,12 @@ describe('TradingGit', () => {
           {
             contract: makeContract({ symbol: 'AAPL' }),
             currency: 'USD', side: 'long', quantity: new Decimal(10), avgCost: '100', marketPrice: '100',
-            marketValue: '1000', unrealizedPnL: '0', realizedPnL: '0',
+            marketValue: '1000', unrealizedPnL: '0', realizedPnL: '0', multiplier: '1',
           },
           {
             contract: makeContract({ symbol: 'GOOG' }),
             currency: 'USD', side: 'long', quantity: new Decimal(5), avgCost: '200', marketPrice: '200',
-            marketValue: '1000', unrealizedPnL: '0', realizedPnL: '0',
+            marketValue: '1000', unrealizedPnL: '0', realizedPnL: '0', multiplier: '1',
           },
         ],
       })
@@ -753,7 +753,7 @@ describe('TradingGit', () => {
           {
             contract: makeContract({ symbol: 'AAPL' }),
             currency: 'USD', side: 'long', quantity: new Decimal(10), avgCost: '100', marketPrice: '100',
-            marketValue: '1000', unrealizedPnL: '0', realizedPnL: '0',
+            marketValue: '1000', unrealizedPnL: '0', realizedPnL: '0', multiplier: '1',
           },
         ],
       })

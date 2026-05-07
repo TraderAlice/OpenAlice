@@ -28,6 +28,7 @@ import {
 } from '@traderalice/ibkr'
 import { BrokerError } from '../types.js'
 import { classifyIbkrError } from './ibkr-contracts.js'
+import { buildPosition } from '../contract-builder.js'
 import type {
   PendingRequest,
   TickSnapshot,
@@ -456,20 +457,21 @@ export class RequestBridge extends DefaultEWrapper {
     if (!this.accountCachePending_) return
     if (position.isZero()) return
 
-    this.accountCachePending_.positions.push({
+    this.accountCachePending_.positions.push(buildPosition({
       contract,
       currency: contract.currency || 'USD',
       side: position.greaterThan(0) ? 'long' : 'short',
       quantity: position.abs(),
       avgCost: averageCost,
       marketPrice,
-      // TWS already bakes contract.multiplier into marketValue — we
-      // surface the multiplier as metadata only, no math here.
+      // TWS already bakes contract.multiplier into the values it reports
+      // here — pass through as-is (don't re-derive). multiplier is surfaced
+      // as metadata for downstream consumers.
       marketValue: new Decimal(marketValue).abs().toString(),
       unrealizedPnL: unrealizedPNL,
       realizedPnL: realizedPNL,
       multiplier: contract.multiplier || '1',
-    })
+    }))
   }
 
   override updateAccountValue(key: string, val: string, _currency: string, _accountName: string): void {

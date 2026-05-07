@@ -31,6 +31,9 @@ import type {
   TpSlParams,
 } from '../types.js'
 import '../../contract-ext.js'
+import { derivePositionMath } from '../../position-math.js'
+import { buildContract, buildPosition } from '../contract-builder.js'
+import type { SecType } from '../../contract-discipline.js'
 
 // ==================== Helpers ====================
 
@@ -120,6 +123,7 @@ export function makePosition(overrides: Partial<Position> = {}): Position {
     marketValue: '1600',
     unrealizedPnL: '100',
     realizedPnL: '0',
+    multiplier: '1',
     ...overrides,
   }
 }
@@ -375,10 +379,15 @@ export class MockBroker implements IBroker {
     let marketValueAcc = new Decimal(0)
     for (const pos of this._positions.values()) {
       const price = pos.marketPriceOverride ?? this._markPriceFor(pos.contract) ?? pos.avgCost
-      const mult = multiplierOf(pos.contract)
-      const posValue = pos.quantity.mul(price).mul(mult)
-      marketValueAcc = marketValueAcc.plus(posValue)
-      unrealizedPnL = unrealizedPnL.plus(pos.quantity.mul(price.minus(pos.avgCost)).mul(mult))
+      const { marketValue, unrealizedPnL: pnl } = derivePositionMath({
+        quantity: pos.quantity,
+        marketPrice: price,
+        avgCost: pos.avgCost,
+        multiplier: pos.contract.multiplier || '1',
+        side: pos.side,
+      })
+      marketValueAcc = marketValueAcc.plus(marketValue)
+      unrealizedPnL = unrealizedPnL.plus(pnl)
     }
 
     return {
@@ -396,24 +405,16 @@ export class MockBroker implements IBroker {
     const result: Position[] = []
     for (const pos of this._positions.values()) {
       const price = pos.marketPriceOverride ?? this._markPriceFor(pos.contract) ?? pos.avgCost
-      // Per IBroker.Position contract: marketValue / unrealizedPnL must be
-      // multiplier-applied at the broker layer. For OPT (×100) and futures
-      // (per-contract size), the simulator has to fold multiplier in here
-      // or downstream cost-basis ends up reporting per-unit numbers.
-      const mult = multiplierOf(pos.contract)
-      result.push({
+      result.push(buildPosition({
         contract: pos.contract,
         currency: pos.contract.currency || 'USD',
         side: pos.side,
         quantity: pos.quantity,
         avgCost: pos.avgCost.toString(),
         marketPrice: price.toString(),
-        marketValue: pos.quantity.mul(price).mul(mult).toString(),
-        unrealizedPnL: pos.quantity.mul(price.minus(pos.avgCost)).mul(mult).toString(),
         realizedPnL: '0',
-        ...(pos.contract.multiplier && { multiplier: pos.contract.multiplier }),
         ...(pos.avgCostSource && { avgCostSource: pos.avgCostSource }),
-      })
+      }))
     }
     return result
   }
@@ -566,16 +567,18 @@ export class MockBroker implements IBroker {
    * options + futures + FOP positions render correctly downstream.
    */
   private _buildContract(nativeKey: string, partial: Partial<Contract> | undefined): Contract {
-    const c = new Contract()
-    c.symbol = partial?.symbol ?? nativeKey
-    c.localSymbol = partial?.localSymbol ?? nativeKey
-    c.secType = partial?.secType ?? 'CRYPTO'
-    c.exchange = partial?.exchange ?? 'MOCK'
-    c.currency = partial?.currency ?? 'USD'
-    if (partial?.lastTradeDateOrContractMonth) c.lastTradeDateOrContractMonth = partial.lastTradeDateOrContractMonth
-    if (partial?.strike != null && partial.strike !== UNSET_DOUBLE) c.strike = partial.strike
-    if (partial?.right) c.right = partial.right
-    if (partial?.multiplier) c.multiplier = partial.multiplier
+    const right = partial?.right
+    const c = buildContract({
+      symbol: partial?.symbol || nativeKey,
+      secType: (partial?.secType as SecType) || 'CRYPTO',
+      exchange: partial?.exchange || 'MOCK',
+      currency: partial?.currency || 'USD',
+      localSymbol: partial?.localSymbol || nativeKey,
+      ...(partial?.lastTradeDateOrContractMonth && { lastTradeDateOrContractMonth: partial.lastTradeDateOrContractMonth }),
+      ...(partial?.strike != null && partial.strike !== UNSET_DOUBLE && { strike: partial.strike }),
+      ...(right === 'C' || right === 'P' || right === 'CALL' || right === 'PUT' ? { right } : {}),
+      ...(partial?.multiplier && { multiplier: partial.multiplier }),
+    })
     this._rememberContract(c)
     return c
   }

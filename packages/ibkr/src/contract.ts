@@ -53,10 +53,78 @@ export class DeltaNeutralContract {
   }
 }
 
+/**
+ * Canonical security types — mirrors IBKR TWS API's full secType taxonomy.
+ *
+ * **NO new secTypes may be added without explicit project-lead sign-off.**
+ * IBKR's catalog is the source of truth; if IBKR can't represent an asset,
+ * OpenAlice doesn't represent it either. Brokers that work in non-IBKR
+ * universes are expected to map their native instruments INTO this set
+ * (e.g. Longbridge HK warrants → 'WAR'; LeverUp synthetic-perps → 'CRYPTO_PERP').
+ *
+ * The single intentional deviation from IBKR's exact list is the pair
+ * `'CRYPTO' | 'CRYPTO_PERP'`. IBKR has weak crypto-perp coverage (they
+ * shoehorn perps into futures/swaps), and crypto's wire format is simple
+ * enough that splitting spot vs. perp at the type level pays off
+ * immediately downstream (PnL formulas, contract identity, fingerprint
+ * fields). No other "subtype" extensions of this kind are allowed —
+ * if you find yourself wanting `STK_PRE`, `OPT_LEAP`, etc., the answer
+ * is "no, encode it via existing fields (lastTradeDateOrContractMonth,
+ * tradingClass, etc.)".
+ */
+const SEC_TYPE_VALUES = new Set<string>([
+  'STK', 'OPT', 'FUT', 'FOP', 'IND', 'CASH', 'BOND', 'CMDTY',
+  'WAR', 'IOPT', 'FUND', 'BAG', 'NEWS', 'CFD', 'CRYPTO',
+  'CRYPTO_PERP',
+])
+
+/**
+ * Wire-side coercion: turns whatever raw secType string TWS sent into
+ * either a typed `SecType` or `''`. Use at the bytes-to-objects boundary
+ * (decoders) so downstream code can trust `Contract.secType: SecType | ''`
+ * without runtime guards. If TWS adds a new secType we don't model yet,
+ * decoder logs a warning and stamps `''` rather than corrupt the type.
+ */
+export function coerceSecType(raw: string | undefined | null): SecType | '' {
+  if (!raw) return ''
+  if (SEC_TYPE_VALUES.has(raw)) return raw as SecType
+  // Unknown — TWS sent something not in our SecType union. Don't propagate
+  // an arbitrary string into the type system; downstream validation will
+  // surface the missing instrument as "no secType set".
+  console.warn(`@traderalice/ibkr: unknown secType "${raw}" — dropped (extend SecType in contract.ts if you need to model it).`)
+  return ''
+}
+
+export type SecType =
+  // ─── IBKR canonical (mirrors TWS API's documented values) ───
+  | 'STK'      // Stock / ETF
+  | 'OPT'      // Equity option
+  | 'FUT'      // Future
+  | 'FOP'      // Future option
+  | 'IND'      // Index
+  | 'CASH'     // Forex pair
+  | 'BOND'     // Bond
+  | 'CMDTY'    // Commodity
+  | 'WAR'      // Warrant
+  | 'IOPT'     // Dutch warrant / structured product
+  | 'FUND'     // Mutual fund
+  | 'BAG'      // Combo (multi-leg)
+  | 'NEWS'     // News
+  | 'CFD'      // Contract for difference
+  | 'CRYPTO'   // Crypto spot
+  // ─── OpenAlice extension — the ONLY allowed deviation from IBKR ───
+  | 'CRYPTO_PERP'
+
 export class Contract {
   conId: number = 0
   symbol: string = ''
-  secType: string = ''
+  /**
+   * Strict union — see `SecType` above for the no-extensions policy.
+   * Empty `''` is the un-set state on a freshly-constructed Contract;
+   * assertContract (in domain/trading/contract-discipline.ts) rejects
+   * `''` at broker output boundaries.
+   */
+  secType: SecType | '' = ''
   lastTradeDateOrContractMonth: string = ''
   lastTradeDate: string = ''
   strike: number = UNSET_DOUBLE

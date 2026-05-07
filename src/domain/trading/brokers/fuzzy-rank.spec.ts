@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { Contract } from '@traderalice/ibkr'
+import { Contract, type SecType } from '@traderalice/ibkr'
 import { fuzzyRankContracts, type FuzzyRankInput } from './fuzzy-rank.js'
 
 function entry(
   symbol: string,
-  opts: { base?: string; quote?: string; name?: string; localSymbol?: string; secType?: string } = {},
+  opts: { base?: string; quote?: string; name?: string; localSymbol?: string; secType?: SecType } = {},
 ): FuzzyRankInput {
   const c = new Contract()
   c.symbol = symbol

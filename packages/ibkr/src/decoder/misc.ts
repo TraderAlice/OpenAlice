@@ -57,7 +57,7 @@ import {
   NewsProvider,
 } from '../common.js'
 import { ScanData } from '../scanner.js'
-import { ContractDetails, Contract } from '../contract.js'
+import { ContractDetails, Contract, coerceSecType } from '../contract.js'
 
 // Protobuf message types
 import { CurrentTime as CurrentTimeProto } from '../protobuf/CurrentTime.js'
@@ -103,7 +103,7 @@ function decodeContractFromProto(cp: ContractProto): Contract {
   const contract = new Contract()
   if (cp.conId !== undefined) contract.conId = cp.conId
   if (cp.symbol !== undefined) contract.symbol = cp.symbol
-  if (cp.secType !== undefined) contract.secType = cp.secType
+  if (cp.secType !== undefined) 
   if (cp.lastTradeDateOrContractMonth !== undefined) contract.lastTradeDateOrContractMonth = cp.lastTradeDateOrContractMonth
   if (cp.strike !== undefined) contract.strike = cp.strike
   if (cp.right !== undefined) contract.right = cp.right
@@ -237,7 +237,7 @@ export function applyMiscHandlers(decoder: Decoder): void {
       data.rank = decodeInt(fields)
       contractDetails.contract.conId = decodeInt(fields) // ver 3
       contractDetails.contract.symbol = decodeStr(fields)
-      contractDetails.contract.secType = decodeStr(fields)
+      contractDetails.contract.secType = coerceSecType(decodeStr(fields))
       contractDetails.contract.lastTradeDateOrContractMonth = decodeStr(fields)
       contractDetails.contract.strike = decodeFloat(fields)
       contractDetails.contract.right = decodeStr(fields)
@@ -418,7 +418,7 @@ export function applyMiscHandlers(decoder: Decoder): void {
       for (let i = 0; i < nDepthMktDataDescriptions; i++) {
         const desc = new DepthMktDataDescription()
         desc.exchange = decodeStr(fields)
-        desc.secType = decodeStr(fields)
+        desc.secType = coerceSecType(decodeStr(fields))
         if (d.serverVersion >= MIN_SERVER_VER_SERVICE_DATA_TYPE) {
           desc.listingExch = decodeStr(fields)
           desc.serviceDataType = decodeStr(fields)

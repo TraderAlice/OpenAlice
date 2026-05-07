@@ -31,6 +31,7 @@ import {
   type TpSlParams,
 } from '../../types.js'
 import '../../../contract-ext.js'
+import { buildContract, buildPosition } from '../../contract-builder.js'
 
 import {
   type LeverupBrokerConfig,
@@ -188,14 +189,16 @@ export class LeverupBroker implements IBroker {
   }
 
   private pairToContract(pair: LeverupPair): Contract {
-    const c = new Contract()
-    c.symbol = pair.base
-    c.secType = 'CRYPTO_PERP'  // LeverUp synthesizes everything (forex, stocks) as crypto-perps
-    c.exchange = 'LEVERUP'
-    c.currency = pair.quote
-    c.localSymbol = pair.symbol
-    c.description = `${pair.symbol} (LeverUp ${pair.category}${pair.highLeverage ? ', 500x' : ''})`
-    return c
+    return buildContract({
+      symbol: pair.base,
+      // LeverUp synthesizes forex / stocks as crypto-perps; the canonical
+      // taxonomy doesn't have a "synthetic perp" — closest fit is CRYPTO_PERP.
+      secType: 'CRYPTO_PERP',
+      exchange: 'LEVERUP',
+      currency: pair.quote,
+      localSymbol: pair.symbol,
+      description: `${pair.symbol} (LeverUp ${pair.category}${pair.highLeverage ? ', 500x' : ''})`,
+    })
   }
 
   private resolvePair(contract: Contract): LeverupPair | undefined {
@@ -420,17 +423,22 @@ export class LeverupBroker implements IBroker {
         const qty = weiToQty(BigInt(r.qty || '0'))
         const entryPrice = weiToPrice(BigInt(r.entryPrice || '0'))
         const margin = weiToAmountIn(BigInt(r.margin || '0'), USDC_DECIMALS)
-        out.push({
+        out.push(buildPosition({
           contract: this.pairToContract(pair),
           currency: 'USD',
           side: r.isLong ? 'long' : 'short',
           quantity: qty,
           avgCost: entryPrice.toString(),
           marketPrice: entryPrice.toString(),  // refined by getQuote callers if needed
+          // LeverUp uses margin (not full notional) for marketValue — preserved
+          // pre-buildPosition. Same for unrealizedPnL = '0' (REST doesn't expose
+          // it). Both are pass-through; the broker's known limitation, filed in
+          // the original LeverupBroker.ts comment.
           marketValue: margin.toString(),
-          unrealizedPnL: '0',  // not directly given by REST; future: compute mark - entry
+          unrealizedPnL: '0',
           realizedPnL: '0',
-        })
+          multiplier: '1',
+        }))
       }
       return out
     } catch (err) {

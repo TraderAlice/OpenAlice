@@ -8,6 +8,7 @@
 
 import { Contract, ContractDescription, OrderState } from '@traderalice/ibkr'
 import '../../contract-ext.js'
+import { buildContract } from '../contract-builder.js'
 
 /** Per-suffix metadata: which exchange / currency the SDK considers it. */
 interface SuffixInfo {
@@ -30,16 +31,15 @@ const SUFFIX_TABLE: Record<string, SuffixInfo> = {
  *                   tickers are accepted as a fallback (treated as US).
  */
 export function makeContract(lbSymbol: string): Contract {
-  const c = new Contract()
   const { ticker, suffix } = parseLbSymbol(lbSymbol)
   const info = SUFFIX_TABLE[suffix] ?? SUFFIX_TABLE['US']
-
-  c.symbol = ticker
-  c.localSymbol = lbSymbol  // preserve native key for round-trip resolution
-  c.secType = 'STK'
-  c.exchange = info.exchange
-  c.currency = info.currency
-  return c
+  return buildContract({
+    symbol: ticker,
+    localSymbol: lbSymbol,  // preserve native key for round-trip resolution
+    secType: 'STK',
+    exchange: info.exchange,
+    currency: info.currency,
+  })
 }
 
 /**

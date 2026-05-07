@@ -78,16 +78,19 @@ export interface Position {
   unrealizedPnL: string
   realizedPnL: string
   /**
-   * Shares-per-contract metadata: how many underlying shares one
-   * unit of `quantity` represents. `'1'` for plain stocks; `'100'`
-   * for US equity options; HK warrants/CBBCs use the issuer-specific
-   * conversion ratio (often a non-integer like '0.1' or '10').
+   * Shares-per-contract: how many underlying units one `quantity` unit
+   * represents. `'1'` for plain stocks/crypto/forex; `'100'` for US
+   * equity options; broker-specific for futures (e.g. ES = '50');
+   * issuer-specific for HK warrants/CBBCs (often a non-integer).
    *
-   * `marketValue` is already multiplier-applied at the broker layer —
-   * this field is metadata for UI / analytics ("1 contract = 100
-   * shares"), not a math input. Consumers must NOT re-apply.
+   * `marketValue` and `unrealizedPnL` are derived via `derivePositionMath`
+   * with this field folded in, so consumers must NOT re-apply. This was
+   * optional before the IBKR-as-truth refactor; it's required now to
+   * force every broker to declare a value rather than rely on an implicit
+   * 1-default. Read-time normalization in TradingGit.rehydrateGitState
+   * fills missing values from older commit.json files.
    */
-  multiplier?: string
+  multiplier: string
   /**
    * Provenance of `avgCost`:
    * - `'broker'`: broker reported it directly (Alpaca avg_entry_price,

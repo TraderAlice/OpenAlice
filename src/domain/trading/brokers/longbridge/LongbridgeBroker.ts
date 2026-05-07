@@ -41,6 +41,7 @@ import {
   type TpSlParams,
 } from '../types.js'
 import '../../contract-ext.js'
+import { buildPosition } from '../contract-builder.js'
 import type { FxService } from '../../fx-service.js'
 import {
   echoContractDescription,
@@ -522,18 +523,20 @@ export class LongbridgeBroker implements IBroker {
     const absQty = qty.abs()
     const marketValue = marketPrice.times(absQty).times(multiplier)
     const unrealizedPnL = marketPrice.minus(cost).times(absQty).times(multiplier)
-    return {
+    return buildPosition({
       contract,
       currency: p.currency.toUpperCase(),
       side: qty.gte(0) ? 'long' : 'short',
       quantity: absQty,
       avgCost: cost.toString(),
       marketPrice: marketPrice.toString(),
+      // Longbridge derives marketValue and unrealizedPnL from its own
+      // market data + cost — pass through as already-correct.
       marketValue: marketValue.toString(),
       unrealizedPnL: unrealizedPnL.toString(),
       realizedPnL: '0',
       multiplier: multiplier.toString(),
-    }
+    })
   }
 
   /** Batch-fetch live `lastDone` for a symbol set. Returns empty map on failure. */

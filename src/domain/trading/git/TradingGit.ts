@@ -442,6 +442,12 @@ export class TradingGit implements ITradingGit {
       positions: state.positions.map((pos) => ({
         ...pos,
         quantity: new Decimal(String(pos.quantity)),
+        // Position.multiplier became required in the IBKR-as-truth refactor
+        // (Phase 1). Older commit.json files written under the optional
+        // contract have positions with no multiplier set — fill the
+        // canonical default so they don't fail downstream consumers that
+        // expect every Position to declare one.
+        multiplier: pos.multiplier ?? '1',
       })),
     }
   }

@@ -346,37 +346,34 @@ interface PositionWithAccount extends Position {
   accountProvider: string
 }
 
-/** True when the position carries derivative-specific context worth showing. */
-function isDerivative(p: Position): boolean {
-  const t = p.contract.secType
-  if (t === 'FUT' || t === 'OPT' || t === 'FOP' || t === 'CRYPTO_PERP') return true
-  return p.side === 'short'
-}
-
-/** Build display fragments for a contract based on its secType. */
-function contractDisplay(p: Position): { name: string; tag?: string } {
+/**
+ * Build display fragments for a contract.
+ *
+ * The `tag` is the canonical SecType string (STK / CRYPTO / CRYPTO_PERP /
+ * OPT / FUT / ...) — no vernacular translation. UI mirrors the taxonomy
+ * directly so a `[CRYPTO_PERP]` pill is unambiguously the same thing as
+ * `Position.contract.secType === 'CRYPTO_PERP'` everywhere else in the
+ * stack.
+ *
+ * `name` defaults to the symbol; for OPT/FOP we build a longer descriptor
+ * (expiry/right/strike) so two option positions on the same underlying
+ * are distinguishable in the table.
+ */
+function contractDisplay(p: Position): { name: string; tag: string } {
   const c = p.contract
   const sym = c.symbol ?? '???'
-  const t = c.secType
+  const t = c.secType || 'UNK'
 
   if (t === 'OPT' || t === 'FOP') {
-    // Options: show localSymbol if available, else construct from parts
     const optDesc = c.localSymbol
       ?? [sym, c.lastTradeDateOrContractMonth, c.right, c.strike && fmt(c.strike)].filter(Boolean).join(' ')
-    return { name: optDesc, tag: 'opt' }
+    return { name: optDesc, tag: t }
   }
   if (t === 'FUT') {
     const expiry = c.lastTradeDateOrContractMonth
-    return { name: expiry ? `${sym} ${expiry}` : sym, tag: 'fut' }
+    return { name: expiry ? `${sym} ${expiry}` : sym, tag: t }
   }
-  if (t === 'CRYPTO_PERP') {
-    return { name: sym, tag: 'perp' }
-  }
-  if (t === 'CRYPTO') {
-    return { name: sym, tag: 'spot' }
-  }
-  // STK, CASH, BOND, CMDTY, etc. — just the symbol, no tag
-  return { name: sym }
+  return { name: sym, tag: t }
 }
 
 function PositionsTable({ positions, fxRates }: { positions: PositionWithAccount[]; fxRates: FxRateInfo[] }) {
@@ -406,25 +403,21 @@ function PositionsTable({ positions, fxRates }: { positions: PositionWithAccount
           <tbody>
             {positions.map((p, i) => {
               const display = contractDisplay(p)
-              const deriv = isDerivative(p)
               const ccy = p.currency ?? 'USD'
               const fxRate = ccy === 'USD' ? 1 : (rateMap[ccy] ?? 1)
               const usdValue = Number(p.marketValue) * fxRate
+              const isShort = p.side === 'short'
 
               return (
                 <tr key={i} className="border-t border-border hover:bg-bg-tertiary/30 transition-colors">
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="font-medium text-text">{display.name}</span>
-                      {display.tag && (
-                        <span className="text-[10px] px-1 py-0.5 rounded bg-bg-tertiary text-text-muted">{display.tag}</span>
+                      <span className="text-[10px] px-1 py-0.5 rounded bg-bg-tertiary text-text-muted font-mono tracking-tight">{display.tag}</span>
+                      {isShort && (
+                        <span className="text-[10px] px-1 py-0.5 rounded font-medium bg-red/15 text-red">SHORT</span>
                       )}
-                      {deriv && (
-                        <span className={`text-[10px] px-1 py-0.5 rounded font-medium ${p.side === 'long' ? 'bg-green/15 text-green' : 'bg-red/15 text-red'}`}>
-                          {p.side}
-                        </span>
-                      )}
-                      <span className="text-[10px] text-text-muted/50">{p.accountLabel}</span>
+                      <span className="text-[10px] text-text-muted/70">{p.accountLabel}</span>
                     </div>
                   </td>
                   <td className="px-3 py-2 text-center text-text-muted text-[11px]">{ccy}</td>

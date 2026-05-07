@@ -4,7 +4,7 @@
 
 import Decimal from 'decimal.js'
 import { UNSET_DOUBLE, UNSET_INTEGER, UNSET_DECIMAL } from './const.js'
-import { Contract, ComboLeg, DeltaNeutralContract } from './contract.js'
+import { Contract, ComboLeg, DeltaNeutralContract, coerceSecType } from './contract.js'
 import { Order, OrderComboLeg } from './order.js'
 import { OrderState, OrderAllocation } from './order-state.js'
 import { OrderCondition, Create as createOrderCondition } from './order-condition.js'
@@ -73,7 +73,7 @@ export class OrderDecoder {
   decodeContractFields(fields: Iterator<string>): void {
     this.contract.conId = decodeInt(fields)
     this.contract.symbol = decodeStr(fields)
-    this.contract.secType = decodeStr(fields)
+    this.contract.secType = coerceSecType(decodeStr(fields))
     this.contract.lastTradeDateOrContractMonth = decodeStr(fields)
     this.contract.strike = decodeFloat(fields)
     this.contract.right = decodeStr(fields)

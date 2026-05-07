@@ -18,7 +18,7 @@ import {
   MIN_SERVER_VER_UNREALIZED_PNL,
   MIN_SERVER_VER_REALIZED_PNL,
 } from '../server-versions.js'
-import { Contract } from '../contract.js'
+import { Contract, coerceSecType } from '../contract.js'
 import Decimal from 'decimal.js'
 
 // Protobuf message types
@@ -47,7 +47,7 @@ function decodeContractProto(cp: ContractProto): Contract {
   const c = new Contract()
   if (cp.conId !== undefined) c.conId = cp.conId
   if (cp.symbol !== undefined) c.symbol = cp.symbol
-  if (cp.secType !== undefined) c.secType = cp.secType
+  if (cp.secType !== undefined) 
   if (cp.lastTradeDateOrContractMonth !== undefined) c.lastTradeDateOrContractMonth = cp.lastTradeDateOrContractMonth
   if (cp.strike !== undefined) c.strike = cp.strike
   if (cp.right !== undefined) c.right = cp.right
@@ -103,7 +103,7 @@ export function applyAccountHandlers(decoder: Decoder): void {
     const contract = new Contract()
     contract.conId = decodeInt(fields) // ver 6
     contract.symbol = decodeStr(fields)
-    contract.secType = decodeStr(fields)
+    contract.secType = coerceSecType(decodeStr(fields))
     contract.lastTradeDateOrContractMonth = decodeStr(fields)
     contract.strike = decodeFloat(fields)
     contract.right = decodeStr(fields)
@@ -220,7 +220,7 @@ export function applyAccountHandlers(decoder: Decoder): void {
     const contract = new Contract()
     contract.conId = decodeInt(fields)
     contract.symbol = decodeStr(fields)
-    contract.secType = decodeStr(fields)
+    contract.secType = coerceSecType(decodeStr(fields))
     contract.lastTradeDateOrContractMonth = decodeStr(fields)
     contract.strike = decodeFloat(fields)
     contract.right = decodeStr(fields)
@@ -325,7 +325,7 @@ export function applyAccountHandlers(decoder: Decoder): void {
     const contract = new Contract()
     contract.conId = decodeInt(fields)
     contract.symbol = decodeStr(fields)
-    contract.secType = decodeStr(fields)
+    contract.secType = coerceSecType(decodeStr(fields))
     contract.lastTradeDateOrContractMonth = decodeStr(fields)
     contract.strike = decodeFloat(fields)
     contract.right = decodeStr(fields)

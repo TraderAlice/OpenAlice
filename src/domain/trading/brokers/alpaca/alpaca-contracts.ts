@@ -7,15 +7,16 @@
 
 import { Contract, OrderState } from '@traderalice/ibkr'
 import '../../contract-ext.js'
+import { buildContract } from '../contract-builder.js'
 
 /** Build a fully qualified IBKR Contract for an Alpaca ticker. */
 export function makeContract(ticker: string): Contract {
-  const c = new Contract()
-  c.symbol = ticker
-  c.secType = 'STK'
-  c.exchange = 'SMART'
-  c.currency = 'USD'
-  return c
+  return buildContract({
+    symbol: ticker,
+    secType: 'STK',
+    exchange: 'SMART',
+    currency: 'USD',
+  })
 }
 
 /** Extract native symbol from aliceId, or null if not ours. */

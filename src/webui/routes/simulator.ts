@@ -19,6 +19,7 @@ import type { Context } from 'hono'
 import { z } from 'zod'
 import type { EngineContext } from '../../core/types.js'
 import { MockBroker } from '../../domain/trading/brokers/mock/MockBroker.js'
+import { SEC_TYPES, type SecType } from '../../domain/trading/contract-discipline.js'
 
 // ==================== Schemas ====================
 
@@ -40,11 +41,13 @@ const fillOrderSchema = z.object({
 })
 
 // IBKR contract surface: includes derivative-distinguishing fields so the
-// simulator can model OPT/FOP/FUT/CASH/BOND alongside CRYPTO.
+// simulator can model OPT/FOP/FUT/CASH/BOND alongside CRYPTO. `secType` is
+// validated against `SEC_TYPES` at the network boundary so unknown values
+// are rejected with a 400 — the in-memory `Contract` type stays strict.
 const contractSchema = z.object({
   symbol: z.string().optional(),
   localSymbol: z.string().optional(),
-  secType: z.string().optional(),
+  secType: z.enum([...SEC_TYPES] as [SecType, ...SecType[]]).optional(),
   exchange: z.string().optional(),
   currency: z.string().optional(),
   // Derivative metadata

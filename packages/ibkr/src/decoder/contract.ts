@@ -24,6 +24,7 @@ import {
   ComboLeg,
   FundDistributionPolicyIndicator,
   FundAssetType,
+  coerceSecType,
 } from '../contract.js'
 import { TagValue } from '../tag-value.js'
 import { PriceIncrement } from '../common.js'
@@ -116,7 +117,7 @@ function decodeContractFromProto(proto: ContractProto): Contract {
   const c = new Contract()
   if (proto.conId !== undefined) c.conId = proto.conId
   if (proto.symbol !== undefined) c.symbol = proto.symbol
-  if (proto.secType !== undefined) c.secType = proto.secType
+  if (proto.secType !== undefined) c.secType = coerceSecType(proto.secType)
   if (proto.lastTradeDateOrContractMonth !== undefined) c.lastTradeDateOrContractMonth = proto.lastTradeDateOrContractMonth
   if (proto.strike !== undefined) c.strike = proto.strike
   if (proto.right !== undefined) c.right = proto.right
@@ -293,7 +294,7 @@ function processContractDataMsg(d: Decoder, fields: Iterator<string>): void {
 
   const contract = new ContractDetails()
   contract.contract.symbol = decodeStr(fields)
-  contract.contract.secType = decodeStr(fields)
+  contract.contract.secType = coerceSecType(decodeStr(fields))
   readLastTradeDate(fields, contract, false)
   if (d.serverVersion >= MIN_SERVER_VER_LAST_TRADE_DATE) {
     contract.contract.lastTradeDate = decodeStr(fields)
@@ -444,7 +445,7 @@ function processBondContractDataMsg(d: Decoder, fields: Iterator<string>): void 
 
   const contract = new ContractDetails()
   contract.contract.symbol = decodeStr(fields)
-  contract.contract.secType = decodeStr(fields)
+  contract.contract.secType = coerceSecType(decodeStr(fields))
   contract.cusip = decodeStr(fields)
   contract.coupon = decodeFloat(fields)
   readLastTradeDate(fields, contract, true)
@@ -532,7 +533,7 @@ function processSymbolSamplesMsg(d: Decoder, fields: Iterator<string>): void {
     const conDesc = new ContractDescription()
     conDesc.contract.conId = decodeInt(fields)
     conDesc.contract.symbol = decodeStr(fields)
-    conDesc.contract.secType = decodeStr(fields)
+    conDesc.contract.secType = coerceSecType(decodeStr(fields))
     conDesc.contract.primaryExchange = decodeStr(fields)
     conDesc.contract.currency = decodeStr(fields)
 

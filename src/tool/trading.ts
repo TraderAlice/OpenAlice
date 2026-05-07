@@ -9,7 +9,7 @@
 import { tool, type Tool } from 'ai'
 import { z } from 'zod'
 import Decimal from 'decimal.js'
-import { Contract, UNSET_DECIMAL } from '@traderalice/ibkr'
+import { Contract, UNSET_DECIMAL, coerceSecType } from '@traderalice/ibkr'
 import type { UTAManager } from '@/domain/trading/uta-manager.js'
 import { BrokerError, type OpenOrder } from '@/domain/trading/brokers/types.js'
 import type { FxService } from '@/domain/trading/fx-service.js'
@@ -147,7 +147,7 @@ hitting the broker, which otherwise expects the bare base ticker.`,
         const query = new Contract()
         if (symbol) query.symbol = symbol
         if (aliceId) query.aliceId = aliceId
-        if (secType) query.secType = secType
+        if (secType) query.secType = coerceSecType(secType)
         if (currency) query.currency = currency
         const details = await uta.getContractDetails(query)
         if (!details) return { error: 'No contract details found.' }

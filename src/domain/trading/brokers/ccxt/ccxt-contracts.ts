@@ -12,6 +12,8 @@
 import { Contract, OrderState } from '@traderalice/ibkr'
 import '../../contract-ext.js'
 import type { CcxtMarket } from './ccxt-types.js'
+import { buildContract } from '../contract-builder.js'
+import type { SecType } from '../../contract-discipline.js'
 
 // ---- Symbol encoding for aliceId ----
 
@@ -23,6 +25,55 @@ export function encodeSymbol(symbol: string): string {
 /** aliceId suffix → CCXT symbol (unescape) */
 export function decodeSymbol(encoded: string): string {
   return encoded.replace(/_/g, '/').replace(/\./g, ':')
+}
+
+// ---- Canonical localSymbol (Phase 3 of IBKR-as-truth refactor) ----
+
+/**
+ * Build the canonical Contract.localSymbol for a CCXT market — IBKR-shaped
+ * (broker-agnostic) instead of CCXT's wire format (`BTC/USDT:USDT`).
+ *
+ * The canonical form lets aliceIds and downstream consumers stop
+ * special-casing CCXT's wire encoding. CCXT's wire format itself stays
+ * a CcxtBroker-internal concern: `contractToCcxt` now derives wire from
+ * the canonical Contract via `resolveContractSync`'s base+secType+currency
+ * search, which already existed as a fallback.
+ *
+ * Format per market.type:
+ *   - spot:   `${base}`                      (e.g. `BTC`)
+ *   - swap:   `${base}-PERP`                 (e.g. `BTC-PERP`)
+ *   - future: `${base}-FUT-${expiryYYYYMM}`  (e.g. `BTC-FUT-202609`)
+ *   - option: `${base}-OPT-...`              (skipped — CCXT options are niche)
+ *
+ * Multi-quote disambiguation (BTC/USDT vs BTC/USDC spot held simultaneously)
+ * is left for a follow-up — most users hold one quote per underlying, and
+ * `Contract.currency` differentiates them within the same UTA.
+ */
+export function canonicalLocalSymbol(market: CcxtMarket): string {
+  const base = market.base
+  switch (market.type) {
+    case 'spot':   return base
+    case 'swap':   return `${base}-PERP`
+    case 'future': return `${base}-FUT-${ccxtExpiryToCanonical(market)}`
+    case 'option': return market.symbol  // out of scope; preserve wire format
+    default:       return market.symbol
+  }
+}
+
+/** Best-effort YYYYMM extraction from a CCXT future market's expiry. */
+function ccxtExpiryToCanonical(market: CcxtMarket): string {
+  // CCXT exposes `expiry` (ms epoch) on dated futures. Fall back to whatever
+  // is encoded in the symbol if not present.
+  const ms = (market as unknown as { expiry?: number }).expiry
+  if (typeof ms === 'number') {
+    const d = new Date(ms)
+    const m = String(d.getUTCMonth() + 1).padStart(2, '0')
+    return `${d.getUTCFullYear()}${m}`
+  }
+  // Fallback: tail of `BTC/USDT:USDT-220929` after the trailing dash.
+  const dash = market.symbol.lastIndexOf('-')
+  if (dash >= 0) return market.symbol.slice(dash + 1)
+  return 'unknown'
 }
 
 // ---- Type mapping ----
@@ -59,18 +110,20 @@ export function makeOrderState(ccxtStatus: string | undefined): OrderState {
 // ---- Contract ↔ CCXT symbol conversion ----
 
 /**
- * Convert a CcxtMarket to an IBKR Contract.
- * aliceId = "{exchangeName}-{encodeSymbol(market.symbol)}"
+ * Convert a CcxtMarket to an IBKR Contract with a canonical localSymbol.
+ * CCXT's wire format ("BTC/USDT:USDT") is no longer on the Contract —
+ * `contractToCcxt` derives it from `(base, secType, currency)` via the
+ * markets table when CCXT-side talk is needed.
  */
 export function marketToContract(market: CcxtMarket, exchangeName: string): Contract {
-  const c = new Contract()
-  c.symbol = market.base
-  c.secType = ccxtTypeToSecType(market.type)
-  c.exchange = exchangeName
-  c.currency = market.quote
-  c.localSymbol = market.symbol       // CCXT unified symbol, e.g. "BTC/USDT:USDT"
-  c.description = `${market.base}/${market.quote} ${market.type}${market.settle ? ` (${market.settle} settled)` : ''}`
-  return c
+  return buildContract({
+    symbol: market.base,
+    secType: ccxtTypeToSecType(market.type) as SecType,
+    exchange: exchangeName,
+    currency: market.quote,
+    localSymbol: canonicalLocalSymbol(market),
+    description: `${market.base}/${market.quote} ${market.type}${market.settle ? ` (${market.settle} settled)` : ''}`,
+  })
 }
 
 /** Parse aliceId → CCXT unified symbol. */

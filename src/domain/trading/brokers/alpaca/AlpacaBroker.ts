@@ -35,6 +35,7 @@ import type {
   AlpacaClockRaw,
 } from './alpaca-types.js'
 import { makeContract, resolveSymbol, mapAlpacaOrderStatus, makeOrderState } from './alpaca-contracts.js'
+import { buildPosition } from '../contract-builder.js'
 import { fuzzyRankContracts, type FuzzyRankInput } from '../fuzzy-rank.js'
 
 /** Subset of Alpaca's `/v2/assets` row we actually use for catalog matching. */
@@ -397,16 +398,21 @@ export class AlpacaBroker implements IBroker {
     try {
       const raw = await this.client.getPositions() as AlpacaPositionRaw[]
 
-      return raw.map(p => ({
+      return raw.map(p => buildPosition({
         contract: makeContract(p.symbol),
         currency: 'USD',
         side: p.side === 'long' ? 'long' as const : 'short' as const,
         quantity: new Decimal(p.qty),
         avgCost: new Decimal(p.avg_entry_price).toString(),
         marketPrice: new Decimal(p.current_price).toString(),
+        // Pass-through: Alpaca's API already provides multiplier-applied
+        // numbers. Don't re-derive (would re-do the math from scratch and
+        // could disagree with their server in edge cases).
         marketValue: new Decimal(p.market_value).abs().toString(),
         unrealizedPnL: new Decimal(p.unrealized_pl).toString(),
         realizedPnL: '0',
+        // Alpaca is STK-only — canonical multiplier is always '1'.
+        multiplier: '1',
       }))
     } catch (err) {
       throw BrokerError.from(err)
