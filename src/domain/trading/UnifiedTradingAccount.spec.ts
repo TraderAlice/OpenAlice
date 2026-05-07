@@ -797,6 +797,36 @@ describe('UTA — getPositions wallet reconciliation', () => {
     expect(positions[0].unrealizedPnL).toBe('100')
   })
 
+  it('bootstraps at broker-reported avgCost when it differs from markPrice', async () => {
+    // Mock externalTrade scenario: broker observed a real fill at $148.50,
+    // current mark is $152. Bootstrap should use the trade price, not mark
+    // — otherwise we destroy the broker's correct cost basis on first sight
+    // (covered call test surfaced this 2026-05-07: AAPL bought at $148.50,
+    // mark at $152, UI showed avgCost=$152 / PnL=0 instead of avgCost=$148.50
+    // / PnL=+$350).
+    const broker = new MockBroker()
+    broker.setPositions([makePosition({
+      contract: makeContract({ symbol: 'AAPL', secType: 'STK' }),
+      quantity: new Decimal('100'),
+      avgCost: '148.50',           // broker has the real trade price
+      marketPrice: '152',          // mark moved up
+      unrealizedPnL: '0',
+      avgCostSource: 'wallet',
+    })])
+    const { uta } = createUTA(broker)
+
+    const positions = await uta.getPositions()
+    expect(new Decimal(positions[0].avgCost).toNumber()).toBeCloseTo(148.50, 4)
+    expect(new Decimal(positions[0].unrealizedPnL).toNumber()).toBeCloseTo(350, 4)
+
+    // Reconcile commit recorded the drift at the trade price, not markPrice.
+    const commits = uta.git.exportState().commits
+    const reconciles = commits.filter(c => c.operations.some(op => op.action === 'reconcileBalance'))
+    expect(reconciles).toHaveLength(1)
+    const op = reconciles[0].operations[0] as Extract<Operation, { action: 'reconcileBalance' }>
+    expect(new Decimal(op.markPrice).toNumber()).toBeCloseTo(148.50, 4)
+  })
+
   it('bootstraps a wallet position with no history → reconcile at markPrice, PnL=0', async () => {
     const broker = new MockBroker()
     broker.setPositions([makePosition({

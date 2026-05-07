@@ -545,10 +545,18 @@ export class UnifiedTradingAccount {
       // Tolerance: dust-level differences (sub-1e-8) come from precision
       // round-trips, not from real balance changes.
       if (drift.abs().gt(new Decimal('1e-8'))) {
+        // Bootstrap price: prefer broker-reported avgCost when non-zero
+        // (Mock externalTrade, future CCXT-with-fetchMyTrades, anything
+        // that observed a real fill price). Fall back to markPrice only
+        // when the broker has nothing — current CCXT spot synthesis sets
+        // avgCost equal to markPrice anyway, so the fallback case
+        // produces identical behavior there.
+        const brokerAvgCost = p.avgCost ? new Decimal(p.avgCost) : new Decimal(0)
+        const bootstrapPrice = brokerAvgCost.gt(0) ? brokerAvgCost : new Decimal(p.marketPrice)
         await this.git.recordReconcile({
           aliceId,
           quantityDelta: drift,
-          markPrice: new Decimal(p.marketPrice),
+          markPrice: bootstrapPrice,
           stateAfter: this._buildReconcileStateAfter(positions),
         })
       }
