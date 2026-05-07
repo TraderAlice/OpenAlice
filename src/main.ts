@@ -46,7 +46,7 @@ import { createHeartbeat } from './task/heartbeat/index.js'
 import { createMetricsListener } from './task/metrics/index.js'
 import { createTaskRouter } from './task/task-router/index.js'
 import { NewsCollectorStore, NewsCollector } from './domain/news/index.js'
-import { createNewsArchiveTools } from './tool/news.js'
+import { createNewsArchiveTools, createNewsSearchTools } from './tool/news.js'
 
 // ==================== Persistence paths ====================
 
@@ -233,6 +233,9 @@ async function main() {
   toolCenter.register(createEquityTools(equityClient), 'equity')
   if (config.news.enabled) {
     toolCenter.register(createNewsArchiveTools(newsStore), 'news')
+  }
+  if (process.env.SELTZ_API_KEY) {
+    toolCenter.register(createNewsSearchTools(), 'news-search')
   }
   toolCenter.register(createAnalysisTools(equityClient, cryptoClient, currencyClient, commodityClient), 'analysis')
 
