@@ -38,15 +38,15 @@ Returns documents with URL, content summary, and publication date.`,
           .describe('Only results published on or before this date (ISO 8601, e.g. "2026-05-07")'),
       }),
       execute: async ({ query, maxResults, includeDomains, excludeDomains, fromDate, toDate }) => {
-        const response = await client.search(
+        const response = await client.search({
           query,
           maxResults,
-          'news',
+          scope: 'news',
           includeDomains,
           excludeDomains,
           fromDate,
           toDate,
-        )
+        })
 
         return response.documents.map((doc) => ({
           url: doc.url ?? null,
