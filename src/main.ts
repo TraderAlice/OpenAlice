@@ -133,6 +133,8 @@ async function main() {
   // ==================== Cron ====================
 
   const cronEngine = createCronEngine({ registry: listenerRegistry })
+  await cronEngine.start()
+  console.log('cron: engine started')
 
   // ==================== News Collector Store ====================
 
@@ -313,9 +315,7 @@ async function main() {
   // ==================== Activate Listeners + Start Cron Engine ====================
 
   await listenerRegistry.start()
-  await cronEngine.start()
   console.log(`listener-registry: started (${listenerRegistry.list().length} listeners)`)
-  console.log('cron: engine started')
 
   // ==================== News Collector ====================
 
