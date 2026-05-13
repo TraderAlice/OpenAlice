@@ -232,7 +232,7 @@ export const useWorkspace = create<WorkspaceStore>()(
     }),
     {
       name: 'openalice.workspace.v2',
-      version: 2,
+      version: 3,
       // Persist only the data shape — actions are recreated by the store factory.
       partialize: (state) => ({
         tabs: state.tabs,

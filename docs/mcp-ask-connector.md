@@ -12,7 +12,7 @@ External agents can converse with Alice via a dedicated MCP server, without redu
 ## Architecture
 
 ```
-External Agent (OpenClaw, etc.)
+External Agent
     │
     │  MCP protocol (Streamable HTTP)
     │  Port: askMcpPort (e.g. 3003)
@@ -38,7 +38,7 @@ External Agent (OpenClaw, etc.)
 
 | Server | Port | Purpose | Registered in ToolCenter? |
 |--------|------|---------|---------------------------|
-| Main MCP (`McpPlugin`) | `mcpPort` | Expose internal tools (trading, analysis, brain) | Yes |
+| Main MCP (`McpPlugin`) | `mcpPort` | Expose internal tools (trading, analysis, market) | Yes |
 | Ask MCP (`McpAskPlugin`) | `askMcpPort` | Expose conversation ability | No |
 
 Because Ask tools are not in ToolCenter, Alice's AI provider (Vercel AI SDK or Claude Code) cannot see them. This structurally prevents circular invocation.
@@ -147,19 +147,19 @@ data/
     mcp-ask__*.jsonl        # Per-session conversation history
 ```
 
-## Example: OpenClaw Integration
+## Example: External Agent Integration
 
-An orchestration agent like OpenClaw can use the Ask connector to delegate trading decisions to Alice:
+An orchestration agent can use the Ask connector to delegate trading decisions to Alice:
 
 ```
-User → OpenClaw: "Should I buy more ETH?"
+User → Orchestrator: "Should I buy more ETH?"
          │
          │  askWithSession({ message: "The user is asking about ETH. Current price is $3,200. What's your view?", sessionId: "user-123" })
          ▼
        Alice: "Based on the 4h RSI at 42 and declining volume, I'd wait for a pullback to $3,050 support..."
          │
          ▼
-OpenClaw → User: "Alice suggests waiting for $3,050 support before adding. RSI is at 42 with declining volume."
+Orchestrator → User: "Alice suggests waiting for $3,050 support before adding. RSI is at 42 with declining volume."
 ```
 
 Alice processes the question using her full toolkit (market data, indicators, position context, memory) and responds as an autonomous agent — not as a function returning a value.

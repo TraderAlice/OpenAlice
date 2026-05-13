@@ -29,7 +29,8 @@ export type McpToolResult = {
 /**
  * Convert a Vercel AI SDK tool result to MCP content blocks.
  *
- * If the result has a `.content` array (OpenClaw AgentToolResult format),
+ * If the result has a `.content` array (the multi-modal AgentToolResult
+ * shape — `{ content: [{type:"text",...}|{type:"image",...}, ...] }`),
  * map each item to native MCP text/image blocks. This avoids stringify-ing
  * base64 image data into a giant JSON text blob.
  *

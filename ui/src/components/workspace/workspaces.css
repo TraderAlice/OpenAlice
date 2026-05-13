@@ -540,36 +540,197 @@
   font-size: 13px;
 }
 
-/* Right-pane Resume CTA */
+/* ── Right-pane Resume CTA ─────────────────────────────────────────────────
+ *
+ * Two-layer design: a heavily-blurred faux-TUI backdrop fills the pane
+ * to telegraph "paused conversation" at a glance, with a focused Resume
+ * card centered on top. The faux-TUI is decorative (no real session
+ * content — we don't persist agent-CLI scrollback); its job is to make
+ * the paused state read as a chat to anyone, not just developers.
+ */
 
-.resume-cta {
+.resume-cta-frame {
   flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
+  position: relative;
+  overflow: hidden;
   border: 1px dashed var(--border);
   border-radius: 8px;
   background: var(--panel);
-  padding: 32px;
 }
 
-.resume-cta-header {
+/* Faux-TUI backdrop ------------------------------------------------------- */
+
+.resume-tui {
+  position: absolute;
+  inset: -16px; /* negative offset hides the soft edge from filter:blur */
+  display: flex;
+  flex-direction: column;
+  padding: 24px 32px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--fg);
+  background: var(--panel);
+  /* Blur softens individual characters into "text-shaped bands"; the
+   * brightness drop pushes it visually to the back layer so the Resume
+   * card pops. opacity helps tune presence without crushing color. */
+  filter: blur(5px) brightness(0.7);
+  opacity: 0.55;
+  pointer-events: none;
+  user-select: none;
+}
+
+.resume-tui-titlebar {
   display: flex;
   align-items: center;
   gap: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+.resume-tui-titlebar-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #28c840;
+}
+.resume-tui-titlebar-title {
+  flex: 1 1 auto;
+  font-weight: 600;
+}
+.resume-tui-titlebar-pid {
+  color: var(--fg-dim);
+  font-size: 12px;
+}
+
+.resume-tui-meta {
+  padding: 14px 16px;
+  margin: 0 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+}
+.resume-tui-meta-strong {
+  font-weight: 600;
+}
+.resume-tui-meta-dim {
+  color: var(--fg-dim);
+}
+
+.resume-tui-prompt {
+  display: flex;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 8px 14px;
+  margin: 6px 0;
+  border-radius: 4px;
+}
+.resume-tui-chev {
+  color: var(--fg-dim);
+  flex-shrink: 0;
+}
+.resume-tui-prompt-text {
+  color: var(--fg);
+}
+
+.resume-tui-response {
+  display: flex;
+  gap: 10px;
+  padding: 4px 0 4px 14px;
+  margin: 4px 0;
+}
+.resume-tui-bullet {
+  color: var(--fg);
+  flex-shrink: 0;
+}
+.resume-tui-response-body {
+  flex: 1 1 auto;
+}
+
+.resume-tui-status {
+  color: var(--fg-dim);
+  font-style: italic;
+  padding-left: 14px;
+  margin: 2px 0 12px;
+  font-size: 12px;
+}
+
+.resume-tui-input {
+  margin-top: auto;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.resume-tui-input-cursor {
+  display: inline-block;
+  width: 8px;
+  height: 14px;
+  background: var(--fg);
+  opacity: 0.7;
+}
+
+.resume-tui-statusbar {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 14px 0;
+  font-size: 12px;
+  color: var(--fg-dim);
+}
+
+/* Foreground Resume card ------------------------------------------------- */
+
+.resume-cta-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Subtle vignette pushes the eye to center, where the card lives. */
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0, 0, 0, 0) 0%,
+    rgba(0, 0, 0, 0.35) 60%,
+    rgba(0, 0, 0, 0.55) 100%
+  );
+}
+
+.resume-cta-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+  padding: 24px 28px;
+  min-width: 320px;
+  max-width: 420px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.resume-cta-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.resume-cta-card-title {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .resume-cta-badge {
   width: 22px;
   height: 20px;
   font-size: 12px;
+  flex-shrink: 0;
 }
 
 .resume-cta-name {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--fg);
 }
@@ -577,7 +738,6 @@
 .resume-cta-state {
   font-size: 11px;
   color: var(--fg-dim);
-  font-style: italic;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -587,7 +747,9 @@
   grid-template-columns: auto 1fr;
   column-gap: 14px;
   row-gap: 4px;
-  margin: 4px 0 8px;
+  margin: 0;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--border);
   font-size: 12px;
 }
 .resume-cta-meta dt {
@@ -605,14 +767,22 @@
 }
 
 .resume-cta-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   background: var(--accent);
   color: var(--bg);
   border: 0;
-  padding: 10px 24px;
+  padding: 10px 20px;
   border-radius: 6px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+  transition: filter 0.12s;
+}
+.resume-cta-btn:hover:not(:disabled) {
+  filter: brightness(1.1);
 }
 .resume-cta-btn:disabled {
   opacity: 0.6;
@@ -620,12 +790,11 @@
 }
 
 .resume-cta-hint {
-  margin: 4px 0 0;
+  margin: 0;
   color: var(--fg-dim);
   font-size: 11px;
   font-style: italic;
   text-align: center;
-  max-width: 360px;
 }
 
 /* ── Main pane ────────────────────────────────────────────────────────────── */

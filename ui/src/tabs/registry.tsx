@@ -4,7 +4,6 @@ import type { Workspace } from '../components/workspace/api'
 import type { ViewKind, ViewSpec } from './types'
 
 import { ChatPage } from '../pages/ChatPage'
-import { DiaryPage } from '../pages/DiaryPage'
 import { PortfolioPage } from '../pages/PortfolioPage'
 import { AutomationPage } from '../pages/AutomationPage'
 import { NewsPage } from '../pages/NewsPage'
@@ -68,13 +67,6 @@ const chatModule: ViewModule<'chat'> = {
       : `/chat/${encodeURIComponent(spec.params.channelId)}`
   },
   Component: ChatPage,
-}
-
-const diaryModule: ViewModule<'diary'> = {
-  kind: 'diary',
-  title: () => 'Diary',
-  toUrl: () => '/diary',
-  Component: () => <DiaryPage />,
 }
 
 const portfolioModule: ViewModule<'portfolio'> = {
@@ -218,7 +210,6 @@ const workspaceModule: ViewModule<'workspace'> = {
 
 export const VIEWS = {
   chat: chatModule,
-  diary: diaryModule,
   portfolio: portfolioModule,
   automation: automationModule,
   news: newsModule,

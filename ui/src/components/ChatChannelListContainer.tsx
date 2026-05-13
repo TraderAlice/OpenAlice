@@ -1,4 +1,4 @@
-import { Bell, HelpCircle, Notebook } from 'lucide-react'
+import { Bell, HelpCircle } from 'lucide-react'
 import { useChannels } from '../contexts/ChannelsContext'
 import { useWorkspace } from '../tabs/store'
 import { getFocusedTab } from '../tabs/types'
@@ -18,9 +18,8 @@ import { SidebarRow } from './SidebarRow'
  *     OpenAlice's ChatHook. Required for connectors (Telegram / MCP Ask
  *     / webhook) which have no PTY to host a CLI in.
  *
- * Above both: Notifications + Diary — system-push surfaces that share
- * this sidebar because the unifying mental model is "everything
- * Alice-shaped".
+ * Above both: Notifications — a system-push surface that shares this
+ * sidebar because the unifying mental model is "everything Alice-shaped".
  *
  * Active row tracking is derived from the focused tab — switching tabs
  * naturally shifts the highlight without bespoke wiring.
@@ -31,7 +30,6 @@ export function ChatChannelListContainer() {
   const focusedKind = focused?.kind
   const focusedChannelId = focusedKind === 'chat' ? focused.params.channelId : ''
   const inboxActive = focusedKind === 'notifications-inbox'
-  const diaryActive = focusedKind === 'diary'
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
   const unreadCount = useUnreadNotificationsCount()
 
@@ -57,16 +55,6 @@ export function ChatChannelListContainer() {
               </span>
             ) : undefined
           }
-        />
-        <SidebarRow
-          label={
-            <span className="flex items-center gap-2">
-              <Notebook size={14} strokeWidth={1.8} className="shrink-0" />
-              <span>Diary</span>
-            </span>
-          }
-          active={diaryActive}
-          onClick={() => openOrFocus({ kind: 'diary', params: {} })}
         />
       </div>
 

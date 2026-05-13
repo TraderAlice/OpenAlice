@@ -17,7 +17,6 @@ export type ViewSpec =
   | { kind: 'chat';           params: { channelId: string } }
   | { kind: 'workspace-list'; params: Record<string, never> }
   | { kind: 'workspace';      params: { wsId: string; sessionId?: string } }
-  | { kind: 'diary';          params: Record<string, never> }
   | { kind: 'portfolio';      params: Record<string, never> }
   | { kind: 'automation';     params: { section: 'flow' | 'heartbeat' | 'cron' | 'webhook' } }
   | { kind: 'news';           params: Record<string, never> }
@@ -39,11 +38,6 @@ export type ViewKind = ViewSpec['kind']
  * Note: trading-as-git has no associated tab kind — it's sidebar-only
  * (the approval queue lives in the sidebar; future commit-detail tabs will
  * be opened from there).
- *
- * Diary deliberately does NOT have its own activity section — it's a
- * read-only Alice-output surface, conceptually grouped with Chat under
- * "interactions with Alice" (chat sidebar carries an entry that opens
- * the Diary tab).
  */
 export type ActivitySection =
   | 'chat'

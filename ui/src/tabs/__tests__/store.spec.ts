@@ -36,7 +36,7 @@ describe('specEquals', () => {
 
   it('different kinds are not equal even with overlapping params shape', () => {
     expect(specEquals(
-      { kind: 'diary', params: {} },
+      { kind: 'news', params: {} },
       { kind: 'portfolio', params: {} },
     )).toBe(false)
   })
@@ -66,9 +66,9 @@ describe('openOrFocus', () => {
   it('focuses an existing tab when same spec is opened twice', () => {
     const s = useWorkspace.getState()
     s.openOrFocus({ kind: 'chat', params: { channelId: 'default' } })
-    s.openOrFocus({ kind: 'diary', params: {} })
+    s.openOrFocus({ kind: 'news', params: {} })
 
-    // Diary is focused. Re-open default chat — should switch focus, not create a new tab.
+    // News is focused. Re-open default chat — should switch focus, not create a new tab.
     s.openOrFocus({ kind: 'chat', params: { channelId: 'default' } })
 
     const group = getFocusedGroup(useWorkspace.getState())!
@@ -95,13 +95,13 @@ describe('closeTab', () => {
   it('closing the active tab focuses the right neighbour', () => {
     const s = useWorkspace.getState()
     s.openOrFocus({ kind: 'chat', params: { channelId: 'default' } })  // [chat]
-    s.openOrFocus({ kind: 'diary', params: {} })                       // [chat, diary]
-    s.openOrFocus({ kind: 'portfolio', params: {} })                   // [chat, diary, portfolio], focus = portfolio
+    s.openOrFocus({ kind: 'news', params: {} })                        // [chat, news]
+    s.openOrFocus({ kind: 'portfolio', params: {} })                   // [chat, news, portfolio], focus = portfolio
 
-    // Close diary (middle, not active) — focus stays on portfolio.
+    // Close news (middle, not active) — focus stays on portfolio.
     const ids = getFocusedGroup(useWorkspace.getState())!.tabIds
-    const diaryId = ids[1]
-    s.closeTab(diaryId)
+    const newsId = ids[1]
+    s.closeTab(newsId)
 
     expect(getFocusedGroup(useWorkspace.getState())!.tabIds).toHaveLength(2)
     expect(getFocusedTab(useWorkspace.getState())?.spec.kind).toBe('portfolio')
@@ -109,11 +109,11 @@ describe('closeTab', () => {
 
   it('closing the rightmost active tab focuses the left neighbour', () => {
     const s = useWorkspace.getState()
-    s.openOrFocus({ kind: 'diary', params: {} })
+    s.openOrFocus({ kind: 'news', params: {} })
     s.openOrFocus({ kind: 'portfolio', params: {} })
     const portfolioId = getFocusedGroup(useWorkspace.getState())!.activeTabId!
     s.closeTab(portfolioId)
-    expect(getFocusedTab(useWorkspace.getState())?.spec.kind).toBe('diary')
+    expect(getFocusedTab(useWorkspace.getState())?.spec.kind).toBe('news')
   })
 
   it('closing the last tab leaves an empty group with null activeTabId', () => {
@@ -144,7 +144,7 @@ describe('focusTab', () => {
   it('switches focus to a known tab', () => {
     const s = useWorkspace.getState()
     s.openOrFocus({ kind: 'chat', params: { channelId: 'default' } })
-    s.openOrFocus({ kind: 'diary', params: {} })
+    s.openOrFocus({ kind: 'news', params: {} })
     const ids = getFocusedGroup(useWorkspace.getState())!.tabIds
     s.focusTab(ids[0])
     expect(getFocusedTab(useWorkspace.getState())?.spec.kind).toBe('chat')
@@ -168,7 +168,7 @@ describe('closeMatching', () => {
     s.openOrFocus({ kind: 'chat', params: { channelId: 'default' } })
     s.openOrFocus({ kind: 'chat', params: { channelId: 'a' } })
     s.openOrFocus({ kind: 'chat', params: { channelId: 'b' } })
-    s.openOrFocus({ kind: 'diary', params: {} })
+    s.openOrFocus({ kind: 'news', params: {} })
 
     s.closeMatching((spec: ViewSpec) =>
       spec.kind === 'chat' && spec.params.channelId !== 'default',
@@ -176,13 +176,13 @@ describe('closeMatching', () => {
 
     const remaining = getFocusedGroup(useWorkspace.getState())!.tabIds
       .map((id) => useWorkspace.getState().tabs[id]?.spec.kind)
-    expect(remaining).toEqual(['chat', 'diary'])
+    expect(remaining).toEqual(['chat', 'news'])
   })
 
   it('closing all tabs via closeMatching leaves an empty group', () => {
     const s = useWorkspace.getState()
     s.openOrFocus({ kind: 'chat', params: { channelId: 'default' } })
-    s.openOrFocus({ kind: 'diary', params: {} })
+    s.openOrFocus({ kind: 'news', params: {} })
     s.closeMatching(() => true)
 
     const group = getFocusedGroup(useWorkspace.getState())!

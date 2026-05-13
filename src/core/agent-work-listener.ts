@@ -12,8 +12,8 @@
  *
  * The runner emits canonical `agent.work.{done,skip,error}` events
  * with the source label baked into the payload — downstream consumers
- * (Diary, etc.) filter on the source field rather than subscribing
- * to per-source event types.
+ * filter on the source field rather than subscribing to per-source event
+ * types.
  */
 
 import type { Listener, ListenerContext } from './listener.js'

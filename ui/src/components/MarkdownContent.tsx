@@ -1,8 +1,8 @@
 /**
  * Reusable markdown renderer with syntax-highlighted code blocks and copy buttons.
  *
- * Extracted from ChatMessage so other surfaces (e.g. DiaryPage) can render
- * assistant text with the same typography without inheriting chat chrome.
+ * Extracted from ChatMessage so other surfaces can render assistant text with
+ * the same typography without inheriting chat chrome.
  */
 
 import { useCallback, useEffect, useMemo, useRef } from 'react'

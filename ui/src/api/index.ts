@@ -15,8 +15,6 @@ import { channelsApi } from './channels'
 import { agentStatusApi } from './agentStatus'
 import { personaApi } from './persona'
 import { newsApi } from './news'
-import { diaryApi } from './diary'
-import { brainApi } from './brain'
 import { topologyApi } from './topology'
 import { marketApi } from './market'
 import { notificationsApi } from './notifications'
@@ -35,8 +33,6 @@ export const api = {
   agentStatus: agentStatusApi,
   persona: personaApi,
   news: newsApi,
-  diary: diaryApi,
-  brain: brainApi,
   topology: topologyApi,
   market: marketApi,
   notifications: notificationsApi,

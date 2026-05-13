@@ -58,9 +58,7 @@ src/
 │   ├── market.ts              # Symbol search tools
 │   ├── analysis.ts            # Indicator calculation tools
 │   ├── news.ts                # News archive tools
-│   ├── brain.ts               # Cognition tools
 │   ├── thinking.ts            # Reasoning tools
-│   ├── browser.ts             # Browser automation tools (wraps openclaw)
 │   └── session.ts             # Session awareness tools
 ├── server/
 │   ├── mcp.ts                 # MCP protocol server
@@ -70,14 +68,13 @@ src/
 │   ├── telegram/              # Telegram bot (grammY, magic link auth, /trading panel)
 │   ├── mcp-ask/               # MCP Ask connector (external agent conversation)
 │   └── mock/                  # Mock connector (testing)
-├── task/
-│   ├── cron/                  # Cron scheduling (engine, listener, AI tools)
-│   └── heartbeat/             # Periodic heartbeat with structured response protocol
-└── openclaw/                  # ⚠️ Frozen — DO NOT MODIFY
+└── task/
+    ├── cron/                  # Cron scheduling (engine, listener, AI tools)
+    └── heartbeat/             # Periodic heartbeat with structured response protocol
 data/
 ├── config/                    # JSON configuration files
 ├── sessions/                  # JSONL conversation histories (web/, telegram/, cron/)
-├── brain/                     # Agent memory and emotion logs
+├── brain/                     # Persona + heartbeat user-override prompts
 ├── cache/                     # API response caches
 ├── trading/                   # Trading commit history + snapshots (per-account)
 ├── news-collector/            # Persistent news archive (JSONL)

@@ -233,8 +233,8 @@ the item when done — git log is the history.
       a new `news.ingested` event, judges relevance against the user's
       holdings, and pushes an alert. Mechanically straightforward
       (heartbeat is the closest existing pattern, modulo heartbeat being
-      OpenClaw-era legacy that should not be used as a template — see
-      memory `project_heartbeat_legacy.md`).
+      a pre-workspace-era template that should not be cloned wholesale —
+      see memory `project_heartbeat_legacy.md`).
 
       **Why this can't ship as just a Listener.** Two compounding
       problems:
@@ -258,18 +258,16 @@ the item when done — git log is the history.
       + a powerless sandbox execution context**.
 
       **TimeView.** Interface like `getPositionsAt(t)`,
-      `getNewsAt(t, lookback)`, `getBrainAt(t)`,
-      `getRecentAlertsAt(t)`. Two implementations: `LiveTimeView`
-      ("now" — current behavior) and `ReplayTimeView(t, eventLog)`
-      (reconstruct from disk). All autonomous components consume
-      TimeView, never call live services directly. Inventoried disk
-      assets are mostly already replayable:
+      `getNewsAt(t, lookback)`, `getRecentAlertsAt(t)`. Two
+      implementations: `LiveTimeView` ("now" — current behavior) and
+      `ReplayTimeView(t, eventLog)` (reconstruct from disk). All
+      autonomous components consume TimeView, never call live services
+      directly. Inventoried disk assets are mostly already replayable:
         - EventLog (`data/event-log/events.jsonl`)
         - Sessions (`data/sessions/*.jsonl`)
         - Tool call log (`data/tool-calls/tool-calls.jsonl`)
         - News (`data/news-collector/news.jsonl`)
         - Trading snapshots (`data/trading/{acct}/snapshots/`)
-        - Brain commits (`data/brain/commit.json`)
       Gaps:
         - **Market data not persisted at all.** Kline / quotes are
           live API calls. Blocks any "did this alert correlate with a
@@ -285,8 +283,6 @@ the item when done — git log is the history.
           correctness issues regardless.
         - **Config files overwrite-only** — "what feeds were enabled
           at T?" not answerable without git history backup.
-        - **Brain commits are a single JSON file with array append**,
-          not true JSONL — fragile under concurrency at scale.
 
       **Powerless sandbox.** Capability-based execution context where
       writes are virtualized:

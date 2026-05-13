@@ -11,10 +11,6 @@ import { createThinkingTools } from './tool/thinking.js'
 import { UTAManager, createSnapshotService, createSnapshotScheduler } from './domain/trading/index.js'
 import { FxService } from './domain/trading/fx-service.js'
 import { createTradingTools } from './tool/trading.js'
-import { Brain } from './domain/brain/index.js'
-import { createBrainTools } from './tool/brain.js'
-import type { BrainExportState } from './domain/brain/index.js'
-import { createBrowserTools } from './tool/browser.js'
 import { SymbolIndex } from './domain/market-data/equity/index.js'
 import { CommodityCatalog } from './domain/market-data/commodity/index.js'
 import { createEquityTools } from './tool/equity.js'
@@ -54,27 +50,12 @@ import { createNewsArchiveTools } from './tool/news.js'
 
 // ==================== Persistence paths ====================
 
-const BRAIN_FILE = resolve('data/brain/commit.json')
-
-const FRONTAL_LOBE_FILE = resolve('data/brain/frontal-lobe.md')
 const PERSONA_FILE = resolve('data/brain/persona.md')
 const PERSONA_DEFAULT = resolve('default/persona.default.md')
 const HEARTBEAT_FILE = resolve('data/brain/heartbeat.md')
 const HEARTBEAT_DEFAULT = resolve('default/heartbeat.default.md')
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
-
-/** Render a timestamp as "Nm ago" / "Nh ago" / "Nd ago" for prompt injection. */
-function formatRelativeAge(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime()
-  if (diffMs < 60_000) return 'just now'
-  const mins = Math.floor(diffMs / 60_000)
-  if (mins < 60) return `${mins}m ago`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  return `${days}d ago`
-}
 
 /** Read a file, copying from default if it doesn't exist yet. */
 async function readWithDefault(target: string, defaultFile: string): Promise<string> {
@@ -126,42 +107,18 @@ async function main() {
     onPostReject: (id) => { snapshotService.takeSnapshot(id, 'post-reject') },
   })
 
-  // ==================== Brain ====================
-
-  const [brainExport] = await Promise.all([
-    readFile(BRAIN_FILE, 'utf-8').then((r) => JSON.parse(r) as BrainExportState).catch(() => undefined),
+  // ==================== Persona ====================
+  // Persona + heartbeat default files are seeded on first run so the user
+  // has editable overrides to point their config at.
+  await Promise.all([
     readWithDefault(PERSONA_FILE, PERSONA_DEFAULT),
     readWithDefault(HEARTBEAT_FILE, HEARTBEAT_DEFAULT),
   ])
 
-  const brainDir = resolve('data/brain')
-  const brainOnCommit = async (state: BrainExportState) => {
-    await mkdir(brainDir, { recursive: true })
-    await writeFile(BRAIN_FILE, JSON.stringify(state, null, 2))
-    await writeFile(FRONTAL_LOBE_FILE, state.state.frontalLobe)
-  }
-
-  const brain = brainExport
-    ? Brain.restore(brainExport, { onCommit: brainOnCommit })
-    : new Brain({ onCommit: brainOnCommit })
-
-  /** Re-read persona from disk + live frontal-lobe note on each request.
-   *  Frames the note as "you wrote this Nh ago" rather than "current state"
-   *  — the time-distance cue stops her from treating a stale note as
-   *  ground truth. */
+  /** Re-read persona from disk on each request so live edits in the
+   *  Settings UI take effect without a restart. */
   const getInstructions = async () => {
-    const persona = await readFile(PERSONA_FILE, 'utf-8').catch(() => '')
-    const { content, updatedAt } = brain.getFrontalLobeMeta()
-    if (!content) return persona
-    const age = updatedAt ? formatRelativeAge(updatedAt) : 'at some point'
-    return [
-      persona,
-      '---',
-      '## Notes you wrote to yourself',
-      `_(written ${age})_`,
-      '',
-      content,
-    ].join('\n')
+    return await readFile(PERSONA_FILE, 'utf-8').catch(() => '')
   }
 
   // ==================== Cron ====================
@@ -236,8 +193,6 @@ async function main() {
     'trading',
   )
 
-  toolCenter.register(createBrainTools(brain), 'brain')
-  toolCenter.register(createBrowserTools(), 'browser')
   toolCenter.register(createCronTools(cronEngine), 'cron')
   toolCenter.register(createMarketSearchTools(marketSearch), 'market-search')
   toolCenter.register(createEquityTools(equityClient), 'equity')

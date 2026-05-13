@@ -32,7 +32,6 @@ export function UrlAdopter() {
         {/* Activities */}
         <Route path="/chat" element={<AdoptStatic spec={{ kind: 'chat', params: { channelId: 'default' } }} />} />
         <Route path="/chat/:channelId" element={<AdoptChat />} />
-        <Route path="/diary" element={<AdoptStatic spec={{ kind: 'diary', params: {} }} />} />
         <Route path="/portfolio" element={<AdoptStatic spec={{ kind: 'portfolio', params: {} }} />} />
         <Route path="/automation" element={<Navigate to="/automation/flow" replace />} />
         <Route path="/automation/:section" element={<AdoptAutomation />} />

@@ -37,7 +37,7 @@ interface NavLeaf {
    *
    * - **Set**: clicking the icon both reveals the sidebar AND opens (or
    *   focuses) this tab. Used for activities with a meaningful default
-   *   landing page — e.g. Portfolio's Overview, Diary, News, Automation.
+   *   landing page — e.g. Portfolio's Overview, News, Automation.
    * - **Omitted**: sidebar-only activity. Click reveals the sidebar; tabs
    *   are created from sidebar interactions. Used when there's no canonical
    *   "all of X" view (Chat, Settings, Dev) or no tab at all (Trading-as-Git).

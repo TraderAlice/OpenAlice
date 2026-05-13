@@ -119,9 +119,7 @@ src/
 │   ├── market.ts              # Symbol search tools (uses domain/market-data)
 │   ├── analysis.ts            # Indicator calculation tools (uses domain/analysis)
 │   ├── news.ts                # News archive tools (uses domain/news)
-│   ├── brain.ts               # Cognition tools (uses domain/brain)
-│   ├── thinking.ts            # Reasoning tools (uses domain/thinking)
-│   └── browser.ts             # Browser automation tools (wraps openclaw)
+│   └── thinking.ts            # Reasoning tools (uses domain/thinking)
 ├── connectors/
 │   ├── web/                   # Web UI (Hono, SSE streaming, sub-channels)
 │   ├── telegram/              # Telegram bot (grammY)
@@ -131,8 +129,7 @@ src/
 ├── task/
 │   ├── cron/                  # Cron scheduling
 │   └── heartbeat/             # Periodic heartbeat
-├── skills/                    # Agent skill definitions
-└── openclaw/                  # ⚠️ Frozen — DO NOT MODIFY
+└── skills/                    # Agent skill definitions
 ```
 
 ## Key Architecture

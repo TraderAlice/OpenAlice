@@ -225,7 +225,7 @@ export function isExternalEventType(type: string): boolean {
 
 // ==================== Runtime Validation ====================
 
-// Ajv ESM interop (same pattern as openclaw/gateway/protocol)
+// Ajv ESM interop — package's default export is on `.default` under ESM
 const ajv = new (AjvPkg as unknown as new (opts?: object) => import('ajv').default)({
   allErrors: true,
   strict: false,
