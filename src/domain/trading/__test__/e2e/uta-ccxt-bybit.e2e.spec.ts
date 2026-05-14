@@ -178,4 +178,40 @@ describe('UTA — Bybit demo (ETH perp)', () => {
     const fullCommit = uta!.show(result.hash)
     expect(fullCommit!.results[0].error).toBe('Rejected by user')
   }, 15_000)
+
+  // Regression: 2026-05-13 — UNSET_DECIMAL (2^127-1) leaked from Order's
+  // class defaults through TradingGit's wire path into PushApprovalPanel
+  // as "BUY 0.0005 BTC/USDT MKT @ 1.7e38". The unit-level fix lives in
+  // OrderHelper.toWire; this e2e ensures the projection survives a real
+  // broker round-trip (stage → push → sync → show).
+  it('sentinel never crosses status/show/exportState boundary on MKT order', async () => {
+    const SENTINEL_LITERAL = '170141183460469231731687303715884105727'
+
+    uta!.stagePlaceOrder({ aliceId: ethAliceId, action: 'BUY', orderType: 'MKT', totalQuantity: '0.01' })
+
+    // Pre-commit staging: sentinel must already be gone.
+    const status = uta!.status()
+    expect(JSON.stringify(status)).not.toContain(SENTINEL_LITERAL)
+
+    uta!.commit('e2e: sentinel boundary')
+    const pushResult = await uta!.push()
+    expect(pushResult.submitted).toHaveLength(1)
+
+    // Post-push: show + exportState + log must all be sentinel-free.
+    const head = uta!.status().head!
+    const shown = uta!.show(head)
+    const exported = uta!.exportGitState()
+    const logged = uta!.log({ limit: 5 })
+    for (const blob of [shown, exported, logged]) {
+      expect(JSON.stringify(blob)).not.toContain(SENTINEL_LITERAL)
+    }
+
+    // Clean up: close the position so the test is idempotent.
+    if (pushResult.submitted[0].status === 'submitted') {
+      await uta!.sync({ delayMs: 3000 })
+    }
+    uta!.stageClosePosition({ aliceId: ethAliceId, qty: '0.01' })
+    uta!.commit('e2e: close sentinel-boundary position')
+    await uta!.push()
+  }, 30_000)
 })
