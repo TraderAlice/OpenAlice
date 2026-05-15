@@ -1,0 +1,6 @@
+{
+  "displayName": "Finance Research",
+  "groupOrder": 30,
+  "description": "Finance research workspace bundling himself65/finance-skills (yfinance market data, valuation, earnings, social readers, sentiment). SKILL.md files copied into project-local .claude/skills/ and .agents/skills/ — discovered natively by Claude Code AND Codex. Cloned fresh from upstream on each workspace creation; user-global state untouched.",
+  "defaultAgents": ["claude", "codex"]
+}

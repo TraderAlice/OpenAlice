@@ -79,10 +79,8 @@ git checkout -b "autoresearch/$TAG" >/dev/null
 # `.codex/auth.json`), the per-clone exclude keeps those secrets out of any
 # push to upstream Auto-Quant. Claude itself auto-ignores its file; this
 # entry is defense-in-depth.
-{
-  echo '.claude/settings.local.json'
-  echo '.codex/auth.json'
-} >> .git/info/exclude
+source "$(dirname "${BASH_SOURCE[0]}")/../_common.sh"
+setup_git_excludes
 
 # 3. user_data/data is a real per-workspace directory. Auto-Quant's
 #    `.gitignore` already excludes `user_data/data/`, so prepare.py's output
