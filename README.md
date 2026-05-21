@@ -294,6 +294,42 @@ Native `cmd.exe` / PowerShell alone are not supported (no `bash`, no POSIX utili
 
 Note: we don't currently dogfood OpenAlice on Windows, so the broader experience (PTY rendering, file watching, paths with spaces) may have rough edges. Bug reports very welcome.
 
+## Run on a server (Docker)
+
+For self-hosting on a VPS or always-on box. The image bundles `claude` and
+`codex` CLIs — no host install needed.
+
+```bash
+git clone https://github.com/TraderAlice/OpenAlice.git
+cd OpenAlice
+docker compose up -d --build
+```
+
+First-time auth (one-shot — credentials persist in the data volume so the
+container can be rebuilt without losing them):
+
+```bash
+docker exec -it openalice claude        # OAuth: paste URL into any browser
+docker exec -it openalice codex login   # same dance for codex
+```
+
+Then open `http://<your-server>:47331` in a browser.
+
+**Notes**
+
+- All state — config, workspaces, claude/codex credentials, logs — lives in
+  the `openalice-data` named volume. `docker compose down -v` is the
+  factory reset.
+- Already have claude/codex auth on the host? Skip the `docker exec` step
+  by uncommenting the bind-mount lines in `docker-compose.yml` to reuse
+  your local `~/.claude` and `~/.codex`.
+- The MCP server (port 47332) is intentionally **not** exposed externally;
+  it's consumed by the CLIs running inside the container only.
+- The base image is `node:22-trixie-slim` (Debian 13) because several
+  native deps (notably `longbridge`) ship glibc 2.39 binaries that older
+  Debians don't have, and workspace bootstrap scripts need `bash` + POSIX
+  utils. Alpine doesn't qualify on either count (musl libc, no bash).
+
 ## Configuration
 
 All config lives in `data/config/` as JSON files with Zod validation. Missing files fall back to sensible defaults. You can edit these files directly or use the Web UI.
