@@ -6,8 +6,9 @@ import { readFile } from 'node:fs/promises'
 import type { ConnectorCenter } from '@/core/connector-center.js'
 import { getActiveEntries } from '@/core/compaction.js'
 import { toTextHistory, type SessionEntry } from '@/core/session.js'
+import { dataPath } from '@/core/paths.js'
 
-const DEFAULT_SESSIONS_DIR = join(process.cwd(), 'data', 'sessions')
+const DEFAULT_SESSIONS_DIR = dataPath('sessions')
 
 /**
  * Create session awareness tools — cross-session visibility for the AI.

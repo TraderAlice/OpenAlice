@@ -1,9 +1,10 @@
 import { Hono } from 'hono'
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { dirname } from 'node:path'
+import { dataPath, defaultPath } from '@/core/paths.js'
 
-const PERSONA_FILE = 'data/brain/persona.md'
-const PERSONA_DEFAULT = 'default/persona.default.md'
+const PERSONA_FILE = dataPath('brain', 'persona.md')
+const PERSONA_DEFAULT = defaultPath('persona.default.md')
 
 /** Persona routes: GET / (read), PUT / (write) */
 export function createPersonaRoutes() {

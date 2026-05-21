@@ -19,9 +19,10 @@ import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Migration, MigrationContext, ConfigMeta } from './types.js'
 import { REGISTRY } from './registry.js'
+import { dataPath } from '@/core/paths.js'
 
-const CONFIG_DIR = resolve('data/config')
-const BACKUP_DIR = resolve('data/_backup')
+const CONFIG_DIR = dataPath('config')
+const BACKUP_DIR = dataPath('_backup')
 const META_FILENAME = '_meta.json'
 
 // ==================== App version ====================

@@ -58,6 +58,20 @@ app.whenReady().then(async () => {
   // → dist/main.js. So one level up from __dirname is the backend entry.
   const backendEntry = resolve(__dirname, '..', 'main.js')
 
+  // Two homes — user data vs app resources. See src/core/paths.ts for why
+  // they're split. Only inject in packaged builds: in dev (pnpm electron:
+  // dev with app.isPackaged === false) the backend should fall back to
+  // process.cwd() so contributors see their working repo state, same as
+  // `pnpm dev`.
+  const homeEnv = app.isPackaged
+    ? {
+        // ~/Library/Application Support/<productName>/ on macOS
+        OPENALICE_HOME: app.getPath('userData'),
+        // .app/Contents/Resources/ — sibling of app.asar
+        OPENALICE_APP_HOME: dirname(app.getAppPath()),
+      }
+    : {}
+
   backend = spawn(process.execPath, [backendEntry], {
     env: {
       ...process.env,
@@ -73,6 +87,7 @@ app.whenReady().then(async () => {
       // bare `node dist/main.js`. Today nothing reads this; future
       // graceful-shutdown / update-flow code can branch on it.
       OPENALICE_LAUNCHER: 'electron',
+      ...homeEnv,
     },
     stdio: 'inherit',
   })

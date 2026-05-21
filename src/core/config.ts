@@ -3,13 +3,14 @@ import { readFile, writeFile, mkdir, unlink, rm } from 'fs/promises'
 import { resolve } from 'path'
 import { newsCollectorSchema } from '../domain/news/config.js'
 import { runMigrations } from '../migrations/runner.js'
+import { dataPath } from '@/core/paths.js'
 import {
   inferVendor as inferVendorFromProfile,
   inferAuthType as inferAuthTypeFromProfile,
   hasExtractableCredential,
 } from './credential-inference.js'
 
-const CONFIG_DIR = resolve('data/config')
+const CONFIG_DIR = dataPath('config')
 
 // ==================== Individual Schemas ====================
 

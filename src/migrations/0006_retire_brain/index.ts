@@ -18,11 +18,11 @@
  */
 
 import { rm } from 'node:fs/promises'
-import { resolve } from 'node:path'
 import type { Migration } from '../types.js'
+import { dataPath } from '@/core/paths.js'
 
-const COMMIT_FILE = resolve('data/brain/commit.json')
-const FRONTAL_LOBE_FILE = resolve('data/brain/frontal-lobe.md')
+const COMMIT_FILE = dataPath('brain', 'commit.json')
+const FRONTAL_LOBE_FILE = dataPath('brain', 'frontal-lobe.md')
 
 /**
  * Delete the two brain-state files. Exported so the spec can drive

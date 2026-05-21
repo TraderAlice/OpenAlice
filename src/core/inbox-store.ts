@@ -28,7 +28,8 @@
 
 import { randomUUID } from 'node:crypto'
 import { readFile, appendFile, mkdir, writeFile, rename } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { dirname } from 'node:path'
+import { dataPath } from '@/core/paths.js'
 import { EventEmitter } from 'node:events'
 
 /** Pointer to a workspace file. Rendered live at view time. */
@@ -71,7 +72,7 @@ export interface IInboxStore {
   onRemoved(listener: (id: string) => void): () => void
 }
 
-const INBOX_FILE = join(process.cwd(), 'data', 'inbox', 'entries.jsonl')
+const INBOX_FILE = dataPath('inbox', 'entries.jsonl')
 
 // ==================== Validation ====================
 

@@ -2,9 +2,10 @@ import { Hono } from 'hono'
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import type { EngineContext } from '../../core/types.js'
+import { dataPath, defaultPath } from '@/core/paths.js'
 
-const PROMPT_FILE = 'data/brain/heartbeat.md'
-const PROMPT_DEFAULT = 'default/heartbeat.default.md'
+const PROMPT_FILE = dataPath('brain', 'heartbeat.md')
+const PROMPT_DEFAULT = defaultPath('heartbeat.default.md')
 
 /** Heartbeat routes: GET /status, POST /trigger, PUT /enabled, GET/PUT /prompt-file */
 export function createHeartbeatRoutes(ctx: EngineContext) {

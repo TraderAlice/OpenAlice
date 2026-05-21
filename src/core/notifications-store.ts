@@ -23,7 +23,8 @@
 
 import { randomUUID } from 'node:crypto'
 import { readFile, appendFile, mkdir } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { dirname } from 'node:path'
+import { dataPath } from '@/core/paths.js'
 import { EventEmitter } from 'node:events'
 import type { MediaAttachment } from './types.js'
 
@@ -58,7 +59,7 @@ export interface INotificationsStore {
   onAppended(listener: (entry: NotificationEntry) => void): () => void
 }
 
-const NOTIFICATIONS_FILE = join(process.cwd(), 'data', 'sessions', 'notifications.jsonl')
+const NOTIFICATIONS_FILE = dataPath('sessions', 'notifications.jsonl')
 
 // ==================== JSONL store ====================
 

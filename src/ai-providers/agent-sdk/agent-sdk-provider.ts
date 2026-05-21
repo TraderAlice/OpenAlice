@@ -8,7 +8,7 @@
  * since both providers are backed by the same Claude Code CLI.
  */
 
-import { resolve } from 'node:path'
+import { dataPath } from '@/core/paths.js'
 import type { Tool } from 'ai'
 import type { ProviderResult, ProviderEvent, AIProvider, GenerateOpts } from '../types.js'
 import type { SessionEntry } from '../../core/session.js'
@@ -34,7 +34,7 @@ export class AgentSdkProvider implements AIProvider {
     return {
       ...agent.claudeCode,
       evolutionMode: agent.evolutionMode,
-      cwd: agent.evolutionMode ? process.cwd() : resolve('data/brain'),
+      cwd: agent.evolutionMode ? process.cwd() : dataPath('brain'),
     }
   }
 

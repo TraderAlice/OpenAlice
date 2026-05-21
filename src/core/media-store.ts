@@ -10,6 +10,7 @@ import { createHash } from 'node:crypto'
 import { readFile, copyFile, mkdir } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { extname, join } from 'node:path'
+import { dataPath } from '@/core/paths.js'
 
 /** 256 short, common English words — one per byte value. */
 const WORDS = [
@@ -41,7 +42,7 @@ const WORDS = [
   'ski','sky','sly','sob','sod','son',
 ] as const
 
-const MEDIA_DIR = join(process.cwd(), 'data', 'media')
+const MEDIA_DIR = dataPath('media')
 
 /** YYYY-MM-DD date folder for today. */
 function datePath(): string {

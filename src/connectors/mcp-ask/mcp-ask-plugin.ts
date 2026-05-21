@@ -17,7 +17,8 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
 import { z } from 'zod'
 import { glob } from 'node:fs/promises'
-import { join, basename } from 'node:path'
+import { basename } from 'node:path'
+import { dataPath } from '@/core/paths.js'
 import type { Plugin, EngineContext } from '../../core/types.js'
 import { SessionStore, toTextHistory } from '../../core/session.js'
 import { McpAskConnector } from './mcp-ask-connector.js'
@@ -76,7 +77,7 @@ export class McpAskPlugin implements Plugin {
         'List all mcp-ask sessions.',
         {},
         async () => {
-          const sessionsDir = join(process.cwd(), 'data', 'sessions')
+          const sessionsDir = dataPath('sessions')
           const sessions: Array<{ sessionId: string }> = []
           try {
             for await (const entry of glob(`${SESSION_PREFIX}__*.jsonl`, { cwd: sessionsDir })) {

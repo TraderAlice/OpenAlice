@@ -1,7 +1,8 @@
 import { readFile, writeFile, mkdir } from 'fs/promises'
-import { resolve, dirname } from 'path'
+import { dirname } from 'path'
 // Engine removed — AgentCenter is the top-level AI entry point
 import { loadConfig, readUTAsConfig, purgeEphemeralUTAs } from './core/config.js'
+import { dataPath, defaultPath } from '@/core/paths.js'
 import type { Plugin, EngineContext, ReconnectResult } from './core/types.js'
 import { McpPlugin } from './server/mcp.js'
 import { TelegramPlugin } from './connectors/telegram/index.js'
@@ -54,10 +55,10 @@ import { createNewsArchiveTools } from './tool/news.js'
 
 // ==================== Persistence paths ====================
 
-const PERSONA_FILE = resolve('data/brain/persona.md')
-const PERSONA_DEFAULT = resolve('default/persona.default.md')
-const HEARTBEAT_FILE = resolve('data/brain/heartbeat.md')
-const HEARTBEAT_DEFAULT = resolve('default/heartbeat.default.md')
+const PERSONA_FILE = dataPath('brain', 'persona.md')
+const PERSONA_DEFAULT = defaultPath('persona.default.md')
+const HEARTBEAT_FILE = dataPath('brain', 'heartbeat.md')
+const HEARTBEAT_DEFAULT = defaultPath('heartbeat.default.md')
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 

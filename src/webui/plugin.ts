@@ -2,7 +2,7 @@ import { Hono, type Context } from 'hono'
 import { cors } from 'hono/cors'
 import { serve } from '@hono/node-server'
 import { serveStatic } from '@hono/node-server/serve-static'
-import { resolve } from 'node:path'
+import { uiBundlePath } from '@/core/paths.js'
 import type { Plugin, EngineContext } from '../core/types.js'
 import type { ProducerHandle } from '../core/producer.js'
 import { SessionStore } from '../core/session.js'
@@ -176,7 +176,7 @@ export class WebPlugin implements Plugin {
     // `dist/ui/` — see ui/vite.config.ts for why (history: UI was added
     // after engine-only era and got an awkward `../dist/ui` outDir; now
     // that UI is first-class, the output lives in its own package).
-    const uiRoot = resolve('ui/dist')
+    const uiRoot = uiBundlePath()
     app.use('/*', serveStatic({ root: uiRoot }))
     app.get('*', serveStatic({ root: uiRoot, path: 'index.html' }))
 

@@ -14,7 +14,8 @@
  */
 
 import { readFile, writeFile, mkdir } from 'fs/promises'
-import { resolve, dirname } from 'path'
+import { dirname } from 'path'
+import { dataPath } from '@/core/paths.js'
 import type { EquityClientLike } from '../client/types.js'
 
 // ==================== Types ====================
@@ -38,7 +39,7 @@ interface CacheEnvelope {
 /** 免费 provider 列表 — 扩展时在这里加 */
 const SOURCES = ['sec'] as const
 
-const CACHE_FILE = resolve('data/cache/equity/symbols.json')
+const CACHE_FILE = dataPath('cache', 'equity', 'symbols.json')
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24 hours
 
 // ==================== SymbolIndex ====================

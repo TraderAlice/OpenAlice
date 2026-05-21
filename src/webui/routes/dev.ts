@@ -13,6 +13,7 @@
 import { Hono } from 'hono'
 import { readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
+import { dataPath } from '@/core/paths.js'
 import type { ConnectorCenter } from '../../core/connector-center.js'
 
 export function createDevRoutes(connectorCenter: ConnectorCenter) {
@@ -49,7 +50,7 @@ export function createDevRoutes(connectorCenter: ConnectorCenter) {
 
   /** List all session files (id + size). */
   app.get('/sessions', async (c) => {
-    const dir = join(process.cwd(), 'data', 'sessions')
+    const dir = dataPath('sessions')
     try {
       const files = await readdir(dir)
       const sessions = await Promise.all(

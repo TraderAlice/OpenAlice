@@ -21,6 +21,7 @@ import { randomUUID } from 'node:crypto'
 import { readFile, appendFile, mkdir } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { getActiveEntries } from './compaction.js'
+import { dataPath } from '@/core/paths.js'
 
 // ==================== Types ====================
 
@@ -81,7 +82,7 @@ export interface ISessionStore {
 
 // ==================== JSONL Session Store ====================
 
-const SESSIONS_DIR = join(process.cwd(), 'data', 'sessions')
+const SESSIONS_DIR = dataPath('sessions')
 
 export class SessionStore implements ISessionStore {
   private sessionId: string

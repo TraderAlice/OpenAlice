@@ -24,11 +24,12 @@
  */
 
 import { readFile, writeFile, mkdir, rename } from 'node:fs/promises'
-import { dirname, resolve } from 'node:path'
+import { dirname } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import type { Migration } from '../types.js'
+import { dataPath } from '@/core/paths.js'
 
-const DEFAULT_JOBS_PATH = resolve('data/cron/jobs.json')
+const DEFAULT_JOBS_PATH = dataPath('cron', 'jobs.json')
 
 interface RawJob {
   name: string
