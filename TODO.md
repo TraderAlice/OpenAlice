@@ -54,6 +54,20 @@ the item when done — git log is the history.
 
 ## Architecture
 
+- [ ] Consolidate vitest config structure. Currently 3 entry points
+      (`vitest.config.ts` for unit, `vitest.e2e.config.ts` for broker
+      e2e, `vitest.bbProvider.config.ts` for market-data integration)
+      each maintain their own `workspaceAliases` block — when the main
+      config switched to alias-based workspace resolution (commit
+      36468fc), the other two had to be patched separately (a95969b)
+      to fix the resulting bug. Plan: fold `*.bbProvider.spec.ts` into
+      the e2e config (same "real API + credentials + slow" shape, no
+      real reason for separation), drop `vitest.bbProvider.config.ts`,
+      drop `test:bbProvider` script, remove the `**/*.bbProvider.spec.*`
+      exclude from main config. End state: 2 configs, single
+      workspaceAliases definition shared (perhaps via a small helper
+      module imported by both).
+
 - [ ] `OrderRequest` discriminated union — long-term followup to the
       2026-05-14 OrderHelper boundary fix. Idea: introduce a domain-level
       intent type (`{ orderType: 'MKT'; ... } | { orderType: 'LMT';
