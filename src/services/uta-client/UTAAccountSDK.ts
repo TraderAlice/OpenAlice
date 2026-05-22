@@ -130,10 +130,15 @@ export class UTAAccountSDK {
       .then((r) => r.results.find((b) => b.id === this.id)?.results ?? [])
   }
 
-  // ==================== Reads (routes not yet on UTA) ====================
+  // ==================== Contract details ====================
 
-  getContractDetails(_query: Contract): Promise<ContractDetails | null> {
-    throw new NotImplementedInSDK('getContractDetails', 'GET /api/trading/uta/:id/contracts/details')
+  getContractDetails(query: Contract): Promise<ContractDetails | null> {
+    // The route accepts a `Contract`-shaped body and hydrates back into a
+    // Contract on the UTA side, so JSON-serializable fields ride along.
+    return this.client.post<ContractDetails | null>(
+      `/api/trading/uta/${encodeURIComponent(this.id)}/contracts/details`,
+      query,
+    )
   }
 
   // ==================== Git/wallet state ====================
@@ -179,21 +184,27 @@ export class UTAAccountSDK {
     )
   }
 
-  // ==================== Write / lifecycle (need new routes) ====================
+  // ==================== Write / lifecycle ====================
 
-  commit(_message: string): Promise<CommitPrepareResult> {
-    // Existing /wallet/place-order|close-position|cancel-order routes
-    // bundle stage→commit→push into one shot. Standalone commit (stage
-    // already happened, prep without push) needs its own route.
-    throw new NotImplementedInSDK('commit', 'POST /api/trading/uta/:id/wallet/commit')
+  commit(message: string): Promise<CommitPrepareResult> {
+    return this.client.post<CommitPrepareResult>(
+      `/api/trading/uta/${encodeURIComponent(this.id)}/wallet/commit`,
+      { message },
+    )
   }
 
-  sync(_opts?: { delayMs?: number }): Promise<SyncResult> {
-    throw new NotImplementedInSDK('sync', 'POST /api/trading/uta/:id/sync')
+  sync(opts?: { delayMs?: number }): Promise<SyncResult> {
+    return this.client.post<SyncResult>(
+      `/api/trading/uta/${encodeURIComponent(this.id)}/sync`,
+      opts ?? {},
+    )
   }
 
-  simulatePriceChange(_priceChanges: PriceChangeInput[]): Promise<SimulatePriceChangeResult> {
-    throw new NotImplementedInSDK('simulatePriceChange', 'POST /api/trading/uta/:id/simulate-price')
+  simulatePriceChange(priceChanges: PriceChangeInput[]): Promise<SimulatePriceChangeResult> {
+    return this.client.post<SimulatePriceChangeResult>(
+      `/api/trading/uta/${encodeURIComponent(this.id)}/simulate-price`,
+      { changes: priceChanges },
+    )
   }
 
   refreshCatalog(): Promise<void> {
