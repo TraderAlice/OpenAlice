@@ -30,6 +30,8 @@ export interface AutoTradingSchedulerConfig {
 export interface AutoTradingScheduler {
   start(): void
   stop(): void
+  /** Trigger one tick immediately, outside the schedule (used in tests). */
+  runNow(): Promise<void>
 }
 
 export function createAutoTradingScheduler(deps: {
@@ -70,9 +72,10 @@ export function createAutoTradingScheduler(deps: {
       if (row.all_clear) {
         currentClear.add(symbol)
         if (!prevAllClear.has(symbol)) {
+          const rawPrice = (row as Record<string, unknown>).price
           newlyClear.push({
             symbol,
-            price: (row as Record<string, unknown>).price as number,
+            price: typeof rawPrice === 'number' ? rawPrice : 0,
             stopLoss: row.suggested_stop_loss,
           })
         }
@@ -114,6 +117,9 @@ export function createAutoTradingScheduler(deps: {
     },
     stop() {
       pump.stop()
+    },
+    runNow() {
+      return pump.runNow()
     },
   }
 }
