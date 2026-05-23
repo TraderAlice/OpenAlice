@@ -54,8 +54,15 @@ export interface SpawnSpec {
 }
 
 export function spawnChild(spec: SpawnSpec): ChildProcess {
-  const child = spawn(spec.command, spec.args, {
+  // On Windows, node_modules/.bin entries are .CMD shims — spawn() without
+  // shell:true can't find them. Combine command+args into one string so
+  // cmd.exe resolves .CMD correctly without triggering DEP0190 (args concat warning).
+  const isWin = process.platform === 'win32'
+  const shellCmd = isWin ? [spec.command, ...spec.args].join(' ') : spec.command
+  const shellArgs = isWin ? [] : spec.args
+  const child = spawn(shellCmd, shellArgs, {
     env: spec.env,
+    shell: isWin,
     stdio: spec.prefixLogs ? ['inherit', 'pipe', 'pipe'] : 'inherit',
   } satisfies SpawnOptions)
 

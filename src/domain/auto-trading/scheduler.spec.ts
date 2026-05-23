@@ -44,7 +44,7 @@ describe('AutoTradingScheduler', () => {
     snapshotPath = join(dir, 'market-snapshot.json')
     store = createMemoryNotificationsStore()
     connectorCenter = new ConnectorCenter({ notificationsStore: store })
-    eventLog = await createEventLog(join(dir, 'events.jsonl'))
+    eventLog = await createEventLog({ logPath: join(dir, 'events.jsonl') })
   })
 
   function makeScheduler() {
