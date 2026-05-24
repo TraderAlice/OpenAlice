@@ -7,11 +7,31 @@
 
 import { query as sdkQuery } from '@anthropic-ai/claude-agent-sdk'
 import type { McpSdkServerConfigWithInstance } from '@anthropic-ai/claude-agent-sdk'
-import { createWriteStream, mkdirSync } from 'node:fs'
+import { createWriteStream, mkdirSync, readdirSync, existsSync } from 'node:fs'
+import { join } from 'node:path'
 import { pino } from 'pino'
 import type { ContentBlock } from '../../core/session.js'
 
 // Config is now resolved via profile system — override carries all needed values
+
+/**
+ * Resolve the absolute path to the claude.exe binary on Windows.
+ * On POSIX returns undefined — claude is expected to be in PATH.
+ * Selects the latest versioned directory under %APPDATA%\Claude\claude-code\.
+ */
+function resolveClaudeExePath(): string | undefined {
+  if (process.platform !== 'win32') return undefined
+  const appData = process.env['APPDATA']
+  if (!appData) return undefined
+  const base = join(appData, 'Claude', 'claude-code')
+  try {
+    const entries = readdirSync(base) as string[]
+    const latest = entries.filter(e => /^\d/.test(e)).sort().at(-1)
+    if (!latest) return undefined
+    const candidate = join(base, latest, 'claude.exe')
+    return existsSync(candidate) ? candidate : undefined
+  } catch { return undefined }
+}
 
 const logger = pino({
   transport: { target: 'pino/file', options: { destination: 'logs/agent-sdk.log', mkdir: true } },
@@ -165,9 +185,9 @@ export async function askAgentSdk(
   const baseUrl = override?.baseUrl
   if (baseUrl) env.ANTHROPIC_BASE_URL = baseUrl
 
-  // Opt-in debug: set ALICE_SDK_DEBUG=1 to turn on the SDK's verbose stderr
-  // + capture every child-process stderr chunk into logs/agent-sdk-debug.log.
-  // This is what surfaces the actual outbound HTTP URLs the CLI hits.
+  // stderr is always captured into a buffer so it shows up in error messages.
+  // Set ALICE_SDK_DEBUG=1 to additionally enable the SDK's verbose debug logs
+  // and write every stderr chunk to logs/agent-sdk-debug.log.
   const debugEnabled = process.env.ALICE_SDK_DEBUG === '1'
   let debugStream: ReturnType<typeof createWriteStream> | null = null
   if (debugEnabled) {
@@ -180,6 +200,13 @@ export async function askAgentSdk(
     )
   }
 
+  // Always collect stderr so we can surface it in error messages.
+  const stderrChunks: string[] = []
+  const stderrCapture = (chunk: string): void => {
+    stderrChunks.push(chunk)
+    debugStream?.write(chunk)
+  }
+
   // MCP servers
   const mcpServers: Record<string, any> = {}
   if (mcpServer) {
@@ -189,6 +216,16 @@ export async function askAgentSdk(
   const messages: AgentSdkMessage[] = []
   let resultText = ''
   let ok = true
+
+  // On Windows, resolve the full path to claude.exe so the SDK doesn't have
+  // to rely on PATH. On POSIX, leave undefined (PATH lookup is reliable).
+  const claudeExePath = resolveClaudeExePath()
+  if (claudeExePath) {
+    logger.info({ claudeExePath }, 'resolved claude.exe path')
+    console.info(`[agent-sdk] using claude.exe: ${claudeExePath}`)
+  } else if (process.platform === 'win32') {
+    console.warn('[agent-sdk] claude.exe not found in AppData — relying on PATH')
+  }
 
   try {
     for await (const event of sdkQuery({
@@ -205,8 +242,9 @@ export async function askAgentSdk(
         permissionMode: 'bypassPermissions',
         allowDangerouslySkipPermissions: true,
         persistSession: false,
+        ...(claudeExePath ? { pathToClaudeCodeExecutable: claudeExePath } : {}),
         ...(loginMethod === 'claudeai' ? { forceLoginMethod: 'claudeai' as const } : {}),
-        ...(debugStream ? { stderr: (chunk: string) => debugStream!.write(chunk) } : {}),
+        stderr: stderrCapture,
       },
     })) {
       // assistant message — extract tool_use + text blocks
@@ -295,9 +333,12 @@ export async function askAgentSdk(
   } catch (err) {
     // Extract as much detail as possible from the error
     const errObj = err instanceof Error ? err : new Error(String(err))
+    // Merge captured stderr into the error object for logging
+    const capturedStderr = stderrChunks.join('').trim() || undefined
     const details: Record<string, unknown> = {
       message: errObj.message,
       stack: errObj.stack,
+      ...(capturedStderr ? { capturedStderr } : {}),
     }
     // SDK errors may carry stderr/stdout/cause as extra properties
     for (const key of ['stderr', 'stdout', 'cause', 'code', 'signal'] as const) {
@@ -307,7 +348,11 @@ export async function askAgentSdk(
     const extraKeys = Object.keys(errObj).filter(k => !(k in details))
     for (const k of extraKeys) details[k] = (errObj as any)[k]
 
-    const classification = classifyError(details)
+    const classification = classifyError({
+      ...details,
+      message: capturedStderr ?? errObj.message,
+      stderr: capturedStderr,
+    })
     logger.error({ ...details, classification }, 'query_error')
     if (classification === 'auth') {
       // User-fixable: don't scream, just hint. Full detail already in logs/agent-sdk.log.
@@ -318,7 +363,7 @@ export async function askAgentSdk(
       console.error('[agent-sdk] Claude Code process error:', details)
     }
     ok = false
-    const stderrHint = details.stderr ? `\nstderr: ${details.stderr}` : ''
+    const stderrHint = capturedStderr ? `\nstderr: ${capturedStderr}` : ''
     resultText = `Agent SDK error: ${errObj.message}${stderrHint}`
   } finally {
     debugStream?.end()

@@ -49,6 +49,7 @@ import { createListenerRegistry } from './core/listener-registry.js'
 import { createEventBus } from './core/event-bus.js'
 import { createCronEngine, createCronListener, createCronTools } from './task/cron/index.js'
 import { createHeartbeat } from './task/heartbeat/index.js'
+import { createAutoTradingScheduler } from './domain/auto-trading/scheduler.js'
 import { createMetricsListener } from './task/metrics/index.js'
 import { createAgentWorkListener } from './core/agent-work-listener.js'
 import { NewsCollectorStore, NewsCollector } from './domain/news/index.js'
@@ -296,6 +297,18 @@ async function main() {
     console.log(`heartbeat: enabled (every ${config.heartbeat.every})`)
   }
 
+  // ==================== Auto-trading Scheduler (Pump-driven, Phase 1) ====================
+
+  const autoTradingScheduler = createAutoTradingScheduler({
+    config: config.autoTrading,
+    connectorCenter,
+    eventLog,
+  })
+  autoTradingScheduler.start()
+  if (config.autoTrading.enabled) {
+    console.log(`auto-trading: enabled (every ${config.autoTrading.tickEvery}, snapshot: ${config.autoTrading.marketSnapshotPath})`)
+  }
+
   // ==================== Event Metrics (wildcard observer) ====================
 
   const metricsListener = createMetricsListener({ registry: listenerRegistry })
@@ -452,6 +465,7 @@ async function main() {
     stopped = true
     newsCollector?.stop()
     heartbeat.stop()
+    autoTradingScheduler.stop()
     metricsListener.stop()
     cronListener.stop()
     cronEngine.stop()
