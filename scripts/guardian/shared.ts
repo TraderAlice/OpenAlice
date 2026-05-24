@@ -21,7 +21,8 @@
 import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { watch, mkdir } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { existsSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { probeFreePort } from '../probe-port.js'
 
 export interface GuardianPorts {
@@ -53,16 +54,27 @@ export interface SpawnSpec {
   prefixLogs: boolean
 }
 
+/**
+ * Resolve a bare command name to the full path of its node_modules/.bin shim.
+ * On Windows returns the .cmd path; on POSIX returns the symlink path.
+ * Falls back to the original command name if not found.
+ */
+function resolveLocalBin(command: string): string {
+  const ext = process.platform === 'win32' ? '.cmd' : ''
+  const candidate = join(process.cwd(), 'node_modules', '.bin', `${command}${ext}`)
+  return existsSync(candidate) ? candidate : command
+}
+
 export function spawnChild(spec: SpawnSpec): ChildProcess {
-  // On Windows, node_modules/.bin entries are .CMD shims — spawn() without
-  // shell:true can't find them. Combine command+args into one string so
-  // cmd.exe resolves .CMD correctly without triggering DEP0190 (args concat warning).
+  // On Windows, .CMD shims cannot be spawn()ed directly (EINVAL). We route
+  // through cmd.exe /c explicitly — this keeps stdio pipes intact unlike
+  // the shell:true shorthand, which silently drops child stdout on Windows.
   const isWin = process.platform === 'win32'
-  const shellCmd = isWin ? [spec.command, ...spec.args].join(' ') : spec.command
-  const shellArgs = isWin ? [] : spec.args
-  const child = spawn(shellCmd, shellArgs, {
+  const resolved = resolveLocalBin(spec.command)
+  const spawnCmd = isWin ? 'cmd.exe' : resolved
+  const spawnArgs = isWin ? ['/c', resolved, ...spec.args] : spec.args
+  const child = spawn(spawnCmd, spawnArgs, {
     env: spec.env,
-    shell: isWin,
     stdio: spec.prefixLogs ? ['inherit', 'pipe', 'pipe'] : 'inherit',
   } satisfies SpawnOptions)
 

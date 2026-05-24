@@ -15,6 +15,7 @@
  */
 
 import { resolve } from 'node:path'
+import { readdirSync } from 'node:fs'
 import type { ChildProcess } from 'node:child_process'
 import {
   probePorts,
@@ -39,10 +40,30 @@ async function main(): Promise<void> {
   console.log(`[guardian] flag     →  ${flagPath}`)
   console.log('')
 
+  // On Windows, the Claude Code CLI (claude.exe) lives in a versioned AppData
+  // subdirectory that isn't on the system PATH. Agent SDK spawns `claude` as a
+  // subprocess, so we inject the directory here so every child process can find it.
+  const claudeCodeDir =
+    process.platform === 'win32' && process.env['APPDATA']
+      ? (() => {
+          const base = `${process.env['APPDATA']}\\Claude\\claude-code`
+          try {
+            const entries = readdirSync(base) as string[]
+            const latest = entries.filter((e) => /^\d/.test(e)).sort().at(-1)
+            return latest ? `${base}\\${latest}` : undefined
+          } catch {
+            return undefined
+          }
+        })()
+      : undefined
+
   const baseEnv = {
     ...process.env,
     NODE_OPTIONS: `${process.env['NODE_OPTIONS'] ?? ''} --conditions=openalice-source`.trim(),
     OPENALICE_USER_DATA_HOME: dataHome,
+    ...(claudeCodeDir
+      ? { PATH: `${claudeCodeDir}${process.platform === 'win32' ? ';' : ':'}${process.env['PATH'] ?? ''}` }
+      : {}),
   }
 
   // ── UTA spec (re-used by Guardian for restart) ────────────
