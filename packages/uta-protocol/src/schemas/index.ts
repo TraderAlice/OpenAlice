@@ -7,5 +7,25 @@
  * lifts each route.
  */
 
-export {}
+import { z } from 'zod'
+
+const guardConfigSchema = z.object({
+  type: z.string(),
+  options: z.record(z.string(), z.unknown()).default({}),
+})
+
+export const utaConfigSchema = z.object({
+  id: z.string(),
+  label: z.string().optional(),
+  presetId: z.string(),
+  enabled: z.boolean().default(true),
+  guards: z.array(guardConfigSchema).default([]),
+  presetConfig: z.record(z.string(), z.unknown()).default({}),
+  ephemeral: z.boolean().optional(),
+}).refine((u) => u.ephemeral !== true || u.presetId === 'mock-simulator', {
+  message: 'ephemeral: true is only allowed on mock-simulator UTAs (would destroy real broker history at next boot)',
+  path: ['ephemeral'],
+})
+
+export type UTAConfig = z.infer<typeof utaConfigSchema>
 

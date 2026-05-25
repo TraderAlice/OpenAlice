@@ -315,44 +315,10 @@ export type WebChannel = z.infer<typeof webSubchannelSchema>
 
 // ==================== UTA Config ====================
 
-const guardConfigSchema = z.object({
-  type: z.string(),
-  options: z.record(z.string(), z.unknown()).default({}),
-})
-
-/**
- * One Unified Trading Account. The user-facing concept — one preset
- * (OKX, Bybit, IBKR, …) plus credentials, guards, and an enabled flag.
- *
- * Distinct from `AccountInfo` (which is broker-side: cash, equity,
- * margin returned by `IBroker.getAccount()`). Two different "account"s.
- */
-export const utaConfigSchema = z.object({
-  id: z.string(),
-  label: z.string().optional(),
-  /** Broker preset id — resolves to engine + form schema via BROKER_PRESET_CATALOG. */
-  presetId: z.string(),
-  enabled: z.boolean().default(true),
-  guards: z.array(guardConfigSchema).default([]),
-  /** User-filled form values, validated against the preset's own zodSchema. */
-  presetConfig: z.record(z.string(), z.unknown()).default({}),
-  /**
-   * Test/throwaway UTA — purged at every server startup (config entry
-   * removed + `data/trading/<id>/` wiped) and dropped immediately when
-   * deleted via the UTA-config DELETE endpoint. For fixture-based testing:
-   * each session starts from a clean slate, no cross-session cost-basis
-   * pollution. Only allowed on `mock-simulator` preset; setting it on a
-   * real broker would silently destroy account history on next boot.
-   */
-  ephemeral: z.boolean().optional(),
-}).refine((u) => u.ephemeral !== true || u.presetId === 'mock-simulator', {
-  message: 'ephemeral: true is only allowed on mock-simulator UTAs (would destroy real broker history at next boot)',
-  path: ['ephemeral'],
-})
+import { utaConfigSchema, type UTAConfig } from '@traderalice/uta-protocol'
+export { utaConfigSchema, UTAConfig }
 
 export const utasFileSchema = z.array(utaConfigSchema)
-
-export type UTAConfig = z.infer<typeof utaConfigSchema>
 
 // ==================== Unified Config Type ====================
 
