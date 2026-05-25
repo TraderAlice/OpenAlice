@@ -26,6 +26,7 @@ Each workspace gets its own `user_data/data/`. First run, the agent runs `uv run
 ## Parameters
 
 - **Tag** — becomes the branch name (`autoresearch/<tag>`).
-- **Agents** — default Claude; Codex works too if you prefer.
+
+All available CLI runtimes are enabled (Claude, Codex, shell). The `+` new-session button defaults to Claude.
 
 Power-user override: set `AQ_TEMPLATE_DIR` in the launcher env to point at a pre-existing Auto-Quant clone (e.g. one you've already populated with data).

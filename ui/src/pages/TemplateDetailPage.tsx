@@ -16,13 +16,8 @@ import type { FormEvent } from 'react'
 import { MarkdownContent } from '../components/MarkdownContent'
 import { useWorkspaces } from '../contexts/WorkspacesContext'
 import { useWorkspace } from '../tabs/store'
-import {
-  createWorkspace,
-  fetchTemplateReadme,
-} from '../components/workspace/api'
-
-const TAG_HINT = 'a-z, 0-9, "-", "_", up to 33 chars'
-const TAG_RE = /^[a-z0-9][a-z0-9_-]{0,32}$/
+import { fetchTemplateReadme } from '../components/workspace/api'
+import { TAG_HINT, useCreateWorkspace } from '../hooks/useCreateWorkspace'
 
 interface Props {
   spec: { kind: 'template-detail'; params: { name: string } }
@@ -71,59 +66,30 @@ export function TemplateDetailPage({ spec }: Props) {
     }
   }, [templateName])
 
-  // Spawn form state — same shape as the sidebar's inline form, but laid
-  // out as a panel rather than a compact column.
-  const [tag, setTag] = useState('')
-  const [pickedAgents, setPickedAgents] = useState<Set<string> | null>(null)
-  const [creating, setCreating] = useState(false)
-  const [createError, setCreateError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
 
-  // Reset form state when the user navigates to a different template tab.
+  // Spawn form state — same shape as the sidebar's inline form, but laid
+  // out as a panel rather than a compact column.
+  const create = useCreateWorkspace({
+    template: template?.name ?? '',
+    templateDefaultAgents: template?.defaultAgents,
+    availableAgents: agents,
+    onCreated: (workspace) => {
+      refresh()
+      openOrFocus({ kind: 'workspace', params: { wsId: workspace.id } })
+    },
+  })
+
+  // Reset when the user navigates to a different template tab.
   useEffect(() => {
-    setTag('')
-    setPickedAgents(null)
-    setCreateError(null)
+    create.reset()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [templateName])
-
-  const checkedAgents: ReadonlySet<string> = useMemo(() => {
-    if (pickedAgents) return pickedAgents
-    return new Set(template?.defaultAgents ?? ['claude'])
-  }, [pickedAgents, template])
-
-  const toggleAgent = (id: string): void => {
-    setPickedAgents((prev) => {
-      const base = prev ?? new Set(template?.defaultAgents ?? ['claude'])
-      const next = new Set(base)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
 
   const submit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault()
     if (!template) return
-    const t = tag.trim()
-    if (!TAG_RE.test(t)) {
-      setCreateError(`invalid tag (${TAG_HINT})`)
-      return
-    }
-    if (checkedAgents.size === 0) {
-      setCreateError('pick at least one agent')
-      return
-    }
-    setCreating(true)
-    setCreateError(null)
-    const result = await createWorkspace(t, template.name, Array.from(checkedAgents))
-    setCreating(false)
-    if (result.ok) {
-      refresh()
-      openOrFocus({ kind: 'workspace', params: { wsId: result.workspace.id } })
-    } else {
-      const msg = result.error.message ?? result.error.error ?? `HTTP ${result.status}`
-      setCreateError(msg)
-    }
+    await create.submit()
   }
 
   if (!template) {
@@ -176,9 +142,9 @@ export function TemplateDetailPage({ spec }: Props) {
               ref={inputRef}
               type="text"
               placeholder="e.g. may1"
-              value={tag}
-              onChange={(e) => setTag(e.target.value)}
-              disabled={creating}
+              value={create.tag}
+              onChange={(e) => create.setTag(e.target.value)}
+              disabled={create.creating}
               spellCheck={false}
               autoCorrect="off"
               autoCapitalize="off"
@@ -187,36 +153,17 @@ export function TemplateDetailPage({ spec }: Props) {
             <p className="text-[11px] text-text-muted/70">{TAG_HINT}</p>
           </div>
 
-          {agents.length > 0 && (
-            <div className="space-y-1.5">
-              <div className="text-[11px] uppercase tracking-wider text-text-muted/70">Agents</div>
-              <div className="flex items-center gap-3 flex-wrap">
-                {agents.map((a) => (
-                  <label key={a.id} className="flex items-center gap-1.5 text-[12px] text-text" title={a.displayName}>
-                    <input
-                      type="checkbox"
-                      checked={checkedAgents.has(a.id)}
-                      onChange={() => toggleAgent(a.id)}
-                      disabled={creating}
-                    />
-                    <span>{a.id}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {createError && (
-            <div className="text-[12px] text-red">{createError}</div>
+          {create.error && (
+            <div className="text-[12px] text-red">{create.error}</div>
           )}
 
           <div className="flex items-center gap-3">
             <button
               type="submit"
-              disabled={creating || tag.length === 0}
+              disabled={create.creating || create.tag.length === 0}
               className="btn-primary"
             >
-              {creating ? 'Creating…' : 'Create workspace'}
+              {create.creating ? 'Creating…' : 'Create workspace'}
             </button>
           </div>
         </form>

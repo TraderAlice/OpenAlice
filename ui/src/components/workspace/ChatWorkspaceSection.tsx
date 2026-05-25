@@ -26,12 +26,11 @@ import { useWorkspaces } from '../../contexts/WorkspacesContext'
 import { useWorkspace } from '../../tabs/store'
 import { getFocusedTab } from '../../tabs/types'
 import { ConfirmDialog } from '../ConfirmDialog'
-import { createWorkspace, deleteWorkspace, type SessionRecord, type Workspace } from './api'
+import { deleteWorkspace, type SessionRecord, type Workspace } from './api'
 import { SessionRow } from './Sidebar'
+import { useCreateWorkspace } from '../../hooks/useCreateWorkspace'
 
 const CHAT_TEMPLATE = 'chat'
-const TAG_HINT = 'a-z, 0-9, "-", "_", up to 33 chars'
-const TAG_RE = /^[a-z0-9][a-z0-9_-]{0,32}$/
 
 function defaultTagFor(workspaces: readonly Workspace[]): string {
   const now = new Date()
@@ -63,32 +62,23 @@ export function ChatWorkspaceSection(): ReactElement | null {
   const chatTemplate = ctx.templates.find((t) => t.name === CHAT_TEMPLATE)
 
   const [showCreate, setShowCreate] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [tag, setTag] = useState('')
-  const [pickedAgents, setPickedAgents] = useState<Set<string> | null>(null)
-  const [createError, setCreateError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
   const [pendingDelete, setPendingDelete] = useState<Workspace | null>(null)
 
-  const checkedAgents: ReadonlySet<string> = useMemo(() => {
-    if (pickedAgents) return pickedAgents
-    return new Set(chatTemplate?.defaultAgents ?? ['claude'])
-  }, [pickedAgents, chatTemplate])
-
-  const toggleAgent = (id: string): void => {
-    setPickedAgents((prev) => {
-      const base = prev ?? new Set(chatTemplate?.defaultAgents ?? ['claude'])
-      const next = new Set(base)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
+  const create = useCreateWorkspace({
+    template: CHAT_TEMPLATE,
+    templateDefaultAgents: chatTemplate?.defaultAgents,
+    availableAgents: ctx.agents,
+    onCreated: (workspace) => {
+      closeCreate()
+      ctx.refresh()
+      openOrFocus({ kind: 'workspace', params: { wsId: workspace.id } })
+    },
+  })
 
   const openCreate = (): void => {
     setShowCreate(true)
-    setTag(defaultTagFor(ctx.workspaces))
-    setCreateError(null)
+    create.setTag(defaultTagFor(ctx.workspaces))
     // Focus + select on next paint so users can type to replace the
     // default in one keystroke.
     setTimeout(() => {
@@ -99,34 +89,12 @@ export function ChatWorkspaceSection(): ReactElement | null {
 
   const closeCreate = (): void => {
     setShowCreate(false)
-    setTag('')
-    setPickedAgents(null)
-    setCreateError(null)
+    create.reset()
   }
 
   const submit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault()
-    const t = tag.trim()
-    if (!TAG_RE.test(t)) {
-      setCreateError(`invalid tag (${TAG_HINT})`)
-      return
-    }
-    if (checkedAgents.size === 0) {
-      setCreateError('pick at least one agent')
-      return
-    }
-    setSubmitting(true)
-    setCreateError(null)
-    const result = await createWorkspace(t, CHAT_TEMPLATE, Array.from(checkedAgents))
-    setSubmitting(false)
-    if (result.ok) {
-      closeCreate()
-      ctx.refresh()
-      openOrFocus({ kind: 'workspace', params: { wsId: result.workspace.id } })
-    } else {
-      const msg = result.error.message ?? result.error.error ?? `HTTP ${result.status}`
-      setCreateError(msg)
-    }
+    await create.submit()
   }
 
   const handleConfirmDelete = async (): Promise<void> => {
@@ -140,10 +108,10 @@ export function ChatWorkspaceSection(): ReactElement | null {
   }
 
   useEffect(() => {
-    if (showCreate && tag === '' && chatTemplate) {
-      setTag(defaultTagFor(ctx.workspaces))
+    if (showCreate && create.tag === '' && chatTemplate) {
+      create.setTag(defaultTagFor(ctx.workspaces))
     }
-  }, [showCreate, tag, chatTemplate, ctx.workspaces])
+  }, [showCreate, create, chatTemplate, ctx.workspaces])
 
   if (!chatTemplate) return null
 
@@ -175,9 +143,9 @@ export function ChatWorkspaceSection(): ReactElement | null {
               ref={inputRef}
               type="text"
               placeholder="tag (e.g. may1)"
-              value={tag}
-              onChange={(e) => setTag(e.target.value)}
-              disabled={submitting}
+              value={create.tag}
+              onChange={(e) => create.setTag(e.target.value)}
+              disabled={create.creating}
               spellCheck={false}
               autoCorrect="off"
               autoCapitalize="off"
@@ -185,34 +153,14 @@ export function ChatWorkspaceSection(): ReactElement | null {
             />
             <button
               type="submit"
-              disabled={submitting || tag.length === 0}
+              disabled={create.creating || create.tag.length === 0}
               className="px-2.5 py-1 text-[12px] rounded bg-accent text-white disabled:opacity-40 hover:bg-accent/90"
             >
-              {submitting ? '…' : 'create'}
+              {create.creating ? '…' : 'create'}
             </button>
           </div>
-          {ctx.agents.length > 0 && (
-            <div className="flex flex-wrap gap-2 text-[11px] text-text-muted">
-              {ctx.agents.map((a) => (
-                <label
-                  key={a.id}
-                  className="flex items-center gap-1 cursor-pointer"
-                  title={a.displayName}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checkedAgents.has(a.id)}
-                    onChange={() => toggleAgent(a.id)}
-                    disabled={submitting}
-                    className="w-3 h-3"
-                  />
-                  <span>{a.id}</span>
-                </label>
-              ))}
-            </div>
-          )}
-          {createError && (
-            <div className="text-[11px] text-red">{createError}</div>
+          {create.error && (
+            <div className="text-[11px] text-red">{create.error}</div>
           )}
         </form>
       )}

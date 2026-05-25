@@ -1,18 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FormEvent, ReactElement } from 'react';
 import { Cpu, LayoutGrid, Library, Sparkles, Terminal, type LucideIcon } from 'lucide-react';
 
 import {
-  createWorkspace,
   deleteWorkspace,
   type AgentInfo,
   type SessionRecord,
   type TemplateInfo,
   type Workspace,
 } from './api';
-
-const TAG_HINT = 'a-z, 0-9, "-", "_", up to 33 chars';
-const TAG_RE = /^[a-z0-9][a-z0-9_-]{0,32}$/;
+import { useCreateWorkspace } from '../../hooks/useCreateWorkspace';
 
 export interface Selection {
   readonly wsId: string;
@@ -50,11 +47,7 @@ export interface SidebarProps {
 }
 
 export function Sidebar(props: SidebarProps): ReactElement {
-  const [creating, setCreating] = useState(false);
-  const [tag, setTag] = useState('');
   const [template, setTemplate] = useState<string>('');
-  const [pickedAgents, setPickedAgents] = useState<Set<string> | null>(null);
-  const [createError, setCreateError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -65,49 +58,19 @@ export function Sidebar(props: SidebarProps): ReactElement {
   }, [props.templates, template]);
 
   const selectedTemplate = props.templates.find((t) => t.name === template);
-  const checkedAgents: ReadonlySet<string> = useMemo(() => {
-    if (pickedAgents) return pickedAgents;
-    return new Set(selectedTemplate?.defaultAgents ?? ['claude']);
-  }, [pickedAgents, selectedTemplate]);
-
-  const toggleAgent = (id: string): void => {
-    setPickedAgents((prev) => {
-      const base = prev ?? new Set(selectedTemplate?.defaultAgents ?? ['claude']);
-      const next = new Set(base);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+  const create = useCreateWorkspace({
+    template,
+    templateDefaultAgents: selectedTemplate?.defaultAgents,
+    availableAgents: props.agents,
+    onCreated: (workspace) => {
+      props.onChanged();
+      props.onSelectWorkspace(workspace.id);
+    },
+  });
 
   const submit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
-    const t = tag.trim();
-    if (!TAG_RE.test(t)) {
-      setCreateError(`invalid tag (${TAG_HINT})`);
-      return;
-    }
-    if (template === '') {
-      setCreateError('no template selected');
-      return;
-    }
-    if (checkedAgents.size === 0) {
-      setCreateError('pick at least one agent');
-      return;
-    }
-    setCreating(true);
-    setCreateError(null);
-    const result = await createWorkspace(t, template, Array.from(checkedAgents));
-    setCreating(false);
-    if (result.ok) {
-      setTag('');
-      setPickedAgents(null);
-      props.onChanged();
-      props.onSelectWorkspace(result.workspace.id);
-    } else {
-      const msg = result.error.message ?? result.error.error ?? `HTTP ${result.status}`;
-      setCreateError(msg);
-    }
+    await create.submit();
   };
 
   const onDelete = async (id: string): Promise<void> => {
@@ -138,11 +101,8 @@ export function Sidebar(props: SidebarProps): ReactElement {
           <select
             className="sidebar-template-select"
             value={template}
-            onChange={(e) => {
-              setTemplate(e.target.value);
-              setPickedAgents(null);
-            }}
-            disabled={creating}
+            onChange={(e) => setTemplate(e.target.value)}
+            disabled={create.creating}
             title={selectedTemplate?.description ?? ''}
           >
             {props.templates.map((t) => (
@@ -156,33 +116,18 @@ export function Sidebar(props: SidebarProps): ReactElement {
           ref={inputRef}
           type="text"
           placeholder="tag (e.g. may1)"
-          value={tag}
-          onChange={(e) => setTag(e.target.value)}
-          disabled={creating}
+          value={create.tag}
+          onChange={(e) => create.setTag(e.target.value)}
+          disabled={create.creating}
           spellCheck={false}
           autoCorrect="off"
           autoCapitalize="off"
         />
-        <button type="submit" disabled={creating || tag.length === 0}>
-          {creating ? '…' : 'create'}
+        <button type="submit" disabled={create.creating || create.tag.length === 0}>
+          {create.creating ? '…' : 'create'}
         </button>
-        {props.agents.length > 0 && (
-          <div className="sidebar-create-agents">
-            {props.agents.map((a) => (
-              <label key={a.id} className="sidebar-agent-toggle" title={a.displayName}>
-                <input
-                  type="checkbox"
-                  checked={checkedAgents.has(a.id)}
-                  onChange={() => toggleAgent(a.id)}
-                  disabled={creating}
-                />
-                <span>{a.id}</span>
-              </label>
-            ))}
-          </div>
-        )}
       </form>
-      {createError && <div className="sidebar-error">{createError}</div>}
+      {create.error && <div className="sidebar-error">{create.error}</div>}
 
       <ul className="sidebar-list">
         {props.onOpenOverview && (
