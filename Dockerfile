@@ -37,7 +37,7 @@ RUN pnpm install --frozen-lockfile
 # Note: --filter excludes @traderalice/desktop (Electron app) which is not
 # needed for the server image and requires native dependencies.
 COPY . .
-RUN pnpm prebuild && pnpm turbo run build --filter='!@traderalice/desktop' && tsup src/main.ts --format esm --dts
+RUN pnpm prebuild && pnpm turbo run build --filter='!@traderalice/desktop' && pnpm exec tsup src/main.ts --format esm --dts
 
 # Strip dev deps before the runtime stage harvests node_modules. With
 # `electron` + `electron-builder` (each ~500MB) in devDependencies, this
