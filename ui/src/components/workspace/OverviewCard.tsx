@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ArrowUpCircle, ChevronRight, Cpu, GitBranch, ScrollText, Settings, Sparkles, Terminal, type LucideIcon } from 'lucide-react'
 import type { GitLogEntry, Workspace } from './api'
 
@@ -26,15 +27,15 @@ function AgentGlyph({ agent }: { agent: string }) {
   return <span aria-hidden="true" className="text-[11px] font-mono">·</span>
 }
 
-function relativeTime(ms: number): string {
+function relativeTime(t: any, ms: number): string {
   const diff = Math.max(0, Date.now() - ms)
   const m = Math.floor(diff / 60_000)
-  if (m < 1) return 'just now'
-  if (m < 60) return `${m}m ago`
+  if (m < 1) return t('common.justNow', 'just now')
+  if (m < 60) return t('common.minutesAgoShort', '{{count}}m ago', { count: m })
   const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ago`
+  if (h < 24) return t('common.hoursAgoShort', '{{count}}h ago', { count: h })
   const d = Math.floor(h / 24)
-  return `${d}d ago`
+  return t('common.daysAgoShort', '{{count}}d ago', { count: d })
 }
 
 interface Props {
@@ -60,6 +61,7 @@ export function OverviewCard({
   onConfigure,
   onOpenTemplate,
 }: Props) {
+  const { t } = useTranslation()
   const w = workspace
   const hasRunning = w.sessions.some((s) => s.state === 'running')
 
@@ -97,7 +99,7 @@ export function OverviewCard({
             {w.tag}
           </h3>
           <p className="text-[11px] text-text-muted">
-            Active {relativeTime(lastActivityMs)}
+            {t('workspace.active', 'Active')} {relativeTime(t, lastActivityMs)}
           </p>
         </div>
         {w.upgradeAvailable && w.template && (
@@ -120,10 +122,10 @@ export function OverviewCard({
       {/* Sessions */}
       <div className="border-t border-border pt-3">
         <div className="text-[10px] uppercase tracking-wider text-text-muted/70 mb-1.5">
-          Sessions
+          {t('workspace.sessions', 'Sessions')}
         </div>
         {w.sessions.length === 0 ? (
-          <p className="text-[12px] text-text-muted/80 italic">no sessions yet</p>
+          <p className="text-[12px] text-text-muted/80 italic">{t('workspace.noSessionsYet', 'no sessions yet')}</p>
         ) : (
           <ul className="space-y-0.5 -mx-2">
             {w.sessions.map((s) => (
@@ -163,7 +165,7 @@ export function OverviewCard({
             <div className="flex items-center gap-2 text-[11px] text-text-muted">
               <GitBranch size={11} strokeWidth={2.25} className="shrink-0" />
               <span className="truncate">
-                from {w.template} v{w.spawnedFromVersion}
+                {t('workspace.fromTemplate', 'from')} {w.template} v{w.spawnedFromVersion}
               </span>
             </div>
           )}
@@ -177,13 +179,13 @@ export function OverviewCard({
               className="flex items-center gap-2 text-[11px] text-text-muted hover:text-text transition-colors w-full text-left"
             >
               <Settings size={11} strokeWidth={2.25} className="shrink-0" />
-              <span>Workspace override · {overrideAgents.join(', ')}</span>
+              <span>{t('workspace.workspaceOverride', 'Workspace override')} · {overrideAgents.join(', ')}</span>
             </button>
           )}
           {overrideAgents.length > 0 && !onConfigure && (
             <div className="flex items-center gap-2 text-[11px] text-text-muted">
               <Settings size={11} strokeWidth={2.25} className="shrink-0" />
-              <span>Workspace override · {overrideAgents.join(', ')}</span>
+              <span>{t('workspace.workspaceOverride', 'Workspace override')} · {overrideAgents.join(', ')}</span>
             </div>
           )}
           {lastCommit && (

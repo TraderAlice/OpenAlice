@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Group, Panel, Separator, useDefaultLayout } from 'react-resizable-panels'
 import { ActivityBar } from './components/ActivityBar'
 import { Sidebar } from './components/Sidebar'
@@ -11,6 +12,7 @@ import { findSectionForActivity } from './sections'
 import { UrlAdopter } from './tabs/UrlAdopter'
 import { useWorkspace } from './tabs/store'
 import { getFocusedTab } from './tabs/types'
+import './i18n'
 
 /**
  * Activity-bar pages — only items that appear as icons in the ActivityBar.

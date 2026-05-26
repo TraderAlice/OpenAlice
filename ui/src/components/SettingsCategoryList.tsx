@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { useWorkspace } from '../tabs/store'
 import { getFocusedTab, type ViewSpec } from '../tabs/types'
 import { SidebarRow } from './SidebarRow'
@@ -5,7 +6,7 @@ import { SidebarRow } from './SidebarRow'
 type SettingsCategory = Extract<ViewSpec, { kind: 'settings' }>['params']['category']
 
 interface CategoryItem {
-  label: string
+  labelKey: string
   category: SettingsCategory
   /**
    * Other view kinds that count as "active" for this row. Used by
@@ -16,16 +17,16 @@ interface CategoryItem {
 }
 
 const CATEGORIES: CategoryItem[] = [
-  { label: 'General', category: 'general' },
-  { label: 'AI Provider', category: 'ai-provider' },
+  { labelKey: 'settings.general', category: 'general' },
+  { labelKey: 'settings.aiProvider', category: 'ai-provider' },
   // Trading Accounts moved to its own ActivityBar Beta entry — see
   // TradingAccountsBetaSidebar. The `settings/trading` ViewSpec is
   // still the underlying tab.
   // Connectors moved to its own ActivityBar Legacy entry — see
   // ConnectorsLegacySidebar.
-  { label: 'MCP Server', category: 'mcp' },
-  { label: 'Market Data', category: 'market-data' },
-  { label: 'News Sources', category: 'news-collector' },
+  { labelKey: 'settings.mcpServer', category: 'mcp' },
+  { labelKey: 'settings.marketData', category: 'market-data' },
+  { labelKey: 'settings.newsSources', category: 'news-collector' },
 ]
 
 /**
@@ -34,6 +35,7 @@ const CATEGORIES: CategoryItem[] = [
  * currently-focused tab's spec, not by sidebar selection.
  */
 export function SettingsCategoryList() {
+  const { t } = useTranslation()
   const focused = useWorkspace((state) => getFocusedTab(state)?.spec)
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
 
@@ -46,7 +48,7 @@ export function SettingsCategoryList() {
         return (
           <SidebarRow
             key={item.category}
-            label={item.label}
+            label={t(item.labelKey)}
             active={active}
             onClick={() => openOrFocus({ kind: 'settings', params: { category: item.category } })}
           />

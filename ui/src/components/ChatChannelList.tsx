@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Settings as SettingsIcon, X } from 'lucide-react'
 import type { ChannelListItem } from '../api/channels'
 import { SidebarRow } from './SidebarRow'
@@ -19,6 +20,7 @@ export function ChatChannelList({
   onEdit,
   onDelete,
 }: ChatChannelListProps) {
+  const { t } = useTranslation()
   // Channel pending delete confirmation. Tiny × buttons in a sidebar are
   // easy to mis-click — the dialog forces an explicit yes.
   const [pendingDelete, setPendingDelete] = useState<ChannelListItem | null>(null)
@@ -65,7 +67,7 @@ export function ChatChannelList({
                       type="button"
                       onClick={(e) => { e.stopPropagation(); setPendingDelete(ch) }}
                       className="w-5 h-5 rounded flex items-center justify-center text-text-muted hover:text-red hover:bg-red/10"
-                      title="Delete"
+                      title={t('common.delete')}
                     >
                       <X size={12} strokeWidth={2.5} />
                     </button>

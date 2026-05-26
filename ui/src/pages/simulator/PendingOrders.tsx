@@ -5,6 +5,7 @@
  */
 
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Section } from '../../components/form'
 import { simulatorApi, type SimulatorState } from '../../api/simulator'
 
@@ -17,6 +18,7 @@ export function PendingOrders({ utaId, state, run, loading }: {
   run: (label: string, fn: () => Promise<unknown>) => Promise<void>
   loading: boolean
 }) {
+  const { t } = useTranslation()
   const [fillForms, setFillForms] = useState<Record<string, { price: string; qty: string }>>({})
   const updateForm = (id: string, field: 'price' | 'qty', value: string) => {
     setFillForms({ ...fillForms, [id]: { ...(fillForms[id] ?? { price: '', qty: '' }), [field]: value } })
@@ -30,25 +32,25 @@ export function PendingOrders({ utaId, state, run, loading }: {
 
   return (
     <Section
-      title="Pending Orders"
-      description="Submitted limit/stop orders waiting on a price trigger or manual fill."
+      title={t('simulator.pendingOrders')}
+      description={t('simulator.pendingOrdersDescription', 'Submitted limit/stop orders waiting on a price trigger or manual fill.')}
     >
       {state.pendingOrders.length === 0 ? (
-        <p className="text-xs text-text-muted">No pending orders.</p>
+        <p className="text-xs text-text-muted">{t('simulator.noPendingOrders', 'No pending orders.')}</p>
       ) : (
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-text-muted text-xs">
-              <th className="pb-1 pr-3">Order</th>
-              <th className="pb-1 pr-3">Symbol</th>
-              <th className="pb-1 pr-3">Side</th>
-              <th className="pb-1 pr-3">Type</th>
-              <th className="pb-1 pr-3 text-right">Qty</th>
-              <th className="pb-1 pr-3 text-right">Trigger</th>
-              <th className="pb-1 pr-3 text-right">Distance</th>
-              <th className="pb-1 pr-3 w-32">Fill price (opt)</th>
-              <th className="pb-1 pr-3 w-24">Fill qty (opt)</th>
-              <th className="pb-1 text-right">Actions</th>
+              <th className="pb-1 pr-3">{t('simulator.order', 'Order')}</th>
+              <th className="pb-1 pr-3">{t('simulator.symbol', 'Symbol')}</th>
+              <th className="pb-1 pr-3">{t('utaDetail.side', 'Side')}</th>
+              <th className="pb-1 pr-3">{t('common.type', 'Type')}</th>
+              <th className="pb-1 pr-3 text-right">{t('dev.qty', 'Qty')}</th>
+              <th className="pb-1 pr-3 text-right">{t('simulator.trigger', 'Trigger')}</th>
+              <th className="pb-1 pr-3 text-right">{t('simulator.distance', 'Distance')}</th>
+              <th className="pb-1 pr-3 w-32">{t('simulator.fillPriceOpt', 'Fill price (opt)')}</th>
+              <th className="pb-1 pr-3 w-24">{t('simulator.fillQtyOpt', 'Fill qty (opt)')}</th>
+              <th className="pb-1 text-right">{t('common.actions', 'Actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -98,7 +100,7 @@ export function PendingOrders({ utaId, state, run, loading }: {
                         }),
                       )}
                       className="btn-secondary-xs"
-                    >Fill</button>
+                    >{t('simulator.fill', 'Fill')}</button>
                     <button
                       disabled={loading}
                       onClick={() => run(`Cancel ${o.orderId}`, () => simulatorApi.cancelOrder(utaId, o.orderId))}

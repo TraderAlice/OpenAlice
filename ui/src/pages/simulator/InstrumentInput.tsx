@@ -9,6 +9,7 @@
 
 import type { InstrumentDraft, SecType } from './instruments'
 import { SEC_TYPES } from './instruments'
+import { useTranslation } from 'react-i18next'
 
 const inputClass =
   'px-2 py-1 bg-bg text-text border border-border rounded text-sm outline-none transition-colors focus:border-accent'
@@ -20,6 +21,7 @@ export function InstrumentInput({ draft, onChange, knownSymbols }: {
   onChange: (next: InstrumentDraft) => void
   knownSymbols?: string[]
 }) {
+  const { t } = useTranslation()
   const set = <K extends keyof InstrumentDraft>(field: K, value: InstrumentDraft[K]) =>
     onChange({ ...draft, [field]: value })
 
@@ -32,7 +34,7 @@ export function InstrumentInput({ draft, onChange, knownSymbols }: {
         value={draft.secType}
         onChange={(e) => set('secType', e.target.value as SecType)}
         className={`${inputClass} w-32`}
-        title="Security type"
+        title={t('simulator.securityType', 'Security type')}
       >
         {SEC_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
       </select>
@@ -71,7 +73,7 @@ export function InstrumentInput({ draft, onChange, knownSymbols }: {
             value={draft.right ?? ''}
             onChange={(e) => set('right', (e.target.value || undefined) as 'C' | 'P' | undefined)}
             className={`${inputClass} w-16`}
-            title="Right"
+            title={t('simulator.right', 'Right')}
           >
             <option value="">right</option>
             <option value="C">Call</option>

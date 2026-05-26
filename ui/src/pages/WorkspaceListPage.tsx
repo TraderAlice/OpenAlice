@@ -13,6 +13,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { useWorkspaces } from '../contexts/WorkspacesContext'
 import { useWorkspace } from '../tabs/store'
@@ -95,6 +96,7 @@ function buildSections(
 }
 
 export function WorkspaceListPage() {
+  const { t } = useTranslation()
   const { workspaces, templates, openAgentConfig } = useWorkspaces()
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
 
@@ -133,11 +135,9 @@ export function WorkspaceListPage() {
   if (workspaces.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-text-muted px-6">
-        <h2 className="text-lg font-medium text-text mb-2">Workspaces</h2>
+        <h2 className="text-lg font-medium text-text mb-2">{t('workspaces.title')}</h2>
         <p className="text-sm max-w-md text-center">
-          No workspaces yet. Create one from the sidebar — each is an isolated git
-          directory with a persistent terminal session attached, wired to OpenAlice
-          over MCP.
+          {t('workspaces.noWorkspaces', 'No workspaces yet. Create one from the sidebar — each is an isolated git directory with a persistent terminal session attached, wired to OpenAlice over MCP.')}
         </p>
       </div>
     )
@@ -147,9 +147,9 @@ export function WorkspaceListPage() {
     <div className="h-full overflow-y-auto">
       <div className="max-w-5xl mx-auto px-6 py-6">
         <div className="mb-6 flex items-baseline justify-between gap-4">
-          <h2 className="text-[18px] font-semibold text-text">Workspaces Overview</h2>
+          <h2 className="text-[18px] font-semibold text-text">{t('workspaces.overview', 'Workspaces Overview')}</h2>
           <span className="text-[12px] text-text-muted">
-            {workspaces.length} workspace{workspaces.length === 1 ? '' : 's'}
+            {t('workspaces.workspaceCount', '{{count}} workspace', { count: workspaces.length })}
           </span>
         </div>
 
@@ -158,7 +158,7 @@ export function WorkspaceListPage() {
             <section key={sec.key}>
               <div className="mb-3 flex items-baseline gap-2">
                 <h3 className="text-[12px] font-semibold text-text/85 uppercase tracking-wider">
-                  {sec.title}
+                  {sec.key === UNKNOWN_KEY ? t('workspaces.other', 'Other') : sec.title}
                 </h3>
                 <span className="text-[11px] text-text-muted">· {sec.workspaces.length}</span>
               </div>

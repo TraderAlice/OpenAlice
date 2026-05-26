@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import type { Credential, Profile, Preset, SdkAdapterId } from '../../api/types'
 
 export type TestState = { status: 'idle' | 'testing' | 'ok' | 'fail'; error?: string }
@@ -29,20 +31,26 @@ export interface CredentialCardProps {
   onModelChange: (profileSlug: string, model: string) => Promise<void>
 }
 
-const VENDOR_LABEL: Record<string, string> = {
-  anthropic: 'Anthropic',
-  openai: 'OpenAI',
-  google: 'Google',
-  minimax: 'MiniMax',
-  glm: 'GLM (Zhipu)',
-  kimi: 'Kimi (Moonshot)',
-  deepseek: 'DeepSeek',
-  custom: 'Custom',
+function getVendorLabel(t: TFunction, vendor: string): string {
+  const map: Record<string, string> = {
+    anthropic: t('credentials.vendorAnthropic', 'Anthropic'),
+    openai: t('credentials.vendorOpenai', 'OpenAI'),
+    google: t('credentials.vendorGoogle', 'Google'),
+    minimax: t('credentials.vendorMinimax', 'MiniMax'),
+    glm: t('credentials.vendorGlm', 'GLM (Zhipu)'),
+    kimi: t('credentials.vendorKimi', 'Kimi (Moonshot)'),
+    deepseek: t('credentials.vendorDeepseek', 'DeepSeek'),
+    custom: t('credentials.vendorCustom', 'Custom'),
+  }
+  return map[vendor] ?? vendor
 }
 
-const AUTH_LABEL: Record<string, string> = {
-  'api-key': 'API key',
-  'subscription': 'subscription',
+function getAuthLabel(t: TFunction, authType: string): string {
+  const map: Record<string, string> = {
+    'api-key': t('credentials.authApiKey', 'API key'),
+    'subscription': t('credentials.authSubscription', 'subscription'),
+  }
+  return map[authType] ?? authType
 }
 
 function getModelOptions(profile: Profile, presets: Preset[]): Array<{ id: string; label: string }> {
@@ -68,10 +76,11 @@ export function CredentialCard({
   onEditProfile,
   onModelChange,
 }: CredentialCardProps) {
+  const { t } = useTranslation()
   const [expanded, setExpanded] = useState(profiles.length > 0)
 
-  const vendorLabel = VENDOR_LABEL[credential.vendor] ?? credential.vendor
-  const authLabel = AUTH_LABEL[credential.authType] ?? credential.authType
+  const vendorLabel = getVendorLabel(t, credential.vendor)
+  const authLabel = getAuthLabel(t, credential.authType)
 
   return (
     <div
@@ -93,7 +102,7 @@ export function CredentialCard({
             className="text-text-muted hover:text-text transition-colors text-[11px] shrink-0"
             aria-expanded={expanded}
           >
-            {expanded ? '▾' : '▸'} {profiles.length} profile{profiles.length === 1 ? '' : 's'}
+            {expanded ? '▾' : '▸'} {t('credentials.profileCount', '{{count}} profile(s)', { count: profiles.length })}
           </button>
         </div>
 
@@ -103,7 +112,7 @@ export function CredentialCard({
               <span
                 key={a.id}
                 className="text-[10px] px-1.5 py-0.5 rounded bg-bg-tertiary text-text-muted border border-border/50"
-                title={a.isTestDefault ? 'Test default' : ''}
+                title={a.isTestDefault ? t('credentials.testDefault', 'Test default') : ''}
               >
                 {a.id}{a.isTestDefault && <span className="text-yellow ml-0.5">★</span>}
               </span>
@@ -114,12 +123,12 @@ export function CredentialCard({
 
       {expanded && profiles.length > 0 && (
         <div className="border-t border-border/50 bg-bg-tertiary/30 px-4 py-2 space-y-2">
-          <div className="text-[10px] uppercase tracking-wide text-text-muted">Profiles</div>
+          <div className="text-[10px] uppercase tracking-wide text-text-muted">{t('credentials.profiles', 'Profiles')}</div>
           {profiles.map(({ slug: pSlug, profile, isActive, testState }) => {
             const modelOptions = getModelOptions(profile, presets)
             const canSwitchModel = modelOptions.length > 1 && modelOptions.some(o => o.id === profile.model)
             const ts = testState
-            const testLabel = ts.status === 'testing' ? 'Testing…' : ts.status === 'ok' ? 'OK' : ts.status === 'fail' ? 'Failed' : 'Test'
+            const testLabel = ts.status === 'testing' ? t('credentials.testing', 'Testing…') : ts.status === 'ok' ? t('credentials.ok', 'OK') : ts.status === 'fail' ? t('credentials.failed', 'Failed') : t('credentials.test', 'Test')
             const testColor =
               ts.status === 'ok' ? 'text-green border-green/40'
               : ts.status === 'fail' ? 'text-red border-red/40'
@@ -129,7 +138,7 @@ export function CredentialCard({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-[12px] font-medium text-text truncate">{pSlug}</span>
-                    {isActive && <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent/20 text-accent font-medium shrink-0">Active</span>}
+                    {isActive && <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent/20 text-accent font-medium shrink-0">{t('credentials.active', 'Active')}</span>}
                   </div>
                   {canSwitchModel ? (
                     <select
@@ -147,7 +156,7 @@ export function CredentialCard({
                   <button
                     onClick={() => onTest(pSlug, profile)}
                     disabled={ts.status === 'testing'}
-                    title={ts.status === 'fail' ? ts.error : 'Send "Hi" to verify connectivity'}
+                    title={ts.status === 'fail' ? ts.error : t('credentials.testDefaultHint', 'Send "Hi" to verify connectivity')}
                     className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${testColor}`}
                   >
                     {testLabel}
@@ -157,14 +166,14 @@ export function CredentialCard({
                       onClick={() => onSetActive(pSlug)}
                       className="text-[10px] px-1.5 py-0.5 rounded border border-border text-text-muted hover:text-accent hover:border-accent transition-colors"
                     >
-                      Activate
+                      {t('credentials.activate', 'Activate')}
                     </button>
                   )}
                   <button
                     onClick={() => onEditProfile(pSlug)}
                     className="text-[10px] px-1.5 py-0.5 rounded border border-border text-text-muted hover:text-text hover:bg-bg-tertiary transition-colors"
                   >
-                    Edit
+                    {t('credentials.edit', 'Edit')}
                   </button>
                 </div>
               </div>

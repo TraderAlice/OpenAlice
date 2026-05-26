@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { useWorkspace } from '../tabs/store'
 import { getFocusedTab, type ViewSpec } from '../tabs/types'
 import { SidebarRow } from './SidebarRow'
@@ -5,17 +6,17 @@ import { SidebarRow } from './SidebarRow'
 type DevTab = Extract<ViewSpec, { kind: 'dev' }>['params']['tab']
 
 interface CategoryItem {
-  label: string
+  labelKey: string
   tab: DevTab
 }
 
 const CATEGORIES: CategoryItem[] = [
-  { label: 'Connectors', tab: 'connectors' },
-  { label: 'Tools', tab: 'tools' },
-  { label: 'Sessions', tab: 'sessions' },
-  { label: 'Snapshots', tab: 'snapshots' },
-  { label: 'Logs', tab: 'logs' },
-  { label: 'Simulator', tab: 'simulator' },
+  { labelKey: 'dev.connectors', tab: 'connectors' },
+  { labelKey: 'dev.tools', tab: 'tools' },
+  { labelKey: 'dev.sessions', tab: 'sessions' },
+  { labelKey: 'dev.snapshots', tab: 'snapshots' },
+  { labelKey: 'dev.logs', tab: 'logs' },
+  { labelKey: 'dev.simulator', tab: 'simulator' },
 ]
 
 /**
@@ -24,6 +25,7 @@ const CATEGORIES: CategoryItem[] = [
  * spec.
  */
 export function DevCategoryList() {
+  const { t } = useTranslation()
   const focused = useWorkspace((state) => getFocusedTab(state)?.spec)
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
 
@@ -34,7 +36,7 @@ export function DevCategoryList() {
         return (
           <SidebarRow
             key={item.tab}
-            label={item.label}
+            label={t(item.labelKey)}
             active={active}
             onClick={() => openOrFocus({ kind: 'dev', params: { tab: item.tab } })}
           />

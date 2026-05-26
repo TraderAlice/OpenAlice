@@ -1,7 +1,9 @@
+import { useTranslation } from 'react-i18next'
 import type { BrokerHealthInfo } from '../../api/types'
 
 /** Connection-status pill for a UTA. Two sizes: 'sm' (cards) / 'md' (dialog headers). */
 export function HealthBadge({ health, size = 'sm' }: { health?: BrokerHealthInfo; size?: 'sm' | 'md' }) {
+  const { t } = useTranslation()
   const textSize = size === 'md' ? 'text-[12px]' : 'text-[11px]'
   const dotSize = size === 'md' ? 'w-2 h-2' : 'w-1.5 h-1.5'
 
@@ -11,7 +13,7 @@ export function HealthBadge({ health, size = 'sm' }: { health?: BrokerHealthInfo
     return (
       <span className={`inline-flex items-center gap-1.5 ${textSize} text-text-muted`} title={health.lastError}>
         <span className={`${dotSize} rounded-full bg-text-muted/40 shrink-0`} />
-        Disabled
+        {t('healthBadge.disabled', 'Disabled')}
       </span>
     )
   }
@@ -21,21 +23,21 @@ export function HealthBadge({ health, size = 'sm' }: { health?: BrokerHealthInfo
       return (
         <span className={`inline-flex items-center gap-1.5 ${textSize} text-green`}>
           <span className={`${dotSize} rounded-full bg-green shrink-0`} />
-          Connected
+          {t('healthBadge.connected', 'Connected')}
         </span>
       )
     case 'degraded':
       return (
         <span className={`inline-flex items-center gap-1.5 ${textSize} text-yellow-400`}>
           <span className={`${dotSize} rounded-full bg-yellow-400 shrink-0`} />
-          Unstable
+          {t('healthBadge.unstable', 'Unstable')}
         </span>
       )
     case 'offline':
       return (
         <span className={`inline-flex items-center gap-1.5 ${textSize} text-red`} title={health.lastError}>
           <span className={`${dotSize} rounded-full bg-red shrink-0 animate-pulse`} />
-          {health.recovering ? 'Reconnecting...' : 'Offline'}
+          {health.recovering ? t('healthBadge.reconnecting', 'Reconnecting...') : t('healthBadge.offline', 'Offline')}
         </span>
       )
   }

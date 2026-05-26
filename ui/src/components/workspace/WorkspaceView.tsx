@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import type { ReactElement } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MessageSquare } from 'lucide-react';
 
 import type { SessionRecord } from './api';
@@ -221,6 +222,7 @@ function SessionCard(props: {
   record: SessionRecord;
   onClick: () => void;
 }): ReactElement {
+  const { t } = useTranslation();
   const r = props.record;
   const isPaused = r.state === 'paused';
   return (
@@ -231,8 +233,8 @@ function SessionCard(props: {
       <div className="workspace-empty-card-meta">
         <span className="workspace-empty-card-name">{r.name}</span>
         <span className="workspace-empty-card-state">
-          {isPaused ? 'paused · ' : 'active · '}
-          {relativeTime(r.lastActiveAt)}
+          {isPaused ? `${t('workspace.paused', 'paused')} · ` : `${t('workspace.active', 'active')} · `}
+          {relativeTime(t, r.lastActiveAt)}
         </span>
       </div>
       <button

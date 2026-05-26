@@ -1,18 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import { PanelRight } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import { useWorkspaceSidePanels } from '../../live/workspace-side-panels'
 
-/**
- * Top-bar button that opens a small popover for toggling the workspace
- * right-pane side panels. Lives next to "AI Provider" in WorkspacePage's
- * header.
- *
- * Click outside closes the popover. State is user-level (not per-
- * workspace) — see `useWorkspaceSidePanels` for rationale.
- */
 export function WorkspaceLayoutPopover(): ReactElement {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const prefs = useWorkspaceSidePanels()
@@ -32,34 +26,34 @@ export function WorkspaceLayoutPopover(): ReactElement {
         type="button"
         onClick={() => setOpen((o) => !o)}
         className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] text-text-muted hover:text-text hover:bg-bg-tertiary transition-colors"
-        title="Show / hide right-pane panels"
+        title={t('workspaces.layoutTooltip')}
         aria-expanded={open}
       >
         <PanelRight size={13} strokeWidth={1.8} aria-hidden />
-        Layout
+        {t('workspaces.layout')}
       </button>
       {open && (
         <div
           role="dialog"
-          aria-label="Workspace layout"
+          aria-label={t('workspaces.layoutDialog')}
           className="absolute right-0 top-full mt-1 w-[220px] z-50 p-2 rounded-md bg-bg-tertiary border border-border shadow-lg text-[12px] text-text"
         >
           <div className="px-1 pb-1 text-[10px] uppercase tracking-wider text-text-muted/60 font-medium">
-            Side panels
+            {t('workspaces.sidePanels')}
           </div>
           <CheckboxRow
-            label="Git"
+            label={t('workspaces.git')}
             checked={prefs.git}
             onChange={(v) => prefs.setPanel('git', v)}
           />
           <CheckboxRow
-            label="Files"
+            label={t('workspaces.files')}
             checked={prefs.files}
             onChange={(v) => prefs.setPanel('files', v)}
           />
           <div className="my-1.5 border-t border-border" />
           <CheckboxRow
-            label="Auto-hide on mobile"
+            label={t('workspaces.autoHideMobile')}
             checked={prefs.autoHideMobile}
             onChange={prefs.setAutoHideMobile}
           />

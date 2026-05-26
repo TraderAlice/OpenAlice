@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api, type AppConfig } from '../api'
 import type { ToolInfo } from '../api/tools'
 import { Toggle } from '../components/Toggle'
@@ -7,10 +8,12 @@ import { ConfigSection, Field, inputClass } from '../components/form'
 import { useAutoSave } from '../hooks/useAutoSave'
 import { PageHeader } from '../components/PageHeader'
 import { PageLoading, EmptyState } from '../components/StateViews'
+import { LanguageSwitcher } from '../components/LanguageSwitcher'
 
 // ==================== Settings Section ====================
 
 function SettingsSection() {
+  const { t } = useTranslation()
   const [config, setConfig] = useState<AppConfig | null>(null)
 
   useEffect(() => {
@@ -22,17 +25,29 @@ function SettingsSection() {
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-[880px] mx-auto">
-        {/* Agent */}
-        <ConfigSection title="Agent" description="Controls file-system and tool permissions for the AI. Changes apply on the next request.">
+        {/* General */}
+        <ConfigSection title={t('settings.general')} description={t('settings.languageDescription')}>
           <div className="flex items-center justify-between gap-4 py-1">
             <div className="flex-1">
               <span className="text-sm font-medium text-text">
-                Evolution Mode
+                {t('settings.language')}
+              </span>
+            </div>
+            <LanguageSwitcher />
+          </div>
+        </ConfigSection>
+
+        {/* Agent */}
+        <ConfigSection title={t('settings.agent')} description={t('settings.agentDescription')}>
+          <div className="flex items-center justify-between gap-4 py-1">
+            <div className="flex-1">
+              <span className="text-sm font-medium text-text">
+                {t('settings.evolutionMode')}
               </span>
               <p className="text-[12px] text-text-muted mt-0.5 leading-relaxed">
                 {config.agent?.evolutionMode
-                  ? 'Full project access — AI can modify source code'
-                  : 'Sandbox mode — AI can only edit data/brain/'}
+                  ? t('settings.evolutionModeEnabled')
+                  : t('settings.evolutionModeDisabled')}
               </p>
             </div>
             <Toggle
@@ -50,12 +65,12 @@ function SettingsSection() {
         </ConfigSection>
 
         {/* Persona */}
-        <ConfigSection title="Persona" description="The system prompt that defines Alice's personality and behavior. Changes take effect on next server restart.">
+        <ConfigSection title={t('settings.persona')} description={t('settings.personaDescription')}>
           <PersonaEditor />
         </ConfigSection>
 
         {/* Compaction */}
-        <ConfigSection title="Compaction" description="Context window management. When conversation size approaches Max Context minus Max Output tokens, older messages are automatically summarized to free up space.">
+        <ConfigSection title={t('settings.compaction')} description={t('settings.compactionDescription')}>
           <CompactionForm config={config} />
         </ConfigSection>
       </div>
@@ -66,6 +81,7 @@ function SettingsSection() {
 // ==================== Compaction Form ====================
 
 function CompactionForm({ config }: { config: AppConfig }) {
+  const { t } = useTranslation()
   const [ctx, setCtx] = useState(String(config.compaction?.maxContextTokens || ''))
   const [out, setOut] = useState(String(config.compaction?.maxOutputTokens || ''))
 
@@ -82,10 +98,10 @@ function CompactionForm({ config }: { config: AppConfig }) {
 
   return (
     <>
-      <Field label="Max Context Tokens">
+      <Field label={t('settings.maxContextTokens', 'Max Context Tokens')}>
         <input className={inputClass} type="number" step={1000} value={ctx} onChange={(e) => setCtx(e.target.value)} />
       </Field>
-      <Field label="Max Output Tokens">
+      <Field label={t('settings.maxOutputTokens', 'Max Output Tokens')}>
         <input className={inputClass} type="number" step={1000} value={out} onChange={(e) => setOut(e.target.value)} />
       </Field>
       <SaveIndicator status={status} onRetry={retry} />
@@ -96,6 +112,7 @@ function CompactionForm({ config }: { config: AppConfig }) {
 // ==================== Persona Editor ====================
 
 function PersonaEditor() {
+  const { t } = useTranslation()
   const [content, setContent] = useState('')
   const [filePath, setFilePath] = useState('')
   const [loading, setLoading] = useState(true)
@@ -110,9 +127,9 @@ function PersonaEditor() {
         setContent(content)
         setFilePath(path)
       })
-      .catch(() => setError('Failed to load persona'))
+      .catch(() => setError(t('common.error', 'Failed to load persona')))
       .finally(() => setLoading(false))
-  }, [])
+  }, [t])
 
   const handleSave = async () => {
     setSaving(true)
@@ -124,13 +141,13 @@ function PersonaEditor() {
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch {
-      setError('Failed to save')
+      setError(t('common.error', 'Failed to save'))
     } finally {
       setSaving(false)
     }
   }
 
-  if (loading) return <div className="text-sm text-text-muted">Loading...</div>
+  if (loading) return <div className="text-sm text-text-muted">{t('common.loading', 'Loading...')}</div>
 
   return (
     <>
@@ -145,12 +162,12 @@ function PersonaEditor() {
           disabled={saving || !dirty}
           className="btn-primary-sm"
         >
-          {saving ? 'Saving...' : 'Save'}
+          {saving ? t('common.saving', 'Saving...') : t('common.save')}
         </button>
         {saved && (
           <span className="inline-flex items-center gap-1.5 text-[11px]">
             <span className="w-1.5 h-1.5 rounded-full bg-green" />
-            <span className="text-text-muted">Saved</span>
+            <span className="text-text-muted">{t('common.saved', 'Saved')}</span>
           </span>
         )}
         {error && (
@@ -160,7 +177,7 @@ function PersonaEditor() {
           </span>
         )}
         {dirty && !saved && !error && (
-          <span className="text-[11px] text-text-muted">Unsaved changes</span>
+          <span className="text-[11px] text-text-muted">{t('common.unsavedChanges', 'Unsaved changes')}</span>
         )}
       </div>
       {filePath && <p className="text-[11px] text-text-muted mt-1">{filePath}</p>}
@@ -190,6 +207,7 @@ interface ToolGroup {
 }
 
 function ToolsSection() {
+  const { t } = useTranslation()
   const [inventory, setInventory] = useState<ToolInfo[]>([])
   const [disabled, setDisabled] = useState<Set<string>>(new Set())
   const [loaded, setLoaded] = useState(false)
@@ -261,12 +279,12 @@ function ToolsSection() {
       {!loaded ? (
         <PageLoading />
       ) : groups.length === 0 ? (
-        <EmptyState title="No tools registered." description="Tools will appear here when the engine starts." />
+        <EmptyState title={t('dev.noTools')} description={t('dev.noToolsDescription')} />
       ) : (
         <div className="max-w-[880px] mx-auto">
           <div className="flex items-center justify-between mb-4">
             <p className="text-[13px] text-text-muted">
-              {inventory.length} tools in {groups.length} groups — changes apply on next AI request
+              {t('dev.toolsDescription', { count: inventory.length, groups: groups.length })}
             </p>
             <SaveIndicator status={status} onRetry={retry} />
           </div>
@@ -386,24 +404,32 @@ const TABS: { key: Tab; label: string }[] = [
 ]
 
 export function SettingsPage() {
+  const { t } = useTranslation()
   const [tab, setTab] = useState<Tab>('settings')
+
+  const tabs = useMemo(() => [
+    { key: 'settings' as Tab, label: t('settings.title') },
+    { key: 'tools' as Tab, label: t('common.actions') },
+  ], [t])
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <PageHeader title="Settings" />
+      <div className="flex items-center justify-between px-4 md:px-6">
+        <PageHeader title={t('settings.title')} />
+      </div>
 
       <div className="px-4 md:px-6 border-b border-border/60">
         <div className="flex gap-1">
-          {TABS.map((t) => (
+          {tabs.map((tabItem) => (
             <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
+              key={tabItem.key}
+              onClick={() => setTab(tabItem.key)}
               className={`px-3 py-2 text-sm font-medium transition-colors relative ${
-                tab === t.key ? 'text-accent' : 'text-text-muted hover:text-text'
+                tab === tabItem.key ? 'text-accent' : 'text-text-muted hover:text-text'
               }`}
             >
-              {t.label}
-              {tab === t.key && (
+              {tabItem.label}
+              {tab === tabItem.key && (
                 <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-accent rounded-t" />
               )}
             </button>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { marketApi, type EquityQuote } from '../../api/market'
 import { fmtNumber, fmtMoneyShort, fmtPercent, fmtInt } from './format'
 
@@ -7,6 +8,7 @@ interface Props {
 }
 
 export function QuoteHeader({ symbol }: Props) {
+  const { t } = useTranslation()
   const [quote, setQuote] = useState<EquityQuote | null>(null)
   const [provider, setProvider] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -68,16 +70,16 @@ export function QuoteHeader({ symbol }: Props) {
       {/* Bid / ask intentionally omitted — they're real-time L1 quote data
           that belongs at the execution layer (UTA), not in analysis. */}
       <dl className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-x-4 gap-y-1 text-[11px]">
-        <Field label="Open"      value={fmtNumber(quote?.open)} />
-        <Field label="Prev"      value={fmtNumber(quote?.prev_close)} />
-        <Field label="High"      value={fmtNumber(quote?.high)} />
-        <Field label="Low"       value={fmtNumber(quote?.low)} />
-        <Field label="Volume"    value={fmtInt(quote?.volume)} />
-        <Field label="Mkt Cap"   value={fmtMoneyShort(quote?.market_cap)} />
-        <Field label="52W High"  value={fmtNumber(quote?.year_high)} />
-        <Field label="52W Low"   value={fmtNumber(quote?.year_low)} />
-        <Field label="MA50"      value={fmtNumber(quote?.ma50)} />
-        <Field label="MA200"     value={fmtNumber(quote?.ma200)} />
+        <Field label={t('market.open', 'Open')}      value={fmtNumber(quote?.open)} />
+        <Field label={t('market.prevClose', 'Prev')}      value={fmtNumber(quote?.prev_close)} />
+        <Field label={t('market.high', 'High')}      value={fmtNumber(quote?.high)} />
+        <Field label={t('market.low', 'Low')}       value={fmtNumber(quote?.low)} />
+        <Field label={t('market.volume', 'Volume')}    value={fmtInt(quote?.volume)} />
+        <Field label={t('market.mktCap', 'Mkt Cap')}   value={fmtMoneyShort(quote?.market_cap)} />
+        <Field label={t('market.yearHigh', '52W High')}  value={fmtNumber(quote?.year_high)} />
+        <Field label={t('market.yearLow', '52W Low')}   value={fmtNumber(quote?.year_low)} />
+        <Field label={t('market.ma50')}      value={fmtNumber(quote?.ma50)} />
+        <Field label={t('market.ma200')}     value={fmtNumber(quote?.ma200)} />
       </dl>
 
       {error && <div className="w-full text-[11px] text-red">{error}</div>}

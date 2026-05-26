@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Dialog } from './uta/Dialog'
 
 interface ConfirmDialogProps {
@@ -35,6 +36,7 @@ export function ConfirmDialog({
   onConfirm,
   onClose,
 }: ConfirmDialogProps) {
+  const { t } = useTranslation()
   const [busy, setBusy] = useState(false)
 
   const handleConfirm = async () => {

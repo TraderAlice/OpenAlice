@@ -1,5 +1,6 @@
 import { Fragment, useState, useEffect, useCallback, useMemo } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import type { ViewSpec } from '../tabs/types'
 import { api } from '../api'
 import type { UTAConfig, BrokerPreset, AccountInfo, Position, BrokerHealthInfo, UTASnapshotSummary, EquityCurvePoint } from '../api/types'
@@ -15,8 +16,9 @@ import { OrderEntryDialog, type OrderEntryMode } from '../components/uta/OrderEn
 import { SnapshotDetail } from '../components/SnapshotDetail'
 import { EquityCurve } from '../components/EquityCurve'
 import { Metric, signFromDelta } from '../components/Metric'
-import { fmt, fmtPnl, fmtNum, fmtPctSigned, isUnsetDecimal } from '../lib/format'
+import { fmt, fmtPnl, fmtNum, fmtPctSigned, fmtDateShort, fmtTime, isUnsetDecimal } from '../lib/i18n-format'
 import { secTypeToClass, assetClassLabel, ASSET_CLASS_ORDER, type AssetClass } from '../lib/asset-class'
+import i18n from '../i18n'
 
 // ==================== Page ====================
 
@@ -25,6 +27,7 @@ interface UTADetailPageProps {
 }
 
 export function UTADetailPage({ spec }: UTADetailPageProps) {
+  const { t } = useTranslation()
   const id = spec.params.id
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -136,17 +139,17 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
       }))
   }, [snapshots, id])
 
-  if (tc.loading) return <Shell title="Loading…" />
-  if (!id) return <Shell title="UTA not specified" />
+  if (tc.loading) return <Shell title={t('common.loading')} />
+  if (!id) return <Shell title={t('utaDetail.utaNotSpecified', 'UTA not specified')} />
   if (!uta) {
     return (
-      <Shell title={`UTA ${id} not found`}>
+      <Shell title={t('utaDetail.utaNotFound', 'UTA {{id}} not found', { id })}>
         <EmptyState
-          title={`No UTA "${id}"`}
-          description="It may have been deleted or never configured. Head back to Trading to create one or pick a different UTA."
+          title={t('utaDetail.noUta', 'No UTA "{{id}}"', { id })}
+          description={t('utaDetail.noUtaDescription', 'It may have been deleted or never configured. Head back to Trading to create one or pick a different UTA.')}
         />
         <div className="mt-4">
-          <Link to="/trading" className="btn-secondary">← Back to Trading</Link>
+          <Link to="/trading" className="btn-secondary">{t('utaDetail.backToTrading', '← Back to Trading')}</Link>
         </div>
       </Shell>
     )
@@ -161,7 +164,7 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
         live={{ lastUpdated }}
         description={
           <>
-            <Link to="/trading" className="text-text-muted hover:text-text">← Trading</Link>
+            <Link to="/trading" className="text-text-muted hover:text-text">{t('utaDetail.backToTrading', '← Trading')}</Link>
             <span className="mx-2 text-text-muted/40">·</span>
             <span className="font-mono text-text-muted">{uta.id}</span>
             <span className="mx-2 text-text-muted/40">·</span>
@@ -180,10 +183,10 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
               disabled={isDisabled}
               className="px-3 py-1.5 text-[13px] font-medium rounded-md bg-accent text-bg hover:bg-accent/90 disabled:opacity-40 transition-colors"
             >
-              + Place Order
+              + {t('utaDetail.placeOrder', 'Place Order')}
             </button>
             <button onClick={() => setEditing(true)} className="btn-secondary-sm">
-              Edit
+              {t('common.edit')}
             </button>
           </div>
         }
@@ -193,7 +196,7 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
         <div className="max-w-[1080px] mx-auto space-y-5">
           {dataError && (
             <div className="rounded-md border border-red/30 bg-red/5 px-3 py-2 text-[12px] text-red">
-              Failed to load live data: {dataError}
+              {t('utaDetail.failedToLoadLiveData', 'Failed to load live data')}: {dataError}
             </div>
           )}
 
@@ -258,9 +261,10 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
 // ==================== Shell ====================
 
 function Shell({ title, children }: { title: string; children?: React.ReactNode }) {
+  const { t } = useTranslation()
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <PageHeader title={title} description={<Link to="/trading" className="text-text-muted hover:text-text">← Trading</Link>} />
+      <PageHeader title={title} description={<Link to="/trading" className="text-text-muted hover:text-text">{t('utaDetail.backToTrading', '← Trading')}</Link>} />
       <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5">
         <div className="max-w-[720px] mx-auto">{children}</div>
       </div>
@@ -273,10 +277,11 @@ function Shell({ title, children }: { title: string; children?: React.ReactNode 
 interface TodayDelta { delta: number; pct: number; currency: string }
 
 function Hero({ account, todayDelta }: { account: AccountInfo | null; todayDelta: TodayDelta | null }) {
+  const { t } = useTranslation()
   if (!account) {
     return (
       <div className="border border-border rounded-lg bg-bg-secondary px-5 py-6">
-        <p className="text-[13px] text-text-muted">Loading account info…</p>
+        <p className="text-[13px] text-text-muted">{t('utaDetail.loadingAccountInfo', 'Loading account info…')}</p>
       </div>
     )
   }
@@ -288,31 +293,31 @@ function Hero({ account, todayDelta }: { account: AccountInfo | null; todayDelta
     <div className="border border-border rounded-lg bg-bg-secondary px-5 py-5 space-y-4">
       <Metric
         size="lg"
-        label="Net Liquidation"
+        label={t('utaDetail.netLiquidation', 'Net Liquidation')}
         value={fmt(account.netLiquidation, ccy)}
         delta={todayDelta ? {
-          value: `${fmtPnl(todayDelta.delta, ccy)} (${fmtPctSigned(todayDelta.pct)}) today`,
+          value: `${fmtPnl(todayDelta.delta, ccy)} (${fmtPctSigned(todayDelta.pct)}) ${t('common.today')}`,
           sign: signFromDelta(todayDelta.delta),
-        } : { value: '— today', sign: 'flat' }}
+        } : { value: `\u2014 ${t('common.today')}`, sign: 'flat' }}
       />
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-border">
-        <Metric size="sm" label="Cash" value={fmt(account.totalCashValue, ccy)} />
+        <Metric size="sm" label={t('common.cash')} value={fmt(account.totalCashValue, ccy)} />
         <Metric
           size="sm"
-          label="Unrealized P&L"
+          label={t('trading.unrealizedPnl')}
           value={fmtPnl(account.unrealizedPnL, ccy)}
           valueSign={signFromDelta(unrealized)}
         />
         <Metric
           size="sm"
-          label="Realized P&L"
+          label={t('utaDetail.realizedPnl', 'Realized P&L')}
           value={fmtPnl(account.realizedPnL ?? '0', ccy)}
           valueSign={signFromDelta(realized)}
         />
         <Metric
           size="sm"
-          label="Buying Power"
-          value={account.buyingPower != null ? fmt(account.buyingPower, ccy) : '—'}
+          label={t('utaDetail.buyingPower', 'Buying Power')}
+          value={account.buyingPower != null ? fmt(account.buyingPower, ccy) : '\u2014'}
         />
       </div>
     </div>
@@ -341,6 +346,7 @@ function PositionsSection({ positions, onCloseClick }: {
   positions: Position[]
   onCloseClick: (p: Position) => void
 }) {
+  const { t } = useTranslation()
   const groups = useMemo<PositionGroup[]>(() => {
     const buckets = new Map<AssetClass, Position[]>()
     for (const p of positions) {
@@ -355,28 +361,28 @@ function PositionsSection({ positions, onCloseClick }: {
 
   if (positions.length === 0) {
     return (
-      <Section title="Positions (0)">
+      <Section title={t('utaDetail.positionsCount', 'Positions ({{count}})', { count: 0 })}>
         <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-text-muted">
-          No open positions.
+          {t('utaDetail.noOpenPositions', 'No open positions.')}
         </div>
       </Section>
     )
   }
 
-  const cols = 7  // contract, side, qty, avg→mark, value, pnl, action
+  const cols = 7
 
   return (
-    <Section title={`Positions (${positions.length})`}>
+    <Section title={t('utaDetail.positionsCount', 'Positions ({{count}})', { count: positions.length })}>
       <div className="border border-border rounded-lg overflow-x-auto">
         <table className="w-full text-[13px]">
           <thead>
             <tr className="bg-bg-secondary text-text-muted text-left">
-              <th className="px-3 py-2 font-medium">Contract</th>
-              <th className="px-3 py-2 font-medium">Side</th>
-              <th className="px-3 py-2 font-medium text-right">Qty</th>
-              <th className="px-3 py-2 font-medium text-right">Avg → Mark</th>
-              <th className="px-3 py-2 font-medium text-right">Mkt Value</th>
-              <th className="px-3 py-2 font-medium text-right">PnL</th>
+              <th className="px-3 py-2 font-medium">{t('utaDetail.contract', 'Contract')}</th>
+              <th className="px-3 py-2 font-medium">{t('utaDetail.side', 'Side')}</th>
+              <th className="px-3 py-2 font-medium text-right">{t('dev.qty', 'Qty')}</th>
+              <th className="px-3 py-2 font-medium text-right">{t('utaDetail.avgToMark', 'Avg → Mark')}</th>
+              <th className="px-3 py-2 font-medium text-right">{t('utaDetail.mktValue', 'Mkt Value')}</th>
+              <th className="px-3 py-2 font-medium text-right">{t('trading.pnl', 'PnL')}</th>
               <th className="px-3 py-2 font-medium text-right" />
             </tr>
           </thead>
@@ -395,15 +401,15 @@ function PositionsSection({ positions, onCloseClick }: {
                         <div className="flex items-center gap-2">
                           <span className="font-semibold text-text">{assetClassLabel(g.class)}</span>
                           <span className="text-text-muted/60">·</span>
-                          <span className="text-text-muted">{g.positions.length} position{g.positions.length > 1 ? 's' : ''}</span>
+                          <span className="text-text-muted">{g.positions.length} {t('utaDetail.position', { count: g.positions.length })}</span>
                           {!groupCcy && (
-                            <span className="text-text-muted/60 text-[11px]">mixed ccy</span>
+                            <span className="text-text-muted/60 text-[11px]">{t('utaDetail.mixedCcy', 'mixed ccy')}</span>
                           )}
                         </div>
                         <div className="flex items-center gap-3 tabular-nums">
-                          <span className="text-text">{groupCcy ? fmt(sumValue, groupCcy) : `$${sumValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</span>
+                          <span className="text-text">{groupCcy ? fmt(sumValue, groupCcy) : fmt(sumValue, 'USD')}</span>
                           <span className={sumPnl >= 0 ? 'text-green' : 'text-red'}>
-                            {groupCcy ? fmtPnl(sumPnl, groupCcy) : `${sumPnl >= 0 ? '+' : ''}${sumPnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                            {groupCcy ? fmtPnl(sumPnl, groupCcy) : fmtPnl(sumPnl, 'USD')}
                           </span>
                         </div>
                       </div>
@@ -423,6 +429,7 @@ function PositionsSection({ positions, onCloseClick }: {
 }
 
 function PositionRow({ position: p, onClose }: { position: Position; onClose: () => void }) {
+  const { t } = useTranslation()
   const ccy = p.currency ?? 'USD'
   const cost = Number(p.avgCost) * Number(p.quantity)
   const pnl = Number(p.unrealizedPnL)
@@ -453,7 +460,7 @@ function PositionRow({ position: p, onClose }: { position: Position; onClose: ()
           onClick={onClose}
           className="text-[11px] text-text-muted hover:text-red transition-colors"
         >
-          Close
+          {t('utaDetail.close', 'Close')}
         </button>
       </td>
     </tr>
@@ -470,29 +477,30 @@ interface OpenOrderRow {
 }
 
 function OrdersSection({ orders }: { orders: unknown[] }) {
+  const { t } = useTranslation()
   const rows = orders as OpenOrderRow[]
   if (rows.length === 0) {
     return (
-      <Section title="Open Orders (0)">
+      <Section title={t('utaDetail.openOrdersCount', 'Open Orders ({{count}})', { count: 0 })}>
         <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-text-muted">
-          No open orders.
+          {t('utaDetail.noOpenOrders', 'No open orders.')}
         </div>
       </Section>
     )
   }
   return (
-    <Section title={`Open Orders (${rows.length})`}>
+    <Section title={t('utaDetail.openOrdersCount', 'Open Orders ({{count}})', { count: rows.length })}>
       <div className="border border-border rounded-lg overflow-x-auto">
         <table className="w-full text-[13px]">
           <thead>
             <tr className="bg-bg-secondary text-text-muted text-left">
-              <th className="px-3 py-2 font-medium">Order ID</th>
-              <th className="px-3 py-2 font-medium">Contract</th>
-              <th className="px-3 py-2 font-medium">Action</th>
-              <th className="px-3 py-2 font-medium">Type</th>
-              <th className="px-3 py-2 font-medium text-right">Qty</th>
-              <th className="px-3 py-2 font-medium text-right">Limit</th>
-              <th className="px-3 py-2 font-medium">Status</th>
+              <th className="px-3 py-2 font-medium">{t('utaDetail.orderId', 'Order ID')}</th>
+              <th className="px-3 py-2 font-medium">{t('utaDetail.contract', 'Contract')}</th>
+              <th className="px-3 py-2 font-medium">{t('common.actions', 'Action')}</th>
+              <th className="px-3 py-2 font-medium">{t('common.type', 'Type')}</th>
+              <th className="px-3 py-2 font-medium text-right">{t('dev.qty', 'Qty')}</th>
+              <th className="px-3 py-2 font-medium text-right">{t('utaDetail.limit', 'Limit')}</th>
+              <th className="px-3 py-2 font-medium">{t('common.status', 'Status')}</th>
             </tr>
           </thead>
           <tbody>
@@ -507,7 +515,7 @@ function OrdersSection({ orders }: { orders: unknown[] }) {
                 <td className="px-3 py-2 text-right text-text tabular-nums">{String(o.order?.totalQuantity ?? '')}</td>
                 <td className="px-3 py-2 text-right text-text-muted tabular-nums">{o.order?.lmtPrice != null && !isUnsetDecimal(o.order.lmtPrice) ? String(o.order.lmtPrice) : '—'}</td>
                 <td className="px-3 py-2">
-                  <span className="text-[11px] text-text-muted">{o.orderState?.status ?? 'Unknown'}</span>
+                  <span className="text-[11px] text-text-muted">{o.orderState?.status ?? t('utaDetail.unknown', 'Unknown')}</span>
                 </td>
               </tr>
             ))}
@@ -527,8 +535,7 @@ interface SnapshotsTimelineProps {
 }
 
 function SnapshotsTimeline({ snapshots, expandedTimestamp, onToggle }: SnapshotsTimelineProps) {
-  // Group by calendar day. Snapshots are newest-first; preserve that order
-  // so the timeline reads top-down chronologically backwards (like git log).
+  const { t } = useTranslation()
   const groups = useMemo(() => {
     const map = new Map<string, UTASnapshotSummary[]>()
     for (const s of snapshots) {
@@ -541,16 +548,16 @@ function SnapshotsTimeline({ snapshots, expandedTimestamp, onToggle }: Snapshots
 
   if (snapshots.length === 0) {
     return (
-      <Section title="Snapshots">
+      <Section title={t('common.snapshots')}>
         <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-text-muted">
-          No snapshots yet. They are captured periodically (Portfolio → Snapshot Settings) or after each push.
+          {t('utaDetail.noSnapshotsYet', 'No snapshots yet. They are captured periodically (Portfolio → Snapshot Settings) or after each push.')}
         </div>
       </Section>
     )
   }
 
   return (
-    <Section title={`Snapshots (${snapshots.length})`}>
+    <Section title={t('utaDetail.snapshotsCount', 'Snapshots ({{count}})', { count: snapshots.length })}>
       <div className="relative pl-4">
         {/* Vertical guide line tucked behind the dots */}
         <div className="absolute left-[7px] top-0 bottom-0 w-px bg-border" aria-hidden />
@@ -618,18 +625,15 @@ function TriggerBadge({ trigger }: { trigger: string }) {
 // ==================== Date helpers ====================
 
 function formatDayLabel(dayString: string): string {
-  // dayString is the output of `Date.toDateString()` — locale-format it
-  // back into something more readable, with a "today" / "yesterday" hint.
   const d = new Date(dayString)
   const todayStr = new Date().toDateString()
   const yesterdayStr = new Date(Date.now() - 24 * 60 * 60 * 1000).toDateString()
-  const formatted = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
-  if (dayString === todayStr) return `${formatted} · today`
-  if (dayString === yesterdayStr) return `${formatted} · yesterday`
+  const formatted = fmtDateShort(d)
+  if (dayString === todayStr) return `${formatted} · ${i18n.t('common.today')}`
+  if (dayString === yesterdayStr) return `${formatted} · ${i18n.t('utaDetail.yesterday', 'yesterday')}`
   return formatted
 }
 
 function formatTime(timestamp: string): string {
-  const d = new Date(timestamp)
-  return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+  return fmtTime(new Date(timestamp))
 }

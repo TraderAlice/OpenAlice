@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { type AppConfig, type NewsCollectorConfig, type NewsCollectorFeed } from '../api'
 import { SaveIndicator } from '../components/SaveIndicator'
 import { ConfigSection, Field, inputClass } from '../components/form'
@@ -17,6 +18,7 @@ const DEFAULT_NEWS_CONFIG: NewsCollectorConfig = {
 }
 
 function CollectorSettings() {
+  const { t } = useTranslation()
   const { config, status, loadError, updateConfig, updateConfigImmediate, retry } = useConfigPage<NewsCollectorConfig>({
     section: 'news',
     extract: (full: AppConfig) => (full as Record<string, unknown>).news as NewsCollectorConfig,
@@ -36,11 +38,11 @@ function CollectorSettings() {
         <div className={`${!enabled ? 'opacity-40 pointer-events-none' : ''}`}>
           {/* Collection Settings */}
           <ConfigSection
-            title="Collection Settings"
-            description="Control how often articles are fetched and how long they are retained in the archive."
+            title={t('news.collectionSettings', 'Collection Settings')}
+            description={t('news.collectionSettingsDescription', 'Control how often articles are fetched and how long they are retained in the archive.')}
           >
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Fetch interval (min)">
+              <Field label={t('news.fetchIntervalMin', 'Fetch interval (min)')}>
                 <input
                   className={inputClass}
                   type="number"
@@ -49,7 +51,7 @@ function CollectorSettings() {
                   onChange={(e) => updateConfig({ intervalMinutes: Number(e.target.value) || 10 })}
                 />
               </Field>
-              <Field label="Retention (days)">
+              <Field label={t('news.retentionDays', 'Retention (days)')}>
                 <input
                   className={inputClass}
                   type="number"
@@ -67,7 +69,7 @@ function CollectorSettings() {
             onChange={(feeds) => updateConfigImmediate({ feeds })}
           />
         </div>
-        {loadError && <p className="text-[13px] text-red mt-4">Failed to load configuration.</p>}
+        {loadError && <p className="text-[13px] text-red mt-4">{t('news.failedToLoadConfig', 'Failed to load configuration.')}</p>}
       </div>
     </div>
   )
@@ -82,6 +84,7 @@ function FeedsSection({
   feeds: NewsCollectorFeed[]
   onChange: (feeds: NewsCollectorFeed[]) => void
 }) {
+  const { t } = useTranslation()
   const [newName, setNewName] = useState('')
   const [newUrl, setNewUrl] = useState('')
   const [newSource, setNewSource] = useState('')
@@ -113,11 +116,11 @@ function FeedsSection({
 
   return (
     <ConfigSection
-      title="RSS Feeds"
+      title={t('news.rssFeeds', 'RSS Feeds')}
       description={
         feeds.length > 0
-          ? `${activeCount} of ${feeds.length} feed${feeds.length > 1 ? 's' : ''} active. Toggle off to pause fetching without removing. Articles are searchable via globNews, grepNews, and readNews tools.`
-          : 'No feeds configured yet. Add feeds to start collecting articles.'
+          ? t('news.feedsActive', '{{active}} of {{total}} feed(s) active. Toggle off to pause fetching without removing. Articles are searchable via globNews, grepNews, and readNews tools.', { active: activeCount, total: feeds.length })
+          : t('news.noFeedsConfigured', 'No feeds configured yet. Add feeds to start collecting articles.')
       }
     >
       {/* Existing feeds */}
@@ -151,7 +154,7 @@ function FeedsSection({
                 <button
                   onClick={() => removeFeed(i)}
                   className="shrink-0 text-text-muted hover:text-red transition-colors p-1"
-                  title="Remove feed"
+                  title={t('news.removeFeed', 'Remove feed')}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="18" y1="6" x2="6" y2="18" />
@@ -166,27 +169,27 @@ function FeedsSection({
 
       {/* Add feed form */}
       <div className="border border-border/40 rounded-lg p-4 space-y-3">
-        <p className="text-[13px] font-medium text-text-muted">Add Feed</p>
+        <p className="text-[13px] font-medium text-text-muted">{t('news.addFeed', 'Add Feed')}</p>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Name">
+          <Field label={t('news.name', 'Name')}>
             <input className={inputClass} value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. CoinDesk" />
           </Field>
-          <Field label="Source Tag">
+          <Field label={t('news.sourceTag', 'Source Tag')}>
             <input className={inputClass} value={newSource} onChange={(e) => setNewSource(e.target.value)} placeholder="e.g. coindesk" />
           </Field>
         </div>
-        <Field label="Feed URL">
+        <Field label={t('news.feedUrl', 'Feed URL')}>
           <input className={inputClass} value={newUrl} onChange={(e) => setNewUrl(e.target.value)} placeholder="https://example.com/rss.xml" />
         </Field>
-        <Field label="Description (optional)">
-          <input className={inputClass} value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="Short description shown in the feed list" />
+        <Field label={t('news.descriptionOptional', 'Description (optional)')}>
+          <input className={inputClass} value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder={t('news.shortDescription', 'Short description shown in the feed list')} />
         </Field>
         <button
           onClick={addFeed}
           disabled={!newName.trim() || !newUrl.trim() || !newSource.trim()}
           className="btn-secondary"
         >
-          Add Feed
+          {t('news.addFeed', 'Add Feed')}
         </button>
       </div>
     </ConfigSection>
@@ -196,11 +199,12 @@ function FeedsSection({
 // ==================== Page ====================
 
 export function NewsCollectorPage() {
+  const { t } = useTranslation()
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
-        title="News Collector"
-        description="Configure RSS feeds and collection settings."
+        title={t('news.title', 'News Collector')}
+        description={t('news.description', 'Configure RSS feeds and collection settings.')}
       />
 
       <div className="flex-1 flex flex-col min-h-0 px-4 md:px-8 py-5">

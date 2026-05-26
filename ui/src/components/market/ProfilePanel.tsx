@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { marketApi, type EquityProfile } from '../../api/market'
 import { Card } from './Card'
 import { fmtInt } from './format'
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export function ProfilePanel({ symbol }: Props) {
+  const { t } = useTranslation()
   const [profile, setProfile] = useState<EquityProfile | null>(null)
   const [provider, setProvider] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -47,19 +49,19 @@ export function ProfilePanel({ symbol }: Props) {
   ].join('\n')
 
   return (
-    <Card title="Profile" info={info}>
+    <Card title={t('market.profile', 'Profile')} info={info}>
       {loading && <div className="text-[12px] text-text-muted">Loading…</div>}
       {error && !loading && <div className="text-[12px] text-red">{error}</div>}
       {!loading && !error && profile && (
         <div className="flex flex-col gap-3 text-[12px]">
           <dl className="grid grid-cols-[90px_1fr] gap-y-1 gap-x-3">
-            <KV label="Sector"    value={sector} />
-            <KV label="Industry"  value={industry} />
-            <KV label="CEO"       value={ceo} />
-            <KV label="Employees" value={employees != null ? fmtInt(employees) : undefined} />
-            <KV label="HQ"        value={hq} />
+            <KV label={t('market.sector', 'Sector')}    value={sector} />
+            <KV label={t('market.industry', 'Industry')}  value={industry} />
+            <KV label={t('market.ceo', 'CEO')}       value={ceo} />
+            <KV label={t('market.employees', 'Employees')} value={employees != null ? fmtInt(employees) : undefined} />
+            <KV label={t('market.hq', 'HQ')}        value={hq} />
             <KV
-              label="Website"
+              label={t('market.website', 'Website')}
               value={website ? <a className="text-accent hover:underline break-all" href={website} target="_blank" rel="noreferrer">{website.replace(/^https?:\/\//, '')}</a> : undefined}
             />
           </dl>
@@ -69,7 +71,7 @@ export function ProfilePanel({ symbol }: Props) {
         </div>
       )}
       {!loading && !error && !profile && (
-        <div className="text-[12px] text-text-muted">No profile data.</div>
+        <div className="text-[12px] text-text-muted">{t('market.noProfileData', 'No profile data.')}</div>
       )}
     </Card>
   )

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api } from '../api'
 import type { VersionInfo } from '../api/types'
 
@@ -21,6 +22,7 @@ const SKIP_STORAGE_KEY = 'openalice.update.skipVersion'
  * eventually handle that path natively).
  */
 export function UpdateBanner() {
+  const { t } = useTranslation()
   const [info, setInfo] = useState<VersionInfo | null>(null)
   const [sessionDismissed, setSessionDismissed] = useState(false)
 
@@ -54,14 +56,14 @@ export function UpdateBanner() {
         </svg>
       </span>
       <span className="flex-1 min-w-0 truncate">
-        <span className="font-semibold">v{info.latest}</span> is available
-        {' '}<span className="text-text-muted">(you have v{info.current})</span>
+        <span className="font-semibold">v{info.latest}</span> {t('updateBanner.isAvailable', 'is available')}
+        {' '}<span className="text-text-muted">({t('updateBanner.youHave', 'you have v{{version}}', { version: info.current })})</span>
         {info.publishedAt && (
-          <span className="text-text-muted"> · released {info.publishedAt.slice(0, 10)}</span>
+          <span className="text-text-muted"> · {t('updateBanner.released', 'released {{date}}', { date: info.publishedAt.slice(0, 10) })}</span>
         )}
       </span>
       <span className="text-text-muted shrink-0 hidden md:inline">
-        Run <code className="text-accent bg-bg-tertiary px-1 rounded">git pull &amp;&amp; pnpm build</code> to update
+        {t('updateBanner.runToUpdate', 'Run')} <code className="text-accent bg-bg-tertiary px-1 rounded">git pull &amp;&amp; pnpm build</code> {t('updateBanner.toUpdate', 'to update')}
       </span>
       {info.releaseUrl && (
         <a
@@ -70,21 +72,21 @@ export function UpdateBanner() {
           rel="noopener noreferrer"
           className="text-accent hover:underline shrink-0"
         >
-          Release notes →
+          {t('updateBanner.releaseNotes', 'Release notes →')}
         </a>
       )}
       <button
         onClick={handleSkip}
         className="text-text-muted hover:text-text shrink-0 text-[11px]"
-        title="Don't show this update again"
+        title={t('updateBanner.skipTitle', "Don't show this update again")}
       >
-        Skip this version
+        {t('updateBanner.skipThisVersion', 'Skip this version')}
       </button>
       <button
         onClick={handleDismiss}
         className="text-text-muted hover:text-text shrink-0"
-        title="Dismiss until next reload"
-        aria-label="Dismiss"
+        title={t('updateBanner.dismissTitle', 'Dismiss until next reload')}
+        aria-label={t('common.dismiss')}
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <line x1="18" y1="6" x2="6" y2="18" />

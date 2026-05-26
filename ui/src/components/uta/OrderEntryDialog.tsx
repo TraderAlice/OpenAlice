@@ -1,10 +1,9 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Field, inputClass } from '../form'
 import { Dialog } from './Dialog'
 import { tradingApi, OrderEntryError } from '../../api/trading'
 import type { WalletPushResult, PlaceOrderRequest, ClosePositionRequest } from '../../api/types'
-
-// ==================== Modes ====================
 
 export type OrderEntryMode =
   | { kind: 'place'; aliceId?: string }
@@ -14,32 +13,15 @@ interface Props {
   utaId: string
   mode: OrderEntryMode
   onClose: () => void
-  /** Called once after a *successful* push so the parent can refresh positions/orders without waiting for the polling tick. */
   onPushComplete?: (result: WalletPushResult) => void
 }
 
-// ==================== Component ====================
-
-/**
- * Manual order entry — single dialog driving the one-shot
- * stage→commit→push backend endpoints. Displays the full
- * `WalletPushResult` after submit so the user can see per-op
- * submitted/rejected outcomes (and in particular, watch the async
- * "Submitted → Filled" transition in real-time).
- *
- * Two modes share the form-then-result flow:
- *   - `place`: full order entry form (aliceId, side, type, qty, limit)
- *   - `close`: tiny confirm form with overridable qty for an existing
- *     position
- */
 export function OrderEntryDialog({ utaId, mode, onClose, onPushComplete }: Props) {
+  const { t } = useTranslation()
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<{ message: string; phase?: string } | null>(null)
   const [result, setResult] = useState<WalletPushResult | null>(null)
 
-  // Whether the result panel has shown — once it has, parent should
-  // refresh on close. We notify via onPushComplete after a successful
-  // push so parent can refresh immediately AND on close.
   const handleClose = () => {
     if (result && onPushComplete) onPushComplete(result)
     onClose()
@@ -60,17 +42,16 @@ export function OrderEntryDialog({ utaId, mode, onClose, onPushComplete }: Props
 
       <div className="shrink-0 flex items-center justify-end px-6 py-4 border-t border-border">
         <button onClick={handleClose} className="btn-secondary">
-          {result ? 'Done' : 'Cancel'}
+          {result ? t('orderEntry.done') : t('common.cancel')}
         </button>
       </div>
     </Dialog>
   )
 }
 
-// ==================== Header ====================
-
 function Header({ mode, onClose }: { mode: OrderEntryMode; onClose: () => void }) {
-  const title = mode.kind === 'place' ? 'Place Order' : 'Close Position'
+  const { t } = useTranslation()
+  const title = mode.kind === 'place' ? t('orderEntry.placeOrder') : t('orderEntry.closePosition')
   return (
     <div className="shrink-0 px-6 py-4 border-b border-border flex items-center justify-between">
       <h3 className="text-[14px] font-semibold text-text">{title}</h3>
@@ -83,8 +64,6 @@ function Header({ mode, onClose }: { mode: OrderEntryMode; onClose: () => void }
   )
 }
 
-// ==================== Place form ====================
-
 interface SharedFormProps {
   utaId: string
   submitting: boolean
@@ -96,6 +75,7 @@ interface SharedFormProps {
 }
 
 function PlaceForm({ initialAliceId, ...p }: SharedFormProps & { initialAliceId?: string }) {
+  const { t } = useTranslation()
   const [aliceId, setAliceId] = useState(initialAliceId ?? '')
   const [action, setAction] = useState<'BUY' | 'SELL'>('BUY')
   const [orderType, setOrderType] = useState<'MKT' | 'LMT'>('MKT')
@@ -143,7 +123,7 @@ function PlaceForm({ initialAliceId, ...p }: SharedFormProps & { initialAliceId?
 
   return (
     <div className="space-y-4">
-      <Field label="aliceId">
+      <Field label={t('orderEntry.aliceId')}>
         <input
           className={`${inputClass} font-mono text-[12px]`}
           value={aliceId}
@@ -153,15 +133,15 @@ function PlaceForm({ initialAliceId, ...p }: SharedFormProps & { initialAliceId?
       </Field>
 
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Action">
-          <Segmented value={action} options={[{ id: 'BUY' }, { id: 'SELL' }]} onChange={(v) => setAction(v as 'BUY' | 'SELL')} />
+        <Field label={t('orderEntry.action')}>
+          <Segmented value={action} options={[{ id: 'BUY', label: t('orderEntry.buy') }, { id: 'SELL', label: t('orderEntry.sell') }]} onChange={(v) => setAction(v as 'BUY' | 'SELL')} />
         </Field>
-        <Field label="Order Type">
-          <Segmented value={orderType} options={[{ id: 'MKT', label: 'Market' }, { id: 'LMT', label: 'Limit' }]} onChange={(v) => setOrderType(v as 'MKT' | 'LMT')} />
+        <Field label={t('orderEntry.orderType')}>
+          <Segmented value={orderType} options={[{ id: 'MKT', label: t('orderEntry.market') }, { id: 'LMT', label: t('orderEntry.limit') }]} onChange={(v) => setOrderType(v as 'MKT' | 'LMT')} />
         </Field>
       </div>
 
-      <Field label={`Quantity${cashQty ? ' (or use Cash Qty below)' : ''}`}>
+      <Field label={t('orderEntry.quantity') + (cashQty ? t('orderEntry.cashQtyHint') : '')}>
         <input
           className={`${inputClass} font-mono`}
           value={quantity}
@@ -169,11 +149,11 @@ function PlaceForm({ initialAliceId, ...p }: SharedFormProps & { initialAliceId?
           placeholder="0.001"
           inputMode="decimal"
         />
-        <p className="text-[11px] text-text-muted/60 mt-1">Numeric string — preserved at full precision through to the broker (no float roundtrip).</p>
+        <p className="text-[11px] text-text-muted/60 mt-1">{t('orderEntry.quantityHint')}</p>
       </Field>
 
       {orderType === 'LMT' && (
-        <Field label="Limit Price">
+        <Field label={t('orderEntry.limitPrice')}>
           <input
             className={`${inputClass} font-mono`}
             value={lmtPrice}
@@ -188,11 +168,11 @@ function PlaceForm({ initialAliceId, ...p }: SharedFormProps & { initialAliceId?
         onClick={() => setShowAdvanced(!showAdvanced)}
         className="text-[11px] text-text-muted hover:text-text transition-colors"
       >
-        {showAdvanced ? '▾ Hide advanced' : '▸ Show advanced (cash qty, TIF)'}
+        {showAdvanced ? t('orderEntry.hideAdvanced') : t('orderEntry.showAdvanced')}
       </button>
       {showAdvanced && (
         <div className="space-y-3 border-l border-border pl-3">
-          <Field label="Cash Qty (notional)">
+          <Field label={t('orderEntry.cashQty')}>
             <input
               className={`${inputClass} font-mono`}
               value={cashQty}
@@ -200,27 +180,27 @@ function PlaceForm({ initialAliceId, ...p }: SharedFormProps & { initialAliceId?
               placeholder="50"
               inputMode="decimal"
             />
-            <p className="text-[11px] text-text-muted/60 mt-1">USDT-equivalent notional. Overrides Quantity if both are set.</p>
+            <p className="text-[11px] text-text-muted/60 mt-1">{t('orderEntry.cashQtyHint')}</p>
           </Field>
-          <Field label="Time in Force">
+          <Field label={t('orderEntry.tif')}>
             <select className={inputClass} value={tif} onChange={(e) => setTif(e.target.value)}>
               <option value="DAY">DAY</option>
-              <option value="GTC">GTC (Good Till Cancelled)</option>
+              <option value="GTC">GTC ({t('orderEntry.gtcDesc')})</option>
             </select>
           </Field>
         </div>
       )}
 
       <div className="border-t border-border pt-4">
-        <Field label="Commit Message — required">
+        <Field label={t('orderEntry.commitMessage')}>
           <input
             className={inputClass}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            placeholder="Why are you placing this order?"
+            placeholder={t('orderEntry.commitMessagePlaceholder')}
             autoFocus
           />
-          <p className="text-[11px] text-text-muted/60 mt-1">Goes into the trading-as-git commit log alongside the order. Required, even for manual entries.</p>
+          <p className="text-[11px] text-text-muted/60 mt-1">{t('orderEntry.commitMessageHint')}</p>
         </Field>
       </div>
 
@@ -232,16 +212,15 @@ function PlaceForm({ initialAliceId, ...p }: SharedFormProps & { initialAliceId?
           disabled={!canSubmit}
           className="btn-primary w-full"
         >
-          {p.submitting ? 'Submitting…' : 'Place Order'}
+          {p.submitting ? t('orderEntry.submitting') : t('orderEntry.placeOrder')}
         </button>
       </div>
     </div>
   )
 }
 
-// ==================== Close form ====================
-
 function CloseForm({ aliceId, initialQty, symbol, ...p }: SharedFormProps & { aliceId: string; initialQty: string; symbol?: string }) {
+  const { t } = useTranslation()
   const [qty, setQty] = useState(initialQty)
   const [message, setMessage] = useState('')
 
@@ -274,11 +253,11 @@ function CloseForm({ aliceId, initialQty, symbol, ...p }: SharedFormProps & { al
   return (
     <div className="space-y-4">
       <div className="rounded-md border border-border bg-bg-secondary/50 px-3 py-2.5 space-y-1">
-        <div className="text-[11px] text-text-muted uppercase tracking-wide">Closing</div>
+        <div className="text-[11px] text-text-muted uppercase tracking-wide">{t('orderEntry.closingLabel')}</div>
         <div className="font-mono text-[13px] text-text">{aliceId}</div>
       </div>
 
-      <Field label="Quantity to close">
+      <Field label={t('orderEntry.quantityToClose')}>
         <input
           className={`${inputClass} font-mono`}
           value={qty}
@@ -286,15 +265,15 @@ function CloseForm({ aliceId, initialQty, symbol, ...p }: SharedFormProps & { al
           placeholder="(empty = full position)"
           inputMode="decimal"
         />
-        <p className="text-[11px] text-text-muted/60 mt-1">Defaults to current position size. Override for partial close. Empty = close entire position.</p>
+        <p className="text-[11px] text-text-muted/60 mt-1">{t('orderEntry.defaultsToPosition')}</p>
       </Field>
 
-      <Field label="Commit Message — required">
+      <Field label={t('orderEntry.commitMessage')}>
         <input
           className={inputClass}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          placeholder="Why are you closing?"
+          placeholder={t('orderEntry.closeCommitPlaceholder')}
           autoFocus
         />
       </Field>
@@ -307,16 +286,15 @@ function CloseForm({ aliceId, initialQty, symbol, ...p }: SharedFormProps & { al
           disabled={!canSubmit}
           className="btn-danger w-full"
         >
-          {p.submitting ? 'Closing…' : 'Close Position'}
+          {p.submitting ? t('orderEntry.closing') : t('orderEntry.closePosition')}
         </button>
       </div>
     </div>
   )
 }
 
-// ==================== Push result panel ====================
-
 function PushResultPanel({ result }: { result: WalletPushResult }) {
+  const { t } = useTranslation()
   const totalRejected = result.rejected.length
   const totalSubmitted = result.submitted.length
   const fullySubmitted = totalRejected === 0 && totalSubmitted > 0
@@ -327,32 +305,31 @@ function PushResultPanel({ result }: { result: WalletPushResult }) {
         <span className={`w-2 h-2 rounded-full shrink-0 ${fullySubmitted ? 'bg-green' : 'bg-yellow-400'}`} />
         <span className={`text-[13px] font-medium ${fullySubmitted ? 'text-green' : 'text-yellow-400'}`}>
           {fullySubmitted
-            ? `${totalSubmitted} operation${totalSubmitted > 1 ? 's' : ''} submitted to broker`
-            : `${totalSubmitted} submitted, ${totalRejected} rejected`}
+            ? t('orderEntry.opsSubmitted', { count: totalSubmitted })
+            : t('orderEntry.opsMixed', { submitted: totalSubmitted, rejected: totalRejected })}
         </span>
       </div>
 
       <div className="rounded-md border border-border bg-bg-secondary/50 px-3 py-2.5 space-y-1.5">
         <div className="flex justify-between text-[12px]">
-          <span className="text-text-muted">Commit hash</span>
+          <span className="text-text-muted">{t('orderEntry.commitHash')}</span>
           <span className="font-mono text-text">{result.hash}</span>
         </div>
         <div className="text-[12px]">
-          <span className="text-text-muted">Message:</span>
+          <span className="text-text-muted">{t('orderEntry.messageLabel')}</span>
           <span className="ml-2 text-text">{result.message}</span>
         </div>
       </div>
 
       {result.submitted.length > 0 && (
-        <OpTable title="Submitted" rows={result.submitted} kind="submitted" />
+        <OpTable title={t('orderEntry.submittedLabel')} rows={result.submitted} kind="submitted" />
       )}
       {result.rejected.length > 0 && (
-        <OpTable title="Rejected" rows={result.rejected} kind="rejected" />
+        <OpTable title={t('orderEntry.rejectedLabel')} rows={result.rejected} kind="rejected" />
       )}
 
       <p className="text-[11px] text-text-muted leading-relaxed">
-        Status <strong className="text-text">Submitted</strong> means the broker accepted the order — fills happen async.
-        Refresh the positions / orders panels in a moment to see the order transition to <strong className="text-text">Filled</strong>.
+        {t('orderEntry.statusNote')}
       </p>
     </div>
   )
@@ -367,6 +344,7 @@ interface OpRow {
 }
 
 function OpTable({ title, rows, kind }: { title: string; rows: OpRow[]; kind: 'submitted' | 'rejected' }) {
+  const { t } = useTranslation()
   return (
     <div>
       <p className="text-[11px] font-medium text-text-muted uppercase tracking-wide mb-1.5">{title} ({rows.length})</p>
@@ -374,9 +352,9 @@ function OpTable({ title, rows, kind }: { title: string; rows: OpRow[]; kind: 's
         <table className="w-full text-[12px]">
           <thead>
             <tr className="bg-bg-tertiary/30 text-text-muted">
-              <th className="text-left px-2.5 py-1.5 font-medium">Action</th>
-              <th className="text-left px-2.5 py-1.5 font-medium">Order ID</th>
-              <th className="text-left px-2.5 py-1.5 font-medium">Status / Error</th>
+              <th className="text-left px-2.5 py-1.5 font-medium">{t('orderEntry.actionLabel')}</th>
+              <th className="text-left px-2.5 py-1.5 font-medium">{t('orderEntry.orderIdLabel')}</th>
+              <th className="text-left px-2.5 py-1.5 font-medium">{t('orderEntry.statusErrorLabel')}</th>
             </tr>
           </thead>
           <tbody>
@@ -396,23 +374,20 @@ function OpTable({ title, rows, kind }: { title: string; rows: OpRow[]; kind: 's
   )
 }
 
-// ==================== Error display ====================
-
 function ErrorPanel({ message, phase }: { message: string; phase?: string }) {
+  const { t } = useTranslation()
   return (
     <div className="rounded-md border border-red/30 bg-red/5 px-3 py-2.5">
       <div className="flex items-center gap-2 mb-1">
         <span className="w-2 h-2 rounded-full bg-red shrink-0" />
         <span className="text-[12px] font-medium text-red">
-          {phase ? `Failed at ${phase} step` : 'Failed'}
+          {phase ? t('orderEntry.failedAtStep', { phase }) : t('orderEntry.failed')}
         </span>
       </div>
       <p className="text-[12px] text-text whitespace-pre-wrap">{message}</p>
     </div>
   )
 }
-
-// ==================== Segmented control ====================
 
 function Segmented({ value, options, onChange }: {
   value: string
@@ -437,4 +412,3 @@ function Segmented({ value, options, onChange }: {
     </div>
   )
 }
-

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   ReactFlow,
   Background,
@@ -205,6 +206,7 @@ function buildGraph(topology: TopologyResponse): { nodes: Node[]; edges: Edge[] 
 // ==================== Component ====================
 
 export function AutomationFlowSection() {
+  const { t } = useTranslation()
   const [topology, setTopology] = useState<TopologyResponse | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
 
@@ -270,7 +272,7 @@ export function AutomationFlowSection() {
   }, [topology, pulsingTypes])
 
   if (loadError) {
-    return <EmptyState title="Failed to load topology" description={loadError} />
+    return <EmptyState title={t('automation.failedToLoadTopology')} description={loadError} />
   }
   if (!topology) return <PageLoading />
 

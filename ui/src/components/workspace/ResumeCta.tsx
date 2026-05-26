@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import type { ReactElement } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MessageSquare } from 'lucide-react';
+import { fmtDate, fmtTime } from '../../lib/i18n-format';
 
 import type { SessionRecord } from './api';
 
@@ -31,6 +33,7 @@ export interface ResumeCtaProps {
  *      `resume --last`; shell fresh + scrollback restore).
  */
 export function ResumeCta(props: ResumeCtaProps): ReactElement {
+  const { t } = useTranslation();
   const [resuming, setResuming] = useState(false);
   const r = props.record;
 
@@ -53,7 +56,7 @@ export function ResumeCta(props: ResumeCtaProps): ReactElement {
             </span>
             <div className="resume-cta-card-title">
               <span className="resume-cta-name">{r.name}</span>
-              <span className="resume-cta-state">paused · {relativeTime(r.lastActiveAt)}</span>
+              <span className="resume-cta-state">{t('workspace.paused', 'paused')} · {relativeTime(t, r.lastActiveAt)}</span>
             </div>
           </div>
 
@@ -62,20 +65,20 @@ export function ResumeCta(props: ResumeCtaProps): ReactElement {
             className="resume-cta-btn"
             onClick={onClick}
             disabled={resuming}
-            aria-label={resuming ? 'Resuming conversation…' : 'Continue conversation'}
+            aria-label={resuming ? t('workspace.resuming', 'Resuming conversation…') : t('workspace.continueConversation', 'Continue conversation')}
           >
             <MessageSquare size={14} strokeWidth={2.25} aria-hidden="true" />
-            <span>{resuming ? 'Resuming…' : 'Continue conversation'}</span>
+            <span>{resuming ? t('workspace.resuming', 'Resuming…') : t('workspace.continueConversation', 'Continue conversation')}</span>
           </button>
 
           <dl className="resume-cta-meta">
-            <dt>Agent</dt>
+            <dt>{t('workspace.agent', 'Agent')}</dt>
             <dd>{r.agent}</dd>
-            <dt>Created</dt>
+            <dt>{t('workspace.created', 'Created')}</dt>
             <dd>{absoluteTime(r.createdAt)}</dd>
             {r.agentSessionId && (
               <>
-                <dt>Transcript</dt>
+                <dt>{t('workspace.transcript', 'Transcript')}</dt>
                 <dd className="mono">{r.agentSessionId.slice(0, 8)}</dd>
               </>
             )}
@@ -170,15 +173,15 @@ export function prefixOf(agent: string): string {
 function absoluteTime(iso: string): string {
   const t = new Date(iso);
   if (!Number.isFinite(t.getTime())) return iso;
-  return t.toLocaleString();
+  return `${fmtDate(t)} ${fmtTime(t)}`;
 }
 
-export function relativeTime(iso: string): string {
-  const t = new Date(iso).getTime();
-  if (!Number.isFinite(t)) return '';
-  const dMs = Date.now() - t;
-  if (dMs < 60_000) return 'just now';
-  if (dMs < 3_600_000) return `${Math.floor(dMs / 60_000)} min ago`;
-  if (dMs < 86_400_000) return `${Math.floor(dMs / 3_600_000)} hours ago`;
-  return `${Math.floor(dMs / 86_400_000)} days ago`;
+export function relativeTime(t: any, iso: string): string {
+  const ts = new Date(iso).getTime();
+  if (!Number.isFinite(ts)) return '';
+  const dMs = Date.now() - ts;
+  if (dMs < 60_000) return t('common.justNow', 'just now');
+  if (dMs < 3_600_000) return t('common.minutesAgo', '{{count}} min ago', { count: Math.floor(dMs / 60_000) });
+  if (dMs < 86_400_000) return t('common.hoursAgo', '{{count}} hours ago', { count: Math.floor(dMs / 3_600_000) });
+  return t('common.daysAgo', '{{count}} days ago', { count: Math.floor(dMs / 86_400_000) });
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Field, inputClass } from '../components/form'
 import { SDKSelector } from '../components/SDKSelector'
 import type { SDKOption } from '../components/SDKSelector'
@@ -88,6 +89,7 @@ function summarizeCurve(points: EquityCurvePoint[]): CurveSummary {
 // ==================== Page ====================
 
 export function TradingPage() {
+  const { t } = useTranslation()
   const tc = useTradingConfig()
   const healthMap = useAccountHealth()
   const navigate = useNavigate()
@@ -126,12 +128,12 @@ export function TradingPage() {
     return () => clearInterval(id)
   }, [refreshAggregates])
 
-  if (tc.loading) return <PageShell subtitle="Loading..." />
+  if (tc.loading) return <PageShell subtitle={t('common.loading')} />
   if (tc.error) {
     return (
-      <PageShell subtitle="Failed to load trading configuration.">
+      <PageShell subtitle={t('trading.failedToLoad')}>
         <p className="text-[13px] text-red">{tc.error}</p>
-        <button onClick={tc.refresh} className="mt-2 btn-secondary">Retry</button>
+        <button onClick={tc.refresh} className="mt-2 btn-secondary">{t('common.retry')}</button>
       </PageShell>
     )
   }
@@ -139,8 +141,8 @@ export function TradingPage() {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
-        title="Trading"
-        description="Configure your UTAs (Unified Trading Accounts)."
+        title={t('trading.title')}
+        description={t('trading.description')}
         live={tc.utas.length > 0 ? { lastUpdated } : undefined}
       />
 
@@ -171,7 +173,7 @@ export function TradingPage() {
                   onClick={() => setShowAdd(true)}
                   className="w-full py-2.5 text-[12px] text-text-muted hover:text-text border border-dashed border-border hover:border-text-muted/40 rounded-lg transition-colors"
                 >
-                  + Add UTA
+                  {t('trading.addUTA')}
                 </button>
               </div>
             </>
@@ -207,9 +209,10 @@ export function TradingPage() {
 // ==================== Page Shell ====================
 
 function PageShell({ subtitle, children }: { subtitle: string; children?: React.ReactNode }) {
+  const { t } = useTranslation()
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <PageHeader title="Trading" description={subtitle} />
+      <PageHeader title={t('trading.title')} description={subtitle} />
       <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5">{children}</div>
     </div>
   )
@@ -218,14 +221,15 @@ function PageShell({ subtitle, children }: { subtitle: string; children?: React.
 // ==================== Empty State ====================
 
 function EmptyState({ onAdd }: { onAdd: () => void }) {
+  const { t } = useTranslation()
   return (
     <div className="rounded-xl border border-dashed border-border p-12 text-center">
-      <h3 className="text-[16px] font-semibold text-text mb-2">No UTAs configured</h3>
+      <h3 className="text-[16px] font-semibold text-text mb-2">{t('trading.noUTAs')}</h3>
       <p className="text-[13px] text-text-muted mb-6 max-w-[320px] mx-auto leading-relaxed">
-        Connect a crypto exchange or brokerage to start automated trading.
+        {t('trading.noUTAsDescription')}
       </p>
       <button onClick={onAdd} className="btn-primary">
-        + Add UTA
+        {t('trading.addUTA')}
       </button>
     </div>
   )
@@ -237,12 +241,11 @@ function PortfolioBanner({ equity, curve }: {
   equity: EquitySummary
   curve: { values: number[]; firstAtCutoff: number | null; latest: number | null } | null
 }) {
+  const { t } = useTranslation()
   const total = Number(equity.totalEquity)
   const cash = Number(equity.totalCash)
   const unrealized = Number(equity.totalUnrealizedPnL)
 
-  // 24h delta from the curve summary. If curve is empty or the cutoff
-  // baseline isn't available (UTA freshly added), suppress the delta.
   let deltaNode: React.ReactNode = null
   if (curve && curve.latest != null && curve.firstAtCutoff != null) {
     const delta = curve.latest - curve.firstAtCutoff
@@ -252,14 +255,14 @@ function PortfolioBanner({ equity, curve }: {
     const color = sign === 'up' ? 'text-green' : sign === 'down' ? 'text-red' : 'text-text-muted'
     deltaNode = (
       <span className={`text-[14px] tabular-nums ${color}`}>
-        {arrow} {fmtPnl(delta, 'USD')} ({fmtPctSigned(pct)}) today
+        {arrow} {fmtPnl(delta, 'USD')} ({fmtPctSigned(pct)}) {t('common.today')}
       </span>
     )
   }
 
   return (
     <div className="rounded-lg border border-border bg-bg-secondary px-5 py-4">
-      <p className="text-[11px] text-text-muted uppercase tracking-wide mb-1">Total Portfolio · USD</p>
+      <p className="text-[11px] text-text-muted uppercase tracking-wide mb-1">{t('common.totalPortfolio')} · USD</p>
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
         <span className="text-[26px] md:text-[30px] font-bold tabular-nums text-text">
           {fmt(total, 'USD')}
@@ -267,9 +270,9 @@ function PortfolioBanner({ equity, curve }: {
         {deltaNode}
       </div>
       <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-text-muted">
-        <span>Cash <span className="text-text tabular-nums">{fmt(cash, 'USD')}</span></span>
+        <span>{t('common.cash')} <span className="text-text tabular-nums">{fmt(cash, 'USD')}</span></span>
         <span className="text-text-muted/40">·</span>
-        <span>Unrealized <span className={`tabular-nums ${unrealized >= 0 ? 'text-green' : 'text-red'}`}>{fmtPnl(unrealized, 'USD')}</span></span>
+        <span>{t('common.unrealized')} <span className={`tabular-nums ${unrealized >= 0 ? 'text-green' : 'text-red'}`}>{fmtPnl(unrealized, 'USD')}</span></span>
       </div>
     </div>
   )
@@ -420,6 +423,7 @@ function CreateWizard({ presets, onSave, onOpenExisting, onClose }: {
   onOpenExisting: (id: string) => void
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   const [step, setStep] = useState<WizardStep>('pick')
   const [presetId, setPresetId] = useState<string | null>(null)
   const [name, setName] = useState('')
@@ -544,13 +548,13 @@ function CreateWizard({ presets, onSave, onOpenExisting, onClose }: {
           <div className="space-y-6">
             {recommendedOptions.length > 0 && (
               <section className="space-y-3">
-                <PickerSectionHeader title="Recommended" />
+                <PickerSectionHeader title={t('trading.wizard.recommended')} />
                 <SDKSelector options={recommendedOptions} selected={presetId ?? ''} onSelect={handlePick} />
               </section>
             )}
             {cryptoOptions.length > 0 && (
               <section className="space-y-3">
-                <PickerSectionHeader title="Crypto" />
+                <PickerSectionHeader title={t('trading.wizard.crypto')} />
                 <SDKSelector options={cryptoOptions} selected={presetId ?? ''} onSelect={handlePick} />
               </section>
             )}
@@ -561,7 +565,7 @@ function CreateWizard({ presets, onSave, onOpenExisting, onClose }: {
           <div className="space-y-5">
             {preset.hint && <HintBlock text={preset.hint} />}
             <div className="space-y-3">
-              <Field label="Name" description="Display label for this account. The unique id is derived automatically from the credentials below.">
+              <Field label={t('trading.wizard.name')} description={t('trading.wizard.nameDescription')}>
                 <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} placeholder={defaultName} />
               </Field>
               <SchemaFormFields
@@ -575,7 +579,7 @@ function CreateWizard({ presets, onSave, onOpenExisting, onClose }: {
                   onClick={() => setShowSecrets(!showSecrets)}
                   className="text-[11px] text-text-muted hover:text-text transition-colors"
                 >
-                  {showSecrets ? 'Hide secrets' : 'Show secrets'}
+                  {showSecrets ? t('trading.wizard.hideSecrets') : t('trading.wizard.showSecrets')}
                 </button>
               )}
               {error && <p className="text-[12px] text-red">{error}</p>}
@@ -595,31 +599,31 @@ function CreateWizard({ presets, onSave, onOpenExisting, onClose }: {
       <div className="shrink-0 flex items-center justify-between px-6 py-4 border-t border-border">
         {step === 'pick' && (
           <>
-            <button onClick={onClose} className="btn-secondary">Cancel</button>
-            <span className="text-[11px] text-text-muted">Pick a platform to continue</span>
+            <button onClick={onClose} className="btn-secondary">{t('common.cancel')}</button>
+            <span className="text-[11px] text-text-muted">{t('trading.wizard.pickPlatform')}</span>
           </>
         )}
         {step === 'config' && (
           <>
-            <button onClick={() => setStep('pick')} className="btn-secondary">← Back</button>
+            <button onClick={() => setStep('pick')} className="btn-secondary">{t('common.back')}</button>
             <button onClick={handleTest} disabled={testing} className="btn-primary">
-              {testing ? 'Testing...' : 'Test Connection →'}
+              {testing ? t('trading.wizard.testing') : t('trading.wizard.testConnection')}
             </button>
           </>
         )}
         {step === 'test' && (
           <>
-            <button onClick={() => setStep('config')} className="btn-secondary">← Back</button>
+            <button onClick={() => setStep('config')} className="btn-secondary">{t('common.back')}</button>
             {conflict ? (
               <button onClick={() => onOpenExisting(conflict.existing.id)} className="btn-primary">
-                Open existing
+                {t('trading.wizard.openExisting')}
               </button>
             ) : testResult?.success ? (
               <button onClick={handleSave} disabled={saving} className="btn-primary">
-                {saving ? 'Saving...' : 'Save UTA'}
+                {saving ? t('trading.wizard.saving') : t('trading.wizard.saveUta')}
               </button>
             ) : (
-              <span className="text-[11px] text-text-muted">Fix the config and try again</span>
+              <span className="text-[11px] text-text-muted">{t('trading.wizard.fixConfig')}</span>
             )}
           </>
         )}

@@ -12,6 +12,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { MarkdownContent } from '../components/MarkdownContent'
 import { useWorkspaces } from '../contexts/WorkspacesContext'
@@ -39,6 +40,7 @@ function humanize(name: string): string {
 }
 
 export function TemplateDetailPage({ spec }: Props) {
+  const { t } = useTranslation()
   const { templates, agents, refresh } = useWorkspaces()
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
 
@@ -129,8 +131,8 @@ export function TemplateDetailPage({ spec }: Props) {
   if (!template) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-text-muted px-6">
-        <h2 className="text-lg font-medium text-text mb-2">Template not found</h2>
-        <p className="text-sm">No template named <code className="font-mono">{templateName}</code>.</p>
+        <h2 className="text-lg font-medium text-text mb-2">{t('templates.notFound', 'Template not found')}</h2>
+        <p className="text-sm">{t('templates.noTemplateNamed', 'No template named')} <code className="font-mono">{templateName}</code>.</p>
       </div>
     )
   }
@@ -150,7 +152,7 @@ export function TemplateDetailPage({ spec }: Props) {
         {/* README body */}
         <div className="rounded-lg border border-border bg-bg-secondary px-6 py-5 mb-6">
           {readme === null && readmeError === null && (
-            <p className="text-[12px] text-text-muted italic">Loading README…</p>
+            <p className="text-[12px] text-text-muted italic">{t('templates.loadingReadme', 'Loading README\u2026')}</p>
           )}
           {readmeError && (
             <p className="text-[12px] text-text-muted italic">{readmeError}</p>
@@ -161,15 +163,15 @@ export function TemplateDetailPage({ spec }: Props) {
         {/* Spawn form */}
         <form onSubmit={submit} className="rounded-lg border border-border bg-bg-secondary px-6 py-5 space-y-4">
           <div className="flex items-baseline justify-between">
-            <h3 className="text-[14px] font-semibold text-text">Spawn a workspace</h3>
+            <h3 className="text-[14px] font-semibold text-text">{t('templates.spawnWorkspace', 'Spawn a workspace')}</h3>
             <span className="text-[11px] text-text-muted">
-              from {template.name} v{template.version}
+              {t('templates.from', 'from')} {template.name} v{template.version}
             </span>
           </div>
 
           <div className="space-y-1.5">
             <label htmlFor="tpl-detail-tag" className="block text-[11px] uppercase tracking-wider text-text-muted/70">
-              Tag
+              {t('templates.tag', 'Tag')}
             </label>
             <input
               id="tpl-detail-tag"
@@ -189,7 +191,7 @@ export function TemplateDetailPage({ spec }: Props) {
 
           {agents.length > 0 && (
             <div className="space-y-1.5">
-              <div className="text-[11px] uppercase tracking-wider text-text-muted/70">Agents</div>
+              <div className="text-[11px] uppercase tracking-wider text-text-muted/70">{t('templates.agents', 'Agents')}</div>
               <div className="flex items-center gap-3 flex-wrap">
                 {agents.map((a) => (
                   <label key={a.id} className="flex items-center gap-1.5 text-[12px] text-text" title={a.displayName}>
@@ -216,7 +218,7 @@ export function TemplateDetailPage({ spec }: Props) {
               disabled={creating || tag.length === 0}
               className="btn-primary"
             >
-              {creating ? 'Creating…' : 'Create workspace'}
+              {creating ? t('templates.creating', 'Creating\u2026') : t('templates.createWorkspace', 'Create workspace')}
             </button>
           </div>
         </form>

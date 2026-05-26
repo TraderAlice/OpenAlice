@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Section } from '../form'
 import { Toggle } from '../Toggle'
 import { GuardsSection, CRYPTO_GUARD_TYPES, SECURITIES_GUARD_TYPES } from '../guards'
@@ -22,6 +23,7 @@ export function EditUTADialog({ uta, preset, health, onSave, onDelete, onClose }
   onDelete: () => Promise<void>
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   const [draft, setDraft] = useState(uta)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
@@ -55,10 +57,10 @@ export function EditUTADialog({ uta, preset, health, onSave, onDelete, onClose }
     setSaving(true); setMsg('')
     try {
       await onSave(draft)
-      setMsg('Saved')
+      setMsg(t('utaEdit.saved', 'Saved'))
       setTimeout(() => setMsg(''), 2000)
     } catch (err) {
-      setMsg(err instanceof Error ? err.message : 'Save failed')
+      setMsg(err instanceof Error ? err.message : t('utaEdit.saveFailed', 'Save failed'))
     } finally {
       setSaving(false)
     }
@@ -83,9 +85,9 @@ export function EditUTADialog({ uta, preset, health, onSave, onDelete, onClose }
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
-        <Section title="Configuration">
+        <Section title={t('uta.configuration', 'Configuration')}>
           <div className="mb-3">
-            <span className="text-[12px] text-text-muted">Type</span>
+            <span className="text-[12px] text-text-muted">{t('common.type', 'Type')}</span>
             <span className="ml-2 text-[12px] font-medium text-text">{preset?.label ?? uta.presetId}</span>
           </div>
           <SchemaFormFields
@@ -99,7 +101,7 @@ export function EditUTADialog({ uta, preset, health, onSave, onDelete, onClose }
               onClick={() => setShowKeys(!showKeys)}
               className="text-[11px] text-text-muted hover:text-text transition-colors mt-2"
             >
-              {showKeys ? 'Hide secrets' : 'Show secrets'}
+              {showKeys ? t('uta.hideSecrets', 'Hide secrets') : t('uta.showSecrets', 'Show secrets')}
             </button>
           )}
         </Section>
@@ -117,14 +119,14 @@ export function EditUTADialog({ uta, preset, health, onSave, onDelete, onClose }
             >
               <polyline points="9 18 15 12 9 6" />
             </svg>
-            Guards ({draft.guards.length})
+            {t('uta.guards', 'Guards')} ({draft.guards.length})
           </button>
           {guardsOpen && (
             <div className="mt-3">
               <GuardsSection
                 guards={draft.guards}
                 guardTypes={guardTypes}
-                description="Guards validate operations before execution. Order matters."
+                description={t('uta.guardsDescription', 'Guards validate operations before execution. Order matters.')}
                 onChange={patchGuards}
                 onChangeImmediate={patchGuards}
               />
@@ -138,7 +140,7 @@ export function EditUTADialog({ uta, preset, health, onSave, onDelete, onClose }
         <div className="flex items-center gap-3">
           {dirty && (
             <button onClick={handleSave} disabled={saving} className="btn-primary">
-              {saving ? 'Saving...' : 'Save'}
+              {saving ? t('uta.saving', 'Saving...') : t('common.save', 'Save')}
             </button>
           )}
           {draft.enabled !== false && <ReconnectButton accountId={uta.id} />}
@@ -148,28 +150,29 @@ export function EditUTADialog({ uta, preset, health, onSave, onDelete, onClose }
               setDraft(updated)
               await onSave(updated)
             }} />
-            <span className="text-[12px] text-text-muted">{draft.enabled !== false ? 'Enabled' : 'Disabled'}</span>
+            <span className="text-[12px] text-text-muted">{draft.enabled !== false ? t('uta.enabled', 'Enabled') : t('uta.disabled', 'Disabled')}</span>
           </label>
           {msg && <span className="text-[12px] text-text-muted">{msg}</span>}
         </div>
         <div className="flex-1" />
-        <DeleteButton label="Delete UTA" onConfirm={onDelete} />
+        <DeleteButton label={t('uta.deleteUta', 'Delete UTA')} onConfirm={onDelete} />
       </div>
     </Dialog>
   )
 }
 
 function DeleteButton({ label, onConfirm }: { label: string; onConfirm: () => void }) {
+  const { t } = useTranslation()
   const [confirming, setConfirming] = useState(false)
 
   if (confirming) {
     return (
       <div className="flex items-center gap-2">
         <button onClick={() => { onConfirm(); setConfirming(false) }} className="btn-danger">
-          Confirm
+          {t('common.confirm', 'Confirm')}
         </button>
         <button onClick={() => setConfirming(false)} className="btn-secondary">
-          Cancel
+          {t('common.cancel', 'Cancel')}
         </button>
       </div>
     )

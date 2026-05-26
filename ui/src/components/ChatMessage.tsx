@@ -1,10 +1,13 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { ToolCall, StreamingToolCall } from '../api'
 import { Marked } from 'marked'
 import { markedHighlight } from 'marked-highlight'
 import hljs from 'highlight.js'
 import DOMPurify from 'dompurify'
 import 'highlight.js/styles/github-dark.min.css'
+import { fmtDate, fmtTime } from '../lib/i18n-format'
+import i18n from '../i18n'
 
 const marked = new Marked(
   markedHighlight({
@@ -46,15 +49,16 @@ function addCodeBlockWrappers(html: string): string {
   return html.replace(
     /<pre><code class="hljs language-(\w+)">([\s\S]*?)<\/code><\/pre>/g,
     (_, lang, code) =>
-      `<div class="code-block-wrapper"><div class="code-header"><span>${lang}</span><button class="code-copy-btn" data-code>${COPY_ICON} Copy</button></div><pre><code class="hljs language-${lang}">${code}</code></pre></div>`,
+      `<div class="code-block-wrapper"><div class="code-header"><span>${lang}</span><button class="code-copy-btn" data-code>${COPY_ICON} ${i18n.t('common.copy', 'Copy')}</button></div><pre><code class="hljs language-${lang}">${code}</code></pre></div>`,
   ).replace(
     /<pre><code class="hljs">([\s\S]*?)<\/code><\/pre>/g,
     (_, code) =>
-      `<div class="code-block-wrapper"><div class="code-header"><span>code</span><button class="code-copy-btn" data-code>${COPY_ICON} Copy</button></div><pre><code class="hljs">${code}</code></pre></div>`,
+      `<div class="code-block-wrapper"><div class="code-header"><span>code</span><button class="code-copy-btn" data-code>${COPY_ICON} ${i18n.t('common.copy', 'Copy')}</button></div><pre><code class="hljs">${code}</code></pre></div>`,
   )
 }
 
 export function ChatMessage({ role, text, timestamp, isGrouped, media }: ChatMessageProps) {
+  const { t } = useTranslation()
   const contentRef = useRef<HTMLDivElement>(null)
 
   const html = useMemo(() => {
@@ -69,10 +73,10 @@ export function ChatMessage({ role, text, timestamp, isGrouped, media }: ChatMes
     const wrapper = btn.closest('.code-block-wrapper')
     const code = wrapper?.querySelector('code')?.textContent ?? ''
     navigator.clipboard.writeText(code).then(() => {
-      btn.innerHTML = `${CHECK_ICON} Copied!`
+      btn.innerHTML = `${CHECK_ICON} ${i18n.t('common.copied', 'Copied!')}`
       btn.classList.add('copied')
       setTimeout(() => {
-        btn.innerHTML = `${COPY_ICON} Copy`
+        btn.innerHTML = `${COPY_ICON} ${i18n.t('common.copy', 'Copy')}`
         btn.classList.remove('copied')
       }, 2000)
     })
@@ -95,7 +99,7 @@ export function ChatMessage({ role, text, timestamp, isGrouped, media }: ChatMes
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
               <path d="M13.73 21a2 2 0 0 1-3.46 0" />
             </svg>
-            <span className="text-[11px] text-text-muted/60 font-medium">Notification</span>
+            <span className="text-[11px] text-text-muted/60 font-medium">{t('chat.notification', 'Notification')}</span>
           </div>
           <div ref={contentRef} className="text-[13px] text-text-muted break-words leading-relaxed">
             <div className="markdown-content" dangerouslySetInnerHTML={{ __html: html! }} />
@@ -116,7 +120,7 @@ export function ChatMessage({ role, text, timestamp, isGrouped, media }: ChatMes
         </div>
         {timestamp && (
           <div className="text-[11px] text-text-muted mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            {new Date(timestamp).toLocaleString()}
+            {(() => { const d = new Date(timestamp); return `${fmtDate(d)} ${fmtTime(d)}` })()}
           </div>
         )}
       </div>
@@ -129,7 +133,7 @@ export function ChatMessage({ role, text, timestamp, isGrouped, media }: ChatMes
       {!isGrouped && (
         <div className="flex items-center gap-2 mb-1.5">
           <AliceAvatar />
-          <span className="text-[12px] text-text-muted font-medium">Alice</span>
+          <span className="text-[12px] text-text-muted font-medium">{t('chat.alice', 'Alice')}</span>
         </div>
       )}
       <div ref={contentRef} className="max-w-[90%] break-words leading-relaxed ml-8 bg-bg-tertiary/30 border border-border/30 rounded-2xl rounded-tl-sm px-4 py-3">
@@ -140,7 +144,7 @@ export function ChatMessage({ role, text, timestamp, isGrouped, media }: ChatMes
       </div>
       {timestamp && (
         <div className="text-[11px] text-text-muted mt-1 ml-8 opacity-0 group-hover:opacity-100 transition-opacity">
-          {new Date(timestamp).toLocaleString()}
+          {(() => { const d = new Date(timestamp); return `${fmtDate(d)} ${fmtTime(d)}` })()}
         </div>
       )}
     </div>
@@ -166,6 +170,7 @@ function highlightJSON(text: string): string {
 }
 
 export function ToolCallGroup({ calls, timestamp }: ToolCallGroupProps) {
+  const { t: _t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
 
   const summary = calls.map((c) => c.name).join(', ')
@@ -210,7 +215,7 @@ export function ToolCallGroup({ calls, timestamp }: ToolCallGroupProps) {
 
       {timestamp && (
         <div className="text-[11px] text-text-muted mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-          {new Date(timestamp).toLocaleString()}
+          {(() => { const d = new Date(timestamp); return `${fmtDate(d)} ${fmtTime(d)}` })()}
         </div>
       )}
     </div>
@@ -246,11 +251,12 @@ export function StreamingToolGroup({ tools }: StreamingToolGroupProps) {
 }
 
 export function ThinkingIndicator() {
+  const { t } = useTranslation()
   return (
     <div className="flex flex-col items-start message-enter">
       <div className="flex items-center gap-2 mb-1.5">
         <AliceAvatar />
-        <span className="text-[12px] text-text-muted font-medium">Alice</span>
+        <span className="text-[12px] text-text-muted font-medium">{t('chat.alice', 'Alice')}</span>
       </div>
       <div className="text-text-muted ml-8">
         <div className="flex">

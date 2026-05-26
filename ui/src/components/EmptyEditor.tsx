@@ -4,7 +4,10 @@
  * start. The full onboarding system (guided setup, status checks, etc.)
  * is a separate effort that will replace this surface.
  */
+import { useTranslation } from 'react-i18next'
+
 export function EmptyEditor() {
+  const { t } = useTranslation()
   return (
     <div className="flex flex-col items-center justify-center h-full select-none px-6 gap-5 text-center">
       <img
@@ -14,12 +17,12 @@ export function EmptyEditor() {
         draggable={false}
       />
       <div className="space-y-2 max-w-md">
-        <h2 className="text-base font-semibold text-text">OpenAlice</h2>
+        <h2 className="text-base font-semibold text-text">{t('emptyEditor.title', 'OpenAlice')}</h2>
         <p className="text-[13px] text-text-muted leading-relaxed">
-          Click an icon on the activity bar to open its sidebar, then pick something from the sidebar to open it as a tab.
+          {t('emptyEditor.clickActivityBar', 'Click an icon on the activity bar to open its sidebar, then pick something from the sidebar to open it as a tab.')}
         </p>
         <p className="text-[12px] text-text-muted/70 leading-relaxed">
-          First time here? Open <span className="text-text">Settings → AI Provider</span> to configure a model, then jump back to <span className="text-text">Chat</span>.
+          {t('emptyEditor.firstTimeHint', 'First time here? Open Settings → AI Provider to configure a model, then jump back to Chat.')}
         </p>
       </div>
     </div>

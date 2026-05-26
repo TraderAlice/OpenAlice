@@ -19,6 +19,8 @@
  */
 
 import { useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
+import { fmt } from '../lib/i18n-format'
 import { Spinner, EmptyState } from '../components/StateViews'
 import { useSimulatorState } from './simulator/useSimulatorState'
 import { CreateSimulatorSection } from './simulator/CreateSimulatorSection'
@@ -29,6 +31,7 @@ import { ActionPanel } from './simulator/ActionPanel'
 import { EventLog } from './simulator/EventLog'
 
 export function SimulatorPage() {
+  const { t } = useTranslation()
   const sim = useSimulatorState()
 
   const onCreated = useCallback(async (newId: string) => {
@@ -50,8 +53,8 @@ export function SimulatorPage() {
 
       {sim.utas.length === 0 ? (
         <EmptyState
-          title="No simulator account yet."
-          description='Click "+ New simulator account" to create one. Each sim is a fresh in-memory MockBroker UTA — wiped on dev server restart.'
+          title={t('simulator.noAccountYet', 'No simulator account yet.')}
+          description={t('simulator.noAccountDescription', 'Click "+ New simulator account" to create one. Each sim is a fresh in-memory MockBroker UTA — wiped on dev server restart.')}
         />
       ) : !sim.selectedId ? null : !sim.state ? (
         <div className="flex justify-center py-12"><Spinner /></div>
@@ -83,13 +86,14 @@ function TopBar({ utas, selectedId, onSelect, cash, onRefresh }: {
   cash: string | undefined
   onRefresh: () => void
 }) {
+  const { t } = useTranslation()
   if (utas.length === 0) {
     return null
   }
 
   return (
     <div className="flex items-center gap-3 flex-wrap">
-      <div className="flex items-center gap-1 flex-wrap" role="tablist" aria-label="Simulator accounts">
+      <div className="flex items-center gap-1 flex-wrap" role="tablist" aria-label={t('simulator.accounts')}>
         {utas.map((u) => {
           const active = u.id === selectedId
           return (
@@ -115,13 +119,13 @@ function TopBar({ utas, selectedId, onSelect, cash, onRefresh }: {
         onClick={onRefresh}
         className="px-2.5 py-1 text-xs bg-bg-tertiary text-text-muted rounded hover:text-text transition-colors"
       >
-        Refresh
+        {t('common.refresh')}
       </button>
 
       {cash !== undefined && (
         <span className="ml-auto text-[12px] text-text-muted uppercase tracking-wide">
-          Cash <span className="font-mono text-text text-sm normal-case ml-1.5">
-            ${Number(cash).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+          {t('simulator.balance')} <span className="font-mono text-text text-sm normal-case ml-1.5">
+            {fmt(cash, 'USD')}
           </span>
         </span>
       )}

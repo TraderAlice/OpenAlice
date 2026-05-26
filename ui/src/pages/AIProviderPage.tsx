@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api, type Profile, type AIBackend, type Preset } from '../api'
 import type { Credential, SdkAdapterInfo, SdkAdapterId } from '../api/types'
 import { SaveIndicator } from '../components/SaveIndicator'
@@ -39,6 +40,7 @@ type TestState = { status: 'idle' | 'testing' | 'ok' | 'fail'; error?: string }
 type Selection = { kind: 'credential'; slug: string } | { kind: 'sdk'; id: SdkAdapterId } | null
 
 export function AIProviderPage() {
+  const { t } = useTranslation()
   const [profiles, setProfiles] = useState<Record<string, Profile> | null>(null)
   const [credentials, setCredentials] = useState<Record<string, Credential>>({})
   const [activeProfile, setActiveProfile] = useState('')
@@ -197,14 +199,14 @@ export function AIProviderPage() {
     }
   }
 
-  if (!profiles) return <div className="flex flex-col flex-1 min-h-0"><PageHeader title="AI Provider" description="Manage AI provider credentials and view available SDKs." /><PageLoading /></div>
+  if (!profiles) return <div className="flex flex-col flex-1 min-h-0"><PageHeader title={t('aiProvider.title')} description={t('aiProvider.description', 'Manage AI provider credentials and view available SDKs.')} /><PageLoading /></div>
 
   // Profiles that have NO credentialSlug (transitional / inline-only) — render as a fallback group
   const inlineProfiles = profilesByCredential['__inline'] ?? []
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <PageHeader title="AI Provider" description="Manage AI provider credentials and view available SDKs." />
+      <PageHeader title={t('aiProvider.title')} description={t('aiProvider.description', 'Manage AI provider credentials and view available SDKs.')} />
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6">
         <div
           className="max-w-[1200px] mx-auto grid gap-6"
@@ -214,12 +216,12 @@ export function AIProviderPage() {
           {/* ============== Credentials column ============== */}
           <section onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-[13px] font-semibold text-text uppercase tracking-wide">Credentials</h2>
+              <h2 className="text-[13px] font-semibold text-text uppercase tracking-wide">{t('aiProvider.credentials', 'Credentials')}</h2>
               <button
                 onClick={() => setShowCreate(true)}
                 className="text-[11px] px-2 py-1 rounded-md border border-border text-text-muted hover:text-accent hover:border-accent transition-colors"
               >
-                + Add
+                {t('aiProvider.add', '+ Add')}
               </button>
             </div>
             <div className="space-y-3">
@@ -252,12 +254,12 @@ export function AIProviderPage() {
 
               {inlineProfiles.length > 0 && (
                 <div className="mt-2 p-3 rounded-lg border border-dashed border-border bg-bg-tertiary/30">
-                  <div className="text-[10px] uppercase tracking-wide text-text-muted mb-1">Inline-only profiles (no credential record)</div>
+                  <div className="text-[10px] uppercase tracking-wide text-text-muted mb-1">{t('aiProvider.inlineOnlyProfiles', 'Inline-only profiles (no credential record)')}</div>
                   <div className="text-[11px] text-text-muted">
                     {inlineProfiles.map(([slug]) => slug).join(', ')}
                   </div>
                   <div className="text-[10px] text-text-muted/70 mt-1">
-                    These profiles still work via inline fallback. They&apos;ll be linked to credential records the next time they&apos;re saved or after the 0003 migration runs.
+                    {t('aiProvider.inlineProfilesHint', "These profiles still work via inline fallback. They'll be linked to credential records the next time they're saved or after the 0003 migration runs.")}
                   </div>
                 </div>
               )}
@@ -267,7 +269,7 @@ export function AIProviderPage() {
                   onClick={() => setShowCreate(true)}
                   className="w-full p-4 rounded-xl border-2 border-dashed border-border text-text-muted hover:border-accent/50 hover:text-accent transition-all text-[13px] font-medium"
                 >
-                  + Add your first credential
+                  {t('aiProvider.addFirstCredential', '+ Add your first credential')}
                 </button>
               )}
             </div>
@@ -276,8 +278,8 @@ export function AIProviderPage() {
           {/* ============== SDKs column ============== */}
           <section onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-[13px] font-semibold text-text uppercase tracking-wide">Available SDKs</h2>
-              <span className="text-[10px] text-text-muted">read-only</span>
+              <h2 className="text-[13px] font-semibold text-text uppercase tracking-wide">{t('aiProvider.availableSDKs', 'Available SDKs')}</h2>
+              <span className="text-[10px] text-text-muted">{t('aiProvider.readOnly', 'read-only')}</span>
             </div>
             <div className="space-y-3">
               {adapters.map((adapter) => {
@@ -336,11 +338,12 @@ function SchemaFormFields({ fields, formData, setField, existingProfile }: {
   setField: (key: string, value: string) => void
   existingProfile?: Profile
 }) {
+  const { t } = useTranslation()
   return (
     <>
       {fields.map((field) => {
         const value = formData[field.key] ?? ''
-        const label = field.required ? field.title : `${field.title} (optional)`
+        const label = field.required ? field.title : `${field.title} ${t('aiProvider.optional', '(optional)')}`
         const hasExisting = existingProfile && field.key === 'apiKey' && !!(existingProfile as unknown as Record<string, unknown>)[field.key]
 
         if (field.type === 'select') {
@@ -358,8 +361,8 @@ function SchemaFormFields({ fields, formData, setField, existingProfile }: {
             <Field key={field.key} label={label} description={field.description}>
               <div className="relative">
                 <input className={inputClass} type="password" value={value} onChange={(e) => setField(field.key, e.target.value)}
-                  placeholder={hasExisting ? '(configured — leave empty to keep)' : 'Enter value'} />
-                {hasExisting && !value && <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-green">active</span>}
+                  placeholder={hasExisting ? t('aiProvider.configuredLeaveEmpty', '(configured — leave empty to keep)') : t('aiProvider.enterValue', 'Enter value')} />
+                {hasExisting && !value && <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-green">{t('aiProvider.active', 'active')}</span>}
               </div>
             </Field>
           )
@@ -382,6 +385,7 @@ function ProfileEditModal({ slug, profile, presets, isActive, onSave, onDelete, 
   slug: string; profile: Profile; presets: Preset[]; isActive: boolean
   onSave: (profile: Profile) => Promise<void>; onDelete: () => void; onClose: () => void
 }) {
+  const { t } = useTranslation()
   // Lookup preset by profile.preset field — no more reverse matching
   const preset = presets.find(p => p.id === profile.preset) ?? presets.find(p => p.category === 'custom')!
 
@@ -432,24 +436,24 @@ function ProfileEditModal({ slug, profile, presets, isActive, onSave, onDelete, 
   }
 
   return (
-    <Modal title={`Edit: ${slug}`} onClose={onClose}>
+    <Modal title={t('aiProvider.edit', 'Edit: {{slug}}', { slug })} onClose={onClose}>
       <div className="space-y-3">
         {preset.hint && <p className="text-[11px] text-text-muted bg-bg-tertiary rounded-lg p-3 leading-relaxed">{preset.hint}</p>}
         <SchemaFormFields fields={fields} formData={formData} setField={setField} existingProfile={profile} />
-        {testing && <p className="text-[12px] text-text-muted">Testing connection…</p>}
+        {testing && <p className="text-[12px] text-text-muted">{t('aiProvider.testingConnection', 'Testing connection…')}</p>}
         {testResult && (
           <div className={`text-[12px] rounded-lg p-3 ${testResult.ok ? 'bg-green/10 text-green' : 'bg-red/10 text-red'}`}>
-            {testResult.ok ? `Connected: "${testResult.response?.slice(0, 100)}"` : `Failed: ${testResult.error}`}
+            {testResult.ok ? t('aiProvider.connected', 'Connected: "{{response}}"', { response: testResult.response?.slice(0, 100) }) : t('aiProvider.failed', 'Failed: {{error}}', { error: testResult.error })}
           </div>
         )}
         <div className="flex items-center gap-2 pt-2 border-t border-border mt-4">
-          <button onClick={handleSave} className="btn-primary">Save</button>
+          <button onClick={handleSave} className="btn-primary">{t('common.save', 'Save')}</button>
           <button onClick={handleTest} disabled={testing} className="text-[12px] px-3 py-1.5 rounded-md border border-border text-text-muted hover:text-text hover:bg-bg-tertiary transition-colors disabled:opacity-50">
-            {testing ? 'Testing…' : 'Test'}
+            {testing ? t('aiProvider.testing', 'Testing…') : t('aiProvider.test', 'Test')}
           </button>
           <SaveIndicator status={status} onRetry={handleSave} />
           <div className="flex-1" />
-          {!isActive && <button onClick={onDelete} className="text-[12px] text-red hover:underline">Delete</button>}
+          {!isActive && <button onClick={onDelete} className="text-[12px] text-red hover:underline">{t('common.delete', 'Delete')}</button>}
         </div>
       </div>
     </Modal>
@@ -462,6 +466,7 @@ function ProfileCreateModal({ presets, existingNames, onSave, onClose }: {
   presets: Preset[]; existingNames: string[]
   onSave: (name: string, profile: Profile) => Promise<void>; onClose: () => void
 }) {
+  const { t } = useTranslation()
   const [selectedPreset, setSelectedPreset] = useState<Preset | null>(null)
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
@@ -544,7 +549,7 @@ function ProfileCreateModal({ presets, existingNames, onSave, onClose }: {
         <div>
           <p className="text-[12px] font-medium text-text">{p.label}</p>
           <p className="text-[10px] text-text-muted mt-0.5 leading-snug">
-            {alreadyExists ? 'Already configured — edit from the list' : p.description}
+            {alreadyExists ? t('aiProvider.alreadyConfigured', 'Already configured — edit from the list') : p.description}
           </p>
         </div>
       </button>
@@ -552,24 +557,24 @@ function ProfileCreateModal({ presets, existingNames, onSave, onClose }: {
   }
 
   return (
-    <Modal title={selectedPreset ? `New: ${selectedPreset.label}` : 'New Profile'} onClose={onClose}>
+    <Modal title={selectedPreset ? t('aiProvider.newPreset', 'New: {{label}}', { label: selectedPreset.label }) : t('aiProvider.newProfile', 'New Profile')} onClose={onClose}>
       {!selectedPreset ? (
         <div className="space-y-4">
           {officialPresets.length > 0 && (
             <div>
-              <p className="text-[11px] font-medium text-text-muted mb-2 uppercase tracking-wider">Official</p>
+              <p className="text-[11px] font-medium text-text-muted mb-2 uppercase tracking-wider">{t('aiProvider.official', 'Official')}</p>
               <div className="grid grid-cols-2 gap-2">{officialPresets.map(renderPresetCard)}</div>
             </div>
           )}
           {thirdPartyPresets.length > 0 && (
             <div>
-              <p className="text-[11px] font-medium text-text-muted mb-2 uppercase tracking-wider">Third Party</p>
+              <p className="text-[11px] font-medium text-text-muted mb-2 uppercase tracking-wider">{t('aiProvider.thirdParty', 'Third Party')}</p>
               <div className="grid grid-cols-2 gap-2">{thirdPartyPresets.map(renderPresetCard)}</div>
             </div>
           )}
           {customPreset && (
             <button onClick={() => selectPreset(customPreset)} className="w-full p-3 rounded-lg border border-dashed border-border hover:border-accent/40 hover:bg-bg-tertiary transition-all text-left">
-              <p className="text-[12px] font-medium text-text">+ Custom</p>
+              <p className="text-[12px] font-medium text-text">{t('aiProvider.custom', '+ Custom')}</p>
               <p className="text-[10px] text-text-muted mt-0.5">{customPreset.description}</p>
             </button>
           )}
@@ -577,33 +582,33 @@ function ProfileCreateModal({ presets, existingNames, onSave, onClose }: {
       ) : (
         <div className="space-y-3">
           {selectedPreset.hint && <p className="text-[11px] text-text-muted bg-bg-tertiary rounded-lg p-3 leading-relaxed">{selectedPreset.hint}</p>}
-          <Field label="Profile Name">
+          <Field label={t('aiProvider.profileName', 'Profile Name')}>
             {isOfficialPreset ? (
               <p className="text-[13px] text-text py-2">{name}</p>
             ) : (
-              <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter a name for this profile" autoFocus />
+              <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} placeholder={t('aiProvider.profileNamePlaceholder', 'Enter a name for this profile')} autoFocus />
             )}
           </Field>
           <SchemaFormFields fields={fields} formData={formData} setField={setField} />
           {error && <p className="text-[12px] text-red">{error}</p>}
           {/* Test result */}
-          {testing && <p className="text-[12px] text-text-muted">Testing connection...</p>}
+          {testing && <p className="text-[12px] text-text-muted">{t('aiProvider.testingConnection', 'Testing connection...')}</p>}
           {testResult && (
             <div className={`text-[12px] rounded-lg p-3 ${testResult.ok ? 'bg-green/10 text-green' : 'bg-red/10 text-red'}`}>
-              {testResult.ok ? `Connected: "${testResult.response?.slice(0, 100)}"` : `Failed: ${testResult.error}`}
+              {testResult.ok ? t('aiProvider.connected', 'Connected: "{{response}}"', { response: testResult.response?.slice(0, 100) }) : t('aiProvider.failed', 'Failed: {{error}}', { error: testResult.error })}
             </div>
           )}
           <div className="flex items-center gap-2 pt-2 border-t border-border mt-4">
             {testResult?.ok ? (
               <button onClick={handleSave} disabled={saving} className="btn-primary">
-                {saving ? 'Saving...' : 'Save'}
+                {saving ? t('aiProvider.saving', 'Saving...') : t('common.save', 'Save')}
               </button>
             ) : (
               <button onClick={handleCreate} disabled={testing} className="btn-primary">
-                {testing ? 'Testing...' : 'Test Connection'}
+                {testing ? t('aiProvider.testing', 'Testing...') : t('aiProvider.testConnection', 'Test Connection')}
               </button>
             )}
-            <button onClick={() => setSelectedPreset(null)} className="btn-secondary">Back</button>
+            <button onClick={() => setSelectedPreset(null)} className="btn-secondary">{t('common.back', 'Back')}</button>
           </div>
         </div>
       )}

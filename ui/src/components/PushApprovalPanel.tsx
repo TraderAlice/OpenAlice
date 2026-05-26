@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api } from '../api'
+import { fmt, fmtPnl } from '../lib/i18n-format'
 import { isUnsetDecimal } from '../lib/format'
 import type { TradingAccount, WalletStatus, WalletPushResult, WalletCommitLog } from '../api/types'
 
@@ -36,10 +38,7 @@ function fmtNum(n: number | string | undefined | null): string {
   if (isUnsetDecimal(n)) return ''
   if (typeof n === 'string') return n
   if (!Number.isFinite(n)) return String(n)
-  const rounded = n.toFixed(8).replace(/\.?0+$/, '')
-  const [intPart, decPart] = rounded.split('.')
-  const withCommas = Number(intPart).toLocaleString('en-US')
-  return decPart ? `${withCommas}.${decPart}` : withCommas
+  return fmt(n, 'USD')
 }
 
 /** Format operation for display — returns { text, isBuy } */
@@ -100,6 +99,7 @@ function statusColor(status: string): string {
 // ==================== Component ====================
 
 export function PushApprovalPanel() {
+  const { t } = useTranslation()
   const [accounts, setAccounts] = useState<TradingAccount[]>([])
   const [staged, setStaged] = useState<StagedAccount[]>([])
   const [pending, setPending] = useState<PendingAccount[]>([])
@@ -191,12 +191,12 @@ export function PushApprovalPanel() {
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-text-muted">
           <path d="M12 20V10M18 20V4M6 20v-4" />
         </svg>
-        <h3 className="text-sm font-semibold text-text">Trading</h3>
+        <h3 className="text-sm font-semibold text-text">{t('trading.title')}</h3>
         {hasPending && (
           <span className="ml-auto w-2 h-2 rounded-full bg-accent animate-pulse" title="Pending operations" />
         )}
         {!hasPending && hasStaged && (
-          <span className="ml-auto w-2 h-2 rounded-full bg-yellow-400 animate-pulse" title="Staged (uncommitted)" />
+          <span className="ml-auto w-2 h-2 rounded-full bg-yellow-400 animate-pulse" title={t('push.stagedUncommitted')} />
         )}
       </div>
 
@@ -211,7 +211,7 @@ export function PushApprovalPanel() {
                 </div>
 
                 <div className="text-xs text-yellow-400/80 font-medium px-2 py-1.5 rounded bg-yellow-400/5 border border-yellow-400/20">
-                  Staged — waiting for AI to commit
+                  {t('push.stagedWaiting', 'Staged — waiting for AI to commit')}
                 </div>
 
                 <div className="space-y-0.5">
@@ -268,19 +268,19 @@ export function PushApprovalPanel() {
                 {/* Inline confirm or action buttons */}
                 {confirmingPush === account.id ? (
                   <div className="flex items-center gap-2 text-xs">
-                    <span className="text-text-muted">Execute {status.staged.length} op{status.staged.length > 1 ? 's' : ''}?</span>
+                    <span className="text-text-muted">{t('push.executeOps', 'Execute {{count}} op(s)?', { count: status.staged.length })}</span>
                     <button
                       onClick={() => handlePush(account.id)}
                       disabled={pushing !== null}
                       className="btn-primary-sm"
                     >
-                      {pushing === account.id ? '...' : 'Confirm'}
+                      {pushing === account.id ? '...' : t('push.confirm', 'Confirm')}
                     </button>
                     <button
                       onClick={() => setConfirmingPush(null)}
                       className="px-2 py-1 rounded text-text-muted hover:text-text transition-colors"
                     >
-                      Cancel
+                      {t('common.cancel', 'Cancel')}
                     </button>
                   </div>
                 ) : (
@@ -290,14 +290,14 @@ export function PushApprovalPanel() {
                       disabled={pushing !== null || rejecting !== null}
                       className="flex-1 btn-primary-sm"
                     >
-                      Approve & Push
+                      {t('push.approveAndPush', 'Approve & Push')}
                     </button>
                     <button
                       onClick={() => handleReject(account.id)}
                       disabled={pushing !== null || rejecting !== null}
                       className="text-xs px-3 py-1.5 rounded font-medium border border-border text-text-muted hover:text-red hover:border-red/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
-                      {rejecting === account.id ? '...' : 'Reject'}
+                      {rejecting === account.id ? '...' : t('push.reject', 'Reject')}
                     </button>
                   </div>
                 )}
@@ -307,23 +307,23 @@ export function PushApprovalPanel() {
             {/* Last push result feedback */}
             {lastResult && (
               <div className="space-y-1 pt-2 border-t border-border">
-                <div className="text-[11px] font-medium text-text-muted uppercase tracking-wider">Last push</div>
+                <div className="text-[11px] font-medium text-text-muted uppercase tracking-wider">{t('push.lastPush', 'Last push')}</div>
                 <div className="text-xs text-text">
                   {lastResult.data.submitted.length > 0 && (
-                    <span className="text-green">{lastResult.data.submitted.length} submitted</span>
+                    <span className="text-green">{t('push.submitted', '{{count}} submitted', { count: lastResult.data.submitted.length })}</span>
                   )}
                   {lastResult.data.rejected.length > 0 && (
                     <>
                       {lastResult.data.submitted.length > 0 && ', '}
-                      <span className="text-red">{lastResult.data.rejected.length} rejected</span>
+                      <span className="text-red">{t('push.rejected', '{{count}} rejected', { count: lastResult.data.rejected.length })}</span>
                     </>
                   )}
                 </div>
                 {lastResult.data.rejected.map((r, i) => (
-                  <div key={i} className="text-xs text-red/80 px-2">{r.error || 'Unknown error'}</div>
+                  <div key={i} className="text-xs text-red/80 px-2">{r.error || t('common.unknownError', 'Unknown error')}</div>
                 ))}
                 <button onClick={() => setLastResult(null)} className="text-[11px] text-text-muted hover:text-text">
-                  Dismiss
+                  {t('common.dismiss', 'Dismiss')}
                 </button>
               </div>
             )}
@@ -331,13 +331,13 @@ export function PushApprovalPanel() {
             {error && (
               <div className="text-xs text-red pt-2 border-t border-border">
                 {error}
-                <button onClick={() => setError(null)} className="ml-2 text-text-muted hover:text-text">Dismiss</button>
+                <button onClick={() => setError(null)} className="ml-2 text-text-muted hover:text-text">{t('common.dismiss', 'Dismiss')}</button>
               </div>
             )}
           </div>
         ) : !hasStaged ? (
           <div className="px-3 py-4 text-xs text-text-muted text-center">
-            No pending operations
+            {t('push.noPendingOperations', 'No pending operations')}
           </div>
         ) : null}
 
@@ -345,7 +345,7 @@ export function PushApprovalPanel() {
         {hasHistory && (
           <div className="border-t border-border">
             <div className="px-3 py-2">
-              <div className="text-[11px] text-text-muted font-medium uppercase tracking-wider">History</div>
+              <div className="text-[11px] text-text-muted font-medium uppercase tracking-wider">{t('push.history', 'History')}</div>
             </div>
             <div className="px-3 pb-3 space-y-3">
               {history.map(({ accountId, label, commits }) => (

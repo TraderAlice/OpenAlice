@@ -9,6 +9,7 @@
  * Connectors.
  */
 
+import { useTranslation } from 'react-i18next'
 import { useConfigPage } from '../hooks/useConfigPage'
 import { SaveIndicator } from '../components/SaveIndicator'
 import { ConfigSection, Field, inputClass } from '../components/form'
@@ -16,6 +17,7 @@ import { PageHeader } from '../components/PageHeader'
 import type { AppConfig, McpConfig } from '../api'
 
 export function MCPPage() {
+  const { t } = useTranslation()
   const { config, status, loadError, updateConfig, retry } = useConfigPage<McpConfig>({
     section: 'mcp',
     extract: (full: AppConfig) => full.mcp,
@@ -24,8 +26,8 @@ export function MCPPage() {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
-        title="MCP Server"
-        description="Streamable-HTTP endpoint that exposes OpenAlice's ToolCenter to external MCP clients. Changes require a restart."
+        title={t('mcp.title')}
+        description={t('mcp.description', "Streamable-HTTP endpoint that exposes OpenAlice's ToolCenter to external MCP clients. Changes require a restart.")}
         right={<SaveIndicator status={status} onRetry={retry} />}
       />
 
@@ -33,10 +35,10 @@ export function MCPPage() {
         {config && (
           <div className="max-w-[880px] mx-auto">
             <ConfigSection
-              title="HTTP Server"
-              description="Listening port for the streamable-HTTP MCP endpoint (path: /mcp)."
+              title={t('mcp.httpServer', 'HTTP Server')}
+              description={t('mcp.httpServerDescription', 'Listening port for the streamable-HTTP MCP endpoint (path: /mcp).')}
             >
-              <Field label="Port">
+              <Field label={t('mcp.port', 'Port')}>
                 <input
                   className={inputClass}
                   type="number"
@@ -47,7 +49,7 @@ export function MCPPage() {
             </ConfigSection>
           </div>
         )}
-        {loadError && <p className="text-[13px] text-red">Failed to load configuration.</p>}
+        {loadError && <p className="text-[13px] text-red">{t('common.failedToLoad')}</p>}
       </div>
     </div>
   )

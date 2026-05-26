@@ -21,6 +21,8 @@ import {
   type ReactElement,
 } from 'react'
 import { ChevronDown, ChevronRight, Plus, Settings as SettingsIcon, X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { getCurrentLocale } from '../../lib/i18n-format'
 
 import { useWorkspaces } from '../../contexts/WorkspacesContext'
 import { useWorkspace } from '../../tabs/store'
@@ -35,7 +37,7 @@ const TAG_RE = /^[a-z0-9][a-z0-9_-]{0,32}$/
 
 function defaultTagFor(workspaces: readonly Workspace[]): string {
   const now = new Date()
-  const month = now.toLocaleString('en-US', { month: 'short' }).toLowerCase()
+  const month = now.toLocaleString(getCurrentLocale(), { month: 'short' }).toLowerCase()
   const day = now.getDate()
   const base = `chat-${month}${day}`
   const taken = new Set(workspaces.map((w) => w.tag))
@@ -46,6 +48,7 @@ function defaultTagFor(workspaces: readonly Workspace[]): string {
 }
 
 export function ChatWorkspaceSection(): ReactElement | null {
+  const { t } = useTranslation()
   const ctx = useWorkspaces()
   const focused = useWorkspace((s) => getFocusedTab(s)?.spec)
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
@@ -106,18 +109,18 @@ export function ChatWorkspaceSection(): ReactElement | null {
 
   const submit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault()
-    const t = tag.trim()
-    if (!TAG_RE.test(t)) {
-      setCreateError(`invalid tag (${TAG_HINT})`)
+    const tagVal = tag.trim()
+    if (!TAG_RE.test(tagVal)) {
+      setCreateError(t('workspaceChat.invalidTag', 'invalid tag ({{hint}})', { hint: TAG_HINT }))
       return
     }
     if (checkedAgents.size === 0) {
-      setCreateError('pick at least one agent')
+      setCreateError(t('workspaceChat.pickAtLeastOneAgent', 'pick at least one agent'))
       return
     }
     setSubmitting(true)
     setCreateError(null)
-    const result = await createWorkspace(t, CHAT_TEMPLATE, Array.from(checkedAgents))
+    const result = await createWorkspace(tagVal, CHAT_TEMPLATE, Array.from(checkedAgents))
     setSubmitting(false)
     if (result.ok) {
       closeCreate()
@@ -151,15 +154,15 @@ export function ChatWorkspaceSection(): ReactElement | null {
     <>
       <div className="px-3 mt-2 flex items-baseline gap-2">
         <h3 className="text-[10px] font-medium text-text-muted/60 uppercase tracking-wider">
-          Workspace chat
+          {t('workspaceChat.title', 'Workspace chat')}
         </h3>
-        <span className="text-[10px] text-text-muted/50">recommended</span>
+        <span className="text-[10px] text-text-muted/50">{t('workspaceChat.recommended', 'recommended')}</span>
         <button
           type="button"
           onClick={() => (showCreate ? closeCreate() : openCreate())}
           className="ml-auto w-5 h-5 rounded flex items-center justify-center text-text-muted hover:text-text hover:bg-bg-secondary"
-          title={showCreate ? 'Cancel' : 'New chat workspace'}
-          aria-label={showCreate ? 'Cancel new chat workspace' : 'New chat workspace'}
+          title={showCreate ? t('common.cancel') : t('workspaceChat.newChatWorkspace', 'New chat workspace')}
+          aria-label={showCreate ? t('workspaceChat.cancelNew', 'Cancel new chat workspace') : t('workspaceChat.newChatWorkspace', 'New chat workspace')}
         >
           {showCreate ? <X size={12} strokeWidth={2.5} /> : <Plus size={13} strokeWidth={2.25} />}
         </button>
@@ -174,7 +177,7 @@ export function ChatWorkspaceSection(): ReactElement | null {
             <input
               ref={inputRef}
               type="text"
-              placeholder="tag (e.g. may1)"
+              placeholder={t('workspaceChat.tagPlaceholder', 'tag (e.g. may1)')}
               value={tag}
               onChange={(e) => setTag(e.target.value)}
               disabled={submitting}
@@ -188,7 +191,7 @@ export function ChatWorkspaceSection(): ReactElement | null {
               disabled={submitting || tag.length === 0}
               className="px-2.5 py-1 text-[12px] rounded bg-accent text-white disabled:opacity-40 hover:bg-accent/90"
             >
-              {submitting ? '…' : 'create'}
+              {submitting ? '…' : t('workspaceChat.create', 'create')}
             </button>
           </div>
           {ctx.agents.length > 0 && (
@@ -219,7 +222,7 @@ export function ChatWorkspaceSection(): ReactElement | null {
 
       <ul className="py-0.5">
         {chatWorkspaces.length === 0 && !ctx.listError && !showCreate && (
-          <li className="px-3 py-2 text-[12px] text-text-muted/60">no chat workspaces yet</li>
+          <li className="px-3 py-2 text-[12px] text-text-muted/60">{t('workspaceChat.noChatWorkspacesYet', 'no chat workspaces yet')}</li>
         )}
         {ctx.listError && (
           <li className="px-3 py-1 text-[11px] text-red">{ctx.listError}</li>
@@ -254,16 +257,14 @@ export function ChatWorkspaceSection(): ReactElement | null {
 
       {pendingDelete && (
         <ConfirmDialog
-          title="Delete chat workspace"
+          title={t('workspaceChat.deleteChatWorkspace', 'Delete chat workspace')}
           message={
             <>
-              Delete chat workspace{' '}
-              <span className="font-mono text-text">{pendingDelete.tag}</span>? The
-              files on disk are kept; only the launcher's registry entry is removed.
-              Any open tab for it will close.
+              {t('workspaceChat.deleteChatWorkspaceConfirm', 'Delete chat workspace')}{' '}
+              <span className="font-mono text-text">{pendingDelete.tag}</span>? {t('workspaceChat.deleteKeepFilesNote', 'The files on disk are kept; only the launcher\'s registry entry is removed. Any open tab for it will close.')}
             </>
           }
-          confirmLabel="Delete"
+          confirmLabel={t('common.delete')}
           onConfirm={handleConfirmDelete}
           onClose={() => setPendingDelete(null)}
         />
@@ -294,6 +295,7 @@ interface ChatWorkspaceRowProps {
 }
 
 function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
+  const { t } = useTranslation()
   const w = props.workspace
   const hasRunning = w.sessions.some((s) => s.state === 'running')
   const [expanded, setExpanded] = useState(true)
@@ -326,8 +328,8 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
             setExpanded((v) => !v)
           }}
           className="w-3 h-4 flex items-center justify-center text-text-muted/60 hover:text-text"
-          aria-label={expanded ? 'Collapse sessions' : 'Expand sessions'}
-          title={expanded ? 'Collapse sessions' : 'Expand sessions'}
+          aria-label={expanded ? t('workspaceChat.collapseSessions', 'Collapse sessions') : t('workspaceChat.expandSessions', 'Expand sessions')}
+          title={expanded ? t('workspaceChat.collapseSessions', 'Collapse sessions') : t('workspaceChat.expandSessions', 'Expand sessions')}
         >
           {expanded ? (
             <ChevronDown size={11} strokeWidth={2.25} />
@@ -356,8 +358,8 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
               props.onConfigure()
             }}
             className="w-5 h-5 rounded flex items-center justify-center text-text-muted hover:text-text hover:bg-bg-secondary"
-            title="AI Provider"
-            aria-label="AI Provider"
+            title={t('workspaces.aiProvider')}
+            aria-label={t('workspaces.aiProvider')}
           >
             <SettingsIcon size={12} strokeWidth={2} />
           </button>
@@ -368,8 +370,8 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
               props.onDelete()
             }}
             className="w-5 h-5 rounded flex items-center justify-center text-text-muted hover:text-red hover:bg-red/10"
-            title="Delete workspace"
-            aria-label="Delete workspace"
+            title={t('workspaceChat.deleteWorkspace', 'Delete workspace')}
+            aria-label={t('workspaceChat.deleteWorkspace', 'Delete workspace')}
           >
             <X size={12} strokeWidth={2.5} />
           </button>

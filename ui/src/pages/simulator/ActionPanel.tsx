@@ -13,10 +13,12 @@
  */
 
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api } from '../../api'
 import { simulatorApi, type SimulatorState } from '../../api/simulator'
 import { InstrumentInput } from './InstrumentInput'
 import { buildInstrument, type InstrumentDraft } from './instruments'
+import type { TFunction } from 'i18next'
 
 const inputClass =
   'px-2 py-1 bg-bg text-text border border-border rounded text-sm outline-none transition-colors focus:border-accent'
@@ -25,12 +27,14 @@ const inputClassMono =
 
 type TabId = 'tick' | 'deposit' | 'trade' | 'order'
 
-const TABS: Array<{ id: TabId; label: string; hint: string }> = [
-  { id: 'tick',    label: 'Quick Tick',       hint: 'Move a mark price' },
-  { id: 'deposit', label: 'External Deposit', hint: 'Funds appear outside Alice (airdrop / transfer-in)' },
-  { id: 'trade',   label: 'External Trade',   hint: 'User manually traded on the exchange app' },
-  { id: 'order',   label: 'Place Order',      hint: 'Stage → commit → push through Alice' },
-]
+function getTabs(t: TFunction): Array<{ id: TabId; label: string; hint: string }> {
+  return [
+    { id: 'tick',    label: t('simulator.quickTick', 'Quick Tick'),       hint: t('simulator.quickTickHint', 'Move a mark price') },
+    { id: 'deposit', label: t('simulator.externalDeposit', 'External Deposit'), hint: t('simulator.externalDepositHint', 'Funds appear outside Alice (airdrop / transfer-in)') },
+    { id: 'trade',   label: t('simulator.externalTrade', 'External Trade'),   hint: t('simulator.externalTradeHint', 'User manually traded on the exchange app') },
+    { id: 'order',   label: t('simulator.placeOrder', 'Place Order'),      hint: t('simulator.placeOrderHint', 'Stage → commit → push through Alice') },
+  ]
+}
 
 export function ActionPanel({ utaId, state, run, loading }: {
   utaId: string
@@ -38,7 +42,9 @@ export function ActionPanel({ utaId, state, run, loading }: {
   run: (label: string, fn: () => Promise<unknown>) => Promise<void>
   loading: boolean
 }) {
+  const { t } = useTranslation()
   const [tab, setTab] = useState<TabId>('tick')
+  const tabs = getTabs(t)
   const knownKeys = useMemo(() => {
     const set = new Set<string>()
     for (const m of state.markPrices) set.add(m.nativeKey)
@@ -50,21 +56,21 @@ export function ActionPanel({ utaId, state, run, loading }: {
     <div className="sticky bottom-0 -mx-4 md:-mx-6 px-4 md:px-6 py-3 bg-bg-secondary/95 backdrop-blur border-t border-border z-10">
       {/* Tab strip */}
       <div className="flex items-center gap-1 mb-3" role="tablist">
-        {TABS.map((t, i) => (
+        {tabs.map((tabItem, i) => (
           <button
-            key={t.id}
+            key={tabItem.id}
             role="tab"
-            aria-selected={tab === t.id}
-            title={`${t.hint} (${i + 1})`}
-            onClick={() => setTab(t.id)}
+            aria-selected={tab === tabItem.id}
+            title={`${tabItem.hint} (${i + 1})`}
+            onClick={() => setTab(tabItem.id)}
             className={`px-2.5 py-1 text-xs rounded transition-colors ${
-              tab === t.id
+              tab === tabItem.id
                 ? 'bg-accent/20 text-accent font-medium'
                 : 'text-text-muted hover:text-text hover:bg-bg-tertiary/50'
             }`}
           >
             <span className="text-[10px] text-text-muted/60 mr-1.5">{i + 1}</span>
-            {t.label}
+            {tabItem.label}
           </button>
         ))}
       </div>
@@ -86,6 +92,7 @@ function QuickTickTab({ utaId, knownKeys, run, loading }: {
   run: (label: string, fn: () => Promise<unknown>) => Promise<void>
   loading: boolean
 }) {
+  const { t } = useTranslation()
   const [key, setKey] = useState(knownKeys[0] ?? '')
   const [setPriceInput, setSetPriceInput] = useState('')
 
@@ -110,7 +117,7 @@ function QuickTickTab({ utaId, knownKeys, run, loading }: {
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <KeySelect value={key} onChange={setKey} options={knownKeys} placeholder="symbol" />
+      <KeySelect value={key} onChange={setKey} options={knownKeys} placeholder={t('simulator.symbol', 'symbol')} />
       <span className="text-text-muted text-xs">Δ</span>
       <button disabled={loading || !key} onClick={() => tick(-5)} className="btn-secondary-sm">−5%</button>
       <button disabled={loading || !key} onClick={() => tick(-1)} className="btn-secondary-sm">−1%</button>
@@ -119,12 +126,12 @@ function QuickTickTab({ utaId, knownKeys, run, loading }: {
       <span className="text-text-muted/60 text-xs px-1">|</span>
       <input
         className={`${inputClassMono} w-32`}
-        placeholder="set exact"
+        placeholder={t('simulator.setPrice', 'set exact')}
         value={setPriceInput}
         onChange={(e) => setSetPriceInput(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter') setExact() }}
       />
-      <button disabled={loading || !key || !setPriceInput} onClick={setExact} className="btn-primary-sm">Set</button>
+      <button disabled={loading || !key || !setPriceInput} onClick={setExact} className="btn-primary-sm">{t('simulator.setExact', 'Set')}</button>
     </div>
   )
 }
@@ -137,6 +144,7 @@ function DepositTab({ utaId, knownKeys, run, loading }: {
   run: (label: string, fn: () => Promise<unknown>) => Promise<void>
   loading: boolean
 }) {
+  const { t } = useTranslation()
   const [draft, setDraft] = useState<InstrumentDraft>({ symbol: '', secType: 'CRYPTO' })
   const [qty, setQty] = useState('')
   const [withdrawKey, setWithdrawKey] = useState('')
@@ -180,11 +188,11 @@ function DepositTab({ utaId, knownKeys, run, loading }: {
           <button
             onClick={() => setMode('in')}
             className={`px-2 py-1 text-xs ${mode === 'in' ? 'bg-green/20 text-green' : 'text-text-muted hover:text-text'}`}
-          >Deposit</button>
+          >{t('simulator.deposit')}</button>
           <button
             onClick={() => setMode('out')}
             className={`px-2 py-1 text-xs ${mode === 'out' ? 'bg-red/20 text-red' : 'text-text-muted hover:text-text'}`}
-          >Withdraw</button>
+          >{t('simulator.withdraw')}</button>
         </div>
 
         {mode === 'in' ? (
@@ -192,7 +200,7 @@ function DepositTab({ utaId, knownKeys, run, loading }: {
             <InstrumentInput draft={draft} onChange={setDraft} />
             <input
               className={`${inputClassMono} w-24`}
-              placeholder="quantity"
+              placeholder={t('simulator.quantity', 'quantity')}
               value={qty}
               onChange={(e) => setQty(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') submitDeposit() }}
@@ -201,16 +209,16 @@ function DepositTab({ utaId, knownKeys, run, loading }: {
               disabled={loading || !draftOk || !qty}
               onClick={submitDeposit}
               className="btn-primary-sm"
-            >Deposit</button>
+            >{t('simulator.deposit')}</button>
             {draftOk && <span className="text-[11px] text-text-muted/70 font-mono">→ {draftOk.nativeKey}</span>}
             {draftError && draft.symbol && <span className="text-[11px] text-yellow-400">{draftError}</span>}
           </>
         ) : (
           <>
-            <KeySelect value={withdrawKey} onChange={setWithdrawKey} options={knownKeys} placeholder="native key" />
+            <KeySelect value={withdrawKey} onChange={setWithdrawKey} options={knownKeys} placeholder={t('simulator.nativeKey', 'native key')} />
             <input
               className={`${inputClassMono} w-32`}
-              placeholder="quantity"
+              placeholder={t('simulator.quantity', 'quantity')}
               value={withdrawQty}
               onChange={(e) => setWithdrawQty(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') submitWithdraw() }}
@@ -219,11 +227,11 @@ function DepositTab({ utaId, knownKeys, run, loading }: {
               disabled={loading || !withdrawKey || !withdrawQty}
               onClick={submitWithdraw}
               className="btn-primary-sm"
-            >Withdraw</button>
+            >{t('simulator.withdraw')}</button>
           </>
         )}
 
-        <span className="text-[11px] text-text-muted ml-auto">Cash unchanged. Triggers UTA reconcile pipeline.</span>
+        <span className="text-[11px] text-text-muted ml-auto">{t('simulator.cashUnchanged')}</span>
       </div>
     </div>
   )
@@ -237,6 +245,7 @@ function TradeTab({ utaId, run, loading }: {
   run: (label: string, fn: () => Promise<unknown>) => Promise<void>
   loading: boolean
 }) {
+  const { t } = useTranslation()
   const [draft, setDraft] = useState<InstrumentDraft>({ symbol: '', secType: 'CRYPTO' })
   const [side, setSide] = useState<'BUY' | 'SELL'>('BUY')
   const [qty, setQty] = useState('')
@@ -278,10 +287,10 @@ function TradeTab({ utaId, run, loading }: {
       <InstrumentInput draft={draft} onChange={setDraft} />
       <input className={`${inputClassMono} w-24`} placeholder="qty" value={qty} onChange={(e) => setQty(e.target.value)} />
       <input className={`${inputClassMono} w-24`} placeholder="price" value={price} onChange={(e) => setPrice(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} />
-      <button disabled={loading || !draftOk || !qty || !price} onClick={submit} className="btn-primary-sm">Submit</button>
+      <button disabled={loading || !draftOk || !qty || !price} onClick={submit} className="btn-primary-sm">{t('simulator.submit')}</button>
       {draftOk && <span className="text-[11px] text-text-muted/70 font-mono">→ {draftOk.nativeKey}</span>}
       {draftError && draft.symbol && <span className="text-[11px] text-yellow-400">{draftError}</span>}
-      <span className="text-[11px] text-text-muted ml-auto">Cash {side === 'BUY' ? '−' : '+'} qty × price.</span>
+      <span className="text-[11px] text-text-muted ml-auto">{t('simulator.cashMinus')}</span>
     </div>
   )
 }
@@ -294,6 +303,7 @@ function OrderTab({ utaId, knownKeys, run, loading }: {
   run: (label: string, fn: () => Promise<unknown>) => Promise<void>
   loading: boolean
 }) {
+  const { t } = useTranslation()
   const [key, setKey] = useState('')
   const [side, setSide] = useState<'BUY' | 'SELL'>('BUY')
   const [orderType, setOrderType] = useState<'MKT' | 'LMT'>('MKT')
@@ -334,13 +344,13 @@ function OrderTab({ utaId, knownKeys, run, loading }: {
         <option value="MKT">MKT</option>
         <option value="LMT">LMT</option>
       </select>
-      <KeySelect value={key} onChange={setKey} options={knownKeys} placeholder="symbol" />
+      <KeySelect value={key} onChange={setKey} options={knownKeys} placeholder={t('simulator.symbol', 'symbol')} />
       <input className={`${inputClassMono} w-28`} placeholder="qty" value={qty} onChange={(e) => setQty(e.target.value)} />
       {orderType === 'LMT' && (
         <input className={`${inputClassMono} w-28`} placeholder="limit price" value={lmtPrice} onChange={(e) => setLmtPrice(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} />
       )}
-      <button disabled={loading || !key || !qty || (orderType === 'LMT' && !lmtPrice)} onClick={submit} className="btn-primary-sm">Place</button>
-      <span className="text-[11px] text-text-muted">Stage → commit → push via Alice's trading pipeline.</span>
+      <button disabled={loading || !key || !qty || (orderType === 'LMT' && !lmtPrice)} onClick={submit} className="btn-primary-sm">{t('simulator.place')}</button>
+      <span className="text-[11px] text-text-muted">{t('simulator.stageCommitPush')}</span>
     </div>
   )
 }

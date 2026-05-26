@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import type { SdkAdapterInfo } from '../../api/types'
 
 export interface SdkAdapterCardProps {
@@ -25,6 +26,7 @@ export function SdkAdapterCard({
   onSelect,
   onConfigurePreset,
 }: SdkAdapterCardProps) {
+  const { t } = useTranslation()
   const isTestDefault = adapter.presets.some(p => p.isTestDefault)
 
   return (
@@ -42,15 +44,15 @@ export function SdkAdapterCard({
         {isTestDefault && (
           <span
             className="text-[10px] text-yellow shrink-0"
-            title="Default for the Test button on at least one preset"
-          >★ test default</span>
+            title={t('credentials.testDefaultHint', 'Default for the Test button on at least one preset')}
+          >★ {t('credentials.testDefault', 'test default')}</span>
         )}
       </div>
       <p className="text-[11px] text-text-muted mb-3 leading-snug">{adapter.description}</p>
 
       {adapter.presets.length > 0 && (
         <div className="space-y-1">
-          <div className="text-[10px] uppercase tracking-wide text-text-muted">Compatible credentials</div>
+          <div className="text-[10px] uppercase tracking-wide text-text-muted">{t('credentials.compatibleCredentials', 'Compatible credentials')}</div>
           {adapter.presets.map((preset) => {
             const isConfigured = preset.presetId in configuredPresetMap
             return (
@@ -63,14 +65,14 @@ export function SdkAdapterCard({
                 />
                 <span className={`flex-1 truncate ${isConfigured ? 'text-text' : 'text-text-muted'}`}>
                   {preset.presetLabel}
-                  {preset.isTestDefault && <span className="text-yellow ml-1" title="Test default for this preset">★</span>}
+                  {preset.isTestDefault && <span className="text-yellow ml-1" title={t('credentials.testDefault', 'Test default')}>★</span>}
                 </span>
                 {!isConfigured && (
                   <button
                     onClick={(e) => { e.stopPropagation(); onConfigurePreset(preset.presetId) }}
                     className="text-[10px] px-1.5 py-0.5 rounded border border-border text-text-muted hover:text-accent hover:border-accent transition-colors"
                   >
-                    Configure →
+                    {t('credentials.configure', 'Configure →')}
                   </button>
                 )}
               </div>

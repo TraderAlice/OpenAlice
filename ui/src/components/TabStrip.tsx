@@ -1,4 +1,5 @@
 import { useState, type MouseEvent, type WheelEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import { X } from 'lucide-react'
 import { useChannels } from '../contexts/ChannelsContext'
 import { useWorkspaces } from '../contexts/WorkspacesContext'
@@ -22,6 +23,7 @@ import { ContextMenu, type ContextMenuItem } from './ContextMenu'
  * would just be noise.
  */
 export function TabStrip() {
+  const { t } = useTranslation()
   const { channels } = useChannels()
   const { workspaces } = useWorkspaces()
   const tabIds = useWorkspace((state) =>
@@ -59,30 +61,30 @@ export function TabStrip() {
     const view = getView(tab.spec.kind)
     const url = view.toUrl(tab.spec as never)
     return [
-      { kind: 'item', label: 'Close', danger: true, onClick: () => closeTab(tabId) },
+      { kind: 'item', label: t('common.close'), danger: true, onClick: () => closeTab(tabId) },
       {
         kind: 'item',
-        label: 'Close Others',
+        label: t('common.closeOthers'),
         disabled: onlyOne,
         onClick: () => closeOthers(tabId),
       },
       {
         kind: 'item',
-        label: 'Close to the Right',
+        label: t('common.closeToRight'),
         disabled: idx === tabIds.length - 1,
         onClick: () => closeToRight(tabId),
       },
       {
         kind: 'item',
-        label: 'Close to the Left',
+        label: t('common.closeToLeft'),
         disabled: idx <= 0,
         onClick: () => closeToLeft(tabId),
       },
-      { kind: 'item', label: 'Close All', onClick: () => closeAll() },
+      { kind: 'item', label: t('common.closeAll'), onClick: () => closeAll() },
       { kind: 'separator' },
       {
         kind: 'item',
-        label: 'Copy URL',
+        label: t('common.copyUrl'),
         onClick: () => {
           const fullUrl = window.location.origin + url
           navigator.clipboard.writeText(fullUrl).catch(() => {

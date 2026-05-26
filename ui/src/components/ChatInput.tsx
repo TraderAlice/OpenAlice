@@ -1,4 +1,5 @@
 import { useRef, useCallback, useState, type KeyboardEvent, type ChangeEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 
 interface ChatInputProps {
   disabled: boolean
@@ -6,6 +7,7 @@ interface ChatInputProps {
 }
 
 export function ChatInput({ disabled, onSend }: ChatInputProps) {
+  const { t } = useTranslation()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [hasText, setHasText] = useState(false)
 
@@ -59,7 +61,7 @@ export function ChatInput({ disabled, onSend }: ChatInputProps) {
                 ? 'bg-accent text-white shadow-sm hover:bg-accent/85 scale-100'
                 : 'bg-bg-tertiary text-text-muted/40 cursor-not-allowed scale-95'
           }`}
-          aria-label="Send message"
+          aria-label={t('chat.sendMessage')}
         >
           {disabled ? (
             <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />

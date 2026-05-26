@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api } from '../api'
 import type { Profile } from '../api/types'
 import type { ChannelListItem } from '../api/channels'
@@ -12,6 +13,7 @@ interface ChannelConfigModalProps {
 }
 
 export function ChannelConfigModal({ channel, onClose, onSaved }: ChannelConfigModalProps) {
+  const { t } = useTranslation()
   const isCreate = !channel
 
   const [label, setLabel] = useState(channel?.label ?? '')
@@ -31,7 +33,7 @@ export function ChannelConfigModal({ channel, onClose, onSaved }: ChannelConfigM
   const handleSave = async () => {
     setError('')
     if (isCreate && !label.trim()) {
-      setError('Name is required')
+      setError(t('channel.nameRequired', 'Name is required'))
       return
     }
     setSaving(true)
@@ -54,7 +56,7 @@ export function ChannelConfigModal({ channel, onClose, onSaved }: ChannelConfigM
         onSaved(updated)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save')
+      setError(err instanceof Error ? err.message : t('channel.failedToSave', 'Failed to save'))
     } finally {
       setSaving(false)
     }
@@ -80,7 +82,7 @@ export function ChannelConfigModal({ channel, onClose, onSaved }: ChannelConfigM
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border">
           <h2 className="text-[15px] font-semibold text-text">
-            {isCreate ? 'New Channel' : 'Configure Channel'}
+            {isCreate ? t('channel.newChannel', 'New Channel') : t('channel.configureChannel', 'Configure Channel')}
           </h2>
           <button onClick={onClose} className="text-text-muted hover:text-text transition-colors">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
@@ -91,7 +93,7 @@ export function ChannelConfigModal({ channel, onClose, onSaved }: ChannelConfigM
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {/* Name */}
           <div>
-            <label className="block text-xs font-medium text-text-muted mb-1">Channel Name</label>
+            <label className="block text-xs font-medium text-text-muted mb-1">{t('channel.channelName', 'Channel Name')}</label>
             <input
               value={label}
               onChange={(e) => setLabel(e.target.value)}
@@ -103,7 +105,7 @@ export function ChannelConfigModal({ channel, onClose, onSaved }: ChannelConfigM
 
           {/* System Prompt */}
           <div>
-            <label className="block text-xs font-medium text-text-muted mb-1">System Prompt</label>
+            <label className="block text-xs font-medium text-text-muted mb-1">{t('channel.systemPrompt', 'System Prompt')}</label>
             <textarea
               value={systemPrompt}
               onChange={(e) => setSystemPrompt(e.target.value)}
@@ -115,13 +117,13 @@ export function ChannelConfigModal({ channel, onClose, onSaved }: ChannelConfigM
 
           {/* AI Profile */}
           <div>
-            <label className="block text-xs font-medium text-text-muted mb-1">AI Provider Profile</label>
+            <label className="block text-xs font-medium text-text-muted mb-1">{t('channel.aiProviderProfile', 'AI Provider Profile')}</label>
             <select
               value={profile}
               onChange={(e) => setProfile(e.target.value)}
               className={inputClass}
             >
-              <option value="">Default (global active)</option>
+              <option value="">{t('channel.defaultGlobalActive', 'Default (global active)')}</option>
               {Object.entries(profiles).map(([slug, p]) => (
                 <option key={slug} value={slug}>{slug} ({p.model})</option>
               ))}
@@ -131,13 +133,13 @@ export function ChannelConfigModal({ channel, onClose, onSaved }: ChannelConfigM
           {/* Disabled Tools */}
           <div>
             <label className="block text-xs font-medium text-text-muted mb-2">
-              Disabled Tools
+              {t('channel.disabledTools', 'Disabled Tools')}
               {disabledTools.size > 0 && (
-                <span className="ml-1 text-text-muted/60">({disabledTools.size} disabled)</span>
+                <span className="ml-1 text-text-muted/60">{t('channel.disabledCount', '({{count}} disabled)', { count: disabledTools.size })}</span>
               )}
             </label>
             {tools.length === 0 ? (
-              <p className="text-[11px] text-text-muted">Loading tools...</p>
+              <p className="text-[11px] text-text-muted">{t('channel.loadingTools', 'Loading tools...')}</p>
             ) : (
               <div className="max-h-[200px] overflow-y-auto border border-border rounded-lg">
                 {tools.map((tool) => (
@@ -165,9 +167,9 @@ export function ChannelConfigModal({ channel, onClose, onSaved }: ChannelConfigM
         <div className="flex items-center justify-between p-4 border-t border-border">
           {error && <p className="text-[12px] text-red flex-1">{error}</p>}
           <div className="flex gap-2 ml-auto">
-            <button onClick={onClose} className="btn-secondary">Cancel</button>
+            <button onClick={onClose} className="btn-secondary">{t('common.cancel', 'Cancel')}</button>
             <button onClick={handleSave} disabled={saving} className="btn-primary">
-              {saving ? (isCreate ? 'Creating...' : 'Saving...') : (isCreate ? 'Create' : 'Save')}
+              {saving ? (isCreate ? t('channel.creating', 'Creating...') : t('channel.saving', 'Saving...')) : (isCreate ? t('channel.create', 'Create') : t('common.save', 'Save'))}
             </button>
           </div>
         </div>

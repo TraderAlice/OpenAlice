@@ -5,6 +5,7 @@
  */
 
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Section } from '../../components/form'
 import { useToast } from '../../components/Toast'
 import { api } from '../../api'
@@ -12,6 +13,7 @@ import { api } from '../../api'
 export function CreateSimulatorSection({ onCreated }: {
   onCreated: (id: string) => Promise<void>
 }) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
   const [cash, setCash] = useState('100000')
@@ -21,7 +23,7 @@ export function CreateSimulatorSection({ onCreated }: {
   const submit = async () => {
     const cashNum = Number(cash)
     if (!Number.isFinite(cashNum) || cashNum < 0) {
-      toast.error('Cash must be a non-negative number')
+      toast.error(t('simulator.cashMustBeNonNegative', 'Cash must be a non-negative number'))
       return
     }
     setBusy(true)
@@ -35,13 +37,13 @@ export function CreateSimulatorSection({ onCreated }: {
         presetConfig: { cash: cashNum },
       })
       await api.trading.reconnectUTA(created.id).catch(() => {})
-      toast.success(`Created ${created.label} (${created.id})`)
+      toast.success(t('simulator.createdSuccess', 'Created {{label}} ({{id}})', { label: created.label, id: created.id }))
       setOpen(false)
       setName('')
       setCash('100000')
       await onCreated(created.id)
     } catch (err) {
-      toast.error(`Create failed: ${err instanceof Error ? err.message : err}`)
+      toast.error(t('simulator.createFailed', 'Create failed: {{error}}', { error: err instanceof Error ? err.message : err }))
     } finally {
       setBusy(false)
     }
@@ -53,38 +55,38 @@ export function CreateSimulatorSection({ onCreated }: {
         onClick={() => setOpen(true)}
         className="btn-secondary-sm"
       >
-        + New simulator account
+        + {t('simulator.newSimulatorAccount', 'New simulator account')}
       </button>
     )
   }
 
   return (
     <Section
-      title="Create simulator account"
-      description="In-memory only — wiped on dev server restart. For repro & regression testing."
+      title={t('simulator.createSimulatorAccount', 'Create simulator account')}
+      description={t('simulator.createDescription', 'In-memory only — wiped on dev server restart. For repro & regression testing.')}
     >
       <div className="flex items-center gap-2 flex-wrap">
         <input
           className="px-2 py-1 bg-bg text-text border border-border rounded text-sm outline-none transition-colors focus:border-accent w-48"
-          placeholder="name (e.g. simulator)"
+          placeholder={t('simulator.namePlaceholder', 'name (e.g. simulator)')}
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
         <input
           className="px-2 py-1 bg-bg text-text border border-border rounded font-mono text-xs outline-none transition-colors focus:border-accent w-32"
-          placeholder="cash (USD)"
+          placeholder={t('simulator.cashPlaceholder', 'cash (USD)')}
           value={cash}
           onChange={(e) => setCash(e.target.value)}
         />
         <button disabled={busy} onClick={submit} className="btn-primary-sm">
-          {busy ? 'Creating…' : 'Create'}
+          {busy ? t('simulator.creating', 'Creating…') : t('common.create')}
         </button>
         <button
           disabled={busy}
           onClick={() => { setOpen(false); setName(''); setCash('100000') }}
           className="btn-secondary-sm"
         >
-          Cancel
+          {t('common.cancel')}
         </button>
       </div>
     </Section>

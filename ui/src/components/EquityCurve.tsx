@@ -1,8 +1,10 @@
 import { useState, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine,
 } from 'recharts'
 import type { EquityCurvePoint } from '../api'
+import { fmt, fmtDate, fmtTime } from '../lib/i18n-format'
 
 // ==================== Time ranges ====================
 
@@ -32,6 +34,7 @@ export function EquityCurve({
   points, accounts, selectedAccountId, onAccountChange,
   onPointClick, selectedTimestamp,
 }: EquityCurveProps) {
+  const { t } = useTranslation()
   const [range, setRange] = useState('24H')
 
   const filtered = useMemo(() => {
@@ -59,7 +62,7 @@ export function EquityCurve({
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-[13px] font-semibold text-text-muted uppercase tracking-wide">
-          Equity Curve
+          {t('equity.title', 'Equity Curve')}
         </h3>
         <div className="flex gap-1">
           {RANGES.map(r => (
@@ -102,7 +105,7 @@ export function EquityCurve({
                 : 'border-border text-text-muted hover:text-text hover:bg-bg-tertiary'
             }`}
           >
-            All
+            {t('common.all', 'All')}
           </button>
         </div>
       )}
@@ -171,14 +174,15 @@ function CustomTooltip({ active, payload, isAllView, accounts }: any) {
   if (!active || !payload?.[0]) return null
   const data = payload[0].payload as EquityCurvePoint & { time: number }
   const accountMap = new Map((accounts as Array<{ id: string; label: string }>).map(a => [a.id, a.label]))
+  const dt = new Date(data.time)
 
   return (
     <div className="bg-bg-secondary border border-border rounded-md px-3 py-2 shadow-lg text-[12px]">
       <p className="text-text-muted mb-1">
-        {new Date(data.time).toLocaleString()}
+        {fmtDate(dt)} {fmtTime(dt)}
       </p>
       <p className="text-text font-semibold tabular-nums">
-        ${Number(data.equity).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        {fmt(data.equity, 'USD')}
       </p>
       {isAllView && data.accounts && Object.keys(data.accounts).length > 1 && (
         <div className="mt-1.5 pt-1.5 border-t border-border space-y-0.5">
@@ -186,7 +190,7 @@ function CustomTooltip({ active, payload, isAllView, accounts }: any) {
             <div key={id} className="flex justify-between gap-4">
               <span className="text-text-muted">{accountMap.get(id) ?? id}</span>
               <span className="text-text tabular-nums">
-                ${Number(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {fmt(Number(val), 'USD')}
               </span>
             </div>
           ))}
@@ -202,10 +206,9 @@ function formatTime(ts: number): string {
   const d = new Date(ts)
   const now = new Date()
   if (d.toDateString() === now.toDateString()) {
-    return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+    return fmtTime(d)
   }
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) +
-    ' ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+  return `${fmtDate(d)} ${fmtTime(d)}`
 }
 
 function formatCurrency(val: number): string {

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api, type AppConfig } from '../api'
 import { SaveIndicator } from '../components/SaveIndicator'
 import { ConfigSection, Field, inputClass } from '../components/form'
@@ -44,6 +45,7 @@ function TestButton({
   disabled: boolean
   onClick: () => void
 }) {
+  const { t } = useTranslation()
   return (
     <button
       onClick={onClick}
@@ -56,7 +58,7 @@ function TestButton({
             : 'border-border text-text-muted hover:bg-bg-tertiary hover:text-text'
       }`}
     >
-      {status === 'testing' ? '...' : status === 'ok' ? 'OK' : status === 'error' ? 'Fail' : 'Test'}
+      {status === 'testing' ? '...' : status === 'ok' ? t('dev.ok', 'OK') : status === 'error' ? t('common.failed', 'Fail') : t('common.test')}
     </button>
   )
 }
@@ -64,6 +66,7 @@ function TestButton({
 // ==================== Page ====================
 
 export function MarketDataPage() {
+  const { t } = useTranslation()
   const { config, status, loadError, updateConfig, updateConfigImmediate, retry } = useConfigPage<MarketDataConfig>({
     section: 'marketData',
     extract: (full: AppConfig) => (full as Record<string, unknown>).marketData as MarketDataConfig,
@@ -74,9 +77,9 @@ export function MarketDataPage() {
   if (!config) {
     return (
       <div className="flex flex-col flex-1 min-h-0">
-        <PageHeader title="Market Data" description="Structured financial data — prices, fundamentals, macro indicators." />
+        <PageHeader title={t('market.data')} description={t('market.dataDescription', 'Structured financial data — prices, fundamentals, macro indicators.')} />
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-[13px] text-text-muted">Loading...</p>
+          <p className="text-[13px] text-text-muted">{t('common.loading')}</p>
         </div>
       </div>
     )
@@ -104,8 +107,8 @@ export function MarketDataPage() {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
-        title="Market Data"
-        description="Structured financial data — prices, fundamentals, macro indicators."
+        title={t('market.data')}
+        description={t('market.dataDescription', 'Structured financial data — prices, fundamentals, macro indicators.')}
         right={
           <div className="flex items-center gap-3">
             <SaveIndicator status={status} onRetry={retry} />
@@ -136,7 +139,7 @@ export function MarketDataPage() {
             onApiUrlChange={(url) => updateConfig({ apiUrl: url })}
           />
         </div>
-        {loadError && <p className="text-[13px] text-red mt-4 max-w-[880px] mx-auto">Failed to load configuration.</p>}
+        {loadError && <p className="text-[13px] text-red mt-4 max-w-[880px] mx-auto">{t('common.failedToLoad')}</p>}
       </div>
     </div>
   )
@@ -151,10 +154,11 @@ function AssetProvidersSection({
   providers: Record<string, string>
   onProviderChange: (asset: string, provider: string) => void
 }) {
+  const { t } = useTranslation()
   return (
     <ConfigSection
-      title="Asset Providers"
-      description="Select a data provider for each asset class. API keys are managed separately below."
+      title={t('market.assetProviders', 'Asset Providers')}
+      description={t('market.assetProvidersDescription', 'Select a data provider for each asset class. API keys are managed separately below.')}
     >
       <div className="space-y-3">
         {Object.entries(PROVIDER_OPTIONS).map(([asset, options]) => {
@@ -170,7 +174,7 @@ function AssetProvidersSection({
                 {options.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
               </select>
               {selectedProvider === 'yfinance' && (
-                <span className="text-[13px] text-text-muted/50 px-1">Free</span>
+                <span className="text-[13px] text-text-muted/50 px-1">{t('common.free', 'Free')}</span>
               )}
             </div>
           )
@@ -189,6 +193,7 @@ function ApiKeysSection({
   providerKeys: Record<string, string>
   onKeyChange: (keyName: string, value: string) => void
 }) {
+  const { t } = useTranslation()
   const [localKeys, setLocalKeys] = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {}
     for (const p of ALL_PROVIDERS) init[p.key] = providerKeys[p.key] || ''
@@ -216,8 +221,8 @@ function ApiKeysSection({
 
   return (
     <ConfigSection
-      title="API Keys"
-      description="Manage credentials for data providers. Keys are used across all asset classes that route to the provider."
+      title={t('market.apiKeys', 'API Keys')}
+      description={t('market.apiKeysDescription', 'Manage credentials for data providers. Keys are used across all asset classes that route to the provider.')}
     >
       <div className="space-y-4">
         {ALL_PROVIDERS.map(({ key, name, desc, hint }) => {
@@ -231,7 +236,7 @@ function ApiKeysSection({
                   type="password"
                   value={localKeys[key]}
                   onChange={(e) => handleKeyChange(key, e.target.value)}
-                  placeholder="Not configured"
+                  placeholder={t('market.notConfigured', 'Not configured')}
                 />
                 <TestButton
                   status={status}
@@ -260,6 +265,7 @@ function AdvancedSection({
   onBackendChange: (backend: string) => void
   onApiUrlChange: (url: string) => void
 }) {
+  const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
 
   return (
@@ -268,17 +274,17 @@ function AdvancedSection({
         onClick={() => setExpanded(!expanded)}
         className="flex items-center gap-2 cursor-pointer text-left mb-1"
       >
-        <h3 className="text-[14px] font-semibold text-text">Advanced</h3>
+        <h3 className="text-[14px] font-semibold text-text">{t('market.advanced', 'Advanced')}</h3>
         <span className="text-[11px] text-text-muted/50">{expanded ? '\u25BC' : '\u25B6'}</span>
       </button>
       {!expanded && (
-        <p className="text-[13px] text-text-muted/70">Data backend selection.</p>
+        <p className="text-[13px] text-text-muted/70">{t('market.dataBackendSelection', 'Data backend selection.')}</p>
       )}
       {expanded && (
         <div className="space-y-6 mt-4">
           {/* Data Backend */}
           <div>
-            <p className="text-[13px] font-medium text-text mb-2">Data Backend</p>
+            <p className="text-[13px] font-medium text-text mb-2">{t('market.dataBackend', 'Data Backend')}</p>
             <div className="flex border border-border rounded-lg overflow-hidden w-fit mb-2">
               {(['typebb-sdk', 'openbb-api'] as const).map((opt, i) => (
                 <button
@@ -292,18 +298,18 @@ function AdvancedSection({
                       : 'text-text-muted hover:text-text'
                   }`}
                 >
-                  {opt === 'typebb-sdk' ? 'Built-in Engine (TypeBB)' : 'External OpenBB API'}
+                  {opt === 'typebb-sdk' ? t('market.builtInEngine', 'Built-in Engine (TypeBB)') : t('market.externalOpenBB', 'External OpenBB API')}
                 </button>
               ))}
             </div>
             <p className="text-[12px] text-text-muted/70">
               {backend === 'typebb-sdk'
-                ? 'Uses the built-in TypeBB engine. No external process required.'
-                : 'Connects to an external OpenBB-compatible HTTP endpoint.'}
+                ? t('market.builtInEngineDesc', 'Uses the built-in TypeBB engine. No external process required.')
+                : t('market.externalOpenBBDesc', 'Connects to an external OpenBB-compatible HTTP endpoint.')}
             </p>
             {backend === 'openbb-api' && (
               <div className="mt-3">
-                <Field label="API URL">
+                <Field label={t('market.apiUrl', 'API URL')}>
                   <input
                     className={inputClass}
                     value={apiUrl}

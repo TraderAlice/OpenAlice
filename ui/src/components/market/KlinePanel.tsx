@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   createChart,
   CandlestickSeries,
@@ -59,6 +60,7 @@ interface Props {
 }
 
 export function KlinePanel({ selection }: Props) {
+  const { t } = useTranslation()
   const [searchParams, setSearchParams] = useSearchParams()
   const interval = parseInterval(searchParams.get('interval'))
   const tf = parseTimeframe(searchParams.get('range'))
@@ -149,7 +151,7 @@ export function KlinePanel({ selection }: Props) {
     if (selection.assetClass === 'commodity') {
       setBars(null)
       setProvider(null)
-      setError('Commodity K-line support is coming in the next step.')
+      setError(t('market.commodityKlineComing', 'Commodity K-line support is coming in the next step.'))
       return
     }
     let cancelled = false
@@ -164,11 +166,11 @@ export function KlinePanel({ selection }: Props) {
         .then((res) => {
           if (cancelled) return
           if (res.error || !res.results) {
-            setError(res.error ?? 'No data returned.')
+            setError(res.error ?? t('market.noDataReturned', 'No data returned.'))
             setBars(null)
             setProvider(null)
           } else if (res.results.length === 0) {
-            setError('No bars in this range.')
+            setError(t('market.noBarsInRange', 'No bars in this range.'))
             setBars([])
             setProvider(res.provider || null)
           } else {
@@ -218,9 +220,9 @@ export function KlinePanel({ selection }: Props) {
   }, [bars])
 
   const title = useMemo(() => {
-    if (!selection) return 'Select a symbol'
+    if (!selection) return t('market.selectSymbol', 'Select a symbol')
     return `${selection.symbol} · ${selection.assetClass}`
-  }, [selection])
+  }, [selection, t])
 
   return (
     <div className="flex flex-col h-full">
@@ -240,7 +242,7 @@ export function KlinePanel({ selection }: Props) {
         </div>
         <div className="flex items-center gap-5 flex-wrap">
           <label className="flex items-center gap-2">
-            <span className="text-[11px] uppercase tracking-wide text-text-muted/70">Interval</span>
+            <span className="text-[11px] uppercase tracking-wide text-text-muted/70">{t('market.interval', 'Interval')}</span>
             <div className="flex border border-border rounded overflow-hidden" title="Candle width (how much time each bar covers)">
               {INTERVALS.map((iv, i) => (
                 <button
@@ -256,17 +258,17 @@ export function KlinePanel({ selection }: Props) {
             </div>
           </label>
           <label className="flex items-center gap-2">
-            <span className="text-[11px] uppercase tracking-wide text-text-muted/70">Range</span>
-            <div className="flex border border-border rounded overflow-hidden" title="How far back to load history">
-              {TIMEFRAMES.map((t, i) => (
+            <span className="text-[11px] uppercase tracking-wide text-text-muted/70">{t('market.range', 'Range')}</span>
+            <div className="flex border border-border rounded overflow-hidden" title={t('market.loadHistory')}>
+              {TIMEFRAMES.map((tf2, i) => (
                 <button
-                  key={t}
-                  onClick={() => setTf(t)}
+                  key={tf2}
+                  onClick={() => setTf(tf2)}
                   className={`px-2 py-1 text-[12px] transition-colors cursor-pointer ${
                     i > 0 ? 'border-l border-border' : ''
-                  } ${tf === t ? 'bg-bg-tertiary text-text' : 'text-text-muted hover:text-text'}`}
+                  } ${tf === tf2 ? 'bg-bg-tertiary text-text' : 'text-text-muted hover:text-text'}`}
                 >
-                  {t}
+                  {tf2}
                 </button>
               ))}
             </div>
@@ -278,7 +280,7 @@ export function KlinePanel({ selection }: Props) {
         <div ref={containerRef} className="absolute inset-0" />
         {!selection && (
           <div className="absolute inset-0 flex items-center justify-center text-[13px] text-text-muted">
-            Pick an asset to see the K-line.
+            {t('market.pickAssetKline', 'Pick an asset to see the K-line.')}
           </div>
         )}
         {selection && loading && (

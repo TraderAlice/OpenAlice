@@ -1,5 +1,7 @@
 import { type LucideIcon, MessageSquare, MessagesSquare, Inbox, Bell, LineChart, GitBranch, BarChart3, Newspaper, Zap, Settings, Code2, TerminalSquare, ChevronDown, Plug, Landmark, Info } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { type Page } from '../App'
 import { useWorkspace } from '../tabs/store'
 import type { ActivitySection, ViewSpec } from '../tabs/types'
@@ -79,65 +81,46 @@ interface NavSection {
   description?: string
 }
 
-const NAV_SECTIONS: NavSection[] = [
-  // Top — primary nav, always visible (no header, not collapsible).
-  // Mental model: Workspace is the atom for all work units. Chat is
-  // the high-frequency subset's shortcut — chat-template workspaces
-  // got their own top-level entry because that flow is common enough
-  // to warrant direct access. Workspaces (the all-templates index)
-  // sits alongside; the two aren't redundant: Workspaces = whole set,
-  // Chat = chat-shape subset shortcut.
-  //
-  // Market / News are operational tools that work but aren't load-
-  // bearing — they live here because they don't need lifecycle
-  // labelling.
+function getNavSections(t: TFunction): NavSection[] {
+  return [
   {
     sectionLabel: '',
     items: [
-      { page: 'inbox',      label: 'Inbox',      icon: Inbox, defaultTab: { kind: 'inbox', params: {} } },
-      { page: 'chat',       label: 'Chat',       icon: MessageSquare },
-      { page: 'workspaces', label: 'Workspaces', icon: TerminalSquare },
-      { page: 'market',     label: 'Market',     icon: BarChart3 },
-      { page: 'news',       label: 'News',       icon: Newspaper, defaultTab: { kind: 'news', params: {} } },
+      { page: 'inbox',      label: t('inbox.title', 'Inbox'),      icon: Inbox, defaultTab: { kind: 'inbox', params: {} } },
+      { page: 'chat',       label: t('chat.title', 'Chat'),       icon: MessageSquare },
+      { page: 'workspaces', label: t('workspaces.title', 'Workspaces'), icon: TerminalSquare },
+      { page: 'market',     label: t('market.title', 'Market'),     icon: BarChart3 },
+      { page: 'news',       label: t('news.title', 'News'),       icon: Newspaper, defaultTab: { kind: 'news', params: {} } },
     ],
   },
-  // Beta — functional but unstable. Goal: unified abstraction across
-  // broker accounts (Trading Accounts) + the Trading-as-Git workflow
-  // + the Portfolio view that surfaces it. Large engineering ahead,
-  // no fixed timeline — configurable today, but lock-in cost can
-  // change as the abstraction settles. Default-expanded because the
-  // items here are actively useful; the Beta label is the right
-  // amount of caution, not a hide.
   {
-    sectionLabel: 'Beta',
-    description: 'Goal here is a unified abstraction across broker accounts (deposit/withdraw, options, futures, FX). Large engineering effort, no fixed timeline. Configure and try, but don\'t depend on schema or UX as stable yet.',
+    sectionLabel: t('activityBar.beta', 'Beta'),
+    description: t('activityBar.betaDescription', "Goal here is a unified abstraction across broker accounts (deposit/withdraw, options, futures, FX). Large engineering effort, no fixed timeline. Configure and try, but don't depend on schema or UX as stable yet."),
     items: [
-      { page: 'trading-accounts', label: 'Trading Accounts', icon: Landmark, defaultTab: { kind: 'settings', params: { category: 'trading' } } },
-      { page: 'trading-as-git',   label: 'Trading as Git',   icon: GitBranch },
-      { page: 'portfolio',        label: 'Portfolio',        icon: LineChart, defaultTab: { kind: 'portfolio', params: {} } },
+      { page: 'trading-accounts', label: t('trading.title', 'Trading Accounts'), icon: Landmark, defaultTab: { kind: 'settings', params: { category: 'trading' } } },
+      { page: 'trading-as-git',   label: t('trading.tradingAsGit', 'Trading as Git'),   icon: GitBranch },
+      { page: 'portfolio',        label: t('portfolio.title', 'Portfolio'),        icon: LineChart, defaultTab: { kind: 'portfolio', params: {} } },
     ],
   },
   {
-    sectionLabel: 'System',
+    sectionLabel: t('activityBar.system', 'System'),
     items: [
-      { page: 'settings', label: 'Settings', icon: Settings },
-      { page: 'dev',      label: 'Dev',      icon: Code2 },
+      { page: 'settings', label: t('settings.title', 'Settings'), icon: Settings },
+      { page: 'dev',      label: t('dev.title', 'Dev'),      icon: Code2 },
     ],
   },
-  // Legacy — pre-Workspace surfaces kept around for backwards-compat
-  // and connector flows that can't host a CLI. Default-collapsed so
-  // the "this isn't the recommended path" signal is visually loud.
   {
-    sectionLabel: 'Legacy',
+    sectionLabel: t('activityBar.legacy', 'Legacy'),
     defaultCollapsed: true,
     items: [
-      { page: 'traditional-chat',     label: 'Traditional chat', icon: MessagesSquare },
-      { page: 'notifications-legacy', label: 'Notifications',    icon: Bell, defaultTab: { kind: 'notifications-inbox', params: {} } },
-      { page: 'connectors-legacy',    label: 'Connectors',       icon: Plug, defaultTab: { kind: 'settings', params: { category: 'connectors' } } },
-      { page: 'automation',           label: 'Automation',       icon: Zap, defaultTab: { kind: 'automation', params: { section: 'flow' } } },
+      { page: 'traditional-chat',     label: t('activityBar.traditionalChat', 'Traditional chat'), icon: MessagesSquare },
+      { page: 'notifications-legacy', label: t('activityBar.notifications', 'Notifications'),    icon: Bell, defaultTab: { kind: 'notifications-inbox', params: {} } },
+      { page: 'connectors-legacy',    label: t('connectors.title', 'Connectors'),       icon: Plug, defaultTab: { kind: 'settings', params: { category: 'connectors' } } },
+      { page: 'automation',           label: t('automation.title', 'Automation'),       icon: Zap, defaultTab: { kind: 'automation', params: { section: 'flow' } } },
     ],
   },
 ]
+}
 
 // ==================== ActivityBar ====================
 
@@ -155,6 +138,8 @@ const NAV_SECTIONS: NavSection[] = [
  * communicate that. Mostly-icon view would hide the differentiation.
  */
 export function ActivityBar({ open, onClose, onItemActivated }: ActivityBarProps) {
+  const { t } = useTranslation()
+  const NAV_SECTIONS = getNavSections(t)
   const selectedSidebar = useWorkspace((state) => state.selectedSidebar)
   const setSidebar = useWorkspace((state) => state.setSidebar)
   const openOrFocus = useWorkspace((state) => state.openOrFocus)

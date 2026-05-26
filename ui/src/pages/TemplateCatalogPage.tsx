@@ -12,12 +12,14 @@
  */
 
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { useWorkspaces } from '../contexts/WorkspacesContext'
 import { useWorkspace } from '../tabs/store'
 import { TemplateCard } from '../components/workspace/TemplateCard'
 
 export function TemplateCatalogPage() {
+  const { t } = useTranslation()
   const { templates } = useWorkspaces()
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
 
@@ -35,9 +37,9 @@ export function TemplateCatalogPage() {
   if (sorted.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-text-muted px-6">
-        <h2 className="text-lg font-medium text-text mb-2">Templates</h2>
+        <h2 className="text-lg font-medium text-text mb-2">{t('templates.title', 'Templates')}</h2>
         <p className="text-sm max-w-md text-center">
-          No templates discovered. Check the launcher's templates directory.
+          {t('templates.noTemplates', 'No templates discovered. Check the launcher\'s templates directory.')}
         </p>
       </div>
     )
@@ -47,11 +49,9 @@ export function TemplateCatalogPage() {
     <div className="h-full overflow-y-auto">
       <div className="max-w-5xl mx-auto px-6 py-6">
         <div className="mb-6">
-          <h2 className="text-[18px] font-semibold text-text">Workspace templates</h2>
+          <h2 className="text-[18px] font-semibold text-text">{t('templates.workspaceTemplates', 'Workspace templates')}</h2>
           <p className="text-[12px] text-text-muted mt-1 max-w-2xl">
-            Each template spawns a workspace with a specific shape — what tools the
-            agent has, what files start in the folder, what kind of work it's set
-            up for. Pick one to see what it does, then create an instance.
+            {t('templates.workspaceTemplatesDescription', 'Each template spawns a workspace with a specific shape — what tools the agent has, what files start in the folder, what kind of work it\'s set up for. Pick one to see what it does, then create an instance.')}
           </p>
         </div>
 

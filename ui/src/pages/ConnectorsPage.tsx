@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import { useConfigPage } from '../hooks/useConfigPage'
 import { SaveIndicator } from '../components/SaveIndicator'
@@ -8,6 +9,7 @@ import { PageHeader } from '../components/PageHeader'
 import type { AppConfig, ConnectorsConfig } from '../api'
 
 export function ConnectorsPage() {
+  const { t } = useTranslation()
   const [searchParams, setSearchParams] = useSearchParams()
   const [pendingChatId, setPendingChatId] = useState<number | null>(null)
 
@@ -59,8 +61,8 @@ export function ConnectorsPage() {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
-        title="Connectors"
-        description="Service ports and external integrations. Changes require a restart."
+        title={t('connectors.title')}
+        description={t('connectors.description', 'Service ports and external integrations. Changes require a restart.')}
         right={<SaveIndicator status={status} onRetry={retry} />}
       />
 
@@ -72,28 +74,28 @@ export function ConnectorsPage() {
             {pendingChatId !== null && (
               <div className="mb-6 flex items-center justify-between gap-4 rounded-lg border border-blue-500/30 bg-blue-500/10 px-4 py-3 text-[13px]">
                 <span>
-                  Authorize Telegram chat <code className="font-mono font-semibold">{pendingChatId}</code>?
+                  {t('connectors.authorizeTelegramChat', 'Authorize Telegram chat')} <code className="font-mono font-semibold">{pendingChatId}</code>?
                 </span>
                 <span className="flex gap-2 shrink-0">
                   <button
                     className="rounded-md bg-blue-600 px-3 py-1 text-white hover:bg-blue-500"
                     onClick={handleAuthorize}
                   >
-                    Authorize
+                    {t('connectors.authorize', 'Authorize')}
                   </button>
                   <button
                     className="rounded-md border border-border px-3 py-1 hover:bg-bg-2"
                     onClick={() => setPendingChatId(null)}
                   >
-                    Dismiss
+                    {t('common.dismiss', 'Dismiss')}
                   </button>
                 </span>
               </div>
             )}
             {/* Connector selector cards */}
             <ConfigSection
-              title="Active Connectors"
-              description="Select which chat surfaces to enable. Web UI is always active."
+              title={t('connectors.activeConnectors', 'Active Connectors')}
+              description={t('connectors.activeConnectorsDesc', 'Select which chat surfaces to enable. Web UI is always active.')}
             >
               <SDKSelector
                 options={CONNECTOR_OPTIONS}
@@ -104,10 +106,10 @@ export function ConnectorsPage() {
 
             {/* Web UI config — always shown */}
             <ConfigSection
-              title="Web UI"
-              description="Browser-based chat and configuration interface."
+              title={t('connectors.webUI', 'Web UI')}
+              description={t('connectors.webUIDesc', 'Browser-based chat and configuration interface.')}
             >
-              <Field label="Port">
+              <Field label={t('connectors.port', 'Port')}>
                 <input
                   className={inputClass}
                   type="number"
@@ -120,10 +122,10 @@ export function ConnectorsPage() {
             {/* MCP Ask config */}
             {config.mcpAsk.enabled && (
               <ConfigSection
-                title="MCP Ask"
-                description="Multi-turn conversation endpoint for external agents."
+                title={t('connectors.mcpAsk', 'MCP Ask')}
+                description={t('connectors.mcpAskDesc', 'Multi-turn conversation endpoint for external agents.')}
               >
-                <Field label="Port">
+                <Field label={t('connectors.port', 'Port')}>
                   <input
                     className={inputClass}
                     type="number"
@@ -132,7 +134,7 @@ export function ConnectorsPage() {
                       const v = e.target.value
                       updateConfig({ mcpAsk: { ...config.mcpAsk, port: v ? Number(v) : undefined } })
                     }}
-                    placeholder="e.g. 3003"
+                    placeholder={t('connectors.portPlaceholder', 'e.g. 3003')}
                   />
                 </Field>
               </ConfigSection>
@@ -141,10 +143,10 @@ export function ConnectorsPage() {
             {/* Telegram config */}
             {config.telegram.enabled && (
               <ConfigSection
-                title="Telegram"
-                description="Create a bot via @BotFather, paste the token below, and add your chat ID."
+                title={t('connectors.telegram', 'Telegram')}
+                description={t('connectors.telegramDesc', 'Create a bot via @BotFather, paste the token below, and add your chat ID.')}
               >
-                <Field label="Bot Token">
+                <Field label={t('connectors.botToken', 'Bot Token')}>
                   <input
                     className={inputClass}
                     type="password"
@@ -157,7 +159,7 @@ export function ConnectorsPage() {
                     placeholder="123456:ABC-DEF..."
                   />
                 </Field>
-                <Field label="Bot Username">
+                <Field label={t('connectors.botUsername', 'Bot Username')}>
                   <input
                     className={inputClass}
                     value={config.telegram.botUsername ?? ''}
@@ -169,7 +171,7 @@ export function ConnectorsPage() {
                     placeholder="my_bot"
                   />
                 </Field>
-                <Field label="Allowed Chat IDs">
+                <Field label={t('connectors.allowedChatIds', 'Allowed Chat IDs')}>
                   <input
                     className={inputClass}
                     value={config.telegram.chatIds.join(', ')}
@@ -186,14 +188,14 @@ export function ConnectorsPage() {
                         },
                       })
                     }
-                    placeholder="Comma-separated, e.g. 123456, 789012"
+                    placeholder={t('connectors.chatIdsPlaceholder', 'Comma-separated, e.g. 123456, 789012')}
                   />
                 </Field>
               </ConfigSection>
             )}
           </div>
         )}
-        {loadError && <p className="text-[13px] text-red">Failed to load configuration.</p>}
+        {loadError && <p className="text-[13px] text-red">{t('common.failedToLoad')}</p>}
       </div>
     </div>
   )

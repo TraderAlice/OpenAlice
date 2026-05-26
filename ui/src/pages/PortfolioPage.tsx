@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api, type Position, type WalletCommitLog, type EquityCurvePoint, type UTASnapshotSummary } from '../api'
 import { useAutoSave } from '../hooks/useAutoSave'
 import { useAccountHealth } from '../hooks/useAccountHealth'
@@ -10,6 +11,7 @@ import { Toggle } from '../components/Toggle'
 import { Metric, signFromDelta } from '../components/Metric'
 import { Sparkline } from '../components/Sparkline'
 import { fmt, fmtPnl, fmtNum, fmtPctSigned } from '../lib/format'
+import { fmtDate } from '../lib/i18n-format'
 
 // ==================== Types ====================
 
@@ -103,6 +105,7 @@ function summarizeAggregateCurve(points: EquityCurvePoint[]): CurveSummary {
 // ==================== Page ====================
 
 export function PortfolioPage() {
+  const { t } = useTranslation()
   const healthMap = useAccountHealth()
   const [data, setData] = useState<PortfolioData>(EMPTY)
   const [loading, setLoading] = useState(true)
@@ -217,8 +220,8 @@ export function PortfolioPage() {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
-        title="Portfolio"
-        description="Live portfolio overview across all trading accounts."
+        title={t('portfolio.title')}
+        description={t('portfolio.description', 'Live portfolio overview across all trading accounts.')}
         live={{ lastUpdated: lastRefresh }}
         right={
           <button
@@ -226,7 +229,7 @@ export function PortfolioPage() {
             disabled={loading}
             className="btn-secondary-sm"
           >
-            {loading ? 'Loading...' : 'Refresh'}
+            {loading ? t('common.loading') : t('common.refresh')}
           </button>
         }
       />
@@ -277,10 +280,10 @@ export function PortfolioPage() {
 
             {/* Empty states */}
             {data.accounts.length === 0 && !loading && (
-              <EmptyState title="No trading accounts connected." description="Configure connections in the Trading page." />
+              <EmptyState title={t('portfolio.noAccounts', 'No trading accounts connected.')} description={t('portfolio.noAccountsDescription', 'Configure connections in the Trading page.')} />
             )}
             {data.accounts.length > 0 && allPositions.length === 0 && !loading && (
-              <EmptyState title="No open positions." />
+              <EmptyState title={t('portfolio.noOpenPositions', 'No open positions.')} />
             )}
 
             {allWalletLogs.length > 0 && (
@@ -340,10 +343,11 @@ function HeroMetrics({ equity, curve }: {
   equity: AggregatedEquity | null
   curve: { values: number[]; firstAtCutoff: number | null; latest: number | null } | null
 }) {
+  const { t } = useTranslation()
   if (!equity) {
     return (
       <div className="border border-border rounded-lg bg-bg-secondary p-5 text-center">
-        <p className="text-[13px] text-text-muted">Unable to load portfolio data.</p>
+        <p className="text-[13px] text-text-muted">{t('portfolio.unableToLoadData', 'Unable to load portfolio data.')}</p>
       </div>
     )
   }
@@ -360,7 +364,7 @@ function HeroMetrics({ equity, curve }: {
     const delta = curve.latest - curve.firstAtCutoff
     const pct = curve.firstAtCutoff !== 0 ? (delta / curve.firstAtCutoff) * 100 : 0
     todayDelta = {
-      value: `${fmtPnl(delta, 'USD')} (${fmtPctSigned(pct)}) today`,
+      value: `${fmtPnl(delta, 'USD')} (${fmtPctSigned(pct)}) ${t('portfolio.today', 'today')}`,
       sign: signFromDelta(delta),
     }
   }
@@ -369,21 +373,21 @@ function HeroMetrics({ equity, curve }: {
     <div className="border border-border rounded-lg bg-bg-secondary px-5 py-5 space-y-4">
       <Metric
         size="lg"
-        label="Total Equity · USD"
+        label={t('portfolio.totalEquityUsd', 'Total Equity · USD')}
         value={fmt(total, 'USD')}
-        delta={todayDelta ?? { value: '— today', sign: 'flat' }}
+        delta={todayDelta ?? { value: `— ${t('portfolio.today', 'today')}`, sign: 'flat' }}
       />
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-4 border-t border-border">
-        <Metric size="sm" label="Cash" value={fmt(cash, 'USD')} />
+        <Metric size="sm" label={t('trading.cash')} value={fmt(cash, 'USD')} />
         <Metric
           size="sm"
-          label="Unrealized PnL"
+          label={t('trading.unrealizedPnl')}
           value={fmtPnl(unrealized, 'USD')}
           valueSign={signFromDelta(unrealized)}
         />
         <Metric
           size="sm"
-          label="Realized PnL"
+          label={t('trading.realizedPnl')}
           value={fmtPnl(realized, 'USD')}
           valueSign={signFromDelta(realized)}
         />
@@ -404,6 +408,7 @@ function AccountStrip({ sources, perAccountCurve }: {
   sources: Array<{ id: string; label: string; provider: string; equity: string; unrealizedPnL: number; error?: string; health?: string; disabled?: boolean }>
   perAccountCurve: Record<string, { values: number[]; firstAtCutoff: number | null; latest: number | null }>
 }) {
+  const { t } = useTranslation()
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
       {sources.map(s => {
@@ -431,18 +436,18 @@ function AccountStrip({ sources, perAccountCurve }: {
               </div>
               <div className="flex items-baseline justify-between gap-2 mt-0.5">
                 {isDisabled
-                  ? <span className="text-text-muted text-[11px]">Disabled</span>
+                  ? <span className="text-text-muted text-[11px]">{t('common.disabled')}</span>
                   : isOffline
-                    ? <span className="text-red text-[11px]">Reconnecting…</span>
+                    ? <span className="text-red text-[11px]">{t('trading.reconnecting', 'Reconnecting…')}</span>
                     : (
                       <span className="text-[11px] tabular-nums">
                         {todayDelta != null && Number.isFinite(todayDelta) ? (
                           <span className={todayDelta >= 0 ? 'text-green' : 'text-red'}>
-                            {todayDelta >= 0 ? '▲' : '▼'} {fmtPnl(todayDelta)} today
+                            {todayDelta >= 0 ? '▲' : '▼'} {fmtPnl(todayDelta)} {t('portfolio.today', 'today')}
                           </span>
                         ) : s.unrealizedPnL !== 0 ? (
                           <span className={s.unrealizedPnL >= 0 ? 'text-green' : 'text-red'}>
-                            {fmtPnl(s.unrealizedPnL)} unrealized
+                            {fmtPnl(s.unrealizedPnL)} {t('common.unrealized', 'unrealized')}
                           </span>
                         ) : (
                           <span className="text-text-muted/60">—</span>
@@ -614,6 +619,7 @@ interface CommitWithAccount extends WalletCommitLog {
 }
 
 function TradeLog({ commits }: { commits: CommitWithAccount[] }) {
+  const { t } = useTranslation()
   const sorted = [...commits]
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
     .slice(0, 10)
@@ -623,7 +629,7 @@ function TradeLog({ commits }: { commits: CommitWithAccount[] }) {
   return (
     <div>
       <h3 className="text-[13px] font-semibold text-text-muted uppercase tracking-wide mb-3">
-        Recent Trades
+        {t('portfolio.recentTrades', 'Recent Trades')}
       </h3>
       <div className="space-y-2">
         {sorted.map((commit) => {
@@ -643,7 +649,7 @@ function TradeLog({ commits }: { commits: CommitWithAccount[] }) {
                   <div className="flex items-center gap-3 mt-1">
                     <span className="text-[11px] text-text-muted font-mono">{commit.hash}</span>
                     <span className="text-[11px] text-text-muted/50">
-                      {new Date(commit.timestamp).toLocaleString()}
+                      {fmtDate(commit.timestamp)}
                     </span>
                   </div>
                   {commit.operations.length > 0 && (
@@ -685,12 +691,13 @@ function SnapshotSettings({ enabled, every, onEnabledChange, onEveryChange, save
   onEveryChange: (v: string) => void
   saveStatus: string
 }) {
+  const { t } = useTranslation()
   const isPreset = INTERVAL_PRESETS.some(p => p.value === every)
   const [showCustom, setShowCustom] = useState(!isPreset)
 
   return (
     <div className="flex items-center gap-3 text-[12px] text-text-muted">
-      <span className="font-medium uppercase tracking-wide">Snapshots</span>
+      <span className="font-medium uppercase tracking-wide">{t('portfolio.snapshots', 'Snapshots')}</span>
       <Toggle checked={enabled} onChange={onEnabledChange} size="sm" />
       <div className="flex gap-0.5">
         {INTERVAL_PRESETS.map(p => (
@@ -714,7 +721,7 @@ function SnapshotSettings({ enabled, every, onEnabledChange, onEveryChange, save
               : 'hover:text-text hover:bg-bg-tertiary'
           }`}
         >
-          Custom
+          {t('portfolio.custom', 'Custom')}
         </button>
       </div>
       {showCustom && (
@@ -722,11 +729,11 @@ function SnapshotSettings({ enabled, every, onEnabledChange, onEveryChange, save
           className="w-16 px-1.5 py-0.5 rounded border border-border bg-bg text-text text-[12px] text-center"
           value={every}
           onChange={(e) => onEveryChange(e.target.value)}
-          placeholder="e.g. 2h"
+          placeholder={t('portfolio.customIntervalPlaceholder', 'e.g. 2h')}
         />
       )}
-      {saveStatus === 'saving' && <span className="text-accent text-[10px]">saving...</span>}
-      {saveStatus === 'error' && <span className="text-red text-[10px]">save failed</span>}
+      {saveStatus === 'saving' && <span className="text-accent text-[10px]">{t('common.saving')}</span>}
+      {saveStatus === 'error' && <span className="text-red text-[10px]">{t('common.failedToSave')}</span>}
     </div>
   )
 }

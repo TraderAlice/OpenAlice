@@ -9,6 +9,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Section } from '../../components/form'
 import { simulatorApi, type SimulatorState } from '../../api/simulator'
 
@@ -23,6 +24,7 @@ export function MarkPrices({ utaId, state, run, loading }: {
   run: (label: string, fn: () => Promise<unknown>) => Promise<void>
   loading: boolean
 }) {
+  const { t } = useTranslation()
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [newKey, setNewKey] = useState('')
   const [newPrice, setNewPrice] = useState('')
@@ -108,19 +110,19 @@ export function MarkPrices({ utaId, state, run, loading }: {
 
   return (
     <Section
-      title="Mark Prices"
-      description="Per-symbol mark price. Editing or ticking auto-matches any pending limit/stop order whose trigger the new price crosses. Focus a price input and press ↑/↓ for ±1%, Shift+↑/↓ for ±5%."
+      title={t('simulator.markPrices')}
+      description={t('simulator.markPricesDescription', 'Per-symbol mark price. Editing or ticking auto-matches any pending limit/stop order whose trigger the new price crosses. Focus a price input and press \u2191/\u2193 for \u00b11%, Shift+\u2191/\u2193 for \u00b15%.')}
     >
       <div className="space-y-1">
         {state.markPrices.length === 0 ? (
-          <p className="text-xs text-text-muted">No prices set yet — add one below.</p>
+          <p className="text-xs text-text-muted">{t('simulator.noPricesYet', 'No prices set yet \u2014 add one below.')}</p>
         ) : (
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-text-muted text-xs">
-                <th className="pb-1 pr-3">Symbol</th>
-                <th className="pb-1 pr-3 w-40">Price</th>
-                <th className="pb-1 text-right">Quick</th>
+                <th className="pb-1 pr-3">{t('simulator.symbol', 'Symbol')}</th>
+                <th className="pb-1 pr-3 w-40">{t('simulator.price', 'Price')}</th>
+                <th className="pb-1 text-right">{t('simulator.quick', 'Quick')}</th>
               </tr>
             </thead>
             <tbody>
@@ -174,7 +176,7 @@ export function MarkPrices({ utaId, state, run, loading }: {
               },
             )}
             className="btn-primary-sm"
-          >Add</button>
+          >{t('common.add')}</button>
         </div>
       </div>
     </Section>

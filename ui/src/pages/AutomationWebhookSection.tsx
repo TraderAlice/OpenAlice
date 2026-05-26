@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api, type TopologyResponse, type EventLogEntry } from '../api'
 import { PageLoading, EmptyState } from '../components/StateViews'
 
@@ -343,6 +344,7 @@ function TryItForm() {
 // ==================== Section ====================
 
 export function AutomationWebhookSection() {
+  const { t } = useTranslation()
   const [topology, setTopology] = useState<TopologyResponse | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
 
@@ -360,7 +362,7 @@ export function AutomationWebhookSection() {
   const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3002'
 
   if (loadError) {
-    return <EmptyState title="Failed to load topology" description={loadError} />
+    return <EmptyState title={t('automation.failedToLoadTopology')} description={loadError} />
   }
   if (!topology) return <PageLoading />
 

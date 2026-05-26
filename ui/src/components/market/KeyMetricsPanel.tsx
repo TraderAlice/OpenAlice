@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { marketApi, type KeyMetrics, type FinancialRatios } from '../../api/market'
 import { Card } from './Card'
 import { fmtNumber, fmtPercent, fmtMoneyShort } from './format'
@@ -10,6 +11,7 @@ interface Props {
 type Loaded = { metrics: KeyMetrics | null; ratios: FinancialRatios | null }
 
 export function KeyMetricsPanel({ symbol }: Props) {
+  const { t } = useTranslation()
   const [data, setData] = useState<Loaded | null>(null)
   const [provider, setProvider] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -20,9 +22,6 @@ export function KeyMetricsPanel({ symbol }: Props) {
     const fetch = (isInitial: boolean) => {
       if (isInitial) setLoading(true)
       if (isInitial) setError(null)
-      // Metrics and ratios both feed this panel, but ratios isn't implemented
-      // on every provider (yfinance 500s with "Fetcher not found"). Use
-      // allSettled so a single rejection doesn't discard the other source.
       Promise.allSettled([marketApi.equity.metrics(symbol), marketApi.equity.ratios(symbol)])
         .then(([mRes, rRes]) => {
           if (cancelled) return
@@ -42,44 +41,33 @@ export function KeyMetricsPanel({ symbol }: Props) {
         .finally(() => { if (!cancelled && isInitial) setLoading(false) })
     }
     fetch(true)
-    // Market cap / valuation ratios move with price; refresh every 5 min so
-    // an overnight-open tab doesn't show stale numbers. Less aggressive than
-    // the quote header because these fields are less price-immediate.
     const timer = setInterval(() => fetch(false), 300_000)
     return () => { cancelled = true; clearInterval(timer) }
   }, [symbol])
 
   const m = data?.metrics ?? {}
   const r = data?.ratios ?? {}
-  // Ratios gives us valuation + margins; metrics gives market_cap, EV, ROE/ROA.
-  // Merge with metrics winning where both have a key.
   const both = { ...r, ...m } as Record<string, unknown>
 
-  // Curated list of what most investors glance at. FMP's live schema uses
-  // snake_case for canonical fields and *TTM camelCase for trailing variants;
-  // we pick snake_case first and fall back where the canonical is missing.
   const rows: Array<[string, string]> = [
-    ['P/E',           fmtNumber(both.price_to_earnings)],
-    ['PEG',           fmtNumber(both.priceToEarningsGrowthRatioTTM)],
-    ['P/S',           fmtNumber(both.price_to_sales)],
-    ['P/B',           fmtNumber(both.price_to_book)],
-    ['EV/EBITDA',     fmtNumber(both.ev_to_ebitda)],
-    ['EV/Sales',      fmtNumber(both.ev_to_sales)],
-    ['Div Yield',     fmtPercent(both.dividend_yield)],
-    ['ROE',           fmtPercent(both.return_on_equity)],
-    ['ROA',           fmtPercent(both.return_on_assets)],
-    ['Gross Margin',  fmtPercent(both.gross_profit_margin)],
-    ['Op Margin',     fmtPercent(both.operating_profit_margin)],
-    ['Net Margin',    fmtPercent(both.net_profit_margin)],
-    ['Debt/Equity',   fmtNumber(both.debt_to_equity)],
-    ['Current Ratio', fmtNumber(both.current_ratio)],
-    ['Market Cap',    fmtMoneyShort(both.marketCap ?? both.market_cap)],
-    ['Enterprise V',  fmtMoneyShort(both.enterprise_value)],
+    [t('market.pe'),           fmtNumber(both.price_to_earnings)],
+    [t('market.peg'),          fmtNumber(both.priceToEarningsGrowthRatioTTM)],
+    [t('market.ps'),           fmtNumber(both.price_to_sales)],
+    [t('market.pb'),           fmtNumber(both.price_to_book)],
+    [t('market.evEbitda'),     fmtNumber(both.ev_to_ebitda)],
+    [t('market.evSales'),      fmtNumber(both.ev_to_sales)],
+    [t('market.divYield'),     fmtPercent(both.dividend_yield)],
+    [t('market.roe'),          fmtPercent(both.return_on_equity)],
+    [t('market.roa'),          fmtPercent(both.return_on_assets)],
+    [t('market.grossMargin'),  fmtPercent(both.gross_profit_margin)],
+    [t('market.opMargin'),     fmtPercent(both.operating_profit_margin)],
+    [t('market.netMargin'),    fmtPercent(both.net_profit_margin)],
+    [t('market.debtEquity'),   fmtNumber(both.debt_to_equity)],
+    [t('market.currentRatio'), fmtNumber(both.current_ratio)],
+    [t('market.marketCap'),    fmtMoneyShort(both.marketCap ?? both.market_cap)],
+    [t('market.enterpriseValue'), fmtMoneyShort(both.enterprise_value)],
   ]
 
-  // Compose a hover hint that explains where the numbers came from, which
-  // endpoints were merged, and flags provider-specific gaps the user is
-  // most likely to notice. Extend when more caveats earn a mention.
   const infoLines: string[] = [
     provider ? `Source: ${provider}` : 'Source: (unknown)',
     'Endpoints: /equity/fundamental/metrics + /equity/fundamental/ratios',
@@ -91,8 +79,8 @@ export function KeyMetricsPanel({ symbol }: Props) {
   const info = infoLines.join('\n')
 
   return (
-    <Card title="Key Metrics" info={info}>
-      {loading && <div className="text-[12px] text-text-muted">Loading…</div>}
+    <Card title={t('market.keyMetrics')} info={info}>
+      {loading && <div className="text-[12px] text-text-muted">{t('common.loading')}</div>}
       {error && !loading && <div className="text-[12px] text-red">{error}</div>}
       {!loading && !error && data && (
         <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-[12px]">

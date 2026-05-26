@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactElement } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Cpu, LayoutGrid, Library, Sparkles, Terminal, type LucideIcon } from 'lucide-react';
 
 import {
@@ -50,6 +51,7 @@ export interface SidebarProps {
 }
 
 export function Sidebar(props: SidebarProps): ReactElement {
+  const { t } = useTranslation()
   const [creating, setCreating] = useState(false);
   const [tag, setTag] = useState('');
   const [template, setTemplate] = useState<string>('');
@@ -204,7 +206,7 @@ export function Sidebar(props: SidebarProps): ReactElement {
               type="button"
               className={`sidebar-overview-btn${props.templatesActive ? ' is-active' : ''}`}
               onClick={props.onOpenTemplates}
-              title="Browse workspace templates"
+              title={t('workspaces.browseTemplates')}
             >
               <Library size={13} strokeWidth={2.25} aria-hidden="true" />
               <span>Templates</span>
@@ -282,6 +284,7 @@ function AgentBadgeGlyph({ agentId }: { agentId: string }): ReactElement {
 }
 
 export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
+  const { t } = useTranslation()
   const w = props.workspace;
   const isSelected = props.selection?.wsId === w.id && props.selection.sessionId === null;
   const hasRunning = w.sessions.some((s) => s.state === 'running');
@@ -391,7 +394,7 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
         <button
           type="button"
           className="sidebar-action sidebar-action-delete"
-          title="delete workspace"
+          title={t('workspaces.deleteWorkspace')}
           onClick={() => void props.onDelete(w.id)}
         >
           ×
@@ -427,6 +430,7 @@ export interface SessionRowProps {
 }
 
 export function SessionRow(props: SessionRowProps): ReactElement {
+  const { t } = useTranslation()
   const s = props.session;
   const isPaused = s.state === 'paused';
   const tidShort = s.agentSessionId ? s.agentSessionId.slice(0, 8) : null;
@@ -464,7 +468,7 @@ export function SessionRow(props: SessionRowProps): ReactElement {
         <button
           type="button"
           className="sidebar-session-action sidebar-session-pause"
-          title="pause this session"
+          title={t('workspaces.pauseSession')}
           onClick={(e) => {
             e.stopPropagation();
             props.onPause();

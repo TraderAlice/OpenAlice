@@ -1,15 +1,10 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { marketApi, type FinancialStatementRow } from '../../api/market'
 import { Card } from './Card'
 import { fmtMoneyShort } from './format'
 
 type Tab = 'balance' | 'income' | 'cashflow'
-
-const TABS: Array<{ key: Tab; label: string }> = [
-  { key: 'balance',  label: 'Balance' },
-  { key: 'income',   label: 'Income' },
-  { key: 'cashflow', label: 'Cash Flow' },
-]
 
 // Curated row picks per statement — the raw rows carry 80+ keys, most of
 // which are duplicates or derived. Pick the common ones every investor wants.
@@ -69,9 +64,16 @@ interface Props {
 type CacheEntry = { rows: FinancialStatementRow[]; provider?: string; error?: string }
 
 export function FinancialStatementsPanel({ symbol }: Props) {
+  const { t } = useTranslation()
   const [tab, setTab] = useState<Tab>('income')
   const [cache, setCache] = useState<Partial<Record<Tab, CacheEntry>>>({})
   const [loading, setLoading] = useState(false)
+
+  const TABS: Array<{ key: Tab; label: string }> = [
+    { key: 'balance',  label: t('market.balance', 'Balance') },
+    { key: 'income',   label: t('market.income', 'Income') },
+    { key: 'cashflow', label: t('market.cashFlow', 'Cash Flow') },
+  ]
 
   useEffect(() => { setCache({}) }, [symbol])
 
@@ -116,7 +118,7 @@ export function FinancialStatementsPanel({ symbol }: Props) {
 
   return (
     <Card
-      title="Financial Statements"
+      title={t('market.financialStatements', 'Financial Statements')}
       info={info}
       contentClassName="overflow-x-auto p-0"
       right={
@@ -138,13 +140,13 @@ export function FinancialStatementsPanel({ symbol }: Props) {
       {loading && !entry && <div className="p-3 text-[12px] text-text-muted">Loading…</div>}
       {entry?.error && <div className="p-3 text-[12px] text-red">{entry.error}</div>}
       {!entry?.error && rows.length === 0 && !loading && (
-        <div className="p-3 text-[12px] text-text-muted">No data.</div>
+        <div className="p-3 text-[12px] text-text-muted">{t('market.noData', 'No data.')}</div>
       )}
       {rows.length > 0 && (
         <table className="w-full text-[12px] border-collapse">
           <thead>
             <tr className="border-b border-border/60">
-              <th className="text-left font-medium text-text-muted/70 px-3 py-2 sticky left-0 bg-bg-secondary/30">Item</th>
+              <th className="text-left font-medium text-text-muted/70 px-3 py-2 sticky left-0 bg-bg-secondary/30">{t('market.item', 'Item')}</th>
               {rows.map((row) => (
                 <th key={String(row.period_ending ?? row.filing_date)}
                     className="text-right font-medium text-text-muted/70 px-3 py-2 whitespace-nowrap">

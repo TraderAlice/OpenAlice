@@ -1,12 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api, type EventLogEntry, type ToolCallRecord } from '../api'
+import { getCurrentLocale } from '../lib/i18n-format'
 
 // ==================== Helpers ====================
 
 function formatDateTime(ts: number): string {
   const d = new Date(ts)
-  const date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  const time = d.toLocaleTimeString('en-US', { hour12: false })
+  const locale = getCurrentLocale()
+  const date = d.toLocaleDateString(locale, { month: 'short', day: 'numeric' })
+  const time = d.toLocaleTimeString(locale, { hour12: false })
   return `${date} ${time}`
 }
 
@@ -41,6 +44,7 @@ function formatOutput(output: string): string {
 const EVENT_PAGE_SIZE = 100
 
 function EventLogSection() {
+  const { t } = useTranslation()
   const [entries, setEntries] = useState<EventLogEntry[]>([])
   const [typeFilter, setTypeFilter] = useState('')
   const [paused, setPaused] = useState(false)
@@ -118,9 +122,9 @@ function EventLogSection() {
           onChange={(e) => handleTypeChange(e.target.value)}
           className="bg-bg-tertiary text-text text-sm rounded-md border border-border px-2 py-1.5 outline-none focus:border-accent"
         >
-          <option value="">All types</option>
-          {types.map((t) => (
-            <option key={t} value={t}>{t}</option>
+          <option value="">{t('dev.allTypes', 'All types')}</option>
+          {types.map((typeItem) => (
+            <option key={typeItem} value={typeItem}>{typeItem}</option>
           ))}
         </select>
 
@@ -132,15 +136,15 @@ function EventLogSection() {
               : 'border-border text-text-muted hover:bg-bg-tertiary'
           }`}
         >
-          {paused ? '▶ Resume' : '⏸ Pause'}
+          {paused ? '▶ ' + t('dev.resume', 'Resume') : '⏸ ' + t('dev.pause', 'Pause')}
         </button>
 
         <span className="text-xs text-text-muted ml-auto">
           {total > 0
-            ? `Page ${page} of ${totalPages} · ${total} events`
-            : '0 events'
+            ? t('dev.pageInfo', 'Page {{page}} of {{totalPages}} · {{total}} events', { page, totalPages, total })
+            : t('dev.zeroEvents', '0 events')
           }
-          {typeFilter && ' (filtered)'}
+          {typeFilter && ' (' + t('dev.filtered', 'filtered') + ')'}
         </span>
       </div>
 
@@ -150,17 +154,17 @@ function EventLogSection() {
         className="flex-1 min-h-0 bg-bg rounded-lg border border-border overflow-y-auto font-mono text-xs"
       >
         {loading && entries.length === 0 ? (
-          <div className="px-4 py-8 text-center text-text-muted">Loading...</div>
+          <div className="px-4 py-8 text-center text-text-muted">{t('common.loading')}</div>
         ) : entries.length === 0 ? (
-          <div className="px-4 py-8 text-center text-text-muted">No events yet</div>
+          <div className="px-4 py-8 text-center text-text-muted">{t('dev.noEventsYet', 'No events yet')}</div>
         ) : (
           <table className="w-full">
             <thead className="sticky top-0 bg-bg-secondary">
               <tr className="text-text-muted text-left">
                 <th className="px-3 py-2 w-12">#</th>
-                <th className="px-3 py-2 w-36">Time</th>
-                <th className="px-3 py-2 w-40">Type</th>
-                <th className="px-3 py-2">Payload</th>
+                <th className="px-3 py-2 w-36">{t('dev.time', 'Time')}</th>
+                <th className="px-3 py-2 w-40">{t('dev.type', 'Type')}</th>
+                <th className="px-3 py-2">{t('dev.payload', 'Payload')}</th>
               </tr>
             </thead>
             <tbody>
@@ -251,6 +255,7 @@ function EventRow({ entry }: { entry: EventLogEntry }) {
 const TOOL_PAGE_SIZE = 100
 
 function ToolCallLogSection() {
+  const { t } = useTranslation()
   const [entries, setEntries] = useState<ToolCallRecord[]>([])
   const [nameFilter, setNameFilter] = useState('')
   const [paused, setPaused] = useState(false)
@@ -322,7 +327,7 @@ function ToolCallLogSection() {
           onChange={(e) => handleNameChange(e.target.value)}
           className="bg-bg-tertiary text-text text-sm rounded-md border border-border px-2 py-1.5 outline-none focus:border-accent"
         >
-          <option value="">All tools</option>
+          <option value="">{t('dev.allTools', 'All tools')}</option>
           {toolNames.map((n) => (
             <option key={n} value={n}>{n}</option>
           ))}
@@ -336,15 +341,15 @@ function ToolCallLogSection() {
               : 'border-border text-text-muted hover:bg-bg-tertiary'
           }`}
         >
-          {paused ? 'Resume' : 'Pause'}
+          {paused ? t('dev.resume', 'Resume') : t('dev.pause', 'Pause')}
         </button>
 
         <span className="text-xs text-text-muted ml-auto">
           {total > 0
-            ? `Page ${page} of ${totalPages} \u00b7 ${total} calls`
-            : '0 calls'
+            ? t('dev.pageInfoToolCalls', 'Page {{page}} of {{totalPages}} · {{total}} calls', { page, totalPages, total })
+            : t('dev.zeroCalls', '0 calls')
           }
-          {nameFilter && ' (filtered)'}
+          {nameFilter && ' (' + t('dev.filtered', 'filtered') + ')'}
         </span>
       </div>
 
@@ -354,19 +359,19 @@ function ToolCallLogSection() {
         className="flex-1 min-h-0 bg-bg rounded-lg border border-border overflow-y-auto font-mono text-xs"
       >
         {loading && entries.length === 0 ? (
-          <div className="px-4 py-8 text-center text-text-muted">Loading...</div>
+          <div className="px-4 py-8 text-center text-text-muted">{t('common.loading')}</div>
         ) : entries.length === 0 ? (
-          <div className="px-4 py-8 text-center text-text-muted">No tool calls yet</div>
+          <div className="px-4 py-8 text-center text-text-muted">{t('dev.noToolCallsYet', 'No tool calls yet')}</div>
         ) : (
           <table className="w-full">
             <thead className="sticky top-0 bg-bg-secondary">
               <tr className="text-text-muted text-left">
                 <th className="px-3 py-2 w-12">#</th>
-                <th className="px-3 py-2 w-36">Time</th>
-                <th className="px-3 py-2 w-48">Tool</th>
-                <th className="px-3 py-2 w-20 text-right">Duration</th>
-                <th className="px-3 py-2 w-16 text-center">Status</th>
-                <th className="px-3 py-2">Input</th>
+                <th className="px-3 py-2 w-36">{t('dev.time', 'Time')}</th>
+                <th className="px-3 py-2 w-48">{t('dev.tool', 'Tool')}</th>
+                <th className="px-3 py-2 w-20 text-right">{t('dev.duration', 'Duration')}</th>
+                <th className="px-3 py-2 w-16 text-center">{t('dev.status', 'Status')}</th>
+                <th className="px-3 py-2">{t('dev.input', 'Input')}</th>
               </tr>
             </thead>
             <tbody>
@@ -419,6 +424,7 @@ function ToolCallLogSection() {
 }
 
 function ToolCallRow({ record }: { record: ToolCallRecord }) {
+  const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
   const inputStr = JSON.stringify(record.input)
   const inputPreview = inputStr.length > 100 ? inputStr.slice(0, 100) + '...' : inputStr
@@ -443,13 +449,13 @@ function ToolCallRow({ record }: { record: ToolCallRecord }) {
         <tr className="border-t border-border/30">
           <td colSpan={6} className="px-3 py-2 space-y-2">
             <div>
-              <span className="text-text-muted text-[11px] uppercase tracking-wide">Input</span>
+              <span className="text-text-muted text-[11px] uppercase tracking-wide">{t('dev.input', 'Input')}</span>
               <pre className="text-text-muted whitespace-pre-wrap break-all bg-bg-tertiary rounded p-2 text-[11px] mt-1">
                 {JSON.stringify(record.input, null, 2)}
               </pre>
             </div>
             <div>
-              <span className="text-text-muted text-[11px] uppercase tracking-wide">Output</span>
+              <span className="text-text-muted text-[11px] uppercase tracking-wide">{t('dev.output', 'Output')}</span>
               <pre className="text-text-muted whitespace-pre-wrap break-all bg-bg-tertiary rounded p-2 text-[11px] mt-1 max-h-64 overflow-y-auto">
                 {formatOutput(record.output)}
               </pre>
@@ -465,28 +471,32 @@ function ToolCallRow({ record }: { record: ToolCallRecord }) {
 
 type Tab = 'events' | 'tools'
 
-const TABS: { key: Tab; label: string }[] = [
-  { key: 'events', label: 'Events' },
-  { key: 'tools', label: 'Tool Calls' },
-]
+function getLogTabs(t: ReturnType<typeof useTranslation>['t']): { key: Tab; label: string }[] {
+  return [
+    { key: 'events', label: t('dev.events') },
+    { key: 'tools', label: t('dev.toolCalls') },
+  ]
+}
 
 export function LogsPage() {
+  const { t } = useTranslation()
   const [tab, setTab] = useState<Tab>('events')
+  const tabs = getLogTabs(t)
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <div className="px-4 md:px-6 border-b border-border/60">
         <div className="flex gap-1">
-          {TABS.map((t) => (
+          {tabs.map((tabItem) => (
             <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
+              key={tabItem.key}
+              onClick={() => setTab(tabItem.key)}
               className={`px-3 py-2 text-sm font-medium transition-colors relative ${
-                tab === t.key ? 'text-accent' : 'text-text-muted hover:text-text'
+                tab === tabItem.key ? 'text-accent' : 'text-text-muted hover:text-text'
               }`}
             >
-              {t.label}
-              {tab === t.key && (
+              {tabItem.label}
+              {tab === tabItem.key && (
                 <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-accent rounded-t" />
               )}
             </button>

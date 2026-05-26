@@ -5,6 +5,7 @@
  */
 
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Section } from '../../components/form'
 import type { SimulatorState, SimulatorPosition } from '../../api/simulator'
 import { describeInstrument } from './instruments'
@@ -22,6 +23,7 @@ function describePosition(p: SimulatorPosition): string {
 }
 
 export function Positions({ state }: { state: SimulatorState }) {
+  const { t } = useTranslation()
   const markByKey = useMemo(() => {
     const m = new Map<string, string>()
     for (const mp of state.markPrices) m.set(mp.nativeKey, mp.price)
@@ -30,20 +32,20 @@ export function Positions({ state }: { state: SimulatorState }) {
 
   return (
     <Section
-      title="Positions"
-      description="Read-only — mutate via mark price moves, order fills, or external events."
+      title={t('simulator.positions')}
+      description={t('simulator.positionsDescription', 'Read-only — mutate via mark price moves, order fills, or external events.')}
     >
       {state.positions.length === 0 ? (
-        <p className="text-xs text-text-muted">No positions.</p>
+        <p className="text-xs text-text-muted">{t('simulator.noPositions', 'No positions.')}</p>
       ) : (
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-text-muted text-xs">
-              <th className="pb-1 pr-3">Position</th>
-              <th className="pb-1 pr-3 text-right">Qty</th>
-              <th className="pb-1 pr-3 text-right">Avg Cost</th>
-              <th className="pb-1 pr-3 text-right">Mark</th>
-              <th className="pb-1 text-right">PnL</th>
+              <th className="pb-1 pr-3">{t('simulator.position', 'Position')}</th>
+              <th className="pb-1 pr-3 text-right">{t('dev.qty', 'Qty')}</th>
+              <th className="pb-1 pr-3 text-right">{t('dev.avgCost', 'Avg Cost')}</th>
+              <th className="pb-1 pr-3 text-right">{t('simulator.mark', 'Mark')}</th>
+              <th className="pb-1 text-right">{t('trading.pnl', 'PnL')}</th>
             </tr>
           </thead>
           <tbody>
@@ -73,7 +75,7 @@ export function Positions({ state }: { state: SimulatorState }) {
                         <span className="text-[9px] text-text-muted/60" title={`Each contract = ${p.multiplier} units`}>×{p.multiplier}</span>
                       )}
                       {p.avgCostSource === 'wallet' && (
-                        <span className="text-[9px] text-text-muted/60" title="Cost basis derived from UTA reconcile pipeline (wallet-source position)">wallet</span>
+                        <span className="text-[9px] text-text-muted/60" title={t('simulator.walletCostBasis', 'Cost basis derived from UTA reconcile pipeline (wallet-source position)')}>wallet</span>
                       )}
                     </div>
                   </td>

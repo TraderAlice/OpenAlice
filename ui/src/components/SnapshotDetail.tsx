@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+import { fmt, fmtPnl, fmtDate, fmtTime } from '../lib/i18n-format'
 import type { UTASnapshotSummary } from '../api'
 
 // ==================== Props ====================
@@ -10,6 +12,7 @@ interface SnapshotDetailProps {
 // ==================== Component ====================
 
 export function SnapshotDetail({ snapshot, onClose }: SnapshotDetailProps) {
+  const { t } = useTranslation()
   const a = snapshot.account
 
   return (
@@ -19,7 +22,7 @@ export function SnapshotDetail({ snapshot, onClose }: SnapshotDetailProps) {
         <div className="flex items-center gap-2">
           <HealthDot health={snapshot.health} />
           <span className="text-[13px] text-text font-medium">
-            {new Date(snapshot.timestamp).toLocaleString()}
+            {(() => { const d = new Date(snapshot.timestamp); return `${fmtDate(d)} ${fmtTime(d)}` })()}
           </span>
           <TriggerBadge trigger={snapshot.trigger} />
           <span className="text-[11px] text-text-muted">{snapshot.accountId}</span>
@@ -34,29 +37,29 @@ export function SnapshotDetail({ snapshot, onClose }: SnapshotDetailProps) {
 
       {/* Account Summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 px-4 py-3">
-        <MetricItem label="Net Liquidation" value={fmtStr(a.netLiquidation)} />
-        <MetricItem label="Cash" value={fmtStr(a.totalCashValue)} />
-        <MetricItem label="Unrealized PnL" value={fmtPnlStr(a.unrealizedPnL)} pnl={Number(a.unrealizedPnL)} />
-        <MetricItem label="Realized PnL" value={fmtPnlStr(a.realizedPnL)} pnl={Number(a.realizedPnL)} />
+        <MetricItem label={t('utaDetail.netLiquidation')} value={fmtStr(a.netLiquidation)} />
+        <MetricItem label={t('common.cash', 'Cash')} value={fmtStr(a.totalCashValue)} />
+        <MetricItem label={t('utaDetail.unrealizedPnl', 'Unrealized PnL')} value={fmtPnlStr(a.unrealizedPnL)} pnl={Number(a.unrealizedPnL)} />
+        <MetricItem label={t('utaDetail.realizedPnl')} value={fmtPnlStr(a.realizedPnL)} pnl={Number(a.realizedPnL)} />
       </div>
 
       {/* Positions */}
       {snapshot.positions.length > 0 && (
         <div className="px-4 pb-3">
           <p className="text-[11px] text-text-muted uppercase tracking-wide mb-1.5">
-            Positions ({snapshot.positions.length})
+            {t('utaDetail.positionsCount', { count: snapshot.positions.length })}
           </p>
           <div className="border border-border rounded overflow-x-auto">
             <table className="w-full text-[12px]">
               <thead>
                 <tr className="bg-bg text-text-muted text-left">
-                  <th className="px-2.5 py-1.5 font-medium">Symbol</th>
+                  <th className="px-2.5 py-1.5 font-medium">{t('simulator.symbol')}</th>
                   <th className="px-2.5 py-1.5 font-medium text-center">Ccy</th>
-                  <th className="px-2.5 py-1.5 font-medium text-right">Qty</th>
-                  <th className="px-2.5 py-1.5 font-medium text-right">Avg Cost</th>
-                  <th className="px-2.5 py-1.5 font-medium text-right">Mkt Price</th>
-                  <th className="px-2.5 py-1.5 font-medium text-right">Mkt Value</th>
-                  <th className="px-2.5 py-1.5 font-medium text-right">PnL</th>
+                  <th className="px-2.5 py-1.5 font-medium text-right">{t('dev.qty')}</th>
+                  <th className="px-2.5 py-1.5 font-medium text-right">{t('dev.avgCost')}</th>
+                  <th className="px-2.5 py-1.5 font-medium text-right">{t('simulator.mark')}</th>
+                  <th className="px-2.5 py-1.5 font-medium text-right">{t('utaDetail.mktValue')}</th>
+                  <th className="px-2.5 py-1.5 font-medium text-right">{t('trading.pnl')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -91,7 +94,7 @@ export function SnapshotDetail({ snapshot, onClose }: SnapshotDetailProps) {
       {snapshot.openOrders.length > 0 && (
         <div className="px-4 pb-3">
           <p className="text-[11px] text-text-muted uppercase tracking-wide mb-1.5">
-            Open Orders ({snapshot.openOrders.length})
+            {t('utaDetail.openOrdersCount', { count: snapshot.openOrders.length })}
           </p>
           <div className="space-y-1">
             {snapshot.openOrders.map((o, i) => (
@@ -109,7 +112,7 @@ export function SnapshotDetail({ snapshot, onClose }: SnapshotDetailProps) {
       {/* Empty state */}
       {snapshot.positions.length === 0 && snapshot.openOrders.length === 0 && (
         <div className="px-4 pb-3">
-          <p className="text-[12px] text-text-muted">No positions or orders at this time.</p>
+          <p className="text-[12px] text-text-muted">{t('snapshot.noPositionsOrOrders', 'No positions or orders at this time.')}</p>
         </div>
       )}
     </div>
@@ -169,14 +172,11 @@ function currencySymbol(currency?: string): string {
 function fmtStr(s: string, currency?: string): string {
   const n = Number(s)
   if (isNaN(n)) return s
-  const sym = currencySymbol(currency)
-  return `${sym}${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  return fmt(n, currency ?? 'USD')
 }
 
 function fmtPnlStr(s: string, currency?: string): string {
   const n = Number(s)
   if (isNaN(n)) return s
-  const sym = currencySymbol(currency)
-  const sign = n >= 0 ? '+' : ''
-  return `${sign}${sym}${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  return fmtPnl(n, currency ?? 'USD')
 }

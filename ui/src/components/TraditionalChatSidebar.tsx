@@ -1,4 +1,5 @@
 import { HelpCircle } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useChannels } from '../contexts/ChannelsContext'
 import { useWorkspace } from '../tabs/store'
 import { getFocusedTab } from '../tabs/types'

@@ -9,6 +9,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   getAgentConfig,
   listAgentProfiles,
@@ -88,6 +89,7 @@ function formsMatch(a: FormState, b: FormState, agent: AgentId): boolean {
 }
 
 export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
+  const { t } = useTranslation()
   const [tab, setTab] = useState<Tab>('claude')
   const [profiles, setProfiles] = useState<AgentProfile[]>([])
   const [bundle, setBundle] = useState<AgentConfigBundle | null>(null)
@@ -229,7 +231,7 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border">
-          <h2 className="text-[15px] font-semibold text-text">Workspace AI Provider</h2>
+          <h2 className="text-[15px] font-semibold text-text">{t('workspaceAI.title', 'Workspace AI Provider')}</h2>
           <button onClick={onClose} className="text-text-muted hover:text-text transition-colors">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
@@ -249,7 +251,7 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
                   : 'text-text-muted hover:text-text'
               }`}
             >
-              {id === 'claude' ? 'Claude Code' : 'Codex'}
+              {id === 'claude' ? t('workspaceAI.claudeCode', 'Claude Code') : t('workspaceAI.codex', 'Codex')}
             </button>
           ))}
         </div>
@@ -259,7 +261,7 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
           {/* Quick pick */}
           <div className="rounded-lg border border-border bg-bg-secondary/30 p-3">
             <label className="block text-xs font-medium text-text-muted mb-2">
-              Apply from OpenAlice profile
+              {t('workspaceAI.applyFromProfile', 'Apply from OpenAlice profile')}
             </label>
             <div className="flex gap-2">
               <select
@@ -267,7 +269,7 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
                 onChange={(e) => setPickedProfile(e.target.value)}
                 className={inputClass + ' flex-1'}
               >
-                <option value="">— select a profile —</option>
+                <option value="">{t('workspaceAI.selectProfile', '— select a profile —')}</option>
                 {profiles.map((p) => (
                   <option key={p.name} value={p.name}>
                     {p.name}
@@ -279,14 +281,14 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
                 disabled={!pickedProfile}
                 className="px-3 py-2 rounded-md bg-accent text-bg text-[13px] font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent/90 transition-colors"
               >
-                Apply
+                {t('workspaceAI.apply', 'Apply')}
               </button>
             </div>
           </div>
 
           {/* Manual fields */}
           <div>
-            <label className="block text-xs font-medium text-text-muted mb-1">Base URL</label>
+            <label className="block text-xs font-medium text-text-muted mb-1">{t('workspaceAI.baseUrl', 'Base URL')}</label>
             <input
               value={form.baseUrl}
               onChange={(e) => setForm({ ...form, baseUrl: e.target.value })}
@@ -299,7 +301,7 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-text-muted mb-1">API Key</label>
+            <label className="block text-xs font-medium text-text-muted mb-1">{t('workspaceAI.apiKey', 'API Key')}</label>
             <div className="flex gap-2">
               <input
                 type={showKey ? 'text' : 'password'}
@@ -316,13 +318,13 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
                 className="px-3 rounded-md border border-border text-text-muted hover:text-text text-[12px]"
                 type="button"
               >
-                {showKey ? 'Hide' : 'Show'}
+                {showKey ? t('workspaceAI.hide', 'Hide') : t('workspaceAI.show', 'Show')}
               </button>
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-text-muted mb-1">Model</label>
+            <label className="block text-xs font-medium text-text-muted mb-1">{t('workspaceAI.model', 'Model')}</label>
             <input
               value={form.model}
               onChange={(e) => setForm({ ...form, model: e.target.value })}
@@ -356,18 +358,18 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
           )}
           {savedFlash && (
             <div className="rounded-md border border-green/40 bg-green/10 text-green text-[12px] px-3 py-2">
-              Saved. Pause + resume any open session to reload.
+              {t('workspaceAI.savedFlash', 'Saved. Pause + resume any open session to reload.')}
             </div>
           )}
           {testing && (
             <div className="rounded-md border border-border bg-bg-secondary text-text-muted text-[12px] px-3 py-2">
-              Testing…
+              {t('workspaceAI.testing', 'Testing…')}
             </div>
           )}
           {!testing && result?.kind === 'pass' && resultMatchesCurrent && (
             <div className="rounded-md border border-green/40 bg-green/10 text-green text-[12px] px-3 py-2">
               <div className="font-medium mb-0.5">
-                Test passed — {tab === 'claude' ? 'Anthropic' : 'OpenAI'} replied:
+                {t('workspaceAI.testPassed', 'Test passed — {{provider}} replied:', { provider: tab === 'claude' ? 'Anthropic' : 'OpenAI' })}
               </div>
               <div className="text-text whitespace-pre-wrap break-words font-mono text-[11.5px]">
                 {result.message || '(empty reply)'}
@@ -376,7 +378,7 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
           )}
           {!testing && result?.kind === 'fail' && resultMatchesCurrent && (
             <div className="rounded-md border border-red/40 bg-red/10 text-red text-[12px] px-3 py-2">
-              <div className="font-medium mb-0.5">Test failed:</div>
+              <div className="font-medium mb-0.5">{t('workspaceAI.testFailed', 'Test failed:')}</div>
               <div className="whitespace-pre-wrap break-words font-mono text-[11.5px]">
                 {result.message}
               </div>
@@ -384,14 +386,12 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
           )}
           {!testing && result && !resultMatchesCurrent && (
             <div className="rounded-md border border-yellow-400/30 bg-yellow-400/5 text-yellow-400/90 text-[12px] px-3 py-2">
-              Form changed since last test — re-test before saving.
+              {t('workspaceAI.formChanged', 'Form changed since last test — re-test before saving.')}
             </div>
           )}
 
           <p className="text-[11px] text-text-muted/80 leading-snug pt-1">
-            Empty fields fall back to the CLI's global default. Changes apply to
-            <strong className="text-text"> new sessions</strong>; pause and resume
-            any open session to re-load.
+            {t('workspaceAI.emptyFieldsFallback', 'Empty fields fall back to the CLI\'s global default. Changes apply to new sessions; pause and resume any open session to re-load.')}
             {tab === 'claude' && ' Claude reads `.claude/settings.local.json` from the workspace cwd.'}
             {tab === 'codex' && ' Codex reads `.codex/config.toml` + `.codex/env.json` (via CODEX_HOME).'}
           </p>
@@ -405,7 +405,7 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
               disabled={saving}
               className="px-3 py-2 rounded-md border border-border text-text-muted hover:text-text text-[12px] disabled:opacity-40"
             >
-              Reset to global default
+              {t('workspaceAI.resetToGlobal', 'Reset to global default')}
             </button>
             <button
               onClick={handleTest}
@@ -413,7 +413,7 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
               title={!canTest ? 'Fill base URL, API key, and model first' : undefined}
               className="px-3 py-2 rounded-md border border-border text-text-muted hover:text-text text-[12px] disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {testing ? 'Testing…' : 'Test'}
+              {testing ? t('workspaceAI.testing', 'Testing…') : t('workspaceAI.test', 'Test')}
             </button>
           </div>
           <div className="flex gap-2">
@@ -422,7 +422,7 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
               disabled={saving}
               className="px-3 py-2 rounded-md text-text-muted hover:text-text text-[13px]"
             >
-              Cancel
+              {t('common.cancel', 'Cancel')}
             </button>
             <button
               onClick={handleSave}
@@ -431,12 +431,12 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
                 !dirty
                   ? undefined
                   : !testPassedForCurrent
-                  ? 'Click Test and get a passing reply before saving'
+                  ? t('workspaceAI.testBeforeSave', 'Click Test and get a passing reply before saving')
                   : undefined
               }
               className="px-4 py-2 rounded-md bg-accent text-bg text-[13px] font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent/90 transition-colors"
             >
-              {saving ? 'Saving…' : 'Save'}
+              {saving ? t('workspaceAI.saving', 'Saving…') : t('common.save', 'Save')}
             </button>
           </div>
         </div>

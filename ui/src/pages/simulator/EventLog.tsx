@@ -7,6 +7,7 @@
  */
 
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Section } from '../../components/form'
 import type { SimulatorEvent } from './useSimulatorState'
 
@@ -25,17 +26,18 @@ function relativeTime(ts: number, now: number): string {
 }
 
 export function EventLog({ events }: { events: SimulatorEvent[] }) {
+  const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
   const visible = expanded ? events : events.slice(0, COLLAPSED_COUNT)
   const now = Date.now()
 
   return (
     <Section
-      title="Event Log"
-      description="Every simulator action issued through this panel, newest first. Useful for retracing steps after a surprising state change."
+      title={t('simulator.eventLog')}
+      description={t('simulator.eventLogDescription', 'Every simulator action issued through this panel, newest first. Useful for retracing steps after a surprising state change.')}
     >
       {events.length === 0 ? (
-        <p className="text-xs text-text-muted">No actions yet.</p>
+        <p className="text-xs text-text-muted">{t('simulator.noActionsYet', 'No actions yet.')}</p>
       ) : (
         <>
           <table className="w-full text-sm">
@@ -62,7 +64,7 @@ export function EventLog({ events }: { events: SimulatorEvent[] }) {
               onClick={() => setExpanded(!expanded)}
               className="mt-2 text-[11px] text-text-muted hover:text-text transition-colors"
             >
-              {expanded ? `Collapse (${COLLAPSED_COUNT})` : `Show all (${events.length})`}
+              {expanded ? t('simulator.collapse', 'Collapse ({{count}})', { count: COLLAPSED_COUNT }) : t('simulator.showAll', 'Show all ({{count}})', { count: events.length })}
             </button>
           )}
         </>

@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
+import { fmt, fmtPnl, fmtTime, fmtDate } from '../lib/i18n-format'
 import { Section } from '../components/form'
 import { PageHeader } from '../components/PageHeader'
 import { Spinner, EmptyState } from '../components/StateViews'
@@ -23,13 +25,15 @@ import type { ViewSpec } from '../tabs/types'
 
 type Tab = Extract<ViewSpec, { kind: 'dev' }>['params']['tab']
 
-const TAB_TITLES: Record<Tab, string> = {
-  connectors: 'Connectors',
-  tools: 'Tools',
-  sessions: 'Sessions',
-  snapshots: 'Snapshots',
-  logs: 'Logs',
-  simulator: 'Simulator',
+function getTabTitles(t: ReturnType<typeof useTranslation>['t']): Record<Tab, string> {
+  return {
+    connectors: t('dev.connectors'),
+    tools: t('dev.tools'),
+    sessions: t('dev.sessions'),
+    snapshots: t('dev.snapshots'),
+    logs: t('dev.logs'),
+    simulator: t('dev.simulator'),
+  }
 }
 
 /** Tabs that render content with internal scroll containers — the outer wrapper must NOT add overflow. */
@@ -42,11 +46,13 @@ interface DevPageProps {
 }
 
 export function DevPage({ spec }: DevPageProps) {
+  const { t } = useTranslation()
   const tab = spec.params.tab
+  const tabTitles = getTabTitles(t)
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <PageHeader title={TAB_TITLES[tab]} />
+      <PageHeader title={tabTitles[tab]} />
       <div className={`flex-1 min-h-0 ${SELF_SCROLLING_TABS.has(tab) ? 'flex flex-col' : 'overflow-y-auto'}`}>
         {tab === 'connectors' && <ConnectorsTab />}
         {tab === 'tools' && <ToolsTab />}
@@ -73,6 +79,7 @@ function ConnectorsTab() {
 }
 
 function RegistrySection() {
+  const { t } = useTranslation()
   const [data, setData] = useState<RegistryResponse | null>(null)
 
   const refresh = useCallback(() => {
@@ -82,28 +89,28 @@ function RegistrySection() {
   useEffect(() => { refresh() }, [refresh])
 
   return (
-    <Section title="Connector Registry" description="Active connectors and last user interaction.">
+    <Section title={t('dev.connectorRegistry')} description={t('dev.connectorRegistryDescription')}>
       <div className="flex items-center gap-2 mb-3">
         <button
           onClick={refresh}
           className="px-2.5 py-1 text-xs bg-bg-tertiary text-text-muted rounded hover:text-text transition-colors"
         >
-          Refresh
+          {t('common.refresh')}
         </button>
       </div>
 
       {data && (
         <div className="space-y-2">
           {data.connectors.length === 0 ? (
-            <p className="text-sm text-text-muted">No connectors registered.</p>
+            <p className="text-sm text-text-muted">{t('common.noConnectorsRegistered')}</p>
           ) : (
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-text-muted text-xs">
-                  <th className="pb-1 pr-3">Channel</th>
-                  <th className="pb-1 pr-3">To</th>
-                  <th className="pb-1 pr-3">Push</th>
-                  <th className="pb-1">Media</th>
+                  <th className="pb-1 pr-3">{t('common.channel')}</th>
+                  <th className="pb-1 pr-3">{t('common.to')}</th>
+                  <th className="pb-1 pr-3">{t('common.push')}</th>
+                  <th className="pb-1">{t('common.media')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -111,8 +118,8 @@ function RegistrySection() {
                   <tr key={cn.channel} className="text-text hover:bg-bg-tertiary/30 transition-colors">
                     <td className="py-0.5 pr-3 font-mono text-xs">{cn.channel}</td>
                     <td className="py-0.5 pr-3 font-mono text-xs">{cn.to}</td>
-                    <td className="py-0.5 pr-3">{cn.capabilities.push ? 'yes' : 'no'}</td>
-                    <td className="py-0.5">{cn.capabilities.media ? 'yes' : 'no'}</td>
+                    <td className="py-0.5 pr-3">{cn.capabilities.push ? t('common.yes') : t('common.no')}</td>
+                    <td className="py-0.5">{cn.capabilities.media ? t('common.yes') : t('common.no')}</td>
                   </tr>
                 ))}
               </tbody>
@@ -120,14 +127,14 @@ function RegistrySection() {
           )}
 
           <div className="pt-2 text-xs text-text-muted">
-            Last interaction:{' '}
+            {t('common.lastInteraction')}:{' '}
             {data.lastInteraction ? (
               <span className="font-mono">
                 {data.lastInteraction.channel}:{data.lastInteraction.to}{' '}
-                ({new Date(data.lastInteraction.ts).toLocaleTimeString()})
+                ({fmtTime(data.lastInteraction.ts)})
               </span>
             ) : (
-              'none'
+              t('common.none')
             )}
           </div>
         </div>
@@ -137,6 +144,7 @@ function RegistrySection() {
 }
 
 function SendSection() {
+  const { t } = useTranslation()
   const [channels, setChannels] = useState<string[]>([])
   const [channel, setChannel] = useState('')
   const [kind, setKind] = useState<'message' | 'notification'>('notification')
@@ -172,53 +180,53 @@ function SendSection() {
   const selectClass = 'px-2.5 py-2 bg-bg text-text border border-border rounded-md text-sm outline-none focus:border-accent'
 
   return (
-    <Section title="Test Send" description="Send a test message or notification through the connector pipeline.">
+    <Section title={t('dev.testSend')} description={t('dev.testSendDescription')}>
       <div className="space-y-3">
         <div className="flex gap-3">
           <div className="flex-1">
-            <label className="block text-[13px] text-text-muted mb-1">Channel</label>
+            <label className="block text-[13px] text-text-muted mb-1">{t('common.channel')}</label>
             <select
               value={channel}
               onChange={(e) => setChannel(e.target.value)}
               className={selectClass + ' w-full'}
             >
-              <option value="">auto (resolveDeliveryTarget)</option>
+              <option value="">{t('dev.channelAuto')}</option>
               {channels.map((ch) => (
                 <option key={ch} value={ch}>{ch}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-[13px] text-text-muted mb-1">Kind</label>
+            <label className="block text-[13px] text-text-muted mb-1">{t('dev.kind')}</label>
             <select
               value={kind}
               onChange={(e) => setKind(e.target.value as typeof kind)}
               className={selectClass}
             >
-              <option value="notification">notification</option>
-              <option value="message">message</option>
+              <option value="notification">{t('dev.notification')}</option>
+              <option value="message">{t('dev.message')}</option>
             </select>
           </div>
           <div>
-            <label className="block text-[13px] text-text-muted mb-1">Source</label>
+            <label className="block text-[13px] text-text-muted mb-1">{t('common.source')}</label>
             <select
               value={source}
               onChange={(e) => setSource(e.target.value as typeof source)}
               className={selectClass}
             >
-              <option value="manual">manual</option>
-              <option value="heartbeat">heartbeat</option>
-              <option value="cron">cron</option>
+              <option value="manual">{t('dev.sourceManual')}</option>
+              <option value="heartbeat">{t('dev.sourceHeartbeat')}</option>
+              <option value="cron">{t('dev.sourceCron')}</option>
             </select>
           </div>
         </div>
 
         <div>
-          <label className="block text-[13px] text-text-muted mb-1">Message</label>
+          <label className="block text-[13px] text-text-muted mb-1">{t('common.text')}</label>
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Test message..."
+            placeholder={t('dev.testMessage', 'Test message...')}
             rows={3}
             className="w-full px-2.5 py-2 bg-bg text-text border border-border rounded-md font-sans text-sm outline-none transition-colors focus:border-accent resize-y"
           />
@@ -229,7 +237,7 @@ function SendSection() {
           disabled={sending || !text.trim()}
           className="btn-primary-sm"
         >
-          {sending ? 'Sending...' : 'Send'}
+          {sending ? t('common.sending') : t('common.send')}
         </button>
 
       </div>
@@ -250,6 +258,7 @@ function SessionsTab() {
 }
 
 function SessionsSection() {
+  const { t } = useTranslation()
   const [sessions, setSessions] = useState<SessionInfo[] | null>(null)
 
   useEffect(() => {
@@ -263,17 +272,17 @@ function SessionsSection() {
   }
 
   return (
-    <Section title="Sessions" description="Active session files on disk.">
+    <Section title={t('dev.sessions')} description={t('dev.sessionsDescription', 'Active session files on disk.')}>
       {sessions === null ? (
         <div className="flex justify-center py-6"><Spinner size="sm" /></div>
       ) : sessions.length === 0 ? (
-        <EmptyState title="No sessions found." />
+        <EmptyState title={t('dev.noSessions')} />
       ) : (
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-text-muted text-xs">
-              <th className="pb-1 pr-3">Session ID</th>
-              <th className="pb-1 text-right">Size</th>
+              <th className="pb-1 pr-3">{t('dev.sessionId', 'Session ID')}</th>
+              <th className="pb-1 text-right">{t('dev.size', 'Size')}</th>
             </tr>
           </thead>
           <tbody>
@@ -293,6 +302,7 @@ function SessionsSection() {
 // ==================== Snapshots Tab ====================
 
 function SnapshotsTab() {
+  const { t } = useTranslation()
   const toast = useToast()
   const [accounts, setAccounts] = useState<Array<{ id: string; label: string }>>([])
   const [selectedAccount, setSelectedAccount] = useState<string>('')
@@ -328,11 +338,11 @@ function SnapshotsTab() {
   const handleDelete = async (timestamp: string) => {
     try {
       await api.trading.deleteSnapshot(selectedAccount, timestamp)
-      toast.success('Snapshot deleted')
+      toast.success(t('dev.snapshotDeleted', 'Snapshot deleted'))
       setExpandedIdx(null)
       await loadSnapshots()
     } catch {
-      toast.error('Failed to delete snapshot')
+      toast.error(t('dev.failedToDeleteSnapshot', 'Failed to delete snapshot'))
     }
   }
 
@@ -341,7 +351,7 @@ function SnapshotsTab() {
       <div className="max-w-[900px] space-y-4">
         {/* Account selector */}
         <div className="flex items-center gap-3">
-          <label className="text-[13px] text-text-muted">Account:</label>
+          <label className="text-[13px] text-text-muted">{t('dev.account', 'Account')}:</label>
           <select
             value={selectedAccount}
             onChange={e => setSelectedAccount(e.target.value)}
@@ -355,26 +365,26 @@ function SnapshotsTab() {
             onClick={loadSnapshots}
             className="text-[13px] px-2.5 py-1.5 rounded-md border border-border hover:bg-bg-tertiary transition-colors text-text-muted"
           >
-            Refresh
+            {t('common.refresh')}
           </button>
-          <span className="text-[11px] text-text-muted/50">{snapshots.length} snapshots</span>
+          <span className="text-[11px] text-text-muted/50">{snapshots.length} {t('dev.snapshots')}</span>
         </div>
 
         {/* Snapshots table */}
         {loading ? (
           <div className="flex justify-center py-10"><Spinner size="sm" /></div>
         ) : snapshots.length === 0 ? (
-          <EmptyState title="No snapshots for this account." />
+          <EmptyState title={t('dev.noSnapshotsForAccount', 'No snapshots for this account.')} />
         ) : (
           <div className="border border-border rounded-lg overflow-hidden">
             <table className="w-full text-[13px]">
               <thead>
                 <tr className="bg-bg-secondary text-text-muted text-left text-[11px] uppercase tracking-wide">
-                  <th className="px-3 py-2 font-medium">Timestamp</th>
-                  <th className="px-3 py-2 font-medium">Trigger</th>
-                  <th className="px-3 py-2 font-medium text-center">Health</th>
-                  <th className="px-3 py-2 font-medium text-right">Positions</th>
-                  <th className="px-3 py-2 font-medium text-right">Equity</th>
+                  <th className="px-3 py-2 font-medium">{t('dev.timestamp', 'Timestamp')}</th>
+                  <th className="px-3 py-2 font-medium">{t('dev.trigger', 'Trigger')}</th>
+                  <th className="px-3 py-2 font-medium text-center">{t('dev.health', 'Health')}</th>
+                  <th className="px-3 py-2 font-medium text-right">{t('dev.positions', 'Positions')}</th>
+                  <th className="px-3 py-2 font-medium text-right">{t('trading.equity')}</th>
                   <th className="px-3 py-2 font-medium text-right w-[80px]"></th>
                 </tr>
               </thead>
@@ -403,6 +413,7 @@ function SnapshotRow({ snapshot: s, expanded, onToggle, onDelete }: {
   onToggle: () => void
   onDelete: () => void
 }) {
+  const { t } = useTranslation()
   const [confirming, setConfirming] = useState(false)
   const healthColor = s.health === 'healthy' ? 'bg-green' : s.health === 'degraded' ? 'bg-yellow-400' : 'bg-red'
 
@@ -413,7 +424,7 @@ function SnapshotRow({ snapshot: s, expanded, onToggle, onDelete }: {
         onClick={onToggle}
       >
         <td className="px-3 py-2 font-mono text-[11px] text-text">
-          {new Date(s.timestamp).toLocaleString()}
+          {fmtDate(s.timestamp)}
         </td>
         <td className="px-3 py-2">
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-bg-tertiary text-text-muted">{s.trigger}</span>
@@ -423,16 +434,16 @@ function SnapshotRow({ snapshot: s, expanded, onToggle, onDelete }: {
         </td>
         <td className="px-3 py-2 text-right text-text">{s.positions.length}</td>
         <td className="px-3 py-2 text-right text-text tabular-nums">
-          ${Number(s.account.netLiquidation).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          {fmt(s.account.netLiquidation, 'USD')}
         </td>
         <td className="px-3 py-2 text-right" onClick={e => e.stopPropagation()}>
           {confirming ? (
             <div className="flex gap-1 justify-end">
               <button onClick={onDelete} className="text-[11px] px-2 py-0.5 rounded bg-red/15 text-red hover:bg-red/25 transition-colors">
-                Confirm
+                {t('common.confirm')}
               </button>
               <button onClick={() => setConfirming(false)} className="text-[11px] px-2 py-0.5 rounded bg-bg-tertiary text-text-muted hover:bg-bg-tertiary/80 transition-colors">
-                Cancel
+                {t('common.cancel')}
               </button>
             </div>
           ) : (
@@ -440,7 +451,7 @@ function SnapshotRow({ snapshot: s, expanded, onToggle, onDelete }: {
               onClick={() => setConfirming(true)}
               className="text-[11px] px-2 py-0.5 rounded text-text-muted hover:text-red hover:bg-red/10 transition-colors"
             >
-              Delete
+              {t('common.delete')}
             </button>
           )}
         </td>
@@ -451,22 +462,22 @@ function SnapshotRow({ snapshot: s, expanded, onToggle, onDelete }: {
             <div className="space-y-2">
               {/* Account metrics */}
               <div className="flex gap-4 text-[11px]">
-                <span className="text-text-muted">Cash: <span className="text-text">${Number(s.account.totalCashValue).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></span>
-                <span className="text-text-muted">Unrealized PnL: <span className={Number(s.account.unrealizedPnL) >= 0 ? 'text-green' : 'text-red'}>{Number(s.account.unrealizedPnL) >= 0 ? '+' : ''}${Number(s.account.unrealizedPnL).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></span>
-                {s.account.baseCurrency && <span className="text-text-muted">Base: <span className="text-text">{s.account.baseCurrency}</span></span>}
+                <span className="text-text-muted">{t('common.cash')}: <span className="text-text">{fmt(s.account.totalCashValue, 'USD')}</span></span>
+                <span className="text-text-muted">{t('trading.unrealizedPnl')}: <span className={Number(s.account.unrealizedPnL) >= 0 ? 'text-green' : 'text-red'}>{fmtPnl(s.account.unrealizedPnL, 'USD')}</span></span>
+                {s.account.baseCurrency && <span className="text-text-muted">{t('dev.base', 'Base')}: <span className="text-text">{s.account.baseCurrency}</span></span>}
               </div>
               {/* Positions detail */}
               {s.positions.length > 0 && (
                 <table className="w-full text-[11px]">
                   <thead>
                     <tr className="text-text-muted text-left">
-                      <th className="pr-3 pb-1 font-medium">Symbol</th>
-                      <th className="pr-3 pb-1 font-medium text-center">Ccy</th>
-                      <th className="pr-3 pb-1 font-medium text-right">Qty</th>
-                      <th className="pr-3 pb-1 font-medium text-right">Avg Cost</th>
-                      <th className="pr-3 pb-1 font-medium text-right">Mkt Price</th>
-                      <th className="pr-3 pb-1 font-medium text-right">Mkt Value</th>
-                      <th className="pr-3 pb-1 font-medium text-right">PnL</th>
+                      <th className="pr-3 pb-1 font-medium">{t('trading.order.symbol')}</th>
+                      <th className="pr-3 pb-1 font-medium text-center">{t('dev.ccy', 'Ccy')}</th>
+                      <th className="pr-3 pb-1 font-medium text-right">{t('dev.qty', 'Qty')}</th>
+                      <th className="pr-3 pb-1 font-medium text-right">{t('dev.avgCost', 'Avg Cost')}</th>
+                      <th className="pr-3 pb-1 font-medium text-right">{t('dev.mktPrice', 'Mkt Price')}</th>
+                      <th className="pr-3 pb-1 font-medium text-right">{t('dev.mktValue', 'Mkt Value')}</th>
+                      <th className="pr-3 pb-1 font-medium text-right">{t('trading.pnl')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -491,7 +502,7 @@ function SnapshotRow({ snapshot: s, expanded, onToggle, onDelete }: {
                 </table>
               )}
               {s.positions.length === 0 && (
-                <p className="text-[11px] text-text-muted">No positions in this snapshot.</p>
+                <p className="text-[11px] text-text-muted">{t('dev.noPositionsInSnapshot', 'No positions in this snapshot.')}</p>
               )}
             </div>
           </td>
@@ -504,6 +515,7 @@ function SnapshotRow({ snapshot: s, expanded, onToggle, onDelete }: {
 // ==================== Tools Tab ====================
 
 function ToolsTab() {
+  const { t } = useTranslation()
   const [inventory, setInventory] = useState<ToolInfo[]>([])
   const [selected, setSelected] = useState<string | null>(null)
   const [detail, setDetail] = useState<ToolDetail | null>(null)
@@ -566,7 +578,7 @@ function ToolsTab() {
             type="text"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            placeholder="Filter tools..."
+            placeholder={t('dev.filterTools', 'Filter tools...')}
             className="w-full px-2.5 py-1.5 bg-bg text-text border border-border rounded-md text-xs outline-none focus:border-accent"
           />
         </div>
@@ -607,14 +619,14 @@ function ToolsTab() {
       <div className="flex-1 overflow-y-auto min-h-0 px-5 py-4">
         {!selected ? (
           <div className="flex items-center justify-center h-full text-text-muted text-sm">
-            Select a tool from the left panel.
+            {t('dev.selectToolFromLeft', 'Select a tool from the left panel.')}
           </div>
         ) : loadingDetail ? (
           <div className="flex justify-center py-10"><Spinner size="sm" /></div>
         ) : detail ? (
           <ToolExecutePanel detail={detail} result={result} onResult={setResult} />
         ) : (
-          <p className="text-sm text-text-muted">Failed to load tool details.</p>
+          <p className="text-sm text-text-muted">{t('dev.failedToLoadToolDetails', 'Failed to load tool details.')}</p>
         )}
       </div>
     </div>
@@ -630,6 +642,7 @@ interface ToolExecutePanelProps {
 }
 
 function ToolExecutePanel({ detail, result, onResult }: ToolExecutePanelProps) {
+  const { t } = useTranslation()
   const [inputs, setInputs] = useState<Record<string, string>>({})
   const [executing, setExecuting] = useState(false)
 
@@ -698,13 +711,13 @@ function ToolExecutePanel({ detail, result, onResult }: ToolExecutePanelProps) {
       {/* Input form */}
       {properties.length > 0 && (
         <div className="space-y-3">
-          <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider">Input</h3>
+          <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider">{t('dev.input', 'Input')}</h3>
           {properties.map((prop) => (
             <div key={prop.key}>
               <label className="flex items-center gap-1.5 text-[13px] text-text mb-1">
                 <span className="font-mono">{prop.key}</span>
                 <span className="text-[10px] text-text-muted/60">{prop.type}</span>
-                {prop.required && <span className="text-[10px] text-accent/70">required</span>}
+                {prop.required && <span className="text-[10px] text-accent/70">{t('dev.required', 'required')}</span>}
               </label>
               {prop.type === 'boolean' ? (
                 <select
@@ -739,7 +752,7 @@ function ToolExecutePanel({ detail, result, onResult }: ToolExecutePanelProps) {
         disabled={executing}
         className="btn-primary-sm"
       >
-        {executing ? 'Executing...' : 'Execute'}
+        {executing ? t('dev.executing', 'Executing...') : t('dev.execute')}
       </button>
 
       {/* Result */}
@@ -747,7 +760,7 @@ function ToolExecutePanel({ detail, result, onResult }: ToolExecutePanelProps) {
         <div className="mt-4">
           <div className="flex items-center gap-2 mb-2">
             <span className={`text-xs font-semibold ${result.data.isError ? 'text-red' : 'text-green'}`}>
-              {result.data.isError ? 'ERROR' : 'OK'}
+              {result.data.isError ? t('dev.error', 'ERROR') : t('dev.ok', 'OK')}
             </span>
             <span className="text-xs text-text-muted">{result.durationMs}ms</span>
           </div>

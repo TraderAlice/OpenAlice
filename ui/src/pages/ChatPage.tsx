@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useCallback, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useChat } from '../hooks/useChat'
 import { useChannels } from '../contexts/ChannelsContext'
 import { ChatMessage, ToolCallGroup, ThinkingIndicator, StreamingToolGroup } from '../components/ChatMessage'
@@ -17,6 +18,7 @@ interface ChatPageProps {
 }
 
 export function ChatPage({ spec, visible }: ChatPageProps) {
+  const { t } = useTranslation()
   const channelId = spec.params.channelId
   const { channels } = useChannels()
   const [showScrollBtn, setShowScrollBtn] = useState(false)
@@ -170,7 +172,7 @@ export function ChatPage({ spec, visible }: ChatPageProps) {
             {/* History load-more status */}
             {messages.length > 0 && (isLoadingMore || !hasMore) && (
               <div className="text-center text-[11px] text-text-muted/50 select-none pb-3">
-                {isLoadingMore ? 'Loading older messages…' : '— beginning of history —'}
+                {isLoadingMore ? t('chat.loadingOlder', 'Loading older messages…') : t('chat.beginningOfHistory', '— beginning of history —')}
               </div>
             )}
             {messages.length === 0 && !isWaiting && (
@@ -183,7 +185,7 @@ export function ChatPage({ spec, visible }: ChatPageProps) {
                 />
                 <div className="text-center">
                   <h2 className="text-lg font-semibold text-text mb-1">{activeChannelConfig?.label ?? channelId}</h2>
-                  <p className="text-sm text-text-muted">Send a message to start chatting</p>
+                  <p className="text-sm text-text-muted">{t('chat.sendMessageToStart', 'Send a message to start chatting')}</p>
                 </div>
               </div>
             )}
@@ -278,7 +280,7 @@ export function ChatPage({ spec, visible }: ChatPageProps) {
             <button
               onClick={handleScrollToBottom}
               className="absolute -top-14 left-1/2 -translate-x-1/2 w-10 h-10 rounded-full bg-bg-secondary border border-border text-text-muted hover:text-text hover:border-accent/50 flex items-center justify-center transition-all shadow-lg z-10"
-              aria-label="Scroll to bottom"
+              aria-label={t('chat.scrollToBottom')}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 5v14M5 12l7 7 7-7" />

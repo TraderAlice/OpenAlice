@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { PageHeader } from '../components/PageHeader'
+import { getCurrentLocale } from '../lib/i18n-format'
+import type { TFunction } from 'i18next'
 import { notificationsLive } from '../live/notifications'
 import { useNotificationsRead } from '../live/notifications-read'
 import type { NotificationEntry, NotificationSource } from '../api/notifications'
@@ -29,6 +32,7 @@ interface NotificationsInboxPageProps {
  * transition — Slack-style.
  */
 export function NotificationsInboxPage({ visible }: NotificationsInboxPageProps) {
+  const { t } = useTranslation()
   const entries = notificationsLive.useStore((s) => s.entries)
   const loading = notificationsLive.useStore((s) => s.loading)
   const lastSeen = useNotificationsRead((s) => s.lastSeenTs)
@@ -54,8 +58,8 @@ export function NotificationsInboxPage({ visible }: NotificationsInboxPageProps)
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
-        title="Notifications"
-        description={`${entries.length} total · system pushes from heartbeat, cron, tasks`}
+        title={t('notifications.title', 'Notifications')}
+        description={t('notifications.description', '{{count}} total \u00b7 system pushes from heartbeat, cron, tasks', { count: entries.length })}
         right={
           sources.length > 0 ? (
             <select
@@ -63,7 +67,7 @@ export function NotificationsInboxPage({ visible }: NotificationsInboxPageProps)
               onChange={(e) => setFilter(e.target.value as NotificationSource | 'all')}
               className="px-2 py-1 text-[12px] bg-bg border border-border rounded-md text-text outline-none focus:border-accent"
             >
-              <option value="all">All sources</option>
+              <option value="all">{t('notifications.allSources', 'All sources')}</option>
               {sources.map((s) => (
                 <option key={s} value={s}>{s}</option>
               ))}
@@ -73,17 +77,17 @@ export function NotificationsInboxPage({ visible }: NotificationsInboxPageProps)
       />
       <div className="flex-1 overflow-y-auto min-h-0">
         {loading && entries.length === 0 ? (
-          <div className="px-6 py-8 text-text-muted text-sm">Loading…</div>
+          <div className="px-6 py-8 text-text-muted text-sm">{t('common.loading')}</div>
         ) : filtered.length === 0 ? (
           <div className="px-6 py-12 text-center text-text-muted text-sm">
             {filter === 'all'
-              ? 'No notifications yet. Heartbeat, cron jobs and external pushes will land here.'
-              : `No notifications from ${filter}.`}
+              ? t('notifications.noNotifications', 'No notifications yet. Heartbeat, cron jobs and external pushes will land here.')
+              : t('notifications.noNotificationsFrom', 'No notifications from {{source}}.', { source: filter })}
           </div>
         ) : (
           <div className="max-w-[900px] mx-auto py-4 px-4 md:px-6 space-y-2">
             {filtered.map((entry) => (
-              <InboxRow key={entry.id} entry={entry} unread={entry.ts > lastSeen} />
+              <InboxRow key={entry.id} entry={entry} unread={entry.ts > lastSeen} t={t} />
             ))}
           </div>
         )}
@@ -92,7 +96,7 @@ export function NotificationsInboxPage({ visible }: NotificationsInboxPageProps)
   )
 }
 
-function InboxRow({ entry, unread }: { entry: NotificationEntry; unread: boolean }) {
+function InboxRow({ entry, unread, t }: { entry: NotificationEntry; unread: boolean; t: TFunction }) {
   return (
     <div
       className={`relative rounded-lg border px-4 py-3 transition-colors ${
@@ -115,7 +119,7 @@ function InboxRow({ entry, unread }: { entry: NotificationEntry; unread: boolean
         )}
         <span className="text-[11px] text-text-muted/70 tabular-nums">{formatAbsoluteTime(entry.ts)}</span>
         <span className="text-[11px] text-text-muted/50">·</span>
-        <span className="text-[11px] text-text-muted/70">{formatRelativeTime(entry.ts)}</span>
+        <span className="text-[11px] text-text-muted/70">{formatRelativeTime(t, entry.ts)}</span>
       </div>
       <p className="text-[13px] text-text whitespace-pre-wrap break-words leading-relaxed">
         {entry.text}
@@ -125,16 +129,17 @@ function InboxRow({ entry, unread }: { entry: NotificationEntry; unread: boolean
 }
 
 function formatAbsoluteTime(ts: number): string {
-  return new Date(ts).toLocaleString(undefined, {
+  const locale = getCurrentLocale()
+  return new Date(ts).toLocaleString(locale, {
     month: 'short', day: 'numeric',
     hour: '2-digit', minute: '2-digit',
   })
 }
 
-function formatRelativeTime(ts: number): string {
+function formatRelativeTime(t: TFunction, ts: number): string {
   const diff = Date.now() - ts
-  if (diff < 60_000) return `${Math.floor(diff / 1000)}s ago`
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`
-  return `${Math.floor(diff / 86_400_000)}d ago`
+  if (diff < 60_000) return t('common.secondsAgo', '{{count}}s ago', { count: Math.floor(diff / 1000) })
+  if (diff < 3_600_000) return t('common.minutesAgoShort', '{{count}}m ago', { count: Math.floor(diff / 60_000) })
+  if (diff < 86_400_000) return t('common.hoursAgoShort', '{{count}}h ago', { count: Math.floor(diff / 3_600_000) })
+  return t('common.daysAgoShort', '{{count}}d ago', { count: Math.floor(diff / 86_400_000) })
 }
