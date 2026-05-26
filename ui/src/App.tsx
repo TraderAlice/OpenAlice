@@ -20,7 +20,7 @@ import './i18n'
  */
 export type Page =
   | 'chat' | 'inbox' | 'workspaces' | 'portfolio' | 'news' | 'automation' | 'market'
-  | 'trading-as-git'
+  | 'trading-as-git' | 'trading-accounts'
   | 'settings' | 'dev'
   | 'traditional-chat' | 'notifications-legacy' | 'connectors-legacy'
 
