@@ -5,12 +5,12 @@
     "moduleResolution": "NodeNext",
     "esModuleInterop": true,
     "strict": true,
-    "outDir": "../dist/electron",
-    "rootDir": ".",
+    "outDir": "../../dist/electron",
+    "rootDir": "./src",
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "sourceMap": true
   },
-  "include": ["**/*.ts"],
-  "exclude": ["**/*.spec.ts"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.spec.ts"]
 }

@@ -29,6 +29,7 @@ Both layers load the same SKILL.md trees (market-analysis, social-readers, data-
 ## Parameters
 
 - **Tag** — short identifier for this workspace.
-- **Agents** — default Claude + Codex (both discover the same skill trees).
+
+All available CLI runtimes are enabled (Claude, Codex, shell — both Claude and Codex discover the same skill trees). The `+` new-session button defaults to Claude.
 
 Finance-skills is cloned fresh on every spawn — no shared cache. Keeps upstream traffic visible to its maintainer, who's part of the ecosystem we want to grow.

@@ -12,15 +12,21 @@ import { SchemaFormFields } from './SchemaFormFields'
 
 /**
  * UTA configuration dialog — edits credentials, guards, enabled state.
- * Mounted from both the trading page (legacy entry) and the UTA detail
- * page (new entry, accessed via the Edit button in the page header).
+ * Mounted from Settings → Trading (primary CRUD entry) and from the UTA
+ * detail page in Portfolio (sibling Edit button).
+ *
+ * When opened from Settings → Trading, the parent passes `onViewInPortfolio`
+ * to render a header link that switches the user over to the Portfolio
+ * drill-in for this account. When opened from inside Portfolio's detail
+ * page, that prop is omitted (the user is already in that context).
  */
-export function EditUTADialog({ uta, preset, health, onSave, onDelete, onClose }: {
+export function EditUTADialog({ uta, preset, health, onSave, onDelete, onViewInPortfolio, onClose }: {
   uta: UTAConfig
   preset?: BrokerPreset
   health?: BrokerHealthInfo
   onSave: (a: UTAConfig) => Promise<void>
   onDelete: () => Promise<void>
+  onViewInPortfolio?: () => void
   onClose: () => void
 }) {
   const { t } = useTranslation()
@@ -76,11 +82,25 @@ export function EditUTADialog({ uta, preset, health, onSave, onDelete, onClose }
           <h3 className="text-[14px] font-semibold text-text truncate">{uta.id}</h3>
           <HealthBadge health={health} size="md" />
         </div>
-        <button onClick={onClose} className="text-text-muted hover:text-text p-1 transition-colors shrink-0">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M18 6L6 18M6 6l12 12" />
-          </svg>
-        </button>
+        <div className="flex items-center gap-3 shrink-0">
+          {onViewInPortfolio && (
+            <button
+              onClick={onViewInPortfolio}
+              className="text-[11px] text-text-muted hover:text-text inline-flex items-center gap-1 transition-colors"
+              title="See this account's positions and equity in Portfolio"
+            >
+              View in Portfolio
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M7 17L17 7M9 7h8v8" />
+              </svg>
+            </button>
+          )}
+          <button onClick={onClose} className="text-text-muted hover:text-text p-1 transition-colors">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Body */}

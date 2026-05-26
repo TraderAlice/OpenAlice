@@ -123,12 +123,6 @@ importers:
       '@vitest/coverage-v8':
         specifier: ^4.1.5
         version: 4.1.5(vitest@4.1.5)
-      electron:
-        specifier: ^38.0.0
-        version: 38.8.6
-      electron-builder:
-        specifier: ^25.1.8
-        version: 25.1.8(electron-builder-squirrel-windows@25.1.8)
       jsdom:
         specifier: ^29.0.0
         version: 29.0.0(@noble/hashes@1.8.0)
@@ -147,6 +141,15 @@ importers:
       vitest:
         specifier: ^4.1.5
         version: 4.1.5(@opentelemetry/api@1.9.0)(@types/node@25.2.3)(@vitest/coverage-v8@4.1.5)(jsdom@29.0.0(@noble/hashes@1.8.0))(vite@7.3.2(@types/node@25.2.3)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0))
+
+  apps/desktop:
+    dependencies:
+      electron:
+        specifier: ^38.0.0
+        version: 38.8.6
+      electron-builder:
+        specifier: ^25.1.8
+        version: 25.1.8(electron-builder-squirrel-windows@25.1.8)
 
   packages/ibkr:
     dependencies:

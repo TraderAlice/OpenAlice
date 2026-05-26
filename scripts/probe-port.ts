@@ -7,9 +7,9 @@ import { createServer } from 'node:net'
  *
  * Used by `scripts/guardian/` (the dev-mode L2 port authority) to pick the
  * backend's web / MCP / UTA ports before spawning. Intentionally duplicated
- * from `electron/probe-port.ts` — dev script tooling and packaged
+ * from `apps/desktop/src/probe-port.ts` — dev script tooling and packaged
  * Electron runtime are different release surfaces, sharing through src/
- * would require breaking the electron tsconfig rootDir boundary.
+ * would require breaking the desktop tsconfig rootDir boundary.
  *
  * Keep the two copies in sync if you ever fix a bug here.
  *

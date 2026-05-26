@@ -9,6 +9,14 @@
  * Routes have moved to tabs/UrlAdopter.tsx (URL → spec adoption) and
  * tabs/registry.tsx (spec → URL projection). This file is now just the
  * activity-section → sidebar lookup.
+ *
+ * Subsection-header convention: a sidebar uses subsection headers (e.g.
+ * Portfolio's "Overview" / "Accounts (N)") IF AND ONLY IF it lists items
+ * of more than one shape — typically an aggregate view alongside per-
+ * instance rows. Sidebars listing one kind of thing (Settings categories,
+ * Workspace instances, Market list, Chat channels) do NOT use headers;
+ * adding them for symmetry would perform a categorization that isn't in
+ * the underlying data. Portfolio is the only sidebar that qualifies today.
  */
 
 import type { ComponentType } from 'react'
@@ -16,7 +24,6 @@ import { ChatChannelListContainer } from './components/ChatChannelListContainer'
 import { TraditionalChatSidebar } from './components/TraditionalChatSidebar'
 import { NotificationsLegacySidebar } from './components/NotificationsLegacySidebar'
 import { ConnectorsLegacySidebar } from './components/ConnectorsLegacySidebar'
-import { TradingAccountsBetaSidebar } from './components/TradingAccountsBetaSidebar'
 import { NewChannelButton } from './components/NewChannelButton'
 import { InboxSidebar } from './components/InboxSidebar'
 import { WorkspacesSidebar } from './components/workspace/WorkspacesSidebar'
@@ -97,10 +104,6 @@ const SECTION_BY_KEY: Record<ActivitySection, SidebarSection> = {
   'connectors-legacy': {
     title: 'Connectors',
     Secondary: ConnectorsLegacySidebar,
-  },
-  'trading-accounts': {
-    title: 'Trading Accounts',
-    Secondary: TradingAccountsBetaSidebar,
   },
 }
 

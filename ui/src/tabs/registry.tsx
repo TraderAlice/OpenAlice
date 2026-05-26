@@ -124,7 +124,7 @@ const settingsCategoryTitle: Record<
 > = {
   general: 'Settings',
   'ai-provider': 'AI Provider',
-  trading: 'Trading Accounts',
+  trading: 'Trading',
   connectors: 'Connectors',
   mcp: 'MCP Server',
   'market-data': 'Market Data',

@@ -2,5 +2,5 @@
   "displayName": "Auto-Quant",
   "groupOrder": 20,
   "description": "Auto-Quant autoresearch workspace — clones the public Auto-Quant repo on first use (~/.openalice/workspaces/auto-quant-mirror), then makes per-workspace local clones with an autoresearch/<tag> branch and symlinked .feather data. Set AQ_TEMPLATE_DIR to override the source location.",
-  "defaultAgents": ["claude"]
+  "defaultAgents": ["claude", "codex"]
 }

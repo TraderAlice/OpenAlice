@@ -1,11 +1,18 @@
 # OpenAlice
 
-File-driven AI trading agent. All state (sessions, config, logs) stored as files — no database.
+AI trading agent. From a code-writing perspective, the Alice process is two
+things: a **Workspace launcher** (PTY sessions running native agent CLIs —
+`claude`, `codex`, `shell`; capability extension ships as workspace templates
++ satellite repos, not `src/` deps) and a **Trading-context injector**
+(market data, analysis, news, and the UTA SDK — surfaced into those
+workspaces via MCP). Broker credentials and trading state live in a separate
+process (UTA). All persisted state lives as files — no database.
 
 ## Quick Start
 
 ```bash
-pnpm install
+pnpm install                                       # Local dev (full, ~1.7G)
+pnpm install --filter='!@traderalice/desktop'      # Cloud / agent sessions (~748M, skips Electron shell)
 pnpm dev          # Dev: Guardian spawns UTA (47333) + Alice (47331) + Vite (5173)
 pnpm build        # Production: turbo (packages + UI + services/uta) + tsup (Alice)
 pnpm test         # Vitest across the monorepo (src/, packages/, services/, ui/)
@@ -168,12 +175,16 @@ roughly mirrors that split — `src/` is Alice, `services/uta/` is UTA,
 ```
 src/                           # Alice process — agent runtime
 ├── main.ts                    # Composition root
-├── core/                      # Orchestration primitives. AgentCenter +
-│                              #   GenerateRouter (provider selection) +
-│                              #   ToolCenter + ConnectorCenter + session
-│                              #   store + event-log + listener/producer.
-│                              #   Workspace-scoped tool registry lives
-│                              #   here too (workspace-tool-center.ts).
+├── core/                      # Orchestration primitives. GenerateRouter
+│                              #   (provider selection) + ToolCenter +
+│                              #   workspace-tool-center + InboxStore +
+│                              #   session store + event-log +
+│                              #   listener/producer. The legacy chat path
+│                              #   (agent-center.ts, connector-center.ts,
+│                              #   notifications-store.ts) also lives here
+│                              #   — still wired for Telegram / MCP Ask /
+│                              #   heartbeat, but no new work routes
+│                              #   through it.
 ├── ai-providers/              # AI backend implementations.
 │   ├── agent-sdk/             # Claude via @anthropic-ai/claude-agent-sdk
 │   ├── codex/                 # OpenAI Codex CLI / API
@@ -209,8 +220,12 @@ src/                           # Alice process — agent runtime
 │                              #   shape: UTAManagerSDK + UTAAccountSDK
 │   └── uta-supervisor/        # health probe + restart-trigger
 │                              #   (flag-file protocol to Guardian)
-├── connectors/                # Push channels.
-│   ├── web/                   # Web UI (Hono, SSE, sub-channels)
+├── connectors/                # Legacy push channels for the traditional
+│                              #   chat path (ConnectorCenter routes
+│                              #   AgentCenter output here). Workspace
+│                              #   outputs do NOT route through these —
+│                              #   they go through InboxStore.
+│   ├── web/                   # Web UI chat-push adapter (SSE)
 │   ├── telegram/              # Telegram bot (grammY)
 │   ├── mcp-ask/               # MCP Ask connector
 │   └── mock/                  # Test connector
@@ -316,45 +331,78 @@ Concretely:
   (`data/control/restart-uta.flag`, watched by Guardian). UTA itself has
   no in-process hot-reload — startup path == restart path.
 
-### AI provider layer (in flight — calling shape will change)
+### Inbox — Workspace → user push channel
 
-> ⚠️ This section describes the current wiring, not the destination.
-> The provider routing layer is destined for redesign — the cross-shape
-> assumptions between Anthropic-API-shape and OpenAI-API-shape backends
-> are leaking, and the registry pattern needs rework. Before adding a
-> new provider or changing routing behavior, **check with the user
-> first.** See memory `feedback_no_bandaid_on_shape_mismatch`.
+The push channel that the new architecture actually uses. An agent
+inside a workspace calls the `inbox_push` MCP tool to surface a
+document (rendered live from workspace files) plus a markdown comment
+in a dedicated Inbox tab; the user reads, then clicks the reply bar to
+jump back into the workspace session and continue there.
+
+- **InboxStore** (`core/inbox-store.ts`) — append-only JSONL behind the
+  Inbox tab.
+- `tool/inbox-push.ts` — the MCP tool registration, wired through
+  `core/workspace-tool-center.ts` so the wsId is bound per workspace
+  (the agent never traffics its own identity).
+- Distinct from the legacy chat path's notification surface
+  (`NotificationsStore` → connectors), which now sits demoted in the
+  Chat sidebar's Traditional section.
+
+### Provider routing — GenerateRouter (in flight)
+
+Scope note: the Workspace path runs the model loop **inside** the
+native CLI (`claude` / `codex`), so it does not touch this layer.
+GenerateRouter governs the legacy chat path and any code that calls
+Alice's in-process AI machinery directly.
+
+> ⚠️ This layer is destined for redesign — the cross-shape assumptions
+> between Anthropic-API-shape and OpenAI-API-shape backends are
+> leaking, and the registry pattern needs rework. Before adding a new
+> provider or changing routing behavior, **check with the user first.**
+> See memory `feedback_no_bandaid_on_shape_mismatch`.
 
 Today:
 
-- **AgentCenter** (`core/agent-center.ts`) — top-level orchestration.
-  Manages sessions, compaction, routes through GenerateRouter. Exposes
-  `ask()` (stateless) and `askWithSession()` (with history).
-- **GenerateRouter** (`core/ai-provider-manager.ts`) — reads
-  `ai-provider.json`, resolves to the active provider. Four backends
-  registered today: `agent-sdk` (Claude), `codex` (OpenAI Codex),
+- **GenerateRouter** (`core/ai-provider-manager.ts`) reads
+  `ai-provider.json` and resolves to the active provider. Four backends
+  registered: `agent-sdk` (Claude), `codex` (OpenAI Codex),
   `vercel-ai-sdk` (Anthropic / OpenAI / Google), `mock`.
 - **AIProvider interface**: `ask(prompt)` one-shot, `generate(input, opts)`
   streams `ProviderEvent`s (`tool_use` / `tool_result` / `text` / `done`).
   Optional `compact()` for provider-native compaction.
-- **StreamableResult**: dual interface — `PromiseLike` (await for result)
-  + `AsyncIterable` (for-await for streaming). Multiple consumers each
-  get independent cursors.
+- **StreamableResult**: dual interface — `PromiseLike` (await for
+  result) + `AsyncIterable` (for-await for streaming). Multiple
+  consumers each get independent cursors.
 - Per-request overrides via `AskOptions.provider` and the per-backend
   option blocks (`AskOptions.vercelAiSdk`, `AskOptions.agentSdk`, etc.).
-
-### ConnectorCenter
-
-`core/connector-center.ts` manages push channels (Web, Telegram,
-MCP Ask). Tracks last-interacted channel for delivery routing.
 
 ### ToolCenter
 
 Centralized registry. Files under `src/tool/` register tools via
 `ToolCenter.register()`; exports in both Vercel-tool and MCP shapes.
-Decoupled from AgentCenter. Workspace-scoped tool registration goes
-through `core/workspace-tool-center.ts` (per-workspace MCP exposure
-without polluting the global tool list).
+Workspace-scoped tool registration goes through
+`core/workspace-tool-center.ts` (per-workspace MCP exposure without
+polluting the global tool list) — this is how Trading-context
+injection actually lands inside a workspace.
+
+### Legacy chat path
+
+The pre-Workspace orchestration is still wired and still serves flows
+that have no terminal to host a CLI in (Telegram, MCP Ask, heartbeat /
+cron `notify_user` pings, the `/chat` SSE surface):
+
+- **AgentCenter** (`core/agent-center.ts`) — runs the AI loop with
+  session history + compaction, routes through GenerateRouter.
+- **ConnectorCenter** (`core/connector-center.ts`) — sends
+  AgentCenter's outbound messages to the last-interacted push channel
+  (`connectors/{web,telegram,mcp-ask}/`).
+- **NotificationsStore** (`core/notifications-store.ts`) — the
+  pre-Workspace notification surface.
+
+No new feature work should ride this path — see memory
+`project_automation_notifications_legacy`. The Workspace path bypasses
+all of it: the CLI runs the model loop, MCP carries tool calls, and
+InboxStore handles push.
 
 ## Conventions
 

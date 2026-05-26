@@ -6,11 +6,11 @@
  *   USER_DATA_HOME    user-produced state (config, sessions, broker
  *                     git-like commits, brain files, etc.). Survives
  *                     app upgrades and reinstalls. In production, set by
- *                     the guardian (electron/main.ts) to a platform-
- *                     standard location like ~/Library/Application
+ *                     the guardian (apps/desktop/src/main.ts) to a
+ *                     platform-standard location like ~/Library/Application
  *                     Support/OpenAlice/. In dev (pnpm dev / pnpm
- *                     electron:dev), unset → falls back to repo root
- *                     so contributors see their working data.
+ *                     electron:dev), the guardian pins it to the repo
+ *                     root so contributors see their working data.
  *
  *   APP_RESOURCES_HOME   files shipped with the app (default templates,
  *                        the UI bundle). Replaced wholesale on app

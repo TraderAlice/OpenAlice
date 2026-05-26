@@ -29,6 +29,5 @@ Things Alice will route here:
 
 When spawning, you'll configure:
 - **Tag** — short identifier for this workspace (lowercase, dashes ok).
-- **Agents** — which CLI runtimes to enable (default: Claude + Codex).
 
-That's it. No template-specific parameters — everything else is shaped by what you say to the agent.
+That's it. All available CLI runtimes (Claude, Codex, shell) are enabled by default; the template's first listed adapter is what the `+` "new session" button defaults to.

@@ -54,15 +54,19 @@ app.whenReady().then(async () => {
   const webPort = await probeFreePort(DEFAULT_WEB_PORT_START)
   const mcpPort = await probeFreePort(webPort + 1)
 
-  // After build: electron/main.ts → dist/electron/main.js; backend bundle
-  // → dist/main.js. So one level up from __dirname is the backend entry.
+  // Build output lives at <repo>/dist/electron/main.js and <repo>/dist/main.js
+  // (sibling directories at <repo>/dist/). The desktop package source is at
+  // apps/desktop/src/ but tsconfig.outDir is ../../dist/electron, so this
+  // sibling-resolve is unchanged from the pre-split layout.
   const backendEntry = resolve(__dirname, '..', 'main.js')
 
   // Two homes — user data vs app resources. See src/core/paths.ts for why
-  // they're split. Only inject in packaged builds: in dev (pnpm electron:
-  // dev with app.isPackaged === false) the backend should fall back to
-  // process.cwd() so contributors see their working repo state, same as
-  // `pnpm dev`.
+  // they're split. In packaged builds the OS-standard locations apply; in
+  // dev (pnpm electron:dev) we now invoke electron with cwd=apps/desktop/,
+  // so we pin both homes to the repo root explicitly — preserves the
+  // pre-split behavior where the backend fell back to process.cwd() and
+  // saw the working repo.
+  const repoRoot = resolve(__dirname, '..', '..')
   const homeEnv = app.isPackaged
     ? {
         // ~/Library/Application Support/<productName>/ on macOS
@@ -70,7 +74,10 @@ app.whenReady().then(async () => {
         // .app/Contents/Resources/ — sibling of app.asar
         OPENALICE_APP_HOME: dirname(app.getAppPath()),
       }
-    : {}
+    : {
+        OPENALICE_HOME: repoRoot,
+        OPENALICE_APP_HOME: repoRoot,
+      }
 
   backend = spawn(process.execPath, [backendEntry], {
     env: {

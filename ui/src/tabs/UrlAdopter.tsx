@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { useWorkspace } from './store'
-import { specEquals, type ViewSpec } from './types'
+import { specEquals, type ActivitySection, type ViewSpec } from './types'
 import { getView } from './registry'
 
 /**
@@ -86,6 +86,7 @@ export function UrlAdopter() {
         <Route path="/scheduler" element={<Navigate to="/automation/cron" replace />} />
         <Route path="/ai-provider" element={<Navigate to="/settings/ai-provider" replace />} />
         <Route path="/trading" element={<Navigate to="/settings/trading" replace />} />
+        <Route path="/trading-accounts" element={<Navigate to="/settings/trading" replace />} />
         <Route path="/connectors" element={<Navigate to="/settings/connectors" replace />} />
         <Route path="/market-data" element={<Navigate to="/settings/market-data" replace />} />
         <Route path="/news-collector" element={<Navigate to="/settings/news-collector" replace />} />
@@ -196,14 +197,49 @@ function SetSidebarOnly({ section }: { section: import('./types').ActivitySectio
 }
 
 /**
+ * Map a ViewSpec to the ActivitySection whose sidebar should accompany
+ * it. URL adoption uses this so a fresh page load / deep link / browser
+ * back-forward lands on a screen with the matching sidebar already
+ * open — otherwise `selectedSidebar` stays at whatever was persisted
+ * (or null on first run), and the page renders without left context.
+ *
+ * `uta-detail` is intentionally Portfolio's sidebar: the URL lives
+ * under /settings/uta/:id for historical reasons but the page is a
+ * Portfolio drill-in (positions / equity for one account).
+ */
+function specToSection(spec: ViewSpec): ActivitySection {
+  switch (spec.kind) {
+    case 'inbox':              return 'inbox'
+    case 'chat':               return 'traditional-chat'
+    case 'workspace':
+    case 'workspace-list':
+    case 'template-catalog':
+    case 'template-detail':    return 'workspaces'
+    case 'portfolio':
+    case 'uta-detail':         return 'portfolio'
+    case 'automation':         return 'automation'
+    case 'news':               return 'news'
+    case 'market-list':
+    case 'market-detail':      return 'market'
+    case 'settings':           return 'settings'
+    case 'dev':                return 'dev'
+    case 'notifications-inbox': return 'notifications-legacy'
+  }
+}
+
+/**
  * Compare focused tab against `spec` and openOrFocus only if different —
- * skips redundant store updates on every render.
+ * skips redundant store updates on every render. Also activates the
+ * matching sidebar so URL-driven navigation (fresh load, deep link,
+ * back-forward) lands with the expected left-rail context, not blank.
  */
 function useAdopt(spec: ViewSpec) {
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
+  const setSidebar = useWorkspace((state) => state.setSidebar)
   // Stable string key for dep tracking; spec is freshly built each render.
   const key = `${spec.kind}:${JSON.stringify(spec.params)}`
   useEffect(() => {
+    setSidebar(specToSection(spec))
     const state = useWorkspace.getState()
     const focused = state.tree.kind === 'leaf' && state.tree.group.activeTabId
       ? state.tabs[state.tree.group.activeTabId]
