@@ -34,8 +34,10 @@ RUN pnpm install --frozen-lockfile
 # + UI Vite build + services/uta tsup) then `tsup` bundles the Alice
 # backend into `dist/main.js`. UTA service ends up at
 # `services/uta/dist/uta.js`.
+# Note: --filter excludes @traderalice/desktop (Electron app) which is not
+# needed for the server image and requires native dependencies.
 COPY . .
-RUN pnpm build
+RUN pnpm prebuild && pnpm turbo run build --filter='!@traderalice/desktop' && tsup src/main.ts --format esm --dts
 
 # Strip dev deps before the runtime stage harvests node_modules. With
 # `electron` + `electron-builder` (each ~500MB) in devDependencies, this
