@@ -105,6 +105,10 @@ const SECTION_BY_KEY: Record<ActivitySection, SidebarSection> = {
     title: 'Connectors',
     Secondary: ConnectorsLegacySidebar,
   },
+  'trading-accounts': {
+    title: 'Trading Accounts',
+    Secondary: SettingsCategoryList,
+  },
 }
 
 /** Resolve the sidebar config for the currently selected ActivitySection. */
