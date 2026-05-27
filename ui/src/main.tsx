@@ -9,6 +9,10 @@ import './index.css'
 
 if (import.meta.env.VITE_DEMO_MODE) {
   await (await import('./demo')).startWorker()
+} else if (import.meta.env.DEV) {
+  // Dev-only: expose window.__demoRecord for capturing real PTY transcripts.
+  // See ui/src/demo/recorder/README.md.
+  await import('./demo/recorder')
 }
 
 createRoot(document.getElementById('root')!).render(

@@ -12,7 +12,7 @@ import {
   type ClientControlMessage,
 } from './protocol';
 import { darkTheme } from './theme';
-import { DemoTerminalStub } from '../../demo/DemoTerminalStub';
+import { DemoTerminalReplay } from '../../demo/DemoTerminalReplay';
 
 type Status = 'connecting' | 'connected' | 'closed' | 'error' | 'kicked';
 
@@ -67,7 +67,7 @@ export interface TerminalViewProps {
 }
 
 export function TerminalView(props: TerminalViewProps): ReactElement {
-  if (import.meta.env.VITE_DEMO_MODE) return <DemoTerminalStub label={props.label ?? props.wsId} />;
+  if (import.meta.env.VITE_DEMO_MODE) return <DemoTerminalReplay label={props.label ?? props.wsId} wsId={props.wsId} sessionId={props.sessionId} />;
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [status, setStatus] = useState<Status>('connecting');
   const [pid, setPid] = useState<number | null>(null);
