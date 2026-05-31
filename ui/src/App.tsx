@@ -10,6 +10,7 @@ import { findSectionForActivity } from './sections'
 import { UrlAdopter } from './tabs/UrlAdopter'
 import { useWorkspace } from './tabs/store'
 import { getFocusedTab } from './tabs/types'
+import { resolveAppLocale } from './i18n/locale'
 
 /**
  * Activity-bar pages — only items that appear as icons in the ActivityBar.
@@ -51,6 +52,12 @@ function AppShell() {
   const section = findSectionForActivity(selectedSidebar)
   const isDesktop = useIsDesktop()
   const showSidebarPanel = isDesktop && section != null
+  const appLocale = useMemo(() => resolveAppLocale(), [])
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    document.documentElement.setAttribute('lang', appLocale === 'zh' ? 'zh-CN' : 'en-US')
+  }, [appLocale])
 
   // Auto-close the mobile secondary drawer once the user picks a sub-item.
   // We snapshot the focused tab at drawer-open time (see openSecondaryDrawer
