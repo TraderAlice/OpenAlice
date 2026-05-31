@@ -43,13 +43,30 @@ export const claudeAdapter: CliAdapter = {
   },
 
   composeCommand(base: readonly string[], ctx: SpawnContext): readonly string[] {
-    if (ctx.resume === undefined) return base;
+    // Auto-trust the workspace's project-scoped `.mcp.json` servers. Without
+    // this, Claude Code parks every project MCP server at "⏸ Pending approval"
+    // (the trust gate for `.mcp.json` shared via VCS) and the agent never sees
+    // the OpenAlice tool surface — the symptom users hit as "MCP 啟動唔到".
+    //
+    // Injected on the command line (not via a written `.claude/settings.json`)
+    // to match the launcher's CLI-injection philosophy — same as the codex
+    // adapter's `-c mcp_servers.openalice.url=...`. Verified empirically that
+    // neither `--mcp-config`, `--dangerously-skip-permissions`, nor
+    // `--permission-mode bypassPermissions` clears this gate; only the
+    // `enableAllProjectMcpServers` setting does. `--settings` accepts an inline
+    // JSON string (PTY spawn passes argv directly, so no shell-quoting needed).
+    const cmd = [
+      ...base,
+      '--settings',
+      JSON.stringify({ enableAllProjectMcpServers: true }),
+    ];
+    if (ctx.resume === undefined) return cmd;
     if (ctx.resume === 'last') {
       throw new Error(
         'claude adapter: "last" resume not supported — use --resume <sessionId> or undefined (fresh)',
       );
     }
-    return [...base, '--resume', ctx.resume.sessionId];
+    return [...cmd, '--resume', ctx.resume.sessionId];
   },
 
   transcriptDir(cwd: string): string {
