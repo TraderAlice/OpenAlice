@@ -30,12 +30,13 @@ COPY ui/package.json ui/
 
 RUN pnpm install --frozen-lockfile
 
-# Source + build. `pnpm build` runs `turbo run build` (workspace packages
-# + UI Vite build + services/uta tsup) then `tsup` bundles the Alice
-# backend into `dist/main.js`. UTA service ends up at
-# `services/uta/dist/uta.js`.
+# Source + build. For the self-host image we intentionally skip
+# `@traderalice/desktop` — it pulls in Electron-only dependencies that are
+# not needed in this container.
 COPY . .
-RUN pnpm build
+RUN pnpm build:migration-index \
+    && pnpm turbo run build --filter=!@traderalice/desktop \
+    && pnpm tsup src/main.ts --format esm --dts
 
 # Strip dev deps before the runtime stage harvests node_modules. With
 # `electron` + `electron-builder` (each ~500MB) in devDependencies, this
@@ -48,12 +49,15 @@ FROM node:22-trixie-slim AS runtime
 WORKDIR /app
 
 # Bash + POSIX utils are required by workspace bootstrap.sh scripts;
-# trixie-slim already ships them. `tini` becomes PID 1 so signals
-# (SIGTERM from `docker stop`) reach the Guardian supervisor cleanly
-# instead of getting dropped by Node's default PID-1 behaviour, and
-# zombies from short-lived children (workspace CLI auth flows, etc.)
-# get reaped.
-RUN apt-get update && apt-get install -y --no-install-recommends tini \
+# trixie-slim already ships Bash and POSIX utils. `git` is required by
+# workspace bootstrap scripts like chat/bootstrap.sh, which run at runtime.
+# `ca-certificates` are required for HTTPS git clones used by templates such
+# as auto-quant.
+# `tini` becomes PID 1 so signals (SIGTERM from `docker stop`) reach the
+# Guardian supervisor cleanly instead of getting dropped by Node's default
+# PID-1 behaviour, and zombies from short-lived children (workspace CLI
+# auth flows, etc.) get reaped.
+RUN apt-get update && apt-get install -y --no-install-recommends tini git ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Two agent CLIs installed globally so they're on PATH for the PTY
