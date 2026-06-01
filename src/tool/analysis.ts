@@ -14,17 +14,23 @@ import type { IndicatorContext, OhlcvData, HistoricalDataResult, DataSourceMeta 
 
 /** 根据 interval 决定拉取的日历天数（约 1 倍冗余） */
 function getCalendarDays(interval: string): number {
-  const match = interval.match(/^(\d+)([dwhm])$/)
+  // Valid intervals: 1m..90m (minutes), 1h, 1d, 5d, 1W, 1M, 1Q.
+  // Case matters: lowercase 'm' = minutes, uppercase 'M' = months. The old
+  // `[dwhm]` class only matched lowercase, so 'W'/'M'/'Q' fell through to the
+  // 365-day fallback — weekly/monthly history was silently capped at 1 year.
+  const match = interval.match(/^(\d+)(m|h|d|W|M|Q)$/)
   if (!match) return 365 // fallback: 1 年
 
   const n = parseInt(match[1])
   const unit = match[2]
 
   switch (unit) {
-    case 'd': return n * 730   // 日线：2 年
-    case 'w': return n * 1825  // 周线：5 年
-    case 'h': return n * 90    // 小时线：90 天
-    case 'm': return n * 30    // 分钟线：30 天
+    case 'm': return n * 30      // 分钟线：~30 天（盘中数据本就受供应商限制）
+    case 'h': return n * 90      // 小时线：90 天
+    case 'd': return n * 1825    // 日线：5 年
+    case 'W': return n * 3650    // 周线：10 年
+    case 'M': return n * 7300    // 月线：20 年
+    case 'Q': return n * 10950   // 季线：30 年
     default:  return 365
   }
 }
