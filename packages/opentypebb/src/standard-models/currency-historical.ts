@@ -18,7 +18,7 @@ export const CurrencyHistoricalDataSchema = z.object({
   open: z.number().nullable().default(null).describe('The open price.'),
   high: z.number().nullable().default(null).describe('The high price.'),
   low: z.number().nullable().default(null).describe('The low price.'),
-  close: z.number().describe('The close price.'),
+  close: z.number().nullable().default(null).describe('The close price.'),
   volume: z.number().nullable().default(null).describe('The trading volume.'),
   vwap: z.number().nullable().default(null).describe('Volume Weighted Average Price over the period.'),
 }).passthrough()
