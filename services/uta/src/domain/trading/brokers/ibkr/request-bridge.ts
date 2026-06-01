@@ -505,11 +505,21 @@ export class RequestBridge extends DefaultEWrapper {
     if (!snap) return
 
     switch (tickType) {
+      // Real-time ticks
       case TickTypeEnum.BID: snap.bid = price; break
       case TickTypeEnum.ASK: snap.ask = price; break
       case TickTypeEnum.LAST: snap.last = price; break
       case TickTypeEnum.HIGH: snap.high = price; break
       case TickTypeEnum.LOW: snap.low = price; break
+      case TickTypeEnum.CLOSE: snap.close = price; break
+      // Delayed ticks (15-min) — sent instead of the above when the account
+      // has no real-time subscription (e.g. IBKR free-trial / paper on TSE).
+      case TickTypeEnum.DELAYED_BID: snap.bid = price; break
+      case TickTypeEnum.DELAYED_ASK: snap.ask = price; break
+      case TickTypeEnum.DELAYED_LAST: snap.last = price; break
+      case TickTypeEnum.DELAYED_HIGH: snap.high = price; break
+      case TickTypeEnum.DELAYED_LOW: snap.low = price; break
+      case TickTypeEnum.DELAYED_CLOSE: snap.close = price; break
     }
   }
 
@@ -517,7 +527,7 @@ export class RequestBridge extends DefaultEWrapper {
     const snap = this.snapshots.get(reqId)
     if (!snap) return
 
-    if (tickType === TickTypeEnum.VOLUME) {
+    if (tickType === TickTypeEnum.VOLUME || tickType === TickTypeEnum.DELAYED_VOLUME) {
       snap.volume = size.toNumber()
     }
   }

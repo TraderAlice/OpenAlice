@@ -649,7 +649,10 @@ export class UnifiedTradingAccount {
     for (const key of Object.keys(src)) {
       const value = src[key]
       if (key === 'aliceId') continue
-      if (value === undefined || value === '' || value === null) continue
+      // `new Contract()` defaults numeric fields (conId, strike, …) to 0, so a
+      // caller-supplied 0 is indistinguishable from "unset" — copying it would
+      // clobber the expanded conId (the only key IBKR resolves by). Skip it.
+      if (value === undefined || value === '' || value === null || value === 0) continue
       dst[key] = value
     }
     return expanded

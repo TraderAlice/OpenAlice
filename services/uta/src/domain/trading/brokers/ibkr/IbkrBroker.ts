@@ -138,8 +138,11 @@ export class IbkrBroker implements IBroker {
   }
 
   async getContractDetails(query: Contract): Promise<ContractDetails | null> {
+    // SMART routing is always safe. But the USD currency default would
+    // exclude non-USD listings (e.g. TSE/JPY) when resolving by conId, so
+    // only force currency when resolving by symbol (no conId).
     if (!query.exchange) query.exchange = 'SMART'
-    if (!query.currency) query.currency = 'USD'
+    if (!query.conId && !query.currency) query.currency = 'USD'
 
     const reqId = this.bridge.allocReqId()
     const promise = this.bridge.requestCollector<ContractDetails>(reqId)
@@ -357,17 +360,31 @@ export class IbkrBroker implements IBroker {
    * auto-released after tickSnapshotEnd.
    */
   async getQuote(contract: Contract): Promise<Quote> {
+    // reqMktData rejects conId-only contracts (IBKR error 321 — it needs
+    // symbol/local-symbol/secId). When we only have a conId (e.g. resolved
+    // from an aliceId), hydrate the full contract via reqContractDetails first.
+    if (contract.conId && !contract.symbol) {
+      const full = await this.getContractDetails(contract)
+      if (full?.contract) contract = full.contract
+    }
     if (!contract.exchange) contract.exchange = 'SMART'
     if (!contract.currency) contract.currency = 'USD'
 
+    // Fall back to delayed data (type 3) when no real-time subscription exists
+    // (e.g. IBKR free-trial / paper accounts on TSE). Accounts WITH a live
+    // subscription still receive real-time data under this setting.
+    this.client.reqMarketDataType(3)
     const reqId = this.bridge.allocReqId()
     const promise = this.bridge.requestSnapshot(reqId)
     this.client.reqMktData(reqId, contract, '', true, false, [])
     const snap = await promise
 
+    // Outside trading hours there is no live/last tick — fall back to the
+    // (delayed) close so callers still get a meaningful price.
+    const last = snap.last ?? snap.close
     return {
       contract,
-      last: String(snap.last ?? 0),
+      last: String(last ?? 0),
       bid: String(snap.bid ?? 0),
       ask: String(snap.ask ?? 0),
       volume: String(snap.volume ?? 0),
