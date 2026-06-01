@@ -154,6 +154,21 @@ export class IbkrBroker implements IBroker {
   // ==================== Trading operations ====================
 
   async placeOrder(contract: Contract, order: Order, _tpsl?: TpSlParams): Promise<PlaceOrderResult> {
+    // When a conId is present it is authoritative. Upstream layers may stamp a
+    // display symbol ("NRI") and a default USD currency onto the contract,
+    // which conflict with what the conId actually resolves to (e.g. 4307/JPY)
+    // and trigger IBKR error 478. Re-resolve the full contract from a clean
+    // conId-only query so symbol/exchange/currency always agree.
+    if (contract.conId) {
+      const query = new Contract()
+      query.conId = contract.conId
+      const full = await this.getContractDetails(query)
+      if (full?.contract) {
+        const aliceId = contract.aliceId
+        contract = full.contract
+        if (aliceId) contract.aliceId = aliceId
+      }
+    }
     // TWS requires exchange and currency on the contract. Upstream layers
     // (staging, AI tools) typically only populate symbol + secType.
     // Default to SMART routing. Currency defaults to USD — non-USD markets

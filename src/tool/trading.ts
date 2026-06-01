@@ -39,9 +39,27 @@ function handleBrokerError(err: unknown): { error: string; code: string; transie
   }
 }
 
+/**
+ * Rehydrate a Decimal field. Orders fetched over HTTP from the UTA service
+ * arrive as JSON, where Decimal fields are serialized to strings — calling
+ * Decimal methods (.equals/.toFixed) on them throws. Coerce back to Decimal,
+ * treating null/empty/unparseable as the unset sentinel.
+ */
+function toDec(v: unknown): Decimal {
+  if (v instanceof Decimal) return v
+  if (v == null || v === '') return UNSET_DECIMAL
+  try { return new Decimal(v as Decimal.Value) } catch { return UNSET_DECIMAL }
+}
+
 /** Summarize an OpenOrder into a compact object for AI consumption. */
 function summarizeOrder(o: OpenOrder, source: string, stringOrderId?: string) {
   const order = o.order
+  const totalQuantity = toDec(order.totalQuantity)
+  const lmtPrice = toDec(order.lmtPrice)
+  const auxPrice = toDec(order.auxPrice)
+  const trailStopPrice = toDec(order.trailStopPrice)
+  const trailingPercent = toDec(order.trailingPercent)
+  const filledQuantity = toDec(order.filledQuantity)
   return {
     source,
     orderId: stringOrderId ?? String(order.orderId),
@@ -49,14 +67,14 @@ function summarizeOrder(o: OpenOrder, source: string, stringOrderId?: string) {
     symbol: o.contract.symbol || o.contract.localSymbol || '',
     action: order.action,
     orderType: order.orderType,
-    totalQuantity: order.totalQuantity.equals(UNSET_DECIMAL) ? '0' : order.totalQuantity.toFixed(),
+    totalQuantity: totalQuantity.equals(UNSET_DECIMAL) ? '0' : totalQuantity.toFixed(),
     status: o.orderState.status,
-    ...(!order.lmtPrice.equals(UNSET_DECIMAL) && { lmtPrice: order.lmtPrice.toFixed() }),
-    ...(!order.auxPrice.equals(UNSET_DECIMAL) && { auxPrice: order.auxPrice.toFixed() }),
-    ...(!order.trailStopPrice.equals(UNSET_DECIMAL) && { trailStopPrice: order.trailStopPrice.toFixed() }),
-    ...(!order.trailingPercent.equals(UNSET_DECIMAL) && { trailingPercent: order.trailingPercent.toFixed() }),
+    ...(!lmtPrice.equals(UNSET_DECIMAL) && { lmtPrice: lmtPrice.toFixed() }),
+    ...(!auxPrice.equals(UNSET_DECIMAL) && { auxPrice: auxPrice.toFixed() }),
+    ...(!trailStopPrice.equals(UNSET_DECIMAL) && { trailStopPrice: trailStopPrice.toFixed() }),
+    ...(!trailingPercent.equals(UNSET_DECIMAL) && { trailingPercent: trailingPercent.toFixed() }),
     ...(order.tif && { tif: order.tif }),
-    ...(!order.filledQuantity.equals(UNSET_DECIMAL) && { filledQuantity: order.filledQuantity.toString() }),
+    ...(!filledQuantity.equals(UNSET_DECIMAL) && { filledQuantity: filledQuantity.toString() }),
     ...(o.avgFillPrice != null && { avgFillPrice: o.avgFillPrice }),
     ...(order.parentId !== 0 && { parentId: order.parentId }),
     ...(order.ocaGroup && { ocaGroup: order.ocaGroup }),
