@@ -14,3 +14,12 @@ To verify the wiring on first attach:
 Otherwise, use this workspace however you like. The CWD is its own git
 repo (commits stay local), and any files you create or edit are scoped
 to this workspace.
+
+## Handing work back to the user
+
+This workspace has an outbound channel to the user's Inbox (`inbox_push`).
+When you finish something the user should see — a shortlist, a thesis, a
+rotation snapshot, a decision you reached — push it to their inbox: the
+file(s) you produced plus a short note on what it is and why it matters.
+Don't make them come looking in the workspace; surface the result. (One-way
+for now — they read the inbox; they don't reply through it.)
