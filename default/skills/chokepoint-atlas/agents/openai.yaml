@@ -1,0 +1,4 @@
+interface:
+  display_name: "AI Bottleneck Hunter"
+  short_description: "Maps AI supply stacks, bottlenecks, and names"
+  default_prompt: "Use $ai-supply-chain-bottleneck-hunter to map an AI infrastructure stack, find the real bottleneck, validate it with reports/news, and only then suggest candidate names."

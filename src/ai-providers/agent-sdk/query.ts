@@ -10,6 +10,7 @@ import type { McpSdkServerConfigWithInstance } from '@anthropic-ai/claude-agent-
 import { createWriteStream, mkdirSync } from 'node:fs'
 import { pino } from 'pino'
 import type { ContentBlock } from '../../core/session.js'
+import { readToolsConfig } from '../../core/config.js'
 
 // Config is now resolved via profile system — override carries all needed values
 
@@ -114,11 +115,13 @@ export function buildAuthEnv(
 const NORMAL_ALLOWED_TOOLS = [
   'Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'WebFetch',
   'mcp__open-alice__*',
+  'mcp__markitdown__*',
 ]
 
 const EVOLUTION_ALLOWED_TOOLS = [
   'Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep', 'WebSearch', 'WebFetch',
   'mcp__open-alice__*',
+  'mcp__markitdown__*',
 ]
 
 const NORMAL_EXTRA_DISALLOWED = ['Bash']
@@ -227,6 +230,10 @@ export async function askAgentSdk(
   const mcpServers: Record<string, any> = {}
   if (mcpServer) {
     mcpServers['open-alice'] = mcpServer
+  }
+  const toolsCfg = await readToolsConfig().catch(() => null)
+  for (const [name, srv] of Object.entries(toolsCfg?.externalMcpServers ?? {})) {
+    mcpServers[name] = { type: 'stdio', command: srv.command, args: srv.args, env: Object.keys(srv.env).length ? srv.env : undefined }
   }
 
   const messages: AgentSdkMessage[] = []

@@ -287,6 +287,12 @@ const snapshotSchema = z.object({
 export const toolsSchema = z.object({
   /** Tool names that are disabled. Tools not listed are enabled by default. */
   disabled: z.array(z.string()).default([]),
+  /** External MCP servers (stdio) to inject into agent-sdk sessions. */
+  externalMcpServers: z.record(z.string(), z.object({
+    command: z.string(),
+    args: z.array(z.string()).default([]),
+    env: z.record(z.string(), z.string()).default({}),
+  })).optional(),
 })
 
 const webhookTokenSchema = z.object({

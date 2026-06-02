@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Template for Kronos launchd agent. Before installing:
+    sed -e "s|{{HOME}}|$HOME|g" -e "s|{{KRONOS_DIR}}|$HOME/openalice/services/kronos|g" \
+        com.openalice.kronos.plist.template > ~/Library/LaunchAgents/com.openalice.kronos.plist
+    launchctl load -w ~/Library/LaunchAgents/com.openalice.kronos.plist
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.openalice.kronos</string>
+    <key>WorkingDirectory</key>
+    <string>{{KRONOS_DIR}}</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>{{KRONOS_DIR}}/.venv/bin/python</string>
+        <string>{{KRONOS_DIR}}/server.py</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>{{KRONOS_DIR}}/.venv/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>KRONOS_MODEL</key>
+        <string>Kronos-small</string>
+        <key>KRONOS_DEVICE</key>
+        <string>mps</string>
+        <key>PORT</key>
+        <string>8765</string>
+        <key>HF_HOME</key>
+        <string>{{HOME}}/.cache/huggingface</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>{{KRONOS_DIR}}/kronos.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>{{KRONOS_DIR}}/kronos.err.log</string>
+</dict>
+</plist>

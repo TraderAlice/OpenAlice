@@ -5,6 +5,15 @@ logs/
 state.json
 *.log
 
+# Python sidecar venvs / caches
+**/.venv/
+**/__pycache__/
+*.pyc
+
+# Local kronos artifacts
+services/kronos/_kronos_repo/
+services/kronos/*.log
+
 .env
 .env.*
 !ui/.env.demo

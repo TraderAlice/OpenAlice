@@ -27,6 +27,9 @@ import { OpenBBEconomyClient } from './domain/market-data/client/openbb-api/econ
 import { createMarketSearchTools } from './tool/market.js'
 import { createAnalysisTools } from './tool/analysis.js'
 import { createEconomyTools } from './tool/economy.js'
+import { createCryptoResearchTools } from './tool/crypto-research.js'
+import { createMarketQuoteTools } from './tool/market-quote.js'
+import { createKronosPredictTools } from './tool/kronos-predict.js'
 import { SessionStore } from './core/session.js'
 import { createInboxStore } from './core/inbox-store.js'
 import { ToolCenter } from './core/tool-center.js'
@@ -199,6 +202,14 @@ async function main() {
   }
   toolCenter.register(createAnalysisTools(equityClient, cryptoClient, currencyClient, commodityClient), 'analysis')
   toolCenter.register(createEconomyTools(economyClient, commodityClient), 'economy')
+  toolCenter.register(createCryptoResearchTools(), 'crypto-research')
+  toolCenter.register(createMarketQuoteTools(), 'market-quote')
+  toolCenter.register(
+    createKronosPredictTools({
+      endpoint: process.env.KRONOS_ENDPOINT ?? 'http://127.0.0.1:8765',
+    }),
+    'prediction',
+  )
 
   console.log(`tool-center: ${toolCenter.list().length} tools registered`)
 
