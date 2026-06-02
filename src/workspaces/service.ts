@@ -9,7 +9,9 @@
  */
 
 import { existsSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { basename, delimiter as pathDelimiter, join } from 'node:path';
+
+import { cliBinPath } from '@/core/paths.js';
 
 import { claudeAdapter } from './adapters/claude.js';
 import { codexAdapter } from './adapters/codex.js';
@@ -213,6 +215,11 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       // the template-default port literal which may not match the actual
       // backend (guardian can pick a different port if the default is taken).
       OPENALICE_MCP_URL: `http://127.0.0.1:${opts.mcpPort}/mcp`,
+      // Prepend the `alice` CLI shim dir so the workspace agent can invoke it
+      // from its shell (it reads OPENALICE_MCP_URL + AQ_WS_ID above). Shared
+      // script — not written into the workspace, so it never pollutes the
+      // workspace's git repo.
+      PATH: `${cliBinPath()}${pathDelimiter}${process.env.PATH ?? ''}`,
     }, ws.dir);
     const spawnCtx = {
       ...(resume !== undefined ? { resume } : {}),

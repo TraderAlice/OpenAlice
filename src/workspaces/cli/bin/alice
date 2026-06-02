@@ -1,0 +1,193 @@
+#!/usr/bin/env node
+/*
+ * alice — OpenAlice workspace CLI.
+ *
+ * A thin argv -> JSON -> HTTP forwarder over the /cli gateway (see
+ * src/server/cli.ts). It owns no schema and no business logic: the gateway
+ * validates + executes, the manifest drives --help, so new capabilities appear
+ * here with zero changes to this file.
+ *
+ * Runs from a workspace PTY shell, reading env the launcher already injects per
+ * spawn (OPENALICE_MCP_URL + AQ_WS_ID). Deliberately written with NO import /
+ * export and NO top-level await, so node runs it identically whether it treats
+ * the file as ESM or CommonJS — and with zero Alice imports, so there is nothing
+ * to build (dev and prod behave the same). Uses only global fetch / process.
+ *
+ *   alice                         list command groups
+ *   alice <group>                 list verbs in a group
+ *   alice <group> <verb> --help   show a verb's flags
+ *   alice <group> <verb> [--flags]   run it; JSON to stdout
+ */
+
+async function main() {
+  const argv = process.argv.slice(2)
+
+  const mcpUrl = process.env.OPENALICE_MCP_URL || 'http://127.0.0.1:47332/mcp'
+  const wsId = process.env.AQ_WS_ID
+  if (!wsId) {
+    fail('AQ_WS_ID is not set — run `alice` from inside an OpenAlice workspace.')
+  }
+  // Derive the CLI base from the MCP URL: .../mcp -> .../cli/<wsId>
+  const base = mcpUrl.replace(/\/+$/, '').replace(/\/mcp$/, '/cli') + '/' + wsId
+
+  const wantsHelp = argv.includes('--help') || argv.includes('-h')
+  const positionals = argv.filter((a) => !a.startsWith('-'))
+  const group = positionals[0]
+  const verb = positionals[1]
+
+  // `alice` / `alice --help` -> group listing
+  if (!group) return printGroups(await manifest(base))
+
+  const m = await manifest(base)
+  const groupCmds = m.groups[group]
+  if (!groupCmds) fail(`unknown group "${group}". Run \`alice\` to list groups.`)
+
+  // `alice <group>` / `alice <group> --help` -> verb listing
+  if (!verb || (wantsHelp && !m.groups[group][verb])) return printVerbs(group, groupCmds)
+
+  const cmd = groupCmds[verb]
+  if (!cmd) fail(`unknown command "${group} ${verb}". Run \`alice ${group}\` to list verbs.`)
+
+  // `alice <group> <verb> --help` -> flag listing
+  if (wantsHelp) return printVerbHelp(group, verb, cmd)
+
+  // Run it.
+  const args = parseFlags(argv.slice(argv.indexOf(verb) + 1))
+  const res = await invoke(base, cmd.tool, args)
+  process.stdout.write(res.endsWith('\n') ? res : res + '\n')
+}
+
+// ---- HTTP -----------------------------------------------------------------
+
+async function manifest(base) {
+  const r = await fetchJson(base + '/manifest', { method: 'GET' })
+  if (!r.ok) {
+    const msg = r.body && r.body.error ? r.body.error : `HTTP ${r.status}`
+    fail(typeof msg === 'string' ? msg : JSON.stringify(msg))
+  }
+  return r.body
+}
+
+async function invoke(base, tool, args) {
+  const r = await fetchJson(base + '/invoke', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tool, args }),
+  })
+  if (!r.ok) {
+    const msg = r.body && r.body.error ? r.body.error : `HTTP ${r.status}`
+    fail(typeof msg === 'string' ? msg : JSON.stringify(msg))
+  }
+  const blocks = (r.body && r.body.content) || []
+  return blocks
+    .map((b) => (b && b.type === 'text' ? b.text : b ? `[${b.type}]` : ''))
+    .join('\n')
+}
+
+async function fetchJson(url, opts) {
+  let resp
+  try {
+    resp = await fetch(url, opts)
+  } catch (e) {
+    fail(`cannot reach OpenAlice at ${url} — is the backend running? (${e && e.message})`)
+  }
+  let body = null
+  const text = await resp.text()
+  try {
+    body = text ? JSON.parse(text) : null
+  } catch {
+    body = text
+  }
+  return { ok: resp.ok, status: resp.status, body }
+}
+
+// ---- flag parsing ---------------------------------------------------------
+
+function parseFlags(tokens) {
+  const args = {}
+  const meta = {}
+  for (let i = 0; i < tokens.length; i++) {
+    let tok = tokens[i]
+    if (!tok.startsWith('--')) continue
+    tok = tok.slice(2)
+    let key, val
+    const eq = tok.indexOf('=')
+    if (eq >= 0) {
+      key = tok.slice(0, eq)
+      val = tok.slice(eq + 1)
+    } else {
+      key = tok
+      const next = tokens[i + 1]
+      if (next === undefined || next.startsWith('--')) {
+        val = 'true' // bare flag -> boolean-ish; gateway coerces as needed
+      } else {
+        val = next
+        i++
+      }
+    }
+    if (key === 'meta') {
+      // repeatable: --meta key=value -> metadataFilter
+      const e = val.indexOf('=')
+      if (e >= 0) meta[val.slice(0, e)] = val.slice(e + 1)
+    } else {
+      args[key] = val
+    }
+  }
+  if (Object.keys(meta).length) args.metadataFilter = meta
+  return args
+}
+
+// ---- help rendering -------------------------------------------------------
+
+function printGroups(m) {
+  const groups = Object.keys(m.groups)
+  const width = Math.max(...groups.map((g) => g.length), 1)
+  out('OpenAlice CLI — alice <group> <verb> [--flags]\n')
+  for (const g of groups) {
+    out(`  ${g.padEnd(width)}  ${Object.keys(m.groups[g]).join(', ')}`)
+  }
+  out('\nRun `alice <group>` or `alice <group> <verb> --help` for details.')
+  if (m.unmapped && m.unmapped.length) {
+    out(`\n(${m.unmapped.length} tool(s) reachable via MCP but not the CLI)`)
+  }
+}
+
+function printVerbs(group, cmds) {
+  const verbs = Object.keys(cmds)
+  const width = Math.max(...verbs.map((v) => v.length), 1)
+  out(`alice ${group} <verb> [--flags]\n`)
+  for (const v of verbs) {
+    out(`  ${v.padEnd(width)}  ${firstLine(cmds[v].description)}`)
+  }
+}
+
+function printVerbHelp(group, verb, cmd) {
+  out(`alice ${group} ${verb} [--flags]\n`)
+  if (cmd.description) out(cmd.description + '\n')
+  const props = (cmd.schema && cmd.schema.properties) || {}
+  const required = new Set((cmd.schema && cmd.schema.required) || [])
+  const names = Object.keys(props)
+  if (!names.length) return out('(no flags)')
+  out('Flags:')
+  for (const n of names) {
+    const p = props[n] || {}
+    const type = p.type || (p.enum ? 'enum' : '')
+    const req = required.has(n) ? ' (required)' : ''
+    out(`  --${n}${type ? ' <' + type + '>' : ''}${req}   ${firstLine(p.description || '')}`)
+  }
+}
+
+// ---- util -----------------------------------------------------------------
+
+function firstLine(s) {
+  return (s || '').split('\n')[0]
+}
+function out(s) {
+  process.stdout.write(s + '\n')
+}
+function fail(msg) {
+  process.stderr.write('alice: ' + msg + '\n')
+  process.exit(1)
+}
+
+main().catch((e) => fail(e && e.stack ? e.stack : String(e)))

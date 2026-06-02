@@ -4,8 +4,11 @@ import type { NewsItem } from '../types'
 
 describe('news tools (pure functions)', () => {
   // Mock news data
+  // Non-sequential ids on purpose: proves addressing is by stable id, not
+  // by position in the returned list.
   const mockNews: NewsItem[] = [
     {
+      id: 10,
       time: new Date('2025-01-01T08:00:00Z'),
       title: 'BTC breaks 50k resistance',
       content:
@@ -13,6 +16,7 @@ describe('news tools (pure functions)', () => {
       metadata: { source: 'official', category: 'crypto' },
     },
     {
+      id: 20,
       time: new Date('2025-01-01T10:00:00Z'),
       title: 'ETH upgrade announcement',
       content:
@@ -20,6 +24,7 @@ describe('news tools (pure functions)', () => {
       metadata: { source: 'official', category: 'crypto' },
     },
     {
+      id: 30,
       time: new Date('2025-01-01T12:00:00Z'),
       title: 'Market analysis report',
       content:
@@ -27,6 +32,7 @@ describe('news tools (pure functions)', () => {
       metadata: { source: 'analyst', category: 'analysis' },
     },
     {
+      id: 40,
       time: new Date('2025-01-02T06:00:00Z'),
       title: '', // Empty title - simulates untitled news
       content:
@@ -44,7 +50,7 @@ describe('news tools (pure functions)', () => {
       const results = await globNews(createContext(), { pattern: 'BTC' })
 
       expect(results).toHaveLength(1)
-      expect(results[0].index).toBe(0)
+      expect(results[0].id).toBe(10)
       expect(results[0].title).toBe('BTC breaks 50k resistance')
     })
 
@@ -99,6 +105,7 @@ describe('news tools (pure functions)', () => {
     it('should truncate long metadata', async () => {
       const newsWithLongMetadata: NewsItem[] = [
         {
+          id: 1,
           time: new Date(),
           title: 'Test',
           content: 'Content',
@@ -132,7 +139,7 @@ describe('news tools (pure functions)', () => {
       })
 
       expect(results).toHaveLength(1)
-      expect(results[0].index).toBe(2)
+      expect(results[0].id).toBe(30)
       expect(results[0].matchedText).toContain('Interest rate')
     })
 
@@ -176,7 +183,7 @@ describe('news tools (pure functions)', () => {
       })
 
       expect(results).toHaveLength(1)
-      expect(results[0].index).toBe(2)
+      expect(results[0].id).toBe(30)
     })
 
     it('should respect limit', async () => {
@@ -192,7 +199,7 @@ describe('news tools (pure functions)', () => {
       const results = await grepNews(createContext(), { pattern: 'Korea' })
 
       expect(results).toHaveLength(1)
-      expect(results[0].index).toBe(3)
+      expect(results[0].id).toBe(40)
       expect(results[0].title).toBe('')
     })
 
@@ -205,28 +212,31 @@ describe('news tools (pure functions)', () => {
   })
 
   describe('readNews', () => {
-    it('should read news by index', async () => {
-      const result = await readNews(createContext(), { index: 1 })
+    it('should read news by stable id', async () => {
+      const result = await readNews(createContext(), { id: 20 })
 
       expect(result).not.toBeNull()
       expect(result!.title).toBe('ETH upgrade announcement')
       expect(result!.content).toContain('Ethereum')
     })
 
-    it('should return null for invalid index', async () => {
-      const result = await readNews(createContext(), { index: 100 })
+    it('should resolve by id regardless of position in the list', async () => {
+      // id 40 is the last item; a positional index of 40 would be out of range,
+      // proving addressing is by id, not by position.
+      const result = await readNews(createContext(), { id: 40 })
 
-      expect(result).toBeNull()
+      expect(result).not.toBeNull()
+      expect(result!.content).toContain('Korea')
     })
 
-    it('should return null for negative index', async () => {
-      const result = await readNews(createContext(), { index: -1 })
+    it('should return null for unknown id', async () => {
+      const result = await readNews(createContext(), { id: 99999 })
 
       expect(result).toBeNull()
     })
 
     it('should return full news item with all fields', async () => {
-      const result = await readNews(createContext(), { index: 0 })
+      const result = await readNews(createContext(), { id: 10 })
 
       expect(result).toEqual(mockNews[0])
       expect(result!.time).toBeInstanceOf(Date)
@@ -248,7 +258,7 @@ describe('news tools (pure functions)', () => {
     })
 
     it('readNews should return null', async () => {
-      const result = await readNews(emptyContext, { index: 0 })
+      const result = await readNews(emptyContext, { id: 0 })
       expect(result).toBeNull()
     })
   })

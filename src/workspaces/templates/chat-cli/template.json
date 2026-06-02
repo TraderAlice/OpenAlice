@@ -1,0 +1,9 @@
+{
+  "displayName": "Chat (CLI)",
+  "groupOrder": 11,
+  "description": "Experimental chat workspace: market/data tools come from the `alice` CLI on PATH instead of MCP; the inbox stays on MCP. A testbed for CLI-mode context injection.",
+  "defaultAgents": ["claude", "codex"],
+  "injectMcp": "inbox",
+  "injectPersona": true,
+  "bundledSkills": ["openalice-cli", "scan-value-chain", "build-thesis", "sector-rotation"]
+}

@@ -63,18 +63,29 @@ If unsure about the symbol, use marketSearchForResearch to find it.`,
     equityGetRatios: tool({
       description: `Get financial ratios for a company.
 
-Returns profitability ratios (ROE, ROA, gross margin, net margin, operating margin),
-liquidity ratios (current ratio, quick ratio), leverage ratios (debt/equity),
-and efficiency ratios (asset turnover, inventory turnover).
+Returns profitability ratios (ROE, ROA, gross/net/operating margin),
+liquidity ratios (current ratio, quick ratio), leverage ratios (debt/equity,
+debt/assets), valuation (P/E, P/B, P/S, dividend yield), and more (a curated
+set with clean names, plus any extra ratios the provider returns passed
+through under their raw names).
+
+By default returns the trailing-twelve-month (TTM) snapshot PLUS \`limit\`
+historical periods. Use \`ttm\` to change that: "include" (default, TTM + the
+historical series), "exclude" (historical series only, no TTM), "only" (just
+the single TTM snapshot — \`period\`/\`limit\` are ignored in this mode).
 
 If unsure about the symbol, use marketSearchForResearch to find it.`,
       inputSchema: z.object({
         symbol: z.string().describe('Ticker symbol, e.g. "AAPL"'),
-        period: z.enum(['annual', 'quarter']).optional().describe('Fiscal period (default: annual)'),
-        limit: z.number().int().positive().optional().describe('Number of periods to return (default: 5)'),
+        period: z.enum(['annual', 'quarter']).optional().describe('Fiscal period for the historical series (default: annual)'),
+        limit: z.number().int().positive().optional().describe('Number of historical periods to return (default: 5; ignored when ttm="only")'),
+        ttm: z.enum(['include', 'exclude', 'only']).optional().describe('TTM handling: "include" (default — TTM + history), "exclude" (history only), "only" (TTM snapshot only)'),
       }),
-      execute: async ({ symbol, period, limit }) => {
-        const params: Record<string, unknown> = { symbol, provider: 'fmp' }
+      execute: async ({ symbol, period, limit, ttm }) => {
+        // The FMP fetcher defaults ttm to "only" (a single TTM row, with
+        // period/limit dead). Default to "include" here so the historical
+        // series — and therefore period/limit — actually come through.
+        const params: Record<string, unknown> = { symbol, provider: 'fmp', ttm: ttm ?? 'include' }
         if (period) params.period = period
         if (limit) params.limit = limit
         return await equityClient.getFinancialRatios(params)

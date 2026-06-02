@@ -40,6 +40,23 @@ const MCP_JSON = `{
 }
 `;
 
+/**
+ * Inbox-only variant (`injectMcp: 'inbox'`): keep just the workspace-scoped
+ * `openalice-workspace` server — the inbox-push outbound channel, which is
+ * stateful and stays on MCP — and DROP the global `openalice` tool server. In
+ * this mode the agent reaches market/data tools through the `alice` CLI on its
+ * PATH instead of MCP. Used by the `chat-cli` template.
+ */
+const MCP_JSON_INBOX_ONLY = `{
+  "mcpServers": {
+    "openalice-workspace": {
+      "type": "streamable-http",
+      "url": "\${OPENALICE_MCP_URL:-http://127.0.0.1:47332/mcp}/__WS_ID__"
+    }
+  }
+}
+`;
+
 export async function injectWorkspaceContext(opts: {
   readonly template: TemplateMeta;
   readonly wsId: string;
@@ -48,7 +65,8 @@ export async function injectWorkspaceContext(opts: {
   const { template, wsId, dir } = opts;
 
   if (template.injectMcp) {
-    await writeWorkspaceFile(dir, '.mcp.json', MCP_JSON.replaceAll('__WS_ID__', wsId));
+    const json = template.injectMcp === 'inbox' ? MCP_JSON_INBOX_ONLY : MCP_JSON;
+    await writeWorkspaceFile(dir, '.mcp.json', json.replaceAll('__WS_ID__', wsId));
   }
 
   if (template.injectPersona) {

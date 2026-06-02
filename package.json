@@ -74,6 +74,7 @@
       "dist/electron/**",
       "ui/dist/**",
       "default/**",
+      "src/workspaces/cli/**",
       "package.json"
     ],
     "mac": {

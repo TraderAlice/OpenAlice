@@ -67,6 +67,20 @@ describe('injectWorkspaceContext — MCP', () => {
     );
   });
 
+  it('writes inbox-only .mcp.json when injectMcp is "inbox" (no global tool server)', async () => {
+    await injectWorkspaceContext({ template: makeTemplate({ injectMcp: 'inbox' }), wsId: 'ws-abc', dir });
+    expect(await read('.mcp.json')).toBe(
+      '{\n'
+      + '  "mcpServers": {\n'
+      + '    "openalice-workspace": {\n'
+      + '      "type": "streamable-http",\n'
+      + '      "url": "${OPENALICE_MCP_URL:-http://127.0.0.1:47332/mcp}/ws-abc"\n'
+      + '    }\n'
+      + '  }\n'
+      + '}\n',
+    );
+  });
+
   it('does not write .mcp.json when injectMcp is false', async () => {
     await injectWorkspaceContext({ template: makeTemplate({ injectMcp: false }), wsId: 'ws-abc', dir });
     expect(existsSync(join(dir, '.mcp.json'))).toBe(false);

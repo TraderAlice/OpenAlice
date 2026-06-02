@@ -43,6 +43,10 @@ export type IngestSource = 'rss'
 
 /** A single news article (in-memory representation) */
 export interface NewsItem {
+  /** Stable monotonic id (mirrors NewsRecord.seq). Survives across lookback
+   *  windows, so it — not a positional index — is the addressing key the
+   *  archive tools hand back and readNews resolves against. */
+  id: number
   time: Date
   title: string
   content: string

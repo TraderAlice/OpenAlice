@@ -9,9 +9,10 @@ import type { WorkspaceToolCenter } from '../core/workspace-tool-center.js'
 import type { IInboxStore } from '../core/inbox-store.js'
 import type { WorkspaceService } from '../workspaces/service.js'
 import { extractMcpShape, wrapToolExecute } from '../core/mcp-export.js'
+import { registerCliRoutes } from './cli.js'
 
 /**
- * MCP Plugin — exposes OpenAlice tools via Streamable HTTP, **two routes**:
+ * MCP Plugin — exposes OpenAlice tools via Streamable HTTP, plus the CLI gateway.
  *
  *   GET/POST /mcp           Workspace-independent surface (ToolCenter).
  *                           Trading / market / news / brain / etc. — what
@@ -25,6 +26,11 @@ import { extractMcpShape, wrapToolExecute } from '../core/mcp-export.js'
  *                           agent never sees or supplies workspaceId, and
  *                           bootstrap.sh bakes the per-workspace URL into
  *                           the workspace's own .mcp.json.
+ *
+ *   GET  /cli/:wsId/manifest   Same open posture, same identity-by-URL trick —
+ *   POST /cli/:wsId/invoke     the gateway for the workspace-local `alice` CLI
+ *                              (see ./cli.ts). Reuses this server's open port so
+ *                              the shim needs no token.
  *
  * Holds references to both registries and the WorkspaceService (for wsId
  * registry lookup). Tools are rebuilt per-request so disable/enable +
@@ -115,6 +121,14 @@ export class McpPlugin implements Plugin {
       const mcp = createWorkspaceMcpServer(meta.id, meta.tag)
       await mcp.connect(transport)
       return transport.handleRequest(c.req.raw)
+    })
+
+    // CLI gateway — same app, same open port, same identity-by-URL trick.
+    registerCliRoutes(app, {
+      toolCenter,
+      workspaceToolCenter,
+      inboxStore,
+      getWorkspaceService,
     })
 
     this.server = serve({ fetch: app.fetch, port: this.port }, (info) => {

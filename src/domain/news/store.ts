@@ -250,6 +250,7 @@ export class NewsCollectorStore implements INewsProvider {
 
 function recordToNewsItem(record: NewsRecord): NewsItem {
   return {
+    id: record.seq,
     time: new Date(record.pubTs),
     title: record.title,
     content: record.content,

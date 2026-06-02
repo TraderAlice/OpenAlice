@@ -11,6 +11,22 @@ To verify the wiring on first attach:
 2. Run `/mcp` — you should see `openalice · ✓ connected`
 3. Ask Claude to "list tools" — it should enumerate OpenAlice's tools
 
+## OpenAlice CLI (`alice`)
+
+OpenAlice's read-only market-data capabilities are also on your shell PATH as
+the `alice` command — handy for a quick lookup, a pipe, or a grep without a
+tool round-trip:
+
+```bash
+alice --help                       # list command groups
+alice market search --query AAPL   # find a symbol
+alice news grep --pattern BTC      # search collected news, then…
+alice news read --id <id>          # …read one article by its stable id
+```
+
+It hits the same backend the MCP tools do. Output is JSON on stdout; a non-zero
+exit means it failed. Trading and scheduling stay MCP-only by design.
+
 Otherwise, use this workspace however you like. The CWD is its own git
 repo (commits stay local), and any files you create or edit are scoped
 to this workspace.

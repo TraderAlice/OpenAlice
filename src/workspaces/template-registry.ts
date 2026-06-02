@@ -50,13 +50,16 @@ export interface TemplateMeta {
   /**
    * Launcher-owned context injection, post-bootstrap, gated per template
    * (defaults preserve each template's pre-standardization behavior):
-   *   injectMcp     — write the standard OpenAlice `.mcp.json`
+   *   injectMcp     — write the OpenAlice `.mcp.json`. `true` writes the full
+   *                   config (global tool server + workspace inbox server);
+   *                   `'inbox'` writes ONLY the inbox server (tools come from
+   *                   the `alice` CLI instead); `false` writes nothing.
    *   injectPersona — compose Alice persona + this template's instruction.md
    *                   into CLAUDE.md / AGENTS.md
    *   bundledSkills — names under `default/skills/` to copy into the
    *                   workspace's `.claude/skills` + `.agents/skills`
    */
-  readonly injectMcp: boolean;
+  readonly injectMcp: boolean | 'inbox';
   readonly injectPersona: boolean;
   readonly bundledSkills: readonly string[];
 }
@@ -151,7 +154,7 @@ interface ParsedTemplateMeta {
   readonly displayName?: string;
   readonly groupOrder?: number;
   readonly defaultAgents: readonly string[];
-  readonly injectMcp: boolean;
+  readonly injectMcp: boolean | 'inbox';
   readonly injectPersona: boolean;
   readonly bundledSkills: readonly string[];
 }
@@ -227,7 +230,8 @@ async function readTemplateMeta(path: string): Promise<ParsedTemplateMeta> {
     const defaultAgents = Array.isArray(obj['defaultAgents'])
       ? obj['defaultAgents'].filter((a): a is string => typeof a === 'string')
       : null;
-    const injectMcp = obj['injectMcp'] === true;
+    const injectMcp: boolean | 'inbox' =
+      obj['injectMcp'] === 'inbox' ? 'inbox' : obj['injectMcp'] === true;
     const injectPersona = obj['injectPersona'] === true;
     // Skill names become directory names under `.claude/skills/` — reject any
     // with path separators / traversal as a defensive measure.

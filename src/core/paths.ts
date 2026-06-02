@@ -61,6 +61,20 @@ export function templatesPath(): string {
   return resolve(APP_RESOURCES_HOME, 'src', 'workspaces', 'templates')
 }
 
+/**
+ * Dir holding the workspace-local `alice` CLI shim, prepended to each PTY's
+ * PATH so a native agent can run `alice ...` from its shell. A single shared,
+ * env-driven script (it reads OPENALICE_MCP_URL + AQ_WS_ID at runtime), so it
+ * is NOT written into individual workspaces and never enters their git repos.
+ *
+ * Rides APP_RESOURCES_HOME exactly like templatesPath(): repo source in dev,
+ * the bundler-copied location in a packaged .app. The same packaging caveat
+ * applies — build.files in package.json must ship `src/workspaces/cli/**`.
+ */
+export function cliBinPath(): string {
+  return resolve(APP_RESOURCES_HOME, 'src', 'workspaces', 'cli', 'bin')
+}
+
 /** Effective USER_DATA_HOME — exported for diagnostics / migration logic. */
 export const userDataHome = USER_DATA_HOME
 

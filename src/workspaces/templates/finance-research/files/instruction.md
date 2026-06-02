@@ -34,6 +34,8 @@ Don't cross the streams: don't quote yfinance to make a UTA order routing call. 
 
 `.mcp.json` points at OpenAlice's MCP server (`http://127.0.0.1:47332/mcp` by default, or `$OPENALICE_MCP_URL`). The full OpenAlice tool surface — trading, market data, news, indicators — is available alongside the bundled skills.
 
+The same **Alice canonical layer** is also on your shell PATH as the `alice` CLI (`alice --help`, `alice market search --query AAPL`, `alice news grep --pattern …` → `alice news read --id …`). Use it for quick scripted lookups — it's the same data口径 as the `openalice` MCP tools (trading/cron stay MCP-only).
+
 To verify on first attach:
 
 1. Approve the MCP server when Claude Code / Codex prompts for trust
