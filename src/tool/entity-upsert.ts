@@ -31,22 +31,24 @@ export const entityUpsertFactory: WorkspaceToolFactory = {
         'can later open the entity and see every file that references it.',
         '',
         'Fields:',
-        '- name: short, NO spaces, kebab-case. It is both the key and the `[[name]]` you write in prose,',
-        '  so keep it terse and reuse it exactly. For an `asset` use the ticker (e.g. "vst") so the app',
-        '  can pull live quotes; for a `topic` use a short phrase (e.g. "ai-data-center-power").',
-        '- description: one line — what this is. The short name is ambiguous alone; this disambiguates it',
-        '  (e.g. name "vst" -> "Vistra, Texas independent power producer driven by AI datacenter demand").',
+        '- name: short, NO spaces, kebab-case, and SELF-DESCRIBING — a bare ticker like "ccj" is opaque',
+        '  to anyone who is not a trader (and to you, weeks later). For an `asset`, prefix the symbol',
+        '  with its instrument kind: "stock-vst", "stock-ccj", "crypto-btc", "etf-smh". For a `topic`,',
+        '  a short phrase: "ai-data-center-power". The name is both the key and the `[[name]]` you write',
+        '  in prose, so keep it terse and reuse it exactly.',
+        '- description: one line — the full identity the terse name leaves out (e.g. name "stock-vst" ->',
+        '  "Vistra, Texas independent power producer driven by AI datacenter electricity demand").',
         '- type: "asset" (a tradable instrument — has a ticker) or "topic" (a theme grouping assets).',
         '',
         'Before creating, prefer reusing an existing name: call entity_search first so you write',
-        '`[[vst]]` consistently instead of fragmenting into both `[[vst]]` and `[[vistra]]`.',
+        '`[[stock-vst]]` consistently instead of fragmenting it (e.g. also inventing `[[vst]]`).',
       ].join('\n'),
       inputSchema: z.object({
         name: z
           .string()
           .min(1)
           .describe(
-            'Short kebab/ticker key, no spaces. The `[[name]]` link target. e.g. "vst" or "ai-data-center-power".',
+            'Self-describing, kebab, no spaces. The `[[name]]` link target. Asset = kind-prefixed symbol ("stock-vst", "crypto-btc"); topic = a phrase ("ai-data-center-power").',
           ),
         type: z
           .enum(['asset', 'topic'])

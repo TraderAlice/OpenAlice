@@ -7,14 +7,14 @@ import type { EntityListItem, EntityDetail } from '../../api/entities'
  */
 export const demoEntities: EntityListItem[] = [
   {
-    name: 'vst',
+    name: 'stock-vst',
     type: 'asset',
     description: 'Vistra — Texas independent power producer, a primary play on AI datacenter electricity demand.',
     createdAt: 1_717_300_000_000,
     backlinkCount: 3,
   },
   {
-    name: 'vrt',
+    name: 'stock-vrt',
     type: 'asset',
     description: 'Vertiv — datacenter power & liquid cooling; the cleanest "AI-infra electricity" expression.',
     createdAt: 1_717_250_000_000,
@@ -33,7 +33,7 @@ export const demoEntities: EntityListItem[] = [
 const ws = { workspaceId: 'demo-ws-1', workspaceTag: 'chat-jun3' }
 
 export const demoEntityDetail: Record<string, EntityDetail> = {
-  vst: {
+  'stock-vst': {
     entity: demoEntities[0]!,
     backlinks: [
       { ...ws, path: 'power_buy_points_2026-06-02.md' },
@@ -41,7 +41,7 @@ export const demoEntityDetail: Record<string, EntityDetail> = {
       { ...ws, path: 'rotation/ai-chain-2026-06-02.md' },
     ],
   },
-  vrt: {
+  'stock-vrt': {
     entity: demoEntities[1]!,
     backlinks: [
       { ...ws, path: 'rotation/ai-chain-2026-06-02.md' },

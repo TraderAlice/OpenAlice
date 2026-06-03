@@ -40,15 +40,16 @@ for now — they read the inbox; they don't reply through it.)
 
 When you surface something the user will want to keep an eye on over time — a
 ticker you're watching, a theme that ties several together — register it with
-`entity_upsert` (an `asset` is a tradable instrument, named by its ticker; a
-`topic` is a theme that groups them). Then, in the notes you write, link to it
-with `[[name]]` — e.g. `[[vst]]`, `[[ai-data-center-power]]`.
+`entity_upsert`. Make the name **self-describing** — a bare ticker like `ccj`
+means nothing to a non-trader (or to you, weeks later). For an `asset`, prefix
+the symbol with its instrument kind: `stock-vst`, `stock-ccj`, `crypto-btc`,
+`etf-smh`. For a `topic`, a short phrase: `ai-data-center-power`. Then link to it
+in your notes with `[[name]]` — e.g. `[[stock-vst]]`, `[[ai-data-center-power]]`.
 
 Those links are the index: the user's Tracked tab gathers every note that
-references `[[name]]`, so a week later they can open `[[vst]]` and see its whole
-story across your files without re-reading them. Before creating one, call
-`entity_search` to reuse an existing name instead of fragmenting it (`[[vst]]`
-vs `[[vistra]]`).
+references `[[name]]`, so a week later they can open `[[stock-vst]]` and see its
+whole story across your files without re-reading them. Before creating one, call
+`entity_search` to reuse an existing name instead of fragmenting it.
 
 Otherwise, use this workspace however you like. The CWD is its own git
 repo (commits stay local), and any files you create or edit are scoped

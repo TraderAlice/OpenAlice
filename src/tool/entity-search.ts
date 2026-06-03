@@ -22,7 +22,7 @@ export const entitySearchFactory: WorkspaceToolFactory = {
       description: [
         "Search the user's tracked entities by name or description.",
         'Call this before creating a new entity, to reuse an existing name and avoid duplicates',
-        '(write `[[vst]]` consistently rather than also inventing `[[vistra]]`).',
+        '(write `[[stock-vst]]` consistently rather than also inventing `[[vst]]`).',
         'Pass an empty query to list everything currently tracked.',
       ].join(' '),
       inputSchema: z.object({
