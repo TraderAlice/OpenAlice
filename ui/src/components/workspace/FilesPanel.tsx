@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import type { ReactElement } from 'react';
-import { ChevronDown } from 'lucide-react';
 
 import { listFiles, type DirListing, type FileEntry } from './api';
 
@@ -14,7 +13,6 @@ export function FilesPanel(props: FilesPanelProps): ReactElement {
   const [path, setPath] = useState('');
   const [listing, setListing] = useState<DirListing | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -55,72 +53,52 @@ export function FilesPanel(props: FilesPanelProps): ReactElement {
   const breadcrumb = path.split('/').filter(Boolean);
 
   return (
-    <section className={`panel files-panel${collapsed ? ' is-collapsed' : ''}`}>
+    <section className="panel files-panel">
       <header className="panel-header">
-        <button
-          type="button"
-          className="panel-collapse"
-          onClick={() => setCollapsed((c) => !c)}
-          aria-label={collapsed ? 'Expand files panel' : 'Collapse files panel'}
-          aria-expanded={!collapsed}
-        >
-          <ChevronDown
-            size={11}
-            strokeWidth={2.25}
-            className={`panel-collapse-chev${collapsed ? ' is-collapsed' : ''}`}
-            aria-hidden
-          />
-        </button>
         <span className="panel-title">files</span>
-        {!collapsed && (
-          <nav className="files-breadcrumb">
-            <button
-              type="button"
-              className="files-crumb"
-              onClick={() => setPath('')}
-              disabled={path === ''}
-            >
-              ~
-            </button>
-            {breadcrumb.map((seg, i) => (
-              <span key={i} className="files-crumb-seg">
-                <span className="files-crumb-sep">/</span>
-                <button
-                  type="button"
-                  className="files-crumb"
-                  onClick={() => setPath(breadcrumb.slice(0, i + 1).join('/'))}
-                  disabled={i === breadcrumb.length - 1}
-                >
-                  {seg}
-                </button>
-              </span>
-            ))}
-          </nav>
-        )}
+        <nav className="files-breadcrumb">
+          <button
+            type="button"
+            className="files-crumb"
+            onClick={() => setPath('')}
+            disabled={path === ''}
+          >
+            ~
+          </button>
+          {breadcrumb.map((seg, i) => (
+            <span key={i} className="files-crumb-seg">
+              <span className="files-crumb-sep">/</span>
+              <button
+                type="button"
+                className="files-crumb"
+                onClick={() => setPath(breadcrumb.slice(0, i + 1).join('/'))}
+                disabled={i === breadcrumb.length - 1}
+              >
+                {seg}
+              </button>
+            </span>
+          ))}
+        </nav>
       </header>
 
-      {!collapsed && (
-        <>
-          {error && <div className="panel-error">{error}</div>}
+      {error && <div className="panel-error">{error}</div>}
 
-          <ul className="files-list">
-            {listing?.entries.length === 0 && !error && (
-              <li className="panel-empty">empty</li>
-            )}
-            {listing?.entries.map((e) => (
-              <li
-                key={e.name}
-                className={`files-row files-${e.kind}`}
-                onClick={() => enter(e)}
-              >
-                <span className="files-icon">{iconFor(e)}</span>
-                <span className="files-name">{e.name}</span>
-                <span className="files-meta">{formatMeta(e)}</span>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
+      <ul className="files-list">
+        {listing?.entries.length === 0 && !error && (
+          <li className="panel-empty">empty</li>
+        )}
+        {listing?.entries.map((e) => (
+          <li
+            key={e.name}
+            className={`files-row files-${e.kind}`}
+            onClick={() => enter(e)}
+          >
+            <span className="files-icon">{iconFor(e)}</span>
+            <span className="files-name">{e.name}</span>
+            <span className="files-meta">{formatMeta(e)}</span>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

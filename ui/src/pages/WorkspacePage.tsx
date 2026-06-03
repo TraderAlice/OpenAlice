@@ -1,17 +1,17 @@
 /**
  * Single workspace/session detail page.
  *
- * Renders the launcher's WorkspaceView (terminal + git/files panels) bound
+ * Renders the launcher's WorkspaceView (terminal + files panel) bound
  * to whatever workspace+session this tab's spec points at:
  *
  *   { wsId }                — workspace selected, no session pinned: shows
  *                             a CTA prompting the user to spawn one.
  *   { wsId, sessionId }     — session pinned: shows the terminal slot for
- *                             that session, with the workspace's git/files
- *                             panels alongside.
+ *                             that session, with the workspace's files
+ *                             panel alongside.
  *
  * Each session is its own tab; multiple session tabs for the same workspace
- * each carry their own WorkspaceView (with their own git/files polling).
+ * each carry their own WorkspaceView (with their own files polling).
  * Closing a tab via the X button does NOT terminate the session — the PTY
  * keeps running on the server. Use the sidebar's × to actually delete.
  */
@@ -22,7 +22,7 @@ import '@xterm/xterm/css/xterm.css'
 import { useWorkspaces } from '../contexts/WorkspacesContext'
 import { useWorkspace } from '../tabs/store'
 import { WorkspaceView } from '../components/workspace/WorkspaceView'
-import { WorkspaceLayoutPopover } from '../components/workspace/WorkspaceLayoutPopover'
+import { WorkspaceFilesToggle } from '../components/workspace/WorkspaceFilesToggle'
 import type { KeyMap } from '../components/workspace/Terminal'
 import type { ViewSpec } from '../tabs/types'
 
@@ -85,7 +85,7 @@ export function WorkspacePage({ spec, visible }: Props) {
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-bg-secondary/30 shrink-0">
         <span className="text-[12px] text-text-muted font-medium">{workspace.tag}</span>
         <div className="flex items-center gap-1">
-          <WorkspaceLayoutPopover />
+          <WorkspaceFilesToggle />
           <button
             type="button"
             onClick={() => ctx.openAgentConfig(wsId)}
