@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { FormEvent, ReactElement } from 'react';
+import type { ReactElement } from 'react';
 import { Cpu, LayoutGrid, Library, Sparkles, Terminal, type LucideIcon } from 'lucide-react';
 
 import {
@@ -9,7 +9,7 @@ import {
   type TemplateInfo,
   type Workspace,
 } from './api';
-import { useCreateWorkspace } from '../../hooks/useCreateWorkspace';
+import { CreateWorkspaceDialog } from './CreateWorkspaceDialog';
 
 export interface Selection {
   readonly wsId: string;
@@ -47,31 +47,7 @@ export interface SidebarProps {
 }
 
 export function Sidebar(props: SidebarProps): ReactElement {
-  const [template, setTemplate] = useState<string>('');
-  const inputRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    if (template !== '') return;
-    if (props.templates.length === 0) return;
-    const preferred = props.templates.find((t) => t.name === 'chat');
-    setTemplate((preferred ?? props.templates[0]!).name);
-  }, [props.templates, template]);
-
-  const selectedTemplate = props.templates.find((t) => t.name === template);
-  const create = useCreateWorkspace({
-    template,
-    templateDefaultAgents: selectedTemplate?.defaultAgents,
-    availableAgents: props.agents,
-    onCreated: (workspace) => {
-      props.onChanged();
-      props.onSelectWorkspace(workspace.id);
-    },
-  });
-
-  const submit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
-    e.preventDefault();
-    await create.submit();
-  };
+  const [showCreate, setShowCreate] = useState(false);
 
   const onDelete = async (id: string): Promise<void> => {
     if (!window.confirm('Delete workspace? (registry only — files on disk are kept.)')) return;
@@ -89,45 +65,24 @@ export function Sidebar(props: SidebarProps): ReactElement {
         <button
           type="button"
           className="sidebar-new-btn"
-          onClick={() => inputRef.current?.focus()}
+          onClick={() => setShowCreate(true)}
           aria-label="New workspace"
         >
           +
         </button>
       </div>
 
-      <form className="sidebar-create" onSubmit={submit}>
-        {props.templates.length > 1 && (
-          <select
-            className="sidebar-template-select"
-            value={template}
-            onChange={(e) => setTemplate(e.target.value)}
-            disabled={create.creating}
-            title={selectedTemplate?.description ?? ''}
-          >
-            {props.templates.map((t) => (
-              <option key={t.name} value={t.name}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-        )}
-        <input
-          ref={inputRef}
-          type="text"
-          placeholder="tag (e.g. may1)"
-          value={create.tag}
-          onChange={(e) => create.setTag(e.target.value)}
-          disabled={create.creating}
-          spellCheck={false}
-          autoCorrect="off"
-          autoCapitalize="off"
+      {showCreate && (
+        <CreateWorkspaceDialog
+          templates={props.templates}
+          agents={props.agents}
+          onCreated={(workspace) => {
+            props.onChanged();
+            props.onSelectWorkspace(workspace.id);
+          }}
+          onClose={() => setShowCreate(false)}
         />
-        <button type="submit" disabled={create.creating || create.tag.length === 0}>
-          {create.creating ? '…' : 'create'}
-        </button>
-      </form>
-      {create.error && <div className="sidebar-error">{create.error}</div>}
+      )}
 
       <ul className="sidebar-list">
         {props.onOpenOverview && (
