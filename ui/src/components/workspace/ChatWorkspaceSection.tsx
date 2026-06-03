@@ -12,14 +12,7 @@
  * — this sidebar is for "pick a conversation and continue".
  */
 
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type FormEvent,
-  type ReactElement,
-} from 'react'
+import { useMemo, useState, type ReactElement } from 'react'
 import { ChevronDown, ChevronRight, Plus, Settings as SettingsIcon, X } from 'lucide-react'
 
 import { useWorkspaces } from '../../contexts/WorkspacesContext'
@@ -28,7 +21,7 @@ import { getFocusedTab } from '../../tabs/types'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { deleteWorkspace, type SessionRecord, type Workspace } from './api'
 import { SessionRow } from './Sidebar'
-import { useCreateWorkspace } from '../../hooks/useCreateWorkspace'
+import { CreateWorkspaceDialog } from './CreateWorkspaceDialog'
 
 const CHAT_TEMPLATE = 'chat'
 
@@ -62,40 +55,7 @@ export function ChatWorkspaceSection(): ReactElement | null {
   const chatTemplate = ctx.templates.find((t) => t.name === CHAT_TEMPLATE)
 
   const [showCreate, setShowCreate] = useState(false)
-  const inputRef = useRef<HTMLInputElement | null>(null)
   const [pendingDelete, setPendingDelete] = useState<Workspace | null>(null)
-
-  const create = useCreateWorkspace({
-    template: CHAT_TEMPLATE,
-    templateDefaultAgents: chatTemplate?.defaultAgents,
-    availableAgents: ctx.agents,
-    onCreated: (workspace) => {
-      closeCreate()
-      ctx.refresh()
-      openOrFocus({ kind: 'workspace', params: { wsId: workspace.id } })
-    },
-  })
-
-  const openCreate = (): void => {
-    setShowCreate(true)
-    create.setTag(defaultTagFor(ctx.workspaces))
-    // Focus + select on next paint so users can type to replace the
-    // default in one keystroke.
-    setTimeout(() => {
-      inputRef.current?.focus()
-      inputRef.current?.select()
-    }, 0)
-  }
-
-  const closeCreate = (): void => {
-    setShowCreate(false)
-    create.reset()
-  }
-
-  const submit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
-    e.preventDefault()
-    await create.submit()
-  }
 
   const handleConfirmDelete = async (): Promise<void> => {
     if (!pendingDelete) return
@@ -106,12 +66,6 @@ export function ChatWorkspaceSection(): ReactElement | null {
       setPendingDelete(null)
     }
   }
-
-  useEffect(() => {
-    if (showCreate && create.tag === '' && chatTemplate) {
-      create.setTag(defaultTagFor(ctx.workspaces))
-    }
-  }, [showCreate, create, chatTemplate, ctx.workspaces])
 
   if (!chatTemplate) return null
 
@@ -124,49 +78,31 @@ export function ChatWorkspaceSection(): ReactElement | null {
         <span className="text-[10px] text-text-muted/50">recommended</span>
         <button
           type="button"
-          onClick={() => (showCreate ? closeCreate() : openCreate())}
+          onClick={() => setShowCreate(true)}
           className="ml-auto w-5 h-5 rounded flex items-center justify-center text-text-muted hover:text-text hover:bg-bg-secondary"
-          title={showCreate ? 'Cancel' : 'New chat workspace'}
-          aria-label={showCreate ? 'Cancel new chat workspace' : 'New chat workspace'}
+          title="New chat workspace"
+          aria-label="New chat workspace"
         >
-          {showCreate ? <X size={12} strokeWidth={2.5} /> : <Plus size={13} strokeWidth={2.25} />}
+          <Plus size={13} strokeWidth={2.25} />
         </button>
       </div>
 
       {showCreate && (
-        <form
-          onSubmit={submit}
-          className="mt-1.5 mx-3 mb-2 p-2 rounded-md border border-border bg-bg-secondary/40 flex flex-col gap-1.5"
-        >
-          <div className="flex gap-1.5">
-            <input
-              ref={inputRef}
-              type="text"
-              placeholder="tag (e.g. may1)"
-              value={create.tag}
-              onChange={(e) => create.setTag(e.target.value)}
-              disabled={create.creating}
-              spellCheck={false}
-              autoCorrect="off"
-              autoCapitalize="off"
-              className="flex-1 min-w-0 px-2 py-1 text-[12px] rounded border border-border bg-bg text-text placeholder:text-text-muted/60 focus:outline-none focus:border-accent"
-            />
-            <button
-              type="submit"
-              disabled={create.creating || create.tag.length === 0}
-              className="px-2.5 py-1 text-[12px] rounded bg-accent text-white disabled:opacity-40 hover:bg-accent/90"
-            >
-              {create.creating ? '…' : 'create'}
-            </button>
-          </div>
-          {create.error && (
-            <div className="text-[11px] text-red">{create.error}</div>
-          )}
-        </form>
+        <CreateWorkspaceDialog
+          templates={ctx.templates}
+          agents={ctx.agents}
+          presetTemplate={CHAT_TEMPLATE}
+          initialTag={defaultTagFor(ctx.workspaces)}
+          onCreated={(workspace) => {
+            ctx.refresh()
+            openOrFocus({ kind: 'workspace', params: { wsId: workspace.id } })
+          }}
+          onClose={() => setShowCreate(false)}
+        />
       )}
 
       <ul className="py-0.5">
-        {chatWorkspaces.length === 0 && !ctx.listError && !showCreate && (
+        {chatWorkspaces.length === 0 && !ctx.listError && (
           <li className="px-3 py-2 text-[12px] text-text-muted/60">no chat workspaces yet</li>
         )}
         {ctx.listError && (
