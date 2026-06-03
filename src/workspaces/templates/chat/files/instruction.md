@@ -36,6 +36,20 @@ file(s) you produced plus a short note on what it is and why it matters.
 Don't make them come looking in the workspace; surface the result. (One-way
 for now — they read the inbox; they don't reply through it.)
 
+## Tracking assets & topics worth following
+
+When you surface something the user will want to keep an eye on over time — a
+ticker you're watching, a theme that ties several together — register it with
+`entity_upsert` (an `asset` is a tradable instrument, named by its ticker; a
+`topic` is a theme that groups them). Then, in the notes you write, link to it
+with `[[name]]` — e.g. `[[vst]]`, `[[ai-data-center-power]]`.
+
+Those links are the index: the user's Tracked tab gathers every note that
+references `[[name]]`, so a week later they can open `[[vst]]` and see its whole
+story across your files without re-reading them. Before creating one, call
+`entity_search` to reuse an existing name instead of fragmenting it (`[[vst]]`
+vs `[[vistra]]`).
+
 Otherwise, use this workspace however you like. The CWD is its own git
 repo (commits stay local), and any files you create or edit are scoped
 to this workspace.
