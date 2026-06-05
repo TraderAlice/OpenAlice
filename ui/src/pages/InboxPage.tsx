@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { formatRelativeTime } from '../lib/intl'
 import { ArrowRight, MessageSquare, Trash2 } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
@@ -32,6 +33,7 @@ interface InboxPageProps {
  * to the next entry after removal.
  */
 export function InboxPage({ visible }: InboxPageProps) {
+  const { t } = useTranslation()
   const entries = inboxLive.useStore((s) => s.entries)
   const loading = inboxLive.useStore((s) => s.loading)
   const selectedId = useInboxSelection((s) => s.selectedEntryId)
@@ -92,17 +94,17 @@ export function InboxPage({ visible }: InboxPageProps) {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
-        title="Inbox"
-        description={`${entries.length} total · workspace status updates`}
+        title={t('nav.item.inbox')}
+        description={t('inbox.pageDescription', { count: entries.length })}
       />
       <div className="flex-1 overflow-y-auto min-h-0">
         {loading && entries.length === 0 ? (
-          <div className="px-6 py-8 text-text-muted text-sm">Loading…</div>
+          <div className="px-6 py-8 text-text-muted text-sm">{t('common.loading')}</div>
         ) : entries.length === 0 ? (
           <EmptyState />
         ) : !selected ? (
           <div className="px-6 py-8 text-text-muted text-sm">
-            Select an entry from the sidebar.
+            {t('inbox.selectFromSidebar')}
           </div>
         ) : (
           <Detail entry={selected} onDelete={() => handleDelete(selected.id)} />
@@ -113,9 +115,10 @@ export function InboxPage({ visible }: InboxPageProps) {
 }
 
 function EmptyState() {
+  const { t } = useTranslation()
   return (
     <div className="px-6 py-16 text-center max-w-[520px] mx-auto">
-      <div className="text-[15px] text-text mb-2">No inbox messages yet</div>
+      <div className="text-[15px] text-text mb-2">{t('inbox.noMessages')}</div>
       <p className="text-[13px] text-text-muted leading-relaxed">
         Workspaces will push status updates here as they work — finished
         analysis, blocked tasks, questions back to you. The integration
@@ -128,6 +131,7 @@ function EmptyState() {
 }
 
 function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }) {
+  const { t } = useTranslation()
   const hasDocs = (entry.docs?.length ?? 0) > 0
   const hasComments = (entry.comments ?? '').trim().length > 0
 
@@ -165,7 +169,7 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
           className={`text-[14px] font-medium ${
             wsAlive ? 'text-text' : 'text-text-muted/70 line-through'
           }`}
-          title={wsAlive ? undefined : 'Workspace no longer exists'}
+          title={wsAlive ? undefined : t('inbox.workspaceNotExists')}
         >
           {displayLabel}
         </span>
@@ -178,8 +182,8 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
           type="button"
           onClick={onDelete}
           className="p-1 rounded text-text-muted/50 hover:text-red hover:bg-red/10 transition-colors"
-          title="Delete this entry (Delete / Backspace)"
-          aria-label="Delete this inbox entry"
+          title={t('inbox.deleteEntryTitle')}
+          aria-label={t('inbox.deleteEntryAriaLabel')}
         >
           <Trash2 size={14} strokeWidth={1.75} />
         </button>
@@ -198,7 +202,7 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
       {hasComments && (
         <div className={`${hasDocs ? 'mt-8 pt-6 border-t border-border' : ''}`}>
           <div className="text-[11px] font-medium text-text-muted/60 uppercase tracking-wider mb-3">
-            Comments
+            {t('inbox.commentsSection')}
           </div>
           <MarkdownContent text={entry.comments!} />
         </div>
@@ -220,13 +224,13 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
           >
             <MessageSquare size={15} strokeWidth={1.75} className="shrink-0 text-text-muted/70 group-hover:text-accent transition-colors" />
             <span className="flex-1 text-[13px] text-text-muted/80 group-hover:text-text transition-colors">
-              Reply in <span className="font-medium text-text">{displayLabel}</span>…
+              {t('inbox.replyInWorkspace', { label: displayLabel })}
             </span>
             <ArrowRight size={15} strokeWidth={1.75} className="shrink-0 text-text-muted/60 group-hover:text-accent group-hover:translate-x-0.5 transition-all" />
           </button>
         ) : (
           <div className="px-4 py-3 text-[12px] text-text-muted/60 italic border-t border-border/40 pt-4">
-            Workspace no longer exists — nowhere to reply.
+            {t('inbox.cannotReplyWorkspaceGone')}
           </div>
         )}
       </div>
@@ -241,6 +245,7 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
 // ==================== Doc block (live fetch from workspace) ====================
 
 function DocBlock({ workspaceId, doc }: { workspaceId: string; doc: InboxDoc }) {
+  const { t } = useTranslation()
   const [result, setResult] = useState<ReadFileResult | null>(null)
 
   useEffect(() => {
@@ -260,7 +265,7 @@ function DocBlock({ workspaceId, doc }: { workspaceId: string; doc: InboxDoc }) 
       </div>
       <div className="px-4 py-3">
         {result === null ? (
-          <div className="text-[12px] text-text-muted">Loading…</div>
+          <div className="text-[12px] text-text-muted">{t('common.loading')}</div>
         ) : (
           <FileContentView path={doc.path} result={result} />
         )}

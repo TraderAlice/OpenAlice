@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { TrendingUp, Hash, FileText } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
 import { api } from '../api'
@@ -18,6 +19,7 @@ import type { EntityDetail, Backlink } from '../api/entities'
  * fetched on selection.
  */
 export function TrackedPage() {
+  const { t } = useTranslation()
   const entities = entitiesLive.useStore((s) => s.entities)
   const loading = entitiesLive.useStore((s) => s.loading)
   const selectedName = useTrackedSelection((s) => s.selectedName)
@@ -45,14 +47,17 @@ export function TrackedPage() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <PageHeader title="Tracked" description={`${entities.length} tracked · assets & topics`} />
+      <PageHeader
+        title={t('nav.item.tracked')}
+        description={t('tracked.pageDescription', { count: entities.length })}
+      />
       <div className="flex-1 overflow-y-auto min-h-0">
         {loading && entities.length === 0 ? (
-          <div className="px-6 py-8 text-text-muted text-sm">Loading…</div>
+          <div className="px-6 py-8 text-text-muted text-sm">{t('common.loading')}</div>
         ) : entities.length === 0 ? (
           <EmptyState />
         ) : !selectedName || !detail ? (
-          <div className="px-6 py-8 text-text-muted text-sm">Select an entity from the sidebar.</div>
+          <div className="px-6 py-8 text-text-muted text-sm">{t('tracked.selectFromSidebar')}</div>
         ) : (
           <Detail detail={detail} />
         )}
@@ -62,9 +67,10 @@ export function TrackedPage() {
 }
 
 function EmptyState() {
+  const { t } = useTranslation()
   return (
     <div className="px-6 py-16 text-center max-w-[520px] mx-auto">
-      <div className="text-[15px] text-text mb-2">Nothing tracked yet</div>
+      <div className="text-[15px] text-text mb-2">{t('tracked.nothingTrackedYet')}</div>
       <p className="text-[13px] text-text-muted leading-relaxed">
         As an agent works, it registers the assets and topics worth following with the
         <code className="mx-1 px-1 py-0.5 rounded bg-bg-tertiary text-[11px]">entity_upsert</code>
@@ -77,6 +83,7 @@ function EmptyState() {
 }
 
 function Detail({ detail }: { detail: EntityDetail }) {
+  const { t } = useTranslation()
   const { entity, backlinks } = detail
   const Icon = entity.type === 'asset' ? TrendingUp : Hash
   return (
@@ -91,7 +98,7 @@ function Detail({ detail }: { detail: EntityDetail }) {
       <p className="text-[14px] text-text-muted leading-relaxed mb-6">{entity.description}</p>
 
       <div className="text-[11px] font-medium text-text-muted/60 uppercase tracking-wider mb-3">
-        Referenced in {backlinks.length} {backlinks.length === 1 ? 'note' : 'notes'}
+        {t('tracked.referencedIn', { count: backlinks.length })}
       </div>
       {backlinks.length === 0 ? (
         <div className="text-[13px] text-text-muted/70 italic">
