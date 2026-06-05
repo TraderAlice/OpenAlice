@@ -12,6 +12,7 @@
  */
 
 import type { OhlcvData } from './indicator/types.js'
+import type { EquityClientLike } from '../market-data/client/types.js'
 
 export interface SectorEtf {
   symbol: string
@@ -258,4 +259,38 @@ export function computeSectorRotation(
     sectors: rows,
     methodology: METHODOLOGY,
   }
+}
+
+/** Calendar days of daily history to pull — enough for the 6M (126-bar)
+ *  lookback plus the 20-day volume baseline, with weekend/holiday headroom. */
+const LOOKBACK_CALENDAR_DAYS = 300
+
+/**
+ * Fetch the daily histories for the GICS sector ETFs (+ SPY) and compute the
+ * rotation table. Shared by the `sectorRotation` AI tool and the
+ * `/api/market/sector-rotation` HTTP route so both read identically.
+ */
+export async function fetchSectorRotation(
+  equityClient: EquityClientLike,
+): Promise<SectorRotationResult> {
+  const start = new Date()
+  start.setDate(start.getDate() - LOOKBACK_CALENDAR_DAYS)
+  const start_date = start.toISOString().slice(0, 10)
+
+  const symbols = [...GICS_SECTOR_ETFS.map((e) => e.symbol), BENCHMARK_SYMBOL]
+
+  const fetched = await Promise.all(
+    symbols.map(async (symbol) => {
+      const raw = await equityClient
+        .getHistorical({ symbol, start_date, interval: '1d' })
+        .catch(() => [] as Array<Record<string, unknown>>)
+      const data = (raw as Array<Record<string, unknown>>).filter(
+        (d): d is Record<string, unknown> & OhlcvData =>
+          d.close != null && typeof d.date === 'string',
+      ) as OhlcvData[]
+      return [symbol, data] as const
+    }),
+  )
+
+  return computeSectorRotation(Object.fromEntries(fetched))
 }

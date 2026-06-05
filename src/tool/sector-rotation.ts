@@ -10,22 +10,7 @@
 import { tool } from 'ai'
 import { z } from 'zod'
 import type { EquityClientLike } from '@/domain/market-data/client/types'
-import type { OhlcvData } from '@/domain/analysis/indicator/types'
-import {
-  GICS_SECTOR_ETFS,
-  BENCHMARK_SYMBOL,
-  computeSectorRotation,
-} from '@/domain/analysis/sector-rotation.js'
-
-/** Calendar days of daily history to pull — enough for the 6M (126-bar) lookback
- *  plus the 20-day volume baseline, with headroom for holidays/weekends. */
-const LOOKBACK_CALENDAR_DAYS = 300
-
-function startDate(): string {
-  const d = new Date()
-  d.setDate(d.getDate() - LOOKBACK_CALENDAR_DAYS)
-  return d.toISOString().slice(0, 10)
-}
+import { fetchSectorRotation } from '@/domain/analysis/sector-rotation.js'
 
 export function createSectorRotationTools(equityClient: EquityClientLike) {
   return {
@@ -49,26 +34,7 @@ This is the broad-sector lens. For a specific theme (robotics, uranium, cybersec
 ...) use etfSearch + etfGetInfo to go one level deeper. See the methodology field for the
 exact definitions and the fund-flow-proxy caveat.`,
       inputSchema: z.object({}).meta({ examples: [{}] }),
-      execute: async () => {
-        const start_date = startDate()
-        const symbols = [...GICS_SECTOR_ETFS.map((e) => e.symbol), BENCHMARK_SYMBOL]
-
-        const fetched = await Promise.all(
-          symbols.map(async (symbol) => {
-            const raw = await equityClient
-              .getHistorical({ symbol, start_date, interval: '1d' })
-              .catch(() => [] as Array<Record<string, unknown>>)
-            const data = (raw as Array<Record<string, unknown>>).filter(
-              (d): d is Record<string, unknown> & OhlcvData =>
-                d.close != null && typeof d.date === 'string',
-            ) as OhlcvData[]
-            return [symbol, data] as const
-          }),
-        )
-
-        const histories: Record<string, OhlcvData[]> = Object.fromEntries(fetched)
-        return computeSectorRotation(histories)
-      },
+      execute: async () => fetchSectorRotation(equityClient),
     }),
   }
 }

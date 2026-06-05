@@ -59,11 +59,41 @@ function equityEndpoint<T>(
   return fetchJson(`/api/market-data-v1/equity/${path}?${qs}`)
 }
 
+export type RotationPeriod = '1D' | '1W' | '1M' | '3M' | '6M'
+
+/** Mirrors the backend `SectorRotationRow` (domain/analysis/sector-rotation). */
+export interface SectorRotationRow {
+  symbol: string
+  sector: string
+  returns: Record<RotationPeriod, number | null>
+  rel_strength: Record<RotationPeriod, number | null>
+  momentum_acceleration: number | null
+  dollar_volume: number | null
+  dv_share: number | null
+  dv_share_change: number | null
+  rvol: number | null
+  rotation_score: number | null
+  bars: number
+}
+
+export interface SectorRotationResult {
+  asOf: string
+  benchmark: { symbol: string; returns: Record<RotationPeriod, number | null> }
+  /** Sorted by rotation_score desc; null-score rows at the bottom. */
+  sectors: SectorRotationRow[]
+  methodology: string
+}
+
 export const marketApi = {
   /** Alice's aggregated heuristic search across all asset classes. */
   async search(query: string, limit = 20): Promise<SearchResponse> {
     const qs = new URLSearchParams({ query, limit: String(limit) })
     return fetchJson(`/api/market/search?${qs}`)
+  },
+
+  /** GICS sector rotation table (11 sector ETFs + SPY anchor). */
+  async sectorRotation(): Promise<SectorRotationResult> {
+    return fetchJson('/api/market/sector-rotation')
   },
 
   /**

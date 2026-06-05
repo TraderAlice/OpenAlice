@@ -6,6 +6,7 @@ import { PortfolioPage } from '../pages/PortfolioPage'
 import { AutomationPage } from '../pages/AutomationPage'
 import { NewsPage } from '../pages/NewsPage'
 import { MarketPage } from '../pages/MarketPage'
+import { MarketRotationPage } from '../pages/MarketRotationPage'
 import { MarketDetailPage } from '../pages/MarketDetailPage'
 import { SettingsPage } from '../pages/SettingsPage'
 import { AIProviderPage } from '../pages/AIProviderPage'
@@ -90,6 +91,13 @@ const marketListModule: ViewModule<'market-list'> = {
   title: () => 'Market',
   toUrl: () => '/market',
   Component: () => <MarketPage />,
+}
+
+const marketRotationModule: ViewModule<'market-rotation'> = {
+  kind: 'market-rotation',
+  title: () => 'Sector Rotation',
+  toUrl: () => '/market/rotation',
+  Component: () => <MarketRotationPage />,
 }
 
 const marketDetailModule: ViewModule<'market-detail'> = {
@@ -215,6 +223,7 @@ export const VIEWS = {
   automation: automationModule,
   news: newsModule,
   'market-list': marketListModule,
+  'market-rotation': marketRotationModule,
   'market-detail': marketDetailModule,
   settings: settingsModule,
   'uta-detail': utaDetailModule,

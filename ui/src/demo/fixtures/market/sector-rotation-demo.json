@@ -1,0 +1,291 @@
+{
+  "asOf": "2026-06-04",
+  "benchmark": {
+    "symbol": "SPY",
+    "returns": {
+      "1D": 0.001,
+      "1W": 0.006,
+      "1M": 0.046,
+      "3M": 0.071,
+      "6M": 0.118
+    }
+  },
+  "sectors": [
+    {
+      "symbol": "XLF",
+      "sector": "Financials",
+      "returns": {
+        "1D": 0.004,
+        "1W": 0.018,
+        "1M": 0.012,
+        "3M": 0.019,
+        "6M": 0.085
+      },
+      "rel_strength": {
+        "1D": 0.003,
+        "1W": 0.012,
+        "1M": -0.034,
+        "3M": -0.052,
+        "6M": -0.033
+      },
+      "momentum_acceleration": 0.0033,
+      "dollar_volume": 550200000,
+      "dv_share": 0.131,
+      "dv_share_change": 0.0762,
+      "rvol": 1.63,
+      "rotation_score": 1.625,
+      "bars": 150
+    },
+    {
+      "symbol": "XLV",
+      "sector": "Health Care",
+      "returns": {
+        "1D": 0.002,
+        "1W": 0.008,
+        "1M": 0.047,
+        "3M": -0.012,
+        "6M": 0.031
+      },
+      "rel_strength": {
+        "1D": 0.001,
+        "1W": 0.002,
+        "1M": 0.001,
+        "3M": -0.083,
+        "6M": -0.087
+      },
+      "momentum_acceleration": 0.0018,
+      "dollar_volume": 394800000,
+      "dv_share": 0.094,
+      "dv_share_change": 0.0405,
+      "rvol": 1.39,
+      "rotation_score": 0.926,
+      "bars": 150
+    },
+    {
+      "symbol": "XLK",
+      "sector": "Technology",
+      "returns": {
+        "1D": 0.006,
+        "1W": 0.034,
+        "1M": 0.166,
+        "3M": 0.378,
+        "6M": 0.512
+      },
+      "rel_strength": {
+        "1D": 0.005,
+        "1W": 0.028,
+        "1M": 0.12,
+        "3M": 0.307,
+        "6M": 0.394
+      },
+      "momentum_acceleration": 0.0008,
+      "dollar_volume": 924000000,
+      "dv_share": 0.22,
+      "dv_share_change": 0.0071,
+      "rvol": 1.02,
+      "rotation_score": 0.32,
+      "bars": 150
+    },
+    {
+      "symbol": "XLI",
+      "sector": "Industrials",
+      "returns": {
+        "1D": 0.003,
+        "1W": 0.014,
+        "1M": 0.022,
+        "3M": 0.024,
+        "6M": 0.078
+      },
+      "rel_strength": {
+        "1D": 0.002,
+        "1W": 0.008,
+        "1M": -0.024,
+        "3M": -0.047,
+        "6M": -0.04
+      },
+      "momentum_acceleration": 0.0023,
+      "dollar_volume": 298200000,
+      "dv_share": 0.071,
+      "dv_share_change": -0.0145,
+      "rvol": 0.84,
+      "rotation_score": 0.19,
+      "bars": 150
+    },
+    {
+      "symbol": "XLB",
+      "sector": "Materials",
+      "returns": {
+        "1D": 0.001,
+        "1W": 0.005,
+        "1M": 0.002,
+        "3M": 0.016,
+        "6M": 0.041
+      },
+      "rel_strength": {
+        "1D": 0.0,
+        "1W": -0.001,
+        "1M": -0.044,
+        "3M": -0.055,
+        "6M": -0.077
+      },
+      "momentum_acceleration": 0.0008,
+      "dollar_volume": 159600000,
+      "dv_share": 0.038,
+      "dv_share_change": -0.009,
+      "rvol": 0.81,
+      "rotation_score": 0.085,
+      "bars": 150
+    },
+    {
+      "symbol": "XLE",
+      "sector": "Energy",
+      "returns": {
+        "1D": 0.01,
+        "1W": 0.032,
+        "1M": -0.012,
+        "3M": 0.04,
+        "6M": -0.018
+      },
+      "rel_strength": {
+        "1D": 0.009,
+        "1W": 0.026,
+        "1M": -0.058,
+        "3M": -0.031,
+        "6M": -0.136
+      },
+      "momentum_acceleration": 0.0057,
+      "dollar_volume": 277200000,
+      "dv_share": 0.066,
+      "dv_share_change": -0.065,
+      "rvol": 0.59,
+      "rotation_score": -0.152,
+      "bars": 150
+    },
+    {
+      "symbol": "XLU",
+      "sector": "Utilities",
+      "returns": {
+        "1D": -0.004,
+        "1W": -0.016,
+        "1M": -0.052,
+        "3M": -0.063,
+        "6M": 0.012
+      },
+      "rel_strength": {
+        "1D": -0.005,
+        "1W": -0.022,
+        "1M": -0.098,
+        "3M": -0.134,
+        "6M": -0.106
+      },
+      "momentum_acceleration": -0.0021,
+      "dollar_volume": 168000000,
+      "dv_share": 0.04,
+      "dv_share_change": -0.0147,
+      "rvol": 0.82,
+      "rotation_score": -0.335,
+      "bars": 150
+    },
+    {
+      "symbol": "XLRE",
+      "sector": "Real Estate",
+      "returns": {
+        "1D": -0.006,
+        "1W": -0.025,
+        "1M": -0.013,
+        "3M": -0.006,
+        "6M": -0.022
+      },
+      "rel_strength": {
+        "1D": -0.007,
+        "1W": -0.031,
+        "1M": -0.059,
+        "3M": -0.077,
+        "6M": -0.14
+      },
+      "momentum_acceleration": -0.0049,
+      "dollar_volume": 130200000,
+      "dv_share": 0.031,
+      "dv_share_change": 0.0017,
+      "rvol": 1.16,
+      "rotation_score": -0.431,
+      "bars": 150
+    },
+    {
+      "symbol": "XLP",
+      "sector": "Consumer Staples",
+      "returns": {
+        "1D": -0.003,
+        "1W": -0.028,
+        "1M": -0.024,
+        "3M": -0.04,
+        "6M": -0.011
+      },
+      "rel_strength": {
+        "1D": -0.004,
+        "1W": -0.034,
+        "1M": -0.07,
+        "3M": -0.111,
+        "6M": -0.129
+      },
+      "momentum_acceleration": -0.005,
+      "dollar_volume": 218400000,
+      "dv_share": 0.052,
+      "dv_share_change": -0.003,
+      "rvol": 1.02,
+      "rotation_score": -0.512,
+      "bars": 150
+    },
+    {
+      "symbol": "XLC",
+      "sector": "Communication Services",
+      "returns": {
+        "1D": -0.009,
+        "1W": -0.036,
+        "1M": -0.035,
+        "3M": -0.057,
+        "6M": -0.029
+      },
+      "rel_strength": {
+        "1D": -0.01,
+        "1W": -0.042,
+        "1M": -0.081,
+        "3M": -0.128,
+        "6M": -0.147
+      },
+      "momentum_acceleration": -0.0063,
+      "dollar_volume": 596400000,
+      "dv_share": 0.142,
+      "dv_share_change": 0.0062,
+      "rvol": 1.24,
+      "rotation_score": -0.527,
+      "bars": 150
+    },
+    {
+      "symbol": "XLY",
+      "sector": "Consumer Discretionary",
+      "returns": {
+        "1D": -0.008,
+        "1W": -0.039,
+        "1M": -0.007,
+        "3M": 0.006,
+        "6M": 0.033
+      },
+      "rel_strength": {
+        "1D": -0.009,
+        "1W": -0.045,
+        "1M": -0.053,
+        "3M": -0.065,
+        "6M": -0.085
+      },
+      "momentum_acceleration": -0.008,
+      "dollar_volume": 483000000,
+      "dv_share": 0.115,
+      "dv_share_change": -0.0257,
+      "rvol": 0.62,
+      "rotation_score": -1.189,
+      "bars": 150
+    }
+  ],
+  "methodology": "rotation_score = mean of cross-sectional z-scores of momentum_acceleration (1W per-day pace minus 3M per-day pace) and dv_share_change (today's share of the 11-sector dollar volume minus its share off the 20-day average). Ranked desc = rotating in. CAVEAT: ETF dollar volume approximates sector capital but misses single-name concentration, and is distorted by creation/redemption & hedging flows \u2014 a proxy for fund flow, not a clean read."
+}

@@ -22,6 +22,7 @@ export type ViewSpec =
   | { kind: 'automation';     params: { section: 'flow' | 'heartbeat' | 'cron' | 'webhook' } }
   | { kind: 'news';           params: Record<string, never> }
   | { kind: 'market-list';    params: Record<string, never> }
+  | { kind: 'market-rotation'; params: Record<string, never> }
   | { kind: 'market-detail';  params: { assetClass: 'equity' | 'crypto' | 'currency' | 'commodity'; symbol: string } }
   | { kind: 'settings';       params: { category: 'general' | 'ai-provider' | 'trading' | 'mcp' | 'market-data' | 'news-collector' } }
   | { kind: 'uta-detail';     params: { id: string } }

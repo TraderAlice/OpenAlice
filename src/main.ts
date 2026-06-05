@@ -368,6 +368,7 @@ async function main() {
     fire: createEventBus(eventLog),
     bbEngine: getSDKExecutor(),
     marketSearch,
+    equityClient,
     utaManager,
     newsProvider: newsStore,
   }

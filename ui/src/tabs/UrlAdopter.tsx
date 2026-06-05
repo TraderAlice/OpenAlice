@@ -40,6 +40,7 @@ export function UrlAdopter() {
         <Route path="/automation/:section" element={<AdoptAutomation />} />
         <Route path="/news" element={<AdoptStatic spec={{ kind: 'news', params: {} }} />} />
         <Route path="/market" element={<AdoptStatic spec={{ kind: 'market-list', params: {} }} />} />
+        <Route path="/market/rotation" element={<AdoptStatic spec={{ kind: 'market-rotation', params: {} }} />} />
         <Route path="/market/:assetClass/:symbol" element={<AdoptMarketDetail />} />
         {/* /trading-as-git no longer creates a tab — sidebar-only activity. */}
         <Route path="/trading-as-git" element={<SetSidebarOnly section="trading-as-git" />} />
@@ -219,6 +220,7 @@ function specToSection(spec: ViewSpec): ActivitySection {
     case 'automation':         return 'automation'
     case 'news':               return 'news'
     case 'market-list':
+    case 'market-rotation':
     case 'market-detail':      return 'market'
     case 'settings':           return 'settings'
     case 'dev':                return 'dev'

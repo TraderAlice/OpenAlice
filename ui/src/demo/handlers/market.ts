@@ -3,6 +3,7 @@ import {
   demoMarketAAPL,
   demoMarketSearchAAPL,
   demoMarketEmpty,
+  demoSectorRotation,
 } from '../fixtures/market'
 
 const AAPL = 'AAPL'
@@ -27,6 +28,9 @@ export const marketHandlers = [
     }
     return HttpResponse.json({ results: [], count: 0 })
   }),
+
+  // Sector rotation — static snapshot fixture.
+  http.get('/api/market/sector-rotation', () => HttpResponse.json(demoSectorRotation)),
 
   // ---- equity data ----
   http.get('/api/market-data-v1/:assetClass/price/historical', ({ request, params }) => {
