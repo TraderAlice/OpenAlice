@@ -132,6 +132,7 @@ export class WorkspaceCreator {
         exitCode: result.exitCode,
         stderr: result.stderr.slice(0, 4000),
       });
+      await rm(dir, { recursive: true, force: true });
       return {
         ok: false,
         code: 'bootstrap_failed',

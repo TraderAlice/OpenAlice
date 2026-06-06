@@ -208,10 +208,11 @@ export async function askAgentSdk(
   const loginMethod = override?.loginMethod ?? 'api-key'
   const baseUrl = override?.baseUrl
 
-  // Opt-in debug: set ALICE_SDK_DEBUG=1 to turn on the SDK's verbose stderr
-  // + capture every child-process stderr chunk into logs/agent-sdk-debug.log.
-  // This is what surfaces the actual outbound HTTP URLs the CLI hits.
+  // Always capture subprocess stderr in memory so a bare "process exited 1"
+  // includes the real CLI failure in logs/UI. Opt-in debug also writes the
+  // chunks to logs/agent-sdk-debug.log and enables the SDK's verbose tracing.
   const debugEnabled = process.env.ALICE_SDK_DEBUG === '1'
+  let capturedStderr = ''
   let debugStream: ReturnType<typeof createWriteStream> | null = null
   if (debugEnabled) {
     env.DEBUG_CLAUDE_AGENT_SDK = '1'
@@ -221,6 +222,12 @@ export async function askAgentSdk(
       `\n===== ${new Date().toISOString()} | ` +
       `loginMethod=${loginMethod} model=${override?.model} baseUrl=${baseUrl ?? '(default)'} =====\n`,
     )
+  }
+  const captureStderr = (chunk: string | Buffer) => {
+    const text = Buffer.isBuffer(chunk) ? chunk.toString('utf8') : chunk
+    capturedStderr += text
+    if (capturedStderr.length > 12000) capturedStderr = capturedStderr.slice(-12000)
+    debugStream?.write(text)
   }
 
   // MCP servers
@@ -249,7 +256,7 @@ export async function askAgentSdk(
         allowDangerouslySkipPermissions: true,
         persistSession: false,
         ...(loginMethod === 'claudeai' ? { forceLoginMethod: 'claudeai' as const } : {}),
-        ...(debugStream ? { stderr: (chunk: string) => debugStream!.write(chunk) } : {}),
+        stderr: captureStderr,
       },
     })) {
       // assistant message — extract tool_use + text blocks
@@ -346,6 +353,7 @@ export async function askAgentSdk(
     for (const key of ['stderr', 'stdout', 'cause', 'code', 'signal'] as const) {
       if ((errObj as any)[key] != null) details[key] = (errObj as any)[key]
     }
+    if (capturedStderr && details.stderr == null) details.stderr = capturedStderr
     // Enumerate any non-standard properties on the error object
     const extraKeys = Object.keys(errObj).filter(k => !(k in details))
     for (const k of extraKeys) details[k] = (errObj as any)[k]

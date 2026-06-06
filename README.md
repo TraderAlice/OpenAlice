@@ -330,7 +330,7 @@ Still stuck → see [Getting Help](#getting-help).
 
 OpenAlice's Workspace feature spawns bash-based bootstrap scripts to materialize new workspaces, so a POSIX shell environment is required:
 
-- **Recommended:** install [Git for Windows](https://gitforwindows.org/) and accept the default *"Use Git from the Windows Command Prompt"* option during setup — this puts `bash` plus the POSIX utilities the scripts depend on (`sed`, `cp`, `mkdir`, `basename`, `printf`, etc.) on your PATH.
+- **Recommended:** install [Git for Windows](https://gitforwindows.org/) and accept the default *"Use Git from the Windows Command Prompt"* option during setup — this puts `git`, `bash`, and the POSIX utilities the scripts depend on (`sed`, `cp`, `mkdir`, `basename`, `printf`, etc.) on your PATH.
 - **Alternative:** run OpenAlice from inside [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) — the Linux env handles everything natively.
 
 Native `cmd.exe` / PowerShell alone are not supported (no `bash`, no POSIX utilities). If `bash` isn't on PATH when you create a workspace, the bootstrap fails with an inline hint pointing back here.
@@ -398,14 +398,15 @@ for how to retrieve the first-run token from `docker logs`.
   the `openalice-data` named volume. `docker compose down -v` is the
   factory reset.
 - Already have claude/codex auth on the host? Skip the `docker exec` step
-  by uncommenting the bind-mount lines in `docker-compose.yml` to reuse
-  your local `~/.claude` and `~/.codex`.
+  by enabling the bind-mount lines in `docker-compose.yml` to reuse your
+  local `~/.claude` and `~/.codex`. Keep those mounts writable: the CLIs
+  create project/session state under the same directories while running.
 - The MCP server (port 47332) is intentionally **not** exposed externally;
   it's consumed by the CLIs running inside the container only.
 - The base image is `node:22-trixie-slim` (Debian 13) because several
   native deps (notably `longbridge`) ship glibc 2.39 binaries that older
-  Debians don't have, and workspace bootstrap scripts need `bash` + POSIX
-  utils. Alpine doesn't qualify on either count (musl libc, no bash).
+  Debians don't have, and workspace bootstrap scripts need `git`, `bash`,
+  and POSIX utils. Alpine doesn't qualify on either count (musl libc, no bash).
 
 ## Configuration
 

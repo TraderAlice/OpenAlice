@@ -10,7 +10,8 @@
 #   docker compose down -v        # also nukes the volume
 #
 # Already have claude/codex auth on the host? Skip the docker exec step by
-# uncommenting the bind-mount lines below.
+# uncommenting the bind-mount lines below. These mounts must be writable:
+# both CLIs create project/session state under their home config dirs.
 
 services:
   openalice:
@@ -25,9 +26,10 @@ services:
     volumes:
       - openalice-data:/data
       # Optional: reuse host auth instead of authenticating inside the
-      # container. Bind-mount your local credentials read-only.
-      # - ${HOME}/.claude:/data/home/.claude:ro
-      # - ${HOME}/.codex:/data/home/.codex:ro
+      # container. These must be writable because the CLIs create
+      # project/session state under the same directories.
+      - ${HOME}/.claude:/data/home/.claude
+      - ${HOME}/.codex:/data/home/.codex
     # Keep stdin/tty open so `docker exec -it openalice claude` can run
     # the interactive OAuth flow.
     stdin_open: true
