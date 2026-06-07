@@ -7,7 +7,7 @@
  *
  * 当前缓存的数据源（免费，不需要 API key）：
  * - SEC (sec): ~10,000 美股上市公司，来自 SEC EDGAR
- * - TMX (tmx): ~3,600 加拿大上市公司，来自多伦多交易所
+ * - TWSE (twse): ~2,400 台湾上市/上柜证券（含 ETF），来自台湾证交所 + 柜买中心开放数据
  *
  * 扩展方法：在 SOURCES 数组中添加新的 provider 即可。
  * 需要 API key 的 provider（intrinio, nasdaq, tradier）暂未接入。
@@ -37,7 +37,7 @@ interface CacheEnvelope {
 // ==================== Config ====================
 
 /** 免费 provider 列表 — 扩展时在这里加 */
-const SOURCES = ['sec'] as const
+const SOURCES = ['sec', 'twse'] as const
 
 const CACHE_FILE = dataPath('cache', 'equity', 'symbols.json')
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24 hours
@@ -59,9 +59,9 @@ export class SymbolIndex {
    * API 失败时降级到过期缓存。全部失败则以空索引启动（不中断）。
    */
   async load(client: EquityClientLike): Promise<void> {
-    // 1. 尝试读缓存
+    // 1. 尝试读缓存（SOURCES 变更时缓存按内容过期，避免新源最多延迟 24h 才生效）
     const cached = await this.readCache()
-    if (cached && !this.isExpired(cached.cachedAt)) {
+    if (cached && !this.isExpired(cached.cachedAt) && this.sourcesMatch(cached.sources)) {
       this.entries = cached.entries
       console.log(`equity: loaded ${this.entries.length} symbols from cache (${cached.sources.join(', ')})`)
       return
@@ -183,5 +183,12 @@ export class SymbolIndex {
 
   private isExpired(cachedAt: string): boolean {
     return Date.now() - new Date(cachedAt).getTime() > CACHE_TTL_MS
+  }
+
+  /** 缓存的来源列表与当前 SOURCES 一致（忽略顺序）才算新鲜 */
+  private sourcesMatch(cachedSources: string[]): boolean {
+    if (cachedSources.length !== SOURCES.length) return false
+    const set = new Set(cachedSources)
+    return SOURCES.every((s) => set.has(s))
   }
 }

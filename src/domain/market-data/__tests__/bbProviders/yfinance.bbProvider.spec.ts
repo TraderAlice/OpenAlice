@@ -96,3 +96,14 @@ describe('yfinance — commodity (canonical names)', () => {
   it('live_cattle', async () => { expect((await exec('CommoditySpotPrice', { symbol: 'live_cattle' })).length).toBeGreaterThan(0) })
   it('lean_hogs',   async () => { expect((await exec('CommoditySpotPrice', { symbol: 'lean_hogs' })).length).toBeGreaterThan(0) })
 })
+
+describe('yfinance — Taiwan equities (.TW / .TWO suffix)', () => {
+  it('EquityQuote 2330.TW (TSMC, TWSE-listed)', async () => {
+    const rows = await exec('EquityQuote', { symbol: '2330.TW' }) as Record<string, unknown>[]
+    expect(rows.length).toBeGreaterThan(0)
+    expect(rows[0].currency).toBe('TWD')
+  })
+  it('EquityHistorical 2330.TW', async () => { expect((await exec('EquityHistorical', { symbol: '2330.TW' })).length).toBeGreaterThan(0) })
+  it('EquityQuote 6488.TWO (GlobalWafers, TPEx OTC)', async () => { expect((await exec('EquityQuote', { symbol: '6488.TWO' })).length).toBeGreaterThan(0) })
+  it('IndexHistorical ^TWII (TAIEX)', async () => { expect((await exec('IndexHistorical', { symbol: '^TWII' })).length).toBeGreaterThan(0) })
+})
