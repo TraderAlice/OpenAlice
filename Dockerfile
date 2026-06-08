@@ -59,16 +59,18 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates git tini \
     && rm -rf /var/lib/apt/lists/*
 
-# Two agent CLIs installed globally so they're on PATH for the PTY
-# sessions OpenAlice spawns. Both come from npm (codex's npm package is
-# a thin wrapper that pulls down the Rust binary on install).
-# Smoke-checking versions at build time fails the build loud if either
-# package broke.
+# Agent CLIs installed globally so they're on PATH for the PTY sessions
+# OpenAlice spawns. They come from npm (codex's npm package is a thin
+# wrapper that pulls down the Rust binary on install).
+# Smoke-checking versions at build time fails the build loud if any package
+# broke.
 RUN npm install -g \
         @anthropic-ai/claude-code \
         @openai/codex \
+        @earendil-works/pi-coding-agent \
     && claude --version \
     && codex --version \
+    && pi --version \
     && npm cache clean --force
 
 # Production artifacts. The Guardian script (`scripts/guardian/prod.mjs`)
