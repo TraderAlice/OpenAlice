@@ -49,8 +49,10 @@ export function createCronTools(cronEngine: CronEngine) {
     cronAdd: tool({
       description:
         'Create a new scheduled job.\n\n' +
-        'The job will fire according to the schedule and deliver the payload text to you\n' +
-        'as a system event during the next heartbeat tick.\n\n' +
+        'On schedule, the job runs its payload as a prompt inside a target workspace,\n' +
+        'headless (the workspace agent runs it and reports back via the Inbox). Set\n' +
+        'workspaceId + agent so the job has somewhere to run — a job with no workspace\n' +
+        'is a no-op when it fires.\n\n' +
         'Schedule types:\n' +
         '- at: One-shot at a specific time. E.g. { kind: "at", at: "2025-06-01T14:00:00Z" }\n' +
         '- every: Repeating interval. E.g. { kind: "every", every: "2h" } or { kind: "every", every: "30m" }\n' +
@@ -58,15 +60,13 @@ export function createCronTools(cronEngine: CronEngine) {
         "Returns the new job's id.",
       inputSchema: z.object({
         name: z.string().describe('Short descriptive name for the job, e.g. "Check ETH funding rate"'),
-        payload: z.string().describe('The reminder/instruction text delivered to you when the job fires'),
+        payload: z.string().describe('The prompt the workspace agent runs when the job fires'),
         schedule: scheduleSchema.optional().describe('When the job should run'),
         enabled: z.boolean().optional().describe('Whether the job starts enabled (default: true)'),
-        sessionTarget: z
-          .enum(['main', 'isolated'])
-          .optional()
-          .describe('Where to run: "main" injects into heartbeat session (default), "isolated" runs in a fresh session'),
+        workspaceId: z.string().optional().describe('Target workspace id the headless run executes in'),
+        agent: z.string().optional().describe('Which enabled CLI agent to run: claude / codex / pi / opencode (defaults to the workspace default)'),
       }),
-      execute: async ({ name, payload, schedule, enabled }) => {
+      execute: async ({ name, payload, schedule, enabled, workspaceId, agent }) => {
         if (!schedule) {
           return { error: 'schedule is required' }
         }
@@ -75,6 +75,8 @@ export function createCronTools(cronEngine: CronEngine) {
           payload,
           schedule,
           enabled,
+          ...(workspaceId !== undefined ? { workspaceId } : {}),
+          ...(agent !== undefined ? { agent } : {}),
         })
         return { id }
       },
@@ -91,14 +93,12 @@ export function createCronTools(cronEngine: CronEngine) {
         payload: z.string().optional().describe('New payload text'),
         schedule: scheduleSchema.optional().describe('New schedule'),
         enabled: z.boolean().optional().describe('Enable or disable the job'),
-        sessionTarget: z
-          .enum(['main', 'isolated'])
-          .optional()
-          .describe('New session target'),
+        workspaceId: z.string().optional().describe('New target workspace id'),
+        agent: z.string().optional().describe('New target agent: claude / codex / pi / opencode'),
       }),
-      execute: async ({ id, name, payload, schedule, enabled }) => {
+      execute: async ({ id, name, payload, schedule, enabled, workspaceId, agent }) => {
         try {
-          await cronEngine.update(id, { name, payload, schedule, enabled })
+          await cronEngine.update(id, { name, payload, schedule, enabled, workspaceId, agent })
           return { ok: true }
         } catch (err) {
           return { error: err instanceof Error ? err.message : String(err) }

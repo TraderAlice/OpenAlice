@@ -17,6 +17,8 @@ export function createCronRoutes(ctx: EngineContext) {
         payload: string
         schedule: { kind: string; at?: string; every?: string; cron?: string }
         enabled?: boolean
+        workspaceId?: string
+        agent?: string
       }>()
       if (!body.name || !body.payload || !body.schedule?.kind) {
         return c.json({ error: 'name, payload, and schedule are required' }, 400)
@@ -26,6 +28,8 @@ export function createCronRoutes(ctx: EngineContext) {
         payload: body.payload,
         schedule: body.schedule as CronSchedule,
         enabled: body.enabled,
+        ...(typeof body.workspaceId === 'string' ? { workspaceId: body.workspaceId } : {}),
+        ...(typeof body.agent === 'string' ? { agent: body.agent } : {}),
       })
       return c.json({ id })
     } catch (err) {

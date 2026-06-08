@@ -284,6 +284,10 @@ export interface CronJob {
   enabled: boolean
   schedule: CronSchedule
   payload: string
+  /** Target workspace the job's prompt runs in, headless. */
+  workspaceId?: string
+  /** Which enabled CLI agent runs it — claude / codex / pi / opencode. */
+  agent?: string
   state: CronJobState
   createdAt: number
 }
