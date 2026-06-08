@@ -49,12 +49,14 @@ FROM node:22-trixie-slim AS runtime
 WORKDIR /app
 
 # Bash + POSIX utils + git are required by workspace bootstrap.sh scripts;
-# trixie-slim already ships the shell/coreutils pieces. `tini` becomes PID 1 so signals
+# ca-certificates is required by the bundled agent CLIs (notably codex's
+# Rust TLS stack) for outbound HTTPS from workspace sessions. trixie-slim
+# already ships the shell/coreutils pieces. `tini` becomes PID 1 so signals
 # (SIGTERM from `docker stop`) reach the Guardian supervisor cleanly
 # instead of getting dropped by Node's default PID-1 behaviour, and
 # zombies from short-lived children (workspace CLI auth flows, etc.)
 # get reaped.
-RUN apt-get update && apt-get install -y --no-install-recommends git tini \
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates git tini \
     && rm -rf /var/lib/apt/lists/*
 
 # Two agent CLIs installed globally so they're on PATH for the PTY
@@ -111,7 +113,9 @@ ENV OPENALICE_APP_HOME=/app \
     OPENALICE_WEB_PORT=47331 \
     OPENALICE_MCP_PORT=47332 \
     OPENALICE_UTA_PORT=47333 \
-    OPENALICE_BIND_HOST=0.0.0.0
+    OPENALICE_BIND_HOST=0.0.0.0 \
+    SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt \
+    SSL_CERT_DIR=/etc/ssl/certs
 
 VOLUME ["/data"]
 EXPOSE 47331
