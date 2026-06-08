@@ -796,6 +796,35 @@ export async function writeCredential(slug: string, credential: Credential): Pro
   await writeFile(resolve(CONFIG_DIR, 'ai-provider-manager.json'), JSON.stringify(config, null, 2) + '\n')
 }
 
+/**
+ * Add a credential to the central store, deduping by vendor/authType/apiKey/
+ * baseUrl (an identical credential reuses its existing slug). Returns the slug.
+ *
+ * Standalone counterpart to `extractCredentialFromProfile` for credentials that
+ * don't come from a profile — e.g. the workspace AI-config modal's "save to
+ * Alice" path, where a hand-entered provider is solidified into the central
+ * store so other workspaces (and future scheduling) can reuse it.
+ */
+export async function addCredential(credential: Credential): Promise<string> {
+  const config = await readAIProviderConfig()
+  const validated = credentialSchema.parse(credential)
+  const match = Object.entries(config.credentials).find(([, c]) =>
+    c.vendor === validated.vendor &&
+    c.authType === validated.authType &&
+    c.apiKey === validated.apiKey &&
+    c.baseUrl === validated.baseUrl,
+  )
+  if (match) return match[0]
+  const taken = new Set(Object.keys(config.credentials))
+  let n = 1
+  while (taken.has(`${validated.vendor}-${n}`)) n++
+  const slug = `${validated.vendor}-${n}`
+  config.credentials[slug] = validated
+  await mkdir(CONFIG_DIR, { recursive: true })
+  await writeFile(resolve(CONFIG_DIR, 'ai-provider-manager.json'), JSON.stringify(config, null, 2) + '\n')
+  return slug
+}
+
 /** Delete a credential. Errors if any profile still references it. */
 export async function deleteCredential(slug: string): Promise<void> {
   const config = await readAIProviderConfig()

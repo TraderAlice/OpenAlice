@@ -18,6 +18,8 @@ import { logger as launcherLogger } from '../../workspaces/logger.js';
 import type { SessionRecord } from '../../workspaces/session-registry.js';
 import { HeadlessCapacityError, resumeFromRecord, type SessionFactoryContext, type WorkspaceService } from '../../workspaces/service.js';
 import type { WorkspaceAiCred } from '../../workspaces/cli-adapter.js';
+import { addCredential, readCredentials, type Credential } from '../../core/config.js';
+import { inferCredentialVendor } from '../../core/credential-inference.js';
 
 const SESSION_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -817,6 +819,53 @@ export function createWorkspaceRoutes(svc: WorkspaceService): Hono {
       if (code === 'ENOENT') return c.json({ profiles: [] });
       launcherLogger.warn('agent_profiles.read_failed', { err });
       return c.json({ error: 'profiles_read_failed', message: (err as Error).message }, 500);
+    }
+  });
+
+  // Central credential store, surfaced to the workspace AI-config modal. The
+  // "Load from saved credential" picker reads this list; the "Save to Alice"
+  // dialog POSTs here so a hand-entered provider becomes reusable. apiKey is
+  // returned so the picker can flash it into the form (same exposure as the
+  // legacy agent-profiles route; both are behind the admin-token gate).
+  app.get('/credentials', async (c) => {
+    try {
+      const credentials = await readCredentials();
+      const list = Object.entries(credentials).map(([slug, cred]) => ({
+        slug,
+        vendor: cred.vendor,
+        authType: cred.authType,
+        baseUrl: cred.baseUrl ?? null,
+        apiKey: cred.apiKey ?? null,
+      }));
+      return c.json({ credentials: list });
+    } catch (err) {
+      launcherLogger.warn('credentials.read_failed', { err });
+      return c.json({ error: 'credentials_read_failed', message: (err as Error).message }, 500);
+    }
+  });
+
+  app.post('/credentials', async (c) => {
+    const body = (await safeJson(c)) as
+      | { apiKey?: string; baseUrl?: string; agent?: string; vendor?: string }
+      | null;
+    const apiKey = body?.apiKey?.trim();
+    if (!apiKey) return c.json({ error: 'apiKey_required' }, 400);
+    const baseUrl = body?.baseUrl?.trim() || undefined;
+    // Subscriptions never flow through the workspace modal — these are always
+    // api-key credentials.
+    const cred: Credential = {
+      vendor: inferCredentialVendor({ agent: body?.agent, baseUrl }),
+      authType: 'api-key',
+      apiKey,
+      ...(baseUrl ? { baseUrl } : {}),
+    };
+    try {
+      const slug = await addCredential(cred);
+      launcherLogger.info('credentials.saved', { slug, vendor: cred.vendor });
+      return c.json({ slug, vendor: cred.vendor }, 201);
+    } catch (err) {
+      launcherLogger.warn('credentials.write_failed', { err });
+      return c.json({ error: 'credentials_write_failed', message: (err as Error).message }, 500);
     }
   });
 

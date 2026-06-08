@@ -4,6 +4,22 @@ import { join, resolve } from 'node:path';
 
 import type { Logger } from './logger.js';
 
+/**
+ * A template's declaration that an enabled agent should be seeded, at
+ * workspace-create time, from a named credential in Alice's central store.
+ * `credentialSlug` points into `aiProviderSchema.credentials`; `model` and the
+ * adapter-specific knobs feed `credentialToWorkspaceAiCred`. Sourced from
+ * `template.json`'s `agentCredentials` map (agentId → decl).
+ */
+export interface AgentCredentialDecl {
+  readonly credentialSlug: string;
+  readonly model?: string;
+  /** Claude only. */
+  readonly authMode?: 'x-api-key' | 'bearer';
+  /** Codex only. */
+  readonly wireApi?: 'chat' | 'responses';
+}
+
 export interface TemplateMeta {
   readonly name: string;
   readonly description?: string;
@@ -62,6 +78,13 @@ export interface TemplateMeta {
   readonly injectMcp: boolean | 'inbox';
   readonly injectPersona: boolean;
   readonly bundledSkills: readonly string[];
+  /**
+   * Optional per-agent credential seeding. When present, the launcher writes
+   * each declared agent's workspace AI config at create time from the named
+   * central credential — so a workspace boots ready-to-run without a manual
+   * UI step. Agents not listed are left to fall back to the CLI's global login.
+   */
+  readonly agentCredentials?: Readonly<Record<string, AgentCredentialDecl>>;
 }
 
 /**
@@ -113,6 +136,7 @@ export class TemplateRegistry {
         injectMcp: tplMeta.injectMcp,
         injectPersona: tplMeta.injectPersona,
         bundledSkills: tplMeta.bundledSkills,
+        ...(tplMeta.agentCredentials !== undefined ? { agentCredentials: tplMeta.agentCredentials } : {}),
       };
       reg.byName.set(name, meta);
     }
@@ -157,6 +181,7 @@ interface ParsedTemplateMeta {
   readonly injectMcp: boolean | 'inbox';
   readonly injectPersona: boolean;
   readonly bundledSkills: readonly string[];
+  readonly agentCredentials?: Readonly<Record<string, AgentCredentialDecl>>;
 }
 
 /**
@@ -240,6 +265,7 @@ async function readTemplateMeta(path: string): Promise<ParsedTemplateMeta> {
           (s): s is string => typeof s === 'string' && !s.includes('/') && !s.includes('..'),
         )
       : [];
+    const agentCredentials = parseAgentCredentials(obj['agentCredentials']);
     return {
       ...(description !== undefined ? { description } : {}),
       ...(displayName !== undefined ? { displayName } : {}),
@@ -248,9 +274,37 @@ async function readTemplateMeta(path: string): Promise<ParsedTemplateMeta> {
       injectMcp,
       injectPersona,
       bundledSkills,
+      ...(agentCredentials !== undefined ? { agentCredentials } : {}),
     };
   } catch {
     return fallback;
   }
+}
+
+/**
+ * Parse the optional `agentCredentials` map from a template.json. Shape:
+ *   { "<agentId>": { "credentialSlug": "openai-1", "model": "gpt-5.5",
+ *                    "authMode"?: "x-api-key"|"bearer", "wireApi"?: "chat"|"responses" } }
+ * Entries missing a string `credentialSlug` are dropped. Returns undefined when
+ * nothing valid is present (so the field stays absent on the meta).
+ */
+function parseAgentCredentials(raw: unknown): Record<string, AgentCredentialDecl> | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const out: Record<string, AgentCredentialDecl> = {};
+  for (const [agentId, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof value !== 'object' || value === null) continue;
+    const v = value as Record<string, unknown>;
+    if (typeof v['credentialSlug'] !== 'string' || v['credentialSlug'].length === 0) continue;
+    const decl: AgentCredentialDecl = { credentialSlug: v['credentialSlug'] };
+    if (typeof v['model'] === 'string') (decl as { model?: string }).model = v['model'];
+    if (v['authMode'] === 'x-api-key' || v['authMode'] === 'bearer') {
+      (decl as { authMode?: 'x-api-key' | 'bearer' }).authMode = v['authMode'];
+    }
+    if (v['wireApi'] === 'chat' || v['wireApi'] === 'responses') {
+      (decl as { wireApi?: 'chat' | 'responses' }).wireApi = v['wireApi'];
+    }
+    out[agentId] = decl;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 

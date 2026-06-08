@@ -413,6 +413,46 @@ export async function listAgentProfiles(): Promise<AgentProfile[]> {
   return body.profiles;
 }
 
+// ── Central credential store ──────────────────────────────────────────────
+//
+// Alice's reusable credentials (`data/config/ai-provider-manager.json`). The
+// modal's "Load from saved credential" picker reads these; "Save to Alice"
+// writes a new one. apiKey is returned so a picked credential can be flashed
+// into the form (same exposure as agent-profiles; admin-token gated).
+
+export interface SavedCredential {
+  readonly slug: string;
+  readonly vendor: string;
+  readonly authType: 'api-key' | 'subscription';
+  readonly baseUrl: string | null;
+  readonly apiKey: string | null;
+}
+
+export async function listCredentials(): Promise<SavedCredential[]> {
+  const res = await fetch('/api/workspaces/credentials');
+  if (!res.ok) throw new Error(`list credentials failed: ${res.status}`);
+  const body = (await res.json()) as { credentials: SavedCredential[] };
+  return body.credentials;
+}
+
+/** Persist a hand-entered provider as a reusable central credential. Returns the slug. */
+export async function saveCredential(input: {
+  apiKey: string;
+  baseUrl?: string;
+  agent?: AgentId;
+}): Promise<{ slug: string; vendor: string }> {
+  const res = await fetch('/api/workspaces/credentials', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const msg = await res.text().catch(() => '');
+    throw new Error(`save credential failed: ${res.status} ${msg}`);
+  }
+  return (await res.json()) as { slug: string; vendor: string };
+}
+
 export async function getAgentConfig(wsId: string): Promise<AgentConfigBundle> {
   const res = await fetch(`/api/workspaces/${encodeURIComponent(wsId)}/agent-config`);
   if (!res.ok) throw new Error(`get agent config failed: ${res.status}`);

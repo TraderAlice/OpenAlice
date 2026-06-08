@@ -66,6 +66,10 @@ copy_readme() {
 #   - .codex/auth.json              (workspace-local Codex auth)
 #   - .codex/env.json               (workspace-local Codex API-key bridge)
 #   - .codex/config.toml            (workspace-local Codex provider config)
+#   - opencode.json                 (workspace-local opencode provider config)
+#   - .pi-agent/                    (workspace-local Pi provider + settings)
+# All five carry a per-workspace API key once a provider is configured (UI or
+# template-injected), so they must never reach a commit.
 # Extra paths passed as args are appended too — useful for templates that
 # clone third-party content (e.g. finance-research clones .finance-skills/
 # and doesn't want git add . to swallow it).
@@ -80,6 +84,8 @@ setup_git_excludes() {
     echo '.codex/auth.json'
     echo '.codex/env.json'
     echo '.codex/config.toml'
+    echo 'opencode.json'
+    echo '.pi-agent/'
     for extra in "$@"; do
       echo "$extra"
     done

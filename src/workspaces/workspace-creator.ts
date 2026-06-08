@@ -3,8 +3,11 @@ import { randomUUID } from 'node:crypto';
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
+import { readCredentials } from '@/core/config.js';
+
 import type { AdapterRegistry } from './cli-adapter.js';
 import { injectWorkspaceContext, resolveInjection, type ToolAccess } from './context-injector.js';
+import { injectWorkspaceCredentials } from './credential-injection.js';
 import type { Logger } from './logger.js';
 import type { TemplateRegistry } from './template-registry.js';
 import type { WorkspaceMeta, WorkspaceRegistry } from './workspace-registry.js';
@@ -183,6 +186,26 @@ export class WorkspaceCreator {
         });
       } catch (err) {
         log.warn('adapter.bootstrap_failed', { agent: a, err });
+      }
+    }
+
+    // Template-declared credential seeding — runs POST-commit so the secret
+    // never lands in the initial commit (the adapter config files are kept out
+    // of git by `_common.sh`'s excludes; post-commit is the belt-and-braces).
+    // Best-effort: a miss warns + skips, the workspace stays usable.
+    if (template.agentCredentials) {
+      try {
+        const credentials = await readCredentials();
+        await injectWorkspaceCredentials({
+          dir,
+          agents,
+          agentCredentials: template.agentCredentials,
+          adapterRegistry: this.opts.adapterRegistry,
+          credentials,
+          logger: log,
+        });
+      } catch (err) {
+        log.warn('cred_inject.failed', { err });
       }
     }
 

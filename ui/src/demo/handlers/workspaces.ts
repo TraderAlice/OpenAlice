@@ -20,6 +20,10 @@ export const workspacesHandlers = [
 
   http.get('/api/workspaces/agents', () => HttpResponse.json({ agents: [] })),
   http.get('/api/workspaces/agent-profiles', () => HttpResponse.json({ profiles: [] })),
+  http.get('/api/workspaces/credentials', () => HttpResponse.json({ credentials: [] })),
+  http.post('/api/workspaces/credentials', () =>
+    HttpResponse.json({ slug: 'custom-1', vendor: 'custom' }, { status: 201 }),
+  ),
 
   http.get('/api/workspaces/:id/git/log', () => HttpResponse.json({ entries: [] })),
   http.get('/api/workspaces/:id/git/status', () =>

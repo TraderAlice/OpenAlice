@@ -11,13 +11,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   getAgentConfig,
-  listAgentProfiles,
+  listCredentials,
   saveAgentConfig,
+  saveCredential,
   testAgentConfig,
   type AgentConfig,
   type AgentConfigBundle,
   type AgentId,
-  type AgentProfile,
+  type SavedCredential,
 } from './api'
 
 interface Props {
@@ -102,17 +103,22 @@ function formsMatch(a: FormState, b: FormState, agent: AgentId): boolean {
 
 export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
   const [tab, setTab] = useState<Tab>('claude')
-  const [profiles, setProfiles] = useState<AgentProfile[]>([])
+  const [credentials, setCredentials] = useState<SavedCredential[]>([])
   const [bundle, setBundle] = useState<AgentConfigBundle | null>(null)
   const [claudeForm, setClaudeForm] = useState<FormState>(EMPTY_FORM)
   const [codexForm, setCodexForm] = useState<FormState>(EMPTY_FORM)
   const [opencodeForm, setOpencodeForm] = useState<FormState>(EMPTY_FORM)
   const [piForm, setPiForm] = useState<FormState>(EMPTY_FORM)
-  const [pickedProfile, setPickedProfile] = useState<string>('')
+  const [pickedCredential, setPickedCredential] = useState<string>('')
   const [showKey, setShowKey] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [savedFlash, setSavedFlash] = useState(false)
+  // Push-back prompt: shown after a successful Save when the just-saved key
+  // isn't already in Alice's central store — offers to solidify it for reuse.
+  const [offerSaveCred, setOfferSaveCred] = useState(false)
+  const [savingCred, setSavingCred] = useState(false)
+  const [credFlash, setCredFlash] = useState<string | null>(null)
   const [testing, setTesting] = useState(false)
   const [claudeResult, setClaudeResult] = useState<TestResult | null>(null)
   const [codexResult, setCodexResult] = useState<TestResult | null>(null)
@@ -120,9 +126,9 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
   const [piResult, setPiResult] = useState<TestResult | null>(null)
 
   useEffect(() => {
-    void Promise.all([listAgentProfiles(), getAgentConfig(wsId)])
-      .then(([ps, b]) => {
-        setProfiles(ps)
+    void Promise.all([listCredentials(), getAgentConfig(wsId)])
+      .then(([creds, b]) => {
+        setCredentials(creds)
         setBundle(b)
         setClaudeForm(configToForm(b.claude))
         setCodexForm(configToForm(b.codex))
@@ -151,17 +157,18 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
     )
   }, [bundle, form, tab])
 
-  const applyProfile = () => {
-    const p = profiles.find((x) => x.name === pickedProfile)
-    if (!p) return
+  const applyCredential = () => {
+    const cred = credentials.find((x) => x.slug === pickedCredential)
+    if (!cred) return
+    // A credential carries no model — that's a per-workspace choice — so we
+    // flash baseUrl + key only and leave the model field for the user.
+    // Auth mode: api.minimax.io needs Bearer; default x-api-key otherwise.
+    const bearer = /api\.minimax\.io/i.test(cred.baseUrl ?? '')
     setForm({
       ...form,
-      baseUrl: p.baseUrl ?? '',
-      apiKey: p.apiKey ?? '',
-      model: p.model ?? '',
-      // A profile may pin its auth mode (e.g. a MiniMax-international profile
-      // needs Bearer); fall back to x-api-key when it doesn't say.
-      authMode: p.authMode === 'bearer' ? 'bearer' : 'x-api-key',
+      baseUrl: cred.baseUrl ?? '',
+      apiKey: cred.apiKey ?? '',
+      authMode: bearer ? 'bearer' : 'x-api-key',
     })
   }
 
@@ -174,10 +181,37 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
       setBundle(fresh)
       setSavedFlash(true)
       setTimeout(() => setSavedFlash(false), 1800)
+      // Offer to solidify a hand-entered key into Alice's central store — but
+      // only when it isn't already there (loaded-from-credential, or re-typed
+      // an existing one, shouldn't re-prompt).
+      const key = form.apiKey.trim()
+      const url = form.baseUrl.trim()
+      const known = credentials.some((c) => c.apiKey === key && (c.baseUrl ?? '') === url)
+      setOfferSaveCred(!!key && !known)
     } catch (err) {
       setError((err as Error).message)
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleSaveCredential = async () => {
+    setSavingCred(true)
+    setError(null)
+    try {
+      const { slug } = await saveCredential({
+        apiKey: form.apiKey.trim(),
+        ...(form.baseUrl.trim() ? { baseUrl: form.baseUrl.trim() } : {}),
+        agent: tab,
+      })
+      setCredentials(await listCredentials())
+      setOfferSaveCred(false)
+      setCredFlash(`Saved to Alice as “${slug}” — reusable in any workspace.`)
+      setTimeout(() => setCredFlash(null), 2600)
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setSavingCred(false)
     }
   }
 
@@ -280,32 +314,41 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {/* Quick pick */}
+          {/* Quick pick — load a saved credential into the form */}
           <div className="rounded-lg border border-border bg-bg-secondary/30 p-3">
             <label className="block text-xs font-medium text-text-muted mb-2">
-              Apply from OpenAlice profile
+              Load from saved credential
             </label>
             <div className="flex gap-2">
               <select
-                value={pickedProfile}
-                onChange={(e) => setPickedProfile(e.target.value)}
+                value={pickedCredential}
+                onChange={(e) => setPickedCredential(e.target.value)}
                 className={inputClass + ' flex-1'}
+                disabled={credentials.length === 0}
               >
-                <option value="">— select a profile —</option>
-                {profiles.map((p) => (
-                  <option key={p.name} value={p.name}>
-                    {p.name}
+                <option value="">
+                  {credentials.length === 0 ? '— none saved yet —' : '— select a credential —'}
+                </option>
+                {credentials.map((cred) => (
+                  <option key={cred.slug} value={cred.slug}>
+                    {cred.slug}
+                    {cred.baseUrl ? ` · ${cred.baseUrl}` : ''}
                   </option>
                 ))}
               </select>
               <button
-                onClick={applyProfile}
-                disabled={!pickedProfile}
+                onClick={applyCredential}
+                disabled={!pickedCredential}
                 className="px-3 py-2 rounded-md bg-accent text-bg text-[13px] font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent/90 transition-colors"
               >
-                Apply
+                Load
               </button>
             </div>
+            <p className="text-[11px] text-text-muted/80 leading-snug mt-1.5">
+              Fills base URL + key from a credential Alice already holds. Pick a
+              model below — credentials don't carry one. Or just type a new one;
+              you'll be offered to save it after Test + Save.
+            </p>
           </div>
 
           {/* Manual fields */}
@@ -438,6 +481,34 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
           {savedFlash && (
             <div className="rounded-md border border-green/40 bg-green/10 text-green text-[12px] px-3 py-2">
               Saved. Pause + resume any open session to reload.
+            </div>
+          )}
+          {offerSaveCred && (
+            <div className="rounded-md border border-accent/40 bg-accent/10 text-text text-[12px] px-3 py-2.5 flex items-center justify-between gap-3">
+              <span className="leading-snug">
+                Save this provider to Alice so other workspaces can reuse it?
+              </span>
+              <div className="flex gap-2 shrink-0">
+                <button
+                  onClick={() => setOfferSaveCred(false)}
+                  disabled={savingCred}
+                  className="px-2.5 py-1 rounded-md border border-border text-text-muted hover:text-text text-[12px] disabled:opacity-40"
+                >
+                  Not now
+                </button>
+                <button
+                  onClick={handleSaveCredential}
+                  disabled={savingCred}
+                  className="px-2.5 py-1 rounded-md bg-accent text-bg text-[12px] font-medium disabled:opacity-40 hover:bg-accent/90"
+                >
+                  {savingCred ? 'Saving…' : 'Save to Alice'}
+                </button>
+              </div>
+            </div>
+          )}
+          {credFlash && (
+            <div className="rounded-md border border-green/40 bg-green/10 text-green text-[12px] px-3 py-2">
+              {credFlash}
             </div>
           )}
           {testing && (

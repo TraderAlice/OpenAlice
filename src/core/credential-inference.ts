@@ -51,6 +51,26 @@ export function inferVendor(profile: ProfileLike): CredentialVendor {
   return 'custom'
 }
 
+/**
+ * Infer a credential vendor from the workspace AI-config modal's context — a
+ * CLI agent tab + the entered baseUrl. Unlike `inferVendor` (profile-shaped),
+ * this is the standalone "save to Alice" path where there's no profile/backend.
+ *
+ * A recognized baseUrl wins (GLM/MiniMax/Kimi/DeepSeek gateways); otherwise the
+ * agent decides: claude → anthropic, codex → openai. opencode/pi are
+ * OpenAI-compatible against arbitrary endpoints, so an unrecognized baseUrl
+ * falls back to 'custom' rather than guessing a first-party vendor.
+ */
+export function inferCredentialVendor(opts: { agent?: string; baseUrl?: string }): CredentialVendor {
+  const baseUrl = opts.baseUrl ?? ''
+  for (const [pattern, vendor] of VENDORS_BY_BASEURL) {
+    if (pattern.test(baseUrl)) return vendor
+  }
+  if (opts.agent === 'claude') return 'anthropic'
+  if (opts.agent === 'codex') return 'openai'
+  return 'custom'
+}
+
 export function inferAuthType(profile: ProfileLike): CredentialAuthType {
   if (profile.loginMethod === 'claudeai' || profile.loginMethod === 'codex-oauth') {
     return 'subscription'
