@@ -142,6 +142,7 @@ export const ja: Resources = {
     noAccountsYet: 'アカウントがまだありません。設定 → 取引 で追加してください。',
   },
   automation: {
+    runs: '実行',
     flow: 'フロー',
     heartbeat: 'ハートビート',
     cronJobs: 'Cron ジョブ',

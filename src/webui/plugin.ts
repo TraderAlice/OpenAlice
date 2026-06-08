@@ -42,6 +42,7 @@ export function createWorkspaceServiceRef(): WorkspaceServiceRef {
   return { current: null }
 }
 import { createWorkspaceRoutes } from './routes/workspaces.js'
+import { createHeadlessRoutes } from './routes/headless.js'
 import { attachWorkspacesWS, type AttachedWS } from './workspaces-ws.js'
 import type { Server as HttpServer } from 'node:http'
 
@@ -216,6 +217,7 @@ export class WebPlugin implements Plugin {
     })
     if (this.workspaceServiceRef) this.workspaceServiceRef.current = this.workspaceService
     app.route('/api/workspaces', createWorkspaceRoutes(this.workspaceService))
+    app.route('/api/headless', createHeadlessRoutes(this.workspaceService))
     // Tracked entities — read surface for the Tracked tab. Mounted here (not
     // with the other /api/* routes above) because backlink scanning needs the
     // workspace registry, which only exists once workspaceService is created.

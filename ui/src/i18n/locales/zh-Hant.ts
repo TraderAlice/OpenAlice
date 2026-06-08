@@ -150,6 +150,7 @@ export const zhHant: Resources = {
     noAccountsYet: '尚無帳戶。請在 設定 → 交易 中新增。',
   },
   automation: {
+    runs: '運行',
     flow: '流程',
     heartbeat: '心跳',
     cronJobs: 'Cron 任務',

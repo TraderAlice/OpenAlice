@@ -8,6 +8,7 @@ import { useAutoSave } from '../hooks/useAutoSave'
 import { PageHeader } from '../components/PageHeader'
 import { AutomationFlowSection } from './AutomationFlowSection'
 import { AutomationWebhookSection } from './AutomationWebhookSection'
+import { AutomationRunsSection } from './AutomationRunsSection'
 import type { ViewSpec } from '../tabs/types'
 
 type AutomationSection = Extract<ViewSpec, { kind: 'automation' }>['params']['section']
@@ -17,6 +18,7 @@ const SECTION_TITLE: Record<AutomationSection, string> = {
   heartbeat: 'Heartbeat',
   cron: 'Cron Jobs',
   webhook: 'Webhook',
+  runs: 'Runs',
 }
 
 const SECTION_DESCRIPTION: Record<AutomationSection, string> = {
@@ -24,6 +26,7 @@ const SECTION_DESCRIPTION: Record<AutomationSection, string> = {
   heartbeat: 'Periodic self-check and autonomous thinking.',
   cron: 'Scheduled jobs that fire events on the dispatch bus.',
   webhook: 'External HTTP triggers routed into the engine.',
+  runs: 'Headless agent runs across workspaces — what the workers are doing.',
 }
 
 // ==================== Helpers ====================
@@ -634,8 +637,10 @@ export function AutomationPage({ spec }: AutomationPageProps) {
             <HeartbeatSection />
           ) : section === 'cron' ? (
             <CronSection />
-          ) : (
+          ) : section === 'webhook' ? (
             <AutomationWebhookSection />
+          ) : (
+            <AutomationRunsSection />
           )}
         </div>
       </div>

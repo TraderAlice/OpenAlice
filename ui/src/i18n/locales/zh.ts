@@ -142,6 +142,7 @@ export const zh: Resources = {
     noAccountsYet: '还没有账户。在 设置 → 交易 中添加。',
   },
   automation: {
+    runs: '运行',
     flow: '流程',
     heartbeat: '心跳',
     cronJobs: 'Cron 任务',

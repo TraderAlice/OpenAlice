@@ -11,6 +11,7 @@ interface SidebarItem {
 }
 
 const ITEMS = [
+  { labelKey: 'automation.runs', section: 'runs' },
   { labelKey: 'automation.flow', section: 'flow' },
   { labelKey: 'automation.heartbeat', section: 'heartbeat' },
   { labelKey: 'automation.cronJobs', section: 'cron' },

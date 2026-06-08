@@ -24,6 +24,18 @@ import { loadConfig, type ServerConfig } from './config.js';
 import { logger as launcherLogger } from './logger.js';
 import { runHeadlessProbe, type HeadlessProbeResult } from './probe.js';
 import { runHeadlessTask, type HeadlessTaskResult } from './headless-task.js';
+import { HeadlessTaskRegistry } from './headless-task-registry.js';
+
+/** Max concurrent in-flight headless tasks — backstop against unbounded spawn. */
+const MAX_CONCURRENT_HEADLESS = 8;
+
+/** Thrown by `dispatchHeadlessTask` when the concurrency cap is hit (→ HTTP 429). */
+export class HeadlessCapacityError extends Error {
+  constructor(public readonly limit: number) {
+    super(`headless capacity reached (${limit} tasks running)`);
+    this.name = 'HeadlessCapacityError';
+  }
+}
 import { ScrollbackStore } from './scrollback-store.js';
 import { SessionPool, type SessionFactoryContext } from './session-pool.js';
 import { SessionRegistry, type SessionRecord } from './session-registry.js';
@@ -100,6 +112,19 @@ export interface WorkspaceService {
     prompt: string,
     timeoutMs: number,
   ): Promise<HeadlessTaskResult>;
+  /**
+   * ASYNC dispatch — records the task, spawns it in the background, returns the
+   * taskId immediately (the automation path). Throws `HeadlessCapacityError`
+   * when the concurrency cap is hit.
+   */
+  dispatchHeadlessTask(
+    meta: WorkspaceMeta,
+    adapter: CliAdapter,
+    prompt: string,
+    timeoutMs: number,
+  ): Promise<{ taskId: string }>;
+  /** The headless-task management plane (cross-workspace; powers GET /api/headless). */
+  headlessTasks: HeadlessTaskRegistry;
   isShuttingDown(): boolean;
   dispose(reason: string): Promise<void>;
 }
@@ -141,6 +166,13 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   const sessionRegistry = await SessionRegistry.load(
     join(config.launcherRoot, 'state'),
     launcherLogger.child({ scope: 'session-registry' }),
+  );
+
+  // The headless-task management plane. load() reconciles leftover `running`
+  // records (zombies from a previous Alice life) → `interrupted`.
+  const headlessTasks = await HeadlessTaskRegistry.load(
+    join(config.launcherRoot, 'state', 'headless-tasks.json'),
+    launcherLogger.child({ scope: 'headless-registry' }),
   );
 
   const scrollbackStore = new ScrollbackStore(
@@ -316,6 +348,56 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     });
   };
 
+  /**
+   * ASYNC dispatch: record the task, spawn it in the background, return the
+   * taskId immediately. The record fills in on exit. This is the automation
+   * path (a trigger doesn't wait minutes for the run); the sync
+   * `runHeadlessTask` stays for the `wait:true` API mode + direct callers.
+   * Throws `HeadlessCapacityError` when too many tasks are already in flight.
+   */
+  const dispatchHeadlessTaskMethod = async (
+    ws: WorkspaceMeta,
+    adapter: CliAdapter,
+    prompt: string,
+    timeoutMs: number,
+  ): Promise<{ taskId: string }> => {
+    if (!adapter.capabilities.headless || !adapter.composeHeadlessCommand) {
+      throw new Error(`adapter "${adapter.id}" has no headless mode`);
+    }
+    if (headlessTasks.runningCount() >= MAX_CONCURRENT_HEADLESS) {
+      throw new HeadlessCapacityError(MAX_CONCURRENT_HEADLESS);
+    }
+    const rec = await headlessTasks.create({
+      wsId: ws.id,
+      agent: adapter.id,
+      prompt,
+      startedAt: Date.now(),
+    });
+    // Fire-and-forget: run to natural exit, then fill the record. NOTE: status
+    // is judged by exit code — pi can exit 0 on an in-band model error, so
+    // "done" means "process exited cleanly", not "the agent succeeded"; the
+    // operator confirms via the Inbox / the task's tail.
+    void runHeadlessTaskMethod(ws, adapter, prompt, timeoutMs)
+      .then((r) =>
+        headlessTasks.complete(rec.taskId, {
+          status: r.killed ? 'failed' : r.exitCode === 0 ? 'done' : 'failed',
+          finishedAt: Date.now(),
+          durationMs: r.durationMs,
+          exitCode: r.exitCode,
+          signal: r.signal,
+          killed: r.killed,
+        }),
+      )
+      .catch((err) =>
+        headlessTasks.complete(rec.taskId, {
+          status: 'failed',
+          finishedAt: Date.now(),
+          error: err instanceof Error ? err.message : String(err),
+        }),
+      );
+    return { taskId: rec.taskId };
+  };
+
   const pool = new SessionPool(
     (wsId, ctx) => {
       const ws = registry.get(wsId);
@@ -468,6 +550,8 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     computeSpawnPlan,
     runHeadlessProbe: runHeadlessProbeMethod,
     runHeadlessTask: runHeadlessTaskMethod,
+    dispatchHeadlessTask: dispatchHeadlessTaskMethod,
+    headlessTasks,
     isShuttingDown: () => shuttingDown,
     dispose,
   };

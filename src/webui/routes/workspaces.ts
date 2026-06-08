@@ -16,7 +16,7 @@ import { listDir, PathTraversal, readWorkspaceFile } from '../../workspaces/file
 import { gitLog, gitStatus } from '../../workspaces/git-service.js';
 import { logger as launcherLogger } from '../../workspaces/logger.js';
 import type { SessionRecord } from '../../workspaces/session-registry.js';
-import { resumeFromRecord, type SessionFactoryContext, type WorkspaceService } from '../../workspaces/service.js';
+import { HeadlessCapacityError, resumeFromRecord, type SessionFactoryContext, type WorkspaceService } from '../../workspaces/service.js';
 import type { WorkspaceAiCred } from '../../workspaces/cli-adapter.js';
 
 const SESSION_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -694,6 +694,7 @@ export function createWorkspaceRoutes(svc: WorkspaceService): Hono {
     let prompt: string;
     let timeoutMs: number;
     let agentId: string | undefined;
+    let wait = false;
     try {
       const body = await safeJson(c);
       const fields = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
@@ -712,6 +713,7 @@ export function createWorkspaceRoutes(svc: WorkspaceService): Hono {
         typeof rawTimeout === 'number' && rawTimeout > 0 ? Math.min(rawTimeout, 1_800_000) : 300_000;
       const rawAgent = fields['agent'];
       if (typeof rawAgent === 'string' && rawAgent.length > 0) agentId = rawAgent;
+      wait = fields['wait'] === true;
     } catch (err) {
       return c.json({ error: 'bad_request', message: (err as Error).message }, 400);
     }
@@ -744,11 +746,28 @@ export function createWorkspaceRoutes(svc: WorkspaceService): Hono {
       agent: adapter.id,
       promptLen: prompt.length,
       timeoutMs,
+      wait,
     });
+    // `wait:true` → run synchronously and return the full result (curl/tests).
+    if (wait) {
+      try {
+        const result = await svc.runHeadlessTask(meta, adapter, prompt, timeoutMs);
+        return c.json(result);
+      } catch (err) {
+        launcherLogger.error('workspace.headless_failed', { id, agent: adapter.id, err });
+        return c.json({ error: 'headless_failed', message: (err as Error).message }, 500);
+      }
+    }
+    // Default → async: record + spawn in the background, return the taskId. The
+    // run's status is queryable at GET /api/headless/:taskId; the agent reports
+    // its actual result via the Inbox.
     try {
-      const result = await svc.runHeadlessTask(meta, adapter, prompt, timeoutMs);
-      return c.json(result);
+      const { taskId } = await svc.dispatchHeadlessTask(meta, adapter, prompt, timeoutMs);
+      return c.json({ taskId, status: 'running' }, 202);
     } catch (err) {
+      if (err instanceof HeadlessCapacityError) {
+        return c.json({ error: 'capacity', message: err.message }, 429);
+      }
       launcherLogger.error('workspace.headless_failed', { id, agent: adapter.id, err });
       return c.json({ error: 'headless_failed', message: (err as Error).message }, 500);
     }

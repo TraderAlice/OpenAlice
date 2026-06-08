@@ -153,6 +153,7 @@ export const en = {
     noAccountsYet: 'No accounts yet. Add one in Settings → Trading.',
   },
   automation: {
+    runs: 'Runs',
     flow: 'Flow',
     heartbeat: 'Heartbeat',
     cronJobs: 'Cron Jobs',

@@ -276,16 +276,15 @@ describe('composeHeadlessCommand (one-shot headless argv, prompt placed per-CLI)
     ]);
   });
 
-  it('codex: shared -c MCP head + exec --json -- <prompt> (both servers)', () => {
-    const env = { OPENALICE_MCP_URL: 'http://127.0.0.1:47332/mcp', AQ_WS_ID: 'ws-1' };
-    expect(codexAdapter.composeHeadlessCommand!(['codex'], ctx(env), 'do x')).toEqual([
+  it('codex: CLI-mode headless (no MCP) — approval/sandbox/network -c + exec --json -- <prompt>', () => {
+    expect(codexAdapter.composeHeadlessCommand!(['codex'], ctx(), 'do x')).toEqual([
       'codex',
       '-c',
-      'mcp_servers.openalice.url="http://127.0.0.1:47332/mcp"',
-      '-c',
-      'mcp_servers.openalice-workspace.url="http://127.0.0.1:47332/mcp/ws-1"',
-      '-c',
       'approval_policy="never"',
+      '-c',
+      'sandbox_mode="workspace-write"',
+      '-c',
+      'sandbox_workspace_write.network_access=true',
       'exec',
       '--json',
       '--',

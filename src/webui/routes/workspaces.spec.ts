@@ -6,7 +6,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { createWorkspaceRoutes } from './workspaces.js';
-import type { WorkspaceService } from '../../workspaces/service.js';
+import { HeadlessCapacityError, type WorkspaceService } from '../../workspaces/service.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -21,7 +21,9 @@ const HEADLESS_RESULT = {
   stderrTail: '',
 };
 
-function build(opts: { meta?: any; adapters?: Record<string, any>; resolveTo?: any } = {}) {
+function build(
+  opts: { meta?: any; adapters?: Record<string, any>; resolveTo?: any; dispatch?: any } = {},
+) {
   const claude = {
     id: 'claude',
     capabilities: { headless: true },
@@ -31,14 +33,16 @@ function build(opts: { meta?: any; adapters?: Record<string, any>; resolveTo?: a
   const meta = opts.meta ?? { id: 'ws-1', dir: '/w', agents: ['claude'] };
   const adapters = opts.adapters ?? { claude };
   const runHeadlessTask = vi.fn(async () => HEADLESS_RESULT);
+  const dispatchHeadlessTask = opts.dispatch ?? vi.fn(async () => ({ taskId: 'task-1' }));
   const svc = {
     registry: { get: (id: string) => (id === 'ws-1' ? meta : undefined) },
     adapters: { get: (a: string) => adapters[a] },
     resolveAdapter: (_m: any, a?: string) => opts.resolveTo ?? adapters[a ?? 'claude'] ?? claude,
     config: { launcherRepoRoot: '/repo' },
     runHeadlessTask,
+    dispatchHeadlessTask,
   } as unknown as WorkspaceService;
-  return { app: createWorkspaceRoutes(svc), runHeadlessTask };
+  return { app: createWorkspaceRoutes(svc), runHeadlessTask, dispatchHeadlessTask };
 }
 
 async function post(app: any, path: string, body?: unknown) {
@@ -96,18 +100,39 @@ describe('POST /:id/headless', () => {
   });
 
   it('clamps timeoutMs to <= 1_800_000 and defaults to 300_000', async () => {
-    const { app, runHeadlessTask } = build();
+    const { app, dispatchHeadlessTask } = build();
     await post(app, '/ws-1/headless', { prompt: 'x', timeoutMs: 9e9 });
-    expect(runHeadlessTask).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), 'x', 1_800_000);
+    expect(dispatchHeadlessTask).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), 'x', 1_800_000);
     await post(app, '/ws-1/headless', { prompt: 'x' });
-    expect(runHeadlessTask).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), 'x', 300_000);
+    expect(dispatchHeadlessTask).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), 'x', 300_000);
   });
 
-  it('200 + dispatches runHeadlessTask on the happy path', async () => {
-    const { app, runHeadlessTask } = build();
+  it('async by default → 202 + taskId, dispatches in the background', async () => {
+    const { app, dispatchHeadlessTask, runHeadlessTask } = build();
     const r = await post(app, '/ws-1/headless', { prompt: 'do the thing' });
+    expect(r.status).toBe(202);
+    expect(r.body.taskId).toBe('task-1');
+    expect(r.body.status).toBe('running');
+    expect(dispatchHeadlessTask).toHaveBeenCalledOnce();
+    expect(runHeadlessTask).not.toHaveBeenCalled(); // async path doesn't await the run
+  });
+
+  it('wait:true → 200 + the full sync result', async () => {
+    const { app, runHeadlessTask, dispatchHeadlessTask } = build();
+    const r = await post(app, '/ws-1/headless', { prompt: 'do the thing', wait: true });
     expect(r.status).toBe(200);
     expect(r.body.exitCode).toBe(0);
     expect(runHeadlessTask).toHaveBeenCalledOnce();
+    expect(dispatchHeadlessTask).not.toHaveBeenCalled();
+  });
+
+  it('429 when the concurrency cap is hit', async () => {
+    const dispatch = vi.fn(async () => {
+      throw new HeadlessCapacityError(8);
+    });
+    const { app } = build({ dispatch });
+    const r = await post(app, '/ws-1/headless', { prompt: 'x' });
+    expect(r.status).toBe(429);
+    expect(r.body.error).toBe('capacity');
   });
 });

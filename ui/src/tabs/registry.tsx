@@ -71,6 +71,7 @@ const automationSectionTitle: Record<
   heartbeat: 'Heartbeat',
   cron: 'Cron Jobs',
   webhook: 'Webhook',
+  runs: 'Runs',
 }
 
 const automationModule: ViewModule<'automation'> = {

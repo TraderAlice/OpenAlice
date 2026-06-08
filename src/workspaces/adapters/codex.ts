@@ -84,16 +84,32 @@ export const codexAdapter: CliAdapter = {
     return [...head, 'resume', ctx.resume.sessionId];
   },
 
-  // Headless: `codex exec` is non-interactive, but its DEFAULT approval policy
-  // CANCELS the agent's actions (MCP tool calls AND shell commands) when there's
-  // no human to approve — so inbox_push fails "user cancelled MCP tool call".
-  // `approval_policy=never` lets it run autonomously. CRITICAL: this `-c` must
-  // be GLOBAL (alongside the mcp_servers `-c` in codexMcpHead, before `exec`) —
-  // an exec-LEVEL `-c` drops the global config and the MCP servers stop loading
-  // (verified: that yields "no MCP tool matching inbox_push"). `--` terminates
-  // options before the trailing prompt.
-  composeHeadlessCommand(_base: readonly string[], ctx: SpawnContext, prompt: string): readonly string[] {
-    return [...codexMcpHead(ctx), '-c', 'approval_policy="never"', 'exec', '--json', '--', prompt];
+  // Headless codex is CLI-MODE, NOT MCP: `codex exec` cancels EVERY MCP tool
+  // call when there's no human to approve — even under approval_policy=never
+  // (verified: "user cancelled MCP tool call") — so MCP is dead weight here.
+  // Instead the agent reads data via `alice` and reports via `alice-workspace`
+  // (shell commands codex runs autonomously). Three GLOBAL `-c` (before `exec`)
+  // make that work:
+  //   approval_policy=never                        — don't block on approval
+  //   sandbox_mode=workspace-write                 — let it write the workspace
+  //   sandbox_workspace_write.network_access=true  — let `alice*` reach the
+  //                       loopback CLI gateway (else: "...fetch failed").
+  // No mcp_servers head (interactive composeCommand keeps it — MCP works there
+  // with a human approver). `--` terminates options before the trailing prompt.
+  composeHeadlessCommand(_base: readonly string[], _ctx: SpawnContext, prompt: string): readonly string[] {
+    return [
+      'codex',
+      '-c',
+      'approval_policy="never"',
+      '-c',
+      'sandbox_mode="workspace-write"',
+      '-c',
+      'sandbox_workspace_write.network_access=true',
+      'exec',
+      '--json',
+      '--',
+      prompt,
+    ];
   },
 
   async writeAiConfig(cwd: string, cred: WorkspaceAiCred): Promise<void> {

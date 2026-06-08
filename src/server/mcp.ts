@@ -28,10 +28,11 @@ import { registerCliRoutes } from './cli.js'
  *                           bootstrap.sh bakes the per-workspace URL into
  *                           the workspace's own .mcp.json.
  *
- *   GET  /cli/:wsId/manifest   Same open posture, same identity-by-URL trick —
- *   POST /cli/:wsId/invoke     the gateway for the workspace-local `alice` CLI
- *                              (see ./cli.ts). Reuses this server's open port so
- *                              the shim needs no token.
+ *   GET  /cli/:wsId/:export/manifest   Same open posture, same identity-by-URL
+ *   POST /cli/:wsId/:export/invoke     trick — the gateway for the workspace-local
+ *                              `alice*` CLIs (`:export` = data | workspace; see
+ *                              ./cli.ts). Reuses this server's open port so the
+ *                              shim needs no token.
  *
  * Holds references to both registries and the WorkspaceService (for wsId
  * registry lookup). Tools are rebuilt per-request so disable/enable +
