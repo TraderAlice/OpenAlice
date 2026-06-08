@@ -11,6 +11,7 @@ import type {
   EquitySearchData, EquityHistoricalData, EquityInfoData, KeyMetricsData,
   IncomeStatementData, BalanceSheetData, CashFlowStatementData, FinancialRatiosData,
   PriceTargetConsensusData, CalendarEarningsData, InsiderTradingData, EquityDiscoveryData,
+  HistoricalDividendsData,
 } from '@traderalice/opentypebb'
 
 export class OpenBBEquityClient {
@@ -103,7 +104,7 @@ export class OpenBBEquityClient {
   }
 
   async getDividends(params: Record<string, unknown>) {
-    return this.request('/fundamental/dividends', params)
+    return this.request<HistoricalDividendsData>('/fundamental/dividends', params)
   }
 
   async getEarningsHistory(params: Record<string, unknown>) {

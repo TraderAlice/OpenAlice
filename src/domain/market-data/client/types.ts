@@ -12,6 +12,7 @@ import type {
   EquitySearchData, EquityHistoricalData, EquityInfoData, KeyMetricsData,
   IncomeStatementData, BalanceSheetData, CashFlowStatementData, FinancialRatiosData,
   PriceTargetConsensusData, CalendarEarningsData, InsiderTradingData, EquityDiscoveryData,
+  HistoricalDividendsData,
   // Crypto
   CryptoSearchData, CryptoHistoricalData,
   // Currency
@@ -44,6 +45,7 @@ export interface EquityClientLike {
   getEstimateConsensus(params: Record<string, unknown>): Promise<PriceTargetConsensusData[]>
   getCalendarEarnings(params?: Record<string, unknown>): Promise<CalendarEarningsData[]>
   getInsiderTrading(params: Record<string, unknown>): Promise<InsiderTradingData[]>
+  getDividends(params: Record<string, unknown>): Promise<HistoricalDividendsData[]>
   getGainers(params?: Record<string, unknown>): Promise<EquityDiscoveryData[]>
   getLosers(params?: Record<string, unknown>): Promise<EquityDiscoveryData[]>
   getActive(params?: Record<string, unknown>): Promise<EquityDiscoveryData[]>

@@ -25,6 +25,20 @@ export function isTaiwanSymbol(symbol: string): boolean {
   return /\.(TW|TWO)$/.test(s) || /^\d{4,6}[A-Z]?$/.test(s)
 }
 
+/**
+ * Normalize a symbol for Yahoo Finance. Yahoo needs the exchange suffix for
+ * Taiwan listings (`0056.TW`), but a user may type the bare listing code
+ * (`0056`). Bare Taiwan codes are assumed TWSE-listed (`.TW`) — the vast
+ * majority of traded ETFs/stocks; TPEx-listed ones need an explicit `.TWO`.
+ * Symbols that already carry a suffix, and US tickers, pass through unchanged.
+ */
+export function toYahooSymbol(symbol: string): string {
+  const s = symbol.trim().toUpperCase()
+  if (/\.(TW|TWO)$/.test(s)) return s
+  if (/^\d{4,6}[A-Z]?$/.test(s)) return `${s}.TW`
+  return s
+}
+
 export function createEquityTools(equityClient: EquityClientLike) {
   return {
     equityGetProfile: tool({
@@ -157,6 +171,34 @@ If unsure about the symbol, use marketSearchForResearch to find it.`,
         const params: Record<string, unknown> = { symbol, provider: 'fmp' }
         if (limit) params.limit = limit
         return await equityClient.getInsiderTrading(params)
+      },
+    }),
+
+    equityGetDividends: tool({
+      description: `Get the dividend / distribution history for a stock or ETF.
+
+Returns each distribution as { ex_dividend_date, amount } (per share,
+split-adjusted), oldest first. Use this for income/yield analysis — e.g. an
+ETF's recent payout cadence and per-unit amounts.
+
+Sourced from Yahoo Finance, which covers Taiwan ETFs/stocks well (e.g.
+"0056.TW", "00878.TW") as well as US names. Taiwan symbols are routed to
+Yahoo here (not TWSE) — pass a bare code like "0056" and it resolves to the
+TWSE listing (".TW"); for a TPEx-listed symbol use the explicit ".TWO" suffix.
+
+If unsure about the symbol, use marketSearchForResearch to find it.`,
+      inputSchema: z.object({
+        symbol: z.string().describe('Ticker symbol, e.g. "AAPL", "SCHD", "0056.TW"'),
+        start_date: z.string().optional().describe('Start date in YYYY-MM-DD format (omit for full history)'),
+        end_date: z.string().optional().describe('End date in YYYY-MM-DD format'),
+        limit: z.number().int().positive().optional().describe('Return only the most recent N distributions'),
+      }).meta({ examples: [{ symbol: '0056.TW', limit: 8 }] }),
+      execute: async ({ symbol, start_date, end_date, limit }) => {
+        const params: Record<string, unknown> = { symbol: toYahooSymbol(symbol), provider: 'yfinance' }
+        if (start_date) params.start_date = start_date
+        if (end_date) params.end_date = end_date
+        const rows = await equityClient.getDividends(params)
+        return limit ? rows.slice(-limit) : rows
       },
     }),
 

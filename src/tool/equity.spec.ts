@@ -24,6 +24,7 @@ function makeMockEquityClient(): EquityClientLike {
     getEstimateConsensus: vi.fn(async () => []),
     getCalendarEarnings: vi.fn(async () => []),
     getInsiderTrading: vi.fn(async () => []),
+    getDividends: vi.fn(async () => []),
     getGainers: vi.fn(async () => []),
     getLosers: vi.fn(async () => []),
     getActive: vi.fn(async () => []),
@@ -103,5 +104,55 @@ describe('createEquityTools — equityGetRatios Taiwan short-circuit', () => {
     expect(client.getFinancialRatios).toHaveBeenCalledWith(
       expect.objectContaining({ symbol: 'AAPL', provider: 'fmp' }),
     )
+  })
+})
+
+describe('createEquityTools — equityGetDividends', () => {
+  let client: EquityClientLike
+  let tools: ReturnType<typeof createEquityTools>
+
+  beforeEach(() => {
+    client = makeMockEquityClient()
+    tools = createEquityTools(client)
+  })
+
+  it('fetches US dividends via yfinance, symbol unchanged', async () => {
+    await exec(tools.equityGetDividends, { symbol: 'AAPL' })
+    expect(client.getDividends).toHaveBeenCalledWith(
+      expect.objectContaining({ symbol: 'AAPL', provider: 'yfinance' }),
+    )
+  })
+
+  it('keeps an explicit Taiwan suffix and routes to yfinance (twse has no dividend feed)', async () => {
+    await exec(tools.equityGetDividends, { symbol: '0056.TW' })
+    expect(client.getDividends).toHaveBeenCalledWith(
+      expect.objectContaining({ symbol: '0056.TW', provider: 'yfinance' }),
+    )
+  })
+
+  it('appends .TW to a bare Taiwan code so Yahoo resolves it', async () => {
+    await exec(tools.equityGetDividends, { symbol: '00878' })
+    expect(client.getDividends).toHaveBeenCalledWith(
+      expect.objectContaining({ symbol: '00878.TW', provider: 'yfinance' }),
+    )
+  })
+
+  it('passes through a date range when provided', async () => {
+    await exec(tools.equityGetDividends, { symbol: 'AAPL', start_date: '2024-01-01', end_date: '2024-12-31' })
+    expect(client.getDividends).toHaveBeenCalledWith(
+      expect.objectContaining({ symbol: 'AAPL', provider: 'yfinance', start_date: '2024-01-01', end_date: '2024-12-31' }),
+    )
+  })
+
+  it('returns only the most recent `limit` distributions, newest last', async () => {
+    const rows = [
+      { symbol: '0056.TW', ex_dividend_date: '2025-07-21', amount: 0.866 },
+      { symbol: '0056.TW', ex_dividend_date: '2025-10-23', amount: 0.866 },
+      { symbol: '0056.TW', ex_dividend_date: '2026-01-22', amount: 0.866 },
+      { symbol: '0056.TW', ex_dividend_date: '2026-04-23', amount: 1.0 },
+    ]
+    ;(client.getDividends as any).mockResolvedValueOnce(rows)
+    const out = await exec(tools.equityGetDividends, { symbol: '0056.TW', limit: 2 })
+    expect(out).toEqual(rows.slice(-2))
   })
 })
