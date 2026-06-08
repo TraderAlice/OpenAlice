@@ -21,11 +21,10 @@
 
 import { z } from 'zod'
 import { Fetcher } from '../../../core/provider/abstract/fetcher.js'
-import { amakeRequest } from '../../../core/provider/utils/helpers.js'
 import { EmptyDataError } from '../../../core/provider/utils/errors.js'
 import { EquityInfoQueryParamsSchema, EquityInfoDataSchema } from '../../../standard-models/equity-info.js'
 import {
-  TW_HEADERS, toNum, toYahooSymbol, parseSymbolList, boardsNeeded,
+  TW_HEADERS, twseFetch, toNum, toYahooSymbol, parseSymbolList, boardsNeeded,
   type ParsedTwSymbol,
 } from './common.js'
 
@@ -207,10 +206,10 @@ export class TwseEquityInfoFetcher extends Fetcher {
     const needed = boardsNeeded(parseSymbolList(query.symbol))
     const [twse, tpex] = await Promise.all([
       needed.twse
-        ? amakeRequest<TwseProfileRow[]>(TWSE_PROFILE_URL, { headers: TW_HEADERS })
+        ? twseFetch<TwseProfileRow[]>(TWSE_PROFILE_URL, { headers: TW_HEADERS })
         : Promise.resolve([] as TwseProfileRow[]),
       needed.tpex
-        ? amakeRequest<TpexProfileRow[]>(TPEX_PROFILE_URL, { headers: TW_HEADERS })
+        ? twseFetch<TpexProfileRow[]>(TPEX_PROFILE_URL, { headers: TW_HEADERS })
         : Promise.resolve([] as TpexProfileRow[]),
     ])
     return { twse, tpex }

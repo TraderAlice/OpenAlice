@@ -20,7 +20,7 @@
 
 import { z } from 'zod'
 import { Fetcher } from '../../../core/provider/abstract/fetcher.js'
-import { amakeRequest } from '../../../core/provider/utils/helpers.js'
+import { twseFetch } from './common.js'
 import { EquitySearchQueryParamsSchema, EquitySearchDataSchema } from '../../../standard-models/equity-search.js'
 
 // ==================== Provider-specific schemas ====================
@@ -128,10 +128,10 @@ export class TwseEquitySearchFetcher extends Fetcher {
     _credentials: Record<string, string> | null,
   ): Promise<TwSecurityEntry[]> {
     const [twseDaily, tpexQuotes, twseProfiles] = await Promise.all([
-      amakeRequest<TwseStockDayAllRow[]>(TWSE_STOCK_DAY_ALL_URL, { headers: TW_HEADERS }),
-      amakeRequest<TpexMainboardRow[]>(TPEX_MAINBOARD_URL, { headers: TW_HEADERS }),
+      twseFetch<TwseStockDayAllRow[]>(TWSE_STOCK_DAY_ALL_URL, { headers: TW_HEADERS }),
+      twseFetch<TpexMainboardRow[]>(TPEX_MAINBOARD_URL, { headers: TW_HEADERS }),
       // English names are an enrichment — failure must not break the search.
-      amakeRequest<TwseCompanyProfileRow[]>(TWSE_PROFILE_URL, { headers: TW_HEADERS }).catch(
+      twseFetch<TwseCompanyProfileRow[]>(TWSE_PROFILE_URL, { headers: TW_HEADERS }).catch(
         () => [] as TwseCompanyProfileRow[],
       ),
     ])

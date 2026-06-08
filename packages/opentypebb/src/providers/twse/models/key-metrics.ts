@@ -17,11 +17,10 @@
 
 import { z } from 'zod'
 import { Fetcher } from '../../../core/provider/abstract/fetcher.js'
-import { amakeRequest } from '../../../core/provider/utils/helpers.js'
 import { EmptyDataError } from '../../../core/provider/utils/errors.js'
 import { KeyMetricsQueryParamsSchema, KeyMetricsDataSchema } from '../../../standard-models/key-metrics.js'
 import {
-  TW_HEADERS, rocToIso, toNum, toYahooSymbol, parseSymbolList, boardsNeeded,
+  TW_HEADERS, twseFetch, rocToIso, toNum, toYahooSymbol, parseSymbolList, boardsNeeded,
   type ParsedTwSymbol,
 } from './common.js'
 
@@ -129,10 +128,10 @@ export class TwseKeyMetricsFetcher extends Fetcher {
     const needed = boardsNeeded(parseSymbolList(query.symbol))
     const [twse, tpex] = await Promise.all([
       needed.twse
-        ? amakeRequest<TwseBwibbuRow[]>(TWSE_BWIBBU_ALL_URL, { headers: TW_HEADERS })
+        ? twseFetch<TwseBwibbuRow[]>(TWSE_BWIBBU_ALL_URL, { headers: TW_HEADERS })
         : Promise.resolve([] as TwseBwibbuRow[]),
       needed.tpex
-        ? amakeRequest<TpexPeratioRow[]>(TPEX_PERATIO_URL, { headers: TW_HEADERS })
+        ? twseFetch<TpexPeratioRow[]>(TPEX_PERATIO_URL, { headers: TW_HEADERS })
         : Promise.resolve([] as TpexPeratioRow[]),
     ])
     return { twse, tpex }

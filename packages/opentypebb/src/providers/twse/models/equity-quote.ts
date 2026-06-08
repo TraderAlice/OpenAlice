@@ -18,11 +18,10 @@
 
 import { z } from 'zod'
 import { Fetcher } from '../../../core/provider/abstract/fetcher.js'
-import { amakeRequest } from '../../../core/provider/utils/helpers.js'
 import { EmptyDataError } from '../../../core/provider/utils/errors.js'
 import { EquityQuoteQueryParamsSchema, EquityQuoteDataSchema } from '../../../standard-models/equity-quote.js'
 import {
-  TW_HEADERS, rocToIso, toNum, toYahooSymbol, parseSymbolList, boardsNeeded,
+  TW_HEADERS, twseFetch, rocToIso, toNum, toYahooSymbol, parseSymbolList, boardsNeeded,
   type ParsedTwSymbol,
 } from './common.js'
 
@@ -170,10 +169,10 @@ export class TwseEquityQuoteFetcher extends Fetcher {
     const needed = boardsNeeded(parseSymbolList(query.symbol))
     const [twse, tpex] = await Promise.all([
       needed.twse
-        ? amakeRequest<TwseStockDayAllRow[]>(TWSE_STOCK_DAY_ALL_URL, { headers: TW_HEADERS })
+        ? twseFetch<TwseStockDayAllRow[]>(TWSE_STOCK_DAY_ALL_URL, { headers: TW_HEADERS })
         : Promise.resolve([] as TwseStockDayAllRow[]),
       needed.tpex
-        ? amakeRequest<TpexMainboardQuoteRow[]>(TPEX_MAINBOARD_URL, { headers: TW_HEADERS })
+        ? twseFetch<TpexMainboardQuoteRow[]>(TPEX_MAINBOARD_URL, { headers: TW_HEADERS })
         : Promise.resolve([] as TpexMainboardQuoteRow[]),
     ])
     return { twse, tpex }

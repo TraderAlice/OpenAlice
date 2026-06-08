@@ -11,6 +11,20 @@ import { z } from 'zod'
 import type { EquityClientLike } from '@/domain/market-data/client/types'
 import type { EquityDiscoveryData } from '@traderalice/opentypebb'
 
+/**
+ * Taiwan-listed symbols are served by the `twse` provider (TWSE / TPEx
+ * official open data — rate-limit-aware, sourced straight from the
+ * exchanges) instead of the default yfinance/fmp. Matches both the
+ * Yahoo-suffix convention emitted by marketSearchForResearch (`2330.TW`,
+ * `6488.TWO`) and the bare numeric listing codes a user might type directly
+ * (`2330`, `00878`). US tickers are alphabetic, so a purely-numeric symbol
+ * is unambiguously a Taiwan listing.
+ */
+export function isTaiwanSymbol(symbol: string): boolean {
+  const s = symbol.trim().toUpperCase()
+  return /\.(TW|TWO)$/.test(s) || /^\d{4,6}[A-Z]?$/.test(s)
+}
+
 export function createEquityTools(equityClient: EquityClientLike) {
   return {
     equityGetProfile: tool({
@@ -19,14 +33,18 @@ export function createEquityTools(equityClient: EquityClientLike) {
 Returns company overview (name, sector, industry, description, website, CEO, employees)
 combined with key metrics (market cap, PE ratio, PB ratio, EV/EBITDA, dividend yield, etc.).
 
+Taiwan-listed symbols (e.g. "2330.TW", "6488.TWO") are sourced from official
+TWSE/TPEx open data; other markets come from Yahoo Finance.
+
 If unsure about the symbol, use marketSearchForResearch to find it.`,
       inputSchema: z.object({
-        symbol: z.string().describe('Ticker symbol, e.g. "AAPL", "MSFT"'),
+        symbol: z.string().describe('Ticker symbol, e.g. "AAPL", "MSFT", "2330.TW"'),
       }).meta({ examples: [{ symbol: 'AAPL' }] }),
       execute: async ({ symbol }) => {
+        const provider = isTaiwanSymbol(symbol) ? 'twse' : 'yfinance'
         const [profile, metrics] = await Promise.all([
-          equityClient.getProfile({ symbol, provider: 'yfinance' }).catch(() => []),
-          equityClient.getKeyMetrics({ symbol, limit: 1, provider: 'yfinance' }).catch(() => []),
+          equityClient.getProfile({ symbol, provider }).catch(() => []),
+          equityClient.getKeyMetrics({ symbol, limit: 1, provider }).catch(() => []),
         ])
         return { profile: profile[0] ?? null, metrics: metrics[0] ?? null }
       },
