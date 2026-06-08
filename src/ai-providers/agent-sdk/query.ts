@@ -239,7 +239,7 @@ export async function askAgentSdk(
       options: {
         cwd,
         env,
-        model: override?.model ?? 'claude-opus-4-7',
+        model: override?.model ?? 'claude-opus-4-8',
         maxTurns,
         allowedTools: finalAllowed,
         disallowedTools: finalDisallowed,

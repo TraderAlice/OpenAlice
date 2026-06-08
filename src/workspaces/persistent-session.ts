@@ -7,6 +7,7 @@ import {
   type ServerControlMessage,
 } from './protocol.js';
 import { ReplayBuffer } from './replay-buffer.js';
+import { resolveLaunchCommand } from './win-command.js';
 
 export interface PersistentSessionOptions {
   /** The workspace this session belongs to (for routing, logging, cwd context). */
@@ -116,7 +117,17 @@ export class PersistentSession {
   }
 
   private spawnChild(): pty.IPty {
-    const [argv0, ...args] = this.opts.command;
+    if (this.opts.command.length === 0) {
+      throw new Error('command must contain at least one argv element');
+    }
+    // win32: resolve the bare CLI name to its real `.exe`, or wrap a `.cmd`/
+    // `.ps1` npm shim through cmd.exe — ConPTY's CreateProcess only appends
+    // `.exe`, so npm-shim CLIs (opencode, pi) otherwise never launch. No-op off
+    // Windows. The interactive command is flags + a uuid, so the shell wrap is
+    // injection-safe here. See win-command.ts.
+    const [argv0, ...args] = resolveLaunchCommand(this.opts.command, {
+      env: this.opts.env,
+    }).argv;
     if (!argv0) throw new Error('command must contain at least one argv element');
 
     const term = pty.spawn(argv0, args, {

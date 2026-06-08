@@ -68,11 +68,11 @@ export const CLAUDE_OAUTH: PresetDef = {
   zodSchema: z.object({
     backend: z.literal('agent-sdk'),
     loginMethod: z.literal('claudeai'),
-    model: z.string().default('claude-opus-4-7').describe('Model'),
+    model: z.string().default('claude-opus-4-8').describe('Model'),
   }),
   models: [
+    { id: 'claude-opus-4-8', label: 'Claude Opus 4.8' },
     { id: 'claude-opus-4-7', label: 'Claude Opus 4.7' },
-    { id: 'claude-opus-4-6', label: 'Claude Opus 4.6' },
     { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
   ],
   sdkAdapters: {
@@ -93,12 +93,12 @@ export const CLAUDE_API: PresetDef = {
   zodSchema: z.object({
     backend: z.literal('agent-sdk'),
     loginMethod: z.literal('api-key'),
-    model: z.string().default('claude-opus-4-7').describe('Model'),
+    model: z.string().default('claude-opus-4-8').describe('Model'),
     apiKey: z.string().min(1).describe('Anthropic API key'),
   }),
   models: [
+    { id: 'claude-opus-4-8', label: 'Claude Opus 4.8' },
     { id: 'claude-opus-4-7', label: 'Claude Opus 4.7' },
-    { id: 'claude-opus-4-6', label: 'Claude Opus 4.6' },
     { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
     { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' },
   ],
@@ -124,9 +124,10 @@ export const CODEX_OAUTH: PresetDef = {
   zodSchema: z.object({
     backend: z.literal('codex'),
     loginMethod: z.literal('codex-oauth'),
-    model: z.string().default('gpt-5.4').describe('Model'),
+    model: z.string().default('gpt-5.5').describe('Model'),
   }),
   models: [
+    { id: 'gpt-5.5', label: 'GPT 5.5' },
     { id: 'gpt-5.4', label: 'GPT 5.4' },
     { id: 'gpt-5.4-mini', label: 'GPT 5.4 Mini' },
   ],
@@ -147,10 +148,11 @@ export const CODEX_API: PresetDef = {
   zodSchema: z.object({
     backend: z.literal('codex'),
     loginMethod: z.literal('api-key'),
-    model: z.string().default('gpt-5.4').describe('Model'),
+    model: z.string().default('gpt-5.5').describe('Model'),
     apiKey: z.string().min(1).describe('OpenAI API key'),
   }),
   models: [
+    { id: 'gpt-5.5', label: 'GPT 5.5' },
     { id: 'gpt-5.4', label: 'GPT 5.4' },
     { id: 'gpt-5.4-mini', label: 'GPT 5.4 Mini' },
   ],
@@ -175,12 +177,13 @@ export const GEMINI: PresetDef = {
   zodSchema: z.object({
     backend: z.literal('vercel-ai-sdk'),
     provider: z.literal('google'),
-    model: z.string().default('gemini-2.5-flash').describe('Model'),
+    model: z.string().default('gemini-3.5-flash').describe('Model'),
     apiKey: z.string().min(1).describe('Google AI API key'),
   }),
   models: [
+    { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash' },
+    { id: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash-Lite' },
     { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
-    { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
   ],
   writeOnlyFields: ['apiKey'],
   sdkAdapters: {
@@ -209,7 +212,7 @@ export const MINIMAX: PresetDef = {
     // Bearer. Default to it so both endpoints work without the user having to
     // know the split. Surfaced to the per-workspace config's "Apply" path.
     authMode: z.enum(['x-api-key', 'bearer']).default('bearer').describe('Auth header'),
-    model: z.string().default('MiniMax-M2.7').describe('Model'),
+    model: z.string().default('MiniMax-M3').describe('Model'),
     apiKey: z.string().min(1).describe('MiniMax API key'),
   }),
   endpoints: [
@@ -217,6 +220,7 @@ export const MINIMAX: PresetDef = {
     { id: 'https://api.minimax.io/anthropic', label: 'International (minimax.io)' },
   ],
   models: [
+    { id: 'MiniMax-M3', label: 'MiniMax M3' },
     { id: 'MiniMax-M2.7', label: 'MiniMax M2.7' },
   ],
   writeOnlyFields: ['apiKey'],
@@ -240,12 +244,12 @@ export const GLM: PresetDef = {
   description: 'Zhipu GLM models via Claude Agent SDK (Anthropic-compatible)',
   category: 'third-party',
   defaultName: 'GLM',
-  hint: 'China console: bigmodel.cn — International console: z.ai. API keys are region-locked. Latest GLM 5.1 is China-only for now.',
+  hint: 'China console: bigmodel.cn — International console: z.ai. API keys are region-locked. GLM 5.1 is the current flagship, served on both regions.',
   zodSchema: z.object({
     backend: z.literal('agent-sdk'),
     loginMethod: z.literal('api-key'),
     baseUrl: z.string().default('https://open.bigmodel.cn/api/anthropic').describe('API endpoint'),
-    model: z.string().default('glm-4.7').describe('Model'),
+    model: z.string().default('glm-5.1').describe('Model'),
     apiKey: z.string().min(1).describe('GLM API key'),
   }),
   endpoints: [
@@ -253,9 +257,8 @@ export const GLM: PresetDef = {
     { id: 'https://api.z.ai/api/anthropic', label: 'International (z.ai)' },
   ],
   models: [
-    { id: 'glm-5.1', label: 'GLM 5.1 (China only)' },
+    { id: 'glm-5.1', label: 'GLM 5.1' },
     { id: 'glm-4.7', label: 'GLM 4.7' },
-    { id: 'glm-4.6', label: 'GLM 4.6 — 200K (China only)' },
     { id: 'glm-4.5-air', label: 'GLM 4.5 Air' },
   ],
   writeOnlyFields: ['apiKey'],

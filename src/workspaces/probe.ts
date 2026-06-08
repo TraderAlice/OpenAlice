@@ -27,6 +27,7 @@ import { join } from 'node:path';
 import * as pty from 'node-pty';
 
 import type { Logger } from './logger.js';
+import { resolveLaunchCommand } from './win-command.js';
 
 export interface HeadlessProbeArgs {
   readonly command: readonly string[];
@@ -69,7 +70,12 @@ const KILL_GRACE_MS = 500;
 export async function runHeadlessProbe(args: HeadlessProbeArgs): Promise<HeadlessProbeResult> {
   const { command, cwd, env, transcriptDir, transcriptFileRe, prompt, timeoutMs, logger } = args;
 
-  const [argv0, ...argv1Composed] = command;
+  // win32: resolve the bare CLI name to a real `.exe` or a cmd.exe-wrapped
+  // `.cmd` shim before the prompt is appended — same ConPTY limitation the
+  // interactive pool handles. Without this, probing opencode/pi on Windows
+  // ENOENTs and the agent can never be enabled. The probe prompt is a fixed
+  // launcher-internal ping (no untrusted input), so the shim wrap is safe.
+  const [argv0, ...argv1Composed] = resolveLaunchCommand(command, { env }).argv;
   if (!argv0) throw new Error('probe: empty command');
   const argv1 = [...argv1Composed, prompt];
 

@@ -23,6 +23,7 @@
 import { spawn } from 'node:child_process';
 
 import type { Logger } from './logger.js';
+import { resolveLaunchCommand } from './win-command.js';
 
 const KILL_GRACE_MS = 5_000;
 const OUTPUT_TAIL_BYTES = 16 * 1024;
@@ -78,7 +79,7 @@ function makeTailSink(maxBytes: number): { push(c: Buffer): void; text(): string
 
 export async function runHeadlessTask(args: HeadlessTaskArgs): Promise<HeadlessTaskResult> {
   const { command, cwd, env, timeoutMs, logger } = args;
-  const [argv0, ...argv1] = command;
+  const [argv0] = command;
   if (!argv0) throw new Error('headless: empty command');
 
   const start = Date.now();
@@ -88,14 +89,35 @@ export async function runHeadlessTask(args: HeadlessTaskArgs): Promise<HeadlessT
   const outSink = makeTailSink(OUTPUT_TAIL_BYTES);
   const errSink = makeTailSink(OUTPUT_TAIL_BYTES);
 
-  // KNOWN GAP (win32): plain shell-less spawn of a bare CLI name (`claude` etc.)
-  // won't resolve the npm `.cmd` shim on Windows (post-CVE-2024-27980 Node
-  // disabled that), so headless tasks ENOENT on win32. The interactive pool
-  // avoids this by using node-pty (ConPTY resolves shims). NOT fixed with
-  // `shell:true` — that would re-parse the prompt arg through cmd.exe and
-  // re-open shell injection. Proper fix = resolve the shim path / cross-spawn.
-  // Tracked for follow-up; primary targets (macOS dev, Linux cloud) are fine.
-  const child = spawn(argv0, argv1, {
+  // win32: resolve the bare CLI name against PATH × PATHEXT. Native-exe agents
+  // (claude.exe, codex.exe) resolve to a direct path and run headless fine. But
+  // npm-shim agents (opencode, pi → a `.cmd`) would have to run through cmd.exe,
+  // and the headless PROMPT is the trailing arg — routing it through cmd.exe
+  // re-parses shell metacharacters (CVE-2024-27980 territory), a real injection
+  // surface. So shim agents stay headless-unsupported on Windows; we fail with a
+  // clear, recorded reason instead of a silent ENOENT. (Interactive launch of
+  // the same agents works — see win-command.ts / persistent-session.ts.)
+  const resolved = resolveLaunchCommand(command, { env });
+  if (resolved.viaShell) {
+    logger.error('headless.win32_shim_unsupported', { command: argv0 });
+    return {
+      command,
+      cwd,
+      exitCode: -1,
+      signal: null,
+      killed: false,
+      durationMs: Date.now() - start,
+      stdoutTail: '',
+      stderrTail:
+        `win32: "${argv0}" is an npm .cmd shim; headless dispatch is unsupported ` +
+        `on Windows (routing the task prompt through cmd.exe is a shell-injection ` +
+        `surface). Native-exe agents (claude, codex) run headless; run shim agents ` +
+        `(opencode, pi) interactively instead.`,
+    };
+  }
+  const [spawnFile, ...spawnArgs] = resolved.argv;
+  if (!spawnFile) throw new Error('headless: empty command after resolution');
+  const child = spawn(spawnFile, spawnArgs, {
     cwd,
     env: env as NodeJS.ProcessEnv,
     stdio: ['ignore', 'pipe', 'pipe'],

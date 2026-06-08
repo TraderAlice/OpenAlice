@@ -94,14 +94,14 @@ const baseProfileFields = {
 export const agentSdkProfileSchema = z.object({
   ...baseProfileFields,
   backend: z.literal('agent-sdk'),
-  model: z.string().default('claude-opus-4-7'),
+  model: z.string().default('claude-opus-4-8'),
   loginMethod: z.enum(['api-key', 'claudeai']).default('api-key'),
 })
 
 export const codexProfileSchema = z.object({
   ...baseProfileFields,
   backend: z.literal('codex'),
-  model: z.string().default('gpt-5.4'),
+  model: z.string().default('gpt-5.5'),
   loginMethod: z.enum(['api-key', 'codex-oauth']).default('codex-oauth'),
 })
 
@@ -109,7 +109,7 @@ export const vercelProfileSchema = z.object({
   ...baseProfileFields,
   backend: z.literal('vercel-ai-sdk'),
   provider: z.string().default('anthropic'),
-  model: z.string().default('claude-opus-4-7'),
+  model: z.string().default('claude-opus-4-8'),
 })
 
 export const profileSchema = z.discriminatedUnion('backend', [
@@ -130,7 +130,7 @@ export const aiProviderSchema = z.object({
     z.string(),
     profileSchema,
   ).default({
-    default: { backend: 'agent-sdk', model: 'claude-opus-4-7', loginMethod: 'claudeai' },
+    default: { backend: 'agent-sdk', model: 'claude-opus-4-8', loginMethod: 'claudeai' },
   }),
   activeProfile: z.string().default('default'),
 })

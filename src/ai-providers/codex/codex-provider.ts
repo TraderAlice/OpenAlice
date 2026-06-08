@@ -27,7 +27,7 @@ const logger = pino({
 
 const DEFAULT_OAUTH_BASE_URL = 'https://chatgpt.com/backend-api/codex'
 const DEFAULT_API_BASE_URL = 'https://api.openai.com/v1'
-const DEFAULT_MODEL = 'gpt-5.4'
+const DEFAULT_MODEL = 'gpt-5.5'
 
 // ==================== Provider ====================
 
