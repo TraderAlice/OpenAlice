@@ -81,3 +81,27 @@ describe('createEquityTools — equityGetProfile provider routing', () => {
     expect(client.getKeyMetrics).toHaveBeenCalledWith({ symbol: 'AAPL', limit: 1, provider: 'yfinance' })
   })
 })
+
+describe('createEquityTools — equityGetRatios Taiwan short-circuit', () => {
+  let client: EquityClientLike
+  let tools: ReturnType<typeof createEquityTools>
+
+  beforeEach(() => {
+    client = makeMockEquityClient()
+    tools = createEquityTools(client)
+  })
+
+  it('short-circuits Taiwan symbols with a pointer to equityGetProfile', async () => {
+    const out = await exec(tools.equityGetRatios, { symbol: '2330.TW' })
+    expect(client.getFinancialRatios).not.toHaveBeenCalled()
+    expect(out).toMatchObject({ ratios: [] })
+    expect(out.message).toContain('equityGetProfile')
+  })
+
+  it('still routes US symbols to the fmp ratios provider', async () => {
+    await exec(tools.equityGetRatios, { symbol: 'AAPL' })
+    expect(client.getFinancialRatios).toHaveBeenCalledWith(
+      expect.objectContaining({ symbol: 'AAPL', provider: 'fmp' }),
+    )
+  })
+})

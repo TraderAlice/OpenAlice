@@ -101,6 +101,16 @@ If unsure about the symbol, use marketSearchForResearch to find it.`,
         ttm: z.enum(['include', 'exclude', 'only']).optional().describe('TTM handling: "include" (default — TTM + history), "exclude" (history only), "only" (TTM snapshot only)'),
       }).meta({ examples: [{ symbol: 'AAPL', period: 'annual', limit: 5 }] }),
       execute: async ({ symbol, period, limit, ttm }) => {
+        // FMP (the ratios provider) covers US fundamentals only, and twse has
+        // no financial-ratios fetcher. Short-circuit Taiwan symbols with a
+        // pointer to the tool that does work, instead of surfacing the raw
+        // "missing fmp_api_key" error.
+        if (isTaiwanSymbol(symbol)) {
+          return {
+            ratios: [],
+            message: `Financial ratios are not available for Taiwan-listed symbols (the FMP ratios provider does not cover Taiwan). For ${symbol}, use equityGetProfile — it returns P/E, P/B, and dividend yield from official TWSE/TPEx data.`,
+          }
+        }
         // The FMP fetcher defaults ttm to "only" (a single TTM row, with
         // period/limit dead). Default to "include" here so the historical
         // series — and therefore period/limit — actually come through.
