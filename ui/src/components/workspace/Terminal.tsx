@@ -1,9 +1,9 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import type { ReactElement } from 'react';
 
+import { CanvasAddon } from '@xterm/addon-canvas';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
-import { WebglAddon } from '@xterm/addon-webgl';
 import { Terminal as Xterm } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
 
@@ -112,7 +112,7 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
     const term = new Xterm({
       theme: darkTheme,
       fontFamily:
-        'ui-monospace, "SF Mono", Menlo, Monaco, "Cascadia Mono", "DejaVu Sans Mono", monospace',
+        'ui-monospace, "SF Mono", Menlo, Monaco, "Cascadia Mono", "DejaVu Sans Mono", "Noto Sans Mono CJK JP", "Noto Sans CJK JP", monospace',
       fontSize: 13,
       lineHeight: 1.2,
       cursorBlink: true,
@@ -127,13 +127,20 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
     term.loadAddon(new WebLinksAddon());
     term.open(container);
 
-    let webgl: WebglAddon | null = null;
+    // Canvas renderer (not WebGL). The WebGL glyph atlas renders any styled
+    // CJK cell it can't rasterize — notably italic Japanese, since Noto Sans
+    // Mono CJK JP has no italic face — as a solid black box. Canvas rasterizes
+    // each cell via 2D fillText, which falls back through the browser font
+    // stack and synthesizes obliques, so bold/italic Japanese renders
+    // correctly. It's far faster than the DOM renderer (which made input echo
+    // sluggish in heavy TUIs like the agent CLIs) while avoiding WebGL's
+    // missing-glyph boxes.
+    let canvas: CanvasAddon | null = null;
     try {
-      webgl = new WebglAddon();
-      webgl.onContextLoss(() => webgl?.dispose());
-      term.loadAddon(webgl);
+      canvas = new CanvasAddon();
+      term.loadAddon(canvas);
     } catch {
-      webgl = null;
+      canvas = null;
     }
 
     safeFit(fit);
@@ -257,7 +264,7 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
       } catch {
         // ignore
       }
-      webgl?.dispose();
+      canvas?.dispose();
       term.dispose();
     };
   }, [wsId, sessionId, wsUrl]);
