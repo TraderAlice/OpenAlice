@@ -2,7 +2,7 @@
 
 AI trading agent. From a code-writing perspective, the Alice process is two
 things: a **Workspace launcher** (PTY sessions running native agent CLIs —
-`claude`, `codex`, `shell`; capability extension ships as workspace templates
+`claude`, `codex`, `opencode`, `pi`, `shell`; capability extension ships as workspace templates
 + satellite repos, not `src/` deps) and a **Trading-context injector**
 (market data, analysis, news, and the UTA SDK — surfaced into those
 workspaces via MCP). Broker credentials and trading state live in a separate
@@ -226,7 +226,7 @@ src/                           # Alice process — agent runtime
 │                              # template registry, CLI adapters, agent
 │                              # probe, file/git services for in-workspace
 │                              # ops, persistent-session reattach.
-│   ├── adapters/              # claude.ts / codex.ts / shell.ts
+│   ├── adapters/              # claude.ts / codex.ts / opencode.ts / pi.ts / shell.ts
 │   └── templates/             # auto-quant, chat, finance-research
 ├── services/                  # Cross-cutting services Alice itself owns.
 │   ├── auth/                  # Admin-token store + session-store
@@ -312,7 +312,7 @@ memory `feedback_workspace_as_capability_boundary` and
 
 Load-bearing files: `service.ts` (lifecycle), `session-pool.ts` (PTYs),
 `session-registry.ts` (persistence), `scrollback-store.ts` (replay),
-`template-registry.ts` (templates), `adapters/{claude,codex,shell}.ts`
+`template-registry.ts` (templates), `adapters/{claude,codex,opencode,pi,shell}.ts`
 (CLI wiring), `protocol.ts` (UI ↔ workspace wire shape).
 
 ### Alice ↔ UTA split
