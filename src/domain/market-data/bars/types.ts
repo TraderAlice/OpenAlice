@@ -78,6 +78,8 @@ export interface BarSourceCandidate {
   source: BarSourceKind
   sourceId: string
   symbol: string
+  /** Human-readable asset name (vendor results) — for the search list. */
+  name?: string
   assetClass: AssetClass | 'unknown'
   label: string
   barCapability?: BarCapability

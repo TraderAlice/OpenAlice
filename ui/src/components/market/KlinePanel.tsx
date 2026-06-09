@@ -62,6 +62,8 @@ export function KlinePanel({ selection }: Props) {
   const [searchParams, setSearchParams] = useSearchParams()
   const interval = parseInterval(searchParams.get('interval'))
   const tf = parseTimeframe(searchParams.get('range'))
+  // The provider picked at search time (a barId), if any — opens the chart on it.
+  const sourceParam = searchParams.get('source')
 
   // Local setter named `selectInterval` rather than `setInterval` so it
   // doesn't shadow the global timer function we use for polling below.
@@ -146,9 +148,10 @@ export function KlinePanel({ selection }: Props) {
   }, [interval])
 
   // Discover the available bar sources for this symbol (populates the picker).
-  // Reset the picked source whenever the symbol changes → falls back to vendor.
+  // Seed the picked source from the URL (?source=barId, set at search time);
+  // otherwise null → vendor default.
   useEffect(() => {
-    setSelectedBarId(null)
+    setSelectedBarId(sourceParam)
     setCandidates([])
     if (!selection || selection.assetClass === 'commodity') return
     let cancelled = false
@@ -156,7 +159,7 @@ export function KlinePanel({ selection }: Props) {
       .then((r) => { if (!cancelled) setCandidates(r.candidates) })
       .catch(() => { if (!cancelled) setCandidates([]) })
     return () => { cancelled = true }
-  }, [selection])
+  }, [selection, sourceParam])
 
   // Fetch bars: an explicitly-picked source (barId) or the vendor default
   // (symbol+assetClass). Re-polls so a long-open tab doesn't show stale bars.

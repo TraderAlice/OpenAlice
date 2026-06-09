@@ -1,27 +1,28 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { marketApi, type SearchResult, type AssetClass } from '../../api/market'
+import { barsApi, type BarSourceCandidate, type AssetClass } from '../../api/market'
 
-const ASSET_CLASS_COLORS: Record<AssetClass, string> = {
+const ASSET_CLASS_COLORS: Record<string, string> = {
   equity: 'bg-accent/15 text-accent',
   crypto: 'bg-amber-500/15 text-amber-400',
   currency: 'bg-green/15 text-green',
   commodity: 'bg-purple-500/15 text-purple-400',
+  unknown: 'bg-bg-tertiary text-text-muted',
 }
 
-function resultKey(r: SearchResult): string {
-  return `${r.assetClass}:${r.symbol ?? r.id ?? Math.random()}`
-}
-
-function resultSymbol(r: SearchResult): string {
-  return r.symbol ?? r.id ?? ''
+const CAPABILITY_COLOR: Record<string, string> = {
+  realtime: 'text-green',
+  iex: 'text-accent',
+  delayed: 'text-text-muted',
+  subscription: 'text-amber-400',
+  free: 'text-text-muted',
 }
 
 export function SearchBox() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<SearchResult[]>([])
+  const [results, setResults] = useState<BarSourceCandidate[]>([])
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
   const [highlight, setHighlight] = useState(0)
@@ -37,8 +38,10 @@ export function SearchBox() {
     setLoading(true)
     const timer = setTimeout(async () => {
       try {
-        const res = await marketApi.search(q, 20)
-        setResults(res.results)
+        // Federated source search: each result is a specific provider's K-line
+        // (vendor or a connected broker), labeled explicitly — no merging.
+        const res = await barsApi.searchSources(q, 24)
+        setResults(res.candidates)
         setHighlight(0)
       } catch (e) {
         console.error('search failed', e)
@@ -60,17 +63,18 @@ export function SearchBox() {
     return () => document.removeEventListener('mousedown', onClickAway)
   }, [])
 
-  const handleSelect = (r: SearchResult) => {
-    const sym = resultSymbol(r)
-    if (!sym) return
+  const handleSelect = (r: BarSourceCandidate) => {
+    if (!r.symbol) return
     setOpen(false)
     setQuery('')
-    // Preserve K-line interval/range across symbol switches so the user's
-    // preferred view settings carry over.
-    const qs = searchParams.toString()
+    // Carry the chosen source (barId) so the chart opens on THAT provider, and
+    // preserve interval/range across switches.
+    const next = new URLSearchParams(searchParams)
+    next.set('source', r.barId)
+    const assetClass: AssetClass = r.assetClass === 'unknown' ? 'equity' : r.assetClass
     navigate({
-      pathname: `/market/${r.assetClass}/${encodeURIComponent(sym)}`,
-      search: qs ? `?${qs}` : '',
+      pathname: `/market/${assetClass}/${encodeURIComponent(r.symbol)}`,
+      search: `?${next.toString()}`,
     })
   }
 
@@ -110,18 +114,25 @@ export function SearchBox() {
           )}
           {results.map((r, i) => (
             <button
-              key={resultKey(r)}
+              key={r.barId}
               onClick={() => handleSelect(r)}
               onMouseEnter={() => setHighlight(i)}
               className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[13px] cursor-pointer transition-colors ${
                 i === highlight ? 'bg-bg-tertiary' : ''
               }`}
             >
-              <span className="font-mono font-semibold text-text">{resultSymbol(r)}</span>
+              <span className="font-mono font-semibold text-text shrink-0">{r.symbol}</span>
               {r.name && (
-                <span className="text-text-muted truncate flex-1">— {r.name}</span>
+                <span className="text-text-muted truncate flex-1 min-w-0">— {r.name}</span>
               )}
-              <span className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded font-medium ${ASSET_CLASS_COLORS[r.assetClass]}`}>
+              {/* Explicit provider — this is how same-symbol sources are disambiguated. */}
+              <span className="ml-auto flex items-center gap-1 shrink-0 text-[11px] text-text-muted">
+                <span className="font-medium text-text/80">{r.sourceId}</span>
+                {r.barCapability && (
+                  <span className={CAPABILITY_COLOR[r.barCapability] ?? 'text-text-muted'}>· {r.barCapability}</span>
+                )}
+              </span>
+              <span className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded font-medium shrink-0 ${ASSET_CLASS_COLORS[r.assetClass] ?? ASSET_CLASS_COLORS.unknown}`}>
                 {r.assetClass}
               </span>
             </button>

@@ -39,8 +39,8 @@ export const marketHandlers = [
     const q = (new URL(request.url).searchParams.get('query') ?? '').toUpperCase()
     if (!q.includes('AAPL') && !q.includes('APPLE')) return HttpResponse.json({ candidates: [], count: 0 })
     const candidates: BarSourceCandidate[] = [
-      { barId: 'yfinance|AAPL', source: 'vendor', sourceId: 'yfinance', symbol: 'AAPL', assetClass: 'equity', label: 'AAPL', barCapability: 'delayed' },
-      { barId: 'alpaca-paper|AAPL', source: 'uta', sourceId: 'alpaca-paper', symbol: 'AAPL', assetClass: 'equity', label: 'AAPL', barCapability: 'iex' },
+      { barId: 'yfinance|AAPL', source: 'vendor', sourceId: 'yfinance', symbol: 'AAPL', name: 'Apple Inc.', assetClass: 'equity', label: 'AAPL', barCapability: 'delayed' },
+      { barId: 'alpaca-paper|AAPL', source: 'uta', sourceId: 'alpaca-paper', symbol: 'AAPL', name: 'Apple Inc.', assetClass: 'equity', label: 'AAPL', barCapability: 'iex' },
     ]
     return HttpResponse.json({ candidates, count: candidates.length })
   }),

@@ -140,6 +140,7 @@ export interface BarSourceCandidate {
   source: BarSource
   sourceId: string
   symbol: string
+  name?: string
   assetClass: AssetClass | 'unknown'
   label: string
   barCapability?: BarCapability

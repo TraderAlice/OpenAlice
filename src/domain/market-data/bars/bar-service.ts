@@ -232,6 +232,7 @@ export function createBarService(deps: BarServiceDeps): BarService {
             source: 'vendor',
             sourceId: provider,
             symbol,
+            name: r.name ?? undefined,
             assetClass: r.assetClass,
             label: r.name ? `${symbol} · ${r.name} (${provider})` : `${symbol} (${provider})`,
             barCapability: VENDOR_CAPABILITY[provider],
