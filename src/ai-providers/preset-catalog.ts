@@ -347,6 +347,47 @@ export const DEEPSEEK: PresetDef = {
   },
 }
 
+// ==================== Third-party: Atlas Cloud ====================
+
+export const ATLAS_CLOUD: PresetDef = {
+  id: 'atlas-cloud',
+  label: 'Atlas Cloud',
+  description: 'Atlas Cloud — 59 frontier LLMs (DeepSeek-V4, Qwen3, Kimi K2, GPT-5, Gemini 2.5 Pro, Claude…) via OpenAI-compatible API',
+  category: 'third-party',
+  defaultName: 'Atlas Cloud',
+  hint: 'Get your API key at atlascloud.ai/console. Single OpenAI-compatible endpoint covering 59 models across LLM, image, and video categories. Great for market analysis and trading decision making in OpenAlice.',
+  zodSchema: z.object({
+    backend: z.literal('vercel-ai-sdk'),
+    provider: z.literal('openai'),
+    baseUrl: z.string().default('https://api.atlascloud.ai/v1').describe('API endpoint'),
+    model: z.string().default('deepseek-ai/deepseek-v4-pro').describe('Model'),
+    apiKey: z.string().min(1).describe('Atlas Cloud API key'),
+  }),
+  models: [
+    { id: 'deepseek-ai/deepseek-v4-pro', label: 'DeepSeek V4 Pro (flagship)' },
+    { id: 'deepseek-ai/deepseek-v4-flash', label: 'DeepSeek V4 Flash (fast)' },
+    { id: 'deepseek-ai/deepseek-r1-0528', label: 'DeepSeek R1 (reasoning)' },
+    { id: 'moonshot-ai/kimi-k2', label: 'Kimi K2' },
+    { id: 'qwen/qwen3-235b-a22b', label: 'Qwen3 235B' },
+    { id: 'qwen/qwen3-32b', label: 'Qwen3 32B' },
+    { id: 'openai/gpt-5', label: 'GPT-5' },
+    { id: 'openai/gpt-4o', label: 'GPT-4o' },
+    { id: 'anthropic/claude-opus-4', label: 'Claude Opus 4' },
+    { id: 'anthropic/claude-sonnet-4-5', label: 'Claude Sonnet 4.5' },
+    { id: 'google/gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+    { id: 'google/gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+    { id: 'xai/grok-4', label: 'Grok-4' },
+    { id: 'meta-llama/llama-4-maverick', label: 'Llama 4 Maverick' },
+  ],
+  writeOnlyFields: ['apiKey'],
+  sdkAdapters: {
+    available: [
+      { id: 'vercel-openai', config: (c) => ({ apiKey: c.apiKey, baseURL: c.baseUrl }) },
+    ],
+    test: 'vercel-openai',
+  },
+}
+
 // ==================== Custom ====================
 
 export const CUSTOM: PresetDef = {
@@ -378,5 +419,6 @@ export const PRESET_CATALOG: PresetDef[] = [
   GLM,
   KIMI,
   DEEPSEEK,
+  ATLAS_CLOUD,
   CUSTOM,
 ]
