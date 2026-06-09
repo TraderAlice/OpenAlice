@@ -4,72 +4,72 @@ import { AdapterRegistry, type CliAdapter, type WorkspaceAiCred } from './cli-ad
 import type { Credential } from '@/core/config.js'
 import type { Logger } from './logger.js'
 
-const anthropicKey: Credential = { vendor: 'anthropic', authType: 'api-key', apiKey: 'sk-ant' }
+// Multi-wire credentials: one key, the shapes (→ endpoints) it can speak.
+const anthropicKey: Credential = { vendor: 'anthropic', authType: 'api-key', apiKey: 'sk-ant', wires: { anthropic: '' } }
 const minimaxIntl: Credential = {
-  vendor: 'minimax',
-  authType: 'api-key',
-  apiKey: 'mm-key',
-  baseUrl: 'https://api.minimax.io/anthropic',
+  vendor: 'minimax', authType: 'api-key', apiKey: 'mm-key',
+  wires: { anthropic: 'https://api.minimax.io/anthropic', 'openai-chat': 'https://api.minimax.io/v1' },
 }
-const openaiKey: Credential = { vendor: 'openai', authType: 'api-key', apiKey: 'sk-oa' }
-const customGateway: Credential = {
-  vendor: 'custom',
-  authType: 'api-key',
-  apiKey: 'k',
-  baseUrl: 'https://gw.example.com/v1',
-}
+const openaiKey: Credential = { vendor: 'openai', authType: 'api-key', apiKey: 'sk-oa', wires: { 'openai-responses': '', 'openai-chat': '' } }
+const chatOnlyGateway: Credential = { vendor: 'custom', authType: 'api-key', apiKey: 'k', wires: { 'openai-chat': 'https://gw.example.com/v1' } }
 
 describe('credentialToWorkspaceAiCred', () => {
-  it('passes through apiKey + baseUrl and takes model from overrides', () => {
-    const cred = credentialToWorkspaceAiCred(minimaxIntl, 'claude', { model: 'MiniMax-M3' })
+  it('picks the agent\'s wire (claude → anthropic) + apiKey; model from overrides', () => {
+    const cred = credentialToWorkspaceAiCred(minimaxIntl, 'claude', { model: 'MiniMax-M3' })!
     expect(cred.apiKey).toBe('mm-key')
     expect(cred.baseUrl).toBe('https://api.minimax.io/anthropic')
+    expect(cred.wireShape).toBe('anthropic')
     expect(cred.model).toBe('MiniMax-M3')
   })
 
+  it('returns null when no wire the agent speaks (chat-only key → codex)', () => {
+    expect(credentialToWorkspaceAiCred(chatOnlyGateway, 'codex', { model: 'gpt-5.5' })).toBeNull()
+  })
+
   it('credential carries no model — model is null without an override', () => {
-    const cred = credentialToWorkspaceAiCred(anthropicKey, 'claude')
+    const cred = credentialToWorkspaceAiCred(anthropicKey, 'claude')!
     expect(cred.model).toBeNull()
+  })
+
+  it('upgrades a legacy {baseUrl,wireShape} credential transparently', () => {
+    const legacy: Credential = { vendor: 'minimax', authType: 'api-key', apiKey: 'm', baseUrl: 'https://api.minimax.io/anthropic', wireShape: 'anthropic' }
+    const cred = credentialToWorkspaceAiCred(legacy, 'claude', { model: 'm' })!
+    expect(cred.baseUrl).toBe('https://api.minimax.io/anthropic')
+    expect(cred.wireShape).toBe('anthropic')
   })
 
   describe('claude → authMode', () => {
     it('defaults to x-api-key for first-party Anthropic', () => {
-      const cred = credentialToWorkspaceAiCred(anthropicKey, 'claude', { model: 'claude-opus-4-8' })
-      expect(cred.authMode).toBe('x-api-key')
+      expect(credentialToWorkspaceAiCred(anthropicKey, 'claude', { model: 'claude-opus-4-8' })!.authMode).toBe('x-api-key')
     })
 
     it('auto-promotes api.minimax.io to bearer', () => {
-      const cred = credentialToWorkspaceAiCred(minimaxIntl, 'claude', { model: 'MiniMax-M3' })
-      expect(cred.authMode).toBe('bearer')
+      expect(credentialToWorkspaceAiCred(minimaxIntl, 'claude', { model: 'MiniMax-M3' })!.authMode).toBe('bearer')
     })
 
     it('explicit override wins', () => {
-      const cred = credentialToWorkspaceAiCred(anthropicKey, 'claude', { authMode: 'bearer' })
-      expect(cred.authMode).toBe('bearer')
+      expect(credentialToWorkspaceAiCred(anthropicKey, 'claude', { authMode: 'bearer' })!.authMode).toBe('bearer')
     })
   })
 
-  describe('codex → wireApi', () => {
-    it('left undefined when not overridden (adapter defaults to chat)', () => {
-      const cred = credentialToWorkspaceAiCred(customGateway, 'codex', { model: 'gpt-5.5' })
+  describe('codex → openai-responses wire', () => {
+    it('picks the responses wire; wireApi undefined unless overridden (adapter forces responses)', () => {
+      const cred = credentialToWorkspaceAiCred(openaiKey, 'codex', { model: 'gpt-5.5' })!
+      expect(cred.wireShape).toBe('openai-responses')
       expect(cred.wireApi).toBeUndefined()
+      expect(cred.authMode).toBeUndefined()
     })
 
     it('passes an explicit wireApi through', () => {
-      const cred = credentialToWorkspaceAiCred(openaiKey, 'codex', { model: 'gpt-5.5', wireApi: 'responses' })
-      expect(cred.wireApi).toBe('responses')
-    })
-
-    it('never sets authMode for codex', () => {
-      const cred = credentialToWorkspaceAiCred(openaiKey, 'codex', { model: 'gpt-5.5' })
-      expect(cred.authMode).toBeUndefined()
+      expect(credentialToWorkspaceAiCred(openaiKey, 'codex', { model: 'gpt-5.5', wireApi: 'responses' })!.wireApi).toBe('responses')
     })
   })
 
-  describe('opencode / pi → plain chat (no adapter-specific knobs)', () => {
+  describe('opencode / pi → prefers chat, no adapter-specific knobs', () => {
     for (const agent of ['opencode', 'pi']) {
-      it(`${agent}: sets neither authMode nor wireApi`, () => {
-        const cred = credentialToWorkspaceAiCred(customGateway, agent, { model: 'some-model' })
+      it(`${agent}: picks openai-chat, sets neither authMode nor wireApi`, () => {
+        const cred = credentialToWorkspaceAiCred(chatOnlyGateway, agent, { model: 'some-model' })!
+        expect(cred.wireShape).toBe('openai-chat')
         expect(cred.authMode).toBeUndefined()
         expect(cred.wireApi).toBeUndefined()
         expect(cred.apiKey).toBe('k')
@@ -157,6 +157,26 @@ describe('injectWorkspaceCredentials', () => {
 
     expect(calls).toHaveLength(0)
     expect(warns).toContain('workspace.cred_inject_skip_disabled')
+  })
+
+  it('skips (loud warn) when the credential has no wire the agent speaks', async () => {
+    const calls: WriteCall[] = []
+    const reg = new AdapterRegistry()
+    reg.register(stubAdapter('codex', calls))
+    const { logger, warns } = fakeLogger()
+
+    await injectWorkspaceCredentials({
+      dir: '/ws',
+      agents: ['codex'],
+      // chatOnlyGateway has only openai-chat; codex is Responses-only.
+      agentCredentials: { codex: { credentialSlug: 'chat-only', model: 'gpt-5.5' } },
+      adapterRegistry: reg,
+      credentials: { 'chat-only': chatOnlyGateway },
+      logger,
+    })
+
+    expect(calls).toHaveLength(0)
+    expect(warns).toContain('workspace.cred_inject_incompatible_wire')
   })
 
   it('skips (loud warn) when the referenced credential slug is missing', async () => {

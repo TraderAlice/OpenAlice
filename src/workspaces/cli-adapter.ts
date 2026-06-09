@@ -11,6 +11,8 @@
  * land codex/shell without touching the core PTY/protocol/UI plumbing.
  */
 
+import type { WireShape } from '../ai-providers/preset-catalog.js';
+
 export interface OnDiskSession {
   readonly sessionId: string;
   readonly file: string;
@@ -51,7 +53,16 @@ export interface WorkspaceAiCred {
   baseUrl?: string | null;
   apiKey?: string | null;
   model?: string | null;
-  /** Codex only. */
+  /**
+   * The wire protocol the endpoint speaks — anthropic Messages / OpenAI Chat
+   * Completions / OpenAI Responses. The cross-CLI generalization of the
+   * codex-only `wireApi`: each adapter renders it into its native config
+   * (opencode → which @ai-sdk package, pi → `api` field, codex → `wire_api`).
+   * Carried on the central credential and threaded through here so a runtime
+   * actually uses the shape the credential was created + tested with.
+   */
+  wireShape?: WireShape | null;
+  /** Codex only — legacy/explicit wire_api; superseded by wireShape when set. */
   wireApi?: 'chat' | 'responses' | null;
   /** Claude only. */
   authMode?: 'x-api-key' | 'bearer';

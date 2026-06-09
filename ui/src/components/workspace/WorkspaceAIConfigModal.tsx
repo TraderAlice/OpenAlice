@@ -20,6 +20,20 @@ import {
   type AgentId,
   type SavedCredential,
 } from './api'
+import { api, type Preset, type WireShape } from '../../api'
+import { baseUrlToVendor, vendorPreset, presetModels, pickAgentWire } from '../../lib/presetHelpers'
+import { ModelCombobox } from '../credentials/PresetFields'
+import { useTestGate } from '../../lib/useTestGate'
+
+// The agent tab implies a default vendor when the baseUrl alone can't say:
+// claude → Anthropic, codex → OpenAI; opencode/pi run anything so they have no
+// default (model suggestions then come only from a recognized baseUrl).
+const TAB_FALLBACK_VENDOR: Record<Tab, string | null> = {
+  claude: 'anthropic',
+  codex: 'openai',
+  opencode: null,
+  pi: null,
+}
 
 interface Props {
   wsId: string
@@ -37,6 +51,8 @@ interface FormState {
   baseUrl: string
   apiKey: string
   model: string
+  /** The wire protocol — drives the test + how the adapter is configured. */
+  wireShape: WireShape
   wireApi: 'chat' | 'responses'
   // Claude-only: which header carries the key. 'x-api-key' is Anthropic's
   // first-party default; 'bearer' (Authorization: Bearer) is what most
@@ -45,20 +61,23 @@ interface FormState {
   authMode: 'x-api-key' | 'bearer'
 }
 
-// codex-cli ≥ 0.130 hard-rejects `wire_api = "chat"`. The AgentConfig schema
-// still carries `wireApi` (the backend writer / file IO is shared with other
-// codex-shaped configs), but this modal locks it to "responses" for every
-// codex provider — a stale 'chat' loaded from disk is normalized on display,
-// so the next Save silently corrects it.
-// Ref: github.com/openai/codex/discussions/7782
-const EMPTY_FORM: FormState = { baseUrl: '', apiKey: '', model: '', wireApi: 'responses', authMode: 'x-api-key' }
+/** The wire shape each agent defaults to when nothing else specifies one. */
+const DEFAULT_WIRE_BY_TAB: Record<Tab, WireShape> = {
+  claude: 'anthropic',
+  codex: 'openai-responses', // codex is Responses-only (hard-rejects chat)
+  opencode: 'openai-chat',
+  pi: 'openai-chat',
+}
 
-function configToForm(cfg: AgentConfig | null): FormState {
-  if (!cfg) return EMPTY_FORM
+const EMPTY_FORM: FormState = { baseUrl: '', apiKey: '', model: '', wireShape: 'anthropic', wireApi: 'responses', authMode: 'x-api-key' }
+
+function configToForm(cfg: AgentConfig | null, tab: Tab): FormState {
+  if (!cfg) return { ...EMPTY_FORM, wireShape: DEFAULT_WIRE_BY_TAB[tab] }
   return {
     baseUrl: cfg.baseUrl ?? '',
     apiKey: cfg.apiKey ?? '',
     model: cfg.model ?? '',
+    wireShape: cfg.wireShape ?? DEFAULT_WIRE_BY_TAB[tab],
     wireApi: 'responses',
     authMode: cfg.authMode === 'bearer' ? 'bearer' : 'x-api-key',
   }
@@ -69,6 +88,7 @@ function formToConfig(form: FormState, agent: AgentId): AgentConfig {
     baseUrl: form.baseUrl.trim() || null,
     apiKey: form.apiKey.trim() || null,
     model: form.model.trim() || null,
+    wireShape: form.wireShape,
   }
   if (agent === 'codex') {
     return { ...cfg, wireApi: form.wireApi }
@@ -76,29 +96,24 @@ function formToConfig(form: FormState, agent: AgentId): AgentConfig {
   if (agent === 'claude') {
     return { ...cfg, authMode: form.authMode }
   }
-  // opencode: plain baseUrl/apiKey/model — no wireApi, no authMode.
+  // opencode / pi: baseUrl/apiKey/model + wireShape.
   return cfg
 }
 
-// Test result is per-tab so switching tabs doesn't lose the other agent's
-// verdict, AND each result is bound to the exact form snapshot it was tested
-// against — editing any field invalidates it (Save re-locks). This is the
-// "test-before-save" linkage: Save only enables when the *current* form has a
-// matching successful test.
-interface TestResult {
-  kind: 'pass' | 'fail'
-  snapshot: FormState
-  message: string  // model reply on pass, error on fail
-}
-
-function formsMatch(a: FormState, b: FormState, agent: AgentId): boolean {
-  return (
-    a.baseUrl === b.baseUrl &&
-    a.apiKey === b.apiKey &&
-    a.model === b.model &&
-    (agent !== 'codex' || a.wireApi === b.wireApi) &&
-    (agent !== 'claude' || a.authMode === b.authMode)
-  )
+// The test-before-save gate is shared with the credential vault via useTestGate
+// (one gate per tab so switching tabs keeps each agent's verdict). The gate binds
+// a result to the `key` it was tested against; editing any tested field changes
+// the key, so the result stops matching and Save re-locks. `testKey` lists
+// exactly the fields the probe covers (agent-specific: wireApi for codex,
+// authMode for claude).
+function testKey(form: FormState, agent: AgentId): string {
+  return [
+    form.baseUrl.trim(),
+    form.apiKey.trim(),
+    form.model.trim(),
+    form.wireShape,
+    agent === 'claude' ? form.authMode : '',
+  ].join('|')
 }
 
 export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
@@ -119,40 +134,56 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
   const [offerSaveCred, setOfferSaveCred] = useState(false)
   const [savingCred, setSavingCred] = useState(false)
   const [credFlash, setCredFlash] = useState<string | null>(null)
-  const [testing, setTesting] = useState(false)
-  const [claudeResult, setClaudeResult] = useState<TestResult | null>(null)
-  const [codexResult, setCodexResult] = useState<TestResult | null>(null)
-  const [opencodeResult, setOpencodeResult] = useState<TestResult | null>(null)
-  const [piResult, setPiResult] = useState<TestResult | null>(null)
+  // One test-gate per tab (hooks are unconditional + fixed-count).
+  const claudeGate = useTestGate()
+  const codexGate = useTestGate()
+  const opencodeGate = useTestGate()
+  const piGate = useTestGate()
+  const [presets, setPresets] = useState<Preset[]>([])
 
   useEffect(() => {
     void Promise.all([listCredentials(), getAgentConfig(wsId)])
       .then(([creds, b]) => {
         setCredentials(creds)
         setBundle(b)
-        setClaudeForm(configToForm(b.claude))
-        setCodexForm(configToForm(b.codex))
-        setOpencodeForm(configToForm(b.opencode))
-        setPiForm(configToForm(b.pi))
+        setClaudeForm(configToForm(b.claude, 'claude'))
+        setCodexForm(configToForm(b.codex, 'codex'))
+        setOpencodeForm(configToForm(b.opencode, 'opencode'))
+        setPiForm(configToForm(b.pi, 'pi'))
       })
       .catch((err: Error) => setError(err.message))
+    // Presets drive the model-id suggestions (anti-typo) — load once.
+    void api.config.getPresets().then(({ presets: p }) => setPresets(p)).catch(() => {})
   }, [wsId])
 
   const form = { claude: claudeForm, codex: codexForm, opencode: opencodeForm, pi: piForm }[tab]
   const setForm = { claude: setClaudeForm, codex: setCodexForm, opencode: setOpencodeForm, pi: setPiForm }[tab]
-  const result = { claude: claudeResult, codex: codexResult, opencode: opencodeResult, pi: piResult }[tab]
-  const setResult = { claude: setClaudeResult, codex: setCodexResult, opencode: setOpencodeResult, pi: setPiResult }[tab]
-  const resultMatchesCurrent = !!result && formsMatch(result.snapshot, form, tab)
-  const testPassedForCurrent = result?.kind === 'pass' && resultMatchesCurrent
+  // Model-id suggestions for the current field: infer the provider vendor from
+  // the entered baseUrl (api.z.ai → glm, …) with the tab as fallback, then pull
+  // that vendor's enumerated models. Empty for custom/local endpoints → the
+  // combobox is just a free-text input. This is vendor-axis, not agent-axis, so
+  // it works when any tab is pointed at any gateway.
+  const modelSuggestions = useMemo(() => {
+    const vendor = baseUrlToVendor(form.baseUrl, TAB_FALLBACK_VENDOR[tab])
+    if (!vendor) return []
+    const p = vendorPreset(vendor, presets)
+    return p ? presetModels(p) : []
+  }, [form.baseUrl, tab, presets])
+  const gate = { claude: claudeGate, codex: codexGate, opencode: opencodeGate, pi: piGate }[tab]
+  const key = testKey(form, tab)
+  const testing = gate.testing
+  const result = gate.result
+  const resultMatchesCurrent = gate.matchesCurrent(key)
+  const testPassedForCurrent = gate.passedFor(key)
   const dirty = useMemo(() => {
     if (!bundle) return false
     const saved = bundle[tab]
-    const savedForm = configToForm(saved)
+    const savedForm = configToForm(saved, tab)
     return (
       savedForm.baseUrl !== form.baseUrl ||
       savedForm.apiKey !== form.apiKey ||
       savedForm.model !== form.model ||
-      (tab === 'codex' && savedForm.wireApi !== form.wireApi) ||
+      savedForm.wireShape !== form.wireShape ||
       (tab === 'claude' && savedForm.authMode !== form.authMode)
     )
   }, [bundle, form, tab])
@@ -160,16 +191,26 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
   const applyCredential = () => {
     const cred = credentials.find((x) => x.slug === pickedCredential)
     if (!cred) return
-    // A credential carries no model — that's a per-workspace choice — so we
-    // flash baseUrl + key only and leave the model field for the user.
+    // Pick the wire this tab's agent speaks from the credential's capabilities.
+    // (The picker only lists compatible credentials, so this is non-null.)
+    const picked = pickAgentWire(cred.wires, tab)
+    if (!picked) return
+    // A credential carries no model, so default it to the matched provider's
+    // first model — a stale model from a previous provider (e.g. minimax-m3 left
+    // on a GLM endpoint) would 404. The user can still pick another below.
+    const vendorP = vendorPreset(cred.vendor, presets)
+    const defaultModel = vendorP ? (presetModels(vendorP)[0]?.id ?? '') : ''
     // Auth mode: api.minimax.io needs Bearer; default x-api-key otherwise.
-    const bearer = /api\.minimax\.io/i.test(cred.baseUrl ?? '')
+    const bearer = /api\.minimax\.io/i.test(picked.baseUrl)
     setForm({
       ...form,
-      baseUrl: cred.baseUrl ?? '',
+      baseUrl: picked.baseUrl,
       apiKey: cred.apiKey ?? '',
+      model: defaultModel,
+      wireShape: picked.shape,
       authMode: bearer ? 'bearer' : 'x-api-key',
     })
+    gate.reset() // a new provider invalidates any prior test verdict
   }
 
   const handleSave = async () => {
@@ -182,11 +223,10 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
       setSavedFlash(true)
       setTimeout(() => setSavedFlash(false), 1800)
       // Offer to solidify a hand-entered key into Alice's central store — but
-      // only when it isn't already there (loaded-from-credential, or re-typed
-      // an existing one, shouldn't re-prompt).
+      // only when that key isn't already there (one key = one account; dedup is
+      // by key, so a known key shouldn't re-prompt).
       const key = form.apiKey.trim()
-      const url = form.baseUrl.trim()
-      const known = credentials.some((c) => c.apiKey === key && (c.baseUrl ?? '') === url)
+      const known = credentials.some((c) => c.apiKey === key)
       setOfferSaveCred(!!key && !known)
     } catch (err) {
       setError((err as Error).message)
@@ -203,6 +243,7 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
         apiKey: form.apiKey.trim(),
         ...(form.baseUrl.trim() ? { baseUrl: form.baseUrl.trim() } : {}),
         agent: tab,
+        wireShape: form.wireShape,
       })
       setCredentials(await listCredentials())
       setOfferSaveCred(false)
@@ -222,7 +263,7 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
       await saveAgentConfig(wsId, tab, { baseUrl: null, apiKey: null, model: null })
       const fresh = await getAgentConfig(wsId)
       setBundle(fresh)
-      setForm(EMPTY_FORM)
+      setForm({ ...EMPTY_FORM, wireShape: DEFAULT_WIRE_BY_TAB[tab] })
       setSavedFlash(true)
       setTimeout(() => setSavedFlash(false), 1800)
     } catch (err) {
@@ -235,37 +276,19 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
   const canTest =
     !!form.baseUrl.trim() && !!form.apiKey.trim() && !!form.model.trim()
 
-  const handleTest = async () => {
+  const handleTest = () => {
     if (!canTest) return
-    // Freeze the form snapshot at click time — async race protection: if the
-    // user starts editing while the request is in flight, the result we get
-    // back is still bound to *what was tested*, not what's currently typed.
-    const snapshot: FormState = {
-      baseUrl: form.baseUrl.trim(),
-      apiKey: form.apiKey.trim(),
-      model: form.model.trim(),
-      wireApi: form.wireApi,
-      authMode: form.authMode,
-    }
-    setTesting(true)
-    try {
-      const r = await testAgentConfig(wsId, tab, {
-        baseUrl: snapshot.baseUrl,
-        apiKey: snapshot.apiKey,
-        model: snapshot.model,
-        ...(tab === 'codex' ? { wireApi: snapshot.wireApi } : {}),
-        ...(tab === 'claude' ? { authMode: snapshot.authMode } : {}),
-      })
-      setResult(
-        r.ok
-          ? { kind: 'pass', snapshot, message: r.response ?? '' }
-          : { kind: 'fail', snapshot, message: r.error ?? 'unknown error' },
-      )
-    } catch (err) {
-      setResult({ kind: 'fail', snapshot, message: (err as Error).message })
-    } finally {
-      setTesting(false)
-    }
+    // The result is bound to `key` (the current form's tested fields). If the
+    // user edits mid-flight, the key no longer matches → Save stays locked.
+    void gate.run(key, () =>
+      testAgentConfig(wsId, tab, {
+        baseUrl: form.baseUrl.trim(),
+        apiKey: form.apiKey.trim(),
+        model: form.model.trim(),
+        wireShape: form.wireShape,
+        ...(tab === 'claude' ? { authMode: form.authMode } : {}),
+      }),
+    )
   }
 
   // Backdrop close uses onMouseDown (not onClick) so that text-selection
@@ -319,36 +342,48 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
             <label className="block text-xs font-medium text-text-muted mb-2">
               Load from saved credential
             </label>
-            <div className="flex gap-2">
-              <select
-                value={pickedCredential}
-                onChange={(e) => setPickedCredential(e.target.value)}
-                className={inputClass + ' flex-1'}
-                disabled={credentials.length === 0}
-              >
-                <option value="">
-                  {credentials.length === 0 ? '— none saved yet —' : '— select a credential —'}
-                </option>
-                {credentials.map((cred) => (
-                  <option key={cred.slug} value={cred.slug}>
-                    {cred.slug}
-                    {cred.baseUrl ? ` · ${cred.baseUrl}` : ''}
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={applyCredential}
-                disabled={!pickedCredential}
-                className="px-3 py-2 rounded-md bg-accent text-bg text-[13px] font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent/90 transition-colors"
-              >
-                Load
-              </button>
-            </div>
-            <p className="text-[11px] text-text-muted/80 leading-snug mt-1.5">
-              Fills base URL + key from a credential Alice already holds. Pick a
-              model below — credentials don't carry one. Or just type a new one;
-              you'll be offered to save it after Test + Save.
-            </p>
+            {(() => {
+              // Only credentials that declare a wire THIS agent speaks. Codex is
+              // Responses-only, so most credentials won't list here — the funnel
+              // toward pi/opencode is by design.
+              const compatible = credentials.filter((c) => pickAgentWire(c.wires, tab))
+              return (
+                <>
+                  <div className="flex gap-2">
+                    <select
+                      value={pickedCredential}
+                      onChange={(e) => setPickedCredential(e.target.value)}
+                      className={inputClass + ' flex-1'}
+                      disabled={compatible.length === 0}
+                    >
+                      <option value="">
+                        {compatible.length === 0 ? `— no ${TAB_LABEL[tab]}-compatible credential —` : '— select a credential —'}
+                      </option>
+                      {compatible.map((cred) => {
+                        const picked = pickAgentWire(cred.wires, tab)
+                        return (
+                          <option key={cred.slug} value={cred.slug}>
+                            {cred.slug}{picked?.baseUrl ? ` · ${picked.baseUrl}` : ''}
+                          </option>
+                        )
+                      })}
+                    </select>
+                    <button
+                      onClick={applyCredential}
+                      disabled={!pickedCredential}
+                      className="px-3 py-2 rounded-md bg-accent text-bg text-[13px] font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent/90 transition-colors"
+                    >
+                      Load
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-text-muted/80 leading-snug mt-1.5">
+                    {compatible.length === 0 && credentials.length > 0
+                      ? `None of your saved credentials speak a wire ${TAB_LABEL[tab]} supports — add one for this provider, or use a runtime that matches (pi / opencode).`
+                      : 'Fills base URL + key from a credential Alice already holds, using the wire this runtime speaks. Pick a model below. Or type a new one; you\'ll be offered to save it after Test + Save.'}
+                  </p>
+                </>
+              )
+            })()}
           </div>
 
           {/* Manual fields */}
@@ -420,15 +455,15 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
 
           <div>
             <label className="block text-xs font-medium text-text-muted mb-1">Model</label>
-            <input
+            <ModelCombobox
               value={form.model}
-              onChange={(e) => setForm({ ...form, model: e.target.value })}
+              suggestions={modelSuggestions}
+              onChange={(v) => setForm({ ...form, model: v })}
               placeholder={tab === 'claude' ? 'claude-sonnet-4-6' : tab === 'opencode' || tab === 'pi' ? 'deepseek-chat' : 'gpt-4o'}
-              className={inputClass}
-              spellCheck={false}
-              autoCapitalize="off"
-              autoCorrect="off"
             />
+            {modelSuggestions.length > 0 && (
+              <p className="text-[11px] text-text-muted/70 mt-1">Suggestions from the matched provider — or type any model id.</p>
+            )}
           </div>
 
           {tab === 'codex' && (
@@ -516,21 +551,27 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
               Testing…
             </div>
           )}
-          {!testing && result?.kind === 'pass' && resultMatchesCurrent && (
+          {!testing && result?.ok && resultMatchesCurrent && (
             <div className="rounded-md border border-green/40 bg-green/10 text-green text-[12px] px-3 py-2">
-              <div className="font-medium mb-0.5">
-                Test passed — {tab === 'claude' ? 'Anthropic' : tab === 'opencode' || tab === 'pi' ? 'the provider' : 'OpenAI'} replied:
-              </div>
-              <div className="text-text whitespace-pre-wrap break-words font-mono text-[11.5px]">
-                {result.message || '(empty reply)'}
-              </div>
+              {result.response?.trim() ? (
+                <>
+                  <div className="font-medium mb-0.5">
+                    Test passed — {tab === 'claude' ? 'Anthropic' : tab === 'opencode' || tab === 'pi' ? 'the provider' : 'OpenAI'} replied:
+                  </div>
+                  <div className="text-text whitespace-pre-wrap break-words font-mono text-[11.5px]">
+                    {result.response.trim()}
+                  </div>
+                </>
+              ) : (
+                <div className="font-medium">Test passed — provider reachable (returned no text).</div>
+              )}
             </div>
           )}
-          {!testing && result?.kind === 'fail' && resultMatchesCurrent && (
+          {!testing && result && !result.ok && resultMatchesCurrent && (
             <div className="rounded-md border border-red/40 bg-red/10 text-red text-[12px] px-3 py-2">
               <div className="font-medium mb-0.5">Test failed:</div>
               <div className="whitespace-pre-wrap break-words font-mono text-[11.5px]">
-                {result.message}
+                {result.error}
               </div>
             </div>
           )}

@@ -15,10 +15,35 @@
  */
 
 import { resolveAnthropicAuthMode } from '@/core/credential-inference.js'
-import type { Credential } from '@/core/config.js'
+import { credentialWires, type Credential, type CredentialWireShape } from '@/core/config.js'
 import type { AdapterRegistry, WorkspaceAiCred } from './cli-adapter.js'
 import type { Logger } from './logger.js'
 import type { AgentCredentialDecl } from './template-registry.js'
+
+/**
+ * The wire shapes each agent can speak, in preference order. The injector picks
+ * the first one a credential actually has — so a credential serves an agent only
+ * if it declares a compatible wire (codex's Responses-only lock means most
+ * credentials can't drive it, which is the intended funnel toward pi/opencode).
+ */
+export const AGENT_WIRE_PREFERENCE: Record<string, CredentialWireShape[]> = {
+  claude: ['anthropic'],
+  codex: ['openai-responses'],
+  opencode: ['openai-chat', 'anthropic', 'openai-responses'],
+  pi: ['openai-chat', 'anthropic', 'openai-responses'],
+}
+
+/** Pick the wire an agent should use from a credential's capabilities (null = none compatible). */
+export function pickAgentWire(
+  wires: Partial<Record<CredentialWireShape, string>>,
+  agentId: string,
+): { shape: CredentialWireShape; baseUrl: string } | null {
+  const pref = AGENT_WIRE_PREFERENCE[agentId] ?? ['openai-chat', 'anthropic', 'openai-responses']
+  for (const shape of pref) {
+    if (shape in wires) return { shape, baseUrl: wires[shape] ?? '' }
+  }
+  return null
+}
 
 export interface CredentialInjectionOverrides {
   /** Model id to run. Required in practice (a credential has none). */
@@ -31,30 +56,34 @@ export interface CredentialInjectionOverrides {
 
 /**
  * Map a central Credential into the `WorkspaceAiCred` the given agent's adapter
- * expects. `agentId` selects which adapter-specific field is populated:
- *   - claude → `authMode` (derived via `resolveAnthropicAuthMode`)
- *   - codex  → `wireApi` (only when explicitly overridden; else adapter default)
- *   - opencode / pi → neither (plain OpenAI-compatible Chat Completions)
+ * expects, picking the wire shape the agent speaks from the credential's
+ * capabilities. Returns null when the credential has NO wire the agent supports
+ * (caller must surface this — never silently inject a wrong shape).
  */
 export function credentialToWorkspaceAiCred(
-  credential: Pick<Credential, 'apiKey' | 'baseUrl'>,
+  credential: Pick<Credential, 'apiKey' | 'baseUrl' | 'wireShape' | 'wires'>,
   agentId: string,
   overrides: CredentialInjectionOverrides = {},
-): WorkspaceAiCred {
+): WorkspaceAiCred | null {
+  const wires = credentialWires(credential as Credential)
+  const picked = pickAgentWire(wires, agentId)
+  if (!picked) return null
+
   const cred: WorkspaceAiCred = {
-    baseUrl: credential.baseUrl ?? null,
+    baseUrl: picked.baseUrl || null,
     apiKey: credential.apiKey ?? null,
     model: overrides.model ?? null,
+    // The chosen wire shape drives how the consuming adapter is configured
+    // (which @ai-sdk package / api field / wire_api).
+    wireShape: picked.shape,
   }
 
   if (agentId === 'claude') {
     cred.authMode = resolveAnthropicAuthMode({
       authMode: overrides.authMode,
-      baseUrl: credential.baseUrl,
+      baseUrl: picked.baseUrl,
     })
   } else if (agentId === 'codex') {
-    // Leave undefined when not overridden so the codex adapter applies its own
-    // default ('chat'); only custom-baseUrl providers write a wire_api at all.
     if (overrides.wireApi) cred.wireApi = overrides.wireApi
   }
 
@@ -105,6 +134,15 @@ export async function injectWorkspaceCredentials(opts: {
       ...(decl.authMode !== undefined ? { authMode: decl.authMode } : {}),
       ...(decl.wireApi !== undefined ? { wireApi: decl.wireApi } : {}),
     })
+    if (!wsCred) {
+      // The credential has no wire shape this agent speaks (e.g. an OpenAI-Chat
+      // key for codex, which is Responses-only). Loud skip — never inject a
+      // mismatched shape.
+      logger.warn('workspace.cred_inject_incompatible_wire', {
+        agentId, credentialSlug: decl.credentialSlug,
+      })
+      continue
+    }
     await adapter.writeAiConfig(dir, wsCred)
     logger.info('workspace.cred_injected', {
       agentId, credentialSlug: decl.credentialSlug, ...(decl.model ? { model: decl.model } : {}),

@@ -2,12 +2,29 @@ import { Hono } from 'hono'
 import {
   loadConfig, writeConfigSection, readAIProviderConfig, validSections,
   writeProfile, deleteProfile, setActiveProfile,
-  profileSchema, type ConfigSection, type Profile,
+  readCredentials, addCredential, deleteCredential, writeCredential, resolveCredential,
+  credentialWires,
+  profileSchema, credentialVendorEnum, credentialWireShapeEnum,
+  type ConfigSection, type Profile, type Credential, type CredentialWireShape,
 } from '../../core/config.js'
+
+/** Validate a `{ [wireShape]: baseUrl }` body into a typed wires map. */
+function parseWires(raw: unknown): Partial<Record<CredentialWireShape, string>> {
+  if (!raw || typeof raw !== 'object') return {}
+  const out: Partial<Record<CredentialWireShape, string>> = {}
+  for (const [shape, url] of Object.entries(raw as Record<string, unknown>)) {
+    const parsed = credentialWireShapeEnum.safeParse(shape)
+    if (parsed.success && typeof url === 'string') out[parsed.data] = url.trim()
+  }
+  return out
+}
 import type { EngineContext } from '../../core/types.js'
 import { BUILTIN_PRESETS } from '../../ai-providers/presets.js'
+import type { WireShape } from '../../ai-providers/preset-catalog.js'
 import { getSdkAdapterInfo } from '../../ai-providers/sdk-adapters.js'
 import { testWithProfile } from '../../core/ai-config.js'
+import { resolveAnthropicAuthMode } from '../../core/credential-inference.js'
+import { probeByWireShape } from '../../workspaces/agent-probe.js'
 
 interface ConfigRouteOpts {
   ctx?: EngineContext
@@ -120,6 +137,117 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
       const validated = profileSchema.parse(profileData)
       const result = await testWithProfile(opts.ctx.router, validated, 'Hi')
       return c.json({ ok: true, response: result.text })
+    } catch (err) {
+      return c.json({ ok: false, error: err instanceof Error ? err.message : String(err) })
+    }
+  })
+
+  // ==================== Credential Vault ====================
+  //
+  // Alice's central api-key credentials — the set injected into workspaces.
+  // Subscription logins (claude login / codex login) are NOT stored here; they
+  // live in the CLI's own auth. The list never returns the raw key (only
+  // whether one is set); Test runs the lightweight probe, not the in-process
+  // provider stack.
+
+  /**
+   * GET /credentials — list central credentials. Returns the apiKey so the edit
+   * form can round-trip it (same exposure as /api/workspaces/credentials and the
+   * legacy agent-profiles route; all behind the admin-token gate). `hasApiKey`
+   * kept for callers that only need presence.
+   */
+  app.get('/credentials', async (c) => {
+    try {
+      const creds = await readCredentials()
+      const list = Object.entries(creds).map(([slug, cred]) => ({
+        slug,
+        vendor: cred.vendor,
+        authType: cred.authType,
+        wires: credentialWires(cred), // derives from legacy {baseUrl,wireShape} too
+        apiKey: cred.apiKey ?? null,
+        hasApiKey: !!cred.apiKey,
+      }))
+      return c.json({ credentials: list })
+    } catch (err) {
+      return c.json({ error: String(err) }, 500)
+    }
+  })
+
+  /** POST /credentials — add an api-key credential (deduped by key). Returns slug. */
+  app.post('/credentials', async (c) => {
+    try {
+      const body = await c.req.json<{ vendor?: string; wires?: unknown; apiKey?: string }>()
+      const apiKey = body.apiKey?.trim()
+      if (!apiKey) return c.json({ error: 'apiKey is required' }, 400)
+      const vendorParse = credentialVendorEnum.safeParse(body.vendor)
+      const wires = parseWires(body.wires)
+      const cred: Credential = {
+        vendor: vendorParse.success ? vendorParse.data : 'custom',
+        authType: 'api-key',
+        apiKey,
+        ...(Object.keys(wires).length ? { wires } : {}),
+      }
+      const slug = await addCredential(cred)
+      return c.json({ slug, vendor: cred.vendor }, 201)
+    } catch (err) {
+      return c.json({ error: String(err) }, 500)
+    }
+  })
+
+  /** PUT /credentials/:slug — update a credential. Empty apiKey keeps the existing key. */
+  app.put('/credentials/:slug', async (c) => {
+    try {
+      const slug = c.req.param('slug')
+      const body = await c.req.json<{ vendor?: string; wires?: unknown; apiKey?: string }>()
+      const existing = await resolveCredential(slug)
+      const apiKey = body.apiKey?.trim() || existing.apiKey
+      const vendorParse = credentialVendorEnum.safeParse(body.vendor)
+      const wires = parseWires(body.wires)
+      const cred: Credential = {
+        vendor: vendorParse.success ? vendorParse.data : existing.vendor,
+        authType: 'api-key',
+        ...(apiKey ? { apiKey } : {}),
+        ...(Object.keys(wires).length ? { wires } : { ...(existing.wires ? { wires: existing.wires } : {}) }),
+      }
+      await writeCredential(slug, cred)
+      return c.json({ slug })
+    } catch (err) {
+      return c.json({ error: String(err) }, 400)
+    }
+  })
+
+  /** DELETE /credentials/:slug — remove (errors if a profile still references it). */
+  app.delete('/credentials/:slug', async (c) => {
+    try {
+      await deleteCredential(c.req.param('slug'))
+      return c.json({ success: true })
+    } catch (err) {
+      return c.json({ error: String(err) }, 400)
+    }
+  })
+
+  /**
+   * POST /credentials/test — probe a credential via the shared
+   * `probeByWireShape` dispatcher (same logic as the per-workspace test). For
+   * the anthropic shape the auth header is auto-resolved from the baseUrl.
+   */
+  app.post('/credentials/test', async (c) => {
+    try {
+      const body = await c.req.json<{
+        wireShape: WireShape
+        baseUrl?: string
+        apiKey: string
+        model: string
+        authMode?: 'x-api-key' | 'bearer'
+      }>()
+      if (!body.apiKey || !body.model) {
+        return c.json({ ok: false, error: 'apiKey and model are required' })
+      }
+      const authMode = resolveAnthropicAuthMode({ authMode: body.authMode, baseUrl: body.baseUrl })
+      const r = await probeByWireShape(body.wireShape, {
+        baseUrl: body.baseUrl, apiKey: body.apiKey, model: body.model, authMode,
+      })
+      return c.json({ ok: true, response: r.text })
     } catch (err) {
       return c.json({ ok: false, error: err instanceof Error ? err.message : String(err) })
     }

@@ -8,6 +8,7 @@ import { useAutoSave } from '../hooks/useAutoSave'
 import { PageHeader } from '../components/PageHeader'
 import { AutomationFlowSection } from './AutomationFlowSection'
 import { AutomationWebhookSection } from './AutomationWebhookSection'
+import { listWorkspaces, type Workspace } from '../components/workspace/api'
 import { AutomationRunsSection } from './AutomationRunsSection'
 import type { ViewSpec } from '../tabs/types'
 
@@ -383,9 +384,10 @@ function CronSection() {
     <div className="flex flex-col gap-3">
       <div className="rounded-lg border border-border/50 bg-bg-secondary/50 px-4 py-3">
         <p className="text-[13px] text-text-muted leading-relaxed">
-          Cron jobs fire events on the dispatch bus at scheduled intervals.
-          Each job's payload is sent to Alice as a prompt — use them for periodic checks, reports, or any recurring task.
-          Internal jobs (heartbeat, snapshot) are managed by their own tabs.
+          On schedule, a cron job runs its payload as a prompt inside the workspace
+          you pick — headless. The workspace agent runs it and reports back via the
+          Inbox; the run shows up live in the Runs tab. Use them for periodic checks,
+          reports, or any recurring task.
         </p>
       </div>
       {error && <div className="text-xs text-red">{error}</div>}
@@ -492,6 +494,16 @@ function CronJobCard({ job, onToggle, onRunNow, onDelete }: {
       {expanded && (
         <div className="border-t border-border/50 px-4 py-3 text-xs space-y-2">
           <div>
+            <span className="text-text-muted">Runs in: </span>
+            {job.workspaceId ? (
+              <span className="text-text font-mono">
+                {job.workspaceId}{job.agent ? ` · ${job.agent}` : ' · default agent'}
+              </span>
+            ) : (
+              <span className="text-red">no workspace — won't run (assign one)</span>
+            )}
+          </div>
+          <div>
             <span className="text-text-muted">Payload: </span>
             <pre className="inline text-text whitespace-pre-wrap break-all">{job.payload}</pre>
           </div>
@@ -511,13 +523,27 @@ function AddCronJobForm({ onClose, onCreated }: { onClose: () => void; onCreated
   const [payload, setPayload] = useState('')
   const [schedKind, setSchedKind] = useState<'every' | 'cron' | 'at'>('every')
   const [schedValue, setSchedValue] = useState('1h')
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([])
+  const [workspaceId, setWorkspaceId] = useState('')
+  const [agent, setAgent] = useState('')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    void listWorkspaces().then(setWorkspaces).catch(() => setWorkspaces([]))
+  }, [])
+
+  // Agent options follow the picked workspace's enabled adapters.
+  const agentOptions = workspaces.find((w) => w.id === workspaceId)?.agents ?? []
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim() || !payload.trim()) {
       setError('Name and payload are required')
+      return
+    }
+    if (!workspaceId) {
+      setError('Pick the workspace this job runs in')
       return
     }
 
@@ -529,7 +555,13 @@ function AddCronJobForm({ onClose, onCreated }: { onClose: () => void; onCreated
     setSaving(true)
     setError('')
     try {
-      await api.cron.add({ name: name.trim(), payload: payload.trim(), schedule })
+      await api.cron.add({
+        name: name.trim(),
+        payload: payload.trim(),
+        schedule,
+        workspaceId,
+        ...(agent ? { agent } : {}),
+      })
       onCreated()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Create failed')
@@ -552,6 +584,33 @@ function AddCronJobForm({ onClose, onCreated }: { onClose: () => void; onCreated
         onChange={(e) => setName(e.target.value)}
         className="w-full bg-bg-tertiary border border-border rounded-md px-3 py-2 text-sm text-text outline-none focus:border-accent"
       />
+
+      {/* Where the job runs — a workspace + one of its enabled agents, headless. */}
+      <div className="flex gap-2">
+        <select
+          value={workspaceId}
+          onChange={(e) => { setWorkspaceId(e.target.value); setAgent('') }}
+          className="flex-1 bg-bg-tertiary border border-border rounded-md px-2 py-2 text-sm text-text outline-none focus:border-accent"
+        >
+          <option value="">
+            {workspaces.length === 0 ? '— no workspaces —' : '— run in workspace… —'}
+          </option>
+          {workspaces.map((w) => (
+            <option key={w.id} value={w.id}>{w.tag}</option>
+          ))}
+        </select>
+        <select
+          value={agent}
+          onChange={(e) => setAgent(e.target.value)}
+          disabled={!workspaceId}
+          className="bg-bg-tertiary border border-border rounded-md px-2 py-2 text-sm text-text outline-none focus:border-accent disabled:opacity-40"
+        >
+          <option value="">{workspaceId ? 'default agent' : 'agent'}</option>
+          {agentOptions.map((a) => (
+            <option key={a} value={a}>{a}</option>
+          ))}
+        </select>
+      </div>
 
       <textarea
         placeholder="Payload / instruction text"

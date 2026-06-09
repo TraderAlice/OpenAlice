@@ -111,6 +111,9 @@ const CronFireSchema = Type.Object({
   jobId: Type.String(),
   jobName: Type.String(),
   payload: Type.String(),
+  // Dispatch target (headless workspace run). Optional for pre-headless jobs.
+  workspaceId: Type.Optional(Type.String()),
+  agent: Type.Optional(Type.String()),
 })
 
 const MessageReceivedSchema = Type.Object({

@@ -146,8 +146,15 @@ export const opencodeAdapter: CliAdapter = {
     if (cred.baseUrl) options['baseURL'] = cred.baseUrl;
     if (cred.apiKey) options['apiKey'] = cred.apiKey;
 
+    // The @ai-sdk package opencode loads depends on the wire shape (all bundled):
+    // anthropic → @ai-sdk/anthropic, OpenAI Responses → @ai-sdk/openai, and
+    // OpenAI Chat Completions (the default — CN/local gateways) → the
+    // openai-compatible SDK.
+    const npm = cred.wireShape === 'anthropic' ? '@ai-sdk/anthropic'
+      : cred.wireShape === 'openai-responses' ? '@ai-sdk/openai'
+      : OPENCODE_SDK_NPM;
     const provider: Record<string, unknown> = {
-      npm: OPENCODE_SDK_NPM,
+      npm,
       name: 'OpenAlice workspace provider',
       options,
     };
@@ -188,7 +195,12 @@ export const opencodeAdapter: CliAdapter = {
       model = slash >= 0 ? top.slice(slash + 1) : top;
     }
     if (baseUrl === null && apiKey === null && model === null) return null;
-    return { baseUrl, apiKey, model };
+    // Reverse the npm package back to the wire shape.
+    const npm = typeof ws['npm'] === 'string' ? (ws['npm'] as string) : '';
+    const wireShape = npm === '@ai-sdk/anthropic' ? 'anthropic' as const
+      : npm === '@ai-sdk/openai' ? 'openai-responses' as const
+      : 'openai-chat' as const;
+    return { baseUrl, apiKey, model, wireShape };
   },
 
   /**

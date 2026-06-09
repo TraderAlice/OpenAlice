@@ -59,15 +59,48 @@ export type CredentialVendor = z.infer<typeof credentialVendorEnum>
 export const credentialAuthTypeEnum = z.enum(['api-key', 'subscription'])
 export type CredentialAuthType = z.infer<typeof credentialAuthTypeEnum>
 
+/**
+ * The wire protocol the credential's endpoint speaks. Load-bearing, NOT
+ * derivable from baseUrl alone — OpenAI Chat Completions and Responses share
+ * one base URL (api.openai.com/v1), so only this field distinguishes them. Also
+ * tells injection how to configure the consuming adapter. Mirrors the
+ * `WireShape` union in ai-providers/preset-catalog.ts (kept in sync by hand —
+ * 3 stable values; core must not depend on the ai-providers layer).
+ */
+export const credentialWireShapeEnum = z.enum(['anthropic', 'openai-chat', 'openai-responses'])
+export type CredentialWireShape = z.infer<typeof credentialWireShapeEnum>
+
 export const credentialSchema = z.object({
   vendor: credentialVendorEnum,
   authType: credentialAuthTypeEnum,
   /** Present for api-key credentials; absent for subscription credentials. */
   apiKey: z.string().optional(),
-  /** Optional region / custom endpoint. */
-  baseUrl: z.string().optional(),
+  /**
+   * The wire shapes this key can speak, each with its endpoint baseUrl (''/absent
+   * = the shape's official endpoint). A provider exposes the SAME key behind
+   * several incompatible shapes that differ only by endpoint (GLM: anthropic at
+   * /api/anthropic, openai-chat at /api/paas/v4), so one credential declares all
+   * of them — "wire capabilities" — and injection picks the one the target agent
+   * speaks. Fill the key once.
+   */
+  wires: z.partialRecord(credentialWireShapeEnum, z.string()).optional(),
+  /** @deprecated legacy single-endpoint fields — read via `credentialWires()`. */
+  baseUrl: z.string().trim().transform((s) => s || undefined).optional(),
+  /** @deprecated legacy single wire shape — superseded by `wires`. */
+  wireShape: credentialWireShapeEnum.optional(),
 })
 export type Credential = z.infer<typeof credentialSchema>
+
+/**
+ * The wire→baseUrl map for a credential, tolerating legacy creds that still
+ * carry the flat `{baseUrl, wireShape}` instead of `wires`. No migration needed:
+ * old creds are upgraded transparently on read.
+ */
+export function credentialWires(cred: Credential): Partial<Record<CredentialWireShape, string>> {
+  if (cred.wires && Object.keys(cred.wires).length > 0) return cred.wires
+  if (cred.wireShape) return { [cred.wireShape]: cred.baseUrl ?? '' }
+  return {}
+}
 
 const baseProfileFields = {
   /** Preset ID this profile was created from (for constraint enforcement on edit). */
@@ -797,13 +830,15 @@ export async function writeCredential(slug: string, credential: Credential): Pro
 }
 
 /**
- * Add a credential to the central store, deduping by vendor/authType/apiKey/
- * baseUrl (an identical credential reuses its existing slug). Returns the slug.
+ * Add a credential to the central store. Dedups by {vendor, authType, apiKey} —
+ * one key is one account, regardless of how many wires/endpoints it can drive —
+ * so re-adding a key you already have (even with a different/newer wire set)
+ * reuses the slug and UPGRADES its wires in place rather than duplicating.
+ * Returns the slug.
  *
  * Standalone counterpart to `extractCredentialFromProfile` for credentials that
  * don't come from a profile — e.g. the workspace AI-config modal's "save to
- * Alice" path, where a hand-entered provider is solidified into the central
- * store so other workspaces (and future scheduling) can reuse it.
+ * Alice" path.
  */
 export async function addCredential(credential: Credential): Promise<string> {
   const config = await readAIProviderConfig()
@@ -811,10 +846,15 @@ export async function addCredential(credential: Credential): Promise<string> {
   const match = Object.entries(config.credentials).find(([, c]) =>
     c.vendor === validated.vendor &&
     c.authType === validated.authType &&
-    c.apiKey === validated.apiKey &&
-    c.baseUrl === validated.baseUrl,
+    c.apiKey === validated.apiKey,
   )
-  if (match) return match[0]
+  if (match) {
+    // Upgrade the existing record's wires/endpoint in place (don't duplicate).
+    config.credentials[match[0]] = validated
+    await mkdir(CONFIG_DIR, { recursive: true })
+    await writeFile(resolve(CONFIG_DIR, 'ai-provider-manager.json'), JSON.stringify(config, null, 2) + '\n')
+    return match[0]
+  }
   const taken = new Set(Object.keys(config.credentials))
   let n = 1
   while (taken.has(`${validated.vendor}-${n}`)) n++
@@ -877,7 +917,9 @@ export function extractCredentialFromProfile(
   const authType = inferAuthTypeFromProfile(profile)
   const cred: Credential = { vendor, authType }
   if (profile.apiKey) cred.apiKey = profile.apiKey
-  if (profile.baseUrl) cred.baseUrl = profile.baseUrl
+  // Trim before assigning so the dedup compare below (and against already-trimmed
+  // stored creds) holds — this hand-built cred isn't run through credentialSchema.
+  if (profile.baseUrl?.trim()) cred.baseUrl = profile.baseUrl.trim()
 
   // Dedupe against existing — same vendor/auth/apiKey/baseUrl reuses the slug
   const match = Object.entries(existing).find(([, c]) =>

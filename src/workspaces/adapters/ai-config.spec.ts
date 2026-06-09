@@ -63,7 +63,7 @@ describe('claudeAdapter AI-config', () => {
       baseUrl: 'https://api.test/v1', apiKey: 'sk-123', model: 'claude-x', authMode: 'bearer',
     });
     expect(await claudeAdapter.readAiConfig!(dir)).toEqual({
-      baseUrl: 'https://api.test/v1', apiKey: 'sk-123', model: 'claude-x', authMode: 'bearer',
+      baseUrl: 'https://api.test/v1', apiKey: 'sk-123', model: 'claude-x', authMode: 'bearer', wireShape: 'anthropic',
     });
   });
 
@@ -126,9 +126,9 @@ describe('codexAdapter AI-config', () => {
     expect(await read('.codex/env.json')).toBe('{\n  "OPENALICE_WORKSPACE_KEY": "sk-c"\n}\n');
   });
 
-  it('defaults wire_api to chat when unset', async () => {
+  it('always writes wire_api = responses (codex is Responses-only)', async () => {
     await codexAdapter.writeAiConfig!(dir, { baseUrl: 'https://oai.test/v1', apiKey: 'sk-c', model: 'gpt-x' });
-    expect(await read('.codex/config.toml')).toContain('wire_api = "chat"\n');
+    expect(await read('.codex/config.toml')).toContain('wire_api = "responses"\n');
   });
 
   it('model-only writes no provider block and an empty env.json', async () => {
@@ -148,7 +148,7 @@ describe('codexAdapter AI-config', () => {
       baseUrl: 'https://oai.test/v1', apiKey: 'sk-c', model: 'gpt-x', wireApi: 'responses',
     });
     expect(await codexAdapter.readAiConfig!(dir)).toEqual({
-      baseUrl: 'https://oai.test/v1', apiKey: 'sk-c', model: 'gpt-x', wireApi: 'responses',
+      baseUrl: 'https://oai.test/v1', apiKey: 'sk-c', model: 'gpt-x', wireApi: 'responses', wireShape: 'openai-responses',
     });
   });
 
@@ -222,6 +222,13 @@ describe('opencodeAdapter AI-config', () => {
     });
   });
 
+  it('honors wireShape — anthropic → @ai-sdk/anthropic, responses → @ai-sdk/openai', async () => {
+    await opencodeAdapter.writeAiConfig!(dir, { baseUrl: 'https://x/anthropic', apiKey: 'k', model: 'glm-5.1', wireShape: 'anthropic' });
+    expect(JSON.parse(await read('opencode.json')).provider.workspace.npm).toBe('@ai-sdk/anthropic');
+    await opencodeAdapter.writeAiConfig!(dir, { baseUrl: 'https://x/v1', apiKey: 'k', model: 'gpt-5.5', wireShape: 'openai-responses' });
+    expect(JSON.parse(await read('opencode.json')).provider.workspace.npm).toBe('@ai-sdk/openai');
+  });
+
   it('reset (empty cred) deletes opencode.json', async () => {
     await opencodeAdapter.writeAiConfig!(dir, { baseUrl: 'u', model: 'm' });
     await opencodeAdapter.writeAiConfig!(dir, {});
@@ -233,7 +240,7 @@ describe('opencodeAdapter AI-config', () => {
       baseUrl: 'https://cn.test/v1', apiKey: 'sk-o', model: 'deepseek-chat',
     });
     expect(await opencodeAdapter.readAiConfig!(dir)).toEqual({
-      baseUrl: 'https://cn.test/v1', apiKey: 'sk-o', model: 'deepseek-chat',
+      baseUrl: 'https://cn.test/v1', apiKey: 'sk-o', model: 'deepseek-chat', wireShape: 'openai-chat',
     });
   });
 
@@ -372,6 +379,13 @@ describe('piAdapter AI-config', () => {
     });
   });
 
+  it('honors wireShape — anthropic → anthropic-messages, responses → openai-responses', async () => {
+    await piAdapter.writeAiConfig!(dir, { baseUrl: 'https://x/anthropic', apiKey: 'k', model: 'glm-5.1', wireShape: 'anthropic' });
+    expect(JSON.parse(await read('.pi-agent/models.json')).providers.workspace.api).toBe('anthropic-messages');
+    await piAdapter.writeAiConfig!(dir, { baseUrl: 'https://x/v1', apiKey: 'k', model: 'gpt-5.5', wireShape: 'openai-responses' });
+    expect(JSON.parse(await read('.pi-agent/models.json')).providers.workspace.api).toBe('openai-responses');
+  });
+
   it('reset (empty cred) tears down the entire .pi-agent/ directory', async () => {
     await piAdapter.writeAiConfig!(dir, { baseUrl: 'u', model: 'm' });
     await piAdapter.writeAiConfig!(dir, {});
@@ -383,7 +397,7 @@ describe('piAdapter AI-config', () => {
       baseUrl: 'https://cn.test/v1', apiKey: 'sk-p', model: 'deepseek-chat',
     });
     expect(await piAdapter.readAiConfig!(dir)).toEqual({
-      baseUrl: 'https://cn.test/v1', apiKey: 'sk-p', model: 'deepseek-chat',
+      baseUrl: 'https://cn.test/v1', apiKey: 'sk-p', model: 'deepseek-chat', wireShape: 'openai-chat',
     });
   });
 

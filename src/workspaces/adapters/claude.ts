@@ -114,7 +114,8 @@ export const claudeAdapter: CliAdapter = {
     const apiKey = authToken ?? xApiKey;
     const model = typeof parsed['model'] === 'string' ? (parsed['model'] as string) : null;
     if (baseUrl === null && apiKey === null && model === null) return null;
-    return { baseUrl, apiKey, model, authMode };
+    // Claude Code is anthropic-only.
+    return { baseUrl, apiKey, model, authMode, wireShape: 'anthropic' };
   },
 
   transcriptDir(cwd: string): string {

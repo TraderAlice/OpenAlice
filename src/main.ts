@@ -276,9 +276,15 @@ async function main() {
 
   // ==================== Cron Listener ====================
 
-  const cronSession = new SessionStore('cron/default')
-  await cronSession.restore()
-  const cronListener = createCronListener({ agentWorkListener, registry: listenerRegistry, session: cronSession })
+  // Cross-plugin ref so the cron listener (and McpPlugin) can reach the
+  // WorkspaceService even though WebPlugin — its actual creator — starts later.
+  // `ref.current` is null until the plugin boots; an early cron fire is a loud
+  // skip (see cron listener). Created here so cron dispatch can hold it.
+  const workspaceServiceRef = createWorkspaceServiceRef()
+
+  // Cron fires now dispatch a headless Workspace run (job → workspace+agent),
+  // not the legacy in-process AgentWork path.
+  const cronListener = createCronListener({ registry: listenerRegistry, workspaceServiceRef })
   await cronListener.start()
 
   // Snapshot scheduler lives in UTA after Step 6 — Alice no longer
@@ -328,9 +334,8 @@ async function main() {
   // Core plugins — always-on, not toggleable at runtime
   const corePlugins: Plugin[] = []
 
-  // Cross-plugin ref so McpPlugin can resolve workspaces for `/mcp/:wsId`
-  // even though WebPlugin (the service's actual creator) starts later.
-  const workspaceServiceRef = createWorkspaceServiceRef()
+  // workspaceServiceRef is created earlier (Cron Listener section) so cron
+  // dispatch shares the same box the WebPlugin fills on start.
 
   // MCP Server is always active when a port is set — Claude Code provider depends on it for tools.
   // Lives at top-level config (not under connectors:) because it exports

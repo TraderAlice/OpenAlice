@@ -141,7 +141,10 @@ export const codexAdapter: CliAdapter = {
       toml += `name = "OpenAlice workspace provider"\n`;
       toml += `base_url = ${tomlString(cred.baseUrl)}\n`;
       toml += `env_key = "${CODEX_KEY_ENV_NAME}"\n`;
-      toml += `wire_api = "${cred.wireApi ?? 'chat'}"\n`;
+      // Codex 0.130+ only speaks the OpenAI Responses API — it hard-rejects
+      // wire_api="chat" — so this is always "responses" regardless of the
+      // credential's wireShape. See memory reference_codex_chat_dead.
+      toml += `wire_api = "responses"\n`;
     }
     await writeWorkspaceFile(cwd, CODEX_CONFIG_PATH, toml);
 
@@ -190,7 +193,8 @@ export const codexAdapter: CliAdapter = {
     }
 
     if (baseUrl === null && apiKey === null && model === null && wireApi === null) return null;
-    return { baseUrl, apiKey, model, wireApi };
+    // Codex is Responses-only, so the unified wireShape is always openai-responses.
+    return { baseUrl, apiKey, model, wireApi, wireShape: 'openai-responses' };
   },
 
   /**

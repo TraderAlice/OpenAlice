@@ -41,6 +41,15 @@ export interface CronJob {
   enabled: boolean
   schedule: CronSchedule
   payload: string
+  /**
+   * The workspace this job fires into. A cron job is "run this prompt in that
+   * workspace, headless". Optional only for backward-compat with pre-headless
+   * jobs (migration 0008 disables those); a job that fires without a
+   * workspaceId is a loud no-op in the listener.
+   */
+  workspaceId?: string
+  /** Which enabled CLI adapter to run — claude / codex / pi / opencode. */
+  agent?: string
   state: CronJobState
   createdAt: number
 }
@@ -49,6 +58,9 @@ export interface CronFirePayload {
   jobId: string
   jobName: string
   payload: string
+  /** Dispatch target — threaded through so the listener needn't re-read the store. */
+  workspaceId?: string
+  agent?: string
 }
 
 // ==================== CRUD Types ====================
@@ -58,6 +70,8 @@ export interface CronJobCreate {
   schedule: CronSchedule
   payload: string
   enabled?: boolean
+  workspaceId?: string
+  agent?: string
 }
 
 export interface CronJobPatch {
@@ -65,6 +79,8 @@ export interface CronJobPatch {
   schedule?: CronSchedule
   payload?: string
   enabled?: boolean
+  workspaceId?: string
+  agent?: string
 }
 
 // ==================== Engine Interface ====================
@@ -177,6 +193,8 @@ export function createCronEngine(opts: CronEngineOpts): CronEngine {
         jobId: job.id,
         jobName: job.name,
         payload: job.payload,
+        ...(job.workspaceId !== undefined ? { workspaceId: job.workspaceId } : {}),
+        ...(job.agent !== undefined ? { agent: job.agent } : {}),
       } satisfies CronFirePayload)
 
       job.state.lastStatus = 'ok'
@@ -235,6 +253,8 @@ export function createCronEngine(opts: CronEngineOpts): CronEngine {
         enabled: params.enabled ?? true,
         schedule: params.schedule,
         payload: params.payload,
+        ...(params.workspaceId !== undefined ? { workspaceId: params.workspaceId } : {}),
+        ...(params.agent !== undefined ? { agent: params.agent } : {}),
         state: {
           nextRunAtMs: computeNextRun(params.schedule, currentMs),
           lastRunAtMs: null,
@@ -261,6 +281,8 @@ export function createCronEngine(opts: CronEngineOpts): CronEngine {
       if (patch.name !== undefined) job.name = patch.name
       if (patch.payload !== undefined) job.payload = patch.payload
       if (patch.enabled !== undefined) job.enabled = patch.enabled
+      if (patch.workspaceId !== undefined) job.workspaceId = patch.workspaceId
+      if (patch.agent !== undefined) job.agent = patch.agent
 
       if (patch.schedule !== undefined) {
         job.schedule = patch.schedule

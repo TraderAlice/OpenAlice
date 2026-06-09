@@ -36,4 +36,13 @@ export const configKeysHandlers = [
 
   http.get('/api/config/presets', () => HttpResponse.json({ presets: [] })),
   http.get('/api/config/sdk-adapters', () => HttpResponse.json({ adapters: [] })),
+
+  // Credential vault (AI Provider page)
+  http.get('/api/config/credentials', () => HttpResponse.json({ credentials: [] })),
+  http.post('/api/config/credentials', () =>
+    HttpResponse.json({ slug: 'custom-1', vendor: 'custom' }, { status: 201 }),
+  ),
+  http.put('/api/config/credentials/:slug', () => HttpResponse.json({ slug: 'custom-1' })),
+  http.delete('/api/config/credentials/:slug', () => HttpResponse.json({ success: true })),
+  http.post('/api/config/credentials/test', () => HttpResponse.json({ ok: true, response: 'Hi!' })),
 ]

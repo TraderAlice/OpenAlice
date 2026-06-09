@@ -108,9 +108,14 @@ export const piAdapter: CliAdapter = {
       return;
     }
 
+    // Pi's `api` field is the wire shape: anthropic-messages / openai-responses /
+    // openai-completions (Chat Completions, the default for CN/local gateways).
+    const api = cred.wireShape === 'anthropic' ? 'anthropic-messages'
+      : cred.wireShape === 'openai-responses' ? 'openai-responses'
+      : 'openai-completions';
     const provider: Record<string, unknown> = {
       name: 'OpenAlice workspace provider',
-      api: 'openai-completions',
+      api,
     };
     if (cred.baseUrl) provider['baseUrl'] = cred.baseUrl;
     // Key written directly into the workspace file (same trust model as codex's
@@ -151,6 +156,11 @@ export const piAdapter: CliAdapter = {
     const first = models[0];
     const model = first && typeof first['id'] === 'string' ? (first['id'] as string) : null;
     if (baseUrl === null && apiKey === null && model === null) return null;
-    return { baseUrl, apiKey, model };
+    // Reverse the `api` field back to the wire shape.
+    const api = p['api'];
+    const wireShape = api === 'anthropic-messages' ? 'anthropic' as const
+      : api === 'openai-responses' ? 'openai-responses' as const
+      : 'openai-chat' as const;
+    return { baseUrl, apiKey, model, wireShape };
   },
 };
