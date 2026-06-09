@@ -95,7 +95,7 @@ export function TabStrip() {
     <>
       <div
         onWheel={handleWheel}
-        className="scrollbar-hide hidden md:flex shrink-0 h-9 bg-bg-secondary border-b border-border overflow-x-auto"
+        className="scrollbar-hide hidden md:flex shrink-0 h-10 bg-bg-secondary/95 border-b border-border/80 overflow-x-auto"
       >
         {tabIds.map((id) => {
           const tab = tabsMap[id]
@@ -150,10 +150,10 @@ function TabButton({ title, active, onSelect, onClose, onContextMenu }: TabButto
         }
       }}
       onContextMenu={onContextMenu}
-      className={`group flex items-center gap-2 pl-3 pr-2 h-full text-[13px] cursor-pointer border-r border-border transition-colors ${
+      className={`group flex items-center gap-2 pl-3 pr-2 h-full text-[13px] cursor-pointer border-r border-border/80 transition-colors ${
         active
-          ? 'bg-bg text-text'
-          : 'text-text-muted hover:text-text hover:bg-bg-tertiary/40'
+          ? 'bg-bg-tertiary text-text'
+          : 'text-text-muted hover:text-text hover:bg-white/[0.035]'
       }`}
     >
       <span className="truncate max-w-[200px]">{title}</span>
@@ -163,7 +163,7 @@ function TabButton({ title, active, onSelect, onClose, onContextMenu }: TabButto
           e.stopPropagation()
           onClose()
         }}
-        className="w-4 h-4 rounded flex items-center justify-center text-text-muted/60 hover:text-text hover:bg-bg-tertiary"
+        className="w-4 h-4 rounded flex items-center justify-center text-text-muted/60 hover:text-text hover:bg-white/[0.06]"
         aria-label={`Close ${title}`}
       >
         <X size={11} strokeWidth={2.5} />

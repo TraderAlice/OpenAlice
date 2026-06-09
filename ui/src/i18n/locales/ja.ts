@@ -6,7 +6,7 @@ export const ja: Resources = {
     item: {
       inbox: '受信トレイ',
       tracked: 'トラッキング',
-      chat: 'チャット',
+      chat: 'Alice に聞く',
       workspaces: 'ワークスペース',
       market: 'マーケット',
       news: 'ニュース',
@@ -24,6 +24,18 @@ export const ja: Resources = {
       '動作はしますが、まだ安定していません。Trading-as-Git とポートフォリオは複数ブローカーを統合した状態を表示しますが、その基盤となる抽象はまだ固まっていません——試用は可能ですが、スキーマや UX の安定性に依存しないでください。オートメーションは動作しますが、現在の Harness アーキテクチャではトリガーチェーンが閉じていないため、Harness のスケジューリングが実装されるまでエンドツーエンドで発火できません。ブローカー接続の設定は 設定 → 取引 にあります。',
     unread: '未読 {{count}} 件',
     about: '{{label}}について',
+  },
+  home: {
+    askLabel: 'Alice に聞く',
+    askPlaceholder: 'Alice に聞く...',
+    skills: 'スキル',
+    agentRuntime: 'エージェントランタイム',
+    attachContext: 'コンテキストを添付',
+    submit: '送信',
+    newBadge: 'NEW',
+    sharedSkills: '共有スキル: チーム全体でスキルを作成して使用',
+    dismiss: '閉じる',
+    shareSkills: 'スキルを共有',
   },
   settings: {
     title: '設定',

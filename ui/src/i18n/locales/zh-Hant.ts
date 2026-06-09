@@ -33,6 +33,18 @@ export const zhHant: Resources = {
     unread: '{{count}} 則未讀',
     about: '關於{{label}}',
   },
+  home: {
+    askLabel: '問 Alice',
+    askPlaceholder: '問 Alice...',
+    skills: '技能',
+    agentRuntime: '智慧體執行環境',
+    attachContext: '附加上下文',
+    submit: '送出',
+    newBadge: 'NEW',
+    sharedSkills: '共享技能：在團隊中建立並使用技能',
+    dismiss: '忽略',
+    shareSkills: '共享技能',
+  },
   settings: {
     title: '設定',
     tab: {

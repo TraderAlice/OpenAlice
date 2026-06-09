@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "vite",
     "dev:demo": "vite --mode demo",
+    "dev:design": "vite --mode demo --host 127.0.0.1 --port 5173",
     "build": "tsc -b && vite build",
     "build:demo": "tsc -b && vite build --mode demo",
     "preview": "vite preview",

@@ -32,22 +32,24 @@ export function TabHost() {
   const isDesktop = useIsDesktop()
 
   return (
-    <div className="flex flex-col flex-1 min-h-0">
-      <TabStrip />
-      <div className="relative flex-1 min-h-0">
-        {tabIds.length === 0 ? (
-          <EmptyEditor />
-        ) : (
-          tabIds.map((id) => {
-            const tab = tabsMap[id]
-            if (!tab) return null
-            const isActive = id === activeTabId
-            // Mobile: only render the active tab to avoid blowing memory and
-            // because we don't even have a strip to switch tabs from.
-            if (!isDesktop && !isActive) return null
-            return <TabFrame key={id} tab={tab} visible={isActive} />
-          })
-        )}
+    <div className="flex flex-col flex-1 min-h-0 bg-bg p-3">
+      <div className="flex flex-col flex-1 min-h-0 overflow-hidden rounded-xl border border-border/80 bg-[#0a0a0b] shadow-[inset_0_1px_0_rgba(255,255,255,0.025)]">
+        <TabStrip />
+        <div className="relative flex-1 min-h-0">
+          {tabIds.length === 0 ? (
+            <EmptyEditor />
+          ) : (
+            tabIds.map((id) => {
+              const tab = tabsMap[id]
+              if (!tab) return null
+              const isActive = id === activeTabId
+              // Mobile: only render the active tab to avoid blowing memory and
+              // because we don't even have a strip to switch tabs from.
+              if (!isDesktop && !isActive) return null
+              return <TabFrame key={id} tab={tab} visible={isActive} />
+            })
+          )}
+        </div>
       </div>
     </div>
   )

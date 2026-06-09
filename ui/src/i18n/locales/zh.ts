@@ -6,7 +6,7 @@ export const zh: Resources = {
     item: {
       inbox: '收件箱',
       tracked: '追踪',
-      chat: '对话',
+      chat: '问 Alice',
       workspaces: '工作区',
       market: '市场',
       news: '新闻',
@@ -24,6 +24,18 @@ export const zh: Resources = {
       '功能可用，但尚不稳定。Trading-as-Git 与投资组合展示的是跨券商的统一状态，其底层抽象仍在定型中——可以试用，但不要依赖其 schema 或 UX 的稳定性。自动化能运行，但在当前 Harness 架构下其触发链尚未闭合，因此在 Harness 调度落地前无法端到端触发。券商连接设置位于 设置 → 交易。',
     unread: '{{count}} 条未读',
     about: '关于{{label}}',
+  },
+  home: {
+    askLabel: '问 Alice',
+    askPlaceholder: '问 Alice...',
+    skills: '技能',
+    agentRuntime: '智能体运行时',
+    attachContext: '附加上下文',
+    submit: '提交',
+    newBadge: 'NEW',
+    sharedSkills: '共享技能：在团队中创建和使用技能',
+    dismiss: '忽略',
+    shareSkills: '共享技能',
   },
   settings: {
     title: '设置',

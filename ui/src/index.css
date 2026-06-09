@@ -1,23 +1,23 @@
 @import "tailwindcss";
 
-/* GitHub Dark theme palette */
+/* Linear dark Alice shell palette */
 @theme {
-  --color-bg: #0d1117;
-  --color-bg-secondary: #161b22;
-  --color-bg-tertiary: #21262d;
-  --color-border: #30363d;
-  --color-text: #e6edf3;
-  --color-text-muted: #8b949e;
-  --color-accent: #58a6ff;
-  --color-accent-dim: rgba(31, 111, 235, 0.2);
-  --color-user-bubble: #1f6feb;
-  --color-assistant-bubble: #161b22;
-  --color-notification-bg: #2d1f00;
-  --color-notification-border: #d29922;
-  --color-green: #3fb950;
-  --color-red: #f85149;
-  --color-purple: #a78bfa;
-  --color-purple-dim: rgba(139, 92, 246, 0.2);
+  --color-bg: #050506;
+  --color-bg-secondary: #070708;
+  --color-bg-tertiary: #17181d;
+  --color-border: #202126;
+  --color-text: #f1f2f5;
+  --color-text-muted: #8f929b;
+  --color-accent: #23b99a;
+  --color-accent-dim: rgba(35, 185, 154, 0.16);
+  --color-user-bubble: #1f2026;
+  --color-assistant-bubble: #141519;
+  --color-notification-bg: #1d1610;
+  --color-notification-border: #8a5b2f;
+  --color-green: #23b99a;
+  --color-red: #e5484d;
+  --color-purple: #8f72ff;
+  --color-purple-dim: rgba(143, 114, 255, 0.16);
 
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Microsoft YaHei", "Hiragino Sans GB", "Noto Sans CJK SC", sans-serif;
@@ -49,6 +49,18 @@ html,
 body,
 #root {
   height: 100%;
+}
+
+body {
+  background:
+    radial-gradient(circle at 50% 28%, rgba(255, 255, 255, 0.035), transparent 32rem),
+    linear-gradient(180deg, #070708 0%, #050506 46%, #030304 100%);
+  color: var(--color-text);
+}
+
+::selection {
+  background: rgba(35, 185, 154, 0.28);
+  color: var(--color-text);
 }
 
 /* ==================== Typography scale ====================

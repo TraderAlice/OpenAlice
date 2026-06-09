@@ -1,8 +1,10 @@
-import { useEffect } from 'react'
+import { useEffect, useLayoutEffect } from 'react'
 import { Navigate, Route, Routes, useParams, useSearchParams } from 'react-router-dom'
 import { useWorkspace } from './store'
 import { specEquals, type ActivitySection, type ViewSpec } from './types'
 import { getView } from './registry'
+
+let suppressNextFocusedUrlSync = false
 
 /**
  * Two-way bridge between window.location and the workspace store.
@@ -26,15 +28,15 @@ export function UrlAdopter() {
   return (
     <>
       <Routes>
-        {/* Root → Inbox (the workspace-anchored landing). */}
-        <Route path="/" element={<Navigate to="/inbox" replace />} />
+        {/* Root → Ask Alice landing. Keep it deterministic even when the
+            user previously had persisted tabs open. */}
+        <Route path="/" element={<LandingRoute />} />
 
         {/* Activities */}
         {/* Legacy /chat URLs (the retired traditional-chat surface) →
-            Inbox, so any stale bookmark or persisted history entry lands
-            on the live surface instead of a 404. */}
-        <Route path="/chat" element={<Navigate to="/inbox" replace />} />
-        <Route path="/chat/:channelId" element={<Navigate to="/inbox" replace />} />
+            the Ask Alice landing instead of a 404. */}
+        <Route path="/chat" element={<Navigate to="/" replace />} />
+        <Route path="/chat/:channelId" element={<Navigate to="/" replace />} />
         <Route path="/portfolio" element={<AdoptStatic spec={{ kind: 'portfolio', params: {} }} />} />
         <Route path="/automation" element={<Navigate to="/automation/flow" replace />} />
         <Route path="/automation/:section" element={<AdoptAutomation />} />
@@ -207,6 +209,17 @@ function SetSidebarOnly({ section }: { section: import('./types').ActivitySectio
   return null
 }
 
+function LandingRoute() {
+  const setSidebar = useWorkspace((state) => state.setSidebar)
+  const closeAll = useWorkspace((state) => state.closeAll)
+  useLayoutEffect(() => {
+    suppressNextFocusedUrlSync = true
+    setSidebar(null)
+    closeAll()
+  }, [closeAll, setSidebar])
+  return null
+}
+
 /**
  * Map a ViewSpec to the ActivitySection whose sidebar should accompany
  * it. URL adoption uses this so a fresh page load / deep link / browser
@@ -274,6 +287,10 @@ function UrlSync() {
     return id ? state.tabs[id]?.spec ?? null : null
   })
   useEffect(() => {
+    if (suppressNextFocusedUrlSync) {
+      suppressNextFocusedUrlSync = false
+      return
+    }
     if (!focusedSpec) return
     const view = getView(focusedSpec.kind)
     const target = view.toUrl(focusedSpec as never)

@@ -17,7 +17,7 @@ export const en = {
     item: {
       inbox: 'Inbox',
       tracked: 'Tracked',
-      chat: 'Chat',
+      chat: 'Ask Alice',
       workspaces: 'Workspaces',
       market: 'Market',
       news: 'News',
@@ -35,6 +35,18 @@ export const en = {
       "Functional but not yet dependable. Trading-as-Git and Portfolio surface cross-broker unified state whose underlying abstraction is still being settled — try them, but don't depend on schema or UX as stable yet. Automation runs, but its trigger chain isn't closed in the current Harness architecture, so it can't fire end-to-end until Harness scheduling lands. Broker connection setup lives in Settings → Trading.",
     unread: '{{count}} unread',
     about: 'About {{label}}',
+  },
+  home: {
+    askLabel: 'Ask Alice',
+    askPlaceholder: 'Ask Alice...',
+    skills: 'Skills',
+    agentRuntime: 'Agent Runtime',
+    attachContext: 'Attach context',
+    submit: 'Submit',
+    newBadge: 'NEW',
+    sharedSkills: 'Shared skills: create and use skills across your team',
+    dismiss: 'Dismiss',
+    shareSkills: 'Share skills',
   },
   settings: {
     title: 'Settings',

@@ -144,7 +144,7 @@ const NAV_SECTIONS: NavSection[] = [
 // ==================== ActivityBar ====================
 
 /**
- * Linear-style left nav. 200px wide on all viewports; on mobile (<md)
+ * Linear-style left nav. 276px wide on desktop; on mobile (<md)
  * it slides in over the page from the left, on desktop it's a static
  * column. Top section (no header) is the pinned-nav block — Chat,
  * Inbox, Workspaces, etc. — always visible. Labeled sections (Agent,
@@ -175,13 +175,13 @@ export function ActivityBar({ open, onClose, onItemActivated }: ActivityBarProps
         onClick={onClose}
       />
 
-      {/* ActivityBar — 200px on all viewports. Mobile: slide-in over
+      {/* ActivityBar — Linear-style workspace rail. Mobile: slide-in over
        *  page with backdrop. Desktop: static column flush left. */}
       <aside
         className={`
-          w-[200px] h-full flex flex-col shrink-0
+          w-[276px] h-full flex flex-col shrink-0
           bg-bg-secondary
-          border-r border-border
+          border-r border-border/80
           fixed z-50 top-0 left-0 transition-transform duration-200
           ${open ? 'translate-x-0' : '-translate-x-full'}
           md:static md:translate-x-0 md:z-auto md:transition-none
@@ -192,14 +192,15 @@ export function ActivityBar({ open, onClose, onItemActivated }: ActivityBarProps
           <img
             src="/alice.ico"
             alt="Alice"
-            className="w-7 h-7 rounded-lg ring-1 ring-accent/25 shadow-[0_0_8px_rgba(88,166,255,0.15)]"
+            className="w-7 h-7 rounded-full ring-1 ring-white/10 shadow-[0_0_14px_rgba(198,109,55,0.12)]"
             draggable={false}
           />
-          <h1 className="text-[15px] font-semibold text-text">OpenAlice</h1>
+          <h1 className="min-w-0 flex-1 truncate text-[15px] font-semibold text-text">OpenAlice</h1>
+          <span className="text-text-muted/70">⌄</span>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 flex flex-col px-2 overflow-y-auto pb-3">
+        <nav className="flex-1 flex flex-col px-3 overflow-y-auto pb-3">
           {NAV_SECTIONS.map((section, si) => {
             const labeled = section.sectionLabel.length > 0
             // User toggle wins over default. The collapse store stores
@@ -228,7 +229,7 @@ export function ActivityBar({ open, onClose, onItemActivated }: ActivityBarProps
                   />
                 )}
                 {showItems && (
-                  <div className="flex flex-col gap-0.5" id={`activity-section-${si}`}>
+                  <div className="flex flex-col gap-1" id={`activity-section-${si}`}>
                     {section.items.map((item) => {
                       const sec = activitySectionFor(item.page)
                       const isActive = selectedSidebar === sec
@@ -263,8 +264,8 @@ export function ActivityBar({ open, onClose, onItemActivated }: ActivityBarProps
                           title={t(item.labelKey)}
                           className={`relative flex items-center gap-3 px-3 py-1.5 rounded-md text-[13px] transition-colors text-left ${
                             isActive
-                              ? 'bg-bg-tertiary text-text'
-                              : 'text-text-muted hover:text-text hover:bg-bg-tertiary/50'
+                              ? 'bg-bg-tertiary text-text shadow-[inset_0_0_0_1px_rgba(255,255,255,0.045)]'
+                              : 'text-text-muted hover:text-text hover:bg-white/[0.035]'
                           }`}
                         >
                           {/* Active indicator — left vertical bar */}
@@ -281,7 +282,7 @@ export function ActivityBar({ open, onClose, onItemActivated }: ActivityBarProps
                           {item.page === 'inbox' && unreadInbox > 0 && (
                             <span
                               aria-label={t('nav.unread', { count: unreadInbox })}
-                              className="shrink-0 min-w-[18px] h-[18px] px-1.5 rounded-full bg-red text-[10px] font-semibold text-white tabular-nums flex items-center justify-center"
+                              className="shrink-0 min-w-[18px] h-[18px] px-1.5 rounded-full border border-border bg-bg-tertiary text-[10px] font-semibold text-text-muted tabular-nums flex items-center justify-center"
                             >
                               {unreadInbox > 99 ? '99+' : unreadInbox}
                             </span>
@@ -340,7 +341,7 @@ function SectionHeader({
         <button
           type="button"
           onClick={onToggleCollapse}
-          className="flex-1 flex items-center gap-1.5 py-1 text-[11px] font-medium text-text-muted/60 hover:text-text-muted uppercase tracking-wider transition-colors text-left"
+          className="flex-1 flex items-center gap-1.5 py-1 text-[12px] font-semibold text-text-muted/75 hover:text-text-muted transition-colors text-left"
           aria-expanded={!isCollapsed}
           aria-controls={controlsId}
         >
