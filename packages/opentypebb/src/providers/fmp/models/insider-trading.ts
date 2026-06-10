@@ -21,6 +21,9 @@ export type FMPInsiderTradingQueryParams = z.infer<typeof FMPInsiderTradingQuery
 
 // --- Data ---
 
+// Field names per the FMP *stable* insider-trading response (the old
+// dict carried legacy-v4 names — 'cik', and upstream's typo'd
+// 'acquistionOrDisposition' — which left dates/types null).
 const ALIAS_DICT: Record<string, string> = {
   owner_cik: 'reportingCik',
   owner_name: 'reportingName',
@@ -28,9 +31,12 @@ const ALIAS_DICT: Record<string, string> = {
   ownership_type: 'directOrIndirect',
   security_type: 'securityName',
   transaction_price: 'price',
-  acquisition_or_disposition: 'acquistionOrDisposition',
+  transaction_type: 'transactionType',
+  transaction_date: 'transactionDate',
+  filing_date: 'filingDate',
+  acquisition_or_disposition: 'acquisitionOrDisposition',
   filing_url: 'link',
-  company_cik: 'cik',
+  company_cik: 'companyCik',
 }
 
 export const FMPInsiderTradingDataSchema = InsiderTradingDataSchema.extend({
