@@ -7,7 +7,7 @@
  */
 
 import { existsSync } from 'node:fs';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -166,5 +166,55 @@ describe('injectWorkspaceContext — skills', () => {
     expect(await read('.claude/skills/scan-value-chain/SKILL.md')).toBe(expected);  // Claude Code
     expect(await read('.agents/skills/scan-value-chain/SKILL.md')).toBe(expected);  // Codex (+ opencode default)
     expect(await read('.pi/skills/scan-value-chain/SKILL.md')).toBe(expected);      // Pi
+  });
+});
+
+// User-skill discovery + override: skills dropped under `data/skills/<name>/`
+// are auto-bundled (no template edit needed), and a user-shipped skill of the
+// same name as a default one wins — same precedence model as persona.
+describe('injectWorkspaceContext — user skills (data/skills/)', () => {
+  const USER_SKILL_NAME = '__test-user-skill__';
+  const OVERRIDE_NAME = 'scan-value-chain';   // shipped default; user copy should win
+  const userSkillDir = dataPath('skills', USER_SKILL_NAME);
+  const overrideDir = dataPath('skills', OVERRIDE_NAME);
+  const userSkillBody = '---\nname: __test-user-skill__\ndescription: user-installed test skill\n---\nUSER-BODY\n';
+  const overrideBody = '---\nname: scan-value-chain\ndescription: user override\n---\nOVERRIDE-BODY\n';
+
+  beforeEach(async () => {
+    await mkdir(userSkillDir, { recursive: true });
+    await writeFile(join(userSkillDir, 'SKILL.md'), userSkillBody);
+    await mkdir(overrideDir, { recursive: true });
+    await writeFile(join(overrideDir, 'SKILL.md'), overrideBody);
+  });
+  afterEach(async () => {
+    await rm(userSkillDir, { recursive: true, force: true });
+    await rm(overrideDir, { recursive: true, force: true });
+  });
+
+  it('auto-discovers user skills from data/skills/* even when template lists none', async () => {
+    await injectWorkspaceContext({ template: makeTemplate({ bundledSkills: [] }), wsId: 'ws-abc', dir });
+    expect(await read(`.claude/skills/${USER_SKILL_NAME}/SKILL.md`)).toBe(userSkillBody);
+    expect(await read(`.agents/skills/${USER_SKILL_NAME}/SKILL.md`)).toBe(userSkillBody);
+    expect(await read(`.pi/skills/${USER_SKILL_NAME}/SKILL.md`)).toBe(userSkillBody);
+  });
+
+  it('a user-shipped skill of the same name wins over the default (persona-style precedence)', async () => {
+    await injectWorkspaceContext({
+      template: makeTemplate({ bundledSkills: [OVERRIDE_NAME] }),
+      wsId: 'ws-abc',
+      dir,
+    });
+    expect(await read(`.claude/skills/${OVERRIDE_NAME}/SKILL.md`)).toBe(overrideBody);
+  });
+
+  it('skips a data/skills/<name>/ entry that has no SKILL.md (WIP guard)', async () => {
+    const wipDir = dataPath('skills', '__wip-no-manifest__');
+    await mkdir(wipDir, { recursive: true });
+    try {
+      await injectWorkspaceContext({ template: makeTemplate({ bundledSkills: [] }), wsId: 'ws-abc', dir });
+      expect(existsSync(join(dir, '.claude/skills/__wip-no-manifest__'))).toBe(false);
+    } finally {
+      await rm(wipDir, { recursive: true, force: true });
+    }
   });
 });
