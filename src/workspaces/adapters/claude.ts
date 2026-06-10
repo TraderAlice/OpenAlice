@@ -9,6 +9,20 @@ const SESSION_FILE_RE = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a
 
 const CLAUDE_SETTINGS_PATH = '.claude/settings.local.json';
 
+/**
+ * Claude Code parks project-scoped `.mcp.json` servers at "⏸ Pending
+ * approval" (the trust gate for VCS-shared MCP config) until the user
+ * approves them — and every workspace dir is a fresh project key, so an
+ * interactive session would re-prompt on every new workspace. Inject the
+ * auto-trust setting at spawn instead of writing it into
+ * `.claude/settings.local.json`, whose lifecycle `writeAiConfig` owns (the
+ * file is deleted wholesale on AI-config reset). Headless `-p` connects to
+ * project servers without approval today (verified on 2.1.170), but gets the
+ * same flag so automation doesn't silently lose MCP if a future version
+ * closes that gap.
+ */
+const AUTOTRUST_SETTINGS = '{"enableAllProjectMcpServers":true}';
+
 /** dashed-cwd convention used by Claude Code's project store. */
 function projectKey(workspaceDir: string): string {
   const abs = resolve(workspaceDir);
@@ -48,13 +62,14 @@ export const claudeAdapter: CliAdapter = {
   },
 
   composeCommand(base: readonly string[], ctx: SpawnContext): readonly string[] {
-    if (ctx.resume === undefined) return base;
+    const cmd = [...base, '--settings', AUTOTRUST_SETTINGS];
+    if (ctx.resume === undefined) return cmd;
     if (ctx.resume === 'last') {
       throw new Error(
         'claude adapter: "last" resume not supported — use --resume <sessionId> or undefined (fresh)',
       );
     }
-    return [...base, '--resume', ctx.resume.sessionId];
+    return [...cmd, '--resume', ctx.resume.sessionId];
   },
 
   // Headless: `claude -p` is non-interactive and exits at the turn boundary.
@@ -64,7 +79,7 @@ export const claudeAdapter: CliAdapter = {
   // end-of-options terminator, so a prompt that starts with `-`/`--` isn't
   // mis-parsed as a flag (verified: without `--`, claude errors out).
   composeHeadlessCommand(base: readonly string[], _ctx: SpawnContext, prompt: string): readonly string[] {
-    return [...base, '-p', '--output-format', 'json', '--', prompt];
+    return [...base, '--settings', AUTOTRUST_SETTINGS, '-p', '--output-format', 'json', '--', prompt];
   },
 
   async writeAiConfig(cwd: string, cred: WorkspaceAiCred): Promise<void> {

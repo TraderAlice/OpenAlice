@@ -29,6 +29,27 @@ afterEach(async () => {
 const read = (rel: string): Promise<string> => readFile(join(dir, rel), 'utf8');
 
 describe('claudeAdapter AI-config', () => {
+  // Project-scoped `.mcp.json` servers park at "Pending approval" until the
+  // user approves — and each workspace dir is a fresh project key, so every
+  // spawn carries the auto-trust setting (see AUTOTRUST_SETTINGS in claude.ts).
+  const SETTINGS_FLAG = ['--settings', '{"enableAllProjectMcpServers":true}'];
+
+  it('composeCommand: fresh spawn injects the MCP auto-trust settings', () => {
+    expect(claudeAdapter.composeCommand(['claude'], { cwd: dir, env: {} })).toEqual([
+      'claude', ...SETTINGS_FLAG,
+    ]);
+  });
+
+  it('composeCommand: by-id resume keeps the settings flag before --resume', () => {
+    expect(claudeAdapter.composeCommand(['claude'], { cwd: dir, env: {}, resume: { sessionId: 'abc-123' } }))
+      .toEqual(['claude', ...SETTINGS_FLAG, '--resume', 'abc-123']);
+  });
+
+  it('composeCommand: "last" resume throws (intentionally unsupported)', () => {
+    expect(() => claudeAdapter.composeCommand(['claude'], { cwd: dir, env: {}, resume: 'last' }))
+      .toThrow(/"last" resume not supported/);
+  });
+
   it('writes full x-api-key config byte-exact', async () => {
     await claudeAdapter.writeAiConfig!(dir, {
       baseUrl: 'https://api.test/v1', apiKey: 'sk-123', model: 'claude-x', authMode: 'x-api-key',
@@ -275,6 +296,8 @@ describe('composeHeadlessCommand (one-shot headless argv, prompt placed per-CLI)
   it('claude: -p --output-format json -- <prompt> (prompt after -- terminator, never --bare)', () => {
     expect(claudeAdapter.composeHeadlessCommand!(['claude'], ctx(), 'do x')).toEqual([
       'claude',
+      '--settings',
+      '{"enableAllProjectMcpServers":true}',
       '-p',
       '--output-format',
       'json',
