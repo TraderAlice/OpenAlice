@@ -23,7 +23,7 @@ export type ViewSpec =
   | { kind: 'news';           params: Record<string, never> }
   | { kind: 'market-list';    params: Record<string, never> }
   | { kind: 'market-rotation'; params: Record<string, never> }
-  | { kind: 'market-board';   params: { board: 'movers' | 'calendar' | 'macro' } }
+  | { kind: 'market-board';   params: { board: 'movers' | 'calendar' | 'macro' | 'term-structure' } }
   | { kind: 'market-detail';  params: { assetClass: 'equity' | 'crypto' | 'currency' | 'commodity'; symbol: string; source?: string } }
   | { kind: 'settings';       params: { category: 'general' | 'ai-provider' | 'trading' | 'mcp' | 'market-data' | 'news-collector' } }
   | { kind: 'uta-detail';     params: { id: string } }

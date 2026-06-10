@@ -179,6 +179,12 @@ export const en = {
     macroClaims: 'Initial Jobless Claims',
     macroWti: 'WTI Crude',
     macroDollar: 'Dollar Index (Broad)',
+    boardTermStructure: 'Term Structure',
+    termSubtitle: 'BTC / ETH futures curve with annualized basis vs the perpetual.',
+    termSpotPerp: 'Perp',
+    termContango: 'Contango',
+    termBackwardation: 'Backwardation',
+    termBasisNote: 'chips = annualized basis vs perp',
   },
   portfolio: {
     overview: 'Overview',

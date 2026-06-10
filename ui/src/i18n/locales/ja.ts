@@ -168,6 +168,12 @@ export const ja: Resources = {
     macroClaims: '新規失業保険申請',
     macroWti: 'WTI 原油',
     macroDollar: 'ドル指数(広義)',
+    boardTermStructure: '期間構造',
+    termSubtitle: 'BTC / ETH 先物カーブ(対パーペチュアル年率ベーシス付き)。',
+    termSpotPerp: 'Perp',
+    termContango: 'コンタンゴ',
+    termBackwardation: 'バックワーデーション',
+    termBasisNote: 'チップ = 対 Perp 年率ベーシス',
   },
   portfolio: {
     overview: '概要',

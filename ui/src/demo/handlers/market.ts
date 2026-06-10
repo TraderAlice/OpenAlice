@@ -6,7 +6,7 @@ import {
   demoSectorRotation,
 } from '../fixtures/market'
 import type { BarSourceCandidate, BarMeta } from '../../api/market'
-import type { MoversBoard, MoverRow, CalendarBoard, MacroBoard, MacroSeriesCard } from '../../api/reference'
+import type { MoversBoard, MoverRow, CalendarBoard, MacroBoard, MacroSeriesCard, TermStructureBoard } from '../../api/reference'
 
 const AAPL = 'AAPL'
 
@@ -38,6 +38,7 @@ export const marketHandlers = [
   http.get('/api/reference/movers', () => HttpResponse.json(demoMovers)),
   http.get('/api/reference/calendar', () => HttpResponse.json(demoCalendar)),
   http.get('/api/reference/macro', () => HttpResponse.json(demoMacro)),
+  http.get('/api/reference/term-structure', () => HttpResponse.json(demoTermStructure)),
 
   // ---- federated bars (multi-source K-lines) ----
   // AAPL has two demo sources so the source picker is exercised.
@@ -157,4 +158,26 @@ const demoMacro: MacroBoard = {
     macroCard('DTWEXBGS', 'Dollar Index (Broad)', 'index', 121, -0.05),
   ],
   meta: { provider: 'federal_reserve', asOf: '2026-06-10T13:30:00.000Z' },
+}
+
+function termCurve(symbol: string, spot: number): TermStructureBoard['curves'][number] {
+  const expiries = [['2026-06-26', 16], ['2026-07-31', 51], ['2026-09-25', 107], ['2026-12-25', 198], ['2027-03-26', 289]] as const
+  return {
+    symbol,
+    spot,
+    points: expiries.map(([expiration, days]) => {
+      const basis = 6 + days / 150
+      return {
+        expiration,
+        price: Math.round(spot * (1 + (basis / 100) * (days / 365))),
+        daysToExpiry: days,
+        annualizedBasis: basis,
+      }
+    }),
+  }
+}
+
+const demoTermStructure: TermStructureBoard = {
+  curves: [termCurve('BTC', 104500), termCurve('ETH', 5230)],
+  meta: { provider: 'deribit', asOf: '2026-06-10T13:30:00.000Z' },
 }

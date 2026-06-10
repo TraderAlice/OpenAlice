@@ -24,6 +24,10 @@ function mkCtx(overrides?: Partial<ReferenceDataService>): EngineContext {
       cards: [{ id: 'DFF', label: 'Fed Funds Rate', unit: 'percent' as const, points: [{ date: '2026-06-09', value: 5.25 }], latest: 5.25, latestDate: '2026-06-09', change: 0.01 }],
       meta: { provider: 'federal_reserve', asOf: '2026-06-10T00:00:00.000Z' },
     }),
+    termStructure: async () => ({
+      curves: [{ symbol: 'BTC', spot: 100000, points: [{ expiration: '2026-09-25', price: 102500, daysToExpiry: 107, annualizedBasis: 8.5 }] }],
+      meta: { provider: 'deribit', asOf: '2026-06-10T00:00:00.000Z' },
+    }),
     ...overrides,
   }
   return { reference } as unknown as EngineContext
@@ -57,6 +61,13 @@ describe('reference routes', () => {
     const body = await res.json()
     expect(body.cards[0].id).toBe('DFF')
     expect(body.meta.provider).toBe('federal_reserve')
+  })
+
+  it('GET /term-structure returns the curves', async () => {
+    const res = await createReferenceRoutes(mkCtx()).request('/term-structure')
+    const body = await res.json()
+    expect(body.curves[0].symbol).toBe('BTC')
+    expect(body.curves[0].points[0].annualizedBasis).toBe(8.5)
   })
 
   it('GET /movers surfaces a failure as { error } with 502, not a crash', async () => {

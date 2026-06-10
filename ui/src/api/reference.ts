@@ -95,8 +95,29 @@ export interface MacroBoard {
   meta: ReferenceMeta
 }
 
+export interface TermPoint {
+  expiration: string
+  price: number | null
+  daysToExpiry: number | null
+  /** Annualized basis vs the perpetual, percent. */
+  annualizedBasis: number | null
+}
+
+export interface TermCurve {
+  symbol: string
+  spot: number | null
+  points: TermPoint[]
+}
+
+export interface TermStructureBoard {
+  curves: TermCurve[]
+  errors?: Record<string, string>
+  meta: ReferenceMeta
+}
+
 export const referenceApi = {
   movers: () => fetchJson<MoversBoard>('/api/reference/movers'),
   calendar: () => fetchJson<CalendarBoard>('/api/reference/calendar'),
   macro: () => fetchJson<MacroBoard>('/api/reference/macro'),
+  termStructure: () => fetchJson<TermStructureBoard>('/api/reference/term-structure'),
 }

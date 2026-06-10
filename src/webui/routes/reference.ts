@@ -34,6 +34,15 @@ export function createReferenceRoutes(ctx: EngineContext): Hono {
     }
   })
 
+  // GET /api/reference/term-structure → BTC/ETH futures curve (Deribit)
+  app.get('/term-structure', async (c) => {
+    try {
+      return c.json(await ctx.reference.termStructure())
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 502)
+    }
+  })
+
   // GET /api/reference/macro → curated FRED regime dashboard
   app.get('/macro', async (c) => {
     try {

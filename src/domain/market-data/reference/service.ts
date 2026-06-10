@@ -4,13 +4,17 @@
  * board-shaped payloads with the explicit meta envelope.
  */
 
-import type { EconomyClientLike, EquityClientLike } from '../client/types.js'
+import type { DerivativesClientLike, EconomyClientLike, EquityClientLike } from '../client/types.js'
 import type { CalendarBoard, MacroBoard, MoversBoard, ReferenceDataService } from './types.js'
 import { fetchMacroBoard } from './macro.js'
+import { fetchTermStructure, type TermStructureBoard } from './term-structure.js'
 
 export interface ReferenceDataDeps {
   equityClient: EquityClientLike
   economyClient: EconomyClientLike
+  /** Only on the typebb-sdk backend — the openbb-api client set has no
+   *  derivatives twin. Term structure fails loud without it. */
+  derivativesClient?: DerivativesClientLike
   /** Configured default equity provider — the meta label. On the SDK backend
    *  the client routes by its constructed default, so the label is the
    *  REQUESTED provider (same caveat as the bar layer's vendor meta). */
@@ -93,6 +97,13 @@ export function createReferenceData(deps: ReferenceDataDeps): ReferenceDataServi
       // Single upstream (FRED) — a failure IS the board failing; let it
       // throw so the route returns the actionable key-missing message.
       return fetchMacroBoard(deps.economyClient)
+    },
+
+    async termStructure(): Promise<TermStructureBoard> {
+      if (!deps.derivativesClient) {
+        throw new Error('Term structure requires the typebb-sdk market-data backend (derivatives client unavailable).')
+      }
+      return fetchTermStructure(deps.derivativesClient)
     },
   }
 }

@@ -168,6 +168,12 @@ export const zh: Resources = {
     macroClaims: '初请失业金',
     macroWti: 'WTI 原油',
     macroDollar: '美元指数(广义)',
+    boardTermStructure: '期限结构',
+    termSubtitle: 'BTC / ETH 期货曲线,标注对永续的年化基差。',
+    termSpotPerp: '永续',
+    termContango: 'Contango(升水)',
+    termBackwardation: 'Backwardation(贴水)',
+    termBasisNote: '徽标 = 对永续的年化基差',
   },
   portfolio: {
     overview: '概览',

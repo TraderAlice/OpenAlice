@@ -140,7 +140,7 @@ function AdoptMarketDetail() {
 
 function AdoptMarketBoard() {
   const { board } = useParams<{ board: string }>()
-  const valid: ReadonlyArray<string> = ['movers', 'calendar', 'macro']
+  const valid: ReadonlyArray<string> = ['movers', 'calendar', 'macro', 'term-structure']
   if (!board || !valid.includes(board)) return <Navigate to="/market" replace />
   return (
     <AdoptStatic

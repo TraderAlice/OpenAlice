@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { LineChart, Line, ResponsiveContainer, YAxis } from 'recharts'
+import { LineChart, Line, ResponsiveContainer, YAxis, XAxis, Tooltip } from 'recharts'
 import { PageHeader } from '../components/PageHeader'
 import {
   referenceApi,
   type MoversBoard, type MoverRow, type ReferenceMeta, type CalendarBoard,
-  type MacroBoard, type MacroSeriesCard,
+  type MacroBoard, type MacroSeriesCard, type TermStructureBoard, type TermCurve,
 } from '../api/reference'
 import { useWorkspace } from '../tabs/store'
 import type { ViewSpec } from '../tabs/types'
@@ -17,6 +17,7 @@ export const MARKET_BOARD_TITLES: Record<BoardKind, string> = {
   movers: 'Movers',
   calendar: 'Calendar',
   macro: 'Macro',
+  'term-structure': 'Term Structure',
 }
 
 const REFRESH_MS = 5 * 60 * 1000
@@ -34,6 +35,8 @@ export function MarketBoardPage({ spec }: PageProps) {
       return <CalendarBoardView />
     case 'macro':
       return <MacroBoardView />
+    case 'term-structure':
+      return <TermStructureBoardView />
   }
 }
 
@@ -462,6 +465,113 @@ function MacroCard({ card }: { card: MacroSeriesCard }) {
         </div>
       </div>
       {empty && <span className="text-[11px] text-text-muted/60">{t('market.noMatches')}</span>}
+    </div>
+  )
+}
+
+// ==================== Term structure ====================
+
+function TermStructureBoardView() {
+  const { t } = useTranslation()
+  const [data, setData] = useState<TermStructureBoard | null>(null)
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    const load = async () => {
+      try {
+        const res = await referenceApi.termStructure()
+        if (!alive) return
+        setData(res)
+        setUpdatedAt(new Date())
+        setError(null)
+      } catch (err) {
+        if (!alive) return
+        setError(err instanceof Error ? err.message : 'Failed to load')
+      } finally {
+        if (alive) setLoading(false)
+      }
+    }
+    load()
+    const timer = setInterval(load, 5 * 60 * 1000)
+    return () => { alive = false; clearInterval(timer) }
+  }, [])
+
+  return (
+    <div className="flex flex-col flex-1 min-h-0">
+      <PageHeader
+        title={t('market.boardTermStructure')}
+        description={
+          <>
+            {t('market.termSubtitle')}
+            {data && <span className="text-text-muted/50"> · {data.meta.provider}</span>}
+          </>
+        }
+        live={{ lastUpdated: updatedAt }}
+      />
+      <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 flex flex-col gap-6 min-h-0">
+        {loading && !data && <div className="text-[13px] text-text-muted">{t('common.loading')}</div>}
+        {error && (
+          <div className="text-[13px] text-red border border-red/30 rounded-md px-3 py-2 bg-red/5">{error}</div>
+        )}
+        {data?.errors && Object.entries(data.errors).map(([sym, msg]) => (
+          <div key={sym} className="text-[13px] text-red border border-red/30 rounded-md px-3 py-2 bg-red/5">{sym}: {msg}</div>
+        ))}
+        {data?.curves.map((curve) => <TermCurveCard key={curve.symbol} curve={curve} />)}
+      </div>
+    </div>
+  )
+}
+
+function TermCurveCard({ curve }: { curve: TermCurve }) {
+  const { t } = useTranslation()
+  // Contango when the far end trades above spot; backwardation otherwise.
+  const far = curve.points[curve.points.length - 1]
+  const regime = far?.price != null && curve.spot != null
+    ? (far.price >= curve.spot ? t('market.termContango') : t('market.termBackwardation'))
+    : null
+  const chartData = curve.points
+    .filter((p) => p.price != null)
+    .map((p) => ({ ...p, label: p.expiration.slice(2) }))
+  return (
+    <div className="border border-border rounded-md bg-bg-secondary/40 px-4 py-3 flex flex-col gap-2">
+      <div className="flex items-baseline gap-3">
+        <span className="text-[15px] font-semibold font-mono text-text">{curve.symbol}</span>
+        {curve.spot != null && (
+          <span className="text-[12px] text-text-muted">{t('market.termSpotPerp')} <span className="font-mono text-text">{curve.spot.toLocaleString('en-US')}</span></span>
+        )}
+        {regime && <span className="text-[11px] uppercase tracking-wide text-text-muted/70">{regime}</span>}
+      </div>
+      <div className="h-40">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={chartData} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
+            <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#7d8590' }} stroke="#7d8590" />
+            <YAxis domain={['dataMin', 'dataMax']} tick={{ fontSize: 10, fill: '#7d8590' }} stroke="#7d8590" width={70}
+              tickFormatter={(v: number) => v.toLocaleString('en-US')} />
+            <Tooltip
+              formatter={(v) => [Number(v).toLocaleString('en-US'), '']}
+              labelFormatter={(l) => `20${l}`}
+              contentStyle={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', fontSize: 11 }}
+            />
+            <Line type="monotone" dataKey="price" stroke="var(--color-accent)" strokeWidth={1.5} dot={{ r: 2.5 }} isAnimationActive={false} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {curve.points.map((p) => (
+          <span key={p.expiration} className="text-[11px] px-1.5 py-0.5 rounded bg-bg-tertiary/60 font-mono" title={`${p.daysToExpiry ?? '—'}d`}>
+            {p.expiration.slice(2)}{' '}
+            <span className={p.annualizedBasis == null ? 'text-text-muted' : p.annualizedBasis >= 0 ? 'text-green' : 'text-red'}>
+              {p.annualizedBasis == null ? '—' : `${p.annualizedBasis >= 0 ? '+' : ''}${p.annualizedBasis.toFixed(1)}%`}
+            </span>
+          </span>
+        ))}
+        {curve.points.length > 0 && (
+          <span className="text-[10px] text-text-muted/60 self-center ml-1">{t('market.termBasisNote')}</span>
+        )}
+      </div>
     </div>
   )
 }

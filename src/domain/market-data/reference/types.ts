@@ -17,6 +17,8 @@
 import type {
   EquityDiscoveryData, CalendarEarningsData, CalendarIpoData, CalendarDividendData,
 } from '@traderalice/opentypebb'
+// Type-only circular import (term-structure.ts imports ReferenceMeta) — fine in TS.
+import type { TermStructureBoard } from './term-structure.js'
 
 /** Envelope on every reference payload. Provider is an explicit label —
  *  same philosophy as the bar layer's sourceId: annotate the source,
@@ -98,4 +100,8 @@ export interface ReferenceDataService {
    *  FRED-only by design — one key, one multi-series call. Fails loud when
    *  the FRED key is missing. */
   macro(): Promise<MacroBoard>
+  /** BTC/ETH futures term structure from Deribit (keyless), with
+   *  annualized basis vs the perpetual. Requires the typebb-sdk backend
+   *  (the derivatives client has no openbb-api twin). */
+  termStructure(): Promise<TermStructureBoard>
 }

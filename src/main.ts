@@ -190,6 +190,7 @@ async function main() {
   const reference = createReferenceData({
     equityClient,
     economyClient,
+    derivativesClient,
     equityProvider: config.marketData.providers.equity,
   })
 

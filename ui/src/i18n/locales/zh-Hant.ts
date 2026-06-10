@@ -176,6 +176,12 @@ export const zhHant: Resources = {
     macroClaims: '初領失業救濟金',
     macroWti: 'WTI 原油',
     macroDollar: '美元指數(廣義)',
+    boardTermStructure: '期限結構',
+    termSubtitle: 'BTC / ETH 期貨曲線,標注對永續的年化基差。',
+    termSpotPerp: '永續',
+    termContango: 'Contango(升水)',
+    termBackwardation: 'Backwardation(貼水)',
+    termBasisNote: '徽章 = 對永續的年化基差',
   },
   portfolio: {
     overview: '總覽',
