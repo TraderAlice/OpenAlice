@@ -9,7 +9,7 @@ import { describe, it, expect } from 'vitest'
  * against drift — if they diverge, one binary would lag behind a shim fix.
  * Add a new copy here whenever a new `alice-*` export ships.
  */
-const EXPORT_BINARIES = ['alice', 'alice-workspace', 'traderhub']
+const EXPORT_BINARIES = ['alice', 'alice-workspace', 'traderhub', 'alice-uta']
 
 const read = (name: string) =>
   readFileSync(fileURLToPath(new URL(`bin/${name}`, import.meta.url)))
