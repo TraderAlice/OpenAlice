@@ -4,10 +4,11 @@ version: 1.1.0
 
 # Chat
 
-A general-purpose Alice workspace. The agent boots with Alice's full
-market/research data surface — by default through the `alice*` / `traderhub`
-CLIs on its PATH (or through the OpenAlice MCP server if you pick MCP at
-creation) — and Alice's persona pre-loaded as CLAUDE.md / AGENTS.md.
+A general-purpose Alice workspace. The agent boots with Alice's full tool
+surface — market/research data plus trading, by default through the
+`alice*` / `traderhub` CLIs on its PATH (or through the OpenAlice MCP server
+if you pick MCP at creation) — and Alice's persona pre-loaded as
+CLAUDE.md / AGENTS.md.
 
 ## What this workspace does
 
@@ -19,9 +20,9 @@ skill additionally teaches it to reach long-tail sources (social sentiment,
 options flow, global news frontpages) through the optional community
 `opencli` CLI — it will ask before assuming you have it.
 
-Trading actions stay on the MCP tool surface: pick **MCP** in the Tools
-field at creation if you want the agent to place orders against your UTA
-accounts. The CLI default is data-only.
+Trading runs through the `alice-uta` CLI (or the MCP trading tools in MCP
+mode) against your UTA accounts — orders go through the trading-as-git
+approval flow. Scheduling (cron) stays MCP-only.
 
 ## When to spawn this
 
@@ -34,7 +35,7 @@ accounts. The CLI default is data-only.
 (v1: Inbox is one-way — the agent posts; you don't reply through it.)
 
 Things Alice will route here:
-- Trade execution confirmations (when she places orders on your behalf — MCP mode).
+- Trade execution confirmations (when she places orders on your behalf).
 - Market alerts she's been watching for you.
 - Anything she flags as worth re-reading later.
 
@@ -42,6 +43,6 @@ Things Alice will route here:
 
 When spawning, you'll configure:
 - **Tag** — short identifier for this workspace (lowercase, dashes ok).
-- **Tools** — how the agent reaches Alice's data: CLI (default) or MCP. Trading requires MCP.
+- **Tools** — how the agent reaches Alice's tools: CLI (default) or MCP.
 
 All available CLI runtimes (Claude, Codex, opencode, Pi, shell) are enabled by default; the template's first listed adapter is what the `+` "new session" button defaults to.

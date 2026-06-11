@@ -1,13 +1,15 @@
 ---
 name: openalice-cli
 description: >
-  How to reach OpenAlice from your shell via the `alice*` CLIs. Two binaries:
+  How to reach OpenAlice from your shell via the `alice*` CLIs. Three binaries:
   `alice` for THIS WORKBENCH's research surfaces (the collected-RSS archive,
-  cross-asset symbol search, K-line quant analysis, calculator) and
+  cross-asset symbol search, K-line quant analysis, calculator),
   `alice-workspace` for AGENT COLLABORATION (push finished work to the user's
-  inbox, track entities). Both print JSON and are discoverable with `--help`.
-  Use for: "grep the collected feeds for the Fed", "find the barId for AAPL",
-  "compute RSI", "push my findings to the inbox", "track this ticker".
+  inbox, track entities), and `alice-uta` for TRADING (accounts, portfolio,
+  orders, the trading-as-git approval flow). All print JSON and are
+  discoverable with `--help`. Use for: "grep the collected feeds for the Fed",
+  "find the barId for AAPL", "compute RSI", "push my findings to the inbox",
+  "track this ticker", "what's my position", "place the order".
   (LOW-FREQUENCY market data — fundamentals, macro series, calendars, boards —
   lives on the separate `traderhub` CLI; see the `traderhub` skill. Technical
   analysis manual: `openalice-quant`.) Discover everything live with `--help`
@@ -16,7 +18,7 @@ description: >
 
 # Using the `alice*` CLIs
 
-OpenAlice exposes two CLIs on your shell PATH, split by what they touch. Both
+OpenAlice exposes three CLIs on your shell PATH, split by what they touch. All
 talk to the same backend the `openalice` MCP tools do — they're the CLI
 front-ends, handy for piping, grepping, and quick scripted use. **Prefer them in
 this workspace** (especially if the MCP tools aren't reliably available to you).
@@ -25,6 +27,7 @@ this workspace** (especially if the MCP tools aren't reliably available to you).
 |---|---|---|
 | `alice` | **Workbench research** (read) | `rss`, `market`, `analysis`, `think` |
 | `alice-workspace` | **Agent collaboration** | `inbox`, `track` |
+| `alice-uta` | **Trading** (mutating!) | `account`, `contract`, `order`, `position`, `git`, `market`, `sim` |
 | `traderhub` | **Low-frequency market data** — see the `traderhub` skill | `board`, `equity`, `etf`, `economy`, `global`, `shipping`, `fed`, `crypto`, `index` |
 
 ## Discover, don't guess
@@ -105,8 +108,30 @@ alice-workspace track search --query "uranium"
 alice-workspace track add --name uranium-ccj --description "Cameco — uranium miner"
 ```
 
+## Trading — `alice-uta`
+
+Accounts, portfolio, orders, and the trading-as-git approval flow. **These
+mutate real broker state** — discover before you act, and act only on what
+the user's instructions actually cover:
+
+```bash
+alice-uta account list                 # registered trading accounts + capabilities
+alice-uta account portfolio --help     # then query positions
+alice-uta contract search --help       # find the broker-native contract first
+alice-uta order place --help           # check EVERY flag before placing
+alice-uta git status                   # trading-as-git: see pending state
+alice-uta git log --help               # ...and the approval/history verbs
+```
+
+- **Resolve the contract before any order** (`contract search` →
+  `contract details`) — never guess a symbol's broker-native identity.
+- **Report every order result to the user** — order id, status, and what
+  you did. Surprises in a brokerage account are never acceptable.
+- The `git` group is OpenAlice's trade-approval flow (status / log / show /
+  commit / push / sync) — mirror of git verbs, run `--help` per verb.
+
 ## What the CLIs are NOT for
 
-- **Trading and scheduling are not on any CLI** — placing/closing orders, cron,
-  etc. stay on the OpenAlice MCP tools by design (boundary review pending). If
-  you need those and they aren't available here, say so rather than improvising.
+- **Scheduling is not on any CLI** — cron stays on the OpenAlice MCP tools by
+  design. If you need it and it isn't available here, say so rather than
+  improvising.

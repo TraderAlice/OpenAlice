@@ -16,6 +16,7 @@ import { createThinkingTools } from '../tool/thinking.js'
 import { inboxPushFactory } from '../tool/inbox-push.js'
 import { entityUpsertFactory } from '../tool/entity-upsert.js'
 import { entitySearchFactory } from '../tool/entity-search.js'
+import { createTradingTools } from '../tool/trading.js'
 
 /**
  * Anti-rot: each export's alias map is hand-authored, so guard it against drift —
@@ -42,6 +43,30 @@ describe('CLI_EXPORTS — data export (global tools)', () => {
 
   it('is scope: global', () => {
     expect(getExport('data')?.scope).toBe('global')
+  })
+})
+
+describe('CLI_EXPORTS — uta export (global trading tools)', () => {
+  const tc = new ToolCenter()
+  tc.register(createTradingTools(any), 'trading')
+
+  it('every mapped verb resolves to a registered trading tool', () => {
+    for (const name of mappedToolNames('uta')) {
+      expect(tc.get(name), `uta CLI maps to missing tool: ${name}`).not.toBeNull()
+    }
+  })
+
+  it('cron tools are NOT reachable from any export', () => {
+    for (const key of Object.keys(CLI_EXPORTS)) {
+      for (const name of mappedToolNames(key)) {
+        expect(name.toLowerCase().includes('cron'), `${key} exposes cron tool ${name}`).toBe(false)
+      }
+    }
+  })
+
+  it('binary alice-uta resolves to the uta export', () => {
+    expect(exportKeyForBinary('alice-uta')).toBe('uta')
+    expect(getExport('uta')?.scope).toBe('global')
   })
 })
 
@@ -91,10 +116,9 @@ describe('CLI_EXPORTS — structure', () => {
     }
   })
 
-  it('keeps trading + cron OFF every export (boundary discipline; no uta export yet)', () => {
-    expect(getExport('uta')).toBeNull()
+  it('keeps cron OFF every export (trading shipped via alice-uta, 2026-06-11)', () => {
+    expect(getExport('uta')).not.toBeNull()
     for (const exp of Object.values(CLI_EXPORTS)) {
-      expect(exp.commands['trading']).toBeUndefined()
       expect(exp.commands['cron']).toBeUndefined()
     }
   })

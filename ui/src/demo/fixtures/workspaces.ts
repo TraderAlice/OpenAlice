@@ -93,7 +93,7 @@ export const chatTemplate: TemplateInfo = {
   name: 'chat',
   displayName: 'Chat',
   description:
-    'General-purpose Alice workspace — full market/research data surface via the alice*/traderhub CLIs (default) or MCP, per launch choice. Trading tools require MCP mode.',
+    "General-purpose Alice workspace — Alice's full tool surface (market/research data + trading) via the alice*/traderhub CLIs by default, or as MCP servers, per launch choice.",
   groupOrder: 10,
   defaultAgents: ['claude', 'codex'],
   version: '0.1.0',

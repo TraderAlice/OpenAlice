@@ -8,11 +8,11 @@ this workspace was launched. Check what's actually wired before you start:
 - `traderhub --help` / `alice --help` — the CLI command groups (when on PATH)
 
 Use whichever is available; if a data tool isn't where you expect, check the
-other. Trading and scheduling stay on MCP by design.
+other. Scheduling (cron) stays on MCP by design.
 
-## OpenAlice CLIs (`traderhub`, `alice`, `alice-workspace`)
+## OpenAlice CLIs (`traderhub`, `alice`, `alice-workspace`, `alice-uta`)
 
-Three CLIs on your shell PATH, split by what they touch — handy for a quick
+Four CLIs on your shell PATH, split by what they touch — handy for a quick
 lookup, a pipe, or a grep without a tool round-trip:
 
 ```bash
@@ -27,6 +27,10 @@ alice rss grep --pattern BTC       # search the collected-RSS archive, then…
 alice rss read --id <id>           # …read one article by its stable id
 
 alice-workspace --help             # COLLABORATION: inbox push + entity tracking
+
+alice-uta --help                   # TRADING: accounts, portfolio, orders,
+                                   #   trading-as-git approval flow (MUTATING —
+                                   #   resolve contracts first, report results)
 ```
 
 All hit the same backend the MCP tools do. Output is JSON on stdout; a non-zero

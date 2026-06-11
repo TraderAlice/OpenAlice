@@ -17,9 +17,12 @@
  *                                            macro series, calendars). Named after
  *                                            the hosted hub so the binary name IS
  *                                            the domain name.
- *   - `alice-uta`       (key `uta`)       → RESERVED. trading/cron live here once
- *                                            the AI<->human boundary review greenlights
- *                                            irreversible broker mutations. Not exposed yet.
+ *   - `alice-uta`       (key `uta`)       → global ToolCenter — TRADING (accounts,
+ *                                            portfolio, orders, trading-as-git approval
+ *                                            flow). Boundary-reviewed 2026-06-11: broker
+ *                                            mutations are deliberate product surface
+ *                                            (users want agent trading); cron stays
+ *                                            MCP-only — no scheduling from the CLI.
  *
  * The (group, verb) → internal-tool-name map IS each export's contract,
  * deliberately decoupled from internal tool names: a verb like `rss grep` maps
@@ -146,7 +149,49 @@ export const CLI_EXPORTS: Record<string, CliExport> = {
       },
     },
   },
-  // uta: reserved — see header. Intentionally absent until boundary review.
+  uta: {
+    binary: 'alice-uta',
+    scope: 'global',
+    description: 'Trading — accounts, portfolio, orders, and the trading-as-git approval flow',
+    commands: {
+      account: {
+        list: 'listUTAs',
+        info: 'getAccount',
+        portfolio: 'getPortfolio',
+      },
+      contract: {
+        search: 'searchContracts',
+        details: 'getContractDetails',
+        quote: 'getQuote',
+      },
+      order: {
+        list: 'getOrders',
+        place: 'placeOrder',
+        modify: 'modifyOrder',
+        cancel: 'cancelOrder',
+      },
+      position: {
+        close: 'closePosition',
+      },
+      // trading-as-git: the approval/state flow mirrors git verbs on purpose.
+      git: {
+        status: 'tradingStatus',
+        log: 'tradingLog',
+        show: 'tradingShow',
+        commit: 'tradingCommit',
+        push: 'tradingPush',
+        sync: 'tradingSync',
+      },
+      market: {
+        clock: 'getMarketClock',
+      },
+      // MockBroker simulator only — no-op against real brokers.
+      sim: {
+        'price-change': 'simulatePriceChange',
+      },
+    },
+  },
+  // cron: deliberately NOT exported — scheduling stays MCP-only.
 }
 
 /**
