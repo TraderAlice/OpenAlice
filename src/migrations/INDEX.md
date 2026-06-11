@@ -8,3 +8,4 @@ Each row corresponds to one migration in `src/migrations/`. The runner applies p
 | ID | App Version | Date | Affects | Summary |
 |----|-------------|------|---------|---------|
 | `0008_disable_targetless_cron_jobs` | 0.40.0-beta.3 | 2026-06-08 | cron/jobs.json | Disable enabled cron jobs that have no target workspace (legacy AgentWork-era jobs) so they stop firing into the retired path. |
+| `0009_seal_broker_credentials` | 0.41.0-beta.2 | 2026-06-11 | accounts.json | Seal broker credentials at rest (AES-256-GCM envelope + 0600), replacing plaintext accounts.json |

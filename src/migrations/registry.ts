@@ -20,7 +20,9 @@
 
 import type { Migration } from './types.js'
 import { migration as migration_0008_disable_targetless_cron_jobs } from './0008_disable_targetless_cron_jobs/index.js'
+import { migration as migration_0009_seal_broker_credentials } from './0009_seal_broker_credentials/index.js'
 
 export const REGISTRY: Migration[] = [
   migration_0008_disable_targetless_cron_jobs,
+  migration_0009_seal_broker_credentials,
 ]

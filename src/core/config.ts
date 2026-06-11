@@ -1,10 +1,11 @@
 import { z } from 'zod'
-import { readFile, writeFile, mkdir, unlink, rm } from 'fs/promises'
+import { readFile, writeFile, mkdir, unlink, rm, rename, chmod } from 'fs/promises'
 import { resolve, join, dirname } from 'path'
 import { homedir } from 'os'
 import { newsCollectorSchema } from '../domain/news/config.js'
 import { runMigrations } from '../migrations/runner.js'
 import { dataPath } from '@/core/paths.js'
+import { isSealedEnvelope, seal, unseal } from './sealing.js'
 
 const CONFIG_DIR = dataPath('config')
 
@@ -599,16 +600,49 @@ function migrateLegacyUTA(raw: Record<string, unknown>): Record<string, unknown>
   return null
 }
 
+/**
+ * Write the accounts file sealed (AES-256-GCM envelope, see sealing.ts) and
+ * owner-only. Every accounts.json write funnels here so no code path can
+ * regress to plaintext credentials at rest.
+ */
+async function writeAccountsFile(validated: UTAConfig[]): Promise<void> {
+  await mkdir(CONFIG_DIR, { recursive: true })
+  const path = resolve(CONFIG_DIR, 'accounts.json')
+  await writeFile(path, JSON.stringify(await seal(validated), null, 2) + '\n', { mode: 0o600 })
+  await chmod(path, 0o600).catch(() => { /* noop — platform without chmod */ })
+}
+
 // File name on disk stays `accounts.json` — internal-only, never
 // user-visible. Renaming would require another migration block; cost
 // outweighs benefit. The on-disk schema is the new UTA shape.
 export async function readUTAsConfig(): Promise<UTAConfig[]> {
-  const raw = await loadJsonFile('accounts.json')
+  let raw = await loadJsonFile('accounts.json')
   if (raw === undefined) {
-    // Seed empty file on first run
-    await mkdir(CONFIG_DIR, { recursive: true })
-    await writeFile(resolve(CONFIG_DIR, 'accounts.json'), '[]\n')
+    // Seed empty (sealed) file on first run — also materializes sealing.key
+    // early, so later credential writes never race key creation.
+    await writeAccountsFile([])
     return []
+  }
+
+  // Sealed envelope — the normal at-rest shape. A plain array is the legacy
+  // plaintext form: still readable (migration 0009 reseals it at boot).
+  if (isSealedEnvelope(raw)) {
+    try {
+      raw = await unseal(raw)
+    } catch (err) {
+      // Recoverable, loudly: quarantine the unreadable file (never delete —
+      // it's the user's broker config, the key may resurface) and continue
+      // with an empty store so the app still boots.
+      const quarantine = resolve(CONFIG_DIR, `accounts.json.sealed-unreadable-${Date.now()}`)
+      await rename(resolve(CONFIG_DIR, 'accounts.json'), quarantine)
+      console.error(
+        `accounts.json could not be unsealed: ${err instanceof Error ? err.message : String(err)}\n` +
+        `The file was preserved at ${quarantine}. Starting with an empty account store — ` +
+        `re-enter broker credentials in Settings → Trading.`,
+      )
+      await writeAccountsFile([])
+      return []
+    }
   }
 
   // Auto-migrate the pre-preset shape ({type, brokerConfig}) into the
@@ -639,7 +673,7 @@ export async function readUTAsConfig(): Promise<UTAConfig[]> {
     )
 
     const validated = utasFileSchema.parse(migrated)
-    await writeFile(resolve(CONFIG_DIR, 'accounts.json'), JSON.stringify(validated, null, 2) + '\n')
+    await writeAccountsFile(validated)
     return validated
   }
 
@@ -648,8 +682,7 @@ export async function readUTAsConfig(): Promise<UTAConfig[]> {
 
 export async function writeUTAsConfig(utas: UTAConfig[]): Promise<void> {
   const validated = utasFileSchema.parse(utas)
-  await mkdir(CONFIG_DIR, { recursive: true })
-  await writeFile(resolve(CONFIG_DIR, 'accounts.json'), JSON.stringify(validated, null, 2) + '\n')
+  await writeAccountsFile(validated)
 }
 
 /**

@@ -13,6 +13,19 @@ vi.mock('fs/promises', () => ({
   writeFile: vi.fn().mockResolvedValue(undefined),
   mkdir: vi.fn().mockResolvedValue(undefined),
   unlink: vi.fn().mockResolvedValue(undefined),
+  rm: vi.fn().mockResolvedValue(undefined),
+  rename: vi.fn().mockResolvedValue(undefined),
+  chmod: vi.fn().mockResolvedValue(undefined),
+}))
+
+// Identity-mock the sealing layer: it's unit-tested in sealing.spec.ts (and
+// round-tripped against real disk in config-accounts.spec.ts). Identity keeps
+// this file's on-disk JSON assertions readable, and spares the mocked
+// fs/promises from having to simulate the key file.
+vi.mock('./sealing.js', () => ({
+  isSealedEnvelope: () => false,
+  seal: async (v: unknown) => v,
+  unseal: async (v: unknown) => v,
 }))
 
 import { readFile, writeFile, mkdir } from 'fs/promises'
