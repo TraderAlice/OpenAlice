@@ -7,6 +7,7 @@ import type { UnifiedTradingAccount } from '../domain/trading/UnifiedTradingAcco
 import { searchTradeableContracts } from '../domain/trading/contract-search.js'
 import type { AssetClassHint } from '@traderalice/uta-protocol'
 import { executeOneShotOrder, type OrderEntryPhase } from '../domain/trading/order-entry.js'
+import { projectOrderHistory, projectTradeHistory } from '../domain/trading/order-history.js'
 
 // ==================== Order entry schemas ====================
 //
@@ -353,6 +354,24 @@ export function createTradingRoutes(ctx: UTAEngineContext) {
     const limit = Number(c.req.query('limit')) || 20
     const symbol = c.req.query('symbol') || undefined
     return c.json({ commits: uta.log({ limit, symbol }) })
+  })
+
+  // Exchange-frontend projections of the git log — Order History (one row
+  // per order, lifecycle collapsed) and Trade History (fills only).
+  // Projection logic lives in domain/trading/order-history.ts so MCP/CLI
+  // surfaces can reuse it.
+  app.get('/uta/:id/order-history', (c) => {
+    const uta = ctx.utaManager.get(c.req.param('id'))
+    if (!uta) return c.json({ error: 'Account not found' }, 404)
+    const limit = Number(c.req.query('limit')) || 50
+    return c.json({ orders: projectOrderHistory(uta.exportGitState().commits, { limit }) })
+  })
+
+  app.get('/uta/:id/trade-history', (c) => {
+    const uta = ctx.utaManager.get(c.req.param('id'))
+    if (!uta) return c.json({ error: 'Account not found' }, 404)
+    const limit = Number(c.req.query('limit')) || 50
+    return c.json({ trades: projectTradeHistory(uta.exportGitState().commits, { limit }) })
   })
 
   app.get('/uta/:id/wallet/show/:hash', (c) => {

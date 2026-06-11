@@ -10,6 +10,8 @@ import {
   demoEquityCurve,
   demoEquityCurveByUTA,
   demoSnapshotsByUTA,
+  demoOrderHistoryByUTA,
+  demoTradeHistoryByUTA,
 } from '../fixtures/trading'
 
 function totals() {
@@ -62,6 +64,12 @@ export const tradingHandlers = [
     HttpResponse.json({ positions: demoPositionsByUTA[utaId(params)] ?? [] }),
   ),
   http.get('/api/trading/uta/:id/orders', () => HttpResponse.json({ orders: [] })),
+  http.get('/api/trading/uta/:id/order-history', ({ params }) =>
+    HttpResponse.json({ orders: demoOrderHistoryByUTA[utaId(params)] ?? [] }),
+  ),
+  http.get('/api/trading/uta/:id/trade-history', ({ params }) =>
+    HttpResponse.json({ trades: demoTradeHistoryByUTA[utaId(params)] ?? [] }),
+  ),
   http.get('/api/trading/uta/:id/market-clock', () =>
     HttpResponse.json({
       isOpen: false,

@@ -19,3 +19,4 @@ export * from './manager.js'
 // `aliceId?` field. Re-export as side-effect so consumers don't need a
 // separate import for the augmentation.
 import './contract-ext.js'
+export * from './history.js'

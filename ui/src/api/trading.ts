@@ -1,5 +1,5 @@
 import { fetchJson } from './client'
-import type { TradingAccount, UTASummary, AccountInfo, Position, WalletCommitLog, ReconnectResult, UTAConfig, WalletStatus, WalletPushResult, WalletRejectResult, TestConnectionResult, BrokerPreset, UTASnapshotSummary, EquityCurvePoint, PlaceOrderRequest, ClosePositionRequest, CancelOrderRequest, OrderErrorResponse } from './types'
+import type { TradingAccount, UTASummary, AccountInfo, Position, WalletCommitLog, ReconnectResult, UTAConfig, WalletStatus, WalletPushResult, WalletRejectResult, TestConnectionResult, BrokerPreset, UTASnapshotSummary, EquityCurvePoint, PlaceOrderRequest, ClosePositionRequest, CancelOrderRequest, OrderErrorResponse, OrderHistoryEntry, TradeHistoryEntry } from './types'
 
 /** Thrown by the one-shot order endpoints when the server returns non-2xx. Carries the phase. */
 export class OrderEntryError extends Error {
@@ -77,8 +77,19 @@ export const tradingApi = {
     return fetchJson(`/api/trading/uta/${utaId}/orders`)
   },
 
-  async marketClock(utaId: string): Promise<{ isOpen: boolean; nextOpen: string; nextClose: string }> {
+  /** nextOpen/nextClose may be absent for 24/7 venues (crypto). */
+  async marketClock(utaId: string): Promise<{ isOpen: boolean; nextOpen?: string; nextClose?: string }> {
     return fetchJson(`/api/trading/uta/${utaId}/market-clock`)
+  },
+
+  /** Order History — every order's lifecycle collapsed to one row. */
+  async orderHistory(utaId: string, limit = 50): Promise<{ orders: OrderHistoryEntry[] }> {
+    return fetchJson(`/api/trading/uta/${utaId}/order-history?limit=${limit}`)
+  },
+
+  /** Trade History — fills only. */
+  async tradeHistory(utaId: string, limit = 50): Promise<{ trades: TradeHistoryEntry[] }> {
+    return fetchJson(`/api/trading/uta/${utaId}/trade-history?limit=${limit}`)
   },
 
   async walletLog(utaId: string, limit = 20, symbol?: string): Promise<{ commits: WalletCommitLog[] }> {

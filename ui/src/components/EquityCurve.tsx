@@ -51,6 +51,31 @@ export function EquityCurve({
     })),
   [filtered])
 
+  // Explicit Y domain + ticks. Recharts' default 'auto' domain rounds tick
+  // values so coarsely that tight ranges render duplicate labels
+  // ("$100.7K $100.7K $100.6K …") — compute our own 4 ticks with a
+  // formatter precise enough to keep them distinct.
+  const yAxis = useMemo(() => {
+    const vals = chartData.map(d => d.equityNum).filter(v => Number.isFinite(v))
+    if (vals.length === 0) return null
+    let min = Math.min(...vals)
+    let max = Math.max(...vals)
+    if (min === max) { min -= 1; max += 1 }
+    const pad = (max - min) * 0.08
+    const lo = min - pad
+    const hi = max + pad
+    const ticks = [0, 1, 2, 3].map(i => lo + ((hi - lo) * i) / 3)
+    return {
+      domain: [lo, hi] as [number, number],
+      ticks,
+      formatter: makeCurrencyTickFormatter(max - min, (hi - lo) / 3),
+    }
+  }, [chartData])
+
+  // Explicit X ticks aligned to round time boundaries (whole hours, local
+  // midnights) instead of recharts' arbitrary data-point positions.
+  const xTicks = useMemo(() => computeTimeTicks(chartData), [chartData])
+
   if (chartData.length === 0) return null
 
   const isAllView = selectedAccountId === 'all'
@@ -128,6 +153,7 @@ export function EquityCurve({
             dataKey="time"
             type="number"
             domain={['dataMin', 'dataMax']}
+            ticks={xTicks}
             tickFormatter={formatTime}
             tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }}
             axisLine={{ stroke: 'var(--color-border)' }}
@@ -135,12 +161,13 @@ export function EquityCurve({
             minTickGap={40}
           />
           <YAxis
-            tickFormatter={formatCurrency}
+            tickFormatter={yAxis?.formatter ?? formatCurrency}
             tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }}
             axisLine={false}
             tickLine={false}
             width={70}
-            domain={['auto', 'auto']}
+            domain={yAxis?.domain ?? ['auto', 'auto']}
+            ticks={yAxis?.ticks}
           />
           <Tooltip content={<CustomTooltip isAllView={isAllView} accounts={accounts} />} />
           <Area
@@ -213,4 +240,61 @@ function formatCurrency(val: number): string {
   if (val >= 1_000_000) return `$${(val / 1_000_000).toFixed(1)}M`
   if (val >= 1_000) return `$${(val / 1_000).toFixed(1)}K`
   return `$${val.toFixed(0)}`
+}
+
+/**
+ * Tick formatter with range-aware precision: tight ranges (< $2,000 across
+ * the visible window) render full dollars with thousands separators
+ * ("$100,680"); wider ranges keep the compact K/M form but with enough
+ * decimals that adjacent ticks stay distinct ("$100.68K").
+ */
+function makeCurrencyTickFormatter(range: number, tickSpacing: number): (val: number) => string {
+  return (val: number) => {
+    if (range < 2000) {
+      const decimals = range < 10 ? 2 : 0
+      return `$${val.toLocaleString(getIntlLocale(), { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`
+    }
+    if (Math.abs(val) < 1_000) return `$${val.toFixed(0)}`
+    const unit = Math.abs(val) >= 1_000_000 ? 1_000_000 : 1_000
+    const suffix = unit === 1_000_000 ? 'M' : 'K'
+    // Enough fractional digits that one tick step is resolvable at this unit.
+    const decimals = Math.min(4, Math.max(1, Math.ceil(-Math.log10(tickSpacing / unit))))
+    return `$${(val / unit).toFixed(decimals)}${suffix}`
+  }
+}
+
+// ==================== X-axis round ticks ====================
+
+const MINUTE = 60_000
+const HOUR = 60 * MINUTE
+const DAY = 24 * HOUR
+
+/** Candidate tick steps, smallest first. */
+const TICK_STEPS = [5 * MINUTE, 15 * MINUTE, HOUR, 3 * HOUR, 6 * HOUR, DAY] as const
+
+/**
+ * Pick the smallest step that yields ≤ 6 ticks across the visible range and
+ * align tick values to round boundaries — epoch-aligned for sub-day steps
+ * (whole hours / 5-minute marks), local midnight for day-sized steps. For
+ * ranges beyond what 1-day steps can cover in 6 ticks, step by N days.
+ */
+function computeTimeTicks(data: Array<{ time: number }>): number[] | undefined {
+  if (data.length < 2) return undefined
+  const t0 = data[0].time
+  const t1 = data[data.length - 1].time
+  const span = t1 - t0
+  if (span <= 0) return undefined
+
+  const step = TICK_STEPS.find(s => span / s <= 6) ?? DAY
+  const ticks: number[] = []
+  if (step >= DAY) {
+    const stride = Math.max(1, Math.ceil(span / (6 * DAY)))
+    const d = new Date(t0)
+    d.setHours(0, 0, 0, 0)
+    if (d.getTime() < t0) d.setDate(d.getDate() + 1)
+    for (; d.getTime() <= t1; d.setDate(d.getDate() + stride)) ticks.push(d.getTime())
+  } else {
+    for (let t = Math.ceil(t0 / step) * step; t <= t1; t += step) ticks.push(t)
+  }
+  return ticks.length >= 2 ? ticks : undefined
 }

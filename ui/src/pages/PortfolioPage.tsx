@@ -11,6 +11,7 @@ import { Toggle } from '../components/Toggle'
 import { Metric, signFromDelta } from '../components/Metric'
 import { Sparkline } from '../components/Sparkline'
 import { fmt, fmtPnl, fmtNum, fmtPctSigned } from '../lib/format'
+import { contractPrimary } from '../lib/contract-display'
 
 // ==================== Types ====================
 
@@ -507,25 +508,11 @@ interface PositionWithAccount extends Position {
  * `Position.contract.secType === 'CRYPTO_PERP'` everywhere else in the
  * stack.
  *
- * `name` defaults to the symbol; for OPT/FOP we build a longer descriptor
- * (expiry/right/strike) so two option positions on the same underlying
- * are distinguishable in the table.
+ * `name` comes from the shared IBKR-superset formatter (lib/contract-display)
+ * so this table renders identically to the UTA detail page.
  */
 function contractDisplay(p: Position): { name: string; tag: string } {
-  const c = p.contract
-  const sym = c.symbol ?? '???'
-  const t = c.secType || 'UNK'
-
-  if (t === 'OPT' || t === 'FOP') {
-    const optDesc = c.localSymbol
-      ?? [sym, c.lastTradeDateOrContractMonth, c.right, c.strike && fmt(c.strike)].filter(Boolean).join(' ')
-    return { name: optDesc, tag: t }
-  }
-  if (t === 'FUT') {
-    const expiry = c.lastTradeDateOrContractMonth
-    return { name: expiry ? `${sym} ${expiry}` : sym, tag: t }
-  }
-  return { name: sym, tag: t }
+  return { name: contractPrimary(p.contract), tag: p.contract.secType || 'UNK' }
 }
 
 function PositionsTable({ positions, fxRates }: { positions: PositionWithAccount[]; fxRates: FxRateInfo[] }) {

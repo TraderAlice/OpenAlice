@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import type { ViewSpec } from '../tabs/types'
 import { api } from '../api'
 import { getIntlLocale } from '../lib/intl'
-import type { UTAConfig, BrokerPreset, AccountInfo, Position, BrokerHealthInfo, UTASnapshotSummary, EquityCurvePoint } from '../api/types'
+import type { UTAConfig, BrokerPreset, AccountInfo, Position, BrokerHealthInfo, UTASnapshotSummary, EquityCurvePoint, OrderHistoryEntry, OrderHistoryStatus, TradeHistoryEntry } from '../api/types'
 import { useTradingConfig } from '../hooks/useTradingConfig'
 import { useAccountHealth } from '../hooks/useAccountHealth'
 import { PageHeader } from '../components/PageHeader'
@@ -13,11 +13,11 @@ import { Toggle } from '../components/Toggle'
 import { HealthBadge } from '../components/uta/HealthBadge'
 import { EditUTADialog } from '../components/uta/EditUTADialog'
 import { OrderEntryDialog, type OrderEntryMode } from '../components/uta/OrderEntryDialog'
-import { SnapshotDetail } from '../components/SnapshotDetail'
 import { EquityCurve } from '../components/EquityCurve'
 import { Metric, signFromDelta } from '../components/Metric'
 import { fmt, fmtPnl, fmtNum, fmtPctSigned, isUnsetDecimal } from '../lib/format'
 import { secTypeToClass, assetClassLabel, ASSET_CLASS_ORDER, type AssetClass } from '../lib/asset-class'
+import { ContractCell } from '../lib/contract-display'
 
 // ==================== Page ====================
 
@@ -39,8 +39,8 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
   const [editing, setEditing] = useState(false)
   const [orderMode, setOrderMode] = useState<OrderEntryMode | null>(null)
   const [dataError, setDataError] = useState<string | null>(null)
-  const [expandedSnapshot, setExpandedSnapshot] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [clock, setClock] = useState<MarketClockState>(null)
 
   useEffect(() => {
     api.trading.getBrokerPresets().then(r => setPresets(r.presets)).catch(() => {})
@@ -88,6 +88,19 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
     const snapshotInterval = setInterval(refreshSnapshots, 60_000)
     return () => { clearInterval(liveInterval); clearInterval(snapshotInterval) }
   }, [refreshLive, refreshSnapshots])
+
+  // Market clock — mount + every 60s. The poll itself re-renders the
+  // "opens in Xh Ym" countdown, so no separate ticker is needed.
+  useEffect(() => {
+    if (!id) return
+    let cancelled = false
+    const load = () => api.trading.marketClock(id)
+      .then(c => { if (!cancelled) setClock(c) })
+      .catch(() => { if (!cancelled) setClock('error') })
+    load()
+    const t = setInterval(load, 60_000)
+    return () => { cancelled = true; clearInterval(t) }
+  }, [id])
 
   // ?aliceId=... auto-opens the place-order form prefilled (e.g. clicked
   // from TradeableContractsPanel on the market workbench).
@@ -167,6 +180,12 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
             <span className="font-mono text-text-muted">{uta.id}</span>
             <span className="mx-2 text-text-muted/40">·</span>
             <HealthBadge health={health} size="sm" />
+            {clock != null && (
+              <>
+                <span className="mx-2 text-text-muted/40">·</span>
+                <MarketClockChip clock={clock} />
+              </>
+            )}
           </>
         }
         right={
@@ -219,13 +238,7 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
             })}
           />
 
-          <OrdersSection orders={orders} />
-
-          <SnapshotsTimeline
-            snapshots={snapshots}
-            expandedTimestamp={expandedSnapshot}
-            onToggle={(ts) => setExpandedSnapshot(prev => prev === ts ? null : ts)}
-          />
+          <OrdersArea utaId={id} openOrders={orders} />
         </div>
       </div>
 
@@ -428,12 +441,11 @@ function PositionRow({ position: p, onClose }: { position: Position; onClose: ()
   const cost = Number(p.avgCost) * Number(p.quantity)
   const pnl = Number(p.unrealizedPnL)
   const pct = cost > 0 ? (pnl / cost) * 100 : 0
-  const display = p.contract.aliceId ?? p.contract.localSymbol ?? p.contract.symbol ?? '?'
 
   return (
     <tr className="border-t border-border hover:bg-bg-tertiary/30 transition-colors">
       <td className="px-3 py-2">
-        <span className="font-mono text-text">{display}</span>
+        <ContractCell contract={p.contract} />
       </td>
       <td className="px-3 py-2">
         <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${p.side === 'long' ? 'bg-green/15 text-green' : 'bg-red/15 text-red'}`}>
@@ -461,7 +473,48 @@ function PositionRow({ position: p, onClose }: { position: Position; onClose: ()
   )
 }
 
-// ==================== Open Orders ====================
+// ==================== Market clock chip ====================
+
+type MarketClockState = { isOpen: boolean; nextOpen?: string; nextClose?: string } | 'error' | null
+
+function MarketClockChip({ clock }: { clock: NonNullable<MarketClockState> }) {
+  let dotClass = 'bg-green'
+  let label = '24/7'
+
+  if (clock !== 'error') {
+    if (clock.isOpen) {
+      const closes = clock.nextClose ? new Date(clock.nextClose) : null
+      if (closes && !Number.isNaN(closes.getTime())) {
+        const at = closes.toLocaleTimeString(getIntlLocale(), { hour: '2-digit', minute: '2-digit', hour12: false })
+        label = `Market Open · closes ${at}`
+      } else if (!clock.nextOpen && !clock.nextClose) {
+        label = '24/7'  // crypto venues report open with no schedule
+      } else {
+        label = 'Market Open'
+      }
+    } else {
+      dotClass = 'bg-text-muted/50'
+      const opens = clock.nextOpen ? new Date(clock.nextOpen) : null
+      if (opens && !Number.isNaN(opens.getTime())) {
+        const mins = Math.max(0, Math.round((opens.getTime() - Date.now()) / 60_000))
+        const h = Math.floor(mins / 60)
+        const m = mins % 60
+        label = `Market Closed · opens in ${h > 0 ? `${h}h ` : ''}${m}m`
+      } else {
+        label = 'Market Closed'
+      }
+    }
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-text-muted">
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotClass}`} aria-hidden />
+      {label}
+    </span>
+  )
+}
+
+// ==================== Orders — tabbed: Open / History / Trades ====================
 
 interface OpenOrderRow {
   orderId?: number | string
@@ -470,167 +523,285 @@ interface OpenOrderRow {
   orderState?: { status?: string }
 }
 
-function OrdersSection({ orders }: { orders: unknown[] }) {
+type OrdersTab = 'open' | 'history' | 'trades'
+
+function OrdersArea({ utaId, openOrders }: { utaId: string; openOrders: unknown[] }) {
+  const [tab, setTab] = useState<OrdersTab>('open')
+  const [history, setHistory] = useState<OrderHistoryEntry[] | null>(null)
+  const [trades, setTrades] = useState<TradeHistoryEntry[] | null>(null)
+
+  // Lazy-fetch per tab on first open; refresh on the same 15s cadence as the
+  // live poll while the tab stays active.
+  useEffect(() => {
+    if (tab !== 'history') return
+    let cancelled = false
+    const load = () => api.trading.orderHistory(utaId, 50)
+      .then(r => { if (!cancelled) setHistory(r.orders) })
+      .catch(() => {})
+    load()
+    const t = setInterval(load, 15_000)
+    return () => { cancelled = true; clearInterval(t) }
+  }, [tab, utaId])
+
+  useEffect(() => {
+    if (tab !== 'trades') return
+    let cancelled = false
+    const load = () => api.trading.tradeHistory(utaId, 50)
+      .then(r => { if (!cancelled) setTrades(r.trades) })
+      .catch(() => {})
+    load()
+    const t = setInterval(load, 15_000)
+    return () => { cancelled = true; clearInterval(t) }
+  }, [tab, utaId])
+
+  const tabs: Array<{ id: OrdersTab; label: string }> = [
+    { id: 'open', label: `Open (${openOrders.length})` },
+    { id: 'history', label: 'History' },
+    { id: 'trades', label: 'Trades' },
+  ]
+
+  return (
+    <Section
+      title="Orders"
+      action={
+        <div className="flex gap-1">
+          {tabs.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`px-2 py-0.5 text-[11px] rounded transition-colors ${
+                tab === t.id
+                  ? 'bg-accent/15 text-accent font-medium'
+                  : 'text-text-muted hover:text-text hover:bg-bg-tertiary'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      }
+    >
+      {tab === 'open' && <OpenOrdersTable orders={openOrders} />}
+      {tab === 'history' && <OrderHistoryTable orders={history} />}
+      {tab === 'trades' && <TradeHistoryTable trades={trades} />}
+    </Section>
+  )
+}
+
+function OpenOrdersTable({ orders }: { orders: unknown[] }) {
   const rows = orders as OpenOrderRow[]
   if (rows.length === 0) {
     return (
-      <Section title="Open Orders (0)">
-        <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-text-muted">
-          No open orders.
-        </div>
-      </Section>
+      <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-text-muted">
+        No open orders.
+      </div>
     )
   }
   return (
-    <Section title={`Open Orders (${rows.length})`}>
-      <div className="border border-border rounded-lg overflow-x-auto">
-        <table className="w-full text-[13px]">
-          <thead>
-            <tr className="bg-bg-secondary text-text-muted text-left">
-              <th className="px-3 py-2 font-medium">Order ID</th>
-              <th className="px-3 py-2 font-medium">Contract</th>
-              <th className="px-3 py-2 font-medium">Action</th>
-              <th className="px-3 py-2 font-medium">Type</th>
-              <th className="px-3 py-2 font-medium text-right">Qty</th>
-              <th className="px-3 py-2 font-medium text-right">Limit</th>
-              <th className="px-3 py-2 font-medium">Status</th>
+    <div className="border border-border rounded-lg overflow-x-auto">
+      <table className="w-full text-[13px]">
+        <thead>
+          <tr className="bg-bg-secondary text-text-muted text-left">
+            <th className="px-3 py-2 font-medium">Order ID</th>
+            <th className="px-3 py-2 font-medium">Contract</th>
+            <th className="px-3 py-2 font-medium">Action</th>
+            <th className="px-3 py-2 font-medium">Type</th>
+            <th className="px-3 py-2 font-medium text-right">Qty</th>
+            <th className="px-3 py-2 font-medium text-right">Limit</th>
+            <th className="px-3 py-2 font-medium">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((o, i) => (
+            <tr key={i} className="border-t border-border">
+              <td className="px-3 py-2 font-mono text-text-muted text-[11px]">{String(o.orderId ?? '—')}</td>
+              <td className="px-3 py-2 font-mono text-text">
+                {o.contract?.aliceId ?? o.contract?.localSymbol ?? o.contract?.symbol ?? '?'}
+              </td>
+              <td className={`px-3 py-2 font-medium ${o.order?.action === 'BUY' ? 'text-green' : o.order?.action === 'SELL' ? 'text-red' : 'text-text'}`}>{o.order?.action ?? '—'}</td>
+              <td className="px-3 py-2 text-text-muted">{o.order?.orderType ?? '—'}</td>
+              <td className="px-3 py-2 text-right text-text tabular-nums">{String(o.order?.totalQuantity ?? '')}</td>
+              <td className="px-3 py-2 text-right text-text-muted tabular-nums">{o.order?.lmtPrice != null && !isUnsetDecimal(o.order.lmtPrice) ? String(o.order.lmtPrice) : '—'}</td>
+              <td className="px-3 py-2">
+                <span className="text-[11px] text-text-muted">{o.orderState?.status ?? 'Unknown'}</span>
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {rows.map((o, i) => (
-              <tr key={i} className="border-t border-border">
-                <td className="px-3 py-2 font-mono text-text-muted text-[11px]">{String(o.orderId ?? '—')}</td>
-                <td className="px-3 py-2 font-mono text-text">
-                  {o.contract?.aliceId ?? o.contract?.localSymbol ?? o.contract?.symbol ?? '?'}
-                </td>
-                <td className={`px-3 py-2 font-medium ${o.order?.action === 'BUY' ? 'text-green' : o.order?.action === 'SELL' ? 'text-red' : 'text-text'}`}>{o.order?.action ?? '—'}</td>
-                <td className="px-3 py-2 text-text-muted">{o.order?.orderType ?? '—'}</td>
-                <td className="px-3 py-2 text-right text-text tabular-nums">{String(o.order?.totalQuantity ?? '')}</td>
-                <td className="px-3 py-2 text-right text-text-muted tabular-nums">{o.order?.lmtPrice != null && !isUnsetDecimal(o.order.lmtPrice) ? String(o.order.lmtPrice) : '—'}</td>
-                <td className="px-3 py-2">
-                  <span className="text-[11px] text-text-muted">{o.orderState?.status ?? 'Unknown'}</span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </Section>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 
-// ==================== Snapshots — vertical timeline ====================
+// ==================== Order History tab ====================
 
-interface SnapshotsTimelineProps {
-  snapshots: UTASnapshotSummary[]
-  expandedTimestamp: string | null
-  onToggle: (ts: string) => void
+const ORDER_STATUS_STYLES: Record<OrderHistoryStatus, string> = {
+  filled: 'bg-green/15 text-green',
+  cancelled: 'bg-bg-tertiary text-text-muted',
+  rejected: 'bg-red/15 text-red',
+  'user-rejected': 'bg-red/15 text-red',
+  submitted: 'bg-accent/15 text-accent',
 }
 
-function SnapshotsTimeline({ snapshots, expandedTimestamp, onToggle }: SnapshotsTimelineProps) {
-  // Group by calendar day. Snapshots are newest-first; preserve that order
-  // so the timeline reads top-down chronologically backwards (like git log).
-  const groups = useMemo(() => {
-    const map = new Map<string, UTASnapshotSummary[]>()
-    for (const s of snapshots) {
-      const day = new Date(s.timestamp).toDateString()
-      if (!map.has(day)) map.set(day, [])
-      map.get(day)!.push(s)
-    }
-    return Array.from(map.entries())
-  }, [snapshots])
-
-  if (snapshots.length === 0) {
-    return (
-      <Section title="Snapshots">
-        <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-text-muted">
-          No snapshots yet. They are captured periodically (Portfolio → Snapshot Settings) or after each push.
-        </div>
-      </Section>
-    )
-  }
-
+function OrderStatusBadge({ status }: { status: OrderHistoryStatus }) {
   return (
-    <Section title={`Snapshots (${snapshots.length})`}>
-      <div className="relative pl-4">
-        {/* Vertical guide line tucked behind the dots */}
-        <div className="absolute left-[7px] top-0 bottom-0 w-px bg-border" aria-hidden />
-        {groups.map(([day, items]) => (
-          <div key={day} className="relative">
-            <div className="sticky top-0 z-10 -mx-4 px-4 py-1 bg-bg/95 backdrop-blur-sm text-[11px] text-text-muted uppercase tracking-wide">
-              {formatDayLabel(day)}
-            </div>
-            <ul>
-              {items.map((s) => {
-                const idxAll = snapshots.indexOf(s)
-                const prev = snapshots[idxAll + 1]   // older snapshot
-                const delta = prev ? Number(s.account.netLiquidation) - Number(prev.account.netLiquidation) : null
-                const isExpanded = expandedTimestamp === s.timestamp
-                return (
-                  <li key={s.timestamp} className="relative">
-                    <button
-                      onClick={() => onToggle(s.timestamp)}
-                      className="w-full flex items-center gap-3 py-2 pr-2 text-left hover:bg-bg-secondary/40 transition-colors rounded"
-                    >
-                      <span className={`absolute left-[-13px] top-3 w-2 h-2 rounded-full ring-2 ring-bg ${isExpanded ? 'bg-accent' : 'bg-text-muted/60'}`} aria-hidden />
-                      <span className="text-[12px] text-text-muted tabular-nums w-[58px] shrink-0">
-                        {formatTime(s.timestamp)}
-                      </span>
-                      <TriggerBadge trigger={s.trigger} />
-                      <span className="flex-1 text-[12px] text-text font-mono tabular-nums truncate">
-                        {fmt(s.account.netLiquidation, s.account.baseCurrency)}
-                      </span>
-                      {delta != null && Number.isFinite(delta) && (
-                        <span className={`text-[12px] tabular-nums ${delta >= 0 ? 'text-green' : 'text-red'}`}>
-                          {fmtPnl(delta, s.account.baseCurrency)}
-                        </span>
-                      )}
-                    </button>
-                    {isExpanded && (
-                      <div className="mb-3 mt-1">
-                        <SnapshotDetail
-                          snapshot={s}
-                          onClose={() => onToggle(s.timestamp)}
-                        />
-                      </div>
-                    )}
-                  </li>
-                )
-              })}
-            </ul>
-          </div>
-        ))}
-      </div>
-    </Section>
+    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${ORDER_STATUS_STYLES[status] ?? 'bg-bg-tertiary text-text-muted'}`}>
+      {status}
+    </span>
   )
 }
 
-function TriggerBadge({ trigger }: { trigger: string }) {
-  const label = trigger === 'post-push' ? 'push'
-    : trigger === 'post-reject' ? 'reject'
-    : trigger
+function SideBadge({ side }: { side: 'BUY' | 'SELL' }) {
   return (
-    <span className="text-[10px] px-1.5 py-0.5 rounded bg-bg-tertiary text-text-muted shrink-0">
+    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${side === 'BUY' ? 'bg-green/15 text-green' : 'bg-red/15 text-red'}`}>
+      {side}
+    </span>
+  )
+}
+
+function SourceChip({ label }: { label: string }) {
+  return (
+    <span className="text-[10px] px-1.5 rounded bg-bg-tertiary text-text-muted">
       {label}
     </span>
   )
 }
 
-// ==================== Date helpers ====================
+function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | null }) {
+  const [expanded, setExpanded] = useState<number | null>(null)
 
-function formatDayLabel(dayString: string): string {
-  // dayString is the output of `Date.toDateString()` — locale-format it
-  // back into something more readable, with a "today" / "yesterday" hint.
-  const d = new Date(dayString)
-  const todayStr = new Date().toDateString()
-  const yesterdayStr = new Date(Date.now() - 24 * 60 * 60 * 1000).toDateString()
-  const formatted = d.toLocaleDateString(getIntlLocale(), { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
-  if (dayString === todayStr) return `${formatted} · today`
-  if (dayString === yesterdayStr) return `${formatted} · yesterday`
-  return formatted
+  if (orders == null) {
+    return (
+      <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-text-muted">
+        Loading order history…
+      </div>
+    )
+  }
+  if (orders.length === 0) {
+    return (
+      <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-text-muted">
+        No order history yet.
+      </div>
+    )
+  }
+  return (
+    <div className="border border-border rounded-lg overflow-x-auto">
+      <table className="w-full text-[13px]">
+        <thead>
+          <tr className="bg-bg-secondary text-text-muted text-left">
+            <th className="px-3 py-2 font-medium">Time</th>
+            <th className="px-3 py-2 font-medium">Contract</th>
+            <th className="px-3 py-2 font-medium">Side</th>
+            <th className="px-3 py-2 font-medium">Type</th>
+            <th className="px-3 py-2 font-medium text-right">Qty</th>
+            <th className="px-3 py-2 font-medium text-right">Limit</th>
+            <th className="px-3 py-2 font-medium text-right">Fill</th>
+            <th className="px-3 py-2 font-medium">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {orders.map((o, i) => (
+            <Fragment key={`${o.commitHash}-${i}`}>
+              <tr
+                className="border-t border-border hover:bg-bg-tertiary/30 transition-colors cursor-pointer"
+                onClick={() => setExpanded(prev => prev === i ? null : i)}
+              >
+                <td className="px-3 py-2 text-text-muted tabular-nums whitespace-nowrap">{formatHistoryTime(o.timestamp)}</td>
+                <td className="px-3 py-2"><ContractCell contract={o.contract} /></td>
+                <td className="px-3 py-2"><SideBadge side={o.side} /></td>
+                <td className="px-3 py-2 text-text-muted">{o.orderType ?? '—'}</td>
+                <td className="px-3 py-2 text-right text-text tabular-nums">{o.quantity != null ? fmtNum(o.quantity) : '—'}</td>
+                <td className="px-3 py-2 text-right text-text-muted tabular-nums">{o.limitPrice ?? '—'}</td>
+                <td className="px-3 py-2 text-right text-text tabular-nums">
+                  {o.avgFillPrice ? `${o.avgFillPrice}${o.filledQty ? ` × ${o.filledQty}` : ''}` : '—'}
+                </td>
+                <td className="px-3 py-2">
+                  <span className="inline-flex items-center gap-1.5">
+                    <OrderStatusBadge status={o.status} />
+                    {o.source === 'external' && <SourceChip label="External" />}
+                  </span>
+                </td>
+              </tr>
+              {expanded === i && (
+                <tr className="border-t border-border bg-bg-tertiary/20">
+                  <td colSpan={8} className="px-3 py-2 text-[11px] text-text-muted">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                      <span className="font-mono">{o.commitHash}</span>
+                      <span>{o.message}</span>
+                      {o.error && <span className="text-red">{o.error}</span>}
+                      {o.resolvedAt && <span>resolved {formatHistoryTime(o.resolvedAt)}</span>}
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </Fragment>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
 }
 
-function formatTime(timestamp: string): string {
+// ==================== Trade History tab ====================
+
+function TradeHistoryTable({ trades }: { trades: TradeHistoryEntry[] | null }) {
+  if (trades == null) {
+    return (
+      <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-text-muted">
+        Loading trade history…
+      </div>
+    )
+  }
+  if (trades.length === 0) {
+    return (
+      <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-text-muted">
+        No trades yet.
+      </div>
+    )
+  }
+  return (
+    <div className="border border-border rounded-lg overflow-x-auto">
+      <table className="w-full text-[13px]">
+        <thead>
+          <tr className="bg-bg-secondary text-text-muted text-left">
+            <th className="px-3 py-2 font-medium">Time</th>
+            <th className="px-3 py-2 font-medium">Contract</th>
+            <th className="px-3 py-2 font-medium">Side</th>
+            <th className="px-3 py-2 font-medium text-right">Qty</th>
+            <th className="px-3 py-2 font-medium text-right">Price</th>
+            <th className="px-3 py-2 font-medium text-right">Value</th>
+            <th className="px-3 py-2 font-medium" />
+          </tr>
+        </thead>
+        <tbody>
+          {trades.map((t, i) => (
+            <tr key={`${t.commitHash}-${i}`} className="border-t border-border hover:bg-bg-tertiary/30 transition-colors">
+              <td className="px-3 py-2 text-text-muted tabular-nums whitespace-nowrap">{formatHistoryTime(t.timestamp)}</td>
+              <td className="px-3 py-2"><ContractCell contract={t.contract} /></td>
+              <td className="px-3 py-2"><SideBadge side={t.side} /></td>
+              <td className="px-3 py-2 text-right text-text tabular-nums">{fmtNum(t.quantity)}</td>
+              <td className="px-3 py-2 text-right text-text tabular-nums">{t.price}</td>
+              <td className="px-3 py-2 text-right text-text tabular-nums">{fmt(t.value, t.contract.currency)}</td>
+              <td className="px-3 py-2 text-right">
+                {t.source !== 'order' && (
+                  <SourceChip label={t.source === 'external' ? 'External' : 'Reconcile'} />
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// ==================== Date helpers ====================
+
+/** "14:32" for today; "Jun 11 14:32" otherwise. */
+function formatHistoryTime(timestamp: string): string {
   const d = new Date(timestamp)
-  return d.toLocaleTimeString(getIntlLocale(), { hour: '2-digit', minute: '2-digit', hour12: false })
+  if (Number.isNaN(d.getTime())) return timestamp
+  const time = d.toLocaleTimeString(getIntlLocale(), { hour: '2-digit', minute: '2-digit', hour12: false })
+  if (d.toDateString() === new Date().toDateString()) return time
+  return `${d.toLocaleDateString(getIntlLocale(), { month: 'short', day: 'numeric' })} ${time}`
 }
