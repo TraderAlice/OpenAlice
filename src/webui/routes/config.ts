@@ -18,6 +18,7 @@ function parseWires(raw: unknown): Partial<Record<CredentialWireShape, string>> 
   return out
 }
 import type { EngineContext } from '../../core/types.js'
+import { triggerUTARestart } from '../../services/uta-supervisor/restart-trigger.js'
 import { BUILTIN_PRESETS } from '../../ai-providers/presets.js'
 import type { WireShape } from '../../ai-providers/preset-catalog.js'
 import { resolveAnthropicAuthMode } from '../../core/credential-inference.js'
@@ -173,6 +174,13 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
       if (opts?.ctx) {
         const fresh = await loadConfig()
         Object.assign(opts.ctx.config, fresh)
+      }
+      // trading.json is consumed by the UTA process at boot (order-sync
+      // poller cadence) — bounce UTA via the Guardian flag protocol, same
+      // as broker config edits. Fire-and-forget: progress is visible
+      // through the health badges.
+      if (section === 'trading') {
+        triggerUTARestart().catch(() => { /* surfaced via health badges */ })
       }
       // marketData edits are picked up lazily by the opentypebb resolver
       // (it reads ctx.config per request), so no explicit hot-reload hook

@@ -15,6 +15,76 @@ import { api } from '../api'
 import { useWorkspace } from '../tabs/store'
 import type { UTAConfig, BrokerPreset, BrokerHealthInfo, TestConnectionResult, Position, AccountInfo } from '../api/types'
 
+// ==================== External order monitoring cadence ====================
+//
+// data/config/trading.json observeExternalOrdersEvery — how often UTA lists
+// the broker's open orders to catch ones placed outside Alice. Saving
+// bounces the UTA process (boot-time config), same protocol as broker
+// edits; the health badges show the brief reconnect.
+
+const OBSERVE_CADENCE_OPTIONS = ['off', '1m', '5m', '10m', '15m'] as const
+
+function ExternalOrderMonitoringRow() {
+  const [value, setValue] = useState<string | null>(null)
+  const [msg, setMsg] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/config')
+      .then((r) => r.json())
+      .then((cfg) => {
+        if (!cancelled) setValue(cfg?.trading?.observeExternalOrdersEvery ?? '15m')
+      })
+      .catch(() => { if (!cancelled) setValue('15m') })
+    return () => { cancelled = true }
+  }, [])
+
+  const save = async (next: string) => {
+    const prev = value
+    setValue(next)
+    setMsg('')
+    try {
+      const res = await fetch('/api/config/trading', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ observeExternalOrdersEvery: next }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      setMsg('Saved — restarting UTA to apply')
+      setTimeout(() => setMsg(''), 4000)
+    } catch (err) {
+      setValue(prev)
+      setMsg(err instanceof Error ? err.message : 'Save failed')
+    }
+  }
+
+  if (value === null) return null
+
+  return (
+    <div className="flex items-center justify-between gap-3 px-4 py-3 border border-border rounded-lg">
+      <div className="min-w-0">
+        <div className="text-[12px] font-medium text-text">External order monitoring</div>
+        <div className="text-[11px] text-text-muted">
+          How often to scan for orders placed outside Alice (exchange app, direct API).
+          Known pending orders are tracked every 10s regardless.
+        </div>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        {msg && <span className="text-[11px] text-text-muted">{msg}</span>}
+        <select
+          value={value}
+          onChange={(e) => { void save(e.target.value) }}
+          className={inputClass + ' w-auto'}
+        >
+          {OBSERVE_CADENCE_OPTIONS.map((v) => (
+            <option key={v} value={v}>{v === 'off' ? 'Off' : `Every ${v}`}</option>
+          ))}
+        </select>
+      </div>
+    </div>
+  )
+}
+
 // ==================== Live equity (across all UTAs) ====================
 //
 // TradingPage is the CRUD surface for broker connections. The single
@@ -120,6 +190,8 @@ export function TradingPage() {
               </button>
             </div>
           )}
+
+          {tc.utas.length > 0 && <ExternalOrderMonitoringRow />}
         </div>
       </div>
 

@@ -6,6 +6,7 @@ export const configKeysHandlers = [
   // Echo the body back — the real route returns the validated section,
   // and useConfigPage adopts the echo, so `{}` here would wipe the page.
   http.put('/api/config/marketData', async ({ request }) => HttpResponse.json(await request.json())),
+  http.put('/api/config/trading', async ({ request }) => HttpResponse.json(await request.json())),
 
   http.get('/api/config', () =>
     HttpResponse.json({
@@ -14,6 +15,7 @@ export const configKeysHandlers = [
       agent: { evolutionMode: false, claudeCode: {} },
       compaction: { maxContextTokens: 0, maxOutputTokens: 0 },
       snapshot: { enabled: false, every: '1h' },
+      trading: { observeExternalOrdersEvery: '15m' },
       mcp: { port: 47332 },
       marketData: {
         enabled: true,
