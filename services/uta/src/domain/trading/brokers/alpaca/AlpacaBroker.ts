@@ -459,7 +459,15 @@ export class AlpacaBroker implements IBroker {
   /** All open orders on the account — external-order observation surface. */
   async getOpenOrders(): Promise<OpenOrder[]> {
     try {
-      const raw = await this.client.getOrders({ status: 'open' }) as AlpacaOrderRaw[]
+      const raw = await this.client.getOrders({
+        status: 'open',
+        until: undefined,
+        after: undefined,
+        limit: undefined,
+        direction: undefined,
+        nested: undefined,
+        symbols: undefined,
+      }) as AlpacaOrderRaw[]
       return raw.map((o) => this.mapOpenOrder(o))
     } catch (err) {
       throw BrokerError.from(err)
