@@ -112,12 +112,24 @@ export interface CommitPrepareResult {
   operationCount: number
 }
 
+export interface ApprovalGateAudit {
+  ticketId: string
+  runId?: string
+  pendingHash: CommitHash
+  operationCount: number
+  actions: string[]
+  symbols: string[]
+  exitPlanMode: 'ticket-exit-plan' | 'staged-tpsl' | 'not-required'
+  entries: Array<{ symbol: string; action: string; notionalUsd: string }>
+}
+
 export interface PushResult {
   hash: CommitHash
   message: string
   operationCount: number
   submitted: OperationResult[]
   rejected: OperationResult[]
+  approvalGate?: ApprovalGateAudit
 }
 
 export interface RejectResult {

@@ -37,6 +37,7 @@ import {
   writeConfigSection,
   readUTAsConfig,
   writeUTAsConfig,
+  utaConfigSchema,
   aiProviderSchema,
   resolveCredential,
   deleteCredential,
@@ -219,6 +220,47 @@ describe('readUTAsConfig', () => {
     expect(accounts[1].presetId).toBe('alpaca')
   })
 
+  it('parses an account-level approvalGate object', async () => {
+    fileReturns([
+      {
+        id: 'ibkr-tws-b9646326',
+        presetId: 'ibkr-tws',
+        enabled: true,
+        guards: [],
+        presetConfig: { host: '127.0.0.1', port: '7497', clientId: '0' },
+        approvalGate: {
+          enabled: true,
+          ticketDirectory: 'autonomy/tickets',
+          publicKeyPath: 'autonomy/ticket-signing.ed25519.public.pem',
+          allowedAccountRole: 'paper',
+          requireTicket: true,
+        },
+      },
+    ])
+
+    const accounts = await readUTAsConfig()
+
+    expect(accounts[0].approvalGate).toEqual({
+      enabled: true,
+      ticketDirectory: 'autonomy/tickets',
+      publicKeyPath: 'autonomy/ticket-signing.ed25519.public.pem',
+      allowedAccountRole: 'paper',
+      requireTicket: true,
+    })
+  })
+
+  it('keeps approvalGate absent for non-opted-in accounts', () => {
+    const parsed = utaConfigSchema.parse({
+      id: 'mock-plain',
+      presetId: 'mock-simulator',
+      enabled: true,
+      guards: [],
+      presetConfig: {},
+    })
+
+    expect(parsed.approvalGate).toBeUndefined()
+  })
+
   it('auto-migrates pre-preset (legacy) ccxt shape and backs up the original', async () => {
     fileReturns([
       { id: 'okx-live', type: 'ccxt', enabled: true, guards: [], brokerConfig: { exchange: 'okx', sandbox: false, apiKey: 'k', apiSecret: 's', password: 'p' } },
@@ -266,6 +308,29 @@ describe('writeUTAsConfig', () => {
     }])
     const filePath = mockWriteFile.mock.calls[0][0] as string
     expect(filePath).toMatch(/accounts\.json$/)
+  })
+
+  it('writes approvalGate config with validated accounts', async () => {
+    await writeUTAsConfig([{
+      id: 'ibkr-tws-b9646326',
+      presetId: 'ibkr-tws',
+      enabled: true,
+      guards: [],
+      presetConfig: { host: '127.0.0.1', port: '7497', clientId: '0' },
+      keyless: false,
+      readOnly: false,
+      editable: true,
+      approvalGate: {
+        enabled: true,
+        ticketDirectory: 'autonomy/tickets',
+        publicKeyPath: 'autonomy/ticket-signing.ed25519.public.pem',
+        allowedAccountRole: 'paper',
+        requireTicket: true,
+      },
+    }])
+
+    const written = JSON.parse(mockWriteFile.mock.calls[0][1] as string)
+    expect(written[0].approvalGate.allowedAccountRole).toBe('paper')
   })
 
   it('throws ZodError for missing required fields', async () => {
@@ -364,4 +429,3 @@ describe('deleteCredential', () => {
     expect(mockWriteFile).toHaveBeenCalled()
   })
 })
-

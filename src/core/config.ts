@@ -362,6 +362,14 @@ const guardConfigSchema = z.object({
   options: z.record(z.string(), z.unknown()).default({}),
 })
 
+export const approvalGateConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  ticketDirectory: z.string().min(1),
+  publicKeyPath: z.string().min(1),
+  allowedAccountRole: z.enum(['paper']).default('paper'),
+  requireTicket: z.boolean().default(true),
+})
+
 /**
  * One Unified Trading Account. The user-facing concept — one preset
  * (OKX, Bybit, IBKR, …) plus credentials, guards, and an enabled flag.
@@ -378,6 +386,8 @@ export const utaConfigSchema = z.object({
   guards: z.array(guardConfigSchema).default([]),
   /** User-filled form values, validated against the preset's own zodSchema. */
   presetConfig: z.record(z.string(), z.unknown()).default({}),
+  /** Optional domain-level pre-push approval gate. Accounts without this keep existing push behavior. */
+  approvalGate: approvalGateConfigSchema.optional(),
   /**
    * Test/throwaway UTA — purged at every server startup (config entry
    * removed + `data/trading/<id>/` wiped) and dropped immediately when
