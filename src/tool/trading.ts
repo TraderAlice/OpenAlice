@@ -9,13 +9,13 @@
 import { tool, type Tool } from 'ai'
 import { z } from 'zod'
 import Decimal from 'decimal.js'
-import { Contract, UNSET_DECIMAL, coerceSecType } from '@traderalice/ibkr'
+import { Contract, coerceSecType } from '@traderalice/ibkr'
 import { BrokerError, type OpenOrder } from '@traderalice/uta-protocol'
 import type { UTAManagerSDK } from '@/services/uta-client/index.js'
 import { normalizeBrokerSearchPattern } from '@traderalice/uta-protocol'
 import {
   compactAccountInfo, compactCommit, compactContract, compactContractDetails,
-  compactOperation, compactPushResult, compactStageResult, compactStatus,
+  compactOperation, compactOrderFields, compactPushResult, compactStageResult, compactStatus,
   money, price,
 } from './trading-compact.js'
 // `Contract.aliceId` declaration merge is registered as a side-effect
@@ -44,27 +44,25 @@ function handleBrokerError(err: unknown): { error: string; code: string; transie
   }
 }
 
-/** Summarize an OpenOrder into a compact object for AI consumption. */
+/**
+ * Summarize an OpenOrder for AI consumption. Uses the value-tolerant
+ * compactors (NOT order.field.equals(...)) because over HTTP the Order's
+ * Decimal fields arrive as strings — calling Decimal methods on them threw
+ * "totalQuantity.equals is not a function" and broke getOrders entirely.
+ * Order id comes from the top-level string field: the inner `order.orderId`
+ * is the IBKR number form and float-truncates 19-digit CCXT ids (…344→…300).
+ */
 function summarizeOrder(o: OpenOrder, source: string, stringOrderId?: string) {
-  const order = o.order
+  const order = o.order as unknown as Record<string, unknown>
+  const innerId = order['orderId']
   return {
     source,
-    orderId: stringOrderId ?? String(order.orderId),
+    orderId: stringOrderId ?? o.orderId ?? (innerId != null ? String(innerId) : ''),
     aliceId: o.contract.aliceId ?? '',
     symbol: o.contract.symbol || o.contract.localSymbol || '',
-    action: order.action,
-    orderType: order.orderType,
-    totalQuantity: order.totalQuantity.equals(UNSET_DECIMAL) ? '0' : order.totalQuantity.toFixed(),
     status: o.orderState.status,
-    ...(!order.lmtPrice.equals(UNSET_DECIMAL) && { lmtPrice: order.lmtPrice.toFixed() }),
-    ...(!order.auxPrice.equals(UNSET_DECIMAL) && { auxPrice: order.auxPrice.toFixed() }),
-    ...(!order.trailStopPrice.equals(UNSET_DECIMAL) && { trailStopPrice: order.trailStopPrice.toFixed() }),
-    ...(!order.trailingPercent.equals(UNSET_DECIMAL) && { trailingPercent: order.trailingPercent.toFixed() }),
-    ...(order.tif && { tif: order.tif }),
-    ...(!order.filledQuantity.equals(UNSET_DECIMAL) && { filledQuantity: order.filledQuantity.toString() }),
-    ...(o.avgFillPrice != null && { avgFillPrice: o.avgFillPrice }),
-    ...(order.parentId !== 0 && { parentId: order.parentId }),
-    ...(order.ocaGroup && { ocaGroup: order.ocaGroup }),
+    ...compactOrderFields(order),
+    ...(o.avgFillPrice != null && { avgFillPrice: price(o.avgFillPrice) }),
     ...(o.tpsl && { tpsl: o.tpsl }),
   }
 }
@@ -296,7 +294,13 @@ If this tool returns an error with transient=true, wait a few seconds and retry 
               const percentOfEquity = netLiqUsd.gt(0) ? mvUsd.div(netLiqUsd).mul(100) : new Decimal(0)
               const percentOfPortfolio = totalMarketValueUsd.gt(0) ? mvUsd.div(totalMarketValueUsd).mul(100) : new Decimal(0)
               allPositions.push({
-                source: uta.id, symbol: pos.contract.symbol, currency: pos.currency, side: pos.side,
+                source: uta.id, symbol: pos.contract.symbol,
+                // secType + aliceId disambiguate same-symbol positions (ETH
+                // spot vs ETH perp render identically without them) and give
+                // the agent the exact id closePosition needs.
+                secType: pos.contract.secType,
+                aliceId: pos.contract.aliceId,
+                currency: pos.currency, side: pos.side,
                 quantity: pos.quantity.toString(), avgCost: price(pos.avgCost), marketPrice: price(pos.marketPrice),
                 marketValue: money(pos.marketValue), unrealizedPnL: money(pos.unrealizedPnL), realizedPnL: money(pos.realizedPnL),
                 percentageOfEquity: `${percentOfEquity.toFixed(1)}%`,

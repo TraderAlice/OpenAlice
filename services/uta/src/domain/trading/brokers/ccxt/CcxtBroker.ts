@@ -620,7 +620,12 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
     order.orderType = 'MKT'
     order.totalQuantity = quantity ?? pos.quantity
 
-    return this.placeOrder(pos.contract, order, undefined, { reduceOnly: true })
+    // reduceOnly is a DERIVATIVES concept (never open the opposite side by
+    // accident). Spot has no position to "reduce" — okx rejects the param
+    // outright (51205 "Reduce Only is not available", observed live on a
+    // partial spot close). Spot close = plain market sell.
+    const isDerivative = pos.contract.secType === 'CRYPTO_PERP' || pos.contract.secType === 'FUT'
+    return this.placeOrder(pos.contract, order, undefined, isDerivative ? { reduceOnly: true } : undefined)
   }
 
   // ---- Queries ----
