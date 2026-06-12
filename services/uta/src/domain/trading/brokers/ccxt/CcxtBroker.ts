@@ -476,7 +476,27 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
         }
       }
 
-      const ccxtOrderType = ibkrOrderTypeToCcxt(order.orderType)
+      // Conditional orders: ccxt's convention is BASE type (market/limit) +
+      // params.triggerPrice — ccxt routes each venue to its algo endpoint.
+      // The old lowercase passthrough sent okx a literal ordType "stp"
+      // (51000 Parameter error, observed live), which meant the documented
+      // "place a separate stop" path didn't work either. TRAIL* stays
+      // refused until venue-verified — same rule as attached TP/SL.
+      let ccxtOrderType = ibkrOrderTypeToCcxt(order.orderType)
+      if (order.orderType === 'STP' || order.orderType === 'STP LMT') {
+        if (order.auxPrice.equals(UNSET_DECIMAL)) {
+          return { success: false, error: `${order.orderType} requires auxPrice (the stop trigger price).` }
+        }
+        params.triggerPrice = order.auxPrice.toNumber()
+        ccxtOrderType = order.orderType === 'STP' ? 'market' : 'limit'
+      } else if (order.orderType === 'TRAIL' || order.orderType === 'TRAIL LIMIT') {
+        return {
+          success: false,
+          error:
+            `${order.orderType} is not verified to reach ${this.exchangeName} through ccxt — refusing rather ` +
+            `than risking a silently mis-typed order. Use STP / STP LMT, or manage the trail manually.`,
+        }
+      }
       const side = order.action.toLowerCase() as 'buy' | 'sell'
       // CCXT SDK expects number for price — convert at the wire boundary.
       const refPrice = ccxtOrderType === 'limit' && !order.lmtPrice.equals(UNSET_DECIMAL)
