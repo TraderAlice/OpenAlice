@@ -15,6 +15,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { createTradingRoutes } from './routes-trading.js'
+import { ApprovalGateError } from '../domain/trading/approval-gate/errors.js'
 import type { UTAEngineContext } from '../types.js'
 
 // Stub the UTA + manager just enough that the handler can call through.
@@ -22,9 +23,13 @@ import type { UTAEngineContext } from '../types.js'
 
 interface CapturedCall { method: string; args: unknown[] }
 
-function makeMockUTA(opts: { stageThrows?: 'stage' | 'commit' | 'push' | null; pushResult?: unknown } = {}) {
+function makeMockUTA(opts: {
+  stageThrows?: 'stage' | 'commit' | 'push' | 'approvalGate' | null
+  pushResult?: unknown
+  pendingMessage?: string | null
+} = {}) {
   const calls: CapturedCall[] = []
-  let pendingMessage: string | null = null
+  let pendingMessage: string | null = opts.pendingMessage ?? null
   return {
     calls,
     uta: {
@@ -49,6 +54,9 @@ function makeMockUTA(opts: { stageThrows?: 'stage' | 'commit' | 'push' | null; p
       }),
       push: vi.fn(async () => {
         calls.push({ method: 'push', args: [] })
+        if (opts.stageThrows === 'approvalGate') {
+          throw new ApprovalGateError('approval_gate_notional_exceeded', 'Approval gate rejected notional.')
+        }
         if (opts.stageThrows === 'push') throw new Error('Broker offline')
         return opts.pushResult ?? {
           hash: 'abc123',
@@ -110,6 +118,42 @@ describe('POST /uta/:id/wallet/place-order', () => {
     expect(status).toBe(200)
     expect((body as { hash: string }).hash).toBe('abc123')
     expect(mock.calls.map(c => c.method)).toEqual(['stagePlaceOrder', 'commit', 'push'])
+  })
+
+  it('returns approvalGate audit on one-shot success when push returns it', async () => {
+    const approvalGate = {
+      ticketId: 'ticket-1',
+      runId: 'run-1',
+      pendingHash: 'abc123',
+      operationCount: 1,
+      actions: ['BUY'],
+      symbols: ['AAPL'],
+      exitPlanMode: 'ticket-exit-plan',
+      entries: [{ symbol: 'AAPL', action: 'BUY', notionalUsd: '300' }],
+    }
+    const audited = makeMockUTA({
+      pushResult: {
+        hash: 'abc123',
+        message: 'ticket-1 run-1 buy AAPL',
+        operationCount: 1,
+        submitted: [],
+        rejected: [],
+        approvalGate,
+      },
+    })
+    const routes = makeRoutes(audited.uta)
+
+    const { status, body } = await post(routes, '/uta/mock-uta/wallet/place-order', {
+      aliceId: 'mock-uta|BTC/USDT',
+      action: 'BUY',
+      orderType: 'MKT',
+      totalQuantity: '0.001',
+      message: 'ticket-1 run-1 buy AAPL',
+    })
+
+    expect(status).toBe(200)
+    expect(body).toMatchObject({ approvalGate })
+    expect(audited.calls.map(c => c.method)).toEqual(['stagePlaceOrder', 'commit', 'push'])
   })
 
   it('rejects body without commit message (Zod 400)', async () => {
@@ -189,6 +233,25 @@ describe('POST /uta/:id/wallet/place-order', () => {
     expect((body as { phase: string }).phase).toBe('push')
   })
 
+  it('returns phase=push with 400 when push throws ApprovalGateError', async () => {
+    const failing = makeMockUTA({ stageThrows: 'approvalGate' })
+    const routes = makeRoutes(failing.uta)
+    const { status, body } = await post(routes, '/uta/mock-uta/wallet/place-order', {
+      aliceId: 'mock-uta|BTC/USDT',
+      action: 'BUY',
+      orderType: 'MKT',
+      totalQuantity: '0.001',
+      message: 'manual test',
+    })
+
+    expect(status).toBe(400)
+    expect(body).toMatchObject({
+      phase: 'push',
+      gate: 'approvalGate',
+      code: 'approval_gate_notional_exceeded',
+    })
+  })
+
   it('returns 404 when UTA does not exist', async () => {
     const routes = makeRoutes(mock.uta)
     const { status } = await post(routes, '/uta/does-not-exist/wallet/place-order', {
@@ -229,6 +292,60 @@ describe('POST /uta/:id/wallet/place-order', () => {
     })
 
     expect(mock.uta.commit).toHaveBeenCalledWith('this exact message')
+  })
+})
+
+describe('POST /uta/:id/wallet/push', () => {
+  it('returns approvalGate audit on direct push success when UTA returns it', async () => {
+    const approvalGate = {
+      ticketId: 'ticket-1',
+      runId: 'run-1',
+      pendingHash: 'abc123',
+      operationCount: 1,
+      actions: ['BUY'],
+      symbols: ['AAPL'],
+      exitPlanMode: 'ticket-exit-plan',
+      entries: [{ symbol: 'AAPL', action: 'BUY', notionalUsd: '300' }],
+    }
+    const audited = makeMockUTA({
+      pendingMessage: 'ticket-1 run-1 buy AAPL',
+      pushResult: {
+        hash: 'abc123',
+        message: 'ticket-1 run-1 buy AAPL',
+        operationCount: 1,
+        submitted: [],
+        rejected: [],
+        approvalGate,
+      },
+    })
+    const routes = makeRoutes(audited.uta)
+
+    const { status, body } = await post(routes, '/uta/mock-uta/wallet/push', {})
+
+    expect(status).toBe(200)
+    expect(body).toMatchObject({ approvalGate })
+    expect(audited.calls.map(c => c.method)).toEqual(['push'])
+  })
+
+  it('maps ApprovalGateError to 400', async () => {
+    const failing = makeMockUTA({ stageThrows: 'approvalGate', pendingMessage: 'pending' })
+    const routes = makeRoutes(failing.uta)
+    const { status, body } = await post(routes, '/uta/mock-uta/wallet/push', {})
+
+    expect(status).toBe(400)
+    expect(body).toMatchObject({
+      gate: 'approvalGate',
+      code: 'approval_gate_notional_exceeded',
+    })
+  })
+
+  it('keeps non-gate push failures mapped to 500', async () => {
+    const failing = makeMockUTA({ stageThrows: 'push', pendingMessage: 'pending' })
+    const routes = makeRoutes(failing.uta)
+    const { status, body } = await post(routes, '/uta/mock-uta/wallet/push', {})
+
+    expect(status).toBe(500)
+    expect(String((body as { error: string }).error)).toContain('Broker offline')
   })
 })
 

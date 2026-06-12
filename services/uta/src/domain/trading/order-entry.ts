@@ -16,21 +16,20 @@
  *   instead of HTTP status codes; the route layer maps the union to
  *   appropriate transport-level signals.
  *
- * Push is normally gated by manual approval (see `tool/trading.ts`
- * `tradingPush` which intentionally tells the agent to ask the user
- * first). One-shot bypasses that gate because the user supplying the
- * full order spec via a form IS the manual approval — re-prompting
- * would be redundant.
+ * One-shot still converges on `UnifiedTradingAccount.push()`. Manual form
+ * submission supplies the user's intent, while domain-level push gates still
+ * enforce account approval policy before broker dispatch.
  */
 
 import type { UnifiedTradingAccount } from './UnifiedTradingAccount.js'
+import { isApprovalGateError } from './approval-gate/errors.js'
 import type { PushResult } from './git/types.js'
 
 export type OrderEntryPhase = 'stage' | 'commit' | 'push'
 
 export type OrderEntryResult =
   | { ok: true; result: PushResult }
-  | { ok: false; phase: OrderEntryPhase; error: string }
+  | { ok: false; phase: OrderEntryPhase; error: string; gate?: 'approvalGate'; code?: string }
 
 /**
  * Run stage → commit → push on the given UTA. The `stage` callback is
@@ -67,6 +66,9 @@ export async function executeOneShotOrder(
     const result = await uta.push()
     return { ok: true, result }
   } catch (err) {
+    if (isApprovalGateError(err)) {
+      return { ok: false, phase: 'push', error: err.message, gate: 'approvalGate', code: err.code }
+    }
     return { ok: false, phase: 'push', error: errorMessage(err) }
   }
 }

@@ -7,6 +7,7 @@ import type { UnifiedTradingAccount } from '../domain/trading/UnifiedTradingAcco
 import { searchTradeableContracts } from '../domain/trading/contract-search.js'
 import type { AssetClassHint } from '@traderalice/uta-protocol'
 import { executeOneShotOrder, type OrderEntryPhase } from '../domain/trading/order-entry.js'
+import { isApprovalGateError } from '../domain/trading/approval-gate/errors.js'
 import { projectOrderHistory, projectTradeHistory } from '../domain/trading/order-history.js'
 
 // ==================== Order entry schemas ====================
@@ -62,6 +63,17 @@ const PHASE_STATUS: Record<OrderEntryPhase, 400 | 500> = {
   push: 500,
 }
 
+function orderEntryStatus(r: Exclude<Awaited<ReturnType<typeof executeOneShotOrder>>, { ok: true }>): 400 | 500 {
+  if (r.phase === 'push' && r.gate === 'approvalGate') return 400
+  return PHASE_STATUS[r.phase]
+}
+
+function orderEntryBody(r: Exclude<Awaited<ReturnType<typeof executeOneShotOrder>>, { ok: true }>) {
+  return r.gate === 'approvalGate'
+    ? { error: r.error, phase: r.phase, gate: r.gate, code: r.code }
+    : { error: r.error, phase: r.phase }
+}
+
 /** Run the domain pipeline and translate to a Hono Response. */
 async function runOneShot(
   c: Context,
@@ -71,7 +83,7 @@ async function runOneShot(
 ): Promise<Response> {
   const r = await executeOneShotOrder(uta, message, stage)
   if (r.ok) return c.json(r.result)
-  return c.json({ error: r.error, phase: r.phase }, PHASE_STATUS[r.phase])
+  return c.json(orderEntryBody(r), orderEntryStatus(r))
 }
 
 const ALLOWED_ASSET_CLASSES: ReadonlySet<AssetClassHint> = new Set([
@@ -433,6 +445,9 @@ export function createTradingRoutes(ctx: UTAEngineContext) {
       const result = await uta.push()
       return c.json(result)
     } catch (err) {
+      if (isApprovalGateError(err)) {
+        return c.json({ error: err.message, gate: 'approvalGate', code: err.code }, 400)
+      }
       return c.json({ error: String(err) }, 500)
     }
   })

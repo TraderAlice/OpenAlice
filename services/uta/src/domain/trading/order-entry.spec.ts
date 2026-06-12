@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { executeOneShotOrder } from './order-entry.js'
+import { ApprovalGateError } from './approval-gate/errors.js'
 import type { UnifiedTradingAccount } from './UnifiedTradingAccount.js'
 import type { PushResult } from './git/types.js'
 
@@ -35,6 +36,35 @@ describe('executeOneShotOrder', () => {
     expect(commit).toHaveBeenCalledWith('place AAPL 100 MKT')
     expect(push).toHaveBeenCalledTimes(1)
     expect(reject).not.toHaveBeenCalled()
+  })
+
+  it('preserves approvalGate audit on successful push result', async () => {
+    const approvalGate = {
+      ticketId: 'ticket-1',
+      runId: 'run-1',
+      pendingHash: 'abc123',
+      operationCount: 1,
+      actions: ['BUY'],
+      symbols: ['AAPL'],
+      exitPlanMode: 'ticket-exit-plan' as const,
+      entries: [{ symbol: 'AAPL', action: 'BUY', notionalUsd: '300' }],
+    }
+    const stage = vi.fn()
+    const { uta } = makeFakeUta({
+      push: vi.fn(async () => ({
+        hash: 'abc123',
+        message: 'ticket-1 run-1 buy AAPL',
+        operationCount: 1,
+        submitted: [],
+        rejected: [],
+        approvalGate,
+      })),
+    })
+
+    const r = await executeOneShotOrder(uta, 'ticket-1 run-1 buy AAPL', stage)
+
+    expect(r.ok).toBe(true)
+    if (r.ok) expect(r.result.approvalGate).toEqual(approvalGate)
   })
 
   it('returns stage error and skips commit + push', async () => {
@@ -83,6 +113,25 @@ describe('executeOneShotOrder', () => {
 
     const r = await executeOneShotOrder(uta, 'msg', stage)
     expect(r).toEqual({ ok: false, phase: 'push', error: 'broker rejected' })
+  })
+
+  it('preserves approval gate metadata on push failure', async () => {
+    const stage = vi.fn()
+    const { uta } = makeFakeUta({
+      push: vi.fn(async () => {
+        throw new ApprovalGateError('approval_gate_notional_exceeded', 'Approval gate rejected notional.')
+      }),
+    })
+
+    const r = await executeOneShotOrder(uta, 'msg', stage)
+
+    expect(r).toEqual({
+      ok: false,
+      phase: 'push',
+      error: 'Approval gate rejected notional.',
+      gate: 'approvalGate',
+      code: 'approval_gate_notional_exceeded',
+    })
   })
 
   it('coerces non-Error throwables to a string error message', async () => {
