@@ -42,6 +42,7 @@ export default defineConfig({
         test: {
           name: 'ui',
           environment: 'jsdom',
+          setupFiles: ['./ui/src/test/setup-localstorage.ts'],
           include: ['ui/**/*.spec.*'],
         },
       },
