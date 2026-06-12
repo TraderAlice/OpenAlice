@@ -34,6 +34,7 @@ import type {
   SyncResult,
 } from './git/types.js'
 import { createGuardPipeline, resolveGuards } from './guards/index.js'
+import { evaluateApprovalGate, type ApprovalGateConfig } from './approval-gate/gate.js'
 import './contract-ext.js'
 
 // ==================== Options ====================
@@ -50,6 +51,10 @@ export interface UnifiedTradingAccountOptions {
   /** Public-data-only account (no key) — no account/positions; excluded from
    *  equity aggregation. Implies readOnly. */
   keyless?: boolean
+  /** Optional pre-push approval gate; absent means existing push behavior. */
+  approvalGate?: ApprovalGateConfig
+  /** Test hook for deterministic ticket expiry checks. */
+  approvalGateNow?: () => Date
 }
 
 // ==================== Stage param types ====================
@@ -91,6 +96,8 @@ export class UnifiedTradingAccount {
   private readonly _onHealthChange?: (accountId: string, health: BrokerHealthInfo) => void
   private readonly _onPostPush?: (accountId: string) => void | Promise<void>
   private readonly _onPostReject?: (accountId: string) => void | Promise<void>
+  private readonly _approvalGate?: ApprovalGateConfig
+  private readonly _approvalGateNow?: () => Date
 
   // ---- Health tracking ----
   private static readonly DEGRADED_THRESHOLD = 3
@@ -123,6 +130,8 @@ export class UnifiedTradingAccount {
     this._onHealthChange = options.onHealthChange
     this._onPostPush = options.onPostPush
     this._onPostReject = options.onPostReject
+    this._approvalGate = options.approvalGate
+    this._approvalGateNow = options.approvalGateNow
 
     // Wire internals
     this._getState = async (): Promise<GitState> => {
@@ -511,9 +520,19 @@ export class UnifiedTradingAccount {
     if (this.health === 'offline') {
       throw new Error(`Account "${this.label}" is offline. Cannot execute trades.`)
     }
+    const status = this.status()
+    const approvalGate = await evaluateApprovalGate({
+      config: this._approvalGate,
+      accountId: this.id,
+      pendingHash: status.pendingHash,
+      pendingMessage: status.pendingMessage,
+      staged: status.staged,
+      pendingOrders: this.git.getPendingOrderIds(),
+      now: this._approvalGateNow?.() ?? new Date(),
+    })
     const result = await this.git.push()
     Promise.resolve(this._onPostPush?.(this.id)).catch(() => {})
-    return result
+    return approvalGate ? { ...result, approvalGate } : result
   }
 
   async reject(reason?: string): Promise<RejectResult> {

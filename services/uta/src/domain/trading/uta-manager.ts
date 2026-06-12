@@ -67,6 +67,7 @@ export class UTAManager {
       guards: cfg.guards,
       keyless: cfg.keyless,
       readOnly: cfg.readOnly,
+      approvalGate: cfg.approvalGate,
       savedState,
       onCommit: createGitPersister(cfg.id),
       onHealthChange: (utaId, health) => {

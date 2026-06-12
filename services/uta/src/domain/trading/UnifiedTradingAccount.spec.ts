@@ -1,9 +1,15 @@
+import { generateKeyPairSync, sign } from 'node:crypto'
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import Decimal from 'decimal.js'
 import { Order, OrderState, UNSET_DOUBLE, UNSET_DECIMAL } from '@traderalice/ibkr'
 import { UnifiedTradingAccount } from './UnifiedTradingAccount.js'
 import type { UnifiedTradingAccountOptions } from './UnifiedTradingAccount.js'
 import { MockBroker, makeContract, makePosition, makeOpenOrder } from './brokers/mock/index.js'
+import { ApprovalGateError } from './approval-gate/errors.js'
+import { canonicalApprovalPayload, type ApprovalTicket } from './approval-gate/tickets.js'
 import type { Operation } from './git/types.js'
 import './contract-ext.js'
 
@@ -11,6 +17,44 @@ function createUTA(broker?: MockBroker, options?: UnifiedTradingAccountOptions):
   const b = broker ?? new MockBroker()
   const uta = new UnifiedTradingAccount(b, options)
   return { uta, broker: b }
+}
+
+const approvalGateTempDirs: string[] = []
+
+afterEach(async () => {
+  await Promise.all(approvalGateTempDirs.map((dir) => rm(dir, { recursive: true, force: true })))
+  approvalGateTempDirs.length = 0
+})
+
+async function writeApprovalGateFiles(overrides: Partial<Omit<ApprovalTicket, 'signature'>> = {}) {
+  const { publicKey, privateKey } = generateKeyPairSync('ed25519')
+  const payload: Omit<ApprovalTicket, 'signature'> = {
+    ticket_id: 'ticket-1',
+    account_id: 'mock-paper',
+    account_role: 'paper',
+    allowed_symbols: ['AAPL'],
+    allowed_actions: ['BUY', 'cancelOrder', 'closePosition'],
+    max_notional_usd: '1000',
+    require_exit_plan: false,
+    expires_at: '2026-06-10T21:01:59.746Z',
+    ...overrides,
+  }
+  const signature = sign(null, Buffer.from(canonicalApprovalPayload(payload)), privateKey).toString('base64')
+  const ticket = { ...payload, signature: `ed25519:${signature}` } as ApprovalTicket
+  const dir = await mkdtemp(join(tmpdir(), 'uta-approval-gate-'))
+  approvalGateTempDirs.push(dir)
+  const ticketDirectory = join(dir, 'tickets')
+  await mkdir(ticketDirectory)
+  await writeFile(join(ticketDirectory, 'ticket.json'), JSON.stringify(ticket, null, 2))
+  const publicKeyPath = join(dir, 'ticket-signing.ed25519.public.pem')
+  await writeFile(publicKeyPath, publicKey.export({ type: 'spki', format: 'pem' }).toString())
+  return {
+    enabled: true,
+    ticketDirectory,
+    publicKeyPath,
+    allowedAccountRole: 'paper' as const,
+    requireTicket: true,
+  }
 }
 
 /** Helper: extract the first staged operation's placeOrder fields */
@@ -552,6 +596,115 @@ describe('UTA — stageCancelOrder', () => {
     const op = staged[0] as Extract<Operation, { action: 'cancelOrder' }>
     expect(op.action).toBe('cancelOrder')
     expect(op.orderId).toBe('ord-999')
+  })
+})
+
+describe('UTA — approval gate pre-push', () => {
+  it('keeps existing push behavior when approvalGate is absent', async () => {
+    const { uta, broker } = createUTA()
+    const spy = vi.spyOn(broker, 'placeOrder')
+
+    uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '10' })
+    uta.commit('plain push still works')
+    const result = await uta.push()
+
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(result).not.toHaveProperty('approvalGate')
+  })
+
+  it('runs approval gate before broker dispatch for opted-in accounts', async () => {
+    const { uta, broker } = createUTA(undefined, {
+      approvalGate: {
+        enabled: true,
+        ticketDirectory: '/path/that/does/not/exist',
+        publicKeyPath: '/path/that/does/not/exist.pem',
+        allowedAccountRole: 'paper',
+        requireTicket: true,
+      },
+      approvalGateNow: () => new Date('2026-06-10T20:00:00.000Z'),
+    })
+    const spy = vi.spyOn(broker, 'placeOrder')
+
+    uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', action: 'BUY', orderType: 'LMT', totalQuantity: '1', lmtPrice: '150' })
+    uta.commit('missing ticket should block')
+
+    await expect(uta.push()).rejects.toThrow()
+    expect(spy).not.toHaveBeenCalled()
+    expect(uta.status().staged).toHaveLength(1)
+  })
+
+  it('surfaces ApprovalGateError from gate policy denials', async () => {
+    const { uta } = createUTA(undefined, {
+      approvalGate: {
+        enabled: true,
+        ticketDirectory: '/path/that/does/not/exist',
+        publicKeyPath: '/path/that/does/not/exist.pem',
+        allowedAccountRole: 'paper',
+        requireTicket: true,
+      },
+      approvalGateNow: () => new Date('2026-06-10T20:00:00.000Z'),
+    })
+
+    uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', action: 'BUY', orderType: 'LMT', totalQuantity: '1', lmtPrice: '150' })
+    uta.commit('')
+
+    await expect(uta.push()).rejects.toBeInstanceOf(ApprovalGateError)
+  })
+
+  it('returns approvalGate audit on successful opted-in push', async () => {
+    const approvalGate = await writeApprovalGateFiles({
+      run_id: 'run-1',
+      require_exit_plan: true,
+      exit_plan: 'Cancel the paper order or close any filled AAPL position.',
+    })
+    const { uta } = createUTA(undefined, {
+      approvalGate,
+      approvalGateNow: () => new Date('2026-06-10T20:00:00.000Z'),
+    })
+
+    uta.stagePlaceOrder({
+      aliceId: 'mock-paper|AAPL',
+      symbol: 'AAPL',
+      action: 'BUY',
+      orderType: 'LMT',
+      totalQuantity: '2',
+      lmtPrice: '150',
+    })
+    const prepared = uta.commit('ticket-1 run-1 buy AAPL')
+
+    const result = await uta.push()
+
+    expect(result.approvalGate).toEqual({
+      ticketId: 'ticket-1',
+      runId: 'run-1',
+      pendingHash: prepared.hash,
+      operationCount: 1,
+      actions: ['BUY'],
+      symbols: ['AAPL'],
+      exitPlanMode: 'ticket-exit-plan',
+      entries: [{ symbol: 'AAPL', action: 'BUY', notionalUsd: '300' }],
+    })
+  })
+
+  it('uses TradingGit pending-order symbols when approving cancelOrder', async () => {
+    const approvalGate = await writeApprovalGateFiles()
+    const { uta, broker } = createUTA(undefined, {
+      approvalGate,
+      approvalGateNow: () => new Date('2026-06-10T20:00:00.000Z'),
+    })
+    const cancelSpy = vi.spyOn(broker, 'cancelOrder')
+
+    uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', action: 'BUY', orderType: 'LMT', totalQuantity: '1', lmtPrice: '150' })
+    uta.commit('ticket-1 open AAPL')
+    const opened = await uta.push()
+    const orderId = opened.submitted[0]?.orderId
+    expect(orderId).toBeDefined()
+
+    uta.stageCancelOrder({ orderId: orderId! })
+    uta.commit('ticket-1 cancel AAPL')
+    await uta.push()
+
+    expect(cancelSpy).toHaveBeenCalledWith(orderId, undefined)
   })
 })
 
