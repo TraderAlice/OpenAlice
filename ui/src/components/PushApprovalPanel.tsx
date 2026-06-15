@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { formatRelativeTime, getIntlLocale } from '../lib/intl'
 import { api } from '../api'
 import { isUnsetDecimal } from '../lib/format'
@@ -20,6 +20,17 @@ interface AccountHistory {
   accountId: string
   label: string
   commits: WalletCommitLog[]
+}
+
+/** One commit lifted out of its per-account bucket, tagged with the
+ *  account it belongs to, so the History view can present every account's
+ *  commits as a single recency-sorted stream (the trade log is really one
+ *  timeline; per-UTA grouping buried fresh commits below stale ones from
+ *  another account). The UTA filter narrows this back to one account. */
+interface FlatCommit {
+  accountId: string
+  label: string
+  commit: WalletCommitLog
 }
 
 // ==================== Helpers ====================
@@ -99,6 +110,9 @@ export function PushApprovalPanel() {
   const [confirmingPush, setConfirmingPush] = useState<string | null>(null)
   const [lastResult, setLastResult] = useState<{ accountId: string; data: WalletPushResult } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // History UTA filter — null = show every account's commits merged. Holds
+  // an accountId when narrowed to one account's log.
+  const [historyFilter, setHistoryFilter] = useState<string | null>(null)
 
   const poll = useCallback(async () => {
     try {
@@ -167,12 +181,44 @@ export function PushApprovalPanel() {
     }
   }, [poll])
 
+  // Accounts that actually have commits — the filter chip set.
+  const historyAccounts = useMemo(
+    () => history.map((h) => ({ id: h.accountId, label: h.label })),
+    [history],
+  )
+
+  // Ignore a stale filter pointing at an account that dropped out of the
+  // log (e.g. its commits aged past the fetch window) — fall back to All
+  // rather than show an empty list.
+  const effectiveFilter =
+    historyFilter && historyAccounts.some((a) => a.id === historyFilter)
+      ? historyFilter
+      : null
+
+  // Single recency-sorted stream across every account (or the filtered one).
+  const mergedHistory = useMemo(() => {
+    const flat: FlatCommit[] = []
+    for (const h of history) {
+      if (effectiveFilter && h.accountId !== effectiveFilter) continue
+      for (const commit of h.commits) {
+        flat.push({ accountId: h.accountId, label: h.label, commit })
+      }
+    }
+    flat.sort(
+      (a, b) =>
+        new Date(b.commit.timestamp).getTime() - new Date(a.commit.timestamp).getTime(),
+    )
+    return flat
+  }, [history, effectiveFilter])
+
   // No trading accounts configured — hide panel entirely
   if (accounts.length === 0) return null
 
   const hasStaged = staged.length > 0
   const hasPending = pending.length > 0
   const hasHistory = history.length > 0
+  // Per-UTA filter only earns its space when there's more than one account.
+  const showHistoryFilter = historyAccounts.length > 1
 
   return (
     <div className="h-full bg-bg-secondary/30 flex flex-col min-h-0">
@@ -337,30 +383,65 @@ export function PushApprovalPanel() {
             <div className="px-3 py-2">
               <div className="text-[11px] text-text-muted font-medium uppercase tracking-wider">History</div>
             </div>
-            <div className="px-3 pb-3 space-y-3">
-              {history.map(({ accountId, label, commits }) => (
-                <div key={accountId} className="space-y-1">
-                  {history.length > 1 && (
-                    <div className="text-[10px] text-text-muted/60 font-medium uppercase tracking-wider">{label}</div>
-                  )}
-                  {commits.map((commit) => (
-                    <div key={commit.hash} className="group px-2 py-1.5 rounded hover:bg-bg-secondary/50 transition-colors">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-mono text-text-muted/50">{commit.hash}</span>
-                        <span className="text-[10px] text-text-muted/40">{formatRelativeTime(commit.timestamp)}</span>
-                      </div>
-                      <div className="text-xs text-text mt-0.5 leading-snug">{commit.message}</div>
-                      {commit.operations.length > 0 && (
-                        <div className="flex flex-wrap gap-x-2 mt-0.5">
-                          {commit.operations.map((op, i) => (
-                            <span key={i} className={`text-[10px] ${statusColor(op.status)}`}>
-                              {op.symbol !== 'unknown' ? op.symbol : op.action} · {op.status}
-                            </span>
-                          ))}
-                        </div>
-                      )}
+
+            {/* Per-UTA filter chips — only shown with >1 account. */}
+            {showHistoryFilter && (
+              <div className="px-3 pb-2 flex flex-wrap gap-1">
+                <button
+                  onClick={() => setHistoryFilter(null)}
+                  className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                    effectiveFilter === null
+                      ? 'bg-bg-tertiary text-text border-border'
+                      : 'text-text-muted border-border/50 hover:text-text hover:border-border'
+                  }`}
+                >
+                  All
+                </button>
+                {historyAccounts.map((a) => (
+                  <button
+                    key={a.id}
+                    onClick={() => setHistoryFilter(a.id)}
+                    title={a.label}
+                    className={`text-[10px] px-2 py-0.5 rounded-full border max-w-[120px] truncate transition-colors ${
+                      effectiveFilter === a.id
+                        ? 'bg-bg-tertiary text-text border-border'
+                        : 'text-text-muted border-border/50 hover:text-text hover:border-border'
+                    }`}
+                  >
+                    {a.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="px-3 pb-3 space-y-1">
+              {mergedHistory.map(({ accountId, label, commit }) => (
+                <div
+                  key={`${accountId}:${commit.hash}`}
+                  className="group px-2 py-1.5 rounded hover:bg-bg-secondary/50 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono text-text-muted/50">{commit.hash}</span>
+                    <span className="text-[10px] text-text-muted/40">{formatRelativeTime(commit.timestamp)}</span>
+                    {/* Account tag — needed now that commits aren't grouped;
+                     *  redundant (so hidden) when the list is already filtered
+                     *  to one account or there's only one. */}
+                    {effectiveFilter === null && historyAccounts.length > 1 && (
+                      <span className="ml-auto text-[10px] text-text-muted/40 truncate max-w-[90px]" title={label}>
+                        {label}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-text mt-0.5 leading-snug">{commit.message}</div>
+                  {commit.operations.length > 0 && (
+                    <div className="flex flex-wrap gap-x-2 mt-0.5">
+                      {commit.operations.map((op, i) => (
+                        <span key={i} className={`text-[10px] ${statusColor(op.status)}`}>
+                          {op.symbol !== 'unknown' ? op.symbol : op.action} · {op.status}
+                        </span>
+                      ))}
                     </div>
-                  ))}
+                  )}
                 </div>
               ))}
             </div>
