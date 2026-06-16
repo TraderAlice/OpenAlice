@@ -11,7 +11,8 @@ import {
   type ClientControlMessage,
 } from './protocol';
 import { attachWebglRenderer } from './renderer';
-import { darkTheme } from './theme';
+import { darkTheme, lightTheme } from './theme';
+import { useEffectiveTheme } from '../../theme/useEffectiveTheme';
 // Lazy-import so the demo subtree (transcripts, fixtures, handlers) is
 // dynamic-imported only when demo mode is actually on. With a static import,
 // Rollup is conservative about module side-effects (the transcript file
@@ -99,6 +100,19 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
   const onSessionLostRef = useRef<TerminalViewProps['onSessionLost']>(props.onSessionLost);
   onSessionLostRef.current = props.onSessionLost;
 
+  // Terminal palette follows the app theme (auto resolves via the OS). Read the
+  // current value through a ref so the connect effect doesn't recreate the
+  // terminal on a theme flip — a separate effect re-skins the live instance.
+  const effectiveTheme = useEffectiveTheme();
+  const xtermTheme = effectiveTheme === 'light' ? lightTheme : darkTheme;
+  const themeRef = useRef(xtermTheme);
+  themeRef.current = xtermTheme;
+  const termRef = useRef<Xterm | null>(null);
+
+  useEffect(() => {
+    if (termRef.current) termRef.current.options.theme = xtermTheme;
+  }, [xtermTheme]);
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return undefined;
@@ -110,7 +124,7 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
     setChildExited(false);
 
     const term = new Xterm({
-      theme: darkTheme,
+      theme: themeRef.current,
       fontFamily:
         'ui-monospace, "SF Mono", Menlo, Monaco, "Cascadia Mono", "DejaVu Sans Mono", monospace',
       fontSize: 13,
@@ -121,6 +135,7 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
       macOptionIsMeta: true,
       convertEol: false,
     });
+    termRef.current = term;
 
     const fit = new FitAddon();
     term.loadAddon(fit);
@@ -313,6 +328,7 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
       }
       webgl?.dispose();
       term.dispose();
+      termRef.current = null;
     };
   }, [wsId, sessionId, wsUrl]);
 

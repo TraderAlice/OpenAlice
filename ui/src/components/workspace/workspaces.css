@@ -1,13 +1,18 @@
 .workspaces-root {
-  color-scheme: dark;
-  --bg: #0b0d10;
-  --panel: #11151a;
-  --sidebar: #0d1014;
-  --border: #21262d;
-  --fg-dim: #8b949e;
-  --fg: #e6edf3;
-  --accent: #79c0ff;
-  --danger: #ff7b72;
+  /* Alias the local palette to the global theme tokens so the whole
+     Workspaces surface (session view + sidebar) follows light / dark.
+     `color-scheme` is inherited from :root (per-theme), not pinned dark.
+     The terminal itself is themed separately (xterm ITheme in Terminal.tsx).
+     Remaining hardcoded semantic chips (agent badges, status pills) are
+     tracked in ANG-110. */
+  --bg: var(--color-bg);
+  --panel: var(--color-bg-secondary);
+  --sidebar: var(--color-bg-secondary);
+  --border: var(--color-border);
+  --fg-dim: var(--color-text-muted);
+  --fg: var(--color-text);
+  --accent: var(--color-accent);
+  --danger: var(--color-red);
 }
 
 .app {
@@ -247,7 +252,7 @@
   transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
 .sidebar-overview-btn:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--color-overlay);
   color: var(--fg);
 }
 .sidebar-overview-btn.is-active {
@@ -290,7 +295,7 @@
   font: inherit;
 }
 .sidebar-row-main:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--color-overlay);
 }
 
 .sidebar-status-dot {
@@ -370,7 +375,7 @@
   transition: background 80ms;
 }
 .sidebar-session:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--color-overlay);
 }
 .sidebar-session.is-active {
   background: rgba(121, 192, 255, 0.10);
@@ -610,7 +615,7 @@
   transition: background 80ms;
 }
 .sidebar-headless-item:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--color-overlay);
 }
 .sidebar-headless-item .sidebar-status-dot {
   width: 5px;
@@ -700,7 +705,7 @@
   margin: 0 0 14px;
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--color-overlay);
 }
 .resume-tui-meta-strong {
   font-weight: 600;
@@ -712,7 +717,7 @@
 .resume-tui-prompt {
   display: flex;
   gap: 10px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--color-overlay);
   padding: 8px 14px;
   margin: 6px 0;
   border-radius: 4px;
@@ -995,7 +1000,7 @@
 }
 .workspace-cta-hint kbd {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--color-overlay-strong);
   border: 1px solid var(--border);
   border-radius: 3px;
   padding: 0 4px;
@@ -1149,7 +1154,7 @@
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: linear-gradient(180deg, #161b22, #11151a);
+  background: linear-gradient(180deg, var(--color-bg-tertiary), var(--color-bg-secondary));
   border-bottom: 1px solid var(--border);
   font-size: 11px;
   color: var(--fg-dim);
@@ -1179,7 +1184,7 @@
   transition: background 0.12s, color 0.12s;
 }
 .panel-collapse:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--color-overlay-strong);
   color: var(--fg);
 }
 
@@ -1326,7 +1331,7 @@
   align-items: baseline;
 }
 .git-log-row:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--color-overlay);
 }
 
 .git-log-hash {
@@ -1396,7 +1401,7 @@
 }
 .files-row.files-dir:hover,
 .files-row.files-symlink:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--color-overlay);
 }
 
 .files-icon {
@@ -1439,7 +1444,7 @@
   align-items: center;
   gap: 10px;
   padding: 8px 12px;
-  background: linear-gradient(180deg, #161b22, #11151a);
+  background: linear-gradient(180deg, var(--color-bg-tertiary), var(--color-bg-secondary));
   border-bottom: 1px solid var(--border);
   font-size: 12px;
   color: var(--fg-dim);
