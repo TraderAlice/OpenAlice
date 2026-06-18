@@ -1,6 +1,6 @@
 {
   "name": "open-alice",
-  "version": "0.51.0-beta.1",
+  "version": "0.51.0-beta.2",
   "description": "File-based trading agent engine",
   "type": "module",
   "main": "dist/electron/main.js",
@@ -38,7 +38,6 @@
   "packageManager": "pnpm@10.29.2",
   "dependencies": {
     "@alpacahq/alpaca-trade-api": "^3.1.3",
-    "@anthropic-ai/claude-agent-sdk": "^0.2.72",
     "@anthropic-ai/sdk": "^0.96.0",
     "@grammyjs/auto-retry": "^2.0.2",
     "@hono/node-server": "^2.0.0",
@@ -67,16 +66,33 @@
     "directories": {
       "output": "dist/electron-app"
     },
+    "electronVersion": "39.8.10",
+    "asar": false,
     "files": [
-      "dist/main.js",
+      "dist/*.js",
       "dist/electron/**",
       "ui/dist/**",
       "default/**",
       "src/workspaces/cli/**",
+      "src/workspaces/templates/**",
+      "services/uta/dist/**",
+      "services/uta/package.json",
       "package.json"
     ],
     "mac": {
-      "target": "dir"
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.finance"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
     }
   },
   "pnpm": {

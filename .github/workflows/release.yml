@@ -11,6 +11,13 @@ jobs:
     permissions:
       contents: write
       packages: write
+    outputs:
+      # Whether this run actually cut a new release (version was bumped). The
+      # desktop build matrix gates on this — a full per-platform Electron build
+      # is expensive (mac runners bill 10×), so it must NOT run on every master
+      # push, only when a new tag/release was created.
+      created: ${{ steps.check.outputs.exists == 'false' }}
+      tag: ${{ steps.version.outputs.tag }}
 
     steps:
       - uses: actions/checkout@v4
@@ -127,3 +134,51 @@ jobs:
           npm publish --registry=https://registry.npmjs.org
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # Per-platform desktop installers, attached to the release the `release`
+  # job already created (Option A — electron-builder only *builds*, softprops
+  # appends the artifact; release.yml stays the single owner of the release
+  # object + tag). Each runner builds only its own platform/arch, so each
+  # artifact carries just its matching native binary (longbridge, node-pty) —
+  # pnpm installs only the os/cpu-matching prebuilt. Unsigned for now: no
+  # Developer ID / Windows cert, so electron-builder emits unsigned packages
+  # (Gatekeeper right-click-open / SmartScreen on first run).
+  build-desktop:
+    needs: release
+    if: needs.release.outputs.created == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, macos-13, windows-latest] # arm64 dmg / x64 dmg / x64 nsis
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write # upload release assets
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Alice + UTA + desktop shell
+        run: pnpm electron:build
+
+      - name: Package installer (unsigned)
+        # electron-builder picks the target + arch from the host runner (mac
+        # arm64 / mac x64 / win x64). --publish never: build only, softprops
+        # does the upload so the release object has one owner.
+        run: pnpm -F @traderalice/desktop exec electron-builder --projectDir ../.. --publish never
+
+      - name: Attach installer to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.release.outputs.tag }}
+          files: |
+            dist/electron-app/*.dmg
+            dist/electron-app/*.exe
