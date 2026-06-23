@@ -23,6 +23,8 @@ import { createAgentStatusRoutes } from './routes/agent-status.js'
 import { createPersonaRoutes } from './routes/persona.js'
 import { createNewsRoutes } from './routes/news.js'
 import { createMarketRoutes } from './routes/market.js'
+import { createStrategyCouncilRoutes } from './routes/strategy-council.js'
+import { createDailyPickRoutes } from './routes/daily-pick.js'
 import { createNotificationsRoutes } from './routes/notifications.js'
 import { createInboxRoutes } from './routes/inbox.js'
 import { createVersionRoutes } from './routes/version.js'
@@ -208,6 +210,8 @@ export class WebPlugin implements Plugin {
     app.route('/api/agent-status', createAgentStatusRoutes(ctx))
     app.route('/api/news', createNewsRoutes(ctx))
     app.route('/api/market', createMarketRoutes(ctx))
+    app.route('/api/strategy-council', createStrategyCouncilRoutes(ctx))
+    app.route('/api/daily-pick', createDailyPickRoutes(ctx))
     app.route('/api/persona', createPersonaRoutes())
     app.route('/api/notifications', createNotificationsRoutes({
       notificationsStore: ctx.notificationsStore,

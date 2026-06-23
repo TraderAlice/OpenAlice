@@ -53,6 +53,13 @@ import { createMetricsListener } from './task/metrics/index.js'
 import { createAgentWorkListener } from './core/agent-work-listener.js'
 import { NewsCollectorStore, NewsCollector } from './domain/news/index.js'
 import { createNewsArchiveTools } from './tool/news.js'
+import { StrategyCouncil } from './core/strategy-council/index.js'
+import { DailyPickEngine, createDailyPickListener, seedDailyPickCronJobs } from './domain/daily-pick/index.js'
+import { TwstockMcpClient } from './domain/twstock/client.js'
+import { createTwstockTools } from './tool/twstock.js'
+import { readTwstockConfig } from './domain/twstock/config.js'
+import { createFugleTools } from './tool/fugle.js'
+import { readFugleConfig } from './domain/fugle/config.js'
 
 // ==================== Persistence paths ====================
 
@@ -207,6 +214,22 @@ async function main() {
   toolCenter.register(createEconomyTools(economyClient, commodityClient), 'economy')
   toolCenter.register(createNotifyUserTool(), 'notify')
 
+  // Taiwan stock market tools (remote MCP)
+  const twstockConfig = await readTwstockConfig()
+  let twstockClient: TwstockMcpClient | null = null
+  if (twstockConfig.enabled && twstockConfig.mcpUrl) {
+    twstockClient = new TwstockMcpClient(twstockConfig.mcpUrl)
+    toolCenter.register(createTwstockTools(twstockClient), 'twstock')
+  }
+
+  // Fugle market data tools (remote MCP)
+  const fugleConfig = await readFugleConfig()
+  let fugleClient: TwstockMcpClient | null = null
+  if (fugleConfig.enabled && fugleConfig.mcpUrl) {
+    fugleClient = new TwstockMcpClient(fugleConfig.mcpUrl)
+    toolCenter.register(createFugleTools(fugleClient), 'fugle')
+  }
+
   console.log(`tool-center: ${toolCenter.list().length} tools registered`)
 
   // ==================== AI Provider Chain ====================
@@ -230,6 +253,17 @@ async function main() {
     router,
     compaction: config.compaction,
     toolCallLog,
+  })
+
+  // ==================== Strategy Council ====================
+  // Three-role multi-agent deliberation (trend / signal / risk).
+  // Sub-agents share the same AgentCenter but get role-specific system
+  // prompts and tool whitelists. Decisions are written to the event log
+  // as `strategy.decision` so the dashboard + heartbeat can consume them.
+  const strategyCouncil = new StrategyCouncil({
+    agentCenter,
+    toolCenter,
+    eventLog,
   })
 
   // ==================== Notifications store + Connector Center ====================
@@ -279,6 +313,18 @@ async function main() {
   await cronSession.restore()
   const cronListener = createCronListener({ agentWorkListener, registry: listenerRegistry, session: cronSession })
   await cronListener.start()
+
+  // ==================== Daily Pick (picker / hourly analyzer / wrap) ====================
+
+  const dailyPickEngine = new DailyPickEngine({
+    agentCenter,
+    strategyCouncil,
+    twstockClient,
+    fugleClient,
+  })
+  const dailyPickListener = createDailyPickListener({ engine: dailyPickEngine, registry: listenerRegistry })
+  await dailyPickListener.start()
+  await seedDailyPickCronJobs(cronEngine)
 
   // Snapshot scheduler lives in UTA after Step 6 — Alice no longer
   // drives the periodic equity-curve writes. The UTA service starts
@@ -426,6 +472,8 @@ async function main() {
 
   const ctx: EngineContext = {
     config, connectorCenter, notificationsStore, inboxStore, agentCenter, eventLog, toolCallLog, heartbeat, cronEngine, toolCenter,
+    strategyCouncil,
+    dailyPickEngine,
     listenerRegistry,
     fire: createEventBus(eventLog),
     bbEngine: getSDKExecutor(),
@@ -454,6 +502,7 @@ async function main() {
     heartbeat.stop()
     metricsListener.stop()
     cronListener.stop()
+    dailyPickListener.stop()
     cronEngine.stop()
     connectorCenter.stop()
     await listenerRegistry.stop()
@@ -463,6 +512,8 @@ async function main() {
     await newsStore.close()
     await toolCallLog.close()
     await eventLog.close()
+    await twstockClient?.close()
+    await fugleClient?.close()
     process.exit(0)
   }
   process.on('SIGINT', shutdown)

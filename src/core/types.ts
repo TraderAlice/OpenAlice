@@ -10,8 +10,10 @@ import type { AgentCenter } from './agent-center.js'
 import type { EventLog } from './event-log.js'
 import type { ToolCallLog } from './tool-call-log.js'
 import type { ToolCenter } from './tool-center.js'
+import type { StrategyCouncil } from './strategy-council/index.js'
 import type { ListenerRegistry } from './listener-registry.js'
 import type { EventBus } from './event-bus.js'
+import type { DailyPickEngine } from '../domain/daily-pick/index.js'
 import type { INotificationsStore } from './notifications-store.js'
 import type { IInboxStore } from './inbox-store.js'
 
@@ -48,6 +50,12 @@ export interface EngineContext {
   /** Ergonomic in-process producer facade. Use this to fire events from
    *  plugins / hacks / extension code instead of plumbing eventLog. */
   fire: EventBus
+
+  // Multi-agent strategy deliberation (three-role council)
+  strategyCouncil?: StrategyCouncil
+
+  /** Daily-pick feature: picker, hourly analyzer, 5-day wrap, lessons RAG. */
+  dailyPickEngine: DailyPickEngine
 
   // Market data
   bbEngine: QueryExecutor
