@@ -5,6 +5,8 @@ import { markedHighlight } from 'marked-highlight'
 import hljs from 'highlight.js'
 import DOMPurify from 'dompurify'
 import 'highlight.js/styles/github-dark.min.css'
+import { KlineChart } from './KlineChart'
+import type { KlineDataPoint } from './KlineChart'
 
 const marked = new Marked(
   markedHighlight({
@@ -42,6 +44,55 @@ function AliceAvatar() {
   )
 }
 
+// ==================== Kline block extraction ====================
+
+interface ContentSegment {
+  type: 'text' | 'kline'
+  content: string // markdown text or raw JSON
+  kline?: { symbol?: string; name?: string; data: KlineDataPoint[] }
+}
+
+const KLINE_FENCE = /```kline\s*\n([\s\S]*?)```/g
+
+function extractKlineSegments(text: string): ContentSegment[] {
+  const segments: ContentSegment[] = []
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+
+  while ((match = KLINE_FENCE.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      segments.push({ type: 'text', content: text.slice(lastIndex, match.index) })
+    }
+    try {
+      const parsed = JSON.parse(match[1])
+      segments.push({
+        type: 'kline',
+        content: match[1],
+        kline: {
+          symbol: parsed.symbol,
+          name: parsed.name,
+          data: parsed.data,
+        },
+      })
+    } catch {
+      // Malformed JSON — render as regular code block
+      segments.push({ type: 'text', content: match[0] })
+    }
+    lastIndex = match.index + match[0].length
+  }
+
+  if (lastIndex < text.length) {
+    segments.push({ type: 'text', content: text.slice(lastIndex) })
+  }
+
+  // Reset regex lastIndex for next call
+  KLINE_FENCE.lastIndex = 0
+
+  return segments.length > 0 ? segments : [{ type: 'text', content: text }]
+}
+
+// ==================== Code block wrappers ====================
+
 function addCodeBlockWrappers(html: string): string {
   return html.replace(
     /<pre><code class="hljs language-(\w+)">([\s\S]*?)<\/code><\/pre>/g,
@@ -57,11 +108,19 @@ function addCodeBlockWrappers(html: string): string {
 export function ChatMessage({ role, text, timestamp, isGrouped, media }: ChatMessageProps) {
   const contentRef = useRef<HTMLDivElement>(null)
 
-  const html = useMemo(() => {
+  const segments = useMemo(() => {
     if (role === 'user') return null
-    const raw = DOMPurify.sanitize(marked.parse(text) as string)
-    return addCodeBlockWrappers(raw)
+    return extractKlineSegments(text)
   }, [role, text])
+
+  const renderSegment = useCallback((seg: ContentSegment, i: number) => {
+    if (seg.type === 'kline' && seg.kline) {
+      return <KlineChart key={i} symbol={seg.kline.symbol} name={seg.kline.name} data={seg.kline.data} />
+    }
+    const raw = DOMPurify.sanitize(marked.parse(seg.content) as string)
+    const html = addCodeBlockWrappers(raw)
+    return <div key={i} className="markdown-content" dangerouslySetInnerHTML={{ __html: html }} />
+  }, [])
 
   const handleCopyClick = useCallback((e: MouseEvent) => {
     const btn = (e.target as HTMLElement).closest('.code-copy-btn') as HTMLButtonElement | null
@@ -98,7 +157,7 @@ export function ChatMessage({ role, text, timestamp, isGrouped, media }: ChatMes
             <span className="text-[11px] text-text-muted/60 font-medium">Notification</span>
           </div>
           <div ref={contentRef} className="text-[13px] text-text-muted break-words leading-relaxed">
-            <div className="markdown-content" dangerouslySetInnerHTML={{ __html: html! }} />
+            {segments?.map(renderSegment)}
             {media?.map((m, i) => (
               <img key={i} src={m.url} alt="" className="max-w-full rounded-lg mt-2" />
             ))}
@@ -133,7 +192,7 @@ export function ChatMessage({ role, text, timestamp, isGrouped, media }: ChatMes
         </div>
       )}
       <div ref={contentRef} className="max-w-[90%] break-words leading-relaxed ml-8 bg-bg-tertiary/30 border border-border/30 rounded-2xl rounded-tl-sm px-4 py-3">
-        <div className="markdown-content" dangerouslySetInnerHTML={{ __html: html! }} />
+        {segments?.map(renderSegment)}
         {media?.map((m, i) => (
           <img key={i} src={m.url} alt="" className="max-w-full rounded-lg mt-2" />
         ))}

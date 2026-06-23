@@ -14,9 +14,11 @@ import { toolsApi } from './tools'
 import { channelsApi } from './channels'
 import { agentStatusApi } from './agentStatus'
 import { personaApi } from './persona'
+import { strategyCouncilApi } from './strategyCouncil'
 import { newsApi } from './news'
 import { topologyApi } from './topology'
 import { marketApi } from './market'
+import { dailyPickApi } from './dailyPick'
 import { notificationsApi } from './notifications'
 import { inboxApi } from './inbox'
 import { versionApi } from './version'
@@ -33,9 +35,11 @@ export const api = {
   channels: channelsApi,
   agentStatus: agentStatusApi,
   persona: personaApi,
+  strategyCouncil: strategyCouncilApi,
   news: newsApi,
   topology: topologyApi,
   market: marketApi,
+  dailyPick: dailyPickApi,
   notifications: notificationsApi,
   inbox: inboxApi,
   version: versionApi,
@@ -77,6 +81,16 @@ export type {
   TopologyResponse,
   TopologyListener,
   TopologyProducer,
+  DailyPick,
+  HourlyEntry,
+  PickAction,
+  PickStatus,
+  PickCandidate,
+  CouncilVerdicts,
+  HardRule,
+  Lesson,
+  WatchlistEntry,
+  WrapResult,
 } from './types'
 export type { EventQueryResult } from './events'
 export type { ToolCallQueryResult } from './agentStatus'

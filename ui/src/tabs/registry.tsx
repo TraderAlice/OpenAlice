@@ -24,6 +24,8 @@ import { WorkspaceListPage } from '../pages/WorkspaceListPage'
 import { WorkspacePage } from '../pages/WorkspacePage'
 import { TemplateCatalogPage } from '../pages/TemplateCatalogPage'
 import { TemplateDetailPage } from '../pages/TemplateDetailPage'
+import { StrategyCouncilPage } from '../pages/StrategyCouncilPage'
+import { TodayPickPage } from '../pages/TodayPickPage'
 
 /**
  * Central registry mapping each ViewKind to its render component and URL
@@ -230,6 +232,20 @@ const templateDetailModule: ViewModule<'template-detail'> = {
   Component: ({ spec }) => <TemplateDetailPage spec={spec} />,
 }
 
+const strategyCouncilModule: ViewModule<'strategy-council'> = {
+  kind: 'strategy-council',
+  title: () => 'Strategy Council',
+  toUrl: () => '/strategy-council',
+  Component: () => <StrategyCouncilPage />,
+}
+
+const todayPickModule: ViewModule<'today-pick'> = {
+  kind: 'today-pick',
+  title: () => "Today's Pick",
+  toUrl: () => '/today-pick',
+  Component: () => <TodayPickPage />,
+}
+
 // ==================== Aggregate ====================
 
 export const VIEWS = {
@@ -244,6 +260,8 @@ export const VIEWS = {
   dev: devModule,
   'notifications-inbox': notificationsInboxModule,
   inbox: inboxModule,
+  'strategy-council': strategyCouncilModule,
+  'today-pick': todayPickModule,
   'workspace-list': workspaceListModule,
   workspace: workspaceModule,
   'template-catalog': templateCatalogModule,

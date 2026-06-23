@@ -560,3 +560,72 @@ export interface EquityCurvePoint {
   equity: string
   accounts: Record<string, string>
 }
+
+
+// ==================== Daily Pick ====================
+
+export type PickAction = 'BUY' | 'HOLD' | 'EXIT'
+export type PickStatus = 'open' | 'closed'
+export type HardRule = 'stop-loss' | 'take-profit' | null
+
+export interface PickCandidate {
+  symbol: string
+  name?: string
+  source: 'watchlist' | 'top-foreign-holdings'
+  context?: string
+}
+
+export interface CouncilVerdicts {
+  trend: string
+  signal: string
+  risk: string
+}
+
+export interface HourlyEntry {
+  timestamp: string
+  hour: string
+  price: string
+  pnlPct: string | null
+  action: PickAction
+  confidence: number
+  reason: string
+  verdicts: CouncilVerdicts
+  hardRuleTriggered: HardRule
+}
+
+export interface DailyPick {
+  date: string
+  symbol: string
+  symbolName?: string
+  pickedAt: string
+  pickReason: string
+  candidates: PickCandidate[]
+  pastLessonsConsulted: string[]
+  hourly: HourlyEntry[]
+  entryPrice: string | null
+  entryAt: string | null
+  exitPrice: string | null
+  exitAt: string | null
+  status: PickStatus
+}
+
+export interface Lesson {
+  id: string
+  date: string
+  symbol: string
+  lesson: string
+  tags: string[]
+  context: string
+  createdAt: string
+}
+
+export interface WatchlistEntry {
+  symbol: string
+  name?: string
+  note?: string
+}
+
+export interface WrapResult {
+  markdown: string
+  lessons: Lesson[]
+}

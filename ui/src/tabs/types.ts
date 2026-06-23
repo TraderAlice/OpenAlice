@@ -29,6 +29,8 @@ export type ViewSpec =
   | { kind: 'dev';            params: { tab: 'connectors' | 'tools' | 'sessions' | 'snapshots' | 'logs' | 'simulator' } }
   | { kind: 'notifications-inbox'; params: Record<string, never> }
   | { kind: 'inbox';               params: Record<string, never> }
+  | { kind: 'strategy-council';    params: Record<string, never> }
+  | { kind: 'today-pick';          params: Record<string, never> }
 
 export type ViewKind = ViewSpec['kind']
 
