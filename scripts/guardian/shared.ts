@@ -161,7 +161,19 @@ export interface SpawnSpec {
 }
 
 export function spawnChild(spec: SpawnSpec): ChildProcess {
-  const child = spawn(spec.command, spec.args, {
+  let { command, args } = spec
+
+  // ponytail: Windows cmd.exe spawned by Node has the MSYS/MinGW bash PATH but
+  // not the .bin dir. Resolve known commands to their full paths so cmd.exe can
+  // find them without needing PATH hacks at the system level.
+  if (process.platform === 'win32') {
+    const binDir = resolve(process.cwd(), 'node_modules', '.bin')
+    if (command === 'tsx') {
+      command = `${binDir}\\tsx.CMD`
+    }
+  }
+
+  const child = spawn(command, args, {
     env: spec.env,
     stdio: spec.prefixLogs ? ['inherit', 'pipe', 'pipe'] : 'inherit',
     // On Windows the dev commands (`tsx`, `pnpm`) are `.cmd` shims in
