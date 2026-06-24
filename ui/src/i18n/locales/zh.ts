@@ -281,6 +281,8 @@ export const zh: Resources = {
   tracked: {
     nothingTrackedYet: '还没有追踪任何东西。',
     backlinksTooltip: '{{count}} 条笔记链接到此',
+    assets: '标的',
+    topics: '主题',
     pageDescription: '{{count}} 个追踪 · 资产与主题',
     selectFromSidebar: '从侧栏选择一个实体。',
     referencedIn_one: '被 {{count}} 条笔记引用',

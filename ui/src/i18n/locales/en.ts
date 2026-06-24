@@ -292,6 +292,8 @@ export const en = {
   tracked: {
     nothingTrackedYet: 'Nothing tracked yet.',
     backlinksTooltip: '{{count}} notes link here',
+    assets: 'Assets',
+    topics: 'Topics',
     pageDescription: '{{count}} tracked · assets & topics',
     selectFromSidebar: 'Select an entity from the sidebar.',
     referencedIn_one: 'Referenced in {{count}} note',

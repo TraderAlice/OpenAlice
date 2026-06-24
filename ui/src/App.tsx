@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Group, Panel, Separator, useDefaultLayout } from 'react-resizable-panels'
+import { useEffect, useRef, useState } from 'react'
+import { Group, Panel, Separator, usePanelRef } from 'react-resizable-panels'
 import { ActivityBar } from './components/ActivityBar'
 import { Sidebar } from './components/Sidebar'
 import { TabHost } from './components/TabHost'
@@ -10,6 +10,7 @@ import { WorkspacesProvider } from './contexts/WorkspacesContext'
 import { findSectionForActivity } from './sections'
 import { UrlAdopter } from './tabs/UrlAdopter'
 import { useWorkspace } from './tabs/store'
+import { useSidebarWidth, resolveSidebarWidth } from './live/sidebar-width'
 import { getFocusedTab } from './tabs/types'
 import { useLocale } from './i18n/useLocale'
 import { useTranslation } from 'react-i18next'
@@ -113,21 +114,43 @@ function AppShell() {
     }
   }, [sidebarOpen, secondaryOpen])
 
-  // Persist the user's resized layout to localStorage. `panelIds` scopes the
-  // saved layout to the current panel set — sidebar+main and main-only get
-  // independent entries, so the sidebar width survives mobile/desktop toggles
-  // and route changes that drop the sidebar.
-  const panelIds = useMemo(
-    () => (showSidebarPanel ? ['sidebar', 'main'] : ['main']),
-    [showSidebarPanel],
-  )
-  const { defaultLayout: savedLayout, onLayoutChanged } = useDefaultLayout({
-    id: 'main-layout',
-    panelIds,
-  })
-  const fallbackLayout: Record<string, number> = showSidebarPanel
-    ? { sidebar: 20, main: 80 }
-    : { main: 100 }
+  // Per-activity secondary-sidebar width. The width is owned per
+  // ActivitySection (see live/sidebar-width.ts) rather than as one global
+  // layout: switching activities re-applies that activity's width
+  // imperatively via the panel's `resize()` — NO Group remount, so the
+  // main panel's tabs (TabHost) keep their state. `defaultSize` (px) seeds
+  // the very first mount; the effect handles subsequent switches.
+  const sidebarRef = usePanelRef()
+  const sidebarWidths = useSidebarWidth((s) => s.widths)
+  const setSidebarWidth = useSidebarWidth((s) => s.setWidth)
+  const sidebarWidth = resolveSidebarWidth(selectedSidebar, sidebarWidths)
+  // Guards onResize from persisting our OWN programmatic resizes — only a
+  // user drag should pin a width over the tuned default.
+  const programmaticResize = useRef(false)
+
+  useEffect(() => {
+    if (!showSidebarPanel || !selectedSidebar) return
+    const target = `${resolveSidebarWidth(selectedSidebar, sidebarWidths)}px`
+    programmaticResize.current = true
+    // Defer one frame and guard with try/catch: calling resize() on a
+    // freshly-mounted panel throws "Layout not found for Panel sidebar"
+    // because the group's layout isn't registered until after the first
+    // layout pass. The Panel's px `defaultSize` already gives the correct
+    // width on first mount, so this imperative resize only needs to succeed
+    // on activity switches (where the panel stays mounted and layout exists).
+    const apply = requestAnimationFrame(() => {
+      try {
+        sidebarRef.current?.resize(target)
+      } catch {
+        /* layout not ready yet — defaultSize covers the initial mount */
+      }
+    })
+    const clear = requestAnimationFrame(() => { programmaticResize.current = false })
+    return () => { cancelAnimationFrame(apply); cancelAnimationFrame(clear) }
+    // Re-apply when the activity changes (sidebarWidths intentionally not a
+    // dep — a persist write shouldn't trigger a re-resize loop).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSidebar, showSidebarPanel])
 
   const mainContent = (
     <main className="flex flex-col min-w-0 min-h-0 bg-bg h-full">
@@ -178,19 +201,28 @@ function AppShell() {
 
         <Group
           orientation="horizontal"
-          id="main-layout"
+          // Layout-cache version. Bump this whenever the panel structure /
+          // sizing model changes so clients don't apply a stale persisted
+          // layout. v2: moved from a single global percent split
+          // (useDefaultLayout) to per-activity px widths (live/sidebar-width).
+          id="main-layout-v2"
           className="flex-1 min-h-0"
-          defaultLayout={savedLayout ?? fallbackLayout}
-          onLayoutChanged={onLayoutChanged}
         >
           {showSidebarPanel && section && (
             <>
               <Panel
                 id="sidebar"
-                defaultSize={20}
+                panelRef={sidebarRef}
+                defaultSize={`${sidebarWidth}px`}
                 minSize="200px"
                 maxSize="420px"
                 groupResizeBehavior="preserve-pixel-size"
+                onResize={(size, _id, prev) => {
+                  // prev === undefined on mount; skip our own programmatic
+                  // resizes — persist only genuine user drags, per activity.
+                  if (prev === undefined || programmaticResize.current) return
+                  if (selectedSidebar) setSidebarWidth(selectedSidebar, size.inPixels)
+                }}
               >
                 <Sidebar
                   title={t(section.titleKey)}

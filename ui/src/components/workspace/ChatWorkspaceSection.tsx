@@ -16,6 +16,7 @@ import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronRight, FolderPlus, Plus, Settings as SettingsIcon, X } from 'lucide-react'
 
+import { getIntlLocale } from '../../lib/intl'
 import { useWorkspaces } from '../../contexts/WorkspacesContext'
 import { useWorkspace } from '../../tabs/store'
 import { getFocusedTab } from '../../tabs/types'
@@ -39,7 +40,7 @@ function chatLabel(w: Workspace, todayLabel: string, yesterdayLabel: string): st
   const diffDays = Math.round((startOfDay(new Date()) - startOfDay(created)) / 86_400_000)
   if (diffDays <= 0) return todayLabel
   if (diffDays === 1) return yesterdayLabel
-  return created.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  return created.toLocaleDateString(getIntlLocale(), { month: 'short', day: 'numeric' })
 }
 
 export function ChatWorkspaceSection(): ReactElement | null {
@@ -299,7 +300,7 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
         </span>
       </div>
       {expanded && w.sessions.length > 0 && (
-        <ul className="sidebar-children chat-ws-children-list">
+        <div className="ml-[18px] border-l border-border/50">
           {w.sessions.map((s) => (
             <SessionRow
               key={s.id}
@@ -311,7 +312,7 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
               onDelete={() => props.onDeleteSession(s.id)}
             />
           ))}
-        </ul>
+        </div>
       )}
     </li>
   )

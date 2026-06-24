@@ -27,7 +27,7 @@ export function WorkspacesSidebar() {
     focused?.kind === 'template-catalog' || focused?.kind === 'template-detail'
 
   return (
-    <div className="workspaces-root workspaces-sidebar-frame">
+    <div className="flex flex-col h-full min-h-0">
       <Sidebar
         workspaces={ctx.workspaces}
         templates={ctx.templates}

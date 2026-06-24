@@ -50,21 +50,25 @@ export function AutomationSidebar() {
   )
 
   return (
-    <div className="py-0.5">
+    <div className="flex flex-col py-1">
       {PRIMARY.map(row)}
-      <SidebarRow
-        label={t('automation.legacy')}
-        dim
-        icon={
-          legacyOpen ? (
-            <ChevronDown size={13} className="text-text-muted/70" />
-          ) : (
-            <ChevronRight size={13} className="text-text-muted/70" />
-          )
-        }
+
+      {/* Legacy — a real collapsible section header (aria-expanded), not a
+          nav row wearing a chevron; its children indent on the kinship rail. */}
+      <button
+        type="button"
+        aria-expanded={legacyOpen}
         onClick={() => setLegacyOpen((v) => !v)}
-      />
-      {legacyOpen && LEGACY.map(row)}
+        className="group flex items-center gap-1 w-full px-3 mt-2 mb-1 text-[10px] font-medium uppercase tracking-wider text-text-muted/60 hover:text-text-muted transition-colors select-none"
+      >
+        {legacyOpen ? <ChevronDown size={11} strokeWidth={2.25} aria-hidden /> : <ChevronRight size={11} strokeWidth={2.25} aria-hidden />}
+        <span>{t('automation.legacy')}</span>
+      </button>
+      {legacyOpen && (
+        <div className="ml-[18px] border-l border-border/50">
+          {LEGACY.map(row)}
+        </div>
+      )}
     </div>
   )
 }

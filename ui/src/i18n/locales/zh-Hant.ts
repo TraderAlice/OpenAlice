@@ -289,6 +289,8 @@ export const zhHant: Resources = {
   tracked: {
     nothingTrackedYet: '尚未追蹤任何項目。',
     backlinksTooltip: '{{count}} 則筆記連結到此',
+    assets: '標的',
+    topics: '主題',
     pageDescription: '{{count}} 個追蹤 · 資產與主題',
     selectFromSidebar: '從側欄選擇一個實體。',
     referencedIn_one: '被 {{count}} 則筆記引用',

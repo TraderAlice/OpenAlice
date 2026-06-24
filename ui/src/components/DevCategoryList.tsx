@@ -1,20 +1,14 @@
 import { useTranslation } from 'react-i18next'
+import { Wrench, Camera, ScrollText, FlaskConical } from 'lucide-react'
 import { useWorkspace } from '../tabs/store'
-import { getFocusedTab, type ViewSpec } from '../tabs/types'
+import { getFocusedTab } from '../tabs/types'
 import { SidebarRow } from './SidebarRow'
 
-type DevTab = Extract<ViewSpec, { kind: 'dev' }>['params']['tab']
-
-interface CategoryItem {
-  labelKey: string
-  tab: DevTab
-}
-
 const CATEGORIES = [
-  { labelKey: 'common.tools', tab: 'tools' },
-  { labelKey: 'dev.snapshots', tab: 'snapshots' },
-  { labelKey: 'common.logs', tab: 'logs' },
-  { labelKey: 'simulator.title', tab: 'simulator' },
+  { labelKey: 'common.tools', tab: 'tools', Icon: Wrench },
+  { labelKey: 'dev.snapshots', tab: 'snapshots', Icon: Camera },
+  { labelKey: 'common.logs', tab: 'logs', Icon: ScrollText },
+  { labelKey: 'simulator.title', tab: 'simulator', Icon: FlaskConical },
 ] as const
 
 /**
@@ -27,7 +21,7 @@ export function DevCategoryList() {
   const { t } = useTranslation()
 
   return (
-    <div className="py-0.5">
+    <div className="py-1">
       {CATEGORIES.map((item) => {
         const active = focused?.kind === 'dev' && focused.params.tab === item.tab
         return (
@@ -35,6 +29,7 @@ export function DevCategoryList() {
             key={item.tab}
             label={t(item.labelKey)}
             active={active}
+            icon={<item.Icon size={14} strokeWidth={1.75} className="text-text-muted/70" aria-hidden />}
             onClick={() => openOrFocus({ kind: 'dev', params: { tab: item.tab } })}
           />
         )

@@ -53,7 +53,7 @@ export function SidebarRow({ label, active = false, onClick, icon, trail, title,
           onClick()
         }
       }}
-      className={`group relative flex items-center gap-1.5 px-3 py-1 text-[13px] cursor-pointer transition-colors outline-none focus-visible:bg-bg-tertiary/70 ${
+      className={`group relative flex items-center gap-1.5 px-3 py-1.5 text-[13px] cursor-pointer transition-colors outline-none focus-visible:bg-bg-tertiary/70 ${
         active
           ? 'bg-bg-tertiary text-text'
           : 'text-text hover:bg-bg-tertiary/50'

@@ -281,6 +281,8 @@ export const ja: Resources = {
   tracked: {
     nothingTrackedYet: 'まだ何もトラッキングしていません。',
     backlinksTooltip: '{{count}} 件のメモがここにリンク',
+    assets: '銘柄',
+    topics: 'トピック',
     pageDescription: '{{count}} 件トラッキング中 · 銘柄とトピック',
     selectFromSidebar: 'サイドバーからエンティティを選択してください。',
     referencedIn_one: '{{count}} 件のメモで参照',

@@ -221,28 +221,18 @@ export function PushApprovalPanel() {
   const showHistoryFilter = historyAccounts.length > 1
 
   return (
-    <div className="h-full bg-bg-secondary/30 flex flex-col min-h-0">
-      {/* Header */}
-      <div className="px-4 py-3 border-b border-border flex items-center gap-2">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-text-muted">
-          <path d="M12 20V10M18 20V4M6 20v-4" />
-        </svg>
-        <h3 className="text-sm font-semibold text-text">Trading</h3>
-        {hasPending && (
-          <span className="ml-auto w-2 h-2 rounded-full bg-accent animate-pulse" title="Pending operations" />
-        )}
-        {!hasPending && hasStaged && (
-          <span className="ml-auto w-2 h-2 rounded-full bg-yellow-400 animate-pulse" title="Staged (uncommitted)" />
-        )}
-      </div>
-
+    // No own header / bg tint — the shared Sidebar wrapper supplies the
+    // "Trading" title, and the ActivityBar nav badge already surfaces the
+    // staged-count attention signal. (Was a duplicate "Trading" header +
+    // a second bg-secondary/30 tint inside the wrapper.)
+    <div className="h-full flex flex-col min-h-0">
       <div className="flex-1 overflow-y-auto">
         {/* ==================== Staged (uncommitted) Section ==================== */}
         {hasStaged && (
           <div className="px-3 py-3 space-y-3">
             {staged.map(({ account, status }) => (
               <div key={account.id} className="space-y-2">
-                <div className="text-[11px] text-text-muted font-medium uppercase tracking-wider">
+                <div className="text-[10px] font-medium uppercase tracking-wider text-text-muted/60">
                   {account.label || account.id}
                 </div>
 
@@ -275,7 +265,7 @@ export function PushApprovalPanel() {
           <div className="px-3 py-3 space-y-3">
             {pending.map(({ account, status }) => (
               <div key={account.id} className="space-y-2">
-                <div className="text-[11px] text-text-muted font-medium uppercase tracking-wider">
+                <div className="text-[10px] font-medium uppercase tracking-wider text-text-muted/60">
                   {account.label || account.id}
                 </div>
 
@@ -343,7 +333,7 @@ export function PushApprovalPanel() {
             {/* Last push result feedback */}
             {lastResult && (
               <div className="space-y-1 pt-2 border-t border-border">
-                <div className="text-[11px] font-medium text-text-muted uppercase tracking-wider">Last push</div>
+                <div className="text-[10px] font-medium uppercase tracking-wider text-text-muted/60">Last push</div>
                 <div className="text-xs text-text">
                   {lastResult.data.submitted.length > 0 && (
                     <span className="text-green">{lastResult.data.submitted.length} submitted</span>
@@ -372,8 +362,11 @@ export function PushApprovalPanel() {
             )}
           </div>
         ) : !hasStaged ? (
-          <div className="px-3 py-4 text-xs text-text-muted text-center">
-            No pending operations
+          <div className="px-3 py-4 text-[12px] text-text-muted/70 leading-relaxed">
+            No pending operations.
+            <div className="mt-1 text-text-muted/50">
+              Approvals appear here when the agent stages a broker write.
+            </div>
           </div>
         ) : null}
 
@@ -381,7 +374,7 @@ export function PushApprovalPanel() {
         {hasHistory && (
           <div className="border-t border-border">
             <div className="px-3 py-2">
-              <div className="text-[11px] text-text-muted font-medium uppercase tracking-wider">History</div>
+              <div className="text-[10px] font-medium uppercase tracking-wider text-text-muted/60">History</div>
             </div>
 
             {/* Per-UTA filter chips — only shown with >1 account. */}
@@ -418,7 +411,7 @@ export function PushApprovalPanel() {
               {mergedHistory.map(({ accountId, label, commit }) => (
                 <div
                   key={`${accountId}:${commit.hash}`}
-                  className="group px-2 py-1.5 rounded hover:bg-bg-secondary/50 transition-colors"
+                  className="group px-3 py-1.5 rounded hover:bg-bg-tertiary/50 transition-colors"
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] font-mono text-text-muted/50">{commit.hash}</span>
@@ -432,7 +425,7 @@ export function PushApprovalPanel() {
                       </span>
                     )}
                   </div>
-                  <div className="text-xs text-text mt-0.5 leading-snug">{commit.message}</div>
+                  <div className="text-[12px] text-text mt-0.5 leading-snug">{commit.message}</div>
                   {commit.operations.length > 0 && (
                     <div className="flex flex-wrap gap-x-2 mt-0.5">
                       {commit.operations.map((op, i) => (

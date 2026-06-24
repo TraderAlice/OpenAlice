@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { formatRelativeTime } from '../lib/intl'
+import { formatRelativeTime, getIntlLocale } from '../lib/intl'
 import { ArrowRight, ChevronRight, MessageSquare, Trash2 } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
 import { MarkdownContent } from '../components/MarkdownContent'
@@ -349,7 +349,7 @@ function buildDocPreview(result: ReadFileResult | null): string {
 // ==================== Date formatting ====================
 
 function formatAbsolute(ts: number): string {
-  return new Date(ts).toLocaleString(undefined, {
+  return new Date(ts).toLocaleString(getIntlLocale(), {
     month: 'short', day: 'numeric', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   })

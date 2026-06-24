@@ -4,6 +4,7 @@ import { TrendingUp, Hash } from 'lucide-react'
 import { entitiesLive } from '../live/entities'
 import { useTrackedSelection } from '../live/tracked-selection'
 import { SidebarRow } from './SidebarRow'
+import { SidebarSectionHeader } from './SidebarSectionHeader'
 
 /**
  * Tracked sidebar — the watchlist. A flat list of entities (assets + topics),
@@ -45,32 +46,49 @@ export function TrackedSidebar() {
     )
   }
 
+  const renderRow = (e: (typeof entities)[number]) => {
+    const Icon = e.type === 'asset' ? TrendingUp : Hash
+    return (
+      <SidebarRow
+        key={e.name}
+        active={e.name === selected}
+        onClick={() => select(e.name)}
+        title={e.description}
+        icon={<Icon size={13} strokeWidth={1.75} className="text-text-muted/70" aria-hidden />}
+        label={<span className="font-mono text-[12px]">{e.name}</span>}
+        trail={
+          e.backlinkCount > 0 ? (
+            <span
+              className="text-[10px] text-text-muted/60 tabular-nums"
+              title={t('tracked.backlinksTooltip', { count: e.backlinkCount })}
+            >
+              {e.backlinkCount}
+            </span>
+          ) : undefined
+        }
+      />
+    )
+  }
+
+  // Partition into Assets / Topics so the watchlist reads as a grouped
+  // navigator, not one undifferentiated run (newest-first within each).
+  const assets = entities.filter((e) => e.type === 'asset')
+  const topics = entities.filter((e) => e.type !== 'asset')
+
   return (
-    <div className="flex flex-col h-full overflow-y-auto py-0.5">
-      {entities.map((e) => {
-        const active = e.name === selected
-        const Icon = e.type === 'asset' ? TrendingUp : Hash
-        return (
-          <SidebarRow
-            key={e.name}
-            active={active}
-            onClick={() => select(e.name)}
-            title={e.description}
-            icon={<Icon size={13} strokeWidth={1.75} className="text-text-muted/70" aria-hidden />}
-            label={<span className="font-mono text-[12px]">{e.name}</span>}
-            trail={
-              e.backlinkCount > 0 ? (
-                <span
-                  className="text-[10px] text-text-muted/60 tabular-nums"
-                  title={t('tracked.backlinksTooltip', { count: e.backlinkCount })}
-                >
-                  {e.backlinkCount}
-                </span>
-              ) : undefined
-            }
-          />
-        )
-      })}
+    <div className="flex flex-col h-full overflow-y-auto py-1">
+      {assets.length > 0 && (
+        <>
+          <SidebarSectionHeader>{t('tracked.assets')}</SidebarSectionHeader>
+          {assets.map(renderRow)}
+        </>
+      )}
+      {topics.length > 0 && (
+        <>
+          <SidebarSectionHeader>{t('tracked.topics')}</SidebarSectionHeader>
+          {topics.map(renderRow)}
+        </>
+      )}
     </div>
   )
 }
