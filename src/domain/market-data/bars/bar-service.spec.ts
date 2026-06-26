@@ -150,6 +150,23 @@ describe('getBars — UTA branch', () => {
     expect(getHistorical).toHaveBeenCalledWith({ aliceId: 'alpaca-paper|AAPL' }, expect.objectContaining({ interval: '1d' }))
   })
 
+  it('renders a daily broker bar date-only even when stamped at the session open (no 05:00 / DST noise)', async () => {
+    // Alpaca stamps a daily bar at the premarket open (04:00/05:00 ET in UTC),
+    // which also flips an hour across DST — render the calendar day, not an instant.
+    const dailyWire = [
+      { timestamp: '2026-02-17T05:00:00.000Z', open: '1', high: '2', low: '0.5', close: '1.5', volume: '100' },
+      { timestamp: '2026-06-25T04:00:00.000Z', open: '2', high: '3', low: '1', close: '2.5', volume: '200' },
+    ] as unknown as Bar[]
+    const utaManager: UtaBarGateway = {
+      has: async (id) => id === 'alpaca-paper',
+      get: async () => ({ getHistorical: async () => dailyWire }),
+      searchContracts: async () => [],
+    }
+    const svc = createBarService(makeDeps({ utaManager }))
+    const { bars } = await svc.getBars({ barId: 'alpaca-paper|AAPL' }, { interval: '1d' })
+    expect(bars.map((b) => b.date)).toEqual(['2026-02-17', '2026-06-25']) // date-only, no time, no DST flip
+  })
+
   it('count-only request becomes a START WINDOW, not a broker `limit` (alpaca count-anchoring bug)', async () => {
     // A count-only request must reach the broker as a start-bounded window — NOT
     // as `limit: count` with no start. Alpaca's getBarsV2 anchors `limit` to a

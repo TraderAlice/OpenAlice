@@ -103,17 +103,22 @@ function isFullBar(d: Record<string, unknown>): boolean {
   return d.close != null && d.open != null && d.high != null && d.low != null
 }
 
-function dateOf(bar: Bar): string {
+function dateOf(bar: Bar, interval?: string): string {
   // Bar.timestamp is typed Date, but it crosses the Alice↔UTA HTTP wire as an
   // ISO string (JSON has no Date) — normalize either form before formatting.
   const iso = new Date(bar.timestamp).toISOString()
-  // Daily/weekly bars land at UTC midnight → keep date-only; intraday keeps time.
-  return iso.endsWith('T00:00:00.000Z') ? iso.slice(0, 10) : iso.slice(0, 19).replace('T', ' ')
+  // A daily/weekly bar is a calendar day, not an instant — render date-only even
+  // when a broker stamps it at the session open (e.g. Alpaca's 04:00/05:00 ET,
+  // which also flips an hour across DST and looks like a bug). Intraday keeps
+  // its time; a UTC-midnight stamp is date-only regardless.
+  const daily = interval === '1d' || interval === '1w'
+  if (daily || iso.endsWith('T00:00:00.000Z')) return iso.slice(0, 10)
+  return iso.slice(0, 19).replace('T', ' ')
 }
 
-function barToOhlcv(bar: Bar): OhlcvBar {
+function barToOhlcv(bar: Bar, interval?: string): OhlcvBar {
   return {
-    date: dateOf(bar),
+    date: dateOf(bar, interval),
     open: Number(bar.open),
     high: Number(bar.high),
     low: Number(bar.low),
@@ -238,7 +243,7 @@ export function createBarService(deps: BarServiceDeps): BarService {
       end: (opts.end ?? opts.asOf) ? new Date((opts.end ?? opts.asOf)!) : undefined,
     }
     const wireBars = await acct.getHistorical({ aliceId: barId }, params)
-    const bars = finalize(wireBars.map(barToOhlcv), opts.count)
+    const bars = finalize(wireBars.map((b) => barToOhlcv(b, params.interval)), opts.count)
     const symbol = parseBarId(barId)?.nativeSymbol ?? barId
     return {
       bars,

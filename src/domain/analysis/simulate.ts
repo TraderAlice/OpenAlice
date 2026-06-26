@@ -155,6 +155,14 @@ export async function simulate(
   const step = Math.max(1, Math.ceil(held.length / 20))
   const path = held.filter((_, i) => i % step === 0 || i === held.length - 1).map((b) => ({ date: b.date, close: px(b.close) }))
 
+  // The requested entry date may have been a weekend/holiday — we entered the
+  // next session. Say so, rather than silently using a different date.
+  const slipped = entryBar.date.slice(0, 10) !== opts.entryDate.slice(0, 10)
+  const notes = [
+    ...(slipped ? [`Requested entryDate ${opts.entryDate} was not a trading day; entered the next session ${entryBar.date.slice(0, 10)}.`] : []),
+    ...(exit === null ? [`Still open at asOf ${asOf} — return is mark-to-market, not realized.`] : []),
+  ]
+
   return {
     symbol: meta.symbol,
     barId: meta.barId,
@@ -172,6 +180,6 @@ export async function simulate(
     peak,
     trough,
     path,
-    ...(exit === null ? { note: `Still open at asOf ${asOf} — return is mark-to-market, not realized.` } : {}),
+    ...(notes.length ? { note: notes.join(' ') } : {}),
   }
 }
