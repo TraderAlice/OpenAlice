@@ -27,8 +27,11 @@ export interface SnapshotOpts {
   asOf?: string
   /** Bar interval. Default '1d'. */
   interval?: string
-  /** Bars of dated context to return + compute over. Default 90. */
+  /** Analysis window FETCHED for the levels (sma50 needs ≥50). Default 90. */
   count?: number
+  /** How many recent dated bars to RETURN in `bars` (default 0 = summary only —
+   *  the dated path is opt-in so a "how's X" read stays light). Capped at count. */
+  barsOut?: number
 }
 
 export interface SnapshotBar {
@@ -64,6 +67,9 @@ export interface SnapshotResult {
     /** (high − low) / prevClose, %. The intraday range a single vs-prevClose number hides. */
     dayAmplitudePct: number | null
   } | null
+  /** How many bars are in the analysis window (the levels were computed over
+   *  these). The `bars` array may hold fewer — request more with barsOut. */
+  windowBars: number
   /** Compact technical state AS OF the anchor (over the returned window). */
   levels: {
     sma20: number | null
@@ -75,7 +81,8 @@ export interface SnapshotResult {
     distFromHighPct: number
     distFromLowPct: number
   } | null
-  /** Dated OHLCV, ascending, ≤ asOf. The dated series the quant tool can't emit. */
+  /** Recent dated OHLCV, ascending, ≤ asOf (the last `barsOut`; empty by default).
+   *  The dated series the quant tool can't emit — opt in with barsOut. */
   bars: SnapshotBar[]
 }
 
@@ -121,8 +128,13 @@ export async function getSnapshot(
   }
 
   if (bars.length === 0) {
-    return { ...base, latest: null, levels: null, bars: [] }
+    return { ...base, windowBars: 0, latest: null, levels: null, bars: [] }
   }
+
+  // Dated path is opt-in (barsOut) so a summary read stays light — the levels
+  // are still computed over the full fetched window either way.
+  const barsOut = Math.max(0, Math.min(opts.barsOut ?? 0, bars.length))
+  const outBars = barsOut > 0 ? bars.slice(-barsOut) : []
 
   const closes = bars.map((b) => b.close)
   const last = bars[bars.length - 1]
@@ -132,6 +144,7 @@ export async function getSnapshot(
 
   return {
     ...base,
+    windowBars: bars.length,
     latest: {
       date: last.date,
       close: r(last.close)!,
@@ -150,7 +163,7 @@ export async function getSnapshot(
       distFromHighPct: r(((last.close - periodHigh) / periodHigh) * 100, 2)!,
       distFromLowPct: r(((last.close - periodLow) / periodLow) * 100, 2)!,
     },
-    bars: bars.map((b) => ({
+    bars: outBars.map((b) => ({
       date: b.date, open: b.open, high: b.high, low: b.low, close: b.close, volume: b.volume,
     })),
   }

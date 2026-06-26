@@ -27,20 +27,29 @@ function mockService(bars: OhlcvBar[], metaOver: Partial<BarMeta> = {}): BarServ
 }
 
 describe('getSnapshot', () => {
-  it('returns dated bars + latest print + levels', async () => {
+  it('summary by default (no bars dumped), latest print + levels computed over the window', async () => {
     const closes = Array.from({ length: 25 }, (_, i) => 50 + i) // 50..74
     const svc = mockService(makeBars(closes))
     const snap = await getSnapshot(svc, { barId: 'alpaca|XLE' } as never, { count: 25 })
-    // dated bars survive
-    expect(snap.bars).toHaveLength(25)
-    expect(snap.bars[0]).toMatchObject({ date: '2026-04-01', close: 50 })
+    // bars are opt-in — empty by default, but the window size is reported
+    expect(snap.bars).toHaveLength(0)
+    expect(snap.windowBars).toBe(25)
     // latest print: close 74, prevClose 73, +1.37%
     expect(snap.latest).toMatchObject({ date: '2026-04-25', close: 74, prevClose: 73 })
     expect(snap.latest!.changePct).toBeCloseTo(1.37, 1)
-    // levels: sma20 present (≥20 bars), rsi present, period high from highs
+    // levels computed over the full window even though no bars were returned
     expect(snap.levels!.sma20).not.toBeNull()
     expect(snap.levels!.periodHigh).toBe(75) // last high = 74+1
     expect(snap.levels!.distFromHighPct).toBeLessThanOrEqual(0)
+  })
+
+  it('returns the last `barsOut` dated bars when the path is requested', async () => {
+    const closes = Array.from({ length: 25 }, (_, i) => 50 + i)
+    const svc = mockService(makeBars(closes))
+    const snap = await getSnapshot(svc, { barId: 'alpaca|XLE' } as never, { count: 25, barsOut: 5 })
+    expect(snap.bars).toHaveLength(5)
+    expect(snap.bars.map((b) => b.close)).toEqual([70, 71, 72, 73, 74]) // last 5
+    expect(snap.windowBars).toBe(25) // still computed over all 25
   })
 
   it('surfaces a LOUD freshness warning when data does not reach the anchor', async () => {

@@ -49,13 +49,15 @@ it.**
 1. **Snapshot the anchor (no lookahead).** Reconstruct the moment with
    `asOf` — bars never run past it.
    ```bash
-   alice analysis snapshot --query XLE --asOf 2026-04-03
+   alice analysis snapshot --query XLE --asOf 2026-04-03            # summary
+   alice analysis snapshot --query XLE --asOf 2026-04-03 --bars 30  # + dated path
    ```
-   Read the dated `bars`, the `latest` print (close, vs-prevClose, day
-   high/low, **amplitude** — a sleepy vs-prevClose number hides an intraday
-   plunge-and-recover), and `levels` (sma20/50, rsi14, distance from the period
-   high — the "how far off the top" feel). This is the honest "what did it look
-   like then".
+   Read the `latest` print (close, vs-prevClose, day high/low, **amplitude** —
+   a sleepy vs-prevClose number hides an intraday plunge-and-recover) and
+   `levels` (sma20/50, rsi14, distance from the period high — the "how far off
+   the top" feel). The snapshot is **summary-only by default** (the dated path
+   can be large); add `--bars N` when you actually need the per-day series.
+   `windowBars` tells you how many are available.
 
 2. **Align the catalysts to the price.** Pull the news IN the window,
    oldest-first, and lay the timestamps against the bars.

@@ -10,6 +10,10 @@ import { z } from 'zod'
 import type { INewsProvider, NewsItem } from '../types.js'
 
 const NEWS_LIMIT = 500
+/** Default cap on windowRss OUTPUT — a wide date window can match hundreds; we
+ *  bound what's returned and report how many were omitted, rather than wall the
+ *  caller's context. */
+const WINDOW_DEFAULT_LIMIT = 40
 
 // ==================== Pure functions (testable) ====================
 
@@ -260,7 +264,7 @@ Example: windowRss({ from: "2026-06-20", to: "2026-06-26", pattern: "Iran|oil" }
         pattern: z.string().optional().describe('Optional regex over title+content. Omit for everything in the window.'),
         contextChars: z.number().int().positive().optional().describe('Context chars around a pattern match (default 50).'),
         metadataFilter: z.record(z.string(), z.string()).optional().describe('Filter by metadata key-value (e.g. source).'),
-        limit: z.number().int().positive().optional().describe('Max results (default: all in window).'),
+        limit: z.number().int().positive().optional().describe(`Max results returned (default ${WINDOW_DEFAULT_LIMIT}). A wide window can match hundreds; raise this, or narrow the pattern/window. The result reports total + how many were omitted.`),
       }).meta({ examples: [{ from: '2026-06-20', to: '2026-06-26', pattern: 'Iran|oil' }] }),
       execute: async ({ from, to, pattern, contextChars, metadataFilter, limit }) => {
         const startTime = new Date(from)
@@ -268,10 +272,23 @@ Example: windowRss({ from: "2026-06-20", to: "2026-06-26", pattern: "Iran|oil" }
         if (Number.isNaN(startTime.getTime()) || Number.isNaN(endTime.getTime())) {
           return { error: 'from/to must be YYYY-MM-DD or ISO dates.' }
         }
-        return windowRss(
+        // Fetch ALL matches in the window, then bound the OUTPUT (a wide window can
+        // be a wall of hundreds) — and say how many we left out, oldest-first.
+        const all = await windowRss(
           { getNews: () => provider.getNewsV2({ startTime, endTime, limit: 5000 }) },
-          { pattern, contextChars, metadataFilter, limit },
+          { pattern, contextChars, metadataFilter },
         )
+        const cap = limit ?? WINDOW_DEFAULT_LIMIT
+        const results = all.slice(0, cap)
+        const omitted = all.length - results.length
+        return {
+          from: startTime.toISOString(),
+          to: endTime.toISOString(),
+          total: all.length,
+          shown: results.length,
+          ...(omitted > 0 ? { omitted, note: `${omitted} more match(es) in this window are not shown (oldest-first; showing the earliest ${results.length}). Narrow the pattern/window, or raise limit.` } : {}),
+          results,
+        }
       },
     }),
 

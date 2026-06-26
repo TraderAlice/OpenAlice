@@ -35,15 +35,17 @@ FRESHNESS IS LOAD-BEARING. The result carries asOf / isLatestActual / staleTradi
         asset: z.enum(['equity', 'crypto', 'currency', 'commodity']).optional().describe('Asset class — needed only for a VENDOR barId/symbol; broker barIds infer it.'),
         asOf: z.string().optional().describe('Point-in-time YYYY-MM-DD. Bars never run past it (no lookahead). Default: now.'),
         interval: z.string().optional().describe('Bar interval (default "1d").'),
-        count: z.number().int().positive().optional().describe('Bars of dated context (default 90).'),
-      }).meta({ examples: [{ query: 'XLE' }, { query: 'NVDA', asOf: '2026-04-15' }] }),
-      execute: async ({ query, barId, asset, asOf, interval, count }) => {
+        count: z.number().int().positive().optional().describe('Analysis window fetched for the levels (default 90; sma50 needs ≥50). NOT the output size.'),
+        bars: z.number().int().nonnegative().optional().describe('How many recent dated bars to RETURN in `bars` (default 0 = summary only — latest + levels + freshness). Set e.g. 30/90 when you need the dated path (it can be large). `windowBars` tells how many are available.'),
+      }).meta({ examples: [{ query: 'XLE' }, { query: 'NVDA', asOf: '2026-04-15', bars: 30 }] }),
+      execute: async ({ query, barId, asset, asOf, interval, count, bars }) => {
         const resolved = await resolveBarSource(barService, { query, barId, asset })
         if ('error' in resolved) return resolved
         const snap = await getSnapshot(barService, resolved.ref as never, {
           ...(asOf ? { asOf } : {}),
           ...(interval ? { interval } : {}),
           ...(count ? { count } : {}),
+          ...(bars != null ? { barsOut: bars } : {}),
         })
         return resolved.pickedFrom ? { ...snap, autoPickedSource: resolved.pickedFrom } : snap
       },
