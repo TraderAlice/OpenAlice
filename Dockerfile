@@ -122,7 +122,7 @@ ENV OPENALICE_APP_HOME=/app \
     OPENALICE_UTA_PORT=47333 \
     OPENALICE_BIND_HOST=0.0.0.0
 
-VOLUME ["/data"]
+#VOLUME ["/data"]
 EXPOSE 47331
 
 # tini handles signal forwarding + zombie reaping; Guardian then spawns

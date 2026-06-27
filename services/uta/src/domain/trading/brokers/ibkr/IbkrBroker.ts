@@ -346,6 +346,39 @@ export class IbkrBroker implements IBroker {
 
   // ==================== Trading operations ====================
 
+  /**
+   * Resolve a possibly-bare contract to its real, routable identity before it
+   * reaches the venue. Staging / AI tools hand us a reference like
+   * `{ conId, symbol }` with no secType/exchange/currency — for forex that
+   * means CASH on IDEALPRO, NOT the STK SMART/USD a naive default picks (which
+   * IBKR rejects with error 200). A conId without a secType is the unresolved
+   * case: round-trip it through reqContractDetails once (cached), exactly like
+   * the quote path. Already-typed contracts only get routing defaults backfilled.
+   *
+   * Shared by getQuote and placeOrder so the two paths can never diverge.
+   */
+  private async resolveFullContract(contract: Contract): Promise<Contract> {
+    if (contract.conId && !contract.secType) {
+      let full = this.conIdContracts.get(contract.conId)
+      if (!full) {
+        // Query by conId alone — a stray symbol on the input ('USDCHF' rather
+        // than the real 'USD'/'USD.CHF') would otherwise narrow TWS to nothing.
+        const details = await this.getContractDetails(Object.assign(new Contract(), { conId: contract.conId }))
+        if (!details?.contract) {
+          throw new BrokerError('EXCHANGE', `conId ${contract.conId} did not resolve to a contract`)
+        }
+        full = details.contract
+        this.conIdContracts.set(contract.conId, full)
+      }
+      return full
+    }
+    // No conId, or already typed: just backfill routing. CASH (forex) lives on
+    // IDEALPRO; everything else routes SMART. Currency defaults to USD.
+    if (!contract.exchange) contract.exchange = contract.secType === 'CASH' ? 'IDEALPRO' : 'SMART'
+    if (!contract.currency) contract.currency = 'USD'
+    return contract
+  }
+
   async placeOrder(contract: Contract, order: Order, tpsl?: TpSlParams): Promise<PlaceOrderResult> {
     // Attached TP/SL: not implemented yet (native path = parent + child
     // orders with parentId + transmit chain — see ANG-103 batch). Refuse
@@ -357,16 +390,14 @@ export class IbkrBroker implements IBroker {
         error: 'IBKR attached TP/SL (bracket) is not implemented yet — refusing to place a naked entry. Place the entry first, then a standalone STP/LMT protective order.',
       }
     }
-    // TWS requires exchange and currency on the contract. Upstream layers
-    // (staging, AI tools) typically only populate symbol + secType.
-    // Default to SMART routing. Currency defaults to USD — non-USD markets
-    // (LSE/GBP, TSE/JPY) and forex (CASH secType) will need the caller
-    // to specify currency explicitly.
-    if (!contract.exchange) contract.exchange = 'SMART'
-    if (!contract.currency) contract.currency = 'USD'
-
     try {
       this._ensureAlive()
+      // Resolve the instrument's real contract before routing. A bare
+      // { conId, symbol } has no secType/exchange/currency; without this a
+      // forex order defaults to STK SMART/USD and IBKR rejects it (error 200).
+      // Inside the try so a resolution failure returns a clean error result —
+      // we never hand a naked, mis-routed contract to client.placeOrder.
+      contract = await this.resolveFullContract(contract)
       const orderId = this.bridge.getNextOrderId()
       const promise = this.bridge.requestOrder(orderId)
       this.client.placeOrder(orderId, contract, order)
@@ -614,32 +645,17 @@ export class IbkrBroker implements IBroker {
    * Each call briefly occupies one TWS market data line (limit ~100),
    * auto-released after tickSnapshotEnd.
    */
-  /** conId → resolved full contract, so by-conId quotes pay reqContractDetails once. */
+  /** conId → resolved full contract, so by-conId quotes and orders pay
+   *  reqContractDetails once. Shared via resolveFullContract. */
   private readonly conIdContracts = new Map<number, Contract>()
 
   async getQuote(contract: Contract): Promise<Quote> {
-    // Enrichment must run BEFORE routing defaults: a premature SMART poisons
-    // the conId details lookup for anything not on SMART (EUR.USD@IDEALPRO).
-    // The enriched contract carries its real exchange/currency.
-
-    // TWS rejects reqMktData on a bare conId (error 321: symbol/localSymbol/
-    // secId required) even though the wire carries conId — resolution by
-    // conId is only honoured via reqContractDetails. Enrich once and cache.
-    if (contract.conId && !contract.symbol && !contract.localSymbol) {
-      let full = this.conIdContracts.get(contract.conId)
-      if (!full) {
-        const details = await this.getContractDetails(contract)
-        if (!details?.contract) {
-          throw new BrokerError('EXCHANGE', `conId ${contract.conId} did not resolve to a contract`)
-        }
-        full = details.contract
-        this.conIdContracts.set(contract.conId, full)
-      }
-      contract = full
-    }
-
-    if (!contract.exchange) contract.exchange = 'SMART'
-    if (!contract.currency) contract.currency = 'USD'
+    // Resolve to the real contract BEFORE routing — a premature SMART poisons
+    // the conId details lookup for anything not on SMART (EUR.USD@IDEALPRO),
+    // and TWS rejects reqMktData on a bare conId (error 321: symbol/localSymbol/
+    // secId required). resolveFullContract is the same path placeOrder uses, so
+    // a quote and the order it informs can never resolve to different contracts.
+    contract = await this.resolveFullContract(contract)
 
     const reqId = this.bridge.allocReqId()
     const promise = this.bridge.requestSnapshot(reqId)

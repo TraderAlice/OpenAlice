@@ -134,6 +134,91 @@ describe('IbkrBroker — getAccount mixed-currency math (ANG-101 / issues #295 #
   })
 })
 
+describe('IbkrBroker — placeOrder resolves the real contract before routing (forex/CASH)', () => {
+  // The bug: placeOrder defaulted a bare { conId, symbol } to STK SMART/USD,
+  // so forex (e.g. USDCHF, conId 12087820) reached IBKR as the wrong contract
+  // and was rejected with "error 200: No security definition". The fix reuses
+  // the same resolver the quote/details path uses (resolveFullContract), which
+  // round-trips the conId to its real CASH/IDEALPRO identity.
+
+  /** What reqContractDetails returns for the forex conId. */
+  function usdChfContract(): Contract {
+    const c = new Contract()
+    c.conId = 12087820
+    c.symbol = 'USD'
+    c.secType = 'CASH'
+    c.currency = 'CHF'
+    c.exchange = 'IDEALPRO'
+    c.localSymbol = 'USD.CHF'
+    return c
+  }
+
+  /** Wire up a bare instance: alive bridge, captured client.placeOrder, and a
+   *  getContractDetails stub that records whether it was called. */
+  function orderBroker(detailsContract: Contract | null): {
+    broker: IbkrBroker
+    captured: { contract?: Contract }
+    detailsCalls: () => number
+  } {
+    const b = bareBroker()
+    ;(b as unknown as { conIdContracts: Map<number, Contract> }).conIdContracts = new Map()
+    const captured: { contract?: Contract } = {}
+    let calls = 0
+    ;(b as unknown as { getContractDetails: (q: Contract) => Promise<unknown> }).getContractDetails =
+      async () => { calls++; return detailsContract ? { contract: detailsContract } : null }
+    ;(b as unknown as { bridge: unknown }).bridge = {
+      connectionDead: false,
+      getNextOrderId: () => 1,
+      requestOrder: () => Promise.resolve({ orderState: { status: 'Submitted' } }),
+    }
+    ;(b as unknown as { client: unknown }).client = {
+      placeOrder: (_id: number, contract: Contract) => { captured.contract = contract },
+    }
+    return { broker: b, captured, detailsCalls: () => calls }
+  }
+
+  it('Case A: a bare { conId, symbol: "USDCHF" } order is sent as CASH/IDEALPRO, matching getContractDetails', async () => {
+    const resolved = usdChfContract()
+    const { broker, captured, detailsCalls } = orderBroker(resolved)
+
+    const bare = new Contract()
+    bare.conId = 12087820
+    bare.symbol = 'USDCHF' // the wrong/loose symbol staging hands us
+    const order = new Order()
+    order.action = 'BUY'
+    order.orderType = 'LMT'
+    order.totalQuantity = new Decimal(1000)
+    order.lmtPrice = new Decimal('0.79')
+
+    const r = await broker.placeOrder(bare, order)
+
+    expect(r.success).toBe(true)
+    expect(detailsCalls()).toBe(1) // the conId was actually resolved, not defaulted
+    // The contract handed to TWS is the real forex contract...
+    expect(captured.contract).toEqual(usdChfContract())
+    // ...i.e. CASH / USD / CHF / IDEALPRO / USD.CHF, never STK SMART/USD.
+    expect(captured.contract?.secType).toBe('CASH')
+    expect(captured.contract?.exchange).toBe('IDEALPRO')
+    expect(captured.contract?.currency).toBe('CHF')
+    expect(captured.contract?.localSymbol).toBe('USD.CHF')
+  })
+
+  it('Case B: a fully-typed STK order passes through unchanged, with no getContractDetails round-trip', async () => {
+    const { broker, captured, detailsCalls } = orderBroker(null)
+    const { contract, order } = stkOrder()
+
+    const r = await broker.placeOrder(contract, order)
+
+    expect(r.success).toBe(true)
+    expect(detailsCalls()).toBe(0) // no resolution needed for an already-typed contract
+    expect(captured.contract).toBe(contract) // same object, untouched
+    expect(captured.contract?.symbol).toBe('AAPL')
+    expect(captured.contract?.secType).toBe('STK')
+    expect(captured.contract?.exchange).toBe('SMART')
+    expect(captured.contract?.currency).toBe('USD')
+  })
+})
+
 describe('IbkrBroker — dead-connection gate (issue #294)', () => {
   it('cache-backed reads and order paths refuse loudly when the socket is known-dead', async () => {
     const b = bareBroker()
