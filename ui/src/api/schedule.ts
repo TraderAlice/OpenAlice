@@ -7,6 +7,8 @@ export type ScheduleWhen =
 
 export interface ScheduleTask {
   id: string
+  /** Short title of the issue this entry is about — the human-facing label. */
+  issue: string
   when: ScheduleWhen
   what: string
   agent?: string

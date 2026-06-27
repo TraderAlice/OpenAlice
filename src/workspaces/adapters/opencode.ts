@@ -143,10 +143,25 @@ export const opencodeAdapter: CliAdapter = {
     if (!workspaceId) {
       throw new Error('opencode adapter: AQ_WS_ID missing from spawn env');
     }
+    // Agent-INVISIBLE run identity: on a HEADLESS spawn the launcher injects
+    // AQ_RUN_ID into the env (interactive spawns never carry it). opencode's
+    // remote-MCP config supports a static `headers` map, so we stamp the run id
+    // onto the workspace server entry — the server then resolves the entry's
+    // origin from it. This is spawn-time server config, NOT a tool argument, so
+    // the agent never sees or supplies it. Only on `openalice-workspace` (the
+    // scoped surface that owns inbox_push); the global `openalice` server has no
+    // per-run identity.
+    const runId = ctx.env['AQ_RUN_ID'];
+    const wsServer: Record<string, unknown> = {
+      type: 'remote',
+      url: `${mcpUrl}/${workspaceId}`,
+      enabled: true,
+      ...(runId ? { headers: { 'x-openalice-run': runId } } : {}),
+    };
     const inline = {
       mcp: {
         openalice: { type: 'remote', url: mcpUrl, enabled: true },
-        'openalice-workspace': { type: 'remote', url: `${mcpUrl}/${workspaceId}`, enabled: true },
+        'openalice-workspace': wsServer,
       },
     };
     env['OPENCODE_CONFIG_CONTENT'] = JSON.stringify(inline);

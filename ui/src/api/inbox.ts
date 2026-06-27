@@ -4,6 +4,34 @@ export interface InboxDoc {
   path: string
 }
 
+/**
+ * Agent-INVISIBLE provenance the server stamps onto every push — mirrors the
+ * backend `InboxOrigin` (`src/core/inbox-store.ts`). The agent never supplies
+ * any of this (exactly as it never supplies its own wsId): the run identity is
+ * injected at spawn, carried out-of-band on an HTTP header, and resolved
+ * server-side from the authoritative HeadlessTaskRegistry. It's the link the UI
+ * cross-references on — an inbox card → its originating run/issue, an issue
+ * detail → the inbox reports it produced.
+ *
+ * First cut is issue/run-level, headless only (`kind:'headless'`): `runId` is
+ * set for every dispatched run, `issueId` when a scheduled issue fired it,
+ * `agent` from the run record. `sessionId` + `kind:'interactive'` are reserved
+ * for Phase 2. Absent on interactive/manual pushes → `origin` is undefined.
+ */
+export type InboxOriginKind = 'headless' | 'interactive' | 'manual'
+
+export interface InboxOrigin {
+  kind: InboxOriginKind
+  /** The headless run's taskId (== HeadlessTaskRegistry key). */
+  runId?: string
+  /** The scheduled issue that fired the run, when applicable (filename stem). */
+  issueId?: string
+  /** Reserved for Phase 2 interactive sessions (pre-allocated record id). */
+  sessionId?: string
+  /** The agent CLI id (claude/codex/…) from the run record. */
+  agent?: string
+}
+
 export interface InboxEntry {
   id: string
   ts: number
@@ -13,6 +41,9 @@ export interface InboxEntry {
   docs?: InboxDoc[]
   /** Agent's message body (markdown). Renders below docs. */
   comments?: string
+  /** Agent-INVISIBLE provenance, stamped server-side. Absent on legacy entries
+   *  and on interactive/manual pushes that carried no run header. */
+  origin?: InboxOrigin
 }
 
 export interface InboxHistoryResponse {

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { formatRelativeTime, getIntlLocale } from '../lib/intl'
-import { ArrowRight, ChevronRight, MessageSquare, Trash2 } from 'lucide-react'
+import { ArrowRight, Bot, ChevronRight, ListChecks, MessageSquare, Trash2 } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
 import { MarkdownContent } from '../components/MarkdownContent'
 import { FileContentView } from '../components/FileContentView'
@@ -9,6 +9,7 @@ import { api } from '../api'
 import { inboxLive, refreshInbox, removeInboxOptimistically } from '../live/inbox'
 import { useInboxSelection } from '../live/inbox-selection'
 import { useInboxRead } from '../live/inbox-read'
+import { useIssues } from '../hooks/useIssues'
 import { useWorkspace } from '../tabs/store'
 import { useWorkspaces } from '../contexts/WorkspacesContext'
 import { readWorkspaceFile, type ReadFileResult } from '../components/workspace/api'
@@ -148,6 +149,22 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const setSidebar = useWorkspace((s) => s.setSidebar)
 
+  // Origin breadcrumb — the run/issue this push came from (server-stamped,
+  // agent-invisible). A scheduled issue gives a navigable "from Issue …"
+  // breadcrumb; a bare headless run only gets a lighter, non-navigable marker
+  // (there's no per-run detail surface to open).
+  const origin = entry.origin
+  const issueId = origin?.issueId
+  // Resolve the issue id (a filename stem) to its display title via the warm,
+  // process-cached board snapshot — a cheap path (no extra fetch on the hot
+  // line). Falls back to the stem when the board hasn't resolved it.
+  const { data: issueBoard } = useIssues()
+  const issueTitle = useMemo(() => {
+    if (!issueId) return null
+    const ws = issueBoard?.workspaces.find((w) => w.wsId === entry.workspaceId)
+    return ws?.issues.find((i) => i.id === issueId)?.title ?? null
+  }, [issueBoard, entry.workspaceId, issueId])
+
   const openWorkspace = () => {
     if (!wsAlive) return
     // Switch the sidebar to Workspaces so the user sees the sessions list
@@ -155,6 +172,12 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
     // chat" — they need both views).
     setSidebar('workspaces')
     openOrFocus({ kind: 'workspace', params: { wsId: entry.workspaceId } })
+  }
+
+  const openIssue = () => {
+    if (!issueId) return
+    setSidebar('issue')
+    openOrFocus({ kind: 'issue-detail', params: { wsId: entry.workspaceId, id: issueId } })
   }
 
   return (
@@ -169,6 +192,29 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
         >
           {displayLabel}
         </span>
+
+        {/* Origin — the run/issue this push came from. Navigable for a
+         *  scheduled issue; a lighter marker for a bare headless run. */}
+        {issueId ? (
+          <button
+            type="button"
+            onClick={openIssue}
+            title={`From issue ${issueId}`}
+            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-text-muted/80 hover:text-accent hover:bg-accent/10 transition-colors"
+          >
+            <ListChecks size={12} strokeWidth={1.75} className="shrink-0" />
+            <span className="truncate max-w-[220px]">from {issueTitle ?? issueId}</span>
+          </button>
+        ) : origin?.runId ? (
+          <span
+            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-text-muted/55"
+            title={`From headless run ${origin.runId}`}
+          >
+            <Bot size={12} strokeWidth={1.75} className="shrink-0" />
+            <span>from run{origin.agent ? ` · ${origin.agent}` : ''}</span>
+          </span>
+        ) : null}
+
         <span className="text-[11px] text-text-muted/70 tabular-nums ml-auto">
           {formatAbsolute(entry.ts)}
           <span className="mx-1.5 text-text-muted/40">·</span>

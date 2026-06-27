@@ -20,6 +20,7 @@ export const zhHant: Resources = {
       news: '新聞',
       tradingAsGit: '交易即 Git',
       portfolio: '投資組合',
+      issue: '議題',
       automation: '自動化',
       settings: '設定',
       dev: '開發',
@@ -271,7 +272,6 @@ export const zhHant: Resources = {
     noAccountsYet: '尚無帳戶。請在 設定 → 交易 中新增。',
   },
   automation: {
-    schedules: '定時',
     runs: '運行',
     api: 'API',
     legacy: '舊版',

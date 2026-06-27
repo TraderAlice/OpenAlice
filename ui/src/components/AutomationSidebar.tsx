@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Activity, CalendarClock, ChevronDown, ChevronRight, Code2, Webhook, Workflow } from 'lucide-react'
+import { Activity, ChevronDown, ChevronRight, Code2, Webhook, Workflow } from 'lucide-react'
 
 import { useWorkspace } from '../tabs/store'
 import { getFocusedTab, type ViewSpec } from '../tabs/types'
@@ -9,7 +9,6 @@ import { SidebarRow } from './SidebarRow'
 type AutomationSection = Extract<ViewSpec, { kind: 'automation' }>['params']['section']
 
 const PRIMARY = [
-  { labelKey: 'automation.schedules', section: 'schedules', Icon: CalendarClock },
   { labelKey: 'automation.runs', section: 'runs', Icon: Activity },
   { labelKey: 'automation.api', section: 'api', Icon: Code2 },
 ] as const
@@ -24,8 +23,8 @@ const LEGACY = [
 type AutomationItem = (typeof PRIMARY)[number] | (typeof LEGACY)[number]
 
 /**
- * Automation sidebar — one row per sub-section. Primary rows (schedules / runs
- * / api) up top; the legacy event-bus rows (flow / webhook) live in a group
+ * Automation sidebar — one row per sub-section. Primary rows (runs / api) up
+ * top; the legacy event-bus rows (flow / webhook) live in a group
  * that is collapsed by default and only auto-expands when a legacy section is
  * the active tab. Clicking a row opens that section as its own tab.
  */

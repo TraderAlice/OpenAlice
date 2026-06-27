@@ -44,6 +44,7 @@ import { workspacePathFactory } from './tool/workspace-path.js'
 import { createEntityStore } from './core/entity-store.js'
 import { entityUpsertFactory } from './tool/entity-upsert.js'
 import { entitySearchFactory } from './tool/entity-search.js'
+import { issueToolFactories } from './tool/issue-tools.js'
 import { createEventLog } from './core/event-log.js'
 import { createToolCallLog } from './core/tool-call-log.js'
 import { createListenerRegistry } from './core/listener-registry.js'
@@ -100,6 +101,7 @@ async function main() {
   workspaceToolCenter.register(workspacePathFactory)
   workspaceToolCenter.register(entityUpsertFactory)
   workspaceToolCenter.register(entitySearchFactory)
+  for (const f of issueToolFactories) workspaceToolCenter.register(f)
 
   // ==================== UTA SDK (HTTP boundary) ====================
   //

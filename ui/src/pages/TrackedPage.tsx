@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { TrendingUp, Hash, FileText } from 'lucide-react'
+import { TrendingUp, Hash, FileText, ListChecks } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
 import { PageLoading } from '../components/StateViews'
 import { api } from '../api'
@@ -121,30 +121,55 @@ function Detail({ detail }: { detail: EntityDetail }) {
   )
 }
 
+// Issue notes live at `.alice/issues/<id>.md` (the only dot-dir the backlink
+// scanner descends into). Such a backlink should open the issue's board detail,
+// not a raw file — detect by this prefix and pull the `<id>` out of the path.
+const ISSUE_NOTE_PREFIX = '.alice/issues/'
+
+/** If `path` is an issue note (`.alice/issues/<id>.md`), return its issue id;
+ *  otherwise null. Tolerates Windows back-slashes from a relative() path. */
+function issueIdFromPath(path: string): string | null {
+  const norm = path.replace(/\\/g, '/')
+  if (!norm.startsWith(ISSUE_NOTE_PREFIX) || !norm.endsWith('.md')) return null
+  const id = norm.slice(ISSUE_NOTE_PREFIX.length, -'.md'.length)
+  // Guard against a nested path under issues/ (ids are flat slugs).
+  return id && !id.includes('/') ? id : null
+}
+
 function BacklinkRow({ backlink }: { backlink: Backlink }) {
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
+  const issueId = issueIdFromPath(backlink.path)
   const open = () => {
-    // Open the referencing note in the dedicated file viewer (VS Code-style),
-    // located at its exact path — not the whole workspace.
+    if (issueId) {
+      // Issue note → its wsId-precise board detail, not a raw file.
+      openOrFocus({
+        kind: 'issue-detail',
+        params: { wsId: backlink.workspaceId, id: issueId },
+      })
+      return
+    }
+    // Plain note → the dedicated file viewer (VS Code-style), at its exact path.
     openOrFocus({
       kind: 'file-viewer',
       params: { wsId: backlink.workspaceId, path: backlink.path },
     })
   }
+  const Icon = issueId ? ListChecks : FileText
+  const label = issueId ?? backlink.path
   return (
     <button
       type="button"
       onClick={open}
-      title={`Open ${backlink.path}`}
+      title={issueId ? `Open issue ${issueId}` : `Open ${backlink.path}`}
       className="group flex items-center gap-2.5 px-3 py-2 rounded-lg border border-border bg-bg-tertiary/30 hover:bg-bg-tertiary hover:border-accent/40 transition-colors text-left"
     >
-      <FileText
+      <Icon
         size={14}
         strokeWidth={1.75}
         className="shrink-0 text-text-muted/70 group-hover:text-accent transition-colors"
         aria-hidden
       />
-      <span className="flex-1 min-w-0 truncate font-mono text-[12px] text-text">{backlink.path}</span>
+      <span className="flex-1 min-w-0 truncate font-mono text-[12px] text-text">{label}</span>
       <span className="shrink-0 text-[11px] text-text-muted/60">{backlink.workspaceTag}</span>
     </button>
   )

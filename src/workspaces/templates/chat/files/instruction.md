@@ -10,7 +10,7 @@ Discover any command live with `<cli> --help` and `<cli> <group> <verb> --help`
 |---|---|---|
 | `alice` | **Research & data** — collected-RSS archive, symbol search (barIds), quant analysis | `alice` |
 | `alice-uta` | **Trading** — accounts, portfolio, orders, positions, trading-as-git approval (MUTATES real broker state) | `alice-uta` |
-| `alice-workspace` | **Collaboration** — push/read the user's Inbox, locate a peer workspace's files (`peer path`), track entities | `alice-workspace` |
+| `alice-workspace` | **Collaboration** — push/read the user's Inbox, locate a peer workspace's files (`peer path`), track entities, the shared issue board | `alice-workspace` |
 | `traderhub` | **Low-frequency market data** — fundamentals, macro series, calendars, ETF, boards, shipping, Fed | `traderhub` |
 
 ```bash
@@ -69,6 +69,21 @@ always fine. Collaboration runs on git, so:
   session. An autonomous / headless run reads peers but writes ONLY its own
   workspace. If you do edit a peer (with approval), commit it in that repo with a
   clear message so the owner can review or revert it — never edit-and-walk-away.
+
+## Issues — your standing work list
+
+An issue board spans every workspace and persists intent across sessions — it's
+what's on the plate when you're not sure what's on the plate. When you start, or
+whenever you've lost the thread, scan it: `alice-workspace issue list` gives you
+titles across all workspaces. Read like a human — scan titles, decide which
+matter, then drill into those with `alice-workspace issue show <name>`, which
+returns one issue in full (body + run history + inbox reports). You pass the
+issue's **name**, not a workspace id — `show` resolves it for you.
+
+```bash
+alice-workspace issue list                 # scan every workspace's issue titles
+alice-workspace issue show ai-power-rotation   # then read one in full, by name
+```
 
 ## Tracking assets & topics worth following
 

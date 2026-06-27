@@ -1,9 +1,11 @@
 /**
  * ScheduleScanner - the dumb external scheduler for workspace self-declared
- * tasks. Each tick it enumerates every workspace, reads that workspace's own
- * `.alice/schedule.json` live, and for every due task fires a headless run via
- * the workspace's automation interface. It interprets NOTHING about the work -
- * `what` is an opaque prompt handed straight to `dispatchHeadlessTask`.
+ * issues. Each tick it enumerates every workspace, reads that workspace's own
+ * `.alice/issues/<id>.md` files live, and for every SCHEDULED + due issue (one
+ * that carries a `when`) fires a headless run via the workspace's automation
+ * interface. Issues without a `when` are pure board work items and are ignored
+ * here. It interprets NOTHING about the work - the fire prompt (`what`, else
+ * title+body) is handed straight to `dispatchHeadlessTask`.
  *
  * The ~1-min tick is the scheduler's OWN control loop (a plain timer), NOT a
  * scheduled task - infrastructure periodicity never enters the self-description
@@ -23,16 +25,16 @@
  * occurrence (rare — needs the pool full at that minute).
  */
 
-import { computeNextRun } from '../../core/schedule-expr.js'
+import { computeNextRun, type Schedule } from '../../core/schedule-expr.js'
 import type { CliAdapter } from '../cli-adapter.js'
 import type { Logger } from '../logger.js'
 import type { WorkspaceMeta, WorkspaceRegistry } from '../workspace-registry.js'
 
+import { isFireable, issueFirePrompt, readWorkspaceIssues } from '../issues/declaration.js'
+
 import {
   fireBase,
-  readScheduleDeclaration,
-  snapshotTask,
-  taskWhen,
+  snapshotScheduledIssue,
   type ScheduleSnapshot,
   type ScheduleSnapshotTask,
   type ScheduleSnapshotWorkspace,
@@ -58,6 +60,10 @@ export interface ScheduleScannerDeps {
     adapter: CliAdapter,
     prompt: string,
     timeoutMs: number,
+    /** The firing issue's id — recorded on the run so the issue detail can show
+     *  its real run history. The scanner ALWAYS passes it (it only fires from an
+     *  issue); manual/external dispatch callers omit it. */
+    issueId?: string,
   ) => Promise<{ taskId: string }>
   markers: MarkerStore
   logger: Logger
@@ -142,9 +148,11 @@ export class ScheduleScanner {
     }
   }
 
-  /** Read one workspace's declaration, fire its due tasks, and return its
-   *  snapshot row (includes disabled tasks, shown as off). Reads each
-   *  declaration ONCE — firing and the dashboard view come from the same read. */
+  /** Read one workspace's issues, fire its due SCHEDULED issues, and return its
+   *  snapshot row (only scheduled issues — unscheduled board items never reach
+   *  this layer). Reads issues ONCE — firing and the dashboard view come from the
+   *  same read. Per-file-invalid issues isolate (they're surfaced to the board
+   *  elsewhere); a workspace stays 'ok' as long as its issues dir read at all. */
   private async scanWorkspace(
     ws: WorkspaceMeta,
     nowMs: number,
@@ -152,10 +160,10 @@ export class ScheduleScanner {
   ): Promise<ScheduleSnapshotWorkspace> {
     let res
     try {
-      res = await readScheduleDeclaration(ws.dir)
+      res = await readWorkspaceIssues(ws.dir)
     } catch (err) {
       this.deps.logger.warn('schedule.read_failed', { wsId: ws.id, err })
-      return { wsId: ws.id, tag: ws.tag, status: 'invalid', error: 'failed to read schedule file', tasks: [] }
+      return { wsId: ws.id, tag: ws.tag, status: 'invalid', error: 'failed to read issues', tasks: [] }
     }
     if (!res.ok) {
       if (res.reason === 'invalid') {
@@ -164,22 +172,30 @@ export class ScheduleScanner {
       }
       return { wsId: ws.id, tag: ws.tag, status: 'absent', tasks: [] }
     }
+    if (res.invalid.length > 0) {
+      this.deps.logger.warn('schedule.issue_files_invalid', {
+        wsId: ws.id,
+        invalid: res.invalid.map((i) => i.id),
+      })
+    }
 
     const tasks: ScheduleSnapshotTask[] = []
-    for (const task of res.tasks) {
-      seen.add(this.deps.markers.key(ws.id, task.id))
-      const enabled = task.enabled !== false
-      if (enabled && this.isDue(ws.id, task.id, taskWhen(task), nowMs)) {
-        await this.fire(ws, task.id, task.what, task.agent, nowMs)
+    for (const issue of res.issues) {
+      // No `when` ⇒ pure board work item; the scanner does not touch it.
+      const when = issue.when
+      if (!when) continue
+      seen.add(this.deps.markers.key(ws.id, issue.id))
+      if (isFireable(issue) && this.isDue(ws.id, issue.id, when, nowMs)) {
+        await this.fire(ws, issue.id, issueFirePrompt(issue), issue.agent, nowMs)
       }
       // Read the marker AFTER any fire so last/next reflect a just-fired run.
-      const last = this.deps.markers.get(ws.id, task.id) ?? null
-      tasks.push(snapshotTask(task, last, nowMs, this.intervalMs))
+      const last = this.deps.markers.get(ws.id, issue.id) ?? null
+      tasks.push(snapshotScheduledIssue(issue, when, last, nowMs, this.intervalMs))
     }
     return { wsId: ws.id, tag: ws.tag, status: 'ok', tasks }
   }
 
-  private isDue(wsId: string, taskId: string, when: ReturnType<typeof taskWhen>, nowMs: number): boolean {
+  private isDue(wsId: string, taskId: string, when: Schedule, nowMs: number): boolean {
     const last = this.deps.markers.get(wsId, taskId) ?? null
     const next = computeNextRun(when, fireBase(when, last, nowMs, this.intervalMs))
     return next !== null && next <= nowMs
@@ -198,7 +214,9 @@ export class ScheduleScanner {
       return
     }
     try {
-      const { taskId: runId } = await this.deps.dispatch(ws, adapter, what, RUN_TIMEOUT_MS)
+      // `taskId` here is the firing ISSUE's id (keyed by filename stem) — thread
+      // it so the run records which issue triggered it.
+      const { taskId: runId } = await this.deps.dispatch(ws, adapter, what, RUN_TIMEOUT_MS, taskId)
       await this.deps.markers.set(ws.id, taskId, nowMs)
       this.deps.logger.info('schedule.fired', { wsId: ws.id, taskId, agent: adapter.id, runId })
     } catch (err) {

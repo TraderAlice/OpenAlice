@@ -40,6 +40,9 @@ export const inboxPushFactory: WorkspaceToolFactory = {
         'detail is needed put it in a doc and reference it.',
         '',
         'At least one of `docs` or `comments` must be present.',
+        '',
+        'Entries are automatically linked back to the run that produced',
+        'them — you do not pass any run, session, or issue identity.',
       ].join(' '),
       inputSchema: z.object({
         docs: z
@@ -71,6 +74,10 @@ export const inboxPushFactory: WorkspaceToolFactory = {
             workspaceLabel: ctx.workspaceLabel,
             docs,
             comments,
+            // Agent-invisible: stamped from the server-resolved run origin, NOT
+            // from anything in the tool's input schema. Omit the key entirely
+            // when absent (interactive / no run header) so the JSONL stays clean.
+            ...(ctx.origin ? { origin: ctx.origin } : {}),
           })
           return {
             ok: true as const,

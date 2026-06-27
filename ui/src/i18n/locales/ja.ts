@@ -12,6 +12,7 @@ export const ja: Resources = {
       news: 'ニュース',
       tradingAsGit: 'Trading as Git',
       portfolio: 'ポートフォリオ',
+      issue: 'イシュー',
       automation: '自動化',
       settings: '設定',
       dev: '開発',
@@ -263,7 +264,6 @@ export const ja: Resources = {
     noAccountsYet: 'アカウントがまだありません。設定 → 取引 で追加してください。',
   },
   automation: {
-    schedules: 'スケジュール',
     runs: '実行',
     api: 'API',
     legacy: 'レガシー',

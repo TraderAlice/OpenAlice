@@ -24,6 +24,14 @@ export type HeadlessTaskStatus = 'running' | 'done' | 'failed' | 'interrupted'
 export interface HeadlessTaskRecord {
   readonly taskId: string
   readonly wsId: string
+  /**
+   * The workspace ISSUE that triggered this run, when it was fired by the
+   * ScheduleScanner from a scheduled `.alice/issues/<id>.md` (the issue id ==
+   * the filename stem). Absent on MANUAL/external dispatches (the workspace
+   * "run task" route) and on runs that predate the field — those have no owning
+   * issue. This is the run↔issue link the issue detail's Activity feed joins on.
+   */
+  readonly issueId?: string
   readonly agent: string
   /** The task prompt (the run's instruction) — shown collapsible in the panel. */
   readonly prompt: string
@@ -105,6 +113,8 @@ export class HeadlessTaskRegistry {
     agent: string
     prompt: string
     startedAt: number
+    /** Set only when an issue fired this run (scheduled scan); omitted for manual/external runs. */
+    issueId?: string
   }): Promise<HeadlessTaskRecord> {
     const rec: HeadlessTaskRecord = {
       taskId: randomUUID(),
@@ -113,6 +123,8 @@ export class HeadlessTaskRegistry {
       prompt: input.prompt,
       status: 'running',
       startedAt: input.startedAt,
+      // Keep the field absent (not `undefined`) on manual runs so the JSON stays clean.
+      ...(input.issueId ? { issueId: input.issueId } : {}),
     }
     this.tasks.push(rec)
     await this.flush()
@@ -147,9 +159,14 @@ export class HeadlessTaskRegistry {
   }
 
   /** Records newest-first, optionally filtered. */
-  list(opts: { wsId?: string; status?: HeadlessTaskStatus; limit?: number } = {}): HeadlessTaskRecord[] {
+  list(
+    opts: { wsId?: string; issueId?: string; status?: HeadlessTaskStatus; limit?: number } = {},
+  ): HeadlessTaskRecord[] {
     let out = this.tasks.filter(
-      (t) => (!opts.wsId || t.wsId === opts.wsId) && (!opts.status || t.status === opts.status),
+      (t) =>
+        (!opts.wsId || t.wsId === opts.wsId) &&
+        (!opts.issueId || t.issueId === opts.issueId) &&
+        (!opts.status || t.status === opts.status),
     )
     out = out.slice().reverse() // newest-first
     return opts.limit && opts.limit > 0 ? out.slice(0, opts.limit) : out

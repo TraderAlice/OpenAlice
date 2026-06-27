@@ -6,6 +6,8 @@ import { inboxHandlers } from './inbox'
 import { entitiesHandlers } from './entities'
 import { personaHeartbeatHandlers } from './personaHeartbeat'
 import { scheduleHandlers } from './schedule'
+import { issuesHandlers } from './issues'
+import { wikilinkHandlers } from './wikilink'
 import { toolsSimulatorHandlers } from './toolsSimulator'
 import { marketHandlers } from './market'
 import { configKeysHandlers } from './configKeys'
@@ -27,6 +29,8 @@ export const handlers = [
   ...entitiesHandlers,
   ...personaHeartbeatHandlers,
   ...scheduleHandlers,
+  ...issuesHandlers,
+  ...wikilinkHandlers,
   ...toolsSimulatorHandlers,
   ...marketHandlers,
   ...configKeysHandlers,

@@ -5,6 +5,11 @@ export type HeadlessTaskStatus = 'running' | 'done' | 'failed' | 'interrupted'
 export interface HeadlessTaskRecord {
   taskId: string
   wsId: string
+  /** The workspace ISSUE that fired this run (the issue filename stem), when it
+   *  was dispatched by the scheduler from a scheduled `.alice/issues/<id>.md`.
+   *  Absent on manual/external dispatches and on runs predating the field. This
+   *  is the run↔issue link the issue detail's Activity feed joins on. */
+  issueId?: string
   agent: string
   prompt: string
   status: HeadlessTaskStatus

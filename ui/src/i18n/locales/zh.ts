@@ -12,6 +12,7 @@ export const zh: Resources = {
       news: '新闻',
       tradingAsGit: '交易即 Git',
       portfolio: '投资组合',
+      issue: '议题',
       automation: '自动化',
       settings: '设置',
       dev: '开发',
@@ -263,7 +264,6 @@ export const zh: Resources = {
     noAccountsYet: '还没有账户。在 设置 → 交易 中添加。',
   },
   automation: {
-    schedules: '定时',
     runs: '运行',
     api: 'API',
     legacy: '旧版',

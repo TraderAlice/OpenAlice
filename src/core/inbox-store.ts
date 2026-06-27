@@ -41,6 +41,34 @@ export interface InboxDoc {
   path: string
 }
 
+/**
+ * Where an inbox entry came from — the agent-INVISIBLE provenance the server
+ * stamps onto every push. The agent never supplies any of this (exactly as it
+ * never supplies its own wsId): the run identity is injected as a spawn-time env
+ * var, carried out-of-band on an HTTP header by OpenAlice-owned code, and
+ * resolved server-side from the authoritative HeadlessTaskRegistry. It's the
+ * link the UI cross-references on: an inbox card → its originating run/issue,
+ * an issue detail → the inbox reports it produced.
+ *
+ * First cut is issue/run-level, headless only (`kind:'headless'`): `runId` is
+ * set for every dispatched run, `issueId` when a scheduled issue fired it,
+ * `agent` from the run record. `sessionId` + `kind:'interactive'` are reserved
+ * for Phase 2 (a pre-allocated session record id via a future AQ_SESSION_ID) —
+ * the object is structured now so it grows without reshaping. Absent on
+ * interactive/manual pushes that carry no run header → `origin` is undefined.
+ */
+export interface InboxOrigin {
+  kind: 'headless' | 'interactive' | 'manual'
+  /** The headless run's taskId (== HeadlessTaskRegistry key). */
+  runId?: string
+  /** The scheduled issue that fired the run, when applicable. */
+  issueId?: string
+  /** Reserved for Phase 2 interactive sessions (pre-allocated record id). */
+  sessionId?: string
+  /** The agent CLI id (claude/codex/…) from the run record. */
+  agent?: string
+}
+
 export interface InboxInput {
   workspaceId: string
   /** Display snapshot of the workspace label. Optional; readers fall
@@ -51,6 +79,10 @@ export interface InboxInput {
   docs?: InboxDoc[]
   /** Agent's message body (markdown). Renders below docs. */
   comments?: string
+  /** Agent-INVISIBLE provenance, stamped server-side from the spawn-injected
+   *  run header (never supplied by the agent). Optional + additive: old JSONL
+   *  entries parse with `origin === undefined`, so NO migration is needed. */
+  origin?: InboxOrigin
 }
 
 export interface InboxEntry extends InboxInput {

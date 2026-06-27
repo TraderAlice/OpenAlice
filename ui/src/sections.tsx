@@ -89,6 +89,9 @@ const SECTION_BY_KEY: Partial<Record<ActivitySection, SidebarSection>> = {
     titleKey: 'nav.item.portfolio',
     Secondary: PortfolioSidebar,
   },
+  // issue: sidebar-less (Linear-style) — clicking Issues opens the board
+  // full-width; no secondary column. Filter views (All/Active/Backlog) belong
+  // at the top of the board, not in a sidebar.
   automation: {
     titleKey: 'nav.item.automation',
     Secondary: AutomationSidebar,

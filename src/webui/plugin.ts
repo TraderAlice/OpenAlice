@@ -13,6 +13,7 @@ import { createConfigRoutes, createMarketDataRoutes } from './routes/config.js'
 import { createEventsRoutes } from './routes/events.js'
 import { createTopologyRoutes } from './routes/topology.js'
 import { createScheduleRoutes } from './routes/schedule.js'
+import { createIssuesRoutes } from './routes/issues.js'
 import { createTradingProxyRoutes } from './routes/trading-proxy.js'
 import { createTradingConfigRoutes } from './routes/trading-config.js'
 import { createToolsRoutes } from './routes/tools.js'
@@ -24,6 +25,7 @@ import { createBarsRoutes } from './routes/bars.js'
 import { createReferenceRoutes } from './routes/reference.js'
 import { createInboxRoutes } from './routes/inbox.js'
 import { createEntityRoutes } from './routes/entities.js'
+import { createWikilinkRoutes } from './routes/wikilink.js'
 import { createVersionRoutes } from './routes/version.js'
 import { createAuthRoutes } from './routes/auth.js'
 import { createAuthMiddleware } from './middleware/auth.js'
@@ -215,17 +217,26 @@ export class WebPlugin implements Plugin {
     this.workspaceService = await createWorkspaceService({
       webPort: this.config.port,
       mcpPort: this.config.mcpPort,
+      inboxStore: ctx.inboxStore,
     })
     if (this.workspaceServiceRef) this.workspaceServiceRef.current = this.workspaceService
     app.route('/api/workspaces', createWorkspaceRoutes(this.workspaceService))
     app.route('/api/headless', createHeadlessRoutes(this.workspaceService))
     app.route('/api/schedule', createScheduleRoutes(this.workspaceService))
+    app.route('/api/issues', createIssuesRoutes(this.workspaceService))
     // Tracked entities — read surface for the Tracked tab. Mounted here (not
     // with the other /api/* routes above) because backlink scanning needs the
     // workspace registry, which only exists once workspaceService is created.
     app.route(
       '/api/entities',
       createEntityRoutes({ entityStore: ctx.entityStore, registry: this.workspaceService.registry }),
+    )
+    // Cross-namespace [[name]] resolver — entities (global store) + issues (per-
+    // workspace scan) in one lookup so the UI can navigate or disambiguate a
+    // clicked wikilink. Same dep shape rationale as /api/entities above.
+    app.route(
+      '/api/wikilink',
+      createWikilinkRoutes({ entityStore: ctx.entityStore, service: this.workspaceService }),
     )
 
     // ==================== Mount opentypebb (market data HTTP) ====================

@@ -164,6 +164,18 @@ export const CLI_EXPORTS: Record<string, CliExport> = {
         add: 'entity_upsert',
         search: 'entity_search',
       },
+      // issue: the issue board. READS are GLOBAL — `list` scans every
+      // workspace's titles, `show <name>` resolves a name across the board and
+      // returns full detail (issue + runs + inbox reports). WRITES stay local —
+      // create/update/comment author in the CALLER's own `.alice/issues/`
+      // (editing a peer's board is the human-approved peer-edit path).
+      issue: {
+        update: 'issue_update',
+        comment: 'issue_comment',
+        create: 'issue_create',
+        list: 'issue_list',
+        show: 'issue_show',
+      },
     },
   },
   uta: {

@@ -1,11 +1,12 @@
 /**
  * /api/schedule — read-only dashboard for workspace self-scheduling.
  *
- * Aggregates every workspace's own `.alice/schedule.json` (the agent writes it;
- * a launcher scanner fires due tasks as headless runs — there is NO central
- * registry) enriched with the scanner's last-fired marker + computed next-due.
- * Creation/edit is NOT a route — scheduling is a coding task (the agent edits
- * the file). This surface is purely "what is scheduled across my workspaces".
+ * Aggregates every workspace's own `.alice/issues/<id>.md` files (the agent
+ * writes them; a launcher scanner fires due scheduled issues as headless runs —
+ * there is NO central registry) enriched with the scanner's last-fired marker +
+ * computed next-due. Creation/edit is NOT a route — scheduling is a coding task
+ * (the agent edits the files). This surface is purely the scheduling projection:
+ * "what is scheduled across my workspaces".
  */
 import { Hono } from 'hono'
 

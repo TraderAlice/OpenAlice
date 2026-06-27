@@ -1,4 +1,4 @@
-import { type LucideIcon, MessageSquare, Inbox, Telescope, LineChart, GitBranch, BarChart3, Newspaper, Zap, Settings, Code2, TerminalSquare, ChevronDown, Info } from 'lucide-react'
+import { type LucideIcon, MessageSquare, Inbox, Telescope, LineChart, GitBranch, BarChart3, Newspaper, Zap, Settings, Code2, TerminalSquare, ChevronDown, Info, ListChecks } from 'lucide-react'
 import { useState } from 'react'
 import { type Page } from '../App'
 import { findSectionForActivity } from '../sections'
@@ -25,6 +25,7 @@ function activitySectionFor(page: Page): ActivitySection {
     case 'dev':                  return 'dev'
     case 'market':               return 'market'
     case 'portfolio':            return 'portfolio'
+    case 'issue':                return 'issue'
     case 'automation':           return 'automation'
     case 'news':                 return 'news'
   }
@@ -55,7 +56,7 @@ interface ActivityBarProps {
 
 type NavItemKey =
   | 'nav.item.inbox' | 'nav.item.tracked' | 'nav.item.chat' | 'nav.item.workspaces'
-  | 'nav.item.market' | 'nav.item.news' | 'nav.item.tradingAsGit'
+  | 'nav.item.market' | 'nav.item.news' | 'nav.item.tradingAsGit' | 'nav.item.issue'
   | 'nav.item.portfolio' | 'nav.item.automation' | 'nav.item.settings' | 'nav.item.dev'
 
 interface NavLeaf {
@@ -117,19 +118,20 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { page: 'chat',       labelKey: 'nav.item.chat',       icon: MessageSquare, defaultTab: { kind: 'chat-landing', params: {} } },
       { page: 'inbox',      labelKey: 'nav.item.inbox',      icon: Inbox, defaultTab: { kind: 'inbox', params: {} } },
+      { page: 'issue',      labelKey: 'nav.item.issue',      icon: ListChecks, defaultTab: { kind: 'issue', params: {} } },
       { page: 'tracked',    labelKey: 'nav.item.tracked',    icon: Telescope, defaultTab: { kind: 'tracked', params: {} } },
       { page: 'market',     labelKey: 'nav.item.market',     icon: BarChart3 },
       { page: 'news',       labelKey: 'nav.item.news',       icon: Newspaper, defaultTab: { kind: 'news', params: {} } },
       { page: 'workspaces', labelKey: 'nav.item.workspaces', icon: TerminalSquare },
-      { page: 'automation', labelKey: 'nav.item.automation', icon: Zap, defaultTab: { kind: 'automation', params: { section: 'schedules' } } },
     ],
   },
   // Beta — functional but not yet dependable. Cross-broker unification
   // (UTA abstraction, FX/options/futures) is in active rearchitecture:
   // Portfolio surfaces that state, Trading-as-Git is the operations side
   // (pending broker writes). The data runs; the schema/UX underneath isn't
-  // settled. (Automation graduated to the top group once its self-scheduling
-  // trigger chain closed end-to-end.) Broker connection CRUD lives under
+  // settled. (Scheduled work now surfaces on the Issues board in the top group;
+  // Automation moved down to System as the headless-run / API / event-bus ops
+  // side.) Broker connection CRUD lives under
   // Settings → Trading, not here — it's a config surface, not state/ops.
   {
     sectionLabel: 'Beta',
@@ -144,6 +146,11 @@ const NAV_SECTIONS: NavSection[] = [
     sectionLabel: 'System',
     labelKey: 'nav.section.system',
     items: [
+      // Automation lives here now: Issues (the board) is the primary
+      // management surface, and scheduled issues fire from there. Automation
+      // is the operations/plumbing side (headless runs, API, event bus) —
+      // System chrome, not a daily-driver nav target.
+      { page: 'automation', labelKey: 'nav.item.automation', icon: Zap, defaultTab: { kind: 'automation', params: { section: 'runs' } } },
       { page: 'settings', labelKey: 'nav.item.settings', icon: Settings },
       { page: 'dev',      labelKey: 'nav.item.dev',      icon: Code2 },
     ],

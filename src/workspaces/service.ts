@@ -27,11 +27,25 @@ import { runHeadlessTask, type HeadlessTaskResult } from './headless-task.js';
 import { ScheduleMarkerStore } from './schedule/marker-store.js';
 import { ScheduleScanner, DEFAULT_INTERVAL_MS } from './schedule/scanner.js';
 import {
-  readScheduleDeclaration,
-  snapshotTask,
+  readWorkspaceIssues,
+  snapshotScheduledIssue,
   type ScheduleSnapshot,
+  type ScheduleSnapshotTask,
   type ScheduleSnapshotWorkspace,
 } from './schedule/declaration.js';
+import {
+  annotateNameCollisions,
+  detailIssue,
+  inboxReportsForIssue,
+  snapshotBoardIssue,
+  type IssueDetail,
+  type IssueFiringMarkers,
+  type IssuesSnapshot,
+  type IssuesSnapshotIssue,
+  type IssuesSnapshotWorkspace,
+  type WikilinkIssueRef,
+} from './issues/board.js';
+import type { IInboxStore } from '@/core/inbox-store.js';
 import { HeadlessTaskRegistry, headlessLogPaths } from './headless-task-registry.js';
 
 /** Max concurrent in-flight headless tasks — backstop against unbounded spawn. */
@@ -140,10 +154,28 @@ export interface WorkspaceService {
     adapter: CliAdapter,
     prompt: string,
     timeoutMs: number,
+    /** The firing issue's id, when dispatched by the ScheduleScanner; recorded on
+     *  the run as `issueId` so the issue detail's Activity feed can join on it.
+     *  Manual/external runs omit it. */
+    issueId?: string,
   ): Promise<{ taskId: string }>;
-  /** Read-only snapshot of every workspace's declared `.alice/schedule.json` +
-   *  each task's last-fired marker and computed next-due. Powers GET /api/schedule. */
+  /** Read-only scheduling projection of every workspace's `.alice/issues/`
+   *  directory (scheduled issues only) + each task's last-fired marker and
+   *  computed next-due. Powers GET /api/schedule. */
   scheduleSnapshot(): Promise<ScheduleSnapshot>;
+  /** Read-only snapshot of every workspace's `.alice/issues/` directory — ALL
+   *  issues (scheduled or not), scheduled ones enriched with firing markers.
+   *  Powers the global Issue board GET /api/issues. */
+  issuesSnapshot(): Promise<IssuesSnapshot>;
+  /** Read-only DETAIL for one issue (markdown body + firing markers + its
+   *  headless run history, newest first). `null` when the workspace or the issue
+   *  id is absent. Powers GET /api/issues/:wsId/:id. */
+  issueDetail(wsId: string, id: string): Promise<IssueDetail | null>;
+  /** Resolve a `[[name]]` token to the issues across ALL workspaces that claim it.
+   *  Matches case-insensitively against an issue's `id` OR its `title` (either is a
+   *  valid name handle). Returns every match — 0, 1, or many (a collision the UI
+   *  disambiguates by wsId). Powers GET /api/wikilink/resolve. */
+  resolveIssuesByName(name: string): Promise<WikilinkIssueRef[]>;
   /** The headless-task management plane (cross-workspace; powers GET /api/headless). */
   headlessTasks: HeadlessTaskRegistry;
   /** Where dispatched tasks' full stdout/stderr logs land (read by the output route). */
@@ -160,6 +192,11 @@ export interface CreateWorkspaceServiceOptions {
    *  fallback bridge resolves to the live backend (not whatever was the
    *  default in template files). */
   readonly mcpPort: number;
+  /** The global inbox store, so `issueDetail` can join the inbox reports an
+   *  issue produced (entries stamped `origin.issueId`) in the domain layer —
+   *  every surface (HTTP / CLI / MCP) gets the join, not just the route.
+   *  Optional: when absent, `issueDetail` returns `inboxReports: []`. */
+  readonly inboxStore?: IInboxStore;
 }
 
 /**
@@ -180,6 +217,7 @@ export function resumeFromRecord(
 
 export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions): Promise<WorkspaceService> {
   const config = loadConfig({ webPort: opts.webPort });
+  const inboxStore = opts.inboxStore;
 
   const registry = await WorkspaceRegistry.load(
     `${config.launcherRoot}/workspaces.json`,
@@ -280,6 +318,12 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     adapter: CliAdapter,
     resume: SessionFactoryContext['resume'],
     initialPrompt?: string,
+    // Per-spawn env on TOP of the shared base — used ONLY by the headless path to
+    // inject AQ_RUN_ID (the run's taskId). Deliberately a param, NOT folded into
+    // baseEnv: interactive/probe spawns must NOT carry a run identity, and merging
+    // it before adapter.composeEnv() lets an MCP-config adapter (opencode) read it
+    // and emit the out-of-band header.
+    extraEnv?: Record<string, string>,
   ): {
     command: readonly string[];
     cwd: string;
@@ -312,6 +356,10 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       GIT_AUTHOR_EMAIL: `${ws.id}@workspace.local`,
       GIT_COMMITTER_NAME: ws.tag,
       GIT_COMMITTER_EMAIL: `${ws.id}@workspace.local`,
+      // Headless-only run identity (see extraEnv above). Merged here so it's
+      // visible to adapter.composeEnv() below (opencode's inline MCP config) and
+      // to the spawned process's env (the `alice` shim reads it).
+      ...(extraEnv ?? {}),
     }, ws.dir);
     const baseCtx = {
       ...(resume !== undefined ? { resume } : {}),
@@ -405,8 +453,18 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       throw new Error(`adapter "${adapter.id}" has no headless mode`);
     }
     // Reuse a fresh interactive spawn's env/cwd (identical MCP injection),
-    // then swap the interactive command for the one-shot headless argv.
-    const { cwd, env } = composeSpawnInputs(ws, adapter, undefined);
+    // then swap the interactive command for the one-shot headless argv. Inject
+    // AQ_RUN_ID = this run's taskId so the agent's inbox pushes self-link to the
+    // run server-side (via the `alice` shim header / opencode's MCP header) —
+    // headless-only, agent never sees it. The taskId is the registry key the
+    // route resolves issueId/agent from.
+    const { cwd, env } = composeSpawnInputs(
+      ws,
+      adapter,
+      undefined,
+      undefined,
+      opts.taskId ? { AQ_RUN_ID: opts.taskId } : undefined,
+    );
     const command = adapter.composeHeadlessCommand(config.command, { cwd, env }, prompt);
     const logPaths = opts.taskId ? headlessLogPaths(headlessLogsDir, opts.taskId) : null;
     return runHeadlessTask({
@@ -435,6 +493,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     adapter: CliAdapter,
     prompt: string,
     timeoutMs: number,
+    // The firing issue's id, when this dispatch came from the ScheduleScanner.
+    // Manual/external runs (the workspace "run task" route) leave it undefined.
+    issueId?: string,
   ): Promise<{ taskId: string }> => {
     if (!adapter.capabilities.headless || !adapter.composeHeadlessCommand) {
       throw new Error(`adapter "${adapter.id}" has no headless mode`);
@@ -447,6 +508,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       agent: adapter.id,
       prompt,
       startedAt: Date.now(),
+      ...(issueId ? { issueId } : {}),
     });
     // Fire-and-forget: run to natural exit, then fill the record. NOTE: status
     // is judged by exit code — pi can exit 0 on an in-band model error, so
@@ -481,8 +543,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     return { taskId: rec.taskId };
   };
 
-  // ── Workspace self-scheduling. Scan each workspace's own `.alice/schedule.json`
-  // and fire due tasks as headless runs through the SAME dispatch primitive. The
+  // ── Workspace self-scheduling. Scan each workspace's own `.alice/issues/*.md`
+  // files and fire due SCHEDULED issues as headless runs through the SAME dispatch
+  // primitive (issues without a `when` are pure board items, ignored here). The
   // scanner owns its own tick (infra periodicity, NOT a scheduled task) and
   // persists only a last-fired marker — never the schedule itself, which lives
   // solely in the workspace's file.
@@ -512,7 +575,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     const nowMs = Date.now();
     const workspaces = await Promise.all(
       registry.list().map(async (ws): Promise<ScheduleSnapshotWorkspace> => {
-        const res = await readScheduleDeclaration(ws.dir);
+        const res = await readWorkspaceIssues(ws.dir);
         if (!res.ok) {
           return {
             wsId: ws.id,
@@ -522,17 +585,130 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
             tasks: [],
           };
         }
-        return {
-          wsId: ws.id,
-          tag: ws.tag,
-          status: 'ok',
-          tasks: res.tasks.map((t) =>
-            snapshotTask(t, scheduleMarkers.get(ws.id, t.id) ?? null, nowMs, DEFAULT_INTERVAL_MS),
-          ),
-        };
+        const tasks: ScheduleSnapshotTask[] = [];
+        for (const issue of res.issues) {
+          // Only SCHEDULED issues (those carrying a `when`) reach the schedule
+          // snapshot; unscheduled issues are pure board work items.
+          if (!issue.when) continue;
+          tasks.push(
+            snapshotScheduledIssue(
+              issue,
+              issue.when,
+              scheduleMarkers.get(ws.id, issue.id) ?? null,
+              nowMs,
+              DEFAULT_INTERVAL_MS,
+            ),
+          );
+        }
+        return { wsId: ws.id, tag: ws.tag, status: 'ok', tasks };
       }),
     );
     return { workspaces };
+  };
+
+  // Read-only aggregation for the global Issue board (GET /api/issues). Mirrors
+  // scheduleSnapshot's cold path, but returns ALL issues (not just scheduled
+  // ones) and the board's two-valued status. Always a live read: the scanner's
+  // warm cache holds only the SCHEDULED projection, so it can't reconstruct the
+  // board's unscheduled work items — and the board is a low-frequency poll.
+  const issuesSnapshot = async (): Promise<IssuesSnapshot> => {
+    const nowMs = Date.now();
+    const workspaces = await Promise.all(
+      registry.list().map(async (ws): Promise<IssuesSnapshotWorkspace> => {
+        const res = await readWorkspaceIssues(ws.dir);
+        if (!res.ok) {
+          // 'absent' (no issues dir) is an empty board for that workspace, not an
+          // error; only a genuinely unreadable dir (e.g. retired issue.json) is
+          // surfaced as 'invalid' with its actionable hint.
+          if (res.reason === 'absent') {
+            return { wsId: ws.id, tag: ws.tag, status: 'ok', issues: [] };
+          }
+          return { wsId: ws.id, tag: ws.tag, status: 'invalid', error: res.error, issues: [] };
+        }
+        const issues: IssuesSnapshotIssue[] = res.issues.map((issue) => {
+          // Unscheduled ⇒ pure board work item, no firing markers.
+          if (!issue.when) return snapshotBoardIssue(issue, null);
+          // Scheduled ⇒ reuse the schedule snapshot's math so the board's
+          // last/next match the Schedules dashboard exactly.
+          const fired = snapshotScheduledIssue(
+            issue,
+            issue.when,
+            scheduleMarkers.get(ws.id, issue.id) ?? null,
+            nowMs,
+            DEFAULT_INTERVAL_MS,
+          );
+          return snapshotBoardIssue(issue, {
+            lastFiredAtMs: fired.lastFiredAtMs,
+            nextDueAtMs: fired.nextDueAtMs,
+          });
+        });
+        return { wsId: ws.id, tag: ws.tag, status: 'ok', issues };
+      }),
+    );
+    // Cross-workspace name-clash detection (mutates rows in place + returns the
+    // colliding display titles). Detection only — never enforced at write time.
+    const duplicateNames = annotateNameCollisions(workspaces);
+    return { workspaces, duplicateNames };
+  };
+
+  // Read-only DETAIL for ONE issue (GET /api/issues/:wsId/:id). Resolves the
+  // workspace, live-reads its issues, finds the matching id, enriches a scheduled
+  // issue with the SAME firing math as the board (so last/next agree), and joins
+  // the headless registry on wsId+issueId for the issue's run history (Activity
+  // feed). Returns null when the workspace, its issues dir, or the id is absent —
+  // the route maps that to a 404. Includes the markdown body (the list omits it).
+  const issueDetail = async (wsId: string, id: string): Promise<IssueDetail | null> => {
+    const ws = registry.get(wsId);
+    if (!ws) return null;
+    const res = await readWorkspaceIssues(ws.dir);
+    if (!res.ok) return null; // absent or unreadable issues dir ⇒ no such issue
+    const issue = res.issues.find((i) => i.id === id);
+    if (!issue) return null;
+    let markers: IssueFiringMarkers | null = null;
+    if (issue.when) {
+      const fired = snapshotScheduledIssue(
+        issue,
+        issue.when,
+        scheduleMarkers.get(ws.id, issue.id) ?? null,
+        Date.now(),
+        DEFAULT_INTERVAL_MS,
+      );
+      markers = { lastFiredAtMs: fired.lastFiredAtMs, nextDueAtMs: fired.nextDueAtMs };
+    }
+    // Newest-first already (registry.list reverses); filter to this issue's runs.
+    const runs = headlessTasks.list({ wsId: ws.id, issueId: issue.id });
+    // The issue→inbox cross-link: the reports this issue produced (entries this
+    // workspace pushed whose server-stamped origin.issueId is this issue).
+    // Joined here in the domain so CLI / MCP get it too, not just the HTTP route.
+    let inboxReports: IssueDetail['inboxReports'] = [];
+    if (inboxStore) {
+      const { entries } = await inboxStore.read({ workspaceId: ws.id, limit: 1000 });
+      inboxReports = inboxReportsForIssue(entries, issue.id);
+    }
+    return { issue: detailIssue(issue, markers), runs, inboxReports };
+  };
+
+  // Resolve a `[[name]]` token to the issues (across ALL workspaces) that claim
+  // it. A token matches an issue when, case-insensitively, it equals the issue's
+  // `id` (filename slug) OR its `title` — both are legitimate name handles an
+  // author might link. Live read like the board; a bad workspace is skipped, not
+  // propagated. Multiple matches = a collision the UI disambiguates by wsId.
+  const resolveIssuesByName = async (name: string): Promise<WikilinkIssueRef[]> => {
+    const token = name.trim().toLowerCase();
+    if (!token) return [];
+    const out: WikilinkIssueRef[] = [];
+    await Promise.all(
+      registry.list().map(async (ws) => {
+        const res = await readWorkspaceIssues(ws.dir);
+        if (!res.ok) return;
+        for (const issue of res.issues) {
+          if (issue.id.toLowerCase() === token || issue.title.trim().toLowerCase() === token) {
+            out.push({ wsId: ws.id, wsTag: ws.tag, id: issue.id, title: issue.title });
+          }
+        }
+      }),
+    );
+    return out;
   };
 
   const pool = new SessionPool(
@@ -716,6 +892,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     runHeadlessTask: runHeadlessTaskMethod,
     dispatchHeadlessTask: dispatchHeadlessTaskMethod,
     scheduleSnapshot,
+    issuesSnapshot,
+    issueDetail,
+    resolveIssuesByName,
     headlessTasks,
     headlessLogsDir,
     isShuttingDown: () => shuttingDown,

@@ -21,6 +21,7 @@ import { useTranslation } from 'react-i18next'
  */
 export type Page =
   | 'chat' | 'inbox' | 'tracked' | 'workspaces' | 'portfolio' | 'news' | 'automation' | 'market'
+  | 'issue'
   | 'trading-as-git'
   | 'settings' | 'dev'
 

@@ -47,7 +47,7 @@ Automation runs a Workspace **headless on a trigger** — the same Workspace sub
 
 Two ways a run is triggered:
 
-- **Self-scheduled** — a workspace declares its own schedule in `.alice/schedule.json` (interval / cron / one-shot); a dumb scanner discovers declarations and fires due tasks. No central registry — scheduling is a coding task the agent does by writing a file.
+- **Self-scheduled** — a workspace declares its own schedule in `.alice/issue.json` (interval / cron / one-shot); a dumb scanner discovers declarations and fires due tasks. No central registry — scheduling is a coding task the agent does by writing a file.
 - **External** — `POST /api/workspaces/:id/headless` lets any outside system (a webhook bridge, a cron on another host) drive a workspace.
 
 ### Interface
@@ -102,7 +102,7 @@ graph TB
   end
 
   subgraph Sched["Triggers — what fires a run"]
-    TRIG[".alice/schedule.json scanner<br/>+ external POST"]
+    TRIG[".alice/issue.json scanner<br/>+ external POST"]
   end
 
   TRIG -.spawns headless run.-> Workspace
@@ -179,7 +179,7 @@ Docker entrypoint (with `tini` as PID 1).
 **Automation** — A run is a **headless Workspace**: the same substrate
 spawned non-interactively against an agent + prompt, doing the work and
 reporting back through the Inbox (dotted line), visible in the Runs tab.
-Two triggers — a workspace's own `.alice/schedule.json` (a scanner
+Two triggers — a workspace's own `.alice/issue.json` (a scanner
 discovers declarations and fires due tasks; no central engine), or an
 external `POST /api/workspaces/:id/headless`. One substrate, whether a
 human or a trigger opened the Workspace.
@@ -201,7 +201,7 @@ agent runtime that drives trading decisions.
 
 **Guard** — A pre-execution safety check that runs inside a UTA before orders reach the broker. Guards enforce limits (max position size, cooldown between trades, symbol whitelist) and are configured per-account. Think of it as ESLint for trading — automated rules that catch problems before they go live.
 
-**Scheduled run** — A workspace's self-declared schedule (`.alice/schedule.json`; interval / cron / one-shot) that, when a task is due, spawns a **headless Workspace**: the same agent + a prompt, run non-interactively, reporting back through the Inbox. Same Workspace substrate as interactive work — there's no separate autonomous-execution path. (External systems can also `POST` a one-off run.)
+**Scheduled run** — A workspace's self-declared schedule (`.alice/issue.json`; interval / cron / one-shot) that, when a task is due, spawns a **headless Workspace**: the same agent + a prompt, run non-interactively, reporting back through the Inbox. Same Workspace substrate as interactive work — there's no separate autonomous-execution path. (External systems can also `POST` a one-off run.)
 
 **AI Provider** — Alice runs no model in-process; the model loop lives inside the native workspace CLI (Claude Code / Codex / opencode / Pi). What Alice keeps is a **credential vault**: api-key credentials, each declaring which wire shapes it can speak (Anthropic Messages / OpenAI Chat Completions / OpenAI Responses), injected into workspaces. Subscription logins (Claude Pro/Max, ChatGPT) live in the CLI's own login, not in Alice.
 

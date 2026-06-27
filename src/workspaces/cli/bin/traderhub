@@ -81,9 +81,17 @@ async function manifest(base) {
 }
 
 async function invoke(base, tool, args) {
+  // Agent-invisible run identity: the launcher injects AQ_RUN_ID into the
+  // HEADLESS spawn env only (mirrors how it injects AQ_WS_ID for the path).
+  // Forward it out-of-band as a header — NOT in the tool args, NOT in the path —
+  // so the gateway can server-side-resolve the entry's origin without the agent
+  // ever trafficking its own run identity. Absent on interactive spawns.
+  const headers = { 'Content-Type': 'application/json' }
+  const runId = process.env.AQ_RUN_ID
+  if (runId) headers['x-openalice-run'] = runId
   const r = await fetchJson(base + '/invoke', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ tool, args }),
   })
   if (!r.ok) {

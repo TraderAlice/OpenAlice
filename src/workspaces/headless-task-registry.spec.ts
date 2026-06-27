@@ -57,6 +57,28 @@ describe('HeadlessTaskRegistry', () => {
     expect(reg.list({ limit: 1 }).length).toBe(1)
   })
 
+  it('records issueId when an issue fired the run; omits it for manual runs', async () => {
+    const reg = await HeadlessTaskRegistry.load(path, noopLogger)
+    const fired = await reg.create({ wsId: 'w1', agent: 'codex', prompt: 'x', startedAt: 1, issueId: 'daily-scan' })
+    const manual = await reg.create({ wsId: 'w1', agent: 'codex', prompt: 'y', startedAt: 2 })
+    expect(fired.issueId).toBe('daily-scan')
+    // Manual runs leave the field absent (not undefined-valued) so the JSON stays clean.
+    expect('issueId' in manual).toBe(false)
+    // Persists across reload.
+    const reg2 = await HeadlessTaskRegistry.load(path, noopLogger)
+    expect(reg2.get(fired.taskId)?.issueId).toBe('daily-scan')
+  })
+
+  it('list filters by issueId (the issue detail Activity feed join)', async () => {
+    const reg = await HeadlessTaskRegistry.load(path, noopLogger)
+    const a = await reg.create({ wsId: 'w1', agent: 'codex', prompt: 'x', startedAt: 1, issueId: 'iss-a' })
+    const b = await reg.create({ wsId: 'w1', agent: 'codex', prompt: 'y', startedAt: 2, issueId: 'iss-a' })
+    await reg.create({ wsId: 'w1', agent: 'codex', prompt: 'z', startedAt: 3, issueId: 'iss-b' })
+    await reg.create({ wsId: 'w1', agent: 'codex', prompt: 'm', startedAt: 4 }) // manual, no issueId
+    // newest-first, only iss-a's runs.
+    expect(reg.list({ wsId: 'w1', issueId: 'iss-a' }).map((t) => t.taskId)).toEqual([b.taskId, a.taskId])
+  })
+
   it('stores the full task prompt (not truncated — collapsible in the UI)', async () => {
     const reg = await HeadlessTaskRegistry.load(path, noopLogger)
     const a = await reg.create({ wsId: 'w1', agent: 'codex', prompt: 'x'.repeat(1000), startedAt: 1 })

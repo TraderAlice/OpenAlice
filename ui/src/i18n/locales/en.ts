@@ -23,6 +23,7 @@ export const en = {
       news: 'News',
       tradingAsGit: 'Trading as Git',
       portfolio: 'Portfolio',
+      issue: 'Issues',
       automation: 'Automation',
       settings: 'Settings',
       dev: 'Dev',
@@ -274,7 +275,6 @@ export const en = {
     noAccountsYet: 'No accounts yet. Add one in Settings → Trading.',
   },
   automation: {
-    schedules: 'Schedules',
     runs: 'Runs',
     api: 'API',
     legacy: 'Legacy',

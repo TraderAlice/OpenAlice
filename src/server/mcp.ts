@@ -9,8 +9,10 @@ import { type WorkspaceToolCenter, makeWorkspaceResolver } from '../core/workspa
 import type { IInboxStore } from '../core/inbox-store.js'
 import type { IEntityStore } from '../core/entity-store.js'
 import type { WorkspaceService } from '../workspaces/service.js'
+import type { InboxOrigin } from '../core/inbox-store.js'
 import { extractMcpShape, wrapToolExecute } from '../core/mcp-export.js'
 import { registerCliRoutes } from './cli.js'
+import { resolveInboxOrigin } from './inbox-origin.js'
 
 /**
  * MCP Plugin — exposes OpenAlice tools via Streamable HTTP, plus the CLI gateway.
@@ -86,7 +88,11 @@ export class McpPlugin implements Plugin {
     /** Build a per-request McpServer scoped to a specific workspace.
      *  Each WorkspaceToolFactory is invoked with the URL's wsId so its
      *  tools' execute() closes over that identity. */
-    const createWorkspaceMcpServer = (wsId: string, wsLabel: string) => {
+    const createWorkspaceMcpServer = (wsId: string, wsLabel: string, origin?: InboxOrigin) => {
+      // GLOBAL issue-board reader, backed by the live WorkspaceService — parity
+      // with the CLI gateway so issue_list / issue_show read EVERY workspace's
+      // issues here too. Absent when the service isn't up → tools self-read.
+      const svc = getWorkspaceService()
       const tools = workspaceToolCenter.build({
         workspaceId: wsId,
         workspaceLabel: wsLabel,
@@ -95,6 +101,18 @@ export class McpPlugin implements Plugin {
         // Parity with the CLI gateway so external MCP consumers get the same
         // workspace_path resolution — shared helper, so the two can't drift.
         resolveWorkspace: makeWorkspaceResolver(getWorkspaceService),
+        ...(svc
+          ? {
+              board: {
+                snapshot: () => svc.issuesSnapshot(),
+                detail: (w: string, i: string) => svc.issueDetail(w, i),
+                resolveByName: (n: string) => svc.resolveIssuesByName(n),
+              },
+            }
+          : {}),
+        // Agent-invisible run provenance from the out-of-band header (resolved
+        // server-side from the authoritative registry). Absent → undefined.
+        ...(origin ? { origin } : {}),
       })
       const mcp = new McpServer({ name: 'open-alice-workspace', version: '1.0.0' })
       for (const [name, t] of Object.entries(tools)) {
@@ -112,7 +130,7 @@ export class McpPlugin implements Plugin {
     app.use('*', cors({
       origin: '*',
       allowMethods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
-      allowHeaders: ['Content-Type', 'mcp-session-id', 'Last-Event-ID', 'mcp-protocol-version'],
+      allowHeaders: ['Content-Type', 'mcp-session-id', 'Last-Event-ID', 'mcp-protocol-version', 'x-openalice-run'],
       exposeHeaders: ['mcp-session-id', 'mcp-protocol-version'],
     }))
 
@@ -134,8 +152,13 @@ export class McpPlugin implements Plugin {
       const meta = svc.registry.get(wsId)
       if (!meta) return c.text('unknown workspace', 404)
 
+      // Out-of-band run identity (agent never sees it): the spawn-injected
+      // AQ_RUN_ID rides this header from native-MCP server config, resolved
+      // server-side to an authoritative origin and baked into the tools.
+      const origin = resolveInboxOrigin(c.req.header('x-openalice-run'), getWorkspaceService)
+
       const transport = new WebStandardStreamableHTTPServerTransport()
-      const mcp = createWorkspaceMcpServer(meta.id, meta.tag)
+      const mcp = createWorkspaceMcpServer(meta.id, meta.tag, origin)
       await mcp.connect(transport)
       return transport.handleRequest(c.req.raw)
     })

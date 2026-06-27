@@ -49,6 +49,27 @@ describe('InboxStore (in-memory)', () => {
     expect(entry.comments).toContain('two reports')
   })
 
+  it('append persists an optional origin (additive, agent-invisible provenance)', async () => {
+    const entry = await store.append({
+      workspaceId: 'ws-1',
+      comments: 'done',
+      origin: { kind: 'headless', runId: 'task-9', issueId: 'macro-scan', agent: 'claude' },
+    })
+    expect(entry.origin).toEqual({
+      kind: 'headless',
+      runId: 'task-9',
+      issueId: 'macro-scan',
+      agent: 'claude',
+    })
+    const { entries } = await store.read({ workspaceId: 'ws-1' })
+    expect(entries[0].origin?.issueId).toBe('macro-scan')
+  })
+
+  it('append without origin leaves it undefined (old-shape backward compatible)', async () => {
+    const entry = await store.append({ workspaceId: 'ws-1', comments: 'no origin' })
+    expect(entry.origin).toBeUndefined()
+  })
+
   it('append rejects missing workspaceId', async () => {
     await expect(
       // @ts-expect-error — exercising runtime guard
@@ -161,6 +182,27 @@ describe('InboxStore (JSONL persistence)', () => {
     expect(entries).toHaveLength(1)
     expect(entries[0].docs).toEqual([{ path: 'report.md' }])
     expect(entries[0].comments).toBe('final draft')
+    await rm(dir, { recursive: true, force: true })
+  })
+
+  it('origin survives a JSONL round-trip; a legacy line (no origin) still parses', async () => {
+    await store.append({
+      workspaceId: 'ws-1',
+      comments: 'with origin',
+      origin: { kind: 'headless', runId: 'r1', issueId: 'i1', agent: 'opencode' },
+    })
+    // Simulate a pre-origin entry written by an older build (no `origin` key).
+    const fs = await import('node:fs/promises')
+    await fs.appendFile(
+      path,
+      JSON.stringify({ id: 'legacy', ts: 1, workspaceId: 'ws-1', comments: 'old' }) + '\n',
+    )
+    const fresh = createInboxStore({ filePath: path })
+    const { entries } = await fresh.read()
+    const legacy = entries.find((e) => e.id === 'legacy')
+    const withOrigin = entries.find((e) => e.comments === 'with origin')
+    expect(legacy?.origin).toBeUndefined()
+    expect(withOrigin?.origin).toEqual({ kind: 'headless', runId: 'r1', issueId: 'i1', agent: 'opencode' })
     await rm(dir, { recursive: true, force: true })
   })
 

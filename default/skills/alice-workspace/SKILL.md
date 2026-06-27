@@ -4,12 +4,15 @@ description: >
   Agent collaboration on your shell PATH via the `alice-workspace` CLI: push
   finished work to the user's Inbox (`inbox push`, with repeatable `--doc`
   file attachments), read the inbox back (`inbox read`, `--self` for your own
-  pushes), locate a peer workspace's files to read/edit them (`peer path`), and
-  track entities across workspaces (`track`). Use for: "push my findings to the
-  inbox", "surface this report to the user", "what did I already report?", "read
-  the file another workspace sent", "track this ticker". Workspaces collaborate
-  through git — commit before you push, and commit after you edit a peer's
-  files. Discover flags with `alice-workspace --help` — do NOT guess.
+  pushes), locate a peer workspace's files to read/edit them (`peer path`),
+  track entities across workspaces (`track`), and read & manage the
+  cross-workspace issue board (`issue list`/`show`/`create`/`update`/`comment`).
+  Use for: "push my findings to the inbox", "surface this report to the user",
+  "what did I already report?", "read the file another workspace sent", "track
+  this ticker", "what's on the issue board?", "what was I working on?", "add or
+  update an issue". Workspaces collaborate through git — commit before you push,
+  and commit after you edit a peer's files. Discover flags with
+  `alice-workspace --help` — do NOT guess.
 ---
 
 # Collaboration — `alice-workspace`
@@ -71,3 +74,22 @@ their doc paths are already relative to your cwd.)
 alice-workspace track search --query "uranium"
 alice-workspace track add --name uranium-ccj --description "Cameco — uranium miner"
 ```
+
+**The issue board** — the cross-workspace work list, shared by you and the user.
+It's *what's on the plate* when you've lost the thread — scan it when you start.
+**Reads are global, writes are local:**
+
+```bash
+alice-workspace issue list                  # scan EVERY workspace's issue titles
+alice-workspace issue show --id <name>      # one issue in full — body + run history + inbox reports (resolves the name across the board)
+alice-workspace issue create --title "…"    # a new issue on THIS workspace's board
+alice-workspace issue update --id <id> --status in_progress
+alice-workspace issue comment --id <id> --text "progress note / finding"
+```
+
+Work it like a human board: `list` to scan titles, decide which matter, then
+`show <name>` to read those in full. `list` / `show` span the whole board (all
+workspaces); `create` / `update` / `comment` write **this** workspace's own
+`.alice/issues/` files (changing a peer's board is the human-approved peer-edit
+path). The full on-disk file model + self-scheduling (an issue with a `when`
+fires a headless run) lives in the **`self-scheduling`** skill.

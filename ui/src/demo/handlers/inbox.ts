@@ -1,9 +1,9 @@
 import { http, HttpResponse } from 'msw'
-import { demoInboxEntry } from '../fixtures/inbox'
+import { demoInboxEntries } from '../fixtures/inbox'
 
 export const inboxHandlers = [
   http.get('/api/inbox/history', () =>
-    HttpResponse.json({ entries: [demoInboxEntry], hasMore: false }),
+    HttpResponse.json({ entries: demoInboxEntries, hasMore: false }),
   ),
   http.post('/api/inbox/seed', () =>
     HttpResponse.json({ error: 'Demo mode — inbox seed is disabled.' }, { status: 400 }),

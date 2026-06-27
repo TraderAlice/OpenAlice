@@ -3,13 +3,11 @@ import type { ViewSpec } from '../tabs/types'
 import { AutomationApiSection } from './AutomationApiSection'
 import { AutomationFlowSection } from './AutomationFlowSection'
 import { AutomationRunsSection } from './AutomationRunsSection'
-import { AutomationSchedulesSection } from './AutomationSchedulesSection'
 import { AutomationWebhookSection } from './AutomationWebhookSection'
 
 type AutomationSection = Extract<ViewSpec, { kind: 'automation' }>['params']['section']
 
 const SECTION_TITLE: Record<AutomationSection, string> = {
-  schedules: 'Schedules',
   runs: 'Runs',
   api: 'API',
   flow: 'Flow',
@@ -17,7 +15,6 @@ const SECTION_TITLE: Record<AutomationSection, string> = {
 }
 
 const SECTION_DESCRIPTION: Record<AutomationSection, string> = {
-  schedules: 'What each workspace has scheduled for itself, and when it next runs.',
   runs: 'Headless agent runs across workspaces — what the workers are doing.',
   api: 'Trigger workspace automation from outside, and the schedule-file format.',
   flow: 'Producer-listener graph for the event bus.',
@@ -33,6 +30,7 @@ interface AutomationPageProps {
  * surface renders. The Automation sidebar holds one row per section so each
  * section is its own tab in the editor area. Flow + Webhook are the old
  * event-bus surfaces, demoted under the sidebar's collapsed "Legacy" group.
+ * (Schedules were absorbed into the Issue board — scheduled issues live there.)
  */
 export function AutomationPage({ spec }: AutomationPageProps) {
   const section = spec.params.section
@@ -42,9 +40,7 @@ export function AutomationPage({ spec }: AutomationPageProps) {
       <PageHeader title={SECTION_TITLE[section]} description={SECTION_DESCRIPTION[section]} />
       <div className="flex-1 flex flex-col min-h-0 px-4 md:px-6 py-5">
         <div className="flex-1 min-h-0">
-          {section === 'schedules' ? (
-            <AutomationSchedulesSection />
-          ) : section === 'api' ? (
+          {section === 'api' ? (
             <AutomationApiSection />
           ) : section === 'flow' ? (
             <AutomationFlowSection />

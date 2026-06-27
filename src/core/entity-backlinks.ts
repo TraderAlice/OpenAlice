@@ -11,6 +11,14 @@
  * scaffolding files (CLAUDE.md / AGENTS.md / README.md) are skipped so injected
  * persona / skill text can't produce phantom backlinks — only the agent's own
  * notes count.
+ *
+ * ONE dot-dir is deliberately let back in: `.alice/issues/*.md`. Issues are
+ * first-class participants in the `[[]]` graph (an issue and an entity are the
+ * same kind of `[[name]]` target), so issue bodies that author `[[name]]` links
+ * must feed this reverse index, and an issue note itself shows up as a backlink.
+ * We descend into `.alice/issues` SPECIFICALLY — every other dot-dir (incl. the
+ * rest of `.alice`) and `node_modules` stay skipped. Issue-note backlinks are
+ * recognisable downstream by their `.alice/issues/` path prefix.
  */
 
 import { readFile, readdir } from 'node:fs/promises'
@@ -31,15 +39,33 @@ const SKIP_FILES = new Set(['CLAUDE.md', 'AGENTS.md', 'README.md'])
 
 async function listMarkdown(root: string): Promise<string[]> {
   const out: string[] = []
+
+  /** Collect `.md` files directly inside one directory (the flat `.alice/issues`
+   *  dir — issues are `<id>.md` files, never nested). Scaffolding names don't
+   *  appear here, but skip them for parity. Unreadable/absent dir → no-op. */
+  async function collectFlat(abs: string): Promise<void> {
+    const entries = await readdir(abs, { withFileTypes: true }).catch(() => [])
+    for (const e of entries) {
+      if (e.isFile() && e.name.endsWith('.md') && !SKIP_FILES.has(e.name)) {
+        out.push(relative(root, join(abs, e.name)))
+      }
+    }
+  }
+
   async function walk(abs: string): Promise<void> {
     // Inferred Dirent<string>[]; on an unreadable dir (race with deletion etc.)
     // fall back to empty rather than aborting the whole scan.
     const entries = await readdir(abs, { withFileTypes: true }).catch(() => [])
     for (const e of entries) {
-      if (e.name.startsWith('.')) continue // .git / .claude / .agents / .codex / dotfiles
       const child = join(abs, e.name)
       if (e.isDirectory()) {
         if (e.name === 'node_modules') continue
+        if (e.name.startsWith('.')) {
+          // Skip every dot-dir (.git / .claude / .agents / .codex / …) EXCEPT
+          // descend into `.alice/issues` so issue notes feed the [[]] graph.
+          if (e.name === '.alice') await collectFlat(join(child, 'issues'))
+          continue
+        }
         await walk(child)
       } else if (e.isFile() && e.name.endsWith('.md') && !SKIP_FILES.has(e.name)) {
         out.push(relative(root, child))

@@ -61,6 +61,30 @@ describe('scanBacklinks', () => {
     expect(vst).toHaveLength(2)
   })
 
+  it('lets .alice/issues/*.md into the corpus while still skipping the rest of .alice and other dot-dirs', async () => {
+    const ws = join(root, 'ws')
+    await mkdir(join(ws, '.alice', 'issues'), { recursive: true })
+    await mkdir(join(ws, '.alice', 'other'), { recursive: true })
+    await mkdir(join(ws, '.claude'), { recursive: true })
+
+    // Issue notes DO feed the graph.
+    await writeFile(join(ws, '.alice', 'issues', 'morning-scan.md'), 'tracking [[vst]] before the open')
+    await writeFile(join(ws, '.alice', 'issues', 'cleanup.md'), 'blocked on [[refactor-fetcher]]')
+    // The rest of .alice and other dot-dirs must stay excluded.
+    await writeFile(join(ws, '.alice', 'other', 'note.md'), '[[ghost]] must not count')
+    await writeFile(join(ws, '.claude', 'persona.md'), '[[ghost]] from persona')
+
+    const map = await scanBacklinks(fakeRegistry([{ id: 'id', tag: 'ws', dir: ws }]))
+
+    // [[vst]] resolves, and its backlink path is the issue-note path (so the UI
+    // can detect issue-notes by the `.alice/issues/` prefix).
+    const vst = map.get('vst') ?? []
+    expect(vst.map((b) => b.path)).toEqual([join('.alice', 'issues', 'morning-scan.md')])
+    expect(map.get('refactor-fetcher')?.[0]?.path).toBe(join('.alice', 'issues', 'cleanup.md'))
+    // Nothing leaked from .alice/other or .claude.
+    expect(map.has('ghost')).toBe(false)
+  })
+
   it('returns an empty map when no notes link anything', async () => {
     const ws = join(root, 'ws')
     await mkdir(ws, { recursive: true })
