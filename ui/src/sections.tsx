@@ -30,10 +30,9 @@ import { DevCategoryList } from './components/DevCategoryList'
 import { MarketSidebar } from './components/MarketSidebar'
 import { PortfolioSidebar } from './components/PortfolioSidebar'
 import { AutomationSidebar } from './components/AutomationSidebar'
-import { IssuesSidebar } from './components/IssuesSidebar'
 import type { ActivitySection } from './tabs/types'
 
-type NavTitleKey = 'nav.item.chat' | 'nav.item.inbox' | 'nav.item.tracked' | 'nav.item.workspaces' | 'nav.item.tradingAsGit' | 'nav.item.settings' | 'nav.item.dev' | 'nav.item.market' | 'nav.item.portfolio' | 'nav.item.issue' | 'nav.item.automation'
+type NavTitleKey = 'nav.item.chat' | 'nav.item.inbox' | 'nav.item.tracked' | 'nav.item.workspaces' | 'nav.item.tradingAsGit' | 'nav.item.settings' | 'nav.item.dev' | 'nav.item.market' | 'nav.item.portfolio' | 'nav.item.automation'
 
 export interface SidebarSection {
   /** Header title shown at the top of the sidebar. */
@@ -90,10 +89,9 @@ const SECTION_BY_KEY: Partial<Record<ActivitySection, SidebarSection>> = {
     titleKey: 'nav.item.portfolio',
     Secondary: PortfolioSidebar,
   },
-  issue: {
-    titleKey: 'nav.item.issue',
-    Secondary: IssuesSidebar,
-  },
+  // issue: sidebar-less (Linear-style) — clicking Issues opens the board
+  // full-width; no secondary column. Filter views (All/Active/Backlog) belong
+  // at the top of the board, not in a sidebar.
   automation: {
     titleKey: 'nav.item.automation',
     Secondary: AutomationSidebar,

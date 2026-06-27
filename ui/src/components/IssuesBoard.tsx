@@ -277,7 +277,7 @@ export function IssuesBoard() {
 
   if (groups.length === 0 && invalid.length === 0) {
     return (
-      <div className="mx-auto max-w-4xl space-y-3">
+      <div className="space-y-3">
         {staleBanner}
         <div className="rounded-lg border border-dashed border-border px-6 py-12 text-center">
           <ListChecks size={24} className="mx-auto text-muted/50" />
@@ -295,7 +295,7 @@ export function IssuesBoard() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-3">
+    <div className="space-y-3">
       {staleBanner}
       <InvalidWorkspaces workspaces={invalid} />
       {groups.map((g) => (
