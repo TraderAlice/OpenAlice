@@ -5,13 +5,13 @@ import { join } from 'node:path';
 
 import { exec as gitExec } from 'dugite';
 
-import { readCredentials } from '@/core/config.js';
+import { readCredentials, readWorkspaceCredentialDefaults } from '@/core/config.js';
 
 import type { AdapterRegistry } from './cli-adapter.js';
 import { injectWorkspaceContext } from './context-injector.js';
 import { injectWorkspaceCredentials } from './credential-injection.js';
 import type { Logger } from './logger.js';
-import type { TemplateRegistry } from './template-registry.js';
+import type { AgentCredentialDecl, TemplateRegistry } from './template-registry.js';
 import type { WorkspaceMeta, WorkspaceRegistry } from './workspace-registry.js';
 
 export interface BootstrapEnv {
@@ -221,24 +221,34 @@ export class WorkspaceCreator {
       }
     }
 
-    // Template-declared credential seeding — runs POST-commit so the secret
-    // never lands in the initial commit (the adapter config files are kept out
-    // of git by `_common.sh`'s excludes; post-commit is the belt-and-braces).
-    // Best-effort: a miss warns + skips, the workspace stays usable.
-    if (template.agentCredentials) {
-      try {
+    // Credential seeding — runs POST-commit so the secret never lands in the
+    // initial commit (the adapter config files are kept out of git by
+    // `_common.sh`'s excludes; post-commit is the belt-and-braces). The source
+    // is the user's per-agent workspace defaults (Settings › AI Provider) merged
+    // with any template-declared `agentCredentials` — the template wins per agent
+    // (explicit per-template intent), though in practice no in-repo template
+    // declares them, so the user defaults are the effective source. Best-effort:
+    // a miss (disabled agent, dangling slug, incompatible wire) warns + skips,
+    // the workspace stays usable.
+    try {
+      const userDefaults = await readWorkspaceCredentialDefaults();
+      const effective: Record<string, AgentCredentialDecl> = {
+        ...userDefaults,
+        ...(template.agentCredentials ?? {}),
+      };
+      if (Object.keys(effective).length > 0) {
         const credentials = await readCredentials();
         await injectWorkspaceCredentials({
           dir,
           agents,
-          agentCredentials: template.agentCredentials,
+          agentCredentials: effective,
           adapterRegistry: this.opts.adapterRegistry,
           credentials,
           logger: log,
         });
-      } catch (err) {
-        log.warn('cred_inject.failed', { err });
       }
+    } catch (err) {
+      log.warn('cred_inject.failed', { err });
     }
 
     const workspace: WorkspaceMeta = {

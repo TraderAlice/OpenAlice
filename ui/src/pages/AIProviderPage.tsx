@@ -16,7 +16,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { api, type Preset, type WireShape } from '../api'
-import type { CredentialSummary } from '../api/config'
+import type { CredentialSummary, WorkspaceCredentialDefaultsResponse } from '../api/config'
 import { PageHeader } from '../components/PageHeader'
 import { PageLoading } from '../components/StateViews'
 import { Field, inputClass } from '../components/form'
@@ -228,6 +228,9 @@ export function AIProviderPage() {
             </div>
           </section>
         </div>
+
+        {/* ============== Default workspace credentials ============== */}
+        <WorkspaceDefaultsSection credentials={credentials} />
       </div>
 
       {modal && (
@@ -240,6 +243,137 @@ export function AIProviderPage() {
         />
       )}
     </div>
+  )
+}
+
+// ==================== Default workspace credentials ====================
+//
+// A user-level "inject my usual key on every new workspace" setting. Per agent,
+// pick a vault credential to seed into each new workspace's file-based AI config
+// at create time. opencode/pi are the primary case (loginless — they need a key
+// to run); Claude Code / Codex run on their own CLI login by default, so they're
+// behind an "advanced" reveal — present (some users drive them via an unofficial
+// API key) but never pushed.
+
+const PRIMARY_DEFAULT_AGENTS = [
+  { id: 'opencode', name: 'opencode' },
+  { id: 'pi', name: 'Pi' },
+] as const
+
+const ADVANCED_DEFAULT_AGENTS = [
+  { id: 'claude', name: 'Claude Code' },
+  { id: 'codex', name: 'Codex' },
+] as const
+
+function WorkspaceDefaultsSection({ credentials }: { credentials: CredentialSummary[] }) {
+  const [data, setData] = useState<WorkspaceCredentialDefaultsResponse | null>(null)
+  const [showAdvanced, setShowAdvanced] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const reload = () =>
+    api.config.getWorkspaceCredentialDefaults()
+      .then(setData)
+      .catch(() => setData({ defaults: {}, compatibleByAgent: {} }))
+
+  // Re-derive when the vault changes (a deleted cred drops from compatible lists,
+  // and the backend also clears any default that pointed at it).
+  useEffect(() => { void reload() }, [credentials])
+
+  const credLabel = (slug: string) => {
+    const c = credentials.find((x) => x.slug === slug)
+    return c ? `${c.vendor} · ${slug}` : slug
+  }
+
+  const setAgentDefault = async (agentId: string, slug: string) => {
+    if (!data) return
+    const nextDefaults = { ...data.defaults }
+    if (slug) nextDefaults[agentId] = { credentialSlug: slug }
+    else delete nextDefaults[agentId]
+    setSaving(true); setError('')
+    setData({ ...data, defaults: nextDefaults }) // optimistic
+    try {
+      const res = await api.config.setWorkspaceCredentialDefaults(nextDefaults)
+      setData((d) => (d ? { ...d, defaults: res.defaults } : d))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Save failed')
+      await reload()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const renderAgent = (agent: { id: string; name: string }, note?: string) => {
+    const options = data?.compatibleByAgent[agent.id] ?? []
+    const current = data?.defaults[agent.id]?.credentialSlug ?? ''
+    return (
+      <div key={agent.id} className="flex items-center gap-3 rounded-lg border border-border bg-bg px-4 py-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline gap-2">
+            <span className="text-[13px] font-medium text-text">{agent.name}</span>
+            <span className="text-[11px] text-text-muted font-mono">{agent.id}</span>
+          </div>
+          {note && <p className="text-[11px] text-text-muted mt-0.5 leading-snug">{note}</p>}
+          {options.length === 0 && (
+            <p className="text-[11px] text-text-muted/70 mt-0.5 leading-snug">No compatible credential in the vault yet.</p>
+          )}
+        </div>
+        <select
+          className={inputClass + ' max-w-[240px]'}
+          value={current}
+          disabled={saving || options.length === 0}
+          onChange={(e) => void setAgentDefault(agent.id, e.target.value)}
+        >
+          <option value="">Don’t seed</option>
+          {options.map((slug) => <option key={slug} value={slug}>{credLabel(slug)}</option>)}
+        </select>
+      </div>
+    )
+  }
+
+  return (
+    <section className="max-w-[1100px] mx-auto mt-6">
+      <div className="rounded-lg border border-border/50 bg-bg-secondary/50 px-4 py-3 mb-4">
+        <p className="text-[13px] text-text-muted leading-relaxed">
+          Seed a default credential into every <em>new</em> workspace, so you don’t open the
+          per-workspace AI config each time. It’s written into the workspace’s own agent config
+          files at create — existing workspaces are untouched, and you can still override any
+          workspace afterwards. opencode and Pi need a key to run; Claude Code and Codex normally
+          run on their own CLI login (<code className="font-mono text-[11.5px]">claude login</code> /{' '}
+          <code className="font-mono text-[11.5px]">codex login</code>) and don’t need this.
+        </p>
+      </div>
+
+      <h2 className="text-[13px] font-semibold text-text uppercase tracking-wide mb-3">Default workspace credentials</h2>
+
+      {!data ? (
+        <p className="text-[12px] text-text-muted">Loading…</p>
+      ) : (
+        <div className="space-y-2.5">
+          {PRIMARY_DEFAULT_AGENTS.map((a) => renderAgent(a))}
+
+          <button
+            onClick={() => setShowAdvanced((v) => !v)}
+            className="text-[11px] text-text-muted hover:text-text transition-colors pt-1"
+          >
+            {showAdvanced ? '▾' : '▸'} Advanced — Claude Code / Codex (unofficial API)
+          </button>
+
+          {showAdvanced && (
+            <>
+              <p className="text-[11px] text-text-muted/80 leading-snug px-1">
+                Only set these if you drive Claude Code / Codex through an unofficial API key
+                instead of their built-in login. A default here overwrites the CLI login in each
+                new workspace.
+              </p>
+              {ADVANCED_DEFAULT_AGENTS.map((a) => renderAgent(a))}
+            </>
+          )}
+
+          {error && <p className="text-[12px] text-red">{error}</p>}
+        </div>
+      )}
+    </section>
   )
 }
 

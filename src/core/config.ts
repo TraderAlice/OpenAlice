@@ -161,6 +161,22 @@ export function credentialWires(cred: Credential): Partial<Record<CredentialWire
   return {}
 }
 
+/**
+ * A user-level default that seeds a freshly-created workspace's per-agent AI
+ * config from a vault credential — the "inject my usual key on every launch"
+ * setting. Keyed by agentId (`claude` / `codex` / `opencode` / `pi`).
+ * `credentialSlug` points into `credentials`; `model` is the optional run model
+ * (absent ⇒ resolved from the cred's `lastModel`, then the vendor flagship).
+ * Structurally a superset-compatible mirror of the workspaces layer's
+ * `AgentCredentialDecl`, so the creator can merge the two and feed
+ * `injectWorkspaceCredentials` directly.
+ */
+export const workspaceCredentialDefaultSchema = z.object({
+  credentialSlug: z.string(),
+  model: z.string().optional(),
+})
+export type WorkspaceCredentialDefault = z.infer<typeof workspaceCredentialDefaultSchema>
+
 export const aiProviderSchema = z.object({
   apiKeys: apiKeysSchema.default({}),
   /**
@@ -171,6 +187,14 @@ export const aiProviderSchema = z.object({
    * existing files keep them on disk until rewritten, where they're ignored.)
    */
   credentials: z.record(z.string(), credentialSchema).default({}),
+  /**
+   * Per-agent default credential seeded into EVERY new workspace at create time
+   * (agentId → {credentialSlug, model?}). The user-level counterpart to a
+   * template's `agentCredentials`: set a default cred per agent once and skip the
+   * per-workspace AI-config modal on each launch. References slugs in
+   * `credentials`; a dangling slug is loud-skipped at injection, never fatal.
+   */
+  workspaceCredentialDefaults: z.record(z.string(), workspaceCredentialDefaultSchema).default({}),
 })
 
 export type AIProviderConfig = z.infer<typeof aiProviderSchema>
@@ -886,6 +910,39 @@ export async function setCredentialLastModel(slug: string, model: string): Promi
 export async function deleteCredential(slug: string): Promise<void> {
   const config = await readAIProviderConfig()
   delete config.credentials[slug]
+  // Drop any workspace-default that pointed at the now-gone slug, so the
+  // Settings dropdown never shows a dangling default (injection would skip it
+  // anyway, but a stale default reads as "still configured").
+  for (const [agentId, def] of Object.entries(config.workspaceCredentialDefaults)) {
+    if (def.credentialSlug === slug) delete config.workspaceCredentialDefaults[agentId]
+  }
+  await mkdir(CONFIG_DIR, { recursive: true })
+  await writeFile(resolve(CONFIG_DIR, 'ai-provider-manager.json'), JSON.stringify(config, null, 2) + '\n')
+}
+
+/**
+ * Read the per-agent default credentials seeded into new workspaces
+ * (agentId → {credentialSlug, model?}). Empty map when unset.
+ */
+export async function readWorkspaceCredentialDefaults(): Promise<Record<string, WorkspaceCredentialDefault>> {
+  const config = await readAIProviderConfig()
+  return { ...config.workspaceCredentialDefaults }
+}
+
+/**
+ * Replace the per-agent workspace-default credential map. Entries with an empty
+ * `credentialSlug` are dropped (the UI's "don't seed this agent" choice).
+ */
+export async function writeWorkspaceCredentialDefaults(
+  defaults: Record<string, WorkspaceCredentialDefault>,
+): Promise<void> {
+  const config = await readAIProviderConfig()
+  const cleaned: Record<string, WorkspaceCredentialDefault> = {}
+  for (const [agentId, def] of Object.entries(defaults)) {
+    const parsed = workspaceCredentialDefaultSchema.parse(def)
+    if (parsed.credentialSlug) cleaned[agentId] = parsed
+  }
+  config.workspaceCredentialDefaults = cleaned
   await mkdir(CONFIG_DIR, { recursive: true })
   await writeFile(resolve(CONFIG_DIR, 'ai-provider-manager.json'), JSON.stringify(config, null, 2) + '\n')
 }
