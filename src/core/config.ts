@@ -806,6 +806,29 @@ export async function readMarketDataConfig() {
   }
 }
 
+/**
+ * Toggle market-data `extraVendors` on/off, persisted to disk. Returns the new list.
+ *
+ * Deliberately reads the RAW file — NOT the global-merged view
+ * `readMarketDataConfig` returns — so global provider keys are never fossilized
+ * into the local section (which would defeat the global-wins-on-update intent;
+ * see [[project_global_data_root_sealed_creds]]). Writes directly, bypassing
+ * `writeConfigSection`'s providerKeys→global mirror, which is irrelevant to a
+ * vendor-list edit. Because the opentypebb resolver re-reads market-data.json
+ * per request, the change takes effect on the next search with no restart.
+ */
+export async function updateExtraVendors(
+  mutate: (current: string[]) => string[],
+): Promise<string[]> {
+  const raw = (await loadJsonFile('market-data.json')) ?? {}
+  const parsed = marketDataSchema.parse(raw)
+  const next = [...new Set(mutate(parsed.extraVendors))]
+  const updated = marketDataSchema.parse({ ...parsed, extraVendors: next })
+  await mkdir(CONFIG_DIR, { recursive: true })
+  await writeFile(resolve(CONFIG_DIR, 'market-data.json'), JSON.stringify(updated, null, 2) + '\n')
+  return next
+}
+
 /** Read tools config from disk (called per-request for hot-reload). */
 export async function readToolsConfig() {
   try {

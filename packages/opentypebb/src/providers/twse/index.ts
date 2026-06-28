@@ -22,11 +22,19 @@ import { TWSEEquityInfoFetcher } from './models/equity-info.js'
 
 export const twseProvider = new Provider({
   name: 'twse',
+  reprName: 'TWSE + TPEx 臺灣證交所',
   description:
     'Taiwan Stock Exchange + TPEx (上市/上櫃) — official free open data: ' +
     'Chinese/English search, daily quotes, key metrics (P/E·yield·P/B), company ' +
     'profiles. K-lines via Yahoo (.TW/.TWO).',
   website: 'https://www.twse.com.tw/',
+  vendorMeta: {
+    coverage: 'Taiwan equities — TWSE listed (.TW) + TPEx OTC (.TWO).',
+    howToUse:
+      'Search by 繁体中文 (台積電, 聯發科) — NOT simplified (台积电 returns nothing), or by English / stock code. ' +
+      'Symbols are Yahoo-suffixed: .TW for listed, .TWO for OTC. Adds official P/E·殖利率·股價淨值比 and company ' +
+      'profiles on top of yfinance; K-lines still come from Yahoo.',
+  },
   fetcherDict: {
     EquitySearch: TWSEEquitySearchFetcher,
     EquityQuote: TWSEEquityQuoteFetcher,

@@ -61,6 +61,11 @@ export const CLI_EXPORTS: Record<string, CliExport> = {
       },
       market: {
         search: 'marketSearchForResearch',
+        // Discover data sources + drive them: `vendors` lists what's available,
+        // each with on/off state and a usage note (symbol convention, search
+        // language); `vendor-set` flips one on/off, live on the next search.
+        vendors: 'listMarketVendors',
+        'vendor-set': 'setMarketVendor',
       },
       analysis: {
         'search-bars': 'searchBars',
