@@ -9,6 +9,7 @@ import {
 } from './cli-commands.js'
 import { createNewsArchiveTools } from '../tool/news.js'
 import { createMarketSearchTools } from '../tool/market.js'
+import { createVendorTools } from '../tool/market-vendors.js'
 import { createEquityTools } from '../tool/equity.js'
 import { createEconomyTools } from '../tool/economy.js'
 import { createQuantTools } from '../tool/quant.js'
@@ -35,6 +36,7 @@ describe('CLI_EXPORTS — data export (global tools)', () => {
   const tc = new ToolCenter()
   tc.register(createThinkingTools(), 'thinking')
   tc.register(createMarketSearchTools(any), 'market-search')
+  tc.register(createVendorTools(any), 'market-vendors')
   tc.register(createEquityTools(any), 'equity')
   tc.register(createNewsArchiveTools(any), 'rss')
   tc.register(createQuantTools(any), 'quant')

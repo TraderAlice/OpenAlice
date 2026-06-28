@@ -27,6 +27,7 @@ import { blsProvider } from '../../providers/bls/index.js'
 import { eiaProvider } from '../../providers/eia/index.js'
 import { secProvider } from '../../providers/sec/index.js'
 import { eastmoneyProvider } from '../../providers/eastmoney/index.js'
+import { twseProvider } from '../../providers/twse/index.js'
 
 // --- Extension routers ---
 import { equityRouter } from '../../extensions/equity/equity-router.js'
@@ -60,6 +61,7 @@ export function createRegistry(): Registry {
   registry.includeProvider(eiaProvider)
   registry.includeProvider(secProvider)
   registry.includeProvider(eastmoneyProvider)
+  registry.includeProvider(twseProvider)
   return registry
 }
 

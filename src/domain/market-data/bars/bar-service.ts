@@ -35,6 +35,7 @@ const VENDOR_CAPABILITY: Record<string, BarCapability> = {
   yfinance: 'delayed',
   fmp: 'delayed',
   eastmoney: 'delayed',
+  twse: 'delayed', // K-lines via Yahoo chart (symbols are .TW/.TWO)
 }
 
 const BAR_INTERVALS: readonly BarInterval[] = ['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w']

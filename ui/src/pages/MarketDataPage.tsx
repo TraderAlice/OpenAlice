@@ -36,6 +36,11 @@ const CHART_VENDORS: ChartVendor[] = [
     name: 'Eastmoney 东方财富',
     desc: 'CN A-shares — 中文搜索 (茅台 → 600519) and 前复权 K-lines yfinance can’t give. Public endpoints, no key. Served from China, so slower than yfinance for users abroad.',
   },
+  {
+    id: 'twse',
+    name: 'TWSE + TPEx 臺灣證交所',
+    desc: 'Taiwan listed + OTC (上市/上櫃) — 中文/英文 search over the official company roster, plus official P/E·殖利率·股價淨值比 and company profiles yfinance lacks. No key. K-lines come from Yahoo (2330.TW / 6488.TWO).',
+  },
 ]
 
 // Data-provider keys — LOW-frequency data (boards, economy, fundamentals). The

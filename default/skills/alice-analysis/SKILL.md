@@ -43,6 +43,12 @@ this order:
 
 Vendor barIds (`yfinance|…`, `fmp|…`) need `asset=`; broker barIds infer it.
 
+**No candidates for a non-US symbol?** `search-bars` only fans out over the
+vendors that are *on*. A Taiwan or CN A-share searched by its native name can
+come back empty just because its vendor is off — `alice market vendors` to see
+what's available, `alice market vendor-set --vendor twse --enabled true` to add
+it (live immediately), then re-run search-bars. See the `alice` skill.
+
 ## Language
 
 A script is zero or more `name = ...` bindings, then a final result expression:

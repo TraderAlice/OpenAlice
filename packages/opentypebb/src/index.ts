@@ -14,7 +14,7 @@
 
 // Core abstractions
 export { Fetcher, type FetcherClass } from './core/provider/abstract/fetcher.js'
-export { Provider, type ProviderConfig } from './core/provider/abstract/provider.js'
+export { Provider, type ProviderConfig, type VendorMeta } from './core/provider/abstract/provider.js'
 export { BaseQueryParamsSchema, type BaseQueryParams } from './core/provider/abstract/query-params.js'
 export { BaseDataSchema, type BaseData, ForceInt } from './core/provider/abstract/data.js'
 
@@ -59,3 +59,4 @@ export { ecbProvider } from './providers/ecb/index.js'
 export { federalReserveProvider } from './providers/federal_reserve/index.js'
 export { intrinioProvider } from './providers/intrinio/index.js'
 export { eastmoneyProvider } from './providers/eastmoney/index.js'
+export { twseProvider } from './providers/twse/index.js'

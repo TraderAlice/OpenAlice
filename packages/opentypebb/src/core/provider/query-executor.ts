@@ -14,6 +14,12 @@ import { OpenBBError } from './utils/errors.js'
 export class QueryExecutor {
   constructor(private readonly registry: Registry) {}
 
+  /** Every registered provider — used to enumerate vendor metadata (e.g. the
+   *  market-vendor picker reads each one's `vendorMeta`). */
+  listProviders(): Provider[] {
+    return [...this.registry.providers.values()]
+  }
+
   /** Get a provider from the registry. */
   getProvider(providerName: string): Provider {
     const name = providerName.toLowerCase()

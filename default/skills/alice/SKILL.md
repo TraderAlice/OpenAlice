@@ -5,10 +5,11 @@ description: >
   read surfaces: the collected-RSS archive (`alice rss`), cross-asset symbol
   search (`alice market search` → barIds), and K-line quant analysis
   (`alice analysis`). Use for: "grep the collected feeds for the Fed", "find
-  the barId for AAPL", "compute RSI on this chart". Output is JSON; discover
-  every flag with `alice --help` / `alice <group> <verb> --help` — do NOT
-  guess. (Low-frequency market data — fundamentals, macro series, calendars,
-  boards — is the separate `traderhub` CLI; the quant scripting manual is the
+  the barId for AAPL", "compute RSI on this chart", "I can't find a Taiwan/CN
+  stock — add a data vendor". Output is JSON; discover every flag with
+  `alice --help` / `alice <group> <verb> --help` — do NOT guess.
+  (Low-frequency market data — fundamentals, macro series, calendars, boards —
+  is the separate `traderhub` CLI; the quant scripting manual is the
   `alice-analysis` skill.)
 ---
 
@@ -35,6 +36,21 @@ alice market search --query "apple"
 
 (Fundamentals, ratios, calendars and macro series live on `traderhub` —
 e.g. `traderhub equity profile --symbol AAPL`.)
+
+**Expand coverage with vendors.** Symbol search — and the K-line sources it
+returns — comes from a set of data vendors; `yfinance` (global, always on) is the
+default. For a name a global vendor misses, like a **CN A-share or a Taiwan stock
+by its native name**, a local vendor closes the gap. List what's on and what each
+covers, then enable one — **live on the next search, no restart**:
+
+```bash
+alice market vendors                                    # sources, on/off, and how to use each
+alice market vendor-set --vendor twse --enabled true    # Taiwan (TWSE/TPEx); `eastmoney` for CN A-shares
+```
+
+If a search for a non-US name comes up empty, check `alice market vendors`
+**before giving up** — the covering source may just be off. Each vendor's
+`howToUse` flags its quirks (e.g. twse wants 繁体 `台積電`, not 简体 `台积电`).
 
 **Search the collected-RSS archive, then read one article by its stable id**
 (the `id` is stable — you do **not** need to repeat `--lookback` to read it):

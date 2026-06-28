@@ -20,8 +20,12 @@ export interface MarketSearchDeps {
   symbolIndex: SymbolIndex
   /** Equity vendors to fan search across — [primary, ...extraVendors]. The
    *  first is the default (yfinance) that also backs the local SEC index;
-   *  the rest are user-opted incremental vendors (e.g. eastmoney). */
-  equityVendors: string[]
+   *  the rest are user-opted incremental vendors (e.g. eastmoney).
+   *
+   *  A function form is resolved per call so a vendor the agent just enabled
+   *  (via setMarketVendor → market-data.json) is picked up on the next search
+   *  with no restart. A plain array is still accepted (tests, static wiring). */
+  equityVendors: string[] | (() => string[] | Promise<string[]>)
   equityClient: EquityClientLike
   cryptoClient: CryptoClientLike
   currencyClient: CurrencyClientLike
@@ -78,7 +82,10 @@ export async function aggregateSymbolSearch(
   const q = query.trim()
   if (!q) return []
 
-  const primaryEquity = deps.equityVendors[0] ?? 'yfinance'
+  const equityVendors = typeof deps.equityVendors === 'function'
+    ? await deps.equityVendors()
+    : deps.equityVendors
+  const primaryEquity = equityVendors[0] ?? 'yfinance'
 
   // Local SEC index — US-only, zero-latency, authoritative for US tickers.
   // Attributed to the primary equity vendor (its symbols feed that provider).
@@ -101,7 +108,7 @@ export async function aggregateSymbolSearch(
       deps.currencyClient.search({ query: q, provider: 'yfinance' }),
     ]),
     Promise.allSettled(
-      deps.equityVendors.map((v) =>
+      equityVendors.map((v) =>
         deps.equityClient
           .search({ query: q, provider: v, is_symbol: false })
           .then((rows) => ({ vendor: v, rows })),
