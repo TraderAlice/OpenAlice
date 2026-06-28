@@ -15,7 +15,7 @@ import { createHash, randomBytes } from 'node:crypto'
 
 // ==================== Types ====================
 
-export type BrokerEngine = 'ccxt' | 'alpaca' | 'ibkr' | 'leverup' | 'longbridge' | 'mock'
+export type BrokerEngine = 'ccxt' | 'alpaca' | 'ibkr' | 'leverup' | 'longbridge' | 'indstocks' | 'mock'
 
 export interface ModeOption {
   id: string
@@ -432,6 +432,39 @@ export const LONGBRIDGE_PRESET: BrokerPresetDef = {
   isPaper: (d) => d.mode === 'paper',
 }
 
+export const INDSTOCKS_PRESET: BrokerPresetDef = {
+  id: 'indstocks',
+  label: 'INDmoney (Indian Equities)',
+  description: 'INDstocks API — NSE / BSE equities. Live only (no paper). Equity-first; F&O is on the roadmap.',
+  category: 'recommended',
+  // The `accessToken` is the SEBI-mandated daily secret: it expires every 24h
+  // and has NO refresh endpoint — you regenerate it from web.indstocks.com → API
+  // and paste a fresh one each session. `userId` is the STABLE identity we
+  // fingerprint on: fingerprinting the token would mint a new UTA id (orphaning
+  // the commit log) on every rotation. There is no sandbox — orders are live.
+  hint: 'INDstocks tokens **expire every 24h** and cannot be auto-refreshed. Regenerate at web.indstocks.com → API and update **Access Token** each session. **Client ID** is your stable INDstocks account id (from your profile). ⚠️ No paper/sandbox — every order is real money; test with tiny quantities. ⚠️ **Selling holdings via API needs DDPI active** (CDSL eDIS) in your INDmoney account — without it, sell orders fail with a generic server error.',
+  defaultName: 'indstocks-main',
+  badge: 'IN',
+  badgeColor: 'text-accent',
+  engine: 'indstocks',
+  guardCategory: 'securities',
+  zodSchema: z.object({
+    userId: z.string().min(1).describe('Client ID'),
+    accessToken: z.string().min(1).describe('Access Token'),
+  }),
+  subtitleFields: [
+    { field: 'userId', prefix: 'INDmoney · ' },
+  ],
+  writeOnlyFields: ['accessToken'],
+  // Fingerprint on the STABLE userId, never the daily token.
+  fingerprintFields: ['userId'],
+  toEngineConfig: (d) => ({
+    userId: d.userId,
+    accessToken: d.accessToken,
+  }),
+  isPaper: () => false,   // no paper environment exists
+}
+
 // ==================== Other ecosystem brokers (lower-tier, isolated) ====================
 
 export const LEVERUP_PRESET: BrokerPresetDef = {
@@ -508,6 +541,7 @@ export const BROKER_PRESET_CATALOG: BrokerPresetDef[] = [
   IBKR_PRESET,
   ALPACA_PRESET,
   LONGBRIDGE_PRESET,
+  INDSTOCKS_PRESET,
   HYPERLIQUID_PRESET,
   // ---- Crypto ----
   BINANCE_PRESET,
