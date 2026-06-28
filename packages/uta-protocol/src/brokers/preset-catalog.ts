@@ -371,7 +371,7 @@ export const IBKR_PRESET: BrokerPresetDef = {
   label: 'IBKR (TWS / IB Gateway)',
   description: 'Interactive Brokers via local TWS or IB Gateway socket — stocks, options, futures, FX, bonds.',
   category: 'recommended',
-  hint: 'IBKR auth happens via your TWS/Gateway login — no API keys here. Make sure TWS is running and "Enable ActiveX and Socket Clients" is on (File → Global Configuration → API → Settings). Default ports: 7496 (live) / 7497 (paper). For IB Gateway: 4001 (live) / 4002 (paper).',
+  hint: 'IBKR auth happens via your local TWS or IB Gateway login — no API keys here. **For TWS**: enable "ActiveX and Socket Clients" (File → Global Configuration → API → Settings), use ports 7496 (live) / 7497 (paper). **For IB Gateway**: use ports 4001 (live) / 4002 (paper) — the socket API is enabled by default.',
   defaultName: 'ibkr',
   badge: 'IB',
   badgeColor: 'text-orange-400',

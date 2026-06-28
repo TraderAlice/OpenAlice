@@ -25,5 +25,23 @@ benchmarks and rate indices. Pair with the chart/bars surface to plot one.`,
         return await indexClient.search({ query, provider: 'cboe' })
       },
     }),
+
+    indexGetConstituents: tool({
+      description: `Get the constituent members of a market index (e.g. S&P 500 via "^GSPC").
+
+Returns each member's symbol, name, weight, and sector where available — the
+starting universe for index-tracking strategies, momentum scans, and mean-reversion
+screens. Only available with the typebb-sdk market data backend.`,
+      inputSchema: z.object({
+        symbol: z.string().describe('Index symbol, e.g. "^GSPC" for S&P 500, "^NDX" for Nasdaq-100'),
+        provider: z.string().optional().describe('Data provider override (optional)'),
+      }).meta({ examples: [{ symbol: '^GSPC' }] }),
+      execute: async ({ symbol, provider }) => {
+        return await indexClient.getConstituents({
+          symbol,
+          ...(provider ? { provider } : {}),
+        })
+      },
+    }),
   }
 }
