@@ -18,6 +18,7 @@ import { ChevronDown, ChevronRight, FolderPlus, Plus, Settings as SettingsIcon, 
 
 import { getIntlLocale } from '../../lib/intl'
 import { useWorkspaces } from '../../contexts/WorkspacesContext'
+import { Skeleton } from '../StateViews'
 import { useWorkspace } from '../../tabs/store'
 import { getFocusedTab } from '../../tabs/types'
 import { ConfirmDialog } from '../ConfirmDialog'
@@ -156,7 +157,26 @@ export function ChatWorkspaceSection(): ReactElement | null {
       )}
 
       <ul className="py-0.5">
-        {chatWorkspaces.length === 0 && !ctx.listError && (
+        {/* Cold load: the list is empty because it hasn't fetched yet, NOT
+            because there are no chats — show a skeleton instead of flashing the
+            "no chats yet" empty text (or a blank pane) until the first list
+            lands. */}
+        {!ctx.hasLoaded && !ctx.listError && (
+          <li aria-hidden="true">
+            {Array.from({ length: 3 }).map((_, g) => (
+              <div key={g} className="mb-1.5">
+                <div className="px-3 py-1.5"><Skeleton className="h-2.5 w-14" /></div>
+                {Array.from({ length: 2 }).map((_, r) => (
+                  <div key={r} className="flex items-center gap-2 px-3 py-1.5">
+                    <Skeleton className="h-3 w-3 rounded" />
+                    <Skeleton className={`h-3 ${r === 0 ? 'w-32' : 'w-24'}`} />
+                  </div>
+                ))}
+              </div>
+            ))}
+          </li>
+        )}
+        {ctx.hasLoaded && chatWorkspaces.length === 0 && !ctx.listError && (
           <li className="px-3 py-2 text-[12px] text-text-muted/60">{t('chat.noChatWorkspacesYet')}</li>
         )}
         {ctx.listError && <li className="px-3 py-1 text-[11px] text-red">{ctx.listError}</li>}

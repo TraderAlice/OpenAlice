@@ -61,6 +61,10 @@ interface WorkspacesContextValue {
   readonly templates: readonly TemplateInfo[]
   readonly agents: readonly AgentInfo[]
   readonly listError: string | null
+  /** True once the first workspaces-list fetch has resolved. Until then an
+   *  empty list means "not loaded yet", not "no workspaces" — the sidebar shows
+   *  a skeleton instead of a blank pane / empty state. */
+  readonly hasLoaded: boolean
   refresh(): void
   spawn(wsId: string, opts?: SpawnOpts): Promise<void>
   /**
@@ -303,6 +307,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         templates,
         agents,
         listError,
+        hasLoaded,
         refresh,
         spawn,
         quickChat,

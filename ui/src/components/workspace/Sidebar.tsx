@@ -12,6 +12,7 @@ import {
   type Workspace,
 } from './api';
 import { CreateWorkspaceDialog } from './CreateWorkspaceDialog';
+import { Skeleton } from '../StateViews';
 
 /**
  * Workspace launcher sidebar.
@@ -43,6 +44,9 @@ export interface SidebarProps {
   readonly templates: readonly TemplateInfo[];
   readonly agents: readonly AgentInfo[];
   readonly listError: string | null;
+  /** True once the first workspaces-list fetch has resolved — gates the empty
+   *  state vs. a cold-load skeleton. */
+  readonly hasLoaded: boolean;
   readonly selection: Selection | null;
   readonly onSelectWorkspace: (wsId: string) => void;
   readonly onSelectSession: (wsId: string, sessionId: string) => void;
@@ -151,7 +155,17 @@ export function Sidebar(props: SidebarProps): ReactElement {
         />
       )}
 
-      {props.workspaces.length === 0 && !props.listError && (
+      {!props.hasLoaded && !props.listError && (
+        <div className="flex flex-col mt-0.5" aria-hidden="true">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-2 px-3 py-2">
+              <Skeleton className="h-4 w-4 rounded" />
+              <Skeleton className={`h-3 ${i % 2 === 0 ? 'w-32' : 'w-24'}`} />
+            </div>
+          ))}
+        </div>
+      )}
+      {props.hasLoaded && props.workspaces.length === 0 && !props.listError && (
         <div className="px-3 py-2 text-[12px] text-text-muted/60">No workspaces yet</div>
       )}
       {props.listError && <div className="px-3 py-2 text-[12px] text-red">{props.listError}</div>}

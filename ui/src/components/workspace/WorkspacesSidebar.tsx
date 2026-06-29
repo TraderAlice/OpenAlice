@@ -33,6 +33,7 @@ export function WorkspacesSidebar() {
         templates={ctx.templates}
         agents={ctx.agents}
         listError={ctx.listError}
+        hasLoaded={ctx.hasLoaded}
         selection={selection}
         onSelectWorkspace={(wsId) => {
           if (wsId.length === 0) return
