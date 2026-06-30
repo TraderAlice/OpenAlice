@@ -111,6 +111,10 @@
       "qs": "^6.15.2",
       "ip-address": "^10.1.1",
       "tmp": "^0.2.6",
+      "form-data": "^4.0.6",
+      "undici@^6.0.0": "^6.27.0",
+      "undici@^7.0.0": "^7.28.0",
+      "ws@^7.0.0": "^7.5.11",
       "ws@^8.0.0": "^8.20.1",
       "lodash": "^4.18.0",
       "path-to-regexp": "^8.4.0",
@@ -119,8 +123,8 @@
       "express-rate-limit": "^8.2.2",
       "picomatch": "^4.0.4",
       "rollup": "^4.59.0",
-      "vitest>vite": "^7.3.2",
-      "@vitest/mocker>vite": "^7.3.2"
+      "vitest>vite": "^7.3.5",
+      "@vitest/mocker>vite": "^7.3.5"
     }
   },
   "devDependencies": {
