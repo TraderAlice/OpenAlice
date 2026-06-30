@@ -44,3 +44,7 @@ export type { CcxtBrokerConfig } from './ccxt/index.js'
 // IBKR
 export { IbkrBroker } from './ibkr/index.js'
 export type { IbkrBrokerConfig } from './ibkr/index.js'
+
+// Schwab
+export { SchwabBroker } from './schwab/index.js'
+export type { SchwabBrokerConfig } from './schwab/index.js'
