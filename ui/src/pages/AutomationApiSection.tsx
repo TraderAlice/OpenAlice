@@ -90,7 +90,7 @@ the watchlist — movers, gaps, and overnight headlines that move the thesis.`}<
         <Block>{`POST /api/workspaces/:id/headless
 {
   "prompt": "<the instruction for the run>",
-  "agent": "claude",      // optional; defaults to the workspace's default agent
+  "agent": "claude",      // optional; uses the saved default agent runtime
   "timeoutMs": 1800000,   // optional
   "wait": false           // optional; true = block and return the run's result
 }

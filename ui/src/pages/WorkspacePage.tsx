@@ -16,7 +16,7 @@
  * keeps running on the server. Use the sidebar's × to actually delete.
  */
 
-import { useEffect } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
 import '@xterm/xterm/css/xterm.css'
 
@@ -47,6 +47,38 @@ export function WorkspacePage({ spec, visible }: Props) {
   const activeRecord = sessionId
     ? sessions.find((s) => s.id === sessionId) ?? null
     : null
+  const [spawnMenuOpen, setSpawnMenuOpen] = useState(false)
+  const spawnMenuRef = useRef<HTMLDivElement | null>(null)
+  const runtimeAgents = useMemo(() => {
+    if (!workspace) return []
+    return workspace.agents
+      .map((id) => ctx.agents.find((a) => a.id === id))
+      .filter((a): a is NonNullable<typeof a> => !!a && a.kind !== 'utility')
+  }, [ctx.agents, workspace])
+  const utilityAgents = useMemo(() => {
+    if (!workspace) return []
+    return workspace.agents
+      .map((id) => ctx.agents.find((a) => a.id === id))
+      .filter((a): a is NonNullable<typeof a> => !!a && a.kind === 'utility')
+  }, [ctx.agents, workspace])
+  const defaultAgentEnabled =
+    ctx.defaultAgent !== null &&
+    workspace?.agents.includes(ctx.defaultAgent) === true &&
+    runtimeAgents.some((a) => a.id === ctx.defaultAgent)
+
+  const spawnWithAgent = async (agentId: string, saveDefault: boolean): Promise<void> => {
+    setSpawnMenuOpen(false)
+    if (saveDefault) await ctx.setDefaultAgent(agentId)
+    await ctx.spawn(wsId, { agent: agentId })
+  }
+
+  const spawnDefault = (): void => {
+    if (defaultAgentEnabled && ctx.defaultAgent) {
+      void ctx.spawn(wsId, { agent: ctx.defaultAgent })
+      return
+    }
+    setSpawnMenuOpen((v) => !v)
+  }
 
   // Cmd+T / Ctrl+T: spawn fresh session in this workspace; only when this
   // tab is visible, to avoid double-spawns when multiple workspace tabs are
@@ -59,11 +91,29 @@ export function WorkspacePage({ spec, visible }: Props) {
       if (e.shiftKey || e.altKey) return
       e.preventDefault()
       e.stopPropagation()
-      void ctx.spawn(wsId, {})
+      spawnDefault()
     }
     document.addEventListener('keydown', handler, { capture: true })
     return () => document.removeEventListener('keydown', handler, { capture: true })
-  }, [visible, ctx, wsId])
+  }, [visible, ctx, wsId, defaultAgentEnabled])
+
+  useEffect(() => {
+    if (!spawnMenuOpen) return
+    const onDocClick = (e: MouseEvent): void => {
+      if (spawnMenuRef.current?.contains(e.target as Node)) return
+      setSpawnMenuOpen(false)
+    }
+    const onEsc = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setSpawnMenuOpen(false)
+    }
+    const tid = setTimeout(() => document.addEventListener('click', onDocClick), 0)
+    document.addEventListener('keydown', onEsc)
+    return () => {
+      clearTimeout(tid)
+      document.removeEventListener('click', onDocClick)
+      document.removeEventListener('keydown', onEsc)
+    }
+  }, [spawnMenuOpen])
 
   if (!workspace) {
     return (
@@ -86,15 +136,44 @@ export function WorkspacePage({ spec, visible }: Props) {
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-bg-secondary/30 shrink-0">
         <span className="text-[12px] text-text-muted font-medium">{workspace.tag}</span>
         <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => void ctx.spawn(wsId, {})}
-            className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] text-text-muted hover:text-text hover:bg-bg-tertiary transition-colors"
-            title="Spawn a fresh session in this workspace (⌘T)"
-          >
-            <Plus size={13} strokeWidth={2.25} aria-hidden="true" />
-            New session
-          </button>
+          <div ref={spawnMenuRef} className="relative">
+            <button
+              type="button"
+              onClick={spawnDefault}
+              className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] text-text-muted hover:text-text hover:bg-bg-tertiary transition-colors"
+              title="Spawn a fresh session in this workspace (⌘T)"
+            >
+              <Plus size={13} strokeWidth={2.25} aria-hidden="true" />
+              New session
+            </button>
+            {spawnMenuOpen && (
+              <div className="absolute right-0 top-full mt-1 w-44 rounded-md border border-border bg-bg-secondary shadow-lg py-1 z-20">
+                {runtimeAgents.map((agent) => (
+                  <button
+                    key={agent.id}
+                    type="button"
+                    onClick={() => void spawnWithAgent(agent.id, true)}
+                    className="w-full px-3 py-1.5 text-left text-[12px] text-text-muted hover:text-text hover:bg-bg-tertiary"
+                  >
+                    {agent.displayName}
+                  </button>
+                ))}
+                {utilityAgents.length > 0 && runtimeAgents.length > 0 && (
+                  <div className="my-1 border-t border-border" />
+                )}
+                {utilityAgents.map((agent) => (
+                  <button
+                    key={agent.id}
+                    type="button"
+                    onClick={() => void spawnWithAgent(agent.id, false)}
+                    className="w-full px-3 py-1.5 text-left text-[12px] text-text-muted hover:text-text hover:bg-bg-tertiary"
+                  >
+                    {agent.displayName}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <WorkspaceFilesToggle />
           <button
             type="button"
@@ -119,7 +198,7 @@ export function WorkspacePage({ spec, visible }: Props) {
           sessions={workspace.sessions}
           label={workspace.tag}
           keyMap={APP_KEY_MAP}
-          onSpawnFresh={() => void ctx.spawn(wsId, {})}
+          onSpawnFresh={spawnDefault}
           onResume={(id) => void ctx.resumeSession(wsId, id)}
           onSelectSession={(id) => {
             // Running session — already alive on the server, just

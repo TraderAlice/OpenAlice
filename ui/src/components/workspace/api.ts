@@ -38,7 +38,7 @@ export interface Workspace {
    * launcher applies migrations. Agent self-upgrade is the resolution path.
    */
   readonly upgradeAvailable?: { from: string; to: string } | null;
-  /** Adapter ids enabled for this workspace; agents[0] is the default for `+`. */
+  /** Adapter ids enabled for this workspace. Default runtime lives in user config. */
   readonly agents: readonly string[];
   /**
    * Single ordered list of all session records (running + paused) the
@@ -175,6 +175,7 @@ export interface AgentCapabilities {
 export interface AgentInfo {
   readonly id: string;
   readonly displayName: string;
+  readonly kind?: 'agent' | 'utility';
   readonly capabilities: AgentCapabilities;
   /**
    * Whether the runtime's CLI was found on the host PATH. Backend-probed per
@@ -191,6 +192,27 @@ export async function listAgents(): Promise<AgentInfo[]> {
   if (!res.ok) throw new Error(`list agents failed: ${res.status}`);
   const body = (await res.json()) as { agents: AgentInfo[] };
   return body.agents;
+}
+
+export async function getWorkspaceDefaultAgent(): Promise<string | null> {
+  const res = await fetch('/api/config/workspace-default-agent');
+  if (!res.ok) return null;
+  const body = (await res.json()) as { agent?: string | null };
+  return body.agent ?? null;
+}
+
+export async function setWorkspaceDefaultAgent(agent: string | null): Promise<string | null> {
+  const res = await fetch('/api/config/workspace-default-agent', {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ agent }),
+  });
+  if (!res.ok) {
+    const msg = await res.text().catch(() => '');
+    throw new Error(`set workspace default agent failed: ${res.status} ${msg}`);
+  }
+  const body = (await res.json()) as { agent?: string | null };
+  return body.agent ?? null;
 }
 
 // ── sessions ─────────────────────────────────────────────────────────────────
@@ -229,7 +251,7 @@ export interface SpawnedSession {
 export interface SpawnOptions {
   /** `'last'` → adapter-specific "continue", any UUID → adapter-specific resume-by-id. */
   readonly resume?: 'last' | string;
-  /** Override workspace's default adapter (workspace.agents[0]). */
+  /** Explicit runtime/tool adapter for this spawn. */
   readonly agent?: string;
   /**
    * Seed a FRESH session with a first user message — the quick-chat launch

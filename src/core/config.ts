@@ -195,6 +195,13 @@ export const aiProviderSchema = z.object({
    * `credentials`; a dangling slug is loud-skipped at injection, never fatal.
    */
   workspaceCredentialDefaults: z.record(z.string(), workspaceCredentialDefaultSchema).default({}),
+  /**
+   * User-level default runtime for new interactive workspace sessions. This is
+   * intentionally separate from workspace identity (`agents[]`) and from
+   * credential defaults: it answers "which agent TUI should a plain New Session
+   * start?" Shell is a utility adapter, not a valid stored default.
+   */
+  workspaceDefaultAgent: z.string().nullable().default(null),
 })
 
 export type AIProviderConfig = z.infer<typeof aiProviderSchema>
@@ -978,6 +985,18 @@ export async function writeWorkspaceCredentialDefaults(
     if (parsed.credentialSlug) cleaned[agentId] = parsed
   }
   config.workspaceCredentialDefaults = cleaned
+  await mkdir(CONFIG_DIR, { recursive: true })
+  await writeFile(resolve(CONFIG_DIR, 'ai-provider-manager.json'), JSON.stringify(config, null, 2) + '\n')
+}
+
+export async function readWorkspaceDefaultAgent(): Promise<string | null> {
+  const config = await readAIProviderConfig()
+  return config.workspaceDefaultAgent ?? null
+}
+
+export async function writeWorkspaceDefaultAgent(agentId: string | null): Promise<void> {
+  const config = await readAIProviderConfig()
+  config.workspaceDefaultAgent = agentId && agentId.trim() ? agentId.trim() : null
   await mkdir(CONFIG_DIR, { recursive: true })
   await writeFile(resolve(CONFIG_DIR, 'ai-provider-manager.json'), JSON.stringify(config, null, 2) + '\n')
 }

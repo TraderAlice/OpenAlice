@@ -12,6 +12,7 @@ import type { Credential, WorkspaceCredentialDefault } from '../../core/config.j
 
 let credStore: Record<string, Credential> = {}
 let defaultsStore: Record<string, WorkspaceCredentialDefault> = {}
+let defaultAgentStore: string | null = null
 
 vi.mock('../../core/config.js', async () => {
   const actual = await vi.importActual<typeof import('../../core/config.js')>('../../core/config.js')
@@ -19,11 +20,15 @@ vi.mock('../../core/config.js', async () => {
     ...actual,
     readCredentials: vi.fn(async () => ({ ...credStore })),
     readWorkspaceCredentialDefaults: vi.fn(async () => ({ ...defaultsStore })),
+    readWorkspaceDefaultAgent: vi.fn(async () => defaultAgentStore),
     writeWorkspaceCredentialDefaults: vi.fn(async (next: Record<string, WorkspaceCredentialDefault>) => {
       // Mirror the real writer: drop empty slugs.
       const cleaned: Record<string, WorkspaceCredentialDefault> = {}
       for (const [k, v] of Object.entries(next)) if (v.credentialSlug) cleaned[k] = v
       defaultsStore = cleaned
+    }),
+    writeWorkspaceDefaultAgent: vi.fn(async (agent: string | null) => {
+      defaultAgentStore = agent
     }),
   }
 })
@@ -48,6 +53,7 @@ beforeEach(() => {
     'chat-1': { vendor: 'custom', authType: 'api-key', apiKey: 'k', wires: { 'openai-chat': 'https://gw/v1' } },
   }
   defaultsStore = {}
+  defaultAgentStore = null
 })
 
 describe('GET /workspace-credential-defaults', () => {
@@ -67,6 +73,32 @@ describe('GET /workspace-credential-defaults', () => {
     // opencode/pi speak chat|anthropic|responses → every key qualifies.
     expect(new Set(compat.opencode)).toEqual(new Set(['anthropic-1', 'openai-1', 'chat-1']))
     expect(new Set(compat.pi)).toEqual(new Set(['anthropic-1', 'openai-1', 'chat-1']))
+  })
+})
+
+describe('GET/PUT /workspace-default-agent', () => {
+  it('round-trips a valid agent runtime default', async () => {
+    const routes = createConfigRoutes()
+    const put = await req(routes, 'PUT', '/workspace-default-agent', { agent: 'codex' })
+    expect(put.status).toBe(200)
+    expect(put.body).toEqual({ agent: 'codex' })
+    expect(defaultAgentStore).toBe('codex')
+
+    const get = await req(routes, 'GET', '/workspace-default-agent')
+    expect(get.body).toEqual({ agent: 'codex' })
+  })
+
+  it('does not persist shell or unknown ids as a default workload', async () => {
+    const routes = createConfigRoutes()
+    defaultAgentStore = 'codex'
+
+    const shell = await req(routes, 'PUT', '/workspace-default-agent', { agent: 'shell' })
+    expect(shell.body).toEqual({ agent: null })
+    expect(defaultAgentStore).toBeNull()
+
+    const unknown = await req(routes, 'PUT', '/workspace-default-agent', { agent: 'bogus' })
+    expect(unknown.body).toEqual({ agent: null })
+    expect(defaultAgentStore).toBeNull()
   })
 })
 

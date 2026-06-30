@@ -45,12 +45,12 @@ interface UseCreateWorkspaceState {
  * agent-checkbox state + submit handler. They've drifted in small ways
  * over time; bundling here keeps them in lockstep.
  *
- * Agent policy lives in the backend (`WorkspaceCreator.create`): every
- * workspace gets every registered adapter enabled, template-headed so
- * `agents[0]` (the new-session default) follows template intent. This hook
- * sends NO agent set, so the form, quick-chat, and headless all converge on
- * that one source of truth — it used to expand the list here, which silently
- * left backend-only callers (quick-chat) on the bare-defaultAgents set.
+ * Adapter enablement policy lives in the backend (`WorkspaceCreator.create`):
+ * every workspace gets every registered adapter enabled, with template
+ * defaults kept only as ordering hints. The user's default runtime is stored
+ * separately; `shell` is a utility adapter, not a default workload candidate.
+ * This hook sends NO agent set, so the form, quick-chat, and headless all
+ * converge on that one source of truth.
  */
 export function useCreateWorkspace(opts: UseCreateWorkspaceOpts): UseCreateWorkspaceState {
   const [tag, setTag] = useState('')

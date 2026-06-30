@@ -33,12 +33,14 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { WorkspaceAIConfigModal } from '../components/workspace/WorkspaceAIConfigModal'
 import {
   deleteSession as apiDeleteSession,
+  getWorkspaceDefaultAgent,
   listAgents,
   listTemplates,
   listWorkspaces,
   pauseSession as apiPauseSession,
   quickChat as apiQuickChat,
   resumeSession as apiResumeSession,
+  setWorkspaceDefaultAgent as apiSetWorkspaceDefaultAgent,
   spawnSession,
   updateWorkspaceMetadata,
   type AgentInfo,
@@ -61,6 +63,7 @@ interface WorkspacesContextValue {
   readonly workspaces: readonly Workspace[]
   readonly templates: readonly TemplateInfo[]
   readonly agents: readonly AgentInfo[]
+  readonly defaultAgent: string | null
   readonly listError: string | null
   /** True once the first workspaces-list fetch has resolved. Until then an
    *  empty list means "not loaded yet", not "no workspaces" — the sidebar shows
@@ -74,6 +77,7 @@ interface WorkspacesContextValue {
   readonly templatesLoaded: boolean
   refresh(): void
   spawn(wsId: string, opts?: SpawnOpts): Promise<void>
+  setDefaultAgent(agent: string | null): Promise<void>
   /**
    * Quick-chat launch: reuse-or-create the chat workspace, spawn a fresh
    * session seeded with `prompt`, and focus into its terminal tab. Rejects on
@@ -101,6 +105,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
   const [templates, setTemplates] = useState<TemplateInfo[]>([])
   const [templatesLoaded, setTemplatesLoaded] = useState(false)
   const [agents, setAgents] = useState<AgentInfo[]>([])
+  const [defaultAgent, setDefaultAgentState] = useState<string | null>(null)
   const [listError, setListError] = useState<string | null>(null)
   // Don't reconcile orphan tabs until we've successfully fetched the
   // workspaces list at least once — otherwise the initial `[]` looks like
@@ -141,6 +146,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
       .catch(() => setTemplates([]))
       .finally(() => setTemplatesLoaded(true))
     void listAgents().then(setAgents).catch(() => setAgents([]))
+    void getWorkspaceDefaultAgent().then(setDefaultAgentState).catch(() => setDefaultAgentState(null))
   }, [])
 
   // Reconcile tabs against the workspaces list. If a workspace or session
@@ -201,6 +207,11 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     },
     [refresh, openOrFocus],
   )
+
+  const setDefaultAgent = useCallback(async (agent: string | null): Promise<void> => {
+    const saved = await apiSetWorkspaceDefaultAgent(agent)
+    setDefaultAgentState(saved)
+  }, [])
 
   const quickChat = useCallback(
     async (prompt: string, agent?: string, credentialSlug?: string, targetWsId?: string): Promise<void> => {
@@ -328,11 +339,13 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         workspaces,
         templates,
         agents,
+        defaultAgent,
         listError,
         hasLoaded,
         templatesLoaded,
         refresh,
         spawn,
+        setDefaultAgent,
         quickChat,
         pauseSession,
         resumeSession,

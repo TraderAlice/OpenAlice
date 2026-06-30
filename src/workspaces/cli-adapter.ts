@@ -97,6 +97,12 @@ export interface CliAdapter {
   readonly id: string;                          // 'claude' | 'codex' | 'shell'
   readonly displayName: string;
   /**
+   * Launch surface category. Agent runtimes run a coding-agent TUI and can be
+   * used as the default workload. Utility adapters are explicit tools such as a
+   * bare shell and must never be selected by an omitted `agent`.
+   */
+  readonly kind?: 'agent' | 'utility';
+  /**
    * Canonical PATH binary name this adapter spawns (`claude`, `codex`,
    * `opencode`, `pi`). Consumed by `agent-detect.ts` to tell the frontend
    * whether the runtime is actually installed on the host. Omit for adapters
@@ -226,6 +232,10 @@ export interface CliAdapter {
 
   /** Subprocess discovery (capabilities.transcriptDiscovery === 'subprocess'). */
   listOnDisk?(cwd: string): Promise<readonly OnDiskSession[]>;
+}
+
+export function isAgentRuntime(adapter: CliAdapter): boolean {
+  return adapter.kind !== 'utility' && adapter.id !== 'shell';
 }
 
 export class AdapterRegistry {

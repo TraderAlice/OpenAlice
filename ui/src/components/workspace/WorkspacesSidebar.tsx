@@ -32,6 +32,7 @@ export function WorkspacesSidebar() {
         workspaces={ctx.workspaces}
         templates={ctx.templates}
         agents={ctx.agents}
+        defaultAgent={ctx.defaultAgent}
         listError={ctx.listError}
         hasLoaded={ctx.hasLoaded}
         selection={selection}
@@ -43,6 +44,7 @@ export function WorkspacesSidebar() {
           openOrFocus({ kind: 'workspace', params: { wsId, sessionId } })
         }}
         onSpawn={(wsId, opts?: SpawnOpts) => void ctx.spawn(wsId, opts)}
+        onSetDefaultAgent={(agent) => void ctx.setDefaultAgent(agent)}
         onPauseSession={(wsId, id) => void ctx.pauseSession(wsId, id)}
         onResumeSession={(wsId, id) => void ctx.resumeSession(wsId, id)}
         onDeleteSession={(wsId, id) => ctx.requestDeleteSession(wsId, id)}

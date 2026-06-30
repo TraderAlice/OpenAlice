@@ -19,7 +19,7 @@ import { codexAdapter } from './adapters/codex.js';
 import { opencodeAdapter } from './adapters/opencode.js';
 import { piAdapter } from './adapters/pi.js';
 import { shellAdapter } from './adapters/shell.js';
-import { AdapterRegistry, type CliAdapter } from './cli-adapter.js';
+import { AdapterRegistry, isAgentRuntime, type CliAdapter } from './cli-adapter.js';
 import { loadConfig, type ServerConfig } from './config.js';
 import { logger as launcherLogger } from './logger.js';
 import { runHeadlessProbe, type HeadlessProbeResult } from './probe.js';
@@ -297,7 +297,10 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       const a = adapters.get(agentId);
       if (a) return a;
     }
-    const fromWorkspace = wsMeta.agents[0];
+    const fromWorkspace = wsMeta.agents.find((id) => {
+      const a = adapters.get(id);
+      return a ? isAgentRuntime(a) : false;
+    });
     if (fromWorkspace) {
       const a = adapters.get(fromWorkspace);
       if (a) return a;

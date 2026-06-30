@@ -56,11 +56,11 @@ const AGENT_ICONS: Record<string, LucideIcon> = {
  * session seeded with that message (the agent CLI opens already working on it),
  * and focuses into the session's terminal tab. No template/CLI pickers in the
  * way — the bottom row shows the workspace type (Chat) and a small runtime
- * picker (the four agent CLIs), defaulting to the workspace's default agent.
+ * picker for agent CLIs. Shell is not an agent runtime and is excluded here.
  */
 export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: string } } }) {
   const { t } = useTranslation()
-  const { quickChat, agents, workspaces } = useWorkspaces()
+  const { quickChat, agents, workspaces, defaultAgent, setDefaultAgent } = useWorkspaces()
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
 
   // Targeted launch: the chat sidebar's per-workspace "+" routes here with a
@@ -72,7 +72,10 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
 
   // The selectable agent runtimes = the agent CLIs (the bare shell has no agent
   // loop, so it can't be seeded with a first message).
-  const cliAgents = agents.filter((a) => a.id !== 'shell')
+  const cliAgents = agents.filter((a) => a.kind !== 'utility')
+  const targetCliAgents = targetWs
+    ? cliAgents.filter((a) => targetWs.agents.includes(a.id))
+    : cliAgents
 
   const [value, setValue] = useState('')
   const [launching, setLaunching] = useState(false)
@@ -85,24 +88,28 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
   // Backend probes the host PATH and reports `installed` per agent. Treat a
   // missing value as installed (older backend / don't gate on a stale shape).
   const isInstalled = (a: { installed?: boolean }) => a.installed !== false
-  const anyInstalled = cliAgents.some(isInstalled)
+  const anyInstalled = targetCliAgents.some(isInstalled)
   // Whether the `/agents` fetch has actually landed. Before it does, `agents`
   // is `[]` and `anyInstalled` is falsely false — which would flash the
   // "nothing installed, go install something" nudge on every page load until
   // the request resolves. The backend registers claude/codex/opencode/pi/shell
   // unconditionally, so a loaded list always has ≥1 CLI agent; an empty
-  // `cliAgents` means "still loading" (or the fetch failed) — in both cases we
+  // `targetCliAgents` means "still loading" (or the fetch failed) — in both cases we
   // must NOT assert that the host is missing its runtimes.
-  const agentsKnown = cliAgents.length > 0
+  const agentsKnown = targetCliAgents.length > 0
 
-  // Default to the first INSTALLED CLI until the user picks one — so a fresh
-  // box that only has, say, codex doesn't silently default to a missing claude.
-  const firstInstalled = cliAgents.find(isInstalled)
-  // When targeting an existing workspace, default the picker to that
-  // workspace's own agent (the user can still switch).
+  // Prefer the user-level runtime default when it is valid for this target.
+  // Without a saved default, require the user to pick an agent once; the pick is
+  // persisted as the next default runtime.
+  const defaultAgentUsable =
+    defaultAgent !== null &&
+    targetCliAgents.some((a) => a.id === defaultAgent) &&
+    (!targetWs || targetWs.agents.includes(defaultAgent))
+  const selectedAgentUsable =
+    selectedAgent !== null && targetCliAgents.some((a) => a.id === selectedAgent)
   const effectiveAgent =
-    selectedAgent ?? targetWs?.agents[0] ?? firstInstalled?.id ?? cliAgents[0]?.id ?? null
-  const selectedInfo = cliAgents.find((a) => a.id === effectiveAgent) ?? null
+    (selectedAgentUsable ? selectedAgent : null) ?? (defaultAgentUsable ? defaultAgent : null)
+  const selectedInfo = targetCliAgents.find((a) => a.id === effectiveAgent) ?? null
   const SelectedIcon = selectedInfo ? AGENT_ICONS[selectedInfo.id] : undefined
   // Surface install guidance when the chosen runtime isn't on PATH.
   const selectedMissing = selectedInfo != null && !isInstalled(selectedInfo)
@@ -188,7 +195,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
     openOrFocus({ kind: 'settings', params: { category: 'ai-provider' } })
   }
 
-  const canSend = value.trim().length > 0 && !launching && !noCreds
+  const canSend = value.trim().length > 0 && !launching && !noCreds && effectiveAgent !== null
 
   // Close the agent menu on an outside click.
   useEffect(() => {
@@ -205,6 +212,10 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
   const submit = async () => {
     const prompt = value.trim()
     if (!prompt || launching) return
+    if (effectiveAgent === null) {
+      setAgentMenuOpen(true)
+      return
+    }
     // A loginless runtime with no configured provider can't launch — send the
     // user to set one up instead of spawning an agent that'll die immediately.
     if (noCreds) {
@@ -218,7 +229,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
       // stays open in the background, so clear it for next time.
       await quickChat(
         prompt,
-        effectiveAgent ?? undefined,
+        effectiveAgent,
         needsCred ? (effectiveCred ?? undefined) : undefined,
         targetWsId,
       )
@@ -322,7 +333,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
                 <button
                   type="button"
                   onClick={() => setAgentMenuOpen((o) => !o)}
-                  disabled={cliAgents.length === 0}
+                  disabled={targetCliAgents.length === 0}
                   aria-haspopup="menu"
                   aria-expanded={agentMenuOpen}
                   aria-label={t('chatLanding.selectAgent')}
@@ -332,12 +343,12 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
                   {selectedInfo?.displayName ?? t('chatLanding.defaultAgent')}
                   <ChevronDown className="w-3 h-3 opacity-60" />
                 </button>
-                {agentMenuOpen && cliAgents.length > 0 && (
+                {agentMenuOpen && targetCliAgents.length > 0 && (
                   <div
                     role="menu"
                     className="absolute bottom-full left-0 mb-1 min-w-[170px] py-1 bg-bg-secondary border border-border/70 rounded-lg shadow-lg z-10"
                   >
-                    {cliAgents.map((a) => {
+                    {targetCliAgents.map((a) => {
                       const Icon = AGENT_ICONS[a.id]
                       const active = a.id === effectiveAgent
                       const missing = !isInstalled(a)
@@ -348,6 +359,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
                           role="menuitem"
                           onClick={() => {
                             setSelectedAgent(a.id)
+                            void setDefaultAgent(a.id)
                             setAgentMenuOpen(false)
                           }}
                           className={`w-full flex items-center gap-2 px-3 py-1.5 text-[12px] text-left transition-colors hover:bg-bg-tertiary ${active ? 'text-accent' : missing ? 'text-text-muted/60' : 'text-text'}`}

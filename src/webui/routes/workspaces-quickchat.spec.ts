@@ -10,14 +10,19 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import { createWorkspaceRoutes } from './workspaces.js';
-import { readCredentials, setCredentialLastModel, type Credential } from '../../core/config.js';
+import { readCredentials, readWorkspaceDefaultAgent, setCredentialLastModel, type Credential } from '../../core/config.js';
 import type { WorkspaceService } from '../../workspaces/service.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 vi.mock('../../core/config.js', async (importActual) => {
   const actual = await importActual<typeof import('../../core/config.js')>();
-  return { ...actual, readCredentials: vi.fn(), setCredentialLastModel: vi.fn(async () => {}) };
+  return {
+    ...actual,
+    readCredentials: vi.fn(),
+    readWorkspaceDefaultAgent: vi.fn(async () => null),
+    setCredentialLastModel: vi.fn(async () => {}),
+  };
 });
 
 const openaiKey: Credential = {
@@ -33,7 +38,8 @@ function build(opts: { workspaces?: any[] } = {}) {
     readAiConfig: vi.fn(async () => null), // workspace has no prior config
   };
   const claude = { id: 'claude', namePrefix: 'c' };
-  const adapters: Record<string, any> = { opencode, claude };
+  const shell = { id: 'shell', kind: 'utility', namePrefix: 'sh' };
+  const adapters: Record<string, any> = { opencode, claude, shell };
   const spawn = vi.fn(() => ({
     recordId: 'rec-1', wsId: 'ws-1', name: 'o1', pid: 1, agentSessionId: null, startedAt: 1,
   }));
@@ -69,6 +75,7 @@ async function quickChat(app: any, body: unknown) {
 
 beforeEach(() => {
   vi.mocked(readCredentials).mockReset();
+  vi.mocked(readWorkspaceDefaultAgent).mockResolvedValue(null);
   vi.mocked(setCredentialLastModel).mockClear();
 });
 
@@ -130,6 +137,27 @@ describe('POST /quick-chat — loginless credential injection', () => {
     expect(creator.create).not.toHaveBeenCalled(); // reused, not created
     expect(spawn).toHaveBeenCalledOnce();
     expect((spawn.mock.calls[0] as any[])[0]).toBe('ws-1'); // spawned into the target
+  });
+
+  it('omitted agent ignores shell at agents[0] and uses the first agent runtime', async () => {
+    const { app, spawn } = build({
+      workspaces: [{ id: 'ws-1', dir: '/w', agents: ['shell', 'claude'], template: 'chat', tag: 'chat-x' }],
+    });
+    const r = await quickChat(app, { prompt: 'hi', targetWsId: 'ws-1' });
+    expect(r.status).toBe(201);
+    expect(spawn).toHaveBeenCalledOnce();
+    expect((spawn.mock.calls[0] as any[])[1].agentId).toBe('claude');
+  });
+
+  it('omitted agent honors a configured default runtime when enabled', async () => {
+    vi.mocked(readWorkspaceDefaultAgent).mockResolvedValue('opencode');
+    vi.mocked(readCredentials).mockResolvedValue({ 'openai-1': openaiKey });
+    const { app, spawn } = build({
+      workspaces: [{ id: 'ws-1', dir: '/w', agents: ['shell', 'claude', 'opencode'], template: 'chat', tag: 'chat-x' }],
+    });
+    const r = await quickChat(app, { prompt: 'hi', targetWsId: 'ws-1' });
+    expect(r.status).toBe(201);
+    expect((spawn.mock.calls[0] as any[])[1].agentId).toBe('opencode');
   });
 
   it('unknown targetWsId → 404 workspace_not_found, no spawn', async () => {

@@ -4,6 +4,7 @@ import {
   readCredentials, addCredential, deleteCredential, writeCredential, resolveCredential,
   credentialWires,
   readWorkspaceCredentialDefaults, writeWorkspaceCredentialDefaults,
+  readWorkspaceDefaultAgent, writeWorkspaceDefaultAgent,
   credentialVendorEnum, credentialWireShapeEnum,
   type ConfigSection, type Credential, type CredentialWireShape,
   type WorkspaceCredentialDefault,
@@ -211,6 +212,27 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
       }
       await writeWorkspaceCredentialDefaults(next)
       return c.json({ defaults: next })
+    } catch (err) {
+      return c.json({ error: String(err) }, 400)
+    }
+  })
+
+  app.get('/workspace-default-agent', async (c) => {
+    try {
+      return c.json({ agent: await readWorkspaceDefaultAgent() })
+    } catch (err) {
+      return c.json({ error: String(err) }, 500)
+    }
+  })
+
+  app.put('/workspace-default-agent', async (c) => {
+    try {
+      const body = await c.req.json<{ agent?: string | null }>()
+      const agent = typeof body.agent === 'string' && DEFAULTABLE_AGENTS.includes(body.agent as typeof DEFAULTABLE_AGENTS[number])
+        ? body.agent
+        : null
+      await writeWorkspaceDefaultAgent(agent)
+      return c.json({ agent })
     } catch (err) {
       return c.json({ error: String(err) }, 400)
     }

@@ -86,7 +86,7 @@ export const issueFrontmatterSchema = z.object({
   when: issueWhenSchema.optional(),
   /** Prompt fired on schedule; if absent, the fire prompt falls back to title+body. */
   what: z.string().min(1).optional(),
-  /** Which adapter to run the scheduled fire with; defaults to the ws default agent. */
+  /** Which agent runtime to run the scheduled fire with; omitted uses the user default / first runtime. */
   agent: z.string().min(1).optional(),
 })
 export type IssueFrontmatter = z.infer<typeof issueFrontmatterSchema>

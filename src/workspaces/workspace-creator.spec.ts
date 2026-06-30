@@ -43,7 +43,7 @@ function setPlatform(value: NodeJS.Platform): void {
 }
 
 describe('resolveCreateAgents — single home of the agent policy', () => {
-  const ALL = ['claude', 'codex', 'opencode', 'pi'];
+  const ALL = ['claude', 'codex', 'opencode', 'pi', 'shell'];
 
   it('enables EVERY registered adapter when the caller pins nothing', () => {
     // The quick-chat bug: it called create() with no explicit set, so it used
@@ -51,16 +51,22 @@ describe('resolveCreateAgents — single home of the agent policy', () => {
     expect(resolveCreateAgents(undefined, ['claude', 'codex'], ALL)).toEqual(ALL);
   });
 
-  it('honors template defaultAgents only as the ORDER head (agents[0] default)', () => {
+  it('honors template defaultAgents as the agent-runtime order head', () => {
     // A template that wants codex first still gets all four, codex leading.
     expect(resolveCreateAgents(undefined, ['codex'], ALL)).toEqual([
-      'codex', 'claude', 'opencode', 'pi',
+      'codex', 'claude', 'opencode', 'pi', 'shell',
     ]);
   });
 
   it('first-wins dedupes when the head repeats a registered id', () => {
     expect(resolveCreateAgents(undefined, ['pi', 'claude'], ALL)).toEqual([
-      'pi', 'claude', 'codex', 'opencode',
+      'pi', 'claude', 'codex', 'opencode', 'shell',
+    ]);
+  });
+
+  it('keeps shell enabled but never ahead of agent runtimes', () => {
+    expect(resolveCreateAgents(undefined, ['shell', 'codex'], ALL)).toEqual([
+      'codex', 'claude', 'opencode', 'pi', 'shell',
     ]);
   });
 
