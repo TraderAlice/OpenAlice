@@ -1,6 +1,6 @@
 {
   "name": "open-alice",
-  "version": "0.70.0-beta.4",
+  "version": "0.70.0-beta.5",
   "description": "File-based trading agent engine",
   "type": "module",
   "main": "dist/electron/main.js",
@@ -51,6 +51,7 @@
     "ccxt": "^4.5.38",
     "decimal.js": "^10.6.0",
     "dugite": "3.2.2",
+    "electron-updater": "^6.8.9",
     "grammy": "^1.40.0",
     "hono": "^4.12.21",
     "longbridge": "^4.0.5",
@@ -108,9 +109,8 @@
     },
     "publish": [
       {
-        "provider": "github",
-        "owner": "TraderAlice",
-        "repo": "OpenAlice"
+        "provider": "generic",
+        "url": "https://download.openalice.ai/"
       }
     ]
   },

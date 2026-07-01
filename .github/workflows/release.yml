@@ -216,6 +216,31 @@ jobs:
         # available.
         run: pnpm -F @traderalice/desktop exec electron-builder --projectDir ../.. --publish never
 
+      - name: Prepare update channel aliases
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs = require('fs')
+          const path = require('path')
+          const version = require('./package.json').version
+          const match = version.match(/^\d+\.\d+\.\d+-([0-9A-Za-z-]+)/)
+          if (!match) process.exit(0)
+
+          const channel = match[1]
+          const outDir = path.join('dist', 'electron-app')
+          const aliases = [
+            ['latest-mac.yml', `${channel}-mac.yml`],
+            ['latest.yml', `${channel}.yml`],
+          ]
+
+          for (const [source, target] of aliases) {
+            const sourcePath = path.join(outDir, source)
+            if (!fs.existsSync(sourcePath)) continue
+            fs.copyFileSync(sourcePath, path.join(outDir, target))
+            console.log(`Created ${target} from ${source}`)
+          }
+          NODE
+
       - name: Attach installer to the release
         uses: softprops/action-gh-release@v2
         with:
@@ -223,6 +248,79 @@ jobs:
           files: |
             dist/electron-app/*.dmg
             dist/electron-app/*.zip
-            dist/electron-app/*mac.yml
+            dist/electron-app/*.yml
             dist/electron-app/*.blockmap
             dist/electron-app/*.exe
+
+  mirror-release-assets:
+    needs: [release, build-desktop]
+    if: needs.release.outputs.created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Download release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.release.outputs.tag }}
+        run: |
+          mkdir -p dist/r2-upload
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir dist/r2-upload --clobber
+
+      - name: Prepare CDN update channel aliases
+        env:
+          TAG: ${{ needs.release.outputs.tag }}
+        run: |
+          VERSION="${TAG#v}"
+          if [[ "$VERSION" != *-* ]]; then
+            exit 0
+          fi
+
+          CHANNEL="${VERSION#*-}"
+          CHANNEL="${CHANNEL%%.*}"
+
+          if [ -f dist/r2-upload/latest-mac.yml ]; then
+            cp dist/r2-upload/latest-mac.yml "dist/r2-upload/${CHANNEL}-mac.yml"
+          fi
+
+          if [ -f dist/r2-upload/latest.yml ]; then
+            cp dist/r2-upload/latest.yml "dist/r2-upload/${CHANNEL}.yml"
+          fi
+
+      - name: Install AWS CLI
+        run: |
+          python3 -m pip install --user awscli
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Mirror release assets to Cloudflare R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_EC2_METADATA_DISABLED: true
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+
+          aws s3 cp dist/r2-upload "s3://${R2_BUCKET}/" \
+            --recursive \
+            --exclude "*.yml" \
+            --cache-control "public, max-age=31536000, immutable" \
+            --endpoint-url "$ENDPOINT"
+
+          aws s3 cp dist/r2-upload "s3://${R2_BUCKET}/" \
+            --recursive \
+            --exclude "*" \
+            --include "*.yml" \
+            --cache-control "no-cache" \
+            --content-type "text/yaml" \
+            --endpoint-url "$ENDPOINT"
+
+      - name: Verify CDN metadata
+        env:
+          DOWNLOAD_BASE_URL: ${{ secrets.DOWNLOAD_BASE_URL }}
+        run: |
+          BASE_URL="${DOWNLOAD_BASE_URL%/}"
+          curl -fsSI "${BASE_URL}/latest-mac.yml"

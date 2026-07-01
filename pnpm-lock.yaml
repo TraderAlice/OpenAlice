@@ -73,6 +73,9 @@ importers:
       dugite:
         specifier: 3.2.2
         version: 3.2.2
+      electron-updater:
+        specifier: ^6.8.9
+        version: 6.8.9
       grammy:
         specifier: ^1.40.0
         version: 1.40.0(encoding@0.1.13)
