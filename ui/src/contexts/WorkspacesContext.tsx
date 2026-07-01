@@ -47,6 +47,7 @@ import {
   type Workspace,
 } from '../components/workspace/api'
 import { useWorkspace } from '../tabs/store'
+import type { WorkspaceSource } from '../tabs/types'
 import { WorkspacesContext, type SpawnOpts } from './workspaces-context'
 
 const LIST_POLL_MS = 3000
@@ -128,7 +129,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
   }, [hasLoaded, workspaces, closeTab])
 
   const spawn = useCallback(
-    async (wsId: string, opts: SpawnOpts = {}): Promise<void> => {
+    async (wsId: string, opts: SpawnOpts = {}, source?: WorkspaceSource): Promise<void> => {
       try {
         const sess = await spawnSession(wsId, opts)
         const nowIso = new Date().toISOString()
@@ -150,7 +151,14 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
             w.id === wsId ? { ...w, sessions: [...w.sessions, newRecord] } : w,
           ),
         )
-        openOrFocus({ kind: 'workspace', params: { wsId, sessionId: sess.sessionId } })
+        openOrFocus({
+          kind: 'workspace',
+          params: {
+            wsId,
+            sessionId: sess.sessionId,
+            ...(source ? { source } : {}),
+          },
+        })
         void refresh()
       } catch (err) {
         console.error('workspaces.spawn_failed', { wsId, opts, err })
@@ -198,7 +206,10 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         }
         return [{ ...workspace, sessions: withRecord(workspace.sessions) }, ...prev]
       })
-      openOrFocus({ kind: 'workspace', params: { wsId: workspace.id, sessionId: session.sessionId } })
+      openOrFocus({
+        kind: 'workspace',
+        params: { wsId: workspace.id, sessionId: session.sessionId, source: 'chat' },
+      })
       void refresh()
     },
     [refresh, openOrFocus],
@@ -221,7 +232,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
   )
 
   const resumeSession = useCallback(
-    async (wsId: string, sessionId: string): Promise<void> => {
+    async (wsId: string, sessionId: string, source?: WorkspaceSource): Promise<void> => {
       const resp = await apiResumeSession(wsId, sessionId)
       if (resp) {
         setWorkspaces((prev) =>
@@ -233,7 +244,14 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
           }),
         )
       }
-      openOrFocus({ kind: 'workspace', params: { wsId, sessionId } })
+      openOrFocus({
+        kind: 'workspace',
+        params: {
+          wsId,
+          sessionId,
+          ...(source ? { source } : {}),
+        },
+      })
       void refresh()
     },
     [refresh, openOrFocus],

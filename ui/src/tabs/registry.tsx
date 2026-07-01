@@ -256,7 +256,10 @@ const workspaceModule: ViewModule<'workspace'> = {
     return `${tag} · ${name}`
   },
   toUrl: (spec) => {
-    const base = `/workspaces/${encodeURIComponent(spec.params.wsId)}`
+    const base =
+      spec.params.source === 'chat'
+        ? `/chat/workspaces/${encodeURIComponent(spec.params.wsId)}`
+        : `/workspaces/${encodeURIComponent(spec.params.wsId)}`
     const sid = spec.params.sessionId
     return sid ? `${base}/s/${encodeURIComponent(sid)}` : base
   },

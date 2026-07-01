@@ -13,9 +13,11 @@
  * a data-model change.
  */
 
+export type WorkspaceSource = 'chat'
+
 export type ViewSpec =
   | { kind: 'workspace-list'; params: Record<string, never> }
-  | { kind: 'workspace';      params: { wsId: string; sessionId?: string } }
+  | { kind: 'workspace';      params: { wsId: string; sessionId?: string; source?: WorkspaceSource } }
   | { kind: 'template-catalog'; params: Record<string, never> }
   | { kind: 'template-detail';  params: { name: string } }
   | { kind: 'portfolio';      params: Record<string, never> }

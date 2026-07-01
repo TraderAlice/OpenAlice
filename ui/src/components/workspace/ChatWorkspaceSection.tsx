@@ -56,7 +56,7 @@ export function ChatWorkspaceSection(): ReactElement | null {
     [ctx.workspaces],
   )
 
-  const isWsFocus = focused?.kind === 'workspace'
+  const isWsFocus = focused?.kind === 'workspace' && focused.params.source === 'chat'
   const selection = isWsFocus
     ? { wsId: focused.params.wsId, sessionId: focused.params.sessionId ?? null }
     : null
@@ -155,7 +155,7 @@ export function ChatWorkspaceSection(): ReactElement | null {
           presetTemplate={CHAT_TEMPLATE}
           onCreated={(workspace) => {
             ctx.refresh()
-            openOrFocus({ kind: 'workspace', params: { wsId: workspace.id } })
+            openOrFocus({ kind: 'workspace', params: { wsId: workspace.id, source: 'chat' } })
           }}
           onClose={() => setShowCreate(false)}
         />
@@ -195,14 +195,16 @@ export function ChatWorkspaceSection(): ReactElement | null {
               const recent = mostRecentSession(w.sessions)
               openOrFocus({
                 kind: 'workspace',
-                params: recent ? { wsId: w.id, sessionId: recent.id } : { wsId: w.id },
+                params: recent
+                  ? { wsId: w.id, sessionId: recent.id, source: 'chat' }
+                  : { wsId: w.id, source: 'chat' },
               })
             }}
             onOpenSession={(sid) =>
-              openOrFocus({ kind: 'workspace', params: { wsId: w.id, sessionId: sid } })
+              openOrFocus({ kind: 'workspace', params: { wsId: w.id, sessionId: sid, source: 'chat' } })
             }
             onPauseSession={(sid) => void ctx.pauseSession(w.id, sid)}
-            onResumeSession={(sid) => void ctx.resumeSession(w.id, sid)}
+            onResumeSession={(sid) => void ctx.resumeSession(w.id, sid, 'chat')}
             onDeleteSession={(sid) => ctx.requestDeleteSession(w.id, sid)}
             onConfigure={() => ctx.openAgentConfig(w.id)}
             onDelete={() => setPendingDelete(w)}
