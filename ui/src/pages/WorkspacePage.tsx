@@ -37,6 +37,7 @@ export function WorkspacePage({ spec, visible }: Props) {
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const wsId = spec.params.wsId
   const sessionId = spec.params.sessionId ?? null
+  const source = spec.params.source
 
   const workspace = ctx.workspaces.find((w) => w.id === wsId)
   const sessions = workspace?.sessions ?? []
@@ -66,12 +67,12 @@ export function WorkspacePage({ spec, visible }: Props) {
   const spawnWithAgent = async (agentId: string, saveDefault: boolean): Promise<void> => {
     setSpawnMenuOpen(false)
     if (saveDefault) await ctx.setDefaultAgent(agentId)
-    await ctx.spawn(wsId, { agent: agentId })
+    await ctx.spawn(wsId, { agent: agentId }, source)
   }
 
   const spawnDefault = (): void => {
     if (defaultAgentEnabled && ctx.defaultAgent) {
-      void ctx.spawn(wsId, { agent: ctx.defaultAgent })
+      void ctx.spawn(wsId, { agent: ctx.defaultAgent }, source)
       return
     }
     setSpawnMenuOpen((v) => !v)
@@ -196,11 +197,18 @@ export function WorkspacePage({ spec, visible }: Props) {
           label={workspace.tag}
           keyMap={keyMap}
           onSpawnFresh={spawnDefault}
-          onResume={(id) => void ctx.resumeSession(wsId, id)}
+          onResume={(id) => void ctx.resumeSession(wsId, id, source)}
           onSelectSession={(id) => {
             // Running session — already alive on the server, just
             // navigate. Mirrors the sidebar's onSelectSession path.
-            openOrFocus({ kind: 'workspace', params: { wsId, sessionId: id } })
+            openOrFocus({
+              kind: 'workspace',
+              params: {
+                wsId,
+                sessionId: id,
+                ...(source ? { source } : {}),
+              },
+            })
           }}
           onSessionLost={() => {
             // 4404 from the WS upgrade — the session is gone server-side.

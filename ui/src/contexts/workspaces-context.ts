@@ -4,6 +4,7 @@ import type {
   TemplateInfo,
   Workspace,
 } from '../components/workspace/api'
+import type { WorkspaceSource } from '../tabs/types'
 
 export interface SpawnOpts {
   readonly resume?: 'last' | string
@@ -23,11 +24,11 @@ export interface WorkspacesContextValue {
   /** True once the templates fetch has settled (success OR failure). */
   readonly templatesLoaded: boolean
   refresh(): void
-  spawn(wsId: string, opts?: SpawnOpts): Promise<void>
+  spawn(wsId: string, opts?: SpawnOpts, source?: WorkspaceSource): Promise<void>
   setDefaultAgent(agent: string | null): Promise<void>
   quickChat(prompt: string, agent?: string, credentialSlug?: string, targetWsId?: string): Promise<void>
   pauseSession(wsId: string, sessionId: string): Promise<void>
-  resumeSession(wsId: string, sessionId: string): Promise<void>
+  resumeSession(wsId: string, sessionId: string, source?: WorkspaceSource): Promise<void>
   requestDeleteSession(wsId: string, sessionId: string): void
   openAgentConfig(wsId: string): void
   saveWorkspaceMetadata(

@@ -36,6 +36,8 @@ export function UrlAdopter() {
             /chat/:channelId (the retired traditional-chat channels) still
             redirects to Inbox so stale bookmarks land on a live surface. */}
         <Route path="/chat" element={<AdoptStatic spec={{ kind: 'chat-landing', params: {} }} />} />
+        <Route path="/chat/workspaces/:wsId" element={<AdoptChatWorkspace />} />
+        <Route path="/chat/workspaces/:wsId/s/:sessionId" element={<AdoptChatWorkspace />} />
         <Route path="/chat/:channelId" element={<Navigate to="/inbox" replace />} />
         <Route path="/portfolio" element={<AdoptStatic spec={{ kind: 'portfolio', params: {} }} />} />
         <Route path="/issues" element={<AdoptStatic spec={{ kind: 'issue', params: {} }} />} />
@@ -209,7 +211,15 @@ function AdoptAutomation() {
 function AdoptWorkspace() {
   const { wsId, sessionId } = useParams<{ wsId: string; sessionId?: string }>()
   if (!wsId) return <Navigate to="/workspaces" replace />
-  const params: { wsId: string; sessionId?: string } = { wsId }
+  const params: Extract<ViewSpec, { kind: 'workspace' }>['params'] = { wsId }
+  if (sessionId) params.sessionId = sessionId
+  return <AdoptStatic spec={{ kind: 'workspace', params }} />
+}
+
+function AdoptChatWorkspace() {
+  const { wsId, sessionId } = useParams<{ wsId: string; sessionId?: string }>()
+  if (!wsId) return <Navigate to="/chat" replace />
+  const params: Extract<ViewSpec, { kind: 'workspace' }>['params'] = { wsId, source: 'chat' }
   if (sessionId) params.sessionId = sessionId
   return <AdoptStatic spec={{ kind: 'workspace', params }} />
 }
@@ -262,7 +272,7 @@ function specToSection(spec: ViewSpec): ActivitySection {
     case 'tracked':            return 'tracked'
     case 'tracked-issue-detail': return 'tracked'
     case 'chat-landing':       return 'chat'
-    case 'workspace':
+    case 'workspace':          return spec.params.source === 'chat' ? 'chat' : 'workspaces'
     case 'workspace-list':
     case 'template-catalog':
     case 'template-detail':
