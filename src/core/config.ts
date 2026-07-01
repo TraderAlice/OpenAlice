@@ -122,6 +122,8 @@ export type CredentialWireShape = z.infer<typeof credentialWireShapeEnum>
 
 export const credentialSchema = z.object({
   vendor: credentialVendorEnum,
+  /** Human-readable label shown in pickers. Slug stays the stable reference id. */
+  label: z.string().trim().max(80).transform((s) => s || undefined).optional(),
   authType: credentialAuthTypeEnum,
   /** Present for api-key credentials; absent for subscription credentials. */
   apiKey: z.string().optional(),
@@ -918,7 +920,10 @@ export async function addCredential(credential: Credential): Promise<string> {
   )
   if (match) {
     // Upgrade the existing record's wires/endpoint in place (don't duplicate).
-    config.credentials[match[0]] = validated
+    config.credentials[match[0]] = {
+      ...validated,
+      ...(validated.label ?? match[1].label ? { label: validated.label ?? match[1].label } : {}),
+    }
     await mkdir(CONFIG_DIR, { recursive: true })
     await writeFile(resolve(CONFIG_DIR, 'ai-provider-manager.json'), JSON.stringify(config, null, 2) + '\n')
     return match[0]

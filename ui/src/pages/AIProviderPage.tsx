@@ -29,6 +29,10 @@ import { useTestGate } from '../lib/useTestGate'
 
 const SHAPE_ORDER: WireShape[] = ['anthropic', 'openai-chat', 'openai-responses']
 
+function credentialLabel(cred: Pick<CredentialSummary, 'slug' | 'vendor' | 'label'>): string {
+  return cred.label?.trim() || cred.slug
+}
+
 /** Find the region whose wires match a stored credential (for edit mode). */
 function matchRegionId(preset: Preset | null, wires: Partial<Record<WireShape, string>>): string | undefined {
   const shapes = Object.keys(wires) as WireShape[]
@@ -154,7 +158,10 @@ export function AIProviderPage() {
                 <div key={cred.slug} className="flex items-center gap-3 rounded-lg border border-border bg-bg px-4 py-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[13px] font-medium text-text">{cred.vendor}</span>
+                      <span className="text-[13px] font-medium text-text">{credentialLabel(cred)}</span>
+                      {cred.label && (
+                        <span className="text-[11px] text-text-muted">{cred.vendor}</span>
+                      )}
                       <span className="text-[11px] text-text-muted font-mono">{cred.slug}</span>
                       {(SHAPE_ORDER.filter((s) => s in cred.wires)).map((s) => (
                         <span key={s} className="text-[10px] text-text-muted border border-border rounded px-1">{WIRE_SHAPE_SHORT[s]}</span>
@@ -282,7 +289,7 @@ function WorkspaceDefaultsSection({ credentials }: { credentials: CredentialSumm
 
   const credLabel = (slug: string) => {
     const c = credentials.find((x) => x.slug === slug)
-    return c ? `${c.vendor} · ${slug}` : slug
+    return c ? `${credentialLabel(c)} · ${slug}` : slug
   }
 
   const setAgentDefault = async (agentId: string, slug: string) => {
@@ -405,6 +412,7 @@ function CredentialModal({ mode, cred, presets, onClose, onSaved }: {
   )
   // Custom (free-form) provider — one shape + a hand-typed endpoint.
   const customInit = cred ? (SHAPE_ORDER.find((s) => s in (cred.wires ?? {})) ?? 'openai-chat') : 'openai-chat'
+  const [customName, setCustomName] = useState<string>(cred?.label ?? '')
   const [customShape, setCustomShape] = useState<WireShape>(customInit)
   const [customUrl, setCustomUrl] = useState<string>(cred?.wires?.[customInit] ?? '')
   const [apiKey, setApiKey] = useState(cred?.apiKey ?? '')
@@ -461,17 +469,25 @@ function CredentialModal({ mode, cred, presets, onClose, onSaved }: {
   const handleSave = async () => {
     if (!preset) return
     if (Object.keys(wires).length === 0) { setError('Pick a region / endpoint first'); return }
+    const customLabel = customName.trim()
+    if (isCustom && !customLabel) { setError('Provider name is required'); return }
     const vendor = VENDOR_BY_PRESET[preset.id] ?? 'custom'
     setSaving(true); setError('')
     try {
       if (mode === 'edit' && cred) {
         await api.config.updateCredential(cred.slug, {
           vendor, wires,
+          ...(isCustom ? { label: customLabel } : {}),
           ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
         })
       } else {
         if (!apiKey.trim()) { setError('API key is required'); setSaving(false); return }
-        await api.config.addCredential({ vendor, wires, apiKey: apiKey.trim() })
+        await api.config.addCredential({
+          vendor,
+          wires,
+          apiKey: apiKey.trim(),
+          ...(isCustom ? { label: customLabel } : {}),
+        })
       }
       await onSaved()
     } catch (err) {
@@ -527,6 +543,15 @@ function CredentialModal({ mode, cred, presets, onClose, onSaved }: {
 
               {isCustom ? (
                 <>
+                  <Field label="Provider name" description="A readable name for this custom credential in pickers.">
+                    <input
+                      className={inputClass}
+                      value={customName}
+                      onChange={(e) => setCustomName(e.target.value)}
+                      placeholder="e.g. OpenRouter work key"
+                      maxLength={80}
+                    />
+                  </Field>
                   <Field label="API mode" description="Which wire protocol your endpoint speaks.">
                     <select className={inputClass} value={customShape} onChange={(e) => { setCustomShape(e.target.value as WireShape); gate.reset() }}>
                       {SHAPE_ORDER.map((s) => <option key={s} value={s}>{WIRE_SHAPE_SHORT[s]}</option>)}
