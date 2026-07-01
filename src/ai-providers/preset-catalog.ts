@@ -141,13 +141,13 @@ export const CODEX_API: PresetDef = {
   writeOnlyFields: ['apiKey'],
 }
 
-// ==================== Official: Gemini ====================
+// ==================== Third-party: Gemini ====================
 
 export const GEMINI: PresetDef = {
   id: 'gemini',
   label: 'Google Gemini',
   description: 'Google AI via API key',
-  category: 'official',
+  category: 'third-party',
   defaultName: 'Google Gemini',
   zodSchema: z.object({
     backend: z.literal('vercel-ai-sdk'),
@@ -350,12 +350,12 @@ export const PRESET_CATALOG: PresetDef[] = [
   CLAUDE_API,
   CODEX_OAUTH,
   CODEX_API,
-  GEMINI,
   MINIMAX,
   GLM,
   KIMI,
   DEEPSEEK,
   LONGCAT,
+  GEMINI,
   CUSTOM,
 ]
 
