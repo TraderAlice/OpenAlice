@@ -1236,6 +1236,7 @@ export function createWorkspaceRoutes(svc: WorkspaceService): Hono {
       const list = entries.map(([slug, cred]) => ({
         slug,
         vendor: cred.vendor,
+        ...(cred.label ? { label: cred.label } : {}),
         authType: cred.authType,
         wires: credentialWires(cred), // shape → endpoint; the modal picks one per agent
         ...(cred.lastModel ? { lastModel: cred.lastModel } : {}),
@@ -1250,17 +1251,19 @@ export function createWorkspaceRoutes(svc: WorkspaceService): Hono {
 
   app.post('/credentials', async (c) => {
     const body = (await safeJson(c)) as
-      | { apiKey?: string; baseUrl?: string; agent?: string; vendor?: string; wireShape?: string }
+      | { apiKey?: string; baseUrl?: string; agent?: string; vendor?: string; label?: string; wireShape?: string }
       | null;
     const apiKey = body?.apiKey?.trim();
     if (!apiKey) return c.json({ error: 'apiKey_required' }, 400);
     const baseUrl = body?.baseUrl?.trim() || undefined;
+    const label = body?.label?.trim();
     const wireParse = credentialWireShapeEnum.safeParse(body?.wireShape);
     // The workspace modal saves a single hand-entered shape; capture it as a
     // one-entry wires map (the vault can later add more shapes for the same key —
     // dedup-by-key upgrades in place). Subscriptions never flow through here.
     const cred: Credential = {
       vendor: inferCredentialVendor({ agent: body?.agent, baseUrl }),
+      ...(label ? { label } : {}),
       authType: 'api-key',
       apiKey,
       ...(wireParse.success ? { wires: { [wireParse.data]: baseUrl ?? '' } } : (baseUrl ? { wires: {} } : {})),

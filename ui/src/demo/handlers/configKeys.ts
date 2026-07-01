@@ -39,8 +39,8 @@ export const configKeysHandlers = [
   http.get('/api/config/credentials', () =>
     HttpResponse.json({
       credentials: [
-        { slug: 'anthropic-1', vendor: 'anthropic', authType: 'api-key', wires: { anthropic: '' }, apiKey: null, hasApiKey: true },
-        { slug: 'openai-1', vendor: 'openai', authType: 'api-key', wires: { 'openai-responses': '', 'openai-chat': '' }, apiKey: null, hasApiKey: true },
+        { slug: 'anthropic-1', vendor: 'anthropic', label: 'Anthropic', authType: 'api-key', wires: { anthropic: '' }, apiKey: null, hasApiKey: true },
+        { slug: 'openai-1', vendor: 'openai', label: 'OpenAI', authType: 'api-key', wires: { 'openai-responses': '', 'openai-chat': '' }, apiKey: null, hasApiKey: true },
       ],
     }),
   ),

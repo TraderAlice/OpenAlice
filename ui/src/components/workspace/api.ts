@@ -527,6 +527,7 @@ export type AgentId = 'claude' | 'codex' | 'opencode' | 'pi';
 export interface SavedCredential {
   readonly slug: string;
   readonly vendor: string;
+  readonly label?: string;
   readonly authType: 'api-key' | 'subscription';
   /** Wire capabilities: each shape this key speaks → its endpoint baseUrl. */
   readonly wires: Partial<Record<WireShape, string>>;
@@ -568,6 +569,7 @@ export async function saveCredential(input: {
   apiKey: string;
   baseUrl?: string;
   agent?: AgentId;
+  label?: string;
   wireShape?: WireShape;
 }): Promise<{ slug: string; vendor: string }> {
   const res = await fetch('/api/workspaces/credentials', {

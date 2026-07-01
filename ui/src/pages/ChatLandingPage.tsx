@@ -403,7 +403,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
                     className="inline-flex min-h-8 max-w-[190px] items-center gap-1.5 text-[11px] text-text-muted bg-bg-tertiary px-2.5 py-1 rounded-md transition-colors hover:text-text"
                   >
                     <KeyRound className="w-3 h-3" />
-                    <span className="truncate">{credInfo?.slug ?? t('chatLanding.selectCredential')}</span>
+                    <span className="truncate">{credInfo?.label?.trim() || credInfo?.slug || t('chatLanding.selectCredential')}</span>
                     <ChevronDown className="w-3 h-3 opacity-60" />
                   </button>
                   {credMenuOpen && (
@@ -424,7 +424,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
                             }}
                             className={`w-full flex items-center gap-2 px-3 py-1.5 text-[12px] text-left transition-colors hover:bg-bg-tertiary ${active ? 'text-accent' : 'text-text'}`}
                           >
-                            <span className="flex-1 truncate">{cr.slug}</span>
+                            <span className="flex-1 truncate">{cr.label?.trim() || cr.slug}</span>
                             <span className="text-[10px] text-text-muted/70 shrink-0">{cr.vendor}</span>
                             {active && <Check className="w-3.5 h-3.5 shrink-0" />}
                           </button>

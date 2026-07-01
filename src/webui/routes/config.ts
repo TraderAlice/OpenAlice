@@ -70,6 +70,7 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
       const list = Object.entries(creds).map(([slug, cred]) => ({
         slug,
         vendor: cred.vendor,
+        ...(cred.label ? { label: cred.label } : {}),
         authType: cred.authType,
         wires: credentialWires(cred), // derives from legacy {baseUrl,wireShape} too
         apiKey: cred.apiKey ?? null,
@@ -84,13 +85,15 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
   /** POST /credentials — add an api-key credential (deduped by key). Returns slug. */
   app.post('/credentials', async (c) => {
     try {
-      const body = await c.req.json<{ vendor?: string; wires?: unknown; apiKey?: string }>()
+      const body = await c.req.json<{ vendor?: string; label?: string; wires?: unknown; apiKey?: string }>()
       const apiKey = body.apiKey?.trim()
       if (!apiKey) return c.json({ error: 'apiKey is required' }, 400)
       const vendorParse = credentialVendorEnum.safeParse(body.vendor)
+      const label = body.label?.trim()
       const wires = parseWires(body.wires)
       const cred: Credential = {
         vendor: vendorParse.success ? vendorParse.data : 'custom',
+        ...(label ? { label } : {}),
         authType: 'api-key',
         apiKey,
         ...(Object.keys(wires).length ? { wires } : {}),
@@ -106,13 +109,15 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
   app.put('/credentials/:slug', async (c) => {
     try {
       const slug = c.req.param('slug')
-      const body = await c.req.json<{ vendor?: string; wires?: unknown; apiKey?: string }>()
+      const body = await c.req.json<{ vendor?: string; label?: string; wires?: unknown; apiKey?: string }>()
       const existing = await resolveCredential(slug)
       const apiKey = body.apiKey?.trim() || existing.apiKey
       const vendorParse = credentialVendorEnum.safeParse(body.vendor)
+      const label = body.label?.trim()
       const wires = parseWires(body.wires)
       const cred: Credential = {
         vendor: vendorParse.success ? vendorParse.data : existing.vendor,
+        ...(label || existing.label ? { label: label || existing.label } : {}),
         authType: 'api-key',
         ...(apiKey ? { apiKey } : {}),
         ...(Object.keys(wires).length ? { wires } : { ...(existing.wires ? { wires: existing.wires } : {}) }),

@@ -540,7 +540,7 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
                         const picked = pickAgentWire(cred.wires, tab)
                         return (
                           <option key={cred.slug} value={cred.slug}>
-                            {cred.slug}{picked?.baseUrl ? ` · ${picked.baseUrl}` : ''}
+                            {(cred.label?.trim() || cred.slug)}{picked?.baseUrl ? ` · ${picked.baseUrl}` : ''}
                           </option>
                         )
                       })}

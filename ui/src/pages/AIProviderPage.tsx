@@ -29,6 +29,10 @@ import { useTestGate } from '../lib/useTestGate'
 
 const SHAPE_ORDER: WireShape[] = ['anthropic', 'openai-chat', 'openai-responses']
 
+function credentialLabel(cred: Pick<CredentialSummary, 'slug' | 'vendor' | 'label'>): string {
+  return cred.label?.trim() || cred.slug
+}
+
 /** Find the region whose wires match a stored credential (for edit mode). */
 function matchRegionId(preset: Preset | null, wires: Partial<Record<WireShape, string>>): string | undefined {
   const shapes = Object.keys(wires) as WireShape[]
@@ -154,7 +158,10 @@ export function AIProviderPage() {
                 <div key={cred.slug} className="flex items-center gap-3 rounded-lg border border-border bg-bg px-4 py-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[13px] font-medium text-text">{cred.vendor}</span>
+                      <span className="text-[13px] font-medium text-text">{credentialLabel(cred)}</span>
+                      {cred.label && (
+                        <span className="text-[11px] text-text-muted">{cred.vendor}</span>
+                      )}
                       <span className="text-[11px] text-text-muted font-mono">{cred.slug}</span>
                       {(SHAPE_ORDER.filter((s) => s in cred.wires)).map((s) => (
                         <span key={s} className="text-[10px] text-text-muted border border-border rounded px-1">{WIRE_SHAPE_SHORT[s]}</span>
@@ -282,7 +289,7 @@ function WorkspaceDefaultsSection({ credentials }: { credentials: CredentialSumm
 
   const credLabel = (slug: string) => {
     const c = credentials.find((x) => x.slug === slug)
-    return c ? `${c.vendor} · ${slug}` : slug
+    return c ? `${credentialLabel(c)} · ${slug}` : slug
   }
 
   const setAgentDefault = async (agentId: string, slug: string) => {
@@ -405,9 +412,11 @@ function CredentialModal({ mode, cred, presets, onClose, onSaved }: {
   )
   // Custom (free-form) provider — one shape + a hand-typed endpoint.
   const customInit = cred ? (SHAPE_ORDER.find((s) => s in (cred.wires ?? {})) ?? 'openai-chat') : 'openai-chat'
+  const [customName, setCustomName] = useState<string>(cred?.label ?? '')
   const [customShape, setCustomShape] = useState<WireShape>(customInit)
   const [customUrl, setCustomUrl] = useState<string>(cred?.wires?.[customInit] ?? '')
   const [apiKey, setApiKey] = useState(cred?.apiKey ?? '')
+  const [presetQuery, setPresetQuery] = useState('')
   const [showKey, setShowKey] = useState(false)
   const [model, setModel] = useState('')
   const [saving, setSaving] = useState(false)
@@ -442,6 +451,15 @@ function CredentialModal({ mode, cred, presets, onClose, onSaved }: {
     gate.reset()
   }
 
+  const visiblePresets = useMemo(() => {
+    const q = presetQuery.trim().toLowerCase()
+    return q
+      ? presets.filter((p) =>
+          [p.label, p.description, p.id].some((text) => text.toLowerCase().includes(q)),
+        )
+      : presets
+  }, [presetQuery, presets])
+
   // The fields the test covers — editing any of them re-locks Save.
   const testKey = `${JSON.stringify(wires)}|${apiKey.trim()}|${model.trim()}`
   const canTest = !!apiKey.trim() && !!model.trim() && !!primaryShape
@@ -461,17 +479,25 @@ function CredentialModal({ mode, cred, presets, onClose, onSaved }: {
   const handleSave = async () => {
     if (!preset) return
     if (Object.keys(wires).length === 0) { setError('Pick a region / endpoint first'); return }
+    const customLabel = customName.trim()
+    if (isCustom && !customLabel) { setError('Provider name is required'); return }
     const vendor = VENDOR_BY_PRESET[preset.id] ?? 'custom'
     setSaving(true); setError('')
     try {
       if (mode === 'edit' && cred) {
         await api.config.updateCredential(cred.slug, {
           vendor, wires,
+          ...(isCustom ? { label: customLabel } : {}),
           ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
         })
       } else {
         if (!apiKey.trim()) { setError('API key is required'); setSaving(false); return }
-        await api.config.addCredential({ vendor, wires, apiKey: apiKey.trim() })
+        await api.config.addCredential({
+          vendor,
+          wires,
+          apiKey: apiKey.trim(),
+          ...(isCustom ? { label: customLabel } : {}),
+        })
       }
       await onSaved()
     } catch (err) {
@@ -496,17 +522,38 @@ function CredentialModal({ mode, cred, presets, onClose, onSaved }: {
 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
           {!preset ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {presets.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => pickPreset(p)}
-                  className="flex flex-col items-start gap-0.5 p-3 rounded-lg border border-border bg-bg hover:bg-bg-tertiary hover:border-accent/40 transition-all text-left"
-                >
-                  <span className="text-[12px] font-medium text-text">{p.label}</span>
-                  <span className="text-[10px] text-text-muted leading-snug">{p.description}</span>
-                </button>
-              ))}
+            <div className="space-y-3">
+              <input
+                className={inputClass}
+                value={presetQuery}
+                onChange={(e) => setPresetQuery(e.target.value)}
+                placeholder="Search providers..."
+                autoFocus
+              />
+              <div className="overflow-hidden rounded-lg border border-border bg-bg">
+                {visiblePresets.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => pickPreset(p)}
+                    className="flex min-h-[46px] w-full items-center gap-3 border-b border-border/60 px-3 py-2 text-left transition-colors last:border-b-0 hover:bg-bg-tertiary/60"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[12.5px] font-medium text-text">{p.label}</span>
+                      <span className="block truncate text-[10.5px] text-text-muted">{p.description}</span>
+                    </span>
+                    {p.category === 'custom' && (
+                      <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] text-text-muted">
+                        free-form
+                      </span>
+                    )}
+                  </button>
+                ))}
+                {visiblePresets.length === 0 && (
+                  <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-[12px] text-text-muted">
+                    No providers match “{presetQuery}”.
+                  </p>
+                )}
+              </div>
             </div>
           ) : (
             <>
@@ -527,6 +574,15 @@ function CredentialModal({ mode, cred, presets, onClose, onSaved }: {
 
               {isCustom ? (
                 <>
+                  <Field label="Provider name" description="A readable name for this custom credential in pickers.">
+                    <input
+                      className={inputClass}
+                      value={customName}
+                      onChange={(e) => setCustomName(e.target.value)}
+                      placeholder="e.g. OpenRouter work key"
+                      maxLength={80}
+                    />
+                  </Field>
                   <Field label="API mode" description="Which wire protocol your endpoint speaks.">
                     <select className={inputClass} value={customShape} onChange={(e) => { setCustomShape(e.target.value as WireShape); gate.reset() }}>
                       {SHAPE_ORDER.map((s) => <option key={s} value={s}>{WIRE_SHAPE_SHORT[s]}</option>)}
