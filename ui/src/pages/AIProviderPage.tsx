@@ -451,18 +451,13 @@ function CredentialModal({ mode, cred, presets, onClose, onSaved }: {
     gate.reset()
   }
 
-  const presetGroups = useMemo(() => {
+  const visiblePresets = useMemo(() => {
     const q = presetQuery.trim().toLowerCase()
-    const visible = q
+    return q
       ? presets.filter((p) =>
           [p.label, p.description, p.id].some((text) => text.toLowerCase().includes(q)),
         )
       : presets
-    return [
-      { key: 'official', label: 'Official', items: visible.filter((p) => p.category === 'official') },
-      { key: 'third-party', label: 'Third-party', items: visible.filter((p) => p.category === 'third-party') },
-      { key: 'custom', label: 'Custom', items: visible.filter((p) => p.category === 'custom') },
-    ].filter((g) => g.items.length > 0)
   }, [presetQuery, presets])
 
   // The fields the test covers — editing any of them re-locks Save.
@@ -535,35 +530,25 @@ function CredentialModal({ mode, cred, presets, onClose, onSaved }: {
                 placeholder="Search providers..."
                 autoFocus
               />
-              <div className="space-y-3">
-                {presetGroups.map((group) => (
-                  <div key={group.key}>
-                    <div className="mb-1.5 flex items-center justify-between px-1">
-                      <span className="text-[10px] font-semibold uppercase tracking-wide text-text-muted/65">
-                        {group.label}
+              <div className="overflow-hidden rounded-lg border border-border bg-bg">
+                {visiblePresets.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => pickPreset(p)}
+                    className="flex min-h-[46px] w-full items-center gap-3 border-b border-border/60 px-3 py-2 text-left transition-colors last:border-b-0 hover:bg-bg-tertiary/60"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[12.5px] font-medium text-text">{p.label}</span>
+                      <span className="block truncate text-[10.5px] text-text-muted">{p.description}</span>
+                    </span>
+                    {p.category === 'custom' && (
+                      <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] text-text-muted">
+                        free-form
                       </span>
-                      <span className="text-[10px] text-text-muted/50 tabular-nums">{group.items.length}</span>
-                    </div>
-                    <div className="overflow-hidden rounded-lg border border-border bg-bg">
-                      {group.items.map((p) => (
-                        <button
-                          key={p.id}
-                          onClick={() => pickPreset(p)}
-                          className="flex min-h-[46px] w-full items-center gap-3 border-b border-border/60 px-3 py-2 text-left transition-colors last:border-b-0 hover:bg-bg-tertiary/60"
-                        >
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-[12.5px] font-medium text-text">{p.label}</span>
-                            <span className="block truncate text-[10.5px] text-text-muted">{p.description}</span>
-                          </span>
-                          <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] text-text-muted">
-                            {p.category === 'custom' ? 'free-form' : p.category}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                    )}
+                  </button>
                 ))}
-                {presetGroups.length === 0 && (
+                {visiblePresets.length === 0 && (
                   <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-[12px] text-text-muted">
                     No providers match “{presetQuery}”.
                   </p>
