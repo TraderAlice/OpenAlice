@@ -295,6 +295,33 @@ export const DEEPSEEK: PresetDef = {
   writeOnlyFields: ['apiKey'],
 }
 
+// ==================== Third-party: LongCat (Meituan) ====================
+
+export const LONGCAT: PresetDef = {
+  id: 'longcat',
+  label: 'LongCat (Meituan)',
+  description: 'Meituan LongCat via OpenAI-compatible API',
+  category: 'third-party',
+  defaultName: 'LongCat',
+  hint: 'Uses the OpenAI-compatible endpoint you tested locally. This preset declares OpenAI Chat only; use opencode or Pi for this credential unless LongCat adds a Responses-compatible endpoint later.',
+  zodSchema: z.object({
+    backend: z.literal('vercel-ai-sdk'),
+    provider: z.literal('openai-compatible'),
+    baseUrl: z.string().default('https://api.longcat.chat/openai').describe('API endpoint'),
+    model: z.string().default('longcat-2.0').describe('Model'),
+    apiKey: z.string().min(1).describe('LongCat API key'),
+  }),
+  regions: [
+    { id: 'default', label: 'LongCat (api.longcat.chat)', wires: {
+      'openai-chat': 'https://api.longcat.chat/openai',
+    } },
+  ],
+  models: [
+    { id: 'longcat-2.0', label: 'LongCat 2.0' },
+  ],
+  writeOnlyFields: ['apiKey'],
+}
+
 // ==================== Custom ====================
 
 export const CUSTOM: PresetDef = {
@@ -328,6 +355,7 @@ export const PRESET_CATALOG: PresetDef[] = [
   GLM,
   KIMI,
   DEEPSEEK,
+  LONGCAT,
   CUSTOM,
 ]
 
@@ -348,4 +376,5 @@ export const DEFAULT_MODEL_BY_VENDOR: Record<string, string> = {
   glm: 'glm-5.2',
   kimi: 'kimi-k2.7-code',
   deepseek: 'deepseek-v4-pro',
+  longcat: 'longcat-2.0',
 }

@@ -257,6 +257,7 @@ describe('resolveInjectionModel', () => {
   it('falls back to the vendor flagship when no lastModel', () => {
     expect(resolveInjectionModel({ vendor: 'anthropic' })).toBe('claude-opus-4-8')
     expect(resolveInjectionModel({ vendor: 'glm' })).toBe('glm-5.2')
+    expect(resolveInjectionModel({ vendor: 'longcat' })).toBe('longcat-2.0')
   })
 
   it('returns null for a vendor with no catalog default (custom)', () => {

@@ -102,7 +102,7 @@ const apiKeysSchema = z.object({
 
 export const credentialVendorEnum = z.enum([
   'anthropic', 'openai', 'google',
-  'minimax', 'glm', 'kimi', 'deepseek', 'custom',
+  'minimax', 'glm', 'kimi', 'deepseek', 'longcat', 'custom',
 ])
 export type CredentialVendor = z.infer<typeof credentialVendorEnum>
 
