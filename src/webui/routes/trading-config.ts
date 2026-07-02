@@ -140,6 +140,7 @@ export function createTradingConfigRoutes(ctx: EngineContext) {
         enabled: body.enabled !== false,
         guards: Array.isArray(body.guards) ? body.guards : [],
         presetConfig,
+        readOnly: preset.id === 'schwab' ? true : body.readOnly === true,
         ...(body.ephemeral === true ? { ephemeral: true as const } : {}),
       }
       const validated = utaConfigSchema.parse(candidate)
@@ -185,6 +186,9 @@ export function createTradingConfigRoutes(ctx: EngineContext) {
       unmaskSecrets(body, existing as unknown as Record<string, unknown>)
 
       const validated = utaConfigSchema.parse(body)
+      if (validated.presetId === 'schwab') {
+        validated.readOnly = true
+      }
       const idx = accounts.findIndex((a) => a.id === id)
       accounts[idx] = validated
       await writeUTAsConfig(accounts)

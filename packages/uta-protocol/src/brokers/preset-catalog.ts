@@ -15,7 +15,7 @@ import { createHash, randomBytes } from 'node:crypto'
 
 // ==================== Types ====================
 
-export type BrokerEngine = 'ccxt' | 'alpaca' | 'ibkr' | 'leverup' | 'longbridge' | 'mock'
+export type BrokerEngine = 'ccxt' | 'alpaca' | 'ibkr' | 'leverup' | 'longbridge' | 'schwab' | 'mock'
 
 export interface ModeOption {
   id: string
@@ -432,6 +432,47 @@ export const LONGBRIDGE_PRESET: BrokerPresetDef = {
   isPaper: (d) => d.mode === 'paper',
 }
 
+export const SCHWAB_PRESET: BrokerPresetDef = {
+  id: 'schwab',
+  label: 'Schwab (Portfolio)',
+  description: 'Charles Schwab Trader API — OAuth-backed, read-only portfolio access for US securities accounts.',
+  category: 'recommended',
+  hint: 'Schwab is portfolio-only here: fill `clientId`, `clientSecret`, and either a `refreshToken` or a `tokenPath` pointing at a Schwab OAuth token JSON. OpenAlice will refresh the access token automatically and persist the updated token back to that file. If your Schwab login spans multiple linked accounts, set `accountNumber` to pin one account; otherwise OpenAlice aggregates them.',
+  defaultName: 'schwab-portfolio',
+  badge: 'CS',
+  badgeColor: 'text-blue-400',
+  engine: 'schwab',
+  guardCategory: 'securities',
+  zodSchema: z.object({
+    clientId: z.string().min(1).describe('Client ID'),
+    clientSecret: z.string().min(1).describe('Client Secret'),
+    refreshToken: z.string().min(1).optional().describe('Refresh Token (optional if tokenPath points at a token JSON)'),
+    tokenPath: z.string().min(1).optional().describe('OAuth Token File Path'),
+    accountNumber: z.string().optional().describe('Account Number (optional; aggregates all linked accounts if blank)'),
+  }).superRefine((data, ctx) => {
+    if (!data.refreshToken && !data.tokenPath) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['refreshToken'],
+        message: 'Provide either refreshToken or tokenPath',
+      })
+    }
+  }),
+  subtitleFields: [
+    { field: 'accountNumber', prefix: 'Schwab · ' },
+  ],
+  writeOnlyFields: ['clientSecret', 'refreshToken'],
+  fingerprintFields: ['clientId', 'accountNumber'],
+  toEngineConfig: (d) => ({
+    clientId: d.clientId,
+    clientSecret: d.clientSecret,
+    ...(d.refreshToken ? { refreshToken: d.refreshToken } : {}),
+    ...(d.tokenPath ? { tokenPath: d.tokenPath } : {}),
+    ...(d.accountNumber ? { accountNumber: d.accountNumber } : {}),
+  }),
+  isPaper: () => false,
+}
+
 // ==================== Other ecosystem brokers (lower-tier, isolated) ====================
 
 export const LEVERUP_PRESET: BrokerPresetDef = {
@@ -508,6 +549,7 @@ export const BROKER_PRESET_CATALOG: BrokerPresetDef[] = [
   IBKR_PRESET,
   ALPACA_PRESET,
   LONGBRIDGE_PRESET,
+  SCHWAB_PRESET,
   HYPERLIQUID_PRESET,
   // ---- Crypto ----
   BINANCE_PRESET,
