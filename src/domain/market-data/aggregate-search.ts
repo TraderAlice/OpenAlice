@@ -26,6 +26,7 @@ export interface MarketSearchDeps {
    *  (via setMarketVendor → market-data.json) is picked up on the next search
    *  with no restart. A plain array is still accepted (tests, static wiring). */
   equityVendors: string[] | (() => string[] | Promise<string[]>)
+  assetProviders?: Partial<Record<AssetClass, string>> | (() => Partial<Record<AssetClass, string>> | Promise<Partial<Record<AssetClass, string>>>)
   equityClient: EquityClientLike
   cryptoClient: CryptoClientLike
   currencyClient: CurrencyClientLike
@@ -85,7 +86,12 @@ export async function aggregateSymbolSearch(
   const equityVendors = typeof deps.equityVendors === 'function'
     ? await deps.equityVendors()
     : deps.equityVendors
+  const assetProviders = deps.assetProviders
+    ? (typeof deps.assetProviders === 'function' ? await deps.assetProviders() : deps.assetProviders)
+    : {}
   const primaryEquity = equityVendors[0] ?? 'yfinance'
+  const cryptoProvider = assetProviders.crypto ?? 'yfinance'
+  const currencyProvider = assetProviders.currency ?? 'yfinance'
 
   // Local SEC index — US-only, zero-latency, authoritative for US tickers.
   // Attributed to the primary equity vendor (its symbols feed that provider).
@@ -104,8 +110,8 @@ export async function aggregateSymbolSearch(
   // CN names yfinance can't match — so all are kept as redundant candidates.
   const [coreSettled, equitySettled] = await Promise.all([
     Promise.allSettled([
-      deps.cryptoClient.search({ query: q, provider: 'yfinance' }),
-      deps.currencyClient.search({ query: q, provider: 'yfinance' }),
+      deps.cryptoClient.search({ query: q, provider: cryptoProvider }),
+      deps.currencyClient.search({ query: q, provider: currencyProvider }),
     ]),
     Promise.allSettled(
       equityVendors.map((v) =>
@@ -118,15 +124,16 @@ export async function aggregateSymbolSearch(
   const [cryptoSettled, currencySettled] = coreSettled
 
   const cryptoResults = (cryptoSettled.status === 'fulfilled' ? cryptoSettled.value : []).map(
-    (r) => ({ ...r, assetClass: 'crypto' as const }),
+    (r) => ({ ...r, assetClass: 'crypto' as const, sourceId: cryptoProvider }),
   )
 
   const currencyResults = (currencySettled.status === 'fulfilled' ? currencySettled.value : [])
     .filter((r) => {
+      if (currencyProvider !== 'yfinance') return true
       const sym = (r as Record<string, unknown>).symbol as string | undefined
       return sym?.endsWith('USD')
     })
-    .map((r) => ({ ...r, assetClass: 'currency' as const }))
+    .map((r) => ({ ...r, assetClass: 'currency' as const, sourceId: currencyProvider }))
 
   // Merge equity online hits, de-duped WITHIN each vendor's namespace by
   // `vendor|symbol` (the SEC index already seeded the primary vendor's keys, so

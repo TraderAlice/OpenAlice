@@ -30,12 +30,26 @@ import { formatBarId, parseBarId } from './types.js'
 /** Hard ceiling on bars returned by any single fetch (explosion guard). */
 const MAX_BARS = 5000
 
-/** Vendor → bar capability (honest-ish defaults; vendors mostly serve delayed). */
+/** Vendor → bar capability (honest-ish defaults; vendors mostly serve delayed).
+ *  Unlisted providers fall back to 'delayed' (the conservative default for
+ *  unverified data sources). */
 const VENDOR_CAPABILITY: Record<string, BarCapability> = {
   yfinance: 'delayed',
   fmp: 'delayed',
   eastmoney: 'delayed',
   twse: 'delayed', // K-lines via Yahoo chart (symbols are .TW/.TWO)
+  // TradingView's anonymous/free global feed is exchange-dependent: bare US
+  // equities may resolve to free Cboe partial-market realtime data, but
+  // exchange-qualified US symbols and non-US equities (HK/A-shares/TW/etc.) are
+  // commonly delayed unless the account has exchange entitlements. At provider
+  // granularity, "delayed" is the honest conservative label; the provider docs
+  // carry the Cboe/partial-volume caveat.
+  tradingview: 'delayed',
+}
+
+/** Safe VENDOR_CAPABILITY lookup with fallback. */
+function getVendorCapability(provider: string): BarCapability {
+  return VENDOR_CAPABILITY[provider] ?? 'delayed'
 }
 
 const BAR_INTERVALS: readonly BarInterval[] = ['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w']
@@ -193,7 +207,17 @@ export function createBarService(deps: BarServiceDeps): BarService {
     // Upper bound: the provider compatibility models apply end_date;
     // we also post-filter defensively in case a provider ignores it.
     const end_date = opts.end
-    const p = (extra?: Record<string, unknown>) => ({ symbol, start_date, provider, ...(end_date ? { end_date } : {}), ...extra })
+    // TradingView consumes count server-side; do not send it to every provider
+    // because several OpenTypeBB fetchers map params directly to vendor APIs.
+    const tvCountParam = provider === 'tradingview' && opts.count != null ? { count: opts.count } : {}
+    const p = (extra?: Record<string, unknown>) => ({
+      symbol,
+      start_date,
+      provider,
+      ...(end_date ? { end_date } : {}),
+      ...tvCountParam,
+      ...extra,
+    })
     let raw: Array<Record<string, unknown>>
     switch (assetClass) {
       case 'equity':
@@ -219,7 +243,7 @@ export function createBarService(deps: BarServiceDeps): BarService {
         sourceId: provider,
         barId: formatBarId(provider, symbol),
         provider,
-        barCapability: VENDOR_CAPABILITY[provider],
+        barCapability: getVendorCapability(provider),
         ...computeFreshness(filtered[filtered.length - 1]?.date ?? '', opts, () => new Date()),
       }),
     }
@@ -284,7 +308,7 @@ export function createBarService(deps: BarServiceDeps): BarService {
           // Per-result vendor attribution (multi-vendor equity); falls back to
           // the configured per-asset provider for crypto/currency/commodity.
           const provider = r.sourceId ?? deps.vendorProviders[r.assetClass]
-          const cap = VENDOR_CAPABILITY[provider]
+          const cap = getVendorCapability(provider)
           const base = r.name ? `${symbol} · ${r.name} (${provider})` : `${symbol} (${provider})`
           out.push({
             barId: formatBarId(provider, symbol),
@@ -325,7 +349,8 @@ export function createBarService(deps: BarServiceDeps): BarService {
       }
 
       // Order by freshness so the agent's default pick is the freshest source:
-      // broker bars (realtime) float above delayed vendors (yfinance/fmp). The
+      // broker bars (realtime) and partial-market feeds (iex/TradingView Cboe)
+      // float above delayed vendors (yfinance/fmp). The
       // list stays fully redundant — this is only the suggested ordering; every
       // candidate is still returned. (Array.sort is stable → within-source order
       // is preserved.)

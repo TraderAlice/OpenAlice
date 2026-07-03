@@ -79,6 +79,21 @@ describe('getBars — vendor branch', () => {
     expect(deps.commodityClient.getSpotPrices).toHaveBeenCalledWith(expect.objectContaining({ symbol: 'gold', provider: 'fmp' }))
   })
 
+  it('labels TradingView as delayed at provider granularity because free freshness is exchange-dependent', async () => {
+    const deps = makeDeps({ vendorProviders: { equity: 'tradingview', crypto: 'yfinance', currency: 'yfinance', commodity: 'yfinance' } })
+    const svc = createBarService(deps)
+
+    const { meta } = await svc.getBars({ symbol: 'HKEX:0700', assetClass: 'equity' }, { interval: '1m', count: 10 })
+
+    expect(meta).toMatchObject({
+      source: 'vendor',
+      sourceId: 'tradingview',
+      provider: 'tradingview',
+      barId: 'tradingview|HKEX:0700',
+      barCapability: 'delayed',
+    })
+  })
+
   it('truncates to `count` (keeps most recent)', async () => {
     const svc = createBarService(makeDeps())
     const { bars } = await svc.getBars({ symbol: 'AAPL', assetClass: 'equity' }, { interval: '1d', count: 2 })
