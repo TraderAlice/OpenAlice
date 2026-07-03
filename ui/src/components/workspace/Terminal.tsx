@@ -30,7 +30,7 @@ const DemoTerminalReplay = lazy(() =>
 
 export type { KeyMap } from './terminalInput';
 
-type Status = 'connecting' | 'reconnecting' | 'connected' | 'closed' | 'error' | 'kicked';
+type Status = 'connecting' | 'reconnecting' | 'connected' | 'closed' | 'error' | 'kicked' | 'locked';
 
 interface SocketMessageEventLike {
   readonly data: unknown;
@@ -68,7 +68,7 @@ class ElectronPtySocket implements SocketLike {
   private readonly unsubscribers: Array<() => void> = [];
   private opened = false;
 
-  constructor(input: { sessionId: string; cols: number; rows: number }) {
+  constructor(input: { sessionId: string; cols: number; rows: number; controllerId: string; takeover?: boolean }) {
     const bridge = window.openAlice?.pty;
     if (!bridge) throw new Error('Electron PTY bridge is unavailable');
     this.bridge = bridge;
@@ -203,10 +203,14 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
   const [scrollbackTruncated, setScrollbackTruncated] = useState(false);
   const [exitInfo, setExitInfo] = useState<ExitInfo | null>(null);
   const [childExited, setChildExited] = useState(false);
+  const takeoverNextAttachRef = useRef(false);
+  const connectRef = useRef<(() => void) | null>(null);
 
   const wsId = props.wsId;
   const wsUrl = props.wsUrl;
   const sessionId = props.sessionId;
+  const controllerIdRef = useRef<string>('');
+  if (!controllerIdRef.current) controllerIdRef.current = getTerminalControllerId();
 
   const keyMapRef = useRef<KeyMap | undefined>(props.keyMap);
   keyMapRef.current = props.keyMap;
@@ -274,7 +278,10 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
         session: sessionId,
         cols: String(lastCols),
         rows: String(lastRows),
+        client: controllerIdRef.current,
+        kind: 'web',
       });
+      if (takeoverNextAttachRef.current) params.set('takeover', '1');
       return `${wsUrl ?? defaultWsUrl()}?${params.toString()}`;
     };
 
@@ -415,7 +422,13 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
       // renderer -> localhost WebSocket hop. Browser/dev/Docker keep the
       // WebSocket path with the exact same xterm lifecycle.
       const ws: SocketLike = window.openAlice?.pty
-        ? new ElectronPtySocket({ sessionId, cols: lastCols, rows: lastRows })
+        ? new ElectronPtySocket({
+            sessionId,
+            cols: lastCols,
+            rows: lastRows,
+            controllerId: controllerIdRef.current,
+            takeover: takeoverNextAttachRef.current,
+          })
         : new WebSocket(currentUrl());
       ws.binaryType = 'arraybuffer';
       activeWs = ws;
@@ -423,6 +436,7 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
 
       ws.addEventListener('open', () => {
         attempts = 0;
+        takeoverNextAttachRef.current = false;
         // A reconnect re-attaches to a live xterm that already shows the
         // pre-drop screen, but the server cold-replays its full ring buffer on
         // every attach. Reset first so the replay repaints cleanly instead of
@@ -478,6 +492,10 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
           setStatus('kicked');
           return;
         }
+        if (ev.code === 4409) {
+          setStatus('locked');
+          return;
+        }
         if (ev.code === 4404) {
           onSessionLostRef.current?.();
           setStatus('closed');
@@ -491,6 +509,7 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
       // reconnect so we don't double-schedule.
       ws.addEventListener('error', () => {});
     }
+    connectRef.current = connect;
 
     const stdinSub = term.onData(sendStdin);
     const binarySub = term.onBinary((d) => {
@@ -542,6 +561,7 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
       } catch {
         // ignore
       }
+      if (connectRef.current === connect) connectRef.current = null;
       webgl?.dispose();
       term.dispose();
       termRef.current = null;
@@ -563,6 +583,20 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
               }`
             : ''}
         </span>
+        {status === 'locked' && (
+          <button
+            type="button"
+            className="terminal-header-action"
+            onClick={() => {
+              takeoverNextAttachRef.current = true;
+              setStatus('connecting');
+              connectRef.current?.();
+            }}
+            title="take over this session"
+          >
+            take over
+          </button>
+        )}
       </header>
       <div ref={containerRef} className="terminal-host" />
     </div>
@@ -577,6 +611,7 @@ function StatusDot({ status }: { status: Status }): ReactElement {
     closed: '#6e7681',
     error: '#ff7b72',
     kicked: '#d2a8ff',
+    locked: '#d2a8ff',
   };
   return (
     <span
@@ -586,6 +621,17 @@ function StatusDot({ status }: { status: Status }): ReactElement {
       aria-label={status}
     />
   );
+}
+
+function getTerminalControllerId(): string {
+  return `web:${randomId()}`;
+}
+
+function randomId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }
 
 function defaultWsUrl(): string {

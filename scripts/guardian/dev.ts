@@ -116,6 +116,16 @@ async function main(): Promise<void> {
     prefixLogs: true,
   })
 
+  const aliceReady = await waitForHttp(`http://127.0.0.1:${ports.webPort}/api/version`, { timeoutMs: 20_000 })
+  if (!aliceReady) {
+    console.error(`[guardian] Alice failed to come up within 20s — aborting before Vite starts`)
+    console.error(`[guardian] If another OpenAlice/Electron instance is running on the same data root, stop it or run dev with an isolated OPENALICE_HOME/AQ_LAUNCHER_ROOT.`)
+    try { alice.kill('SIGTERM') } catch { /* noop */ }
+    try { uta.process.kill('SIGTERM') } catch { /* noop */ }
+    process.exit(1)
+  }
+  console.log(`[guardian] Alice ready`)
+
   // ── Vite ──────────────────────────────────────────────────
   const vite: ChildProcess = spawnChild({
     name: 'vite',

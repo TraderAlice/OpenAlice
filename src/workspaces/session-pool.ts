@@ -4,6 +4,8 @@ import type { CliAdapter } from './cli-adapter.js';
 import type { Logger } from './logger.js';
 import {
   PersistentSession,
+  type SessionAttachResult,
+  type SessionControllerClaim,
   type PersistentSessionOptions,
 } from './persistent-session.js';
 import type { TranscriptWatcher } from './transcript-watcher.js';
@@ -121,11 +123,11 @@ export class SessionPool {
     cols: number,
     rows: number,
     since: number | undefined,
-  ): boolean {
+    claim?: SessionControllerClaim,
+  ): SessionAttachResult | { readonly ok: false; readonly reason: 'missing' } {
     const session = this.sessions.get(recordId);
-    if (!session) return false;
-    session.attach(ws, cols, rows, since);
-    return true;
+    if (!session) return { ok: false, reason: 'missing' };
+    return session.attach(ws, cols, rows, since, claim);
   }
 
   get(recordId: string): PersistentSession | undefined {

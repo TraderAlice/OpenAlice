@@ -52,7 +52,15 @@ interface Window {
       >
     }
     readonly pty: {
-      connect(input: { sessionId: string; cols: number; rows: number; since?: number }): string
+      connect(input: {
+        sessionId: string
+        cols: number
+        rows: number
+        since?: number
+        controllerId?: string
+        controllerKind?: string
+        takeover?: boolean
+      }): string
       send(connectionId: string, data: Uint8Array): void
       resize(connectionId: string, cols: number, rows: number): void
       close(connectionId: string): void

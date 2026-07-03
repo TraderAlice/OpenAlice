@@ -120,6 +120,9 @@ export function attachWorkspacesWS(httpServer: HttpServer, svc: WorkspaceService
     const rows = clampQuery(url.searchParams.get('rows'), 24, 1, 1000);
     const sinceRaw = url.searchParams.get('since');
     const since = sinceRaw === null ? undefined : parseSince(sinceRaw);
+    const controllerId = cleanToken(url.searchParams.get('client'), 128);
+    const controllerKind = cleanToken(url.searchParams.get('kind'), 32) ?? 'web';
+    const takeover = url.searchParams.get('takeover') === '1';
 
     const sessionId = (url.searchParams.get('session') ?? '').slice(0, 64);
     if (!sessionId) {
@@ -139,6 +142,9 @@ export function attachWorkspacesWS(httpServer: HttpServer, svc: WorkspaceService
       cols,
       rows,
       since: since ?? null,
+      controllerId: controllerId ?? null,
+      controllerKind,
+      takeover,
       origin: req.headers.origin ?? null,
       // Host the browser actually connected to. Discriminates the dev
       // transport: `localhost:<backendPort>` = direct (proxy bypassed),
@@ -149,7 +155,17 @@ export function attachWorkspacesWS(httpServer: HttpServer, svc: WorkspaceService
       remoteAddress: req.socket.remoteAddress ?? null,
     });
     try {
-      svc.pool.attachById(sessionId, ws, cols, rows, since);
+      const result = svc.pool.attachById(
+        sessionId,
+        ws,
+        cols,
+        rows,
+        since,
+        controllerId ? { controllerId, controllerKind, takeover } : undefined,
+      );
+      if (!result.ok && result.reason === 'missing') {
+        try { ws.close(4404, 'session not found'); } catch { /* ignore */ }
+      }
     } catch (err) {
       launcherLogger.error('pool.attach_failed', { sessionId, err });
       try { ws.close(1011, 'attach failed'); } catch { /* ignore */ }
@@ -212,4 +228,10 @@ function parseSince(raw: string): number | undefined {
   const n = Number.parseInt(raw, 10);
   if (!Number.isFinite(n) || n < 0) return undefined;
   return n;
+}
+
+function cleanToken(raw: string | null, max: number): string | undefined {
+  if (raw === null) return undefined;
+  const value = raw.trim().slice(0, max);
+  return value.length > 0 ? value : undefined;
 }

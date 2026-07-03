@@ -21,7 +21,17 @@ const MSG_SERVER = 'openalice:pty:server-message'
 const MSG_SERVER_CLOSE = 'openalice:pty:server-close'
 
 type BridgeMessage =
-  | { type: typeof MSG_CONNECT; connectionId: string; sessionId: string; cols: number; rows: number; since?: number }
+  | {
+      type: typeof MSG_CONNECT
+      connectionId: string
+      sessionId: string
+      cols: number
+      rows: number
+      since?: number
+      controllerId?: string
+      controllerKind?: string
+      takeover?: boolean
+    }
   | { type: typeof MSG_CLIENT; connectionId: string; binary: boolean; data: unknown }
   | { type: typeof MSG_CLIENT_CLOSE; connectionId: string }
 
@@ -106,8 +116,17 @@ export function attachWorkspacesIpc(svc: WorkspaceService): AttachedWorkspaceIpc
       const cols = clamp(msg.cols, 80, 1, 1000)
       const rows = clamp(msg.rows, 24, 1, 1000)
       const since = typeof msg.since === 'number' && Number.isFinite(msg.since) && msg.since >= 0 ? msg.since : undefined
-      const ok = svc.pool.attachById(sessionId, socket as unknown as WebSocket, cols, rows, since)
-      if (!ok) socket.close(4404, 'session not found')
+      const controllerId = typeof msg.controllerId === 'string' ? msg.controllerId.slice(0, 128) : ''
+      const controllerKind = typeof msg.controllerKind === 'string' ? msg.controllerKind.slice(0, 32) : 'electron'
+      const result = svc.pool.attachById(
+        sessionId,
+        socket as unknown as WebSocket,
+        cols,
+        rows,
+        since,
+        controllerId ? { controllerId, controllerKind, takeover: msg.takeover === true } : undefined,
+      )
+      if (!result.ok && result.reason === 'missing') socket.close(4404, 'session not found')
       launcherLogger.event('ipc_pty.attached', { connectionId, sessionId, cols, rows })
       console.log(`ipc pty attached: session=${sessionId} connection=${connectionId} size=${cols}x${rows}`)
       return

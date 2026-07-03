@@ -848,6 +848,22 @@
   font-variant-numeric: tabular-nums;
 }
 
+.terminal-header-action {
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--color-bg-secondary);
+  color: var(--fg);
+  font-size: 11px;
+  line-height: 22px;
+}
+
+.terminal-header-action:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .status-dot {
   width: 8px;
   height: 8px;
@@ -872,4 +888,3 @@
 .terminal-host .xterm-viewport {
   background-color: transparent !important;
 }
-

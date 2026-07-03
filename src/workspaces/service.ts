@@ -22,6 +22,7 @@ import { shellAdapter } from './adapters/shell.js';
 import { AdapterRegistry, isAgentRuntime, type CliAdapter } from './cli-adapter.js';
 import { loadConfig, type ServerConfig } from './config.js';
 import { logger as launcherLogger } from './logger.js';
+import { acquireWorkspaceProcessLock } from './process-lock.js';
 import { runHeadlessProbe, type HeadlessProbeResult } from './probe.js';
 import { runHeadlessTask, type HeadlessTaskResult } from './headless-task.js';
 import { ScheduleMarkerStore } from './schedule/marker-store.js';
@@ -222,6 +223,7 @@ export function resumeFromRecord(
 export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions): Promise<WorkspaceService> {
   const config = loadConfig({ webPort: opts.webPort });
   const inboxStore = opts.inboxStore;
+  const processLock = await acquireWorkspaceProcessLock(config.launcherRoot);
 
   const registry = await WorkspaceRegistry.load(
     `${config.launcherRoot}/workspaces.json`,
@@ -897,6 +899,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     scheduleScanner.stop();
     pool.disposeAll('plugin shutdown');
     transcriptWatcher.disposeAll();
+    await processLock.release().catch((err) =>
+      launcherLogger.warn('workspaces.process_lock_release_failed', { err }),
+    );
   };
 
   return {

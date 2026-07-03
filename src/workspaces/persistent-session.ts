@@ -36,6 +36,22 @@ export interface PersistentSessionOptions {
   readonly initialReplayBytes?: Buffer;
 }
 
+export interface SessionControllerClaim {
+  readonly controllerId: string;
+  readonly controllerKind: string;
+  /** Explicit user/operator action: replace the current controller. */
+  readonly takeover?: boolean;
+}
+
+export interface SessionControllerOwner {
+  readonly id: string;
+  readonly kind: string;
+}
+
+export type SessionAttachResult =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly reason: 'locked'; readonly owner: SessionControllerOwner };
+
 const MAX_DIM = 1000;
 const CURSOR_TICK_MS = 2000;
 const CURSOR_BYTES_INTERVAL = 64 * 1024;
@@ -71,6 +87,7 @@ export class PersistentSession {
   private messageHandler: ((raw: unknown, isBinary: boolean) => void) | null = null;
   private closeHandler: (() => void) | null = null;
   private errorHandler: (() => void) | null = null;
+  private controller: SessionControllerOwner | null = null;
   private currentCols: number;
   private currentRows: number;
   private respawnTimes: number[] = [];
@@ -281,15 +298,40 @@ export class PersistentSession {
     this.log.info('session.agent_id_detected', { agentSessionId: id });
   }
 
-  /** Swap in `ws` as the attached client; kick the previous one if any. */
-  attach(ws: WebSocket, cols: number, rows: number, since: number | undefined): void {
+  /** Swap in `ws` as the attached client. A controller claim makes ownership
+   *  explicit: a second controller is rejected unless it deliberately takes
+   *  over. This is the shared rule for browser, Electron IPC, future IM bridges,
+   *  and any debug client that can write to the PTY. */
+  attach(
+    ws: WebSocket,
+    cols: number,
+    rows: number,
+    since: number | undefined,
+    claim?: SessionControllerClaim,
+  ): SessionAttachResult {
     if (this.disposed) {
       try {
         ws.close(1011, 'session disposed');
       } catch {
         // ignore
       }
-      return;
+      return { ok: false, reason: 'locked', owner: this.controller ?? { id: 'disposed', kind: 'session' } };
+    }
+
+    const owner = normalizeClaim(claim);
+    if (
+      owner &&
+      this.ws !== null &&
+      this.controller !== null &&
+      this.controller.id !== owner.id &&
+      !claim?.takeover
+    ) {
+      try {
+        ws.close(4409, 'session locked by another controller');
+      } catch {
+        // ignore
+      }
+      return { ok: false, reason: 'locked', owner: this.controller };
     }
 
     // Kick previous client.
@@ -305,6 +347,7 @@ export class PersistentSession {
     }
 
     this.ws = ws;
+    this.controller = owner;
     // A previous client may have dropped mid-backpressure, leaving the PTY
     // paused at the OS level. Clearing only the flag (not resuming the term)
     // would strand it paused forever; resumePty() un-sticks both.
@@ -345,7 +388,9 @@ export class PersistentSession {
       replayFromSeq: slice.effectiveSeq,
       replayBytes: slice.bytes.length,
       scrollbackTruncated,
+      controller: this.controller,
     });
+    return { ok: true };
   }
 
   /** Drop the current client without killing the PTY. */
@@ -353,6 +398,7 @@ export class PersistentSession {
     if (this.ws === null) return;
     const ws = this.ws;
     this.ws = null;
+    this.controller = null;
     this.unwireWs(ws);
     // No consumer left — let the PTY run free into the in-memory ring buffer
     // (onPtyData appends regardless of socket). If the socket dropped while
@@ -387,6 +433,7 @@ export class PersistentSession {
     if (ws !== null) {
       this.unwireWs(ws);
       this.ws = null;
+      this.controller = null;
       try {
         ws.close(1000, `disposed: ${reason}`);
       } catch {
@@ -541,6 +588,11 @@ export class PersistentSession {
     this.lastCursorSeq = seq;
     this.sendControl({ type: 'cursor', seq });
   }
+}
+
+function normalizeClaim(claim: SessionControllerClaim | undefined): SessionControllerOwner | null {
+  if (!claim?.controllerId) return null;
+  return { id: claim.controllerId, kind: claim.controllerKind || 'unknown' };
 }
 
 function toBuffer(raw: unknown): Buffer | null {

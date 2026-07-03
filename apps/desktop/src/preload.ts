@@ -74,7 +74,15 @@ const api = {
       ipcRenderer.invoke('openalice:workspace:read-file', input),
   },
   pty: {
-    connect: (input: { sessionId: string; cols: number; rows: number; since?: number }) => {
+    connect: (input: {
+      sessionId: string
+      cols: number
+      rows: number
+      since?: number
+      controllerId?: string
+      controllerKind?: string
+      takeover?: boolean
+    }) => {
       const connectionId = randomId()
       listenersFor(connectionId)
       // Keep the Electron transport on ordinary ipcRenderer events instead of

@@ -241,6 +241,9 @@ export function registerOpenAliceIpc(opts: OpenAliceIpcOptions): void {
       cols: typeof body['cols'] === 'number' ? body['cols'] : 80,
       rows: typeof body['rows'] === 'number' ? body['rows'] : 24,
       since: typeof body['since'] === 'number' ? body['since'] : undefined,
+      controllerId: typeof body['controllerId'] === 'string' ? body['controllerId'] : undefined,
+      controllerKind: typeof body['controllerKind'] === 'string' ? body['controllerKind'] : 'electron',
+      takeover: body['takeover'] === true,
     })
   })
 
