@@ -32,6 +32,115 @@ export type { KeyMap } from './terminalInput';
 
 type Status = 'connecting' | 'reconnecting' | 'connected' | 'closed' | 'error' | 'kicked';
 
+interface SocketMessageEventLike {
+  readonly data: unknown;
+}
+
+interface SocketCloseEventLike {
+  readonly code: number;
+}
+
+interface SocketLike {
+  readonly OPEN: number;
+  readyState: number;
+  binaryType?: BinaryType;
+  send(data: string | Uint8Array): void;
+  close(): void;
+  addEventListener(type: 'open', cb: () => void): void;
+  addEventListener(type: 'message', cb: (ev: SocketMessageEventLike) => void): void;
+  addEventListener(type: 'close', cb: (ev: SocketCloseEventLike) => void): void;
+  addEventListener(type: 'error', cb: () => void): void;
+}
+
+class ElectronPtySocket implements SocketLike {
+  readonly OPEN = 1;
+  readonly CLOSED = 3;
+  readyState = 0;
+
+  private readonly connectionId: string;
+  private readonly bridge: NonNullable<Window['openAlice']>['pty'];
+  private readonly listeners = {
+    open: new Set<() => void>(),
+    message: new Set<(ev: SocketMessageEventLike) => void>(),
+    close: new Set<(ev: SocketCloseEventLike) => void>(),
+    error: new Set<() => void>(),
+  };
+  private readonly unsubscribers: Array<() => void> = [];
+  private opened = false;
+
+  constructor(input: { sessionId: string; cols: number; rows: number }) {
+    const bridge = window.openAlice?.pty;
+    if (!bridge) throw new Error('Electron PTY bridge is unavailable');
+    this.bridge = bridge;
+    this.connectionId = bridge.connect(input);
+    this.unsubscribers.push(
+      bridge.onMessage(this.connectionId, (msg) => {
+        if (msg.type === 'control') {
+          const text = typeof msg.data === 'string' ? msg.data : String(msg.data ?? '');
+          const control = parseServerControl(text);
+          if (control?.type === 'attached') this.emitOpen();
+          this.emitMessage(text);
+        } else {
+          this.emitMessage(toArrayBuffer(msg.data));
+        }
+      }),
+      bridge.onClose(this.connectionId, (msg) => {
+        this.readyState = this.CLOSED;
+        for (const cb of this.listeners.close) cb({ code: msg.code });
+        this.cleanup();
+      }),
+    );
+  }
+
+  send(data: string | Uint8Array): void {
+    if (this.readyState !== this.OPEN) return;
+    if (typeof data === 'string') {
+      const parsed = parseResizeControl(data);
+      if (parsed) this.bridge.resize(this.connectionId, parsed.cols, parsed.rows);
+      return;
+    }
+    this.bridge.send(this.connectionId, data);
+  }
+
+  close(): void {
+    if (this.readyState === this.CLOSED) return;
+    this.readyState = this.CLOSED;
+    this.bridge.close(this.connectionId);
+    this.cleanup();
+  }
+
+  addEventListener(type: 'open', cb: () => void): void;
+  addEventListener(type: 'message', cb: (ev: SocketMessageEventLike) => void): void;
+  addEventListener(type: 'close', cb: (ev: SocketCloseEventLike) => void): void;
+  addEventListener(type: 'error', cb: () => void): void;
+  addEventListener(
+    type: 'open' | 'message' | 'close' | 'error',
+    cb: (() => void) | ((ev: SocketMessageEventLike | SocketCloseEventLike) => void),
+  ): void {
+    if (type === 'open') {
+      this.listeners.open.add(cb as () => void);
+      if (this.readyState === this.OPEN) queueMicrotask(cb as () => void);
+    } else if (type === 'message') this.listeners.message.add(cb as (ev: SocketMessageEventLike) => void);
+    else if (type === 'close') this.listeners.close.add(cb as (ev: SocketCloseEventLike) => void);
+    else this.listeners.error.add(cb as () => void);
+  }
+
+  private emitMessage(data: unknown): void {
+    for (const cb of this.listeners.message) cb({ data });
+  }
+
+  private emitOpen(): void {
+    if (this.opened || this.readyState === this.CLOSED) return;
+    this.opened = true;
+    this.readyState = this.OPEN;
+    for (const cb of this.listeners.open) cb();
+  }
+
+  private cleanup(): void {
+    for (const unsub of this.unsubscribers.splice(0)) unsub();
+  }
+}
+
 interface ExitInfo {
   readonly code: number;
   readonly signal: number | null;
@@ -171,7 +280,7 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
 
     // The live socket is swapped out on every (re)connect; senders read it at
     // call time so xterm's stdin/binary subs survive a reconnect untouched.
-    let activeWs: WebSocket | null = null;
+    let activeWs: SocketLike | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
     let attempts = 0;
     let hasConnectedOnce = false;
@@ -182,7 +291,7 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
 
     const sendControl = (msg: ClientControlMessage): void => {
       const ws = activeWs;
-      if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+      if (ws && ws.readyState === ws.OPEN) ws.send(JSON.stringify(msg));
     };
 
     const encoder = new TextEncoder();
@@ -202,7 +311,7 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
     const sendStdin = (data: string): void => {
       logInput('stdin', data);
       const ws = activeWs;
-      if (ws && ws.readyState === WebSocket.OPEN) ws.send(encoder.encode(data));
+      if (ws && ws.readyState === ws.OPEN) ws.send(encoder.encode(data));
     };
 
     const safeFocus = (): void => {
@@ -302,7 +411,12 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
 
     function connect(): void {
       if (teardown) return;
-      const ws = new WebSocket(currentUrl());
+      // Electron app mode has a preload PTY bridge, so it can bypass the
+      // renderer -> localhost WebSocket hop. Browser/dev/Docker keep the
+      // WebSocket path with the exact same xterm lifecycle.
+      const ws: SocketLike = window.openAlice?.pty
+        ? new ElectronPtySocket({ sessionId, cols: lastCols, rows: lastRows })
+        : new WebSocket(currentUrl());
       ws.binaryType = 'arraybuffer';
       activeWs = ws;
       setStatus(hasConnectedOnce ? 'reconnecting' : 'connecting');
@@ -381,7 +495,7 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
     const stdinSub = term.onData(sendStdin);
     const binarySub = term.onBinary((d) => {
       const ws = activeWs;
-      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      if (!ws || ws.readyState !== ws.OPEN) return;
       logInput('binary', d);
       const bytes = new Uint8Array(d.length);
       for (let i = 0; i < d.length; i++) bytes[i] = d.charCodeAt(i) & 0xff;
@@ -499,4 +613,29 @@ function safeFit(fit: FitAddon): void {
   } catch {
     // Container may have zero size during initial layout; ignore.
   }
+}
+
+function parseResizeControl(data: string): { cols: number; rows: number } | null {
+  let value: unknown;
+  try {
+    value = JSON.parse(data);
+  } catch {
+    return null;
+  }
+  if (!value || typeof value !== 'object') return null;
+  const msg = value as Record<string, unknown>;
+  if (msg['type'] !== 'resize') return null;
+  const cols = typeof msg['cols'] === 'number' ? msg['cols'] : Number.NaN;
+  const rows = typeof msg['rows'] === 'number' ? msg['rows'] : Number.NaN;
+  if (!Number.isFinite(cols) || !Number.isFinite(rows) || cols <= 0 || rows <= 0) return null;
+  return { cols: Math.floor(cols), rows: Math.floor(rows) };
+}
+
+function toArrayBuffer(data: unknown): ArrayBuffer {
+  if (data instanceof ArrayBuffer) return data;
+  if (data instanceof Uint8Array) {
+    return data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer;
+  }
+  if (Array.isArray(data)) return new Uint8Array(data).buffer;
+  return new Uint8Array().buffer;
 }

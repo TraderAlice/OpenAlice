@@ -447,7 +447,16 @@ export interface DirListing {
   readonly entries: readonly FileEntry[];
 }
 
+function electronWorkspaceBridge(): NonNullable<Window['openAlice']>['workspace'] | undefined {
+  return typeof window !== 'undefined' ? window.openAlice?.workspace : undefined;
+}
+
 export async function listFiles(id: string, relPath: string): Promise<DirListing> {
+  // Electron app mode has a native file transport. Browser/dev/Docker keep the
+  // HTTP path, which is still the right shape for self-hosting and ordinary
+  // browser debugging.
+  const bridge = electronWorkspaceBridge();
+  if (bridge) return bridge.listFiles({ id, path: relPath });
   const qs = relPath ? `?path=${encodeURIComponent(relPath)}` : '';
   const res = await fetch(`/api/workspaces/${encodeURIComponent(id)}/files${qs}`);
   if (!res.ok) throw new Error(`list files failed: ${res.status}`);
@@ -468,6 +477,8 @@ export type ReadFileResult =
   | { kind: 'error'; message: string };
 
 export async function readWorkspaceFile(id: string, relPath: string): Promise<ReadFileResult> {
+  const bridge = electronWorkspaceBridge();
+  if (bridge) return bridge.readFile({ id, path: relPath });
   const qs = `?path=${encodeURIComponent(relPath)}`;
   let res: Response;
   try {

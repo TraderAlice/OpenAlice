@@ -21,6 +21,10 @@ import { delimiter, join } from 'node:path';
 const STRIP_EXACT = new Set<string>([
   'TERM_PROGRAM',
   'TERM_PROGRAM_VERSION',
+  'OPENALICE_MCP_URL',
+  'OPENALICE_TOOL_URL',
+  'OPENALICE_TOOL_SOCKET',
+  'OPENCODE_CONFIG_CONTENT',
 ]);
 
 const STRIP_PREFIXES = [

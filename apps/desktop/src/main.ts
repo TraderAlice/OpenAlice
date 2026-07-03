@@ -20,7 +20,7 @@
  * Out of scope (future iterations): tray icon, multi-window, native menus.
  */
 
-import { app, BrowserWindow, dialog, Menu } from 'electron'
+import { app, BrowserWindow, dialog, Menu, protocol } from 'electron'
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import { mkdir, readFile, watch } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
@@ -29,6 +29,7 @@ import { dirname, join, resolve } from 'node:path'
 import { probeFreePort } from './probe-port.js'
 import { relocateLegacyData } from './relocate-data.js'
 import { configureAutoUpdate } from './auto-update.js'
+import { fetchAliceWebRequest, handleOpenAliceIpcMessage, registerOpenAliceIpc } from './ipc.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -43,6 +44,19 @@ const READY_TIMEOUT_MS = 30_000
 const UTA_READY_TIMEOUT_MS = 15_000
 const SIGTERM_GRACE_MS = 5_000
 const UTA_RESTART_GRACE_MS = 8_000
+
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'app',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+      stream: true,
+    },
+  },
+])
 
 // ── Cross-platform process-tree kill ─────────────────────────
 // Inline mirror of scripts/guardian/shared.ts:killTree. UTA and Alice each
@@ -100,6 +114,35 @@ async function readPortsFile(userDataHome: string): Promise<Partial<Record<'web'
   return out
 }
 
+async function readMcpConfigFile(userDataHome: string): Promise<{ enabled: boolean; port?: number }> {
+  const filePath = resolve(userDataHome, 'data', 'config', 'mcp.json')
+  let raw: string
+  try {
+    raw = await readFile(filePath, 'utf8')
+  } catch {
+    return { enabled: false }
+  }
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch (err) {
+    throw new Error(`[guardian] ${filePath} is not valid JSON: ${err instanceof Error ? err.message : String(err)}`)
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new Error(`[guardian] ${filePath} must be a JSON object like {"enabled":false,"port":47332}`)
+  }
+  const rec = parsed as Record<string, unknown>
+  return {
+    enabled: rec['enabled'] === true,
+    ...(rec['port'] !== undefined ? { port: parsePort(rec['port'], `${filePath} ("port")`) } : {}),
+  }
+}
+
+function parseEnabledEnv(raw: string | undefined): boolean | null {
+  if (raw === undefined || raw === '') return null
+  return raw === '1' || raw.toLowerCase() === 'true'
+}
+
 /** Explicit (env/file) port → assert free or throw; unset → probe upward. */
 async function claimPort(
   name: string,
@@ -124,19 +167,19 @@ async function claimPort(
   }
 }
 
-async function waitForAliceReady(port: number, timeoutMs = READY_TIMEOUT_MS): Promise<void> {
+async function waitForAliceReady(timeoutMs = READY_TIMEOUT_MS): Promise<void> {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     try {
-      // 5xx still means the server is up; only treat connect errors as not-ready.
-      const res = await fetch(`http://127.0.0.1:${port}/`, { method: 'GET' })
+      // 5xx still means the app is reachable; only transport errors mean not-ready.
+      const res = await fetchAliceWebRequest(new Request('app://openalice/api/version'), alice, 1_000)
       if (res.status < 500) return
     } catch {
-      // ECONNREFUSED etc. — backend not bound yet
+      // child not listening on its IPC web transport yet
     }
     await new Promise((r) => setTimeout(r, 200))
   }
-  throw new Error(`Alice did not become ready on port ${port} within ${timeoutMs}ms`)
+  throw new Error(`Alice did not become ready over Electron IPC within ${timeoutMs}ms`)
 }
 
 async function waitForUTA(utaUrl: string, timeoutMs = UTA_READY_TIMEOUT_MS): Promise<boolean> {
@@ -151,6 +194,76 @@ async function waitForUTA(utaUrl: string, timeoutMs = UTA_READY_TIMEOUT_MS): Pro
     await new Promise((r) => setTimeout(r, 200))
   }
   return false
+}
+
+async function runRendererPtySmoke(win: BrowserWindow): Promise<void> {
+  const keepWorkspace = process.env['OPENALICE_ELECTRON_SMOKE_KEEP_WORKSPACE'] === '1'
+  const result = await win.webContents.executeJavaScript(`(async () => {
+    const bridge = window.openAlice?.pty
+    if (!bridge) throw new Error('window.openAlice.pty missing')
+    const tag = 'electron-smoke-' + Date.now().toString(36)
+    const json = async (res) => {
+      const text = await res.text()
+      let body = null
+      try { body = text ? JSON.parse(text) : null } catch { body = text }
+      if (!res.ok) throw new Error(res.status + ' ' + text)
+      return body
+    }
+    let workspaceId = ''
+    let sessionId = ''
+    let connectionId = ''
+    try {
+      const created = await json(await fetch('/api/workspaces', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ tag, template: 'chat', agents: ['shell'] }),
+      }))
+      workspaceId = created.workspace.id
+      const spawned = await json(await fetch('/api/workspaces/' + encodeURIComponent(workspaceId) + '/sessions/spawn', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ agent: 'shell' }),
+      }))
+      sessionId = spawned.sessionId
+      const attached = await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('PTY attached timeout')), 10000)
+        connectionId = bridge.connect({ sessionId, cols: 80, rows: 24 })
+        const offMessage = bridge.onMessage(connectionId, (msg) => {
+          if (msg.type !== 'control') return
+          const text = typeof msg.data === 'string' ? msg.data : String(msg.data ?? '')
+          try {
+            const control = JSON.parse(text)
+            if (control.type === 'attached') {
+              clearTimeout(timer)
+              offMessage()
+              offClose()
+              resolve(control)
+            }
+          } catch {
+            // Ignore non-JSON terminal control frames.
+          }
+        })
+        const offClose = bridge.onClose(connectionId, (ev) => {
+          clearTimeout(timer)
+          offMessage()
+          offClose()
+          reject(new Error('PTY closed before attach: ' + ev.code))
+        })
+      })
+      return { ok: true, workspaceId, sessionId, attached }
+    } finally {
+      if (connectionId) bridge.close(connectionId)
+      if (!${keepWorkspace ? 'true' : 'false'}) {
+        if (workspaceId && sessionId) {
+          await fetch('/api/workspaces/' + encodeURIComponent(workspaceId) + '/sessions/' + encodeURIComponent(sessionId) + '/pause', { method: 'POST' }).catch(() => {})
+        }
+        if (workspaceId) {
+          await fetch('/api/workspaces/' + encodeURIComponent(workspaceId), { method: 'DELETE' }).catch(() => {})
+        }
+      }
+    }
+  })()`, true) as { ok?: boolean; workspaceId?: string; sessionId?: string }
+  console.log(`[guardian] electron smoke pty → ok workspace=${result.workspaceId ?? ''} session=${result.sessionId ?? ''}`)
 }
 
 app.whenReady().then(async () => {
@@ -210,10 +323,18 @@ app.whenReady().then(async () => {
   // the user pinned them; silently drifting would break their bookmarks /
   // firewall rules. Unconfigured ports keep the probe-upward behavior.
   const portsFile = await readPortsFile(homeEnv.OPENALICE_HOME)
-  const webPort = await claimPort('web', 'OPENALICE_WEB_PORT', portsFile.web, DEFAULT_WEB_PORT_START)
-  const mcpPort = await claimPort('mcp', 'OPENALICE_MCP_PORT', portsFile.mcp, webPort + 1)
-  const utaPort = await claimPort('uta', 'OPENALICE_UTA_PORT', portsFile.uta, mcpPort + 1)
+  const mcpFile = await readMcpConfigFile(homeEnv.OPENALICE_HOME)
+  const mcpEnabled = parseEnabledEnv(process.env['OPENALICE_MCP_ENABLED']) ?? mcpFile.enabled
+  const mcpPort = mcpEnabled
+    ? await claimPort('mcp', 'OPENALICE_MCP_PORT', portsFile.mcp ?? mcpFile.port, DEFAULT_WEB_PORT_START + 1)
+    : null
+  const utaPort = await claimPort('uta', 'OPENALICE_UTA_PORT', portsFile.uta, mcpPort !== null ? mcpPort + 1 : DEFAULT_WEB_PORT_START + 1)
   const utaUrl = `http://127.0.0.1:${utaPort}`
+  const launcherMode = app.isPackaged ? 'electron-packaged' : 'electron-dev'
+  const toolBaseUrl = '/cli'
+  const toolSocketPath = process.platform === 'win32'
+    ? `\\\\.\\pipe\\openalice-${process.pid}-tools`
+    : join(app.getPath('temp'), `openalice-${process.pid}-tools.sock`)
 
   // ── Child spawns ────────────────────────────────────────────
   // Both children run as pure Node, not nested Electron main processes —
@@ -244,8 +365,12 @@ app.whenReady().then(async () => {
       env: {
         ...process.env,
         ELECTRON_RUN_AS_NODE: '1',
-        OPENALICE_WEB_PORT: String(webPort),
-        OPENALICE_MCP_PORT: String(mcpPort),
+        OPENALICE_WEB_TRANSPORT: 'ipc',
+        ...(mcpPort !== null ? { OPENALICE_MCP_PORT: String(mcpPort) } : {}),
+        OPENALICE_MCP_ENABLED: mcpEnabled ? '1' : '0',
+        OPENALICE_LOCAL_CLI_ON_WEB: '1',
+        OPENALICE_TOOL_BASE_URL: toolBaseUrl,
+        OPENALICE_TOOL_SOCKET: toolSocketPath,
         // The fix: Alice hard-requires OPENALICE_UTA_URL at boot
         // (src/main.ts) and throws without it. The pre-UTA desktop shell
         // never set it, so the packaged app crashed on launch.
@@ -253,7 +378,17 @@ app.whenReady().then(async () => {
         OPENALICE_LAUNCHER: 'electron',
         ...homeEnv,
       },
-      stdio: 'inherit',
+      // The fourth fd opens Node child_process IPC. Electron app mode uses it
+      // as the local PTY transport between BrowserWindow/preload and Alice's
+      // WorkspaceService, while HTTP/WS remains the browser/dev/Docker plane.
+      stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
+      serialization: 'advanced',
+    })
+    child.on('message', (msg) => {
+      if (!handleOpenAliceIpcMessage(msg)) {
+        // No-op today; keeps the IPC pipe extensible without silently hiding
+        // malformed messages while we build out app-mode transports.
+      }
     })
     child.once('exit', (code, signal) => {
       if (appQuitting) return
@@ -264,8 +399,34 @@ app.whenReady().then(async () => {
   }
 
   // ── Boot order: UTA first, then Alice pointed at it ─────────
-  console.log(`[guardian] UTA   → ${utaUrl}`)
-  console.log(`[guardian] Alice → http://127.0.0.1:${webPort}`)
+  // Keep this banner explicit: desktop logs are often the only thing a user
+  // sees when debugging startup, and "Electron app loading local HTTP" looks
+  // deceptively similar to Docker/prod unless the launcher mode is named.
+  console.log('')
+  console.log(`[guardian] mode     →  ${launcherMode}`)
+  console.log(`[guardian] data     →  ${homeEnv.OPENALICE_HOME}`)
+  console.log(`[guardian] app      →  ${homeEnv.OPENALICE_APP_HOME}`)
+  console.log(`[guardian] UTA      →  ${utaUrl}`)
+  console.log(`[guardian] Alice    →  app://openalice (Electron IPC)`)
+  console.log(`[guardian] Tools    →  ${toolSocketPath}`)
+  console.log(`[guardian] MCP      →  ${mcpPort !== null ? `http://127.0.0.1:${mcpPort}/mcp` : 'disabled'}`)
+  console.log('')
+  registerOpenAliceIpc({
+    mode: launcherMode,
+    userDataHome: homeEnv.OPENALICE_HOME,
+    appHome: homeEnv.OPENALICE_APP_HOME,
+    webPort: null,
+    mcpPort,
+    utaPort,
+    getAliceProcess: () => alice,
+  })
+  protocol.handle('app', async (request) => {
+    try {
+      return await fetchAliceWebRequest(request, alice)
+    } catch (err) {
+      return new Response(err instanceof Error ? err.message : String(err), { status: 503 })
+    }
+  })
   uta = spawnUTA()
   const utaReady = await waitForUTA(utaUrl)
   if (!utaReady) {
@@ -280,8 +441,8 @@ app.whenReady().then(async () => {
   console.log(`[guardian] UTA ready pid=${uta.pid}`)
 
   alice = spawnAlice()
-  console.log(`[guardian] Alice pid=${alice.pid} webPort=${webPort} mcpPort=${mcpPort}`)
-  await waitForAliceReady(webPort)
+  console.log(`[guardian] Alice pid=${alice.pid} web=ipc mcpPort=${mcpPort ?? 'disabled'}`)
+  await waitForAliceReady()
 
   // ── Restart-flag watcher: broker config changes touch the flag; SIGTERM
   // + respawn UTA without restarting Alice (mirrors prod.mjs). ────────────
@@ -306,9 +467,45 @@ app.whenReady().then(async () => {
       preload: resolve(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      // Keep preload in Electron's full preload environment. The renderer page
+      // stays isolated and has no Node globals, but the preload itself imports
+      // Electron modules and exposes the app-mode transport bridge.
+      sandbox: false,
     },
   })
-  win.loadURL(`http://localhost:${webPort}/`)
+  win.webContents.on('preload-error', (_event, preloadPath, error) => {
+    console.error(`[guardian] renderer preload failed path=${preloadPath}: ${error.message}`)
+  })
+  win.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+    console.error(`[guardian] renderer load failed code=${errorCode} url=${validatedURL}: ${errorDescription}`)
+  })
+  win.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    if (level < 2) return
+    console.log(`[renderer] ${sourceId}:${line} ${message}`)
+  })
+  win.webContents.on('did-finish-load', () => {
+    void win.webContents.executeJavaScript('Boolean(window.openAlice?.pty && window.openAlice?.runtime)', true)
+      .then((ready) => {
+        console.log(`[guardian] renderer bridge → ${ready ? 'ready' : 'missing'}`)
+        if (ready && process.env['OPENALICE_ELECTRON_SMOKE_PTY'] === '1') {
+          void runRendererPtySmoke(win)
+            .then(() => {
+              if (process.env['OPENALICE_ELECTRON_SMOKE_EXIT'] === '1') shutdown()
+            })
+            .catch((err) => {
+              console.error(`[guardian] electron smoke pty → failed: ${err instanceof Error ? err.message : String(err)}`)
+              if (process.env['OPENALICE_ELECTRON_SMOKE_EXIT'] === '1') {
+                process.exitCode = 1
+                shutdown()
+              }
+            })
+        }
+      })
+      .catch((err) => {
+        console.error(`[guardian] renderer bridge probe failed: ${err instanceof Error ? err.message : String(err)}`)
+      })
+  })
+  win.loadURL('app://openalice/')
 
   configureAutoUpdate(win, { beforeInstall: stopChildren })
 })

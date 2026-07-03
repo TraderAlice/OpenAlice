@@ -181,6 +181,7 @@ export interface AppConfig {
  * stays under connectors.
  */
 export interface McpConfig {
+  enabled: boolean
   port: number
 }
 

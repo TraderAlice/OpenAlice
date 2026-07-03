@@ -8,6 +8,7 @@ import { printLegacyDataNotice } from './core/legacy-data-notice.js'
 import { dataPath, defaultPath } from '@/core/paths.js'
 import type { Plugin, EngineContext } from './core/types.js'
 import { McpPlugin } from './server/mcp.js'
+import { LocalToolGatewayPlugin } from './server/local-tool-gateway.js'
 import { WebPlugin } from './webui/index.js'
 import { createWorkspaceServiceRef } from './webui/plugin.js'
 import { createThinkingTools } from './tool/thinking.js'
@@ -303,10 +304,21 @@ async function main() {
   // workspaceServiceRef is created earlier (Cron Listener section) so cron
   // dispatch shares the same box the WebPlugin fills on start.
 
-  // MCP Server is always active when a port is set — Claude Code provider depends on it for tools.
-  // Lives at top-level config (not under connectors:) because it exports
-  // ToolCenter outward rather than consuming chat input.
-  if (config.mcp.port) {
+  const envMcpEnabled = process.env['OPENALICE_MCP_ENABLED']
+  const mcpEnabled = envMcpEnabled === '1'
+    || ((envMcpEnabled === undefined || envMcpEnabled === '') && config.mcp.enabled === true)
+  const localCliOnWeb = process.env['OPENALICE_LOCAL_CLI_ON_WEB'] === '1'
+  const webTransport = process.env['OPENALICE_WEB_TRANSPORT'] === 'ipc' ? 'ipc' : 'http'
+  const toolBaseUrl = process.env['OPENALICE_TOOL_BASE_URL']
+    ?? (localCliOnWeb
+      ? `http://127.0.0.1:${config.connectors.web.port}/cli`
+      : `http://127.0.0.1:${config.mcp.port}/cli`)
+  const mcpBaseUrl = mcpEnabled ? `http://127.0.0.1:${config.mcp.port}/mcp` : undefined
+
+  // MCP is optional. The workspace CLI gateway is the default local tool path;
+  // when it cannot safely ride the loopback web listener, keep it on a
+  // loopback-only side listener.
+  if (mcpEnabled && config.mcp.port) {
     corePlugins.push(new McpPlugin(
       toolCenter,
       config.mcp.port,
@@ -315,12 +327,28 @@ async function main() {
       entityStore,
       () => workspaceServiceRef.current,
     ))
+  } else if (!localCliOnWeb && config.mcp.port) {
+    corePlugins.push(new LocalToolGatewayPlugin(config.mcp.port, {
+      toolCenter,
+      workspaceToolCenter,
+      inboxStore,
+      entityStore,
+      getWorkspaceService: () => workspaceServiceRef.current,
+    }))
   }
 
   // Web UI is always active (no enabled flag)
   if (config.connectors.web.port) {
     corePlugins.push(new WebPlugin(
-      { port: config.connectors.web.port, mcpPort: config.mcp.port },
+      {
+        port: config.connectors.web.port,
+        mcpPort: config.mcp.port,
+        toolBaseUrl,
+        ...(mcpBaseUrl ? { mcpBaseUrl } : {}),
+        localCliOnWeb,
+        listen: webTransport !== 'ipc',
+        ...(process.env['OPENALICE_TOOL_SOCKET'] ? { cliSocketPath: process.env['OPENALICE_TOOL_SOCKET'] } : {}),
+      },
       workspaceServiceRef,
     ))
   }
@@ -335,6 +363,7 @@ async function main() {
 
   const ctx: EngineContext = {
     config, inboxStore, entityStore, eventLog, toolCallLog, toolCenter,
+    workspaceToolCenter,
     listenerRegistry,
     fire: createEventBus(eventLog),
     bbEngine: getSDKExecutor(),

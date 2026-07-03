@@ -15,6 +15,7 @@
     "electron:dev": "pnpm electron:build && pnpm -F @traderalice/desktop dev",
     "electron:pack": "pnpm electron:build && pnpm -F @traderalice/desktop pack",
     "electron:smoke:packaged": "node scripts/desktop-packaged-smoke.mjs",
+    "electron:smoke:pty": "node scripts/desktop-pty-smoke.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",

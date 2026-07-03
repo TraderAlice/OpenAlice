@@ -188,11 +188,14 @@ export interface WorkspaceService {
 export interface CreateWorkspaceServiceOptions {
   /** Backend's bound web port — used to derive the CORS allowlist. */
   readonly webPort: number;
-  /** Backend's bound MCP port — injected as `OPENALICE_MCP_URL` into each
-   *  PTY's env so workspace `mcp.json` templates' `${OPENALICE_MCP_URL:-...}`
-   *  fallback bridge resolves to the live backend (not whatever was the
-   *  default in template files). */
+  /** Legacy MCP/local-tool port retained for callers that still print it. */
   readonly mcpPort: number;
+  /** Base URL used by the injected `alice*` CLI shims, usually `/cli`. */
+  readonly toolBaseUrl: string;
+  /** Optional Unix socket / named pipe used by `alice*` in Electron app mode. */
+  readonly toolSocketPath?: string;
+  /** Optional MCP protocol URL. Absent when MCP is disabled. */
+  readonly mcpBaseUrl?: string;
   /** The global inbox store, so `issueDetail` can join the inbox reports an
    *  issue produced (entries stamped `origin.issueId`) in the domain layer —
    *  every surface (HTTP / CLI / MCP) gets the join, not just the route.
@@ -341,14 +344,15 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     const baseEnv = buildSpawnEnv(process.env, {
       AQ_WS_ID: ws.id,
       AQ_LAUNCHER_REPO_ROOT: config.launcherRepoRoot,
-      // Tells workspace templates' `${OPENALICE_MCP_URL:-...}` substitution
-      // where to find the backend's MCP endpoint at spawn time. Without
-      // this, Claude Code / Codex inside the workspace would fall back to
-      // the template-default port literal which may not match the actual
-      // backend (guardian can pick a different port if the default is taken).
-      OPENALICE_MCP_URL: `http://127.0.0.1:${opts.mcpPort}/mcp`,
+      // Local tool gateway for the injected `alice*` CLI shims. Electron/dev
+      // can point this at the web listener's `/cli`; Docker/public-web can keep
+      // it on a separate loopback-only port. This is the default agent tool
+      // path and does not require MCP to be enabled.
+      OPENALICE_TOOL_URL: opts.toolBaseUrl,
+      ...(opts.toolSocketPath ? { OPENALICE_TOOL_SOCKET: opts.toolSocketPath } : {}),
+      ...(opts.mcpBaseUrl ? { OPENALICE_MCP_URL: opts.mcpBaseUrl } : {}),
       // Prepend the `alice` CLI shim dir so the workspace agent can invoke it
-      // from its shell (it reads OPENALICE_MCP_URL + AQ_WS_ID above). Shared
+      // from its shell (it reads OPENALICE_TOOL_URL + AQ_WS_ID above). Shared
       // script — not written into the workspace, so it never pollutes the
       // workspace's git repo.
       PATH: `${cliBinPath()}${pathDelimiter}${process.env.PATH ?? ''}`,

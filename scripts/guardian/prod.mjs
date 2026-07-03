@@ -88,8 +88,12 @@ let aliceChild = null
 let restartingUTA = false
 
 console.log('[guardian/prod] starting')
+console.log('[guardian/prod] mode  → docker/prod')
+console.log(`[guardian/prod] data  → ${DATA_HOME}`)
 console.log(`[guardian/prod] UTA   → ${UTA_URL}`)
 console.log(`[guardian/prod] Alice → http://0.0.0.0:${WEB_PORT}`)
+console.log(`[guardian/prod] Tools → http://127.0.0.1:${MCP_PORT}/cli`)
+console.log(`[guardian/prod] MCP   → optional on http://127.0.0.1:${MCP_PORT}/mcp`)
 console.log(`[guardian/prod] flag  → ${FLAG_PATH}`)
 
 function makeUTASpec() {
@@ -100,6 +104,7 @@ function makeUTASpec() {
       ...process.env,
       OPENALICE_UTA_PORT: String(UTA_PORT),
       OPENALICE_HOME: DATA_HOME,
+      OPENALICE_LAUNCHER: 'docker',
     },
   }
 }
@@ -121,8 +126,10 @@ function spawnAlice() {
       ...process.env,
       OPENALICE_WEB_PORT: String(WEB_PORT),
       OPENALICE_MCP_PORT: String(MCP_PORT),
+      OPENALICE_TOOL_BASE_URL: `http://127.0.0.1:${MCP_PORT}/cli`,
       OPENALICE_UTA_URL: UTA_URL,
       OPENALICE_HOME: DATA_HOME,
+      OPENALICE_LAUNCHER: 'docker',
     },
     stdio: 'inherit',
   })

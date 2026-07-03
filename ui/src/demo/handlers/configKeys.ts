@@ -16,7 +16,7 @@ export const configKeysHandlers = [
       compaction: { maxContextTokens: 0, maxOutputTokens: 0 },
       snapshot: { enabled: false, every: '1h' },
       trading: { observeExternalOrdersEvery: '15m' },
-      mcp: { port: 47332 },
+      mcp: { enabled: false, port: 47332 },
       marketData: {
         enabled: true,
         providers: { equity: 'yfinance', crypto: 'yfinance', currency: 'yfinance', commodity: 'yfinance' },

@@ -74,7 +74,7 @@ export function templatesPath(): string {
 /**
  * Dir holding the workspace-local `alice` CLI shim, prepended to each PTY's
  * PATH so a native agent can run `alice ...` from its shell. A single shared,
- * env-driven script (it reads OPENALICE_MCP_URL + AQ_WS_ID at runtime), so it
+ * env-driven script (it reads OPENALICE_TOOL_URL + AQ_WS_ID at runtime), so it
  * is NOT written into individual workspaces and never enters their git repos.
  *
  * Rides APP_RESOURCES_HOME exactly like templatesPath(): repo source in dev,

@@ -12,7 +12,7 @@
  * (`alice` -> data, `alice-<x>` -> <x>) and talks to `/cli/<wsId>/<export>/*`.
  *
  * Runs from a workspace PTY shell, reading env the launcher already injects per
- * spawn (OPENALICE_MCP_URL + AQ_WS_ID). Deliberately written with NO import /
+ * spawn (OPENALICE_TOOL_URL + AQ_WS_ID). Deliberately written with NO import /
  * export and NO top-level await, so node runs it identically whether it treats
  * the file as ESM or CommonJS — and with zero Alice imports, so there is nothing
  * to build (dev and prod behave the same). Uses only global fetch / process.
@@ -34,13 +34,21 @@ async function main() {
   BIN = (process.argv[1] || 'alice').split(/[\\/]/).pop() || 'alice'
   const exportKey = BIN === 'alice' ? 'data' : BIN.replace(/^alice-/, '')
 
-  const mcpUrl = process.env.OPENALICE_MCP_URL || 'http://127.0.0.1:47332/mcp'
+  const toolSocket = process.env.OPENALICE_TOOL_SOCKET
+  const toolUrl = process.env.OPENALICE_TOOL_URL
+  const legacyMcpUrl = process.env.OPENALICE_MCP_URL || 'http://127.0.0.1:47332/mcp'
   const wsId = process.env.AQ_WS_ID
   if (!wsId) {
     fail('AQ_WS_ID is not set — run from inside an OpenAlice workspace.')
   }
-  // Derive the CLI base from the MCP URL: .../mcp -> .../cli/<wsId>/<export>
-  const base = mcpUrl.replace(/\/+$/, '').replace(/\/mcp$/, '/cli') + '/' + wsId + '/' + exportKey
+  // Prefer the dedicated CLI base. Fall back to legacy MCP-derived config so
+  // older workspace envs keep working: .../mcp -> .../cli/<wsId>/<export>.
+  const gateway = toolSocket
+    ? (toolUrl || '/cli').replace(/\/+$/, '')
+    : toolUrl
+      ? toolUrl.replace(/\/+$/, '')
+      : legacyMcpUrl.replace(/\/+$/, '').replace(/\/mcp$/, '/cli')
+  const base = gateway + '/' + wsId + '/' + exportKey
 
   const wantsHelp = argv.includes('--help') || argv.includes('-h')
   const positionals = argv.filter((a) => !a.startsWith('-'))
@@ -111,6 +119,9 @@ async function invoke(base, tool, args) {
 }
 
 async function fetchJson(url, opts) {
+  if (process.env.OPENALICE_TOOL_SOCKET && url.startsWith('/')) {
+    return fetchSocketJson(process.env.OPENALICE_TOOL_SOCKET, url, opts)
+  }
   let resp
   try {
     resp = await fetch(url, opts)
@@ -125,6 +136,30 @@ async function fetchJson(url, opts) {
     body = text
   }
   return { ok: resp.ok, status: resp.status, body }
+}
+
+async function fetchSocketJson(socketPath, path, opts) {
+  const http = await import('node:http')
+  return new Promise((resolve) => {
+    const req = http.request({
+      socketPath,
+      path,
+      method: opts && opts.method ? opts.method : 'GET',
+      headers: opts && opts.headers ? opts.headers : undefined,
+    }, (res) => {
+      let raw = ''
+      res.setEncoding('utf8')
+      res.on('data', (chunk) => { raw += chunk })
+      res.on('end', () => {
+        let body = null
+        try { body = raw ? JSON.parse(raw) : null } catch { body = raw }
+        resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode, body })
+      })
+    })
+    req.on('error', (e) => fail(`cannot reach OpenAlice at ${socketPath}${path} — is the backend running? (${e && e.message})`))
+    if (opts && opts.body) req.write(opts.body)
+    req.end()
+  })
 }
 
 // ---- flag parsing ---------------------------------------------------------

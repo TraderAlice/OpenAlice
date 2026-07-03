@@ -336,8 +336,9 @@ const compactionSchema = z.object({
  * and stays in connectors.
  */
 const mcpSchema = z.object({
+  enabled: z.boolean().default(false),
   port: z.number().int().positive().default(3001),
-}).default({ port: 3001 })
+}).default({ enabled: false, port: 3001 })
 
 const connectorsSchema = z.object({
   web: z.object({ port: z.number().int().positive().default(3002) }).default({ port: 3002 }),

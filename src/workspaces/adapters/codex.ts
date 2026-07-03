@@ -71,12 +71,9 @@ export const codexAdapter: CliAdapter = {
   },
 
   /**
-   * Always prepends `-c mcp_servers.openalice.url="..."` and the workspace
-   * scoped `openalice-workspace` server so OpenAlice MCP is visible
-   * per-spawn without writing to `~/.codex/config.toml`. The
-   * flag overrides any same-key entry in the read config.toml (verified
-   * empirically), and adds a new key when none exists — safe in both
-   * default and override modes.
+   * Prepends MCP server flags only when OpenAlice's optional MCP server is
+   * enabled. The default tool path is CLI-mode (`alice*` shell commands), so a
+   * workspace must still spawn even when no MCP URL is present.
    */
   composeCommand(_base: readonly string[], ctx: SpawnContext): readonly string[] {
     const head = codexMcpHead(ctx);
@@ -307,19 +304,17 @@ export const codexAdapter: CliAdapter = {
 };
 
 /**
- * The `codex -c mcp_servers.*` head shared by interactive `composeCommand` and
- * headless `composeHeadlessCommand` — so the two never drift on MCP wiring.
+ * Optional `codex -c mcp_servers.*` head. When MCP is disabled, return the
+ * bare codex command and let the workspace use the injected `alice*` CLIs.
  *
- * Reads OPENALICE_MCP_URL / AQ_WS_ID from the spawn-bound env (which service.ts
- * populates with the backend's actual MCP port), NOT process.env — the backend
- * env only carries OPENALICE_MCP_PORT; the URL is composed per-spawn and
- * injected via buildSpawnEnv. Reading process.env here used to fall back to the
- * historical 3001 hardcode and route codex at a dead port.
+ * Reads OPENALICE_MCP_URL / AQ_WS_ID from the spawn-bound env. The URL exists
+ * only when the optional MCP server is enabled; otherwise the workspace uses
+ * the injected `alice*` CLI tools.
  */
 function codexMcpHead(ctx: SpawnContext): string[] {
   const mcpUrl = ctx.env['OPENALICE_MCP_URL'];
   if (!mcpUrl) {
-    throw new Error('codex adapter: OPENALICE_MCP_URL missing from spawn env');
+    return ['codex'];
   }
   const workspaceId = ctx.env['AQ_WS_ID'];
   if (!workspaceId) {

@@ -45,6 +45,25 @@ describe('buildSpawnEnv', () => {
     expect(out['PWD']).toBe('/ws/dir')
   })
 
+  it('strips launcher-owned tool/MCP env from the parent and only trusts extras', () => {
+    const out = buildSpawnEnv(
+      {
+        OPENALICE_MCP_URL: 'http://stale/mcp',
+        OPENALICE_TOOL_URL: 'http://stale/cli',
+        OPENALICE_TOOL_SOCKET: '/tmp/stale.sock',
+        OPENCODE_CONFIG_CONTENT: '{"mcp":{"stale":true}}',
+      },
+      {
+        OPENALICE_TOOL_URL: '/cli',
+        OPENALICE_TOOL_SOCKET: '/tmp/current.sock',
+      },
+    )
+    expect(out['OPENALICE_MCP_URL']).toBeUndefined()
+    expect(out['OPENCODE_CONFIG_CONTENT']).toBeUndefined()
+    expect(out['OPENALICE_TOOL_URL']).toBe('/cli')
+    expect(out['OPENALICE_TOOL_SOCKET']).toBe('/tmp/current.sock')
+  })
+
   it('defaults terminal locale to UTF-8 without overriding explicit locale', () => {
     expect(buildSpawnEnv({})['LANG']).toBe('en_US.UTF-8')
     expect(buildSpawnEnv({})['LC_CTYPE']).toBe('en_US.UTF-8')
