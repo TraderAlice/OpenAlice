@@ -98,7 +98,7 @@ export function MarketRotationPage() {
           <>
             <QuadrantChart points={points} t={t} />
             <RotationTable rows={data.sectors} benchmarkSymbol={data.benchmark.symbol} t={t} />
-            <p className="text-[11px] leading-relaxed text-text-muted/70 max-w-3xl">
+            <p className="max-w-3xl break-words text-[11px] leading-relaxed text-text-muted/70">
               <span className="font-semibold text-text-muted">{t('market.rotationMethodology')}: </span>
               {data.methodology}
             </p>
@@ -173,23 +173,24 @@ function PointTooltip({ active, payload, t }: { active?: boolean; payload?: Arra
 
 function RotationTable({ rows, benchmarkSymbol, t }: { rows: SectorRotationRow[]; benchmarkSymbol: string; t: TFunction }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-[12px] border-collapse">
+    <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0" data-testid="sector-rotation-table-scroll">
+      {/* Keep the market columns readable; narrow screens scroll instead of compressing headers together. */}
+      <table className="w-full min-w-[820px] border-collapse text-[12px]" data-testid="sector-rotation-table">
         <thead>
-          <tr className="text-text-muted/70 text-left border-b border-border">
-            <th className="py-1.5 pr-3 font-medium">{t('market.colSector')}</th>
-            <th className="py-1.5 px-3 font-medium text-right">{t('market.colScore')}</th>
-            <th className="py-1.5 px-3 font-medium text-right">1W</th>
-            <th className="py-1.5 px-3 font-medium text-right">1M</th>
-            <th className="py-1.5 px-3 font-medium text-right">3M</th>
-            <th className="py-1.5 px-3 font-medium text-right">{t('market.colVsBench', { sym: benchmarkSymbol })}</th>
-            <th className="py-1.5 px-3 font-medium text-right">{t('market.colRvol')}</th>
-            <th className="py-1.5 pl-3 font-medium text-right">{t('market.colVolShareDelta')}</th>
+          <tr className="whitespace-nowrap border-b border-border text-left text-text-muted/70">
+            <th className="w-[220px] py-1.5 pr-3 font-medium">{t('market.colSector')}</th>
+            <th className="w-[72px] py-1.5 px-3 font-medium text-right">{t('market.colScore')}</th>
+            <th className="w-[64px] py-1.5 px-3 font-medium text-right">1W</th>
+            <th className="w-[64px] py-1.5 px-3 font-medium text-right">1M</th>
+            <th className="w-[64px] py-1.5 px-3 font-medium text-right">3M</th>
+            <th className="w-[88px] py-1.5 px-3 font-medium text-right">{t('market.colVsBench', { sym: benchmarkSymbol })}</th>
+            <th className="w-[72px] py-1.5 px-3 font-medium text-right">{t('market.colRvol')}</th>
+            <th className="w-[120px] py-1.5 pl-3 font-medium text-right">{t('market.colVolShareDelta')}</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.symbol} className="border-b border-border/50 hover:bg-bg-secondary/40">
+            <tr key={r.symbol} className="whitespace-nowrap border-b border-border/50 hover:bg-bg-secondary/40">
               <td className="py-1.5 pr-3">
                 <span className="font-mono font-semibold text-text">{r.symbol}</span>
                 <span className="ml-2 text-text-muted">{r.sector}</span>
