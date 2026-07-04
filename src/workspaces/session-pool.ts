@@ -9,6 +9,7 @@ import {
   type PersistentSessionOptions,
 } from './persistent-session.js';
 import type { TranscriptWatcher } from './transcript-watcher.js';
+import type { TerminalThemeVariant } from './terminal-theme.js';
 
 /**
  * Per-attach context the factory uses to compose a fresh PersistentSession.
@@ -32,6 +33,12 @@ export interface SessionFactoryContext {
    * `SpawnContext.initialPrompt`.
    */
   readonly initialPrompt?: string;
+  /**
+   * Concrete terminal renderer theme for this interactive spawn. Used only as a
+   * process-start hint for TUIs; changing the frontend theme later does not
+   * mutate an already-running process environment.
+   */
+  readonly terminalTheme?: TerminalThemeVariant;
 }
 
 /**

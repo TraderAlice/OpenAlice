@@ -51,17 +51,23 @@ describe('buildSpawnEnv', () => {
         OPENALICE_MCP_URL: 'http://stale/mcp',
         OPENALICE_TOOL_URL: 'http://stale/cli',
         OPENALICE_TOOL_SOCKET: '/tmp/stale.sock',
+        OPENALICE_TERMINAL_THEME: 'light',
+        COLORFGBG: '0;15',
         OPENCODE_CONFIG_CONTENT: '{"mcp":{"stale":true}}',
       },
       {
         OPENALICE_TOOL_URL: '/cli',
         OPENALICE_TOOL_SOCKET: '/tmp/current.sock',
+        OPENALICE_TERMINAL_THEME: 'dark',
+        COLORFGBG: '15;0',
       },
     )
     expect(out['OPENALICE_MCP_URL']).toBeUndefined()
     expect(out['OPENCODE_CONFIG_CONTENT']).toBeUndefined()
     expect(out['OPENALICE_TOOL_URL']).toBe('/cli')
     expect(out['OPENALICE_TOOL_SOCKET']).toBe('/tmp/current.sock')
+    expect(out['OPENALICE_TERMINAL_THEME']).toBe('dark')
+    expect(out['COLORFGBG']).toBe('15;0')
   })
 
   it('defaults terminal locale to UTF-8 without overriding explicit locale', () => {

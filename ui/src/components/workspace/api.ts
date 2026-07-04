@@ -5,6 +5,7 @@
  */
 
 import type { WireShape } from '../../api'
+import type { TerminalThemeVariant } from './terminalTheme'
 
 export interface Workspace {
   readonly id: string;
@@ -280,6 +281,8 @@ export interface SpawnOptions {
    * the adapter's interactive `composeCommand`; ignored when `resume` is set.
    */
   readonly initialPrompt?: string;
+  /** Concrete renderer theme at spawn time; gives TUIs an env hint. */
+  readonly terminalTheme?: TerminalThemeVariant;
 }
 
 export async function spawnSession(
@@ -290,6 +293,7 @@ export async function spawnSession(
   if (opts.resume !== undefined) body['resume'] = opts.resume;
   if (opts.agent !== undefined) body['agent'] = opts.agent;
   if (opts.initialPrompt !== undefined) body['initialPrompt'] = opts.initialPrompt;
+  if (opts.terminalTheme !== undefined) body['terminalTheme'] = opts.terminalTheme;
   const res = await fetch(
     `/api/workspaces/${encodeURIComponent(id)}/sessions/spawn`,
     {
@@ -332,11 +336,13 @@ export async function quickChat(
   agent?: string,
   credentialSlug?: string,
   targetWsId?: string,
+  terminalTheme?: TerminalThemeVariant,
 ): Promise<QuickChatResult> {
   const body: Record<string, unknown> = { prompt };
   if (agent !== undefined) body['agent'] = agent;
   if (credentialSlug !== undefined) body['credentialSlug'] = credentialSlug;
   if (targetWsId !== undefined) body['targetWsId'] = targetWsId;
+  if (terminalTheme !== undefined) body['terminalTheme'] = terminalTheme;
   const res = await fetch('/api/workspaces/quick-chat', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -363,10 +369,24 @@ export async function pauseSession(wsId: string, sessionId: string): Promise<boo
  * semantic (claude: --resume <id> or --continue; codex: resume --last; shell:
  * fresh PTY w/ scrollback restore in S5).
  */
-export async function resumeSession(wsId: string, sessionId: string): Promise<SpawnedSession | null> {
+export async function resumeSession(
+  wsId: string,
+  sessionId: string,
+  terminalTheme?: TerminalThemeVariant,
+): Promise<SpawnedSession | null> {
+  const body: Record<string, unknown> = {};
+  if (terminalTheme !== undefined) body['terminalTheme'] = terminalTheme;
   const res = await fetch(
     `/api/workspaces/${encodeURIComponent(wsId)}/sessions/${encodeURIComponent(sessionId)}/resume`,
-    { method: 'POST' },
+    {
+      method: 'POST',
+      ...(Object.keys(body).length > 0
+        ? {
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(body),
+          }
+        : {}),
+    },
   );
   if (!res.ok) return null;
   return (await res.json()) as SpawnedSession;

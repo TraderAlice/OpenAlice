@@ -175,6 +175,24 @@ describe('POST /quick-chat — loginless credential injection', () => {
     expect((spawn.mock.calls[0] as any[])[0]).toBe('ws-1'); // spawned into the target
   });
 
+  it('passes a concrete terminal theme hint into the spawned session', async () => {
+    const { app, spawn } = build();
+    const r = await quickChat(app, { prompt: 'hi', agent: 'claude', terminalTheme: 'light' });
+
+    expect(r.status).toBe(201);
+    expect(spawn).toHaveBeenCalledOnce();
+    expect((spawn.mock.calls[0] as any[])[1].terminalTheme).toBe('light');
+  });
+
+  it('rejects UI-only terminal theme preferences at the HTTP boundary', async () => {
+    const { app, spawn } = build();
+    const r = await quickChat(app, { prompt: 'hi', agent: 'claude', terminalTheme: 'follow' });
+
+    expect(r.status).toBe(400);
+    expect(r.body.message).toBe('terminalTheme must be "light" or "dark"');
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
   it('omitted agent ignores shell at agents[0] and uses the first agent runtime', async () => {
     const { app, spawn } = build({
       workspaces: [{ id: 'ws-1', dir: '/w', agents: ['shell', 'claude'], template: 'chat', tag: 'chat-x' }],

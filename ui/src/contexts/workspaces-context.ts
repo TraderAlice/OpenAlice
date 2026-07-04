@@ -2,17 +2,13 @@ import { createContext, useContext } from 'react'
 import type {
   AgentId,
   AgentInfo,
+  SpawnOptions,
   TemplateInfo,
   Workspace,
 } from '../components/workspace/api'
 import type { WorkspaceSource } from '../tabs/types'
 
-export interface SpawnOpts {
-  readonly resume?: 'last' | string
-  readonly agent?: string
-  /** Seed a fresh session with a first message (quick-chat). Ignored when resuming. */
-  readonly initialPrompt?: string
-}
+export type SpawnOpts = Omit<SpawnOptions, 'terminalTheme'>
 
 export interface WorkspacesContextValue {
   readonly workspaces: readonly Workspace[]

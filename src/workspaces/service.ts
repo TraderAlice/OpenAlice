@@ -66,6 +66,7 @@ import { ScrollbackStore } from './scrollback-store.js';
 import { SessionPool, type SessionFactoryContext } from './session-pool.js';
 import { SessionRegistry, type SessionRecord } from './session-registry.js';
 import { buildCliPath, buildSpawnEnv } from './spawn-env.js';
+import { terminalThemeEnv } from './terminal-theme.js';
 import { readReadmeVersion, TemplateRegistry } from './template-registry.js';
 import { readWorkspaceMetadata } from './workspace-metadata.js';
 import { TranscriptWatcher } from './transcript-watcher.js';
@@ -854,7 +855,10 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         // carries AQ_SESSION_ID; a spawn carries AQ_RUN_ID XOR AQ_SESSION_ID. The
         // `alice` shim forwards it as the `x-openalice-session` header, resolved
         // server-side against the session registry — agent never sees it.
-        { AQ_SESSION_ID: ctx.recordId },
+        {
+          ...terminalThemeEnv(ctx.terminalTheme),
+          AQ_SESSION_ID: ctx.recordId,
+        },
       );
 
       // path.trace — single line capturing every path the spawn touches. The

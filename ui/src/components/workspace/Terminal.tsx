@@ -4,6 +4,7 @@ import type { ReactElement } from 'react';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { Terminal as Xterm } from '@xterm/xterm';
+import { Monitor, Moon, Sun, type LucideIcon } from 'lucide-react';
 import '@xterm/xterm/css/xterm.css';
 
 import {
@@ -11,14 +12,17 @@ import {
   type ClientControlMessage,
 } from './protocol';
 import { attachWebglRenderer } from './renderer';
-import { darkTheme, lightTheme } from './theme';
 import {
   describeTerminalInput,
   keySignature,
   TERMINAL_FONT_FAMILY,
   type KeyMap,
 } from './terminalInput';
-import { useEffectiveTheme } from '../../theme/useEffectiveTheme';
+import {
+  useResolvedTerminalTheme,
+  useTerminalThemeStore,
+  type TerminalThemePreference,
+} from './terminalTheme';
 // Lazy-import so the demo subtree (transcripts, fixtures, handlers) is
 // dynamic-imported only when demo mode is actually on. With a static import,
 // Rollup is conservative about module side-effects (the transcript file
@@ -219,18 +223,28 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
   const onSessionLostRef = useRef<TerminalViewProps['onSessionLost']>(props.onSessionLost);
   onSessionLostRef.current = props.onSessionLost;
 
-  // Terminal palette follows the app theme (auto resolves via the OS). Read the
-  // current value through a ref so the connect effect doesn't recreate the
+  // Terminal palette is its own preference, not just the app chrome theme. Read
+  // the current value through a ref so the connect effect doesn't recreate the
   // terminal on a theme flip — a separate effect re-skins the live instance.
-  const effectiveTheme = useEffectiveTheme();
-  const xtermTheme = effectiveTheme === 'light' ? lightTheme : darkTheme;
-  const themeRef = useRef(xtermTheme);
-  themeRef.current = xtermTheme;
+  const { profile: terminalThemeProfile } = useResolvedTerminalTheme();
+  const themeRef = useRef(terminalThemeProfile.xtermTheme);
+  themeRef.current = terminalThemeProfile.xtermTheme;
+  const appliedThemeVariantRef = useRef(terminalThemeProfile.variant);
   const termRef = useRef<Xterm | null>(null);
 
   useEffect(() => {
-    if (termRef.current) termRef.current.options.theme = xtermTheme;
-  }, [xtermTheme]);
+    const term = termRef.current;
+    if (!term) return;
+    term.options.theme = terminalThemeProfile.xtermTheme;
+
+    if (appliedThemeVariantRef.current === terminalThemeProfile.variant) return;
+    appliedThemeVariantRef.current = terminalThemeProfile.variant;
+    // Muxy-style terminal theming treats the raw PTY stream as the source of
+    // truth and the active theme as renderer config. Reattach so the server
+    // replays raw scrollback through the current xterm theme/profile, without
+    // mutating the output bytes themselves.
+    connectRef.current?.();
+  }, [terminalThemeProfile]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -418,6 +432,13 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
 
     function connect(): void {
       if (teardown) return;
+      const previousWs = activeWs;
+      activeWs = null;
+      try {
+        previousWs?.close();
+      } catch {
+        // Best-effort detach before a deliberate reattach/replay.
+      }
       // Electron app mode has a preload PTY bridge, so it can bypass the
       // renderer -> localhost WebSocket hop. Browser/dev/Docker keep the
       // WebSocket path with the exact same xterm lifecycle.
@@ -597,8 +618,40 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
             take over
           </button>
         )}
+        <TerminalThemeControl />
       </header>
       <div ref={containerRef} className="terminal-host" />
+    </div>
+  );
+}
+
+function TerminalThemeControl(): ReactElement {
+  const { preference, appTheme } = useResolvedTerminalTheme();
+  const setPreference = useTerminalThemeStore((s) => s.setPreference);
+  const options: Array<{
+    preference: TerminalThemePreference;
+    label: string;
+    icon: LucideIcon;
+  }> = [
+    { preference: 'follow', label: `Follow app (${appTheme})`, icon: Monitor },
+    { preference: 'dark', label: 'Dark terminal', icon: Moon },
+    { preference: 'light', label: 'Light terminal', icon: Sun },
+  ];
+  return (
+    <div className="terminal-theme-switch" role="group" aria-label="Terminal theme">
+      {options.map(({ preference: value, label, icon: Icon }) => (
+        <button
+          key={value}
+          type="button"
+          className={`terminal-theme-option ${preference === value ? 'active' : ''}`}
+          aria-label={label}
+          aria-pressed={preference === value}
+          title={label}
+          onClick={() => setPreference(value)}
+        >
+          <Icon size={12} strokeWidth={2.2} aria-hidden="true" />
+        </button>
+      ))}
     </div>
   );
 }

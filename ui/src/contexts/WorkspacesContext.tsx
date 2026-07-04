@@ -28,6 +28,7 @@ import { useTranslation } from 'react-i18next'
 import '../components/workspace/workspaces.css'
 
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { useResolvedTerminalThemeVariant } from '../components/workspace/terminalTheme'
 import { WorkspaceAIConfigModal } from '../components/workspace/WorkspaceAIConfigModal'
 import {
   deleteSession as apiDeleteSession,
@@ -75,6 +76,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
   const [configuringAgentTarget, setConfiguringAgentTarget] = useState<{ wsId: string; agent?: AgentId } | null>(null)
   const [pendingSessionDelete, setPendingSessionDelete] = useState<{ wsId: string; sessionId: string } | null>(null)
   const { t } = useTranslation()
+  const terminalTheme = useResolvedTerminalThemeVariant()
 
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const closeTab = useWorkspace((s) => s.closeTab)
@@ -136,7 +138,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
   const spawn = useCallback(
     async (wsId: string, opts: SpawnOpts = {}, source?: WorkspaceSource): Promise<void> => {
       try {
-        const sess = await spawnSession(wsId, opts)
+        const sess = await spawnSession(wsId, { ...opts, terminalTheme })
         const nowIso = new Date().toISOString()
         const newRecord: SessionRecord = {
           id: sess.sessionId,
@@ -169,7 +171,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         console.error('workspaces.spawn_failed', { wsId, opts, err })
       }
     },
-    [refresh, openOrFocus],
+    [refresh, openOrFocus, terminalTheme],
   )
 
   const setDefaultAgent = useCallback(async (agent: string | null): Promise<void> => {
@@ -184,7 +186,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
 
   const quickChat = useCallback(
     async (prompt: string, agent?: string, credentialSlug?: string, targetWsId?: string): Promise<void> => {
-      const { workspace, session } = await apiQuickChat(prompt, agent, credentialSlug, targetWsId)
+      const { workspace, session } = await apiQuickChat(prompt, agent, credentialSlug, targetWsId, terminalTheme)
       const nowIso = new Date().toISOString()
       const newRecord: SessionRecord = {
         id: session.sessionId,
@@ -222,7 +224,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
       })
       void refresh()
     },
-    [refresh, openOrFocus],
+    [refresh, openOrFocus, terminalTheme],
   )
 
   const pauseSession = useCallback(
@@ -243,7 +245,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
 
   const resumeSession = useCallback(
     async (wsId: string, sessionId: string, source?: WorkspaceSource): Promise<void> => {
-      const resp = await apiResumeSession(wsId, sessionId)
+      const resp = await apiResumeSession(wsId, sessionId, terminalTheme)
       if (resp) {
         setWorkspaces((prev) =>
           patchSession(prev, wsId, sessionId, {
@@ -264,7 +266,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
       })
       void refresh()
     },
-    [refresh, openOrFocus],
+    [refresh, openOrFocus, terminalTheme],
   )
 
   const saveWorkspaceMetadata = useCallback(
