@@ -25,9 +25,10 @@ Thumbs.db
 # Test
 coverage/
 
-# Claude Code — ignore local config, but track shared dev skills/commands
+# Claude Code — ignore local config, but track shared dev skills/rules
 .claude/*
 !.claude/skills/
+!.claude/rules/
 .playwright-mcp/
 # Stray screenshots at repo root (playwright captures, manual screen grabs).
 # UI assets live under ui/public/ or ui/src/assets/ — never at the root.
