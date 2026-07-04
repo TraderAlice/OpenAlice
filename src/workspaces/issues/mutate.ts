@@ -39,12 +39,15 @@ import {
 /** The heading that anchors the comment thread inside an issue's markdown body. */
 const COMMENTS_HEADING = '## Comments'
 
-/** Fields a human/agent may patch on an existing issue. Scheduling frontmatter
- *  (`when`/`what`/`agent`) is preserved untouched — edit it as a coding task. */
+/** Fields a human/agent may patch on an existing issue. Most scheduling
+ *  frontmatter is preserved untouched; `agent` is intentionally editable from
+ *  the UI because it controls which runtime the scheduler uses next fire. */
 export interface IssueFieldPatch {
   status?: IssueStatus
   priority?: IssuePriority
   assignee?: string
+  /** Runtime override for scheduled fires; null removes the override. */
+  agent?: string | null
 }
 
 /** Input to `createIssue`. `id` is optional — derived as a kebab slug from the
@@ -141,6 +144,15 @@ export async function updateIssueFields(
     const a = patch.assignee.trim()
     if (a.length === 0) return { ok: false, reason: 'invalid', error: 'assignee must be a non-empty string' }
     data.assignee = a
+  }
+  if (patch.agent !== undefined) {
+    if (patch.agent === null) {
+      delete data.agent
+    } else {
+      const a = patch.agent.trim()
+      if (a.length === 0) return { ok: false, reason: 'invalid', error: 'agent must be a non-empty string or null' }
+      data.agent = a
+    }
   }
 
   const content = serializeIssue(data, split.body)

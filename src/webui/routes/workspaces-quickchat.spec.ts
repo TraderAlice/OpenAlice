@@ -12,6 +12,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { createWorkspaceRoutes } from './workspaces.js';
 import { readCredentials, readWorkspaceDefaultAgent, setCredentialLastModel, type Credential } from '../../core/config.js';
 import type { WorkspaceService } from '../../workspaces/service.js';
+import type { WorkspaceAiCred } from '../../workspaces/cli-adapter.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -29,13 +30,13 @@ const openaiKey: Credential = {
   vendor: 'openai', authType: 'api-key', apiKey: 'sk-oa', wires: { 'openai-chat': '' },
 };
 
-function build(opts: { workspaces?: any[] } = {}) {
+function build(opts: { workspaces?: any[]; opencodeConfig?: WorkspaceAiCred | null } = {}) {
   const META = { id: 'ws-1', dir: '/w', agents: ['claude', 'opencode'], template: 'chat', tag: 'chat-x' };
   const opencode = {
     id: 'opencode',
     namePrefix: 'o',
     writeAiConfig: vi.fn(async () => {}),
-    readAiConfig: vi.fn(async () => null), // workspace has no prior config
+    readAiConfig: vi.fn(async () => opts.opencodeConfig ?? null),
   };
   const claude = { id: 'claude', namePrefix: 'c' };
   const shell = { id: 'shell', kind: 'utility', namePrefix: 'sh' };
@@ -52,7 +53,10 @@ function build(opts: { workspaces?: any[] } = {}) {
   const svc = {
     // Default []: today's tag never matches → creator.create path. Tests that
     // exercise targetWsId pass the workspace in so registry resolves it by id.
-    registry: { list: () => opts.workspaces ?? [] },
+    registry: {
+      list: () => opts.workspaces ?? [],
+      get: (id: string) => (opts.workspaces ?? []).find((w) => w.id === id) ?? (id === META.id ? META : undefined),
+    },
     creator,
     resolveAdapter: (_m: any, agentId?: string) => adapters[agentId ?? 'claude'] ?? claude,
     adapters: { get: (id: string) => adapters[id] },
@@ -72,6 +76,15 @@ function build(opts: { workspaces?: any[] } = {}) {
 
 async function quickChat(app: any, body: unknown) {
   const res = await app.request('/quick-chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return { status: res.status, body: await res.json().catch(() => null) };
+}
+
+async function spawnSession(app: any, body: unknown) {
+  const res = await app.request('/ws-1/sessions/spawn', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -110,6 +123,22 @@ describe('POST /quick-chat — loginless credential injection', () => {
     expect(cred.contextWindow).toBe(1_000_000);
     // model remembered on the cred for next time
     expect(vi.mocked(setCredentialLastModel)).toHaveBeenCalledWith('openai-1', 'gpt-5.5');
+    expect(spawn).toHaveBeenCalledOnce();
+  });
+
+  it('opencode + existing usable workspace config → spawns without vault injection', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({});
+    const { app, opencode, spawn } = build({
+      opencodeConfig: {
+        apiKey: 'sk-existing',
+        model: 'deepseek-chat',
+        wireShape: 'openai-chat',
+      },
+    });
+    const r = await quickChat(app, { prompt: 'hi', agent: 'opencode' });
+
+    expect(r.status).toBe(201);
+    expect(opencode.writeAiConfig).not.toHaveBeenCalled();
     expect(spawn).toHaveBeenCalledOnce();
   });
 
@@ -174,5 +203,45 @@ describe('POST /quick-chat — loginless credential injection', () => {
     expect(r.body.error).toBe('workspace_not_found');
     expect(creator.create).not.toHaveBeenCalled();
     expect(spawn).not.toHaveBeenCalled();
+  });
+
+  it('normal opencode spawn + empty vault/config → 400 no_ai_credential', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({});
+    const { app, opencode, spawn } = build();
+
+    const r = await spawnSession(app, { agent: 'opencode' });
+
+    expect(r.status).toBe(400);
+    expect(r.body.error).toBe('no_ai_credential');
+    expect(opencode.writeAiConfig).not.toHaveBeenCalled();
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
+  it('normal opencode spawn + compatible cred → injects and spawns', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({ 'openai-1': openaiKey });
+    const { app, opencode, spawn } = build();
+
+    const r = await spawnSession(app, { agent: 'opencode' });
+
+    expect(r.status).toBe(201);
+    expect(opencode.writeAiConfig).toHaveBeenCalledOnce();
+    expect(spawn).toHaveBeenCalledOnce();
+  });
+
+  it('agent-readiness reports missing credential for loginless runtimes', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({});
+    const { app } = build();
+
+    const res = await app.request('/ws-1/agent-readiness/opencode');
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body).toMatchObject({
+      agent: 'opencode',
+      ready: false,
+      requiresCredential: true,
+      source: 'missing',
+      settingsTarget: 'ai-provider',
+    });
   });
 });

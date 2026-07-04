@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react'
 import type {
+  AgentId,
   AgentInfo,
   TemplateInfo,
   Workspace,
@@ -30,7 +31,7 @@ export interface WorkspacesContextValue {
   pauseSession(wsId: string, sessionId: string): Promise<void>
   resumeSession(wsId: string, sessionId: string, source?: WorkspaceSource): Promise<void>
   requestDeleteSession(wsId: string, sessionId: string): void
-  openAgentConfig(wsId: string): void
+  openAgentConfig(wsId: string, agent?: AgentId): void
   saveWorkspaceMetadata(
     wsId: string,
     metadata: { displayName?: string | null; description?: string | null },

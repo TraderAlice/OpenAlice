@@ -97,6 +97,12 @@ export interface IssueRecord extends IssueFrontmatter {
   id: string
   /** Markdown description below the frontmatter (trimmed). */
   body: string
+  /**
+   * True when `assignee` came from the schema default rather than frontmatter.
+   * Board projections can then default it to `ws:<workspace>` while still
+   * respecting a human who explicitly wrote `assignee: unassigned`.
+   */
+  assigneeDefaulted: boolean
 }
 
 /** A file that could not be read/validated — reported, never propagated. */
@@ -207,13 +213,22 @@ export function parseIssueContent(
   if (data === null || typeof data !== 'object' || Array.isArray(data)) {
     return { ok: false, error: 'frontmatter is not a mapping' }
   }
+  const rawFrontmatter = data as Record<string, unknown>
 
   const parsed = issueFrontmatterSchema.safeParse(data)
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ') }
   }
 
-  return { ok: true, issue: { id, ...parsed.data, body: split.body } }
+  return {
+    ok: true,
+    issue: {
+      id,
+      ...parsed.data,
+      body: split.body,
+      assigneeDefaulted: !Object.prototype.hasOwnProperty.call(rawFrontmatter, 'assignee'),
+    },
+  }
 }
 
 /** Split a `---\n<yaml>\n---\n<body>` document. Line-based so a `---` inside the

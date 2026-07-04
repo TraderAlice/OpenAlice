@@ -38,16 +38,18 @@ const TAB_FALLBACK_VENDOR: Record<Tab, string | null> = {
   pi: null,
 }
 
+type Tab = 'claude' | 'codex' | 'opencode' | 'pi'
+type Section = 'general' | 'ai'
+
 interface Props {
   wsId: string
   onClose: () => void
+  initialAgent?: Tab
+  initialSection?: Section
 }
 
 const inputClass =
   'w-full bg-bg-secondary border border-border rounded-md px-3 py-2 text-[13px] text-text placeholder:text-text-muted/60 focus:outline-none focus:border-accent'
-
-type Tab = 'claude' | 'codex' | 'opencode' | 'pi'
-type Section = 'general' | 'ai'
 
 const TAB_LABEL: Record<Tab, string> = { claude: 'Claude Code', codex: 'Codex', opencode: 'opencode', pi: 'Pi' }
 const DEFAULT_CONTEXT_WINDOW = 1_000_000
@@ -145,12 +147,12 @@ function testKey(form: FormState, agent: AgentId): string {
   ].join('|')
 }
 
-export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
+export function WorkspaceAIConfigModal({ wsId, onClose, initialAgent = 'claude', initialSection = 'general' }: Props) {
   const { workspaces, saveWorkspaceMetadata } = useWorkspaces()
   const workspace = workspaces.find((w) => w.id === wsId) ?? null
   const workspaceLabel = workspace?.displayName?.trim() || workspace?.tag || wsId
-  const [section, setSection] = useState<Section>('general')
-  const [tab, setTab] = useState<Tab>('claude')
+  const [section, setSection] = useState<Section>(initialSection)
+  const [tab, setTab] = useState<Tab>(initialAgent)
   const [metadataFormWsId, setMetadataFormWsId] = useState<string | null>(null)
   const [displayName, setDisplayName] = useState('')
   const [description, setDescription] = useState('')
@@ -178,6 +180,11 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
   const opencodeGate = useTestGate()
   const piGate = useTestGate()
   const [presets, setPresets] = useState<Preset[]>([])
+
+  useEffect(() => {
+    setSection(initialSection)
+    setTab(initialAgent)
+  }, [initialAgent, initialSection, wsId])
 
   useEffect(() => {
     if (metadataFormWsId === wsId) return

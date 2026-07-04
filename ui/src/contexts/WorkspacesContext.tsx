@@ -31,6 +31,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { WorkspaceAIConfigModal } from '../components/workspace/WorkspaceAIConfigModal'
 import {
   deleteSession as apiDeleteSession,
+  type AgentId,
   getWorkspaceDefaultAgent,
   listAgents,
   listTemplates,
@@ -68,7 +69,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
   // gear button (no workspace tab needed) and the WorkspacePage header
   // button share one modal instance — and the modal survives activity
   // switches (rendered here, not inside an activity-scoped component).
-  const [configuringWsId, setConfiguringWsId] = useState<string | null>(null)
+  const [configuringAgentTarget, setConfiguringAgentTarget] = useState<{ wsId: string; agent?: AgentId } | null>(null)
   const [pendingSessionDelete, setPendingSessionDelete] = useState<{ wsId: string; sessionId: string } | null>(null)
   const { t } = useTranslation()
 
@@ -329,16 +330,19 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         pauseSession,
         resumeSession,
         requestDeleteSession,
-        openAgentConfig: (wsId: string) => setConfiguringWsId(wsId),
+        openAgentConfig: (wsId: string, agent?: AgentId) =>
+          setConfiguringAgentTarget({ wsId, ...(agent ? { agent } : {}) }),
         saveWorkspaceMetadata,
         renameWorkspace,
       }}
     >
       {children}
-      {configuringWsId !== null && (
+      {configuringAgentTarget !== null && (
         <WorkspaceAIConfigModal
-          wsId={configuringWsId}
-          onClose={() => setConfiguringWsId(null)}
+          wsId={configuringAgentTarget.wsId}
+          initialAgent={configuringAgentTarget.agent}
+          initialSection={configuringAgentTarget.agent ? 'ai' : 'general'}
+          onClose={() => setConfiguringAgentTarget(null)}
         />
       )}
       {pendingSessionDelete !== null && (

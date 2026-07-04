@@ -24,6 +24,8 @@ export interface IssuesSnapshotIssue {
   status: IssueStatus
   priority: IssuePriority
   assignee: string
+  /** Adapter id for the scheduled fire (frontmatter `agent`), if set. */
+  agent?: string
   /** Present iff the issue self-schedules. */
   when?: Schedule
   /** When the scanner last fired this issue (epoch ms); only for scheduled issues. */
@@ -117,6 +119,8 @@ export interface BoardRow {
   status: IssueStatus
   priority: IssuePriority
   assignee: string
+  /** Adapter id for the scheduled fire override, if set. */
+  agent?: string
   /** True iff the issue self-schedules (snapshot `when` present). */
   scheduled: boolean
   workspace: { wsId: string; tag: string }
@@ -154,6 +158,7 @@ export function flattenBoardRows(snapshot: IssuesSnapshot): {
         status: issue.status,
         priority: issue.priority,
         assignee: issue.assignee,
+        ...(issue.agent ? { agent: issue.agent } : {}),
         scheduled: issue.when !== undefined,
         workspace: { wsId: ws.wsId, tag: ws.tag },
         ...(issue.nameCollision ? { nameCollision: true } : {}),
@@ -229,11 +234,18 @@ export function inboxReportsForIssue(entries: readonly InboxEntry[], issueId: st
   return entries.filter((e) => e.origin?.issueId === issueId)
 }
 
+/** A missing assignee in a workspace-owned issue means "this workspace owns it".
+ *  Keep an explicit `assignee: unassigned` as unassigned so human edits survive. */
+export function issueAssigneeForWorkspace(issue: IssueRecord, workspaceTag?: string): string {
+  return issue.assigneeDefaulted && workspaceTag ? `ws:${workspaceTag}` : issue.assignee
+}
+
 /** Map a validated issue (+ its firing markers, iff scheduled) to the detail
  *  issue shape. Keeps the body and the scheduling frontmatter the board drops. */
 export function detailIssue(
   issue: IssueRecord,
   markers: IssueFiringMarkers | null,
+  workspaceTag?: string,
 ): IssueDetailIssue {
   return {
     id: issue.id,
@@ -241,7 +253,7 @@ export function detailIssue(
     body: issue.body,
     status: issue.status,
     priority: issue.priority,
-    assignee: issue.assignee,
+    assignee: issueAssigneeForWorkspace(issue, workspaceTag),
     ...(issue.when ? { when: issue.when } : {}),
     ...(issue.what ? { what: issue.what } : {}),
     ...(issue.agent ? { agent: issue.agent } : {}),
@@ -255,13 +267,15 @@ export function detailIssue(
 export function snapshotBoardIssue(
   issue: IssueRecord,
   markers: IssueFiringMarkers | null,
+  workspaceTag?: string,
 ): IssuesSnapshotIssue {
   return {
     id: issue.id,
     title: issue.title,
     status: issue.status,
     priority: issue.priority,
-    assignee: issue.assignee,
+    assignee: issueAssigneeForWorkspace(issue, workspaceTag),
+    ...(issue.agent ? { agent: issue.agent } : {}),
     ...(issue.when ? { when: issue.when } : {}),
     ...(markers ? { lastFiredAtMs: markers.lastFiredAtMs, nextDueAtMs: markers.nextDueAtMs } : {}),
   }

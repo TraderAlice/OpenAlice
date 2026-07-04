@@ -3,8 +3,10 @@ import { describe, expect, it } from 'vitest'
 import type { InboxEntry } from '../../core/inbox-store.js'
 import {
   annotateNameCollisions,
+  detailIssue,
   flattenBoardRows,
   inboxReportsForIssue,
+  snapshotBoardIssue,
   type IssuesSnapshot,
   type IssuesSnapshotWorkspace,
 } from './board.js'
@@ -66,6 +68,7 @@ describe('flattenBoardRows', () => {
               status: 'todo',
               priority: 'none',
               assignee: 'unassigned',
+              agent: 'pi',
               when: { kind: 'every', every: '1h' },
               nameCollision: true,
             },
@@ -92,12 +95,36 @@ describe('flattenBoardRows', () => {
         status: 'todo',
         priority: 'none',
         assignee: 'unassigned',
+        agent: 'pi',
         scheduled: true,
         workspace: { wsId: 'a', tag: 'auto-quant' },
         nameCollision: true,
       },
     ])
     expect(invalid).toEqual([{ wsId: 'b', tag: 'broken', error: 'unreadable' }])
+  })
+})
+
+describe('workspace default assignee projection', () => {
+  const baseIssue = {
+    id: 'i',
+    title: 'Issue',
+    status: 'todo',
+    priority: 'none',
+    assignee: 'unassigned',
+    body: '',
+  } as const
+
+  it('projects a missing assignee to the owning workspace', () => {
+    const issue = { ...baseIssue, assigneeDefaulted: true }
+    expect(snapshotBoardIssue(issue, null, 'chat-jul4').assignee).toBe('ws:chat-jul4')
+    expect(detailIssue(issue, null, 'chat-jul4').assignee).toBe('ws:chat-jul4')
+  })
+
+  it('respects an explicit unassigned assignee', () => {
+    const issue = { ...baseIssue, assigneeDefaulted: false }
+    expect(snapshotBoardIssue(issue, null, 'chat-jul4').assignee).toBe('unassigned')
+    expect(detailIssue(issue, null, 'chat-jul4').assignee).toBe('unassigned')
   })
 })
 

@@ -41,7 +41,12 @@ import {
   createIssue,
   updateIssueFields,
 } from '../workspaces/issues/mutate.js'
-import { flattenBoardRows, type BoardInvalidWorkspace, type BoardRow } from '../workspaces/issues/board.js'
+import {
+  flattenBoardRows,
+  issueAssigneeForWorkspace,
+  type BoardInvalidWorkspace,
+  type BoardRow,
+} from '../workspaces/issues/board.js'
 
 /** Resolve THIS workspace's absolute checkout dir, or a clean error. */
 function selfDir(ctx: WorkspaceToolContext): { ok: true; dir: string } | { ok: false; error: string } {
@@ -56,13 +61,14 @@ function selfDir(ctx: WorkspaceToolContext): { ok: true; dir: string } | { ok: f
 const author = (ctx: WorkspaceToolContext): string => `ws:${ctx.workspaceLabel}`
 
 /** Project a full IssueRecord into the compact row the tools return. */
-function rowOf(issue: IssueRecord) {
+function rowOf(issue: IssueRecord, workspaceLabel?: string) {
   return {
     id: issue.id,
     title: issue.title,
     status: issue.status,
     priority: issue.priority,
-    assignee: issue.assignee,
+    assignee: issueAssigneeForWorkspace(issue, workspaceLabel),
+    ...(issue.agent ? { agent: issue.agent } : {}),
     scheduled: issue.when !== undefined,
   }
 }
@@ -179,7 +185,7 @@ export const issueUpdateFactory: WorkspaceToolFactory = {
           return { ok: false as const, error: 'no fields to update (pass at least one of status/priority/assignee)' }
         }
         const res = await updateIssueFields(dir.dir, id, { status, priority, assignee })
-        if (res.ok) return { ok: true as const, issue: rowOf(res.issue) }
+        if (res.ok) return { ok: true as const, issue: rowOf(res.issue, ctx.workspaceLabel) }
         if (res.reason === 'not_found') return { ok: false as const, error: `no such issue: ${id}` }
         return { ok: false as const, error: res.error }
       },
@@ -209,7 +215,7 @@ export const issueCommentFactory: WorkspaceToolFactory = {
         const dir = selfDir(ctx)
         if (!dir.ok) return { ok: false as const, error: dir.error }
         const res = await appendIssueComment(dir.dir, id, author(ctx), text)
-        if (res.ok) return { ok: true as const, issue: rowOf(res.issue) }
+        if (res.ok) return { ok: true as const, issue: rowOf(res.issue, ctx.workspaceLabel) }
         if (res.reason === 'not_found') return { ok: false as const, error: `no such issue: ${id}` }
         return { ok: false as const, error: res.error }
       },
@@ -243,7 +249,11 @@ export const issueCreateFactory: WorkspaceToolFactory = {
           .describe('Explicit id (filename stem). Omit to derive a kebab slug from the title.'),
         status: z.enum(ISSUE_STATUSES).optional().describe('Initial status (default "todo").'),
         priority: z.enum(ISSUE_PRIORITIES).optional().describe('Initial priority (default "none").'),
-        assignee: z.string().min(1).optional().describe('Initial assignee (default "unassigned").'),
+        assignee: z
+          .string()
+          .min(1)
+          .optional()
+          .describe('Initial assignee (default `ws:<this workspace>`).'),
         when: issueWhenSchema
           .optional()
           .describe('Schedule shape — { kind:"at", at } | { kind:"every", every } | { kind:"cron", cron }. Present iff the issue self-schedules.'),
@@ -265,7 +275,7 @@ export const issueCreateFactory: WorkspaceToolFactory = {
           agent,
           body,
         })
-        if (res.ok) return { ok: true as const, issue: rowOf(res.issue) }
+        if (res.ok) return { ok: true as const, issue: rowOf(res.issue, ctx.workspaceLabel) }
         if (res.reason === 'conflict') return { ok: false as const, error: `issue already exists: ${res.id}` }
         return { ok: false as const, error: res.error }
       },
@@ -329,7 +339,7 @@ export const issueListFactory: WorkspaceToolFactory = {
         const res = await readWorkspaceIssues(dir.dir)
         if (res.ok) {
           const rows = res.issues.map((issue) => ({
-            ...rowOf(issue),
+            ...rowOf(issue, ctx.workspaceLabel),
             workspace: { wsId: ctx.workspaceId, tag: ctx.workspaceLabel },
             ...(issue.when !== undefined ? { scheduled: true } : { scheduled: false }),
           }))

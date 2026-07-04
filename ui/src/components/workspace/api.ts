@@ -530,6 +530,32 @@ export interface AgentConfigBundle {
 
 export type AgentId = 'claude' | 'codex' | 'opencode' | 'pi';
 
+export type AgentCredentialSource =
+  | 'runtime-login'
+  | 'workspace-config'
+  | 'launcher-vault'
+  | 'missing'
+  | 'unknown-agent'
+  | 'disabled-agent';
+
+export interface AgentCredentialReadiness {
+  readonly agent: string;
+  readonly ready: boolean;
+  readonly requiresCredential: boolean;
+  readonly source: AgentCredentialSource;
+  readonly hasWorkspaceConfig: boolean;
+  readonly hasUsableWorkspaceConfig: boolean;
+  readonly detectedCredentialSlug: string | null;
+  readonly compatibleCredentialSlugs: readonly string[];
+  readonly injectableCredentialSlugs: readonly string[];
+  readonly settingsTarget?: 'ai-provider';
+  readonly message?: string;
+}
+
+export interface AgentReadinessBundle {
+  readonly agents: Record<string, AgentCredentialReadiness>;
+}
+
 // ── Central credential store ──────────────────────────────────────────────
 //
 // Alice's reusable credentials (`data/config/ai-provider-manager.json`). The
@@ -601,6 +627,12 @@ export async function getAgentConfig(wsId: string): Promise<AgentConfigBundle> {
   const res = await fetch(`/api/workspaces/${encodeURIComponent(wsId)}/agent-config`);
   if (!res.ok) throw new Error(`get agent config failed: ${res.status}`);
   return (await res.json()) as AgentConfigBundle;
+}
+
+export async function getAgentReadiness(wsId: string): Promise<AgentReadinessBundle> {
+  const res = await fetch(`/api/workspaces/${encodeURIComponent(wsId)}/agent-readiness`);
+  if (!res.ok) throw new Error(`get agent readiness failed: ${res.status}`);
+  return (await res.json()) as AgentReadinessBundle;
 }
 
 export async function saveAgentConfig(

@@ -21,6 +21,7 @@ import { piAdapter } from './adapters/pi.js';
 import { shellAdapter } from './adapters/shell.js';
 import { AdapterRegistry, isAgentRuntime, type CliAdapter } from './cli-adapter.js';
 import { loadConfig, type ServerConfig } from './config.js';
+import { ensureAgentCredentialReady } from './agent-credential-readiness.js';
 import { logger as launcherLogger } from './logger.js';
 import { acquireWorkspaceProcessLock } from './process-lock.js';
 import { runHeadlessProbe, type HeadlessProbeResult } from './probe.js';
@@ -46,6 +47,7 @@ import {
   type IssuesSnapshotWorkspace,
   type WikilinkIssueRef,
 } from './issues/board.js';
+import { completeOneShotIssueAfterRun } from './issues/auto-complete.js';
 import type { IInboxStore } from '@/core/inbox-store.js';
 import { HeadlessTaskRegistry, headlessLogPaths } from './headless-task-registry.js';
 
@@ -440,6 +442,12 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     prompt: string,
     timeoutMs: number,
   ): Promise<HeadlessProbeResult> => {
+    await ensureAgentCredentialReady({
+      meta: ws,
+      agentId: adapter.id,
+      adapter,
+      logger: launcherLogger,
+    });
     const { command, cwd, env, transcriptDir } = composeSpawnInputs(ws, adapter, resume);
     return runHeadlessProbe({
       command,
@@ -466,6 +474,12 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     if (!adapter.capabilities.headless || !adapter.composeHeadlessCommand) {
       throw new Error(`adapter "${adapter.id}" has no headless mode`);
     }
+    await ensureAgentCredentialReady({
+      meta: ws,
+      agentId: adapter.id,
+      adapter,
+      logger: launcherLogger,
+    });
     // Reuse a fresh interactive spawn's env/cwd (identical MCP injection),
     // then swap the interactive command for the one-shot headless argv. Inject
     // AQ_RUN_ID = this run's taskId so the agent's inbox pushes self-link to the
@@ -514,6 +528,12 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     if (!adapter.capabilities.headless || !adapter.composeHeadlessCommand) {
       throw new Error(`adapter "${adapter.id}" has no headless mode`);
     }
+    await ensureAgentCredentialReady({
+      meta: ws,
+      agentId: adapter.id,
+      adapter,
+      logger: launcherLogger,
+    });
     if (headlessTasks.runningCount() >= MAX_CONCURRENT_HEADLESS) {
       throw new HeadlessCapacityError(MAX_CONCURRENT_HEADLESS);
     }
@@ -537,16 +557,53 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
             launcherLogger.warn('headless.session_id_record_failed', { taskId: rec.taskId, err }),
           ),
     })
-      .then((r) =>
-        headlessTasks.complete(rec.taskId, {
-          status: r.killed ? 'failed' : r.exitCode === 0 ? 'done' : 'failed',
+      .then(async (r) => {
+        const status = r.killed ? 'failed' : r.exitCode === 0 ? 'done' : 'failed';
+        await headlessTasks.complete(rec.taskId, {
+          status,
           finishedAt: Date.now(),
           durationMs: r.durationMs,
           exitCode: r.exitCode,
           signal: r.signal,
           killed: r.killed,
-        }),
-      )
+        });
+        // Scheduled one-shot issues are the only board items whose lifecycle can
+        // be closed mechanically from a run exit. Repeating schedules keep their
+        // issue open; failed one-shots stay open so the operator can inspect and
+        // decide whether to rerun.
+        try {
+          const issueCompletion = await completeOneShotIssueAfterRun({
+            wsDir: ws.dir,
+            issueId,
+            status,
+            exitCode: r.exitCode,
+            killed: r.killed,
+          });
+          if (issueCompletion.updated) {
+            launcherLogger.info('issue.oneshot_completed', {
+              wsId: ws.id,
+              issueId: issueCompletion.issueId,
+              previousStatus: issueCompletion.previousStatus,
+              taskId: rec.taskId,
+            });
+          } else if (issueCompletion.reason === 'mutation_failed' || issueCompletion.reason === 'issues_unavailable') {
+            launcherLogger.warn('issue.oneshot_complete_skipped', {
+              wsId: ws.id,
+              issueId,
+              taskId: rec.taskId,
+              reason: issueCompletion.reason,
+              error: issueCompletion.error,
+            });
+          }
+        } catch (err) {
+          launcherLogger.warn('issue.oneshot_complete_failed', {
+            wsId: ws.id,
+            issueId,
+            taskId: rec.taskId,
+            err,
+          });
+        }
+      })
       .catch((err) =>
         headlessTasks.complete(rec.taskId, {
           status: 'failed',
@@ -641,7 +698,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         }
         const issues: IssuesSnapshotIssue[] = res.issues.map((issue) => {
           // Unscheduled ⇒ pure board work item, no firing markers.
-          if (!issue.when) return snapshotBoardIssue(issue, null);
+          if (!issue.when) return snapshotBoardIssue(issue, null, ws.tag);
           // Scheduled ⇒ reuse the schedule snapshot's math so the board's
           // last/next match the Schedules dashboard exactly.
           const fired = snapshotScheduledIssue(
@@ -651,10 +708,14 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
             nowMs,
             DEFAULT_INTERVAL_MS,
           );
-          return snapshotBoardIssue(issue, {
-            lastFiredAtMs: fired.lastFiredAtMs,
-            nextDueAtMs: fired.nextDueAtMs,
-          });
+          return snapshotBoardIssue(
+            issue,
+            {
+              lastFiredAtMs: fired.lastFiredAtMs,
+              nextDueAtMs: fired.nextDueAtMs,
+            },
+            ws.tag,
+          );
         });
         return { wsId: ws.id, tag: ws.tag, status: 'ok', issues };
       }),
@@ -699,7 +760,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       const { entries } = await inboxStore.read({ workspaceId: ws.id, limit: 1000 });
       inboxReports = inboxReportsForIssue(entries, issue.id);
     }
-    return { issue: detailIssue(issue, markers), runs, inboxReports };
+    return { issue: detailIssue(issue, markers, ws.tag), runs, inboxReports };
   };
 
   // Resolve a `[[name]]` token to the issues (across ALL workspaces) that claim

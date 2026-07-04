@@ -28,8 +28,10 @@ export interface IssueListItem {
   title: string
   status: IssueStatus
   priority: IssuePriority
-  /** "human" | "ws:<tag|id>" | "unassigned" — free-form, rendered verbatim. */
+  /** "human" | "ws:<tag|id>" | "unassigned"; missing assignee defaults to the owning workspace. */
   assignee: string
+  /** Adapter id for the scheduled fire override, if set. */
+  agent?: string
   /** Present iff the issue is scheduled (shares the core Schedule union). */
   when?: ScheduleWhen
   /** Scanner last-fired marker (epoch ms) — scheduled issues only. */
@@ -113,6 +115,7 @@ export interface IssueDetailIssue {
   body: string
   status: IssueStatus
   priority: IssuePriority
+  /** "human" | "ws:<tag|id>" | "unassigned"; missing assignee defaults to the owning workspace. */
   assignee: string
   /** Present iff the issue self-schedules. */
   when?: ScheduleWhen
@@ -167,14 +170,15 @@ export const issuesApi = {
 
   /**
    * Human write path: patch one issue's editable fields (any subset of
-   * status / priority / assignee). Returns the SAME detail shape as `getDetail`
-   * so the caller can apply it directly (refetch-free). Working-tree write on
-   * the server, no commit.
+   * status / priority / assignee / agent). `agent: null` clears the scheduled
+   * runtime override so the workspace default applies. Returns the SAME detail
+   * shape as `getDetail` so the caller can apply it directly (refetch-free).
+   * Working-tree write on the server, no commit.
    */
   async update(
     wsId: string,
     id: string,
-    patch: { status?: IssueStatus; priority?: IssuePriority; assignee?: string },
+    patch: { status?: IssueStatus; priority?: IssuePriority; assignee?: string; agent?: string | null },
   ): Promise<IssueDetail> {
     return fetchJson<IssueDetail>(
       `/api/issues/${encodeURIComponent(wsId)}/${encodeURIComponent(id)}`,

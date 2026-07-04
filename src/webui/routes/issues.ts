@@ -26,6 +26,7 @@ import { Hono } from 'hono'
 
 import { ISSUE_PRIORITIES, ISSUE_STATUSES, type IssuePriority, type IssueStatus } from '../../workspaces/issues/declaration.js'
 import { appendIssueComment, updateIssueFields } from '../../workspaces/issues/mutate.js'
+import { isAgentRuntime } from '../../workspaces/cli-adapter.js'
 import { logger as launcherLogger } from '../../workspaces/logger.js'
 import type { WorkspaceService } from '../../workspaces/service.js'
 
@@ -63,9 +64,10 @@ export function createIssuesRoutes(svc: WorkspaceService): Hono {
   })
 
   // PATCH /api/issues/:wsId/:id — patch board fields { status?, priority?,
-  // assignee? } on one issue (the human/UI path). Scheduling frontmatter
-  // (when/what/agent) is untouched — that stays a coding task. Returns the
-  // updated detail shape; 404 when the workspace or issue is missing.
+  // assignee? } plus the scheduled runtime override { agent? } on one issue
+  // (the human/UI path). `agent: null` removes the override so future fires use
+  // the workspace default runtime. Other scheduling frontmatter (when/what)
+  // stays file-owned. Returns the updated detail shape; 404 when missing.
   app.patch('/:wsId/:id', async (c) => {
     const wsId = c.req.param('wsId')
     const id = c.req.param('id')
@@ -75,7 +77,7 @@ export function createIssuesRoutes(svc: WorkspaceService): Hono {
 
     const body = await safeJson(c)
     const fields = body && typeof body === 'object' ? (body as Record<string, unknown>) : {}
-    const patch: { status?: IssueStatus; priority?: IssuePriority; assignee?: string } = {}
+    const patch: { status?: IssueStatus; priority?: IssuePriority; assignee?: string; agent?: string | null } = {}
     if ('status' in fields) {
       const s = fields['status']
       if (typeof s !== 'string' || !ISSUE_STATUSES.includes(s as IssueStatus)) {
@@ -97,8 +99,23 @@ export function createIssuesRoutes(svc: WorkspaceService): Hono {
       }
       patch.assignee = a.trim()
     }
+    if ('agent' in fields) {
+      const raw = fields['agent']
+      if (raw === null || raw === '') {
+        patch.agent = null
+      } else if (typeof raw !== 'string') {
+        return c.json({ error: 'invalid_agent', message: 'agent must be a runtime id or null' }, 400)
+      } else {
+        const agent = raw.trim()
+        const adapter = svc.adapters.get(agent)
+        if (!adapter || !isAgentRuntime(adapter) || !meta.agents.includes(agent)) {
+          return c.json({ error: 'invalid_agent', message: `unknown or disabled agent runtime: ${agent}` }, 400)
+        }
+        patch.agent = agent
+      }
+    }
     if (Object.keys(patch).length === 0) {
-      return c.json({ error: 'no_fields', message: 'provide at least one of status, priority, assignee' }, 400)
+      return c.json({ error: 'no_fields', message: 'provide at least one of status, priority, assignee, agent' }, 400)
     }
 
     try {

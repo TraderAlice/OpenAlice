@@ -41,6 +41,7 @@ export const demoIssuesSnapshot: IssueSnapshot = {
           status: 'in_progress',
           priority: 'high',
           assignee: 'ws:auto-quant',
+          agent: 'codex',
           when: { kind: 'cron', cron: '30 8 * * 1-5' },
           lastFiredAtMs: now - HOUR,
           nextDueAtMs: now + 16 * HOUR,
@@ -52,6 +53,7 @@ export const demoIssuesSnapshot: IssueSnapshot = {
           status: 'todo',
           priority: 'urgent',
           assignee: 'ws:auto-quant',
+          agent: 'claude',
           when: { kind: 'every', every: '1h' },
           lastFiredAtMs: now - HOUR / 2,
           nextDueAtMs: now + HOUR / 2,
@@ -97,6 +99,7 @@ export const demoIssuesSnapshot: IssueSnapshot = {
           status: 'in_progress',
           priority: 'medium',
           assignee: 'ws:macro-research',
+          agent: 'codex',
           when: { kind: 'cron', cron: '0 16 * * 5' },
           lastFiredAtMs: now - 2 * DAY,
           nextDueAtMs: now + 5 * DAY,
@@ -108,6 +111,7 @@ export const demoIssuesSnapshot: IssueSnapshot = {
           status: 'todo',
           priority: 'high',
           assignee: 'human',
+          agent: 'claude',
           when: { kind: 'at', at: new Date(now + 3 * DAY).toISOString() },
           lastFiredAtMs: null,
           nextDueAtMs: now + 3 * DAY,
@@ -449,13 +453,25 @@ function appendCommentToBody(body: string, author: string, text: string): string
 export function demoIssueUpdate(
   wsId: string,
   id: string,
-  patch: { status?: IssueStatus; priority?: IssuePriority; assignee?: string },
+  patch: { status?: IssueStatus; priority?: IssuePriority; assignee?: string; agent?: string | null },
 ): IssueDetail | null {
   const boardIssue = findBoardIssue(wsId, id)
   if (!boardIssue) return null
   if (patch.status !== undefined) boardIssue.status = patch.status
   if (patch.priority !== undefined) boardIssue.priority = patch.priority
   if (patch.assignee !== undefined) boardIssue.assignee = patch.assignee
+  if (patch.agent !== undefined) {
+    if (patch.agent === null) delete boardIssue.agent
+    else boardIssue.agent = patch.agent
+    const key = `${wsId}/${id}`
+    const existing = demoIssueExtras[key]
+    if (existing) {
+      if (patch.agent === null) delete existing.agent
+      else existing.agent = patch.agent
+    } else if (patch.agent !== null) {
+      demoIssueExtras[key] = { body: `${boardIssue.title}\n\n(No description.)`, agent: patch.agent, runs: [] }
+    }
+  }
   return demoIssueDetail(wsId, id)
 }
 

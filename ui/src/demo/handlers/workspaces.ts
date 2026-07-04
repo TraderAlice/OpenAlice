@@ -126,6 +126,56 @@ export const workspacesHandlers = [
   ),
 
   http.get('/api/workspaces/:id/agent-config', () => HttpResponse.json({})),
+  http.get('/api/workspaces/:id/agent-readiness', () =>
+    HttpResponse.json({
+      agents: {
+        claude: {
+          agent: 'claude',
+          ready: true,
+          requiresCredential: false,
+          source: 'runtime-login',
+          hasWorkspaceConfig: false,
+          hasUsableWorkspaceConfig: false,
+          detectedCredentialSlug: null,
+          compatibleCredentialSlugs: [],
+          injectableCredentialSlugs: [],
+        },
+        codex: {
+          agent: 'codex',
+          ready: true,
+          requiresCredential: false,
+          source: 'runtime-login',
+          hasWorkspaceConfig: false,
+          hasUsableWorkspaceConfig: false,
+          detectedCredentialSlug: null,
+          compatibleCredentialSlugs: [],
+          injectableCredentialSlugs: [],
+        },
+        opencode: {
+          agent: 'opencode',
+          ready: true,
+          requiresCredential: true,
+          source: 'launcher-vault',
+          hasWorkspaceConfig: false,
+          hasUsableWorkspaceConfig: false,
+          detectedCredentialSlug: null,
+          compatibleCredentialSlugs: ['openai-1'],
+          injectableCredentialSlugs: ['openai-1'],
+        },
+        pi: {
+          agent: 'pi',
+          ready: true,
+          requiresCredential: true,
+          source: 'launcher-vault',
+          hasWorkspaceConfig: false,
+          hasUsableWorkspaceConfig: false,
+          detectedCredentialSlug: null,
+          compatibleCredentialSlugs: ['openai-1'],
+          injectableCredentialSlugs: ['openai-1'],
+        },
+      },
+    }),
+  ),
   // Credential detection — demo workspaces have no on-disk config, so report
   // none (no overwrite notice; the picker defaults to the first compatible).
   http.get('/api/workspaces/:id/agent-config/:agent/credential', () =>

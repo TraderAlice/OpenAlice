@@ -34,7 +34,18 @@ afterEach(async () => {
 function build(inboxReports: InboxEntry[] = []) {
   const svc = {
     registry: {
-      get: (id: string) => (id === 'ws-1' ? { id: 'ws-1', dir: wsDir, tag: 'ws-1', agents: [] } : undefined),
+      get: (id: string) => (
+        id === 'ws-1'
+          ? { id: 'ws-1', dir: wsDir, tag: 'ws-1', agents: ['claude', 'codex', 'pi', 'shell'] }
+          : undefined
+      ),
+    },
+    adapters: {
+      get: (id: string) => {
+        if (id === 'shell') return { id: 'shell', displayName: 'Shell', kind: 'utility' }
+        if (id === 'claude' || id === 'codex' || id === 'pi') return { id, displayName: id }
+        return undefined
+      },
     },
     issueDetail: async (wsId: string, id: string) => {
       if (wsId !== 'ws-1') return null
@@ -84,6 +95,13 @@ describe('PATCH /api/issues/:wsId/:id', () => {
     expect(r.body.error).toBe('invalid_status')
   })
 
+  it('400 invalid_agent for an unknown or utility runtime', async () => {
+    await createIssue(wsDir, { id: 'i1', title: 'T' })
+    const app = build()
+    expect((await req(app, 'PATCH', '/ws-1/i1', { agent: 'nope' })).body.error).toBe('invalid_agent')
+    expect((await req(app, 'PATCH', '/ws-1/i1', { agent: 'shell' })).body.error).toBe('invalid_agent')
+  })
+
   it('400 no_fields when the body has none of the patchable fields', async () => {
     await createIssue(wsDir, { id: 'i1', title: 'T' })
     const app = build()
@@ -92,22 +110,34 @@ describe('PATCH /api/issues/:wsId/:id', () => {
     expect(r.body.error).toBe('no_fields')
   })
 
-  it('updates fields and returns the detail shape', async () => {
+  it('updates fields including the scheduled agent runtime and returns the detail shape', async () => {
     await createIssue(wsDir, { id: 'i1', title: 'T', body: 'keep me' })
     const app = build()
-    const r = await req(app, 'PATCH', '/ws-1/i1', { status: 'in_progress', priority: 'high', assignee: 'human' })
+    const r = await req(app, 'PATCH', '/ws-1/i1', { status: 'in_progress', priority: 'high', assignee: 'human', agent: 'pi' })
     expect(r.status).toBe(200)
     expect(r.body.issue).toMatchObject({
       id: 'i1',
       status: 'in_progress',
       priority: 'high',
       assignee: 'human',
+      agent: 'pi',
       body: 'keep me',
     })
     expect(Array.isArray(r.body.runs)).toBe(true)
     // Persisted on disk.
     const re = await readWorkspaceIssues(wsDir)
     expect(re.ok && re.issues[0].status).toBe('in_progress')
+    expect(re.ok && re.issues[0].agent).toBe('pi')
+  })
+
+  it('clears the scheduled agent runtime with null', async () => {
+    await createIssue(wsDir, { id: 'i1', title: 'T', agent: 'claude' })
+    const app = build()
+    const r = await req(app, 'PATCH', '/ws-1/i1', { agent: null })
+    expect(r.status).toBe(200)
+    expect(r.body.issue.agent).toBeUndefined()
+    const re = await readWorkspaceIssues(wsDir)
+    expect(re.ok && re.issues[0].agent).toBeUndefined()
   })
 })
 

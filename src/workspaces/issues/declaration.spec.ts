@@ -71,8 +71,19 @@ describe('readWorkspaceIssues', () => {
         priority: 'none',
         assignee: 'unassigned',
       })
+      expect(i.assigneeDefaulted).toBe(true)
       expect(i.when).toBeUndefined()
       expect(isFireable(i)).toBe(false)
+    }
+  })
+
+  it('distinguishes explicit unassigned from a defaulted assignee', async () => {
+    await writeIssue('explicit', fm('title: Explicit\nassignee: unassigned'))
+    const r = await readWorkspaceIssues(dir)
+    expect(r.ok).toBe(true)
+    if (r.ok) {
+      expect(r.issues[0].assignee).toBe('unassigned')
+      expect(r.issues[0].assigneeDefaulted).toBe(false)
     }
   })
 

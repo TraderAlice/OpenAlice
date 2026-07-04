@@ -1,6 +1,6 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { ArrowLeft, Hash, Inbox, ListChecks, TrendingUp, X } from 'lucide-react'
+import { ArrowLeft, Hash, Inbox, ListChecks, Settings, TrendingUp, X } from 'lucide-react'
 
 import type { HeadlessTaskRecord, HeadlessTaskStatus } from '../api/headless'
 import type { InboxEntry } from '../api/inbox'
@@ -12,9 +12,11 @@ import type {
   WikilinkIssueRef,
   WikilinkResolution,
 } from '../api/issues'
+import { getAgentReadiness, type AgentCredentialReadiness, type AgentId } from './workspace/api'
 import { issuesApi } from '../api/issues'
 import { useIssueDetail } from '../hooks/useIssueDetail'
 import { useIssues } from '../hooks/useIssues'
+import { useWorkspaces } from '../contexts/workspaces-context'
 import { formatRelativeTime } from '../lib/intl'
 import { useInboxRead } from '../live/inbox-read'
 import { useInboxSelection } from '../live/inbox-selection'
@@ -47,6 +49,12 @@ const railControl =
 
 // Sentinel option that swaps the assignee select into a free-text input.
 const ASSIGNEE_CUSTOM = '__custom__'
+
+const CONFIGURABLE_AGENTS: readonly AgentId[] = ['claude', 'codex', 'opencode', 'pi']
+
+function isConfigurableAgent(agent: string | null | undefined): agent is AgentId {
+  return CONFIGURABLE_AGENTS.includes(agent as AgentId)
+}
 
 function fmtDuration(ms?: number): string {
   if (ms == null) return '—'
@@ -158,20 +166,101 @@ function AssigneeEditor({
   )
 }
 
+function AgentEditor({
+  value,
+  defaultAgent,
+  options,
+  readiness,
+  disabled,
+  onChange,
+  onConfigure,
+}: {
+  value?: string
+  defaultAgent: string | null
+  options: readonly { id: string; displayName: string; installed?: boolean }[]
+  readiness: Readonly<Record<string, AgentCredentialReadiness>>
+  disabled?: boolean
+  onChange: (next: string | null) => void
+  onConfigure: (agent: AgentId) => void
+}) {
+  const selected = value ?? ''
+  const defaultInOptions = defaultAgent && options.some((a) => a.id === defaultAgent) ? defaultAgent : null
+  const effectiveAgent = value || defaultInOptions || options[0]?.id || null
+  const canConfigure = isConfigurableAgent(effectiveAgent)
+  const defaultLabel = defaultInOptions
+    ? `Default (${options.find((a) => a.id === defaultAgent)?.displayName ?? defaultAgent})`
+    : 'Default'
+
+  return (
+    <>
+      <select
+        className={railControl}
+        value={selected}
+        disabled={disabled}
+        onChange={(e) => {
+          const next = e.target.value
+          onChange(next ? next : null)
+        }}
+      >
+        <option value="">{defaultLabel}</option>
+        {options.map((agent) => {
+          const row = readiness[agent.id]
+          const suffix =
+            agent.installed === false ? ' (missing)'
+            : row?.requiresCredential && !row.ready ? ' (needs cred)'
+            : ''
+          return (
+            <option key={agent.id} value={agent.id}>
+              {agent.displayName}{suffix}
+            </option>
+          )
+        })}
+        {value && !options.some((agent) => agent.id === value) && (
+          <option value={value}>{value}</option>
+        )}
+      </select>
+      <button
+        type="button"
+        disabled={!canConfigure}
+        onClick={() => {
+          if (canConfigure) onConfigure(effectiveAgent)
+        }}
+        title={canConfigure ? `Configure ${effectiveAgent}` : 'No configurable runtime selected'}
+        aria-label={canConfigure ? `Configure ${effectiveAgent}` : 'No configurable runtime selected'}
+        className="shrink-0 rounded-md border border-border bg-bg px-2 py-1 text-muted transition-colors hover:border-accent/50 hover:text-text disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        <Settings size={14} aria-hidden />
+      </button>
+    </>
+  )
+}
+
 function PropertiesRail({
   issue,
   wsTag,
+  agentOptions,
+  defaultAgent,
+  agentReadiness,
   saving,
   error,
   onPatch,
+  onConfigureAgent,
 }: {
   issue: IssueDetailIssue
   wsTag?: string
+  agentOptions: readonly { id: string; displayName: string; installed?: boolean }[]
+  defaultAgent: string | null
+  agentReadiness: Readonly<Record<string, AgentCredentialReadiness>>
   saving: boolean
   error: string | null
-  onPatch: (patch: { status?: IssueStatus; priority?: IssuePriority; assignee?: string }) => void
+  onPatch: (patch: { status?: IssueStatus; priority?: IssuePriority; assignee?: string; agent?: string | null }) => void
+  onConfigureAgent: (agent: AgentId) => void
 }) {
   const meta = STATUS_META[issue.status]
+  const defaultInOptions = defaultAgent && agentOptions.some((a) => a.id === defaultAgent) ? defaultAgent : null
+  const effectiveAgent = issue.agent || defaultInOptions || agentOptions[0]?.id || null
+  const selectedReadiness = effectiveAgent ? agentReadiness[effectiveAgent] : undefined
+  const agentNeedsCredential = selectedReadiness?.requiresCredential === true && !selectedReadiness.ready
   return (
     <aside className="w-full shrink-0 space-y-1 rounded-lg border border-border bg-bg-secondary p-4 lg:w-64">
       <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted/70">Properties</h3>
@@ -217,13 +306,22 @@ function PropertiesRail({
         <PropRow label="Cadence">
           {issue.when ? <CadencePill when={issue.when} /> : <span className="text-muted">—</span>}
         </PropRow>
-        <PropRow label="Agent">
-          {issue.agent ? (
-            <span className="font-mono text-[12px]">{issue.agent}</span>
-          ) : (
-            <span className="text-muted">—</span>
-          )}
-        </PropRow>
+        <EditRow label="Agent">
+          <AgentEditor
+            value={issue.agent}
+            defaultAgent={defaultAgent}
+            options={agentOptions}
+            readiness={agentReadiness}
+            disabled={saving}
+            onChange={(agent) => onPatch({ agent })}
+            onConfigure={onConfigureAgent}
+          />
+        </EditRow>
+        {agentNeedsCredential && (
+          <p className="-mt-1 pb-2 text-right text-[11px] leading-snug text-amber-400">
+            AI credential missing.
+          </p>
+        )}
         {issue.when && (
           <>
             <PropRow label="Last fired">
@@ -509,8 +607,9 @@ function WikilinkPicker({
  * rendered markdown body (which now carries the `## Comments` section) +
  * Activity feed + a comment composer. Right rail = Properties, with status /
  * priority / assignee editable inline (each write PATCHes and applies the
- * server-returned detail — authoritative, refetch-free). Scheduling/agent/firing
- * markers stay read-only (they're driven by frontmatter the agent owns).
+ * server-returned detail — authoritative, refetch-free). The scheduled agent
+ * runtime is editable because it is operational routing; schedule cadence and
+ * fire prompt remain file-owned frontmatter.
  */
 interface IssueDetailProps {
   wsId: string
@@ -529,6 +628,7 @@ export function IssueDetail({
 }: IssueDetailProps) {
   const { data, error, loading, mutate } = useIssueDetail(wsId, id)
   const { data: board } = useIssues()
+  const { agents, defaultAgent, openAgentConfig, workspaces } = useWorkspaces()
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const setSidebar = useWorkspace((s) => s.setSidebar)
   const selectInboxEntry = useInboxSelection((s) => s.select)
@@ -540,8 +640,21 @@ export function IssueDetail({
 
   const [saving, setSaving] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [agentReadiness, setAgentReadiness] = useState<Record<string, AgentCredentialReadiness>>({})
   // Set when a clicked `[[name]]` resolves to >1 target — drives the picker.
   const [picker, setPicker] = useState<WikilinkResolution | null>(null)
+
+  useEffect(() => {
+    let live = true
+    getAgentReadiness(wsId)
+      .then((bundle) => {
+        if (live) setAgentReadiness(bundle.agents)
+      })
+      .catch(() => {
+        if (live) setAgentReadiness({})
+      })
+    return () => { live = false }
+  }, [wsId])
 
   const gotoIssue = useCallback(
     (ref: WikilinkIssueRef) => {
@@ -598,9 +711,15 @@ export function IssueDetail({
   // board snapshot (the canonical wsId→tag map), which is process-cached and
   // already warm when the detail is opened from a board row.
   const wsTag = board?.workspaces.find((w) => w.wsId === wsId)?.tag
+  const workspace = workspaces.find((w) => w.id === wsId) ?? null
+  const agentOptions = agents.filter(
+    (agent) =>
+      agent.kind !== 'utility' &&
+      (workspace ? workspace.agents.includes(agent.id) : true),
+  )
 
   const onPatch = useCallback(
-    async (patch: { status?: IssueStatus; priority?: IssuePriority; assignee?: string }) => {
+    async (patch: { status?: IssueStatus; priority?: IssuePriority; assignee?: string; agent?: string | null }) => {
       setSaving(true)
       setActionError(null)
       try {
@@ -680,9 +799,13 @@ export function IssueDetail({
         <PropertiesRail
           issue={issue}
           wsTag={wsTag}
+          agentOptions={agentOptions}
+          defaultAgent={defaultAgent}
+          agentReadiness={agentReadiness}
           saving={saving}
           error={actionError}
           onPatch={onPatch}
+          onConfigureAgent={(agent) => openAgentConfig(wsId, agent)}
         />
       </div>
       {picker && (

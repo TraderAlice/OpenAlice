@@ -41,9 +41,9 @@ const COMMENT_MAX = 16_000
 //
 // PATCH /api/issues/:wsId/:id and POST /api/issues/:wsId/:id/comments are the
 // Phase 2b write path: they mutate the in-memory fixture in place (status /
-// priority / assignee on the board row; a `## Comments` block appended to the
-// markdown body) and return the same `{ issue, runs }` detail shape as GET, so
-// the demo reflects the change without a backend.
+// priority / assignee on the board row, agent in detail extras; a `## Comments`
+// block appended to the markdown body) and return the same `{ issue, runs }`
+// detail shape as GET, so the demo reflects the change without a backend.
 export const issuesHandlers = [
   http.get('/api/issues', () => HttpResponse.json(demoIssuesSnapshot)),
 
@@ -59,12 +59,13 @@ export const issuesHandlers = [
       status?: unknown
       priority?: unknown
       assignee?: unknown
+      agent?: unknown
     } | null
     if (!body || typeof body !== 'object') {
       return HttpResponse.json({ error: 'invalid_body' }, { status: 400 })
     }
 
-    const patch: { status?: IssueStatus; priority?: IssuePriority; assignee?: string } = {}
+    const patch: { status?: IssueStatus; priority?: IssuePriority; assignee?: string; agent?: string | null } = {}
     if (body.status !== undefined) {
       if (!ISSUE_STATUSES.includes(body.status as IssueStatus)) {
         return HttpResponse.json({ error: 'invalid_status' }, { status: 400 })
@@ -83,7 +84,25 @@ export const issuesHandlers = [
       }
       patch.assignee = body.assignee.trim()
     }
-    if (patch.status === undefined && patch.priority === undefined && patch.assignee === undefined) {
+    if (body.agent !== undefined) {
+      if (body.agent === null || body.agent === '') {
+        patch.agent = null
+      } else if (typeof body.agent !== 'string') {
+        return HttpResponse.json({ error: 'invalid_agent' }, { status: 400 })
+      } else {
+        const agent = body.agent.trim()
+        if (!['claude', 'codex', 'opencode', 'pi'].includes(agent)) {
+          return HttpResponse.json({ error: 'invalid_agent' }, { status: 400 })
+        }
+        patch.agent = agent
+      }
+    }
+    if (
+      patch.status === undefined &&
+      patch.priority === undefined &&
+      patch.assignee === undefined &&
+      patch.agent === undefined
+    ) {
       return HttpResponse.json({ error: 'no_fields' }, { status: 400 })
     }
 

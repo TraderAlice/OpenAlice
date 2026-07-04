@@ -90,7 +90,7 @@ describe('createIssue', () => {
 })
 
 describe('updateIssueFields', () => {
-  it('patches status/priority/assignee and preserves body + scheduling frontmatter', async () => {
+  it('patches status/priority/assignee/agent and preserves body + other scheduling frontmatter', async () => {
     await createIssue(dir, {
       id: 'task-1',
       title: 'Do the thing',
@@ -103,12 +103,14 @@ describe('updateIssueFields', () => {
       status: 'in_progress',
       priority: 'urgent',
       assignee: 'human',
+      agent: 'pi',
     })
     expect(res.ok).toBe(true)
     if (res.ok) {
       expect(res.issue.status).toBe('in_progress')
       expect(res.issue.priority).toBe('urgent')
       expect(res.issue.assignee).toBe('human')
+      expect(res.issue.agent).toBe('pi')
     }
     const { issue } = await readBack('task-1')
     expect(issue).toMatchObject({
@@ -116,10 +118,18 @@ describe('updateIssueFields', () => {
       priority: 'urgent',
       assignee: 'human',
       what: 'keep the fire prompt',
-      agent: 'claude',
+      agent: 'pi',
     })
     expect(issue?.when).toEqual({ kind: 'every', every: '15m' })
     expect(issue?.body).toBe('Body text to preserve.')
+  })
+
+  it('clears an issue agent override with null', async () => {
+    await createIssue(dir, { id: 'agent-clear', title: 'T', agent: 'claude' })
+    const res = await updateIssueFields(dir, 'agent-clear', { agent: null })
+    expect(res.ok).toBe(true)
+    const { issue } = await readBack('agent-clear')
+    expect(issue?.agent).toBeUndefined()
   })
 
   it('supports a partial patch (only status)', async () => {
