@@ -25,6 +25,11 @@ function getStagedPlaceOrder(uta: UnifiedTradingAccount) {
 // ==================== Read-only / keyless account-mutation guard ====================
 
 describe('UTA — read-only / keyless account-mutation guard', () => {
+  it('defaults data-source participation on and allows disabling it per account', () => {
+    expect(createUTA().uta.asVendor).toBe(true)
+    expect(createUTA(undefined, { asVendor: false }).uta.asVendor).toBe(false)
+  })
+
   it('allows a funded read-only account to stage and commit a local proposal', () => {
     const { uta } = createUTA(undefined, { readOnly: true })
     expect(uta.readOnly).toBe(true)

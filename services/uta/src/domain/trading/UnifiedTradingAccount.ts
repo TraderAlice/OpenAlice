@@ -50,6 +50,8 @@ export interface UnifiedTradingAccountOptions {
   /** Public-data-only account (no key) — no account/positions; excluded from
    *  equity aggregation. Implies readOnly. */
   keyless?: boolean
+  /** Whether this UTA participates in broker-backed market-data discovery. */
+  asVendor?: boolean
 }
 
 // ==================== Stage param types ====================
@@ -86,6 +88,8 @@ export class UnifiedTradingAccount {
   readonly keyless: boolean
   /** External account mutations refused (implied by keyless). */
   readonly readOnly: boolean
+  /** Broker-backed market-data discovery participation. */
+  readonly asVendor: boolean
 
   private readonly _getState: () => Promise<GitState>
   private readonly _onHealthChange?: (accountId: string, health: BrokerHealthInfo) => void
@@ -140,6 +144,7 @@ export class UnifiedTradingAccount {
     this.label = broker.label
     this.keyless = options.keyless ?? false
     this.readOnly = options.readOnly ?? options.keyless ?? false
+    this.asVendor = options.asVendor ?? true
     // Optimistically assume we'll reach this account's target until the first
     // probe says otherwise — preserves "usable immediately after construction"
     // (the probe corrects/demotes within ms).

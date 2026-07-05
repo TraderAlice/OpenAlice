@@ -198,7 +198,7 @@ export class UTAAccountSDK {
     // false negative: "SOL isn't tradeable" when it plainly was.)
     return this.client
       .get<{ results: Array<{ source: string } & ContractDescription> }>(
-        `/api/trading/contracts/search`, { pattern })
+        `/api/trading/contracts/search`, { pattern, source: this.id })
       .then((r) => r.results
         .filter((row) => row.source === this.id)
         .map(({ source: _source, ...desc }) => desc as ContractDescription))

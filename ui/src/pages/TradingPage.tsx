@@ -548,6 +548,8 @@ function CreateWizard({ presets, onSave, onOpenExisting, onClose }: {
   const [presetId, setPresetId] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [showSecrets, setShowSecrets] = useState(false)
+  const [readOnly, setReadOnly] = useState(false)
+  const [asVendor, setAsVendor] = useState(true)
   const [testing, setTesting] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -589,11 +591,15 @@ function CreateWizard({ presets, onSave, onOpenExisting, onClose }: {
       enabled: true,
       guards: [],
       presetConfig: getSubmitData(),
+      readOnly,
+      asVendor,
     }
   }
 
   const handlePick = (id: string) => {
     setPresetId(id)
+    setReadOnly(false)
+    setAsVendor(true)
     setError('')
     setStep('config')
   }
@@ -688,6 +694,24 @@ function CreateWizard({ presets, onSave, onOpenExisting, onClose }: {
               <Field label="Name" description="Display label for this account. The unique id is derived automatically from the credentials below.">
                 <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} placeholder={defaultName} />
               </Field>
+              <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2.5">
+                <div className="min-w-0">
+                  <div className="text-[12px] font-medium text-text">Read-only account</div>
+                  <div className="text-[11px] text-text-muted leading-relaxed">
+                    Allow analysis reads; block broker-side order changes.
+                  </div>
+                </div>
+                <Toggle size="sm" checked={readOnly} onChange={setReadOnly} />
+              </div>
+              <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2.5">
+                <div className="min-w-0">
+                  <div className="text-[12px] font-medium text-text">Use as data source</div>
+                  <div className="text-[11px] text-text-muted leading-relaxed">
+                    Include this UTA in K-line and contract discovery.
+                  </div>
+                </div>
+                <Toggle size="sm" checked={asVendor} onChange={setAsVendor} />
+              </div>
               <SchemaFormFields
                 fields={fields}
                 formData={formData}

@@ -466,6 +466,9 @@ export const utaConfigSchema = z.object({
    *  Funded read-only accounts may still stage/commit local trade proposals;
    *  keyless data sources remain public-data-only and cannot create proposals. */
   readOnly: z.boolean().default(false),
+  /** Data-vendor participation. When false, the UTA remains an account/trading
+   *  connection but is excluded from broker-backed market-data discovery. */
+  asVendor: z.boolean().default(true),
   /** Whether this UTA can be edited/removed via the config UI. Optional
    *  keyless data UTAs (binance/okx/bybit-readonly) are non-editable. */
   editable: z.boolean().default(true),

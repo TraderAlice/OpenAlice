@@ -30,6 +30,7 @@ export function buildKeylessDataUTAs(
       presetConfig: { exchange: ex },
       keyless: true,
       readOnly: true,
+      asVendor: true,
       editable: false,
     }))
 }

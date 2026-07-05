@@ -40,18 +40,21 @@ export const demoUTASummaries: UTASummary[] = [
   {
     id: DEMO_UTA_PAPER,
     label: 'Alpaca Paper',
+    asVendor: true,
     capabilities: { supportedSecTypes: ['STK'], supportedOrderTypes: ['MKT', 'LMT'] },
     health: healthOk,
   },
   {
     id: DEMO_UTA_IBKR,
     label: 'IBKR Demo',
+    asVendor: true,
     capabilities: { supportedSecTypes: ['STK', 'OPT'], supportedOrderTypes: ['MKT', 'LMT', 'STP'] },
     health: healthOk,
   },
   {
     id: DEMO_UTA_CRYPTO,
     label: 'Binance',
+    asVendor: true,
     capabilities: { supportedSecTypes: ['CRYPTO'], supportedOrderTypes: ['MKT', 'LMT'] },
     health: healthOk,
   },
@@ -416,8 +419,8 @@ export const demoTradeHistoryByUTA: Record<string, TradeHistoryEntry[]> = {
 // ==================== UTA configs ====================
 
 export const demoUTAConfigs: UTAConfig[] = [
-  { id: DEMO_UTA_PAPER, label: 'Alpaca Paper', presetId: 'alpaca-paper', enabled: true, guards: [], presetConfig: {} },
-  { id: DEMO_UTA_IBKR, label: 'IBKR Demo', presetId: 'ibkr', enabled: true, guards: [], presetConfig: {} },
-  { id: DEMO_UTA_CRYPTO, label: 'Binance', presetId: 'ccxt', enabled: true, guards: [], presetConfig: {} },
+  { id: DEMO_UTA_PAPER, label: 'Alpaca Paper', presetId: 'alpaca-paper', enabled: true, guards: [], presetConfig: {}, readOnly: false, asVendor: true },
+  { id: DEMO_UTA_IBKR, label: 'IBKR Demo', presetId: 'ibkr', enabled: true, guards: [], presetConfig: {}, readOnly: false, asVendor: true },
+  { id: DEMO_UTA_CRYPTO, label: 'Binance', presetId: 'ccxt', enabled: true, guards: [], presetConfig: {}, readOnly: false, asVendor: true },
 ]
 export const demoUTAConfig: UTAConfig = demoUTAConfigs[0]

@@ -11,7 +11,15 @@ import Decimal from 'decimal.js'
 import { BrokerError } from '@traderalice/uta-protocol'
 import { createTradingTools } from './trading.js'
 
-type AccOpts = { account?: Record<string, unknown>; positions?: unknown[]; orders?: unknown[]; fail?: boolean; connecting?: boolean }
+type AccOpts = {
+  account?: Record<string, unknown>
+  positions?: unknown[]
+  orders?: unknown[]
+  fail?: boolean
+  connecting?: boolean
+  asVendor?: boolean
+  contracts?: unknown[]
+}
 
 const DEFAULT_ACCOUNT = { netLiquidation: '10000', baseCurrency: 'USD', totalCashValue: '10000', unrealizedPnL: '0', realizedPnL: '0' }
 
@@ -38,14 +46,16 @@ function fakeAccount(id: string, o: AccOpts) {
     getAccount: async () => { guard(); return o.account ?? DEFAULT_ACCOUNT },
     getPositions: async () => { guard(); return o.positions ?? [] },
     getOrders: async () => { guard(); return o.orders ?? [] },
+    searchContracts: async () => { guard(); return o.contracts ?? [] },
     getPendingOrderIds: () => [],
+    asVendor: o.asVendor ?? true,
   }
 }
 
 function fakeManager(accounts: ReturnType<typeof fakeAccount>[]) {
   return {
-    resolve: async (_source?: string, _opts?: { tradingOnly?: boolean }) => accounts,
-    listUTAs: async () => accounts.map((a) => ({ id: a.id, label: a.label })),
+    resolve: async (source?: string, _opts?: { tradingOnly?: boolean }) => source ? accounts.filter((a) => a.id === source) : accounts,
+    listUTAs: async () => accounts.map((a) => ({ id: a.id, label: a.label, asVendor: a.asVendor })),
     getFxRates: async () => [],
   } as never
 }
@@ -150,6 +160,35 @@ describe('trading tools — partial tolerance (#390)', () => {
     const res = await run(tools.getOrders, { groupBy: 'contract' }) as Record<string, unknown>
     expect(res['acc|BTC']).toBeDefined()
     expect(res.degraded).toBeUndefined()
+  })
+})
+
+describe('searchContracts — data-source participation', () => {
+  it('defaults to accounts with UTA data-source participation enabled', async () => {
+    const tools = createTradingTools(fakeManager([
+      fakeAccount('alpaca-paper', {
+        contracts: [{ contract: { aliceId: 'alpaca-paper|AAPL', symbol: 'AAPL' }, derivativeSecTypes: [] }],
+      }),
+      fakeAccount('bybit-paper', {
+        asVendor: false,
+        contracts: [{ contract: { aliceId: 'bybit-paper|BTC/USDT', symbol: 'BTC' }, derivativeSecTypes: [] }],
+      }),
+    ]))
+
+    const res = await run(tools.searchContracts, { pattern: 'AAPL' }) as Array<Record<string, unknown>>
+    expect(res.map((r) => r.source)).toEqual(['alpaca-paper'])
+  })
+
+  it('allows an explicit source even when data-source participation is disabled', async () => {
+    const tools = createTradingTools(fakeManager([
+      fakeAccount('bybit-paper', {
+        asVendor: false,
+        contracts: [{ contract: { aliceId: 'bybit-paper|BTC/USDT', symbol: 'BTC' }, derivativeSecTypes: [] }],
+      }),
+    ]))
+
+    const res = await run(tools.searchContracts, { pattern: 'BTC', source: 'bybit-paper' }) as Array<Record<string, unknown>>
+    expect(res.map((r) => r.source)).toEqual(['bybit-paper'])
   })
 })
 

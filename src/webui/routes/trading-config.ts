@@ -141,6 +141,8 @@ export function createTradingConfigRoutes(ctx: EngineContext) {
         enabled: body.enabled !== false,
         guards: Array.isArray(body.guards) ? body.guards : [],
         presetConfig,
+        readOnly: body.readOnly === true,
+        asVendor: body.asVendor !== false,
         ...(body.ephemeral === true ? { ephemeral: true as const } : {}),
       }
       const validated = utaConfigSchema.parse(candidate)

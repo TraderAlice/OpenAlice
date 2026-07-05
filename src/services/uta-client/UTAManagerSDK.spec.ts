@@ -7,11 +7,15 @@
  */
 import { describe, it, expect } from 'vitest'
 import { UTAManagerSDK } from './UTAManagerSDK.js'
-import type { UTATier } from '@traderalice/uta-protocol'
+import type { UTATier, UTASummary } from '@traderalice/uta-protocol'
 
-const summary = (id: string, tier: UTATier) => ({
-  id, label: id, capabilities: {},
-  health: { status: 'healthy', reach: 'connected', tier, consecutiveFailures: 0, recovering: false, connecting: false },
+const summary = (id: string, tier: UTATier, over: Partial<UTASummary> = {}): UTASummary => ({
+  id,
+  label: id,
+  asVendor: true,
+  capabilities: { supportedSecTypes: [], supportedOrderTypes: [] },
+  health: { status: 'healthy', reach: 'connected', tier, consecutiveFailures: 0, recovering: false, connecting: false, disabled: false },
+  ...over,
 })
 
 function fakeClient(utas: unknown[]) {
@@ -53,6 +57,24 @@ describe('UTAManagerSDK.resolve — tier filter (#390)', () => {
     const m = new UTAManagerSDK({ client: fakeClient(UTAS) })
     const ids = (await m.resolve('alpaca', { tradingOnly: true })).map((u) => u.id)
     expect(ids).toEqual(['alpaca-paper'])
+  })
+})
+
+describe('UTAManagerSDK — data-source participation', () => {
+  it('excludes disabled UTA vendors from bar capability discovery', async () => {
+    const m = new UTAManagerSDK({
+      client: fakeClient([
+        summary('alpaca-paper', 'trading', {
+          capabilities: { supportedSecTypes: [], supportedOrderTypes: [], historicalBars: { supported: true, quality: 'iex' } },
+        }),
+        summary('bybit-paper', 'trading', {
+          asVendor: false,
+          capabilities: { supportedSecTypes: [], supportedOrderTypes: [], historicalBars: { supported: true, quality: 'realtime' } },
+        }),
+      ]),
+    })
+
+    await expect(m.getBarCapabilities()).resolves.toEqual({ 'alpaca-paper': 'iex' })
   })
 })
 

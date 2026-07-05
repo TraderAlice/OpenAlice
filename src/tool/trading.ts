@@ -165,6 +165,21 @@ async function noAccountsError(manager: UTAManagerSDK, source?: string): Promise
   }
 }
 
+async function filterVendorSearchTargets<T extends { id: string }>(
+  manager: UTAManagerSDK,
+  targets: T[],
+): Promise<T[]> {
+  try {
+    const vendorIds = new Set(
+      (await manager.listUTAs())
+        .filter((u) => u.asVendor !== false)
+        .map((u) => u.id),
+    )
+    return targets.filter((t) => vendorIds.has(t.id))
+  } catch {
+    return targets
+  }
+}
 
 /** Stage + (optionally) commit in one call. The stage→commit split is pure
  *  ceremony when one decision = one operation — which is the dominant agent
@@ -204,6 +219,8 @@ export function createTradingTools(
     searchContracts: tool({
       description: `Search broker accounts for tradeable contracts matching a pattern.
 This is a BROKER-LEVEL search — it queries your connected trading accounts.
+By default it uses accounts with data-source participation enabled; pass
+\`source\` to query a specific account explicitly.
 
 Results are either LEAVES (tradeable, use aliceId with getQuote/placeOrder) or
 DIRECTORIES (expandable: true — e.g. a bond issuer): call expandContract on
@@ -228,8 +245,17 @@ hitting the broker, which otherwise expects the bare base ticker.`,
         if (!brokerPattern) return { results: [], message: 'Empty pattern.' }
         // Source-scoped: when the caller pinned an account, only that one is
         // hit; otherwise fan out to all configured accounts.
-        const targets = await manager.resolve(source)
-        if (targets.length === 0) return await noAccountsError(manager, source)
+        const resolvedTargets = await manager.resolve(source)
+        const targets = source ? resolvedTargets : await filterVendorSearchTargets(manager, resolvedTargets)
+        if (targets.length === 0) {
+          if (!source && resolvedTargets.length > 0) {
+            return {
+              results: [],
+              message: 'No UTA data sources are enabled. Pass source to search a specific account, or enable data-source participation on a UTA.',
+            }
+          }
+          return await noAccountsError(manager, source)
+        }
         const all: Array<Record<string, unknown>> = []
         const settled = await Promise.allSettled(
           targets.map(async (uta) => ({ id: uta.id, results: await uta.searchContracts(brokerPattern) })),

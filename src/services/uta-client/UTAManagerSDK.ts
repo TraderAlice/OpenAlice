@@ -133,6 +133,7 @@ export class UTAManagerSDK {
     const all = await this.listUTAs()
     const out: Record<string, 'realtime' | 'iex' | 'delayed' | 'subscription'> = {}
     for (const u of all) {
+      if (u.asVendor === false) continue
       const q = u.capabilities.historicalBars?.quality
       if (q) out[u.id] = q
     }

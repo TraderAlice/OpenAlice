@@ -28,6 +28,7 @@ export async function searchTradeableContracts(
   manager: UTAManager,
   pattern: string,
   assetClass: AssetClassHint = 'unknown',
+  source?: string,
 ): Promise<ContractSearchHit[]> {
   // Translate data-vendor symbol to a broker-friendly pattern. The rule set
   // and its rationale live in `./contract-search-rules.md` — read that
@@ -35,7 +36,9 @@ export async function searchTradeableContracts(
   const brokerPattern = normalizeBrokerSearchPattern(pattern, assetClass)
   if (!brokerPattern) return []
 
-  const targets = manager.resolve()
+  const targets = source
+    ? manager.resolve(source)
+    : manager.resolve().filter((uta) => uta.asVendor !== false)
   if (targets.length === 0) return []
 
   const hits: ContractSearchHit[] = []
