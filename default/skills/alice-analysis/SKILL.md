@@ -3,13 +3,15 @@ name: alice-analysis
 description: >
   How to use OpenAlice's `alice analysis` tools over K-lines keyed by barId:
   source discovery (`search-bars`), order-flow approximation (`delta-volume`,
-  `volume-profile`), and Quant Calculator (v2) scripts. Use whenever the task is
-  technical/quantitative on price data: "RSI on BTC", "is AAPL above its
-  200-day", "50/200 golden cross check", "multi-timeframe momentum", "delta/CVD",
-  "volume profile", "where is POC/value area", "how extended is X (z-score)",
-  "does this track the sector (correlation)", "trend strength", "compare
-  1h/4h/12h at once". Start with `alice analysis search-bars` to find a barId,
-  then choose `quant`, `delta-volume`, or `volume-profile`.
+  `volume-profile`), price action (`price-action`), and Quant Calculator (v2)
+  scripts. Use whenever the task is technical/quantitative on price data:
+  "RSI on BTC", "is AAPL above its 200-day", "50/200 golden cross check",
+  "multi-timeframe momentum", "delta/CVD", "volume profile", "where is
+  POC/value area", "FVG/iFVG", "order blocks", "BOS/CHoCH", "market structure",
+  "how extended is X (z-score)", "does this track the sector (correlation)", "trend
+  strength", "compare 1h/4h/12h at once". Start with
+  `alice analysis search-bars` to find a barId, then choose `quant`,
+  `delta-volume`, `volume-profile`, or `price-action`.
 ---
 
 # `alice analysis` — Quant Calculator (v2)
@@ -25,6 +27,7 @@ the question.
 | Find K-line sources | `alice analysis search-bars` | Return broker/vendor `barId` candidates and freshness labels |
 | Order flow / Delta / CVD | `alice analysis delta-volume` | Estimate buying/selling pressure from lower-timeframe intrabars |
 | Volume Profile | `alice analysis volume-profile` | Find POC, Value Area, and high/low-volume price zones |
+| Price Action / ICT / SMC | `alice analysis price-action` | Detect FVG, inverse FVG, order blocks, BOS, CHoCH, and market structure |
 | Technical indicators / custom panels | `alice analysis quant` | RSI, MACD, moving averages, correlations, z-score, batches |
 
 ## The loop
@@ -35,11 +38,12 @@ alice analysis search-bars --query AAPL
 alice analysis quant --script $'s = bars("alpaca-paper|AAPL", "1d", count=250)\nsma(s.close, 50)'
 ```
 
-For order flow:
+For specialized analysis:
 
 ```bash
 alice analysis delta-volume --barId tradingview\|AAPL --assetClass equity --interval 15m --count 100
 alice analysis volume-profile --barId tradingview\|AAPL --assetClass equity --interval 1h --count 120 --bins 32
+alice analysis price-action --barId tradingview\|AAPL --assetClass equity --interval 15m --count 200
 ```
 
 ## Choosing a source
@@ -127,6 +131,67 @@ Examples:
 - `1d` target * 100 bars usually uses `1h` intrabars.
 - `1h` target * 100 bars may fall back from `1m` to `3m`.
 - `15m` target * 100 bars usually uses `1m` intrabars.
+
+## Price Action Verb
+
+Use `alice analysis price-action` when the question is about ICT/SMC-style
+structure rather than indicators: Fair Value Gaps, inverse FVGs, trend
+continuation/reversal breaks, liquidity zones, or whether current price is near
+an imbalance.
+
+It detects:
+
+- **FVG / VI / OG:** standard three-candle Fair Value Gaps,
+  Volume Imbalance body gaps, and Opening Gaps. Use `gapMode` to pick
+  `FVG`, `VI`, `OG`, or `all`; use `fvgMitigationSource` as `close` or `wick`.
+  The result includes both `formationIndex` and `confirmationIndex`; by default
+  the confirmation candle gets lower-timeframe intrabar delta confirmation when
+  available.
+- **iFVG (Inverse FVG):** an FVG that is filled and then acts as a reversal
+  support/resistance zone. By default the reversal candle gets lower-timeframe
+  intrabar delta confirmation when available.
+- **OB (Order Block):** volumetric order block: after a
+  BOS/CHoCH, locate the extreme candle between the broken swing and breakout,
+  derive a zone, and mark it mitigated when price closes through the configured
+  boundary. By default the tool also tries to attach lower-timeframe intrabar
+  delta confirmation for the OB anchor candle and breakout candle, including
+  delta ratio, coverage, confidence, and whether the delta direction agrees
+  with the OB direction. When anchor intrabars are available, it also estimates
+  `internalBuyVolume` / `internalSellVolume` and their percentages from the
+  anchor candle's intrabar delta. Overlapping OBs are hidden by default using
+  Pine-style overlap filtering.
+- **BOS (Break of Structure):** continuation break of the active structure.
+- **CHoCH (Change of Character):** reversal break that flips the
+  active structure state.
+- **CHoCH+:** CHoCH with stronger opposing swing context. The tool reports it
+  via `isPlus: true`.
+
+Key inputs:
+
+- `barId`: required. Use `search-bars` first.
+- `assetClass`: required for vendor barIds.
+- `interval`: analysis interval, such as `15m`, `1h`, `4h`, `1d`.
+- `count` or `start`/`end`: requested window.
+- `gapMode`, `fvgMitigationSource`, `gapVolumeConfirmation`, `minGapSize`,
+  `minBodyRatio`: gap type, mitigation, volume confirmation, and noise filters
+  for FVG/VI/OG detection.
+- `maxFVGs`, `maxIFVGs`, `includeFilled`, `proximityPct`: result filters.
+- `maxIFVGLookAheadBars`, `ifvgVolumeConfirmation`, `minImpulseRatio`,
+  `minEngulfingStrength`: iFVG confirmation filters.
+- `maxOrderBlocks`, `includeMitigatedOrderBlocks`, `orderBlockTrigger`,
+  `orderBlockPosition`, `orderBlockMitigation`, `hideOverlappingOrderBlocks`,
+  `orderBlockOverlapMethod`, `orderBlockVolumeConfirmation`: OB result, zone,
+  mitigation, Pine-style overlap, and intrabar delta confirmation controls.
+- `internalLookback`, `swingLookback`, `externalLookback`: swing lengths.
+  Defaults are `5`, `20`, and `50`.
+
+Returns ranked FVG/VI/OG/iFVG zones, OB zones with mitigation status, intrabar
+delta confirmation and OB internal buy/sell activity when available, swing
+points, BOS/CHoCH breaks, and `stateByLevel` for current
+internal/swing/external structure.
+Volume confirmation is approximate lower-timeframe bar delta, not tick/order-book
+data; check `coverage` and `confidence` before treating it as reliable. For FVG
+it is an auxiliary quality signal, not part of the gap definition.
 
 ## Language
 
