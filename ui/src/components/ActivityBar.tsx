@@ -1,5 +1,5 @@
 import { type LucideIcon, MessageSquare, Inbox, Telescope, LineChart, GitBranch, BarChart3, Newspaper, Zap, Settings, Code2, TerminalSquare, ChevronDown, Info, ListChecks, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { type Page } from '../App'
 import { useWorkspace } from '../tabs/store'
 import type { ActivitySection, ViewSpec } from '../tabs/types'
@@ -129,6 +129,20 @@ const NAV_SECTIONS: NavSection[] = [
   },
 ]
 
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia(query).matches : false,
+  )
+  useEffect(() => {
+    const mq = window.matchMedia(query)
+    const handler = () => setMatches(mq.matches)
+    setMatches(mq.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [query])
+  return matches
+}
+
 // ==================== ActivityBar ====================
 
 /**
@@ -162,6 +176,8 @@ export function ActivityBar({
   const railCollapsed = useActivityBarCollapse((s) => s.railCollapsed)
   const setRailCollapsed = useActivityBarCollapse((s) => s.setRailCollapsed)
   const compactRail = desktopStatic && (compactRailForced || railCollapsed)
+  const shortRailHeight = useMediaQuery('(max-height: 700px)')
+  const denseRail = compactRail && shortRailHeight
 
   return (
     <>
@@ -187,18 +203,18 @@ export function ActivityBar({
       >
         {/* Branding — h-10 to line up with the Sidebar header + TabStrip
             (all three top surfaces share the 40px header rhythm). */}
-        <div className={`h-10 mb-2 flex items-center shrink-0 ${compactRail ? 'pl-[22px] pr-4 gap-2.5 md:gap-0 md:pr-0' : 'pl-[22px] pr-4 gap-2.5'}`}>
+        <div className={`${denseRail ? 'h-10 mb-2 md:h-7 md:mb-0.5' : 'h-10 mb-2'} flex items-center shrink-0 ${compactRail ? 'pl-[22px] pr-4 gap-2.5 md:gap-0 md:pr-0' : 'pl-[22px] pr-4 gap-2.5'}`}>
           <img
             src="/alice.ico"
             alt="Alice"
-            className="w-6 h-6 shrink-0 rounded-full ring-1 ring-border shadow-[0_0_14px_var(--color-accent-dim)]"
+            className={`${denseRail ? 'w-6 h-6 md:w-5 md:h-5' : 'w-6 h-6'} shrink-0 rounded-full ring-1 ring-border shadow-[0_0_14px_var(--color-accent-dim)]`}
             draggable={false}
           />
           <h1 className={`min-w-0 flex-1 truncate text-[15px] font-semibold text-text ${compactRail ? 'md:hidden' : ''}`}>OpenAlice</h1>
         </div>
 
         {/* Navigation */}
-        <nav className={`flex-1 flex flex-col overflow-x-hidden overflow-y-auto pb-3 ${compactRail ? 'px-3 md:items-start' : 'px-3'}`}>
+        <nav className={`flex-1 flex flex-col overflow-x-hidden overflow-y-auto ${denseRail ? 'pb-3 md:pb-0.5' : 'pb-3'} ${compactRail ? 'px-3 md:items-start' : 'px-3'}`}>
           {NAV_SECTIONS.map((section, si) => {
             const labeled = section.sectionLabel.length > 0
             // User toggle wins over default. The collapse store stores
@@ -215,11 +231,11 @@ export function ActivityBar({
                 key={si}
                 className={
                   compactRail && si > 0
-                    ? 'mt-3 border-t border-border/70 pt-3 md:w-11'
+                    ? `${denseRail ? 'mt-3 pt-3 md:mt-0.5 md:pt-0.5 md:w-8' : 'mt-3 pt-3 md:w-11'} border-t border-border/70`
                     : si > 0
                       ? 'mt-4'
                       : compactRail
-                        ? 'md:w-11'
+                        ? denseRail ? 'md:w-8' : 'md:w-11'
                         : ''
                 }
               >
@@ -238,7 +254,7 @@ export function ActivityBar({
                   />
                 )}
                 {showItems && (
-                  <div className="flex flex-col gap-1" id={`activity-section-${si}`}>
+                  <div className={`flex flex-col ${denseRail ? 'gap-1 md:gap-px' : 'gap-1'}`} id={`activity-section-${si}`}>
                     {section.items.map((item) => {
                       const sec = activitySectionFor(item.page)
                       const isActive = selectedSidebar === sec
@@ -256,7 +272,9 @@ export function ActivityBar({
                           title={t(item.labelKey)}
                           className={`relative flex min-h-[34px] items-center rounded-md text-[13px] transition-colors text-left ${
                             compactRail
-                              ? 'md:h-9 md:w-11 md:min-h-9 md:justify-center md:gap-0 md:px-0 md:py-0'
+                              ? denseRail
+                                ? 'md:h-[26px] md:w-8 md:min-h-[26px] md:justify-center md:gap-0 md:px-0 md:py-0'
+                                : 'md:h-9 md:w-11 md:min-h-9 md:justify-center md:gap-0 md:px-0 md:py-0'
                               : 'gap-3 px-3 py-1.5'
                           } ${
                             isActive
@@ -266,13 +284,13 @@ export function ActivityBar({
                         >
                           {/* Active indicator — left vertical bar */}
                           <span
-                            className={`absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r-full bg-accent transition-opacity duration-150 ${
+                            className={`absolute left-0 ${denseRail ? 'top-1.5 bottom-1.5 md:top-0.5 md:bottom-0.5' : 'top-1.5 bottom-1.5'} w-[2px] rounded-r-full bg-accent transition-opacity duration-150 ${
                               isActive ? 'opacity-100' : 'opacity-0'
                             }`}
                             aria-hidden
                           />
-                          <span className="relative flex items-center justify-center w-5 h-5 shrink-0">
-                            <Icon size={16} strokeWidth={1.75} />
+                          <span className={`relative flex items-center justify-center w-5 h-5 shrink-0 ${denseRail ? 'md:w-3.5 md:h-3.5' : ''}`}>
+                            <Icon size={denseRail ? 14 : 16} strokeWidth={1.75} />
                           </span>
                           <span className={`flex-1 truncate ${compactRail ? 'md:hidden' : ''}`}>{t(item.labelKey)}</span>
                           {item.page === 'inbox' && unreadInbox > 0 && (
@@ -306,19 +324,19 @@ export function ActivityBar({
         </nav>
 
         {/* Footer — global icon controls pinned to the bottom of the rail. */}
-        <div className={`shrink-0 px-4 flex items-center ${compactRail ? 'py-2 md:flex-col md:items-start md:px-4 md:gap-1' : 'border-t border-border py-1.5 justify-between gap-2'}`}>
-          <ThemeToggle />
+        <div className={`shrink-0 px-4 flex items-center ${compactRail ? `${denseRail ? 'py-2 md:py-0.5 md:gap-px' : 'py-2 md:gap-1'} md:flex-col md:items-start md:px-4` : 'border-t border-border py-1.5 justify-between gap-2'}`}>
+          <ThemeToggle compact={denseRail} />
           {!compactRailForced && (
             <button
               type="button"
               onClick={() => setRailCollapsed(!railCollapsed)}
               title={t(railCollapsed ? 'nav.expandRail' : 'nav.collapseRail')}
               aria-label={t(railCollapsed ? 'nav.expandRail' : 'nav.collapseRail')}
-              className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-overlay hover:text-text md:flex"
+              className={`hidden ${denseRail ? 'h-9 w-9 md:h-[26px] md:w-[26px]' : 'h-9 w-9'} shrink-0 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-overlay hover:text-text md:flex`}
             >
               {railCollapsed
-                ? <PanelLeftOpen size={17} strokeWidth={1.75} aria-hidden />
-                : <PanelLeftClose size={17} strokeWidth={1.75} aria-hidden />}
+                ? <PanelLeftOpen size={denseRail ? 14 : 17} strokeWidth={1.75} aria-hidden />
+                : <PanelLeftClose size={denseRail ? 14 : 17} strokeWidth={1.75} aria-hidden />}
             </button>
           )}
         </div>
