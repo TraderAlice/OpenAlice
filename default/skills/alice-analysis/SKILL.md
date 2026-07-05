@@ -1,25 +1,31 @@
 ---
 name: alice-analysis
 description: >
-  How to compute technical analysis with OpenAlice's Quant Calculator (v2) via
-  `alice analysis` — a small Python/pandas-subset scripting language over
-  K-lines, keyed by barId so you compute on a SPECIFIC source — prefer a
-  broker's bars (matches what you trade, realtime) over a free vendor like
-  yfinance (delayed fallback) — and can batch many
-  timeframes/symbols/indicators in ONE call. Use whenever the task is
+  How to use OpenAlice's `alice analysis` tools over K-lines keyed by barId:
+  source discovery (`search-bars`), order-flow approximation (`delta-volume`,
+  `volume-profile`), and Quant Calculator (v2) scripts. Use whenever the task is
   technical/quantitative on price data: "RSI on BTC", "is AAPL above its
-  200-day", "50/200 golden cross check", "multi-timeframe momentum", "how
-  extended is X (z-score)", "does this track the sector (correlation)", "trend
-  strength", "compare 1h/4h/12h at once". Reach it with
-  `alice analysis search-bars` (find a barId) then `alice analysis quant`
-  (compute).
+  200-day", "50/200 golden cross check", "multi-timeframe momentum", "delta/CVD",
+  "volume profile", "where is POC/value area", "how extended is X (z-score)",
+  "does this track the sector (correlation)", "trend strength", "compare
+  1h/4h/12h at once". Start with `alice analysis search-bars` to find a barId,
+  then choose `quant`, `delta-volume`, or `volume-profile`.
 ---
 
 # `alice analysis` — Quant Calculator (v2)
 
-A bounded, side-effect-free expression language for technical analysis. You write
-a short script; it fetches K-lines by **barId** and returns a value (or a panel
-of values). Get barIds from `alice analysis search-bars` first.
+OpenAlice's analysis commands operate on K-lines by **barId**. Get barIds from
+`alice analysis search-bars` first, then choose the analysis verb that matches
+the question.
+
+## Quick Index
+
+| Need | Command | Use when |
+|---|---|---|
+| Find K-line sources | `alice analysis search-bars` | Return broker/vendor `barId` candidates and freshness labels |
+| Order flow / Delta / CVD | `alice analysis delta-volume` | Estimate buying/selling pressure from lower-timeframe intrabars |
+| Volume Profile | `alice analysis volume-profile` | Find POC, Value Area, and high/low-volume price zones |
+| Technical indicators / custom panels | `alice analysis quant` | RSI, MACD, moving averages, correlations, z-score, batches |
 
 ## The loop
 
@@ -27,6 +33,13 @@ of values). Get barIds from `alice analysis search-bars` first.
 alice analysis search-bars --query AAPL
 # Pick a broker barId if one came back (realtime, matches your fills); fall back to a vendor only if not.
 alice analysis quant --script $'s = bars("alpaca-paper|AAPL", "1d", count=250)\nsma(s.close, 50)'
+```
+
+For order flow:
+
+```bash
+alice analysis delta-volume --barId tradingview\|AAPL --assetClass equity --interval 15m --count 100
+alice analysis volume-profile --barId tradingview\|AAPL --assetClass equity --interval 1h --count 120 --bins 32
 ```
 
 ## Choosing a source
@@ -51,9 +64,75 @@ come back empty just because its vendor is off — `alice market vendors` to see
 what's available, `alice market vendor-set --vendor twse --enabled true` to add
 it (live immediately), then re-run search-bars. See the `alice` skill.
 
+TradingView is the broad free fallback for global intraday bars when enabled:
+`tradingview|NASDAQ:AAPL`, `tradingview|HKEX:0700`, `tradingview|SZSE:300820`,
+`tradingview|BINANCE:BTCUSDT`, `tradingview|FX:EURUSD`. Treat its freshness as
+exchange-dependent and conservatively delayed unless verified; timestamps are
+UTC.
+
+## Order Flow Verbs
+
+Use these when the question is about buying/selling pressure, CVD, volume
+concentration, POC, Value Area, support/resistance from volume, or whether a
+move had participation behind it. They are approximation tools built from OHLCV
+intrabars, not true tick/order-book data.
+
+### `alice analysis delta-volume`
+
+Estimates Delta Volume and Cumulative Delta (CVD). Each lower-timeframe intrabar
+is classified by candle direction, its volume is signed, then intrabars are
+aggregated into each target bar.
+
+Key inputs:
+
+- `barId`: required. Use `search-bars` first.
+- `assetClass`: required for vendor barIds, such as `equity`, `crypto`, or
+  `currency`.
+- `interval`: target bar interval: `15m`, `30m`, `1h`, `4h`, `1d`, `1w`.
+- `count` or `start`/`end`: requested window.
+
+Returns per-bar `delta`, `cvd`, `deltaRatio`, `coverage`, and a confidence flag.
+Low coverage means the lower-timeframe bars did not cover enough of the target
+bar's volume; treat the result as weak evidence.
+
+### `alice analysis volume-profile`
+
+Builds a Volume Profile histogram from lower-timeframe intrabars inside the
+requested target window.
+
+Key inputs:
+
+- `barId`, `assetClass`, `interval`, `count`, `start`, `end`: same source/window
+  pattern as `delta-volume`.
+- `bins`: optional price-bin count. Higher is more granular; lower is more
+  stable.
+
+Returns price bins with volume, POC (Point of Control), Value Area high/low, and
+metadata about the intrabar sample used.
+
+### Intrabar selection is automatic
+
+Do **not** pass an `intrabarInterval`. The tool chooses it.
+
+- It picks the finest intrabar interval that keeps
+  `requested_count * intrabars_per_parent <= 5000`.
+- TradingView can use internal `3m` intrabars between `1m` and `5m`.
+- If the finest interval would exceed the cap, the tool falls back to coarser
+  intrabars or reduces `count`.
+- The response `meta` reports `intrabarInterval`, `intrabarTimeframe`,
+  `requestedCount`, `actualCount`, `truncated`, and `degradationReason`.
+
+Examples:
+
+- `1d` target * 100 bars usually uses `1h` intrabars.
+- `1h` target * 100 bars may fall back from `1m` to `3m`.
+- `15m` target * 100 bars usually uses `1m` intrabars.
+
 ## Language
 
-A script is zero or more `name = ...` bindings, then a final result expression:
+`quant` is a bounded, side-effect-free expression language for technical
+analysis. A script is zero or more `name = ...` bindings, then a final result
+expression:
 
 ```python
 s = bars("alpaca-paper|AAPL", "1d", count=250)
