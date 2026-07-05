@@ -25,6 +25,7 @@ import {
   ALPACA_PRESET,
   IBKR_PRESET,
   LONGBRIDGE_PRESET,
+  SCHWAB_PRESET,
   CCXT_CUSTOM_PRESET,
   SIMULATOR_PRESET,
   BUILTIN_BROKER_PRESETS,
@@ -43,6 +44,7 @@ const SAMPLE_CONFIGS: Record<string, Record<string, unknown>> = {
   alpaca:          { mode: 'paper', apiKey: 'k', apiSecret: 's' },
   'ibkr-tws':      { host: '127.0.0.1', port: 7497, clientId: 0 },
   longbridge:      { mode: 'live', appKey: 'k', appSecret: 's', accessToken: 't' },
+  schwab:          { clientId: 'cid', clientSecret: 'secret', refreshToken: 'refresh' },
   'ccxt-custom':   { exchange: 'kucoin', apiKey: 'k', secret: 's' },
   'leverup-monad': {
     mode: 'testnet',
@@ -156,6 +158,16 @@ describe('preset → engine config translation', () => {
     expect(cfg.paper).toBe(false)
   })
 
+  it('Schwab passes OAuth fields straight through to the engine', () => {
+    const cfg = SCHWAB_PRESET.toEngineConfig({ clientId: 'cid', clientSecret: 'secret', refreshToken: 'refresh', accountNumber: '1234' })
+    expect(cfg).toMatchObject({
+      clientId: 'cid',
+      clientSecret: 'secret',
+      refreshToken: 'refresh',
+      accountNumber: '1234',
+    })
+  })
+
   it('IBKR passes host/port/clientId straight through', () => {
     const cfg = IBKR_PRESET.toEngineConfig({ host: '10.0.0.5', port: 7496, clientId: 7 })
     expect(cfg).toMatchObject({ host: '10.0.0.5', port: 7496, clientId: 7 })
@@ -233,6 +245,13 @@ describe('BUILTIN_BROKER_PRESETS', () => {
     expect(props.apiKey.writeOnly).toBe(true)
     expect(props.secret.writeOnly).toBe(true)
     expect(props.password.writeOnly).toBe(true)
+  })
+
+  it('Schwab marks secret fields writeOnly', () => {
+    const schwab = BUILTIN_BROKER_PRESETS.find(p => p.id === 'schwab')!
+    const props = (schwab.schema as { properties: Record<string, { writeOnly?: boolean }> }).properties
+    expect(props.clientSecret.writeOnly).toBe(true)
+    expect(props.refreshToken.writeOnly).toBe(true)
   })
 })
 
