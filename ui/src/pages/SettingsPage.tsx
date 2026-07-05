@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { api, type AppConfig } from '../api'
 import type { ToolInfo } from '../api/tools'
 import { Toggle } from '../components/Toggle'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import { SaveIndicator } from '../components/SaveIndicator'
 import { ConfigSection, Field, inputClass } from '../components/form'
 import { useAutoSave } from '../hooks/useAutoSave'
@@ -9,6 +10,32 @@ import { PageHeader } from '../components/PageHeader'
 import { PageLoading, EmptyState } from '../components/StateViews'
 import { useTranslation } from 'react-i18next'
 import { useLocale, useSetLocale, LOCALE_LABELS } from '../i18n/useLocale'
+import { useEditorTabsPref } from '../live/editor-tabs-pref'
+
+// ==================== Appearance ====================
+
+function AppearanceSection() {
+  const { t } = useTranslation()
+  const showEditorTabs = useEditorTabsPref((s) => s.showEditorTabs)
+  const setShowEditorTabs = useEditorTabsPref((s) => s.setShowEditorTabs)
+  return (
+    <ConfigSection title={t('settings.appearance.title')} description={t('settings.appearance.description')}>
+      <div className="flex items-center justify-between gap-4 py-1">
+        <div className="flex-1">
+          <span className="text-sm font-medium text-text">
+            {t('settings.appearance.showEditorTabs')}
+          </span>
+          <p className="text-[12px] text-text-muted mt-0.5 leading-relaxed">
+            {showEditorTabs
+              ? t('settings.appearance.showEditorTabsOn')
+              : t('settings.appearance.showEditorTabsOff')}
+          </p>
+        </div>
+        <Toggle checked={showEditorTabs} onChange={setShowEditorTabs} />
+      </div>
+    </ConfigSection>
+  )
+}
 
 // ==================== Language ====================
 
@@ -38,6 +65,70 @@ function LanguageSection() {
   )
 }
 
+// ==================== AI Trading Toggle ====================
+
+/**
+ * Master switch for AI-initiated trade execution (issue #95). OFF by default;
+ * enabling it requires a deliberate danger-confirm (turning it OFF is
+ * immediate). While ON, a persistent red banner keeps the risk visible.
+ */
+function AiTradingToggle({
+  config,
+  setConfig,
+}: {
+  config: AppConfig
+  setConfig: React.Dispatch<React.SetStateAction<AppConfig | null>>
+}) {
+  const { t } = useTranslation()
+  const [confirming, setConfirming] = useState(false)
+  const enabled = config.agent?.allowAiTrading || false
+
+  const persist = useCallback(async (v: boolean) => {
+    await api.config.updateSection('agent', { ...config.agent, allowAiTrading: v })
+    setConfig((c) => (c ? { ...c, agent: { ...c.agent, allowAiTrading: v } } : c))
+  }, [config.agent, setConfig])
+
+  const onToggle = (v: boolean) => {
+    if (v) {
+      setConfirming(true) // enabling is dangerous → confirm first, persist on confirm
+    } else {
+      void persist(false).catch(() => { /* toggle stays on if the write fails */ })
+    }
+  }
+
+  return (
+    <>
+      <div className="flex items-center justify-between gap-4 py-1">
+        <div className="flex-1">
+          <span className="text-sm font-medium text-text">{t('settings.agent.allowAiTrading')}</span>
+          <p className="text-[12px] text-text-muted mt-0.5 leading-relaxed">
+            {enabled ? t('settings.agent.allowAiTradingOn') : t('settings.agent.allowAiTradingOff')}
+          </p>
+        </div>
+        <Toggle checked={enabled} onChange={onToggle} />
+      </div>
+      {enabled && (
+        <div className="mt-2 rounded-md border border-red/30 bg-red/5 px-3 py-2 text-[12px] text-red leading-relaxed">
+          ⚠ {t('settings.agent.allowAiTradingWarning')}
+        </div>
+      )}
+      {confirming && (
+        <ConfirmDialog
+          title={t('settings.agent.allowAiTradingConfirmTitle')}
+          message={t('settings.agent.allowAiTradingConfirmBody')}
+          confirmLabel={t('settings.agent.allowAiTradingConfirmCta')}
+          variant="danger"
+          onConfirm={async () => {
+            try { await persist(true) } catch { /* stays off — write failed */ }
+            setConfirming(false)
+          }}
+          onClose={() => setConfirming(false)}
+        />
+      )}
+    </>
+  )
+}
+
 // ==================== Settings Section ====================
 
 function SettingsSection() {
@@ -53,34 +144,15 @@ function SettingsSection() {
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-[880px] mx-auto">
+        {/* Appearance */}
+        <AppearanceSection />
+
         {/* Language */}
         <LanguageSection />
 
         {/* Agent */}
         <ConfigSection title={t('settings.agent.title')} description={t('settings.agent.description')}>
-          <div className="flex items-center justify-between gap-4 py-1">
-            <div className="flex-1">
-              <span className="text-sm font-medium text-text">
-                {t('settings.agent.evolutionMode')}
-              </span>
-              <p className="text-[12px] text-text-muted mt-0.5 leading-relaxed">
-                {config.agent?.evolutionMode
-                  ? t('settings.agent.evolutionOn')
-                  : t('settings.agent.evolutionOff')}
-              </p>
-            </div>
-            <Toggle
-              checked={config.agent?.evolutionMode || false}
-              onChange={async (v) => {
-                try {
-                  await api.config.updateSection('agent', { ...config.agent, evolutionMode: v })
-                  setConfig((c) => c ? { ...c, agent: { ...c.agent, evolutionMode: v } } : c)
-                } catch {
-                  // Toggle doesn't flip on failure
-                }
-              }}
-            />
-          </div>
+          <AiTradingToggle config={config} setConfig={setConfig} />
         </ConfigSection>
 
         {/* Persona */}

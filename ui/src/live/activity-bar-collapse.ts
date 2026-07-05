@@ -1,5 +1,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { reloadOnHotUpdate } from '../lib/hmr'
+
+reloadOnHotUpdate('live/activity-bar-collapse')
 
 /**
  * Per-section collapse state for the ActivityBar.
@@ -15,14 +18,14 @@ import { persist } from 'zustand/middleware'
  * model can't represent "user explicitly expanded a default-collapsed
  * section".
  *
- * Persists to localStorage so the user's preference survives reloads.
- * Mirrors the `useInboxRead` shape — explicit user actions are stored;
- * key only gets pruned when the user-toggled-state matches the default
- * (avoids the store growing forever).
+ * Persists to localStorage so the user's preference survives reloads. A key
+ * only gets pruned when the user-toggled-state matches the default (avoids the
+ * store growing forever).
  */
 
 interface ActivityBarCollapseState {
   collapsedSections: Record<string, boolean>
+  railCollapsed: boolean
 }
 
 interface ActivityBarCollapseActions {
@@ -30,12 +33,14 @@ interface ActivityBarCollapseActions {
    *  `defaultCollapsed` so the store can prune the key when the user's
    *  preference now matches the default — keeps localStorage tight. */
   setCollapsed: (name: string, collapsed: boolean, defaultCollapsed?: boolean) => void
+  setRailCollapsed: (collapsed: boolean) => void
 }
 
 export const useActivityBarCollapse = create<ActivityBarCollapseState & ActivityBarCollapseActions>()(
   persist(
     (set) => ({
       collapsedSections: {},
+      railCollapsed: false,
       setCollapsed: (name, collapsed, defaultCollapsed) =>
         set((s) => {
           const next = { ...s.collapsedSections }
@@ -46,7 +51,8 @@ export const useActivityBarCollapse = create<ActivityBarCollapseState & Activity
           }
           return { collapsedSections: next }
         }),
+      setRailCollapsed: (collapsed) => set({ railCollapsed: collapsed }),
     }),
-    { name: 'openalice.activitybar-sections.v1', version: 1 },
+    { name: 'openalice.activitybar-sections.v1', version: 2 },
   ),
 )

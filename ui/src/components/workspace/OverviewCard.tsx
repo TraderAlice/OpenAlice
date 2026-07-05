@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { formatRelativeTime } from '../../lib/intl'
 import { ArrowUpCircle, Bot, ChevronRight, Code, Cpu, GitBranch, ScrollText, Settings, Sparkles, Terminal, type LucideIcon } from 'lucide-react'
 import type { GitLogEntry, Workspace } from './api'
+import { workspaceDisplayName, workspaceDisplayTitle } from './display'
 
 /**
  * Single-workspace card for the Workspaces Overview dashboard. Variant B
@@ -54,6 +55,7 @@ export function OverviewCard({
   onOpenTemplate,
 }: Props) {
   const w = workspace
+  const label = workspaceDisplayName(w)
   const hasRunning = w.sessions.some((s) => s.state === 'running')
 
   const lastActivityMs = useMemo(() => {
@@ -88,11 +90,11 @@ export function OverviewCard({
           aria-hidden="true"
         />
         <div className="flex-1 min-w-0">
-          <h3 className="text-[14px] font-semibold text-text truncate" title={w.tag}>
-            {w.tag}
+          <h3 className="text-[14px] font-semibold text-text truncate" title={workspaceDisplayTitle(w)}>
+            {label}
           </h3>
-          <p className="text-[11px] text-text-muted">
-            Active {formatRelativeTime(lastActivityMs)}
+          <p className="text-[11px] text-text-muted truncate" title={w.description}>
+            {w.description?.trim() || `Active ${formatRelativeTime(lastActivityMs)}`}
           </p>
         </div>
         {w.upgradeAvailable && w.template && (

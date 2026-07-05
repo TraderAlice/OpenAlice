@@ -77,12 +77,23 @@ export class UTAManagerSDK {
   }
 
   /** Async equivalent of `UTAManager.resolve(source?)`. Filters by id or
-   *  provider prefix when `source` is given. */
-  async resolve(source?: string): Promise<UTAAccountSDK[]> {
+   *  provider prefix when `source` is given.
+   *
+   *  `tradingOnly` (used by the user-portfolio aggregations — account /
+   *  portfolio / orders) drops keyless **'data'-tier** sources
+   *  (binance-readonly, okx-readonly, bybit-readonly) from the no-source
+   *  aggregate: they hold no user positions or orders, so including them only
+   *  adds failure surface — a region-blocked public-data source must not blank
+   *  the whole portfolio (issue #390). An explicit `source` still resolves a
+   *  data-tier account (you can query it directly). */
+  async resolve(source?: string, opts?: { tradingOnly?: boolean }): Promise<UTAAccountSDK[]> {
     const all = await this.listUTAs()
-    const matches = source
+    let matches = source
       ? all.filter((u) => u.id === source || u.id.startsWith(`${source}-`))
       : all
+    if (!source && opts?.tradingOnly) {
+      matches = matches.filter((u) => u.health.tier !== 'data')
+    }
     return matches.map((u) => new UTAAccountSDK({ client: this.client, id: u.id, label: u.label }))
   }
 
@@ -106,6 +117,19 @@ export class UTAManagerSDK {
   async has(id: string): Promise<boolean> {
     const all = await this.listUTAs()
     return all.some((u) => u.id === id)
+  }
+
+  /** sourceId → declared historical-bar quality, for the federated bar layer to
+   *  report each broker's honest entitlement (Alpaca free = 'iex', CCXT =
+   *  'realtime') rather than blanket-labeling broker sources 'realtime'. */
+  async getBarCapabilities(): Promise<Record<string, 'realtime' | 'iex' | 'delayed' | 'subscription'>> {
+    const all = await this.listUTAs()
+    const out: Record<string, 'realtime' | 'iex' | 'delayed' | 'subscription'> = {}
+    for (const u of all) {
+      const q = u.capabilities.historicalBars?.quality
+      if (q) out[u.id] = q
+    }
+    return out
   }
 
   /** UTAManager exposed `size` as a sync getter — SDK can't avoid the

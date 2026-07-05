@@ -21,6 +21,11 @@ together."
 
 ## Procedure (don't answer from memory — go to the data)
 
+The data is on your CLIs: `traderhub board` / `traderhub etf` for sector & theme
+performance, `alice analysis quant` for momentum across timeframes and breadth,
+`alice rss grep` for the news narrative. (See the `traderhub`, `alice-analysis`
+skills.)
+
 1. **Rank the field across timeframes.** Look at sector/theme performance and
    momentum over long, medium, and short windows. The signal isn't any single
    window — it's how they line up:
@@ -41,7 +46,7 @@ together."
    rotation that contradicts the regime is either early (valuable) or wrong.
 5. **Hand off the standouts.** For each surging/crashing sector worth a look,
    give a one-line read and the next move — usually "decompose this one"
-   (a value-chain scan) to find the names carrying the move.
+   (the `scan-value-chain` skill) to find the names carrying the move.
 
 ## Output — persist a dated snapshot
 

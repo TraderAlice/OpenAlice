@@ -4,9 +4,13 @@
  * (no real spawn). Modeled on trading-config.spec's harness.
  */
 import { describe, expect, it, vi } from 'vitest';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { createWorkspaceRoutes } from './workspaces.js';
 import { HeadlessCapacityError, type WorkspaceService } from '../../workspaces/service.js';
+import { readWorkspaceMetadata } from '../../workspaces/workspace-metadata.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -41,6 +45,10 @@ function build(
     config: { launcherRepoRoot: '/repo' },
     runHeadlessTask,
     dispatchHeadlessTask,
+    publicMeta: vi.fn(async (m: any) => {
+      const res = await readWorkspaceMetadata(m.dir);
+      return { ...m, ...(res.ok ? res.metadata : {}) };
+    }),
   } as unknown as WorkspaceService;
   return { app: createWorkspaceRoutes(svc), runHeadlessTask, dispatchHeadlessTask };
 }
@@ -54,6 +62,54 @@ async function post(app: any, path: string, body?: unknown) {
   const json = res.status === 204 ? null : await res.json().catch(() => null);
   return { status: res.status, body: json as any };
 }
+
+async function patch(app: any, path: string, body?: unknown) {
+  const res = await app.request(path, {
+    method: 'PATCH',
+    headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  const json = await res.json().catch(() => null);
+  return { status: res.status, body: json as any };
+}
+
+describe('PATCH /:id/metadata', () => {
+  it('writes workspace-owned display metadata without changing launcher identity', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'workspace-route-meta-'));
+    try {
+      const meta = { id: 'ws-1', tag: 'aapl-q1', dir, agents: ['claude'] };
+      const { app } = build({ meta });
+
+      const r = await patch(app, '/ws-1/metadata', { displayName: 'AAPL earnings review' });
+      expect(r.status).toBe(200);
+      expect(r.body.workspace).toMatchObject({
+        id: 'ws-1',
+        tag: 'aapl-q1',
+        displayName: 'AAPL earnings review',
+      });
+
+      const readBack = await readWorkspaceMetadata(dir);
+      expect(readBack).toEqual({ ok: true, metadata: { displayName: 'AAPL earnings review' } });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('ignores attempts to smuggle registry fields into workspace metadata', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'workspace-route-meta-'));
+    try {
+      const { app } = build({ meta: { id: 'ws-1', tag: 'stable-tag', dir, agents: ['claude'] } });
+      const r = await patch(app, '/ws-1/metadata', { displayName: 'Nice label', id: 'different' });
+
+      expect(r.status).toBe(200);
+      expect(r.body.workspace.id).toBe('ws-1');
+      expect(r.body.workspace.tag).toBe('stable-tag');
+      expect(r.body.workspace.displayName).toBe('Nice label');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
 
 describe('POST /:id/headless', () => {
   it('404 on a malformed workspace id', async () => {
@@ -134,5 +190,63 @@ describe('POST /:id/headless', () => {
     const r = await post(app, '/ws-1/headless', { prompt: 'x' });
     expect(r.status).toBe(429);
     expect(r.body.error).toBe('capacity');
+  });
+});
+
+describe('POST /:id/sessions/:sid/resume — concurrent coalescing (ANG-120)', () => {
+  const TOKEN = 'claude-calm-amber-river';
+
+  function buildResume() {
+    const session = {
+      recordId: TOKEN,
+      wsId: 'ws-1',
+      name: 'c1',
+      pid: 4242,
+      startedAt: 1,
+      waitForFirstExit: vi.fn(async () => null), // stays up
+    };
+    let live: unknown = undefined; // what pool.get returns; set once spawned
+    const spawn = vi.fn(() => {
+      live = session;
+      return session;
+    });
+    const record = {
+      id: TOKEN,
+      wsId: 'ws-1',
+      agent: 'claude',
+      name: 'c1',
+      state: 'paused',
+      resumeHint: { kind: 'agent-session-id', value: 'aid' },
+    };
+    const adapter = { id: 'claude', capabilities: { resumeById: true, resumeLast: false } };
+    const svc = {
+      sessionRegistry: { get: () => record, update: vi.fn(async () => {}) },
+      pool: { get: () => live, spawn, disposeToken: vi.fn() },
+      registry: { get: () => ({ id: 'ws-1', dir: '/w', agents: ['claude'] }) },
+      adapters: { get: () => adapter },
+      computeSpawnPlan: () => ({
+        spawnCwd: '/w',
+        envPWD: '/w',
+        transcriptDir: null,
+        projectKey: 'k',
+        composedCommand: ['claude'],
+        resumeMode: 'by-id',
+        resumeId: 'aid',
+      }),
+      config: { launcherRepoRoot: '/repo' },
+    } as unknown as WorkspaceService;
+    return { app: createWorkspaceRoutes(svc), spawn };
+  }
+
+  it('two simultaneous resumes spawn the agent exactly once', async () => {
+    const { app, spawn } = buildResume();
+    const path = `/ws-1/sessions/${TOKEN}/resume`;
+    const [a, b] = await Promise.all([post(app, path), post(app, path)]);
+
+    expect(spawn).toHaveBeenCalledOnce(); // no double-spawn racing one transcript
+    // both succeed: one really resumed, the other coalesced to alreadyRunning
+    expect(a.body.ok).toBe(true);
+    expect(b.body.ok).toBe(true);
+    expect([a.body, b.body].filter((x) => x.alreadyRunning)).toHaveLength(1);
   });
 });

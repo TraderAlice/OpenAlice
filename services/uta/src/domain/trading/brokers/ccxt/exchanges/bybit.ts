@@ -29,4 +29,25 @@ export const bybitOverrides: CcxtExchangeOverrides = {
   },
 
   // cancelOrderById: not overridden — default { stop: true } fallback works for Bybit
+
+  /**
+   * Bybit's open-orders listing is category-scoped, and the broker config
+   * sets defaultType 'swap' — an unscoped fetchOpenOrders() silently
+   * returns ONLY swap orders (observed live: a real open spot order,
+   * empty list, no error). Sweep every category the account trades and
+   * merge. Throws if any category fails — a partial listing would ghost
+   * real orders out of absence-detection and external observation, which
+   * is worse than observation being loudly off (same rule as full-spectrum
+   * market loading).
+   */
+  async fetchAllOpenOrders(exchange: Exchange, _defaultImpl): Promise<CcxtOrder[]> {
+    const merged = new Map<string, CcxtOrder>()
+    for (const type of ['spot', 'swap'] as const) {
+      const orders = await exchange.fetchOpenOrders(undefined, undefined, undefined, { type })
+      for (const o of orders) {
+        if (o.id) merged.set(o.id, o)
+      }
+    }
+    return Array.from(merged.values())
+  },
 }

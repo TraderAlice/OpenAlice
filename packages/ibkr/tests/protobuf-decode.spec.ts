@@ -12,6 +12,7 @@ import { CurrentTime } from '../src/protobuf/CurrentTime.js'
 import { NextValidId } from '../src/protobuf/NextValidId.js'
 import { ErrorMessage } from '../src/protobuf/ErrorMessage.js'
 import { ManagedAccounts } from '../src/protobuf/ManagedAccounts.js'
+import { PortfolioValue } from '../src/protobuf/PortfolioValue.js'
 import { IN } from '../src/message.js'
 
 function encodeProto<T>(codec: { encode(msg: T, writer?: BinaryWriter): BinaryWriter }, msg: T): Buffer {
@@ -20,6 +21,35 @@ function encodeProto<T>(codec: { encode(msg: T, writer?: BinaryWriter): BinaryWr
 }
 
 describe('Decoder.processProtoBuf', () => {
+
+  it('decodes PortfolioValue with full contract identity (secType regression)', () => {
+    // Regression: decodeContractProto had a dropped assignment — the
+    // `if (cp.secType !== undefined)` guard had an EMPTY body, so every
+    // portfolio row reached the UTA layer with secType '' (found live,
+    // IBKR round: rows violated the IBKR-superset row contract).
+    const wrapper = new DefaultEWrapper()
+    const spy = vi.spyOn(wrapper, 'updatePortfolio')
+    const decoder = new Decoder(wrapper, 222)
+    applyAllHandlers(decoder)
+
+    const buf = encodeProto(PortfolioValue, {
+      contract: { conId: 265598, symbol: 'AAPL', secType: 'STK', exchange: 'SMART', currency: 'USD', comboLegs: [] },
+      position: '10',
+      marketPrice: 291.3,
+      marketValue: 2913,
+      averageCost: 254.4,
+      unrealizedPNL: 368.8,
+      realizedPNL: 0,
+      accountName: 'DU1',
+    })
+    decoder.processProtoBuf(buf, IN.PORTFOLIO_VALUE)
+
+    expect(spy).toHaveBeenCalledOnce()
+    const contract = spy.mock.calls[0][0]
+    expect(contract.symbol).toBe('AAPL')
+    expect(contract.secType).toBe('STK')
+    expect(contract.conId).toBe(265598)
+  })
 
   it('decodes CurrentTime and calls wrapper.currentTime', () => {
     const wrapper = new DefaultEWrapper()

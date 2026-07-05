@@ -10,27 +10,32 @@ import { readWorkspaceFile, writeWorkspaceFile } from '../file-service.js';
 // `<cwd>/.pi-agent` via PI_CODING_AGENT_DIR (composeEnv) and drop models.json
 // there. This is a DIFFERENT dir from `<cwd>/.pi` (Pi's project-local
 // extensions/skills discovery, keyed off cwd and unaffected by
-// PI_CODING_AGENT_DIR) — so the openalice-cli skill in `<cwd>/.pi/skills` still
-// resolves. Verified against pi 0.78.1 (`dist/core/model-registry.js:144-157`,
+// PI_CODING_AGENT_DIR) — so the alice* CLI skills in `<cwd>/.pi/skills` still
+// resolve. Verified against pi 0.78.1 (`dist/core/model-registry.js:144-157`,
 // `dist/config.js:378,393-407`).
 const PI_AGENT_DIR = '.pi-agent';
 const PI_MODELS_PATH = `${PI_AGENT_DIR}/models.json`;
 const PI_SETTINGS_PATH = `${PI_AGENT_DIR}/settings.json`;
 const PI_PROVIDER_NAME = 'workspace';
 
+function positiveNumber(value: number | null | undefined): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
+}
+
 /**
  * Pi (github.com/earendil-works/pi, by Mario Zechner; MIT). Open-source agent
  * CLI — the second non-claude/openai channel after opencode ("two suppliers",
  * the IBKR-superset dual-vendor stance). Verified against pi 0.78.1.
  *
- * TOOL ACCESS is NOT a per-CLI MCP bridge — Pi has no native MCP. It rides
- * OpenAlice's CLI-injection path: the `alice` shim is on PATH for every spawn
- * (`service.ts:220-224`) and the `openalice-cli` skill is copied to
- * `<cwd>/.pi/skills` (`context-injector.ts`); Pi's built-in `bash` tool calls
- * `alice <tool>`. trading/cron are MCP-only (`server/cli.ts:20`), so CLI-mode
- * Pi workspaces are analysis-only — a future trading-capable Pi workspace would
- * need an MCP bridge extension, deferred until there's a concrete need. See
- * memory feedback_cli_injection_over_mcp_bridge.
+ * TOOL ACCESS: Pi has no native MCP, and the launcher injects NO MCP into
+ * workspaces at all — Pi reaches OpenAlice purely through the `alice*` CLI
+ * shims on PATH (`service.ts`) + the `alice*` / `traderhub` skills
+ * copied to `<cwd>/.pi/skills` (`context-injector.ts`); Pi's built-in `bash`
+ * tool runs `alice` / `alice-uta` / `alice-workspace` / `traderhub`. This is
+ * the full surface (data, trading, workspace, market) — same as every other
+ * agent; only cron is unavailable (MCP-only by design, on no CLI). The old
+ * `.pi/extensions/openalice-bridge.ts` MCP bridge was removed when the launcher
+ * went CLI-only. See memory feedback_cli_injection_over_mcp_bridge.
  *
  * PROVIDER override: Pi has no `--base-url` flag and `models.json` has no
  * project layer, so per-workspace provider config goes through the redirected
@@ -52,6 +57,7 @@ const PI_PROVIDER_NAME = 'workspace';
 export const piAdapter: CliAdapter = {
   id: 'pi',
   displayName: 'Pi',
+  binary: 'pi',
   // c=claude, x=codex, o=opencode, sh=shell taken; 'p' is free.
   namePrefix: 'p',
   capabilities: {
@@ -70,9 +76,20 @@ export const piAdapter: CliAdapter = {
     // Tools come from the CLI-injection path (alice on PATH + .pi/skills), not
     // flags — so the command head is just the binary + a resume flag (if any).
     const head = ['pi'];
-    if (ctx.resume === undefined) return head;
-    if (ctx.resume === 'last') return [...head, '--continue'];
-    return [...head, '--session-id', ctx.resume.sessionId];
+    // Quick-chat seed: `pi [--session-id <id>] <messages…>` opens the
+    // interactive TUI seeded with that first message. UNLIKE the other adapters,
+    // pi appends the seed REGARDLESS of the resume branch: pi assigns its own id
+    // at spawn (`assignsSessionId`), so a FRESH seeded spawn arrives here with
+    // BOTH a launcher-minted `{ sessionId }` AND `initialPrompt`. The launcher
+    // only ever sets `initialPrompt` on a fresh spawn, so its presence is itself
+    // the "this is fresh" signal — a real resume never carries one. NOTE pi
+    // REJECTS a `--` terminator ("Unknown option: --", verified 0.78.1), so the
+    // prompt is a bare trailing positional (a prompt starting with `-`/`--` is
+    // unprotected on pi; rare for chat messages — the other adapters guard with `--`).
+    const seed = ctx.initialPrompt ? [ctx.initialPrompt] : [];
+    if (ctx.resume === undefined) return [...head, ...seed];
+    if (ctx.resume === 'last') return [...head, '--continue', ...seed];
+    return [...head, '--session-id', ctx.resume.sessionId, ...seed];
   },
 
   // Headless: `pi -p <prompt>` is non-interactive and exits at the turn
@@ -83,6 +100,20 @@ export const piAdapter: CliAdapter = {
   // starting with `-`/`--` is unprotected on pi (rare for task prompts).
   composeHeadlessCommand(_base: readonly string[], _ctx: SpawnContext, prompt: string): readonly string[] {
     return ['pi', '-p', '--mode', 'json', prompt];
+  },
+
+  // pi `--mode json` line 1 is `{"type":"session","id":…,"cwd":…}` — pi mints
+  // its own id on a fresh headless run and announces it immediately (verified
+  // 0.78.x, 2026-06-11; `--session-id` is also accepted alongside `-p`, but
+  // harvesting the echo keeps headless uniform with the other adapters).
+  extractHeadlessSessionId(line: string): string | null {
+    try {
+      const evt = JSON.parse(line) as Record<string, unknown>;
+      if (evt['type'] !== 'session') return null;
+      return typeof evt['id'] === 'string' ? evt['id'] : null;
+    } catch {
+      return null;
+    }
   },
 
   composeEnv(ctx: SpawnContext): Record<string, string> {
@@ -121,9 +152,14 @@ export const piAdapter: CliAdapter = {
     // Key written directly into the workspace file (same trust model as codex's
     // .codex/env.json / opencode's opencode.json).
     if (cred.apiKey) provider['apiKey'] = cred.apiKey;
-    // ModelDefinitionSchema requires only `id` (model-registry.js:108-109);
-    // TypeBox Type.Object rejects unknown props, so keep it to `{ id }`.
-    if (cred.model) provider['models'] = [{ id: cred.model }];
+    // Pi's custom model registry otherwise falls back to 128k. OpenAlice writes
+    // the context window when known so long-context models do not compact early.
+    if (cred.model) {
+      const model: Record<string, unknown> = { id: cred.model };
+      const contextWindow = positiveNumber(cred.contextWindow);
+      if (contextWindow !== null) model['contextWindow'] = contextWindow;
+      provider['models'] = [model];
+    }
 
     await writeWorkspaceFile(
       cwd,
@@ -155,12 +191,13 @@ export const piAdapter: CliAdapter = {
     const models = Array.isArray(p['models']) ? (p['models'] as Array<Record<string, unknown>>) : [];
     const first = models[0];
     const model = first && typeof first['id'] === 'string' ? (first['id'] as string) : null;
+    const contextWindow = first && positiveNumber(first['contextWindow'] as number | null | undefined);
     if (baseUrl === null && apiKey === null && model === null) return null;
     // Reverse the `api` field back to the wire shape.
     const api = p['api'];
     const wireShape = api === 'anthropic-messages' ? 'anthropic' as const
       : api === 'openai-responses' ? 'openai-responses' as const
       : 'openai-chat' as const;
-    return { baseUrl, apiKey, model, wireShape };
+    return { baseUrl, apiKey, model, wireShape, ...(contextWindow ? { contextWindow } : {}) };
   },
 };

@@ -121,8 +121,11 @@ export function wrapToolExecute(tool: Tool): (args: any) => Promise<McpToolResul
       })
       return { content: toMcpContent(result) }
     } catch (err) {
+      // err.message, not `${err}` — a thrown Error stringifies to "Error: <msg>",
+      // which the `Error: ` prefix then doubled into "Error: Error: <msg>".
+      const message = err instanceof Error ? err.message : String(err)
       return {
-        content: [{ type: 'text' as const, text: `Error: ${err}` }],
+        content: [{ type: 'text' as const, text: `Error: ${message}` }],
         isError: true,
       }
     }

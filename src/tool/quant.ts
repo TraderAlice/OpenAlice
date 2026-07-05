@@ -17,15 +17,18 @@ export function createQuantTools(deps: CalcDeps) {
     searchBars: tool({
       description: `Find K-line sources for a symbol — returns barIds to paste into calculateQuant's bars(...).
 
-Federates vendors (yfinance/fmp) AND connected brokers (alpaca-paper, binance-readonly, …).
-Each candidate carries:
+Federates connected brokers (alpaca-paper, binance-readonly, …) AND vendors (fmp, yfinance).
+Candidates come back freshest-first. Each carries:
   - barId: use directly, e.g. bars("<barId>", "1d", count=250).
     · broker barIds ("accountId|symbol") need NO asset= in bars().
     · vendor barIds ("provider|symbol") need asset="equity|crypto|currency|commodity".
   - source: "uta" (broker) | "vendor"
-  - barCapability: "realtime" | "delayed" | "iex" | "subscription" — prefer the freshest.
-The same asset appears from multiple sources (redundancy is expected) — pick by capability,
-and by whether it's a broker you actually trade (so the chart matches your fills).`,
+  - barCapability: "realtime" | "delayed" | "iex" | "subscription".
+Source preference: a broker you actually trade (realtime, and the chart matches your fills) >
+a paid vendor (fmp, …) > yfinance. yfinance is a FREE FALLBACK only — its end-of-day bars can
+lag a day or two, so don't use it for anything time-sensitive or to chart a live position when
+a broker source exists. The same asset appears from multiple sources (redundancy is expected);
+default to the freshest broker candidate.`,
       inputSchema: z.object({
         query: z.string().describe('Symbol or keyword, e.g. "AAPL", "BTC", "bitcoin"'),
         limit: z.number().int().positive().optional().describe('Max candidates (default 20)'),
@@ -46,8 +49,10 @@ A script is one or more \`name = bars(...)\` bindings followed by a final result
   sma(s.close, 50) - sma(s.close, 200)
 
 bars(barId, interval, count=, asOf=, start=, end=, asset=):
-  - barId: "{source}|{symbol}" from searchContracts (broker, e.g. "alpaca-paper|AAPL",
-    "binance-readonly|BTC/USDT") or a vendor ("yfinance|AAPL", "fmp|AAPL").
+  - barId: "{source}|{symbol}" from searchBars (broker, e.g. "alpaca-paper|AAPL",
+    "binance-readonly|BTC/USDT") or a vendor ("yfinance|AAPL", "fmp|AAPL"). Prefer a broker
+    barId for anything you trade or anything time-sensitive — yfinance is a delayed free
+    fallback (EOD bars can lag a day or two).
   - interval: "1m" "5m" "15m" "30m" "1h" "4h" "1d" "1w".
   - count=N: number of most-recent bars (the natural window for indicators).
   - asset=: REQUIRED for vendor barIds — "equity" | "crypto" | "currency" | "commodity".
@@ -81,13 +86,19 @@ or compare sources in one script, e.g. basis check:
   a.close[-1] - b.close[-1]
 
 Returns { value, dataRange } on success, or { error: { kind, message, suggestion } }
-on failure — read the error and fix the script (it pinpoints the problem).`,
+on failure. Most kinds are script problems — read the error and fix the script (it
+pinpoints the problem). The exception is kind:"data-source": the K-line fetch itself
+failed (vendor rate-limited/blocked this client, network down, or a bad barId) — that
+is NOT a script bug. Do not rewrite the expression; follow the suggestion (retry later,
+switch source, or fix the barId), and tell the user if data is simply unavailable.`,
+
       inputSchema: z.object({
         script: z.string().describe('The quant script (let-bindings + a final result expression).'),
         precision: z.number().int().min(0).max(10).optional().describe('Decimal places (default 4).'),
+        dates: z.stringbool().optional().describe('Opt-in: also return each source\'s date axis (dates[barId] = ["YYYY-MM-DD", …]) so a dumped series can be mapped to dates. Off by default. For a full dated snapshot, prefer marketSnapshot.'),
       }).meta({ examples: [{ script: 's = bars("yfinance|AAPL", "1d", count=250, asset="equity")\nsma(s.close, 50)' }] }),
-      execute: async ({ script, precision }) => {
-        return runScript(script, deps, precision ?? 4)
+      execute: async ({ script, precision, dates }) => {
+        return runScript(script, deps, precision ?? 4, { withDates: dates ?? false })
       },
     }),
   }

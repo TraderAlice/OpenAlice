@@ -4,9 +4,12 @@ import type { CliAdapter } from './cli-adapter.js';
 import type { Logger } from './logger.js';
 import {
   PersistentSession,
+  type SessionAttachResult,
+  type SessionControllerClaim,
   type PersistentSessionOptions,
 } from './persistent-session.js';
 import type { TranscriptWatcher } from './transcript-watcher.js';
+import type { TerminalThemeVariant } from './terminal-theme.js';
 
 /**
  * Per-attach context the factory uses to compose a fresh PersistentSession.
@@ -23,6 +26,19 @@ export interface SessionFactoryContext {
   readonly recordName: string;
   /** Shell-resume preamble: bytes prepended to the new PTY's ReplayBuffer. */
   readonly initialReplayBytes?: Buffer;
+  /**
+   * Quick-chat seed: a first user message the FRESH interactive TUI opens
+   * already working on (threaded into the adapter's `composeCommand` argv).
+   * Ignored when `resume` is set; `shell` ignores it always. See
+   * `SpawnContext.initialPrompt`.
+   */
+  readonly initialPrompt?: string;
+  /**
+   * Concrete terminal renderer theme for this interactive spawn. Used only as a
+   * process-start hint for TUIs; changing the frontend theme later does not
+   * mutate an already-running process environment.
+   */
+  readonly terminalTheme?: TerminalThemeVariant;
 }
 
 /**
@@ -54,7 +70,7 @@ export interface LiveSessionInfo {
 }
 
 /**
- * Owns every live PTY, keyed by the record id (a stable uuid the
+ * Owns every live PTY, keyed by the record id (a stable launcher id the
  * SessionRegistry pre-allocates). One PersistentSession per id; one
  * attached WebSocket per session (second attach kicks the first). PTYs
  * exist only between spawn and dispose — restart wipes the pool but the
@@ -114,11 +130,11 @@ export class SessionPool {
     cols: number,
     rows: number,
     since: number | undefined,
-  ): boolean {
+    claim?: SessionControllerClaim,
+  ): SessionAttachResult | { readonly ok: false; readonly reason: 'missing' } {
     const session = this.sessions.get(recordId);
-    if (!session) return false;
-    session.attach(ws, cols, rows, since);
-    return true;
+    if (!session) return { ok: false, reason: 'missing' };
+    return session.attach(ws, cols, rows, since, claim);
   }
 
   get(recordId: string): PersistentSession | undefined {

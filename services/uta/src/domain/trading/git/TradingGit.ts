@@ -6,7 +6,7 @@
 
 import { createHash } from 'crypto'
 import Decimal from 'decimal.js'
-import { Order, UNSET_DECIMAL } from '@traderalice/ibkr'
+import { Contract, Order, UNSET_DECIMAL, UNSET_DOUBLE } from '@traderalice/ibkr'
 import { OrderHelper } from '../OrderHelper.js'
 import type { ITradingGit, TradingGitConfig } from './interfaces.js'
 import type {
@@ -30,6 +30,10 @@ import type {
   SyncResult,
 } from './types.js'
 import { getOperationSymbol } from './types.js'
+
+/** secTypes whose price does NOT track the underlying 1:1 — excluded from
+ *  symbol-level price simulation (they share the underlying's symbol). */
+const DERIVATIVE_SECTYPES = new Set(['OPT', 'FOP', 'WAR', 'IOPT', 'BAG'])
 
 function generateCommitHash(content: object): CommitHash {
   const hash = createHash('sha256')
@@ -256,6 +260,67 @@ export class TradingGit implements ITradingGit {
     return hash
   }
 
+  /**
+   * Record externally-observed open orders as ONE squashed commit — the
+   * "commits without a message" the user made on the exchange directly.
+   * The log is a faithful record, not the source of final state: once an
+   * external order is in the log with orderId + submitted, the regular
+   * pending scanner and sync poller track its fill/cancel like any
+   * Alice-placed order.
+   */
+  async recordObservedOrders(params: {
+    observed: Array<{ contract: Contract; order: Order; orderId: string }>
+    stateAfter: GitState
+  }): Promise<CommitHash> {
+    const { observed, stateAfter } = params
+    const timestamp = new Date().toISOString()
+
+    const operations: Operation[] = observed.map((o) => ({
+      action: 'observeExternalOrder',
+      contract: o.contract,
+      order: o.order,
+    }))
+    const results: OperationResult[] = observed.map((o) => ({
+      action: 'observeExternalOrder',
+      success: true,
+      orderId: o.orderId,
+      status: 'submitted',
+    }))
+
+    const message = `[observed] ${observed.length} external order(s) not placed through Alice`
+    const hash = generateCommitHash({ message, operations, timestamp, parentHash: this.head })
+
+    const commit: GitCommit = {
+      hash,
+      parentHash: this.head,
+      message,
+      operations,
+      results,
+      stateAfter,
+      timestamp,
+      round: this.currentRound,
+    }
+
+    this.commits.push(commit)
+    this.head = hash
+
+    await this.config.onCommit?.(this.exportState())
+
+    return hash
+  }
+
+  /** Every broker orderId the log has ever seen — observation diffs against this. */
+  getKnownOrderIds(): Set<string> {
+    const known = new Set<string>()
+    for (const commit of this.commits) {
+      for (const result of commit.results) {
+        if (result.orderId) known.add(result.orderId)
+        for (const leg of result.legs ?? []) known.add(leg.orderId)
+      }
+    }
+    return known
+  }
+
   // ==================== git log / show / status ====================
 
   log(options: { limit?: number; symbol?: string } = {}): CommitLogEntry[] {
@@ -287,10 +352,14 @@ export class TradingGit implements ITradingGit {
   ): OperationSummary[] {
     const summaries: OperationSummary[] = []
 
-    for (let i = 0; i < commit.operations.length; i++) {
-      const op = commit.operations[i]
+    // Sync commits store ONE syncOrders op with N per-order results — iterate
+    // the longer of the two so every update gets its own row, attributed by
+    // the result's own symbol (the op carries none).
+    const count = Math.max(commit.operations.length, commit.results.length)
+    for (let i = 0; i < count; i++) {
+      const op = commit.operations[i] ?? commit.operations[0]
       const result = commit.results[i]
-      const symbol = getOperationSymbol(op)
+      const symbol = result?.symbol || getOperationSymbol(op)
 
       if (filterSymbol && symbol !== filterSymbol) continue
 
@@ -350,6 +419,17 @@ export class TradingGit implements ITradingGit {
         return `synced → ${status}${price}${qty}`
       }
 
+      case 'observeExternalOrder': {
+        const side = op.order?.action || 'unknown'
+        const qty = op.order?.totalQuantity
+        const qtyStr = qty && !qty.equals(UNSET_DECIMAL) ? qty.toFixed() : '?'
+        if (result?.status === 'filled') {
+          const price = result.filledPrice ? ` @${result.filledPrice}` : ''
+          return `external ${side} ${qtyStr}${price}`
+        }
+        return `external ${side} ${qtyStr} (${result?.status || 'observed'})`
+      }
+
       case 'reconcileBalance': {
         const delta = new Decimal(op.quantityDelta)
         const direction = delta.gte(0) ? 'observed' : 'released'
@@ -377,7 +457,7 @@ export class TradingGit implements ITradingGit {
   // raw Order instances stay private to staging / push internals, never
   // observed by external callers (UI, MCP, c.json, on-disk commit.json).
   private projectOperation(op: Operation): Operation {
-    if (op.action === 'placeOrder') {
+    if (op.action === 'placeOrder' || op.action === 'observeExternalOrder') {
       return { ...op, order: OrderHelper.toWire(op.order) as unknown as Order }
     }
     if (op.action === 'modifyOrder') {
@@ -418,6 +498,7 @@ export class TradingGit implements ITradingGit {
   private static rehydrateOperation(op: Operation): Operation {
     switch (op.action) {
       case 'placeOrder':
+      case 'observeExternalOrder':
         return {
           ...op,
           order: op.order ? TradingGit.rehydrateOrder(op.order) : op.order,
@@ -494,12 +575,13 @@ export class TradingGit implements ITradingGit {
     const commit: GitCommit = {
       hash,
       parentHash: this.head,
-      message: `[sync] ${updates.length} order(s) updated`,
+      message: `[sync] ${updates.slice(0, 3).map((u) => `${u.symbol} ${u.currentStatus}`).join(', ')}${updates.length > 3 ? ` +${updates.length - 3} more` : ''}`,
       operations: [{ action: 'syncOrders' as const }],
       results: updates.map((u) => ({
         action: 'syncOrders' as const,
         success: true,
         orderId: u.orderId,
+        symbol: u.symbol,
         status: u.currentStatus,
         filledQty: u.filledQty,
         filledPrice: u.filledPrice,
@@ -517,8 +599,11 @@ export class TradingGit implements ITradingGit {
     return { hash, updatedCount: updates.length, updates }
   }
 
-  getPendingOrderIds(): Array<{ orderId: string; symbol: string }> {
-    // Scan newest→oldest to find latest known status per orderId
+  getPendingOrderIds(): Array<{ orderId: string; symbol: string; localSymbol?: string; aliceId?: string }> {
+    // Scan newest→oldest to find latest known status per orderId.
+    // Bracket TP/SL legs ride in result.legs — born 'submitted'; any later
+    // sync row for a leg lives in a newer commit and wins (first-seen-wins
+    // over a newest-first scan).
     const orderStatus = new Map<string, string>()
 
     for (let i = this.commits.length - 1; i >= 0; i--) {
@@ -526,24 +611,46 @@ export class TradingGit implements ITradingGit {
         if (result.orderId && !orderStatus.has(result.orderId)) {
           orderStatus.set(result.orderId, result.status)
         }
+        for (const leg of result.legs ?? []) {
+          if (!orderStatus.has(leg.orderId)) orderStatus.set(leg.orderId, 'submitted')
+        }
       }
     }
 
     // Collect orders still pending
-    const pending: Array<{ orderId: string; symbol: string }> = []
+    const pending: Array<{ orderId: string; symbol: string; localSymbol?: string; aliceId?: string }> = []
     const seen = new Set<string>()
 
     for (const commit of this.commits) {
       for (let j = 0; j < commit.results.length; j++) {
         const result = commit.results[j]
-        if (
-          result.orderId &&
-          !seen.has(result.orderId) &&
-          orderStatus.get(result.orderId) === 'submitted'
-        ) {
-          const symbol = getOperationSymbol(commit.operations[j])
-          pending.push({ orderId: result.orderId, symbol })
-          seen.add(result.orderId)
+        // Sync commits store ONE syncOrders op with N per-order results —
+        // operations[j] is undefined past index 0 (a multi-update sync
+        // commit in the journal turned this into a BOOT-LOOP crash once).
+        const op = commit.operations[j] ?? commit.operations[0]
+        const symbol = getOperationSymbol(op)
+        // Broker-native symbol for symbol-scoped order lookups (CCXT).
+        // Persisted with the operation, so it survives process restarts
+        // where the broker's in-memory orderId→symbol cache is empty.
+        const hasContract =
+          op?.action === 'placeOrder' || op?.action === 'closePosition' || op?.action === 'observeExternalOrder'
+        const localSymbol = hasContract ? op.contract?.localSymbol || undefined : undefined
+        const aliceId = hasContract ? op.contract?.aliceId || undefined : undefined
+
+        // Parent order + its bracket legs share the operation's contract.
+        const candidates = [
+          ...(result.orderId ? [result.orderId] : []),
+          ...(result.legs ?? []).map((l) => l.orderId),
+        ]
+        for (const orderId of candidates) {
+          if (seen.has(orderId) || orderStatus.get(orderId) !== 'submitted') continue
+          pending.push({
+            orderId,
+            symbol,
+            ...(localSymbol && { localSymbol }),
+            ...(aliceId && { aliceId }),
+          })
+          seen.add(orderId)
         }
       }
     }
@@ -578,8 +685,10 @@ export class TradingGit implements ITradingGit {
       }
     }
 
-    // Parse price changes → target price map
-    const priceMap = new Map<string, Decimal>()
+    // Parse price changes → per-position target prices. Index-keyed: bare
+    // symbols collide between an underlying and its derivatives.
+    const priceByIndex = new Map<number, Decimal>()
+    const excludedDerivatives: string[] = []
 
     for (const { symbol, change } of priceChanges) {
       const parsed = this.parsePriceChange(change)
@@ -594,13 +703,24 @@ export class TradingGit implements ITradingGit {
       }
 
       if (symbol === 'all') {
-        for (const pos of positions) {
-          priceMap.set(pos.contract.symbol || 'unknown', this.applyPriceChange(new Decimal(pos.marketPrice), parsed.type, parsed.value))
+        for (let i = 0; i < positions.length; i++) {
+          // 'all' scales each position's OWN mark — valid for derivatives too.
+          priceByIndex.set(i, this.applyPriceChange(new Decimal(positions[i].marketPrice), parsed.type, parsed.value))
         }
       } else {
-        const pos = positions.find((p) => (p.contract.symbol || p.contract.aliceId) === symbol)
-        if (pos) {
-          priceMap.set(symbol, this.applyPriceChange(new Decimal(pos.marketPrice), parsed.type, parsed.value))
+        for (let i = 0; i < positions.length; i++) {
+          const pos = positions[i]
+          if ((pos.contract.symbol || pos.contract.aliceId) !== symbol) continue
+          // A symbol-level price change describes the UNDERLYING. Derivative
+          // rows share the symbol but do NOT move 1:1 with it (an option's
+          // own price is not the stock's price) — re-marking them with the
+          // stock price produced +23,000% "moves" and inverted PnL. Exclude
+          // loudly instead of pricing garbage.
+          if (DERIVATIVE_SECTYPES.has(pos.contract.secType)) {
+            excludedDerivatives.push(`${symbol} ${pos.contract.secType}${pos.contract.strike && !new Decimal(pos.contract.strike).equals(UNSET_DOUBLE) ? ' ' + pos.contract.strike : ''}`)
+            continue
+          }
+          priceByIndex.set(i, this.applyPriceChange(new Decimal(pos.marketPrice), parsed.type, parsed.value))
         }
       }
     }
@@ -618,19 +738,21 @@ export class TradingGit implements ITradingGit {
 
     // Simulated state
     let simulatedUnrealizedPnL = new Decimal(0)
-    const simulatedPositions = positions.map((pos) => {
+    const simulatedPositions = positions.map((pos, i) => {
       const sym = pos.contract.symbol || pos.contract.aliceId || 'unknown'
       const mktPrice = new Decimal(pos.marketPrice)
-      const simulatedPrice = priceMap.get(sym) ?? mktPrice
+      const simulatedPrice = priceByIndex.get(i) ?? mktPrice
       const priceChange = simulatedPrice.minus(mktPrice)
       const priceChangePct = mktPrice.gt(0) ? priceChange.div(mktPrice).mul(100) : new Decimal(0)
       const q = pos.quantity
       const avgCost = new Decimal(pos.avgCost)
+      // Multiplier-aware: 1 option contract at price 1.15 is $115 of value.
+      const mult = new Decimal(pos.multiplier || '1')
 
       const newPnL =
         pos.side === 'long'
-          ? simulatedPrice.minus(avgCost).mul(q)
-          : avgCost.minus(simulatedPrice).mul(q)
+          ? simulatedPrice.minus(avgCost).mul(q).mul(mult)
+          : avgCost.minus(simulatedPrice).mul(q).mul(mult)
 
       const pnlChange = newPnL.minus(pos.unrealizedPnL)
       simulatedUnrealizedPnL = simulatedUnrealizedPnL.plus(newPnL)
@@ -642,7 +764,7 @@ export class TradingGit implements ITradingGit {
         avgCost: pos.avgCost,
         simulatedPrice: simulatedPrice.toString(),
         unrealizedPnL: newPnL.toString(),
-        marketValue: simulatedPrice.mul(q).toString(),
+        marketValue: simulatedPrice.mul(q).mul(mult).toString(),
         pnlChange: pnlChange.toString(),
         priceChangePercent: `${priceChangePct.gte(0) ? '+' : ''}${priceChangePct.toFixed(2)}%`,
       }
@@ -658,10 +780,13 @@ export class TradingGit implements ITradingGit {
       { ...simulatedPositions[0], pnlChange: new Decimal(simulatedPositions[0].pnlChange) },
     )
 
+    const excludedNote = excludedDerivatives.length > 0
+      ? ` NOTE: derivative positions not simulated (their price does not track the underlying 1:1): ${excludedDerivatives.join(', ')}.`
+      : ''
     const worstCase =
-      worst.pnlChange.lt(0)
+      (worst.pnlChange.lt(0)
         ? `${worst.symbol} would lose $${worst.pnlChange.abs().toFixed(2)} (${worst.priceChangePercent})`
-        : 'All positions would profit or break even.'
+        : 'All positions would profit or break even.') + excludedNote
 
     return {
       success: true,
@@ -738,6 +863,7 @@ export class TradingGit implements ITradingGit {
 
     const orderId = rawObj.orderId as string | undefined
     const orderState = rawObj.orderState as OperationResult['orderState']
+    const legs = rawObj.legs as OperationResult['legs']
 
     return {
       action: op.action,
@@ -745,6 +871,7 @@ export class TradingGit implements ITradingGit {
       orderId,
       status: this.mapOrderStatus(orderState),
       orderState,
+      ...(Array.isArray(legs) && legs.length > 0 ? { legs } : {}),
       raw,
     }
   }

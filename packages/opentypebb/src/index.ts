@@ -14,7 +14,7 @@
 
 // Core abstractions
 export { Fetcher, type FetcherClass } from './core/provider/abstract/fetcher.js'
-export { Provider, type ProviderConfig } from './core/provider/abstract/provider.js'
+export { Provider, type ProviderConfig, type VendorMeta } from './core/provider/abstract/provider.js'
 export { BaseQueryParamsSchema, type BaseQueryParams } from './core/provider/abstract/query-params.js'
 export { BaseDataSchema, type BaseData, ForceInt } from './core/provider/abstract/data.js'
 
@@ -34,7 +34,7 @@ export { Router, type CommandDef, type CommandHandler } from './core/app/router.
 
 // Utilities
 export { amakeRequest, applyAliases, replaceEmptyStrings, buildQueryString } from './core/provider/utils/helpers.js'
-export { OpenBBError, EmptyDataError, UnauthorizedError, NetworkUnreachableError } from './core/provider/utils/errors.js'
+export { OpenBBError, EmptyDataError, UnauthorizedError, NetworkUnreachableError, RateLimitedError } from './core/provider/utils/errors.js'
 
 // App loader — convenience functions to create a fully-loaded system
 export { createRegistry, createExecutor, loadAllRouters } from './core/api/app-loader.js'
@@ -58,3 +58,5 @@ export { imfProvider } from './providers/imf/index.js'
 export { ecbProvider } from './providers/ecb/index.js'
 export { federalReserveProvider } from './providers/federal_reserve/index.js'
 export { intrinioProvider } from './providers/intrinio/index.js'
+export { eastmoneyProvider } from './providers/eastmoney/index.js'
+export { twseProvider } from './providers/twse/index.js'

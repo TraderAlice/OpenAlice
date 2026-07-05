@@ -14,7 +14,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 
-import { useWorkspaces } from '../contexts/WorkspacesContext'
+import { useWorkspaces } from '../contexts/workspaces-context'
 import { useWorkspace } from '../tabs/store'
 import { OverviewCard } from '../components/workspace/OverviewCard'
 import {

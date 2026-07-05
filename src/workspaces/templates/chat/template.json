@@ -1,9 +1,9 @@
 {
   "displayName": "Chat",
   "groupOrder": 10,
-  "description": "General-purpose Alice workspace — Alice's full tool surface (market/research data + trading) via the alice*/traderhub CLIs by default, or as MCP servers, per launch choice.",
+  "description": "General-purpose Alice workspace — Alice's full tool surface (market/research data + trading) via the alice*/traderhub CLIs on PATH.",
   "defaultAgents": ["claude", "codex"],
-  "injectMcp": true,
+  "injectTools": true,
   "injectPersona": true,
-  "bundledSkills": ["scan-value-chain", "build-thesis", "sector-rotation", "opencli-reader"]
+  "bundledSkills": ["scan-value-chain", "build-thesis", "sector-rotation", "retrospective", "opencli-reader"]
 }

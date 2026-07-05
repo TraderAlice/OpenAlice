@@ -22,7 +22,7 @@ function build(provider: string, creds: Record<string, string>): BarService {
   const currencyClient = new SDKCurrencyClient(executor, 'currency', provider, creds, routeMap)
   const commodityClient = new SDKCommodityClient(executor, 'commodity', provider, creds, routeMap)
   return createBarService({
-    marketSearch: { symbolIndex: {} as never, cryptoClient, currencyClient, commodityCatalog: {} as never },
+    marketSearch: { symbolIndex: {} as never, equityVendors: [], equityClient: {} as never, cryptoClient, currencyClient, commodityCatalog: {} as never },
     equityClient, cryptoClient, currencyClient, commodityClient,
     utaManager: { has: async () => false, get: async () => undefined, searchContracts: async () => [] },
     vendorProviders: { equity: provider, crypto: provider, currency: provider, commodity: provider },

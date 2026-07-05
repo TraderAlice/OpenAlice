@@ -4,7 +4,8 @@
  */
 import { configApi } from './config'
 import { eventsApi } from './events'
-import { cronApi } from './cron'
+import { scheduleApi } from './schedule'
+import { issuesApi } from './issues'
 import { tradingApi } from './trading'
 import { marketDataApi } from './openbb'
 import { toolsApi } from './tools'
@@ -20,7 +21,8 @@ import { headlessApi } from './headless'
 export const api = {
   config: configApi,
   events: eventsApi,
-  cron: cronApi,
+  schedule: scheduleApi,
+  issues: issuesApi,
   trading: tradingApi,
   marketData: marketDataApi,
   tools: toolsApi,
@@ -53,9 +55,6 @@ export type {
   AppConfig,
   AIProviderConfig,
   EventLogEntry,
-  CronSchedule,
-  CronJobState,
-  CronJob,
   TradingAccount,
   AccountInfo,
   Position,
@@ -68,6 +67,12 @@ export type {
   ToolCallRecord,
   UTASnapshotSummary,
   EquityCurvePoint,
+  HistoryContract,
+  OrderHistoryEntry,
+  OrderHistoryStatus,
+  OrderHistorySource,
+  TradeHistoryEntry,
+  TradeHistorySource,
   NewsArticle,
   NewsListResponse,
   TopologyResponse,

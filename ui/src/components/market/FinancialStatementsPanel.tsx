@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { marketApi, type FinancialStatementRow } from '../../api/market'
 import { Card } from './Card'
+import { Skeleton } from '../StateViews'
 import { fmtMoneyShort } from './format'
 
 type Tab = 'balance' | 'income' | 'cashflow'
@@ -130,7 +131,36 @@ export function FinancialStatementsPanel({ symbol }: Props) {
         </div>
       }
     >
-      {loading && !entry && <div className="p-3 text-[12px] text-text-muted">Loading…</div>}
+      {loading && !entry && (
+        <table aria-hidden="true" className="w-full text-[12px] border-collapse">
+          <thead>
+            <tr className="border-b border-border/60">
+              <th className="text-left px-3 py-2 sticky left-0 bg-bg-secondary/30">
+                <Skeleton className="h-3 w-10 rounded" />
+              </th>
+              {Array.from({ length: 4 }).map((_, i) => (
+                <th key={i} className="px-3 py-2">
+                  <Skeleton className="h-3 w-12 rounded ml-auto" />
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {Array.from({ length: 5 }).map((_, r) => (
+              <tr key={r} className="border-b border-border/30 last:border-b-0">
+                <td className="px-3 py-1.5">
+                  <Skeleton className="h-3 w-28 rounded" />
+                </td>
+                {Array.from({ length: 4 }).map((_, c) => (
+                  <td key={c} className="px-3 py-1.5">
+                    <Skeleton className="h-3 w-14 rounded ml-auto" />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
       {entry?.error && <div className="p-3 text-[12px] text-red">{entry.error}</div>}
       {!entry?.error && rows.length === 0 && !loading && (
         <div className="p-3 text-[12px] text-text-muted">No data.</div>

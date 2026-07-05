@@ -1,12 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   stripImageData,
-  resolveToolPermissions,
   buildChatHistoryPrompt,
-  NORMAL_ALLOWED_TOOLS,
-  EVOLUTION_ALLOWED_TOOLS,
-  NORMAL_EXTRA_DISALLOWED,
-  EVOLUTION_EXTRA_DISALLOWED,
   DEFAULT_MAX_HISTORY,
 } from './utils.js'
 
@@ -58,44 +53,6 @@ describe('stripImageData', () => {
   })
 })
 
-// ==================== resolveToolPermissions ====================
-
-describe('resolveToolPermissions', () => {
-  it('should return normal defaults when no options', () => {
-    const { allowed, disallowed } = resolveToolPermissions({})
-    expect(allowed).toEqual(NORMAL_ALLOWED_TOOLS)
-    expect(disallowed).toEqual(NORMAL_EXTRA_DISALLOWED)
-  })
-
-  it('should return evolution defaults when evolutionMode is true', () => {
-    const { allowed, disallowed } = resolveToolPermissions({ evolutionMode: true })
-    expect(allowed).toEqual(EVOLUTION_ALLOWED_TOOLS)
-    expect(disallowed).toEqual(EVOLUTION_EXTRA_DISALLOWED)
-  })
-
-  it('should use explicit allowedTools when provided', () => {
-    const custom = ['MyTool', 'AnotherTool']
-    const { allowed } = resolveToolPermissions({ allowedTools: custom })
-    expect(allowed).toEqual(custom)
-  })
-
-  it('should not use explicit allowedTools when array is empty', () => {
-    const { allowed } = resolveToolPermissions({ allowedTools: [] })
-    expect(allowed).toEqual(NORMAL_ALLOWED_TOOLS)
-  })
-
-  it('should merge disallowedTools with mode defaults', () => {
-    const { disallowed } = resolveToolPermissions({ disallowedTools: ['Dangerous'] })
-    expect(disallowed).toContain('Dangerous')
-    expect(disallowed).toContain('Bash')
-  })
-
-  it('should merge disallowedTools with evolution defaults (empty)', () => {
-    const { disallowed } = resolveToolPermissions({ evolutionMode: true, disallowedTools: ['Dangerous'] })
-    expect(disallowed).toEqual(['Dangerous'])
-  })
-})
-
 // ==================== buildChatHistoryPrompt ====================
 
 describe('buildChatHistoryPrompt', () => {
@@ -130,19 +87,6 @@ describe('buildChatHistoryPrompt', () => {
 // ==================== Constants ====================
 
 describe('constants', () => {
-  it('should have Bash in evolution allowed tools but not normal', () => {
-    expect(EVOLUTION_ALLOWED_TOOLS).toContain('Bash')
-    expect(NORMAL_ALLOWED_TOOLS).not.toContain('Bash')
-  })
-
-  it('should have Bash in normal disallowed', () => {
-    expect(NORMAL_EXTRA_DISALLOWED).toContain('Bash')
-  })
-
-  it('should have empty evolution disallowed', () => {
-    expect(EVOLUTION_EXTRA_DISALLOWED).toHaveLength(0)
-  })
-
   it('should have a positive DEFAULT_MAX_HISTORY', () => {
     expect(DEFAULT_MAX_HISTORY).toBeGreaterThan(0)
   })

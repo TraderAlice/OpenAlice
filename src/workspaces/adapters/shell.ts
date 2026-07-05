@@ -13,6 +13,7 @@ import type { CliAdapter, SpawnContext } from '../cli-adapter.js';
 export const shellAdapter: CliAdapter = {
   id: 'shell',
   displayName: 'Shell',
+  kind: 'utility',
   namePrefix: 'sh',
   capabilities: {
     parallelPerCwd: true,

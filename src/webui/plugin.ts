@@ -1,7 +1,8 @@
 import { Hono, type Context } from 'hono'
 import { cors } from 'hono/cors'
-import { serve } from '@hono/node-server'
+import { createAdaptorServer, serve } from '@hono/node-server'
 import { serveStatic } from '@hono/node-server/serve-static'
+import { rm } from 'node:fs/promises'
 import { uiBundlePath } from '@/core/paths.js'
 import type { Plugin, EngineContext } from '../core/types.js'
 import type { ProducerHandle } from '../core/producer.js'
@@ -12,7 +13,8 @@ import { createChannelsRoutes, type SSEClient } from './routes/channels.js'
 import { createConfigRoutes, createMarketDataRoutes } from './routes/config.js'
 import { createEventsRoutes } from './routes/events.js'
 import { createTopologyRoutes } from './routes/topology.js'
-import { createCronRoutes } from './routes/cron.js'
+import { createScheduleRoutes } from './routes/schedule.js'
+import { createIssuesRoutes } from './routes/issues.js'
 import { createTradingProxyRoutes } from './routes/trading-proxy.js'
 import { createTradingConfigRoutes } from './routes/trading-config.js'
 import { createToolsRoutes } from './routes/tools.js'
@@ -24,6 +26,7 @@ import { createBarsRoutes } from './routes/bars.js'
 import { createReferenceRoutes } from './routes/reference.js'
 import { createInboxRoutes } from './routes/inbox.js'
 import { createEntityRoutes } from './routes/entities.js'
+import { createWikilinkRoutes } from './routes/wikilink.js'
 import { createVersionRoutes } from './routes/version.js'
 import { createAuthRoutes } from './routes/auth.js'
 import { createAuthMiddleware } from './middleware/auth.js'
@@ -45,15 +48,26 @@ export function createWorkspaceServiceRef(): WorkspaceServiceRef {
 import { createWorkspaceRoutes } from './routes/workspaces.js'
 import { createHeadlessRoutes } from './routes/headless.js'
 import { attachWorkspacesWS, type AttachedWS } from './workspaces-ws.js'
+import { attachWorkspacesIpc, type AttachedWorkspaceIpc } from './workspaces-ipc.js'
+import { attachWebIpc, type AttachedWebIpc } from './web-ipc.js'
+import { mountLocalToolGateway } from '../server/local-tool-gateway.js'
 import type { Server as HttpServer } from 'node:http'
 
 export interface WebConfig {
   /** Effective web port (env-overridden if guardian injected, else from config file). */
   port: number
-  /** Effective MCP port — passed through to workspace service so the
-   *  PTY-injected `OPENALICE_MCP_URL` env points at the live backend
-   *  (not the template-baked default). */
+  /** Effective MCP/local-tool port retained for legacy logs and config. */
   mcpPort: number
+  /** Base URL used by workspace `alice*` CLI shims. */
+  toolBaseUrl: string
+  /** Optional MCP protocol URL. Absent when the MCP server is disabled. */
+  mcpBaseUrl?: string
+  /** Mount unauthenticated /cli on this web listener. Safe only on loopback. */
+  localCliOnWeb?: boolean
+  /** Start the TCP HTTP listener. Electron app mode sets this false. */
+  listen?: boolean
+  /** Optional Unix socket / named pipe for workspace CLI shims in app mode. */
+  cliSocketPath?: string
 }
 
 export class WebPlugin implements Plugin {
@@ -64,6 +78,9 @@ export class WebPlugin implements Plugin {
   private ingestProducer?: ProducerHandle<readonly ['agent.work.requested']>
   private workspaceService: WorkspaceService | null = null
   private workspacesWs: AttachedWS | null = null
+  private workspacesIpc: AttachedWorkspaceIpc | null = null
+  private webIpc: AttachedWebIpc | null = null
+  private cliSocketServer: HttpServer | null = null
 
   constructor(
     private config: WebConfig,
@@ -147,10 +164,28 @@ export class WebPlugin implements Plugin {
 
     app.use('/api/*', cors())
 
+    if (this.config.localCliOnWeb) {
+      if (bindIsPublic) {
+        throw new Error('Refusing to mount unauthenticated /cli on a non-loopback web listener')
+      }
+      // Electron/dev can reuse the loopback web listener for workspace CLI
+      // shims, eliminating the old default MCP/CLI side port. Docker/public-web
+      // keeps this off and uses a separate loopback-only local tool gateway.
+      mountLocalToolGateway(app, {
+        toolCenter: ctx.toolCenter,
+        workspaceToolCenter: ctx.workspaceToolCenter,
+        inboxStore: ctx.inboxStore,
+        entityStore: ctx.entityStore,
+        getWorkspaceService: () => this.workspaceServiceRef?.current ?? this.workspaceService,
+      })
+    }
+
     // ==================== Auth gate ====================
     //
-    // The gate sits between CORS and every route mount. Public surface
-    // (/api/auth/*, /api/version, /login, static assets, /mcp) is
+    // The gate sits between CORS and every normal route mount. When enabled,
+    // local `/cli` is mounted above this gate only on a loopback listener; all
+    // public web surfaces stay below the auth middleware.
+    // Public surface (/api/auth/*, /api/version, /login, static assets, /mcp) is
     // allowlisted inside the middleware itself. Localhost requests
     // bypass when no trusted proxy is configured — preserving the
     // zero-friction dev UX. See safe/playbooks/{01,02,03}-*.md for the
@@ -189,7 +224,6 @@ export class WebPlugin implements Plugin {
     app.route('/api/market-data', createMarketDataRoutes(ctx))
     app.route('/api/events', createEventsRoutes({ ctx, ingestProducer: this.ingestProducer }))
     app.route('/api/topology', createTopologyRoutes(ctx))
-    app.route('/api/cron', createCronRoutes(ctx))
     app.route('/api/trading/config', createTradingConfigRoutes(ctx))
     // `/api/trading/*` and `/api/simulator/*` are proxied to the co-located
     // UTA service (decision #2 of UTA-split v1 — UI stays single-origin).
@@ -216,16 +250,30 @@ export class WebPlugin implements Plugin {
     this.workspaceService = await createWorkspaceService({
       webPort: this.config.port,
       mcpPort: this.config.mcpPort,
+      toolBaseUrl: this.config.toolBaseUrl,
+      ...(this.config.cliSocketPath ? { toolSocketPath: this.config.cliSocketPath } : {}),
+      mcpBaseUrl: this.config.mcpBaseUrl,
+      inboxStore: ctx.inboxStore,
     })
+    this.workspacesIpc = attachWorkspacesIpc(this.workspaceService)
     if (this.workspaceServiceRef) this.workspaceServiceRef.current = this.workspaceService
     app.route('/api/workspaces', createWorkspaceRoutes(this.workspaceService))
     app.route('/api/headless', createHeadlessRoutes(this.workspaceService))
+    app.route('/api/schedule', createScheduleRoutes(this.workspaceService))
+    app.route('/api/issues', createIssuesRoutes(this.workspaceService))
     // Tracked entities — read surface for the Tracked tab. Mounted here (not
     // with the other /api/* routes above) because backlink scanning needs the
     // workspace registry, which only exists once workspaceService is created.
     app.route(
       '/api/entities',
       createEntityRoutes({ entityStore: ctx.entityStore, registry: this.workspaceService.registry }),
+    )
+    // Cross-namespace [[name]] resolver — entities (global store) + issues (per-
+    // workspace scan) in one lookup so the UI can navigate or disambiguate a
+    // clicked wikilink. Same dep shape rationale as /api/entities above.
+    app.route(
+      '/api/wikilink',
+      createWikilinkRoutes({ entityStore: ctx.entityStore, service: this.workspaceService }),
     )
 
     // ==================== Mount opentypebb (market data HTTP) ====================
@@ -249,6 +297,33 @@ export class WebPlugin implements Plugin {
     app.use('/*', serveStatic({ root: uiRoot }))
     app.get('*', serveStatic({ root: uiRoot, path: 'index.html' }))
 
+    this.webIpc = attachWebIpc(app)
+
+    if (this.config.cliSocketPath) {
+      if (process.platform !== 'win32') await rm(this.config.cliSocketPath, { force: true })
+      const server = createAdaptorServer({ fetch: (request, env) => app.fetch(request, env) }) as HttpServer
+      await new Promise<void>((resolveListen, rejectListen) => {
+        const onError = (err: Error) => {
+          server.off('listening', onListening)
+          rejectListen(err)
+        }
+        const onListening = () => {
+          server.off('error', onError)
+          resolveListen()
+        }
+        server.once('error', onError)
+        server.once('listening', onListening)
+        server.listen(this.config.cliSocketPath)
+      })
+      this.cliSocketServer = server
+      console.log(`local tool gateway listening on ${this.config.cliSocketPath}`)
+    }
+
+    if (this.config.listen === false) {
+      console.log('web plugin listening over Electron IPC')
+      return
+    }
+
     // ==================== Start server ====================
     // Default hostname is 127.0.0.1 — public-internet exposure requires
     // explicit `OPENALICE_BIND_HOST=0.0.0.0` (gated by the safety check
@@ -268,6 +343,12 @@ export class WebPlugin implements Plugin {
     this.sseByChannel.clear()
     this.ingestProducer?.dispose()
     this.ingestProducer = undefined
+    this.webIpc?.dispose()
+    this.webIpc = null
+    this.cliSocketServer?.close()
+    this.cliSocketServer = null
+    this.workspacesIpc?.dispose()
+    this.workspacesIpc = null
     this.workspacesWs?.dispose()
     this.workspacesWs = null
     if (this.workspaceService) {

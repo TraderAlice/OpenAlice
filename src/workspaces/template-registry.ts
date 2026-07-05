@@ -73,16 +73,17 @@ export interface TemplateMeta {
   /**
    * Launcher-owned context injection, post-bootstrap, gated per template
    * (defaults preserve each template's pre-standardization behavior):
-   *   injectMcp     — write the OpenAlice `.mcp.json`. `true` writes the full
-   *                   config (global tool server + workspace inbox server);
-   *                   `'inbox'` writes ONLY the inbox server (tools come from
-   *                   the `alice` CLI instead); `false` writes nothing.
+   *   injectTools   — inject the per-CLI playbooks (alice / alice-uta /
+   *                   alice-workspace / traderhub skills) so the agent knows the `alice*` CLI
+   *                   surface. The launcher injects NO MCP into workspaces;
+   *                   `false` = a template that ships its own tool docs
+   *                   (e.g. auto-quant).
    *   injectPersona — compose Alice persona + this template's instruction.md
    *                   into CLAUDE.md / AGENTS.md
    *   bundledSkills — names under `default/skills/` to copy into the
    *                   workspace's `.claude/skills` + `.agents/skills`
    */
-  readonly injectMcp: boolean | 'inbox';
+  readonly injectTools: boolean;
   readonly injectPersona: boolean;
   readonly bundledSkills: readonly string[];
   /**
@@ -119,8 +120,18 @@ export class TemplateRegistry {
       if (!entry.isDirectory()) continue;
       const name = entry.name;
       const templateDir = join(absDir, name);
-      const bootstrapScript = join(templateDir, 'bootstrap.sh');
-      if (!existsSync(bootstrapScript)) {
+      // Prefer the cross-platform Node bootstrap (`bootstrap.mjs`, run on the
+      // bundled Node + bundled git — works on bare Windows/Mac). Fall back to
+      // `bootstrap.sh` for third-party templates that still ship bash (only
+      // runnable where bash is on PATH).
+      const mjsScript = join(templateDir, 'bootstrap.mjs');
+      const shScript = join(templateDir, 'bootstrap.sh');
+      const bootstrapScript = existsSync(mjsScript)
+        ? mjsScript
+        : existsSync(shScript)
+          ? shScript
+          : undefined;
+      if (bootstrapScript === undefined) {
         logger.warn('templates.no_bootstrap', { name, templateDir });
         continue;
       }
@@ -141,7 +152,7 @@ export class TemplateRegistry {
         ...(hasReadme ? { readmePath } : {}),
         version,
         defaultAgents: tplMeta.defaultAgents,
-        injectMcp: tplMeta.injectMcp,
+        injectTools: tplMeta.injectTools,
         injectPersona: tplMeta.injectPersona,
         bundledSkills: tplMeta.bundledSkills,
         ...(tplMeta.agentCredentials !== undefined ? { agentCredentials: tplMeta.agentCredentials } : {}),
@@ -189,7 +200,7 @@ interface ParsedTemplateMeta {
    *  outside OpenAlice. UI surfaces separate these from official templates. */
   readonly community?: boolean;
   readonly defaultAgents: readonly string[];
-  readonly injectMcp: boolean | 'inbox';
+  readonly injectTools: boolean;
   readonly injectPersona: boolean;
   readonly bundledSkills: readonly string[];
   readonly agentCredentials?: Readonly<Record<string, AgentCredentialDecl>>;
@@ -245,7 +256,7 @@ function extractVersion(raw: string): string {
 
 async function readTemplateMeta(path: string): Promise<ParsedTemplateMeta> {
   const fallback: ParsedTemplateMeta = {
-    defaultAgents: ['claude'], injectMcp: false, injectPersona: false, bundledSkills: [],
+    defaultAgents: ['claude'], injectTools: false, injectPersona: false, bundledSkills: [],
   };
   try {
     if (!statSync(path).isFile()) return fallback;
@@ -267,8 +278,7 @@ async function readTemplateMeta(path: string): Promise<ParsedTemplateMeta> {
     const defaultAgents = Array.isArray(obj['defaultAgents'])
       ? obj['defaultAgents'].filter((a): a is string => typeof a === 'string')
       : null;
-    const injectMcp: boolean | 'inbox' =
-      obj['injectMcp'] === 'inbox' ? 'inbox' : obj['injectMcp'] === true;
+    const injectTools = obj['injectTools'] === true;
     const injectPersona = obj['injectPersona'] === true;
     // Skill names become directory names under `.claude/skills/` — reject any
     // with path separators / traversal as a defensive measure.
@@ -284,7 +294,7 @@ async function readTemplateMeta(path: string): Promise<ParsedTemplateMeta> {
       ...(groupOrder !== undefined ? { groupOrder } : {}),
       ...(community !== undefined ? { community } : {}),
       defaultAgents: defaultAgents && defaultAgents.length > 0 ? defaultAgents : ['claude'],
-      injectMcp,
+      injectTools,
       injectPersona,
       bundledSkills,
       ...(agentCredentials !== undefined ? { agentCredentials } : {}),

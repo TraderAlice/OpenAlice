@@ -1,6 +1,9 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { ViewSpec } from './types'
+import { reloadOnHotUpdate } from '../lib/hmr'
+
+reloadOnHotUpdate('tabs/watchlist-store')
 
 type AssetClass = Extract<ViewSpec, { kind: 'market-detail' }>['params']['assetClass']
 

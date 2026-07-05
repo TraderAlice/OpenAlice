@@ -8,11 +8,19 @@ interface SidebarRowProps {
   /** Click handler for the row body. Trailing actions should `stopPropagation`. */
   onClick: () => void
   /**
+   * Optional leading glyph (shrink-0), e.g. an entity-type icon. Pass the
+   * fully-styled node — the row doesn't impose a size or colour so callers
+   * keep control (e.g. `<TrendingUp size={13} className="text-text-muted/70" />`).
+   */
+  icon?: ReactNode
+  /**
    * Right-aligned content slot — status badges, counts, hover-revealed
    * action buttons. The row uses `group` so consumers can apply
    * `opacity-0 group-hover:opacity-100` to reveal-on-hover affordances.
    */
   trail?: ReactNode
+  /** Optional native tooltip for the whole row (e.g. an entity description). */
+  title?: string
   /** Optional disabled / dimmed presentation, e.g. for off-by-default rows. */
   dim?: boolean
 }
@@ -32,19 +40,20 @@ interface SidebarRowProps {
  * can nest action buttons inside `trail` (HTML disallows nested buttons).
  * Enter / Space activate the row for keyboard users.
  */
-export function SidebarRow({ label, active = false, onClick, trail, dim = false }: SidebarRowProps) {
+export function SidebarRow({ label, active = false, onClick, icon, trail, title, dim = false }: SidebarRowProps) {
   return (
     <div
       role="button"
       tabIndex={0}
       onClick={onClick}
+      title={title}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault()
           onClick()
         }
       }}
-      className={`group relative flex items-center gap-1.5 px-3 py-1 text-[13px] cursor-pointer transition-colors outline-none focus-visible:bg-bg-tertiary/70 ${
+      className={`group relative flex min-h-10 items-center gap-1.5 px-3 py-2 text-[13px] cursor-pointer transition-colors outline-none focus-visible:bg-bg-tertiary/70 ${
         active
           ? 'bg-bg-tertiary text-text'
           : 'text-text hover:bg-bg-tertiary/50'
@@ -56,6 +65,7 @@ export function SidebarRow({ label, active = false, onClick, trail, dim = false 
           className="absolute left-0 top-0 bottom-0 w-[2px] bg-accent"
         />
       )}
+      {icon && <span className="shrink-0 flex items-center">{icon}</span>}
       <span className="truncate flex-1">{label}</span>
       {trail && <div className="shrink-0 flex items-center gap-0.5">{trail}</div>}
     </div>

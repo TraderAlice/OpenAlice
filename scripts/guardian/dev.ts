@@ -58,9 +58,13 @@ async function main(): Promise<void> {
   const flagPath = resolve(dataHome, 'data/control/restart-uta.flag')
 
   console.log('')
+  console.log(`[guardian] mode     →  dev (Guardian + UTA + Alice + Vite)`)
+  console.log(`[guardian] data     →  ${dataHome}`)
+  console.log(`[guardian] app      →  ${process.cwd()}`)
   console.log(`[guardian] UTA      →  http://127.0.0.1:${ports.utaPort}`)
   console.log(`[guardian] Alice    →  http://localhost:${ports.webPort}`)
-  console.log(`[guardian] MCP      →  http://localhost:${ports.mcpPort}/mcp`)
+  console.log(`[guardian] Tools    →  http://127.0.0.1:${ports.mcpPort}/cli`)
+  console.log(`[guardian] MCP      →  optional on http://127.0.0.1:${ports.mcpPort}/mcp`)
   console.log(`[guardian] UI       →  http://localhost:${ports.uiPort}`)
   console.log(`[guardian] flag     →  ${flagPath}`)
   console.log('')
@@ -71,6 +75,7 @@ async function main(): Promise<void> {
     // Children must resolve the same user-data root the Guardian watches —
     // src/core/paths.ts reads OPENALICE_HOME; never rely on cwd inheritance.
     OPENALICE_HOME: dataHome,
+    OPENALICE_LAUNCHER: 'dev',
   }
 
   // ── UTA spec (re-used by Guardian for restart) ────────────
@@ -102,6 +107,7 @@ async function main(): Promise<void> {
       ...baseEnv,
       OPENALICE_WEB_PORT: String(ports.webPort),
       OPENALICE_MCP_PORT: String(ports.mcpPort),
+      OPENALICE_TOOL_BASE_URL: `http://127.0.0.1:${ports.mcpPort}/cli`,
       // Where the UI actually lives — consumed by the workspace WS-origin
       // allowlist (src/workspaces/config.ts buildDefaultOrigins).
       OPENALICE_UI_PORT: String(ports.uiPort),
@@ -109,6 +115,16 @@ async function main(): Promise<void> {
     },
     prefixLogs: true,
   })
+
+  const aliceReady = await waitForHttp(`http://127.0.0.1:${ports.webPort}/api/version`, { timeoutMs: 20_000 })
+  if (!aliceReady) {
+    console.error(`[guardian] Alice failed to come up within 20s — aborting before Vite starts`)
+    console.error(`[guardian] If another OpenAlice/Electron instance is running on the same data root, stop it or run dev with an isolated OPENALICE_HOME/AQ_LAUNCHER_ROOT.`)
+    try { alice.kill('SIGTERM') } catch { /* noop */ }
+    try { uta.process.kill('SIGTERM') } catch { /* noop */ }
+    process.exit(1)
+  }
+  console.log(`[guardian] Alice ready`)
 
   // ── Vite ──────────────────────────────────────────────────
   const vite: ChildProcess = spawnChild({

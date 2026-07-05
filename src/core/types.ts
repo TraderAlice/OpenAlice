@@ -5,11 +5,11 @@ import type { MarketSearchDeps } from '../domain/market-data/aggregate-search.js
 import type { EquityClientLike } from '../domain/market-data/client/types.js'
 import type { BarService } from '../domain/market-data/bars/index.js'
 import type { ReferenceDataService } from '../domain/market-data/reference/types.js'
-import type { CronEngine } from '../task/cron/engine.js'
 import type { Config, WebChannel } from './config.js'
 import type { EventLog } from './event-log.js'
 import type { ToolCallLog } from './tool-call-log.js'
 import type { ToolCenter } from './tool-center.js'
+import type { WorkspaceToolCenter } from './workspace-tool-center.js'
 import type { ListenerRegistry } from './listener-registry.js'
 import type { EventBus } from './event-bus.js'
 import type { IInboxStore } from './inbox-store.js'
@@ -45,8 +45,8 @@ export interface EngineContext {
   entityStore: IEntityStore
   eventLog: EventLog
   toolCallLog: ToolCallLog
-  cronEngine: CronEngine
   toolCenter: ToolCenter
+  workspaceToolCenter: WorkspaceToolCenter
   listenerRegistry: ListenerRegistry
   /** Ergonomic in-process producer facade. Use this to fire events from
    *  plugins / hacks / extension code instead of plumbing eventLog. */

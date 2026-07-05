@@ -9,3 +9,5 @@ Each row corresponds to one migration in `src/migrations/`. The runner applies p
 |----|-------------|------|---------|---------|
 | `0008_disable_targetless_cron_jobs` | 0.40.0-beta.3 | 2026-06-08 | cron/jobs.json | Disable enabled cron jobs that have no target workspace (legacy AgentWork-era jobs) so they stop firing into the retired path. |
 | `0009_seal_broker_credentials` | 0.41.0-beta.2 | 2026-06-11 | accounts.json | Seal broker credentials at rest (AES-256-GCM envelope + 0600), replacing plaintext accounts.json |
+| `0010_workspace_issues_to_markdown` | 0.60.0-beta.1 | 2026-06-27 | workspaces/<id>/.alice/{issue,schedule}.json | Convert legacy workspace declarations (.alice/schedule.json, .alice/issue.json) into the per-issue markdown format (.alice/issues/<id>.md) so existing self-scheduled issues survive the upgrade. |
+| `0011_workspace_issue_assignee_defaults` | 0.72.0-beta | 2026-07-04 | workspaces/<id>/.alice/issues/*.md | Remove legacy `assignee: unassigned` defaults from workspace issue files so missing assignees resolve to the owning workspace. |

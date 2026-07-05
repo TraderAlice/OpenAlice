@@ -18,7 +18,7 @@ export function PageHeader({ title, description, right, live }: PageHeaderProps)
       <div className="px-4 md:px-6 py-5 flex items-center justify-between gap-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h2 className="text-lg font-bold text-text truncate">{title}</h2>
+            <h2 className="text-title font-bold text-text truncate">{title}</h2>
             {live && (
               <span
                 className="relative inline-block w-1.5 h-1.5 rounded-full bg-green live-pulse shrink-0"

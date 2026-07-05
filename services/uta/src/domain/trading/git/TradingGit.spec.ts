@@ -688,7 +688,9 @@ describe('TradingGit', () => {
 
       const pending = gitP.getPendingOrderIds()
       expect(pending).toHaveLength(1)
-      expect(pending[0]).toEqual({ orderId: 'lmt-1', symbol: 'AAPL' })
+      // localSymbol/aliceId ride along when the operation's contract has
+      // them — broker lookup hint + reconcile race guard respectively.
+      expect(pending[0]).toMatchObject({ orderId: 'lmt-1', symbol: 'AAPL' })
     })
 
     it('excludes orders that have been synced to filled', async () => {
@@ -720,6 +722,72 @@ describe('TradingGit', () => {
       expect(gitP.getPendingOrderIds()).toHaveLength(0)
     })
 
+    it('tracks bracket TP/SL legs from birth (Alpaca naked-ledger bug)', async () => {
+      // The bug: bracket legs existed only on the exchange — order list,
+      // sync poller, and cancel were all blind to them; the held SL leg
+      // never even appears in the venue's open-orders listing.
+      const legConfig = makeConfig({
+        executeOperation: vi.fn().mockResolvedValue({
+          success: true,
+          orderId: 'parent-1',
+          legs: [
+            { orderId: 'leg-tp', kind: 'takeProfit' },
+            { orderId: 'leg-sl', kind: 'stopLoss' },
+          ],
+        }),
+      })
+      const gitP = new TradingGit(legConfig)
+
+      gitP.add(buyOp('AAPL'))
+      gitP.commit('bracket buy')
+      await gitP.push()
+
+      const pending = gitP.getPendingOrderIds()
+      expect(pending.map((p) => p.orderId).sort()).toEqual(['leg-sl', 'leg-tp', 'parent-1'])
+      // Legs inherit the parent operation's contract (symbol-scoped lookups
+      // + restart survival need it).
+      for (const p of pending) expect(p.symbol).toBe('AAPL')
+
+      // Observation pass must never re-record our own legs as external.
+      const known = gitP.getKnownOrderIds()
+      expect(known.has('leg-tp')).toBe(true)
+      expect(known.has('leg-sl')).toBe(true)
+
+      // A later sync resolving a leg removes it from pending, keeps the rest.
+      await gitP.sync(
+        [{
+          orderId: 'leg-tp', symbol: 'AAPL',
+          previousStatus: 'submitted', currentStatus: 'filled',
+          filledPrice: '297', filledQty: '1',
+        }],
+        makeGitState(),
+      )
+      expect(gitP.getPendingOrderIds().map((p) => p.orderId).sort()).toEqual(['leg-sl', 'parent-1'])
+    })
+
+    it('survives a multi-update sync commit (1 op, N results — boot-loop regression)', async () => {
+      const gitP = new TradingGit(makeConfig({
+        executeOperation: vi.fn().mockResolvedValue({ success: true, orderId: 'o-1' }),
+      }))
+      gitP.add(buyOp('AAPL'))
+      gitP.commit('buy')
+      await gitP.push()
+
+      // One sync commit carrying TWO updates → operations[1] is undefined;
+      // the pending scan crashed the whole UTA process on every boot once
+      // such a commit was persisted in the journal.
+      await gitP.sync(
+        [
+          { orderId: 'o-1', symbol: 'AAPL', previousStatus: 'submitted', currentStatus: 'filled', filledPrice: '10', filledQty: '1' },
+          { orderId: 'o-2', symbol: 'MSFT', previousStatus: 'submitted', currentStatus: 'cancelled' },
+        ],
+        makeGitState(),
+      )
+
+      expect(() => gitP.getPendingOrderIds()).not.toThrow()
+      expect(gitP.getPendingOrderIds()).toHaveLength(0)
+    })
+
     it('excludes orders that were filled at push time (no sync needed)', async () => {
       const orderState = new OrderState()
       orderState.status = 'Filled'
@@ -741,7 +809,84 @@ describe('TradingGit', () => {
     })
   })
 
+  describe('log — sync commit attribution', () => {
+    it('renders one row per sync update, attributed by the update symbol', async () => {
+      const gitS = new TradingGit(makeConfig({
+        executeOperation: vi.fn().mockResolvedValue({ success: true, orderId: 'o-1' }),
+      }))
+      gitS.add(buyOp('AAPL'))
+      gitS.commit('buy')
+      await gitS.push()
+
+      await gitS.sync(
+        [
+          { orderId: 'o-1', symbol: 'AAPL', previousStatus: 'submitted', currentStatus: 'filled', filledPrice: '150', filledQty: '10' },
+          { orderId: 'o-2', symbol: 'TSLA', previousStatus: 'submitted', currentStatus: 'cancelled' },
+        ],
+        makeGitState(),
+      )
+
+      const [head] = gitS.log({ limit: 1 })
+      expect(head.operations).toHaveLength(2)
+      expect(head.operations.map((o) => o.symbol)).toEqual(['AAPL', 'TSLA'])
+      expect(head.operations[0].change).toContain('@150')
+    })
+  })
+
   // ==================== simulatePriceChange ====================
+
+  describe('simulatePriceChange — derivative handling (community sign-flip report)', () => {
+    it('excludes option rows from a symbol-level change and applies multiplier to applied rows', async () => {
+      const optContract = makeContract({ symbol: 'AAPL' })
+      optContract.secType = 'OPT'
+      optContract.strike = 260
+      optContract.right = 'P'
+      const gitS = new TradingGit(makeConfig({
+        getGitState: vi.fn().mockResolvedValue(makeGitState({
+          positions: [
+            { contract: makeContract({ symbol: 'AAPL' }), currency: 'USD', side: 'long',
+              quantity: new Decimal(10), avgCost: '261', marketPrice: '290',
+              marketValue: '2900', unrealizedPnL: '290', realizedPnL: '0', multiplier: '1' },
+            // short put — its own price must NOT be replaced by the stock's
+            { contract: optContract, currency: 'USD', side: 'short',
+              quantity: new Decimal(1), avgCost: '1.03', marketPrice: '1.15',
+              marketValue: '115', unrealizedPnL: '-12', realizedPnL: '0', multiplier: '100' },
+          ] as never,
+        })),
+      }))
+
+      const r = await gitS.simulatePriceChange([{ symbol: 'AAPL', change: '-5%' }])
+      expect(r.success).toBe(true)
+      const rows = r.simulatedState.positions
+      // Stock row moved; option row untouched (no +23,000% garbage)
+      expect(Number(rows[0].simulatedPrice)).toBeCloseTo(275.5, 1)
+      expect(rows[1].simulatedPrice).toBe('1.15')
+      expect(rows[1].pnlChange).toBe('0')
+      // exclusion is loud, not silent
+      expect(r.summary.worstCase).toMatch(/derivative positions not simulated/i)
+      expect(r.summary.worstCase).toMatch(/OPT/)
+    })
+
+    it("'all' scales a derivative's OWN mark with multiplier-aware math", async () => {
+      const optContract = makeContract({ symbol: 'AAPL' })
+      optContract.secType = 'OPT'
+      const gitS = new TradingGit(makeConfig({
+        getGitState: vi.fn().mockResolvedValue(makeGitState({
+          positions: [
+            { contract: optContract, currency: 'USD', side: 'short',
+              quantity: new Decimal(1), avgCost: '1.03', marketPrice: '1.00',
+              marketValue: '100', unrealizedPnL: '3', realizedPnL: '0', multiplier: '100' },
+          ] as never,
+        })),
+      }))
+      const r = await gitS.simulatePriceChange([{ symbol: 'all', change: '+10%' }])
+      const row = r.simulatedState.positions[0]
+      // own mark 1.00 → 1.10; short: (1.03 − 1.10) × 1 × 100 = −7
+      expect(Number(row.simulatedPrice)).toBeCloseTo(1.10, 8)
+      expect(Number(row.unrealizedPnL)).toBeCloseTo(-7, 6)
+      expect(Number(row.marketValue)).toBeCloseTo(110, 6)
+    })
+  })
 
   describe('simulatePriceChange', () => {
     it('returns empty state when no positions', async () => {

@@ -10,6 +10,10 @@ import { z } from 'zod'
 import type { INewsProvider, NewsItem } from '../types.js'
 
 const NEWS_LIMIT = 500
+/** Default cap on windowRss OUTPUT — a wide date window can match hundreds; we
+ *  bound what's returned and report how many were omitted, rather than wall the
+ *  caller's context. */
+const WINDOW_DEFAULT_LIMIT = 40
 
 // ==================== Pure functions (testable) ====================
 
@@ -20,6 +24,8 @@ export interface NewsToolContext {
 
 export interface GlobRssResult {
   id: number
+  /** Publish time (ISO) — so matches can be put on a timeline without reading each. */
+  time: string
   title: string
   contentLength: number
   metadata: string
@@ -27,9 +33,20 @@ export interface GlobRssResult {
 
 export interface GrepRssResult {
   id: number
+  /** Publish time (ISO) — so matches can be put on a timeline without reading each. */
+  time: string
   title: string
   matchedText: string
   contentLength: number
+  metadata: string
+}
+
+export interface WindowRssResult {
+  id: number
+  time: string
+  title: string
+  /** Present only when a pattern was given (the matched snippet). */
+  matchedText?: string
   metadata: string
 }
 
@@ -65,6 +82,7 @@ export async function globRss(
 
     results.push({
       id: item.id,
+      time: new Date(item.time).toISOString(),
       title: item.title,
       contentLength: item.content.length,
       metadata: truncateMetadata(item.metadata),
@@ -110,6 +128,7 @@ export async function grepRss(
 
     results.push({
       id: item.id,
+      time: new Date(item.time).toISOString(),
       title: item.title,
       matchedText,
       contentLength: item.content.length,
@@ -122,6 +141,41 @@ export async function grepRss(
   }
 
   return results
+}
+
+/** Articles within a time window (event study) — optionally pattern-filtered,
+ *  returned OLDEST-first so they line up against a price path. The window itself
+ *  is set by the caller's `getNews` (provider start/endTime). */
+export async function windowRss(
+  context: NewsToolContext,
+  options: { pattern?: string; metadataFilter?: Record<string, string>; contextChars?: number; limit?: number },
+): Promise<WindowRssResult[]> {
+  const news = await context.getNews()
+  const regex = options.pattern ? new RegExp(options.pattern, 'i') : null
+  const contextChars = options.contextChars ?? 50
+  const out: WindowRssResult[] = []
+
+  for (const item of news) {
+    if (options.metadataFilter && !matchesMetadataFilter(item.metadata, options.metadataFilter)) continue
+    let matchedText: string | undefined
+    if (regex) {
+      const searchText = `${item.title}\n${item.content}`
+      const m = regex.exec(searchText)
+      if (!m) continue
+      const s = Math.max(0, m.index - contextChars)
+      const e = Math.min(searchText.length, m.index + m[0].length + contextChars)
+      matchedText = `${s > 0 ? '...' : ''}${searchText.slice(s, e)}${e < searchText.length ? '...' : ''}`
+    }
+    out.push({
+      id: item.id,
+      time: new Date(item.time).toISOString(),
+      title: item.title,
+      ...(matchedText ? { matchedText } : {}),
+      metadata: truncateMetadata(item.metadata),
+    })
+  }
+  out.sort((a, b) => a.time.localeCompare(b.time)) // oldest-first for timeline alignment
+  return options.limit ? out.slice(0, options.limit) : out
 }
 
 /** Read full news content by stable id (like "cat") */
@@ -193,6 +247,48 @@ Example: grepRss({ pattern: "interest rate", lookback: "2d" })`,
           { getNews: () => provider.getNewsV2({ endTime: new Date(), lookback, limit: NEWS_LIMIT }) },
           { pattern, contextChars, metadataFilter, limit },
         )
+      },
+    }),
+
+    windowRss: tool({
+      description: `Articles within a DATE WINDOW (event study), oldest-first — for aligning news against a price path ("what hit between the gap-up and the fade").
+
+Returns id + ISO time + title (+ matched snippet when a pattern is given), sorted oldest→newest so the timeline lines up with bars. Pair with marketSnapshot/simulate to attribute a move to a catalyst.
+
+Coverage is the user's SUBSCRIBED RSS feeds only (not the news at large) — an empty window means "nothing in the subscribed feeds for that span", not "nothing happened". Pass a \`pattern\` to filter, or omit it to get everything in the window.
+
+Example: windowRss({ from: "2026-06-20", to: "2026-06-26", pattern: "Iran|oil" })`,
+      inputSchema: z.object({
+        from: z.string().describe('Window start (YYYY-MM-DD or ISO).'),
+        to: z.string().optional().describe('Window end (YYYY-MM-DD or ISO). Default: now.'),
+        pattern: z.string().optional().describe('Optional regex over title+content. Omit for everything in the window.'),
+        contextChars: z.number().int().positive().optional().describe('Context chars around a pattern match (default 50).'),
+        metadataFilter: z.record(z.string(), z.string()).optional().describe('Filter by metadata key-value (e.g. source).'),
+        limit: z.number().int().positive().optional().describe(`Max results returned (default ${WINDOW_DEFAULT_LIMIT}). A wide window can match hundreds; raise this, or narrow the pattern/window. The result reports total + how many were omitted.`),
+      }).meta({ examples: [{ from: '2026-06-20', to: '2026-06-26', pattern: 'Iran|oil' }] }),
+      execute: async ({ from, to, pattern, contextChars, metadataFilter, limit }) => {
+        const startTime = new Date(from)
+        const endTime = to ? new Date(to) : new Date()
+        if (Number.isNaN(startTime.getTime()) || Number.isNaN(endTime.getTime())) {
+          return { error: 'from/to must be YYYY-MM-DD or ISO dates.' }
+        }
+        // Fetch ALL matches in the window, then bound the OUTPUT (a wide window can
+        // be a wall of hundreds) — and say how many we left out, oldest-first.
+        const all = await windowRss(
+          { getNews: () => provider.getNewsV2({ startTime, endTime, limit: 5000 }) },
+          { pattern, contextChars, metadataFilter },
+        )
+        const cap = limit ?? WINDOW_DEFAULT_LIMIT
+        const results = all.slice(0, cap)
+        const omitted = all.length - results.length
+        return {
+          from: startTime.toISOString(),
+          to: endTime.toISOString(),
+          total: all.length,
+          shown: results.length,
+          ...(omitted > 0 ? { omitted, note: `${omitted} more match(es) in this window are not shown (oldest-first; showing the earliest ${results.length}). Narrow the pattern/window, or raise limit.` } : {}),
+          results,
+        }
       },
     }),
 

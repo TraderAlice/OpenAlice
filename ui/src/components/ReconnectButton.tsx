@@ -27,12 +27,15 @@ export function ReconnectButton({ accountId }: { accountId: string }) {
     }
   }
 
+  // No outer margin here — spacing belongs to the call site (this rides in
+  // the page-header action row AND in the edit dialog; a baked-in mt-3 was
+  // what knocked the header buttons out of alignment).
   return (
-    <div className="flex items-center gap-3 mt-3">
+    <div className="flex items-center gap-2">
       <button
         onClick={handleReconnect}
         disabled={status === 'loading'}
-        className="px-3 py-1.5 text-[13px] font-medium rounded-md border border-border hover:bg-bg-tertiary disabled:opacity-50 transition-colors"
+        className="btn-secondary-sm"
       >
         {status === 'loading' ? 'Connecting...' : 'Reconnect'}
       </button>

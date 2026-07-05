@@ -1,13 +1,18 @@
 .workspaces-root {
-  color-scheme: dark;
-  --bg: #0b0d10;
-  --panel: #11151a;
-  --sidebar: #0d1014;
-  --border: #21262d;
-  --fg-dim: #8b949e;
-  --fg: #e6edf3;
-  --accent: #79c0ff;
-  --danger: #ff7b72;
+  /* Alias the local palette to the global theme tokens so the whole
+     Workspaces surface (session view + sidebar) follows light / dark.
+     `color-scheme` is inherited from :root (per-theme), not pinned dark.
+     The terminal itself is themed separately (xterm ITheme in Terminal.tsx).
+     Remaining hardcoded semantic chips (agent badges, status pills) are
+     tracked in ANG-110. */
+  --bg: var(--color-bg);
+  --panel: var(--color-bg-secondary);
+  --sidebar: var(--color-bg-secondary);
+  --border: var(--color-border);
+  --fg-dim: var(--color-text-muted);
+  --fg: var(--color-text);
+  --accent: var(--color-accent);
+  --danger: var(--color-red);
 }
 
 .app {
@@ -16,529 +21,6 @@
   grid-template-columns: 260px 1fr;
 }
 
-/* ── Sidebar ──────────────────────────────────────────────────────────────── */
-
-.sidebar {
-  border-right: 1px solid var(--border);
-  background: var(--sidebar);
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-.sidebar-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border);
-}
-
-.sidebar-title {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
-  color: var(--fg-dim);
-}
-
-.sidebar-new-btn {
-  background: none;
-  border: 1px solid var(--border);
-  color: var(--fg);
-  width: 24px;
-  height: 24px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 16px;
-  line-height: 1;
-}
-.sidebar-new-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.sidebar-create {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border);
-}
-.sidebar-template-select {
-  flex: 1 1 100%;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  color: var(--fg);
-  padding: 4px 6px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-}
-.sidebar-template-select:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-.sidebar-create input {
-  flex: 1 1 auto;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  color: var(--fg);
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-}
-.sidebar-create input:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-.sidebar-create button {
-  background: var(--accent);
-  color: var(--bg);
-  border: 0;
-  padding: 4px 10px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.sidebar-create button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.sidebar-create-agents {
-  flex: 1 1 100%;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 10px;
-  font-size: 11px;
-  color: var(--fg-dim);
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-}
-
-.sidebar-agent-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  cursor: pointer;
-  user-select: none;
-}
-.sidebar-agent-toggle input {
-  width: 12px;
-  height: 12px;
-  accent-color: var(--accent);
-  cursor: pointer;
-}
-.sidebar-agent-toggle:hover {
-  color: var(--fg);
-}
-
-.sidebar-action-spawn {
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-/* ── Spawn menu popover (workspace row's + button at N≥2 agents) ──────────── */
-
-.sidebar-spawn-wrap {
-  position: relative;
-  display: inline-flex;
-}
-
-.sidebar-spawn-menu {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  margin-top: 4px;
-  list-style: none;
-  padding: 4px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
-  z-index: 30;
-  min-width: 140px;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.sidebar-spawn-menu-item {
-  width: 100%;
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 8px;
-  align-items: baseline;
-  padding: 5px 10px;
-  background: none;
-  border: 0;
-  color: var(--fg);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-  border-radius: 4px;
-  text-align: left;
-}
-.sidebar-spawn-menu-item:hover {
-  background: rgba(121, 192, 255, 0.10);
-  color: var(--accent);
-}
-
-.sidebar-spawn-menu-prefix {
-  color: var(--fg-dim);
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-}
-
-.sidebar-spawn-menu-name {
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-}
-
-.sidebar-spawn-menu-suffix {
-  color: var(--fg-dim);
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 10px;
-}
-
-.sidebar-error {
-  padding: 6px 14px;
-  color: var(--danger);
-  font-size: 12px;
-}
-
-.sidebar-list {
-  list-style: none;
-  margin: 0;
-  padding: 6px 0;
-  overflow-y: auto;
-  flex: 1 1 auto;
-}
-
-.sidebar-empty {
-  padding: 12px 14px;
-  font-size: 12px;
-  color: var(--fg-dim);
-}
-
-/* Pinned "Overview" row at the top of the workspaces list. Opens the
- * dashboard view rather than a session — visually distinct (icon-led,
- * slightly muted, no agent badges or session children) so users don't
- * confuse it with a workspace. */
-.sidebar-overview-row {
-  list-style: none;
-  margin: 0 0 4px 0;
-  padding: 0;
-}
-.sidebar-overview-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  background: none;
-  border: 0;
-  border-left: 2px solid transparent;
-  padding: 6px 14px;
-  font-family: inherit;
-  font-size: 12px;
-  color: var(--fg-dim);
-  cursor: pointer;
-  transition: background 0.12s, color 0.12s, border-color 0.12s;
-}
-.sidebar-overview-btn:hover {
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--fg);
-}
-.sidebar-overview-btn.is-active {
-  background: rgba(121, 192, 255, 0.08);
-  border-left-color: var(--accent);
-  color: var(--fg);
-}
-.sidebar-overview-btn > svg {
-  flex-shrink: 0;
-  opacity: 0.85;
-}
-
-.sidebar-row {
-  display: flex;
-  align-items: stretch;
-}
-.sidebar-row.is-selected {
-  background: rgba(121, 192, 255, 0.08);
-  border-left: 2px solid var(--accent);
-}
-.sidebar-row.is-selected .sidebar-row-main {
-  padding-left: 12px;
-}
-
-.sidebar-row-main {
-  background: none;
-  border: 0;
-  color: var(--fg);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
-  flex: 1 1 auto;
-  /* min-width: 0 lets the .sidebar-tag child shrink below its intrinsic
-   * width so the text-overflow ellipsis kicks in. Without this, long tags
-   * push the row wider than the sidebar column and wrap or overflow. */
-  min-width: 0;
-  cursor: pointer;
-  text-align: left;
-  font: inherit;
-}
-.sidebar-row-main:hover {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.sidebar-status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex: 0 0 auto;
-}
-
-.sidebar-tag {
-  flex: 1 1 auto;
-  /* Required for ellipsis to work inside a flex parent (matches the
-   * min-width: 0 on .sidebar-row-main above). */
-  min-width: 0;
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 13px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sidebar-meta {
-  font-size: 11px;
-  color: var(--fg-dim);
-  font-variant-numeric: tabular-nums;
-}
-
-/* ── Workspace row action buttons (hover-revealed) ────────────────────────── */
-
-.sidebar-action {
-  background: none;
-  border: 0;
-  color: var(--fg-dim);
-  padding: 0 6px;
-  cursor: pointer;
-  font-size: 14px;
-  opacity: 0;
-  transition: opacity 80ms, color 80ms;
-}
-.sidebar-tree-item:hover .sidebar-action,
-.sidebar-row.is-selected .sidebar-action {
-  opacity: 1;
-}
-.sidebar-action:hover {
-  color: var(--accent);
-}
-.sidebar-action.sidebar-action-stop:hover {
-  color: #d29922;
-}
-.sidebar-action.sidebar-action-delete {
-  padding: 0 10px;
-  font-size: 16px;
-}
-.sidebar-action.sidebar-action-delete:hover {
-  color: var(--danger);
-}
-
-/* ── Workspace tree (children under each workspace row) ───────────────────── */
-
-.sidebar-tree-item {
-  display: flex;
-  flex-direction: column;
-}
-
-.sidebar-children {
-  list-style: none;
-  margin: 0;
-  padding: 0 0 4px 0;
-}
-
-.sidebar-session {
-  display: flex;
-  align-items: center;
-  margin-left: 22px;
-  border-left: 1px solid var(--border);
-  padding-left: 8px;
-  transition: background 80ms;
-}
-.sidebar-session:hover {
-  background: rgba(255, 255, 255, 0.03);
-}
-.sidebar-session.is-active {
-  background: rgba(121, 192, 255, 0.10);
-  border-left-color: var(--accent);
-}
-
-.sidebar-session-main {
-  background: none;
-  border: 0;
-  color: var(--fg);
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 3px 8px 3px 4px;
-  flex: 1 1 auto;
-  cursor: pointer;
-  text-align: left;
-  font: inherit;
-  min-width: 0;
-}
-
-.sidebar-session-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #7ee787;
-  flex: 0 0 auto;
-}
-.sidebar-session-dot-disk {
-  background: transparent;
-  border: 1px solid var(--fg-dim);
-}
-
-/* Per-agent badge that replaces the green dot on live session rows. The
- * letter is the adapter's `namePrefix`; the colour disambiguates at a glance
- * (claude blue / codex green / shell gray). */
-.sidebar-agent-badge {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 14px;
-  border-radius: 3px;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0;
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  text-transform: lowercase;
-}
-.sidebar-agent-badge.is-claude {
-  background: rgba(121, 192, 255, 0.18);
-  color: #79c0ff;
-}
-.sidebar-agent-badge.is-codex {
-  background: rgba(126, 231, 135, 0.18);
-  color: #7ee787;
-}
-.sidebar-agent-badge.is-shell {
-  background: rgba(210, 153, 34, 0.18);
-  color: #d29922;
-}
-.sidebar-agent-badge.is-unknown {
-  background: rgba(110, 118, 129, 0.25);
-  color: var(--fg-dim);
-}
-
-.sidebar-session-name {
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--fg);
-}
-.sidebar-session.is-active .sidebar-session-name {
-  color: var(--accent);
-}
-
-.sidebar-session-tid {
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 10px;
-  color: var(--fg-dim);
-  font-variant-numeric: tabular-nums;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sidebar-session-age {
-  margin-left: auto;
-  font-size: 10px;
-  color: var(--fg-dim);
-  font-variant-numeric: tabular-nums;
-}
-
-.sidebar-session-disk .sidebar-session-main {
-  opacity: 0.65;
-}
-.sidebar-session-disk:hover .sidebar-session-main {
-  opacity: 1;
-}
-
-.sidebar-session-stop {
-  background: none;
-  border: 0;
-  color: var(--fg-dim);
-  padding: 0 8px;
-  cursor: pointer;
-  font-size: 10px;
-  opacity: 0;
-  transition: opacity 80ms, color 80ms;
-}
-.sidebar-session:hover .sidebar-session-stop,
-.sidebar-session.is-active .sidebar-session-stop {
-  opacity: 1;
-}
-.sidebar-session-stop:hover {
-  color: var(--danger);
-}
-
-/* V3.S4 — paused-state visuals + per-row pause/resume/delete buttons */
-
-.sidebar-agent-badge.is-paused {
-  opacity: 0.4;
-  filter: grayscale(1);
-}
-.sidebar-session.is-paused .sidebar-session-name {
-  color: var(--fg-dim);
-}
-.sidebar-session.is-paused.is-active .sidebar-session-name {
-  color: var(--accent);
-}
-
-.sidebar-session-state {
-  font-size: 10px;
-  color: var(--fg-dim);
-  font-style: italic;
-}
-
-.sidebar-session-action {
-  background: none;
-  border: 0;
-  color: var(--fg-dim);
-  padding: 0 8px;
-  cursor: pointer;
-  font-size: 11px;
-  opacity: 0;
-  transition: opacity 80ms, color 80ms;
-}
-.sidebar-session:hover .sidebar-session-action,
-.sidebar-session.is-active .sidebar-session-action {
-  opacity: 1;
-}
-.sidebar-session-pause:hover {
-  color: #d29922;
-}
-.sidebar-session-resume {
-  color: #7ee787;
-  font-size: 13px;
-}
-.sidebar-session-resume:hover {
-  color: #95eea0;
-}
-.sidebar-session-delete:hover {
-  color: var(--danger);
-}
-.sidebar-session-delete {
-  font-size: 13px;
-}
 
 /* ── Right-pane Resume CTA ─────────────────────────────────────────────────
  *
@@ -608,7 +90,7 @@
   margin: 0 0 14px;
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--color-overlay);
 }
 .resume-tui-meta-strong {
   font-weight: 600;
@@ -620,7 +102,7 @@
 .resume-tui-prompt {
   display: flex;
   gap: 10px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--color-overlay);
   padding: 8px 14px;
   margin: 6px 0;
   border-radius: 4px;
@@ -903,7 +385,7 @@
 }
 .workspace-cta-hint kbd {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--color-overlay-strong);
   border: 1px solid var(--border);
   border-radius: 3px;
   padding: 0 4px;
@@ -1057,7 +539,7 @@
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: linear-gradient(180deg, #161b22, #11151a);
+  background: linear-gradient(180deg, var(--color-bg-tertiary), var(--color-bg-secondary));
   border-bottom: 1px solid var(--border);
   font-size: 11px;
   color: var(--fg-dim);
@@ -1087,7 +569,7 @@
   transition: background 0.12s, color 0.12s;
 }
 .panel-collapse:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--color-overlay-strong);
   color: var(--fg);
 }
 
@@ -1234,7 +716,7 @@
   align-items: baseline;
 }
 .git-log-row:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--color-overlay);
 }
 
 .git-log-hash {
@@ -1304,7 +786,7 @@
 }
 .files-row.files-dir:hover,
 .files-row.files-symlink:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--color-overlay);
 }
 
 .files-icon {
@@ -1347,7 +829,7 @@
   align-items: center;
   gap: 10px;
   padding: 8px 12px;
-  background: linear-gradient(180deg, #161b22, #11151a);
+  background: linear-gradient(180deg, var(--color-bg-tertiary), var(--color-bg-secondary));
   border-bottom: 1px solid var(--border);
   font-size: 12px;
   color: var(--fg-dim);
@@ -1364,6 +846,56 @@
 .terminal-meta {
   margin-left: auto;
   font-variant-numeric: tabular-nums;
+}
+
+.terminal-header-action {
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--color-bg-secondary);
+  color: var(--fg);
+  font-size: 11px;
+  line-height: 22px;
+}
+
+.terminal-header-action:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.terminal-theme-switch {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 2px;
+  gap: 1px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--color-bg-secondary);
+}
+
+.terminal-theme-option {
+  width: 22px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 4px;
+  color: var(--fg-dim);
+  background: transparent;
+  cursor: pointer;
+}
+
+.terminal-theme-option:hover {
+  color: var(--fg);
+  background: var(--color-overlay);
+}
+
+.terminal-theme-option.active {
+  color: var(--accent);
+  background: var(--color-overlay-strong);
 }
 
 .status-dot {
@@ -1390,25 +922,3 @@
 .terminal-host .xterm-viewport {
   background-color: transparent !important;
 }
-
-/* ── OpenAlice-frame overrides ──────────────────────────────────────────────
- * When rendered inside OpenAlice's secondary sidebar slot, the surrounding
- * frame already shows the "Workspaces" title + border. Hide launcher's
- * own outer chrome so we don't get duplicated headers / double borders.
- */
-.workspaces-sidebar-frame {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-}
-.workspaces-sidebar-frame .sidebar {
-  border-right: 0;
-  background: transparent;
-  height: 100%;
-  min-height: 0;
-}
-.workspaces-sidebar-frame .sidebar-header {
-  display: none;
-}
-

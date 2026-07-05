@@ -55,14 +55,25 @@ export const CLI_EXPORTS: Record<string, CliExport> = {
       rss: {
         glob: 'globRss',
         grep: 'grepRss',
+        // window: date-bounded, oldest-first — for aligning catalysts to a price path.
+        window: 'windowRss',
         read: 'readRss',
       },
       market: {
         search: 'marketSearchForResearch',
+        // Discover data sources + drive them: `vendors` lists what's available,
+        // each with on/off state and a usage note (symbol convention, search
+        // language); `vendor-set` flips one on/off, live on the next search.
+        vendors: 'listMarketVendors',
+        'vendor-set': 'setMarketVendor',
       },
       analysis: {
         'search-bars': 'searchBars',
         quant: 'calculateQuant',
+        // Honest as-of read (dated bars, no-lookahead, freshness contract) + a
+        // path-dependent backtest. The Retrospective / Time-Machine primitives.
+        snapshot: 'marketSnapshot',
+        simulate: 'simulate',
       },
       think: {
         calc: 'calculate',
@@ -134,18 +145,41 @@ export const CLI_EXPORTS: Record<string, CliExport> = {
   workspace: {
     binary: 'alice-workspace',
     scope: 'scoped',
-    description: 'Agent collaboration — push to the user inbox, track entities',
+    description: 'Agent collaboration — push/read the user inbox, locate a peer workspace (peer path), track entities',
     commands: {
-      // inbox push: surface a doc + comment to the user's Inbox tab. v1 is
-      // comment-only via the CLI (`--comments`); the `docs` array param needs
-      // structured-arg support in the client (a flat flag can't carry it).
+      // inbox push: surface doc(s) + comment to the user's Inbox tab. Attach
+      // files with repeatable `--doc <path>` (the shim folds them into the
+      // `docs: [{ path }]` array; bare paths wrap, JSON objects pass through);
+      // `--comments` carries the markdown note. At least one of the two.
+      // inbox read: look back at the inbox stream — `--self` narrows to this
+      // workspace's own pushes (whose doc paths are cwd-relative, so readable
+      // with the shell); `--limit N` caps the newest-first window.
       inbox: {
         push: 'inbox_push',
+        read: 'inbox_read',
+      },
+      // peer path: resolve another workspace's absolute dir by id (the
+      // `workspaceId` an inbox_read entry carries), so the agent can read/edit
+      // that peer's files with native tools — cross-workspace collaboration.
+      peer: {
+        path: 'workspace_path',
       },
       // track: the durable cross-workspace tracked-entity index ([[name]]).
       track: {
         add: 'entity_upsert',
         search: 'entity_search',
+      },
+      // issue: the issue board. READS are GLOBAL — `list` scans every
+      // workspace's titles, `show <name>` resolves a name across the board and
+      // returns full detail (issue + runs + inbox reports). WRITES stay local —
+      // create/update/comment author in the CALLER's own `.alice/issues/`
+      // (editing a peer's board is the human-approved peer-edit path).
+      issue: {
+        update: 'issue_update',
+        comment: 'issue_comment',
+        create: 'issue_create',
+        list: 'issue_list',
+        show: 'issue_show',
       },
     },
   },
@@ -163,14 +197,18 @@ export const CLI_EXPORTS: Record<string, CliExport> = {
         search: 'searchContracts',
         details: 'getContractDetails',
         quote: 'getQuote',
+        expand: 'expandContract',
       },
       order: {
         list: 'getOrders',
+        history: 'orderHistory',
+        trades: 'tradeHistory',
         place: 'placeOrder',
         modify: 'modifyOrder',
         cancel: 'cancelOrder',
       },
       position: {
+        // listing positions = `account portfolio` (one tool, one verb).
         close: 'closePosition',
       },
       // trading-as-git: the approval/state flow mirrors git verbs on purpose.
@@ -180,6 +218,7 @@ export const CLI_EXPORTS: Record<string, CliExport> = {
         show: 'tradingShow',
         commit: 'tradingCommit',
         push: 'tradingPush',
+        reject: 'tradingReject',
         sync: 'tradingSync',
       },
       market: {

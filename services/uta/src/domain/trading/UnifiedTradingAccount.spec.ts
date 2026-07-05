@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import Decimal from 'decimal.js'
-import { Order, OrderState, UNSET_DOUBLE, UNSET_DECIMAL } from '@traderalice/ibkr'
+import { Contract, Order, OrderState, UNSET_DOUBLE, UNSET_DECIMAL } from '@traderalice/ibkr'
 import { UnifiedTradingAccount } from './UnifiedTradingAccount.js'
 import type { UnifiedTradingAccountOptions } from './UnifiedTradingAccount.js'
 import { MockBroker, makeContract, makePosition, makeOpenOrder } from './brokers/mock/index.js'
@@ -44,6 +44,74 @@ describe('UTA — read-only / keyless write guard', () => {
     const { uta } = createUTA()
     expect(uta.readOnly).toBe(false)
     expect(() => uta.stageCancelOrder({ orderId: 'x' })).not.toThrow()
+  })
+})
+
+// ==================== Multi-sub-account write disambiguation ====================
+
+describe('UTA — sub-account write disambiguation', () => {
+  /** A MockBroker that pretends to be a separate-wallet venue (binance-shaped):
+   *  two sub-accounts, instrument routes by secType. */
+  function multiSubBroker(): MockBroker {
+    const b = new MockBroker()
+    ;(b as unknown as Record<string, unknown>).listSubAccounts = async () => ([
+      { id: 'spot', label: 'Spot', kind: 'spot' },
+      { id: 'derivatives', label: 'Futures', kind: 'derivatives' },
+    ])
+    ;(b as unknown as Record<string, unknown>).subAccountForContract = (c: Contract) =>
+      (c.secType === 'CRYPTO_PERP' || c.secType === 'FUT') ? 'derivatives' : 'spot'
+    return b
+  }
+
+  const placeParams = (subAccountId?: string) =>
+    ({ aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '1', subAccountId } as never)
+
+  it('single-sub-account brokers need no selector and stamp nothing', async () => {
+    const { uta } = createUTA()  // plain MockBroker — one implicit default
+    await uta.listSubAccounts()
+    expect(() => uta.stagePlaceOrder(placeParams())).not.toThrow()
+    const res = uta.commit('buy AAPL')
+    expect(res.message).toBe('buy AAPL')  // no [sub:…] tag
+  })
+
+  it('multi-sub-account write WITHOUT a selector loud-refuses with the valid ids', async () => {
+    const { uta } = createUTA(multiSubBroker())
+    await uta.listSubAccounts()  // warm the cache
+    expect(() => uta.stagePlaceOrder(placeParams())).toThrow(/multiple sub-accounts.*spot.*derivatives/s)
+  })
+
+  it('multi-sub-account write WITH a valid, instrument-consistent selector stamps the commit message', async () => {
+    const { uta } = createUTA(multiSubBroker())
+    await uta.listSubAccounts()
+    expect(() => uta.stagePlaceOrder(placeParams('spot'))).not.toThrow()  // AAPL (STK) → spot
+    const res = uta.commit('buy AAPL')
+    expect(res.message).toBe('buy AAPL [sub:spot]')
+  })
+
+  it('rejects an unknown sub-account id', async () => {
+    const { uta } = createUTA(multiSubBroker())
+    await uta.listSubAccounts()
+    expect(() => uta.stagePlaceOrder(placeParams('funding'))).toThrow(/unknown sub-account "funding".*spot, derivatives/s)
+  })
+
+  it('rejects a selector that contradicts the instrument', async () => {
+    const { uta } = createUTA(multiSubBroker())
+    await uta.listSubAccounts()
+    // AAPL (STK) routes to 'spot'; asking for 'derivatives' is a wrong-wallet mistake.
+    expect(() => uta.stagePlaceOrder(placeParams('derivatives'))).toThrow(/trades in sub-account "spot", not "derivatives"/)
+  })
+
+  it('clears the staged sub-account between commits — no stamp bleed-through', async () => {
+    const { uta } = createUTA(multiSubBroker())
+    await uta.listSubAccounts()
+
+    uta.stagePlaceOrder(placeParams('spot'))
+    expect(uta.commit('first').message).toBe('first [sub:spot]')
+
+    // Second cycle: the tracker was cleared by the first commit, so this stamps
+    // only its own sub-account (not 'first's leftover 'spot' duplicated).
+    uta.stagePlaceOrder(placeParams('spot'))
+    expect(uta.commit('second').message).toBe('second [sub:spot]')
   })
 })
 
@@ -258,6 +326,109 @@ describe('UTA — getState', () => {
   })
 })
 
+// ==================== getAccount PnL invariant ====================
+
+describe('UTA — getAccount PnL invariant', () => {
+  it('account-level unrealizedPnL equals the sum over positions (broker placeholder overridden)', async () => {
+    const { uta, broker } = createUTA()
+    // CCXT-spot pattern: broker account info carries a placeholder 0 while
+    // the positions surface has real PnL. MockBroker derives position PnL
+    // from qty/avgCost/markPrice: (160-150)*10 = 100 and (1645.46-1644.44)*2
+    // = 2.04 → account must report the 102.04 sum, not the placeholder.
+    broker.setAccountInfo({ unrealizedPnL: '0' })
+    broker.setPositions([
+      makePosition({ quantity: new Decimal(10), avgCost: '150', marketPrice: '160' }),
+      makePosition({
+        contract: makeContract({ aliceId: 'mock-paper|ETH', symbol: 'ETH', secType: 'CRYPTO' }),
+        quantity: new Decimal(2),
+        avgCost: '1644.44',
+        marketPrice: '1645.46',
+      }),
+    ])
+
+    const account = await uta.getAccount()
+    expect(account.unrealizedPnL).toBe('102.04')
+  })
+
+  it('keeps the broker-reported value for mixed-currency books (no blind cross-currency sum)', async () => {
+    const { uta, broker } = createUTA()
+    broker.setAccountInfo({ baseCurrency: 'USD', unrealizedPnL: '777' })
+    broker.setPositions([
+      makePosition({ unrealizedPnL: '100' }), // USD
+      makePosition({
+        contract: makeContract({ aliceId: 'mock-paper|0700', symbol: '0700', currency: 'HKD' }),
+        currency: 'HKD',
+        unrealizedPnL: '500', // HKD — not summable with USD
+      }),
+    ])
+
+    const account = await uta.getAccount()
+    expect(account.unrealizedPnL).toBe('777')
+  })
+})
+
+// ==================== aliceId expansion overlay ====================
+
+describe('UTA — _expandAliceIdIfNeeded overlay (via getQuote)', () => {
+  it('does not clobber resolved fields with Contract numeric defaults (conId=0)', async () => {
+    // Regression (IBKR round 7): the HTTP route wraps the body with
+    // Object.assign(new Contract(), body) — string defaults ('') were
+    // skipped by the overlay, but conId=0 was copied and CLOBBERED the
+    // expanded conId. The broker got an all-empty contract → TWS 321.
+    const broker = new MockBroker()
+    const seen: Contract[] = []
+    broker.resolveNativeKey = (nativeKey: string) => {
+      const c = new Contract()
+      c.conId = 12087792
+      c.symbol = 'EUR'
+      c.secType = 'CASH'
+      c.exchange = 'IDEALPRO'
+      c.currency = 'USD'
+      void nativeKey
+      return c
+    }
+    const origQuote = broker.getQuote.bind(broker)
+    broker.getQuote = async (c: Contract) => {
+      seen.push(c)
+      return origQuote(makeContract({ symbol: 'EUR' }))
+    }
+    const uta = new UnifiedTradingAccount(broker)
+
+    // Route-style stub: aliceId only, every other field at Contract defaults
+    const stub = Object.assign(new Contract(), { aliceId: 'mock-paper|12087792' })
+    await uta.getQuote(stub)
+
+    expect(seen).toHaveLength(1)
+    expect(seen[0].conId).toBe(12087792)
+    expect(seen[0].symbol).toBe('EUR')
+    expect(seen[0].exchange).toBe('IDEALPRO')
+  })
+
+  it('still applies caller overrides that carry real values', async () => {
+    const broker = new MockBroker()
+    const seen: Contract[] = []
+    broker.resolveNativeKey = () => {
+      const c = new Contract()
+      c.conId = 42
+      c.symbol = 'AAPL'
+      c.exchange = 'SMART'
+      return c
+    }
+    const origQuote = broker.getQuote.bind(broker)
+    broker.getQuote = async (c: Contract) => {
+      seen.push(c)
+      return origQuote(makeContract({ symbol: 'AAPL' }))
+    }
+    const uta = new UnifiedTradingAccount(broker)
+
+    const stub = Object.assign(new Contract(), { aliceId: 'mock-paper|42', exchange: 'NASDAQ' })
+    await uta.getQuote(stub)
+
+    expect(seen[0].conId).toBe(42)
+    expect(seen[0].exchange).toBe('NASDAQ') // real override survives
+  })
+})
+
 // ==================== stagePlaceOrder ====================
 
 describe('UTA — stagePlaceOrder', () => {
@@ -280,13 +451,69 @@ describe('UTA — stagePlaceOrder', () => {
   })
 
   it('passes order types through', () => {
-    const types = ['MKT', 'LMT', 'STP', 'STP LMT', 'TRAIL']
-    for (const orderType of types) {
+    // Each type with its required fields (stage-time validation refuses less)
+    const cases: Array<[string, Record<string, string>]> = [
+      ['MKT', {}],
+      ['LMT', { lmtPrice: '100' }],
+      ['STP', { auxPrice: '95' }],
+      ['STP LMT', { auxPrice: '95', lmtPrice: '94' }],
+      ['TRAIL', { auxPrice: '5' }],
+    ]
+    for (const [orderType, extra] of cases) {
       const { uta: u } = createUTA()
-      u.stagePlaceOrder({ aliceId: 'mock-paper|X', action: 'BUY', orderType, totalQuantity: '1' })
+      u.stagePlaceOrder({ aliceId: 'mock-paper|X', action: 'BUY', orderType, totalQuantity: '1', ...extra })
       const { order } = getStagedPlaceOrder(u)
       expect(order.orderType).toBe(orderType)
     }
+  })
+
+  describe('per-orderType required-field gate (stage-time refusal)', () => {
+    // The bug this guards: a CLI typo (--quantity for --totalQuantity) staged
+    // a quantity-less, price-less LMT order that committed clean.
+    const place = (p: Record<string, unknown>) =>
+      uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', action: 'BUY', ...p } as never)
+
+    it('refuses LMT without lmtPrice', () => {
+      expect(() => place({ orderType: 'LMT', totalQuantity: '1' })).toThrow(/requires lmtPrice/)
+    })
+
+    it('refuses LMT without any quantity', () => {
+      expect(() => place({ orderType: 'LMT', lmtPrice: '100' })).toThrow(/requires totalQuantity/)
+    })
+
+    it('refuses MKT with neither totalQuantity nor cashQty', () => {
+      expect(() => place({ orderType: 'MKT' })).toThrow(/totalQuantity .*or cashQty/)
+    })
+
+    it('refuses totalQuantity + cashQty together', () => {
+      expect(() => place({ orderType: 'MKT', totalQuantity: '1', cashQty: '100' })).toThrow(/mutually exclusive/)
+    })
+
+    it('refuses cashQty on non-MKT orders', () => {
+      expect(() => place({ orderType: 'LMT', cashQty: '100', lmtPrice: '100' })).toThrow(/only supported for MKT/)
+    })
+
+    it('refuses STP without auxPrice', () => {
+      expect(() => place({ orderType: 'STP', totalQuantity: '1' })).toThrow(/requires auxPrice/)
+    })
+
+    it('refuses STP LMT missing either price', () => {
+      expect(() => place({ orderType: 'STP LMT', totalQuantity: '1', lmtPrice: '94' })).toThrow(/requires auxPrice/)
+      expect(() => place({ orderType: 'STP LMT', totalQuantity: '1', auxPrice: '95' })).toThrow(/requires lmtPrice/)
+    })
+
+    it('refuses TRAIL with neither/both of auxPrice and trailingPercent', () => {
+      expect(() => place({ orderType: 'TRAIL', totalQuantity: '1' })).toThrow(/auxPrice .*or trailingPercent/)
+      expect(() => place({ orderType: 'TRAIL', totalQuantity: '1', auxPrice: '5', trailingPercent: '1' })).toThrow(/mutually exclusive/)
+    })
+
+    it('refuses TRAIL LIMIT without lmtPrice', () => {
+      expect(() => place({ orderType: 'TRAIL LIMIT', totalQuantity: '1', auxPrice: '5' })).toThrow(/requires lmtPrice/)
+    })
+
+    it('treats empty string as absent (LLM-emitted "" must not satisfy a requirement)', () => {
+      expect(() => place({ orderType: 'LMT', totalQuantity: '1', lmtPrice: '' })).toThrow(/requires lmtPrice/)
+    })
   })
 
   it('sets totalQuantity as Decimal', () => {
@@ -578,6 +805,120 @@ describe('UTA — sync', () => {
     expect(result.updatedCount).toBe(1)
     expect(result.updates[0].orderId).toBe(orderId)
     expect(result.updates[0].currentStatus).toBe('filled')
+    // Execution data must flow into the sync record — without qty/price the
+    // fill is invisible to cost-basis reconstruction.
+    expect(result.updates[0].filledQty).toBe('10')
+    expect(result.updates[0].filledPrice).toBe('149')
+  })
+
+  it('records cumulative qty + weighted avg price across partial fills', async () => {
+    const { uta, broker } = createUTA()
+
+    uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', action: 'BUY', orderType: 'LMT', totalQuantity: '10', lmtPrice: '150' })
+    uta.commit('limit buy')
+    const pushResult = await uta.push()
+    const orderId = pushResult.submitted[0]!.orderId!
+
+    broker.fillOrder(orderId, { qty: '4', price: '148' })
+    broker.fillOrder(orderId, { qty: '6', price: '150' })
+
+    const result = await uta.sync()
+    expect(result.updates[0].currentStatus).toBe('filled')
+    expect(result.updates[0].filledQty).toBe('10')
+    // (148*4 + 150*6) / 10 = 149.2
+    expect(result.updates[0].filledPrice).toBe('149.2')
+  })
+
+  it('listing mode: getOrder is spent ONLY on orders absent from the open-orders listing', async () => {
+    const { uta, broker } = createUTA()
+
+    // Two pending limit orders; one fills (vanishes from the listing).
+    uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', action: 'BUY', orderType: 'LMT', totalQuantity: '10', lmtPrice: '150' })
+    uta.commit('a'); const a = (await uta.push()).submitted[0]!.orderId!
+    uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', action: 'BUY', orderType: 'LMT', totalQuantity: '5', lmtPrice: '140' })
+    uta.commit('b'); const b = (await uta.push()).submitted[0]!.orderId!
+    broker.fillOrder(a, { price: '149' })
+
+    const getOrderSpy = vi.spyOn(broker, 'getOrder')
+    const result = await uta.sync()
+
+    // Transition pass: the confirm step polls ONLY the vanished order (a).
+    // (_getState's snapshot read adds delegated getOrder calls via
+    // getOrders — those happen once per pass WITH updates, not per order
+    // per pass, so assert on the confirm call specifically.)
+    expect(getOrderSpy.mock.calls.filter((c) => c[0] === a && c.length > 1)).toHaveLength(1)
+    expect(result.updatedCount).toBe(1)
+    expect(uta.getPendingOrderIds().map((p) => p.orderId)).toEqual([b])
+
+    // Steady-state pass: order b hangs (still in the listing) — ZERO
+    // getOrder calls. A stop/TP parked for weeks costs one listing per
+    // pass for the whole account, not one poll per order.
+    getOrderSpy.mockClear()
+    const second = await uta.sync()
+    expect(second.updatedCount).toBe(0)
+    expect(getOrderSpy).not.toHaveBeenCalled()
+  })
+
+  it('per-order fallback: brokers without a listing API still detect fills', async () => {
+    const { uta, broker } = createUTA()
+    // Simulate a venue with no open-orders enumeration.
+    ;(broker as { getOpenOrders?: unknown }).getOpenOrders = undefined
+
+    uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', action: 'BUY', orderType: 'LMT', totalQuantity: '10', lmtPrice: '150' })
+    uta.commit('limit buy')
+    const orderId = (await uta.push()).submitted[0]!.orderId!
+    broker.fillPendingOrder(orderId, 149)
+
+    const result = await uta.sync()
+    expect(result.updatedCount).toBe(1)
+    expect(result.updates[0].currentStatus).toBe('filled')
+  })
+
+  it('per-order fallback: hangers back off (5min cadence after an hour)', async () => {
+    vi.useFakeTimers()
+    try {
+      const { uta, broker } = createUTA()
+      ;(broker as { getOpenOrders?: unknown }).getOpenOrders = undefined
+
+      uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', action: 'BUY', orderType: 'LMT', totalQuantity: '10', lmtPrice: '150' })
+      uta.commit('limit buy')
+      await uta.push()
+
+      const getOrderSpy = vi.spyOn(broker, 'getOrder')
+      await uta.sync() // fresh — polls (registers firstSeen)
+      expect(getOrderSpy).toHaveBeenCalledTimes(1)
+
+      // Two hours later, two syncs 10s apart: only the first polls.
+      vi.advanceTimersByTime(2 * 60 * 60_000)
+      await uta.sync()
+      vi.advanceTimersByTime(10_000)
+      await uta.sync()
+      expect(getOrderSpy).toHaveBeenCalledTimes(2)
+
+      // 5 minutes on, it's due again.
+      vi.advanceTimersByTime(5 * 60_000)
+      await uta.sync()
+      expect(getOrderSpy).toHaveBeenCalledTimes(3)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('passes the operation localSymbol as the broker symbolHint', async () => {
+    const { uta, broker } = createUTA()
+
+    uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', action: 'BUY', orderType: 'LMT', totalQuantity: '10', lmtPrice: '150' })
+    uta.commit('limit buy')
+    const pushResult = await uta.push()
+    const orderId = pushResult.submitted[0]!.orderId!
+    broker.fillPendingOrder(orderId, 149)
+
+    const spy = vi.spyOn(broker, 'getOrder')
+    await uta.sync()
+    // MockBroker stamps localSymbol = nativeKey on contracts it resolves; a
+    // symbol-scoped broker (CCXT) needs this hint to look orders up after a
+    // restart wipes its in-memory cache.
+    expect(spy).toHaveBeenCalledWith(orderId, expect.any(String))
   })
 
   it('does not update when pending order not found in broker', async () => {
@@ -594,6 +935,44 @@ describe('UTA — sync', () => {
     broker.setOrders([])
     const result = await uta.sync()
     expect(result.updatedCount).toBe(0)
+  })
+})
+
+// ==================== reconcile race guard ====================
+
+describe('UTA — wallet reconcile defers while orders are in flight', () => {
+  it('drift is not booked at mark price while the aliceId has a pending order; residual reconciles after settlement', async () => {
+    const { uta, broker } = createUTA()
+    const aliceId = 'mock-paper|AAPL'
+    broker.setPositions([
+      makePosition({
+        contract: makeContract({ aliceId }),
+        quantity: new Decimal(10),
+        avgCost: '150',
+        marketPrice: '160',
+        avgCostSource: 'wallet',
+      }),
+    ])
+
+    // In-flight order on the same aliceId.
+    uta.stagePlaceOrder({ aliceId, symbol: 'AAPL', action: 'BUY', orderType: 'LMT', totalQuantity: '5', lmtPrice: '150' })
+    uta.commit('limit buy')
+    const orderId = (await uta.push()).submitted[0]!.orderId!
+
+    // The dfb01435 race: positions read while the fill is in flight must
+    // NOT record drift as a mark-price reconcile.
+    await uta.getPositions()
+    expect(uta.log({ limit: 10 }).some((c) => c.message.startsWith('reconcile:'))).toBe(false)
+
+    // Order settles and syncs (fill enters cost basis at execution price).
+    broker.fillPendingOrder(orderId, 149)
+    await uta.sync()
+
+    // No in-flight orders left — the TRUE residual (the pre-existing 10
+    // that no order explains) reconciles now.
+    await uta.getPositions()
+    const reconcile = uta.log({ limit: 10 }).find((c) => c.message.startsWith('reconcile:'))
+    expect(reconcile).toBeDefined()
   })
 })
 
@@ -1037,5 +1416,58 @@ describe('UTA — getPositions wallet reconciliation', () => {
     const { uta } = createUTA(broker)
     // UTA's stampAliceId will fill it, but if broker emits without symbol/contract id we fall through cleanly.
     await expect(uta.getPositions()).resolves.toBeDefined()
+  })
+})
+
+// ==================== Cold-start connecting gate ====================
+
+describe('UTA — connecting gate (non-blocking cold start)', () => {
+  it('reports connecting=true until the initial connect settles, then false', async () => {
+    const { uta } = createUTA()
+    expect(uta.getHealthInfo().connecting).toBe(true)
+    await uta.waitForConnect()
+    expect(uta.getHealthInfo().connecting).toBe(false)
+  })
+
+  it('a read during a SLOW connect fast-fails CONNECTING after the grace, without poisoning health', async () => {
+    vi.useFakeTimers()
+    try {
+      const broker = new MockBroker()
+      // Hang init() so the account is stuck in the connecting window — stands in
+      // for CCXT loadMarkets taking tens of seconds.
+      let release!: () => void
+      ;(broker as unknown as { init: () => Promise<void> }).init = () =>
+        new Promise<void>((resolve) => { release = resolve })
+
+      const { uta } = createUTA(broker)
+      expect(uta.getHealthInfo().connecting).toBe(true)
+
+      // Attach the rejection expectation BEFORE advancing time, so the
+      // rejection (which fires mid-advance) is never momentarily unhandled.
+      const assertion = expect(uta.getAccount()).rejects.toThrow(/still connecting/)
+      // Past the grace window — the read returns instead of blocking on init.
+      await vi.advanceTimersByTimeAsync(2_000)
+      await assertion
+
+      // The gate threw BEFORE the broker call, so it never registered as a
+      // failure: no counter bump, no premature recovery, account not disabled.
+      const h = uta.getHealthInfo()
+      expect(h.connecting).toBe(true)
+      expect(h.consecutiveFailures).toBe(0)
+      expect(h.recovering).toBe(false)
+      expect(h.disabled).toBe(false)
+
+      // Let the connect finish so timer/teardown is clean.
+      release()
+      await vi.runAllTimersAsync()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('serves a read normally once an instant broker has connected (grace not consumed)', async () => {
+    const { uta } = createUTA()
+    await uta.waitForConnect()
+    await expect(uta.getAccount()).resolves.toBeDefined()
   })
 })

@@ -19,14 +19,12 @@ import type { FormEvent, ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { TAG_HINT, defaultTagFor, useCreateWorkspace } from '../../hooks/useCreateWorkspace'
-import { useWorkspaces } from '../../contexts/WorkspacesContext'
-import type { AgentInfo, TemplateInfo, Workspace } from './api'
+import { useWorkspaces } from '../../contexts/workspaces-context'
+import type { TemplateInfo, Workspace } from './api'
 
 export interface CreateWorkspaceFormProps {
   /** Full template catalog — drives the select and resolves defaultAgents. */
   readonly templates: readonly TemplateInfo[]
-  /** All registered adapters; every workspace enables all of them. */
-  readonly agents: readonly AgentInfo[]
   /**
    * Pin the template (Chat section, template detail page). When set, no
    * template select is shown. When omitted, the user picks from `templates`.
@@ -52,7 +50,7 @@ const HINT = 'text-[11px] text-text-muted/70'
 export function CreateWorkspaceForm(props: CreateWorkspaceFormProps): ReactElement {
   const { t } = useTranslation()
   const { workspaces } = useWorkspaces()
-  const { templates, agents, presetTemplate, initialTag, onCancel, autoFocusTag } = props
+  const { templates, presetTemplate, initialTag, onCancel, autoFocusTag } = props
 
   // Template selection. Fixed when `presetTemplate` is set; otherwise the
   // user picks, defaulting to `chat` (then first available).
@@ -70,8 +68,6 @@ export function CreateWorkspaceForm(props: CreateWorkspaceFormProps): ReactEleme
 
   const create = useCreateWorkspace({
     template: effectiveTemplate,
-    templateDefaultAgents: selectedMeta?.defaultAgents,
-    availableAgents: agents,
     onCreated: props.onCreated,
   })
 
@@ -156,23 +152,6 @@ export function CreateWorkspaceForm(props: CreateWorkspaceFormProps): ReactEleme
           className={`${FIELD} font-mono placeholder:text-text-muted/50`}
         />
         <p className={HINT}>{TAG_HINT}</p>
-      </div>
-
-      <div className="space-y-1.5">
-        <label htmlFor="cw-tools" className={LABEL}>
-          {t('createWorkspace.toolsLabel')}
-        </label>
-        <select
-          id="cw-tools"
-          value={create.toolAccess}
-          onChange={(e) => create.setToolAccess(e.target.value as 'mcp' | 'cli')}
-          disabled={create.creating}
-          className={FIELD}
-        >
-          <option value="cli">{t('createWorkspace.toolsCli')}</option>
-          <option value="mcp">{t('createWorkspace.toolsMcp')}</option>
-        </select>
-        <p className={HINT}>{t('createWorkspace.toolsHint')}</p>
       </div>
 
       {create.error && <div className="text-[12px] text-red">{create.error}</div>}

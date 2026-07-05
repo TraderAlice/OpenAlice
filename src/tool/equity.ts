@@ -24,11 +24,26 @@ If unsure about the symbol, use marketSearchForResearch to find it.`,
         symbol: z.string().describe('Ticker symbol, e.g. "AAPL", "MSFT"'),
       }).meta({ examples: [{ symbol: 'AAPL' }] }),
       execute: async ({ symbol }) => {
+        // For Taiwan tickers (2330.TW / 6488.TWO), metrics route to the official
+        // twse vendor first (official P/E·殖利率·股價淨值比), then yfinance.
+        // Profile stays yfinance-first (richer description/sector), with twse as a
+        // backstop. Routes by symbol DOMAIN (the ticker is itself a TW security),
+        // not by a hardcoded asset-class → vendor map.
+        const isTW = /\d{3,6}[A-Z]?\.(TW|TWO)$/i.test(symbol)
+        const profileProviders = isTW ? ['yfinance', 'twse'] : ['yfinance']
+        const metricProviders = isTW ? ['twse', 'yfinance'] : ['yfinance']
+        const firstHit = async <T,>(providers: string[], call: (p: string) => Promise<T[]>): Promise<T | null> => {
+          for (const p of providers) {
+            const rows = await call(p).catch(() => [] as T[])
+            if (rows[0]) return rows[0]
+          }
+          return null
+        }
         const [profile, metrics] = await Promise.all([
-          equityClient.getProfile({ symbol, provider: 'yfinance' }).catch(() => []),
-          equityClient.getKeyMetrics({ symbol, limit: 1, provider: 'yfinance' }).catch(() => []),
+          firstHit(profileProviders, (p) => equityClient.getProfile({ symbol, provider: p })),
+          firstHit(metricProviders, (p) => equityClient.getKeyMetrics({ symbol, limit: 1, provider: p })),
         ])
-        return { profile: profile[0] ?? null, metrics: metrics[0] ?? null }
+        return { profile, metrics }
       },
     }),
 

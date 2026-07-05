@@ -7,6 +7,7 @@ import type { UnifiedTradingAccount } from '../domain/trading/UnifiedTradingAcco
 import { searchTradeableContracts } from '../domain/trading/contract-search.js'
 import type { AssetClassHint } from '@traderalice/uta-protocol'
 import { executeOneShotOrder, type OrderEntryPhase } from '../domain/trading/order-entry.js'
+import { projectOrderHistory, projectTradeHistory } from '../domain/trading/order-history.js'
 
 // ==================== Order entry schemas ====================
 //
@@ -36,6 +37,7 @@ const placeOrderSchema = z.object({
   ocaGroup: z.string().optional(),
   takeProfit: z.object({ price: numericString }).optional(),
   stopLoss: z.object({ price: numericString, limitPrice: numericString.optional() }).optional(),
+  subAccountId: z.string().optional(),
   message,
 }).refine(
   (d) => d.totalQuantity != null || d.cashQty != null,
@@ -46,6 +48,7 @@ const closePositionSchema = z.object({
   aliceId: z.string().min(1),
   symbol: z.string().optional(),
   qty: numericString.optional(),
+  subAccountId: z.string().optional(),
   message,
 })
 
@@ -247,18 +250,26 @@ export function createTradingRoutes(ctx: UTAEngineContext) {
     }
   })
 
-  // Account info
+  // Sub-accounts (wallets) — one element for ordinary brokers, >1 for
+  // separate-wallet venues (CCXT Binance: spot / derivatives).
+  app.get('/uta/:id/subaccounts', async (c) => {
+    const account = resolveAccount(ctx, c)
+    if (!account) return c.json({ error: 'Account not found' }, 404)
+    return queryAccount(c, account, async () => ({ subAccounts: await account.listSubAccounts() }))
+  })
+
+  // Account info. `?subAccountId=` scopes to one wallet (omitted ⇒ aggregate).
   app.get('/uta/:id/account', async (c) => {
     const account = resolveAccount(ctx, c)
     if (!account) return c.json({ error: 'Account not found' }, 404)
-    return queryAccount(c, account, () => account.getAccount())
+    return queryAccount(c, account, () => account.getAccount(c.req.query('subAccountId')))
   })
 
-  // Positions
+  // Positions. `?subAccountId=` scopes to one wallet (omitted ⇒ all).
   app.get('/uta/:id/positions', async (c) => {
     const account = resolveAccount(ctx, c)
     if (!account) return c.json({ error: 'Account not found' }, 404)
-    return queryAccount(c, account, async () => ({ positions: await account.getPositions() }))
+    return queryAccount(c, account, async () => ({ positions: await account.getPositions(c.req.query('subAccountId')) }))
   })
 
   // Orders
@@ -303,6 +314,19 @@ export function createTradingRoutes(ctx: UTAEngineContext) {
       const { Contract } = await import('@traderalice/ibkr')
       const contract = Object.assign(new Contract(), body)
       return c.json(await account.getQuote(contract))
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 500)
+    }
+  })
+
+  // Hub → leaves expansion (bond issuers, option chains, futures months).
+  // Body: { aliceId, filters?: ExpandContractFilters }.
+  app.post('/uta/:id/contract/expand', async (c) => {
+    const account = resolveAccount(ctx, c)
+    if (!account) return c.json({ error: 'Account not found' }, 404)
+    try {
+      const body = await c.req.json().catch(() => ({}))
+      return c.json(await account.expandContract(String(body.aliceId ?? ''), body.filters ?? {}))
     } catch (err) {
       return c.json({ error: err instanceof Error ? err.message : String(err) }, 500)
     }
@@ -353,6 +377,24 @@ export function createTradingRoutes(ctx: UTAEngineContext) {
     const limit = Number(c.req.query('limit')) || 20
     const symbol = c.req.query('symbol') || undefined
     return c.json({ commits: uta.log({ limit, symbol }) })
+  })
+
+  // Exchange-frontend projections of the git log — Order History (one row
+  // per order, lifecycle collapsed) and Trade History (fills only).
+  // Projection logic lives in domain/trading/order-history.ts so MCP/CLI
+  // surfaces can reuse it.
+  app.get('/uta/:id/order-history', (c) => {
+    const uta = ctx.utaManager.get(c.req.param('id'))
+    if (!uta) return c.json({ error: 'Account not found' }, 404)
+    const limit = Number(c.req.query('limit')) || 50
+    return c.json({ orders: projectOrderHistory(uta.exportGitState().commits, { limit }) })
+  })
+
+  app.get('/uta/:id/trade-history', (c) => {
+    const uta = ctx.utaManager.get(c.req.param('id'))
+    if (!uta) return c.json({ error: 'Account not found' }, 404)
+    const limit = Number(c.req.query('limit')) || 50
+    return c.json({ trades: projectTradeHistory(uta.exportGitState().commits, { limit }) })
   })
 
   app.get('/uta/:id/wallet/show/:hash', (c) => {

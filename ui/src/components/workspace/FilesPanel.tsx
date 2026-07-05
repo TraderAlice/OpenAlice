@@ -3,6 +3,7 @@ import { formatRelativeTime } from '../../lib/intl';
 import type { ReactElement } from 'react';
 
 import { listFiles, type DirListing, type FileEntry } from './api';
+import { Skeleton } from '../StateViews';
 import { useWorkspace } from '../../tabs/store';
 
 const POLL_MS = 5000;
@@ -93,6 +94,17 @@ export function FilesPanel(props: FilesPanelProps): ReactElement {
       {error && <div className="panel-error">{error}</div>}
 
       <ul className="files-list">
+        {!listing && !error &&
+          Array.from({ length: 6 }).map((_, i) => (
+            <li key={i} className="files-row" aria-hidden="true">
+              <span className="files-icon">
+                <Skeleton className="h-4 w-4 rounded" />
+              </span>
+              <span className="files-name">
+                <Skeleton className="h-3.5 w-32 rounded" />
+              </span>
+            </li>
+          ))}
         {listing?.entries.length === 0 && !error && (
           <li className="panel-empty">empty</li>
         )}

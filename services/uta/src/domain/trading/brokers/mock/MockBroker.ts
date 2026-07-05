@@ -68,6 +68,11 @@ interface InternalOrder {
   order: Order
   status: 'Submitted' | 'Filled' | 'Cancelled'
   fillPrice?: number
+  /** Cumulative filled qty across partial fills — reported via getOrder so
+   *  sync can record execution size like a real broker would. */
+  filledQuantity?: Decimal
+  /** Quantity-weighted average fill price (Decimal — no float noise). */
+  avgFillPrice?: Decimal
 }
 
 // ==================== Options ====================
@@ -299,6 +304,7 @@ export class MockBroker implements IBroker {
       this._orders.set(orderId, {
         id: orderId, contract, order: filledOrder,
         status: 'Filled', fillPrice: price.toNumber(),
+        filledQuantity: qty, avgFillPrice: price,
       })
 
       const orderState = new OrderState()
@@ -437,13 +443,36 @@ export class MockBroker implements IBroker {
     return results
   }
 
-  async getOrder(orderId: string): Promise<OpenOrder | null> {
+  async getOrder(orderId: string, _symbolHint?: string): Promise<OpenOrder | null> {
     this._record('getOrder', [orderId])
     const internal = this._orders.get(orderId)
     if (!internal) return null
+    return this._toOpenOrder(internal)
+  }
+
+  /** All currently-open (Submitted) orders — external-order observation surface. */
+  async getOpenOrders(): Promise<OpenOrder[]> {
+    this._record('getOpenOrders', [])
+    const open: OpenOrder[] = []
+    for (const internal of this._orders.values()) {
+      if (internal.status === 'Submitted') open.push(this._toOpenOrder(internal))
+    }
+    return open
+  }
+
+  private _toOpenOrder(internal: InternalOrder): OpenOrder {
     const orderState = new OrderState()
     orderState.status = internal.status
-    return { contract: internal.contract, order: internal.order, orderState }
+    if (internal.filledQuantity) {
+      internal.order.filledQuantity = internal.filledQuantity
+    }
+    return {
+      contract: internal.contract,
+      order: internal.order,
+      orderState,
+      orderId: internal.id,
+      ...(internal.avgFillPrice && { avgFillPrice: internal.avgFillPrice.toFixed() }),
+    }
   }
 
   async getQuote(contract: Contract): Promise<Quote> {
@@ -571,6 +600,14 @@ export class MockBroker implements IBroker {
     this._applyFill(internal.contract, side, fillQty, price)
     const cost = fillQty.mul(price).mul(multiplierOf(internal.contract))
     this._cash = side === 'BUY' ? this._cash.minus(cost) : this._cash.plus(cost)
+
+    // Track cumulative execution like a real broker: filledQuantity adds up
+    // across partial fills, avgFillPrice is the quantity-weighted average.
+    const prevQty = internal.filledQuantity ?? new Decimal(0)
+    const prevAvg = internal.avgFillPrice ?? price
+    const newQty = prevQty.plus(fillQty)
+    internal.avgFillPrice = prevAvg.mul(prevQty).plus(price.mul(fillQty)).div(newQty)
+    internal.filledQuantity = newQty
 
     const isPartial = fillQty.lt(internal.order.totalQuantity)
     if (isPartial) {

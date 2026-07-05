@@ -7,7 +7,7 @@
  */
 
 import YahooFinance from 'yahoo-finance2'
-import { EmptyDataError } from '../../../core/provider/utils/errors.js'
+import { EmptyDataError, OpenBBError, NetworkUnreachableError, RateLimitedError } from '../../../core/provider/utils/errors.js'
 import { SCREENER_FIELDS } from './references.js'
 
 // Singleton Yahoo Finance instance — reset on persistent failures
@@ -23,6 +23,93 @@ function getYF(): InstanceType<typeof YahooFinance> {
 
 function recordYFSuccess(): void { _yfFailCount = 0 }
 function recordYFFailure(): void { _yfFailCount++ }
+
+/**
+ * The HTTP status yahoo-finance2 attaches to its `HTTPError` as `.code`
+ * (see yahoo-finance2 lib/yahooFinanceFetch.js: `error.code = response.status`).
+ * Returns the numeric status only — string error codes (ENOTFOUND etc.) are
+ * not statuses and must not be mistaken for one.
+ */
+function httpStatusOf(err: unknown): number | undefined {
+  const code = (err as { code?: unknown } | null)?.code
+  return typeof code === 'number' && code >= 100 && code < 600 ? code : undefined
+}
+
+/** Flatten an error (name + message + `.cause` chain) into one searchable string. */
+function errorHaystack(err: unknown, depth = 0): string {
+  if (err == null || depth > 4) return ''
+  if (err instanceof Error) {
+    const cause = (err as Error & { cause?: unknown }).cause
+    return [err.name, err.message, errorHaystack(cause, depth + 1)].filter(Boolean).join(' ')
+  }
+  return String(err)
+}
+
+/**
+ * Translate whatever yahoo-finance2 throws into a typed, self-explanatory error.
+ *
+ * Yahoo serves the K-line endpoints to the unofficial client behind a
+ * crumb/cookie handshake and throttles by IP + request fingerprint. When that
+ * throttle trips, the library throws an `HTTPError` with `.code = 429` (or a
+ * 401/403 on the crumb step — itself usually a downstream 429). Left raw, those
+ * surface as an opaque "Edge: Too Many Requests"; worse, the per-symbol fan-out's
+ * `Promise.allSettled` used to swallow them into "No historical data" entirely
+ * (issue #375). Map them to errors that say what's actually wrong:
+ *   - 429 / "too many requests" / rate-limit  → RateLimitedError (retry / switch source)
+ *   - 401 / 403 / crumb / cookie / consent     → RateLimitedError (same Yahoo-block syndrome)
+ *   - DNS / TLS / connection failures           → NetworkUnreachableError (do-not-retry)
+ *   - anything else                             → passed through unchanged (never masked)
+ */
+export function classifyYahooFetchError(symbol: string, err: unknown): Error {
+  const status = httpStatusOf(err)
+  const hay = errorHaystack(err)
+  const detail = err instanceof Error ? (err.message || err.name) : String(err)
+
+  if (status === 429 || /too many requests|rate.?limit(ed)?/i.test(hay)) {
+    return new RateLimitedError('Yahoo Finance', detail, { symbol, status: status ?? 429, original: err })
+  }
+  if (status === 401 || status === 403 || /\bcrumb\b|invalid cookie|consent|unauthorized|forbidden/i.test(hay)) {
+    return new RateLimitedError('Yahoo Finance', detail, { symbol, status, original: err })
+  }
+  if (/fetch failed|ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|ETIMEDOUT|EHOSTUNREACH|ENETUNREACH|socket hang up|UNABLE_TO_VERIFY|SELF_SIGNED/i.test(hay)) {
+    return new NetworkUnreachableError('finance.yahoo.com', detail, err)
+  }
+  return err instanceof Error ? err : new Error(detail)
+}
+
+/**
+ * Build the error to throw when a per-symbol historical fan-out produced zero
+ * rows. The yfinance `*-historical` models fetch each symbol under
+ * `Promise.allSettled` and keep only fulfilled rows; when EVERY fetch fails we
+ * must surface WHY rather than a bare "no data" (issue #375 — a Yahoo rate-limit
+ * failed all symbols and the old generic EmptyDataError masked a transient block
+ * as missing history).
+ *
+ *   - rejections sharing one distinct cause (single symbol, or all symbols hit
+ *     the same wall) → re-throw it verbatim so its type + actionable text survive
+ *     (a RateLimitedError stays a RateLimitedError).
+ *   - rejections with several distinct causes → aggregate the messages.
+ *   - no rejections (every fetch resolved empty — defensive; getHistoricalData
+ *     throws on empty, so this is unreachable today) → plain EmptyDataError.
+ */
+export function emptyHistoricalError(
+  results: PromiseSettledResult<unknown>[],
+  emptyMessage: string,
+): Error {
+  const failures = results.filter(
+    (r): r is PromiseRejectedResult => r.status === 'rejected',
+  )
+  if (failures.length === 0) return new EmptyDataError(emptyMessage)
+
+  const distinct = [...new Set(
+    failures.map((f) => (f.reason instanceof Error ? f.reason.message : String(f.reason))),
+  )]
+  if (distinct.length === 1) {
+    const reason = failures[0].reason
+    return reason instanceof Error ? reason : new Error(distinct[0])
+  }
+  return new OpenBBError(`${emptyMessage}: every symbol failed — ${distinct.join(' | ')}`)
+}
 
 /** Retry a function up to maxRetries times with delay between attempts */
 async function withRetry<T>(fn: () => Promise<T>, maxRetries = 2, delayMs = 1000): Promise<T> {
@@ -215,7 +302,17 @@ export async function getHistoricalData(
     period1,
     period2,
     interval: interval as any,
-  }))
+  })).catch((err: unknown) => {
+    // A failed K-line fetch is almost always Yahoo throttling / blocking the
+    // unofficial client (HTTP 429 / crumb auth), NOT a symbol with no history.
+    // Bump the failure counter so a stale crumb is refreshed on the next call,
+    // and rethrow a typed, self-explanatory error instead of letting an opaque
+    // "Edge: Too Many Requests" — or, worse, a swallowed "No historical data" —
+    // reach the agent (issue #375).
+    recordYFFailure()
+    throw classifyYahooFetchError(symbol, err)
+  })
+  recordYFSuccess()
 
   if (!chartResult?.quotes?.length) {
     throw new EmptyDataError(`No historical data for ${symbol}`)

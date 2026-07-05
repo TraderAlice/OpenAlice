@@ -13,6 +13,7 @@
 import { Hono } from 'hono'
 import { serve } from '@hono/node-server'
 import { loadConfig, readUTAsConfig, purgeEphemeralUTAs, type UTAConfig } from '@/core/config.js'
+import { parseDuration } from '@/core/duration.js'
 import { createEventLog } from '@/core/event-log.js'
 import { ToolCenter } from '@/core/tool-center.js'
 import {
@@ -28,6 +29,7 @@ import {
 } from '@/domain/market-data/client/typebb/index.js'
 import type { CurrencyClientLike } from '@/domain/market-data/client/types.js'
 import { buildSDKCredentials } from '@/domain/market-data/credential-map.js'
+import { startOrderSyncPoller } from './domain/trading/order-sync-poller.js'
 import { createTradingRoutes } from './http/routes-trading.js'
 import { createSimulatorRoutes } from './http/routes-simulator.js'
 import type { UTAEngineContext } from './types.js'
@@ -38,6 +40,17 @@ const CATALOG_REFRESH_MS = 6 * 60 * 60 * 1000  // 6h
 async function main(): Promise<void> {
   const startedAt = new Date().toISOString()
   console.log(`[uta] bootstrap @ ${startedAt}`)
+
+  // Surface outbound-proxy config at startup so a user behind a proxy can
+  // confirm UTA saw it — CCXT exchange instances are bridged onto it per
+  // broker (see CcxtBroker.applyEnvProxy / issue #384). Credentials in the
+  // URL (user:pass@) are redacted.
+  const outboundProxy = process.env.HTTPS_PROXY || process.env.https_proxy
+    || process.env.HTTP_PROXY || process.env.http_proxy
+    || process.env.ALL_PROXY || process.env.all_proxy
+  if (outboundProxy) {
+    console.log(`[uta] outbound proxy detected (${outboundProxy.replace(/\/\/[^@/]*@/, '//***@')}) — bridging into CCXT exchanges`)
+  }
 
   const config = await loadConfig()
 
@@ -111,6 +124,20 @@ async function main(): Promise<void> {
   if (config.snapshot.enabled) {
     console.log(`[uta] snapshot scheduler started (every ${config.snapshot.every})`)
   }
+
+  // ==================== Order-sync poller ====================
+  // Fast lane (10s): fill/cancel detection for known pending orders —
+  // broker calls only when something is actually pending. Slow lane
+  // (config.trading.observeExternalOrdersEvery, default 15m): list open
+  // orders to catch ones placed outside Alice.
+
+  const observeRaw = config.trading.observeExternalOrdersEvery
+  const observeIntervalMs = observeRaw === 'off' ? 0 : parseDuration(observeRaw)
+  if (observeIntervalMs === null) {
+    console.warn(`[uta] trading.json observeExternalOrdersEvery "${observeRaw}" is not a duration (e.g. "15m") — falling back to 15m`)
+  }
+  startOrderSyncPoller(() => utaManager.resolve(), { observeIntervalMs: observeIntervalMs ?? 15 * 60_000 })
+  console.log(`[uta] order-sync poller started (10s pending lane; external-order observation ${observeRaw === 'off' ? 'off' : `every ${observeRaw}`})`)
 
   // ==================== Catalog refresh ====================
   // Brokers that cache catalog (Alpaca / CCXT / Mock) need periodic refresh.

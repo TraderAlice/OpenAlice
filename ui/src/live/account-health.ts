@@ -2,6 +2,9 @@ import { api } from '../api'
 import type { BrokerHealthInfo } from '../api/types'
 import { createLiveStore } from './createLiveStore'
 import { connectSSE } from './connectSSE'
+import { reloadOnHotUpdate } from '../lib/hmr'
+
+reloadOnHotUpdate('live/account-health')
 
 /**
  * Live broker-health map: accountId → BrokerHealthInfo.

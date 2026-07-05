@@ -17,8 +17,16 @@
 import { Type, type TSchema } from '@sinclair/typebox'
 import AjvPkg from 'ajv'
 
-// Re-export CronFirePayload from its canonical location
-export type { CronFirePayload } from '../task/cron/engine.js'
+// The cron engine was retired (workspace self-scheduling replaced it). The
+// `cron.fire` event type stays defined here as the event bus's canonical sample
+// event (kept so the bus specs don't churn); it has no producer/listener now.
+export interface CronFirePayload {
+  jobId: string
+  jobName: string
+  payload: string
+  workspaceId?: string
+  agent?: string
+}
 
 /**
  * Which trigger source produced an AgentWork request — the routing key
@@ -90,9 +98,6 @@ export interface AgentWorkErrorPayload {
 }
 
 // ==================== Event Map ====================
-
-// Import the actual CronFirePayload type for use in the map
-import type { CronFirePayload } from '../task/cron/engine.js'
 
 export interface AgentEventMap {
   'cron.fire': CronFirePayload

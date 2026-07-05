@@ -41,6 +41,7 @@ function projectKey(workspaceDir: string): string {
 export const claudeAdapter: CliAdapter = {
   id: 'claude',
   displayName: 'Claude Code',
+  binary: 'claude',
   namePrefix: 'c',
   capabilities: {
     parallelPerCwd: true,
@@ -63,7 +64,14 @@ export const claudeAdapter: CliAdapter = {
 
   composeCommand(base: readonly string[], ctx: SpawnContext): readonly string[] {
     const cmd = [...base, '--settings', AUTOTRUST_SETTINGS];
-    if (ctx.resume === undefined) return cmd;
+    if (ctx.resume === undefined) {
+      // Quick-chat seed: `claude [flags] -- <prompt>` opens the interactive TUI
+      // and auto-submits the prompt. The `--` end-of-options terminator (same as
+      // the headless path) keeps a prompt starting with `-`/`--` from being
+      // mis-parsed as a flag (claude accepts `--` interactively; verified).
+      if (ctx.initialPrompt) return [...cmd, '--', ctx.initialPrompt];
+      return cmd;
+    }
     if (ctx.resume === 'last') {
       throw new Error(
         'claude adapter: "last" resume not supported — use --resume <sessionId> or undefined (fresh)',
@@ -78,8 +86,27 @@ export const claudeAdapter: CliAdapter = {
   // lose inbox_push). The prompt is the trailing positional AFTER a `--`
   // end-of-options terminator, so a prompt that starts with `-`/`--` isn't
   // mis-parsed as a flag (verified: without `--`, claude errors out).
+  // Output is `stream-json` (one event per line, REQUIRES --verbose — plain
+  // `-p --output-format stream-json` errors out): the launcher gets live
+  // progress in the task log AND every event carries `session_id`, so the
+  // run's identity is captured from line 1 instead of parsed out of a final
+  // result blob (verified 2.1.x, 2026-06-11).
   composeHeadlessCommand(base: readonly string[], _ctx: SpawnContext, prompt: string): readonly string[] {
-    return [...base, '--settings', AUTOTRUST_SETTINGS, '-p', '--output-format', 'json', '--', prompt];
+    return [
+      ...base,
+      '--settings', AUTOTRUST_SETTINGS,
+      '-p', '--output-format', 'stream-json', '--verbose',
+      '--', prompt,
+    ];
+  },
+
+  extractHeadlessSessionId(line: string): string | null {
+    try {
+      const evt = JSON.parse(line) as Record<string, unknown>;
+      return typeof evt['session_id'] === 'string' ? evt['session_id'] : null;
+    } catch {
+      return null;
+    }
   },
 
   async writeAiConfig(cwd: string, cred: WorkspaceAiCred): Promise<void> {

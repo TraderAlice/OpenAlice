@@ -3,6 +3,8 @@ import { useTradingConfig } from '../hooks/useTradingConfig'
 import { useWorkspace } from '../tabs/store'
 import { getFocusedTab } from '../tabs/types'
 import { SidebarRow } from './SidebarRow'
+import { SidebarSectionHeader } from './SidebarSectionHeader'
+import { SidebarRowsSkeleton } from './StateViews'
 
 /**
  * Portfolio sidebar — Overview + per-UTA accounts.
@@ -25,7 +27,7 @@ export function PortfolioSidebar() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="flex-1 overflow-y-auto min-h-0 py-0.5">
+      <div className="flex-1 overflow-y-auto min-h-0 py-1">
         <SidebarSectionHeader>{t('portfolio.overview')}</SidebarSectionHeader>
         <SidebarRow
           label={t('portfolio.allAccounts')}
@@ -38,9 +40,9 @@ export function PortfolioSidebar() {
         </SidebarSectionHeader>
 
         {loading ? (
-          <p className="px-3 py-1 text-[12px] text-text-muted/60">{t('common.loading')}</p>
+          <SidebarRowsSkeleton rows={3} />
         ) : utas.length === 0 ? (
-          <p className="px-3 py-1 text-[12px] text-text-muted/60 leading-snug">
+          <p className="px-3 py-2 text-[12px] text-text-muted/70 leading-relaxed">
             {t('portfolio.noAccountsYet')}
           </p>
         ) : (
@@ -58,7 +60,7 @@ export function PortfolioSidebar() {
                 }
                 trail={
                   !uta.enabled ? (
-                    <span className="text-[9px] uppercase tracking-wide text-text-muted/60">{t('common.off')}</span>
+                    <span className="text-[10px] uppercase tracking-wide text-text-muted/60">{t('common.off')}</span>
                   ) : undefined
                 }
               />
@@ -67,13 +69,5 @@ export function PortfolioSidebar() {
         )}
       </div>
     </div>
-  )
-}
-
-function SidebarSectionHeader({ children }: { children: React.ReactNode }) {
-  return (
-    <h3 className="px-3 mt-3 mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-text-muted/60 select-none">
-      {children}
-    </h3>
   )
 }

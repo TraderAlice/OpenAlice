@@ -6,7 +6,7 @@ import { useWorkspaceSidePanels } from '../../live/workspace-side-panels'
 /**
  * Top-bar toggle for the workspace right pane (the Files panel). One click
  * folds the whole column away so the terminal gets full width, instead of
- * leaving a narrow always-on column. Lives next to "AI Provider" in
+ * leaving a narrow always-on column. Lives next to "Settings" in
  * WorkspacePage's header; replaces the old Layout popover.
  *
  * State is user-level + persisted (fold it once, it stays folded) — see

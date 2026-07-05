@@ -16,9 +16,9 @@ description: >
 
 # `traderhub` — low-frequency market data
 
-One binary for everything that updates on hours-to-quarters cadence. It talks
-to the same backend as the `openalice` MCP tools; output is JSON on stdout
-(pipe to `jq`), non-zero exit = failure with the reason on stderr.
+One binary for everything that updates on hours-to-quarters cadence. Output is
+JSON on stdout (pipe to `jq`); a non-zero exit = failure with the reason on
+stderr.
 
 ```
 traderhub <group> <verb> [--flag value]
@@ -27,7 +27,8 @@ traderhub <group> <verb> --help   # a verb's flags
 ```
 
 **Not here:** K-lines/quotes (realtime — see `alice analysis` + the
-`openalice-quant` skill), collected-RSS articles (`alice rss`), trading (MCP only).
+`alice-analysis` skill), collected-RSS articles (`alice rss`), trading (use
+`alice-uta` — see the `alice-uta` skill).
 
 ## Reach for a BOARD before assembling primitives
 

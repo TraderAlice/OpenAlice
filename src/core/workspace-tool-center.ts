@@ -25,8 +25,12 @@
  */
 
 import type { Tool } from 'ai'
-import type { IInboxStore } from './inbox-store.js'
+import type { IInboxStore, InboxOrigin } from './inbox-store.js'
 import type { IEntityStore } from './entity-store.js'
+// TYPE-ONLY: the global-issue-board shapes. Importing them as types keeps
+// core/ free of any runtime dependency on the workspaces/ module (no
+// core→workspaces coupling), while letting the board reader below be typed.
+import type { IssuesSnapshot, IssueDetail, WikilinkIssueRef } from '../workspaces/issues/board.js'
 
 // ==================== Context handed to factories ====================
 
@@ -45,6 +49,31 @@ export interface WorkspaceToolContext {
    *  entity_upsert / entity_search read and write. Same injection rationale
    *  as inboxStore. */
   entityStore: IEntityStore
+  /** Resolve ANY workspace's location by id (not just this one) — the backing
+   *  for cross-workspace collaboration: an inbox entry from a peer carries its
+   *  workspaceId, and `workspace_path` turns that into the peer's absolute dir
+   *  so the agent can read/edit its files with native tools. Optional because
+   *  it needs the live WorkspaceService (created after this center); the two
+   *  build sites (cli.ts, mcp.ts) inject a lazy closure, tests may omit it. */
+  resolveWorkspace?: (id: string) => { id: string; dir: string; tag: string } | null
+  /** Agent-INVISIBLE run provenance, resolved server-side from the
+   *  `x-openalice-run` header by the MCP / CLI route (never supplied by the
+   *  agent). Factories pass it through to call sites (e.g. inbox_push →
+   *  inboxStore.append) so a pushed entry self-links to its originating run /
+   *  issue. Absent (interactive session, or no header) → undefined. */
+  origin?: InboxOrigin
+  /** GLOBAL issue-board reader — the cross-workspace board the
+   *  `alice-workspace` CLI surfaces (issue_list / issue_show read EVERY
+   *  workspace's issues, not just the caller's). Backed by the live
+   *  WorkspaceService at the two build sites (cli.ts, mcp.ts). OPTIONAL: a
+   *  context without a service (older callers, unit tests) omits it, and the
+   *  issue tools then fall back to reading THIS workspace's own files — so
+   *  nothing breaks when it's absent. Reads only; writes stay caller-local. */
+  board?: {
+    snapshot(): Promise<IssuesSnapshot>
+    detail(wsId: string, id: string): Promise<IssueDetail | null>
+    resolveByName(name: string): Promise<WikilinkIssueRef[]>
+  }
 }
 
 // ==================== Factory shape ====================
@@ -83,5 +112,30 @@ export class WorkspaceToolCenter {
   /** Names of registered factories. Useful for introspection / tests. */
   list(): string[] {
     return this.factories.map((f) => f.name)
+  }
+}
+
+// ==================== Resolver helper ====================
+
+/** Minimal structural view of WorkspaceService that {@link makeWorkspaceResolver}
+ *  needs — kept structural so core/ doesn't depend on the workspaces/ module. */
+interface WorkspaceRegistryLike {
+  registry: { get(id: string): { id: string; dir: string; tag: string } | undefined }
+}
+
+/**
+ * Build the `resolveWorkspace` closure both tool-context build sites
+ * (cli.ts, mcp.ts) inject. Single source so the two never drift. Lazy over
+ * `getService` because the WorkspaceService is created after the tool center,
+ * and re-reads the live registry per call so a peer created later still
+ * resolves. Returns null when the service isn't up yet or the id is unknown —
+ * the tool then surfaces a clean error instead of throwing.
+ */
+export function makeWorkspaceResolver(
+  getService: () => WorkspaceRegistryLike | null,
+): NonNullable<WorkspaceToolContext['resolveWorkspace']> {
+  return (id) => {
+    const meta = getService()?.registry.get(id)
+    return meta ? { id: meta.id, dir: meta.dir, tag: meta.tag } : null
   }
 }

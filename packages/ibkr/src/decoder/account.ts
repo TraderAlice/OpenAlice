@@ -47,7 +47,7 @@ function decodeContractProto(cp: ContractProto): Contract {
   const c = new Contract()
   if (cp.conId !== undefined) c.conId = cp.conId
   if (cp.symbol !== undefined) c.symbol = cp.symbol
-  if (cp.secType !== undefined) 
+  if (cp.secType !== undefined) c.secType = coerceSecType(cp.secType)
   if (cp.lastTradeDateOrContractMonth !== undefined) c.lastTradeDateOrContractMonth = cp.lastTradeDateOrContractMonth
   if (cp.strike !== undefined) c.strike = cp.strike
   if (cp.right !== undefined) c.right = cp.right

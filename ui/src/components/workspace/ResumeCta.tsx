@@ -49,7 +49,7 @@ export function ResumeCta(props: ResumeCtaProps): ReactElement {
       <div className="resume-cta-overlay">
         <div className="resume-cta-card">
           <div className="resume-cta-card-header">
-            <span className={`resume-cta-badge sidebar-agent-badge is-${r.agent}`}>
+            <span className="resume-cta-badge">
               {prefixOf(r.agent)}
             </span>
             <div className="resume-cta-card-title">

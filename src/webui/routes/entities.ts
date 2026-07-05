@@ -14,7 +14,7 @@ import { Hono } from 'hono'
 
 import type { IEntityStore } from '../../core/entity-store.js'
 import type { WorkspaceRegistry } from '../../workspaces/workspace-registry.js'
-import { scanBacklinks } from '../../core/entity-backlinks.js'
+import { scanBacklinks, warmBacklinks } from '../../core/entity-backlinks.js'
 
 export interface EntityRoutesDeps {
   entityStore: IEntityStore
@@ -23,6 +23,10 @@ export interface EntityRoutesDeps {
 
 export function createEntityRoutes(deps: EntityRoutesDeps) {
   const app = new Hono()
+
+  // Warm the backlink cache at startup so the first Tracked open doesn't pay
+  // for a cold full-corpus scan (the slow path the user hit).
+  warmBacklinks(deps.registry)
 
   app.get('/', async (c) => {
     const [entities, backlinks] = await Promise.all([

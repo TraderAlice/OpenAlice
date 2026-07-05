@@ -8,12 +8,14 @@
  */
 
 import Decimal from 'decimal.js'
-import { Contract, Order, ContractDescription, ContractDetails, UNSET_DECIMAL } from '@traderalice/ibkr'
-import { BrokerError, type IBroker, type AccountInfo, type Position, type OpenOrder, type PlaceOrderResult, type Quote, type MarketClock, type AccountCapabilities, type BrokerHealth, type BrokerHealthInfo, type UTAReach, type UTATier, type TpSlParams, type Bar, type BarParams } from './brokers/types.js'
+import { Contract, Order, ContractDescription, ContractDetails, UNSET_DECIMAL, UNSET_INTEGER, UNSET_DOUBLE } from '@traderalice/ibkr'
+import { BrokerError, type IBroker, type AccountInfo, type Position, type OpenOrder, type PlaceOrderResult, type Quote, type MarketClock, type AccountCapabilities, type BrokerHealth, type BrokerHealthInfo, type UTAReach, type UTATier, type TpSlParams, type Bar, type BarParams, type ExpandContractFilters, type ContractExpansion, type SubAccountRef } from './brokers/types.js'
 
 const REACH_RANK: Record<UTAReach, number> = { down: 0, connected: 1, readable: 2 }
 import { TradingGit } from './git/TradingGit.js'
 import { recomputeCostBasisFromCommits } from './cost-basis.js'
+import { projectOrderHistory, projectTradeHistory } from './order-history.js'
+import type { OrderHistoryEntry, TradeHistoryEntry } from '@traderalice/uta-protocol'
 import { pnlOf } from './position-math.js'
 import type {
   Operation,
@@ -95,6 +97,12 @@ export class UnifiedTradingAccount {
   private static readonly OFFLINE_THRESHOLD = 6
   private static readonly RECOVERY_BASE_MS = 5_000
   private static readonly RECOVERY_MAX_MS = 60_000
+  /** Grace a read gives the INITIAL connect before it fast-fails with CONNECTING.
+   *  An instantly-connecting broker (mock, warm cache) settles within this and
+   *  serves real data; a slow one (CCXT loadMarkets, tens of seconds) blows past
+   *  it and the read returns "connecting" instead of blocking on the whole init.
+   *  Bounds the cold-start first-read to this, not the full connect time. */
+  private static readonly CONNECT_GRACE_MS = 1_500
 
   private _consecutiveFailures = 0
   private _lastError?: string
@@ -103,10 +111,28 @@ export class UnifiedTradingAccount {
   private _recoveryTimer?: ReturnType<typeof setTimeout>
   private _recovering = false
   private _disabled = false
+  /** True while the INITIAL broker connect is in flight (e.g. CCXT loadMarkets,
+   *  which can take tens of seconds). Reads during this window return fast with
+   *  a transient CONNECTING error instead of blocking on the slow connect — the
+   *  bug that made the whole UI hang ~30s on cold start while the optimistic
+   *  reach (below) reported "healthy". Flips false when `_connectPromise`
+   *  settles; never set true again (re-connects go through the recovery loop,
+   *  which has its own gate). Orthogonal to `_recovering`. */
+  private _connecting = true
   /** Current rung on the capability ladder. Updated by every connect/recovery
    *  probe and by live broker-call success/failure. */
   private _currentReach: UTAReach = 'down'
   private _connectPromise: Promise<void>
+  /** Sub-account (wallet) list, cached from the broker once it connects. Null
+   *  until first probed. Static per connection (CCXT derives it from venue
+   *  overrides — network-independent), so caching can't go stale. Drives the
+   *  write-disambiguation guard. */
+  private _subAccounts: SubAccountRef[] | null = null
+  /** Sub-account ids declared by writes staged-but-not-yet-committed, parallel
+   *  to the git staging area. Stamped into the commit message at commit time
+   *  (the ledger records the wallet without touching the Operation schema),
+   *  then cleared. */
+  private _stagedSubAccountIds: string[] = []
 
   constructor(broker: IBroker, options: UnifiedTradingAccountOptions = {}) {
     this.broker = broker
@@ -172,8 +198,13 @@ export class UnifiedTradingAccount {
       ? TradingGit.restore(options.savedState, gitConfig)
       : new TradingGit(gitConfig)
 
-    // Kick off broker connection asynchronously — UTA is usable immediately,
-    // broker queries will fail (tracked by health) until init succeeds.
+    // Kick off broker connection asynchronously — UTA is usable immediately;
+    // reads during the connect window return a fast transient CONNECTING marker
+    // (see `_connecting` / `_callBroker`) rather than blocking on init.
+    // `_connecting` is cleared INSIDE _connect() (right after the connect probe
+    // settles, before the health-change emit) so the first emitted health diff
+    // already carries connecting:false — clearing it here in a .finally would
+    // run after that emit and leave the UI stuck on "connecting".
     const p = this._connect()
     // Silence unhandled rejection in fire-and-forget path.
     // waitForConnect() returns the raw promise so callers can observe failures.
@@ -236,6 +267,7 @@ export class UnifiedTradingAccount {
       lastSuccessAt: this._lastSuccessAt,
       lastFailureAt: this._lastFailureAt,
       recovering: this._recovering,
+      connecting: this._connecting,
       disabled: this._disabled,
     }
   }
@@ -278,7 +310,23 @@ export class UnifiedTradingAccount {
 
   /** Initial broker connection — fire-and-forget from constructor. */
   private async _connect(): Promise<void> {
+    // Timed + logged: the connect duration is the cold-start cost this whole
+    // non-blocking path exists to absorb, so surface it on the console (a slow
+    // CCXT loadMarkets is otherwise an invisible ~30s stall).
+    const startedAt = Date.now()
+    console.log(`UTA[${this.id}]: connecting (target ${this.targetReach})…`)
     this._currentReach = await this._attemptReach()
+    // Initial connect has settled (reached, down, or disabled — _attemptReach
+    // never throws). Clear the connecting gate now, BEFORE any _emitHealthChange
+    // below, so the first health diff the UI receives reflects the real state.
+    // Re-connections go through the recovery loop, which has its own gating.
+    this._connecting = false
+    // Warm the sub-account cache once the transport is up, so the (sync)
+    // write-disambiguation guard has the list before any staging. Best-effort:
+    // a failure here must not break connection.
+    if (!this._disabled && this._currentReach !== 'down') {
+      try { await this._ensureSubAccounts() } catch { /* guard falls back to single-default */ }
+    }
     if (this._disabled) {
       console.warn(`UTA[${this.id}]: disabled — ${this._lastError}`)
       this._emitHealthChange()
@@ -287,7 +335,7 @@ export class UnifiedTradingAccount {
     if (this._reachedTarget()) {
       this._onSuccess()
       this._emitHealthChange()
-      console.log(`UTA[${this.id}]: ${this._currentReach} (${this.tier})`)
+      console.log(`UTA[${this.id}]: ${this._currentReach} (${this.tier}) in ${((Date.now() - startedAt) / 1000).toFixed(1)}s`)
       return
     }
     // Below target → recover toward it.
@@ -295,17 +343,45 @@ export class UnifiedTradingAccount {
     this._startRecovery()
     this._emitHealthChange()
     if (this._currentReach === 'down') {
+      console.warn(`UTA[${this.id}]: unreachable after ${((Date.now() - startedAt) / 1000).toFixed(1)}s — ${this._lastError ?? 'no detail'} (recovering)`)
       throw new BrokerError('NETWORK', this._lastError ?? `Account "${this.label}" unreachable`)
     }
     // 'connected' but funded wants 'readable' — partial; recovery pursues it.
+  }
+
+  /** Race the initial connect against a short grace window. Resolves as soon as
+   *  the connect settles (an instant broker wins via microtask, well before the
+   *  timer) or the grace elapses (a slow broker). The caller re-checks
+   *  `_connecting` afterwards to decide whether to proceed or fast-fail. */
+  private _awaitConnectOrGrace(): Promise<void> {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const grace = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, UnifiedTradingAccount.CONNECT_GRACE_MS)
+      timer.unref?.()
+    })
+    return Promise.race([this._connectPromise.catch(() => {}), grace])
+      .finally(() => { if (timer) clearTimeout(timer) })
   }
 
   private async _callBroker<T>(fn: () => Promise<T>): Promise<T> {
     if (this._disabled) {
       throw new BrokerError('CONFIG', `Account "${this.label}" is disabled due to configuration error: ${this._lastError}`)
     }
+    // Initial connect still in flight (e.g. CCXT loadMarkets). Give it a short
+    // grace: an instant broker settles within it and the read proceeds with real
+    // data; a slow one is still connecting afterwards and we return FAST instead
+    // of blocking on the whole init. Thrown BEFORE the try block, so it never
+    // reaches _onFailure: no failure counter, no health degrade, no premature
+    // recovery. The background connect keeps going; a later read gets real data.
+    // This is the fix for the ~30s cold-start hang.
+    if (this._connecting) {
+      await this._awaitConnectOrGrace()
+      if (this._connecting) {
+        throw new BrokerError('CONNECTING', `Account "${this.label}" is still connecting to the broker. Data will be available shortly.`)
+      }
+    }
     if (this.health === 'offline' && this._recovering) {
-      throw new BrokerError('NETWORK', `Account "${this.label}" is offline and reconnecting. Try again shortly.`)
+      throw new BrokerError('CONNECTING', `Account "${this.label}" is offline and reconnecting. Try again shortly.`)
     }
     try {
       const result = await fn()
@@ -434,11 +510,111 @@ export class UnifiedTradingAccount {
     }
   }
 
+  /**
+   * Per-orderType required-field gate, enforced at stage time so a broken
+   * order can never reach staging/commit. Without this, a caller that loses
+   * fields on the way in (e.g. a CLI typo like --quantity for --totalQuantity)
+   * stages a quantity-less LMT order that looks perfectly committable.
+   */
+  private _validatePlaceOrderParams(p: StagePlaceOrderParams): void {
+    const fail = (msg: string): never => {
+      throw new Error(`placeOrder (${p.orderType}): ${msg}`)
+    }
+    const has = (v: unknown): boolean => v != null && String(v) !== ''
+    const qty = has(p.totalQuantity)
+    const cash = has(p.cashQty)
+    if (qty && cash) fail('totalQuantity and cashQty are mutually exclusive — provide exactly one.')
+    if (p.orderType === 'MKT') {
+      if (!qty && !cash) fail('requires totalQuantity (shares) or cashQty (notional).')
+    } else {
+      if (cash) fail('cashQty (notional) is only supported for MKT orders — use totalQuantity.')
+      if (!qty) fail('requires totalQuantity.')
+    }
+    switch (p.orderType) {
+      case 'LMT':
+        if (!has(p.lmtPrice)) fail('requires lmtPrice.')
+        break
+      case 'STP':
+        if (!has(p.auxPrice)) fail('requires auxPrice (stop trigger price).')
+        break
+      case 'STP LMT':
+        if (!has(p.auxPrice)) fail('requires auxPrice (stop trigger price).')
+        if (!has(p.lmtPrice)) fail('requires lmtPrice.')
+        break
+      case 'TRAIL':
+      case 'TRAIL LIMIT': {
+        const aux = has(p.auxPrice)
+        const pct = has(p.trailingPercent)
+        if (aux && pct) fail('auxPrice and trailingPercent are mutually exclusive — provide exactly one.')
+        if (!aux && !pct) fail('requires auxPrice (trailing offset) or trailingPercent.')
+        if (p.orderType === 'TRAIL LIMIT' && !has(p.lmtPrice)) fail('requires lmtPrice.')
+        break
+      }
+    }
+  }
+
+  // ==================== Sub-accounts ====================
+
+  /** Fetch (and memoize) the broker's sub-account list. Brokers that don't
+   *  implement `listSubAccounts` collapse to a single implicit 'default'. */
+  private async _ensureSubAccounts(): Promise<SubAccountRef[]> {
+    if (this._subAccounts) return this._subAccounts
+    const list = this.broker.listSubAccounts ? await this.broker.listSubAccounts() : null
+    this._subAccounts = list && list.length ? list : [{ id: 'default', label: this.label, kind: 'unified' }]
+    return this._subAccounts
+  }
+
+  /** The sub-accounts (wallets) this connection spans. One element for ordinary
+   *  brokers; >1 only for separate-wallet venues (CCXT Binance: spot / futures). */
+  async listSubAccounts(): Promise<SubAccountRef[]> {
+    return this._ensureSubAccounts()
+  }
+
+  /**
+   * Resolve + validate the target sub-account for a WRITE. When the connection
+   * spans >1 sub-account, an explicit selector is REQUIRED (placing an order is
+   * irreversible — we never guess a wallet). The selector is also checked
+   * against the instrument: "place this on spot" with a perp contract
+   * loud-refuses. Returns the resolved id to stamp into the commit message, or
+   * undefined for single-sub-account brokers (nothing to disambiguate or stamp).
+   */
+  private _resolveWriteSubAccount(contract: Contract, requested?: string): string | undefined {
+    const subs = this._subAccounts ?? []
+    if (subs.length <= 1) return undefined  // single (or not-yet-probed) → nothing to disambiguate
+
+    const valid = subs.map(s => s.id).join(', ')
+    const expected = this.broker.subAccountForContract?.(contract)
+    const instr = contract.secType || 'this instrument'
+
+    if (!requested) {
+      throw new BrokerError('CONFIG',
+        `Account "${this.label}" has multiple sub-accounts (${subs.map(s => `${s.id} [${s.kind}]`).join(', ')}). ` +
+        `Re-issue this write with subAccountId` +
+        (expected ? `="${expected}" (where ${instr} trades).` : ` set to one of: ${valid}.`))
+    }
+    if (!subs.some(s => s.id === requested)) {
+      throw new BrokerError('CONFIG',
+        `Account "${this.label}": unknown sub-account "${requested}". Valid sub-accounts: ${valid}.`)
+    }
+    if (expected && expected !== requested) {
+      throw new BrokerError('CONFIG',
+        `Account "${this.label}": ${instr} trades in sub-account "${expected}", not "${requested}". ` +
+        `Re-issue with subAccountId="${expected}".`)
+    }
+    return requested
+  }
+
+  // ==================== Staging ====================
+
   stagePlaceOrder(params: StagePlaceOrderParams): AddResult {
     this._assertWritable()
+    this._validatePlaceOrderParams(params)
     // Resolve aliceId → full contract via broker (fills secType, exchange, currency, conId, etc.)
     const contract = this.contractFromAliceId(params.aliceId)
     if (params.symbol) contract.symbol = params.symbol
+
+    const subAccountId = this._resolveWriteSubAccount(contract, params.subAccountId)
+    if (subAccountId) this._stagedSubAccountIds.push(subAccountId)
 
     const order = new Order()
     order.action = params.action
@@ -484,6 +660,9 @@ export class UnifiedTradingAccount {
     const contract = this.contractFromAliceId(params.aliceId)
     if (params.symbol) contract.symbol = params.symbol
 
+    const subAccountId = this._resolveWriteSubAccount(contract, params.subAccountId)
+    if (subAccountId) this._stagedSubAccountIds.push(subAccountId)
+
     return this.git.add({
       action: 'closePosition',
       contract,
@@ -499,7 +678,20 @@ export class UnifiedTradingAccount {
   // ==================== Git flow ====================
 
   commit(message: string): CommitPrepareResult {
-    return this.git.commit(message)
+    const result = this.git.commit(this._stampSubAccount(message))
+    // Sub-account intent is now baked into the persisted message — clear the
+    // transient tracker so the next staging batch starts clean.
+    this._stagedSubAccountIds = []
+    return result
+  }
+
+  /** Append a `[sub:…]` tag to the commit message recording which wallet(s) the
+   *  staged writes targeted. The ONLY place the sub-account is persisted — the
+   *  Operation / GitCommit schema is deliberately left untouched. No-op when no
+   *  multi-sub-account write was staged. */
+  private _stampSubAccount(message: string): string {
+    const ids = [...new Set(this._stagedSubAccountIds)]
+    return ids.length ? `${message} [sub:${ids.join(',')}]` : message
   }
 
   async push(): Promise<PushResult> {
@@ -516,6 +708,7 @@ export class UnifiedTradingAccount {
 
   async reject(reason?: string): Promise<RejectResult> {
     const result = await this.git.reject(reason)
+    this._stagedSubAccountIds = []
     Promise.resolve(this._onPostReject?.(this.id)).catch(() => {})
     return result
   }
@@ -534,6 +727,23 @@ export class UnifiedTradingAccount {
     return this.git.status()
   }
 
+  /**
+   * Sync cost model — two strategies, picked by broker capability:
+   *
+   * LISTING (broker has getOpenOrders): ONE listing call covers every
+   * pending order. An order still present is alive — zero further calls,
+   * no matter how long it hangs (stop-loss / take-profit orders can sit
+   * for weeks; per-order polling would be 8.6k calls/day EACH). An order
+   * ABSENT from the listing transitioned — only then is getOrder spent to
+   * confirm the terminal state + execution data. Absence alone is never
+   * trusted as terminal: conditional/algo orders on some venues live in a
+   * different listing namespace, so a vanished-but-still-Submitted confirm
+   * is treated as "still working".
+   *
+   * PER-ORDER (no listing capability): poll each pending order with
+   * age-based backoff — fresh orders (likely marketable) every pass, then
+   * 1m, then 5m once they've proven to be hangers.
+   */
   async sync(opts?: { delayMs?: number }): Promise<SyncResult> {
     const pendingOrders = this.git.getPendingOrderIds()
     if (pendingOrders.length === 0) {
@@ -543,10 +753,25 @@ export class UnifiedTradingAccount {
     // Optional delay — gives exchange APIs time to settle before querying
     if (opts?.delayMs) await new Promise(r => setTimeout(r, opts.delayMs))
 
+    let candidates = pendingOrders
+    if (this.broker.getOpenOrders) {
+      const listing = await this._callBroker(() => this.broker.getOpenOrders!())
+      const openIds = new Set(listing.map((o) => o.orderId).filter(Boolean))
+      // Present in the listing → alive, skip. (A just-placed order missing
+      // due to listing lag is also safe: its confirm returns Submitted.)
+      candidates = pendingOrders.filter((p) => !openIds.has(p.orderId))
+    } else {
+      candidates = pendingOrders.filter((p) => this._pollBackoffDue(p.orderId))
+    }
+
+    if (candidates.length === 0) {
+      return { hash: '', updatedCount: 0, updates: [] }
+    }
+
     const updates: OrderStatusUpdate[] = []
 
-    for (const { orderId, symbol } of pendingOrders) {
-      const brokerOrder = await this._callBroker(() => this.broker.getOrder(orderId))
+    for (const { orderId, symbol, localSymbol } of candidates) {
+      const brokerOrder = await this._callBroker(() => this.broker.getOrder(orderId, localSymbol))
       if (!brokerOrder) continue
 
       const status = brokerOrder.orderState.status
@@ -560,11 +785,24 @@ export class UnifiedTradingAccount {
           ? orderFilledQty.toFixed()
           : undefined
 
+        const currentStatus =
+          status === 'Filled' ? 'filled' : status === 'Cancelled' ? 'cancelled' : 'rejected'
+        if (currentStatus === 'filled' && (!filledQty || !brokerOrder.avgFillPrice)) {
+          // Loud, not fatal: a fill without qty/price still advances the
+          // state machine, but cost-basis reconstruction downstream will be
+          // missing data — that must be visible, not silent.
+          console.warn(
+            `UTA[${this.id}]: order ${orderId} (${symbol}) synced to filled but broker omitted ` +
+            `${!filledQty ? 'filledQuantity' : ''}${!filledQty && !brokerOrder.avgFillPrice ? ' and ' : ''}` +
+            `${!brokerOrder.avgFillPrice ? 'avgFillPrice' : ''} — cost basis for this fill may be incomplete`,
+          )
+        }
+
         updates.push({
           orderId,
           symbol,
           previousStatus: 'submitted',
-          currentStatus: status === 'Filled' ? 'filled' : status === 'Cancelled' ? 'cancelled' : 'rejected',
+          currentStatus,
           filledQty,
           filledPrice: brokerOrder.avgFillPrice,
         })
@@ -579,8 +817,70 @@ export class UnifiedTradingAccount {
     return this.git.sync(updates, state)
   }
 
-  getPendingOrderIds(): Array<{ orderId: string; symbol: string }> {
+  getPendingOrderIds(): Array<{ orderId: string; symbol: string; localSymbol?: string }> {
     return this.git.getPendingOrderIds()
+  }
+
+  /** Exchange-frontend projection — same translation the UI and routes use. */
+  async orderHistory(limit = 50): Promise<OrderHistoryEntry[]> {
+    return projectOrderHistory(this.git.exportState().commits, { limit })
+  }
+
+  /** Exchange-frontend projection — fills only. */
+  async tradeHistory(limit = 50): Promise<TradeHistoryEntry[]> {
+    return projectTradeHistory(this.git.exportState().commits, { limit })
+  }
+
+  /** firstSeen/lastPolled per pending order — drives the per-order polling
+   *  backoff for brokers without a listing API. In-memory only: a restart
+   *  resets every order to "fresh", which just means one eager poll. */
+  private _pollState = new Map<string, { firstSeenAt: number; lastPolledAt: number }>()
+
+  private _pollBackoffDue(orderId: string): boolean {
+    const now = Date.now()
+    const state = this._pollState.get(orderId)
+    if (!state) {
+      this._pollState.set(orderId, { firstSeenAt: now, lastPolledAt: now })
+      return true
+    }
+    const age = now - state.firstSeenAt
+    // <2min old: every pass (marketable orders resolve here). <1h: every
+    // 60s. Older: every 5min — it's a hanger (stop/take-profit), awareness
+    // latency of minutes changes nothing about the execution itself.
+    const interval = age < 2 * 60_000 ? 0 : age < 60 * 60_000 ? 60_000 : 5 * 60_000
+    if (now - state.lastPolledAt < interval) return false
+    state.lastPolledAt = now
+    return true
+  }
+
+  /**
+   * Faithful-record pass for orders Alice didn't place: diff the broker's
+   * open orders against every orderId the log has ever seen, and squash the
+   * unknowns into one [observed] commit. The log is the narrative, not the
+   * state engine — this exists so "怎么回事" is always answerable from the
+   * log. Once recorded (orderId + submitted), the regular pending scanner
+   * and sync poller track the order's fill/cancel like any other.
+   *
+   * No-op (0 broker calls beyond the listing) when the broker can't
+   * enumerate open orders or everything is already known.
+   */
+  async observeExternalOrders(): Promise<{ observed: number }> {
+    if (!this.broker.getOpenOrders) return { observed: 0 }
+    const open = await this._callBroker(() => this.broker.getOpenOrders!())
+    if (open.length === 0) return { observed: 0 }
+
+    const known = this.git.getKnownOrderIds()
+    const unknown = open.filter((o) => o.orderId && !known.has(o.orderId))
+    if (unknown.length === 0) return { observed: 0 }
+
+    for (const o of unknown) this.stampAliceId(o.contract)
+    const stateAfter = await this._getState()
+    await this.git.recordObservedOrders({
+      observed: unknown.map((o) => ({ contract: o.contract, order: o.order, orderId: o.orderId! })),
+      stateAfter,
+    })
+    console.warn(`UTA[${this.id}]: recorded ${unknown.length} external order(s) not placed through Alice`)
+    return { observed: unknown.length }
   }
 
   simulatePriceChange(priceChanges: PriceChangeInput[]): Promise<SimulatePriceChangeResult> {
@@ -593,12 +893,41 @@ export class UnifiedTradingAccount {
 
   // ==================== Broker queries (delegation) ====================
 
-  getAccount(): Promise<AccountInfo> {
-    return this._callBroker(() => this.broker.getAccount())
+  /**
+   * Account info with the UTA-layer invariant enforced: account-level
+   * unrealizedPnL ALWAYS equals the sum over reconciled positions. Brokers
+   * can't uphold this themselves — wallet-sourced spot positions (CCXT
+   * synthesis from fetchBalance) carry a placeholder unrealizedPnL of '0'
+   * at the broker layer because cost basis lives in Alice's order log, not
+   * on the exchange. Trusting broker-reported account PnL therefore shows
+   * 0 for spot-only accounts while the positions surface shows real PnL
+   * (the Bybit-demo aggregation bug). Deriving from positions makes the
+   * two surfaces agree by construction, at the cost of one extra broker
+   * round-trip per account read (a 60s-poll path, not a hot path).
+   */
+  async getAccount(subAccountId?: string): Promise<AccountInfo> {
+    const account = await this._callBroker(() => this.broker.getAccount(subAccountId))
+    const positions = await this.getPositions(subAccountId)
+    // Currency guard: position PnLs can only be summed when they all share
+    // the account's base currency. Mixed-currency books (IBKR holding HKD +
+    // USD lines) would otherwise blind-sum different units — the exact bug
+    // aggregateAccountFromPositions has today. Those accounts keep the
+    // broker-reported value until the currency-aware FX aggregation lands.
+    const summable = positions.every(
+      (p) => (p.currency || account.baseCurrency) === account.baseCurrency,
+    )
+    if (summable) {
+      let unrealized = new Decimal(0)
+      for (const p of positions) {
+        unrealized = unrealized.plus(new Decimal(p.unrealizedPnL || '0'))
+      }
+      account.unrealizedPnL = unrealized.toString()
+    }
+    return account
   }
 
-  async getPositions(): Promise<Position[]> {
-    const positions = await this._callBroker(() => this.broker.getPositions())
+  async getPositions(subAccountId?: string): Promise<Position[]> {
+    const positions = await this._callBroker(() => this.broker.getPositions(subAccountId))
     for (const p of positions) this.stampAliceId(p.contract)
     await this._reconcileWalletPositions(positions)
     return positions
@@ -615,6 +944,20 @@ export class UnifiedTradingAccount {
     const walletPositions = positions.filter(p => p.avgCostSource === 'wallet')
     if (walletPositions.length === 0) return
 
+    // Race guard (observed live as commit dfb01435): a fill can land on the
+    // exchange between the broker's position read and the poller's sync
+    // pass. The position already shows the new quantity, but the projection
+    // doesn't include the fill yet — naive drift detection would book it as
+    // a reconcileBalance at the OBSERVATION-TIME mark price, polluting cost
+    // basis with the wrong price and double-counting once sync records the
+    // real execution. While an aliceId has in-flight orders, its drift
+    // belongs to sync; reconcile only what no pending order can explain.
+    // True residuals (fee-in-kind dust, external transfers racing an open
+    // order) get reconciled on the next pass after the order settles.
+    const inFlight = new Set(
+      this.git.getPendingOrderIds().map((p) => p.aliceId).filter(Boolean),
+    )
+
     for (const p of walletPositions) {
       const aliceId = p.contract.aliceId
       if (!aliceId) continue
@@ -625,8 +968,11 @@ export class UnifiedTradingAccount {
       const drift = p.quantity.minus(projectedQty)
 
       // Tolerance: dust-level differences (sub-1e-8) come from precision
-      // round-trips, not from real balance changes.
-      if (drift.abs().gt(new Decimal('1e-8'))) {
+      // round-trips, not from real balance changes. The in-flight guard
+      // only suppresses RECORDING — the avgCost/PnL projection below still
+      // applies, so a position with a weeks-long hanging stop order keeps
+      // its real cost basis on screen throughout.
+      if (!inFlight.has(aliceId) && drift.abs().gt(new Decimal('1e-8'))) {
         // Bootstrap price: prefer broker-reported avgCost when non-zero
         // (Mock externalTrade, future CCXT-with-fetchMyTrades, anything
         // that observed a real fill price). Fall back to markPrice only
@@ -711,6 +1057,29 @@ export class UnifiedTradingAccount {
     return this._callBroker(() => this.broker.getMarketClock())
   }
 
+  /**
+   * Hub → leaves expansion (bond issuers, option chains, futures months).
+   * Loud-refuses when the broker has no hub semantics. Accepts a full
+   * aliceId; hub keys (issuer:…) are passed to the broker verbatim — they
+   * deliberately do NOT go through resolveNativeKey, which refuses them
+   * (directories are not tradeable contracts).
+   */
+  async expandContract(aliceId: string, filters?: ExpandContractFilters): Promise<ContractExpansion> {
+    if (typeof this.broker.expandContract !== 'function') {
+      throw new BrokerError('CONFIG', `Account "${this.label}" does not support contract expansion.`)
+    }
+    const parsed = UnifiedTradingAccount.parseAliceId(aliceId)
+    if (!parsed) {
+      throw new Error(`Invalid aliceId "${aliceId}" — expected format: accountId|nativeKey`)
+    }
+    if (parsed.utaId !== this.id) {
+      throw new Error(`aliceId "${aliceId}" belongs to UTA "${parsed.utaId}", not "${this.id}".`)
+    }
+    const result = await this._callBroker(() => this.broker.expandContract!(parsed.nativeKey, filters))
+    for (const c of result.contracts ?? []) this.stampAliceId(c)
+    return result
+  }
+
   async searchContracts(pattern: string): Promise<ContractDescription[]> {
     const results = await this._callBroker(() => this.broker.searchContracts(pattern))
     for (const desc of results) this.stampAliceId(desc.contract)
@@ -756,6 +1125,13 @@ export class UnifiedTradingAccount {
       const value = src[key]
       if (key === 'aliceId') continue
       if (value === undefined || value === '' || value === null) continue
+      // Numeric defaults are defaults too: `new Contract()` sets conId=0 and
+      // sentinel numbers (UNSET_DOUBLE/UNSET_INTEGER) on numeric fields. A
+      // blanket copy clobbered the expanded conId back to 0 — the broker got
+      // an all-empty contract and TWS rejected with error 321 (the by-conId
+      // quote path was dead in production while direct broker calls worked).
+      // No numeric Contract field carries signal at 0 or at a sentinel.
+      if (typeof value === 'number' && (value === 0 || value === UNSET_INTEGER || value === UNSET_DOUBLE)) continue
       dst[key] = value
     }
     return expanded

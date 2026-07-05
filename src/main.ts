@@ -3,11 +3,12 @@ import { dirname } from 'path'
 // The in-process AI loop (AgentCenter, then GenerateRouter + AgentWork) is gone
 // as of 0.40 — the model loop runs inside the native workspace CLIs; autonomous
 // runs go through headless workspace dispatch (cron → workspace).
-import { loadConfig } from './core/config.js'
+import { loadConfig, readMarketDataConfig } from './core/config.js'
 import { printLegacyDataNotice } from './core/legacy-data-notice.js'
 import { dataPath, defaultPath } from '@/core/paths.js'
 import type { Plugin, EngineContext } from './core/types.js'
 import { McpPlugin } from './server/mcp.js'
+import { LocalToolGatewayPlugin } from './server/local-tool-gateway.js'
 import { WebPlugin } from './webui/index.js'
 import { createWorkspaceServiceRef } from './webui/plugin.js'
 import { createThinkingTools } from './tool/thinking.js'
@@ -24,7 +25,10 @@ import { getSDKExecutor, buildRouteMap, SDKEquityClient, SDKCryptoClient, SDKCur
 import type { EquityClientLike, CryptoClientLike, CurrencyClientLike, EtfClientLike, IndexClientLike, DerivativesClientLike, CommodityClientLike, EconomyClientLike } from './domain/market-data/client/types.js'
 import { buildSDKCredentials } from './domain/market-data/credential-map.js'
 import { createMarketSearchTools } from './tool/market.js'
+import { createVendorTools } from './tool/market-vendors.js'
 import { createQuantTools } from './tool/quant.js'
+import { createSnapshotTools } from './tool/snapshot.js'
+import { createSimulateTools } from './tool/simulate.js'
 import { createBarService } from './domain/market-data/bars/index.js'
 import { createReferenceData } from './domain/market-data/reference/service.js'
 import { createSectorRotationTools } from './tool/sector-rotation.js'
@@ -37,14 +41,16 @@ import { createInboxStore } from './core/inbox-store.js'
 import { ToolCenter } from './core/tool-center.js'
 import { WorkspaceToolCenter } from './core/workspace-tool-center.js'
 import { inboxPushFactory } from './tool/inbox-push.js'
+import { inboxReadFactory } from './tool/inbox-read.js'
+import { workspacePathFactory } from './tool/workspace-path.js'
 import { createEntityStore } from './core/entity-store.js'
 import { entityUpsertFactory } from './tool/entity-upsert.js'
 import { entitySearchFactory } from './tool/entity-search.js'
+import { issueToolFactories } from './tool/issue-tools.js'
 import { createEventLog } from './core/event-log.js'
 import { createToolCallLog } from './core/tool-call-log.js'
 import { createListenerRegistry } from './core/listener-registry.js'
 import { createEventBus } from './core/event-bus.js'
-import { createCronEngine, createCronListener, createCronTools } from './task/cron/index.js'
 import { createMetricsListener } from './task/metrics/index.js'
 import { NewsCollectorStore, NewsCollector } from './domain/news/index.js'
 import { createNewsArchiveTools } from './tool/news.js'
@@ -81,7 +87,7 @@ async function main() {
   const toolCallLog = await createToolCallLog()
 
   // ==================== Listener Registry ====================
-  // Created early so CronEngine and other producers can declare against it.
+  // Created early so producers can declare against it.
 
   const listenerRegistry = createListenerRegistry(eventLog)
 
@@ -93,8 +99,11 @@ async function main() {
 
   const workspaceToolCenter = new WorkspaceToolCenter()
   workspaceToolCenter.register(inboxPushFactory)
+  workspaceToolCenter.register(inboxReadFactory)
+  workspaceToolCenter.register(workspacePathFactory)
   workspaceToolCenter.register(entityUpsertFactory)
   workspaceToolCenter.register(entitySearchFactory)
+  for (const f of issueToolFactories) workspaceToolCenter.register(f)
 
   // ==================== UTA SDK (HTTP boundary) ====================
   //
@@ -120,10 +129,6 @@ async function main() {
   // The persona file is seeded on first run so the user has an editable
   // override (consumed by the workspace context-injector).
   await readWithDefault(PERSONA_FILE, PERSONA_DEFAULT)
-
-  // ==================== Cron ====================
-
-  const cronEngine = createCronEngine({ registry: listenerRegistry })
 
   // ==================== News Collector Store ====================
 
@@ -168,7 +173,17 @@ async function main() {
   const commodityCatalog = new CommodityCatalog()
   commodityCatalog.load()
 
-  const marketSearch = { symbolIndex, cryptoClient, currencyClient, commodityCatalog }
+  // Default equity vendor + user-opted incremental vendors (eastmoney, …),
+  // de-duped, fanned out in searchBars; yfinance stays the always-on default.
+  // Resolved PER search (not a boot snapshot) so a vendor the agent enables at
+  // runtime via setMarketVendor — written to market-data.json, which the
+  // resolver re-reads per request — is live on the next search, no restart.
+  const getEquityVendors = async () => {
+    const md = await readMarketDataConfig()
+    return [...new Set([md.providers.equity, ...md.extraVendors])]
+  }
+
+  const marketSearch = { symbolIndex, equityVendors: getEquityVendors, equityClient, cryptoClient, currencyClient, commodityCatalog }
 
   // Federated bar layer — vendor (OpenTypeBB) + broker (UTA) OHLCV behind one
   // barId-keyed interface. Vendor branch live now; UTA branch lands with Phase 1.
@@ -201,14 +216,17 @@ async function main() {
 
   toolCenter.register(createThinkingTools(), 'thinking')
 
-  // One unified set of trading tools — routes via `source` parameter at runtime
+  // One unified set of trading tools — routes via `source` parameter at runtime.
+  // The getter reads `config.agent.allowAiTrading` live (config is mutated in
+  // place on Settings writes), so toggling AI trading takes effect without a
+  // restart.
   toolCenter.register(
-    createTradingTools(utaManager),
+    createTradingTools(utaManager, () => config.agent.allowAiTrading),
     'trading',
   )
 
-  toolCenter.register(createCronTools(cronEngine), 'cron')
   toolCenter.register(createMarketSearchTools(marketSearch), 'market-search')
+  toolCenter.register(createVendorTools(getSDKExecutor()), 'market-vendors')
   toolCenter.register(createReferenceBoardTools(reference), 'market-board')
   toolCenter.register(createEquityTools(equityClient), 'equity')
   if (etfClient) {
@@ -221,6 +239,8 @@ async function main() {
   // — calculateQuant (v2, barId-keyed) supersedes it and the two descriptions
   // confused the model / bloated context. The code remains for now.
   toolCenter.register(createQuantTools({ barService }), 'quant')
+  toolCenter.register(createSnapshotTools(barService), 'snapshot')
+  toolCenter.register(createSimulateTools(barService), 'simulate')
   toolCenter.register(createSectorRotationTools(equityClient, config.marketData.hub), 'sector-rotation')
   if (derivativesClient) {
     toolCenter.register(createDerivativesTools(derivativesClient), 'derivatives')
@@ -248,11 +268,6 @@ async function main() {
   // skip (see cron listener). Created here so cron dispatch can hold it.
   const workspaceServiceRef = createWorkspaceServiceRef()
 
-  // Cron fires now dispatch a headless Workspace run (job → workspace+agent),
-  // not the legacy in-process AgentWork path.
-  const cronListener = createCronListener({ registry: listenerRegistry, workspaceServiceRef })
-  await cronListener.start()
-
   // Snapshot scheduler lives in UTA after Step 6 — Alice no longer
   // drives the periodic equity-curve writes. The UTA service starts
   // its own scheduler at boot.
@@ -262,12 +277,10 @@ async function main() {
   const metricsListener = createMetricsListener({ registry: listenerRegistry })
   await metricsListener.start()
 
-  // ==================== Activate Listeners + Start Cron Engine ====================
+  // ==================== Activate Listeners ====================
 
   await listenerRegistry.start()
-  await cronEngine.start()
   console.log(`listener-registry: started (${listenerRegistry.list().length} listeners)`)
-  console.log('cron: engine started')
 
   // ==================== News Collector ====================
 
@@ -291,10 +304,21 @@ async function main() {
   // workspaceServiceRef is created earlier (Cron Listener section) so cron
   // dispatch shares the same box the WebPlugin fills on start.
 
-  // MCP Server is always active when a port is set — Claude Code provider depends on it for tools.
-  // Lives at top-level config (not under connectors:) because it exports
-  // ToolCenter outward rather than consuming chat input.
-  if (config.mcp.port) {
+  const envMcpEnabled = process.env['OPENALICE_MCP_ENABLED']
+  const mcpEnabled = envMcpEnabled === '1'
+    || ((envMcpEnabled === undefined || envMcpEnabled === '') && config.mcp.enabled === true)
+  const localCliOnWeb = process.env['OPENALICE_LOCAL_CLI_ON_WEB'] === '1'
+  const webTransport = process.env['OPENALICE_WEB_TRANSPORT'] === 'ipc' ? 'ipc' : 'http'
+  const toolBaseUrl = process.env['OPENALICE_TOOL_BASE_URL']
+    ?? (localCliOnWeb
+      ? `http://127.0.0.1:${config.connectors.web.port}/cli`
+      : `http://127.0.0.1:${config.mcp.port}/cli`)
+  const mcpBaseUrl = mcpEnabled ? `http://127.0.0.1:${config.mcp.port}/mcp` : undefined
+
+  // MCP is optional. The workspace CLI gateway is the default local tool path;
+  // when it cannot safely ride the loopback web listener, keep it on a
+  // loopback-only side listener.
+  if (mcpEnabled && config.mcp.port) {
     corePlugins.push(new McpPlugin(
       toolCenter,
       config.mcp.port,
@@ -303,12 +327,28 @@ async function main() {
       entityStore,
       () => workspaceServiceRef.current,
     ))
+  } else if (!localCliOnWeb && config.mcp.port) {
+    corePlugins.push(new LocalToolGatewayPlugin(config.mcp.port, {
+      toolCenter,
+      workspaceToolCenter,
+      inboxStore,
+      entityStore,
+      getWorkspaceService: () => workspaceServiceRef.current,
+    }))
   }
 
   // Web UI is always active (no enabled flag)
   if (config.connectors.web.port) {
     corePlugins.push(new WebPlugin(
-      { port: config.connectors.web.port, mcpPort: config.mcp.port },
+      {
+        port: config.connectors.web.port,
+        mcpPort: config.mcp.port,
+        toolBaseUrl,
+        ...(mcpBaseUrl ? { mcpBaseUrl } : {}),
+        localCliOnWeb,
+        listen: webTransport !== 'ipc',
+        ...(process.env['OPENALICE_TOOL_SOCKET'] ? { cliSocketPath: process.env['OPENALICE_TOOL_SOCKET'] } : {}),
+      },
       workspaceServiceRef,
     ))
   }
@@ -322,7 +362,8 @@ async function main() {
   // ==================== Engine Context ====================
 
   const ctx: EngineContext = {
-    config, inboxStore, entityStore, eventLog, toolCallLog, cronEngine, toolCenter,
+    config, inboxStore, entityStore, eventLog, toolCallLog, toolCenter,
+    workspaceToolCenter,
     listenerRegistry,
     fire: createEventBus(eventLog),
     bbEngine: getSDKExecutor(),
@@ -351,8 +392,6 @@ async function main() {
     stopped = true
     newsCollector?.stop()
     metricsListener.stop()
-    cronListener.stop()
-    cronEngine.stop()
     await listenerRegistry.stop()
     for (const plugin of [...corePlugins, ...optionalPlugins.values()]) {
       await plugin.stop()

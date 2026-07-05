@@ -75,6 +75,29 @@ function ibkrTifToAlpaca(tif: string): string {
   }
 }
 
+/**
+ * Surface Alpaca's response body in failures. The SDK throws axios-shaped
+ * errors whose message is just "Request failed with status code 422" — the
+ * actual reason ("order is not cancelable", observed live when cancelling
+ * during the after-hours pending_new window) lives in response.data and was
+ * being dropped, leaving the git record and the UI with an opaque code.
+ */
+function alpacaErrorMessage(err: unknown): string {
+  const base = err instanceof Error ? err.message : String(err)
+  const data = (err as { response?: { data?: unknown } })?.response?.data
+  if (data && typeof data === 'object') {
+    return `${base} — alpaca: ${JSON.stringify(data)}`
+  }
+  return base
+}
+
+/** The free-tier "you can't query the last ~15 min of SIP data" gate — a 403
+ *  whose body says exactly that. The signal to retry the same window on IEX. */
+function isRecentSipDenied(err: unknown): boolean {
+  const status = (err as { response?: { status?: number } })?.response?.status
+  return status === 403 && /recent SIP data/i.test(alpacaErrorMessage(err))
+}
+
 export class AlpacaBroker implements IBroker {
   // ---- Self-registration ----
 
@@ -114,6 +137,9 @@ export class AlpacaBroker implements IBroker {
    * null) means "we tried and got nothing" — null means "haven't tried yet".
    */
   private catalog: AlpacaAssetRaw[] | null = null
+  /** symbol → asset, derived from `catalog` for O(1) name/exchange joins on
+   *  position & order rows (issue #340). Rebuilt whenever the catalog loads. */
+  private catalogBySymbol: Map<string, AlpacaAssetRaw> | null = null
 
   constructor(config: AlpacaBrokerConfig) {
     this.config = config
@@ -196,6 +222,7 @@ export class AlpacaBroker implements IBroker {
       // contract the broker won't accept orders for.
       const next = (raw ?? []).filter((a) => a.tradable !== false)
       this.catalog = next
+      this.catalogBySymbol = new Map(next.map((a) => [a.symbol, a]))
       console.log(`AlpacaBroker[${this.id}]: catalog loaded (${next.length} active tradable assets)`)
     } catch (err) {
       // Re-throw so the caller (init / cron) can decide whether to log or
@@ -278,9 +305,13 @@ export class AlpacaBroker implements IBroker {
       if (!order.trailingPercent.equals(UNSET_DECIMAL)) alpacaOrder.trail_percent = order.trailingPercent.toFixed()
       if (order.outsideRth) alpacaOrder.extended_hours = true
 
-      // Bracket order (TPSL)
+      // Attached exit legs (TPSL). Alpaca's `bracket` class REQUIRES both
+      // take_profit AND stop_loss — a single leg under `bracket` is rejected
+      // 422 ("bracket orders require take_profit.limit_price"). When only one
+      // leg is present, `oto` (one-triggers-other) is the correct class, which
+      // accepts either leg alone. So: two legs → bracket, one leg → oto.
       if (tpsl?.takeProfit || tpsl?.stopLoss) {
-        alpacaOrder.order_class = 'bracket'
+        alpacaOrder.order_class = (tpsl.takeProfit && tpsl.stopLoss) ? 'bracket' : 'oto'
         if (tpsl.takeProfit) {
           alpacaOrder.take_profit = { limit_price: parseFloat(tpsl.takeProfit.price) }
         }
@@ -293,13 +324,24 @@ export class AlpacaBroker implements IBroker {
       }
 
       const result = await this.client.createOrder(alpacaOrder) as AlpacaOrderRaw
+      // Bracket legs: surface child order ids so the ledger tracks them from
+      // birth. The held stop leg never appears in the open-orders listing
+      // (Alpaca keeps it 'held' while the TP works), so place-time is the
+      // ONLY moment Alice can learn it exists.
+      const legs = (result.legs ?? [])
+        .filter((l) => l.id)
+        .map((l) => ({
+          orderId: l.id,
+          kind: (l.stop_price ? 'stopLoss' : 'takeProfit') as 'stopLoss' | 'takeProfit',
+        }))
       return {
         success: true,
         orderId: result.id,
         orderState: makeOrderState(result.status),
+        ...(legs.length > 0 ? { legs } : {}),
       }
     } catch (err) {
-      return { success: false, error: err instanceof Error ? err.message : String(err) }
+      return { success: false, error: alpacaErrorMessage(err) }
     }
   }
 
@@ -320,7 +362,7 @@ export class AlpacaBroker implements IBroker {
         orderState: makeOrderState(result.status),
       }
     } catch (err) {
-      return { success: false, error: err instanceof Error ? err.message : String(err) }
+      return { success: false, error: alpacaErrorMessage(err) }
     }
   }
 
@@ -331,7 +373,7 @@ export class AlpacaBroker implements IBroker {
       orderState.status = 'Cancelled'
       return { success: true, orderId, orderState }
     } catch (err) {
-      return { success: false, error: err instanceof Error ? err.message : String(err) }
+      return { success: false, error: alpacaErrorMessage(err) }
     }
   }
 
@@ -365,7 +407,7 @@ export class AlpacaBroker implements IBroker {
         orderState: makeOrderState(result.status),
       }
     } catch (err) {
-      return { success: false, error: err instanceof Error ? err.message : String(err) }
+      return { success: false, error: alpacaErrorMessage(err) }
     }
   }
 
@@ -397,12 +439,26 @@ export class AlpacaBroker implements IBroker {
     }
   }
 
+  /**
+   * Build a contract for `symbol`, enriched from the cached asset catalog with
+   * the instrument long-name (`description`) + primary listing exchange so
+   * position / order / trade rows can render them (issue #340). Falls back to a
+   * bare contract before the catalog has loaded.
+   */
+  private contractFor(symbol: string): Contract {
+    const contract = makeContract(symbol)
+    const asset = this.catalogBySymbol?.get(symbol)
+    if (asset?.name) contract.description = asset.name
+    if (asset?.exchange) contract.primaryExchange = asset.exchange
+    return contract
+  }
+
   async getPositions(): Promise<Position[]> {
     try {
       const raw = await this.client.getPositions() as AlpacaPositionRaw[]
 
       return raw.map(p => buildPosition({
-        contract: makeContract(p.symbol),
+        contract: this.contractFor(p.symbol),
         currency: 'USD',
         side: p.side === 'long' ? 'long' as const : 'short' as const,
         quantity: new Decimal(p.qty),
@@ -440,6 +496,16 @@ export class AlpacaBroker implements IBroker {
     }
   }
 
+  /** All open orders on the account — external-order observation surface. */
+  async getOpenOrders(): Promise<OpenOrder[]> {
+    try {
+      const raw = await this.client.getOrders({ status: 'open' }) as AlpacaOrderRaw[]
+      return raw.map((o) => this.mapOpenOrder(o))
+    } catch (err) {
+      throw BrokerError.from(err)
+    }
+  }
+
   async getQuote(contract: Contract): Promise<Quote> {
     const symbol = resolveSymbol(contract)
     if (!symbol) throw new BrokerError('EXCHANGE', 'Cannot resolve contract to Alpaca symbol')
@@ -470,13 +536,14 @@ export class AlpacaBroker implements IBroker {
     const symbol = resolveSymbol(contract)
     if (!symbol) throw new BrokerError('EXCHANGE', 'Cannot resolve contract to Alpaca symbol')
     const timeframe = ALPACA_TIMEFRAME[params.interval]
-    try {
-      const opts: Record<string, unknown> = { timeframe, adjustment: 'all' }
-      if (params.start) opts.start = params.start.toISOString()
-      if (params.end) opts.end = params.end.toISOString()
-      if (params.limit) opts.limit = params.limit
+    const baseOpts: Record<string, unknown> = { timeframe, adjustment: 'all' }
+    if (params.start) baseOpts.start = params.start.toISOString()
+    if (params.end) baseOpts.end = params.end.toISOString()
+    if (params.limit) baseOpts.limit = params.limit
+
+    const drain = async (feed: 'sip' | 'iex'): Promise<Bar[]> => {
       const bars: Bar[] = []
-      const gen = this.client.getBarsV2(symbol, opts) as AsyncGenerator<AlpacaBarRaw>
+      const gen = this.client.getBarsV2(symbol, { ...baseOpts, feed }) as AsyncGenerator<AlpacaBarRaw>
       for await (const b of gen) {
         bars.push({
           timestamp: new Date(b.Timestamp),
@@ -488,6 +555,26 @@ export class AlpacaBroker implements IBroker {
         })
       }
       return bars
+    }
+
+    try {
+      // SIP = the full consolidated tape (the right feed for history/backtest —
+      // real volume, real closes). The free tier can't query the last ~15 min of
+      // SIP, so a window that reaches "now" 403s; fall back to IEX (free
+      // real-time, but only IEX's ~2-3% of the tape) for that case so a recent
+      // request degrades to thinner data instead of dying. (Alpaca's OWN data
+      // endpoint serves both feeds; this never touches a third-party vendor.)
+      try {
+        return await drain('sip')
+      } catch (err) {
+        if (isRecentSipDenied(err)) {
+          console.warn(
+            `AlpacaBroker[${this.id}]: SIP denied recent data for ${symbol} (${timeframe}) — falling back to IEX (thinner tape). Free tier can't query the last ~15min of SIP.`,
+          )
+          return await drain('iex')
+        }
+        throw err
+      }
     } catch (err) {
       throw BrokerError.from(err)
     }
@@ -531,7 +618,7 @@ export class AlpacaBroker implements IBroker {
   // ---- Internal ----
 
   private mapOpenOrder(o: AlpacaOrderRaw): OpenOrder {
-    const contract = makeContract(o.symbol)
+    const contract = this.contractFor(o.symbol)
 
     const order = new Order()
     order.action = o.side.toUpperCase() // buy → BUY
@@ -541,6 +628,8 @@ export class AlpacaBroker implements IBroker {
     if (o.stop_price) order.auxPrice = new Decimal(o.stop_price)
     if (o.time_in_force) order.tif = o.time_in_force.toUpperCase()
     if (o.extended_hours) order.outsideRth = true
+    // Fill data — sync reads these to record execution qty/price into git.
+    if (o.filled_qty != null) order.filledQuantity = new Decimal(o.filled_qty)
     // Alpaca order IDs are UUIDs — IBKR's orderId field is number, so leave at default 0.
     // The real string ID is preserved through PlaceOrderResult.orderId and getOrder(string).
     order.orderId = 0
@@ -550,6 +639,8 @@ export class AlpacaBroker implements IBroker {
       contract,
       order,
       orderState: makeOrderState(o.status, o.reject_reason ?? undefined),
+      ...(o.id && { orderId: o.id }),
+      ...(o.filled_avg_price != null && { avgFillPrice: o.filled_avg_price }),
       ...(tpsl && { tpsl }),
     }
   }

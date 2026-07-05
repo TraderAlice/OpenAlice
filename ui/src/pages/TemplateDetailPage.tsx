@@ -18,7 +18,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { MarkdownContent } from '../components/MarkdownContent'
-import { useWorkspaces } from '../contexts/WorkspacesContext'
+import { useWorkspaces } from '../contexts/workspaces-context'
 import { useWorkspace } from '../tabs/store'
 import { fetchTemplateReadme } from '../components/workspace/api'
 import { CreateWorkspaceDialog } from '../components/workspace/CreateWorkspaceDialog'
@@ -163,7 +163,6 @@ export function TemplateDetailPage({ spec }: Props) {
       {showCreate && (
         <CreateWorkspaceDialog
           templates={templates}
-          agents={agents}
           presetTemplate={template.name}
           onClose={() => setShowCreate(false)}
           onCreated={(workspace) => {

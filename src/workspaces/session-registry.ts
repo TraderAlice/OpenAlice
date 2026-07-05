@@ -7,8 +7,9 @@ import type { Logger } from './logger.js';
 /**
  * Persistent session-identity record. Lives across server restart so the user
  * can pause a session today and resume it tomorrow. The `id` is the stable
- * uuid used in every cross-system reference (URL hash, WebSocket query, REST
- * route) — what we previously called `sessionToken` (transient, in-memory).
+ * launcher-owned record id used in every cross-system reference (URL hash,
+ * WebSocket query, REST route) — what we previously called `sessionToken`
+ * (transient, in-memory).
  *
  * `state` is the launcher's view: 'running' means we have a live PTY in the
  * pool keyed by this id; 'paused' means the record exists but no PTY. On a
@@ -33,6 +34,13 @@ export interface SessionRecord {
   state: 'running' | 'paused';
   resumeHint?: { kind: 'agent-session-id'; value: string };
   scrollbackFile?: string;
+  /**
+   * The user's first message, captured when the session is seeded (quick-chat).
+   * Surfaced as a human-readable title in the chat sidebar instead of the sticky
+   * `c1` name. Only present for seeded sessions; absent ones fall back to `name`.
+   * Stored capped — we don't need the whole prompt for a one-line title.
+   */
+  readonly title?: string;
 }
 
 interface FileShape {
@@ -40,7 +48,7 @@ interface FileShape {
   readonly records: SessionRecord[];
 }
 
-const SESSION_FILE_RE = /^[0-9a-f-]+\.json$/;
+const SESSION_FILE_RE = /^[A-Za-z0-9_-]+\.json$/;
 
 /**
  * Per-workspace persistent registry of SessionRecords. Each workspace gets
@@ -153,7 +161,7 @@ export class SessionRegistry {
     return this.byWs.get(wsId)?.get(id);
   }
 
-  /** Find a record by id without knowing its wsId (uniqueness assumed at uuid level). */
+  /** Find a record by id without knowing its wsId (record ids are global). */
   findById(id: string): SessionRecord | undefined {
     for (const records of this.byWs.values()) {
       const r = records.get(id);
@@ -285,6 +293,10 @@ function validateFile(value: unknown): SessionRecord[] {
       createdAt: r['createdAt'],
       lastActiveAt: r['lastActiveAt'],
       state: r['state'],
+      // Carry the session title (the captured first message) across reloads —
+      // it's written to disk by `flush`, so it must be read back here too, or
+      // every server restart / registry reload reverts the row to the `c1` name.
+      ...(typeof r['title'] === 'string' ? { title: r['title'] } : {}),
     };
     const hint = r['resumeHint'];
     if (

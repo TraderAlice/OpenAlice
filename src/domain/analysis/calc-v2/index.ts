@@ -16,15 +16,26 @@ export interface RunResult {
   value?: CalcValue
   /** Sources actually fetched, keyed by barId (source/provider/capability). */
   dataRange?: Record<string, DataSourceMeta>
+  /** Per-source date axis (ascending) — present only when `dates` was requested. */
+  dates?: Record<string, string[]>
   /** Present iff the script failed — actionable for self-correction. */
   error?: CalcDiagnostic
 }
 
-export async function runScript(script: string, deps: CalcDeps, precision = 4): Promise<RunResult> {
+export async function runScript(
+  script: string,
+  deps: CalcDeps,
+  precision = 4,
+  opts: { withDates?: boolean } = {},
+): Promise<RunResult> {
   try {
     const program = parse(script)
-    const out = await evaluate(program, deps)
-    return { value: round(out.value, precision), dataRange: out.dataRange }
+    const out = await evaluate(program, deps, opts)
+    return {
+      value: round(out.value, precision),
+      dataRange: out.dataRange,
+      ...(out.dates ? { dates: out.dates } : {}),
+    }
   } catch (e) {
     if (e instanceof CalcError) return { error: e.diagnostic }
     throw e

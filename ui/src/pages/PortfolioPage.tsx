@@ -4,13 +4,14 @@ import { useAutoSave } from '../hooks/useAutoSave'
 import { useAccountHealth } from '../hooks/useAccountHealth'
 import { useWorkspace } from '../tabs/store'
 import { PageHeader } from '../components/PageHeader'
-import { EmptyState } from '../components/StateViews'
+import { EmptyState, Skeleton } from '../components/StateViews'
 import { EquityCurve } from '../components/EquityCurve'
 import { SnapshotDetail } from '../components/SnapshotDetail'
 import { Toggle } from '../components/Toggle'
 import { Metric, signFromDelta } from '../components/Metric'
 import { Sparkline } from '../components/Sparkline'
 import { fmt, fmtPnl, fmtNum, fmtPctSigned } from '../lib/format'
+import { contractPrimary } from '../lib/contract-display'
 
 // ==================== Types ====================
 
@@ -212,7 +213,7 @@ export function PortfolioPage() {
     const acct = data.accounts.find(a => a.id === eq.id)
     const unrealizedPnL = acct?.positions.reduce((sum, p) => sum + Number(p.unrealizedPnL), 0) ?? 0
     const hInfo = healthMap[eq.id]
-    return { ...eq, provider: acct?.provider ?? '', unrealizedPnL, error: acct?.error, health: eq.health, disabled: hInfo?.disabled ?? false }
+    return { ...eq, provider: acct?.provider ?? '', unrealizedPnL, error: acct?.error, health: eq.health, disabled: hInfo?.disabled ?? false, connecting: hInfo?.connecting ?? false }
   })
 
   return (
@@ -237,6 +238,7 @@ export function PortfolioPage() {
         <div className="flex gap-6 items-start">
           {/* Main column */}
           <div className="flex-1 min-w-0 space-y-5">
+            {!lastRefresh ? <PortfolioSkeleton /> : <>
             <HeroMetrics equity={data.equity} curve={aggregateCurve?.total ?? null} />
 
             {curvePoints.length > 0 && (
@@ -287,6 +289,7 @@ export function PortfolioPage() {
             {allWalletLogs.length > 0 && (
               <TradeLog commits={allWalletLogs} />
             )}
+            </>}
           </div>
 
           {/* Right sidebar — FX rates */}
@@ -418,6 +421,63 @@ function HeroMetrics({ equity, curve }: {
   )
 }
 
+// ==================== Cold-start skeleton ====================
+
+/** First-load placeholder for the portfolio main column. Mirrors the real
+ *  layout's shapes (hero metrics → curve → account strip → positions) so the
+ *  page reads as "loading this" rather than a blank white pane while the broker
+ *  reads (which can be slow on a cold connect) come back. */
+function PortfolioSkeleton() {
+  return (
+    <div className="space-y-5" aria-hidden="true">
+      {/* Hero metrics */}
+      <div className="rounded-lg border border-border bg-bg-secondary p-5">
+        <Skeleton className="h-3 w-24" />
+        <Skeleton className="h-9 w-48 mt-3" />
+        <div className="flex gap-8 mt-5">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="space-y-2">
+              <Skeleton className="h-2.5 w-16" />
+              <Skeleton className="h-4 w-20" />
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* Equity curve */}
+      <Skeleton className="h-[220px] w-full rounded-lg" />
+      {/* Account strip */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-3 px-3.5 py-3 rounded-lg border border-border bg-bg-secondary">
+            <Skeleton className="h-1.5 w-1.5 rounded-full" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-2.5 w-16" />
+            </div>
+            <Skeleton className="h-8 w-20" />
+          </div>
+        ))}
+      </div>
+      {/* Positions table */}
+      <div className="rounded-lg border border-border overflow-hidden">
+        <div className="px-4 py-2.5 border-b border-border bg-bg-secondary">
+          <Skeleton className="h-3 w-32" />
+        </div>
+        <div className="divide-y divide-border">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-4 px-4 py-3.5">
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-4 w-12" />
+              <Skeleton className="h-4 w-16 ml-auto" />
+              <Skeleton className="h-4 w-24" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ==================== Account Strip ====================
 
 const HEALTH_DOT: Record<string, string> = {
@@ -427,37 +487,44 @@ const HEALTH_DOT: Record<string, string> = {
 }
 
 function AccountStrip({ sources, perAccountCurve }: {
-  sources: Array<{ id: string; label: string; provider: string; equity: string; unrealizedPnL: number; error?: string; health?: string; disabled?: boolean }>
+  sources: Array<{ id: string; label: string; provider: string; equity: string; unrealizedPnL: number; error?: string; health?: string; disabled?: boolean; connecting?: boolean }>
   perAccountCurve: Record<string, { values: number[]; firstAtCutoff: number | null; latest: number | null }>
 }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
       {sources.map(s => {
         const isDisabled = s.disabled
-        const isOffline = s.health === 'offline' && !isDisabled
+        // Initial connect in flight — distinct from offline. `health` is
+        // optimistically 'healthy' here, so this can only come from the flag.
+        const isConnecting = !!s.connecting && !isDisabled
+        const isOffline = s.health === 'offline' && !isDisabled && !isConnecting
         const dotColor = isDisabled
           ? 'bg-text-muted/40'
-          : (HEALTH_DOT[s.health ?? 'healthy'] ?? 'bg-text-muted')
+          : isConnecting
+            ? 'bg-accent'
+            : (HEALTH_DOT[s.health ?? 'healthy'] ?? 'bg-text-muted')
 
         const curve = perAccountCurve[s.id]
         const todayDelta = curve && curve.latest != null && curve.firstAtCutoff != null
           ? curve.latest - curve.firstAtCutoff
           : null
-        const showSpark = !isDisabled && !isOffline && curve && curve.values.length >= 2
+        const showSpark = !isDisabled && !isOffline && !isConnecting && curve && curve.values.length >= 2
 
         return (
           <div key={s.id} className={`flex items-center gap-3 px-3.5 py-3 rounded-lg border border-border bg-bg-secondary ${isOffline || isDisabled ? 'opacity-60' : ''}`}>
-            <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor}`} />
+            <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor} ${isConnecting ? 'animate-pulse' : ''}`} />
             <div className="flex-1 min-w-0">
               <div className="flex items-baseline justify-between gap-2">
                 <span className="text-text font-medium text-[13px] truncate">{s.label}</span>
-                {!isDisabled && !isOffline && (
+                {!isDisabled && !isOffline && !isConnecting && (
                   <span className="text-text-muted tabular-nums text-[13px]">{fmt(Number(s.equity))}</span>
                 )}
               </div>
               <div className="flex items-baseline justify-between gap-2 mt-0.5">
                 {isDisabled
                   ? <span className="text-text-muted text-[11px]">Disabled</span>
+                  : isConnecting
+                    ? <span className="text-accent text-[11px]">Connecting...</span>
                   : isOffline
                     ? <span className="text-red text-[11px]">Reconnecting…</span>
                     : (
@@ -507,25 +574,11 @@ interface PositionWithAccount extends Position {
  * `Position.contract.secType === 'CRYPTO_PERP'` everywhere else in the
  * stack.
  *
- * `name` defaults to the symbol; for OPT/FOP we build a longer descriptor
- * (expiry/right/strike) so two option positions on the same underlying
- * are distinguishable in the table.
+ * `name` comes from the shared IBKR-superset formatter (lib/contract-display)
+ * so this table renders identically to the UTA detail page.
  */
 function contractDisplay(p: Position): { name: string; tag: string } {
-  const c = p.contract
-  const sym = c.symbol ?? '???'
-  const t = c.secType || 'UNK'
-
-  if (t === 'OPT' || t === 'FOP') {
-    const optDesc = c.localSymbol
-      ?? [sym, c.lastTradeDateOrContractMonth, c.right, c.strike && fmt(c.strike)].filter(Boolean).join(' ')
-    return { name: optDesc, tag: t }
-  }
-  if (t === 'FUT') {
-    const expiry = c.lastTradeDateOrContractMonth
-    return { name: expiry ? `${sym} ${expiry}` : sym, tag: t }
-  }
-  return { name: sym, tag: t }
+  return { name: contractPrimary(p.contract), tag: p.contract.secType || 'UNK' }
 }
 
 function PositionsTable({ positions, fxRates }: { positions: PositionWithAccount[]; fxRates: FxRateInfo[] }) {

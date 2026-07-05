@@ -9,13 +9,19 @@ import {
 } from './cli-commands.js'
 import { createNewsArchiveTools } from '../tool/news.js'
 import { createMarketSearchTools } from '../tool/market.js'
+import { createVendorTools } from '../tool/market-vendors.js'
 import { createEquityTools } from '../tool/equity.js'
 import { createEconomyTools } from '../tool/economy.js'
 import { createQuantTools } from '../tool/quant.js'
+import { createSnapshotTools } from '../tool/snapshot.js'
+import { createSimulateTools } from '../tool/simulate.js'
 import { createThinkingTools } from '../tool/thinking.js'
 import { inboxPushFactory } from '../tool/inbox-push.js'
+import { inboxReadFactory } from '../tool/inbox-read.js'
+import { workspacePathFactory } from '../tool/workspace-path.js'
 import { entityUpsertFactory } from '../tool/entity-upsert.js'
 import { entitySearchFactory } from '../tool/entity-search.js'
+import { issueToolFactories } from '../tool/issue-tools.js'
 import { createTradingTools } from '../tool/trading.js'
 
 /**
@@ -30,9 +36,12 @@ describe('CLI_EXPORTS — data export (global tools)', () => {
   const tc = new ToolCenter()
   tc.register(createThinkingTools(), 'thinking')
   tc.register(createMarketSearchTools(any), 'market-search')
+  tc.register(createVendorTools(any), 'market-vendors')
   tc.register(createEquityTools(any), 'equity')
   tc.register(createNewsArchiveTools(any), 'rss')
   tc.register(createQuantTools(any), 'quant')
+  tc.register(createSnapshotTools(any), 'snapshot')
+  tc.register(createSimulateTools(any), 'simulate')
   tc.register(createEconomyTools(any, any), 'economy')
 
   it('every mapped verb resolves to a registered global tool', () => {
@@ -73,8 +82,11 @@ describe('CLI_EXPORTS — uta export (global trading tools)', () => {
 describe('CLI_EXPORTS — workspace export (scoped collaboration tools)', () => {
   const wtc = new WorkspaceToolCenter()
   wtc.register(inboxPushFactory)
+  wtc.register(inboxReadFactory)
+  wtc.register(workspacePathFactory)
   wtc.register(entityUpsertFactory)
   wtc.register(entitySearchFactory)
+  for (const f of issueToolFactories) wtc.register(f)
   const built = wtc.build({
     workspaceId: 'ws-test',
     workspaceLabel: 'test',

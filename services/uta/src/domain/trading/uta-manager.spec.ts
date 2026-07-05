@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import Decimal from 'decimal.js'
 import { ContractDescription } from '@traderalice/ibkr'
 import { UTAManager } from './uta-manager.js'
 import { UnifiedTradingAccount } from './UnifiedTradingAccount.js'
 import {
   MockBroker,
   makeContract,
+  makePosition,
 } from './brokers/mock/index.js'
 import './contract-ext.js'
 
@@ -103,8 +105,17 @@ describe('UTAManager', () => {
 
   describe('getAggregatedEquity', () => {
     it('aggregates equity across accounts', async () => {
-      manager.add(makeUta(new MockBroker({ id: 'a1', label: 'A', accountInfo: { netLiquidation: '50000', totalCashValue: '30000', unrealizedPnL: '2000', realizedPnL: '500' } })))
-      manager.add(makeUta(new MockBroker({ id: 'a2', label: 'B', accountInfo: { netLiquidation: '75000', totalCashValue: '60000', unrealizedPnL: '3000', realizedPnL: '1000' } })))
+      // unrealizedPnL is derived from positions at the UTA layer (the
+      // account-level invariant), so the fixtures carry positions whose
+      // derived PnL is 2000 ((250-150)*20=2000) and 3000 ((310-160)*20=3000)
+      // — broker-reported account PnL is intentionally bogus to prove the
+      // override.
+      const a1 = new MockBroker({ id: 'a1', label: 'A', accountInfo: { netLiquidation: '50000', totalCashValue: '30000', unrealizedPnL: '999', realizedPnL: '500' } })
+      a1.setPositions([makePosition({ quantity: new Decimal(20), avgCost: '150', marketPrice: '250' })])
+      const a2 = new MockBroker({ id: 'a2', label: 'B', accountInfo: { netLiquidation: '75000', totalCashValue: '60000', unrealizedPnL: '999', realizedPnL: '1000' } })
+      a2.setPositions([makePosition({ quantity: new Decimal(20), avgCost: '160', marketPrice: '310' })])
+      manager.add(makeUta(a1))
+      manager.add(makeUta(a2))
 
       const result = await manager.getAggregatedEquity()
       expect(result.totalEquity).toBe('125000')

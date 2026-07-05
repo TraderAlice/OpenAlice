@@ -35,8 +35,8 @@ export interface ResolvedCommand {
    * shim (win32 only). Callers that append an UNTRUSTED positional arg (e.g. a
    * headless prompt) must NOT use this form — cmd.exe re-parses shell
    * metacharacters (`& | < > ^ %`) in that arg, which is a command-injection
-   * surface. The interactive/probe paths only ever pass flags + a uuid, so the
-   * wrap is safe there.
+   * surface. The interactive/probe paths only pass flags + trusted generated
+   * ids, so the wrap is safe there.
    */
   readonly viaShell: boolean;
 }

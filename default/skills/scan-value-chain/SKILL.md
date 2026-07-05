@@ -20,6 +20,11 @@ thing, and why."
 
 ## Procedure (don't answer from memory — go to the data)
 
+The data is on your CLIs: `alice market search` to turn a name into a barId,
+`traderhub equity` / `traderhub board` for valuation snapshots & macro,
+`alice analysis quant` for where each trades vs its own trend, `alice rss grep`
+for the news cluster. (See the `alice`, `alice-analysis`, `traderhub` skills.)
+
 1. **Decompose the chain, not a flat list.** Break the theme into structural
    layers — upstream (inputs, equipment, IP) → midstream (manufacture, core
    product) → downstream (demand, end-market). Place the real names in each
@@ -39,7 +44,7 @@ thing, and why."
    macro frame is what separates a live theme from noise.
 5. **Hand off to research.** For each surfaced name: one-line WHY + the next
    question to answer (the "is the thesis real" question). That next question
-   is the baton to the deeper research step.
+   is the baton to the deeper research step — the `build-thesis` skill.
 
 ## Output — persist as a file group, don't leave it in chat
 

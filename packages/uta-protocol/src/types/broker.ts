@@ -13,12 +13,18 @@ import './contract-ext.js'
 
 // ==================== Errors ====================
 
-export type BrokerErrorCode = 'CONFIG' | 'AUTH' | 'NETWORK' | 'EXCHANGE' | 'MARKET_CLOSED' | 'UNKNOWN'
+export type BrokerErrorCode = 'CONFIG' | 'AUTH' | 'NETWORK' | 'EXCHANGE' | 'MARKET_CLOSED' | 'CONNECTING' | 'UNKNOWN'
 
 /**
  * Structured broker error.
  * - `permanent` errors (CONFIG, AUTH) disable the account — will not be retried.
  * - Transient errors (NETWORK, EXCHANGE, MARKET_CLOSED) trigger auto-recovery.
+ * - `CONNECTING` is a special transient marker: the account is not yet (or no
+ *   longer) ready — its initial broker connect is still in flight, or it's
+ *   offline and the recovery loop is actively reconnecting. It means "data
+ *   pending, retry shortly", NOT a failure: a read returns it WITHOUT blocking
+ *   on the slow connect and WITHOUT counting as a failure (so it never degrades
+ *   health or disables the account). Recovery keeps running underneath.
  */
 export class BrokerError extends Error {
   readonly code: BrokerErrorCode
@@ -62,6 +68,31 @@ export class BrokerError extends Error {
 // ==================== Position ====================
 
 /**
+ * Venue risk metadata for a leveraged-derivative position (crypto perps /
+ * futures). Grouped into its own struct — rather than added as loose
+ * top-level fields — so the base Position stays aligned with IBKR's
+ * updatePortfolio() shape. IBKR itself keeps margin/leverage OFF the
+ * position: init/maint margin live on `OrderState`, and account-wide margin
+ * lives in the account-summary tags (ExcessLiquidity, MaintMarginReq, …),
+ * because there leverage is a cross-margin *account* concept, not a
+ * per-position one. On CCXT isolated/cross perps it genuinely IS
+ * per-position, so we surface it here.
+ *
+ * Absent (`Position.risk === undefined`) for spot holdings and for
+ * equity/cash brokers that don't expose per-position leverage. Numeric
+ * fields are strings for the same float-safety reason as the monetary
+ * fields on Position.
+ */
+export interface PositionRisk {
+  /** Effective leverage on the position, e.g. `'50'` for 50×. */
+  leverage?: string
+  /** Estimated liquidation price, denominated in the position's `currency`. */
+  liquidationPrice?: string
+  /** Margin mode the position runs under. */
+  marginMode?: 'cross' | 'isolated'
+}
+
+/**
  * Unified position/holding.
  * Field names aligned with IBKR EWrapper.updatePortfolio() parameters.
  */
@@ -101,9 +132,27 @@ export interface Position {
    * Undefined defaults to `'broker'` (current behavior, back-compat).
    */
   avgCostSource?: 'broker' | 'wallet'
+  /**
+   * Venue risk metadata for leveraged derivatives (see {@link PositionRisk}).
+   * Undefined for spot and for brokers without per-position leverage — so
+   * a consumer reading `position.risk?.leverage` gets `undefined` rather
+   * than a misleading implicit 1×.
+   */
+  risk?: PositionRisk
 }
 
 // ==================== Order result ====================
+
+/**
+ * A protective child order the venue created alongside the entry (bracket
+ * TP/SL legs). Surfaced so the ledger can track the legs from birth —
+ * otherwise they exist only on the exchange and every Alice surface
+ * (order list, sync poller, cancel) is blind to them.
+ */
+export interface PlaceOrderLeg {
+  orderId: string
+  kind: 'takeProfit' | 'stopLoss'
+}
 
 /** Result of placeOrder / modifyOrder / closePosition. */
 export interface PlaceOrderResult {
@@ -113,6 +162,51 @@ export interface PlaceOrderResult {
   message?: string
   execution?: Execution
   orderState?: OrderState
+  /** Bracket TP/SL child orders created by this placement, if any. */
+  legs?: PlaceOrderLeg[]
+}
+
+// ==================== Contract expansion (hub → leaves) ====================
+
+/**
+ * Filters narrowing a contract expansion. Venue search returns two species:
+ * LEAVES (tradeable, conId-keyed) and HUBS (directories — a bond issuer, an
+ * FX currency family, an option chain behind a stock). Expansion turns a hub
+ * (or a leaf's derivative family) into concrete tradeable leaves.
+ */
+export interface ExpandContractFilters {
+  /** Option/future expiry (YYYYMMDD or YYYYMM). For options, switches the
+   *  expansion from the parameter grid to concrete contracts. */
+  expiry?: string
+  /** Option right: C or P. */
+  right?: 'C' | 'P'
+  strikeMin?: number
+  strikeMax?: number
+  /** Which derivative family to expand on an underlying leaf (default OPT). */
+  secType?: 'OPT' | 'FUT'
+  /** Max leaves returned (default 60, capped at 200). `total` always reports the full count. */
+  limit?: number
+}
+
+/** One exchange's option-chain parameter set (expirations × strikes). */
+export interface OptionGridEntry {
+  exchange: string
+  tradingClass: string
+  multiplier: string
+  expirations: string[]
+  strikes: number[]
+}
+
+export interface ContractExpansion {
+  kind: 'contracts' | 'optionGrid'
+  /** kind=contracts — concrete tradeable leaves, each with its own conId-based aliceId. */
+  contracts?: Contract[]
+  /** Full match count before `limit` was applied (never silently truncate). */
+  total?: number
+  /** kind=optionGrid — pick an expiry (+ right / strike range) and expand again. */
+  grid?: OptionGridEntry[]
+  /** Next-step guidance for the agent. */
+  hint?: string
 }
 
 /** An open/completed order triplet as returned by getOrders(). */
@@ -120,6 +214,13 @@ export interface OpenOrder {
   contract: Contract
   order: Order
   orderState: OrderState
+  /**
+   * Broker-native order id AS A STRING. `order.orderId` is IBKR-shaped
+   * (number) and mangles ids that exceed float precision — CCXT venues
+   * issue 19-digit ids. Consumers that diff or track orders (external-
+   * order observation) must use this field.
+   */
+  orderId?: string
   /**
    * Average fill price — from orderStatus callback or broker-specific
    * source. String to preserve Decimal precision end-to-end (sub-tick
@@ -145,6 +246,37 @@ export interface AccountInfo {
   initMarginReq?: string
   maintMarginReq?: string
   dayTradesRemaining?: number
+}
+
+// ==================== Sub-accounts ====================
+
+/**
+ * A sub-account (a.k.a. wallet / compartment) WITHIN a single broker
+ * connection. Most brokers have exactly one and never implement
+ * `listSubAccounts` — they are treated as having a single implicit 'default'
+ * sub-account, and the `subAccountId` selector on reads/writes is ignored for
+ * them end-to-end (every broker today except CCXT).
+ *
+ * The asymmetric case is CCXT separate-wallet venues (Binance: spot /
+ * USDⓈ-M / COIN-M live behind distinct endpoints) and, in future, IBKR
+ * linked / FA accounts under one login. There the SAME connection spans
+ * several trading compartments, so a READ can scope to one (or aggregate
+ * across all) and a WRITE must name its target — placing an order is
+ * irreversible, so the ambiguity is resolved up front, never defaulted.
+ *
+ * `kind` is editorial taxonomy for the UI, not a routing key:
+ *   - 'spot'        a cash / spot wallet
+ *   - 'derivatives' a futures / swap / margin wallet
+ *   - 'unified'     a single cross-margin account that IS the whole thing
+ * Funding / earn / staking wallets are deliberately NOT enumerated — Alice
+ * trades; it does not custody-manage them.
+ */
+export interface SubAccountRef {
+  /** Stable id used as the `subAccountId` selector, e.g. 'spot', 'derivatives'. */
+  id: string
+  /** User-facing label, e.g. 'Spot', 'USDⓈ-M Futures'. */
+  label: string
+  kind: 'spot' | 'derivatives' | 'unified'
 }
 
 // ==================== Market data ====================
@@ -256,6 +388,13 @@ export interface BrokerHealthInfo {
   lastSuccessAt?: Date
   lastFailureAt?: Date
   recovering: boolean
+  /** True while the account's INITIAL broker connect is still in flight (e.g.
+   *  CCXT loadMarkets, which can take tens of seconds). During this window
+   *  `status` is optimistically 'healthy' (reach defaults to target) but the
+   *  broker isn't actually ready, so reads return a transient CONNECTING marker
+   *  instead of blocking. The UI shows a "connecting…" state off this flag —
+   *  `status`/`reach` alone can't distinguish it from a genuinely-ready account. */
+  connecting: boolean
   disabled: boolean
 }
 
@@ -329,6 +468,14 @@ export interface IBroker<TMeta = unknown> {
   getContractDetails(query: Contract): Promise<ContractDetails | null>
 
   /**
+   * Expand a directory-style nativeKey (bond issuer, FX family) or a leaf's
+   * derivative family (option chain, futures months) into tradeable leaves.
+   * Optional — venues without hub semantics leave it undefined; the UTA
+   * layer loud-refuses.
+   */
+  expandContract?(nativeKey: string, filters?: ExpandContractFilters): Promise<ContractExpansion>
+
+  /**
    * Refresh the broker's local catalog cache from upstream.
    * Optional — only EnumeratingCatalog brokers (Alpaca / CCXT / Mock)
    * implement this. SearchingCatalog brokers (IBKR via reqMatchingSymbols)
@@ -346,12 +493,60 @@ export interface IBroker<TMeta = unknown> {
   cancelOrder(orderId: string, orderCancel?: OrderCancel): Promise<PlaceOrderResult>
   closePosition(contract: Contract, quantity?: Decimal): Promise<PlaceOrderResult>
 
+  // ---- Sub-accounts (wallets / compartments within one connection) ----
+
+  /**
+   * Enumerate the sub-accounts this connection spans. OPTIONAL — a broker that
+   * omits it is treated as having a single implicit 'default' sub-account, and
+   * the `subAccountId` selector is ignored for it (every broker today except
+   * CCXT separate-wallet venues). Implementations return >1 ONLY for genuinely
+   * separate-wallet venues (CCXT Binance: spot / USDⓈ-M / COIN-M). Trading
+   * compartments only — funding / earn wallets are never enumerated.
+   */
+  listSubAccounts?(): Promise<SubAccountRef[]>
+
+  /**
+   * Which sub-account id a given contract trades in — derived from the
+   * INSTRUMENT (CCXT: a spot symbol vs a perp symbol route to different
+   * wallets). OPTIONAL — the UTA layer uses it to validate that a write's
+   * declared `subAccountId` is consistent with the instrument, so "place this
+   * on spot" with a perp contract loud-refuses instead of silently landing in
+   * the wrong wallet. Brokers with a single sub-account omit it.
+   */
+  subAccountForContract?(contract: Contract): string | undefined
+
   // ---- Queries ----
 
-  getAccount(): Promise<AccountInfo>
-  getPositions(): Promise<Position[]>
+  /**
+   * Account equity. `subAccountId` OPTIONAL: omitted ⇒ AGGREGATE across every
+   * sub-account (the rolled-up netLiquidation); a specific id ⇒ just that
+   * wallet. Single-sub-account brokers ignore the arg.
+   */
+  getAccount(subAccountId?: string): Promise<AccountInfo>
+  /**
+   * Positions / holdings. `subAccountId` OPTIONAL: omitted ⇒ ALL sub-accounts;
+   * a specific id ⇒ just that wallet's positions. Single-sub-account brokers
+   * ignore the arg.
+   */
+  getPositions(subAccountId?: string): Promise<Position[]>
   getOrders(orderIds: string[]): Promise<OpenOrder[]>
-  getOrder(orderId: string): Promise<OpenOrder | null>
+  /**
+   * Look up a single order. `symbolHint` is the broker-native localSymbol
+   * recorded with the order's git operation — brokers whose order-lookup
+   * API is symbol-scoped (CCXT fetchOrder) use it to survive process
+   * restarts, where any in-memory orderId→symbol cache is gone. Brokers
+   * with globally-unique order ids may ignore it.
+   */
+  getOrder(orderId: string, symbolHint?: string): Promise<OpenOrder | null>
+  /**
+   * List ALL currently-open orders on the account — including ones Alice
+   * never placed (user trading on the exchange app directly). Optional:
+   * brokers without a broad open-orders API simply don't declare it, and
+   * external-order observation degrades to off for that account. Returns
+   * an empty array (never throws) when the venue can't enumerate without
+   * extra scoping the broker doesn't have.
+   */
+  getOpenOrders?(): Promise<OpenOrder[]>
   getQuote(contract: Contract): Promise<Quote>
   getMarketClock(): Promise<MarketClock>
 

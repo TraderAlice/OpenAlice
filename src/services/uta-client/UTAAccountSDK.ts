@@ -13,6 +13,9 @@
 import type {
   UTAClient,
   AccountInfo,
+  SubAccountRef,
+  OrderHistoryEntry,
+  TradeHistoryEntry,
   Position,
   OpenOrder,
   Quote,
@@ -37,6 +40,8 @@ import type {
   StagePlaceOrderParams,
   StageModifyOrderParams,
   StageClosePositionParams,
+  ExpandContractFilters,
+  ContractExpansion,
 } from '@traderalice/uta-protocol'
 import type { Contract, ContractDescription, ContractDetails } from '@traderalice/ibkr'
 
@@ -96,6 +101,7 @@ export class UTAAccountSDK {
       tier: 'trading',
       consecutiveFailures: 0,
       recovering: false,
+      connecting: false,
       disabled: false,
     }
   }
@@ -114,13 +120,23 @@ export class UTAAccountSDK {
 
   // ==================== Reads (existing routes) ====================
 
-  getAccount(): Promise<AccountInfo> {
-    return this.client.get<AccountInfo>(`/api/trading/uta/${encodeURIComponent(this.id)}/account`)
+  /** Sub-accounts (wallets) this connection spans — one for ordinary brokers,
+   *  >1 for separate-wallet venues (CCXT Binance: spot / derivatives). */
+  listSubAccounts(): Promise<SubAccountRef[]> {
+    return this.client
+      .get<{ subAccounts: SubAccountRef[] }>(`/api/trading/uta/${encodeURIComponent(this.id)}/subaccounts`)
+      .then((r) => r.subAccounts)
   }
 
-  getPositions(): Promise<Position[]> {
+  /** `subAccountId` scopes to one wallet; omitted ⇒ aggregate across all. */
+  getAccount(subAccountId?: string): Promise<AccountInfo> {
+    return this.client.get<AccountInfo>(`/api/trading/uta/${encodeURIComponent(this.id)}/account`, { subAccountId })
+  }
+
+  /** `subAccountId` scopes to one wallet; omitted ⇒ positions across all. */
+  getPositions(subAccountId?: string): Promise<Position[]> {
     return this.client
-      .get<{ positions: Position[] }>(`/api/trading/uta/${encodeURIComponent(this.id)}/positions`)
+      .get<{ positions: Position[] }>(`/api/trading/uta/${encodeURIComponent(this.id)}/positions`, { subAccountId })
       .then((r) => r.positions)
   }
 
@@ -145,6 +161,14 @@ export class UTAAccountSDK {
     return this.client.get<MarketClock>(`/api/trading/uta/${encodeURIComponent(this.id)}/market-clock`)
   }
 
+  /** Hub → leaves expansion (bond issuers, option chains, futures months). */
+  expandContract(aliceId: string, filters?: ExpandContractFilters): Promise<ContractExpansion> {
+    return this.client.post<ContractExpansion>(
+      `/api/trading/uta/${encodeURIComponent(this.id)}/contract/expand`,
+      { aliceId, filters },
+    )
+  }
+
   /**
    * Historical OHLCV bars for a contract. Mirrors `getQuote`: the body may
    * be a full `Contract` or an `{ aliceId }` hint, expanded server-side via
@@ -166,13 +190,18 @@ export class UTAAccountSDK {
   }
 
   searchContracts(pattern: string): Promise<ContractDescription[]> {
-    // The existing `/api/trading/contracts/search` is aggregated across
-    // accounts; per-account search isn't a route yet. Fall back to the
-    // aggregated endpoint and filter by id. Route added in Step 6 follow-up.
+    // The `/api/trading/contracts/search` route is aggregated across
+    // accounts and returns FLAT rows `{ source, contract, ... }` — one per
+    // hit, tagged with the owning account. (An earlier SDK version assumed
+    // a grouped `{ id, results[] }` shape; the find() never matched and
+    // every per-account search silently returned [] — an analysis-killing
+    // false negative: "SOL isn't tradeable" when it plainly was.)
     return this.client
-      .get<{ results: Array<{ id: string; results: ContractDescription[] }> }>(
+      .get<{ results: Array<{ source: string } & ContractDescription> }>(
         `/api/trading/contracts/search`, { pattern })
-      .then((r) => r.results.find((b) => b.id === this.id)?.results ?? [])
+      .then((r) => r.results
+        .filter((row) => row.source === this.id)
+        .map(({ source: _source, ...desc }) => desc as ContractDescription))
   }
 
   // ==================== Contract details ====================
@@ -207,6 +236,22 @@ export class UTAAccountSDK {
 
   status(): Promise<GitStatus> {
     return this.client.get<GitStatus>(`/api/trading/uta/${encodeURIComponent(this.id)}/wallet/status`)
+  }
+
+  /** Exchange-frontend projection: one row per order, lifecycle collapsed. */
+  async orderHistory(limit = 50): Promise<OrderHistoryEntry[]> {
+    const r = await this.client.get<{ orders: OrderHistoryEntry[] }>(
+      `/api/trading/uta/${encodeURIComponent(this.id)}/order-history?limit=${limit}`,
+    )
+    return r.orders
+  }
+
+  /** Exchange-frontend projection: fills only (reconcile foldings labeled). */
+  async tradeHistory(limit = 50): Promise<TradeHistoryEntry[]> {
+    const r = await this.client.get<{ trades: TradeHistoryEntry[] }>(
+      `/api/trading/uta/${encodeURIComponent(this.id)}/trade-history?limit=${limit}`,
+    )
+    return r.trades
   }
 
   getState(): Promise<GitState> {

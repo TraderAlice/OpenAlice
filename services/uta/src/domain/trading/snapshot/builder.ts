@@ -18,6 +18,11 @@ export async function buildSnapshot(
   if (uta.disabled || uta.health === 'offline') return null
 
   try {
+    // Sync first so the snapshot doesn't immortalize stale `submitted`
+    // states for orders the broker already filled/cancelled. Best-effort —
+    // a sync hiccup must not block the snapshot itself.
+    await uta.sync().catch(() => {})
+
     const pendingOrderIds = uta.git.getPendingOrderIds().map(p => p.orderId)
     const [accountInfo, positions, orders] = await Promise.all([
       uta.getAccount(),

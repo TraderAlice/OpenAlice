@@ -263,3 +263,112 @@ describe('recomputeCostBasisFromCommits', () => {
     expect(result.qty.toString()).toBe('0.001')
   })
 })
+
+// ==================== sync-fill attribution ====================
+
+/** A placeOrder push result that is still working — no execution data yet. */
+function pendingBuy(aliceId: string, qty: number, orderId: string): { op: Operation; result: OperationResult } {
+  const order = new Order()
+  order.action = 'BUY'
+  order.totalQuantity = new Decimal(qty)
+  return {
+    op: { action: 'placeOrder', contract: makeContract(aliceId), order },
+    result: { action: 'placeOrder', success: true, status: 'submitted', orderId },
+  }
+}
+
+/** A sync commit: ONE syncOrders op, one result per updated order. */
+function syncCommit(...updates: Array<{ orderId: string; status: 'filled' | 'cancelled'; qty?: number; price?: number }>): GitCommit {
+  return {
+    hash: `c${++commitCounter}`,
+    parentHash: null,
+    message: '[sync] test',
+    operations: [{ action: 'syncOrders' }],
+    results: updates.map((u) => ({
+      action: 'syncOrders' as const,
+      success: true,
+      orderId: u.orderId,
+      status: u.status,
+      ...(u.qty != null && { filledQty: String(u.qty) }),
+      ...(u.price != null && { filledPrice: String(u.price) }),
+    })),
+    stateAfter: {
+      netLiquidation: '0', totalCashValue: '0', unrealizedPnL: '0', realizedPnL: '0',
+      positions: [], pendingOrders: [],
+    },
+    timestamp: new Date().toISOString(),
+  }
+}
+
+describe('recomputeCostBasisFromCommits — sync fills', () => {
+  it('attributes an async fill at the EXECUTION price, not a later mark', () => {
+    const commits = [
+      commit(pendingBuy(ALICE_ID, 0.01, 'ord-1')),               // submitted, no data
+      syncCommit({ orderId: 'ord-1', status: 'filled', qty: 0.01, price: 1656.76 }),
+    ]
+    const result = recomputeCostBasisFromCommits(commits, ALICE_ID)!
+    expect(result.avgCost.toString()).toBe('1656.76')
+    expect(result.qty.toString()).toBe('0.01')
+    expect(result.fillCount).toBe(1)
+  })
+
+  it('does not double-count when the originating result already carried execution data', () => {
+    const filled = buy(ALICE_ID, 1, 100)
+    filled.result.orderId = 'ord-2'
+    const commits = [
+      commit(filled),
+      // A redundant sync of the same order (e.g. operator manual sync racing
+      // the poller) must be a no-op.
+      syncCommit({ orderId: 'ord-2', status: 'filled', qty: 1, price: 100 }),
+    ]
+    const result = recomputeCostBasisFromCommits(commits, ALICE_ID)!
+    expect(result.qty.toString()).toBe('1')
+    expect(result.fillCount).toBe(1)
+  })
+
+  it('ignores sync fills for other aliceIds and non-filled transitions', () => {
+    const commits = [
+      commit(pendingBuy('bybit|ETH_USDT', 1, 'ord-other')),       // different aliceId
+      commit(pendingBuy(ALICE_ID, 1, 'ord-cancelled')),
+      syncCommit(
+        { orderId: 'ord-other', status: 'filled', qty: 1, price: 2000 },
+        { orderId: 'ord-cancelled', status: 'cancelled' },
+      ),
+    ]
+    expect(recomputeCostBasisFromCommits(commits, ALICE_ID)).toBeNull()
+  })
+
+  it('attributes a sync fill of an OBSERVED external order at execution price', () => {
+    const order = new Order()
+    order.action = 'BUY'
+    order.totalQuantity = new Decimal(2)
+    const commits = [
+      {
+        ...commit(),
+        operations: [{ action: 'observeExternalOrder' as const, contract: makeContract(ALICE_ID), order }],
+        results: [{ action: 'observeExternalOrder' as const, success: true, orderId: 'ext-1', status: 'submitted' as const }],
+      },
+      syncCommit({ orderId: 'ext-1', status: 'filled', qty: 2, price: 333 }),
+    ]
+    const result = recomputeCostBasisFromCommits(commits, ALICE_ID)!
+    expect(result.qty.toString()).toBe('2')
+    expect(result.avgCost.toString()).toBe('333')
+  })
+
+  it('sync-filled SELL reduces the position', () => {
+    const sellOrder = new Order()
+    sellOrder.action = 'SELL'
+    sellOrder.totalQuantity = new Decimal(0.5)
+    const commits = [
+      commit(buy(ALICE_ID, 1, 100)),
+      commit({
+        op: { action: 'placeOrder', contract: makeContract(ALICE_ID), order: sellOrder },
+        result: { action: 'placeOrder', success: true, status: 'submitted', orderId: 'ord-3' },
+      }),
+      syncCommit({ orderId: 'ord-3', status: 'filled', qty: 0.5, price: 120 }),
+    ]
+    const result = recomputeCostBasisFromCommits(commits, ALICE_ID)!
+    expect(result.qty.toString()).toBe('0.5')
+    expect(result.avgCost.toString()).toBe('100') // sell never moves WAC
+  })
+})

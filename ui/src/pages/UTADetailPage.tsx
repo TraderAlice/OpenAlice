@@ -1,23 +1,23 @@
-import { Fragment, useState, useEffect, useCallback, useMemo } from 'react'
+import { Fragment, useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import type { ViewSpec } from '../tabs/types'
 import { api } from '../api'
 import { getIntlLocale } from '../lib/intl'
-import type { UTAConfig, BrokerPreset, AccountInfo, Position, BrokerHealthInfo, UTASnapshotSummary, EquityCurvePoint } from '../api/types'
+import type { UTAConfig, BrokerPreset, AccountInfo, SubAccountRef, Position, BrokerHealthInfo, UTASnapshotSummary, EquityCurvePoint, OrderHistoryEntry, OrderHistoryStatus, TradeHistoryEntry } from '../api/types'
 import { useTradingConfig } from '../hooks/useTradingConfig'
 import { useAccountHealth } from '../hooks/useAccountHealth'
 import { PageHeader } from '../components/PageHeader'
-import { EmptyState } from '../components/StateViews'
+import { EmptyState, Skeleton } from '../components/StateViews'
 import { ReconnectButton } from '../components/ReconnectButton'
 import { Toggle } from '../components/Toggle'
 import { HealthBadge } from '../components/uta/HealthBadge'
 import { EditUTADialog } from '../components/uta/EditUTADialog'
 import { OrderEntryDialog, type OrderEntryMode } from '../components/uta/OrderEntryDialog'
-import { SnapshotDetail } from '../components/SnapshotDetail'
 import { EquityCurve } from '../components/EquityCurve'
 import { Metric, signFromDelta } from '../components/Metric'
 import { fmt, fmtPnl, fmtNum, fmtPctSigned, isUnsetDecimal } from '../lib/format'
 import { secTypeToClass, assetClassLabel, ASSET_CLASS_ORDER, type AssetClass } from '../lib/asset-class'
+import { ContractCell } from '../lib/contract-display'
 
 // ==================== Page ====================
 
@@ -35,12 +35,17 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
   const [account, setAccount] = useState<AccountInfo | null>(null)
   const [positions, setPositions] = useState<Position[]>([])
   const [orders, setOrders] = useState<unknown[]>([])
+  // Sub-accounts (wallets). Empty/length-1 for ordinary brokers; >1 for
+  // separate-wallet venues (Binance: spot / derivatives). `selectedSub`
+  // undefined ⇒ the aggregate view across all wallets.
+  const [subAccounts, setSubAccounts] = useState<SubAccountRef[]>([])
+  const [selectedSub, setSelectedSub] = useState<string | undefined>(undefined)
   const [snapshots, setSnapshots] = useState<UTASnapshotSummary[]>([])
   const [editing, setEditing] = useState(false)
   const [orderMode, setOrderMode] = useState<OrderEntryMode | null>(null)
   const [dataError, setDataError] = useState<string | null>(null)
-  const [expandedSnapshot, setExpandedSnapshot] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [clock, setClock] = useState<MarketClockState>(null)
 
   useEffect(() => {
     api.trading.getBrokerPresets().then(r => setPresets(r.presets)).catch(() => {})
@@ -50,24 +55,49 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
   const preset = useMemo<BrokerPreset | undefined>(() => presets.find(p => p.id === uta?.presetId), [presets, uta])
   const health: BrokerHealthInfo | undefined = id ? healthMap[id] : undefined
 
-  // Live polling — account/positions/orders refresh every 15s.
+  // Sub-account discovery — once per UTA. A failure (or a single-wallet
+  // broker) leaves the list empty, so the selector simply never renders.
+  useEffect(() => {
+    if (!id) return
+    let cancelled = false
+    api.trading.utaSubAccounts(id)
+      .then(r => { if (!cancelled) setSubAccounts(r.subAccounts ?? []) })
+      .catch(() => { if (!cancelled) setSubAccounts([]) })
+    setSelectedSub(undefined)  // reset to aggregate when switching UTAs
+    return () => { cancelled = true }
+  }, [id])
+
+  // Live polling — account/positions/orders refresh every 15s. Account +
+  // positions scope to the selected wallet (undefined ⇒ aggregate); orders
+  // are not wallet-scoped (the venue order list is account-wide).
+  //
+  // Latest-wins guard: scoped CCXT reads are slow (multi-wallet venues do
+  // several round-trips), so switching the sub-account pill twice quickly
+  // leaves two fetches in flight. Without this, the slower (older) response
+  // can land last and paint the WRONG wallet's data under the selected pill.
+  // Each call claims a sequence number; a response only applies if it's still
+  // the newest in flight.
+  const reqSeq = useRef(0)
   const refreshLive = useCallback(async () => {
     if (!id) return
+    const seq = ++reqSeq.current
     setDataError(null)
     try {
       const [acct, pos, ord] = await Promise.all([
-        api.trading.utaAccount(id).catch(() => null),
-        api.trading.utaPositions(id).catch(() => ({ positions: [] as Position[] })),
+        api.trading.utaAccount(id, selectedSub).catch(() => null),
+        api.trading.utaPositions(id, selectedSub).catch(() => ({ positions: [] as Position[] })),
         api.trading.utaOrders(id).catch(() => ({ orders: [] as unknown[] })),
       ])
+      if (seq !== reqSeq.current) return  // superseded by a newer refresh — discard
       setAccount(acct)
       setPositions(pos.positions)
       setOrders(ord.orders)
       setLastUpdated(new Date())
     } catch (err) {
+      if (seq !== reqSeq.current) return
       setDataError(err instanceof Error ? err.message : String(err))
     }
-  }, [id])
+  }, [id, selectedSub])
 
   // Snapshots refresh more slowly (60s); same data feeds the NAV chart and
   // the 24h-delta anchor — no extra fetches needed.
@@ -89,6 +119,19 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
     return () => { clearInterval(liveInterval); clearInterval(snapshotInterval) }
   }, [refreshLive, refreshSnapshots])
 
+  // Market clock — mount + every 60s. The poll itself re-renders the
+  // "opens in Xh Ym" countdown, so no separate ticker is needed.
+  useEffect(() => {
+    if (!id) return
+    let cancelled = false
+    const load = () => api.trading.marketClock(id)
+      .then(c => { if (!cancelled) setClock(c) })
+      .catch(() => { if (!cancelled) setClock('error') })
+    load()
+    const t = setInterval(load, 60_000)
+    return () => { cancelled = true; clearInterval(t) }
+  }, [id])
+
   // ?aliceId=... auto-opens the place-order form prefilled (e.g. clicked
   // from TradeableContractsPanel on the market workbench).
   useEffect(() => {
@@ -102,10 +145,10 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
   }, [searchParams, setSearchParams, orderMode])
 
   // 24h delta = current NLV − the oldest snapshot still within the trailing
-  // 24h window. We label this "today" in the UI even though it's strictly
-  // 24h-trailing — matches consumer-trading apps' "Day's Change" wording
-  // without entangling market-hours / timezone arithmetic.
-  const todayDelta = useMemo(() => {
+  // 24h window. Labeled "24h" in the UI — it IS a trailing-24h diff, not a
+  // market-session "today", and the honest label avoids market-hours /
+  // timezone arithmetic.
+  const delta24h = useMemo(() => {
     if (!account || snapshots.length === 0) return null
     const cutoff = Date.now() - 24 * 60 * 60 * 1000
     let baseline: number | null = null
@@ -137,7 +180,7 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
       }))
   }, [snapshots, id])
 
-  if (tc.loading) return <Shell title="Loading…" />
+  if (tc.loading) return <Shell title={id ?? 'UTA'}><UTADetailMainSkeleton /></Shell>
   if (!id) return <Shell title="UTA not specified" />
   if (!uta) {
     return (
@@ -170,62 +213,89 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
           </>
         }
         right={
+          // One action row, one visual language: the enable toggle (state
+          // control) sits apart from the buttons behind a divider; the
+          // secondary actions share btn-secondary-sm; Place Order is the
+          // single filled-accent primary at the same size. No hand-rolled
+          // paddings — mixed sizes were what made this row look drunk.
           <div className="flex items-center gap-2">
             <Toggle
+              size="sm"
               checked={!isDisabled}
               onChange={async (v) => { await tc.saveUTA({ ...uta, enabled: v }) }}
             />
+            <div className="w-px h-5 bg-border" />
             <ReconnectButton accountId={uta.id} />
+            <button onClick={() => setEditing(true)} className="btn-secondary-sm">
+              Edit
+            </button>
             <button
               onClick={() => setOrderMode({ kind: 'place' })}
               disabled={isDisabled}
-              className="px-3 py-1.5 text-[13px] font-medium rounded-md bg-accent text-bg hover:bg-accent/90 disabled:opacity-40 transition-colors"
+              className="px-3 py-1.5 text-xs font-medium rounded-md bg-accent text-bg hover:bg-accent/90 disabled:opacity-40 transition-all active:scale-[0.98] cursor-pointer"
             >
               + Place Order
-            </button>
-            <button onClick={() => setEditing(true)} className="btn-secondary-sm">
-              Edit
             </button>
           </div>
         }
       />
 
       <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5">
-        <div className="max-w-[1080px] mx-auto space-y-5">
+        <div className="max-w-[1240px] mx-auto">
           {dataError && (
-            <div className="rounded-md border border-red/30 bg-red/5 px-3 py-2 text-[12px] text-red">
+            <div className="rounded-md border border-red/30 bg-red/5 px-3 py-2 text-[12px] text-red mb-4">
               Failed to load live data: {dataError}
             </div>
           )}
 
-          <Hero account={account} todayDelta={todayDelta} />
+          {/* Exchange-style two-column layout: tables get the wide main
+              column, the Account panel rides a sticky sidebar. On narrow
+              screens it collapses to one column with the Account panel
+              first — it's the summary. */}
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4 items-start">
+            <div className="lg:order-2 lg:sticky lg:top-4 self-start min-w-0 space-y-3">
+              {subAccounts.length > 1 && (
+                <SubAccountSelector
+                  subAccounts={subAccounts}
+                  selected={selectedSub}
+                  onSelect={(sub) => {
+                    // Drop the previous wallet's numbers immediately so the
+                    // panel shows "Loading account info…" during the (slow,
+                    // multi-round-trip) scoped read instead of briefly painting
+                    // the old scope's net-liquidation under the new pill.
+                    setAccount(null)
+                    setSelectedSub(sub)
+                  }}
+                />
+              )}
+              <AccountPanel account={account} positions={positions} delta24h={delta24h} clock={clock} connecting={health?.connecting ?? false} />
+            </div>
 
-          {curvePoints.length >= 2 && (
-            <EquityCurve
-              points={curvePoints}
-              accounts={[{ id, label: preset?.label ?? id }]}
-              selectedAccountId={id}
-              onAccountChange={() => { /* single-account mode: switcher hidden */ }}
-            />
-          )}
+            <div className="lg:order-1 min-w-0 space-y-5">
+              {!lastUpdated ? <UTADetailMainSkeleton /> : <>
+              {curvePoints.length >= 2 && (
+                <EquityCurve
+                  points={curvePoints}
+                  accounts={[{ id, label: preset?.label ?? id }]}
+                  selectedAccountId={id}
+                  onAccountChange={() => { /* single-account mode: switcher hidden */ }}
+                />
+              )}
 
-          <PositionsSection
-            positions={positions}
-            onCloseClick={(p) => setOrderMode({
-              kind: 'close',
-              aliceId: p.contract.aliceId ?? p.contract.localSymbol ?? p.contract.symbol ?? '',
-              quantity: p.quantity,
-              symbol: p.contract.symbol,
-            })}
-          />
+              <PositionsSection
+                positions={positions}
+                onCloseClick={(p) => setOrderMode({
+                  kind: 'close',
+                  aliceId: p.contract.aliceId ?? p.contract.localSymbol ?? p.contract.symbol ?? '',
+                  quantity: p.quantity,
+                  symbol: p.contract.symbol,
+                })}
+              />
 
-          <OrdersSection orders={orders} />
-
-          <SnapshotsTimeline
-            snapshots={snapshots}
-            expandedTimestamp={expandedSnapshot}
-            onToggle={(ts) => setExpandedSnapshot(prev => prev === ts ? null : ts)}
-          />
+              <OrdersArea utaId={id} openOrders={orders} />
+              </>}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -248,6 +318,8 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
         <OrderEntryDialog
           utaId={uta.id}
           mode={orderMode}
+          subAccounts={subAccounts}
+          defaultSubAccountId={selectedSub}
           onClose={() => setOrderMode(null)}
           onPushComplete={() => { void refreshLive() }}
         />
@@ -269,53 +341,216 @@ function Shell({ title, children }: { title: string; children?: React.ReactNode 
   )
 }
 
-// ==================== Hero ====================
+// ==================== Sub-account selector ====================
 
-interface TodayDelta { delta: number; pct: number; currency: string }
+/** Segmented control for separate-wallet venues (Binance: spot / derivatives).
+ *  "All" is the aggregate (selected = undefined); each pill scopes the account
+ *  + positions view to one wallet. Only rendered when a UTA spans >1 wallet. */
+function SubAccountSelector({ subAccounts, selected, onSelect }: {
+  subAccounts: SubAccountRef[]
+  selected: string | undefined
+  onSelect: (id: string | undefined) => void
+}) {
+  const pill = (active: boolean) =>
+    `px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+      active ? 'bg-accent text-white' : 'text-text-muted hover:text-text hover:bg-surface-hover'
+    }`
+  return (
+    <div className="flex items-center gap-1 p-1 rounded-lg bg-surface border border-border">
+      <button type="button" className={pill(selected === undefined)} onClick={() => onSelect(undefined)}>All</button>
+      {subAccounts.map(s => (
+        <button key={s.id} type="button" className={pill(selected === s.id)} onClick={() => onSelect(s.id)} title={`${s.kind} wallet`}>
+          {s.label}
+        </button>
+      ))}
+    </div>
+  )
+}
 
-function Hero({ account, todayDelta }: { account: AccountInfo | null; todayDelta: TodayDelta | null }) {
+// ==================== Account panel (sidebar) ====================
+
+interface Delta24h { delta: number; pct: number; currency: string }
+
+/** Sum a string-decimal field, ignoring non-finite entries. */
+function sumFinite(values: number[]): number {
+  return values.reduce((s, n) => s + (Number.isFinite(n) ? n : 0), 0)
+}
+
+/**
+ * Sidebar account summary. The AccountInfo contract is the IBKR superset:
+ * a broker that doesn't report a field gets its row OMITTED — never a
+ * fabricated zero. (Live examples: Alpaca has no realizedPnL; CCXT/okx has
+ * realizedPnL but no buyingPower.)
+ */
+/** Cold-start placeholder for the UTA-detail main column (curve + positions +
+ *  orders), shown until the first live read lands — instead of a blank pane or
+ *  a misleading "No open positions" while the (sometimes slow) broker read runs. */
+function UTADetailMainSkeleton() {
+  return (
+    <div className="space-y-5" aria-hidden="true">
+      <Skeleton className="h-[220px] w-full rounded-lg" />
+      <div className="rounded-lg border border-border overflow-hidden">
+        <div className="px-4 py-2.5 border-b border-border bg-bg-secondary">
+          <Skeleton className="h-3 w-28" />
+        </div>
+        <div className="divide-y divide-border">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-4 px-4 py-3.5">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-4 w-12" />
+              <Skeleton className="h-4 w-16 ml-auto" />
+              <Skeleton className="h-4 w-20" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function AccountPanel({ account, positions, delta24h, clock, connecting }: {
+  account: AccountInfo | null
+  positions: Position[]
+  delta24h: Delta24h | null
+  clock: MarketClockState
+  connecting?: boolean
+}) {
   if (!account) {
     return (
-      <div className="border border-border rounded-lg bg-bg-secondary px-5 py-6">
-        <p className="text-[13px] text-text-muted">Loading account info…</p>
+      <div className="border border-border rounded-lg bg-bg-secondary p-4">
+        {clock != null && (
+          <div className="text-[12px] mb-3"><MarketClockChip clock={clock} /></div>
+        )}
+        {/* During the initial broker connect, say so explicitly — "connecting"
+            reads as progress, where a bare "Loading…" that lingers 30s reads
+            as a stall. Skeleton rows below stand in for the metric list so the
+            panel has shape instead of a single line of text. */}
+        <p className={`text-[12px] mb-3.5 ${connecting ? 'text-accent' : 'text-text-muted'}`}>
+          {connecting ? 'Connecting to broker…' : 'Loading account info…'}
+        </p>
+        <div className="space-y-3.5" aria-hidden="true">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="flex items-center justify-between">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-3 w-14" />
+            </div>
+          ))}
+        </div>
       </div>
     )
   }
+
   const ccy = account.baseCurrency || 'USD'
+  const netLiq = Number(account.netLiquidation)
   const unrealized = Number(account.unrealizedPnL)
-  const realized = Number(account.realizedPnL ?? '0')
+
+  // Positions value = non-cash equity = netLiq − cash, so Cash + Positions
+  // Value ≡ Net Liquidation by construction. netLiq is now the sum of every
+  // wallet asset (stablecoins + priced holdings across spot/futures wallets,
+  // ANG-111); cash is the stablecoin slice, so the remainder is exactly the
+  // value of non-stablecoin holdings. Summing positions[].marketValue does NOT
+  // reconcile — it counts perp NOTIONAL (not equity) and omits non-stablecoin
+  // futures-wallet collateral. Fall back to the row sum only if netLiq/cash are
+  // unavailable.
+  const cashVal = Number(account.totalCashValue)
+  const positionsValue = Number.isFinite(netLiq) && Number.isFinite(cashVal)
+    ? netLiq - cashVal
+    : sumFinite(positions.map(p => Number(p.marketValue)))
+  const utilizationPct = Number.isFinite(netLiq) && netLiq > 0
+    ? (positionsValue / netLiq) * 100
+    : null
+
+  // Unrealized % vs cost basis, when a positive cost basis is computable.
+  const costBasis = sumFinite(positions.map(p =>
+    Math.abs(Number(p.quantity)) * Number(p.avgCost) * (p.contract.multiplier ?? 1)
+  ))
+  const unrealizedPct = costBasis > 0 && Number.isFinite(unrealized)
+    ? (unrealized / costBasis) * 100
+    : null
+
+  const realized = account.realizedPnL != null ? Number(account.realizedPnL) : null
+  const marginUsed = account.initMarginReq != null && !isUnsetDecimal(account.initMarginReq)
+    ? Number(account.initMarginReq)
+    : null
 
   return (
-    <div className="border border-border rounded-lg bg-bg-secondary px-5 py-5 space-y-4">
+    <div className="border border-border rounded-lg bg-bg-secondary p-4">
+      {clock != null && (
+        <div className="text-[12px] mb-3"><MarketClockChip clock={clock} /></div>
+      )}
+
       <Metric
         size="lg"
         label="Net Liquidation"
         value={fmt(account.netLiquidation, ccy)}
-        delta={todayDelta ? {
-          value: `${fmtPnl(todayDelta.delta, ccy)} (${fmtPctSigned(todayDelta.pct)}) today`,
-          sign: signFromDelta(todayDelta.delta),
-        } : { value: '— today', sign: 'flat' }}
+        delta={delta24h ? {
+          value: `${fmtPnl(delta24h.delta, ccy)} (${fmtPctSigned(delta24h.pct)}) 24h`,
+          sign: signFromDelta(delta24h.delta),
+        } : { value: '— 24h', sign: 'flat' }}
       />
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-border">
-        <Metric size="sm" label="Cash" value={fmt(account.totalCashValue, ccy)} />
-        <Metric
-          size="sm"
+
+      <div className="mt-4 border-t border-border divide-y divide-border">
+        <AccountRow label="Cash" value={fmt(account.totalCashValue, ccy)} />
+
+        <AccountRow label="Positions Value" value={fmt(positionsValue, ccy)} />
+
+        {utilizationPct != null && (
+          <div className="py-2">
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-[11px] uppercase tracking-wide text-text-muted">Utilization</span>
+              <span className="text-[13px] font-medium tabular-nums text-text">{utilizationPct.toFixed(1)}%</span>
+            </div>
+            <div className="mt-1.5 h-[2px] rounded-full bg-bg-tertiary overflow-hidden">
+              <div
+                className="h-full rounded-full bg-accent"
+                style={{ width: `${Math.min(100, Math.max(0, utilizationPct))}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        <AccountRow
           label="Unrealized P&L"
-          value={fmtPnl(account.unrealizedPnL, ccy)}
-          valueSign={signFromDelta(unrealized)}
+          value={unrealizedPct != null
+            ? `${fmtPnl(account.unrealizedPnL, ccy)} (${fmtPctSigned(unrealizedPct, 1)})`
+            : fmtPnl(account.unrealizedPnL, ccy)}
+          sign={signFromDelta(unrealized)}
         />
-        <Metric
-          size="sm"
-          label="Realized P&L"
-          value={fmtPnl(account.realizedPnL ?? '0', ccy)}
-          valueSign={signFromDelta(realized)}
-        />
-        <Metric
-          size="sm"
-          label="Buying Power"
-          value={account.buyingPower != null ? fmt(account.buyingPower, ccy) : '—'}
-        />
+
+        {realized != null && (
+          <AccountRow
+            label="Realized P&L"
+            value={fmtPnl(account.realizedPnL, ccy)}
+            sign={signFromDelta(realized)}
+          />
+        )}
+
+        {account.buyingPower != null && !isUnsetDecimal(account.buyingPower) && (
+          <AccountRow label="Buying Power" value={fmt(account.buyingPower, ccy)} />
+        )}
+
+        {marginUsed != null && marginUsed > 0 && (
+          <AccountRow label="Margin Used" value={fmt(account.initMarginReq, ccy)} />
+        )}
+
+        {account.dayTradesRemaining != null && (
+          <AccountRow label="Day Trades Left" value={fmtNum(account.dayTradesRemaining)} />
+        )}
       </div>
+    </div>
+  )
+}
+
+function AccountRow({ label, value, sign }: {
+  label: string
+  value: React.ReactNode
+  sign?: 'up' | 'down' | 'flat'
+}) {
+  const valueColor = sign === 'up' ? 'text-green' : sign === 'down' ? 'text-red' : 'text-text'
+  return (
+    <div className="flex items-baseline justify-between gap-3 py-2">
+      <span className="text-[11px] uppercase tracking-wide text-text-muted">{label}</span>
+      <span className={`text-[13px] font-medium tabular-nums text-right ${valueColor}`}>{value}</span>
     </div>
   )
 }
@@ -428,12 +663,11 @@ function PositionRow({ position: p, onClose }: { position: Position; onClose: ()
   const cost = Number(p.avgCost) * Number(p.quantity)
   const pnl = Number(p.unrealizedPnL)
   const pct = cost > 0 ? (pnl / cost) * 100 : 0
-  const display = p.contract.aliceId ?? p.contract.localSymbol ?? p.contract.symbol ?? '?'
 
   return (
     <tr className="border-t border-border hover:bg-bg-tertiary/30 transition-colors">
       <td className="px-3 py-2">
-        <span className="font-mono text-text">{display}</span>
+        <ContractCell contract={p.contract} />
       </td>
       <td className="px-3 py-2">
         <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${p.side === 'long' ? 'bg-green/15 text-green' : 'bg-red/15 text-red'}`}>
@@ -461,7 +695,48 @@ function PositionRow({ position: p, onClose }: { position: Position; onClose: ()
   )
 }
 
-// ==================== Open Orders ====================
+// ==================== Market clock chip ====================
+
+type MarketClockState = { isOpen: boolean; nextOpen?: string; nextClose?: string } | 'error' | null
+
+function MarketClockChip({ clock }: { clock: NonNullable<MarketClockState> }) {
+  let dotClass = 'bg-green'
+  let label = '24/7'
+
+  if (clock !== 'error') {
+    if (clock.isOpen) {
+      const closes = clock.nextClose ? new Date(clock.nextClose) : null
+      if (closes && !Number.isNaN(closes.getTime())) {
+        const at = closes.toLocaleTimeString(getIntlLocale(), { hour: '2-digit', minute: '2-digit', hour12: false })
+        label = `Market Open · closes ${at}`
+      } else if (!clock.nextOpen && !clock.nextClose) {
+        label = '24/7'  // crypto venues report open with no schedule
+      } else {
+        label = 'Market Open'
+      }
+    } else {
+      dotClass = 'bg-text-muted/50'
+      const opens = clock.nextOpen ? new Date(clock.nextOpen) : null
+      if (opens && !Number.isNaN(opens.getTime())) {
+        const mins = Math.max(0, Math.round((opens.getTime() - Date.now()) / 60_000))
+        const h = Math.floor(mins / 60)
+        const m = mins % 60
+        label = `Market Closed · opens in ${h > 0 ? `${h}h ` : ''}${m}m`
+      } else {
+        label = 'Market Closed'
+      }
+    }
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-text-muted">
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotClass}`} aria-hidden />
+      {label}
+    </span>
+  )
+}
+
+// ==================== Orders — tabbed: Open / History / Trades ====================
 
 interface OpenOrderRow {
   orderId?: number | string
@@ -470,167 +745,285 @@ interface OpenOrderRow {
   orderState?: { status?: string }
 }
 
-function OrdersSection({ orders }: { orders: unknown[] }) {
+type OrdersTab = 'open' | 'history' | 'trades'
+
+function OrdersArea({ utaId, openOrders }: { utaId: string; openOrders: unknown[] }) {
+  const [tab, setTab] = useState<OrdersTab>('open')
+  const [history, setHistory] = useState<OrderHistoryEntry[] | null>(null)
+  const [trades, setTrades] = useState<TradeHistoryEntry[] | null>(null)
+
+  // Lazy-fetch per tab on first open; refresh on the same 15s cadence as the
+  // live poll while the tab stays active.
+  useEffect(() => {
+    if (tab !== 'history') return
+    let cancelled = false
+    const load = () => api.trading.orderHistory(utaId, 50)
+      .then(r => { if (!cancelled) setHistory(r.orders) })
+      .catch(() => {})
+    load()
+    const t = setInterval(load, 15_000)
+    return () => { cancelled = true; clearInterval(t) }
+  }, [tab, utaId])
+
+  useEffect(() => {
+    if (tab !== 'trades') return
+    let cancelled = false
+    const load = () => api.trading.tradeHistory(utaId, 50)
+      .then(r => { if (!cancelled) setTrades(r.trades) })
+      .catch(() => {})
+    load()
+    const t = setInterval(load, 15_000)
+    return () => { cancelled = true; clearInterval(t) }
+  }, [tab, utaId])
+
+  const tabs: Array<{ id: OrdersTab; label: string }> = [
+    { id: 'open', label: `Open (${openOrders.length})` },
+    { id: 'history', label: 'History' },
+    { id: 'trades', label: 'Trades' },
+  ]
+
+  return (
+    <Section
+      title="Orders"
+      action={
+        <div className="flex gap-1">
+          {tabs.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`px-2 py-0.5 text-[11px] rounded transition-colors ${
+                tab === t.id
+                  ? 'bg-accent/15 text-accent font-medium'
+                  : 'text-text-muted hover:text-text hover:bg-bg-tertiary'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      }
+    >
+      {tab === 'open' && <OpenOrdersTable orders={openOrders} />}
+      {tab === 'history' && <OrderHistoryTable orders={history} />}
+      {tab === 'trades' && <TradeHistoryTable trades={trades} />}
+    </Section>
+  )
+}
+
+function OpenOrdersTable({ orders }: { orders: unknown[] }) {
   const rows = orders as OpenOrderRow[]
   if (rows.length === 0) {
     return (
-      <Section title="Open Orders (0)">
-        <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-text-muted">
-          No open orders.
-        </div>
-      </Section>
+      <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-text-muted">
+        No open orders.
+      </div>
     )
   }
   return (
-    <Section title={`Open Orders (${rows.length})`}>
-      <div className="border border-border rounded-lg overflow-x-auto">
-        <table className="w-full text-[13px]">
-          <thead>
-            <tr className="bg-bg-secondary text-text-muted text-left">
-              <th className="px-3 py-2 font-medium">Order ID</th>
-              <th className="px-3 py-2 font-medium">Contract</th>
-              <th className="px-3 py-2 font-medium">Action</th>
-              <th className="px-3 py-2 font-medium">Type</th>
-              <th className="px-3 py-2 font-medium text-right">Qty</th>
-              <th className="px-3 py-2 font-medium text-right">Limit</th>
-              <th className="px-3 py-2 font-medium">Status</th>
+    <div className="border border-border rounded-lg overflow-x-auto">
+      <table className="w-full text-[13px]">
+        <thead>
+          <tr className="bg-bg-secondary text-text-muted text-left">
+            <th className="px-3 py-2 font-medium">Order ID</th>
+            <th className="px-3 py-2 font-medium">Contract</th>
+            <th className="px-3 py-2 font-medium">Action</th>
+            <th className="px-3 py-2 font-medium">Type</th>
+            <th className="px-3 py-2 font-medium text-right">Qty</th>
+            <th className="px-3 py-2 font-medium text-right">Limit</th>
+            <th className="px-3 py-2 font-medium">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((o, i) => (
+            <tr key={i} className="border-t border-border">
+              <td className="px-3 py-2 font-mono text-text-muted text-[11px]">{String(o.orderId ?? '—')}</td>
+              <td className="px-3 py-2 font-mono text-text" title={o.contract?.aliceId}>
+                {o.contract?.symbol ?? o.contract?.localSymbol ?? o.contract?.aliceId ?? '?'}
+              </td>
+              <td className={`px-3 py-2 font-medium ${o.order?.action === 'BUY' ? 'text-green' : o.order?.action === 'SELL' ? 'text-red' : 'text-text'}`}>{o.order?.action ?? '—'}</td>
+              <td className="px-3 py-2 text-text-muted">{o.order?.orderType ?? '—'}</td>
+              <td className="px-3 py-2 text-right text-text tabular-nums">{String(o.order?.totalQuantity ?? '')}</td>
+              <td className="px-3 py-2 text-right text-text-muted tabular-nums">{o.order?.lmtPrice != null && !isUnsetDecimal(o.order.lmtPrice) ? String(o.order.lmtPrice) : '—'}</td>
+              <td className="px-3 py-2">
+                <span className="text-[11px] text-text-muted">{o.orderState?.status ?? 'Unknown'}</span>
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {rows.map((o, i) => (
-              <tr key={i} className="border-t border-border">
-                <td className="px-3 py-2 font-mono text-text-muted text-[11px]">{String(o.orderId ?? '—')}</td>
-                <td className="px-3 py-2 font-mono text-text">
-                  {o.contract?.aliceId ?? o.contract?.localSymbol ?? o.contract?.symbol ?? '?'}
-                </td>
-                <td className={`px-3 py-2 font-medium ${o.order?.action === 'BUY' ? 'text-green' : o.order?.action === 'SELL' ? 'text-red' : 'text-text'}`}>{o.order?.action ?? '—'}</td>
-                <td className="px-3 py-2 text-text-muted">{o.order?.orderType ?? '—'}</td>
-                <td className="px-3 py-2 text-right text-text tabular-nums">{String(o.order?.totalQuantity ?? '')}</td>
-                <td className="px-3 py-2 text-right text-text-muted tabular-nums">{o.order?.lmtPrice != null && !isUnsetDecimal(o.order.lmtPrice) ? String(o.order.lmtPrice) : '—'}</td>
-                <td className="px-3 py-2">
-                  <span className="text-[11px] text-text-muted">{o.orderState?.status ?? 'Unknown'}</span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </Section>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 
-// ==================== Snapshots — vertical timeline ====================
+// ==================== Order History tab ====================
 
-interface SnapshotsTimelineProps {
-  snapshots: UTASnapshotSummary[]
-  expandedTimestamp: string | null
-  onToggle: (ts: string) => void
+const ORDER_STATUS_STYLES: Record<OrderHistoryStatus, string> = {
+  filled: 'bg-green/15 text-green',
+  cancelled: 'bg-bg-tertiary text-text-muted',
+  rejected: 'bg-red/15 text-red',
+  'user-rejected': 'bg-red/15 text-red',
+  submitted: 'bg-accent/15 text-accent',
 }
 
-function SnapshotsTimeline({ snapshots, expandedTimestamp, onToggle }: SnapshotsTimelineProps) {
-  // Group by calendar day. Snapshots are newest-first; preserve that order
-  // so the timeline reads top-down chronologically backwards (like git log).
-  const groups = useMemo(() => {
-    const map = new Map<string, UTASnapshotSummary[]>()
-    for (const s of snapshots) {
-      const day = new Date(s.timestamp).toDateString()
-      if (!map.has(day)) map.set(day, [])
-      map.get(day)!.push(s)
-    }
-    return Array.from(map.entries())
-  }, [snapshots])
-
-  if (snapshots.length === 0) {
-    return (
-      <Section title="Snapshots">
-        <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-text-muted">
-          No snapshots yet. They are captured periodically (Portfolio → Snapshot Settings) or after each push.
-        </div>
-      </Section>
-    )
-  }
-
+function OrderStatusBadge({ status }: { status: OrderHistoryStatus }) {
   return (
-    <Section title={`Snapshots (${snapshots.length})`}>
-      <div className="relative pl-4">
-        {/* Vertical guide line tucked behind the dots */}
-        <div className="absolute left-[7px] top-0 bottom-0 w-px bg-border" aria-hidden />
-        {groups.map(([day, items]) => (
-          <div key={day} className="relative">
-            <div className="sticky top-0 z-10 -mx-4 px-4 py-1 bg-bg/95 backdrop-blur-sm text-[11px] text-text-muted uppercase tracking-wide">
-              {formatDayLabel(day)}
-            </div>
-            <ul>
-              {items.map((s) => {
-                const idxAll = snapshots.indexOf(s)
-                const prev = snapshots[idxAll + 1]   // older snapshot
-                const delta = prev ? Number(s.account.netLiquidation) - Number(prev.account.netLiquidation) : null
-                const isExpanded = expandedTimestamp === s.timestamp
-                return (
-                  <li key={s.timestamp} className="relative">
-                    <button
-                      onClick={() => onToggle(s.timestamp)}
-                      className="w-full flex items-center gap-3 py-2 pr-2 text-left hover:bg-bg-secondary/40 transition-colors rounded"
-                    >
-                      <span className={`absolute left-[-13px] top-3 w-2 h-2 rounded-full ring-2 ring-bg ${isExpanded ? 'bg-accent' : 'bg-text-muted/60'}`} aria-hidden />
-                      <span className="text-[12px] text-text-muted tabular-nums w-[58px] shrink-0">
-                        {formatTime(s.timestamp)}
-                      </span>
-                      <TriggerBadge trigger={s.trigger} />
-                      <span className="flex-1 text-[12px] text-text font-mono tabular-nums truncate">
-                        {fmt(s.account.netLiquidation, s.account.baseCurrency)}
-                      </span>
-                      {delta != null && Number.isFinite(delta) && (
-                        <span className={`text-[12px] tabular-nums ${delta >= 0 ? 'text-green' : 'text-red'}`}>
-                          {fmtPnl(delta, s.account.baseCurrency)}
-                        </span>
-                      )}
-                    </button>
-                    {isExpanded && (
-                      <div className="mb-3 mt-1">
-                        <SnapshotDetail
-                          snapshot={s}
-                          onClose={() => onToggle(s.timestamp)}
-                        />
-                      </div>
-                    )}
-                  </li>
-                )
-              })}
-            </ul>
-          </div>
-        ))}
-      </div>
-    </Section>
+    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${ORDER_STATUS_STYLES[status] ?? 'bg-bg-tertiary text-text-muted'}`}>
+      {status}
+    </span>
   )
 }
 
-function TriggerBadge({ trigger }: { trigger: string }) {
-  const label = trigger === 'post-push' ? 'push'
-    : trigger === 'post-reject' ? 'reject'
-    : trigger
+function SideBadge({ side }: { side: 'BUY' | 'SELL' }) {
   return (
-    <span className="text-[10px] px-1.5 py-0.5 rounded bg-bg-tertiary text-text-muted shrink-0">
+    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${side === 'BUY' ? 'bg-green/15 text-green' : 'bg-red/15 text-red'}`}>
+      {side}
+    </span>
+  )
+}
+
+function SourceChip({ label }: { label: string }) {
+  return (
+    <span className="text-[10px] px-1.5 rounded bg-bg-tertiary text-text-muted">
       {label}
     </span>
   )
 }
 
-// ==================== Date helpers ====================
+function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | null }) {
+  const [expanded, setExpanded] = useState<number | null>(null)
 
-function formatDayLabel(dayString: string): string {
-  // dayString is the output of `Date.toDateString()` — locale-format it
-  // back into something more readable, with a "today" / "yesterday" hint.
-  const d = new Date(dayString)
-  const todayStr = new Date().toDateString()
-  const yesterdayStr = new Date(Date.now() - 24 * 60 * 60 * 1000).toDateString()
-  const formatted = d.toLocaleDateString(getIntlLocale(), { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
-  if (dayString === todayStr) return `${formatted} · today`
-  if (dayString === yesterdayStr) return `${formatted} · yesterday`
-  return formatted
+  if (orders == null) {
+    return (
+      <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-text-muted">
+        Loading order history…
+      </div>
+    )
+  }
+  if (orders.length === 0) {
+    return (
+      <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-text-muted">
+        No order history yet.
+      </div>
+    )
+  }
+  return (
+    <div className="border border-border rounded-lg overflow-x-auto">
+      <table className="w-full text-[13px]">
+        <thead>
+          <tr className="bg-bg-secondary text-text-muted text-left">
+            <th className="px-3 py-2 font-medium">Time</th>
+            <th className="px-3 py-2 font-medium">Contract</th>
+            <th className="px-3 py-2 font-medium">Side</th>
+            <th className="px-3 py-2 font-medium">Type</th>
+            <th className="px-3 py-2 font-medium text-right">Qty</th>
+            <th className="px-3 py-2 font-medium text-right">Limit</th>
+            <th className="px-3 py-2 font-medium text-right">Fill</th>
+            <th className="px-3 py-2 font-medium">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {orders.map((o, i) => (
+            <Fragment key={`${o.commitHash}-${i}`}>
+              <tr
+                className="border-t border-border hover:bg-bg-tertiary/30 transition-colors cursor-pointer"
+                onClick={() => setExpanded(prev => prev === i ? null : i)}
+              >
+                <td className="px-3 py-2 text-text-muted tabular-nums whitespace-nowrap">{formatHistoryTime(o.timestamp)}</td>
+                <td className="px-3 py-2"><ContractCell contract={o.contract} /></td>
+                <td className="px-3 py-2"><SideBadge side={o.side} /></td>
+                <td className="px-3 py-2 text-text-muted">{o.orderType ?? '—'}</td>
+                <td className="px-3 py-2 text-right text-text tabular-nums">{o.quantity != null ? fmtNum(o.quantity) : '—'}</td>
+                <td className="px-3 py-2 text-right text-text-muted tabular-nums">{o.limitPrice ?? '—'}</td>
+                <td className="px-3 py-2 text-right text-text tabular-nums">
+                  {o.avgFillPrice ? `${o.avgFillPrice}${o.filledQty ? ` × ${o.filledQty}` : ''}` : '—'}
+                </td>
+                <td className="px-3 py-2">
+                  <span className="inline-flex items-center gap-1.5">
+                    <OrderStatusBadge status={o.status} />
+                    {o.source === 'external' && <SourceChip label="External" />}
+                  </span>
+                </td>
+              </tr>
+              {expanded === i && (
+                <tr className="border-t border-border bg-bg-tertiary/20">
+                  <td colSpan={8} className="px-3 py-2 text-[11px] text-text-muted">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                      <span className="font-mono">{o.commitHash}</span>
+                      <span>{o.message}</span>
+                      {o.error && <span className="text-red">{o.error}</span>}
+                      {o.resolvedAt && <span>resolved {formatHistoryTime(o.resolvedAt)}</span>}
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </Fragment>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
 }
 
-function formatTime(timestamp: string): string {
+// ==================== Trade History tab ====================
+
+function TradeHistoryTable({ trades }: { trades: TradeHistoryEntry[] | null }) {
+  if (trades == null) {
+    return (
+      <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-text-muted">
+        Loading trade history…
+      </div>
+    )
+  }
+  if (trades.length === 0) {
+    return (
+      <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-text-muted">
+        No trades yet.
+      </div>
+    )
+  }
+  return (
+    <div className="border border-border rounded-lg overflow-x-auto">
+      <table className="w-full text-[13px]">
+        <thead>
+          <tr className="bg-bg-secondary text-text-muted text-left">
+            <th className="px-3 py-2 font-medium">Time</th>
+            <th className="px-3 py-2 font-medium">Contract</th>
+            <th className="px-3 py-2 font-medium">Side</th>
+            <th className="px-3 py-2 font-medium text-right">Qty</th>
+            <th className="px-3 py-2 font-medium text-right">Price</th>
+            <th className="px-3 py-2 font-medium text-right">Value</th>
+            <th className="px-3 py-2 font-medium" />
+          </tr>
+        </thead>
+        <tbody>
+          {trades.map((t, i) => (
+            <tr key={`${t.commitHash}-${i}`} className="border-t border-border hover:bg-bg-tertiary/30 transition-colors">
+              <td className="px-3 py-2 text-text-muted tabular-nums whitespace-nowrap">{formatHistoryTime(t.timestamp)}</td>
+              <td className="px-3 py-2"><ContractCell contract={t.contract} /></td>
+              <td className="px-3 py-2"><SideBadge side={t.side} /></td>
+              <td className="px-3 py-2 text-right text-text tabular-nums">{fmtNum(t.quantity)}</td>
+              <td className="px-3 py-2 text-right text-text tabular-nums">{t.price}</td>
+              <td className="px-3 py-2 text-right text-text tabular-nums">{fmt(t.value, t.contract.currency)}</td>
+              <td className="px-3 py-2 text-right">
+                {t.source !== 'order' && (
+                  <SourceChip label={t.source === 'external' ? 'External' : 'Reconcile'} />
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// ==================== Date helpers ====================
+
+/** "14:32" for today; "Jun 11 14:32" otherwise. */
+function formatHistoryTime(timestamp: string): string {
   const d = new Date(timestamp)
-  return d.toLocaleTimeString(getIntlLocale(), { hour: '2-digit', minute: '2-digit', hour12: false })
+  if (Number.isNaN(d.getTime())) return timestamp
+  const time = d.toLocaleTimeString(getIntlLocale(), { hour: '2-digit', minute: '2-digit', hour12: false })
+  if (d.toDateString() === new Date().toDateString()) return time
+  return `${d.toLocaleDateString(getIntlLocale(), { month: 'short', day: 'numeric' })} ${time}`
 }

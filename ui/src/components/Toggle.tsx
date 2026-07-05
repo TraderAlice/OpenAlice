@@ -15,7 +15,7 @@ export function Toggle({ checked, onChange, size = 'md' }: ToggleProps) {
       aria-checked={checked}
       onClick={() => onChange(!checked)}
       className={`relative rounded-full cursor-pointer transition-colors ${track} ${
-        checked ? 'bg-green' : 'bg-bg-tertiary'
+        checked ? 'bg-accent' : 'bg-bg-tertiary'
       }`}
     >
       <span

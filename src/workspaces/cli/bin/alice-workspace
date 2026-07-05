@@ -12,7 +12,7 @@
  * (`alice` -> data, `alice-<x>` -> <x>) and talks to `/cli/<wsId>/<export>/*`.
  *
  * Runs from a workspace PTY shell, reading env the launcher already injects per
- * spawn (OPENALICE_MCP_URL + AQ_WS_ID). Deliberately written with NO import /
+ * spawn (OPENALICE_TOOL_URL + AQ_WS_ID). Deliberately written with NO import /
  * export and NO top-level await, so node runs it identically whether it treats
  * the file as ESM or CommonJS — and with zero Alice imports, so there is nothing
  * to build (dev and prod behave the same). Uses only global fetch / process.
@@ -34,13 +34,21 @@ async function main() {
   BIN = (process.argv[1] || 'alice').split(/[\\/]/).pop() || 'alice'
   const exportKey = BIN === 'alice' ? 'data' : BIN.replace(/^alice-/, '')
 
-  const mcpUrl = process.env.OPENALICE_MCP_URL || 'http://127.0.0.1:47332/mcp'
+  const toolSocket = process.env.OPENALICE_TOOL_SOCKET
+  const toolUrl = process.env.OPENALICE_TOOL_URL
+  const legacyMcpUrl = process.env.OPENALICE_MCP_URL || 'http://127.0.0.1:47332/mcp'
   const wsId = process.env.AQ_WS_ID
   if (!wsId) {
     fail('AQ_WS_ID is not set — run from inside an OpenAlice workspace.')
   }
-  // Derive the CLI base from the MCP URL: .../mcp -> .../cli/<wsId>/<export>
-  const base = mcpUrl.replace(/\/+$/, '').replace(/\/mcp$/, '/cli') + '/' + wsId + '/' + exportKey
+  // Prefer the dedicated CLI base. Fall back to legacy MCP-derived config so
+  // older workspace envs keep working: .../mcp -> .../cli/<wsId>/<export>.
+  const gateway = toolSocket
+    ? (toolUrl || '/cli').replace(/\/+$/, '')
+    : toolUrl
+      ? toolUrl.replace(/\/+$/, '')
+      : legacyMcpUrl.replace(/\/+$/, '').replace(/\/mcp$/, '/cli')
+  const base = gateway + '/' + wsId + '/' + exportKey
 
   const wantsHelp = argv.includes('--help') || argv.includes('-h')
   const positionals = argv.filter((a) => !a.startsWith('-'))
@@ -77,18 +85,44 @@ async function manifest(base) {
     const msg = r.body && r.body.error ? r.body.error : `HTTP ${r.status}`
     fail(typeof msg === 'string' ? msg : JSON.stringify(msg))
   }
+  if (!r.body || typeof r.body !== 'object' || !r.body.groups || typeof r.body.groups !== 'object') {
+    const kind =
+      typeof r.body === 'string' && r.body.trim().startsWith('<')
+        ? 'HTML'
+        : r.body === null
+          ? 'empty response'
+          : typeof r.body
+    fail(
+      `invalid OpenAlice CLI manifest from ${base}/manifest (${kind}) — ` +
+        'check OPENALICE_TOOL_URL / OPENALICE_TOOL_SOCKET and point at the tools endpoint, not the Vite UI page.',
+    )
+  }
   return r.body
 }
 
 async function invoke(base, tool, args) {
+  // Agent-invisible identity, forwarded out-of-band as a header — NOT in the
+  // tool args, NOT in the path — so the gateway can server-side-resolve the
+  // entry's origin without the agent ever trafficking its own identity. The
+  // launcher injects exactly one per spawn (mirrors how it injects AQ_WS_ID for
+  // the path): AQ_RUN_ID on a HEADLESS spawn, AQ_SESSION_ID on an INTERACTIVE
+  // one. So at most one of these headers is ever sent.
+  const headers = { 'Content-Type': 'application/json' }
+  const runId = process.env.AQ_RUN_ID
+  if (runId) headers['x-openalice-run'] = runId
+  const sessionId = process.env.AQ_SESSION_ID
+  if (sessionId) headers['x-openalice-session'] = sessionId
   const r = await fetchJson(base + '/invoke', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ tool, args }),
   })
   if (!r.ok) {
-    const msg = r.body && r.body.error ? r.body.error : `HTTP ${r.status}`
-    fail(typeof msg === 'string' ? msg : JSON.stringify(msg))
+    let msg = r.body && r.body.error ? r.body.error : `HTTP ${r.status}`
+    if (typeof msg !== 'string') msg = JSON.stringify(msg)
+    const details = r.body && r.body.details
+    if (details) msg += '\n' + (typeof details === 'string' ? details : JSON.stringify(details, null, 2))
+    fail(msg)
   }
   const blocks = (r.body && r.body.content) || []
   return blocks
@@ -97,6 +131,9 @@ async function invoke(base, tool, args) {
 }
 
 async function fetchJson(url, opts) {
+  if (process.env.OPENALICE_TOOL_SOCKET && url.startsWith('/')) {
+    return fetchSocketJson(process.env.OPENALICE_TOOL_SOCKET, url, opts)
+  }
   let resp
   try {
     resp = await fetch(url, opts)
@@ -113,11 +150,36 @@ async function fetchJson(url, opts) {
   return { ok: resp.ok, status: resp.status, body }
 }
 
+async function fetchSocketJson(socketPath, path, opts) {
+  const http = await import('node:http')
+  return new Promise((resolve) => {
+    const req = http.request({
+      socketPath,
+      path,
+      method: opts && opts.method ? opts.method : 'GET',
+      headers: opts && opts.headers ? opts.headers : undefined,
+    }, (res) => {
+      let raw = ''
+      res.setEncoding('utf8')
+      res.on('data', (chunk) => { raw += chunk })
+      res.on('end', () => {
+        let body = null
+        try { body = raw ? JSON.parse(raw) : null } catch { body = raw }
+        resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode, body })
+      })
+    })
+    req.on('error', (e) => fail(`cannot reach OpenAlice at ${socketPath}${path} — is the backend running? (${e && e.message})`))
+    if (opts && opts.body) req.write(opts.body)
+    req.end()
+  })
+}
+
 // ---- flag parsing ---------------------------------------------------------
 
 function parseFlags(tokens) {
   const args = {}
   const meta = {}
+  const docs = []
   for (let i = 0; i < tokens.length; i++) {
     let tok = tokens[i]
     if (!tok.startsWith('--')) continue
@@ -137,15 +199,27 @@ function parseFlags(tokens) {
         i++
       }
     }
+    // JSON-looking values parse into objects/arrays so object flags work:
+    //   --takeProfit '{"price":"1725"}'
+    // Parse failures fall through as plain strings (gateway validates).
+    if (typeof val === 'string' && (val.startsWith('{') || val.startsWith('['))) {
+      try { val = JSON.parse(val) } catch { /* keep the raw string */ }
+    }
     if (key === 'meta') {
       // repeatable: --meta key=value -> metadataFilter
       const e = val.indexOf('=')
       if (e >= 0) meta[val.slice(0, e)] = val.slice(e + 1)
+    } else if (key === 'doc') {
+      // repeatable: --doc <path> -> docs: [{ path }] (inbox_push attachments).
+      // A JSON object value (--doc '{"path":"x"}') is kept as-is so future
+      // per-doc fields keep working; a bare path is wrapped into { path }.
+      docs.push(val && typeof val === 'object' ? val : { path: String(val) })
     } else {
       args[key] = val
     }
   }
   if (Object.keys(meta).length) args.metadataFilter = meta
+  if (docs.length) args.docs = docs
   return args
 }
 

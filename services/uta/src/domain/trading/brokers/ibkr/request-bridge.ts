@@ -374,7 +374,18 @@ export class RequestBridge extends DefaultEWrapper {
     this.accountId_ = accounts[0] ?? null
   }
 
+  /** True once the socket is known-dead (connectionClosed or a failed
+   *  heartbeat) and until the next successful (re)connect. The IBKR account
+   *  surface is cache-backed — without this flag a dead-but-idle connection
+   *  serves stale data and SWALLOWS ORDERS while health stays green
+   *  (issue #294). */
+  private connectionDead_ = false
+  get connectionDead(): boolean { return this.connectionDead_ }
+  markDead(): void { this.connectionDead_ = true }
+  markAlive(): void { this.connectionDead_ = false }
+
   override connectionClosed(): void {
+    this.connectionDead_ = true
     this.rejectAll(new BrokerError('NETWORK', 'Connection to TWS/Gateway lost'))
 
     if (this.connectReject) {
@@ -387,8 +398,12 @@ export class RequestBridge extends DefaultEWrapper {
   // ---- Error routing ----
 
   override error(reqId: number, _errorTime: number, errorCode: number, errorString: string): void {
-    // Informational messages (code >= 2000) — data farm status, etc.
-    if (errorCode >= 2000) return
+    // Informational warnings live in the 2100-2200 band (data farm
+    // status etc.). The old `>= 2000` blanket also swallowed the 10xxx
+    // REAL errors (10089 no-subscription, 10197 competing session...) —
+    // pending requests then died as useless timeouts instead of carrying
+    // the venue's actionable message.
+    if (errorCode >= 2100 && errorCode < 2200) return
 
     // System-level errors (reqId === -1) — connectivity events
     if (reqId === NO_VALID_ID) {
@@ -421,7 +436,37 @@ export class RequestBridge extends DefaultEWrapper {
     this.pushCollector(reqId, cd)
   }
 
+  // Bonds arrive via their own callback (TWS quirk) — same collector.
+  override bondContractDetails(reqId: number, cd: ContractDetails): void {
+    this.pushCollector(reqId, cd)
+  }
+
   override contractDetailsEnd(reqId: number): void {
+    this.resolveCollector(reqId)
+  }
+
+  // ---- Option chain parameters (collector) ----
+
+  override securityDefinitionOptionParameter(
+    reqId: number,
+    exchange: string,
+    underlyingConId: number,
+    tradingClass: string,
+    multiplier: string,
+    expirations: Set<string>,
+    strikes: Set<number>,
+  ): void {
+    this.pushCollector(reqId, {
+      exchange,
+      underlyingConId,
+      tradingClass,
+      multiplier,
+      expirations: [...expirations].sort(),
+      strikes: [...strikes].sort((a, b) => a - b),
+    })
+  }
+
+  override securityDefinitionOptionParameterEnd(reqId: number): void {
     this.resolveCollector(reqId)
   }
 
@@ -444,6 +489,26 @@ export class RequestBridge extends DefaultEWrapper {
 
   // ---- Account subscription callbacks (persistent cache) ----
 
+  /**
+   * Upsert-by-conId into a position list; null row = remove.
+   * TWS sends DELTAS between accountDownloadEnd markers (a fill updates one
+   * position immediately, the next full download can be ~3 minutes away) —
+   * so updates must apply to BOTH the live cache (immediate visibility) and
+   * the pending rebuild buffer (next swap must not resurrect stale rows).
+   * Keying by conId also prevents duplicate rows when the same position
+   * updates repeatedly within one batch window (price ticks do this).
+   */
+  private upsertPosition(list: AccountDownloadResult['positions'], contract: Contract, row: AccountDownloadResult['positions'][number] | null): void {
+    const idx = list.findIndex((p) => p.contract.conId === contract.conId)
+    if (row === null) {
+      if (idx >= 0) list.splice(idx, 1)
+    } else if (idx >= 0) {
+      list[idx] = row
+    } else {
+      list.push(row)
+    }
+  }
+
   override updatePortfolio(
     contract: Contract,
     position: Decimal,
@@ -454,15 +519,22 @@ export class RequestBridge extends DefaultEWrapper {
     realizedPNL: string,
     _accountName: string,
   ): void {
-    if (!this.accountCachePending_) return
-    if (position.isZero()) return
-
-    this.accountCachePending_.positions.push(buildPosition({
+    // Zero quantity = position fully closed — must REMOVE from cache, not
+    // be ignored (a closed position used to linger until the next full
+    // download).
+    // IBKR's averageCost is PER CONTRACT (multiplier-baked: an option bought
+    // at 1.03 reports averageCost 103) while marketPrice is per unit. Every
+    // downstream consumer that recomputes PnL as (mark − avg) × mult would
+    // produce inverted, ~100x-wrong numbers for derivatives (the community
+    // "option PnL direction is flipped" report). Normalize to per-unit here.
+    const multDec = new Decimal(contract.multiplier || '1')
+    const avgPerUnit = multDec.gt(1) ? new Decimal(averageCost).div(multDec).toString() : averageCost
+    const row = position.isZero() ? null : buildPosition({
       contract,
       currency: contract.currency || 'USD',
       side: position.greaterThan(0) ? 'long' : 'short',
       quantity: position.abs(),
-      avgCost: averageCost,
+      avgCost: avgPerUnit,
       marketPrice,
       // TWS already bakes contract.multiplier into the values it reports
       // here — pass through as-is (don't re-derive). multiplier is surfaced
@@ -471,11 +543,26 @@ export class RequestBridge extends DefaultEWrapper {
       unrealizedPnL: unrealizedPNL,
       realizedPnL: realizedPNL,
       multiplier: contract.multiplier || '1',
-    }))
+    })
+
+    if (this.accountCachePending_) this.upsertPosition(this.accountCachePending_.positions, contract, row)
+    if (this.accountCache_) this.upsertPosition(this.accountCache_.positions, contract, row)
   }
 
-  override updateAccountValue(key: string, val: string, _currency: string, _accountName: string): void {
-    this.accountCachePending_?.values.set(key, val)
+  override updateAccountValue(key: string, val: string, currency: string, _accountName: string): void {
+    // Multi-currency families (CashBalance, NetLiquidationByCurrency,
+    // ExchangeRate, …) arrive once PER CURRENCY plus a consolidated BASE
+    // line. Store the composite key always; the plain key is reserved for
+    // the consolidated value — BASE wins it and, once written, a
+    // per-currency line can never overwrite it (issue #295: last-write-wins
+    // left whichever currency arrived last in the plain slot).
+    const apply = (m: Map<string, string>): void => {
+      if (currency) m.set(`${key}:${currency}`, val)
+      if (!currency || currency === 'BASE' || !m.has(`${key}:BASE`)) m.set(key, val)
+    }
+    if (this.accountCachePending_) apply(this.accountCachePending_.values)
+    // Deltas must be visible immediately, not at the next downloadEnd swap.
+    if (this.accountCache_) apply(this.accountCache_.values)
   }
 
   override accountDownloadEnd(_accountName: string): void {
@@ -504,12 +591,20 @@ export class RequestBridge extends DefaultEWrapper {
     const snap = this.snapshots.get(reqId)
     if (!snap) return
 
+    // Delayed variants (66-73) arrive instead of live ticks when the
+    // account has no live subscription and reqMarketDataType(3) is set —
+    // paper accounts live here. Same field, 15-min-delayed value.
     switch (tickType) {
-      case TickTypeEnum.BID: snap.bid = price; break
-      case TickTypeEnum.ASK: snap.ask = price; break
-      case TickTypeEnum.LAST: snap.last = price; break
-      case TickTypeEnum.HIGH: snap.high = price; break
-      case TickTypeEnum.LOW: snap.low = price; break
+      case TickTypeEnum.BID:
+      case TickTypeEnum.DELAYED_BID: snap.bid = price; break
+      case TickTypeEnum.ASK:
+      case TickTypeEnum.DELAYED_ASK: snap.ask = price; break
+      case TickTypeEnum.LAST:
+      case TickTypeEnum.DELAYED_LAST: snap.last = price; break
+      case TickTypeEnum.HIGH:
+      case TickTypeEnum.DELAYED_HIGH: snap.high = price; break
+      case TickTypeEnum.LOW:
+      case TickTypeEnum.DELAYED_LOW: snap.low = price; break
     }
   }
 
@@ -517,7 +612,7 @@ export class RequestBridge extends DefaultEWrapper {
     const snap = this.snapshots.get(reqId)
     if (!snap) return
 
-    if (tickType === TickTypeEnum.VOLUME) {
+    if (tickType === TickTypeEnum.VOLUME || tickType === TickTypeEnum.DELAYED_VOLUME) {
       snap.volume = size.toNumber()
     }
   }

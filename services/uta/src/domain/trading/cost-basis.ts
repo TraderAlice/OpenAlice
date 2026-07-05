@@ -49,7 +49,71 @@ export function recomputeCostBasisFromCommits(
   let qty = new Decimal(0)
   let fillCount = 0
 
+  // Pre-pass: orderId → originating operation, so sync results (which carry
+  // only orderId + execution data, no contract/side) can be attributed.
+  // Orders whose ORIGINATING result already carried execution data are
+  // marked counted, so a later sync of the same order can't double-apply.
+  const orderMeta = new Map<string, { matches: boolean; direction: 'buy' | 'sell' }>()
+  const counted = new Set<string>()
   for (const commit of commits) {
+    for (let i = 0; i < commit.operations.length; i++) {
+      const op = commit.operations[i]
+      const result = commit.results[i]
+      if (op.action !== 'placeOrder' && op.action !== 'closePosition' && op.action !== 'observeExternalOrder') continue
+      if (!result?.orderId) continue
+      orderMeta.set(result.orderId, {
+        matches: matchesAliceId(op, aliceId),
+        direction: fillDirection(op),
+      })
+    }
+  }
+
+  const applyFill = (fillQty: Decimal, fillPrice: Decimal, direction: 'buy' | 'sell'): void => {
+    if (direction === 'buy') {
+      // Weighted-average update
+      const newQty = qty.plus(fillQty)
+      if (newQty.isZero()) {
+        // Defensive — shouldn't happen for a buy, but guard against div/0
+        avg = new Decimal(0)
+        qty = new Decimal(0)
+      } else {
+        avg = avg.mul(qty).plus(fillPrice.mul(fillQty)).div(newQty)
+        qty = newQty
+      }
+    } else {
+      // Sell — qty drops, avg unchanged. Reset when fully sold (or oversold).
+      qty = qty.minus(fillQty)
+      if (qty.lte(0)) {
+        avg = new Decimal(0)
+        qty = new Decimal(0)
+      }
+    }
+    fillCount++
+  }
+
+  for (const commit of commits) {
+    // Sync commits: ONE syncOrders operation but one result PER updated
+    // order — the op↔result pairing below doesn't apply. Each filled
+    // result is attributed back to its originating order. Without this,
+    // every async fill (i.e. every real limit order) was invisible here
+    // and got patched in later by reconcileBalance at the OBSERVATION-TIME
+    // mark price instead of the actual execution price.
+    const isSyncCommit = commit.operations.some((op) => op.action === 'syncOrders')
+    if (isSyncCommit) {
+      for (const result of commit.results) {
+        if (!result.success || result.status !== 'filled') continue
+        if (!result.orderId || counted.has(result.orderId)) continue
+        if (!result.filledQty || !result.filledPrice) continue
+        const meta = orderMeta.get(result.orderId)
+        if (!meta?.matches) continue
+        const fillQty = new Decimal(result.filledQty)
+        if (fillQty.isZero()) continue
+        applyFill(fillQty, new Decimal(result.filledPrice), meta.direction)
+        counted.add(result.orderId)
+      }
+      continue
+    }
+
     for (let i = 0; i < commit.operations.length; i++) {
       const op = commit.operations[i]
       const result = commit.results[i]
@@ -58,30 +122,10 @@ export function recomputeCostBasisFromCommits(
       if (!result.filledQty || !result.filledPrice) continue
 
       const fillQty = new Decimal(result.filledQty)
-      const fillPrice = new Decimal(result.filledPrice)
       if (fillQty.isZero()) continue
 
-      const direction = fillDirection(op)
-      if (direction === 'buy') {
-        // Weighted-average update
-        const newQty = qty.plus(fillQty)
-        if (newQty.isZero()) {
-          // Defensive — shouldn't happen for a buy, but guard against div/0
-          avg = new Decimal(0)
-          qty = new Decimal(0)
-        } else {
-          avg = avg.mul(qty).plus(fillPrice.mul(fillQty)).div(newQty)
-          qty = newQty
-        }
-      } else {
-        // Sell — qty drops, avg unchanged. Reset when fully sold (or oversold).
-        qty = qty.minus(fillQty)
-        if (qty.lte(0)) {
-          avg = new Decimal(0)
-          qty = new Decimal(0)
-        }
-      }
-      fillCount++
+      applyFill(fillQty, new Decimal(result.filledPrice), fillDirection(op))
+      if (result.orderId) counted.add(result.orderId)
     }
   }
 
@@ -94,6 +138,7 @@ function matchesAliceId(op: Operation, aliceId: string): boolean {
   switch (op.action) {
     case 'placeOrder':
     case 'closePosition':
+    case 'observeExternalOrder':
       return op.contract?.aliceId === aliceId
     case 'reconcileBalance':
       return op.aliceId === aliceId
@@ -105,7 +150,8 @@ function matchesAliceId(op: Operation, aliceId: string): boolean {
 /** Determine if a filled op behaves as a buy or sell for cost-basis purposes. */
 function fillDirection(op: Operation): 'buy' | 'sell' {
   switch (op.action) {
-    case 'placeOrder': {
+    case 'placeOrder':
+    case 'observeExternalOrder': {
       const action = (op.order?.action ?? '').toUpperCase()
       return action === 'SELL' ? 'sell' : 'buy'
     }

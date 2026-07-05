@@ -64,9 +64,8 @@ export function uiBundlePath(): string {
  * default/ does: dev points to repo source, packaged points to wherever
  * the bundler copied the templates inside .app/Contents/Resources/.
  *
- * NOTE: For packaged .app distribution, build.files in package.json must
- * include `src/workspaces/templates/**` (currently DOES NOT — workspace
- * spawning will fail until that's added; tracked in TODO).
+ * `build.files` in package.json ships `src/workspaces/templates/**`, so the
+ * `.mjs` bootstraps + their READMEs land in the packaged .app.
  */
 export function templatesPath(): string {
   return resolve(APP_RESOURCES_HOME, 'src', 'workspaces', 'templates')
@@ -75,7 +74,7 @@ export function templatesPath(): string {
 /**
  * Dir holding the workspace-local `alice` CLI shim, prepended to each PTY's
  * PATH so a native agent can run `alice ...` from its shell. A single shared,
- * env-driven script (it reads OPENALICE_MCP_URL + AQ_WS_ID at runtime), so it
+ * env-driven script (it reads OPENALICE_TOOL_URL + AQ_WS_ID at runtime), so it
  * is NOT written into individual workspaces and never enters their git repos.
  *
  * Rides APP_RESOURCES_HOME exactly like templatesPath(): repo source in dev,

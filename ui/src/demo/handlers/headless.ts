@@ -1,10 +1,12 @@
 import { http, HttpResponse } from 'msw'
 
+import type { HeadlessOutput, HeadlessTaskRecord } from '../../api/headless'
+
 const now = Date.now()
-const demoHeadlessTasks = [
+const demoHeadlessTasks: HeadlessTaskRecord[] = [
   {
     taskId: 'demo-headless-1',
-    wsId: 'demo-finance-research',
+    wsId: 'demo-ws',
     agent: 'codex',
     prompt: 'Compute a quant snapshot of NVDA and push a report to the inbox.',
     status: 'done',
@@ -12,6 +14,7 @@ const demoHeadlessTasks = [
     finishedAt: now - 20_000,
     durationMs: 72_000,
     exitCode: 0,
+    agentSessionId: '019eb75e-0b1b-7fa2-ba95-fd7db4463afe',
   },
   {
     taskId: 'demo-headless-2',
@@ -20,10 +23,11 @@ const demoHeadlessTasks = [
     prompt: "Summarize today's AI-sector headlines and flag anything actionable.",
     status: 'running',
     startedAt: now - 6_000,
+    agentSessionId: '414d6b8c-95b4-4e01-8ffc-4b6332da17d4',
   },
   {
     taskId: 'demo-headless-3',
-    wsId: 'demo-finance-research',
+    wsId: 'demo-ws',
     agent: 'pi',
     prompt: 'Refresh the uranium watchlist and note any breakouts.',
     status: 'interrupted',
@@ -32,8 +36,34 @@ const demoHeadlessTasks = [
   },
 ]
 
+const demoOutput = (taskId: string): HeadlessOutput | null => {
+  const t = demoHeadlessTasks.find((x) => x.taskId === taskId)
+  if (!t) return null
+  const lines = [
+    `{"type":"thread.started","thread_id":"${t.agentSessionId ?? 'demo'}"}`,
+    '{"type":"turn.started"}',
+    '{"type":"item.completed","item":{"type":"agent_message","text":"Report pushed to the inbox."}}',
+  ]
+  const text = lines.join('\n') + '\n'
+  return {
+    taskId,
+    status: t.status,
+    stdout: { text, sizeBytes: text.length, truncated: false },
+    stderr: null,
+  }
+}
+
 export const headlessHandlers = [
-  http.get('/api/headless', () => HttpResponse.json({ tasks: demoHeadlessTasks })),
+  http.get('/api/headless', ({ request }) => {
+    const wsId = new URL(request.url).searchParams.get('wsId')
+    const tasks = wsId ? demoHeadlessTasks.filter((t) => t.wsId === wsId) : demoHeadlessTasks
+    return HttpResponse.json({ tasks })
+  }),
+  // Path-specific route BEFORE the :taskId catch-all (msw matches in order).
+  http.get('/api/headless/:taskId/output', ({ params }) => {
+    const out = demoOutput(String(params.taskId))
+    return out ? HttpResponse.json(out) : HttpResponse.json({ error: 'not_found' }, { status: 404 })
+  }),
   http.get('/api/headless/:taskId', ({ params }) => {
     const t = demoHeadlessTasks.find((x) => x.taskId === params.taskId)
     return t ? HttpResponse.json(t) : HttpResponse.json({ error: 'not_found' }, { status: 404 })

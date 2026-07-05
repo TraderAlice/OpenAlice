@@ -39,7 +39,7 @@ function CollectorSettings() {
             title="Collection Settings"
             description="Control how often articles are fetched and how long they are retained in the archive."
           >
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Fetch interval (min)">
                 <input
                   className={inputClass}
@@ -167,7 +167,7 @@ function FeedsSection({
       {/* Add feed form */}
       <div className="border border-border/40 rounded-lg p-4 space-y-3">
         <p className="text-[13px] font-medium text-text-muted">Add Feed</p>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Name">
             <input className={inputClass} value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. CoinDesk" />
           </Field>

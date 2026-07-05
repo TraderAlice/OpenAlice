@@ -30,6 +30,20 @@ export interface SpawnContext {
    * cross-CLI MCP definition into their own native command flags.
    */
   readonly env: Readonly<Record<string, string>>;
+  /**
+   * Seed a freshly-spawned INTERACTIVE TUI with a first user message — the
+   * "quick chat" launch ("type a message → you're in, agent already working").
+   * Unlike `composeHeadlessCommand`'s prompt (one-shot, exits at the turn
+   * boundary), this rides the interactive `composeCommand`: each agent CLI
+   * accepts a first prompt that opens the TUI and auto-submits it (claude/codex
+   * positional after `--`; opencode `--prompt`; pi trailing positional).
+   *
+   * ONLY honored on a FRESH spawn (`resume` undefined) — seeding a prompt while
+   * also resuming is ambiguous on codex's `resume <id>` subcommand and pi's
+   * `--session-id`, so adapters MUST ignore it when resuming. `shell` ignores
+   * it entirely (no agent to receive a prompt).
+   */
+  readonly initialPrompt?: string;
 }
 
 export interface BootstrapContext {
@@ -62,6 +76,12 @@ export interface WorkspaceAiCred {
    * actually uses the shape the credential was created + tested with.
    */
   wireShape?: WireShape | null;
+  /**
+   * Model context window for runtimes that need an explicit custom-model limit
+   * (currently opencode/Pi). Optional so old workspace configs keep loading;
+   * injectors may choose a modern default for newly-written configs.
+   */
+  contextWindow?: number | null;
   /** Codex only — legacy/explicit wire_api; superseded by wireShape when set. */
   wireApi?: 'chat' | 'responses' | null;
   /** Claude only. */
@@ -82,6 +102,20 @@ export interface EnvOverrides {
 export interface CliAdapter {
   readonly id: string;                          // 'claude' | 'codex' | 'shell'
   readonly displayName: string;
+  /**
+   * Launch surface category. Agent runtimes run a coding-agent TUI and can be
+   * used as the default workload. Utility adapters are explicit tools such as a
+   * bare shell and must never be selected by an omitted `agent`.
+   */
+  readonly kind?: 'agent' | 'utility';
+  /**
+   * Canonical PATH binary name this adapter spawns (`claude`, `codex`,
+   * `opencode`, `pi`). Consumed by `agent-detect.ts` to tell the frontend
+   * whether the runtime is actually installed on the host. Omit for adapters
+   * that always resolve (e.g. `shell` runs `$SHELL`, present on any box) —
+   * those are reported as installed unconditionally.
+   */
+  readonly binary?: string;
   /**
    * Short prefix used to name sessions (e.g. `c1`, `x1`, `sh1`). Helps scan a
    * mixed sidebar tree. Defaults to `id[0]` if omitted, but adapters whose
@@ -122,6 +156,12 @@ export interface CliAdapter {
    * For codex (M2):
    *   base + 'last'    → [...base, 'resume', '--last']
    *   base + { id }    → [...base, 'resume', id]
+   *
+   * On a FRESH spawn (`resume` undefined) with `ctx.initialPrompt` set, the
+   * adapter ALSO appends the prompt at the CLI's interactive-seed position so
+   * the TUI opens already working on it (claude/codex positional after `--`;
+   * opencode `--prompt`; pi trailing positional). Ignored when resuming; `shell`
+   * ignores it always.
    */
   composeCommand(base: readonly string[], ctx: SpawnContext): readonly string[];
 
@@ -130,14 +170,32 @@ export interface CliAdapter {
    * the process consumes `prompt` and EXITS at the turn boundary (vs the
    * interactive TUI that waits for input). The adapter places `prompt` at the
    * CLI-correct position (claude right after `-p`; codex/opencode/pi trailing).
-   * MUST keep the SAME MCP injection as `composeCommand` so the agent can reach
-   * `inbox_push`. Present iff `capabilities.headless` is true.
+   * MUST keep the same tool-access strategy as `composeCommand`: modern
+   * OpenAlice workspaces prefer the injected `alice*` / `traderhub` CLI shims,
+   * while adapter-native MCP is optional and adapter-specific. Present iff
+   * `capabilities.headless` is true.
    *   claude:   [...base, -p, <prompt>, --output-format, json]   // never --bare
-   *   codex:    [codex, -c mcp…, exec, --json, <prompt>]
+   *   codex:    [codex, exec, --json, <prompt>]                  // MCP optional
    *   opencode: [opencode, run, --format, json, <prompt>]
    *   pi:       [pi, -p, --mode, json, <prompt>]
    */
   composeHeadlessCommand?(base: readonly string[], ctx: SpawnContext, prompt: string): readonly string[];
+
+  /**
+   * Extract the agent's OWN session id from one line of headless stdout.
+   * All four agent CLIs announce their session id in the first line(s) of
+   * their structured headless output (verified 2026-06-11):
+   *   claude:   every stream-json event carries `session_id`
+   *   codex:    `{"type":"thread.started","thread_id":…}` — equals the rollout
+   *             `session_meta.id`, resumable via `codex resume <id>`
+   *   opencode: every event carries top-level `sessionID` (`ses_…`)
+   *   pi:       line 1 is `{"type":"session","id":…}` (echoes --session-id)
+   * The runner calls this per complete line until it returns non-null; the id
+   * is recorded on the task so a finished headless run can be REOPENED as a
+   * normal interactive session (resume-by-id). Present iff
+   * `capabilities.headless` (shell excluded).
+   */
+  extractHeadlessSessionId?(line: string): string | null;
 
   /** Optional per-CLI env adjustments on top of `spawn-env.ts`'s baseline. */
   envOverrides?(parent: NodeJS.ProcessEnv): EnvOverrides;
@@ -182,6 +240,10 @@ export interface CliAdapter {
 
   /** Subprocess discovery (capabilities.transcriptDiscovery === 'subprocess'). */
   listOnDisk?(cwd: string): Promise<readonly OnDiskSession[]>;
+}
+
+export function isAgentRuntime(adapter: CliAdapter): boolean {
+  return adapter.kind !== 'utility' && adapter.id !== 'shell';
 }
 
 export class AdapterRegistry {

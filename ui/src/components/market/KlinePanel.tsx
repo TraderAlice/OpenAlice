@@ -11,6 +11,7 @@ import {
   type HistogramData,
 } from 'lightweight-charts'
 import { barsApi, type AssetClass, type HistoricalBar, type BarSourceCandidate, type BarMeta } from '../../api/market'
+import { Skeleton } from '../StateViews'
 
 type Interval = '1m' | '5m' | '1h' | '1d'
 type Timeframe = '1D' | '5D' | '1M' | '3M' | '1Y' | '5Y' | 'All'
@@ -326,6 +327,11 @@ export function KlinePanel({ selection }: Props) {
         {!selection && (
           <div className="absolute inset-0 flex items-center justify-center text-[13px] text-text-muted">
             Pick an asset to see the K-line.
+          </div>
+        )}
+        {selection && loading && !bars && (
+          <div className="absolute inset-0 p-2" aria-hidden="true">
+            <Skeleton className="w-full h-full rounded" />
           </div>
         )}
         {selection && loading && (

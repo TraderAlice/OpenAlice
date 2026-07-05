@@ -16,9 +16,9 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { api, type Preset, type WireShape } from '../api'
-import type { CredentialSummary } from '../api/config'
+import type { CredentialSummary, WorkspaceCredentialDefaultsResponse } from '../api/config'
 import { PageHeader } from '../components/PageHeader'
-import { PageLoading } from '../components/StateViews'
+import { PageLoading, Skeleton } from '../components/StateViews'
 import { Field, inputClass } from '../components/form'
 import { ModelCombobox } from '../components/credentials/PresetFields'
 import {
@@ -28,6 +28,10 @@ import {
 import { useTestGate } from '../lib/useTestGate'
 
 const SHAPE_ORDER: WireShape[] = ['anthropic', 'openai-chat', 'openai-responses']
+
+function credentialLabel(cred: Pick<CredentialSummary, 'slug' | 'vendor' | 'label'>): string {
+  return cred.label?.trim() || cred.slug
+}
 
 /** Find the region whose wires match a stored credential (for edit mode). */
 function matchRegionId(preset: Preset | null, wires: Partial<Record<WireShape, string>>): string | undefined {
@@ -154,7 +158,10 @@ export function AIProviderPage() {
                 <div key={cred.slug} className="flex items-center gap-3 rounded-lg border border-border bg-bg px-4 py-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[13px] font-medium text-text">{cred.vendor}</span>
+                      <span className="text-[13px] font-medium text-text">{credentialLabel(cred)}</span>
+                      {cred.label && (
+                        <span className="text-[11px] text-text-muted">{cred.vendor}</span>
+                      )}
                       <span className="text-[11px] text-text-muted font-mono">{cred.slug}</span>
                       {(SHAPE_ORDER.filter((s) => s in cred.wires)).map((s) => (
                         <span key={s} className="text-[10px] text-text-muted border border-border rounded px-1">{WIRE_SHAPE_SHORT[s]}</span>
@@ -228,6 +235,9 @@ export function AIProviderPage() {
             </div>
           </section>
         </div>
+
+        {/* ============== Default workspace credentials ============== */}
+        <WorkspaceDefaultsSection credentials={credentials} />
       </div>
 
       {modal && (
@@ -240,6 +250,147 @@ export function AIProviderPage() {
         />
       )}
     </div>
+  )
+}
+
+// ==================== Default workspace credentials ====================
+//
+// A user-level "inject my usual key on every new workspace" setting. Per agent,
+// pick a vault credential to seed into each new workspace's file-based AI config
+// at create time. opencode/pi are the primary case (loginless — they need a key
+// to run); Claude Code / Codex run on their own CLI login by default, so they're
+// behind an "advanced" reveal — present (some users drive them via an unofficial
+// API key) but never pushed.
+
+const PRIMARY_DEFAULT_AGENTS = [
+  { id: 'opencode', name: 'opencode' },
+  { id: 'pi', name: 'Pi' },
+] as const
+
+const ADVANCED_DEFAULT_AGENTS = [
+  { id: 'claude', name: 'Claude Code' },
+  { id: 'codex', name: 'Codex' },
+] as const
+
+function WorkspaceDefaultsSection({ credentials }: { credentials: CredentialSummary[] }) {
+  const [data, setData] = useState<WorkspaceCredentialDefaultsResponse | null>(null)
+  const [showAdvanced, setShowAdvanced] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const reload = () =>
+    api.config.getWorkspaceCredentialDefaults()
+      .then(setData)
+      .catch(() => setData({ defaults: {}, compatibleByAgent: {} }))
+
+  // Re-derive when the vault changes (a deleted cred drops from compatible lists,
+  // and the backend also clears any default that pointed at it).
+  useEffect(() => { void reload() }, [credentials])
+
+  const credLabel = (slug: string) => {
+    const c = credentials.find((x) => x.slug === slug)
+    return c ? `${credentialLabel(c)} · ${slug}` : slug
+  }
+
+  const setAgentDefault = async (agentId: string, slug: string) => {
+    if (!data) return
+    const nextDefaults = { ...data.defaults }
+    if (slug) nextDefaults[agentId] = { credentialSlug: slug }
+    else delete nextDefaults[agentId]
+    setSaving(true); setError('')
+    setData({ ...data, defaults: nextDefaults }) // optimistic
+    try {
+      const res = await api.config.setWorkspaceCredentialDefaults(nextDefaults)
+      setData((d) => (d ? { ...d, defaults: res.defaults } : d))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Save failed')
+      await reload()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const renderAgent = (agent: { id: string; name: string }, note?: string) => {
+    const options = data?.compatibleByAgent[agent.id] ?? []
+    const current = data?.defaults[agent.id]?.credentialSlug ?? ''
+    return (
+      <div key={agent.id} className="flex items-center gap-3 rounded-lg border border-border bg-bg px-4 py-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline gap-2">
+            <span className="text-[13px] font-medium text-text">{agent.name}</span>
+            <span className="text-[11px] text-text-muted font-mono">{agent.id}</span>
+          </div>
+          {note && <p className="text-[11px] text-text-muted mt-0.5 leading-snug">{note}</p>}
+          {options.length === 0 && (
+            <p className="text-[11px] text-text-muted/70 mt-0.5 leading-snug">No compatible credential in the vault yet.</p>
+          )}
+        </div>
+        <select
+          className={inputClass + ' max-w-[240px]'}
+          value={current}
+          disabled={saving || options.length === 0}
+          onChange={(e) => void setAgentDefault(agent.id, e.target.value)}
+        >
+          <option value="">Don’t seed</option>
+          {options.map((slug) => <option key={slug} value={slug}>{credLabel(slug)}</option>)}
+        </select>
+      </div>
+    )
+  }
+
+  return (
+    <section className="max-w-[1100px] mx-auto mt-6">
+      <div className="rounded-lg border border-border/50 bg-bg-secondary/50 px-4 py-3 mb-4">
+        <p className="text-[13px] text-text-muted leading-relaxed">
+          Seed a default credential into every <em>new</em> workspace, so you don’t open the
+          per-workspace AI config each time. It’s written into the workspace’s own agent config
+          files at create — existing workspaces are untouched, and you can still override any
+          workspace afterwards. opencode and Pi need a key to run; Claude Code and Codex normally
+          run on their own CLI login (<code className="font-mono text-[11.5px]">claude login</code> /{' '}
+          <code className="font-mono text-[11.5px]">codex login</code>) and don’t need this.
+        </p>
+      </div>
+
+      <h2 className="text-[13px] font-semibold text-text uppercase tracking-wide mb-3">Default workspace credentials</h2>
+
+      {!data ? (
+        <div className="space-y-2.5" aria-hidden="true">
+          {PRIMARY_DEFAULT_AGENTS.map((a) => (
+            <div key={a.id} className="flex items-center gap-3 rounded-lg border border-border bg-bg px-4 py-3">
+              <div className="flex-1 min-w-0 space-y-1.5">
+                <Skeleton className="h-3.5 w-28 rounded" />
+                <Skeleton className="h-2.5 w-44 rounded" />
+              </div>
+              <Skeleton className="h-8 w-[240px] max-w-[240px] rounded" />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-2.5">
+          {PRIMARY_DEFAULT_AGENTS.map((a) => renderAgent(a))}
+
+          <button
+            onClick={() => setShowAdvanced((v) => !v)}
+            className="text-[11px] text-text-muted hover:text-text transition-colors pt-1"
+          >
+            {showAdvanced ? '▾' : '▸'} Advanced — Claude Code / Codex (unofficial API)
+          </button>
+
+          {showAdvanced && (
+            <>
+              <p className="text-[11px] text-text-muted/80 leading-snug px-1">
+                Only set these if you drive Claude Code / Codex through an unofficial API key
+                instead of their built-in login. A default here overwrites the CLI login in each
+                new workspace.
+              </p>
+              {ADVANCED_DEFAULT_AGENTS.map((a) => renderAgent(a))}
+            </>
+          )}
+
+          {error && <p className="text-[12px] text-red">{error}</p>}
+        </div>
+      )}
+    </section>
   )
 }
 
@@ -261,11 +412,13 @@ function CredentialModal({ mode, cred, presets, onClose, onSaved }: {
   )
   // Custom (free-form) provider — one shape + a hand-typed endpoint.
   const customInit = cred ? (SHAPE_ORDER.find((s) => s in (cred.wires ?? {})) ?? 'openai-chat') : 'openai-chat'
+  const [customName, setCustomName] = useState<string>(cred?.label ?? '')
   const [customShape, setCustomShape] = useState<WireShape>(customInit)
   const [customUrl, setCustomUrl] = useState<string>(cred?.wires?.[customInit] ?? '')
   const [apiKey, setApiKey] = useState(cred?.apiKey ?? '')
+  const [presetQuery, setPresetQuery] = useState('')
   const [showKey, setShowKey] = useState(false)
-  const [model, setModel] = useState('')
+  const [model, setModel] = useState(cred?.lastModel ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const gate = useTestGate()
@@ -298,6 +451,15 @@ function CredentialModal({ mode, cred, presets, onClose, onSaved }: {
     gate.reset()
   }
 
+  const visiblePresets = useMemo(() => {
+    const q = presetQuery.trim().toLowerCase()
+    return q
+      ? presets.filter((p) =>
+          [p.label, p.description, p.id].some((text) => text.toLowerCase().includes(q)),
+        )
+      : presets
+  }, [presetQuery, presets])
+
   // The fields the test covers — editing any of them re-locks Save.
   const testKey = `${JSON.stringify(wires)}|${apiKey.trim()}|${model.trim()}`
   const canTest = !!apiKey.trim() && !!model.trim() && !!primaryShape
@@ -317,17 +479,27 @@ function CredentialModal({ mode, cred, presets, onClose, onSaved }: {
   const handleSave = async () => {
     if (!preset) return
     if (Object.keys(wires).length === 0) { setError('Pick a region / endpoint first'); return }
+    const customLabel = customName.trim()
+    if (isCustom && !customLabel) { setError('Provider name is required'); return }
     const vendor = VENDOR_BY_PRESET[preset.id] ?? 'custom'
     setSaving(true); setError('')
     try {
       if (mode === 'edit' && cred) {
         await api.config.updateCredential(cred.slug, {
           vendor, wires,
+          ...(isCustom ? { label: customLabel } : {}),
           ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
+          ...(model.trim() ? { lastModel: model.trim() } : {}),
         })
       } else {
         if (!apiKey.trim()) { setError('API key is required'); setSaving(false); return }
-        await api.config.addCredential({ vendor, wires, apiKey: apiKey.trim() })
+        await api.config.addCredential({
+          vendor,
+          wires,
+          apiKey: apiKey.trim(),
+          ...(isCustom ? { label: customLabel } : {}),
+          ...(model.trim() ? { lastModel: model.trim() } : {}),
+        })
       }
       await onSaved()
     } catch (err) {
@@ -341,7 +513,7 @@ function CredentialModal({ mode, cred, presets, onClose, onSaved }: {
   const staleResult = gate.result && !gate.matchesCurrent(testKey)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-bg border border-border rounded-xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h2 className="text-[15px] font-semibold text-text">{title}</h2>
@@ -352,17 +524,38 @@ function CredentialModal({ mode, cred, presets, onClose, onSaved }: {
 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
           {!preset ? (
-            <div className="grid grid-cols-2 gap-2">
-              {presets.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => pickPreset(p)}
-                  className="flex flex-col items-start gap-0.5 p-3 rounded-lg border border-border bg-bg hover:bg-bg-tertiary hover:border-accent/40 transition-all text-left"
-                >
-                  <span className="text-[12px] font-medium text-text">{p.label}</span>
-                  <span className="text-[10px] text-text-muted leading-snug">{p.description}</span>
-                </button>
-              ))}
+            <div className="space-y-3">
+              <input
+                className={inputClass}
+                value={presetQuery}
+                onChange={(e) => setPresetQuery(e.target.value)}
+                placeholder="Search providers..."
+                autoFocus
+              />
+              <div className="overflow-hidden rounded-lg border border-border bg-bg">
+                {visiblePresets.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => pickPreset(p)}
+                    className="flex min-h-[46px] w-full items-center gap-3 border-b border-border/60 px-3 py-2 text-left transition-colors last:border-b-0 hover:bg-bg-tertiary/60"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[12.5px] font-medium text-text">{p.label}</span>
+                      <span className="block truncate text-[10.5px] text-text-muted">{p.description}</span>
+                    </span>
+                    {p.category === 'custom' && (
+                      <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] text-text-muted">
+                        free-form
+                      </span>
+                    )}
+                  </button>
+                ))}
+                {visiblePresets.length === 0 && (
+                  <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-[12px] text-text-muted">
+                    No providers match “{presetQuery}”.
+                  </p>
+                )}
+              </div>
             </div>
           ) : (
             <>
@@ -383,6 +576,15 @@ function CredentialModal({ mode, cred, presets, onClose, onSaved }: {
 
               {isCustom ? (
                 <>
+                  <Field label="Provider name" description="A readable name for this custom credential in pickers.">
+                    <input
+                      className={inputClass}
+                      value={customName}
+                      onChange={(e) => setCustomName(e.target.value)}
+                      placeholder="e.g. OpenRouter work key"
+                      maxLength={80}
+                    />
+                  </Field>
                   <Field label="API mode" description="Which wire protocol your endpoint speaks.">
                     <select className={inputClass} value={customShape} onChange={(e) => { setCustomShape(e.target.value as WireShape); gate.reset() }}>
                       {SHAPE_ORDER.map((s) => <option key={s} value={s}>{WIRE_SHAPE_SHORT[s]}</option>)}
@@ -433,7 +635,7 @@ function CredentialModal({ mode, cred, presets, onClose, onSaved }: {
                 </div>
               </Field>
 
-              <Field label="Test model" description="Used only to verify the key — not stored on the credential (the model is chosen per workspace).">
+              <Field label="Test model" description="Used to verify the key and remembered as the default for quick-chat injection. Workspaces can still choose a different model.">
                 <ModelCombobox value={model} suggestions={models} onChange={setModel} />
               </Field>
 

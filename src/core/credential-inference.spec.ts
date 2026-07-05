@@ -11,6 +11,7 @@ describe('inferCredentialVendor', () => {
     expect(inferCredentialVendor({ baseUrl: 'https://api.minimax.io/anthropic' })).toBe('minimax')
     expect(inferCredentialVendor({ baseUrl: 'https://api.moonshot.cn/v1' })).toBe('kimi')
     expect(inferCredentialVendor({ baseUrl: 'https://api.deepseek.com' })).toBe('deepseek')
+    expect(inferCredentialVendor({ baseUrl: 'https://api.longcat.chat/openai' })).toBe('longcat')
   })
 
   it('falls back to the agent when the baseUrl is unrecognized', () => {

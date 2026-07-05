@@ -133,7 +133,7 @@ describe('readAgentConfig', () => {
     fileNotFound()
     const cfg = await readAgentConfig()
     expect(cfg.maxSteps).toBe(20)
-    expect(cfg.evolutionMode).toBe(false)
+    expect(cfg.allowAiTrading).toBe(false)
   })
 
   it('parses maxSteps from file', async () => {

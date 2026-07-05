@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { globRss, grepRss, readRss, type NewsToolContext } from './archive'
+import { globRss, grepRss, readRss, windowRss, type NewsToolContext } from './archive'
 import type { NewsItem } from '../types'
 
 describe('news tools (pure functions)', () => {
@@ -289,6 +289,27 @@ describe('news tools (pure functions)', () => {
       })
 
       expect(results).toHaveLength(1)
+    })
+  })
+
+  describe('result dates + windowRss', () => {
+    it('glob/grep results carry an ISO publish time (timeline without re-reading)', async () => {
+      const g = await globRss(createContext(), { pattern: 'BTC' })
+      expect(g[0].time).toBe('2025-01-01T08:00:00.000Z')
+      const gr = await grepRss(createContext(), { pattern: 'Ethereum' })
+      expect(gr[0].time).toBe('2025-01-01T10:00:00.000Z')
+    })
+
+    it('windowRss returns OLDEST-first for timeline alignment', async () => {
+      const out = await windowRss(createContext(), {})
+      expect(out.map((r) => r.id)).toEqual([10, 20, 30, 40]) // ascending by time
+      expect(out[0].time).toBe('2025-01-01T08:00:00.000Z')
+    })
+
+    it('windowRss with a pattern filters + attaches matched text', async () => {
+      const out = await windowRss(createContext(), { pattern: 'Bitcoin' })
+      expect(out.map((r) => r.id)).toEqual([10, 30]) // both mention Bitcoin, oldest-first
+      expect(out[0].matchedText).toMatch(/Bitcoin/)
     })
   })
 })

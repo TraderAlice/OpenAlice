@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Field, inputClass } from '../form'
 import { Dialog } from './Dialog'
 import { tradingApi, OrderEntryError } from '../../api/trading'
-import type { WalletPushResult, PlaceOrderRequest, ClosePositionRequest } from '../../api/types'
+import type { WalletPushResult, PlaceOrderRequest, ClosePositionRequest, SubAccountRef } from '../../api/types'
 
 // ==================== Modes ====================
 
@@ -14,6 +14,11 @@ interface Props {
   utaId: string
   mode: OrderEntryMode
   onClose: () => void
+  /** Sub-accounts (wallets) the UTA spans. >1 ⇒ the form shows a wallet picker
+   *  and requires a choice (the backend loud-refuses a write without one). */
+  subAccounts?: SubAccountRef[]
+  /** Pre-selected wallet (the page's current view scope). */
+  defaultSubAccountId?: string
   /** Called once after a *successful* push so the parent can refresh positions/orders without waiting for the polling tick. */
   onPushComplete?: (result: WalletPushResult) => void
 }
@@ -32,7 +37,7 @@ interface Props {
  *   - `close`: tiny confirm form with overridable qty for an existing
  *     position
  */
-export function OrderEntryDialog({ utaId, mode, onClose, onPushComplete }: Props) {
+export function OrderEntryDialog({ utaId, mode, onClose, subAccounts, defaultSubAccountId, onPushComplete }: Props) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<{ message: string; phase?: string } | null>(null)
   const [result, setResult] = useState<WalletPushResult | null>(null)
@@ -53,8 +58,8 @@ export function OrderEntryDialog({ utaId, mode, onClose, onPushComplete }: Props
         {result
           ? <PushResultPanel result={result} />
           : mode.kind === 'place'
-            ? <PlaceForm utaId={utaId} initialAliceId={mode.aliceId} submitting={submitting} error={error} setError={setError} setSubmitting={setSubmitting} setResult={setResult} onPushComplete={onPushComplete} />
-            : <CloseForm utaId={utaId} aliceId={mode.aliceId} initialQty={mode.quantity} symbol={mode.symbol} submitting={submitting} error={error} setError={setError} setSubmitting={setSubmitting} setResult={setResult} onPushComplete={onPushComplete} />
+            ? <PlaceForm utaId={utaId} initialAliceId={mode.aliceId} subAccounts={subAccounts} defaultSubAccountId={defaultSubAccountId} submitting={submitting} error={error} setError={setError} setSubmitting={setSubmitting} setResult={setResult} onPushComplete={onPushComplete} />
+            : <CloseForm utaId={utaId} aliceId={mode.aliceId} initialQty={mode.quantity} symbol={mode.symbol} subAccounts={subAccounts} defaultSubAccountId={defaultSubAccountId} submitting={submitting} error={error} setError={setError} setSubmitting={setSubmitting} setResult={setResult} onPushComplete={onPushComplete} />
         }
       </div>
 
@@ -87,12 +92,41 @@ function Header({ mode, onClose }: { mode: OrderEntryMode; onClose: () => void }
 
 interface SharedFormProps {
   utaId: string
+  subAccounts?: SubAccountRef[]
+  defaultSubAccountId?: string
   submitting: boolean
   error: { message: string; phase?: string } | null
   setError: (e: { message: string; phase?: string } | null) => void
   setSubmitting: (b: boolean) => void
   setResult: (r: WalletPushResult) => void
   onPushComplete?: (result: WalletPushResult) => void
+}
+
+/** Wallet picker for separate-wallet venues. Returns null (renders nothing)
+ *  when the account has a single wallet — the field only appears when a choice
+ *  is genuinely required. */
+function WalletPicker({ subAccounts, value, onChange }: {
+  subAccounts?: SubAccountRef[]
+  value: string
+  onChange: (id: string) => void
+}) {
+  if (!subAccounts || subAccounts.length <= 1) return null
+  return (
+    <Field label="Wallet — required">
+      <select className={inputClass} value={value} onChange={(e) => onChange(e.target.value)}>
+        {subAccounts.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+      </select>
+      <p className="text-[11px] text-text-muted/60 mt-1">This venue has separate wallets; the order routes to the one you pick.</p>
+    </Field>
+  )
+}
+
+/** Initial wallet selection: the page's current scope if it names a real
+ *  wallet, else the first wallet. Empty when single-wallet (field is hidden). */
+function initialWallet(subAccounts?: SubAccountRef[], preferred?: string): string {
+  if (!subAccounts || subAccounts.length <= 1) return ''
+  if (preferred && subAccounts.some(s => s.id === preferred)) return preferred
+  return subAccounts[0].id
 }
 
 function PlaceForm({ initialAliceId, ...p }: SharedFormProps & { initialAliceId?: string }) {
@@ -105,12 +139,15 @@ function PlaceForm({ initialAliceId, ...p }: SharedFormProps & { initialAliceId?
   const [tif, setTif] = useState('DAY')
   const [message, setMessage] = useState('')
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [subAccountId, setSubAccountId] = useState(() => initialWallet(p.subAccounts, p.defaultSubAccountId))
 
+  const multiWallet = (p.subAccounts?.length ?? 0) > 1
   const canSubmit =
     !!aliceId.trim() &&
     !!message.trim() &&
     (!!quantity.trim() || !!cashQty.trim()) &&
     (orderType !== 'LMT' || !!lmtPrice.trim()) &&
+    (!multiWallet || !!subAccountId) &&
     !p.submitting
 
   const handleSubmit = async () => {
@@ -126,6 +163,7 @@ function PlaceForm({ initialAliceId, ...p }: SharedFormProps & { initialAliceId?
         ...(quantity.trim() && { totalQuantity: quantity.trim() }),
         ...(cashQty.trim() && { cashQty: cashQty.trim() }),
         ...(orderType === 'LMT' && lmtPrice.trim() && { lmtPrice: lmtPrice.trim() }),
+        ...(multiWallet && subAccountId && { subAccountId }),
       }
       const result = await tradingApi.placeOrder(p.utaId, body)
       p.setResult(result)
@@ -151,6 +189,8 @@ function PlaceForm({ initialAliceId, ...p }: SharedFormProps & { initialAliceId?
           placeholder="okx-test|BTC/USDT"
         />
       </Field>
+
+      <WalletPicker subAccounts={p.subAccounts} value={subAccountId} onChange={setSubAccountId} />
 
       <div className="grid grid-cols-2 gap-3">
         <Field label="Action">
@@ -244,8 +284,10 @@ function PlaceForm({ initialAliceId, ...p }: SharedFormProps & { initialAliceId?
 function CloseForm({ aliceId, initialQty, symbol, ...p }: SharedFormProps & { aliceId: string; initialQty: string; symbol?: string }) {
   const [qty, setQty] = useState(initialQty)
   const [message, setMessage] = useState('')
+  const [subAccountId, setSubAccountId] = useState(() => initialWallet(p.subAccounts, p.defaultSubAccountId))
 
-  const canSubmit = !!message.trim() && !p.submitting
+  const multiWallet = (p.subAccounts?.length ?? 0) > 1
+  const canSubmit = !!message.trim() && (!multiWallet || !!subAccountId) && !p.submitting
 
   const handleSubmit = async () => {
     p.setError(null)
@@ -255,6 +297,7 @@ function CloseForm({ aliceId, initialQty, symbol, ...p }: SharedFormProps & { al
         aliceId,
         ...(symbol && { symbol }),
         ...(qty.trim() && { qty: qty.trim() }),
+        ...(multiWallet && subAccountId && { subAccountId }),
         message: message.trim(),
       }
       const result = await tradingApi.closePosition(p.utaId, body)
@@ -277,6 +320,8 @@ function CloseForm({ aliceId, initialQty, symbol, ...p }: SharedFormProps & { al
         <div className="text-[11px] text-text-muted uppercase tracking-wide">Closing</div>
         <div className="font-mono text-[13px] text-text">{aliceId}</div>
       </div>
+
+      <WalletPicker subAccounts={p.subAccounts} value={subAccountId} onChange={setSubAccountId} />
 
       <Field label="Quantity to close">
         <input

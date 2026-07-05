@@ -7,7 +7,7 @@
 
 import type { Contract, Order, OrderCancel, Execution, OrderState } from '@traderalice/ibkr'
 import type Decimal from 'decimal.js'
-import type { Position, OpenOrder, TpSlParams } from './broker.js'
+import type { Position, OpenOrder, TpSlParams, PlaceOrderLeg } from './broker.js'
 import './contract-ext.js'
 
 // ==================== Commit Hash ====================
@@ -25,6 +25,18 @@ export type Operation =
   | { action: 'closePosition'; contract: Contract; quantity?: Decimal }
   | { action: 'cancelOrder'; orderId: string; orderCancel?: OrderCancel }
   | { action: 'syncOrders' }
+  | {
+      // Wallet-only event: an open order observed on the broker that Alice
+      // never placed (user trading on the exchange app directly). The log is
+      // a faithful record, not the source of final state — untracked orders
+      // are themselves "commits without a message": N of them observed in
+      // one pass get squashed into one [observed] commit. Once recorded with
+      // orderId + submitted status, the regular pending scanner + sync
+      // poller take over their lifecycle (fill / cancel) for free.
+      action: 'observeExternalOrder'
+      contract: Contract
+      order: Order
+    }
   | {
       // Wallet-only event: bridges the gap between Alice's order log and a
       // broker-reported balance change Alice did not initiate (first-sight
@@ -57,6 +69,10 @@ export interface OperationResult {
   /** Decimal as string — see filledQty. */
   filledPrice?: string
   error?: string
+  /** Bracket TP/SL child orders created alongside this placeOrder (tracked from birth). */
+  legs?: PlaceOrderLeg[]
+  /** Symbol for per-row attribution in multi-update sync commits (the op carries none). */
+  symbol?: string
   raw?: unknown
 }
 
@@ -228,6 +244,14 @@ export interface SimulatePriceChangeResult {
 export interface StagePlaceOrderParams {
   aliceId: string
   symbol?: string
+  /**
+   * Target sub-account (wallet) for multi-sub-account brokers (CCXT Binance:
+   * 'spot' / 'derivatives'). REQUIRED when the broker exposes >1 sub-account —
+   * the UTA layer loud-refuses a write without it rather than guessing. Ignored
+   * by single-sub-account brokers. Not persisted in the Operation schema; it is
+   * validated against the instrument and stamped into the commit message.
+   */
+  subAccountId?: string
   action: 'BUY' | 'SELL'
   orderType: string
   totalQuantity?: string
@@ -262,18 +286,25 @@ export interface StageClosePositionParams {
   symbol?: string
   /** Empty / undefined closes the full position. */
   qty?: string
+  /**
+   * Target sub-account — same semantics as `StagePlaceOrderParams.subAccountId`.
+   * REQUIRED for multi-sub-account brokers, ignored otherwise.
+   */
+  subAccountId?: string
 }
 
 // ==================== Operation Helpers ====================
 
 /** Extract the symbol from any Operation variant. */
-export function getOperationSymbol(op: Operation): string {
+export function getOperationSymbol(op: Operation | undefined): string {
+  if (!op) return 'unknown'
   switch (op.action) {
     case 'placeOrder': return op.contract?.symbol || op.contract?.aliceId || 'unknown'
     case 'modifyOrder': return 'unknown' // modifyOrder doesn't carry contract
     case 'closePosition': return op.contract?.symbol || op.contract?.aliceId || 'unknown'
     case 'cancelOrder': return 'unknown'
     case 'syncOrders': return 'unknown'
+    case 'observeExternalOrder': return op.contract?.symbol || op.contract?.aliceId || 'unknown'
     case 'reconcileBalance': return op.aliceId
   }
 }

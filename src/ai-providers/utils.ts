@@ -21,41 +21,6 @@ export function stripImageData(raw: string): string {
   } catch { return raw }
 }
 
-// ==================== Tool Permission Lists ====================
-
-/** Tools pre-approved in normal mode (no Bash). */
-export const NORMAL_ALLOWED_TOOLS = [
-  'Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'WebFetch',
-  'mcp__open-alice__*',
-]
-
-/** Tools pre-approved in evolution mode (includes Bash). */
-export const EVOLUTION_ALLOWED_TOOLS = [
-  'Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep', 'WebSearch', 'WebFetch',
-  'mcp__open-alice__*',
-]
-
-/** Extra tools to disallow in normal mode. */
-export const NORMAL_EXTRA_DISALLOWED = ['Bash']
-
-/** Extra tools to disallow in evolution mode. */
-export const EVOLUTION_EXTRA_DISALLOWED: string[] = []
-
-/** Resolve tool permissions based on evolution mode and explicit overrides. */
-export function resolveToolPermissions(opts: {
-  evolutionMode?: boolean
-  allowedTools?: string[]
-  disallowedTools?: string[]
-}): { allowed: string[]; disallowed: string[] } {
-  const { evolutionMode = false, allowedTools = [], disallowedTools = [] } = opts
-  const modeAllowed = evolutionMode ? EVOLUTION_ALLOWED_TOOLS : NORMAL_ALLOWED_TOOLS
-  const modeDisallowed = evolutionMode ? EVOLUTION_EXTRA_DISALLOWED : NORMAL_EXTRA_DISALLOWED
-  return {
-    allowed: allowedTools.length > 0 ? allowedTools : modeAllowed,
-    disallowed: [...disallowedTools, ...modeDisallowed],
-  }
-}
-
 // ==================== Chat History Prompt ====================
 
 export interface TextHistoryEntry {

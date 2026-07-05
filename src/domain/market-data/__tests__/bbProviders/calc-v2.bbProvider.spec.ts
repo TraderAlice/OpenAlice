@@ -17,7 +17,7 @@ import { runScript } from '@/domain/analysis/calc-v2/index.js'
 function build(provider: string, creds: Record<string, string>): BarService {
   const ex = getSDKExecutor(); const rm = buildRouteMap()
   return createBarService({
-    marketSearch: { symbolIndex: {} as never, cryptoClient: new SDKCryptoClient(ex, 'crypto', provider, creds, rm), currencyClient: new SDKCurrencyClient(ex, 'currency', provider, creds, rm), commodityCatalog: {} as never },
+    marketSearch: { symbolIndex: {} as never, equityVendors: [], equityClient: {} as never, cryptoClient: new SDKCryptoClient(ex, 'crypto', provider, creds, rm), currencyClient: new SDKCurrencyClient(ex, 'currency', provider, creds, rm), commodityCatalog: {} as never },
     equityClient: new SDKEquityClient(ex, 'equity', provider, creds, rm),
     cryptoClient: new SDKCryptoClient(ex, 'crypto', provider, creds, rm),
     currencyClient: new SDKCurrencyClient(ex, 'currency', provider, creds, rm),

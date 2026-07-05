@@ -1,28 +1,105 @@
 @import "tailwindcss";
 
-/* GitHub Dark theme palette */
+/* ============================================================
+   Theme tokens — two palettes, one identity. Alice-blue (her dress)
+   is the brand accent in BOTH modes. @theme below is Daybreak (light)
+   and the DEFAULT; the [data-theme="dark"] block + the prefers-color-
+   scheme block flip the same token names, so every `bg-bg`/`text-accent`/
+   `border-border` utility follows the active theme with zero component
+   changes. Living color card: ui/design/theme-study.html. The toggle lives in the
+   ActivityBar footer (light / dark / auto), persisted by the theme store
+   (ui/src/theme) and mirrored pre-paint by the inline script in index.html.
+   ============================================================ */
 @theme {
-  --color-bg: #0d1117;
-  --color-bg-secondary: #161b22;
-  --color-bg-tertiary: #21262d;
-  --color-border: #30363d;
-  --color-text: #e6edf3;
-  --color-text-muted: #8b949e;
-  --color-accent: #58a6ff;
-  --color-accent-dim: rgba(31, 111, 235, 0.2);
-  --color-user-bubble: #1f6feb;
-  --color-assistant-bubble: #161b22;
-  --color-notification-bg: #2d1f00;
-  --color-notification-border: #d29922;
-  --color-green: #3fb950;
-  --color-red: #f85149;
-  --color-purple: #a78bfa;
-  --color-purple-dim: rgba(139, 92, 246, 0.2);
+  /* Daybreak — light (default). Warm paper · engraved navy · alice-blue. */
+  --color-bg: #fbfaf6;
+  --color-bg-secondary: #f1ede4;
+  --color-bg-tertiary: #e4dccb;
+  --color-border: #d8d2c4;
+  --color-text: #1c2a41;
+  --color-text-muted: #5e6573;
+  --color-accent: #2f62b0;
+  --color-accent-dim: rgba(47, 98, 176, 0.14);
+  --color-user-bubble: #2f62b0;
+  --color-assistant-bubble: #fffdf8;
+  --color-notification-bg: #fbf1d6;
+  --color-notification-border: #c99a2e;
+  --color-green: #2e8b6f;
+  --color-red: #be4138;
+  --color-purple: #6b5bc2;
+  --color-purple-dim: rgba(107, 91, 194, 0.14);
+
+  /* Elevation overlays — theme-aware "subtle wash on hover / active".
+     Light darkens with navy ink; dark lightens with white. Components use
+     `bg-overlay` / `bg-overlay-strong`; raw CSS uses `var(--color-overlay)`. */
+  --color-overlay: rgba(28, 42, 65, 0.045);
+  --color-overlay-strong: rgba(28, 42, 65, 0.075);
 
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Microsoft YaHei", "Hiragino Sans GB", "Noto Sans CJK SC", sans-serif;
   --font-mono: "SF Mono", "Fira Code", "Cascadia Code", Menlo, Consolas,
     monospace;
+}
+
+/* Base resolution (no attribute / explicit light). */
+:root {
+  color-scheme: light;
+  --app-bg-wash: radial-gradient(circle at 50% 24%, rgba(47, 98, 176, 0.045), transparent 38rem);
+}
+
+/* ---- Midnight — dark (neutral charcoal-black) ----
+   Reverted to the #353 neutral-black palette: a navy-tinted dark read as
+   "too blue" once the full shell (rail + sidebar + tabs) was on screen — a
+   large neutral surface is calmer. Alice-blue survives ONLY as small brand
+   highlights (accent + the user's own bubble), so the large-area blue tint
+   is gone while the brand stays consistent with Daybreak.
+   Forced via data-theme="dark", AND the resolution for data-theme="auto"
+   when the OS is in dark mode (media block below). KEEP THE TWO IN SYNC. */
+:root[data-theme="dark"] {
+  --color-bg: #0b0c0e;
+  --color-bg-secondary: #0e0f12;
+  --color-bg-tertiary: #1a1b21;
+  --color-border: #24262c;
+  --color-text: #dfe1e6;
+  --color-text-muted: #8f929b;
+  --color-accent: #3b82f6;
+  --color-accent-dim: rgba(59, 130, 246, 0.16);
+  --color-user-bubble: #2f62b0;
+  --color-assistant-bubble: #141519;
+  --color-notification-bg: #1d1610;
+  --color-notification-border: #8a5b2f;
+  --color-green: #23b99a;
+  --color-red: #e5484d;
+  --color-purple: #8f72ff;
+  --color-purple-dim: rgba(143, 114, 255, 0.16);
+  --color-overlay: rgba(255, 255, 255, 0.04);
+  --color-overlay-strong: rgba(255, 255, 255, 0.07);
+  color-scheme: dark;
+  --app-bg-wash: radial-gradient(circle at 50% 28%, rgba(255, 255, 255, 0.02), transparent 34rem);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="auto"] {
+    --color-bg: #0b0c0e;
+    --color-bg-secondary: #0e0f12;
+    --color-bg-tertiary: #1a1b21;
+    --color-border: #24262c;
+    --color-text: #dfe1e6;
+    --color-text-muted: #8f929b;
+    --color-accent: #3b82f6;
+    --color-accent-dim: rgba(59, 130, 246, 0.16);
+    --color-user-bubble: #2f62b0;
+    --color-assistant-bubble: #141519;
+    --color-notification-bg: #1d1610;
+    --color-notification-border: #8a5b2f;
+    --color-green: #23b99a;
+    --color-red: #e5484d;
+    --color-purple: #8f72ff;
+    --color-purple-dim: rgba(143, 114, 255, 0.16);
+    --color-overlay: rgba(255, 255, 255, 0.04);
+    --color-overlay-strong: rgba(255, 255, 255, 0.07);
+    color-scheme: dark;
+    --app-bg-wash: radial-gradient(circle at 50% 28%, rgba(255, 255, 255, 0.02), transparent 34rem);
+  }
 }
 
 /* Japanese gets a JP-first sans stack so shared Han characters render in
@@ -49,6 +126,18 @@ html,
 body,
 #root {
   height: 100%;
+}
+
+body {
+  background: var(--app-bg-wash), var(--color-bg);
+  color: var(--color-text);
+  overflow: hidden;
+  transition: background-color 0.4s ease, color 0.4s ease;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-accent) 28%, transparent);
+  color: var(--color-text);
 }
 
 /* ==================== Typography scale ====================
@@ -105,6 +194,35 @@ body,
   opacity: 0.3;
   animation: live-pulse 2.4s ease-in-out infinite;
   animation-delay: 0.3s;
+}
+
+/* Skeleton placeholder — theme-aware shimmer for first-load states. The block
+   is the tertiary surface (reads on both the page bg and bg-secondary cards); a
+   soft overlay band sweeps across at an ambient cadence (sibling to live-pulse's
+   2.4s, a touch quicker so it reads as "loading" without feeling anxious). Size
+   + radius come from the element's own utility classes. Honors reduced motion. */
+@keyframes skeleton-sweep {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.skeleton {
+  background-color: var(--color-bg-tertiary);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--color-overlay-strong) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: skeleton-sweep 1.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background-image: none;
+    opacity: 0.7;
+  }
 }
 
 /* ==================== Button utility classes ==================== */
@@ -170,6 +288,14 @@ body,
 }
 
 /* Markdown content inside assistant messages */
+/* Prose base size — the single knob for all markdown surfaces (chat,
+   inbox comment, doc preview, file viewer). Headings/lists use `em` so
+   they scale off this. Without it, markdown inherits the browser default
+   16px, which reads oversized next to the 12–13px UI chrome. Being
+   tuned empirically; candidate prose tier for the semantic scale. */
+.markdown-content {
+  font-size: 15px;
+}
 .markdown-content p {
   margin: 0.5em 0;
 }
@@ -365,7 +491,9 @@ body,
 }
 .code-block-wrapper .code-copy-btn:hover {
   color: var(--color-text);
-  background: rgba(255, 255, 255, 0.06);
+  /* Theme-aware wash — navy in Daybreak, white in Midnight. The old
+     hardcoded rgba(255,255,255,…) was invisible in light mode. */
+  background: var(--color-overlay-strong);
 }
 .code-block-wrapper .code-copy-btn.copied {
   color: var(--color-green);

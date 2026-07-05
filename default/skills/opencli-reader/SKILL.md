@@ -32,7 +32,7 @@ trading engine sees.
 
 | You need… | Use |
 |---|---|
-| Quotes, K-lines, fundamentals, macro series, calendars, boards | `traderhub` / `alice` / `openalice` MCP — never opencli, even when it has a similar command |
+| Quotes, K-lines, fundamentals, macro series, calendars, boards | `traderhub` / `alice` — never opencli, even when it has a similar command |
 | Articles already pulled by Alice's RSS collector (subscribed feeds only) | `alice rss grep` / `alice rss read` |
 | Social sentiment, forum chatter (Reddit, HN, X, 雪球, Weibo) | opencli |
 | Options flow / greeks beyond Alice's surface (Barchart) | opencli |
@@ -142,8 +142,7 @@ OPENCLI_DIAGNOSTIC=1 opencli <site> <command> <args>
 ```
 
 This emits a structured `RepairContext`. Suggest the user file it at
-https://github.com/jackwener/opencli/issues (or run the upstream
-`opencli-autofix` skill if they have it). **Never fall back to hand-rolled
+https://github.com/jackwener/opencli/issues. **Never fall back to hand-rolled
 curl/fetch scraping** — that hides the breakage from the registry and gives
 you a parser that rots in a week. Empty results can also just be rate
 limits; wait and retry once before declaring breakage.

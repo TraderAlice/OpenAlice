@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Field, inputClass } from '../components/form'
+import { Skeleton } from '../components/StateViews'
 import { SDKSelector } from '../components/SDKSelector'
 import type { SDKOption } from '../components/SDKSelector'
 import { useTradingConfig } from '../hooks/useTradingConfig'
@@ -14,6 +15,76 @@ import { fmt } from '../lib/format'
 import { api } from '../api'
 import { useWorkspace } from '../tabs/store'
 import type { UTAConfig, BrokerPreset, BrokerHealthInfo, TestConnectionResult, Position, AccountInfo } from '../api/types'
+
+// ==================== External order monitoring cadence ====================
+//
+// data/config/trading.json observeExternalOrdersEvery — how often UTA lists
+// the broker's open orders to catch ones placed outside Alice. Saving
+// bounces the UTA process (boot-time config), same protocol as broker
+// edits; the health badges show the brief reconnect.
+
+const OBSERVE_CADENCE_OPTIONS = ['off', '1m', '5m', '10m', '15m'] as const
+
+function ExternalOrderMonitoringRow() {
+  const [value, setValue] = useState<string | null>(null)
+  const [msg, setMsg] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/config')
+      .then((r) => r.json())
+      .then((cfg) => {
+        if (!cancelled) setValue(cfg?.trading?.observeExternalOrdersEvery ?? '15m')
+      })
+      .catch(() => { if (!cancelled) setValue('15m') })
+    return () => { cancelled = true }
+  }, [])
+
+  const save = async (next: string) => {
+    const prev = value
+    setValue(next)
+    setMsg('')
+    try {
+      const res = await fetch('/api/config/trading', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ observeExternalOrdersEvery: next }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      setMsg('Saved — restarting UTA to apply')
+      setTimeout(() => setMsg(''), 4000)
+    } catch (err) {
+      setValue(prev)
+      setMsg(err instanceof Error ? err.message : 'Save failed')
+    }
+  }
+
+  if (value === null) return null
+
+  return (
+    <div className="flex items-center justify-between gap-3 px-4 py-3 border border-border rounded-lg">
+      <div className="min-w-0">
+        <div className="text-[12px] font-medium text-text">External order monitoring</div>
+        <div className="text-[11px] text-text-muted">
+          How often to scan for orders placed outside Alice (exchange app, direct API).
+          Known pending orders are tracked every 10s regardless.
+        </div>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        {msg && <span className="text-[11px] text-text-muted">{msg}</span>}
+        <select
+          value={value}
+          onChange={(e) => { void save(e.target.value) }}
+          className={inputClass + ' w-auto'}
+        >
+          {OBSERVE_CADENCE_OPTIONS.map((v) => (
+            <option key={v} value={v}>{v === 'off' ? 'Off' : `Every ${v}`}</option>
+          ))}
+        </select>
+      </div>
+    </div>
+  )
+}
 
 // ==================== Live equity (across all UTAs) ====================
 //
@@ -75,7 +146,22 @@ export function TradingPage() {
     openOrFocus({ kind: 'uta-detail', params: { id } })
   }
 
-  if (tc.loading) return <PageShell subtitle="Loading..." />
+  if (tc.loading) return (
+    <PageShell subtitle="Configure your UTAs (Unified Trading Accounts).">
+      <div className="max-w-[820px] mx-auto space-y-2.5" aria-hidden="true">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-3 px-4 py-3.5 rounded-lg border border-border bg-bg-secondary">
+            <Skeleton className="h-9 w-9 rounded-lg" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-3.5 w-32" />
+              <Skeleton className="h-2.5 w-20" />
+            </div>
+            <Skeleton className="h-4 w-24" />
+          </div>
+        ))}
+      </div>
+    </PageShell>
+  )
   if (tc.error) {
     return (
       <PageShell subtitle="Failed to load trading configuration.">
@@ -120,6 +206,8 @@ export function TradingPage() {
               </button>
             </div>
           )}
+
+          {tc.utas.length > 0 && <ExternalOrderMonitoringRow />}
         </div>
       </div>
 
@@ -636,7 +724,7 @@ function TestResultPanel({ result, utaId }: { result: TestConnectionResult; utaI
               <tbody>
                 {visiblePositions.map((p, i) => (
                   <tr key={i} className="border-t border-border">
-                    <td className="px-2.5 py-1.5 text-text font-mono">{p.contract.aliceId ?? p.contract.localSymbol ?? p.contract.symbol ?? '?'}</td>
+                    <td className="px-2.5 py-1.5 text-text font-mono" title={p.contract.aliceId}>{p.contract.symbol ?? p.contract.localSymbol ?? p.contract.aliceId ?? '?'}</td>
                     <td className="px-2.5 py-1.5 text-text-muted">{p.side}</td>
                     <td className="px-2.5 py-1.5 text-right text-text">{p.quantity}</td>
                     <td className="px-2.5 py-1.5 text-right text-text">{p.currency} {p.marketValue}</td>

@@ -5,7 +5,7 @@
  * opens (or focuses) the corresponding tab.
  */
 
-import { useWorkspaces } from '../../contexts/WorkspacesContext'
+import { useWorkspaces } from '../../contexts/workspaces-context'
 import { useWorkspace } from '../../tabs/store'
 import { getFocusedTab } from '../../tabs/types'
 import { Sidebar, type SpawnOpts } from './Sidebar'
@@ -27,12 +27,14 @@ export function WorkspacesSidebar() {
     focused?.kind === 'template-catalog' || focused?.kind === 'template-detail'
 
   return (
-    <div className="workspaces-root workspaces-sidebar-frame">
+    <div className="flex flex-col h-full min-h-0">
       <Sidebar
         workspaces={ctx.workspaces}
         templates={ctx.templates}
         agents={ctx.agents}
+        defaultAgent={ctx.defaultAgent}
         listError={ctx.listError}
+        hasLoaded={ctx.hasLoaded}
         selection={selection}
         onSelectWorkspace={(wsId) => {
           if (wsId.length === 0) return
@@ -42,10 +44,12 @@ export function WorkspacesSidebar() {
           openOrFocus({ kind: 'workspace', params: { wsId, sessionId } })
         }}
         onSpawn={(wsId, opts?: SpawnOpts) => void ctx.spawn(wsId, opts)}
+        onSetDefaultAgent={(agent) => void ctx.setDefaultAgent(agent)}
         onPauseSession={(wsId, id) => void ctx.pauseSession(wsId, id)}
         onResumeSession={(wsId, id) => void ctx.resumeSession(wsId, id)}
-        onDeleteSession={(wsId, id) => void ctx.deleteSession(wsId, id)}
+        onDeleteSession={(wsId, id) => ctx.requestDeleteSession(wsId, id)}
         onChanged={() => void ctx.refresh()}
+        onRenameWorkspace={(wsId, displayName) => void ctx.renameWorkspace(wsId, displayName)}
         onConfigureWorkspace={(wsId) => ctx.openAgentConfig(wsId)}
         onOpenOverview={() => openOrFocus({ kind: 'workspace-list', params: {} })}
         overviewActive={overviewActive}

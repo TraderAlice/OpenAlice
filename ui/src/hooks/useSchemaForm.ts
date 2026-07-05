@@ -12,7 +12,7 @@ import type { JsonSchema, JsonSchemaProperty } from '../api/types'
 
 export interface SchemaField {
   key: string
-  type: 'text' | 'password' | 'select'
+  type: 'text' | 'password' | 'select' | 'boolean'
   title: string
   description?: string
   required: boolean
@@ -40,7 +40,7 @@ export function useSchemaForm(
   initialValues?: Record<string, string>,
 ): UseSchemaFormResult {
   // Parse schema into const values and editable field descriptors
-  const { constValues, fieldDefs, defaults } = useMemo(() => {
+  const { constValues, fieldDefs, defaults, booleanKeys } = useMemo(() => {
     const consts: Record<string, unknown> = {}
     const fields: SchemaField[] = []
     const defs: Record<string, string> = {}
@@ -67,17 +67,26 @@ export function useSchemaForm(
       } else if (prop.enum) {
         const options = prop.enum.map(v => ({ value: v, label: v }))
         fields.push({ key, type: 'select', title, description: prop.description, required: isRequired, options })
+      } else if (prop.type === 'boolean') {
+        // Stored in string form-state as 'true'/'false'; getSubmitData
+        // converts back to a real boolean. Rendered as a checkbox.
+        fields.push({ key, type: 'boolean', title, description: prop.description, required: isRequired, defaultValue: String(prop.default ?? false) })
       } else {
         fields.push({ key, type: 'text', title, description: prop.description, required: isRequired, defaultValue: prop.default !== undefined ? String(prop.default) : undefined })
       }
 
-      // Collect defaults
-      if (prop.default !== undefined) {
+      // Collect defaults. Booleans always seed (a checkbox/toggle is never
+      // "unset"), so even a required boolean with no .default() lands in form
+      // state and submits a real `false` rather than going missing.
+      if (prop.type === 'boolean') {
+        defs[key] = String(prop.default ?? false)
+      } else if (prop.default !== undefined) {
         defs[key] = String(prop.default)
       }
     }
 
-    return { constValues: consts, fieldDefs: fields, defaults: defs }
+    const booleanKeys = new Set(fields.filter(f => f.type === 'boolean').map(f => f.key))
+    return { constValues: consts, fieldDefs: fields, defaults: defs, booleanKeys }
   }, [schema])
 
   // Form state — reset when schema changes (e.g. user picks a different preset)
@@ -103,10 +112,15 @@ export function useSchemaForm(
     const result: Record<string, unknown> = { ...constValues }
     for (const [key, value] of Object.entries(formData)) {
       if (key.endsWith('__custom')) continue
+      // Boolean fields carry 'true'/'false' strings in form state — emit a
+      // real boolean (always, incl. false) so the backend z.boolean() schema
+      // accepts it. NB: z.coerce.boolean() can't be used backend-side because
+      // Boolean('false') === true.
+      if (booleanKeys.has(key)) { result[key] = value === 'true'; continue }
       if (value !== '' && value !== undefined) result[key] = value
     }
     return result
-  }, [constValues, formData])
+  }, [constValues, formData, booleanKeys])
 
   const validate = useCallback((): string | null => {
     for (const field of fieldDefs) {

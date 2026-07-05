@@ -102,7 +102,7 @@ const apiKeysSchema = z.object({
 
 export const credentialVendorEnum = z.enum([
   'anthropic', 'openai', 'google',
-  'minimax', 'glm', 'kimi', 'deepseek', 'custom',
+  'minimax', 'glm', 'kimi', 'deepseek', 'longcat', 'custom',
 ])
 export type CredentialVendor = z.infer<typeof credentialVendorEnum>
 
@@ -122,6 +122,8 @@ export type CredentialWireShape = z.infer<typeof credentialWireShapeEnum>
 
 export const credentialSchema = z.object({
   vendor: credentialVendorEnum,
+  /** Human-readable label shown in pickers. Slug stays the stable reference id. */
+  label: z.string().trim().max(80).transform((s) => s || undefined).optional(),
   authType: credentialAuthTypeEnum,
   /** Present for api-key credentials; absent for subscription credentials. */
   apiKey: z.string().optional(),
@@ -138,6 +140,15 @@ export const credentialSchema = z.object({
   baseUrl: z.string().trim().transform((s) => s || undefined).optional(),
   /** @deprecated legacy single wire shape — superseded by `wires`. */
   wireShape: credentialWireShapeEnum.optional(),
+  /**
+   * The last model run against this key — a credential carries no model of its
+   * own (model is always a per-use choice), so quick-chat and the per-workspace
+   * config remember the user's last pick here to spare them re-typing it. Set on
+   * every config write that knows the slug; read as the injection default
+   * (falling back to the vendor's catalog flagship when absent). Optional ⇒ no
+   * migration; an old cred just has no remembered model until next write.
+   */
+  lastModel: z.string().optional(),
 })
 export type Credential = z.infer<typeof credentialSchema>
 
@@ -152,6 +163,22 @@ export function credentialWires(cred: Credential): Partial<Record<CredentialWire
   return {}
 }
 
+/**
+ * A user-level default that seeds a freshly-created workspace's per-agent AI
+ * config from a vault credential — the "inject my usual key on every launch"
+ * setting. Keyed by agentId (`claude` / `codex` / `opencode` / `pi`).
+ * `credentialSlug` points into `credentials`; `model` is the optional run model
+ * (absent ⇒ resolved from the cred's `lastModel`, then the vendor flagship).
+ * Structurally a superset-compatible mirror of the workspaces layer's
+ * `AgentCredentialDecl`, so the creator can merge the two and feed
+ * `injectWorkspaceCredentials` directly.
+ */
+export const workspaceCredentialDefaultSchema = z.object({
+  credentialSlug: z.string(),
+  model: z.string().optional(),
+})
+export type WorkspaceCredentialDefault = z.infer<typeof workspaceCredentialDefaultSchema>
+
 export const aiProviderSchema = z.object({
   apiKeys: apiKeysSchema.default({}),
   /**
@@ -162,13 +189,39 @@ export const aiProviderSchema = z.object({
    * existing files keep them on disk until rewritten, where they're ignored.)
    */
   credentials: z.record(z.string(), credentialSchema).default({}),
+  /**
+   * Per-agent default credential seeded into EVERY new workspace at create time
+   * (agentId → {credentialSlug, model?}). The user-level counterpart to a
+   * template's `agentCredentials`: set a default cred per agent once and skip the
+   * per-workspace AI-config modal on each launch. References slugs in
+   * `credentials`; a dangling slug is loud-skipped at injection, never fatal.
+   */
+  workspaceCredentialDefaults: z.record(z.string(), workspaceCredentialDefaultSchema).default({}),
+  /**
+   * User-level default runtime for new interactive workspace sessions. This is
+   * intentionally separate from workspace identity (`agents[]`) and from
+   * credential defaults: it answers "which agent TUI should a plain New Session
+   * start?" Shell is a utility adapter, not a valid stored default.
+   */
+  workspaceDefaultAgent: z.string().nullable().default(null),
+  /**
+   * User-level default runtime for issue-triggered headless work. This stays
+   * separate from `workspaceDefaultAgent`: users often want Codex/Claude for
+   * interactive chat, but Pi/opencode for scheduled scans.
+   */
+  issueDefaultAgent: z.string().nullable().default(null),
 })
 
 export type AIProviderConfig = z.infer<typeof aiProviderSchema>
 
 const agentSchema = z.object({
   maxSteps: z.number().int().positive().default(20),
-  evolutionMode: z.boolean().default(false),
+  /** Master switch for AI-initiated trade execution. When false (default),
+   *  `tradingPush` only stages + asks the user to approve in the Web UI; when
+   *  true, the AI may push committed operations straight to the broker. Gated
+   *  in the UI behind a danger warning + double-confirm. Per-account `readOnly`
+   *  still wins (read-only accounts can't stage in the first place). */
+  allowAiTrading: z.boolean().default(false),
   claudeCode: z.object({
     allowedTools: z.array(z.string()).optional(),
     disallowedTools: z.array(z.string()).default([
@@ -244,6 +297,13 @@ const marketDataSchema = z.object({
     currency: 'yfinance',
     commodity: 'yfinance',
   }),
+  /** Opt-in incremental vendors federated into equity search alongside the
+   *  default provider — regional/specialised sources a user manually enables
+   *  (e.g. 'eastmoney' for CN A-share Chinese-name search + 前复权 K-line).
+   *  yfinance stays the always-on global default; these are purely additive,
+   *  surfaced as extra searchBars candidates in their own namespace, never a
+   *  replacement. Each name must be a registered OpenTypeBB provider. */
+  extraVendors: z.array(z.string()).default([]),
   providerKeys: z.object({
     fred: z.string().optional(),
     fmp: z.string().optional(),
@@ -282,8 +342,9 @@ const compactionSchema = z.object({
  * and stays in connectors.
  */
 const mcpSchema = z.object({
+  enabled: z.boolean().default(false),
   port: z.number().int().positive().default(3001),
-}).default({ port: 3001 })
+}).default({ enabled: false, port: 3001 })
 
 const connectorsSchema = z.object({
   web: z.object({ port: z.number().int().positive().default(3002) }).default({ port: 3002 }),
@@ -302,6 +363,19 @@ const connectorsSchema = z.object({
 const snapshotSchema = z.object({
   enabled: z.boolean().default(true),
   every: z.string().default('15m'),
+})
+
+const tradingSchema = z.object({
+  /**
+   * External-order observation cadence — how often UTA lists the broker's
+   * open orders to catch ones placed outside Alice (exchange app, direct
+   * API). Duration string ('1m' / '5m' / '10m' / '15m'); 'off' disables.
+   * Default 15m: untracked orders are a narrative-fidelity feature, not a
+   * primary flow — keep the standing request rate negligible (96/day per
+   * account). Fill/cancel detection for KNOWN pending orders is separate
+   * (10s fast lane) and unaffected by this knob.
+   */
+  observeExternalOrdersEvery: z.string().default('15m'),
 })
 
 export const toolsSchema = z.object({
@@ -404,6 +478,7 @@ export type Config = {
   compaction: z.infer<typeof compactionSchema>
   aiProvider: z.infer<typeof aiProviderSchema>
   snapshot: z.infer<typeof snapshotSchema>
+  trading: z.infer<typeof tradingSchema>
   mcp: z.infer<typeof mcpSchema>
   connectors: z.infer<typeof connectorsSchema>
   news: z.infer<typeof newsCollectorSchema>
@@ -446,7 +521,7 @@ export async function loadConfig(): Promise<Config> {
   // is pending. See src/migrations/INDEX.md for the full list.
   await runMigrations()
 
-  const files = ['engine.json', 'agent.json', 'crypto.json', 'securities.json', 'market-data.json', 'compaction.json', 'ai-provider-manager.json', 'snapshot.json', 'mcp.json', 'connectors.json', 'news.json', 'tools.json', 'webhook.json'] as const
+  const files = ['engine.json', 'agent.json', 'crypto.json', 'securities.json', 'market-data.json', 'compaction.json', 'ai-provider-manager.json', 'snapshot.json', 'mcp.json', 'connectors.json', 'news.json', 'tools.json', 'webhook.json', 'trading.json'] as const
   const raws = await Promise.all(files.map((f) => loadJsonFile(f)))
 
   const config: Config = {
@@ -463,6 +538,7 @@ export async function loadConfig(): Promise<Config> {
     news:          await parseAndSeed(files[10], newsCollectorSchema, raws[10]),
     tools:         await parseAndSeed(files[11], toolsSchema, raws[11]),
     webhook:       await parseAndSeed(files[12], webhookSchema, raws[12]),
+    trading:       await parseAndSeed(files[13], tradingSchema, raws[13]),
   }
 
   // Spawn-time-fixed channel: when guardian (Electron main) spawns the
@@ -751,6 +827,29 @@ export async function readMarketDataConfig() {
   }
 }
 
+/**
+ * Toggle market-data `extraVendors` on/off, persisted to disk. Returns the new list.
+ *
+ * Deliberately reads the RAW file — NOT the global-merged view
+ * `readMarketDataConfig` returns — so global provider keys are never fossilized
+ * into the local section (which would defeat the global-wins-on-update intent;
+ * see [[project_global_data_root_sealed_creds]]). Writes directly, bypassing
+ * `writeConfigSection`'s providerKeys→global mirror, which is irrelevant to a
+ * vendor-list edit. Because the opentypebb resolver re-reads market-data.json
+ * per request, the change takes effect on the next search with no restart.
+ */
+export async function updateExtraVendors(
+  mutate: (current: string[]) => string[],
+): Promise<string[]> {
+  const raw = (await loadJsonFile('market-data.json')) ?? {}
+  const parsed = marketDataSchema.parse(raw)
+  const next = [...new Set(mutate(parsed.extraVendors))]
+  const updated = marketDataSchema.parse({ ...parsed, extraVendors: next })
+  await mkdir(CONFIG_DIR, { recursive: true })
+  await writeFile(resolve(CONFIG_DIR, 'market-data.json'), JSON.stringify(updated, null, 2) + '\n')
+  return next
+}
+
 /** Read tools config from disk (called per-request for hot-reload). */
 export async function readToolsConfig() {
   try {
@@ -828,7 +927,12 @@ export async function addCredential(credential: Credential): Promise<string> {
   )
   if (match) {
     // Upgrade the existing record's wires/endpoint in place (don't duplicate).
-    config.credentials[match[0]] = validated
+    const existing = match[1]
+    config.credentials[match[0]] = {
+      ...validated,
+      ...(validated.label ?? existing.label ? { label: validated.label ?? existing.label } : {}),
+      ...(validated.lastModel ?? existing.lastModel ? { lastModel: validated.lastModel ?? existing.lastModel } : {}),
+    }
     await mkdir(CONFIG_DIR, { recursive: true })
     await writeFile(resolve(CONFIG_DIR, 'ai-provider-manager.json'), JSON.stringify(config, null, 2) + '\n')
     return match[0]
@@ -843,10 +947,82 @@ export async function addCredential(credential: Credential): Promise<string> {
   return slug
 }
 
+/**
+ * Remember the model last run against a credential (see `lastModel`). No-ops
+ * silently when the slug is gone or the model is unchanged — it's a convenience
+ * memory, never load-bearing, so a miss must not break the caller's flow.
+ */
+export async function setCredentialLastModel(slug: string, model: string): Promise<void> {
+  if (!model) return
+  const config = await readAIProviderConfig()
+  const cred = config.credentials[slug]
+  if (!cred || cred.lastModel === model) return
+  config.credentials[slug] = { ...cred, lastModel: model }
+  await mkdir(CONFIG_DIR, { recursive: true })
+  await writeFile(resolve(CONFIG_DIR, 'ai-provider-manager.json'), JSON.stringify(config, null, 2) + '\n')
+}
+
 /** Delete a credential from the vault. */
 export async function deleteCredential(slug: string): Promise<void> {
   const config = await readAIProviderConfig()
   delete config.credentials[slug]
+  // Drop any workspace-default that pointed at the now-gone slug, so the
+  // Settings dropdown never shows a dangling default (injection would skip it
+  // anyway, but a stale default reads as "still configured").
+  for (const [agentId, def] of Object.entries(config.workspaceCredentialDefaults)) {
+    if (def.credentialSlug === slug) delete config.workspaceCredentialDefaults[agentId]
+  }
+  await mkdir(CONFIG_DIR, { recursive: true })
+  await writeFile(resolve(CONFIG_DIR, 'ai-provider-manager.json'), JSON.stringify(config, null, 2) + '\n')
+}
+
+/**
+ * Read the per-agent default credentials seeded into new workspaces
+ * (agentId → {credentialSlug, model?}). Empty map when unset.
+ */
+export async function readWorkspaceCredentialDefaults(): Promise<Record<string, WorkspaceCredentialDefault>> {
+  const config = await readAIProviderConfig()
+  return { ...config.workspaceCredentialDefaults }
+}
+
+/**
+ * Replace the per-agent workspace-default credential map. Entries with an empty
+ * `credentialSlug` are dropped (the UI's "don't seed this agent" choice).
+ */
+export async function writeWorkspaceCredentialDefaults(
+  defaults: Record<string, WorkspaceCredentialDefault>,
+): Promise<void> {
+  const config = await readAIProviderConfig()
+  const cleaned: Record<string, WorkspaceCredentialDefault> = {}
+  for (const [agentId, def] of Object.entries(defaults)) {
+    const parsed = workspaceCredentialDefaultSchema.parse(def)
+    if (parsed.credentialSlug) cleaned[agentId] = parsed
+  }
+  config.workspaceCredentialDefaults = cleaned
+  await mkdir(CONFIG_DIR, { recursive: true })
+  await writeFile(resolve(CONFIG_DIR, 'ai-provider-manager.json'), JSON.stringify(config, null, 2) + '\n')
+}
+
+export async function readWorkspaceDefaultAgent(): Promise<string | null> {
+  const config = await readAIProviderConfig()
+  return config.workspaceDefaultAgent ?? null
+}
+
+export async function writeWorkspaceDefaultAgent(agentId: string | null): Promise<void> {
+  const config = await readAIProviderConfig()
+  config.workspaceDefaultAgent = agentId && agentId.trim() ? agentId.trim() : null
+  await mkdir(CONFIG_DIR, { recursive: true })
+  await writeFile(resolve(CONFIG_DIR, 'ai-provider-manager.json'), JSON.stringify(config, null, 2) + '\n')
+}
+
+export async function readIssueDefaultAgent(): Promise<string | null> {
+  const config = await readAIProviderConfig()
+  return config.issueDefaultAgent ?? null
+}
+
+export async function writeIssueDefaultAgent(agentId: string | null): Promise<void> {
+  const config = await readAIProviderConfig()
+  config.issueDefaultAgent = agentId && agentId.trim() ? agentId.trim() : null
   await mkdir(CONFIG_DIR, { recursive: true })
   await writeFile(resolve(CONFIG_DIR, 'ai-provider-manager.json'), JSON.stringify(config, null, 2) + '\n')
 }
@@ -864,6 +1040,7 @@ const sectionSchemas: Record<ConfigSection, z.ZodTypeAny> = {
   compaction: compactionSchema,
   aiProvider: aiProviderSchema,
   snapshot: snapshotSchema,
+  trading: tradingSchema,
   mcp: mcpSchema,
   connectors: connectorsSchema,
   news: newsCollectorSchema,
@@ -880,6 +1057,7 @@ const sectionFiles: Record<ConfigSection, string> = {
   compaction: 'compaction.json',
   aiProvider: 'ai-provider-manager.json',
   snapshot: 'snapshot.json',
+  trading: 'trading.json',
   mcp: 'mcp.json',
   connectors: 'connectors.json',
   news: 'news.json',

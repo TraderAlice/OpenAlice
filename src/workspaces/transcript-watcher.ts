@@ -160,7 +160,7 @@ export class TranscriptWatcher {
     // Compare watchDir + projectKey against the spawn path.trace; any
     // divergence means the CLI will write jsonl to a place we're not
     // watching, and resumeHint will never be populated.
-    this.logger.info('path.trace', {
+    this.logger.event('path.trace', {
       where: 'transcript.watch.register',
       wsId: session.wsId,
       recordId: session.recordId,

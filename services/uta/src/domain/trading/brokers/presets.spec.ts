@@ -17,6 +17,7 @@ import {
   getBrokerPreset,
   isPaperPreset,
   deriveUtaId,
+  BINANCE_PRESET,
   OKX_PRESET,
   BYBIT_PRESET,
   HYPERLIQUID_PRESET,
@@ -34,6 +35,7 @@ import { BROKER_ENGINE_REGISTRY } from './registry.js'
 
 /** Minimal valid presetConfig for each preset id. Use to round-trip through schema + engine. */
 const SAMPLE_CONFIGS: Record<string, Record<string, unknown>> = {
+  binance:         { mode: 'live', apiKey: 'k', secret: 's' },
   okx:             { mode: 'live', apiKey: 'k', secret: 's', password: 'p' },
   bybit:           { mode: 'live', apiKey: 'k', secret: 's' },
   hyperliquid:     { mode: 'live', walletAddress: '0xabc', privateKey: 'pk' },
@@ -88,6 +90,19 @@ describe.each(BROKER_PRESET_CATALOG)('preset $id', (preset) => {
 // ==================== Mode → engine flag translation (the OKX-bug guard) ====================
 
 describe('preset → engine config translation', () => {
+  it('Binance mode=demo sets demoTrading=true (unified demo-*.binance.com)', () => {
+    const cfg = BINANCE_PRESET.toEngineConfig({ mode: 'demo', apiKey: 'k', secret: 's' })
+    expect(cfg.demoTrading).toBe(true)
+  })
+
+  it('Binance mode=live sets demoTrading=false, no sandbox (testnet not offered)', () => {
+    const cfg = BINANCE_PRESET.toEngineConfig({ mode: 'live', apiKey: 'k', secret: 's' })
+    expect(cfg.demoTrading).toBe(false)
+    // Binance futures testnet is deprecated and spot-only testnet needs an
+    // engine change; the preset exposes only live + demo, never sandbox.
+    expect(cfg.sandbox).toBeUndefined()
+  })
+
   it('OKX mode=demo sets sandbox=true (avoids the demoTrading footgun)', () => {
     const cfg = OKX_PRESET.toEngineConfig({ mode: 'demo', apiKey: 'k', secret: 's', password: 'p' })
     expect(cfg.sandbox).toBe(true)
@@ -164,6 +179,12 @@ describe('isPaperPreset', () => {
     expect(isPaperPreset('bybit', { mode: 'testnet' })).toBe(true)
     expect(isPaperPreset('bybit', { mode: 'demo' })).toBe(true)
     expect(isPaperPreset('bybit', { mode: 'live' })).toBe(false)
+  })
+
+  it('true for Binance testnet AND demo, false for live', () => {
+    expect(isPaperPreset('binance', { mode: 'testnet' })).toBe(true)
+    expect(isPaperPreset('binance', { mode: 'demo' })).toBe(true)
+    expect(isPaperPreset('binance', { mode: 'live' })).toBe(false)
   })
 
   it('true for Alpaca paper, false for Alpaca live', () => {

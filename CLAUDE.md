@@ -38,17 +38,28 @@ pnpm test                               # behavior across the monorepo — alway
 - `pnpm test` catches behavior, not type drift (Vitest transpiles via esbuild).
 - `services/uta` standalone typecheck has known errors (ANG-65) — not a gate.
 
-Cross-platform: workspace bootstrap scripts (`src/workspaces/templates/*/bootstrap.sh`)
-are bash; Windows needs Git for Windows bash or WSL2. New templates: plain
-bash, only commands that ship with Git for Windows's MSYS env (no `jq`).
+## Cross-platform workspace bootstrap
+
+Workspace bootstrap is **cross-platform Node**: built-in templates ship
+`src/workspaces/templates/<name>/bootstrap.mjs` (plain ESM, no TS syntax),
+spawned on the Electron-bundled Node (`process.execPath` +
+`ELECTRON_RUN_AS_NODE`), and **all git goes through bundled git (`dugite`)**
+via `_common.mjs`'s `git()` helper — works on bare Windows/Mac with no bash
+and no system git. When adding a template: write `bootstrap.mjs`, import
+`../_common.mjs` (`initWorkspaceDir` / `copyReadme` / `setupGitExcludes` /
+`git`), and route every git call through `git()` — never `spawn('git')`.
+`bootstrap.sh` remains a fallback for third-party/satellite templates only
+(needs bash on PATH); don't add new `.sh` bootstraps in-repo. Packaging
+invariant: `dugite` must stay in `pnpm.onlyBuiltDependencies` (its
+postinstall fetches the per-platform git; release CI asserts it's present).
 
 ## Rules & skills (where the details live)
 
-- Git rules (branch safety, external-PR refusal) → `.claude/rules/git-workflow.md` (always loaded)
+- Git rules (branch safety, external-PR quarantine, contributor credit) → `.claude/rules/git-workflow.md` (always loaded)
 - UTA rules → `.claude/rules/uta.md` (loads when touching `services/uta/**`)
 - UI rules incl. demo-handler duty → `.claude/rules/ui.md` (loads when touching `ui/**`)
 - **Session start**: run the `openalice-session-start` skill checklist before touching code
-- **After trading-path changes**: run the `uta-test-scenarios` skill (S1–S14, demo accounts)
+- **After trading-path changes**: run the `uta-test-scenarios` skill — canonical catalog at [docs/uta-live-testing.md](docs/uta-live-testing.md) (S1–S14, demo accounts)
 - `/api/*` surface changes: `openalice-demo-mode` skill (MSW handler sync)
 - Event / Listener / Producer system → [docs/event-system.md](docs/event-system.md) — read before adding an event type, Listener, or Producer
 
@@ -87,7 +98,8 @@ src/                    # Alice process — agent runtime
 ├── main.ts             # Composition root
 ├── core/               # ToolCenter + workspace-tool-center + InboxStore +
 │                       #   session store + event-log + listener/producer +
-│                       #   config (central credential vault)
+│                       #   config (central credential vault) +
+│                       #   credential-inference
 ├── ai-providers/       # Preset catalog ONLY (vault form suggestions — the
 │                       #   in-process AI loop was deleted in 0.40)
 ├── domain/             # market-data / analysis / news / thinking
@@ -95,7 +107,8 @@ src/                    # Alice process — agent runtime
 ├── tool/               # AI tool definitions: thin domain→ToolCenter bridges
 ├── workspaces/         # Workspace launcher: PTY pool, scrollback, template
 │                       #   registry, adapters/{claude,codex,opencode,pi,shell},
-│                       #   templates/{auto-quant,chat,finance-research}
+│                       #   templates/{auto-quant,chat} (bootstrap.mjs — see
+│                       #   Cross-platform above)
 ├── services/           # auth / uta-client (SDK mirrors) / uta-supervisor
 ├── server/             # mcp.ts + opentypebb.ts
 ├── webui/              # Hono plugin: routes (~23), auth middleware,
@@ -109,12 +122,34 @@ packages/               # uta-protocol (the ONLY cross-process shape) /
                         #   ibkr (UTA-owned) / opentypebb
 scripts/guardian/       # L2 supervisor: dev.ts / prod.mjs / shared.ts
 ui/                     # React frontend (Vite); auth/ ships separately
-data/                   # ALL persistent state; ~/.openalice/data by default —
-                        #   ONE global store shared by dev/start/packaged app.
-                        #   OPENALICE_HOME overrides (Docker: /data; pin a
-                        #   checkout-local store for experimental branches —
-                        #   migrations run against the real store otherwise!).
-                        #   accounts.json sealed at rest (src/core/sealing.ts).
+
+data/                   # PORTABLE user state — the backup/migrate/share unit,
+                        #   ~/.openalice/data by default, ONE global store for
+                        #   dev/start/packaged app. OPENALICE_HOME moves THIS
+                        #   root only (Docker: /data; OPENALICE_HOME="$PWD"
+                        #   pins a checkout-local store — otherwise migrations
+                        #   run against the real store!). accounts.json +
+                        #   auth.json sealed at rest; the AES key lives BESIDE
+                        #   data/ (~/.openalice/sealing.key) so a data/-only
+                        #   backup can't decrypt. Subdirs via dataPath():
+                        #   config/, _backup/, sessions/ (web/admin — NOT
+                        #   workspace sessions), trading/<id>/, control/,
+                        #   cron/, event-log/, tool-calls/, news-collector/,
+                        #   inbox/, entities/, media/, cache/, brain/ (dormant)
+
+workspaces/             # WORKSPACE LAUNCHER ROOT — a SIBLING global root at
+                        #   ~/.openalice/workspaces, governed by
+                        #   AQ_LAUNCHER_ROOT and deliberately NOT following
+                        #   OPENALICE_HOME (workspaces are user-level
+                        #   git-heavy assets kept across checkouts; no
+                        #   migrations run there). Holds workspaces.json,
+                        #   state/sessions/<wsId>.json (PTY resume — the
+                        #   OTHER session store), state/scrollback/,
+                        #   state/headless-tasks.json + headless-logs/,
+                        #   workspaces/<wsId>/ (one checkout per workspace),
+                        #   auto-quant-mirror/. Sibling under ~/.openalice:
+                        #   provider-keys.json (user-global vendor keys,
+                        #   OPENALICE_GLOBAL_DIR; data/config values win)
 ```
 
 ## Key Architecture
@@ -171,4 +206,7 @@ inside a workspace.
 - Strict TypeScript, ES2023 target
 - Zod for config, TypeBox for tool parameter schemas
 - `decimal.js` for financial math
-- Pino logger → `logs/engine.log`
+- Logging: the workspace launcher writes structured JSON to
+  `logs/workspace-sessions.log` (`src/workspaces/logger.ts`); the main
+  process logs via `console`. (`pino` is a declared dep but currently
+  unused — don't assume a central pino sink exists.)

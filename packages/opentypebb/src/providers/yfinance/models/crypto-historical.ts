@@ -6,8 +6,7 @@
 import { z } from 'zod'
 import { Fetcher } from '../../../core/provider/abstract/fetcher.js'
 import { CryptoHistoricalQueryParamsSchema, CryptoHistoricalDataSchema } from '../../../standard-models/crypto-historical.js'
-import { EmptyDataError } from '../../../core/provider/utils/errors.js'
-import { getHistoricalData } from '../utils/helpers.js'
+import { getHistoricalData, emptyHistoricalError } from '../utils/helpers.js'
 import { INTERVALS_DICT } from '../utils/references.js'
 
 export const YFinanceCryptoHistoricalQueryParamsSchema = CryptoHistoricalQueryParamsSchema.extend({
@@ -62,7 +61,7 @@ export class YFinanceCryptoHistoricalFetcher extends Fetcher {
       if (r.status === 'fulfilled') allData.push(...r.value)
     }
 
-    if (!allData.length) throw new EmptyDataError('No crypto historical data returned')
+    if (!allData.length) throw emptyHistoricalError(results, 'No crypto historical data returned')
     return allData
   }
 

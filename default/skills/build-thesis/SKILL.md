@@ -25,6 +25,11 @@ favoring this?) is usually what drives realized P&L. Don't stop at "it's cheap."
 
 ## Procedure (don't answer from memory — run the tools)
 
+The tools: `traderhub equity` for valuation / estimates / consensus,
+`alice analysis quant` for relative strength, momentum, and z-score vs history,
+`traderhub board` for the sector/macro frame, `alice rss grep` for the
+narrative. (See the `traderhub`, `alice-analysis`, `alice` skills.)
+
 0. **Anchor the comparison set.** The right side is *relative* — "strong" only
    means something against peers. If a value-chain map for this name's theme
    exists in the dossier (from `scan-value-chain`), use it as the peer/chain
@@ -74,7 +79,9 @@ scan started (confirm the layout with the user if none exists — don't impose
 one). The per-name note is the living thesis: the claim, both sides, what-must-
 be-true, and the disconfirming-signal watchlist. Next session reads it and
 updates it as the signals move — never re-derives from zero. The right-side
-disconfirming signals are the baton to a position-monitor step.
+disconfirming signals are the baton to a position-monitor step. To act on the
+verdict — size and place the trade through the approval flow — that's the
+`alice-uta` skill.
 
 ## Worked example: NVDA (illustrative — run it fresh for any name)
 

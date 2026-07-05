@@ -17,6 +17,14 @@ function mockBars(closes: number[], barId = 'yfinance|AAPL'): BarService {
   } as unknown as BarService
 }
 
+/** Mock bar service whose getBars always rejects — simulates a vendor failure. */
+function failingBars(message: string): BarService {
+  return {
+    searchBarSources: async () => [],
+    getBars: async () => { throw new Error(message) },
+  } as unknown as BarService
+}
+
 const run = (script: string, svc: BarService) => runScript(script, { barService: svc })
 
 describe('calc-v2 evaluator', () => {
@@ -48,6 +56,40 @@ describe('calc-v2 evaluator', () => {
     expect(r.value).toBeUndefined()
     expect(r.error?.kind).toBe('insufficient-bars')
     expect(r.error?.message).toMatch(/needs ≥100 bars/)
+  })
+
+  // issue #375: a failed K-line fetch is an upstream/data problem, not a script
+  // bug. The quant calculator (an AI harness) must hand the agent a clean signal
+  // (kind:"data-source" + an operational suggestion), not a misleading "type".
+  describe('bars() fetch failures surface as kind:"data-source"', () => {
+    it('passes the real rate-limit cause through and suggests retry/switch (not a script edit)', async () => {
+      const rl = 'RATE_LIMITED: HTTP 429 Yahoo Finance refused to serve this client for "MU" (Edge: Too Many Requests). This is NOT a missing-data condition.'
+      const r = await run(`s = bars("yfinance|MU","1d",asset="equity")\nsma(s.close, 50)`, failingBars(rl))
+      expect(r.value).toBeUndefined()
+      expect(r.error?.kind).toBe('data-source')
+      expect(r.error?.message).toContain('bars("yfinance|MU") failed')
+      expect(r.error?.message).toContain('RATE_LIMITED')        // real cause reaches the agent
+      expect(r.error?.suggestion).toMatch(/retry|switch source/i)
+      expect(r.error?.suggestion).toMatch(/not a script error/i)
+    })
+
+    it('flags a network failure as data-source with a do-not-retry-blindly hint', async () => {
+      const r = await run(
+        `s = bars("yfinance|AAPL","1d",asset="equity")\nsma(s.close, 50)`,
+        failingBars('NETWORK_UNREACHABLE: cannot reach finance.yahoo.com from this machine (ENOTFOUND).'),
+      )
+      expect(r.error?.kind).toBe('data-source')
+      expect(r.error?.suggestion).toMatch(/unreachable|different source|network/i)
+    })
+
+    it('falls back to a barId/availability hint for an unrecognized fetch error', async () => {
+      const r = await run(
+        `s = bars("bogus","1d",asset="equity")\nsma(s.close, 50)`,
+        failingBars('Invalid barId "bogus" (expected "sourceId|nativeSymbol")'),
+      )
+      expect(r.error?.kind).toBe('data-source')
+      expect(r.error?.suggestion).toMatch(/barId/)
+    })
   })
 
   it('unknown-function with did-you-mean', async () => {
@@ -136,10 +178,18 @@ describe('calc-v2 evaluator', () => {
   })
 
   it('caps panel size', async () => {
-    const entries = Array.from({ length: 51 }, (_, i) => `"k${i}": 1`).join(', ')
+    const entries = Array.from({ length: 201 }, (_, i) => `"k${i}": 1`).join(', ')
     const r = await run(`{ ${entries} }`, mockBars([1, 2, 3]))
     expect(r.error?.kind).toBe('type')
-    expect(r.error?.message).toMatch(/at most 50/)
+    expect(r.error?.message).toMatch(/at most 200/)
+  })
+
+  it('dates opt-in: attaches the per-source date axis', async () => {
+    const svc = mockBars([1, 2, 3, 4, 5])
+    const off = await runScript(`s = bars("x","1d",asset="equity")\ns.close[-1]`, { barService: svc })
+    expect(off.dates).toBeUndefined() // off by default
+    const on = await runScript(`s = bars("x","1d",asset="equity")\ns.close[-1]`, { barService: svc }, 4, { withDates: true })
+    expect(on.dates?.['yfinance|AAPL']).toEqual(['2024-01-01', '2024-01-02', '2024-01-03', '2024-01-04', '2024-01-05'])
   })
 
   it('a panel entry can be an indicator record (nested)', async () => {

@@ -1,4 +1,5 @@
 import { Field, inputClass } from '../form'
+import { Toggle } from '../Toggle'
 import type { SchemaField } from '../../hooks/useSchemaForm'
 
 /**
@@ -16,6 +17,16 @@ export function SchemaFormFields({ fields, formData, setField, showSecrets }: {
       {fields.map(f => {
         const value = formData[f.key] ?? f.defaultValue ?? ''
         switch (f.type) {
+          case 'boolean':
+            return (
+              <label key={f.key} className="flex items-start gap-2 cursor-pointer select-none">
+                <Toggle size="sm" checked={value === 'true'} onChange={(v) => setField(f.key, v ? 'true' : 'false')} />
+                <span>
+                  <span className="text-[13px] text-text">{f.title}</span>
+                  {f.description && <p className="text-[11px] text-text-muted/60 mt-0.5">{f.description}</p>}
+                </span>
+              </label>
+            )
           case 'select':
             return (
               <Field key={f.key} label={f.title}>

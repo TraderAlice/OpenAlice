@@ -18,7 +18,7 @@
 
 import { Contract } from '@traderalice/ibkr'
 import Decimal from 'decimal.js'
-import type { Position } from './types.js'
+import type { Position, PositionRisk } from './types.js'
 import { assertContract, type SecType } from '../contract-discipline.js'
 import { derivePositionMath } from '../position-math.js'
 
@@ -94,6 +94,9 @@ export interface BuildPositionInput {
   /** Pre-computed unrealizedPnL — see marketValue. */
   unrealizedPnL?: string
   avgCostSource?: 'broker' | 'wallet'
+  /** Venue risk metadata (leverage/liqPrice/marginMode) for leveraged
+   *  derivatives. Passed through verbatim; omitted ⇒ no `risk` on output. */
+  risk?: PositionRisk
 }
 
 /**
@@ -153,5 +156,6 @@ export function buildPosition(input: BuildPositionInput): Position {
     realizedPnL: input.realizedPnL,
     multiplier,
     ...(input.avgCostSource && { avgCostSource: input.avgCostSource }),
+    ...(input.risk && { risk: input.risk }),
   }
 }

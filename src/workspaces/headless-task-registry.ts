@@ -14,8 +14,8 @@
  * upgrade; see project_workspace_automation_design.)
  */
 import { randomUUID } from 'node:crypto'
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
 
 import type { Logger } from './logger.js'
 
@@ -24,6 +24,14 @@ export type HeadlessTaskStatus = 'running' | 'done' | 'failed' | 'interrupted'
 export interface HeadlessTaskRecord {
   readonly taskId: string
   readonly wsId: string
+  /**
+   * The workspace ISSUE that triggered this run, when it was fired by the
+   * ScheduleScanner from a scheduled `.alice/issues/<id>.md` (the issue id ==
+   * the filename stem). Absent on MANUAL/external dispatches (the workspace
+   * "run task" route) and on runs that predate the field — those have no owning
+   * issue. This is the run↔issue link the issue detail's Activity feed joins on.
+   */
+  readonly issueId?: string
   readonly agent: string
   /** The task prompt (the run's instruction) — shown collapsible in the panel. */
   readonly prompt: string
@@ -35,6 +43,22 @@ export interface HeadlessTaskRecord {
   signal?: string | null
   killed?: boolean
   error?: string
+  /**
+   * The agent CLI's OWN session id, captured from the run's stdout (adapter's
+   * `extractHeadlessSessionId`). This is what makes a headless run REOPENABLE:
+   * spawn an interactive session with `resume: { sessionId }` and the user
+   * lands inside the run's full conversation. Absent on runs that died before
+   * announcing (spawn failure) or predate the field.
+   */
+  agentSessionId?: string
+}
+
+/** Task-log file paths — shared by the writer (service) and reader (route). */
+export function headlessLogPaths(logsDir: string, taskId: string): { stdout: string; stderr: string } {
+  return {
+    stdout: join(logsDir, `${taskId}.stdout.log`),
+    stderr: join(logsDir, `${taskId}.stderr.log`),
+  }
 }
 
 const MAX_RECORDS = 200 // prune oldest FINISHED records past this (bounds the file)
@@ -45,10 +69,16 @@ export class HeadlessTaskRegistry {
   private constructor(
     private readonly path: string,
     private readonly logger: Logger,
+    /** Where task logs live; pruned records get their log files deleted too. */
+    private readonly logsDir: string | null,
   ) {}
 
-  static async load(path: string, logger: Logger): Promise<HeadlessTaskRegistry> {
-    const reg = new HeadlessTaskRegistry(path, logger)
+  static async load(
+    path: string,
+    logger: Logger,
+    opts: { logsDir?: string } = {},
+  ): Promise<HeadlessTaskRegistry> {
+    const reg = new HeadlessTaskRegistry(path, logger, opts.logsDir ?? null)
     await reg.read()
     await reg.reconcile()
     return reg
@@ -83,6 +113,8 @@ export class HeadlessTaskRegistry {
     agent: string
     prompt: string
     startedAt: number
+    /** Set only when an issue fired this run (scheduled scan); omitted for manual/external runs. */
+    issueId?: string
   }): Promise<HeadlessTaskRecord> {
     const rec: HeadlessTaskRecord = {
       taskId: randomUUID(),
@@ -91,6 +123,8 @@ export class HeadlessTaskRegistry {
       prompt: input.prompt,
       status: 'running',
       startedAt: input.startedAt,
+      // Keep the field absent (not `undefined`) on manual runs so the JSON stays clean.
+      ...(input.issueId ? { issueId: input.issueId } : {}),
     }
     this.tasks.push(rec)
     await this.flush()
@@ -112,14 +146,27 @@ export class HeadlessTaskRegistry {
     await this.flush()
   }
 
+  /** Record the agent's own session id, captured from stdout while running. */
+  async setAgentSessionId(taskId: string, agentSessionId: string): Promise<void> {
+    const rec = this.tasks.find((t) => t.taskId === taskId)
+    if (!rec || rec.agentSessionId === agentSessionId) return
+    rec.agentSessionId = agentSessionId
+    await this.flush()
+  }
+
   get(taskId: string): HeadlessTaskRecord | null {
     return this.tasks.find((t) => t.taskId === taskId) ?? null
   }
 
   /** Records newest-first, optionally filtered. */
-  list(opts: { wsId?: string; status?: HeadlessTaskStatus; limit?: number } = {}): HeadlessTaskRecord[] {
+  list(
+    opts: { wsId?: string; issueId?: string; status?: HeadlessTaskStatus; limit?: number } = {},
+  ): HeadlessTaskRecord[] {
     let out = this.tasks.filter(
-      (t) => (!opts.wsId || t.wsId === opts.wsId) && (!opts.status || t.status === opts.status),
+      (t) =>
+        (!opts.wsId || t.wsId === opts.wsId) &&
+        (!opts.issueId || t.issueId === opts.issueId) &&
+        (!opts.status || t.status === opts.status),
     )
     out = out.slice().reverse() // newest-first
     return opts.limit && opts.limit > 0 ? out.slice(0, opts.limit) : out
@@ -139,7 +186,17 @@ export class HeadlessTaskRegistry {
           .slice(0, dropCount)
           .map((t) => t.taskId),
       )
-      if (toDrop.size) this.tasks = this.tasks.filter((t) => !toDrop.has(t.taskId))
+      if (toDrop.size) {
+        this.tasks = this.tasks.filter((t) => !toDrop.has(t.taskId))
+        // Best-effort: a pruned record's task logs go with it (bounds disk).
+        if (this.logsDir) {
+          for (const taskId of toDrop) {
+            const paths = headlessLogPaths(this.logsDir, taskId)
+            void rm(paths.stdout, { force: true }).catch(() => undefined)
+            void rm(paths.stderr, { force: true }).catch(() => undefined)
+          }
+        }
+      }
     }
     try {
       await mkdir(dirname(this.path), { recursive: true })

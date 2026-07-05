@@ -21,6 +21,7 @@
 import { spawn, spawnSync, type ChildProcess, type SpawnOptions } from 'node:child_process'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { watch, mkdir, readFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import { dirname, basename, resolve } from 'node:path'
 import { probeFreePort } from '../probe-port.js'
 
@@ -160,15 +161,54 @@ export interface SpawnSpec {
   prefixLogs: boolean
 }
 
+/**
+ * Resolve a dev bin command to its absolute Windows `.CMD` shim when one
+ * exists locally.
+ *
+ * On Windows the dev commands (`tsx`, `pnpm`) are `.CMD` shims in
+ * `node_modules/.bin`. Guardian spawns children through cmd.exe (shell:true),
+ * which would resolve them via PATH — but a Git-Bash / MSYS PATH (or a
+ * service-account environment in a self-hosted deploy) frequently doesn't
+ * carry the project's `.bin` dir, so a bare `tsx` throws ENOENT. Handing
+ * cmd.exe the absolute `.CMD` path removes that PATH dependency.
+ *
+ * Two guards the naive "always rewrite to .bin\<cmd>.CMD" form needs:
+ *   - Only rewrite when the shim actually exists — a globally-installed `pnpm`
+ *     (the Vite child) has no local `node_modules\.bin\pnpm.CMD`; for it we
+ *     fall through to the bare command so cmd.exe's PATH lookup still finds the
+ *     global install.
+ *   - Quote the path when it contains a space (`C:\Program Files\…`): under
+ *     shell:true the command line is parsed by cmd.exe (`/s /c`), which would
+ *     otherwise split the path at the space.
+ *
+ * No-op off Windows — POSIX resolves `.bin` directly with shell off. Reported
+ * by @2233admin (#378), reimplemented here.
+ *
+ * `platform` / `binDir` / `exists` are injectable so the Windows branch is
+ * unit-testable on any OS (it never runs on the POSIX boxes CI mostly uses).
+ */
+export function resolveWindowsBin(
+  command: string,
+  platform: NodeJS.Platform = process.platform,
+  binDir: string = resolve(process.cwd(), 'node_modules', '.bin'),
+  exists: (p: string) => boolean = existsSync,
+): string {
+  if (platform !== 'win32') return command
+  const shim = `${binDir}\\${command}.CMD`
+  if (!exists(shim)) return command
+  return shim.includes(' ') ? `"${shim}"` : shim
+}
+
 export function spawnChild(spec: SpawnSpec): ChildProcess {
-  const child = spawn(spec.command, spec.args, {
+  const child = spawn(resolveWindowsBin(spec.command), spec.args, {
     env: spec.env,
     stdio: spec.prefixLogs ? ['inherit', 'pipe', 'pipe'] : 'inherit',
     // On Windows the dev commands (`tsx`, `pnpm`) are `.cmd` shims in
     // node_modules/.bin. Node's spawn won't apply PATHEXT resolution to find
-    // them without a shell, so a bare `spawn('tsx', …)` throws ENOENT. POSIX
-    // resolves the bin dir directly, so keep shell off there. Args here have
-    // no spaces, so shell quoting isn't a concern.
+    // them without a shell, so a bare `spawn('tsx', …)` throws ENOENT — and a
+    // Git-Bash PATH may not even carry .bin, so the command is resolved to its
+    // absolute shim above. POSIX resolves the bin dir directly, so keep shell
+    // off there. Args here have no spaces, so shell quoting isn't a concern.
     shell: process.platform === 'win32',
   } satisfies SpawnOptions)
 

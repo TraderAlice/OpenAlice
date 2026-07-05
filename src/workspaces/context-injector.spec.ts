@@ -16,7 +16,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { dataPath, defaultPath } from '@/core/paths.js';
 
-import { injectWorkspaceContext, resolveInjection } from './context-injector.js';
+import { injectWorkspaceContext } from './context-injector.js';
 import type { TemplateMeta } from './template-registry.js';
 
 // src/workspaces/ — this spec's directory.
@@ -31,42 +31,12 @@ function makeTemplate(over: Partial<TemplateMeta>): TemplateMeta {
     templateDir: '',
     version: '0.0.0',
     defaultAgents: ['claude'],
-    injectMcp: false,
+    injectTools: false,
     injectPersona: false,
     bundledSkills: [],
     ...over,
   };
 }
-
-describe('resolveInjection (toolAccess)', () => {
-  it('mcp mode leaves an injectable template unchanged', () => {
-    const t = makeTemplate({ injectMcp: true, bundledSkills: ['scan-value-chain'] });
-    expect(resolveInjection(t, 'mcp')).toEqual(t);
-  });
-
-  it('cli mode drops to inbox-only MCP and adds the openalice-cli skill', () => {
-    const t = makeTemplate({ injectMcp: true, bundledSkills: ['scan-value-chain'] });
-    const r = resolveInjection(t, 'cli');
-    expect(r.injectMcp).toBe('inbox');
-    expect(r.bundledSkills).toEqual(['scan-value-chain', 'openalice-cli', 'traderhub']);
-  });
-
-  it('cli mode does not duplicate an already-present openalice-cli', () => {
-    const t = makeTemplate({ injectMcp: true, bundledSkills: ['openalice-cli'] });
-    expect(resolveInjection(t, 'cli').bundledSkills).toEqual(['openalice-cli', 'traderhub']);
-  });
-
-  it('a non-injectable template (injectMcp false) ignores toolAccess', () => {
-    const t = makeTemplate({ injectMcp: false });
-    expect(resolveInjection(t, 'cli')).toEqual(t);
-    expect(resolveInjection(t, 'mcp')).toEqual(t);
-  });
-
-  it('a CLI-locked template (injectMcp inbox) ignores toolAccess', () => {
-    const t = makeTemplate({ injectMcp: 'inbox', bundledSkills: ['openalice-cli'] });
-    expect(resolveInjection(t, 'mcp')).toEqual(t);
-  });
-});
 
 let dir: string;
 beforeEach(async () => {
@@ -78,52 +48,15 @@ afterEach(async () => {
 
 const read = (rel: string): Promise<string> => readFile(join(dir, rel), 'utf8');
 
-describe('injectWorkspaceContext — MCP', () => {
-  it('writes .mcp.json byte-exact with __WS_ID__ substituted and the URL placeholder intact', async () => {
-    await injectWorkspaceContext({ template: makeTemplate({ injectMcp: true }), wsId: 'ws-abc', dir });
-    expect(await read('.mcp.json')).toBe(
-      '{\n'
-      + '  "mcpServers": {\n'
-      + '    "openalice": {\n'
-      + '      "type": "streamable-http",\n'
-      + '      "url": "${OPENALICE_MCP_URL:-http://127.0.0.1:47332/mcp}"\n'
-      + '    },\n'
-      + '    "openalice-workspace": {\n'
-      + '      "type": "streamable-http",\n'
-      + '      "url": "${OPENALICE_MCP_URL:-http://127.0.0.1:47332/mcp}/ws-abc"\n'
-      + '    }\n'
-      + '  }\n'
-      + '}\n',
-    );
-  });
-
-  it('writes inbox-only .mcp.json when injectMcp is "inbox" (no global tool server)', async () => {
-    await injectWorkspaceContext({ template: makeTemplate({ injectMcp: 'inbox' }), wsId: 'ws-abc', dir });
-    expect(await read('.mcp.json')).toBe(
-      '{\n'
-      + '  "mcpServers": {\n'
-      + '    "openalice-workspace": {\n'
-      + '      "type": "streamable-http",\n'
-      + '      "url": "${OPENALICE_MCP_URL:-http://127.0.0.1:47332/mcp}/ws-abc"\n'
-      + '    }\n'
-      + '  }\n'
-      + '}\n',
-    );
-  });
-
-  it('does not write .mcp.json when injectMcp is false', async () => {
-    await injectWorkspaceContext({ template: makeTemplate({ injectMcp: false }), wsId: 'ws-abc', dir });
+describe('injectWorkspaceContext — no MCP injection (CLI-only)', () => {
+  it('never writes .mcp.json, even for a tool-bearing template', async () => {
+    await injectWorkspaceContext({ template: makeTemplate({ injectTools: true }), wsId: 'ws-abc', dir });
     expect(existsSync(join(dir, '.mcp.json'))).toBe(false);
-    // No tools injected → no Pi bridge either.
-    expect(existsSync(join(dir, '.pi/extensions/openalice-bridge.ts'))).toBe(false);
   });
 
-  it('writes the Pi MCP bridge extension when injecting MCP (Pi has no native MCP)', async () => {
-    await injectWorkspaceContext({ template: makeTemplate({ injectMcp: true }), wsId: 'ws-abc', dir });
-    const bridge = await read('.pi/extensions/openalice-bridge.ts');
-    expect(bridge).toContain('openalice-bridge');
-    expect(bridge).toContain('registerTool');
-    expect(bridge).toContain('OPENALICE_MCP_URL');
+  it('never writes the Pi MCP bridge extension', async () => {
+    await injectWorkspaceContext({ template: makeTemplate({ injectTools: true }), wsId: 'ws-abc', dir });
+    expect(existsSync(join(dir, '.pi/extensions/openalice-bridge.ts'))).toBe(false);
   });
 });
 
@@ -166,5 +99,38 @@ describe('injectWorkspaceContext — skills', () => {
     expect(await read('.claude/skills/scan-value-chain/SKILL.md')).toBe(expected);  // Claude Code
     expect(await read('.agents/skills/scan-value-chain/SKILL.md')).toBe(expected);  // Codex (+ opencode default)
     expect(await read('.pi/skills/scan-value-chain/SKILL.md')).toBe(expected);      // Pi
+  });
+
+  it('injects the per-CLI playbooks (alice* + traderhub) for a tool-bearing template', async () => {
+    await injectWorkspaceContext({
+      template: makeTemplate({ injectTools: true, bundledSkills: ['scan-value-chain'] }),
+      wsId: 'ws-abc',
+      dir,
+    });
+    for (const name of ['alice', 'alice-analysis', 'alice-uta', 'alice-workspace', 'traderhub', 'scan-value-chain']) {
+      expect(existsSync(join(dir, '.claude/skills', name, 'SKILL.md')), name).toBe(true);
+      expect(existsSync(join(dir, '.pi/skills', name, 'SKILL.md')), name).toBe(true);
+    }
+  });
+
+  it('does not inject CLI playbooks when the template is not tool-bearing', async () => {
+    await injectWorkspaceContext({
+      template: makeTemplate({ injectTools: false, bundledSkills: ['scan-value-chain'] }),
+      wsId: 'ws-abc',
+      dir,
+    });
+    expect(existsSync(join(dir, '.claude/skills/alice-uta/SKILL.md'))).toBe(false);
+    expect(existsSync(join(dir, '.claude/skills/scan-value-chain/SKILL.md'))).toBe(true);
+  });
+
+  it('injects the self-scheduling skill into every workspace, even an untooled one', async () => {
+    await injectWorkspaceContext({
+      template: makeTemplate({ injectTools: false }),
+      wsId: 'ws-abc',
+      dir,
+    });
+    expect(existsSync(join(dir, '.claude/skills/self-scheduling/SKILL.md'))).toBe(true);
+    expect(existsSync(join(dir, '.agents/skills/self-scheduling/SKILL.md'))).toBe(true);
+    expect(existsSync(join(dir, '.pi/skills/self-scheduling/SKILL.md'))).toBe(true);
   });
 });

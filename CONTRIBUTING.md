@@ -13,17 +13,39 @@ We actively welcome issues of all kinds:
 
 The more detail you provide, the faster we can act on it. Screenshots, logs, and steps to reproduce are always helpful.
 
-## Pull Requests — Not Accepted
+## Pull Requests — Welcome as Proposals
 
-**We do not accept external pull requests.** This is not a reflection on the quality of contributions — it's a security decision.
+External pull requests are welcome. We read them carefully and treat good PRs as
+high-signal contributions to the project.
 
-OpenAlice is a trading agent that executes real financial operations. Every line of code that runs has direct access to exchange accounts and API keys. Accepting external code — even well-intentioned code — introduces supply chain risk that we cannot afford. A single malicious dependency update, a subtle logic change in order execution, or a backdoor in a utility function could result in real financial loss.
+That said, we still do **not directly merge external PR branches**. OpenAlice is
+a trading agent that can connect to real broker accounts and API keys, so every
+line of code that runs has a security and financial-risk surface. The project is
+also still early: large architectural changes happen often, and maintainers need
+to keep authorship and integration responsibility tight while those boundaries
+are moving.
 
-We review and implement all changes internally to maintain full control over the security surface.
+In practice:
 
-## How to Contribute Without Code
+- Open a PR when you have a concrete fix, design, refactor, or implementation
+  idea.
+- Explain the problem, the tradeoffs, and why the approach fits OpenAlice.
+- Maintainers may use the PR as a reference, adapt it, or reimplement the idea
+  internally before it lands.
+- If your PR meaningfully shapes the project, we credit you in
+  [`CONTRIBUTORS.md`](./CONTRIBUTORS.md). That public credit is the contribution
+  record for externally proposed work, even when the final code is integrated by
+  maintainers.
 
-The best way to help is to **open an issue**. If you've found a bug or have an idea, file it — we read every issue and often ship fixes the same day. Your feedback directly shapes the roadmap.
+This policy is not about contribution quality. It is about keeping the trading
+security surface controlled while still recognizing the people whose ideas,
+reports, and PRs move the project forward.
+
+## Other Ways to Contribute
+
+Issues are still very welcome. If you've found a bug or have an idea, file it —
+we read every issue and often ship fixes quickly. Screenshots, logs, repro steps,
+broker/account mode, operating system, and expected-vs-actual behavior all help.
 
 ## Security Issues
 

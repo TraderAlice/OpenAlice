@@ -1,9 +1,12 @@
-import type { InboxEntry } from '../../api/inbox'
+import type { InboxEntry, InboxOrigin } from '../../api/inbox'
 import { DEMO_WORKSPACE_ID } from './workspaces'
 
 export const DEMO_REPORT_PATH = 'research-AAPL-q1.md'
 
 const FIVE_MIN_AGO = Date.now() - 5 * 60 * 1000
+const HOUR = 60 * 60 * 1000
+const DAY = 24 * HOUR
+const nowMs = Date.now()
 
 export const demoInboxEntry: InboxEntry = {
   id: 'demo-inbox-aapl-q1',
@@ -20,9 +23,107 @@ export const demoInboxEntry: InboxEntry = {
   ].join('\n'),
 }
 
+// ── Headless reports tied to scheduled issues ──
+// These carry a server-stamped `origin` (kind:'headless' + runId + issueId +
+// agent) — the agent-INVISIBLE provenance. It drives BOTH directions of the
+// cross-link: each card renders an "originating issue/run" breadcrumb, and the
+// matching issue detail lists them under "Inbox reports" (see fixtures/issues.ts
+// `demoIssueDetail`, which filters by workspaceId + origin.issueId). The
+// runId/issueId here MUST match real fixtures — runId ↔ a HeadlessTaskRecord
+// taskId in demoIssueExtras, issueId ↔ a board issue id — so the link resolves
+// on both surfaces.
+
+/** Build the headless InboxOrigin the server would stamp for a scheduled-issue
+ *  run. Agent-invisible: the agent never supplies any of this (it's injected at
+ *  spawn, carried out-of-band, resolved server-side). */
+function headlessOrigin(runId: string, issueId: string, agent: string): InboxOrigin {
+  return { kind: 'headless', runId, issueId, agent }
+}
+
+// auto-quant › morning-scan, latest run (demo-run-morning-1, codex). Has a doc.
+export const demoMoversReport: InboxEntry = {
+  id: 'demo-inbox-morning-1',
+  ts: nowMs - HOUR + 84_000,
+  workspaceId: 'demo-ws-auto-quant',
+  workspaceLabel: 'auto-quant',
+  docs: [{ path: 'reports/movers-2026-06-27.md' }],
+  comments: [
+    'Morning scan is in — ranked digest above.',
+    '',
+    'Top of the list is **VST** (+7.4%, 3.1x RVOL) on the datacenter-power read; it touches the book. Full table in the report.',
+  ].join('\n'),
+  origin: headlessOrigin('demo-run-morning-1', 'morning-scan', 'codex'),
+}
+
+// macro-research › weekly-digest, latest run (demo-run-digest-1, codex). Has a doc.
+export const demoDigestReport: InboxEntry = {
+  id: 'demo-inbox-digest-1',
+  ts: nowMs - 2 * DAY + 156_000,
+  workspaceId: 'demo-ws-macro',
+  workspaceLabel: 'macro-research',
+  docs: [{ path: 'digests/macro-2026-06-25.md' }],
+  comments:
+    'Weekly macro digest is up — rates steepened, dollar soft, core PCE inline. Next week\'s calendar at the bottom.',
+  origin: headlessOrigin('demo-run-digest-1', 'weekly-digest', 'codex'),
+}
+
+// auto-quant › morning-scan, an OLDER run (demo-run-morning-3, codex). Same issue
+// as demoMoversReport → that issue's detail lists TWO inbox reports. Comments-only
+// (no doc) to exercise the doc-less card.
+export const demoMoversReportOlder: InboxEntry = {
+  id: 'demo-inbox-morning-3',
+  ts: nowMs - 2 * DAY + 79_000,
+  workspaceId: 'demo-ws-auto-quant',
+  workspaceLabel: 'auto-quant',
+  comments: [
+    'Earlier morning scan (two days ago) — quiet tape, nothing actionable touched the book.',
+    '',
+    'Logged for the record; no doc attached.',
+  ].join('\n'),
+  origin: headlessOrigin('demo-run-morning-3', 'morning-scan', 'codex'),
+}
+
+/** GET /api/inbox/history order — newest-first. `demoInboxEntry` (the AAPL
+ *  research push) carries NO origin: the interactive/manual case, which renders
+ *  without an originating-issue breadcrumb. */
+export const demoInboxEntries: InboxEntry[] = [
+  demoInboxEntry,
+  demoMoversReport,
+  demoDigestReport,
+  demoMoversReportOlder,
+]
+
 // File contents served back to readWorkspaceFile() for demo workspace docs.
 // Keyed by relative path.
 export const demoWorkspaceFiles: Record<string, string> = {
+  // Doc for demoMoversReport (auto-quant › morning-scan run).
+  'reports/movers-2026-06-27.md': `# Pre-market movers — 2026-06-27
+
+**Workspace:** auto-quant · **Run:** morning movers scan (scheduled)
+
+Ranked by gap × relative volume. Bold = touches the book.
+
+| # | Ticker | Gap | RVOL | Why | Book? |
+|---|--------|------|------|-----|-------|
+| 1 | **VST** | +7.4% | 3.1x | datacenter-power read-through; PPA headline | yes |
+| 2 | NVDA | +3.2% | 1.8x | supplier guidance bump | no |
+| 3 | VRT | +5.1% | 2.4x | cooling order flow | watch |
+
+[[stock-vst]] is the cleanest [[ai-data-center-power]] expression in the list —
+flagged for the [[Liquidity risk review]] sizing pass.
+`,
+
+  // Doc for demoDigestReport (macro-research › weekly-digest run).
+  'digests/macro-2026-06-25.md': `# Weekly macro digest — week of 2026-06-23
+
+**Workspace:** macro-research · **Run:** weekly digest (scheduled, Fri close)
+
+1. **Rates** — UST 2s10s steepened 6bp; market nudged the first cut earlier.
+2. **FX** — DXY -0.4%; JPY the standout on intervention chatter.
+3. **Prints** — core PCE inline; jobless claims a touch soft.
+4. **Next week** — ISM, payrolls, and the quarter-end refunding update.
+`,
+
   [DEMO_REPORT_PATH]: `# AAPL Q1 — Hidden Deceleration Signal
 
 **Workspace:** aapl-q1 · **Generated:** just now

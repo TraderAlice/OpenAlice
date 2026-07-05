@@ -17,13 +17,14 @@ const VENDORS_BY_BASEURL: Array<[RegExp, CredentialVendor]> = [
   [/minimaxi\.com|minimax\.io/i, 'minimax'],
   [/moonshot\.cn|moonshot\.ai/i, 'kimi'],
   [/deepseek\.com/i, 'deepseek'],
+  [/longcat\.chat/i, 'longcat'],
 ]
 
 /**
  * Infer a credential vendor from the workspace AI-config modal's context — a
  * CLI agent tab + the entered baseUrl.
  *
- * A recognized baseUrl wins (GLM/MiniMax/Kimi/DeepSeek gateways); otherwise the
+ * A recognized baseUrl wins (GLM/MiniMax/Kimi/DeepSeek/LongCat gateways); otherwise the
  * agent decides: claude → anthropic, codex → openai. opencode/pi are
  * OpenAI-compatible against arbitrary endpoints, so an unrecognized baseUrl
  * falls back to 'custom' rather than guessing a first-party vendor.

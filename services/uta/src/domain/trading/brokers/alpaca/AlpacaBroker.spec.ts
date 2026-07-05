@@ -120,6 +120,117 @@ describe('AlpacaBroker — placeOrder()', () => {
     expect(result.orderId).toBe('ord-1')
   })
 
+  it('surfaces bracket leg ids with kinds (ledger tracks legs from birth)', async () => {
+    const acc = new AlpacaBroker({ apiKey: 'k', secretKey: 's', paper: true })
+    ;(acc as any).client = {
+      createOrder: vi.fn().mockResolvedValue({
+        id: 'parent-1', status: 'new', order_class: 'bracket',
+        legs: [
+          { id: 'tp-1', type: 'limit', limit_price: '297', stop_price: null, status: 'held' },
+          { id: 'sl-1', type: 'stop', limit_price: null, stop_price: '285.5', status: 'held' },
+        ],
+      }),
+    }
+    const contract = new Contract()
+    contract.aliceId = 'alpaca-paper|AAPL'
+    contract.symbol = 'AAPL'
+    contract.secType = 'STK'
+    contract.exchange = 'NASDAQ'
+    contract.currency = 'USD'
+
+    const order = new Order()
+    order.action = 'BUY'
+    order.orderType = 'LMT'
+    order.totalQuantity = new Decimal(1)
+    order.lmtPrice = new Decimal('291.57')
+
+    const result = await acc.placeOrder(contract, order, {
+      takeProfit: { price: '297' },
+      stopLoss: { price: '285.5' },
+    })
+    expect(result.success).toBe(true)
+    expect(result.legs).toEqual([
+      { orderId: 'tp-1', kind: 'takeProfit' },
+      { orderId: 'sl-1', kind: 'stopLoss' },
+    ])
+  })
+
+  it('uses order_class "oto" (not "bracket") when only one exit leg is attached', async () => {
+    // Regression: a single stop_loss under order_class "bracket" is rejected
+    // 422 by Alpaca ("bracket orders require take_profit.limit_price"). One
+    // leg must go out as "oto", two legs as "bracket".
+    const createOrder = vi.fn().mockResolvedValue({ id: 'ord-oto', status: 'new' })
+    const acc = new AlpacaBroker({ apiKey: 'k', secretKey: 's', paper: true })
+    ;(acc as any).client = { createOrder }
+    const contract = new Contract()
+    contract.aliceId = 'alpaca-paper|FCX'
+    contract.symbol = 'FCX'
+    contract.secType = 'STK'
+    contract.exchange = 'NYSE'
+    contract.currency = 'USD'
+
+    const order = new Order()
+    order.action = 'BUY'
+    order.orderType = 'LMT'
+    order.totalQuantity = new Decimal(90)
+    order.lmtPrice = new Decimal('65')
+
+    // Only a stop loss, no take profit — the case that 422'd in production.
+    const result = await acc.placeOrder(contract, order, { stopLoss: { price: '58' } })
+    expect(result.success).toBe(true)
+    const sent = createOrder.mock.calls[0][0]
+    expect(sent.order_class).toBe('oto')
+    expect(sent.stop_loss).toEqual({ stop_price: 58 })
+    expect(sent.take_profit).toBeUndefined()
+  })
+
+  it('uses order_class "bracket" when both exit legs are attached', async () => {
+    const createOrder = vi.fn().mockResolvedValue({ id: 'ord-br', status: 'new' })
+    const acc = new AlpacaBroker({ apiKey: 'k', secretKey: 's', paper: true })
+    ;(acc as any).client = { createOrder }
+    const contract = new Contract()
+    contract.aliceId = 'alpaca-paper|AAPL'
+    contract.symbol = 'AAPL'
+    contract.secType = 'STK'
+    contract.exchange = 'NASDAQ'
+    contract.currency = 'USD'
+
+    const order = new Order()
+    order.action = 'BUY'
+    order.orderType = 'LMT'
+    order.totalQuantity = new Decimal(1)
+    order.lmtPrice = new Decimal('291.57')
+
+    const result = await acc.placeOrder(contract, order, {
+      takeProfit: { price: '297' },
+      stopLoss: { price: '285.5' },
+    })
+    expect(result.success).toBe(true)
+    expect(createOrder.mock.calls[0][0].order_class).toBe('bracket')
+  })
+
+  it('omits legs for simple (non-bracket) placements', async () => {
+    const acc = new AlpacaBroker({ apiKey: 'k', secretKey: 's', paper: true })
+    ;(acc as any).client = {
+      createOrder: vi.fn().mockResolvedValue({ id: 'ord-2', status: 'new' }),
+    }
+    const contract = new Contract()
+    contract.aliceId = 'alpaca-paper|AAPL'
+    contract.symbol = 'AAPL'
+    contract.secType = 'STK'
+    contract.exchange = 'NASDAQ'
+    contract.currency = 'USD'
+
+    const order = new Order()
+    order.action = 'BUY'
+    order.orderType = 'MKT'
+    order.totalQuantity = new Decimal(1)
+
+    const result = await acc.placeOrder(contract, order)
+    expect(result.success).toBe(true)
+    expect('legs' in result).toBe(false)
+  })
+
   it('returns error when contract resolution fails', async () => {
     const acc = new AlpacaBroker({ apiKey: 'k', secretKey: 's', paper: true })
     ;(acc as any).client = { createOrder: vi.fn() }
@@ -760,5 +871,47 @@ describe('AlpacaBroker — getCapabilities()', () => {
     const caps = acc.getCapabilities()
     expect(caps.supportedSecTypes).toEqual(['STK'])
     expect(caps.supportedOrderTypes).toEqual(['MKT', 'LMT', 'STP', 'STP LMT', 'TRAIL'])
+  })
+})
+
+describe('AlpacaBroker — getHistorical() feed handling', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  async function* barGen(rows: any[]) { for (const r of rows) yield r }
+  const ROW = { Timestamp: '2026-06-25T05:00:00Z', OpenPrice: 1, HighPrice: 2, LowPrice: 0.5, ClosePrice: 1.5, Volume: 100 }
+  const recentSip403 = Object.assign(new Error('Request failed with status code 403'), {
+    response: { status: 403, data: { message: 'subscription does not permit querying recent SIP data' } },
+  })
+
+  it('requests the full SIP tape by default', async () => {
+    const acc = new AlpacaBroker({ apiKey: 'k', secretKey: 's', paper: true })
+    const getBarsV2 = vi.fn(() => barGen([ROW]))
+    ;(acc as any).client = { getBarsV2 }
+    const bars = await acc.getHistorical(Object.assign(new Contract(), { symbol: 'SPY' }), { interval: '1d' } as any)
+    expect(getBarsV2).toHaveBeenCalledTimes(1)
+    expect(getBarsV2).toHaveBeenCalledWith('SPY', expect.objectContaining({ feed: 'sip' }))
+    expect(bars).toHaveLength(1)
+  })
+
+  it('falls back to IEX when SIP denies the recent window (403)', async () => {
+    const acc = new AlpacaBroker({ apiKey: 'k', secretKey: 's', paper: true })
+    const getBarsV2 = vi.fn((_sym: string, opts: any) => {
+      if (opts.feed === 'sip') throw recentSip403
+      return barGen([ROW])
+    })
+    ;(acc as any).client = { getBarsV2 }
+    const bars = await acc.getHistorical(Object.assign(new Contract(), { symbol: 'SPY' }), { interval: '1m' } as any)
+    expect(getBarsV2).toHaveBeenCalledTimes(2)
+    expect(getBarsV2).toHaveBeenNthCalledWith(2, 'SPY', expect.objectContaining({ feed: 'iex' }))
+    expect(bars).toHaveLength(1)
+  })
+
+  it('does NOT fall back on a non-SIP error (propagates)', async () => {
+    const acc = new AlpacaBroker({ apiKey: 'k', secretKey: 's', paper: true })
+    const err500 = Object.assign(new Error('boom'), { response: { status: 500 } })
+    const getBarsV2 = vi.fn(() => { throw err500 })
+    ;(acc as any).client = { getBarsV2 }
+    await expect(acc.getHistorical(Object.assign(new Contract(), { symbol: 'SPY' }), { interval: '1d' } as any)).rejects.toThrow()
+    expect(getBarsV2).toHaveBeenCalledTimes(1)
   })
 })

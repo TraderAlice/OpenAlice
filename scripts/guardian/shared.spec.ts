@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { readPortsFile, resolvePortConfig } from './shared.js'
+import { readPortsFile, resolvePortConfig, resolveWindowsBin } from './shared.js'
 
 let home: string
 
@@ -88,5 +88,29 @@ describe('resolvePortConfig', () => {
 
   it('fails loud on a malformed env value', () => {
     expect(() => resolvePortConfig({ OPENALICE_MCP_PORT: 'banana' }, {})).toThrow(/invalid port/)
+  })
+})
+
+describe('resolveWindowsBin — Windows .CMD shim resolution (#378)', () => {
+  const BIN = 'C:\\proj\\node_modules\\.bin'
+
+  it('is a no-op off Windows (POSIX resolves .bin directly with shell off)', () => {
+    expect(resolveWindowsBin('tsx', 'linux', BIN, () => true)).toBe('tsx')
+    expect(resolveWindowsBin('tsx', 'darwin', BIN, () => true)).toBe('tsx')
+  })
+
+  it('rewrites a local shim to its absolute .CMD path on Windows', () => {
+    expect(resolveWindowsBin('tsx', 'win32', BIN, (p) => p === `${BIN}\\tsx.CMD`))
+      .toBe('C:\\proj\\node_modules\\.bin\\tsx.CMD')
+  })
+
+  it('falls through to the bare command when no local shim exists (e.g. global pnpm)', () => {
+    expect(resolveWindowsBin('pnpm', 'win32', BIN, () => false)).toBe('pnpm')
+  })
+
+  it('quotes the path when it contains a space, for cmd.exe parsing under shell:true', () => {
+    const spaced = 'C:\\Program Files\\proj\\node_modules\\.bin'
+    expect(resolveWindowsBin('tsx', 'win32', spaced, () => true))
+      .toBe('"C:\\Program Files\\proj\\node_modules\\.bin\\tsx.CMD"')
   })
 })

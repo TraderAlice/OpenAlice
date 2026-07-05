@@ -6,6 +6,8 @@ import { useWorkspace } from '../tabs/store'
 import { useWatchlist } from '../tabs/watchlist-store'
 import { getFocusedTab, type ViewSpec } from '../tabs/types'
 import { SidebarRow } from './SidebarRow'
+import { SidebarSectionHeader } from './SidebarSectionHeader'
+import { Spinner } from './StateViews'
 
 const ASSET_CLASS_COLORS: Record<string, string> = {
   equity: 'bg-accent/15 text-accent',
@@ -68,7 +70,7 @@ export function MarketSidebar() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t('market.searchPlaceholder')}
-          className="w-full px-2.5 py-1.5 bg-bg text-text border border-border rounded-md text-[13px] outline-none focus:border-accent"
+          className="w-full px-2.5 py-1.5 bg-bg text-text border border-border/70 rounded-md text-[13px] outline-none focus:border-accent"
         />
       </div>
 
@@ -85,41 +87,45 @@ export function MarketSidebar() {
           active={isFocused('market-rotation')}
           onClick={() => openOrFocus({ kind: 'market-rotation', params: {} })}
         />
-        <SidebarRow
-          label={t('market.boardMovers')}
-          active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'movers'}
-          onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'movers' } })}
-        />
-        <SidebarRow
-          label={t('market.boardCalendar')}
-          active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'calendar'}
-          onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'calendar' } })}
-        />
-        <SidebarRow
-          label={t('market.boardMacro')}
-          active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'macro'}
-          onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'macro' } })}
-        />
-        <SidebarRow
-          label={t('market.boardTermStructure')}
-          active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'term-structure'}
-          onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'term-structure' } })}
-        />
-        <SidebarRow
-          label={t('market.boardGlobalMacro')}
-          active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'global-macro'}
-          onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'global-macro' } })}
-        />
-        <SidebarRow
-          label={t('market.boardFed')}
-          active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'fed'}
-          onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'fed' } })}
-        />
-        <SidebarRow
-          label={t('market.boardShipping')}
-          active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'shipping'}
-          onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'shipping' } })}
-        />
+        {/* Boards — a distinct cluster from the two nav rows above, on the
+            same kinship rail the Inbox uses for grouped sub-rows. */}
+        <div className="ml-[18px] border-l border-border/50">
+          <SidebarRow
+            label={t('market.boardMovers')}
+            active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'movers'}
+            onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'movers' } })}
+          />
+          <SidebarRow
+            label={t('market.boardCalendar')}
+            active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'calendar'}
+            onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'calendar' } })}
+          />
+          <SidebarRow
+            label={t('market.boardMacro')}
+            active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'macro'}
+            onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'macro' } })}
+          />
+          <SidebarRow
+            label={t('market.boardTermStructure')}
+            active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'term-structure'}
+            onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'term-structure' } })}
+          />
+          <SidebarRow
+            label={t('market.boardGlobalMacro')}
+            active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'global-macro'}
+            onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'global-macro' } })}
+          />
+          <SidebarRow
+            label={t('market.boardFed')}
+            active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'fed'}
+            onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'fed' } })}
+          />
+          <SidebarRow
+            label={t('market.boardShipping')}
+            active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'shipping'}
+            onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'shipping' } })}
+          />
+        </div>
 
         {/* Search results — only when query is non-empty */}
         {query.trim() && (
@@ -127,8 +133,14 @@ export function MarketSidebar() {
             <SidebarSectionHeader>
               {t('market.searchResults')}{loading ? ` (${t('common.searching')})` : results.length ? ` (${results.length})` : ''}
             </SidebarSectionHeader>
+            {loading && (
+              <div className="px-3 py-2 flex items-center gap-2 text-[12px] text-text-muted/60">
+                <Spinner size="sm" />
+                <span>{t('common.searching')}</span>
+              </div>
+            )}
             {!loading && results.length === 0 && (
-              <p className="px-3 py-1 text-[12px] text-text-muted/60">{t('market.noMatches')}</p>
+              <p className="px-3 py-2 text-[12px] text-text-muted/70 leading-relaxed">{t('market.noMatches')}</p>
             )}
             {results.map((c) => (
               <SidebarRow
@@ -150,7 +162,7 @@ export function MarketSidebar() {
         {/* Watchlist */}
         <SidebarSectionHeader>{t('market.watchlist')}{watchlist.length ? ` (${watchlist.length})` : ''}</SidebarSectionHeader>
         {watchlist.length === 0 ? (
-          <p className="px-3 py-1 text-[12px] text-text-muted/60">
+          <p className="px-3 py-2 text-[12px] text-text-muted/70 leading-relaxed">
             {t('market.emptyWatchlistHint')}
           </p>
         ) : (
@@ -214,10 +226,3 @@ function SourceTrail({ c }: { c: BarSourceCandidate }) {
   )
 }
 
-function SidebarSectionHeader({ children }: { children: React.ReactNode }) {
-  return (
-    <h3 className="px-3 mt-3 mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-text-muted/60 select-none">
-      {children}
-    </h3>
-  )
-}
