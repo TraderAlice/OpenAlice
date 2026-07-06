@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { ActivityBar } from './components/ActivityBar'
 import { TabHost } from './components/TabHost'
 import { DesktopUpdatePrompt } from './components/DesktopUpdatePrompt'
@@ -65,6 +66,8 @@ function AppShell() {
   const hasRailText = useHasRailText() // ≥960 — text rail is allowed
   const hasFullRail = useHasFullRail() // ≥1280 — full rail width
   const railMode = !isDesktop ? 'full' : hasFullRail ? 'full' : hasRailText ? 'narrow' : 'compact'
+  const location = useLocation()
+  const suppressFirstRunGuide = location.pathname.startsWith('/design/')
 
   // When the rail becomes a static column, drop its mobile drawer state.
   useEffect(() => {
@@ -119,7 +122,7 @@ function AppShell() {
           {mainContent}
         </div>
         <UrlAdopter />
-        <FirstRunGuide />
+        {!suppressFirstRunGuide && <FirstRunGuide />}
       </div>
     </div>
   )

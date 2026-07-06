@@ -474,18 +474,13 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
 
         {error !== null && <div className="text-[12px] text-red px-1">{error}</div>}
 
-        {/* Runtime install guidance — the conversion nudge. Shows when no agent
-            CLI is installed at all, or the selected one is missing from PATH.
-            Detection is a hint, not a gate, so send stays enabled (PATH probing
-            can be wrong); this just tells the user what to install. Gated on
-            `agentsKnown` so it never flashes during the initial /agents load. */}
+        {/* Runtime guidance. A normal packaged build should expose managed Pi;
+            no-runtime is now an abnormal setup/debug state, not a prompt to
+            make a fresh user install a CLI. */}
         {agentsKnown && !anyInstalled ? (
           <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-[12px] space-y-1.5">
             <div className="font-medium text-text">{t('chatLanding.noAgentsTitle')}</div>
             <p className="text-text-muted">{t('chatLanding.noAgentsBody')}</p>
-            <code className="block font-mono text-[11px] text-text bg-bg-tertiary rounded px-2 py-1 select-all">
-              {installHintFor('claude')!.cmd}
-            </code>
           </div>
         ) : selectedMissing && selectedInfo ? (
           <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-[12px] space-y-1.5">

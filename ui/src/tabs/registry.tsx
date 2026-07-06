@@ -24,6 +24,7 @@ import { MarketDataPage } from '../pages/MarketDataPage'
 import { NewsCollectorPage } from '../pages/NewsCollectorPage'
 import { UTADetailPage } from '../pages/UTADetailPage'
 import { OnboardingDesignPage } from '../pages/OnboardingDesignPage'
+import { DesignProjectPage } from '../pages/DesignProjectPage'
 import { DevPage } from '../pages/DevPage'
 import { InboxPage } from '../pages/InboxPage'
 import { InboxPageShell } from '../pages/InboxPageShell'
@@ -43,6 +44,7 @@ import { DevCategoryList } from '../components/DevCategoryList'
 import { MarketSidebar } from '../components/MarketSidebar'
 import { PortfolioSidebar } from '../components/PortfolioSidebar'
 import { AutomationSidebar } from '../components/AutomationSidebar'
+import { getDesignProject } from '../design/projects'
 
 /**
  * Central registry mapping each ViewKind to its render component and URL
@@ -310,6 +312,13 @@ const onboardingModule: ViewModule<'onboarding'> = {
   Component: () => <OnboardingDesignPage />,
 }
 
+const designProjectModule: ViewModule<'design-project'> = {
+  kind: 'design-project',
+  title: (spec) => getDesignProject(spec.params.project)?.title ?? `Design: ${spec.params.project}`,
+  toUrl: (spec) => `/design/${encodeURIComponent(spec.params.project)}`,
+  Component: ({ spec }) => <DesignProjectPage spec={spec} />,
+}
+
 const devTabTitle: Record<Extract<ViewSpec, { kind: 'dev' }>['params']['tab'], string> = {
   tools: 'Tools',
   onboarding: 'Onboarding',
@@ -497,6 +506,7 @@ const VIEWS = {
   settings: settingsModule,
   'uta-detail': utaDetailModule,
   onboarding: onboardingModule,
+  'design-project': designProjectModule,
   dev: devModule,
   inbox: inboxModule,
   tracked: trackedModule,

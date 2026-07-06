@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -19,13 +20,18 @@ export function buildOnboardingTestEnv(
   opts: { root?: string } = {},
 ): OnboardingTestEnvPlan {
   const root = opts.root ?? input['OPENALICE_ONBOARDING_TEST_ROOT'] ?? mkdtempSync(join(tmpdir(), 'openalice-onboarding-'))
+  const credentialTestMode = input['OPENALICE_CREDENTIAL_TEST_MODE']?.trim() || 'mock'
   const env: NodeJS.ProcessEnv = {
     ...input,
     OPENALICE_ONBOARDING_TEST: '1',
+    OPENALICE_CREDENTIAL_TEST_MODE: credentialTestMode,
     OPENALICE_HOME: input['OPENALICE_HOME'] ?? join(root, 'home'),
     AQ_LAUNCHER_ROOT: input['AQ_LAUNCHER_ROOT'] ?? join(root, 'workspaces'),
     OPENALICE_GLOBAL_DIR: input['OPENALICE_GLOBAL_DIR'] ?? join(root, 'global'),
-    OPENALICE_AGENT_RUNTIME_INSTALLS: input['OPENALICE_AGENT_RUNTIME_INSTALLS'] ?? 'none',
+    OPENALICE_AGENT_RUNTIME_INSTALLS: input['OPENALICE_AGENT_RUNTIME_INSTALLS'] ?? 'only:pi',
+    VITE_OPENALICE_ONBOARDING_TEST: '1',
+    VITE_OPENALICE_CREDENTIAL_TEST_MODE: input['VITE_OPENALICE_CREDENTIAL_TEST_MODE'] ?? credentialTestMode,
+    VITE_OPENALICE_ONBOARDING_STORAGE_SUFFIX: input['VITE_OPENALICE_ONBOARDING_STORAGE_SUFFIX'] ?? randomUUID(),
   }
 
   for (const [key, value] of Object.entries(DEFAULT_PORTS)) {

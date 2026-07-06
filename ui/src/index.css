@@ -196,6 +196,172 @@ body {
   animation-delay: 0.3s;
 }
 
+@keyframes onboarding-slide-forward {
+  from {
+    opacity: 0;
+    transform: translateX(22px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes onboarding-slide-back {
+  from {
+    opacity: 0;
+    transform: translateX(-22px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes onboarding-completion-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.76);
+  }
+  62% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes onboarding-completion-ring {
+  0% {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+  45% {
+    opacity: 0.55;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.42);
+  }
+}
+
+@keyframes onboarding-completion-line {
+  0% {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+  35% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scaleX(1);
+  }
+}
+
+.oa-onboarding-slide-forward {
+  animation: onboarding-slide-forward 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.oa-onboarding-slide-back {
+  animation: onboarding-slide-back 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.oa-onboarding-step-layout {
+  display: grid;
+  min-height: 0;
+  flex: 1 1 0%;
+  gap: 1rem;
+  align-content: start;
+  overflow-y: auto;
+  padding-top: 0.75rem;
+}
+
+.oa-onboarding-completion {
+  position: relative;
+  width: 5rem;
+  height: 5rem;
+  margin-bottom: 1.25rem;
+}
+
+.oa-onboarding-completion-ring {
+  position: relative;
+  display: grid;
+  width: 4.5rem;
+  height: 4.5rem;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--color-green) 38%, var(--color-border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-green) 12%, var(--color-bg));
+  box-shadow: inset 0 0 0 0.5rem color-mix(in srgb, var(--color-green) 7%, transparent);
+  animation: onboarding-completion-pop 0.58s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.oa-onboarding-completion-ring::after {
+  position: absolute;
+  inset: -0.5rem;
+  content: "";
+  border: 1px solid var(--color-green);
+  border-radius: inherit;
+  animation: onboarding-completion-ring 0.72s 0.12s ease-out both;
+}
+
+.oa-onboarding-completion-line {
+  position: absolute;
+  width: 1.25rem;
+  height: 1px;
+  border-radius: 999px;
+  background: var(--color-green);
+  opacity: 0;
+  transform-origin: center;
+  animation: onboarding-completion-line 0.62s ease-out both;
+}
+
+.oa-onboarding-completion-line-a {
+  top: 0.55rem;
+  left: 3.85rem;
+  transform: rotate(-22deg) scaleX(0);
+  animation-delay: 0.16s;
+}
+
+.oa-onboarding-completion-line-b {
+  top: 3.55rem;
+  left: 4.2rem;
+  transform: rotate(16deg) scaleX(0);
+  animation-delay: 0.23s;
+}
+
+.oa-onboarding-completion-line-c {
+  top: 1.15rem;
+  left: -0.25rem;
+  transform: rotate(18deg) scaleX(0);
+  animation-delay: 0.2s;
+}
+
+@media (min-width: 768px) {
+  .oa-onboarding-step-layout {
+    grid-template-columns: minmax(0, 360px) minmax(300px, 340px);
+    gap: 1.5rem;
+    align-items: start;
+    justify-content: center;
+    padding-top: clamp(3rem, 10vh, 5rem);
+  }
+}
+
+@media (min-width: 900px) {
+  .oa-onboarding-step-layout {
+    grid-template-columns: minmax(0, 420px) minmax(320px, 350px);
+  }
+}
+
+@media (min-width: 1024px) {
+  .oa-onboarding-step-layout {
+    grid-template-columns: minmax(0, 480px) minmax(340px, 360px);
+  }
+}
+
 /* Skeleton placeholder — theme-aware shimmer for first-load states. The block
    is the tertiary surface (reads on both the page bg and bg-secondary cards); a
    soft overlay band sweeps across at an ambient cadence (sibling to live-pulse's
@@ -218,6 +384,13 @@ body {
   animation: skeleton-sweep 1.6s ease-in-out infinite;
 }
 @media (prefers-reduced-motion: reduce) {
+  .oa-onboarding-slide-forward,
+  .oa-onboarding-slide-back,
+  .oa-onboarding-completion-ring,
+  .oa-onboarding-completion-ring::after,
+  .oa-onboarding-completion-line {
+    animation: none;
+  }
   .skeleton {
     animation: none;
     background-image: none;

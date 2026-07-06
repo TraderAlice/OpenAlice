@@ -33,6 +33,35 @@ interface ConfigRouteOpts {
   ctx?: EngineContext
 }
 
+export const ONBOARDING_TEST_CREDENTIAL = {
+  apiKey: 'oa_test_ok',
+  model: 'openalice-onboarding-test',
+  baseUrl: 'https://onboarding.openalice.test/openai-chat',
+  wireShape: 'openai-chat' as const satisfies WireShape,
+}
+
+function onboardingMockCredentialTestEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env['OPENALICE_ONBOARDING_TEST'] === '1' && env['OPENALICE_CREDENTIAL_TEST_MODE'] === 'mock'
+}
+
+function maybeHandleOnboardingMockCredentialTest(body: {
+  wireShape: WireShape
+  baseUrl?: string
+  apiKey: string
+  model: string
+}): { ok: boolean; response?: string; error?: string } | null {
+  if (!onboardingMockCredentialTestEnabled()) return null
+  const isMockEndpoint =
+    body.wireShape === ONBOARDING_TEST_CREDENTIAL.wireShape &&
+    body.baseUrl?.trim() === ONBOARDING_TEST_CREDENTIAL.baseUrl &&
+    body.model.trim() === ONBOARDING_TEST_CREDENTIAL.model
+  if (!isMockEndpoint) return null
+  if (body.apiKey.trim() !== ONBOARDING_TEST_CREDENTIAL.apiKey) {
+    return { ok: false, error: `Use the onboarding test key "${ONBOARDING_TEST_CREDENTIAL.apiKey}".` }
+  }
+  return { ok: true, response: 'OpenAlice onboarding mock credential is ready.' }
+}
+
 /** Config routes: GET /, PUT /:section, profile CRUD, presets, test */
 export function createConfigRoutes(opts?: ConfigRouteOpts) {
   const app = new Hono()
@@ -161,6 +190,8 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
       if (!body.apiKey || !body.model) {
         return c.json({ ok: false, error: 'apiKey and model are required' })
       }
+      const mockResult = maybeHandleOnboardingMockCredentialTest(body)
+      if (mockResult) return c.json(mockResult)
       const authMode = resolveAnthropicAuthMode({ authMode: body.authMode, baseUrl: body.baseUrl })
       const r = await probeByWireShape(body.wireShape, {
         baseUrl: body.baseUrl, apiKey: body.apiKey, model: body.model, authMode,

@@ -21,6 +21,7 @@ import {
 import { configApi, type CredentialSummary } from '../api/config'
 import { tradingApi, type TradingServiceStatus } from '../api/trading'
 import type { AppConfig, UTAConfig } from '../api/types'
+import type { AgentInfo } from '../components/workspace/api'
 import { CenteredLoading } from '../components/StateViews'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { useWorkspace } from '../tabs/store'
@@ -112,7 +113,7 @@ export function OnboardingDesignPage() {
     }
   }, [])
 
-  const model = useMemo(() => buildModel({
+  const model = useMemo(() => buildOnboardingModel({
     agents,
     credentials: runtime.credentials,
     tradingStatus: runtime.tradingStatus,
@@ -126,10 +127,10 @@ export function OnboardingDesignPage() {
   }
 
   return (
-    <div className="flex flex-col min-h-full">
-      <div className="px-4 md:px-6 py-5 space-y-5">
+    <div className="flex min-h-full flex-col">
+      <div className="space-y-5 px-4 py-5 md:px-6">
         {loading ? (
-          <CenteredLoading label="Loading first-run state..." />
+          <CenteredLoading label="Loading setup state..." />
         ) : error ? (
           <div className="rounded-lg border border-red/30 bg-red/10 px-4 py-3 text-[13px] text-red">
             {error}
@@ -137,27 +138,86 @@ export function OnboardingDesignPage() {
         ) : (
           <>
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-              <p className="max-w-[620px] text-[13px] leading-relaxed text-text-muted">
-                First-run setup states and layout candidates.
-              </p>
+              <div className="min-w-0">
+                <div className="text-[11px] font-medium uppercase tracking-wide text-text-muted">
+                  Setup checklist
+                </div>
+                <h1 className="mt-1 text-[24px] font-semibold leading-tight text-text">
+                  Bring Alice online one layer at a time.
+                </h1>
+                <p className="mt-2 max-w-[680px] text-[13px] leading-relaxed text-text-muted">
+                  Start with an agent runtime and AI access. Add UTA only when you want broker-aware analysis or trading workflows.
+                </p>
+              </div>
               <div className="flex flex-wrap items-center gap-2 text-[11px] text-text-muted">
-                <span className="rounded-md border border-border bg-bg-secondary px-2 py-1">
-                  {model.tradingModeLabel}
-                </span>
-                <span className="rounded-md border border-border bg-bg-secondary px-2 py-1">
-                  {model.installedAgentCount}/{model.agentCount} runtimes
-                </span>
+                <StatusChip>{model.tradingModeLabel}</StatusChip>
+                <StatusChip>{model.installedAgentCount}/{model.agentCount} runtimes</StatusChip>
+                <StatusChip>{model.utaCount} UTA</StatusChip>
               </div>
             </div>
 
             <StatusBand model={model} />
 
-            <div className="overflow-x-auto pb-2">
-              <div className="grid min-w-[900px] grid-cols-3 gap-4 items-start">
-                <ChecklistVariant model={model} onAction={openTarget} />
-                <ModeFirstVariant model={model} onAction={openTarget} />
-                <CapabilityVariant model={model} onAction={openTarget} />
-              </div>
+            <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+              <section className="min-w-0 rounded-lg border border-border bg-bg-secondary/50">
+                <div className="border-b border-border px-4 py-3">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-accent-dim text-accent">
+                      <TerminalSquare className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <h2 className="text-[16px] font-semibold text-text">Setup path</h2>
+                      <p className="mt-1 text-[12px] leading-relaxed text-text-muted">
+                        The first incomplete item is the next useful action.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="px-4 py-2">
+                  {model.steps.map((step, index) => (
+                    <StepRow
+                      key={step.id}
+                      step={step}
+                      index={index + 1}
+                      onAction={openTarget}
+                    />
+                  ))}
+                </div>
+                <div className="border-t border-border px-4 py-4">
+                  <PrimaryAction step={model.primaryStep} onAction={openTarget} />
+                </div>
+              </section>
+
+              <aside className="min-w-0 space-y-5">
+                <CapabilityPanel model={model} />
+                <div className="rounded-lg border border-border bg-bg-secondary/50 px-4 py-4">
+                  <div className="text-[11px] font-medium uppercase tracking-wide text-text-muted">
+                    Shortcuts
+                  </div>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+                    <SmallAction
+                      icon={<KeyRound className="h-3.5 w-3.5" />}
+                      label="AI Provider"
+                      onClick={() => openTarget({ kind: 'settings', params: { category: 'ai-provider' } })}
+                    />
+                    <SmallAction
+                      icon={<Settings className="h-3.5 w-3.5" />}
+                      label="Agent Permissions"
+                      onClick={() => openTarget({ kind: 'settings', params: { category: 'agent-permissions' } })}
+                    />
+                    <SmallAction
+                      icon={<WalletCards className="h-3.5 w-3.5" />}
+                      label="Trading Settings"
+                      onClick={() => openTarget({ kind: 'settings', params: { category: 'trading' } })}
+                    />
+                    <SmallAction
+                      icon={<Bot className="h-3.5 w-3.5" />}
+                      label="Ask Alice"
+                      onClick={() => openTarget({ kind: 'chat-landing', params: {} })}
+                    />
+                  </div>
+                </div>
+              </aside>
             </div>
           </>
         )}
@@ -166,8 +226,8 @@ export function OnboardingDesignPage() {
   )
 }
 
-function buildModel(input: {
-  agents: readonly { id: string; displayName: string; kind?: 'agent' | 'utility'; installed?: boolean }[]
+export function buildOnboardingModel(input: {
+  agents: readonly Pick<AgentInfo, 'id' | 'displayName' | 'kind' | 'installed'>[]
   credentials: CredentialSummary[]
   tradingStatus: TradingServiceStatus | null
   utas: UTAConfig[]
@@ -194,10 +254,10 @@ function buildModel(input: {
   const runtimeNames = installedAgents.map((a) => a.displayName).join(', ')
   const agentStep: StepModel = {
     id: 'agent-runtime',
-    title: hasAgentRuntime ? 'Agent runtime ready' : agentsKnown ? 'Install an agent runtime' : 'Checking agent runtimes',
+    title: hasAgentRuntime ? 'Agent runtime ready' : agentsKnown ? 'Choose an agent runtime' : 'Checking agent runtimes',
     body: hasAgentRuntime
       ? `${runtimeNames} can launch Alice workspaces.`
-      : 'Install Codex, Claude Code, opencode, or Pi before starting a workspace chat.',
+      : 'Desktop builds can include a managed runtime; developer installs can also use Codex, Claude Code, opencode, or Pi on PATH.',
     state: hasAgentRuntime ? 'ready' : 'attention',
     action: hasAgentRuntime ? 'Open Ask Alice' : 'Open runtime setup',
     target: hasAgentRuntime
@@ -212,8 +272,8 @@ function buildModel(input: {
     body: hasCredential
       ? `${credentialCount} vault credential${credentialCount === 1 ? '' : 's'} available for workspace injection.`
       : hasLoginRuntime
-        ? 'Claude Code and Codex can use their own CLI login; vault credentials stay optional.'
-        : 'Add a vault credential for opencode/Pi, or install a CLI with its own login.',
+        ? 'Claude Code and Codex can use their own login; vault credentials stay optional.'
+        : 'Pi and opencode need a vault credential before they can call a model.',
     state: hasCredential || hasLoginRuntime ? 'ready' : 'attention',
     action: 'Open AI Provider',
     target: { kind: 'settings', params: { category: 'ai-provider' } },
@@ -224,7 +284,7 @@ function buildModel(input: {
     id: 'trading-mode',
     title: mode === 'lite' ? 'Lite mode active' : mode === 'readonly' ? 'Readonly mode active' : 'Pro mode active',
     body: mode === 'lite'
-      ? 'UTA is disconnected. Alice can analyze without broker accounts.'
+      ? 'UTA is disconnected. Alice can still analyze markets and research without broker state.'
       : mode === 'readonly'
         ? 'UTA can read accounts and positions. Broker writes stay blocked.'
         : 'UTA is enabled and per-account permissions decide write behavior.',
@@ -236,14 +296,14 @@ function buildModel(input: {
 
   const utaStep: StepModel = {
     id: 'uta-accounts',
-    title: hasUTA ? 'UTA configured' : mode === 'lite' ? 'UTA is optional in Lite' : 'Connect a UTA',
+    title: hasUTA ? 'UTA configured' : mode === 'lite' ? 'UTA can wait' : 'Connect a UTA',
     body: hasUTA
       ? `${utaCount} configured, ${enabledUtaCount} enabled, ${readOnlyUtaCount} read-only, ${vendorCount} data vendor${vendorCount === 1 ? '' : 's'}.`
       : mode === 'lite'
-        ? 'Connect one later when you want portfolio-aware analysis or broker-backed data.'
+        ? 'Connect one later for portfolio-aware analysis, broker-backed data, or Trading as Git.'
         : 'Readonly and Pro modes need at least one broker or exchange account.',
     state: hasUTA ? 'ready' : mode === 'lite' ? 'optional' : 'attention',
-    action: hasUTA ? 'Open Trading settings' : mode === 'lite' ? 'Add later' : 'Add UTA',
+    action: hasUTA ? 'Open Trading settings' : mode === 'lite' ? 'Add UTA later' : 'Add UTA',
     target: { kind: 'settings', params: { category: 'trading' } },
     icon: WalletCards,
   }
@@ -254,7 +314,7 @@ function buildModel(input: {
     {
       id: 'ask-alice',
       label: 'Ask Alice',
-      detail: hasAgentRuntime ? 'Workspace chat can launch.' : 'Needs one installed agent runtime.',
+      detail: hasAgentRuntime ? 'Workspace chat can launch.' : 'Needs one available agent runtime.',
       state: hasAgentRuntime ? 'ready' : 'attention',
       icon: Bot,
     },
@@ -308,13 +368,13 @@ function buildModel(input: {
   }
 }
 
-function StatusBand({ model }: { model: ReturnType<typeof buildModel> }) {
+function StatusBand({ model }: { model: ReturnType<typeof buildOnboardingModel> }) {
   return (
     <div className="border-y border-border bg-bg-secondary/35">
-      <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-border">
+      <div className="grid grid-cols-2 divide-x divide-y divide-border lg:grid-cols-4 lg:divide-y-0">
         <StatusMetric label="Setup" value={`${model.readyCount}/${model.steps.length}`} sub="ready checks" />
         <StatusMetric label="Mode" value={model.tradingModeLabel} sub="global trading capability" />
-        <StatusMetric label="Agent" value={`${model.installedAgentCount}/${model.agentCount}`} sub="installed runtimes" />
+        <StatusMetric label="Agent" value={`${model.installedAgentCount}/${model.agentCount}`} sub="available runtimes" />
         <StatusMetric label="UTA" value={model.hasUTA ? `${model.utaCount} configured` : 'none'} sub="broker connection state" />
       </div>
     </div>
@@ -324,132 +384,34 @@ function StatusBand({ model }: { model: ReturnType<typeof buildModel> }) {
 function StatusMetric({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
     <div className="min-w-0 px-3 py-3">
-      <div className="text-[10px] uppercase text-text-muted tracking-wide">{label}</div>
+      <div className="text-[10px] uppercase tracking-wide text-text-muted">{label}</div>
       <div className="mt-1 truncate text-[14px] font-semibold text-text">{value}</div>
       <div className="mt-0.5 truncate text-[11px] text-text-muted">{sub}</div>
     </div>
   )
 }
 
-function ChecklistVariant({
-  model,
-  onAction,
-}: {
-  model: ReturnType<typeof buildModel>
-  onAction: (target?: ViewSpec) => void
-}) {
+function CapabilityPanel({ model }: { model: ReturnType<typeof buildOnboardingModel> }) {
   return (
-    <VariantShell
-      eyebrow="Option A"
-      title="Setup checklist"
-      subtitle="A direct first-run panel for users who want the shortest path to a working Alice."
-      accent={<TerminalSquare className="h-4 w-4" />}
-    >
-      <div className="space-y-1">
-        {model.steps.map((step, index) => (
-          <StepRow
-            key={step.id}
-            step={step}
-            index={index + 1}
-            onAction={onAction}
-          />
-        ))}
+    <section className="min-w-0 rounded-lg border border-border bg-bg-secondary/50">
+      <div className="border-b border-border px-4 py-3">
+        <div className="flex items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-accent-dim text-accent">
+            <Compass className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-[16px] font-semibold text-text">Capability map</h2>
+            <p className="mt-1 text-[12px] leading-relaxed text-text-muted">
+              Shows what is usable in the current mode.
+            </p>
+          </div>
+        </div>
       </div>
-      <PrimaryAction step={model.primaryStep} onAction={onAction} />
-    </VariantShell>
-  )
-}
-
-function ModeFirstVariant({
-  model,
-  onAction,
-}: {
-  model: ReturnType<typeof buildModel>
-  onAction: (target?: ViewSpec) => void
-}) {
-  return (
-    <VariantShell
-      eyebrow="Option B"
-      title="Mode first"
-      subtitle="Starts with Lite, Readonly, and Pro so broker risk is framed before setup steps."
-      accent={<ShieldCheck className="h-4 w-4" />}
-    >
-      <div className="grid gap-2">
-        {[
-          {
-            mode: 'lite',
-            title: 'Lite',
-            body: 'UTA disconnected. Alice analyzes without broker accounts.',
-            icon: Compass,
-          },
-          {
-            mode: 'readonly',
-            title: 'Readonly',
-            body: 'Read accounts and positions. Broker writes are blocked.',
-            icon: Lock,
-          },
-          {
-            mode: 'pro',
-            title: 'Pro',
-            body: 'Per-account permissions and approval controls apply.',
-            icon: GitBranch,
-          },
-        ].map((item) => {
-          const Icon = item.icon
-          const active = model.mode === item.mode
-          return (
-            <button
-              key={item.mode}
-              type="button"
-              onClick={() => onAction({ kind: 'settings', params: { category: 'agent-permissions' } })}
-              className={`min-w-0 rounded-lg border px-3 py-3 text-left transition-colors hover:border-accent/55 ${
-                active ? 'border-accent bg-accent-dim' : 'border-border bg-bg-secondary/45'
-              }`}
-            >
-              <div className="flex min-w-0 items-start gap-3">
-                <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${active ? 'bg-accent text-white' : 'bg-bg-tertiary text-text-muted'}`}>
-                  <Icon className="h-4 w-4" />
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <div className="text-[14px] font-semibold text-text">{item.title}</div>
-                    {active && <StateBadge state="ready" label="Current" />}
-                  </div>
-                  <p className="mt-1 text-[12px] leading-relaxed text-text-muted">{item.body}</p>
-                </div>
-              </div>
-            </button>
-          )
-        })}
-      </div>
-      <div className="border-t border-border pt-3 space-y-2">
-        {model.steps.slice(0, 2).map((step) => (
-          <CompactStep key={step.id} step={step} onAction={onAction} />
-        ))}
-      </div>
-    </VariantShell>
-  )
-}
-
-function CapabilityVariant({
-  model,
-  onAction,
-}: {
-  model: ReturnType<typeof buildModel>
-  onAction: (target?: ViewSpec) => void
-}) {
-  return (
-    <VariantShell
-      eyebrow="Option C"
-      title="Capability map"
-      subtitle="Shows what OpenAlice can do now, then links missing capabilities to the owning setting."
-      accent={<Compass className="h-4 w-4" />}
-    >
-      <div className="divide-y divide-border border-y border-border">
+      <div className="divide-y divide-border px-4">
         {model.capabilities.map((capability) => {
           const Icon = capability.icon
           return (
-            <div key={capability.id} className="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-3 py-3">
+            <div key={capability.id} className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] gap-3 py-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-md bg-bg-tertiary text-text-muted">
                 <Icon className="h-4 w-4" />
               </div>
@@ -461,52 +423,6 @@ function CapabilityVariant({
             </div>
           )
         })}
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2 gap-2">
-        <SmallAction
-          icon={<KeyRound className="h-3.5 w-3.5" />}
-          label="AI Provider"
-          onClick={() => onAction({ kind: 'settings', params: { category: 'ai-provider' } })}
-        />
-        <SmallAction
-          icon={<Settings className="h-3.5 w-3.5" />}
-          label="Agent Permissions"
-          onClick={() => onAction({ kind: 'settings', params: { category: 'agent-permissions' } })}
-        />
-      </div>
-    </VariantShell>
-  )
-}
-
-function VariantShell({
-  eyebrow,
-  title,
-  subtitle,
-  accent,
-  children,
-}: {
-  eyebrow: string
-  title: string
-  subtitle: string
-  accent: ReactNode
-  children: ReactNode
-}) {
-  return (
-    <section className="min-w-0 rounded-lg border border-border bg-bg-secondary/50">
-      <div className="border-b border-border px-4 py-3">
-        <div className="flex items-start gap-3">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-accent-dim text-accent">
-            {accent}
-          </div>
-          <div className="min-w-0">
-            <div className="text-[10px] uppercase tracking-wide text-text-muted">{eyebrow}</div>
-            <h3 className="mt-0.5 truncate text-[15px] font-semibold text-text">{title}</h3>
-            <p className="mt-1 text-[12px] leading-relaxed text-text-muted">{subtitle}</p>
-          </div>
-        </div>
-      </div>
-      <div className="space-y-3 px-4 py-4">
-        {children}
       </div>
     </section>
   )
@@ -523,15 +439,15 @@ function StepRow({
 }) {
   const Icon = step.icon
   return (
-    <div className="min-w-0 border-b border-border/70 py-3 last:border-b-0">
+    <div className="min-w-0 border-b border-border/70 py-4 last:border-b-0">
       <div className="flex min-w-0 items-start gap-3">
-        <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-bg-tertiary text-[12px] font-semibold text-text-muted">
+        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-bg-tertiary text-[12px] font-semibold text-text-muted">
           {index}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <Icon className="h-3.5 w-3.5 shrink-0 text-text-muted" />
-            <div className="min-w-0 truncate text-[13px] font-semibold text-text">{step.title}</div>
+            <div className="min-w-0 text-[14px] font-semibold text-text">{step.title}</div>
             <StateBadge state={step.state} />
           </div>
           <p className="mt-1 text-[12px] leading-relaxed text-text-muted">{step.body}</p>
@@ -539,7 +455,7 @@ function StepRow({
         <button
           type="button"
           onClick={() => onAction(step.target)}
-          className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-bg text-text-muted transition-colors hover:border-accent/50 hover:text-accent"
+          className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-bg text-text-muted transition-colors hover:border-accent/50 hover:text-accent"
           aria-label={step.action}
           title={step.action}
         >
@@ -547,27 +463,6 @@ function StepRow({
         </button>
       </div>
     </div>
-  )
-}
-
-function CompactStep({
-  step,
-  onAction,
-}: {
-  step: StepModel
-  onAction: (target?: ViewSpec) => void
-}) {
-  const Icon = step.icon
-  return (
-    <button
-      type="button"
-      onClick={() => onAction(step.target)}
-      className="flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-2 text-left transition-colors hover:bg-overlay"
-    >
-      <Icon className="h-3.5 w-3.5 shrink-0 text-text-muted" />
-      <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-text">{step.title}</span>
-      <StateDot state={step.state} />
-    </button>
   )
 }
 
@@ -623,6 +518,14 @@ function StateDot({ state }: { state: Readiness }) {
   return (
     <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md border ${STATE_STYLE[state]}`} title={STATE_LABEL[state]}>
       <Icon className="h-3.5 w-3.5" />
+    </span>
+  )
+}
+
+function StatusChip({ children }: { children: ReactNode }) {
+  return (
+    <span className="rounded-md border border-border bg-bg-secondary px-2 py-1">
+      {children}
     </span>
   )
 }

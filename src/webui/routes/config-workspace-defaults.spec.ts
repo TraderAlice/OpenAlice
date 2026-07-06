@@ -15,6 +15,10 @@ let defaultsStore: Record<string, WorkspaceCredentialDefault> = {}
 let defaultAgentStore: string | null = null
 let issueDefaultAgentStore: string | null = null
 
+const { probeByWireShapeMock } = vi.hoisted(() => ({
+  probeByWireShapeMock: vi.fn(async () => ({ text: 'real probe' })),
+}))
+
 vi.mock('../../core/config.js', async () => {
   const actual = await vi.importActual<typeof import('../../core/config.js')>('../../core/config.js')
   return {
@@ -51,6 +55,10 @@ vi.mock('../../core/config.js', async () => {
   }
 })
 
+vi.mock('../../workspaces/agent-probe.js', () => ({
+  probeByWireShape: probeByWireShapeMock,
+}))
+
 import { createConfigRoutes } from './config.js'
 
 async function req(routes: ReturnType<typeof createConfigRoutes>, method: 'GET' | 'POST' | 'PUT', path: string, body?: unknown) {
@@ -65,6 +73,10 @@ async function req(routes: ReturnType<typeof createConfigRoutes>, method: 'GET' 
 }
 
 beforeEach(() => {
+  delete process.env.OPENALICE_ONBOARDING_TEST
+  delete process.env.OPENALICE_CREDENTIAL_TEST_MODE
+  probeByWireShapeMock.mockClear()
+  probeByWireShapeMock.mockResolvedValue({ text: 'real probe' })
   credStore = {
     'anthropic-1': { vendor: 'anthropic', authType: 'api-key', apiKey: 'sk-ant', wires: { anthropic: '' } },
     'openai-1': { vendor: 'openai', authType: 'api-key', apiKey: 'sk-oa', wires: { 'openai-responses': '', 'openai-chat': '' } },
@@ -111,6 +123,46 @@ describe('POST /credentials', () => {
     const slug = body!.slug
     expect(typeof slug).toBe('string')
     expect(credStore[slug as string]).toMatchObject({ lastModel: 'longmao-chat' })
+  })
+})
+
+describe('POST /credentials/test', () => {
+  const mockBody = {
+    wireShape: 'openai-chat',
+    baseUrl: 'https://onboarding.openalice.test/openai-chat',
+    apiKey: 'oa_test_ok',
+    model: 'openalice-onboarding-test',
+  }
+
+  it('uses the onboarding mock provider only when the test env enables it', async () => {
+    process.env.OPENALICE_ONBOARDING_TEST = '1'
+    process.env.OPENALICE_CREDENTIAL_TEST_MODE = 'mock'
+    const routes = createConfigRoutes()
+
+    const { body } = await req(routes, 'POST', '/credentials/test', mockBody)
+
+    expect(body).toEqual({ ok: true, response: 'OpenAlice onboarding mock credential is ready.' })
+    expect(probeByWireShapeMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects the onboarding mock provider with the wrong test key', async () => {
+    process.env.OPENALICE_ONBOARDING_TEST = '1'
+    process.env.OPENALICE_CREDENTIAL_TEST_MODE = 'mock'
+    const routes = createConfigRoutes()
+
+    const { body } = await req(routes, 'POST', '/credentials/test', { ...mockBody, apiKey: 'wrong' })
+
+    expect(body).toEqual({ ok: false, error: 'Use the onboarding test key "oa_test_ok".' })
+    expect(probeByWireShapeMock).not.toHaveBeenCalled()
+  })
+
+  it('falls back to the real probe outside onboarding mock mode', async () => {
+    const routes = createConfigRoutes()
+
+    const { body } = await req(routes, 'POST', '/credentials/test', mockBody)
+
+    expect(body).toEqual({ ok: true, response: 'real probe' })
+    expect(probeByWireShapeMock).toHaveBeenCalledOnce()
   })
 })
 

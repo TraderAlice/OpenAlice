@@ -31,6 +31,7 @@ export function UrlAdopter() {
             la Linear — but Linear's comms live in Slack; ours live here). */}
         <Route path="/" element={<Navigate to="/chat" replace />} />
         <Route path="/onboarding" element={<AdoptStatic spec={{ kind: 'onboarding', params: {} }} />} />
+        <Route path="/design/:project" element={<AdoptDesignProject />} />
 
         {/* Activities */}
         {/* /chat → the "Ask Alice" quick-chat landing (composer). Legacy
@@ -239,6 +240,12 @@ function AdoptFileViewer() {
   return <AdoptStatic spec={{ kind: 'file-viewer', params: { wsId, path } }} />
 }
 
+function AdoptDesignProject() {
+  const { project } = useParams<{ project: string }>()
+  if (!project) return <Navigate to="/dev/tools" replace />
+  return <AdoptStatic spec={{ kind: 'design-project', params: { project } }} />
+}
+
 function RedirectUtaDetail() {
   const { id } = useParams<{ id: string }>()
   return <Navigate to={`/settings/uta/${id ?? ''}`} replace />
@@ -275,8 +282,9 @@ function specToSection(spec: ViewSpec): ActivitySection {
     case 'market-rotation':
     case 'market-board':
     case 'market-detail':      return 'market'
-    case 'settings':           return 'settings'
-    case 'onboarding':         return 'dev'
+    case 'settings':
+    case 'onboarding':         return 'settings'
+    case 'design-project':     return 'dev'
     case 'dev':                return 'dev'
   }
 }

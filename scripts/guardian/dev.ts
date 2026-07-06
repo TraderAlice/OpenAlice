@@ -30,6 +30,12 @@ import {
   resolveGuardianTradingMode,
   type SpawnSpec,
 } from './shared.js'
+import {
+  ALICE_BACKEND_WATCH_INCLUDES,
+  UTA_BACKEND_WATCH_INCLUDES,
+  buildTsxWatchArgs,
+  isBackendHotReloadEnabled,
+} from './dev-hot-reload.js'
 
 async function main(): Promise<void> {
   // One global store by default (~/.openalice) — shared with the packaged
@@ -61,6 +67,7 @@ async function main(): Promise<void> {
   const ports = await planPorts(resolvePortConfig(process.env, await readPortsFile(dataHome)), { skipUta: liteMode })
   const flagPath = resolve(dataHome, 'data/control/restart-uta.flag')
   const utaUrl = `http://127.0.0.1:${ports.utaPort}`
+  const backendHotReload = isBackendHotReloadEnabled(process.env)
 
   console.log('')
   console.log(`[guardian] mode     →  ${initialMode.mode} (${initialMode.source}${initialMode.envLocked ? ', env-locked' : ''})`)
@@ -71,6 +78,7 @@ async function main(): Promise<void> {
   console.log(`[guardian] Tools    →  http://127.0.0.1:${ports.mcpPort}/cli`)
   console.log(`[guardian] MCP      →  optional on http://127.0.0.1:${ports.mcpPort}/mcp`)
   console.log(`[guardian] UI       →  http://localhost:${ports.uiPort}`)
+  console.log(`[guardian] reload   →  ${backendHotReload ? 'backend watch enabled' : 'backend watch disabled'}`)
   console.log(`[guardian] flag     →  ${flagPath}`)
   console.log('')
 
@@ -87,7 +95,7 @@ async function main(): Promise<void> {
   const utaSpec: SpawnSpec = {
     name: 'uta',
     command: 'tsx',
-    args: ['watch', 'services/uta/src/main.ts'],
+    args: buildTsxWatchArgs('services/uta/src/main.ts', UTA_BACKEND_WATCH_INCLUDES, process.env),
     env: { ...baseEnv, OPENALICE_UTA_PORT: String(ports.utaPort) },
     prefixLogs: true,
   }
@@ -110,7 +118,7 @@ async function main(): Promise<void> {
   const alice: ChildProcess = spawnChild({
     name: 'alice',
     command: 'tsx',
-    args: ['watch', 'src/main.ts'],
+    args: buildTsxWatchArgs('src/main.ts', ALICE_BACKEND_WATCH_INCLUDES, process.env),
     env: {
       ...baseEnv,
       OPENALICE_WEB_PORT: String(ports.webPort),

@@ -11,9 +11,21 @@ describe('buildOnboardingTestEnv', () => {
     expect(env['OPENALICE_HOME']).toBe('/tmp/oa-onboarding/home')
     expect(env['AQ_LAUNCHER_ROOT']).toBe('/tmp/oa-onboarding/workspaces')
     expect(env['OPENALICE_GLOBAL_DIR']).toBe('/tmp/oa-onboarding/global')
-    expect(env['OPENALICE_AGENT_RUNTIME_INSTALLS']).toBe('none')
+    expect(env['OPENALICE_AGENT_RUNTIME_INSTALLS']).toBe('only:pi')
+    expect(env['OPENALICE_CREDENTIAL_TEST_MODE']).toBe('mock')
+    expect(env['VITE_OPENALICE_ONBOARDING_TEST']).toBe('1')
+    expect(env['VITE_OPENALICE_CREDENTIAL_TEST_MODE']).toBe('mock')
+    expect(env['VITE_OPENALICE_ONBOARDING_STORAGE_SUFFIX']).toMatch(/^[0-9a-f-]{36}$/)
     expect(env['OPENALICE_UI_PORT']).toBe('15173')
     expect(env['OPENALICE_TRADING_MODE']).toBeUndefined()
+  })
+
+  it('allows a fixed onboarding storage suffix for reproducing browser state', () => {
+    const { env } = buildOnboardingTestEnv({
+      VITE_OPENALICE_ONBOARDING_STORAGE_SUFFIX: 'fixed-ui-state',
+    }, { root: '/tmp/oa-onboarding' })
+
+    expect(env['VITE_OPENALICE_ONBOARDING_STORAGE_SUFFIX']).toBe('fixed-ui-state')
   })
 
   it('scrubs inherited trading env unless the onboarding-specific mode is set', () => {
@@ -35,6 +47,7 @@ describe('buildOnboardingTestEnv', () => {
       OPENALICE_GLOBAL_DIR: '/custom/global',
       OPENALICE_UI_PORT: '25173',
       OPENALICE_AGENT_RUNTIME_INSTALLS: 'only:codex',
+      OPENALICE_CREDENTIAL_TEST_MODE: 'real',
     }, { root: '/tmp/oa-onboarding' })
 
     expect(env['OPENALICE_HOME']).toBe('/custom/home')
@@ -42,6 +55,7 @@ describe('buildOnboardingTestEnv', () => {
     expect(env['OPENALICE_GLOBAL_DIR']).toBe('/custom/global')
     expect(env['OPENALICE_UI_PORT']).toBe('25173')
     expect(env['OPENALICE_AGENT_RUNTIME_INSTALLS']).toBe('only:codex')
+    expect(env['OPENALICE_CREDENTIAL_TEST_MODE']).toBe('real')
+    expect(env['VITE_OPENALICE_CREDENTIAL_TEST_MODE']).toBe('real')
   })
 })
-

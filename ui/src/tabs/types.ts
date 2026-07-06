@@ -34,6 +34,7 @@ export type ViewSpec =
   | { kind: 'settings';       params: { category: 'general' | 'ai-provider' | 'agent-permissions' | 'trading' | 'issues' | 'mcp' | 'market-data' | 'news-collector' } }
   | { kind: 'uta-detail';     params: { id: string } }
   | { kind: 'onboarding';     params: Record<string, never> }
+  | { kind: 'design-project'; params: { project: string } }
   | { kind: 'dev';            params: { tab: 'tools' | 'onboarding' | 'snapshots' | 'logs' | 'simulator' } }
   | { kind: 'inbox';               params: Record<string, never> }
   | { kind: 'tracked';             params: Record<string, never> }
