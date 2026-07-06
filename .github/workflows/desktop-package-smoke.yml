@@ -1,0 +1,90 @@
+name: Desktop Package Smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [master]
+    paths:
+      - ".github/workflows/desktop-package-smoke.yml"
+      - ".github/workflows/release.yml"
+      - "apps/desktop/**"
+      - "build/entitlements*.plist"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "scripts/assert-desktop-package.mjs"
+      - "scripts/desktop-packaged-smoke.mjs"
+      - "scripts/vendor-managed-runtime.mjs"
+      - "src/core/paths.ts"
+      - "src/core/runtime-profile.ts"
+      - "src/workspaces/**"
+      - "services/uta/**"
+  push:
+    branches: [master]
+    paths:
+      - ".github/workflows/desktop-package-smoke.yml"
+      - ".github/workflows/release.yml"
+      - "apps/desktop/**"
+      - "build/entitlements*.plist"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "scripts/assert-desktop-package.mjs"
+      - "scripts/desktop-packaged-smoke.mjs"
+      - "scripts/vendor-managed-runtime.mjs"
+      - "src/core/paths.ts"
+      - "src/core/runtime-profile.ts"
+      - "src/workspaces/**"
+      - "services/uta/**"
+
+jobs:
+  package:
+    name: package ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Keep this until the Windows managed Git runtime fully replaces dugite's
+      # embedded payload. It catches a skipped dugite postinstall before a
+      # package artifact reaches a tester.
+      - name: Verify bundled git (dugite) was fetched
+        shell: bash
+        run: |
+          node -e "const{existsSync}=require('fs');const{dirname,join}=require('path');const g=join(dirname(require.resolve('dugite/package.json')),'git');if(!existsSync(g)){console.error('dugite embedded git MISSING at '+g);process.exit(1)}console.log('dugite embedded git OK '+g)"
+
+      - name: Build Alice + UTA + desktop shell
+        run: pnpm electron:build
+
+      - name: Vendor managed workspace runtime
+        run: pnpm vendor:runtime
+
+      - name: Verify managed Pi runtime
+        run: node vendor/pi/node_modules/@earendil-works/pi-coding-agent/dist/cli.js --version
+
+      - name: Package unpacked desktop app
+        shell: bash
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: |
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            ulimit -n 65536 || ulimit -n 32768 || ulimit -n 16384 || ulimit -n 10240
+            echo "open files limit: $(ulimit -n)"
+          fi
+          pnpm -F @traderalice/desktop exec electron-builder --dir --projectDir ../.. --publish never
+
+      - name: Assert packaged resource layout
+        run: pnpm electron:assert-package
