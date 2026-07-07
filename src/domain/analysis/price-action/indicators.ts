@@ -4,12 +4,12 @@
  * ATR (Average True Range) 等指标，用于 iFVG 验证和其他分析
  */
 
-import type { OhlcvBar } from '@/domain/market-data/bars/types'
+import type { OhlcvBar } from '@/domain/market-data/bars/types.js'
 
 /**
  * 计算 True Range
  */
-function calculateTrueRange(current: OhlcvBar, previous: OhlcvBar | null): number {
+export function calculateTrueRange(current: OhlcvBar, previous: OhlcvBar | null): number {
   const highLow = current.high - current.low
 
   if (!previous) {
@@ -75,6 +75,66 @@ export function calculateAverageRange(bars: OhlcvBar[], lookback = 20): number[]
   }
 
   return avgRanges
+}
+
+export interface PriceActionVolatilityContext {
+  period: number
+  currentVolatility: number
+  formationVolatilityByIndex: number[]
+  fallback: {
+    used: boolean
+    reason?: 'insufficient_bars' | 'zero_volatility'
+    availableBars: number
+  }
+}
+
+function fallbackVolatilityAt(bars: OhlcvBar[], index: number): number {
+  const end = Math.max(0, Math.min(index, bars.length - 1))
+  const window = bars.slice(0, end + 1)
+  const trueRanges = window.map((bar, i) => calculateTrueRange(bar, i > 0 ? window[i - 1] : null))
+  const averageTrueRange = trueRanges.reduce((sum, tr) => sum + tr, 0) / Math.max(trueRanges.length, 1)
+  if (averageTrueRange > 0) return averageTrueRange
+
+  const close = bars[end]?.close ?? 0
+  return Math.max(Math.abs(close) * 0.0001, Number.EPSILON)
+}
+
+export function calculatePriceActionVolatility(
+  bars: OhlcvBar[],
+  period = 200,
+): PriceActionVolatilityContext {
+  if (bars.length === 0) {
+    return {
+      period,
+      currentVolatility: Number.EPSILON,
+      formationVolatilityByIndex: [],
+      fallback: {
+        used: true,
+        reason: 'insufficient_bars',
+        availableBars: 0,
+      },
+    }
+  }
+
+  const atr = calculateATR(bars, period)
+  const formationVolatilityByIndex = bars.map((_, index) => {
+    const atrValue = atr[index]
+    return atrValue && atrValue > 0 ? atrValue : fallbackVolatilityAt(bars, index)
+  })
+
+  const currentVolatility = formationVolatilityByIndex.at(-1) ?? Number.EPSILON
+  const hasFullAtr = bars.length >= period && atr.some((value) => value > 0)
+
+  return {
+    period,
+    currentVolatility,
+    formationVolatilityByIndex,
+    fallback: {
+      used: !hasFullAtr,
+      reason: hasFullAtr ? undefined : 'insufficient_bars',
+      availableBars: bars.length,
+    },
+  }
 }
 
 /**

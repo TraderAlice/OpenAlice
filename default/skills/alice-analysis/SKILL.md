@@ -28,6 +28,7 @@ the question.
 | Order flow / Delta / CVD | `alice analysis delta-volume` | Estimate buying/selling pressure from lower-timeframe intrabars |
 | Volume Profile | `alice analysis volume-profile` | Find POC, Value Area, and high/low-volume price zones |
 | Price Action / ICT / SMC | `alice analysis price-action` | Detect FVG, inverse FVG, order blocks, BOS, CHoCH, and market structure |
+| Multi-timeframe Price Action | `alice analysis price-action-mtf` | Summarize trend, liquidity, zones, and conflicts across intervals |
 | Technical indicators / custom panels | `alice analysis quant` | RSI, MACD, moving averages, correlations, z-score, batches |
 
 ## The loop
@@ -44,6 +45,7 @@ For specialized analysis:
 alice analysis delta-volume --barId tradingview\|AAPL --assetClass equity --interval 15m --count 100
 alice analysis volume-profile --barId tradingview\|AAPL --assetClass equity --interval 1h --count 120 --bins 32
 alice analysis price-action --barId tradingview\|AAPL --assetClass equity --interval 15m --count 200
+alice analysis price-action-mtf --barId tradingview\|AAPL --assetClass equity --intervals 4h,1h,15m --count 200
 ```
 
 ## Choosing a source
@@ -143,7 +145,9 @@ It detects:
 
 - **FVG / VI / OG:** standard three-candle Fair Value Gaps,
   Volume Imbalance body gaps, and Opening Gaps. Use `gapMode` to pick
-  `FVG`, `VI`, `OG`, or `all`; use `fvgMitigationSource` as `close` or `wick`.
+  `FVG`, `VI`, `OG`, or `all`; use `zoneMitigationSource` as `body`, `wick`,
+  or `midpoint` (default `body`), or `fvgZoneMitigationSource` to override
+  only FVG/VI/OG zone mitigation.
   The result includes both `formationIndex` and `confirmationIndex`; by default
   the confirmation candle gets lower-timeframe intrabar delta confirmation when
   available.
@@ -159,12 +163,19 @@ It detects:
   with the OB direction. When anchor intrabars are available, it also estimates
   `internalBuyVolume` / `internalSellVolume` and their percentages from the
   anchor candle's intrabar delta. Overlapping OBs are hidden by default using
-  Pine-style overlap filtering.
+  Pine-style overlap filtering. Use `orderBlockZoneMitigationSource` to
+  override OB mitigation separately from the shared `zoneMitigationSource`.
 - **BOS (Break of Structure):** continuation break of the active structure.
 - **CHoCH (Change of Character):** reversal break that flips the
   active structure state.
 - **CHoCH+:** CHoCH with stronger opposing swing context. The tool reports it
   via `isPlus: true`.
+- **Structure modes and strong/weak swings:** `marketStructureMode` defaults to
+  `pivot`; use `extreme` when you want cleaner top-down structure with minor
+  pivots compressed into active extremes. `adjusted` is not a public mode.
+- **Liquidity and location context:** the v2 result always includes
+  `premiumDiscount`, `liquidityPools`, `liquiditySweeps`, and `breakers`.
+  Zone-like results may include premium/discount annotations.
 
 Key inputs:
 
@@ -172,26 +183,45 @@ Key inputs:
 - `assetClass`: required for vendor barIds.
 - `interval`: analysis interval, such as `15m`, `1h`, `4h`, `1d`.
 - `count` or `start`/`end`: requested window.
-- `gapMode`, `fvgMitigationSource`, `gapVolumeConfirmation`, `minGapSize`,
-  `minBodyRatio`: gap type, mitigation, volume confirmation, and noise filters
-  for FVG/VI/OG detection.
+- `gapMode`, `zoneMitigationSource`, `fvgZoneMitigationSource`,
+  `gapVolumeConfirmation`, `minGapAtrMultiplier`, `minBodyRatio`: gap type,
+  mitigation trigger source, volume confirmation, and ATR-normalized noise
+  filters for FVG/VI/OG detection.
 - `maxFVGs`, `maxIFVGs`, `includeFilled`, `proximityPct`: result filters.
 - `maxIFVGLookAheadBars`, `ifvgVolumeConfirmation`, `minImpulseRatio`,
   `minEngulfingStrength`: iFVG confirmation filters.
 - `maxOrderBlocks`, `includeMitigatedOrderBlocks`, `orderBlockTrigger`,
-  `orderBlockPosition`, `orderBlockMitigation`, `hideOverlappingOrderBlocks`,
-  `orderBlockOverlapMethod`, `orderBlockVolumeConfirmation`: OB result, zone,
-  mitigation, Pine-style overlap, and intrabar delta confirmation controls.
+  `orderBlockPosition`, `orderBlockZoneMitigationSource`,
+  `overlapPolicy`, `orderBlockVolumeConfirmation`: OB result, zone,
+  mitigation, ranked overlap, and intrabar delta confirmation controls.
 - `internalLookback`, `swingLookback`, `externalLookback`: swing lengths.
   Defaults are `5`, `20`, and `50`.
+- `marketStructureMode`: `pivot` or `extreme` (default `pivot`).
+- `liquidityPoolToleranceAtrMultiplier`, `liquidityPoolTolerancePctCap`,
+  `minLiquidityPoolTouches`, `liquidityPoolLevels`: EQH/EQL liquidity-pool
+  controls.
 
 Returns ranked FVG/VI/OG/iFVG zones, OB zones with mitigation status, intrabar
 delta confirmation and OB internal buy/sell activity when available, swing
-points, BOS/CHoCH breaks, and `stateByLevel` for current
-internal/swing/external structure.
+points, strong/weak swing context, liquidity pools/sweeps, breaker zones,
+premium/discount context, BOS/CHoCH breaks, and `stateByLevel` for current
+internal/swing/external structure. The single-timeframe result uses schema v2
+and top-down key order: `marketStructure`, `premiumDiscount`,
+`liquidityPools`, `liquiditySweeps`, `fvgs`, `ifvgs`, `orderBlocks`,
+`breakers`, `meta`.
 Volume confirmation is approximate lower-timeframe bar delta, not tick/order-book
 data; check `coverage` and `confidence` before treating it as reliable. For FVG
 it is an auxiliary quality signal, not part of the gap definition.
+For zone mitigation sources, `body` uses the adverse candle body edge
+(`min(open, close)` for bullish zones and `max(open, close)` for bearish
+zones), `wick` uses the adverse wick, and `midpoint` triggers when that body
+edge reaches the zone midpoint.
+
+Use `alice analysis price-action-mtf` when you need a multi-timeframe summary.
+It returns condensed trend, liquidity, zone,
+premium/discount, structure, conflicts, confluences, and per-interval
+`detailRequest` objects; use those detail requests with `price-action` for the
+full single-timeframe payload.
 
 ## Language
 

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { buildPriceActionVolumeConfirmations } from './volume-confirmation'
-import type { BarService } from '@/domain/market-data/bars/index'
-import type { OhlcvBar } from '@/domain/market-data/bars/types'
+import type { BarService } from '@/domain/market-data/bars/index.js'
+import type { OhlcvBar } from '@/domain/market-data/bars/types.js'
 
 describe('buildPriceActionVolumeConfirmations', () => {
   it('returns unavailable before fetching intrabars when vendor barId lacks assetClass', async () => {

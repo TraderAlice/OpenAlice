@@ -4,7 +4,7 @@
  * 三个层级的 swing 点检测（internal/swing/external），用于识别市场结构和支撑/阻力。
  */
 
-import type { OhlcvBar } from '@/domain/market-data/bars/types'
+import type { OhlcvBar } from '@/domain/market-data/bars/types.js'
 import type { SwingPoint, SwingPointLevels } from './types.js'
 
 export interface SwingDetectionParams {

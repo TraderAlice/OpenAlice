@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { detectFairValueGaps } from './fvg-detector.js'
-import type { OhlcvBar } from '@/domain/market-data/bars/types'
+import { detectFairValueGaps, detectFairValueGapsWithMeta } from './fvg-detector.js'
+import type { OhlcvBar } from '@/domain/market-data/bars/types.js'
 
 describe('detectFairValueGaps', () => {
   it('检测看涨 FVG (bars[0].low > bars[2].high)', () => {
@@ -120,17 +120,18 @@ describe('detectFairValueGaps', () => {
     expect(fvgs[0].completelyFilled).toBe(true)
   })
 
-  it('过滤最小 gap 大小', () => {
+  it('filters gaps smaller than the ATR multiplier threshold', () => {
     const bars: OhlcvBar[] = [
-      { date: '2024-01-01 09:00', open: 100, high: 100.5, low: 100.5, close: 100.2, volume: 1000 },
-      { date: '2024-01-01 09:05', open: 100.2, high: 101, low: 100.2, close: 101, volume: 2000 },
-      { date: '2024-01-01 09:10', open: 101, high: 101.2, low: 100, close: 101.2, volume: 1000 },
-      // Gap size = 0.5 - 0 = 0.5
+      { date: '2024-01-01 09:00', open: 100, high: 104, low: 96, close: 102, volume: 1000 },
+      { date: '2024-01-01 09:05', open: 102, high: 108, low: 100, close: 108, volume: 2000 },
+      { date: '2024-01-01 09:10', open: 108, high: 112, low: 108, close: 110, volume: 1000 },
     ]
 
-    const fvgs = detectFairValueGaps({ bars, minGapSize: 1.0 })
+    const fvgs = detectFairValueGaps({
+      bars,
+      minGapAtrMultiplier: 0.51,
+    })
 
-    // 应该被过滤掉
     expect(fvgs).toHaveLength(0)
   })
 
@@ -183,7 +184,7 @@ describe('detectFairValueGaps', () => {
     expect(fvgs).toEqual([])
   })
 
-  it('wick mitigation can mark a gap filled even when close stays outside', () => {
+  it('wick zone mitigation can mark a gap filled even when the body stays outside', () => {
     const bars: OhlcvBar[] = [
       { date: '2024-01-01 09:00', open: 100, high: 102, low: 98, close: 100, volume: 1000 },
       { date: '2024-01-01 09:05', open: 100, high: 120, low: 100, close: 120, volume: 2000 },
@@ -192,9 +193,44 @@ describe('detectFairValueGaps', () => {
     ]
 
     expect(detectFairValueGaps({ bars })[0].isFilled).toBe(false)
-    expect(detectFairValueGaps({ bars, mitigationSource: 'wick' })[0]).toMatchObject({
+    expect(detectFairValueGaps({ bars, zoneMitigationSource: 'wick' })[0]).toMatchObject({
       isFilled: true,
       completelyFilled: true,
+      filledAtIndex: 3,
+    })
+  })
+
+  it('body zone mitigation uses the adverse body edge', () => {
+    const bars: OhlcvBar[] = [
+      { date: '2024-01-01 09:00', open: 100, high: 102, low: 98, close: 100, volume: 1000 },
+      { date: '2024-01-01 09:05', open: 100, high: 120, low: 100, close: 120, volume: 2000 },
+      { date: '2024-01-01 09:10', open: 120, high: 125, low: 114, close: 125, volume: 1000 },
+      { date: '2024-01-01 09:15', open: 112, high: 126, low: 108, close: 121, volume: 1000 },
+    ]
+
+    const fvg = detectFairValueGaps({ bars, zoneMitigationSource: 'body' })[0]
+
+    expect(fvg).toMatchObject({
+      isFilled: true,
+      filledAtIndex: 3,
+      completelyFilled: false,
+    })
+    expect(fvg.fillPercentage).toBeCloseTo((114 - 112) / 12, 2)
+  })
+
+  it('midpoint zone mitigation is reached by body price rather than close only', () => {
+    const bars: OhlcvBar[] = [
+      { date: '2024-01-01 09:00', open: 100, high: 102, low: 98, close: 100, volume: 1000 },
+      { date: '2024-01-01 09:05', open: 100, high: 120, low: 100, close: 120, volume: 2000 },
+      { date: '2024-01-01 09:10', open: 120, high: 125, low: 114, close: 125, volume: 1000 },
+      { date: '2024-01-01 09:15', open: 107, high: 126, low: 106, close: 121, volume: 1000 },
+    ]
+
+    expect(detectFairValueGaps({ bars, zoneMitigationSource: 'body' })[0].completelyFilled).toBe(false)
+    expect(detectFairValueGaps({ bars, zoneMitigationSource: 'midpoint' })[0]).toMatchObject({
+      state: 'mitigated',
+      isFilled: true,
+      completelyFilled: false,
       filledAtIndex: 3,
     })
   })
@@ -297,4 +333,262 @@ describe('detectFairValueGaps', () => {
       formationVolumeConfirmation: expect.objectContaining({ delta: 1200 }),
     }))
   })
+
+  it('returns envelope fields plus raw and ATR-normalized size for FVG, VI, and OG', () => {
+    expect(detectFairValueGaps({ bars: atrThresholdFixture('FVG'), gapMode: 'FVG' })[0]).toEqual(expect.objectContaining({
+      kind: 'fvg',
+      direction: 'bullish',
+      midpoint: 106,
+      formedAtIndex: 1,
+      confirmedAtIndex: 2,
+      state: 'active',
+      size: 4,
+      sizeAtr: 0.5,
+      lifecycle: expect.objectContaining({
+        formedAtIndex: 1,
+        confirmedAtIndex: 2,
+        fillPercentage: 0,
+      }),
+    }))
+
+    expect(detectFairValueGaps({ bars: atrThresholdFixture('VI'), gapMode: 'VI' })[0]).toEqual(expect.objectContaining({
+      kind: 'vi',
+      direction: 'bullish',
+      top: 106,
+      bottom: 102,
+      midpoint: 104,
+      size: 4,
+      sizeAtr: expect.any(Number),
+    }))
+
+    expect(detectFairValueGaps({ bars: atrThresholdFixture('OG'), gapMode: 'OG' })[0]).toEqual(expect.objectContaining({
+      kind: 'og',
+      direction: 'bullish',
+      top: 108,
+      bottom: 104,
+      midpoint: 106,
+      size: 4,
+      sizeAtr: expect.any(Number),
+    }))
+  })
+
+  it('applies minGapAtrMultiplier after each gap family computes its natural bounds', () => {
+    expect(detectFairValueGaps({ bars: atrThresholdFixture('FVG'), gapMode: 'FVG', minGapAtrMultiplier: 0.5 })).toHaveLength(1)
+    expect(detectFairValueGaps({ bars: atrThresholdFixture('FVG'), gapMode: 'FVG', minGapAtrMultiplier: 0.51 })).toHaveLength(0)
+
+    expect(detectFairValueGaps({ bars: atrThresholdFixture('VI'), gapMode: 'VI', minGapAtrMultiplier: 0.5 })).toHaveLength(1)
+    expect(detectFairValueGaps({ bars: atrThresholdFixture('VI'), gapMode: 'VI', minGapAtrMultiplier: 0.51 })).toHaveLength(0)
+
+    expect(detectFairValueGaps({ bars: atrThresholdFixture('OG'), gapMode: 'OG', minGapAtrMultiplier: 0.5 })).toHaveLength(1)
+    expect(detectFairValueGaps({ bars: atrThresholdFixture('OG'), gapMode: 'OG', minGapAtrMultiplier: 0.51 })).toHaveLength(0)
+  })
+
+  it('tracks touched lifecycle when wick enters the zone but body does not mitigate', () => {
+    const fvgs = detectFairValueGaps({ bars: zoneSourceFixture('wick-touch'), zoneMitigationSource: 'body' })
+
+    expect(fvgs[0]).toEqual(expect.objectContaining({
+      state: 'touched',
+      isFilled: false,
+      fillPercentage: 0,
+      lifecycle: expect.objectContaining({
+        firstTouchedAtIndex: 3,
+        lastTouchedAtIndex: 3,
+        currentlyInside: true,
+        mitigatedAtIndex: undefined,
+      }),
+    }))
+  })
+
+  it('uses body adverse edge for body mitigation', () => {
+    const fvgs = detectFairValueGaps({ bars: zoneSourceFixture('body-mitigated'), zoneMitigationSource: 'body' })
+
+    expect(fvgs[0]).toEqual(expect.objectContaining({
+      state: 'mitigated',
+      isFilled: true,
+      filledAtIndex: 3,
+      fillPercentage: 1 / 3,
+      completelyFilled: false,
+      lifecycle: expect.objectContaining({
+        firstTouchedAtIndex: 3,
+        mitigatedAtIndex: 3,
+        fillPercentage: 1 / 3,
+      }),
+    }))
+  })
+
+  it('uses wick extreme for wick mitigation', () => {
+    const fvgs = detectFairValueGaps({ bars: zoneSourceFixture('wick-touch'), zoneMitigationSource: 'wick' })
+
+    expect(fvgs[0]).toEqual(expect.objectContaining({
+      state: 'mitigated',
+      isFilled: true,
+      fillPercentage: 1 / 3,
+      lifecycle: expect.objectContaining({
+        firstTouchedAtIndex: 3,
+        mitigatedAtIndex: 3,
+      }),
+    }))
+  })
+
+  it('uses zone midpoint reached by body price for midpoint mitigation', () => {
+    const fvgs = detectFairValueGaps({ bars: zoneSourceFixture('midpoint-mitigated'), zoneMitigationSource: 'midpoint' })
+
+    expect(fvgs[0]).toEqual(expect.objectContaining({
+      state: 'mitigated',
+      midpoint: 108,
+      fillPercentage: 7 / 12,
+      completelyFilled: false,
+      lifecycle: expect.objectContaining({
+        mitigatedAtIndex: 3,
+      }),
+    }))
+  })
+
+  it('filters filled zones by default and can include them for diagnostics', () => {
+    expect(detectFairValueGaps({ bars: lifecycleFixture('filled'), zoneMitigationSource: 'body' })).toHaveLength(0)
+
+    expect(detectFairValueGaps({ bars: lifecycleFixture('filled'), zoneMitigationSource: 'body', includeResolved: true })[0]).toEqual(expect.objectContaining({
+      state: 'filled',
+      completelyFilled: true,
+      lifecycle: expect.objectContaining({
+        filledAtIndex: 3,
+        fullyFilledAtIndex: 3,
+      }),
+    }))
+  })
+
+  it('marks a zone broken when the selected source crosses the far edge', () => {
+    const fvgs = detectFairValueGaps({ bars: lifecycleFixture('broken'), zoneMitigationSource: 'body' })
+
+    expect(fvgs[0]).toEqual(expect.objectContaining({
+      state: 'broken',
+      completelyFilled: true,
+      lifecycle: expect.objectContaining({
+        brokenAtIndex: 3,
+      }),
+    }))
+  })
+
+  it('filters same-bucket overlapping FVGs with ranked policy by default and reports staged meta', () => {
+    const result = detectFairValueGapsWithMeta({
+      bars: overlapFixture(),
+      zoneMitigationSource: 'body',
+    })
+
+    expect(result.fvgs).toEqual([
+      expect.objectContaining({
+        kind: 'fvg',
+        direction: 'bullish',
+        top: 110,
+        bottom: 100,
+        state: 'touched',
+      }),
+    ])
+    expect(result.meta).toEqual({
+      detectedCount: 2,
+      lifecycleFilteredCount: 0,
+      overlapFilteredCount: 1,
+      returnedCount: 1,
+    })
+
+    expect(detectFairValueGaps({
+      bars: overlapFixture(),
+      zoneMitigationSource: 'body',
+      overlapPolicy: 'none',
+    })).toHaveLength(2)
+  })
+
+  it('keeps cross-family and opposite-direction overlaps in separate groups', () => {
+    const fvgs = detectFairValueGaps({
+      bars: crossGroupOverlapFixture(),
+      gapMode: 'all',
+      zoneMitigationSource: 'body',
+    })
+
+    expect(fvgs.map((fvg) => `${fvg.variant}:${fvg.type}`)).toContain('FVG:bullish')
+    expect(fvgs.map((fvg) => `${fvg.variant}:${fvg.type}`)).toContain('OG:bullish')
+    expect(fvgs.map((fvg) => `${fvg.variant}:${fvg.type}`)).toContain('FVG:bearish')
+  })
 })
+
+function atrThresholdFixture(variant: 'FVG' | 'VI' | 'OG'): OhlcvBar[] {
+  if (variant === 'FVG') {
+    return [
+      bar(100, 104, 96, 102, 0),
+      bar(102, 108, 100, 108, 1),
+      bar(108, 112, 108, 110, 2),
+    ]
+  }
+
+  if (variant === 'VI') {
+    return [
+      bar(98, 101, 97, 100, 0),
+      bar(100, 104, 96, 102, 1),
+      bar(106, 114, 103, 110, 2),
+    ]
+  }
+
+  return [
+    bar(98, 101, 97, 100, 0),
+    bar(100, 104, 96, 102, 1),
+    bar(110, 114, 108, 111, 2),
+  ]
+}
+
+function zoneSourceFixture(kind: 'wick-touch' | 'body-mitigated' | 'midpoint-mitigated'): OhlcvBar[] {
+  const tail = {
+    'wick-touch': bar(118, 119, 110, 118, 3),
+    'body-mitigated': bar(118, 119, 109, 110, 3),
+    'midpoint-mitigated': bar(118, 119, 106, 107, 3),
+  }[kind]
+
+  return [
+    bar(100, 102, 98, 100, 0),
+    bar(100, 120, 100, 120, 1),
+    bar(120, 125, 114, 124, 2),
+    tail,
+  ]
+}
+
+function lifecycleFixture(kind: 'filled' | 'broken'): OhlcvBar[] {
+  return [
+    bar(100, 102, 98, 100, 0),
+    bar(100, 120, 100, 120, 1),
+    bar(120, 125, 114, 124, 2),
+    kind === 'filled' ? bar(114, 115, 102, 102, 3) : bar(114, 115, 101, 101, 3),
+  ]
+}
+
+function overlapFixture(): OhlcvBar[] {
+  return [
+    bar(95, 100, 90, 98, 0),
+    bar(98, 105, 97, 104, 1),
+    bar(104, 112, 110, 111, 2),
+    bar(111, 115, 106, 114, 3),
+    bar(111, 112, 105.5, 112, 4),
+  ]
+}
+
+function crossGroupOverlapFixture(): OhlcvBar[] {
+  return [
+    bar(95, 100, 90, 98, 0),
+    bar(98, 105, 97, 104, 1),
+    bar(108, 112, 108, 111, 2),
+    bar(111, 113, 106, 112, 3),
+    bar(112, 114, 107, 113, 4),
+    bar(113, 116, 95, 96, 5),
+    bar(96, 97, 92, 93, 6),
+    bar(93, 95, 90, 91, 7),
+  ]
+}
+
+function bar(open: number, high: number, low: number, close: number, index: number): OhlcvBar {
+  return {
+    date: `2024-01-01 09:${String(index).padStart(2, '0')}`,
+    open,
+    high,
+    low,
+    close,
+    volume: 1000,
+  }
+}

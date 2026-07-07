@@ -1,17 +1,18 @@
 /**
  * Inverse FVG (iFVG) Detection — 反转公允价值缺口检测
  *
- * iFVG: FVG 被填补后，价格从中反转，原失衡区转变为机构订单区（支撑/阻力）。
+ * iFVG: FVG breaker 获得反转/冲动确认后的更严格子集。
  *
  * 严格识别条件：
- * 1. FVG 已被填补（fillPercentage > 0）
- * 2. 填补后出现吞没蜡烛（engulfing pattern）
- * 3. 冲动移动：反转K线实体 >= 平均 range × 1.5
+ * 1. 来源必须是 fvg_breaker
+ * 2. breaker 形成后出现同方向吞没蜡烛（engulfing pattern）
+ * 3. 冲动移动：确认 K 线实体 >= 平均 range × 1.5
  */
 
-import type { OhlcvBar } from '@/domain/market-data/bars/types'
+import type { OhlcvBar } from '@/domain/market-data/bars/types.js'
 import type {
-  FairValueGap,
+  BreakerZone,
+  FairValueGapVariant,
   InverseFVG,
   PriceActionVolumeConfirmation,
   VolumeConfirmationConfidence,
@@ -20,16 +21,16 @@ import { calculateATR, calculateAverageRange, calculateBodySize, isEngulfing } f
 
 export interface IFVGDetectionParams {
   bars: OhlcvBar[]
-  fvgs: FairValueGap[]
+  breakers: BreakerZone[]
   /** ATR 计算周期（默认 14） */
   atrPeriod?: number
   /** 平均 range 计算周期（默认 20） */
   avgRangePeriod?: number
   /** 冲动移动倍数阈值（默认 1.5） */
   impulseThreshold?: number
-  /** FVG 填补后最多向后搜索多少根 K 线（默认 20） */
+  /** FVG breaker 形成后最多向后搜索多少根 K 线（默认 20） */
   maxLookAheadBars?: number
-  /** 价格离 FVG 中点超过 gap 大小的该倍数后停止搜索（默认 1.5） */
+  /** 价格离 breaker 中点超过 zone 大小的该倍数后停止搜索（默认 1.5） */
   maxDistanceFromGapMultiplier?: number
   volumeConfirmations?: Map<number, PriceActionVolumeConfirmationInput>
 }
@@ -67,7 +68,7 @@ function volumeConfirmationFor(
 export function detectInverseFVG(params: IFVGDetectionParams): InverseFVG[] {
   const {
     bars,
-    fvgs,
+    breakers,
     atrPeriod = 14,
     avgRangePeriod = 20,
     impulseThreshold = 1.5,
@@ -76,7 +77,7 @@ export function detectInverseFVG(params: IFVGDetectionParams): InverseFVG[] {
     volumeConfirmations,
   } = params
 
-  if (bars.length < Math.max(atrPeriod, avgRangePeriod) || fvgs.length === 0) {
+  if (bars.length < Math.max(atrPeriod, avgRangePeriod) || breakers.length === 0) {
     return []
   }
 
@@ -84,20 +85,20 @@ export function detectInverseFVG(params: IFVGDetectionParams): InverseFVG[] {
   const atr = calculateATR(bars, atrPeriod)
   const avgRanges = calculateAverageRange(bars, avgRangePeriod)
 
-  // 遍历所有已填补的 FVG
-  for (const fvg of fvgs) {
-    // 必须已被填补
-    if (!fvg.isFilled || fvg.filledAtIndex === undefined) {
-      continue
-    }
+  for (const breaker of breakers) {
+    if (breaker.kind !== 'fvg_breaker') continue
 
-    // 从填补位置开始，寻找反转 K 线
-    const startIndex = fvg.filledAtIndex
-    const gapMidPrice = (fvg.top + fvg.bottom) / 2
-    const maxDistanceFromGap = fvg.size * maxDistanceFromGapMultiplier
+    const startIndex = breaker.formedAtIndex
+    const endIndex = Math.min(
+      startIndex + maxLookAheadBars,
+      breaker.lifecycle.invalidatedAtIndex ?? bars.length,
+      bars.length,
+    )
+    const gapMidPrice = breaker.midpoint
+    const maxDistanceFromGap = breaker.size * maxDistanceFromGapMultiplier
 
-    // 检查填补后的几根 K 线；若价格已经远离 FVG 区域，则停止搜索。
-    for (let i = startIndex; i < Math.min(startIndex + maxLookAheadBars, bars.length); i++) {
+    // 检查 breaker 形成后的几根 K 线；若价格已经远离区域，则停止搜索。
+    for (let i = startIndex; i < endIndex; i++) {
       const currentBar = bars[i]
       const previousBar = i > 0 ? bars[i - 1] : null
 
@@ -117,14 +118,12 @@ export function detectInverseFVG(params: IFVGDetectionParams): InverseFVG[] {
         continue
       }
 
-      // 条件3: 反转方向必须与原 FVG 方向一致
-      // 看涨 FVG 填补后，应该出现看涨反转（iFVG 作为支撑）
-      // 看跌 FVG 填补后，应该出现看跌反转（iFVG 作为阻力）
+      // 条件3: 确认方向必须与 breaker 方向一致
       const currentBullish = currentBar.close > currentBar.open
 
       if (
-        (fvg.type === 'bullish' && !currentBullish) ||
-        (fvg.type === 'bearish' && currentBullish)
+        (breaker.direction === 'bullish' && !currentBullish) ||
+        (breaker.direction === 'bearish' && currentBullish)
       ) {
         continue
       }
@@ -139,21 +138,33 @@ export function detectInverseFVG(params: IFVGDetectionParams): InverseFVG[] {
 
       // 创建 iFVG
       ifvgs.push({
-        type: fvg.type === 'bullish' ? 'bullish_ifvg' : 'bearish_ifvg',
-        variant: fvg.variant,
-        top: fvg.top,
-        bottom: fvg.bottom,
-        originalFVG: fvg,
+        type: breaker.direction === 'bullish' ? 'bullish_ifvg' : 'bearish_ifvg',
+        variant: variantFromBreakerSource(breaker),
+        top: breaker.top,
+        bottom: breaker.bottom,
+        breakerId: breaker.id,
+        source: {
+          kind: 'fvg_breaker',
+          id: breaker.id,
+          index: breaker.formedAtIndex,
+          timeframe: breaker.timeframe,
+        },
         reversalIndex: i,
         engulfingStrength,
         impulseRatio,
-        reversalVolumeConfirmation: volumeConfirmationFor(volumeConfirmations, i, fvg.type),
+        reversalVolumeConfirmation: volumeConfirmationFor(volumeConfirmations, i, breaker.direction),
       })
 
-      // 每个 FVG 只检测一次 iFVG
+      // 每个 breaker 只检测一次 iFVG
       break
     }
   }
 
   return ifvgs
+}
+
+function variantFromBreakerSource(breaker: BreakerZone): FairValueGapVariant {
+  if (breaker.source?.kind === 'vi') return 'VI'
+  if (breaker.source?.kind === 'og') return 'OG'
+  return 'FVG'
 }

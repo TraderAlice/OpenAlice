@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { detectInverseFVG } from './ifvg-detector.js'
-import type { OhlcvBar } from '@/domain/market-data/bars/types'
-import type { FairValueGap } from './types.js'
+import type { OhlcvBar } from '@/domain/market-data/bars/types.js'
+import type { BreakerZone } from './types.js'
 
 describe('detectInverseFVG', () => {
   it('空 FVG 列表返回空数组', () => {
     const ifvgs = detectInverseFVG({
       bars: makeFlatBars(20),
-      fvgs: [],
+      breakers: [],
     })
 
     expect(ifvgs).toEqual([])
@@ -16,27 +16,27 @@ describe('detectInverseFVG', () => {
   it('数据少于指标周期时返回空数组', () => {
     const ifvgs = detectInverseFVG({
       bars: makeFlatBars(10),
-      fvgs: [makeFVG({ isFilled: true, filledAtIndex: 5 })],
+      breakers: [makeBreaker({ formedAtIndex: 5, confirmedAtIndex: 5 })],
     })
 
     expect(ifvgs).toEqual([])
   })
 
-  it('忽略未填补的 FVG', () => {
+  it('忽略非 FVG breaker', () => {
     const ifvgs = detectInverseFVG({
       bars: makeBullishReversalBars(),
-      fvgs: [makeFVG({ isFilled: false, filledAtIndex: undefined })],
+      breakers: [makeBreaker({ kind: 'order_block_breaker' })],
     })
 
     expect(ifvgs).toEqual([])
   })
 
-  it('检测看涨 iFVG（填补后出现同方向吞没和冲动反转）', () => {
-    const fvg = makeFVG({ type: 'bullish', top: 114, bottom: 102, filledAtIndex: 20 })
+  it('检测看涨 iFVG（FVG breaker 出现同方向吞没和冲动确认）', () => {
+    const breaker = makeBreaker({ id: 'brk-bull', direction: 'bullish', top: 114, bottom: 102, formedAtIndex: 20 })
 
     const ifvgs = detectInverseFVG({
       bars: makeBullishReversalBars(),
-      fvgs: [fvg],
+      breakers: [breaker],
     })
 
     expect(ifvgs).toHaveLength(1)
@@ -45,7 +45,12 @@ describe('detectInverseFVG', () => {
       variant: 'FVG',
       top: 114,
       bottom: 102,
-      originalFVG: fvg,
+      breakerId: 'brk-bull',
+      source: {
+        kind: 'fvg_breaker',
+        id: 'brk-bull',
+        index: 20,
+      },
       reversalIndex: 20,
     })
     expect(ifvgs[0].impulseRatio).toBeGreaterThanOrEqual(1.5)
@@ -53,11 +58,11 @@ describe('detectInverseFVG', () => {
   })
 
   it('检测看跌 iFVG（填补后出现同方向吞没和冲动反转）', () => {
-    const fvg = makeFVG({ type: 'bearish', top: 115, bottom: 105, filledAtIndex: 20 })
+    const breaker = makeBreaker({ id: 'brk-bear', direction: 'bearish', top: 115, bottom: 105, formedAtIndex: 20 })
 
     const ifvgs = detectInverseFVG({
       bars: makeBearishReversalBars(),
-      fvgs: [fvg],
+      breakers: [breaker],
     })
 
     expect(ifvgs).toHaveLength(1)
@@ -66,7 +71,12 @@ describe('detectInverseFVG', () => {
       variant: 'FVG',
       top: 115,
       bottom: 105,
-      originalFVG: fvg,
+      breakerId: 'brk-bear',
+      source: {
+        kind: 'fvg_breaker',
+        id: 'brk-bear',
+        index: 20,
+      },
       reversalIndex: 20,
     })
     expect(ifvgs[0].impulseRatio).toBeGreaterThanOrEqual(1.5)
@@ -76,18 +86,18 @@ describe('detectInverseFVG', () => {
   it('吞没方向与原 FVG 方向不一致时不产生 iFVG', () => {
     const ifvgs = detectInverseFVG({
       bars: makeBearishReversalBars(),
-      fvgs: [makeFVG({ type: 'bullish', filledAtIndex: 20 })],
+      breakers: [makeBreaker({ direction: 'bullish', formedAtIndex: 20 })],
     })
 
     expect(ifvgs).toEqual([])
   })
 
   it('默认可检测填补后 10 根以外但仍靠近 gap 的反转', () => {
-    const fvg = makeFVG({ type: 'bullish', top: 114, bottom: 102, filledAtIndex: 20 })
+    const breaker = makeBreaker({ direction: 'bullish', top: 114, bottom: 102, formedAtIndex: 20 })
 
     const ifvgs = detectInverseFVG({
       bars: makeDelayedBullishReversalBars(),
-      fvgs: [fvg],
+      breakers: [breaker],
     })
 
     expect(ifvgs).toHaveLength(1)
@@ -100,29 +110,44 @@ describe('detectInverseFVG', () => {
   it('价格远离 FVG 区域后不继续搜索 iFVG', () => {
     const ifvgs = detectInverseFVG({
       bars: makeFarFromGapBars(),
-      fvgs: [makeFVG({ type: 'bullish', top: 114, bottom: 102, filledAtIndex: 20 })],
+      breakers: [makeBreaker({ direction: 'bullish', top: 114, bottom: 102, formedAtIndex: 20 })],
+    })
+
+    expect(ifvgs).toEqual([])
+  })
+
+  it('does not search for iFVG confirmation after the breaker has invalidated', () => {
+    const ifvgs = detectInverseFVG({
+      bars: makeDelayedBullishReversalBars(),
+      breakers: [makeBreaker({
+        direction: 'bullish',
+        top: 114,
+        bottom: 102,
+        formedAtIndex: 20,
+        lifecycle: { formedAtIndex: 20, confirmedAtIndex: 20, invalidatedAtIndex: 25 },
+      })],
     })
 
     expect(ifvgs).toEqual([])
   })
 
   it('preserves the original gap variant for VI/OG inverse zones', () => {
-    const fvg = makeFVG({ variant: 'VI', type: 'bullish', top: 114, bottom: 102, filledAtIndex: 20 })
+    const breaker = makeBreaker({ source: { kind: 'vi', index: 1 }, direction: 'bullish', top: 114, bottom: 102, formedAtIndex: 20 })
 
     const ifvgs = detectInverseFVG({
       bars: makeBullishReversalBars(),
-      fvgs: [fvg],
+      breakers: [breaker],
     })
 
     expect(ifvgs[0]).toMatchObject({
       type: 'bullish_ifvg',
       variant: 'VI',
-      originalFVG: fvg,
+      source: expect.objectContaining({ kind: 'fvg_breaker' }),
     })
   })
 
   it('attaches reversal intrabar volume confirmation', () => {
-    const fvg = makeFVG({ type: 'bullish', top: 114, bottom: 102, filledAtIndex: 20 })
+    const breaker = makeBreaker({ direction: 'bullish', top: 114, bottom: 102, formedAtIndex: 20 })
     const volumeConfirmations = new Map([
       [20, {
         delta: 2500,
@@ -136,7 +161,7 @@ describe('detectInverseFVG', () => {
 
     const ifvgs = detectInverseFVG({
       bars: makeBullishReversalBars(),
-      fvgs: [fvg],
+      breakers: [breaker],
       volumeConfirmations,
     })
 
@@ -150,19 +175,23 @@ describe('detectInverseFVG', () => {
   })
 })
 
-function makeFVG(overrides: Partial<FairValueGap> = {}): FairValueGap {
+function makeBreaker(overrides: Partial<BreakerZone> = {}): BreakerZone {
   return {
-    type: 'bullish',
-    variant: 'FVG',
+    id: 'brk-1',
+    kind: 'fvg_breaker',
+    direction: 'bullish',
     top: 114,
     bottom: 102,
-    formationIndex: 1,
-    confirmationIndex: 2,
+    midpoint: 108,
     size: 12,
-    isFilled: true,
-    fillPercentage: 1,
-    filledAtIndex: 20,
-    completelyFilled: true,
+    sizeAtr: 2,
+    formedAtIndex: 20,
+    confirmedAtIndex: 20,
+    state: 'active',
+    lifecycle: { formedAtIndex: 20, confirmedAtIndex: 20 },
+    source: { kind: 'fvg', index: 1 },
+    sourceDirection: 'bearish',
+    sourceBrokenAtIndex: 20,
     ...overrides,
   }
 }

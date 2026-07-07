@@ -6,19 +6,22 @@
  * mitigated when price closes through its boundary.
  */
 
-import type { OhlcvBar } from '@/domain/market-data/bars/types'
+import type { OhlcvBar } from '@/domain/market-data/bars/types.js'
 import type {
   BreakOfStructure,
   ChangeOfCharacter,
   OrderBlock,
-  OrderBlockMitigationMode,
   OrderBlockOverlapMethod,
   OrderBlockPositionMode,
   OrderBlockTrigger,
   OrderBlockVolumeConfirmation,
+  PriceActionFamilyFilterMeta,
   PriceActionVolumeConfirmationInput,
   StructureLevel,
+  ZoneMitigationSource,
+  ZoneOverlapPolicy,
 } from './types.js'
+import { applyZoneOverlapFiltering, buildFamilyFilterMeta } from './overlap-filter.js'
 
 export interface DetectOrderBlocksParams {
   bars: OhlcvBar[]
@@ -27,12 +30,18 @@ export interface DetectOrderBlocksParams {
   levels?: StructureLevel[]
   triggerFilter?: 'all' | OrderBlockTrigger
   positionMode?: OrderBlockPositionMode
-  mitigationMode?: OrderBlockMitigationMode
+  zoneMitigationSource?: ZoneMitigationSource
   includeMitigated?: boolean
   maxOrderBlocks?: number
   volumeConfirmations?: Map<number, OrderBlockVolumeConfirmationInput>
   hideOverlap?: boolean
+  overlapPolicy?: ZoneOverlapPolicy
   overlapMethod?: OrderBlockOverlapMethod
+}
+
+export interface DetectOrderBlocksResult {
+  orderBlocks: OrderBlock[]
+  meta: PriceActionFamilyFilterMeta
 }
 
 type StructureBreak = (BreakOfStructure | ChangeOfCharacter) & { trigger: OrderBlockTrigger }
@@ -130,20 +139,27 @@ function buildZone(
   }
 }
 
-function mitigationTarget(ob: Pick<OrderBlock, 'type' | 'bottom' | 'top' | 'middle'>, mode: OrderBlockMitigationMode): number {
-  if (mode === 'middle') return ob.middle
+function mitigationTarget(ob: Pick<OrderBlock, 'type' | 'bottom' | 'top' | 'middle'>, source: ZoneMitigationSource): number {
+  if (source === 'midpoint') return ob.middle
   return ob.type === 'bullish' ? ob.bottom : ob.top
+}
+
+function mitigationPrice(bar: OhlcvBar, type: OrderBlock['type'], source: ZoneMitigationSource): number {
+  if (source === 'wick') return type === 'bullish' ? bar.low : bar.high
+  return type === 'bullish'
+    ? Math.min(bar.open, bar.close)
+    : Math.max(bar.open, bar.close)
 }
 
 function findMitigationIndex(
   bars: OhlcvBar[],
   ob: Pick<OrderBlock, 'type' | 'bottom' | 'top' | 'middle' | 'breakoutIndex'>,
-  mode: OrderBlockMitigationMode,
+  source: ZoneMitigationSource,
 ): number | undefined {
-  const target = mitigationTarget(ob, mode)
+  const target = mitigationTarget(ob, source)
   for (let i = ob.breakoutIndex + 1; i < bars.length; i++) {
-    const close = bars[i].close
-    if (ob.type === 'bullish' ? close < target : close > target) return i
+    const price = mitigationPrice(bars[i], ob.type, source)
+    if (ob.type === 'bullish' ? price < target : price > target) return i
   }
   return undefined
 }
@@ -189,37 +205,11 @@ function addInternalActivityFromIntrabar(
   ob.internalSellVolumePct = Math.floor((sellVolume / total) * 100)
 }
 
-function overlapsPineStyle(current: OrderBlock, previous: OrderBlock): boolean {
-  if (current.type !== previous.type || current.level !== previous.level) return false
-  return current.type === 'bullish'
-    ? current.bottom < previous.top
-    : current.top > previous.bottom
-}
-
-function pushWithOverlapPolicy(
-  out: OrderBlock[],
-  ob: OrderBlock,
-  hideOverlap: boolean,
-  overlapMethod: OrderBlockOverlapMethod,
-): void {
-  if (!hideOverlap) {
-    out.push(ob)
-    return
-  }
-
-  const previousIndex = out.findLastIndex((candidate) => overlapsPineStyle(ob, candidate))
-  if (previousIndex === -1) {
-    out.push(ob)
-    return
-  }
-
-  if (overlapMethod === 'recent') {
-    out.splice(previousIndex, 1)
-    out.push(ob)
-  }
-}
-
 export function detectOrderBlocks(params: DetectOrderBlocksParams): OrderBlock[] {
+  return detectOrderBlocksWithMeta(params).orderBlocks
+}
+
+export function detectOrderBlocksWithMeta(params: DetectOrderBlocksParams): DetectOrderBlocksResult {
   const {
     bars,
     bos,
@@ -227,15 +217,26 @@ export function detectOrderBlocks(params: DetectOrderBlocksParams): OrderBlock[]
     levels = ['internal', 'swing'],
     triggerFilter = 'all',
     positionMode = 'precise',
-    mitigationMode = 'absolute',
+    zoneMitigationSource = 'body',
     includeMitigated = false,
     maxOrderBlocks = 10,
     volumeConfirmations,
     hideOverlap = true,
-    overlapMethod = 'previous',
+    overlapPolicy,
+    overlapMethod,
   } = params
 
-  if (bars.length === 0) return []
+  if (bars.length === 0) {
+    return {
+      orderBlocks: [],
+      meta: buildFamilyFilterMeta({
+        detectedCount: 0,
+        afterLifecycleCount: 0,
+        overlapFilteredCount: 0,
+        returnedCount: 0,
+      }),
+    }
+  }
 
   const levelSet = new Set(levels)
   const breaks: StructureBreak[] = [
@@ -246,7 +247,7 @@ export function detectOrderBlocks(params: DetectOrderBlocksParams): OrderBlock[]
     .filter((b) => triggerMatches(b.trigger, triggerFilter))
     .sort((a, b) => a.index - b.index)
 
-  const out: OrderBlock[] = []
+  const detected: OrderBlock[] = []
 
   for (const brk of breaks) {
     const extremeIndex = findExtremeIndex(
@@ -279,17 +280,29 @@ export function detectOrderBlocks(params: DetectOrderBlocksParams): OrderBlock[]
     }
     addInternalActivityFromIntrabar(ob, anchorVolumeConfirmation)
 
-    const mitigatedAtIndex = findMitigationIndex(bars, ob, mitigationMode)
+    const mitigatedAtIndex = findMitigationIndex(bars, ob, zoneMitigationSource)
     if (mitigatedAtIndex !== undefined) {
       ob.mitigated = true
       ob.mitigatedAtIndex = mitigatedAtIndex
     }
-    if (!includeMitigated && ob.mitigated) continue
 
-    pushWithOverlapPolicy(out, ob, hideOverlap, overlapMethod)
+    detected.push(ob)
   }
 
-  const ranked = out
+  const afterLifecycle = includeMitigated ? detected : detected.filter((ob) => !ob.mitigated)
+  const resolvedOverlapPolicy = resolveOverlapPolicy({ hideOverlap, overlapPolicy, overlapMethod })
+  const overlapFiltered = applyZoneOverlapFiltering(afterLifecycle, resolvedOverlapPolicy, (ob) => ({
+    kind: 'order_block',
+    direction: ob.type,
+    top: ob.top,
+    bottom: ob.bottom,
+    state: ob.mitigated ? 'mitigated' : 'active',
+    size: ob.size,
+    formedAtIndex: ob.index,
+    confirmedAtIndex: ob.breakoutIndex,
+  }))
+
+  const ranked = overlapFiltered.items
     .sort((a, b) => b.breakoutIndex - a.breakoutIndex)
     .slice(0, maxOrderBlocks === 0 ? undefined : maxOrderBlocks)
 
@@ -300,5 +313,24 @@ export function detectOrderBlocks(params: DetectOrderBlocksParams): OrderBlock[]
     }
   }
 
-  return ranked
+  return {
+    orderBlocks: ranked,
+    meta: buildFamilyFilterMeta({
+      detectedCount: detected.length,
+      afterLifecycleCount: afterLifecycle.length,
+      overlapFilteredCount: overlapFiltered.overlapFilteredCount,
+      returnedCount: ranked.length,
+    }),
+  }
+}
+
+function resolveOverlapPolicy(opts: {
+  hideOverlap: boolean
+  overlapPolicy?: ZoneOverlapPolicy
+  overlapMethod?: OrderBlockOverlapMethod
+}): ZoneOverlapPolicy {
+  if (!opts.hideOverlap) return 'none'
+  if (opts.overlapPolicy) return opts.overlapPolicy
+  if (opts.overlapMethod) return opts.overlapMethod === 'recent' ? 'newer' : 'older'
+  return 'ranked'
 }

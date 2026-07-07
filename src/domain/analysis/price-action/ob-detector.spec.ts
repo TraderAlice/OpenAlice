@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { detectOrderBlocks } from './ob-detector.js'
-import type { OhlcvBar } from '@/domain/market-data/bars/types'
+import { detectOrderBlocks, detectOrderBlocksWithMeta } from './ob-detector.js'
+import type { OhlcvBar } from '@/domain/market-data/bars/types.js'
 import type { BreakOfStructure, ChangeOfCharacter } from './types.js'
 
 describe('detectOrderBlocks', () => {
@@ -104,6 +104,80 @@ describe('detectOrderBlocks', () => {
     expect(detectOrderBlocks({ bars, bos, choch: [], positionMode: 'full', includeMitigated: true })).toEqual([
       expect.objectContaining({ mitigated: true, mitigatedAtIndex: 7 }),
     ])
+  })
+
+  it('uses the adverse body edge for body zone mitigation', () => {
+    const bars = makeBars([
+      [100, 103, 98, 101, 1000],
+      [101, 104, 99, 102, 1000],
+      [102, 105, 100, 104, 1000],
+      [104, 106, 95, 96, 1000],
+      [96, 100, 94, 99, 1000],
+      [99, 108, 98, 107, 1000],
+      [107, 116, 106, 115, 1000],
+      [96, 97, 90, 101, 1000], // wick crosses bottom, body stays above it
+    ])
+    const bos: BreakOfStructure[] = [{
+      type: 'bullish',
+      index: 6,
+      price: 115,
+      level: 'internal',
+      brokenSwing: { index: 2, price: 105, type: 'high' },
+    }]
+
+    expect(detectOrderBlocks({
+      bars,
+      bos,
+      choch: [],
+      positionMode: 'full',
+      includeMitigated: true,
+      zoneMitigationSource: 'body',
+    })[0]).toEqual(expect.objectContaining({ mitigated: false }))
+    expect(detectOrderBlocks({
+      bars,
+      bos,
+      choch: [],
+      positionMode: 'full',
+      includeMitigated: true,
+      zoneMitigationSource: 'wick',
+    })[0]).toEqual(expect.objectContaining({ mitigated: true, mitigatedAtIndex: 7 }))
+  })
+
+  it('uses body price to trigger midpoint zone mitigation', () => {
+    const bars = makeBars([
+      [100, 103, 98, 101, 1000],
+      [101, 104, 99, 102, 1000],
+      [102, 105, 100, 104, 1000],
+      [104, 106, 95, 96, 1000],
+      [96, 100, 94, 99, 1000],
+      [99, 108, 98, 107, 1000],
+      [107, 116, 106, 115, 1000],
+      [99, 118, 96, 103, 1000], // close above middle, body low below middle
+    ])
+    const bos: BreakOfStructure[] = [{
+      type: 'bullish',
+      index: 6,
+      price: 115,
+      level: 'internal',
+      brokenSwing: { index: 2, price: 105, type: 'high' },
+    }]
+
+    expect(detectOrderBlocks({
+      bars,
+      bos,
+      choch: [],
+      positionMode: 'full',
+      includeMitigated: true,
+      zoneMitigationSource: 'body',
+    })[0]).toEqual(expect.objectContaining({ mitigated: false }))
+    expect(detectOrderBlocks({
+      bars,
+      bos,
+      choch: [],
+      positionMode: 'full',
+      includeMitigated: true,
+      zoneMitigationSource: 'midpoint',
+    })[0]).toEqual(expect.objectContaining({ mitigated: true, mitigatedAtIndex: 7 }))
   })
 
   it('applies trigger filters', () => {
@@ -230,14 +304,14 @@ describe('detectOrderBlocks', () => {
     }))
   })
 
-  it('hides overlapping order blocks by preserving the previous block by default', () => {
+  it('uses ranked overlap filtering by default and keeps legacy older/newer/none policies explicit', () => {
     const bars = makeBars([
       [100, 102, 99, 101, 1000],
       [101, 104, 99, 103, 1000],
       [103, 106, 100, 105, 1000],
       [105, 107, 94, 96, 3000],
-      [96, 103, 95, 102, 2000],
-      [102, 108, 101, 107, 2000],
+      [96, 120, 95, 102, 2000],
+      [102, 108, 90, 107, 2000],
       [107, 112, 106, 111, 2000],
       [111, 115, 110, 114, 2000],
     ])
@@ -259,6 +333,15 @@ describe('detectOrderBlocks', () => {
     ]
 
     expect(detectOrderBlocks({ bars, bos, choch: [], positionMode: 'full' })).toEqual([
+      expect.objectContaining({ breakoutIndex: 7, index: 5, size: 30 }),
+    ])
+    expect(detectOrderBlocks({
+      bars,
+      bos,
+      choch: [],
+      positionMode: 'full',
+      overlapPolicy: 'older',
+    })).toEqual([
       expect.objectContaining({ breakoutIndex: 5, index: 3 }),
     ])
     expect(detectOrderBlocks({
@@ -266,7 +349,7 @@ describe('detectOrderBlocks', () => {
       bos,
       choch: [],
       positionMode: 'full',
-      overlapMethod: 'recent',
+      overlapPolicy: 'newer',
     })).toEqual([
       expect.objectContaining({ breakoutIndex: 7, index: 5 }),
     ])
@@ -277,6 +360,51 @@ describe('detectOrderBlocks', () => {
       positionMode: 'full',
       hideOverlap: false,
     })).toHaveLength(2)
+  })
+
+  it('reports detected, lifecycle-filtered, overlap-filtered, and returned order-block counts', () => {
+    const bars = makeBars([
+      [100, 102, 99, 101, 1000],
+      [101, 104, 99, 103, 1000],
+      [103, 106, 100, 105, 1000],
+      [105, 107, 94, 96, 3000],
+      [96, 120, 95, 102, 2000],
+      [102, 108, 90, 107, 2000],
+      [107, 112, 106, 111, 2000],
+      [111, 115, 110, 114, 2000],
+      [92, 93, 88, 92, 2000],
+    ])
+    const bos: BreakOfStructure[] = [
+      {
+        type: 'bullish',
+        index: 5,
+        price: 107,
+        level: 'internal',
+        brokenSwing: { index: 2, price: 106, type: 'high' },
+      },
+      {
+        type: 'bullish',
+        index: 7,
+        price: 114,
+        level: 'internal',
+        brokenSwing: { index: 5, price: 108, type: 'high' },
+      },
+    ]
+
+    const result = detectOrderBlocksWithMeta({
+      bars,
+      bos,
+      choch: [],
+      positionMode: 'full',
+      zoneMitigationSource: 'body',
+    })
+
+    expect(result.meta).toEqual({
+      detectedCount: 2,
+      lifecycleFilteredCount: 1,
+      overlapFilteredCount: 0,
+      returnedCount: 1,
+    })
   })
 })
 

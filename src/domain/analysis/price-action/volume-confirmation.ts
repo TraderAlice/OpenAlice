@@ -1,7 +1,7 @@
-import { calculateDeltaVolume } from '@/domain/analysis/order-flow/delta-volume'
-import { chooseIntrabarPlan, confidenceForCoverage } from '@/domain/analysis/order-flow/intrabar-plan'
-import { parseBarId, type BarService, type BarSourceRef } from '@/domain/market-data/bars/index'
-import type { OhlcvBar } from '@/domain/market-data/bars/types'
+import { calculateDeltaVolume } from '@/domain/analysis/order-flow/delta-volume.js'
+import { chooseIntrabarPlan, confidenceForCoverage } from '@/domain/analysis/order-flow/intrabar-plan.js'
+import { parseBarId, type BarService, type BarSourceRef } from '@/domain/market-data/bars/index.js'
+import type { OhlcvBar } from '@/domain/market-data/bars/types.js'
 import type { PriceActionVolumeConfirmationInput } from './types.js'
 
 type PriceActionVolumeConfirmationStatus = 'available' | 'disabled' | 'unavailable'

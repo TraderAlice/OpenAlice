@@ -1,9 +1,107 @@
 import { describe, it, expect } from 'vitest'
 import { analyzeMarketStructure } from './market-structure.js'
 import { detectSwingPoints } from './swing-detector.js'
-import type { OhlcvBar } from '@/domain/market-data/bars/types'
+import type { OhlcvBar } from '@/domain/market-data/bars/types.js'
+import type { MarketStructureMode } from './types.js'
 
 describe('analyzeMarketStructure', () => {
+  it('pivot 模式保持默认三层级敏感度', () => {
+    const bars = makeBars([99, 100, 101, 106, 104, 103, 94])
+    const swingPoints = makeSwingPoints({
+      highs: [{ index: 1, price: 105, type: 'high' }],
+      lows: [{ index: 4, price: 95, type: 'low' }],
+    })
+
+    const defaultResult = analyzeMarketStructure({ bars, swingPoints, internalLookback: 1 })
+    const pivotResult = analyzeMarketStructure({
+      bars,
+      swingPoints,
+      internalLookback: 1,
+      marketStructureMode: 'pivot',
+    })
+
+    expect(pivotResult.marketStructureMode).toBe('pivot')
+    expect(pivotResult.bos).toEqual(defaultResult.bos)
+    expect(pivotResult.choch).toEqual(defaultResult.choch)
+    expect(pivotResult.stateByLevel).toEqual(defaultResult.stateByLevel)
+  })
+
+  it('public market-structure modes 只暴露 pivot 和 extreme', () => {
+    const modes: MarketStructureMode[] = ['pivot', 'extreme']
+
+    expect(modes).toEqual(['pivot', 'extreme'])
+  })
+
+  it('extreme 模式压缩连续同类 minor pivots 后再判断结构', () => {
+    const bars = makeBars([100, 101, 102, 103, 106, 104, 103, 107])
+    const swingPoints = makeSwingPoints({
+      highs: [
+        { index: 1, price: 105, type: 'high' },
+        { index: 2, price: 104, type: 'high' },
+        { index: 3, price: 103, type: 'high' },
+      ],
+      lows: [{ index: 5, price: 95, type: 'low' }],
+    })
+
+    const pivotResult = analyzeMarketStructure({ bars, swingPoints, internalLookback: 1 })
+    const extremeResult = analyzeMarketStructure({
+      bars,
+      swingPoints,
+      internalLookback: 1,
+      marketStructureMode: 'extreme',
+    })
+
+    expect(pivotResult.swingPoints.internal.highs).toEqual([
+      { index: 1, price: 105, type: 'high' },
+      { index: 2, price: 104, type: 'high' },
+      { index: 3, price: 103, type: 'high' },
+    ])
+    expect(extremeResult.marketStructureMode).toBe('extreme')
+    expect(extremeResult.swingPoints.internal.highs).toEqual([{ index: 1, price: 105, type: 'high' }])
+    expect(extremeResult.bos.filter((event) => event.level === 'internal' && event.type === 'bullish')).toHaveLength(1)
+  })
+
+  it('bullish context marks lows strong and swept highs weak liquidity targets', () => {
+    const bars = makeOhlcBars([
+      { close: 100 },
+      { close: 101 },
+      { close: 106 },
+      { close: 103 },
+      { close: 104 },
+      { close: 105, high: 107, low: 103 },
+    ])
+    const swingPoints = makeSwingPoints({
+      highs: [{ index: 1, price: 105, type: 'high' }],
+      lows: [{ index: 3, price: 96, type: 'low' }],
+    })
+
+    const result = analyzeMarketStructure({ bars, swingPoints, internalLookback: 1 })
+
+    expect(result.swingStrength).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'internal-high-1',
+          type: 'high',
+          level: 'internal',
+          index: 1,
+          price: 105,
+          strength: 'weak',
+          liquidityTarget: expect.objectContaining({ kind: 'swing', id: 'internal-high-1', index: 1 }),
+          scoringImpact: expect.objectContaining({ zoneScoreDelta: -8, explanationTag: 'weak_high_swept' }),
+        }),
+        expect.objectContaining({
+          id: 'internal-low-3',
+          type: 'low',
+          level: 'internal',
+          index: 3,
+          price: 96,
+          strength: 'strong',
+          scoringImpact: expect.objectContaining({ zoneScoreDelta: 12, explanationTag: 'strong_low_defended' }),
+        }),
+      ])
+    )
+  })
+
   it('只使用已确认的 swing 点判断趋势（避免前视偏差）', () => {
     const bars = makeBars([90, 92, 94, 96, 98, 100, 102, 104, 106, 108, 121, 118, 119, 122])
     const targetSwingHigh = { index: 8, price: 120, type: 'high' as const }
@@ -260,6 +358,17 @@ function makeBars(closes: number[]): OhlcvBar[] {
     high: close + 1,
     low: close - 1,
     close,
+    volume: 1000,
+  }))
+}
+
+function makeOhlcBars(values: Array<{ close: number; open?: number; high?: number; low?: number }>): OhlcvBar[] {
+  return values.map((bar, index) => ({
+    date: `2024-01-${String(index + 1).padStart(2, '0')}`,
+    open: bar.open ?? bar.close,
+    high: bar.high ?? bar.close + 1,
+    low: bar.low ?? bar.close - 1,
+    close: bar.close,
     volume: 1000,
   }))
 }

@@ -36,6 +36,7 @@ describe('price-action importance scoring', () => {
     const alignedContext: ScoringContext = {
       ...baseContext,
       marketStructure: {
+        marketStructureMode: 'pivot',
         swingPoints: {
           internal: { highs: [], lows: [] },
           swing: { highs: [], lows: [] },
@@ -56,11 +57,55 @@ describe('price-action importance scoring', () => {
           },
         ],
         choch: [],
+        swingStrength: [],
       },
     }
 
     expect(scoreFVGImportance(fvg, alignedContext)).toBeGreaterThan(
       scoreFVGImportance(fvg, baseContext)
+    )
+  })
+
+  it('strong/weak swing strength contributes structured scoring impact to FVGs', () => {
+    const fvg = makeFVG({ type: 'bullish', top: 101, bottom: 99, formationIndex: 20 })
+    const baseContext: ScoringContext = {
+      currentPrice: 100,
+      volatility: 2,
+      barCount: 100,
+    }
+    const strongLowContext: ScoringContext = {
+      ...baseContext,
+      marketStructure: {
+        marketStructureMode: 'pivot',
+        swingPoints: {
+          internal: { highs: [], lows: [] },
+          swing: { highs: [], lows: [] },
+          external: { highs: [], lows: [] },
+        },
+        stateByLevel: {
+          internal: { trend: 'bullish', trendValue: 1 },
+          swing: { trend: 'unknown', trendValue: 0 },
+          external: { trend: 'unknown', trendValue: 0 },
+        },
+        bos: [],
+        choch: [],
+        swingStrength: [
+          {
+            id: 'internal-low-10',
+            type: 'low',
+            level: 'internal',
+            index: 10,
+            price: 98,
+            strength: 'strong',
+            reason: 'Defended structural anchor.',
+            scoringImpact: { zoneScoreDelta: 12, explanationTag: 'strong_low_defended' },
+          },
+        ],
+      },
+    }
+
+    expect(scoreFVGImportance(fvg, strongLowContext)).toBe(
+      scoreFVGImportance(fvg, baseContext) + 12
     )
   })
 
@@ -80,13 +125,22 @@ describe('price-action importance scoring', () => {
 
 function makeFVG(overrides: Partial<FairValueGap> = {}): FairValueGap {
   return {
+    id: 'fvg-test',
+    kind: 'fvg',
+    direction: overrides.type ?? 'bullish',
     type: 'bullish',
     variant: 'FVG',
     top: 112,
     bottom: 108,
+    midpoint: 110,
+    sizeAtr: 2,
+    formedAtIndex: 50,
     formationIndex: 50,
+    confirmedAtIndex: 51,
     confirmationIndex: 51,
     size: 4,
+    state: 'active',
+    lifecycle: { formedAtIndex: 50, confirmedAtIndex: 51 },
     isFilled: false,
     fillPercentage: 0,
     completelyFilled: false,
@@ -100,7 +154,8 @@ function makeIFVG(overrides: Partial<InverseFVG> = {}): InverseFVG {
     variant: 'FVG',
     top: 112,
     bottom: 108,
-    originalFVG: makeFVG(),
+    breakerId: 'fvg_breaker:fvg:50:70',
+    source: { kind: 'fvg_breaker', id: 'fvg_breaker:fvg:50:70', index: 70 },
     reversalIndex: 80,
     engulfingStrength: 1,
     impulseRatio: 2,

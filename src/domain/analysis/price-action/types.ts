@@ -4,7 +4,74 @@
  * FVG (Fair Value Gaps), iFVG (Inverse FVG), OB, BOS/CHoCH (Market Structure)
  */
 
-import type { OhlcvBar } from '@/domain/market-data/bars/types'
+import type { OhlcvBar } from '@/domain/market-data/bars/types.js'
+
+export type PriceActionSchemaVersion = 2
+export type ZoneDirection = 'bullish' | 'bearish'
+export type ZoneState = 'active' | 'touched' | 'mitigated' | 'filled' | 'broken' | 'invalidated'
+export type ZoneKind = 'fvg' | 'vi' | 'og' | 'order_block' | 'fvg_breaker' | 'order_block_breaker'
+export type ZoneMitigationSource = 'body' | 'wick' | 'midpoint'
+export type ZoneOverlapPolicy = 'ranked' | 'older' | 'newer' | 'none'
+
+export interface PriceActionFamilyFilterMeta {
+  detectedCount: number
+  lifecycleFilteredCount: number
+  overlapFilteredCount: number
+  returnedCount: number
+}
+
+export interface PriceActionSourceRef {
+  kind: ZoneKind | 'swing' | 'liquidity_pool'
+  id?: string
+  index?: number
+  level?: StructureLevel
+  top?: number
+  bottom?: number
+  timeframe?: string
+}
+
+export interface ZoneLifecycle {
+  formedAtIndex: number
+  confirmedAtIndex?: number
+  firstTouchedAtIndex?: number
+  lastTouchedAtIndex?: number
+  currentlyInside?: boolean
+  mitigatedAtIndex?: number
+  fillPercentage?: number
+  filledAtIndex?: number
+  fullyFilledAtIndex?: number
+  brokenAtIndex?: number
+  invalidatedAtIndex?: number
+}
+
+export interface ZoneEnvelope {
+  id?: string
+  kind: ZoneKind
+  direction: ZoneDirection
+  top: number
+  bottom: number
+  midpoint: number
+  size: number
+  sizeAtr: number
+  formedAtIndex: number
+  confirmedAtIndex: number
+  state: ZoneState
+  lifecycle: ZoneLifecycle
+  source?: PriceActionSourceRef
+  timeframe?: string
+  rank?: number
+  premiumDiscount?: PremiumDiscountZoneAnnotation
+}
+
+export interface PriceActionVolatilityMeta {
+  period: number
+  currentVolatility: number
+  fallback: {
+    used: boolean
+    reason?: 'insufficient_bars' | 'zero_volatility'
+    availableBars: number
+  }
+}
 
 // ==================== Swing Points ====================
 
@@ -38,7 +105,6 @@ export interface SwingPointLevels {
 // ==================== Fair Value Gaps ====================
 
 export type FairValueGapVariant = 'FVG' | 'VI' | 'OG'
-export type FairValueGapMitigationSource = 'close' | 'wick'
 export type VolumeConfirmationConfidence = 'high' | 'usable' | 'low' | 'not_recommended'
 
 export interface PriceActionVolumeConfirmation {
@@ -67,7 +133,7 @@ export interface PriceActionVolumeConfirmationInput {
   intrabarCount: number
 }
 
-export interface FairValueGap {
+export interface FairValueGap extends Partial<Omit<ZoneEnvelope, 'top' | 'bottom' | 'size'>> {
   /** FVG 类型 */
   type: 'bullish' | 'bearish'
   /** FVG/VI/OG variant */
@@ -105,8 +171,10 @@ export interface InverseFVG {
   top: number
   /** 区域下边界 */
   bottom: number
-  /** 原始 FVG */
-  originalFVG: FairValueGap
+  /** Confirming FVG breaker zone id */
+  breakerId?: string
+  /** Lightweight reference to the confirming FVG breaker */
+  source: PriceActionSourceRef
   /** 反转 K 线索引 */
   reversalIndex: number
   /** 吞没强度（反转 K 线 range 相对 ATR 的倍数） */
@@ -115,12 +183,23 @@ export interface InverseFVG {
   impulseRatio: number
   /** iFVG 反转 K 线的 intrabar delta/coverage 确认 */
   reversalVolumeConfirmation?: PriceActionVolumeConfirmation
+  /** Premium / discount / equilibrium location relative to the selected range */
+  premiumDiscount?: PremiumDiscountZoneAnnotation
 }
 
 // ==================== Market Structure ====================
 
 export type TrendDirection = 'bullish' | 'bearish' | 'unknown'
 export type StructureLevel = 'internal' | 'swing' | 'external'
+export type MarketStructureMode = 'pivot' | 'extreme'
+export type SwingStrengthValue = 'strong' | 'weak'
+export type SwingStrengthExplanationTag =
+  | 'strong_high_defended'
+  | 'strong_low_defended'
+  | 'weak_high_target'
+  | 'weak_low_target'
+  | 'weak_high_swept'
+  | 'weak_low_swept'
 
 export interface BreakOfStructure {
   /** BOS 类型 */
@@ -154,6 +233,30 @@ export interface ChangeOfCharacter {
 
 export type StructureBreakEvent = BreakOfStructure | ChangeOfCharacter
 
+export interface StructureRangePoint extends SwingPoint {
+  classification: 'strong_high' | 'strong_low' | 'weak_high' | 'weak_low'
+}
+
+export interface ActiveStructureRange {
+  high?: StructureRangePoint
+  low?: StructureRangePoint
+}
+
+export interface SwingStrengthEntry {
+  id: string
+  type: SwingPoint['type']
+  level: StructureLevel
+  index: number
+  price: number
+  strength: SwingStrengthValue
+  reason: string
+  liquidityTarget?: PriceActionSourceRef
+  scoringImpact?: {
+    zoneScoreDelta: number
+    explanationTag: SwingStrengthExplanationTag
+  }
+}
+
 export interface StructureState {
   /** Current state-machine trend for this structure level */
   trend: TrendDirection
@@ -169,9 +272,13 @@ export interface StructureState {
   lastConfirmedHigh?: SwingPoint
   /** Most recent confirmed swing low available to this level */
   lastConfirmedLow?: SwingPoint
+  /** Active high/low range used by extreme-mode structure reads */
+  activeRange?: ActiveStructureRange
 }
 
 export interface MarketStructureAnalysis {
+  /** Public structure mode used for this analysis */
+  marketStructureMode: MarketStructureMode
   /** Swing 点（三个层级） */
   swingPoints: SwingPointLevels
   /** Current state by structure level */
@@ -180,13 +287,14 @@ export interface MarketStructureAnalysis {
   bos: BreakOfStructure[]
   /** Change of Character 事件 */
   choch: ChangeOfCharacter[]
+  /** Strong/weak swing classification by level */
+  swingStrength: SwingStrengthEntry[]
 }
 
 // ==================== Order Blocks ====================
 
 export type OrderBlockTrigger = 'BOS' | 'CHoCH'
 export type OrderBlockPositionMode = 'full' | 'middle' | 'accurate' | 'precise'
-export type OrderBlockMitigationMode = 'absolute' | 'middle'
 export type OrderBlockOverlapMethod = 'previous' | 'recent'
 
 export interface OrderBlockVolumeConfirmation extends PriceActionVolumeConfirmation {
@@ -239,17 +347,187 @@ export interface OrderBlock {
   anchorVolumeConfirmation?: OrderBlockVolumeConfirmation
   /** 结构突破 K 线的 intrabar delta/coverage 确认 */
   breakoutVolumeConfirmation?: OrderBlockVolumeConfirmation
+  /** Premium / discount / equilibrium location relative to the selected range */
+  premiumDiscount?: PremiumDiscountZoneAnnotation
+}
+
+// ==================== Breakers / Liquidity / Premium Discount ====================
+
+export interface BreakerZone extends ZoneEnvelope {
+  kind: 'fvg_breaker' | 'order_block_breaker'
+  sourceDirection: ZoneDirection
+  sourceBrokenAtIndex: number
+}
+
+export interface LiquidityPool {
+  id: string
+  kind: 'liquidity_pool'
+  type: 'EQH' | 'EQL'
+  direction: ZoneDirection
+  level: StructureLevel
+  price: number
+  tolerance: number
+  toleranceAtr?: number
+  touches: SwingPoint[]
+  firstTouchedAtIndex: number
+  lastTouchedAtIndex: number
+  swept: boolean
+  sweptAtIndex?: number
+  sweepId?: string
+}
+
+export interface LiquiditySweep {
+  kind: 'swing_sweep' | 'fvg_raid' | 'liquidity_pool_sweep'
+  direction: ZoneDirection
+  sweepIndex: number
+  sweptLevel: number
+  wickExtreme: number
+  close: number
+  reclaimSource: ZoneMitigationSource
+  reclaimConfirmed: boolean
+  target: PriceActionSourceRef
+  penetration: number
+  penetrationAtr?: number
+  relatedStructure?: PriceActionSourceRef
+}
+
+export type PremiumDiscountLocation = 'premium' | 'discount' | 'equilibrium'
+export type PremiumDiscountZoneLocation = PremiumDiscountLocation | 'spanning'
+
+export interface PremiumDiscountZoneAnnotation {
+  location: PremiumDiscountZoneLocation
+  midpointLocation: PremiumDiscountLocation
+  coverage: {
+    premium: number
+    discount: number
+    equilibrium: number
+  }
+}
+
+export interface PremiumDiscountUnavailable {
+  status: 'unavailable'
+  reason: 'missing_range'
+}
+
+export interface PremiumDiscountAvailable {
+  status: 'available'
+  range: {
+    high: SwingPoint
+    low: SwingPoint
+    midpoint: number
+    equilibrium: {
+      bottom: number
+      top: number
+    }
+  }
+  currentPrice: number
+  location: PremiumDiscountLocation
+  equilibriumBandPct: number
+}
+
+export type PremiumDiscountContext = PremiumDiscountAvailable | PremiumDiscountUnavailable
+
+export interface PriceActionMeta {
+  schemaVersion: PriceActionSchemaVersion
+  volatility: PriceActionVolatilityMeta
+  totalFvgCount: number
+  returnedFvgCount: number
+  totalIfvgCount: number
+  returnedIfvgCount: number
+  totalOrderBlockCount: number
+  returnedOrderBlockCount: number
+  mitigatedOrderBlockCount: number
+  bosCount: number
+  chochCount: number
+  [key: string]: unknown
 }
 
 // ==================== 完整分析结果 ====================
 
 export interface PriceActionAnalysis {
+  /** Market Structure */
+  marketStructure: MarketStructureAnalysis
+  /** Premium / discount / equilibrium context */
+  premiumDiscount: PremiumDiscountContext
+  /** EQH/EQL liquidity pools */
+  liquidityPools: LiquidityPool[]
+  /** Swing, pool, and zone sweep events */
+  liquiditySweeps: LiquiditySweep[]
   /** Fair Value Gaps */
   fvgs: FairValueGap[]
   /** Inverse FVGs */
   ifvgs: InverseFVG[]
   /** Order Blocks */
   orderBlocks: OrderBlock[]
-  /** Market Structure */
-  marketStructure: MarketStructureAnalysis
+  /** Breaker zones */
+  breakers: BreakerZone[]
+  /** Result metadata */
+  meta: PriceActionMeta
+}
+
+// ==================== Multi-timeframe summary ====================
+
+export type PriceActionMtfStatus = 'ok' | 'partial' | 'error'
+export type PriceActionMtfIntervalStatus = 'ok' | 'insufficient' | 'error'
+
+export interface PriceActionDetailRequest {
+  tool: 'analyzePriceAction'
+  args: {
+    barId: string
+    assetClass?: 'equity' | 'crypto' | 'currency' | 'commodity'
+    interval: string
+    count?: number
+    start?: string
+    end?: string
+    [key: string]: unknown
+  }
+}
+
+export interface PriceActionMtfIntervalSummary {
+  interval: string
+  status: PriceActionMtfIntervalStatus
+  trend?: {
+    internal: TrendDirection
+    swing: TrendDirection
+    external: TrendDirection
+    dominant: TrendDirection
+  }
+  liquidity?: {
+    poolCount: number
+    sweepCount: number
+    recentSweeps: LiquiditySweep[]
+  }
+  zone?: {
+    fvgCount: number
+    ifvgCount: number
+    orderBlockCount: number
+    nearestFvg?: FairValueGap
+    nearestIFVG?: InverseFVG
+    nearestOrderBlock?: OrderBlock
+  }
+  premiumDiscount?: PremiumDiscountContext
+  structure?: {
+    mode: MarketStructureMode
+    bosCount: number
+    chochCount: number
+    lastBreak?: StructureBreakEvent
+    strongWeak: SwingStrengthEntry[]
+  }
+  detailRequest: PriceActionDetailRequest
+  error?: string
+  meta?: PriceActionMeta
+}
+
+export interface PriceActionMtfSummary {
+  bias: TrendDirection | 'mixed' | 'neutral'
+  alignment: 'aligned' | 'mixed' | 'conflicted' | 'unknown'
+  conflicts: string[]
+  confluences: string[]
+}
+
+export interface PriceActionMtfAnalysis {
+  status: PriceActionMtfStatus
+  summary: PriceActionMtfSummary
+  intervals: PriceActionMtfIntervalSummary[]
+  error?: string
 }

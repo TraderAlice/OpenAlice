@@ -77,6 +77,7 @@ export const CLI_EXPORTS: Record<string, CliExport> = {
         'delta-volume': 'calculateDeltaVolume',
         'volume-profile': 'calculateVolumeProfile',
         'price-action': 'analyzePriceAction',
+        'price-action-mtf': 'analyzeMultiTimeframePriceAction',
       },
       think: {
         calc: 'calculate',

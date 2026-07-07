@@ -29,6 +29,26 @@ function hasAlignedRecentBOS(fvg: FairValueGap, marketStructure: MarketStructure
     .some((bos) => bos.type === fvg.type)
 }
 
+function swingStrengthScoreDelta(fvg: FairValueGap, marketStructure: MarketStructureAnalysis): number {
+  return marketStructure.swingStrength.reduce((total, entry) => {
+    if (!entry.scoringImpact) return total
+
+    const supportsBullishZone =
+      fvg.type === 'bullish' && entry.type === 'low' && entry.strength === 'strong' && entry.price <= fvg.bottom
+    const supportsBearishZone =
+      fvg.type === 'bearish' && entry.type === 'high' && entry.strength === 'strong' && entry.price >= fvg.top
+    const chasesWeakHigh =
+      fvg.type === 'bullish' && entry.type === 'high' && entry.strength === 'weak' && entry.price <= fvg.top
+    const chasesWeakLow =
+      fvg.type === 'bearish' && entry.type === 'low' && entry.strength === 'weak' && entry.price >= fvg.bottom
+
+    if (supportsBullishZone || supportsBearishZone || chasesWeakHigh || chasesWeakLow) {
+      return total + entry.scoringImpact.zoneScoreDelta
+    }
+    return total
+  }, 0)
+}
+
 export function scoreFVGImportance(fvg: FairValueGap, context: ScoringContext): number {
   let score = 0
 
@@ -48,6 +68,10 @@ export function scoreFVGImportance(fvg: FairValueGap, context: ScoringContext): 
 
   if (context.marketStructure && hasAlignedRecentBOS(fvg, context.marketStructure)) {
     score += 20
+  }
+
+  if (context.marketStructure) {
+    score += swingStrengthScoreDelta(fvg, context.marketStructure)
   }
 
   return score

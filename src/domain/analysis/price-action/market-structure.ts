@@ -9,7 +9,7 @@
  * state and consumes the broken-side candidates.
  */
 
-import type { OhlcvBar } from '@/domain/market-data/bars/types'
+import type { OhlcvBar } from '@/domain/market-data/bars/types.js'
 import type {
   SwingPointLevels,
   SwingPoint,
@@ -17,7 +17,10 @@ import type {
   ChangeOfCharacter,
   StructureLevel,
   MarketStructureAnalysis,
+  MarketStructureMode,
   StructureState,
+  SwingStrengthEntry,
+  ActiveStructureRange,
 } from './types.js'
 
 export interface MarketStructureParams {
@@ -26,6 +29,7 @@ export interface MarketStructureParams {
   internalLookback?: number
   swingLookback?: number
   externalLookback?: number
+  marketStructureMode?: MarketStructureMode
 }
 
 const DEFAULT_INTERNAL_LOOKBACK = 5
@@ -63,6 +67,140 @@ function crossedBelow(previousClose: number, close: number, price: number): bool
 
 function sortedSwings(swings: SwingPoint[]): SwingPoint[] {
   return [...swings].sort((a, b) => a.index - b.index)
+}
+
+function compressConsecutiveExtremes(points: { highs: SwingPoint[]; lows: SwingPoint[] }): {
+  highs: SwingPoint[]
+  lows: SwingPoint[]
+} {
+  const events = [...points.highs, ...points.lows].sort((a, b) => a.index - b.index || a.type.localeCompare(b.type))
+  const compressed: SwingPoint[] = []
+
+  for (const point of events) {
+    const previous = compressed[compressed.length - 1]
+    if (!previous || previous.type !== point.type) {
+      compressed.push(point)
+      continue
+    }
+
+    const pointIsMoreExtreme =
+      point.type === 'high' ? point.price > previous.price : point.price < previous.price
+    if (pointIsMoreExtreme) {
+      compressed[compressed.length - 1] = point
+    }
+  }
+
+  return {
+    highs: compressed.filter((point) => point.type === 'high'),
+    lows: compressed.filter((point) => point.type === 'low'),
+  }
+}
+
+function swingPointsForMode(swingPoints: SwingPointLevels, mode: MarketStructureMode): SwingPointLevels {
+  if (mode === 'pivot') return swingPoints
+
+  return {
+    internal: compressConsecutiveExtremes(swingPoints.internal),
+    swing: compressConsecutiveExtremes(swingPoints.swing),
+    external: compressConsecutiveExtremes(swingPoints.external),
+  }
+}
+
+function swingId(level: StructureLevel, point: SwingPoint): string {
+  return `${level}-${point.type}-${point.index}`
+}
+
+function wasSweptAsLiquidity(bars: OhlcvBar[], point: SwingPoint): boolean {
+  return bars.slice(point.index + 1).some((bar) => {
+    if (point.type === 'high') return bar.high > point.price && bar.close <= point.price
+    return bar.low < point.price && bar.close >= point.price
+  })
+}
+
+function strengthForSwing(trend: StructureState['trend'], point: SwingPoint): SwingStrengthEntry['strength'] | undefined {
+  if (trend === 'bullish') return point.type === 'low' ? 'strong' : 'weak'
+  if (trend === 'bearish') return point.type === 'high' ? 'strong' : 'weak'
+  return undefined
+}
+
+function buildReason(trend: StructureState['trend'], point: SwingPoint, strength: SwingStrengthEntry['strength'], swept: boolean): string {
+  if (swept && strength === 'weak') {
+    return `${point.type === 'high' ? 'High' : 'Low'} was swept by a wick and reclaimed in ${trend} structure.`
+  }
+  if (strength === 'strong') {
+    return `${point.type === 'high' ? 'High' : 'Low'} is the defended structural anchor in ${trend} context.`
+  }
+  return `${point.type === 'high' ? 'High' : 'Low'} is a liquidity target in ${trend} context.`
+}
+
+function buildSwingStrength(
+  bars: OhlcvBar[],
+  swingPoints: SwingPointLevels,
+  stateByLevel: Record<StructureLevel, StructureState>
+): SwingStrengthEntry[] {
+  const entries: SwingStrengthEntry[] = []
+  const levels: StructureLevel[] = ['internal', 'swing', 'external']
+
+  for (const level of levels) {
+    const trend = stateByLevel[level].trend
+    const points = [...swingPoints[level].highs, ...swingPoints[level].lows].sort((a, b) => a.index - b.index)
+
+    for (const point of points) {
+      const strength = strengthForSwing(trend, point)
+      if (!strength) continue
+
+      const swept = wasSweptAsLiquidity(bars, point)
+      const weakTag = point.type === 'high' ? 'weak_high_target' : 'weak_low_target'
+      const sweptTag = point.type === 'high' ? 'weak_high_swept' : 'weak_low_swept'
+      const strongTag = point.type === 'high' ? 'strong_high_defended' : 'strong_low_defended'
+      const explanationTag = strength === 'strong' ? strongTag : swept ? sweptTag : weakTag
+
+      entries.push({
+        id: swingId(level, point),
+        type: point.type,
+        level,
+        index: point.index,
+        price: point.price,
+        strength,
+        reason: buildReason(trend, point, strength, swept),
+        liquidityTarget: strength === 'weak' && swept
+          ? { kind: 'swing', id: swingId(level, point), index: point.index }
+          : undefined,
+        scoringImpact: {
+          zoneScoreDelta: strength === 'strong' ? 12 : swept ? -8 : -4,
+          explanationTag,
+        },
+      })
+    }
+  }
+
+  return entries
+}
+
+function buildActiveRange(
+  level: StructureLevel,
+  swingPoints: SwingPointLevels,
+  swingStrength: SwingStrengthEntry[]
+): ActiveStructureRange | undefined {
+  const high = swingPoints[level].highs.at(-1)
+  const low = swingPoints[level].lows.at(-1)
+  if (!high && !low) return undefined
+
+  const strengthById = new Map(swingStrength.map((entry) => [entry.id, entry]))
+  return {
+    high: high
+      ? {
+          ...high,
+          classification: strengthById.get(swingId(level, high))?.strength === 'strong' ? 'strong_high' : 'weak_high',
+        }
+      : undefined,
+    low: low
+      ? {
+          ...low,
+          classification: strengthById.get(swingId(level, low))?.strength === 'strong' ? 'strong_low' : 'weak_low',
+        }
+      : undefined,
+  }
 }
 
 function detectStructureBreaksAtLevel(
@@ -187,11 +325,13 @@ function detectStructureBreaksAtLevel(
 export function analyzeMarketStructure(params: MarketStructureParams): MarketStructureAnalysis {
   const {
     bars,
-    swingPoints,
+    swingPoints: rawSwingPoints,
     internalLookback = DEFAULT_INTERNAL_LOOKBACK,
     swingLookback = DEFAULT_SWING_LOOKBACK,
     externalLookback = DEFAULT_EXTERNAL_LOOKBACK,
+    marketStructureMode = 'pivot',
   } = params
+  const swingPoints = swingPointsForMode(rawSwingPoints, marketStructureMode)
 
   // 检测三个层级的结构突破（传入各自的lookback）
   const internalBreaks = detectStructureBreaksAtLevel(
@@ -218,15 +358,25 @@ export function analyzeMarketStructure(params: MarketStructureParams): MarketStr
     externalLookback
   )
 
-  // 合并所有层级的结果
+  const stateByLevel = {
+    internal: internalBreaks.state,
+    swing: swingBreaks.state,
+    external: externalBreaks.state,
+  }
+  const swingStrength = buildSwingStrength(bars, swingPoints, stateByLevel)
+
+  if (marketStructureMode === 'extreme') {
+    stateByLevel.internal.activeRange = buildActiveRange('internal', swingPoints, swingStrength)
+    stateByLevel.swing.activeRange = buildActiveRange('swing', swingPoints, swingStrength)
+    stateByLevel.external.activeRange = buildActiveRange('external', swingPoints, swingStrength)
+  }
+
   return {
+    marketStructureMode,
     swingPoints,
-    stateByLevel: {
-      internal: internalBreaks.state,
-      swing: swingBreaks.state,
-      external: externalBreaks.state,
-    },
+    stateByLevel,
     bos: [...internalBreaks.bos, ...swingBreaks.bos, ...externalBreaks.bos],
     choch: [...internalBreaks.choch, ...swingBreaks.choch, ...externalBreaks.choch],
+    swingStrength,
   }
 }

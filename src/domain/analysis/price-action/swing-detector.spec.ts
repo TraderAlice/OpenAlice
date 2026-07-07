@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { detectSwingPoints } from './swing-detector.js'
-import type { OhlcvBar } from '@/domain/market-data/bars/types'
+import type { OhlcvBar } from '@/domain/market-data/bars/types.js'
 
 describe('detectSwingPoints', () => {
   it('检测 Swing High（中心高点大于左右邻近高点）', () => {
