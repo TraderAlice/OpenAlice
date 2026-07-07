@@ -10,6 +10,7 @@ declare const __OPENALICE_DEV_BACKEND_PORT__: number
 
 interface ImportMetaEnv {
   readonly VITE_DEMO_MODE?: string
+  readonly VITE_OPENALICE_FIRST_RUN_GUIDE?: string
   readonly VITE_OPENALICE_ONBOARDING_TEST?: string
   readonly VITE_OPENALICE_CREDENTIAL_TEST_MODE?: string
   readonly VITE_OPENALICE_ONBOARDING_STORAGE_SUFFIX?: string

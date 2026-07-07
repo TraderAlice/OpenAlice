@@ -13,6 +13,7 @@ console.log(`[onboarding-test] workspaces → ${env['AQ_LAUNCHER_ROOT']}`)
 console.log(`[onboarding-test] global     → ${env['OPENALICE_GLOBAL_DIR']}`)
 console.log(`[onboarding-test] agents     → ${env['OPENALICE_AGENT_RUNTIME_INSTALLS']}`)
 console.log(`[onboarding-test] cred test  → ${env['OPENALICE_CREDENTIAL_TEST_MODE']}`)
+console.log(`[onboarding-test] guide     → ${env['VITE_OPENALICE_FIRST_RUN_GUIDE'] === '1' ? 'enabled' : 'disabled'}`)
 console.log(`[onboarding-test] storage   → ${env['VITE_OPENALICE_ONBOARDING_STORAGE_SUFFIX']}`)
 console.log(`[onboarding-test] UI         → http://localhost:${env['OPENALICE_UI_PORT']}`)
 console.log('')
@@ -25,6 +26,7 @@ if (printOnly) {
     OPENALICE_GLOBAL_DIR: env['OPENALICE_GLOBAL_DIR'],
     OPENALICE_AGENT_RUNTIME_INSTALLS: env['OPENALICE_AGENT_RUNTIME_INSTALLS'],
     OPENALICE_CREDENTIAL_TEST_MODE: env['OPENALICE_CREDENTIAL_TEST_MODE'],
+    VITE_OPENALICE_FIRST_RUN_GUIDE: env['VITE_OPENALICE_FIRST_RUN_GUIDE'],
     OPENALICE_TRADING_MODE: env['OPENALICE_TRADING_MODE'] ?? null,
     VITE_OPENALICE_ONBOARDING_TEST: env['VITE_OPENALICE_ONBOARDING_TEST'],
     VITE_OPENALICE_CREDENTIAL_TEST_MODE: env['VITE_OPENALICE_CREDENTIAL_TEST_MODE'],

@@ -13,6 +13,7 @@ describe('buildOnboardingTestEnv', () => {
     expect(env['OPENALICE_GLOBAL_DIR']).toBe('/tmp/oa-onboarding/global')
     expect(env['OPENALICE_AGENT_RUNTIME_INSTALLS']).toBe('only:pi')
     expect(env['OPENALICE_CREDENTIAL_TEST_MODE']).toBe('mock')
+    expect(env['VITE_OPENALICE_FIRST_RUN_GUIDE']).toBe('1')
     expect(env['VITE_OPENALICE_ONBOARDING_TEST']).toBe('1')
     expect(env['VITE_OPENALICE_CREDENTIAL_TEST_MODE']).toBe('mock')
     expect(env['VITE_OPENALICE_ONBOARDING_STORAGE_SUFFIX']).toMatch(/^[0-9a-f-]{36}$/)
@@ -26,6 +27,14 @@ describe('buildOnboardingTestEnv', () => {
     }, { root: '/tmp/oa-onboarding' })
 
     expect(env['VITE_OPENALICE_ONBOARDING_STORAGE_SUFFIX']).toBe('fixed-ui-state')
+  })
+
+  it('allows disabling the first-run guide in onboarding test mode', () => {
+    const { env } = buildOnboardingTestEnv({
+      VITE_OPENALICE_FIRST_RUN_GUIDE: '0',
+    }, { root: '/tmp/oa-onboarding' })
+
+    expect(env['VITE_OPENALICE_FIRST_RUN_GUIDE']).toBe('0')
   })
 
   it('scrubs inherited trading env unless the onboarding-specific mode is set', () => {

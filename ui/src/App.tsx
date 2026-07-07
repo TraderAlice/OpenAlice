@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { ActivityBar } from './components/ActivityBar'
 import { TabHost } from './components/TabHost'
 import { DesktopUpdatePrompt } from './components/DesktopUpdatePrompt'
 import { UpdateBanner } from './components/UpdateBanner'
-import { FirstRunGuide } from './components/FirstRunGuide'
 import { DemoBanner } from './demo/DemoBanner'
 import { DemoAnalytics } from './demo/DemoAnalytics'
 import { WorkspacesProvider } from './contexts/WorkspacesContext'
@@ -48,6 +47,11 @@ function useMediaQuery(query: string): boolean {
 const useIsDesktop = () => useMediaQuery('(min-width: 768px)') // rail static
 const useHasRailText = () => useMediaQuery('(min-width: 960px)') // text rail allowed
 const useHasFullRail = () => useMediaQuery('(min-width: 1280px)') // full rail width
+const firstRunGuideEnabled = import.meta.env.VITE_OPENALICE_FIRST_RUN_GUIDE === '1'
+const FirstRunGuide = lazy(async () => {
+  const module = await import('./components/FirstRunGuide')
+  return { default: module.FirstRunGuide }
+})
 
 export function App() {
   return (
@@ -67,7 +71,7 @@ function AppShell() {
   const hasFullRail = useHasFullRail() // ≥1280 — full rail width
   const railMode = !isDesktop ? 'full' : hasFullRail ? 'full' : hasRailText ? 'narrow' : 'compact'
   const location = useLocation()
-  const suppressFirstRunGuide = location.pathname.startsWith('/design/')
+  const showFirstRunGuide = firstRunGuideEnabled && !location.pathname.startsWith('/design/')
 
   // When the rail becomes a static column, drop its mobile drawer state.
   useEffect(() => {
@@ -122,7 +126,11 @@ function AppShell() {
           {mainContent}
         </div>
         <UrlAdopter />
-        {!suppressFirstRunGuide && <FirstRunGuide />}
+        {showFirstRunGuide && (
+          <Suspense fallback={null}>
+            <FirstRunGuide />
+          </Suspense>
+        )}
       </div>
     </div>
   )
