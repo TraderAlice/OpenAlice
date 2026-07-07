@@ -27,8 +27,8 @@ export function calculatePremiumDiscountContext(params: CalculatePremiumDiscount
   const level = params.level ?? DEFAULT_STRUCTURE_LEVEL
   const equilibriumBandPct = params.equilibriumBandPct ?? DEFAULT_EQUILIBRIUM_BAND_PCT
   const state = params.marketStructure.stateByLevel[level]
-  const high = params.marketStructure.swingPoints[level].highs.at(-1) ?? state.lastConfirmedHigh
-  const low = params.marketStructure.swingPoints[level].lows.at(-1) ?? state.lastConfirmedLow
+  const high = state.lastConfirmedHigh
+  const low = state.lastConfirmedLow
 
   if (!high || !low || high.price === low.price) {
     return { status: 'unavailable', reason: 'missing_range' }

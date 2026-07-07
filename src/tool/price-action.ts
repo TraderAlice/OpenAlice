@@ -290,8 +290,8 @@ do not overlap. The detector can also use VI (body/volume imbalance)
 and OG (opening gap) variants, with mitigation by body, wick, or midpoint. When enabled,
 the formation candle includes lower-timeframe intrabar delta confirmation.
 
-**Inverse FVG (iFVG)**: When an FVG is filled and price reverses from within the gap, it
-transforms into an institutional order block (support/resistance). When enabled,
+**Inverse FVG (iFVG)**: A confirmed subset of FVG breaker zones, produced when a broken
+FVG shows reversal/impulse confirmation and links back to the breaker. When enabled,
 the reversal candle includes lower-timeframe intrabar delta confirmation.
 
 **Order Blocks (OB)**: Volumetric order blocks. When a BOS/CHoCH
@@ -896,14 +896,19 @@ Use each interval's detailRequest with analyzePriceAction when full single-timef
         }))
 
         const successfulCount = intervalResults.filter((entry) => entry.status === 'ok').length
+        const errorCount = intervalResults.filter((entry) => entry.status === 'error').length
         const status: PriceActionMtfAnalysis['status'] =
-          successfulCount === 0 ? 'error' : successfulCount === intervalResults.length ? 'ok' : 'partial'
+          successfulCount === intervalResults.length
+            ? 'ok'
+            : errorCount === intervalResults.length
+              ? 'error'
+              : 'partial'
 
         return {
           status,
           summary: summarizeMtf(intervalResults),
           intervals: intervalResults,
-          ...(status === 'error' ? { error: 'All intervals failed or returned insufficient data' } : {}),
+          ...(status === 'error' ? { error: 'All intervals failed' } : {}),
         }
       },
     }),

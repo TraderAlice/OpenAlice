@@ -16,6 +16,7 @@ import type {
   ZoneKind,
   ZoneMitigationSource,
 } from './types.js'
+import { zoneTriggerPrice } from './zone-price.js'
 
 export interface DetectBreakersParams {
   bars: OhlcvBar[]
@@ -160,10 +161,7 @@ function invalidationPrice(
   direction: ZoneDirection,
   source: Exclude<ZoneMitigationSource, 'midpoint'>,
 ): number {
-  if (source === 'wick') return direction === 'bearish' ? bar.high : bar.low
-  return direction === 'bearish'
-    ? Math.max(bar.open, bar.close)
-    : Math.min(bar.open, bar.close)
+  return zoneTriggerPrice(bar, direction, source)
 }
 
 function reverseDirection(direction: ZoneDirection): ZoneDirection {

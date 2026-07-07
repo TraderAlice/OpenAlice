@@ -54,6 +54,25 @@ describe('premium / discount context', () => {
     expect(context.status).toBe('available')
   })
 
+  it('uses the latest confirmed anchors instead of newer unconfirmed pivots', () => {
+    const confirmedHigh = { index: 10, price: 120, type: 'high' } satisfies SwingPoint
+    const confirmedLow = { index: 12, price: 80, type: 'low' } satisfies SwingPoint
+    const marketStructure = marketStructureWithAnchors(confirmedHigh, confirmedLow)
+    marketStructure.swingPoints.swing.highs.push({ index: 20, price: 180, type: 'high' })
+    marketStructure.swingPoints.swing.lows.push({ index: 21, price: 160, type: 'low' })
+
+    expect(calculatePremiumDiscountContext({ marketStructure, currentPrice: 101 })).toMatchObject({
+      status: 'available',
+      location: 'equilibrium',
+      range: {
+        high: confirmedHigh,
+        low: confirmedLow,
+        midpoint: 100,
+        equilibrium: { bottom: 98, top: 102 },
+      },
+    })
+  })
+
   it('annotates a spanning zone with location, midpoint location, and range coverage', () => {
     const context = calculatePremiumDiscountContext({
       marketStructure: marketStructureWithAnchors(

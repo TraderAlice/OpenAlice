@@ -18,6 +18,7 @@ import type {
 } from './types.js'
 import { calculatePriceActionVolatility } from './indicators.js'
 import { applyZoneOverlapFiltering, buildFamilyFilterMeta } from './overlap-filter.js'
+import { bodyHigh, bodyLow, zoneTriggerPrice } from './zone-price.js'
 
 export interface FVGDetectionParams {
   bars: OhlcvBar[]
@@ -171,11 +172,7 @@ function sourcePrice(
   direction: 'bullish' | 'bearish',
   zoneMitigationSource: ZoneMitigationSource,
 ): number {
-  if (zoneMitigationSource === 'wick') {
-    return direction === 'bullish' ? bar.low : bar.high
-  }
-
-  return direction === 'bullish' ? bodyLow(bar) : bodyHigh(bar)
+  return zoneTriggerPrice(bar, direction, zoneMitigationSource === 'midpoint' ? 'body' : zoneMitigationSource)
 }
 
 function reachesMitigationTarget(
@@ -204,14 +201,6 @@ function stateFromLifecycle(events: {
   if (events.mitigated) return 'mitigated'
   if (events.touched) return 'touched'
   return 'active'
-}
-
-function bodyLow(bar: OhlcvBar): number {
-  return Math.min(bar.open, bar.close)
-}
-
-function bodyHigh(bar: OhlcvBar): number {
-  return Math.max(bar.open, bar.close)
 }
 
 function bodyRatio(bar: OhlcvBar): number {

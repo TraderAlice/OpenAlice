@@ -74,6 +74,98 @@ describe('analyzePriceAction v2 foundation', () => {
     expect(result.breakers).toEqual([])
   })
 
+  it('locks the stable single-timeframe public contract fields', async () => {
+    const tools = createPriceActionTools({
+      barService: fakeBarService([
+        bar(100, 102, 98, 101, 0),
+        bar(101, 103, 99, 102, 1),
+        bar(102, 104, 100, 103, 2),
+      ]),
+    })
+
+    const result = await run(tools.analyzePriceAction, {
+      barId: 'test|PA',
+      interval: '15m',
+      gapVolumeConfirmation: false,
+      ifvgVolumeConfirmation: false,
+      orderBlockVolumeConfirmation: false,
+    }) as Record<string, any>
+
+    expect({
+      keys: Object.keys(result),
+      marketStructure: {
+        mode: result.marketStructure.marketStructureMode,
+        internalTrend: result.marketStructure.stateByLevel.internal.trend,
+        swingTrend: result.marketStructure.stateByLevel.swing.trend,
+        externalTrend: result.marketStructure.stateByLevel.external.trend,
+        bosCount: result.marketStructure.bos.length,
+        chochCount: result.marketStructure.choch.length,
+        swingStrengthCount: result.marketStructure.swingStrength.length,
+      },
+      premiumDiscount: result.premiumDiscount,
+      liquidityPools: result.liquidityPools,
+      liquiditySweeps: result.liquiditySweeps,
+      fvgs: result.fvgs,
+      ifvgs: result.ifvgs,
+      orderBlocks: result.orderBlocks,
+      breakers: result.breakers,
+      meta: {
+        schemaVersion: result.meta.schemaVersion,
+        totalFvgCount: result.meta.totalFvgCount,
+        returnedFvgCount: result.meta.returnedFvgCount,
+        totalIfvgCount: result.meta.totalIfvgCount,
+        returnedIfvgCount: result.meta.returnedIfvgCount,
+        totalBreakerCount: result.meta.totalBreakerCount,
+        returnedBreakerCount: result.meta.returnedBreakerCount,
+        totalOrderBlockCount: result.meta.totalOrderBlockCount,
+        returnedOrderBlockCount: result.meta.returnedOrderBlockCount,
+        bosCount: result.meta.bosCount,
+        chochCount: result.meta.chochCount,
+      },
+    }).toEqual({
+      keys: [
+        'marketStructure',
+        'premiumDiscount',
+        'liquidityPools',
+        'liquiditySweeps',
+        'fvgs',
+        'ifvgs',
+        'orderBlocks',
+        'breakers',
+        'meta',
+      ],
+      marketStructure: {
+        mode: 'pivot',
+        internalTrend: 'unknown',
+        swingTrend: 'unknown',
+        externalTrend: 'unknown',
+        bosCount: 0,
+        chochCount: 0,
+        swingStrengthCount: 0,
+      },
+      premiumDiscount: { status: 'unavailable', reason: 'missing_range' },
+      liquidityPools: [],
+      liquiditySweeps: [],
+      fvgs: [],
+      ifvgs: [],
+      orderBlocks: [],
+      breakers: [],
+      meta: {
+        schemaVersion: 2,
+        totalFvgCount: 0,
+        returnedFvgCount: 0,
+        totalIfvgCount: 0,
+        returnedIfvgCount: 0,
+        totalBreakerCount: 0,
+        returnedBreakerCount: 0,
+        totalOrderBlockCount: 0,
+        returnedOrderBlockCount: 0,
+        bosCount: 0,
+        chochCount: 0,
+      },
+    })
+  })
+
   it('keeps v2 result placeholders when no bars are returned', async () => {
     const tools = createPriceActionTools({
       barService: fakeBarService([]),
@@ -334,6 +426,163 @@ describe('analyzeMultiTimeframePriceAction', () => {
     })
   })
 
+  it('marks the top-level result partial when every interval is insufficient', async () => {
+    const tools = createPriceActionTools({
+      barService: fakeBarServiceByInterval({
+        '1h': [bar(100, 101, 99, 100, 0), bar(100, 101, 99, 100, 1)],
+        '15m': [bar(100, 101, 99, 100, 0)],
+      }),
+    })
+
+    const result = await run(tools.analyzeMultiTimeframePriceAction, {
+      barId: 'test|MTF',
+      intervals: ['1h', '15m'],
+    }) as Record<string, any>
+
+    expect(result.status).toBe('partial')
+    expect(result.error).toBeUndefined()
+    expect(result.intervals.map((entry: any) => entry.status)).toEqual(['insufficient', 'insufficient'])
+  })
+
+  it('locks the stable MTF public contract statuses and detail requests', async () => {
+    const tools = createPriceActionTools({
+      barService: fakeBarServiceByInterval({
+        ok: trendBars('bullish'),
+        partial: [bar(100, 101, 99, 100, 0)],
+      }, {
+        failed: new Error('provider timeout'),
+      }),
+    })
+
+    const partial = await run(tools.analyzeMultiTimeframePriceAction, {
+      barId: 'test|MTF-GOLDEN',
+      intervals: ['ok', 'partial', 'failed'],
+      count: 100,
+      gapVolumeConfirmation: false,
+      ifvgVolumeConfirmation: false,
+      orderBlockVolumeConfirmation: false,
+    }) as Record<string, any>
+
+    const ok = await run(tools.analyzeMultiTimeframePriceAction, {
+      barId: 'test|MTF-GOLDEN',
+      intervals: ['ok'],
+      count: 100,
+      gapVolumeConfirmation: false,
+      ifvgVolumeConfirmation: false,
+      orderBlockVolumeConfirmation: false,
+    }) as Record<string, any>
+
+    expect({
+      status: ok.status,
+      error: ok.error,
+      intervalShapes: ok.intervals.map((entry: any) => ({
+        interval: entry.interval,
+        status: entry.status,
+        detailRequest: entry.detailRequest,
+        hasTrend: Boolean(entry.trend),
+        hasLiquidity: Boolean(entry.liquidity),
+        hasZone: Boolean(entry.zone),
+        hasPremiumDiscount: Boolean(entry.premiumDiscount),
+        hasStructure: Boolean(entry.structure),
+        hasMeta: Boolean(entry.meta),
+      })),
+    }).toEqual({
+      status: 'ok',
+      error: undefined,
+      intervalShapes: [
+        {
+          interval: 'ok',
+          status: 'ok',
+          detailRequest: {
+            tool: 'analyzePriceAction',
+            args: expect.objectContaining({ barId: 'test|MTF-GOLDEN', interval: 'ok', count: 100 }),
+          },
+          hasTrend: true,
+          hasLiquidity: true,
+          hasZone: true,
+          hasPremiumDiscount: true,
+          hasStructure: true,
+          hasMeta: true,
+        },
+      ],
+    })
+
+    expect({
+      status: partial.status,
+      intervalShapes: partial.intervals.map((entry: any) => ({
+        interval: entry.interval,
+        status: entry.status,
+        detailRequest: entry.detailRequest,
+        hasMeta: Boolean(entry.meta),
+        error: entry.error,
+      })),
+    }).toEqual({
+      status: 'partial',
+      intervalShapes: [
+        {
+          interval: 'ok',
+          status: 'ok',
+          detailRequest: {
+            tool: 'analyzePriceAction',
+            args: expect.objectContaining({ barId: 'test|MTF-GOLDEN', interval: 'ok', count: 100 }),
+          },
+          hasMeta: true,
+          error: undefined,
+        },
+        {
+          interval: 'partial',
+          status: 'insufficient',
+          detailRequest: {
+            tool: 'analyzePriceAction',
+            args: expect.objectContaining({ barId: 'test|MTF-GOLDEN', interval: 'partial', count: 100 }),
+          },
+          hasMeta: true,
+          error: 'Insufficient bars returned for price-action summary',
+        },
+        {
+          interval: 'failed',
+          status: 'error',
+          detailRequest: {
+            tool: 'analyzePriceAction',
+            args: expect.objectContaining({ barId: 'test|MTF-GOLDEN', interval: 'failed', count: 100 }),
+          },
+          hasMeta: false,
+          error: 'provider timeout',
+        },
+      ],
+    })
+
+    const error = await run(tools.analyzeMultiTimeframePriceAction, {
+      barId: 'test|MTF-GOLDEN',
+      intervals: ['failed'],
+    }) as Record<string, any>
+
+    expect({
+      status: error.status,
+      error: error.error,
+      intervalShapes: error.intervals.map((entry: any) => ({
+        interval: entry.interval,
+        status: entry.status,
+        detailRequest: entry.detailRequest,
+        error: entry.error,
+      })),
+    }).toEqual({
+      status: 'error',
+      error: 'All intervals failed',
+      intervalShapes: [
+        {
+          interval: 'failed',
+          status: 'error',
+          detailRequest: {
+            tool: 'analyzePriceAction',
+            args: expect.objectContaining({ barId: 'test|MTF-GOLDEN', interval: 'failed' }),
+          },
+          error: 'provider timeout',
+        },
+      ],
+    })
+  })
+
   it('includes liquidity pool context in each interval summary', async () => {
     const tools = createPriceActionTools({
       barService: fakeBarServiceByInterval({
@@ -399,7 +648,7 @@ describe('analyzeMultiTimeframePriceAction', () => {
     }) as Record<string, any>
 
     expect(result.status).toBe('error')
-    expect(result.error).toBe('All intervals failed or returned insufficient data')
+    expect(result.error).toBe('All intervals failed')
     expect(result.intervals.map((entry: any) => entry.status)).toEqual(['error', 'error'])
   })
 })

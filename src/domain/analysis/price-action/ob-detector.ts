@@ -22,6 +22,7 @@ import type {
   ZoneOverlapPolicy,
 } from './types.js'
 import { applyZoneOverlapFiltering, buildFamilyFilterMeta } from './overlap-filter.js'
+import { zoneTriggerPrice } from './zone-price.js'
 
 export interface DetectOrderBlocksParams {
   bars: OhlcvBar[]
@@ -145,10 +146,7 @@ function mitigationTarget(ob: Pick<OrderBlock, 'type' | 'bottom' | 'top' | 'midd
 }
 
 function mitigationPrice(bar: OhlcvBar, type: OrderBlock['type'], source: ZoneMitigationSource): number {
-  if (source === 'wick') return type === 'bullish' ? bar.low : bar.high
-  return type === 'bullish'
-    ? Math.min(bar.open, bar.close)
-    : Math.max(bar.open, bar.close)
+  return zoneTriggerPrice(bar, type, source === 'midpoint' ? 'body' : source)
 }
 
 function findMitigationIndex(

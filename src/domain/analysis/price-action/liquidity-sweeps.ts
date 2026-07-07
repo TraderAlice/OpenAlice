@@ -10,6 +10,7 @@ import type {
   SwingPointLevels,
   ZoneMitigationSource,
 } from './types.js'
+import { bodyHigh, bodyLow } from './zone-price.js'
 
 export interface LiquiditySweepDetectionParams {
   bars: OhlcvBar[]
@@ -25,14 +26,6 @@ const LEVEL_IMPORTANCE: Record<StructureLevel, number> = {
   external: 3,
   swing: 2,
   internal: 1,
-}
-
-function bodyLow(bar: OhlcvBar): number {
-  return Math.min(bar.open, bar.close)
-}
-
-function bodyHigh(bar: OhlcvBar): number {
-  return Math.max(bar.open, bar.close)
 }
 
 function penetrationAtr(penetration: number, currentVolatility: number | undefined): number | undefined {

@@ -151,9 +151,11 @@ It detects:
   The result includes both `formationIndex` and `confirmationIndex`; by default
   the confirmation candle gets lower-timeframe intrabar delta confirmation when
   available.
-- **iFVG (Inverse FVG):** an FVG that is filled and then acts as a reversal
-  support/resistance zone. By default the reversal candle gets lower-timeframe
-  intrabar delta confirmation when available.
+- **iFVG (Inverse FVG):** a confirmed subset of FVG breaker zones. The source
+  FVG must break through its far edge, create a breaker with reversed direction,
+  then show reversal/impulse confirmation; each iFVG links back to that breaker.
+  By default the reversal candle gets lower-timeframe intrabar delta
+  confirmation when available.
 - **OB (Order Block):** volumetric order block: after a
   BOS/CHoCH, locate the extreme candle between the broken swing and breakout,
   derive a zone, and mark it mitigated when price closes through the configured
