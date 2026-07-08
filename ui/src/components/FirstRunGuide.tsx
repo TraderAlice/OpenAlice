@@ -35,6 +35,11 @@ import { useWorkspace } from '../tabs/store'
 import { isApiKeyPreset } from '../lib/presetHelpers'
 import { LOCALE_LABELS, useLocale, useSetLocale } from '../i18n/useLocale'
 import type { AppLocale } from '../lib/intl'
+import {
+  getAgentRuntimeReadiness,
+  probeAgentRuntimeReadiness,
+  type AgentRuntimeReadinessSnapshot,
+} from './workspace/api'
 
 const BASE_DISMISS_KEY = 'openalice.onboarding.firstRunGuide.dismissed.v3'
 const STORAGE_SUFFIX = import.meta.env.VITE_OPENALICE_ONBOARDING_STORAGE_SUFFIX?.trim()
@@ -74,6 +79,7 @@ const ONBOARDING_TEST_PRESET: Preset = {
 
 interface GuideState {
   credentials: CredentialSummary[]
+  runtimeReadiness: AgentRuntimeReadinessSnapshot | null
   tradingStatus: TradingServiceStatus | null
   utas: UTAConfig[]
 }
@@ -84,18 +90,21 @@ const FIRST_RUN_LOCALES: AppLocale[] = ['en', 'zh', 'ja', 'zh-Hant']
 
 const INITIAL_GUIDE_STATE: GuideState = {
   credentials: [],
+  runtimeReadiness: null,
   tradingStatus: null,
   utas: [],
 }
 
 async function fetchGuideState(): Promise<GuideState> {
-  const [credentials, tradingStatus, tradingConfig] = await Promise.all([
+  const [credentials, runtimeReadiness, tradingStatus, tradingConfig] = await Promise.all([
     configApi.getCredentials(),
+    getAgentRuntimeReadiness().catch(() => null),
     tradingApi.status(),
     tradingApi.loadTradingConfig(),
   ])
   return {
     credentials: credentials.credentials,
+    runtimeReadiness,
     tradingStatus,
     utas: tradingConfig.utas,
   }
@@ -123,6 +132,9 @@ export function FirstRunGuide() {
   const [showCredentialForm, setShowCredentialForm] = useState(false)
   const [showUTAForm, setShowUTAForm] = useState(false)
   const [utaEscapeSaving, setUtaEscapeSaving] = useState(false)
+  const [runtimeProbeRunning, setRuntimeProbeRunning] = useState(false)
+  const [runtimeProbeAttempted, setRuntimeProbeAttempted] = useState(false)
+  const [runtimeProbeError, setRuntimeProbeError] = useState<string | null>(null)
   const [aiPresets, setAiPresets] = useState<Preset[]>([])
   const [brokerPresets, setBrokerPresets] = useState<BrokerPreset[]>([])
   const [sessionStarted, setSessionStarted] = useState(false)
@@ -139,6 +151,23 @@ export function FirstRunGuide() {
     const next = await fetchGuideState()
     setState(next)
     return next
+  }, [])
+
+  const runRuntimeReadinessProbe = useCallback(async (agent?: string) => {
+    setRuntimeProbeRunning(true)
+    setRuntimeProbeAttempted(true)
+    setRuntimeProbeError(null)
+    try {
+      const runtimeReadiness = await probeAgentRuntimeReadiness(agent)
+      setState((prev) => ({ ...prev, runtimeReadiness }))
+      return runtimeReadiness
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      setRuntimeProbeError(message)
+      return null
+    } finally {
+      setRuntimeProbeRunning(false)
+    }
   }, [])
 
   useEffect(() => {
@@ -189,6 +218,7 @@ export function FirstRunGuide() {
 
   const model = useMemo(() => buildFirstRunGuideModel({
     agents,
+    runtimeReadiness: state.runtimeReadiness,
     credentials: state.credentials,
     tradingStatus: state.tradingStatus,
     utas: state.utas,
@@ -198,6 +228,9 @@ export function FirstRunGuide() {
   const guideAccess = useMemo(() => buildFirstRunGuideAccess(model), [model])
   const shouldStartGuide = loaded && (model.shouldShow || !!stepOverride)
   const shouldShowGuide = loaded && !sessionClosed && (sessionStarted || shouldStartGuide)
+  const requestedStepKey = FIRST_RUN_STEP_KEYS[
+    Math.max(0, Math.min(stepIndex, FIRST_RUN_STEP_KEYS.length - 1))
+  ]
   const apiKeyPresets = useMemo(() => {
     const base = aiPresets.filter(isApiKeyPreset)
     return ONBOARDING_TEST_MODE && MOCK_CREDENTIAL_TEST
@@ -208,6 +241,22 @@ export function FirstRunGuide() {
   useEffect(() => {
     if (shouldStartGuide && !sessionClosed) setSessionStarted(true)
   }, [sessionClosed, shouldStartGuide])
+
+  useEffect(() => {
+    if (!shouldShowGuide) return
+    if (requestedStepKey !== 'ai') return
+    if (model.hasUsableAiChain || model.runtimeProbeChecking) return
+    if (runtimeProbeAttempted || runtimeProbeRunning) return
+    void runRuntimeReadinessProbe()
+  }, [
+    model.hasUsableAiChain,
+    model.runtimeProbeChecking,
+    requestedStepKey,
+    runRuntimeReadinessProbe,
+    runtimeProbeAttempted,
+    runtimeProbeRunning,
+    shouldShowGuide,
+  ])
 
   useEffect(() => {
     if (!shouldShowGuide) return
@@ -287,9 +336,20 @@ export function FirstRunGuide() {
         : t('firstRunGuide.ai.runtimeMissing')
     const credentialText = model.noCredentials
       ? t('firstRunGuide.ai.noVerifiedKey')
-      : model.hasUsableAiChain
-        ? t('firstRunGuide.ai.usableKey')
-        : t('firstRunGuide.ai.keyMismatch')
+      : t('firstRunGuide.ai.keyMismatch')
+    const aiAccessText = model.hasUsableAiChain
+      ? t('firstRunGuide.ai.runtimeReady')
+      : runtimeProbeError
+        ? t('firstRunGuide.ai.probeFailed')
+        : model.runtimeProbeChecking || runtimeProbeRunning
+          ? t('firstRunGuide.ai.checkingRuntime')
+          : model.aiRepairTarget === 'cli-login'
+            ? t('firstRunGuide.ai.cliLoginNeeded')
+            : model.aiRepairTarget === 'ai-provider'
+              ? t('firstRunGuide.ai.providerNeeded')
+              : model.aiRepairTarget === 'runtime-install'
+                ? t('firstRunGuide.ai.runtimeMissing')
+                : credentialText
     const aiTitle = model.hasAgentRuntime
       ? model.hasUsableAiChain
         ? t('firstRunGuide.ai.titleReady')
@@ -298,15 +358,25 @@ export function FirstRunGuide() {
     const aiBody = model.hasAgentRuntime
       ? model.hasUsableAiChain
         ? t('firstRunGuide.ai.bodyReady')
-        : model.hasManagedPi
-          ? t('firstRunGuide.ai.bodyPiInstalled')
-          : t('firstRunGuide.ai.bodyAddKey')
+        : model.runtimeProbeChecking || runtimeProbeRunning
+          ? t('firstRunGuide.ai.bodyChecking')
+          : model.aiRepairTarget === 'cli-login'
+            ? t('firstRunGuide.ai.bodyCliLogin')
+            : model.aiRepairTarget === 'ai-provider'
+              ? t('firstRunGuide.ai.bodyAddKey')
+              : model.hasManagedPi
+                ? t('firstRunGuide.ai.bodyPiInstalled')
+                : t('firstRunGuide.ai.bodyRetry')
       : t('firstRunGuide.ai.bodyMissingRuntime')
     const aiPrimary = model.hasUsableAiChain
       ? t('firstRunGuide.common.continue')
-      : model.hasAgentRuntime
-        ? t('firstRunGuide.action.addCredential')
-        : t('firstRunGuide.action.openChecklist')
+      : model.runtimeProbeChecking || runtimeProbeRunning
+        ? t('firstRunGuide.common.checking')
+        : model.aiRepairTarget === 'ai-provider'
+          ? t('firstRunGuide.action.addCredential')
+          : model.aiRepairTarget === 'retry'
+            ? t('firstRunGuide.action.testRuntime')
+            : t('firstRunGuide.action.openChecklist')
 
     return [
       {
@@ -349,7 +419,7 @@ export function FirstRunGuide() {
         panelBody: t('firstRunGuide.ai.panelBody'),
         rows: [
           { icon: <TerminalSquare className="h-4 w-4" />, label: t('firstRunGuide.ai.runtime'), value: runtimeText, tone: model.hasAgentRuntime ? 'ready' as const : 'attention' as const },
-          { icon: <KeyRound className="h-4 w-4" />, label: t('firstRunGuide.ai.aiAccess'), value: credentialText, tone: model.hasUsableAiChain ? 'ready' as const : 'attention' as const },
+          { icon: <KeyRound className="h-4 w-4" />, label: t('firstRunGuide.ai.aiAccess'), value: aiAccessText, tone: model.hasUsableAiChain ? 'ready' as const : 'attention' as const },
         ],
       },
       {
@@ -389,7 +459,7 @@ export function FirstRunGuide() {
         ],
       },
     ]
-  }, [model, t])
+  }, [model, runtimeProbeError, runtimeProbeRunning, t])
 
   const maxReachableStepIndex = useMemo(() => {
     const index = steps.findIndex((step) => step.key === guideAccess.maxReachableStepKey)
@@ -410,6 +480,7 @@ export function FirstRunGuide() {
 
   const activeStepIndex = Math.max(0, Math.min(stepIndex, maxReachableStepIndex, steps.length - 1))
   const activeStep = steps[activeStepIndex]
+  const primaryDisabled = activeStep.key === 'ai' && (runtimeProbeRunning || model.runtimeProbeChecking)
 
   const goToStep = (nextIndex: number) => {
     const targetIndex = Math.max(0, Math.min(steps.length - 1, maxReachableStepIndex, nextIndex))
@@ -433,12 +504,17 @@ export function FirstRunGuide() {
   }
 
   const runPrimary = () => {
-    if (activeStep.key === 'ai' && !model.hasAgentRuntime) {
-      openChecklist()
-      return
-    }
     if (activeStep.key === 'ai' && !model.hasUsableAiChain) {
-      setShowCredentialForm(true)
+      if (runtimeProbeRunning || model.runtimeProbeChecking) return
+      if (!model.hasAgentRuntime || model.aiRepairTarget === 'runtime-install' || model.aiRepairTarget === 'cli-login') {
+        openChecklist()
+        return
+      }
+      if (model.aiRepairTarget === 'ai-provider') {
+        setShowCredentialForm(true)
+        return
+      }
+      void runRuntimeReadinessProbe()
       return
     }
     if (activeStep.key === 'broker') {
@@ -533,7 +609,7 @@ export function FirstRunGuide() {
                 {activeStep.key === 'language' ? (
                   <LanguageChoices locale={locale} onSelect={setLocale} />
                 ) : activeStep.key === 'ai' ? (
-                  <RuntimeScanTable rows={model.runtimeRows} />
+                  <RuntimeScanTable rows={model.runtimeRows} error={runtimeProbeError} />
                 ) : activeStep.key === 'broker' ? (
                   <TradingModeChoices
                     mode={model.mode}
@@ -607,8 +683,9 @@ export function FirstRunGuide() {
                 <button
                   type="button"
                   onClick={runPrimary}
+                  disabled={primaryDisabled}
                   data-testid="first-run-guide-primary"
-                  className="flex min-w-0 items-center justify-center gap-2 rounded-md bg-accent px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-accent/90"
+                  className="flex min-w-0 items-center justify-center gap-2 rounded-md bg-accent px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-accent/90 disabled:cursor-default disabled:opacity-60 disabled:hover:bg-accent"
                 >
                   <span className="min-w-0 truncate">{activeStep.primary}</span>
                   <ArrowRight className="h-4 w-4 shrink-0" />
@@ -637,9 +714,11 @@ export function FirstRunGuide() {
           onClose={() => setShowCredentialForm(false)}
           onSaved={async () => {
             const nextState = await refreshGuideState()
+            const runtimeReadiness = await runRuntimeReadinessProbe()
             setShowCredentialForm(false)
             const nextModel = buildFirstRunGuideModel({
               agents,
+              runtimeReadiness: runtimeReadiness ?? nextState.runtimeReadiness,
               credentials: nextState.credentials,
               tradingStatus: nextState.tradingStatus,
               utas: nextState.utas,
@@ -902,7 +981,9 @@ function TradingModeChoices({
 
 function RuntimeScanTable({
   rows,
+  error,
 }: {
+  error: string | null
   rows: Array<{
     id: string
     displayName: string
@@ -911,15 +992,24 @@ function RuntimeScanTable({
     compatibleCredentialCount: number
     chainReady: boolean
     accessLabel: string
+    source: string
+    readinessStatus: string
+    readinessMessage: string | null
   }>
 }) {
   const { t } = useTranslation()
   return (
-    <div className="mt-4 overflow-hidden border-y border-border sm:mt-5">
-      <div className="hidden border-b border-border py-2 text-[10px] font-medium uppercase tracking-wide text-text-muted sm:grid sm:grid-cols-[minmax(0,1fr)_72px_116px] sm:gap-3">
-        <span>{t('firstRunGuide.ai.runtime')}</span>
-        <span>{t('firstRunGuide.ai.cli')}</span>
-        <span>{t('firstRunGuide.ai.aiAccess')}</span>
+    <div className="mt-4 sm:mt-5">
+      {error && (
+        <div className="mb-3 break-words rounded-md border border-red/25 bg-red/5 px-3 py-2 text-[12px] leading-relaxed text-red">
+          {error}
+        </div>
+      )}
+      <div className="overflow-hidden border-y border-border">
+      <div className="hidden border-b border-border py-2 text-[10px] font-medium uppercase tracking-wide text-text-muted sm:grid sm:grid-cols-[minmax(0,1fr)_72px_minmax(112px,140px)] sm:gap-3">
+          <span>{t('firstRunGuide.ai.runtime')}</span>
+          <span>{t('firstRunGuide.ai.cli')}</span>
+          <span>{t('firstRunGuide.ai.readyProbe')}</span>
       </div>
       {rows.map((row) => {
         const tone: RowTone = row.chainReady ? 'ready' : row.installed ? 'attention' : 'muted'
@@ -931,17 +1021,24 @@ function RuntimeScanTable({
         const cliText = row.installed ? t('firstRunGuide.ai.installed') : t('firstRunGuide.ai.missing')
         const accessText = row.chainReady
           ? t('firstRunGuide.ai.ready')
-          : row.installed && row.compatibleCredentialCount > 0
-            ? t('firstRunGuide.ai.ready')
-            : row.installed
-              ? row.loginRuntime
-                ? t('firstRunGuide.ai.loginCheckPending')
-                : t('firstRunGuide.ai.needsAiKey')
-              : t('firstRunGuide.ai.cliNotInstalled')
+          : row.readinessStatus === 'checking'
+            ? t('firstRunGuide.ai.checkingRuntime')
+            : row.readinessStatus === 'not_installed'
+              ? t('firstRunGuide.ai.cliNotInstalled')
+              : row.readinessStatus === 'auth_required'
+                ? t('firstRunGuide.ai.cliLoginNeeded')
+                : row.readinessStatus === 'provider_required'
+                  ? t('firstRunGuide.ai.providerNeeded')
+                  : row.readinessStatus === 'unknown'
+                    ? t('firstRunGuide.ai.notChecked')
+                    : t('firstRunGuide.ai.probeFailed')
+        const sourceText = row.chainReady && row.source !== 'unknown'
+          ? t('firstRunGuide.ai.source', { source: row.source })
+          : null
         return (
           <div
             key={row.id}
-            className="grid min-w-0 grid-cols-1 gap-2 border-b border-border py-2.5 text-[12px] last:border-b-0 sm:grid-cols-[minmax(0,1fr)_72px_116px] sm:gap-3 sm:py-3"
+            className="grid min-w-0 grid-cols-1 gap-2 border-b border-border py-2.5 text-[12px] last:border-b-0 sm:grid-cols-[minmax(0,1fr)_72px_minmax(112px,140px)] sm:gap-3 sm:py-3"
             data-testid="runtime-scan-row"
           >
             <div className="min-w-0">
@@ -953,6 +1050,11 @@ function RuntimeScanTable({
                 <span className={row.installed ? 'text-green' : 'text-text-muted'}>{cliText}</span>
                 <span className={toneClass}>{accessText}</span>
               </div>
+              {sourceText && (
+                <div className="mt-1 break-words text-[10.5px] leading-relaxed text-text-muted/75">
+                  {sourceText}
+                </div>
+              )}
             </div>
             <div className={`hidden sm:block ${row.installed ? 'text-green' : 'text-text-muted'}`}>
               {cliText}
@@ -963,6 +1065,7 @@ function RuntimeScanTable({
           </div>
         )
       })}
+      </div>
     </div>
   )
 }

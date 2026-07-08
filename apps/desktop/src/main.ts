@@ -414,34 +414,45 @@ async function runRendererOnboardingSmoke(win: BrowserWindow): Promise<void> {
     clickPrimary()
     await waitFor('AI access step', () => activeStep() === 'ai' ? true : false)
 
-    const mockCredential = await json(await fetch('/api/config/credentials/test', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        wireShape: 'openai-chat',
-        baseUrl: 'https://onboarding.openalice.test/openai-chat',
-        apiKey: 'oa_test_ok',
-        model: 'openalice-onboarding-test',
-      }),
-    }))
-    if (!mockCredential.ok) {
-      throw new Error('onboarding mock credential failed: ' + (mockCredential.error || 'unknown error'))
-    }
+    const readiness = await waitFor('Pi runtime readiness', async () => {
+      const snapshot = await json(await fetch('/api/workspaces/agent-runtime-readiness'))
+      const row = snapshot.agents?.pi
+      if (row?.ready && row.status === 'ready') return snapshot
+      if (row && row.status !== 'unknown' && row.status !== 'checking') {
+        throw new Error('Pi readiness was ' + row.status + ': ' + (row.message || 'no detail'))
+      }
+      return null
+    }, 60000)
+    const piReady = readiness.agents.pi
 
+    await waitFor('AI ready primary button', async () => {
+      const snapshot = await json(await fetch('/api/workspaces/agent-runtime-readiness'))
+      const row = snapshot.agents?.pi
+      const button = document.querySelector('[data-testid="first-run-guide-primary"]')
+      return activeStep() === 'ai' && row?.ready === true && button && !button.disabled
+    }, 60000)
     clickPrimary()
-    await waitFor('onboarding credential modal', () =>
-      document.body.innerText.includes('OpenAlice Test Provider') &&
-      Array.from(document.querySelectorAll('input')).some((input) => input.value === 'oa_test_ok')
-    )
+    await waitFor('broker step', () => activeStep() === 'broker' ? true : false)
 
     return {
       ok: true,
       step: activeStep(),
       piPath: pi.binPath || null,
+      runtimeStatus: piReady.status,
+      runtimeSource: piReady.source,
       tradingMode: tradingStatus.mode,
     }
-  })()`, true) as { ok?: boolean; step?: string; piPath?: string | null; tradingMode?: string }
-  console.log(`[guardian] electron smoke onboarding → ok step=${result.step ?? ''} mode=${result.tradingMode ?? ''} pi=${result.piPath ?? 'managed'}`)
+  })()`, true) as {
+    ok?: boolean
+    step?: string
+    piPath?: string | null
+    runtimeStatus?: string
+    runtimeSource?: string
+    tradingMode?: string
+  }
+  console.log(
+    `[guardian] electron smoke onboarding → ok step=${result.step ?? ''} mode=${result.tradingMode ?? ''} pi=${result.piPath ?? 'managed'} runtime=${result.runtimeStatus ?? ''}/${result.runtimeSource ?? ''}`,
+  )
 }
 
 app.whenReady().then(async () => {

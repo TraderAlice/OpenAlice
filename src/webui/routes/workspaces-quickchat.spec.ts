@@ -70,6 +70,7 @@ function build(opts: { workspaces?: any[]; opencodeConfig?: WorkspaceAiCred | nu
     pool: { spawn, get: vi.fn(() => undefined) },
     publicMeta: vi.fn(async () => META),
     config: { launcherRepoRoot: '/repo' },
+    getAgentRuntimeReadiness: vi.fn(() => ({ agents: {}, overallReady: false, checkedAt: null })),
   } as unknown as WorkspaceService;
   return { app: createWorkspaceRoutes(svc), opencode, spawn, creator };
 }

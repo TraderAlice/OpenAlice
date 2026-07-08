@@ -10,10 +10,11 @@
 
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
+import { mkdir, rm } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 
 import { cliBinPath } from '@/core/paths.js';
-import { readIssueDefaultAgent, readWorkspaceDefaultAgent } from '@/core/config.js';
+import { readCredentials, readIssueDefaultAgent, readWorkspaceDefaultAgent } from '@/core/config.js';
 
 import { claudeAdapter } from './adapters/claude.js';
 import { codexAdapter } from './adapters/codex.js';
@@ -27,6 +28,20 @@ import { logger as launcherLogger } from './logger.js';
 import { acquireWorkspaceProcessLock } from './process-lock.js';
 import { runHeadlessProbe, type HeadlessProbeResult } from './probe.js';
 import { runHeadlessTask, type HeadlessTaskResult } from './headless-task.js';
+import {
+  checkingRuntimeReadinessRow,
+  failedRuntimeReadinessRow,
+  initialRuntimeReadinessRow,
+  notInstalledRuntimeReadinessRow,
+  readyRuntimeReadinessRow,
+  runtimeProbeSucceeded,
+  snapshotRuntimeReadiness,
+  RUNTIME_READINESS_PROMPT,
+  RUNTIME_READINESS_TIMEOUT_MS,
+  type AgentRuntimeReadinessRow,
+  type AgentRuntimeReadinessSnapshot,
+  type AgentRuntimeReadinessSource,
+} from './agent-runtime-readiness.js';
 import { ScheduleMarkerStore } from './schedule/marker-store.js';
 import { ScheduleScanner, DEFAULT_INTERVAL_MS } from './schedule/scanner.js';
 import {
@@ -51,6 +66,12 @@ import {
 import { completeOneShotIssueAfterRun } from './issues/auto-complete.js';
 import type { IInboxStore } from '@/core/inbox-store.js';
 import { HeadlessTaskRegistry, headlessLogPaths } from './headless-task-registry.js';
+import {
+  compatibleCredentials,
+  credentialToWorkspaceAiCred,
+  resolveInjectionModel,
+} from './credential-injection.js';
+import { injectWorkspaceContext } from './context-injector.js';
 
 /** Max concurrent in-flight headless tasks — backstop against unbounded spawn. */
 const MAX_CONCURRENT_HEADLESS = 8;
@@ -150,6 +171,13 @@ export interface WorkspaceService {
     prompt: string,
     timeoutMs: number,
   ): Promise<HeadlessTaskResult>;
+  /** Cached install/ready snapshot for global first-run runtime gating. */
+  getAgentRuntimeReadiness(): AgentRuntimeReadinessSnapshot;
+  /**
+   * Run real headless readiness probes for one or all agent runtimes. Uses
+   * launcher-owned scratch dirs, never registered workspaces or user projects.
+   */
+  probeAgentRuntimeReadiness(agentId?: string): Promise<AgentRuntimeReadinessSnapshot>;
   /**
    * ASYNC dispatch — records the task, spawns it in the background, returns the
    * taskId immediately (the automation path). Throws `HeadlessCapacityError`
@@ -282,6 +310,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   adapters.register(opencodeAdapter);
   adapters.register(piAdapter);
   adapters.register(shellAdapter);
+  const runtimeReadinessCache = new Map<string, AgentRuntimeReadinessRow>();
 
   const creator = new WorkspaceCreator({
     workspacesRoot: `${config.launcherRoot}/workspaces`,
@@ -440,6 +469,207 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     }
     const transcriptDir = adapter.transcriptDir ? adapter.transcriptDir(ws.dir) : null;
     return { command, cwd: ws.dir, env, transcriptDir };
+  };
+
+  const getRuntimeAdapters = () => adapters.list().filter(isAgentRuntime);
+
+  const getAgentRuntimeReadinessMethod = (): AgentRuntimeReadinessSnapshot =>
+    snapshotRuntimeReadiness(getRuntimeAdapters(), detectAgents(), runtimeReadinessCache);
+
+  const runtimeReadinessSourceFor = (
+    adapter: CliAdapter,
+    availability?: AgentAvailability,
+  ): AgentRuntimeReadinessSource => {
+    if (adapter.id === 'claude' || adapter.id === 'codex') return 'global-login';
+    const binaryPath = availability?.path ?? '';
+    if (
+      adapter.id === 'pi' &&
+      (binaryPath.includes('/vendor/pi/') || binaryPath.includes('\\vendor\\pi\\'))
+    ) {
+      return 'managed-runtime';
+    }
+    return 'global-config';
+  };
+
+  const prepareRuntimeReadinessWorkspace = async (adapter: CliAdapter): Promise<WorkspaceMeta> => {
+    const id = `__runtime_readiness_${adapter.id}`;
+    const dir = join(config.launcherRoot, 'state', 'runtime-readiness', adapter.id);
+    await rm(dir, { recursive: true, force: true });
+    await mkdir(dir, { recursive: true });
+
+    const template = templates.get('chat');
+    if (template) {
+      await injectWorkspaceContext({ template, wsId: id, dir });
+    }
+    if (adapter.bootstrap) {
+      await adapter.bootstrap({ wsId: id, cwd: dir, launcherRepoRoot: config.launcherRepoRoot });
+    }
+
+    return {
+      id,
+      tag: id,
+      dir,
+      createdAt: new Date().toISOString(),
+      template: 'chat',
+      agents: [adapter.id],
+    };
+  };
+
+  const writeFirstCompatibleRuntimeCredential = async (
+    adapter: CliAdapter,
+    dir: string,
+  ): Promise<boolean> => {
+    if (!adapter.writeAiConfig) return false;
+    const credentials = await readCredentials();
+    const [, credential] = compatibleCredentials(credentials, adapter.id)[0] ?? [];
+    if (!credential) return false;
+
+    const model = resolveInjectionModel(credential);
+    const workspaceCredential = credentialToWorkspaceAiCred(
+      credential,
+      adapter.id,
+      model ? { model } : {},
+    );
+    if (!workspaceCredential) return false;
+    await adapter.writeAiConfig(dir, workspaceCredential);
+    return true;
+  };
+
+  const runRuntimeReadinessProbeAttempt = async (
+    adapter: CliAdapter,
+    source: AgentRuntimeReadinessSource,
+    options: { injectCredential?: boolean } = {},
+  ) => {
+    const ws = await prepareRuntimeReadinessWorkspace(adapter);
+    try {
+      if (options.injectCredential) {
+        const wroteCredential = await writeFirstCompatibleRuntimeCredential(adapter, ws.dir);
+        if (!wroteCredential) return null;
+      }
+      const { cwd, env } = composeSpawnInputs(ws, adapter, undefined);
+      const command = adapter.composeHeadlessCommand?.(
+        config.command,
+        { cwd, env },
+        RUNTIME_READINESS_PROMPT,
+      );
+      if (!command) return null;
+      const result = await runHeadlessTask({
+        command,
+        cwd,
+        env,
+        timeoutMs: RUNTIME_READINESS_TIMEOUT_MS,
+        logger: launcherLogger.child({ scope: 'runtime-readiness', agent: adapter.id }),
+        allowShellShim: true,
+        ...(adapter.extractHeadlessSessionId
+          ? { extractSessionId: adapter.extractHeadlessSessionId.bind(adapter) }
+          : {}),
+      });
+      return { result, source };
+    } finally {
+      await rm(ws.dir, { recursive: true, force: true }).catch(() => {});
+    }
+  };
+
+  const syntheticRuntimeReadinessFailure = (message: string): HeadlessTaskResult => ({
+    command: [],
+    cwd: config.launcherRoot,
+    exitCode: -1,
+    signal: null,
+    killed: false,
+    durationMs: 0,
+    stdoutTail: '',
+    stderrTail: message,
+    agentSessionId: null,
+  });
+
+  const probeSingleAgentRuntimeReadiness = async (
+    adapter: CliAdapter,
+    availability?: AgentAvailability,
+  ): Promise<AgentRuntimeReadinessRow> => {
+    if (!availability?.installed) {
+      const row = notInstalledRuntimeReadinessRow(adapter, availability);
+      runtimeReadinessCache.set(adapter.id, row);
+      return row;
+    }
+    if (!adapter.capabilities.headless || !adapter.composeHeadlessCommand) {
+      const row = failedRuntimeReadinessRow({
+        adapter,
+        availability,
+        result: syntheticRuntimeReadinessFailure('Agent does not support headless probes.'),
+      });
+      runtimeReadinessCache.set(adapter.id, row);
+      return row;
+    }
+
+    const existing =
+      runtimeReadinessCache.get(adapter.id) ?? initialRuntimeReadinessRow(adapter, availability);
+    runtimeReadinessCache.set(adapter.id, checkingRuntimeReadinessRow(existing));
+
+    const globalSource = runtimeReadinessSourceFor(adapter, availability);
+    let lastAttempt: Awaited<ReturnType<typeof runRuntimeReadinessProbeAttempt>> | null = null;
+
+    try {
+      lastAttempt = await runRuntimeReadinessProbeAttempt(adapter, globalSource);
+      if (lastAttempt && runtimeProbeSucceeded(lastAttempt.result)) {
+        const row = readyRuntimeReadinessRow({
+          adapter,
+          availability,
+          source: lastAttempt.source,
+          durationMs: lastAttempt.result.durationMs,
+        });
+        runtimeReadinessCache.set(adapter.id, row);
+        return row;
+      }
+
+      const launcherAttempt = await runRuntimeReadinessProbeAttempt(adapter, 'launcher-vault', {
+        injectCredential: true,
+      });
+      if (launcherAttempt) lastAttempt = launcherAttempt;
+      if (launcherAttempt && runtimeProbeSucceeded(launcherAttempt.result)) {
+        const row = readyRuntimeReadinessRow({
+          adapter,
+          availability,
+          source: 'launcher-vault',
+          durationMs: launcherAttempt.result.durationMs,
+        });
+        runtimeReadinessCache.set(adapter.id, row);
+        return row;
+      }
+
+      const row = failedRuntimeReadinessRow({
+        adapter,
+        availability,
+        result:
+          lastAttempt?.result ??
+          syntheticRuntimeReadinessFailure('No compatible credential or runtime config was found.'),
+        source: lastAttempt?.source ?? globalSource,
+      });
+      runtimeReadinessCache.set(adapter.id, row);
+      return row;
+    } catch (err) {
+      const row = failedRuntimeReadinessRow({
+        adapter,
+        availability,
+        result: syntheticRuntimeReadinessFailure(err instanceof Error ? err.message : String(err)),
+        source: lastAttempt?.source ?? globalSource,
+      });
+      runtimeReadinessCache.set(adapter.id, row);
+      return row;
+    }
+  };
+
+  const probeAgentRuntimeReadinessMethod = async (
+    agentId?: string,
+  ): Promise<AgentRuntimeReadinessSnapshot> => {
+    const runtimeAdapters = getRuntimeAdapters();
+    const targets = agentId
+      ? runtimeAdapters.filter((adapter) => adapter.id === agentId)
+      : runtimeAdapters;
+    const availability = detectAgents();
+    await Promise.all(
+      targets.map((adapter) => probeSingleAgentRuntimeReadiness(adapter, availability[adapter.id])),
+    );
+    return snapshotRuntimeReadiness(runtimeAdapters, detectAgents(), runtimeReadinessCache);
   };
 
   const computeSpawnPlan = (
@@ -1013,6 +1243,8 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     resolveAdapter,
     publicMeta,
     detectAgents,
+    getAgentRuntimeReadiness: getAgentRuntimeReadinessMethod,
+    probeAgentRuntimeReadiness: probeAgentRuntimeReadinessMethod,
     computeSpawnPlan,
     runHeadlessProbe: runHeadlessProbeMethod,
     runHeadlessTask: runHeadlessTaskMethod,

@@ -3,6 +3,61 @@ import { demoChatWorkspace, demoWorkspaces, demoTemplates } from '../fixtures/wo
 import { demoWorkspaceFiles } from '../fixtures/inbox'
 import type { WorkspaceMetadataPatch } from '../../components/workspace/api'
 
+const demoAgentRuntimeReadiness = {
+  agents: {
+    claude: {
+      agent: 'claude',
+      displayName: 'Claude Code',
+      installed: true,
+      binPath: '/usr/local/bin/claude',
+      status: 'ready',
+      ready: true,
+      source: 'global-login',
+      checkedAt: '2026-07-08T00:00:00.000Z',
+      durationMs: 12,
+      message: 'Claude Code replied to the readiness probe.',
+    },
+    codex: {
+      agent: 'codex',
+      displayName: 'Codex',
+      installed: true,
+      binPath: '/usr/local/bin/codex',
+      status: 'ready',
+      ready: true,
+      source: 'global-login',
+      checkedAt: '2026-07-08T00:00:00.000Z',
+      durationMs: 14,
+      message: 'Codex replied to the readiness probe.',
+    },
+    opencode: {
+      agent: 'opencode',
+      displayName: 'opencode',
+      installed: true,
+      binPath: '/usr/local/bin/opencode',
+      status: 'ready',
+      ready: true,
+      source: 'launcher-vault',
+      checkedAt: '2026-07-08T00:00:00.000Z',
+      durationMs: 18,
+      message: 'opencode replied to the readiness probe.',
+    },
+    pi: {
+      agent: 'pi',
+      displayName: 'Pi',
+      installed: true,
+      binPath: '/usr/local/bin/pi',
+      status: 'ready',
+      ready: true,
+      source: 'launcher-vault',
+      checkedAt: '2026-07-08T00:00:00.000Z',
+      durationMs: 16,
+      message: 'Pi replied to the readiness probe.',
+    },
+  },
+  overallReady: true,
+  checkedAt: '2026-07-08T00:00:00.000Z',
+}
+
 export const workspacesHandlers = [
   http.get('/api/workspaces', () => HttpResponse.json({ workspaces: demoWorkspaces })),
   http.post('/api/workspaces', () =>
@@ -53,6 +108,12 @@ export const workspacesHandlers = [
         { id: 'pi', displayName: 'Pi', installed: true, binPath: '/usr/local/bin/pi', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'none' } },
       ],
     }),
+  ),
+  http.get('/api/workspaces/agent-runtime-readiness', () =>
+    HttpResponse.json(demoAgentRuntimeReadiness),
+  ),
+  http.post('/api/workspaces/agent-runtime-readiness/probe', () =>
+    HttpResponse.json(demoAgentRuntimeReadiness),
   ),
   // One sample vault credential so the quick-chat runtime picker (opencode/pi)
   // shows a populated dropdown — a clean showcase, not a "go configure" prompt.

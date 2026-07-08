@@ -26,7 +26,13 @@ const HEADLESS_RESULT = {
 };
 
 function build(
-  opts: { meta?: any; adapters?: Record<string, any>; resolveTo?: any; dispatch?: any } = {},
+  opts: {
+    meta?: any;
+    adapters?: Record<string, any>;
+    resolveTo?: any;
+    dispatch?: any;
+    runtimeReadiness?: any;
+  } = {},
 ) {
   const claude = {
     id: 'claude',
@@ -38,6 +44,39 @@ function build(
   const adapters = opts.adapters ?? { claude };
   const runHeadlessTask = vi.fn(async () => HEADLESS_RESULT);
   const dispatchHeadlessTask = opts.dispatch ?? vi.fn(async () => ({ taskId: 'task-1' }));
+  const runtimeReadiness = opts.runtimeReadiness ?? {
+    agents: {
+      claude: {
+        agent: 'claude',
+        displayName: 'Claude',
+        installed: true,
+        binPath: '/usr/bin/claude',
+        status: 'unknown',
+        ready: false,
+        source: 'unknown',
+        checkedAt: null,
+        durationMs: null,
+      },
+    },
+    overallReady: false,
+    checkedAt: null,
+  };
+  const getAgentRuntimeReadiness = vi.fn(() => runtimeReadiness);
+  const probeAgentRuntimeReadiness = vi.fn(async () => ({
+    ...runtimeReadiness,
+    overallReady: true,
+    checkedAt: '2026-07-08T00:00:00.000Z',
+    agents: {
+      ...runtimeReadiness.agents,
+      claude: {
+        ...runtimeReadiness.agents.claude,
+        status: 'ready',
+        ready: true,
+        source: 'global-login',
+        checkedAt: '2026-07-08T00:00:00.000Z',
+      },
+    },
+  }));
   const svc = {
     registry: { get: (id: string) => (id === 'ws-1' ? meta : undefined) },
     adapters: { get: (a: string) => adapters[a] },
@@ -45,12 +84,20 @@ function build(
     config: { launcherRepoRoot: '/repo' },
     runHeadlessTask,
     dispatchHeadlessTask,
+    getAgentRuntimeReadiness,
+    probeAgentRuntimeReadiness,
     publicMeta: vi.fn(async (m: any) => {
       const res = await readWorkspaceMetadata(m.dir);
       return { ...m, ...(res.ok ? res.metadata : {}) };
     }),
   } as unknown as WorkspaceService;
-  return { app: createWorkspaceRoutes(svc), runHeadlessTask, dispatchHeadlessTask };
+  return {
+    app: createWorkspaceRoutes(svc),
+    runHeadlessTask,
+    dispatchHeadlessTask,
+    getAgentRuntimeReadiness,
+    probeAgentRuntimeReadiness,
+  };
 }
 
 async function post(app: any, path: string, body?: unknown) {
@@ -108,6 +155,44 @@ describe('PATCH /:id/metadata', () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('agent runtime readiness routes', () => {
+  it('GET returns the cached snapshot without triggering a probe', async () => {
+    const { app, getAgentRuntimeReadiness, probeAgentRuntimeReadiness } = build();
+    const res = await app.request('/agent-runtime-readiness');
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.overallReady).toBe(false);
+    expect(getAgentRuntimeReadiness).toHaveBeenCalledOnce();
+    expect(probeAgentRuntimeReadiness).not.toHaveBeenCalled();
+  });
+
+  it('POST /probe runs all runtimes by default or one requested runtime', async () => {
+    const { app, probeAgentRuntimeReadiness } = build();
+    const all = await post(app, '/agent-runtime-readiness/probe', {});
+    const one = await post(app, '/agent-runtime-readiness/probe', { agent: 'claude' });
+
+    expect(all.status).toBe(200);
+    expect(all.body.overallReady).toBe(true);
+    expect(one.status).toBe(200);
+    expect(probeAgentRuntimeReadiness).toHaveBeenNthCalledWith(1, undefined);
+    expect(probeAgentRuntimeReadiness).toHaveBeenNthCalledWith(2, 'claude');
+  });
+
+  it('POST /probe rejects unknown or utility agents before probing', async () => {
+    const shell = { id: 'shell', kind: 'utility', capabilities: {} };
+    const { app, probeAgentRuntimeReadiness } = build({ adapters: { shell } });
+    const unknown = await post(app, '/agent-runtime-readiness/probe', { agent: 'ghost' });
+    const utility = await post(app, '/agent-runtime-readiness/probe', { agent: 'shell' });
+
+    expect(unknown.status).toBe(400);
+    expect(unknown.body.error).toBe('unknown_agent');
+    expect(utility.status).toBe(400);
+    expect(utility.body.error).toBe('unknown_agent');
+    expect(probeAgentRuntimeReadiness).not.toHaveBeenCalled();
   });
 });
 
