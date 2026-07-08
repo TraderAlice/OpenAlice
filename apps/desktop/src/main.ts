@@ -39,6 +39,7 @@ let uta: ChildProcess | null = null
 let alice: ChildProcess | null = null
 let appQuitting = false
 let restartingUTA = false
+let rendererOnboardingSmokeStarted = false
 
 const DEFAULT_WEB_PORT_START = 47331
 const READY_TIMEOUT_MS = 30_000
@@ -362,6 +363,87 @@ async function runRendererPtySmoke(win: BrowserWindow): Promise<void> {
   console.log(`[guardian] electron smoke pty → ok workspace=${result.workspaceId ?? ''} session=${result.sessionId ?? ''}`)
 }
 
+async function runRendererOnboardingSmoke(win: BrowserWindow): Promise<void> {
+  const result = await win.webContents.executeJavaScript(`(async () => {
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+    const json = async (res) => {
+      const text = await res.text()
+      let body = null
+      try { body = text ? JSON.parse(text) : null } catch { body = text }
+      if (!res.ok) throw new Error(res.status + ' ' + text)
+      return body
+    }
+    const waitFor = async (label, predicate, timeoutMs = 12000) => {
+      const deadline = Date.now() + timeoutMs
+      let last = null
+      while (Date.now() < deadline) {
+        try {
+          const value = await predicate()
+          if (value) return value
+        } catch (err) {
+          last = err
+        }
+        await sleep(100)
+      }
+      throw new Error('Timed out waiting for ' + label + (last ? ': ' + (last.message || String(last)) : ''))
+    }
+    const activeStep = () => document
+      .querySelector('[data-testid="first-run-guide-step"]')
+      ?.getAttribute('data-onboarding-step') || null
+    const clickPrimary = () => {
+      const button = document.querySelector('[data-testid="first-run-guide-primary"]')
+      if (!button) throw new Error('first-run primary button missing')
+      button.click()
+    }
+
+    await waitFor('Electron preload bridge', () => Boolean(window.openAlice?.runtime && window.openAlice?.pty))
+
+    const agents = await json(await fetch('/api/workspaces/agents'))
+    const pi = agents.agents?.find((agent) => agent.id === 'pi')
+    if (!pi?.installed) throw new Error('managed Pi was not detected by packaged /agents')
+
+    const tradingStatus = await json(await fetch('/api/trading/status'))
+    if (tradingStatus.mode !== 'lite') {
+      throw new Error('expected fresh onboarding trading mode to be lite, got ' + tradingStatus.mode)
+    }
+
+    await waitFor('first-run guide', () => document.querySelector('[data-testid="first-run-guide"]'))
+    await waitFor('language step', () => activeStep() === 'language' ? true : false)
+    clickPrimary()
+    await waitFor('welcome step', () => activeStep() === 'lite' ? true : false)
+    clickPrimary()
+    await waitFor('AI access step', () => activeStep() === 'ai' ? true : false)
+
+    const mockCredential = await json(await fetch('/api/config/credentials/test', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        wireShape: 'openai-chat',
+        baseUrl: 'https://onboarding.openalice.test/openai-chat',
+        apiKey: 'oa_test_ok',
+        model: 'openalice-onboarding-test',
+      }),
+    }))
+    if (!mockCredential.ok) {
+      throw new Error('onboarding mock credential failed: ' + (mockCredential.error || 'unknown error'))
+    }
+
+    clickPrimary()
+    await waitFor('onboarding credential modal', () =>
+      document.body.innerText.includes('OpenAlice Test Provider') &&
+      Array.from(document.querySelectorAll('input')).some((input) => input.value === 'oa_test_ok')
+    )
+
+    return {
+      ok: true,
+      step: activeStep(),
+      piPath: pi.binPath || null,
+      tradingMode: tradingStatus.mode,
+    }
+  })()`, true) as { ok?: boolean; step?: string; piPath?: string | null; tradingMode?: string }
+  console.log(`[guardian] electron smoke onboarding → ok step=${result.step ?? ''} mode=${result.tradingMode ?? ''} pi=${result.piPath ?? 'managed'}`)
+}
+
 app.whenReady().then(async () => {
   // Build output lives at <repo>/dist/electron/main.js, <repo>/dist/main.js
   // (Alice), and <repo>/services/uta/dist/uta.js (UTA). The desktop package
@@ -605,6 +687,20 @@ app.whenReady().then(async () => {
               }
             })
         }
+        if (process.env['OPENALICE_ELECTRON_SMOKE_ONBOARDING'] === '1' && !rendererOnboardingSmokeStarted) {
+          rendererOnboardingSmokeStarted = true
+          void runRendererOnboardingSmoke(win)
+            .then(() => {
+              if (process.env['OPENALICE_ELECTRON_SMOKE_EXIT'] === '1') shutdown()
+            })
+            .catch((err) => {
+              console.error(`[guardian] electron smoke onboarding → failed: ${err instanceof Error ? err.message : String(err)}`)
+              if (process.env['OPENALICE_ELECTRON_SMOKE_EXIT'] === '1') {
+                process.exitCode = 1
+                shutdown()
+              }
+            })
+        }
       })
       .catch((err) => {
         console.error(`[guardian] renderer bridge probe failed: ${err instanceof Error ? err.message : String(err)}`)
@@ -688,7 +784,10 @@ async function stopChildren(): Promise<void> {
 /** Cascade tree-kill both children, then exit once they're gone. */
 function shutdown(): void {
   if (appQuitting) return
-  void stopChildren().finally(() => app.exit(0))
+  void stopChildren().finally(() => {
+    const exitCode = typeof process.exitCode === 'number' ? process.exitCode : 0
+    app.exit(exitCode)
+  })
 }
 
 app.on('before-quit', (e) => {

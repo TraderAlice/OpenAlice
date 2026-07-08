@@ -276,7 +276,20 @@ body {
   gap: 1rem;
   align-content: start;
   overflow-y: auto;
+  padding-bottom: 0.75rem;
   padding-top: 0.75rem;
+}
+
+.oa-onboarding-title {
+  overflow-wrap: normal;
+  text-wrap: balance;
+  word-break: keep-all;
+}
+
+html[lang="ja"] .oa-onboarding-title {
+  line-break: strict;
+  overflow-wrap: anywhere;
+  word-break: normal;
 }
 
 .oa-onboarding-completion {
@@ -358,7 +371,7 @@ body {
 
 @media (min-width: 1024px) {
   .oa-onboarding-step-layout {
-    grid-template-columns: minmax(0, 480px) minmax(340px, 360px);
+    grid-template-columns: minmax(0, 540px) minmax(340px, 360px);
   }
 }
 

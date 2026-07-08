@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   AlertTriangle,
   ArrowRight,
@@ -8,6 +9,7 @@ import {
   Compass,
   GitBranch,
   KeyRound,
+  Languages,
   Lock,
   MousePointerClick,
   ShieldCheck,
@@ -31,6 +33,8 @@ import { useWorkspaces } from '../contexts/workspaces-context'
 import { useTradingMode } from '../live/trading-mode'
 import { useWorkspace } from '../tabs/store'
 import { isApiKeyPreset } from '../lib/presetHelpers'
+import { LOCALE_LABELS, useLocale, useSetLocale } from '../i18n/useLocale'
+import type { AppLocale } from '../lib/intl'
 
 const BASE_DISMISS_KEY = 'openalice.onboarding.firstRunGuide.dismissed.v3'
 const STORAGE_SUFFIX = import.meta.env.VITE_OPENALICE_ONBOARDING_STORAGE_SUFFIX?.trim()
@@ -76,6 +80,7 @@ interface GuideState {
 
 type StepDirection = 'forward' | 'back'
 type RowTone = 'ready' | 'attention' | 'muted'
+const FIRST_RUN_LOCALES: AppLocale[] = ['en', 'zh', 'ja', 'zh-Hant']
 
 const INITIAL_GUIDE_STATE: GuideState = {
   credentials: [],
@@ -97,6 +102,9 @@ async function fetchGuideState(): Promise<GuideState> {
 }
 
 export function FirstRunGuide() {
+  const { t } = useTranslation()
+  const locale = useLocale()
+  const setLocale = useSetLocale()
   const { agents } = useWorkspaces()
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const setTradingMode = useTradingMode((s) => s.setMode)
@@ -236,9 +244,9 @@ export function FirstRunGuide() {
       await setTradingMode(mode)
       await refreshGuideState()
     } catch (err) {
-      setModeChoiceError(err instanceof Error ? err.message : 'Failed to save trading mode')
+      setModeChoiceError(err instanceof Error ? err.message : t('firstRunGuide.error.saveTradingMode'))
     }
-  }, [model.mode, refreshGuideState, setTradingMode, state.tradingStatus?.envLocked])
+  }, [model.mode, refreshGuideState, setTradingMode, state.tradingStatus?.envLocked, t])
 
   const saveCreatedUTA = useCallback(async (uta: Omit<UTAConfig, 'id'>) => {
     const created = await tradingApi.createUTA(uta)
@@ -250,114 +258,138 @@ export function FirstRunGuide() {
 
   const steps = useMemo(() => {
     const canStartWorkspace = model.hasUsableAiChain
-    const modeLabel = capitalize(model.mode)
+    const modeLabel = model.mode === 'readonly'
+      ? t('firstRunGuide.mode.readonly')
+      : model.mode === 'pro'
+        ? t('firstRunGuide.mode.pro')
+        : t('firstRunGuide.mode.lite')
+    const modeAccessLabel = model.mode === 'lite'
+      ? t('firstRunGuide.finish.noBrokerAccess')
+      : t('firstRunGuide.finish.modeBrokerAccess', { mode: modeLabel })
     const brokerPrimary = model.needsUTASetup
-      ? 'Connect broker account'
+      ? t('firstRunGuide.action.connectBroker')
       : model.mode === 'lite'
-        ? 'Continue without UTA'
-        : `Continue with ${modeLabel}`
+        ? t('firstRunGuide.action.continueWithoutUTA')
+        : t('firstRunGuide.action.continueWithMode', { mode: modeLabel })
     const brokerSecondary = model.needsUTASetup
-      ? 'Continue without UTA'
+      ? t('firstRunGuide.action.continueWithoutUTA')
       : model.mode === 'lite'
-        ? 'Choose later'
-        : 'Skip broker setup'
+        ? t('firstRunGuide.action.chooseLater')
+        : t('firstRunGuide.action.skipBrokerSetup')
     const brokerWriteText = model.mode === 'pro'
-      ? 'Controlled by account permissions.'
-      : 'Blocked.'
-    const runtimeText = model.runtimeLabel
+      ? t('firstRunGuide.broker.writesControlled')
+      : t('firstRunGuide.broker.writesBlocked')
+    const installedRuntimeCount = model.runtimeRows.filter((row) => row.installed).length
+    const runtimeText = model.hasAgentRuntime
+      ? t('firstRunGuide.ai.runtimeInstalled', { count: installedRuntimeCount })
+      : model.hasManagedPi
+        ? t('firstRunGuide.ai.managedPiMissing')
+        : t('firstRunGuide.ai.runtimeMissing')
     const credentialText = model.noCredentials
-      ? 'No verified AI key yet.'
+      ? t('firstRunGuide.ai.noVerifiedKey')
       : model.hasUsableAiChain
-        ? 'One installed runtime can use a verified key.'
-        : 'Saved keys do not match an installed runtime yet.'
+        ? t('firstRunGuide.ai.usableKey')
+        : t('firstRunGuide.ai.keyMismatch')
     const aiTitle = model.hasAgentRuntime
       ? model.hasUsableAiChain
-        ? 'Alice has a working AI path.'
-        : 'Connect one runtime to AI access.'
-      : 'Managed runtime was not detected.'
+        ? t('firstRunGuide.ai.titleReady')
+        : t('firstRunGuide.ai.titleConnect')
+      : t('firstRunGuide.ai.titleMissingRuntime')
     const aiBody = model.hasAgentRuntime
       ? model.hasUsableAiChain
-        ? 'A workspace agent can now launch with a verified AI key. Broker and portfolio setup can stay off until you choose to enable it.'
+        ? t('firstRunGuide.ai.bodyReady')
         : model.hasManagedPi
-          ? 'To run workspace chat, Alice needs an agent runtime and a verified AI key. Pi is already installed here; add one key to continue.'
-          : 'To run workspace chat, Alice needs an agent runtime and a verified AI key. Add a key for any installed runtime to continue.'
-      : 'Packaged builds should include a managed Pi runtime. Open the setup checklist to repair the runtime path before continuing.'
+          ? t('firstRunGuide.ai.bodyPiInstalled')
+          : t('firstRunGuide.ai.bodyAddKey')
+      : t('firstRunGuide.ai.bodyMissingRuntime')
     const aiPrimary = model.hasUsableAiChain
-      ? 'Continue'
+      ? t('firstRunGuide.common.continue')
       : model.hasAgentRuntime
-        ? 'Add AI credential'
-        : 'Open setup checklist'
+        ? t('firstRunGuide.action.addCredential')
+        : t('firstRunGuide.action.openChecklist')
 
     return [
       {
+        key: 'language' as const,
+        navLabel: t('firstRunGuide.language.navLabel'),
+        eyebrow: t('firstRunGuide.language.eyebrow'),
+        title: t('firstRunGuide.language.title'),
+        body: t('firstRunGuide.language.body'),
+        primary: t('firstRunGuide.language.primary'),
+        secondary: undefined,
+        panelTitle: t('firstRunGuide.language.panelTitle'),
+        panelBody: t('firstRunGuide.language.panelBody'),
+        rows: [],
+      },
+      {
         key: 'lite' as const,
-        navLabel: 'Welcome',
-        eyebrow: 'Welcome',
-        title: 'OpenAlice is your AI trading workspace.',
-        body: 'Use Alice to research markets and run workspace agents first. Broker accounts stay disconnected until you choose to add them, and Alice cannot place orders in this setup.',
-        primary: 'Start setup',
-        secondary: model.hasUsableAiChain ? 'Start without broker setup' : undefined,
-        panelTitle: 'Safe by default',
-        panelBody: 'You can use OpenAlice without connecting a broker. Add power step by step when you need it.',
+        navLabel: t('firstRunGuide.welcome.navLabel'),
+        eyebrow: t('firstRunGuide.welcome.eyebrow'),
+        title: t('firstRunGuide.welcome.title'),
+        body: t('firstRunGuide.welcome.body'),
+        primary: t('firstRunGuide.action.startSetup'),
+        secondary: model.hasUsableAiChain ? t('firstRunGuide.action.startWithoutBrokerSetup') : undefined,
+        panelTitle: t('firstRunGuide.welcome.panelTitle'),
+        panelBody: t('firstRunGuide.welcome.panelBody'),
         rows: [
-          { icon: <Bot className="h-4 w-4" />, label: 'Workspace agents', value: 'Research and analysis workflows.', tone: model.hasAgentRuntime ? 'ready' as const : 'muted' as const },
-          { icon: <ShieldCheck className="h-4 w-4" />, label: 'Broker mode', value: model.mode === 'lite' ? 'No broker connection active.' : `${capitalize(model.mode)} active.`, tone: 'ready' as const },
-          { icon: <Lock className="h-4 w-4" />, label: 'Broker access', value: model.hasUTA ? 'Configured.' : 'Disconnected until you opt in.', tone: model.hasUTA ? 'ready' as const : 'muted' as const },
+          { icon: <Bot className="h-4 w-4" />, label: t('firstRunGuide.welcome.workspaceAgents'), value: t('firstRunGuide.welcome.workspaceAgentsValue'), tone: model.hasAgentRuntime ? 'ready' as const : 'muted' as const },
+          { icon: <ShieldCheck className="h-4 w-4" />, label: t('firstRunGuide.welcome.brokerMode'), value: model.mode === 'lite' ? t('firstRunGuide.welcome.noBrokerConnectionActive') : t('firstRunGuide.welcome.modeActive', { mode: modeLabel }), tone: 'ready' as const },
+          { icon: <Lock className="h-4 w-4" />, label: t('firstRunGuide.welcome.brokerAccess'), value: model.hasUTA ? t('firstRunGuide.common.configured') : t('firstRunGuide.welcome.disconnectedUntilOptIn'), tone: model.hasUTA ? 'ready' as const : 'muted' as const },
         ],
       },
       {
         key: 'ai' as const,
-        navLabel: 'AI access',
-        eyebrow: 'Make Alice Useful',
+        navLabel: t('firstRunGuide.ai.navLabel'),
+        eyebrow: t('firstRunGuide.ai.eyebrow'),
         title: aiTitle,
         body: aiBody,
         primary: aiPrimary,
-        secondary: model.hasUsableAiChain ? 'Skip broker setup' : undefined,
-        panelTitle: 'Runtime scan',
-        panelBody: 'Alice is ready when one row has both a runtime and AI access.',
+        secondary: model.hasUsableAiChain ? t('firstRunGuide.action.skipBrokerSetup') : undefined,
+        panelTitle: t('firstRunGuide.ai.panelTitle'),
+        panelBody: t('firstRunGuide.ai.panelBody'),
         rows: [
-          { icon: <TerminalSquare className="h-4 w-4" />, label: 'Runtime', value: runtimeText, tone: model.hasAgentRuntime ? 'ready' as const : 'attention' as const },
-          { icon: <KeyRound className="h-4 w-4" />, label: 'AI access', value: credentialText, tone: model.hasUsableAiChain ? 'ready' as const : 'attention' as const },
+          { icon: <TerminalSquare className="h-4 w-4" />, label: t('firstRunGuide.ai.runtime'), value: runtimeText, tone: model.hasAgentRuntime ? 'ready' as const : 'attention' as const },
+          { icon: <KeyRound className="h-4 w-4" />, label: t('firstRunGuide.ai.aiAccess'), value: credentialText, tone: model.hasUsableAiChain ? 'ready' as const : 'attention' as const },
         ],
       },
       {
         key: 'broker' as const,
-        navLabel: 'Broker access',
-        eyebrow: 'Trading Mode',
-        title: 'Decide whether to connect a broker account.',
-        body: 'You can keep broker access off and use Alice for research, or connect an account so Alice can read positions. Write access stays blocked unless you later choose Pro permissions.',
+        navLabel: t('firstRunGuide.broker.navLabel'),
+        eyebrow: t('firstRunGuide.broker.eyebrow'),
+        title: t('firstRunGuide.broker.title'),
+        body: t('firstRunGuide.broker.body'),
         primary: brokerPrimary,
         secondary: brokerSecondary,
-        panelTitle: 'Broker connection',
+        panelTitle: t('firstRunGuide.broker.panelTitle'),
         panelBody: model.needsUTASetup
-          ? 'The broker-connected options need a connector first. Connect one now, or continue without UTA and add it later.'
-          : 'Choose whether Alice should connect to a broker account. You can change this later in Settings.',
+          ? t('firstRunGuide.broker.panelBodyNeedsUTA')
+          : t('firstRunGuide.broker.panelBodyChoose'),
         rows: [
-          { icon: <Compass className="h-4 w-4" />, label: 'No broker connection', value: 'Use Alice for research; portfolio and trading stay off.', tone: model.mode === 'lite' ? 'ready' as const : 'muted' as const },
-          { icon: <Lock className="h-4 w-4" />, label: 'Read-only broker connection', value: 'Include balances and positions; block orders.', tone: model.mode === 'readonly' ? 'ready' as const : 'muted' as const },
-          { icon: <GitBranch className="h-4 w-4" />, label: 'Permissioned broker workflows', value: 'Use per-account approval policy.', tone: model.mode === 'pro' ? 'ready' as const : 'muted' as const },
+          { icon: <Compass className="h-4 w-4" />, label: t('firstRunGuide.broker.noBrokerConnection'), value: t('firstRunGuide.broker.noBrokerConnectionValue'), tone: model.mode === 'lite' ? 'ready' as const : 'muted' as const },
+          { icon: <Lock className="h-4 w-4" />, label: t('firstRunGuide.broker.readOnlyBrokerConnection'), value: t('firstRunGuide.broker.readOnlyBrokerConnectionValue'), tone: model.mode === 'readonly' ? 'ready' as const : 'muted' as const },
+          { icon: <GitBranch className="h-4 w-4" />, label: t('firstRunGuide.broker.permissionedBrokerWorkflows'), value: t('firstRunGuide.broker.permissionedBrokerWorkflowsValue'), tone: model.mode === 'pro' ? 'ready' as const : 'muted' as const },
         ],
       },
       {
         key: 'finish' as const,
-        navLabel: 'Ready',
-        eyebrow: 'Setup Complete',
-        title: canStartWorkspace ? "You're all set." : 'OpenAlice is ready to open.',
+        navLabel: t('firstRunGuide.finish.navLabel'),
+        eyebrow: t('firstRunGuide.finish.eyebrow'),
+        title: canStartWorkspace ? t('firstRunGuide.finish.titleReady') : t('firstRunGuide.finish.titleOpen'),
         body: canStartWorkspace
-          ? `OpenAlice is ready with a working AI path and ${model.mode === 'lite' ? 'no broker connection' : `${modeLabel} broker access`}. Broker accounts can stay disconnected until you add them.`
-          : 'Alice can open without a broker account. Add an AI credential later when you want workspace chat and automated research.',
-        primary: canStartWorkspace ? 'Start using Alice' : 'Open Alice now',
-        secondary: 'Open checklist',
-        panelTitle: 'Ready now',
+          ? t('firstRunGuide.finish.bodyReady', { access: modeAccessLabel })
+          : t('firstRunGuide.finish.bodyOpen'),
+        primary: canStartWorkspace ? t('firstRunGuide.action.startUsingAlice') : t('firstRunGuide.action.openAliceNow'),
+        secondary: t('firstRunGuide.action.openChecklist'),
+        panelTitle: t('firstRunGuide.finish.panelTitle'),
         panelBody: '',
         rows: [
-          { icon: <Bot className="h-4 w-4" />, label: 'Workspace chat', value: canStartWorkspace ? 'Ready.' : model.hasAgentRuntime ? 'Needs AI access.' : 'Needs runtime.', tone: canStartWorkspace ? 'ready' as const : 'attention' as const },
-          { icon: <ShieldCheck className="h-4 w-4" />, label: 'Broker mode', value: model.mode === 'lite' ? 'No broker connection.' : `${modeLabel} saved.`, tone: 'ready' as const },
-          { icon: <WalletCards className="h-4 w-4" />, label: 'Broker writes', value: brokerWriteText, tone: model.mode === 'pro' ? 'muted' as const : 'ready' as const },
+          { icon: <Bot className="h-4 w-4" />, label: t('firstRunGuide.ai.workspaceChat'), value: canStartWorkspace ? t('firstRunGuide.common.ready') : model.hasAgentRuntime ? t('firstRunGuide.ai.needsAiAccess') : t('firstRunGuide.ai.needsRuntime'), tone: canStartWorkspace ? 'ready' as const : 'attention' as const },
+          { icon: <ShieldCheck className="h-4 w-4" />, label: t('firstRunGuide.finish.brokerMode'), value: model.mode === 'lite' ? t('firstRunGuide.finish.noBrokerConnection') : t('firstRunGuide.finish.modeSaved', { mode: modeLabel }), tone: 'ready' as const },
+          { icon: <WalletCards className="h-4 w-4" />, label: t('firstRunGuide.finish.brokerWrites'), value: brokerWriteText, tone: model.mode === 'pro' ? 'muted' as const : 'ready' as const },
         ],
       },
     ]
-  }, [model])
+  }, [model, t])
 
   const maxReachableStepIndex = useMemo(() => {
     const index = steps.findIndex((step) => step.key === guideAccess.maxReachableStepKey)
@@ -394,7 +426,7 @@ export function FirstRunGuide() {
       setShowUTAForm(false)
       goToStep(activeStepIndex + 1)
     } catch (err) {
-      setModeChoiceError(err instanceof Error ? err.message : 'Failed to continue without UTA')
+      setModeChoiceError(err instanceof Error ? err.message : t('firstRunGuide.error.continueWithoutUTA'))
     } finally {
       setUtaEscapeSaving(false)
     }
@@ -448,17 +480,17 @@ export function FirstRunGuide() {
           <header className="relative shrink-0 border-b border-border pb-4 pr-12">
             <div className="min-w-0">
               <div className="text-[11px] font-medium uppercase tracking-wide text-text-muted">
-                OpenAlice Setup
+                {t('firstRunGuide.header.setup')}
               </div>
               <div className="mt-1 text-[15px] font-semibold leading-snug text-text sm:text-[16px]">
-                Start safe. Add power only when you need it.
+                {t('firstRunGuide.header.subtitle')}
               </div>
             </div>
             {guideAccess.canDismiss && (
               <button
                 type="button"
                 onClick={() => close()}
-                aria-label="Close onboarding"
+                aria-label={t('firstRunGuide.header.close')}
                 className="absolute right-0 top-0 flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-overlay hover:text-text"
               >
                 <X className="h-4 w-4" />
@@ -470,6 +502,8 @@ export function FirstRunGuide() {
             <section
               key={activeStep.key}
               aria-live="polite"
+              data-testid="first-run-guide-step"
+              data-onboarding-step={activeStep.key}
               className={`oa-onboarding-slide-${direction} oa-onboarding-step-layout`}
             >
               <div className="min-w-0">
@@ -479,7 +513,7 @@ export function FirstRunGuide() {
                 <div className="text-[11px] font-medium uppercase tracking-wide text-text-muted">
                   {activeStep.eyebrow}
                 </div>
-                <h1 className="mt-3 max-w-[660px] text-[28px] font-semibold leading-tight text-text sm:mt-4 sm:text-[38px] lg:text-[44px]">
+                <h1 className="oa-onboarding-title mt-3 max-w-[660px] text-[28px] font-semibold leading-tight text-text sm:mt-4 sm:text-[38px] lg:text-[44px]">
                   {activeStep.title}
                 </h1>
                 <p className="mt-3 max-w-[610px] text-[14px] leading-6 text-text-muted sm:mt-4 sm:text-[15px]">
@@ -496,7 +530,9 @@ export function FirstRunGuide() {
                     {activeStep.panelBody}
                   </p>
                 )}
-                {activeStep.key === 'ai' ? (
+                {activeStep.key === 'language' ? (
+                  <LanguageChoices locale={locale} onSelect={setLocale} />
+                ) : activeStep.key === 'ai' ? (
                   <RuntimeScanTable rows={model.runtimeRows} />
                 ) : activeStep.key === 'broker' ? (
                   <TradingModeChoices
@@ -534,10 +570,10 @@ export function FirstRunGuide() {
                     return (
                       <button
                         key={step.key}
-                      type="button"
-                      onClick={() => goToStep(index)}
-                      disabled={locked}
-                      className={`h-2.5 rounded-full transition-all ${
+                        type="button"
+                        onClick={() => goToStep(index)}
+                        disabled={locked}
+                        className={`h-2.5 rounded-full transition-all ${
                           index === activeStepIndex
                             ? 'w-8 bg-accent'
                             : locked
@@ -551,7 +587,11 @@ export function FirstRunGuide() {
                   })}
                 </div>
                 <div className="min-w-0 text-[11px] font-medium uppercase tracking-wide text-text-muted">
-                  Step {activeStepIndex + 1} of {steps.length} · {activeStep.navLabel}
+                  {t('firstRunGuide.common.step', {
+                    current: activeStepIndex + 1,
+                    total: steps.length,
+                    label: activeStep.navLabel,
+                  })}
                 </div>
               </div>
 
@@ -562,11 +602,12 @@ export function FirstRunGuide() {
                   disabled={activeStepIndex === 0}
                   className="rounded-md border border-border bg-bg px-3 py-2 text-[13px] font-medium text-text-muted transition-colors hover:border-accent/50 hover:text-accent disabled:cursor-default disabled:opacity-40 disabled:hover:border-border disabled:hover:text-text-muted"
                 >
-                  Back
+                  {t('firstRunGuide.common.back')}
                 </button>
                 <button
                   type="button"
                   onClick={runPrimary}
+                  data-testid="first-run-guide-primary"
                   className="flex min-w-0 items-center justify-center gap-2 rounded-md bg-accent px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-accent/90"
                 >
                   <span className="min-w-0 truncate">{activeStep.primary}</span>
@@ -576,6 +617,7 @@ export function FirstRunGuide() {
                   <button
                     type="button"
                     onClick={runSecondary}
+                    data-testid="first-run-guide-secondary"
                     className="col-span-2 rounded-md px-3 py-2 text-[12px] font-medium text-text-muted transition-colors hover:bg-overlay hover:text-text sm:col-span-1"
                   >
                     {activeStep.secondary}
@@ -630,12 +672,69 @@ export function FirstRunGuide() {
             return created
           }}
           escapeAction={{
-            label: 'Continue without UTA',
+            label: t('firstRunGuide.action.continueWithoutUTA'),
             onClick: continueInLite,
             disabled: utaEscapeSaving,
           }}
         />
       )}
+    </div>
+  )
+}
+
+function LanguageChoices({
+  locale,
+  onSelect,
+}: {
+  locale: AppLocale
+  onSelect: (locale: AppLocale) => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <div className="mt-4 grid gap-2 sm:mt-5">
+      {FIRST_RUN_LOCALES.map((option) => {
+        const active = option === locale
+        const description =
+          option === 'en' ? t('firstRunGuide.language.option.en')
+          : option === 'zh' ? t('firstRunGuide.language.option.zh')
+          : option === 'ja' ? t('firstRunGuide.language.option.ja')
+          : t('firstRunGuide.language.option.zh-Hant')
+        return (
+          <button
+            key={option}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onSelect(option)}
+            className={`grid min-w-0 w-full grid-cols-[auto_minmax(0,1fr)_auto] gap-3 rounded-md border px-3 py-3 text-left transition-[border-color,background-color,color,transform] ${
+              active
+                ? 'border-accent/55 bg-accent/10 text-text'
+                : 'border-border bg-bg text-text-muted hover:border-accent/35 hover:bg-bg-tertiary hover:text-text'
+            } active:scale-[0.99]`}
+          >
+            <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${
+              active ? 'bg-accent/15 text-accent' : 'bg-bg-tertiary text-text-muted'
+            }`}>
+              <Languages className="h-4 w-4" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-[13px] font-semibold text-text">{LOCALE_LABELS[option]}</span>
+              <span className="mt-0.5 block text-[12px] leading-relaxed text-text-muted">
+                {description}
+              </span>
+              <span className={`mt-1.5 inline-flex text-[11px] font-medium ${
+                active ? 'text-accent' : 'text-text-muted/70'
+              }`}>
+                {active ? t('firstRunGuide.language.current') : t('firstRunGuide.language.choose')}
+              </span>
+            </span>
+            {active ? (
+              <CheckCircle2 className="mt-1.5 h-4 w-4 shrink-0 text-green" />
+            ) : (
+              <Circle className="mt-1.5 h-4 w-4 shrink-0 text-text-muted" />
+            )}
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -699,6 +798,7 @@ function TradingModeChoices({
   error: string | null
   onSelect: (mode: TradingMode) => void
 }) {
+  const { t } = useTranslation()
   const choices: Array<{
     mode: TradingMode
     icon: ReactNode
@@ -708,20 +808,20 @@ function TradingModeChoices({
     {
       mode: 'lite',
       icon: <Compass className="h-4 w-4" />,
-      label: 'Research only',
-      description: 'No broker connector. Portfolio and trading stay off.',
+      label: t('firstRunGuide.tradingChoices.researchOnly'),
+      description: t('firstRunGuide.tradingChoices.researchOnlyDescription'),
     },
     {
       mode: 'readonly',
       icon: <Lock className="h-4 w-4" />,
-      label: 'Read-only broker',
-      description: 'Read balances and positions; block orders.',
+      label: t('firstRunGuide.tradingChoices.readOnlyBroker'),
+      description: t('firstRunGuide.tradingChoices.readOnlyBrokerDescription'),
     },
     {
       mode: 'pro',
       icon: <GitBranch className="h-4 w-4" />,
-      label: 'Pro broker',
-      description: 'Use per-account approval policy.',
+      label: t('firstRunGuide.tradingChoices.proBroker'),
+      description: t('firstRunGuide.tradingChoices.proBrokerDescription'),
     },
   ]
   const disabled = envLocked || saving !== null
@@ -729,7 +829,7 @@ function TradingModeChoices({
     <div className="mt-4 sm:mt-5">
       <div className="mb-3 inline-flex items-center gap-2 rounded-md border border-accent/25 bg-accent/10 px-2.5 py-1.5 text-[11px] font-medium text-accent">
         <MousePointerClick className="h-3.5 w-3.5" />
-        Choose broker access
+        {t('firstRunGuide.tradingChoices.badge')}
       </div>
       <div className="grid gap-2">
         {choices.map((choice) => {
@@ -761,14 +861,14 @@ function TradingModeChoices({
                 {isSaving && (
                   <span className="mt-1.5 inline-flex items-center gap-1.5 text-[11px] text-accent">
                     <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" aria-hidden />
-                    Saving
+                    {t('firstRunGuide.common.saving')}
                   </span>
                 )}
                 {!isSaving && (
                   <span className={`mt-1.5 inline-flex text-[11px] font-medium ${
                     active ? 'text-accent' : 'text-text-muted/70'
                   }`}>
-                    {active ? 'Selected' : 'Choose this option'}
+                    {active ? t('firstRunGuide.common.selected') : t('firstRunGuide.common.chooseThisOption')}
                   </span>
                 )}
               </span>
@@ -785,10 +885,10 @@ function TradingModeChoices({
         {envLocked ? (
           <span className="inline-flex items-center gap-1.5">
             <AlertTriangle className="h-3.5 w-3.5 text-yellow-500" />
-            Broker mode is locked by the current environment.
+            {t('firstRunGuide.tradingChoices.envLocked')}
           </span>
         ) : (
-          `Current source: ${modeSource}`
+          t('firstRunGuide.tradingChoices.source', { source: modeSource })
         )}
       </div>
       {error && (
@@ -813,12 +913,13 @@ function RuntimeScanTable({
     accessLabel: string
   }>
 }) {
+  const { t } = useTranslation()
   return (
     <div className="mt-4 overflow-hidden border-y border-border sm:mt-5">
       <div className="hidden border-b border-border py-2 text-[10px] font-medium uppercase tracking-wide text-text-muted sm:grid sm:grid-cols-[minmax(0,1fr)_72px_116px] sm:gap-3">
-        <span>Runtime</span>
-        <span>CLI</span>
-        <span>AI access</span>
+        <span>{t('firstRunGuide.ai.runtime')}</span>
+        <span>{t('firstRunGuide.ai.cli')}</span>
+        <span>{t('firstRunGuide.ai.aiAccess')}</span>
       </div>
       {rows.map((row) => {
         const tone: RowTone = row.chainReady ? 'ready' : row.installed ? 'attention' : 'muted'
@@ -827,12 +928,16 @@ function RuntimeScanTable({
           : tone === 'attention'
             ? 'text-red'
             : 'text-text-muted'
-        const cliText = row.installed ? 'Installed' : 'Missing'
+        const cliText = row.installed ? t('firstRunGuide.ai.installed') : t('firstRunGuide.ai.missing')
         const accessText = row.chainReady
-          ? 'Ready'
+          ? t('firstRunGuide.ai.ready')
           : row.installed && row.compatibleCredentialCount > 0
-            ? 'Ready'
-            : row.accessLabel
+            ? t('firstRunGuide.ai.ready')
+            : row.installed
+              ? row.loginRuntime
+                ? t('firstRunGuide.ai.loginCheckPending')
+                : t('firstRunGuide.ai.needsAiKey')
+              : t('firstRunGuide.ai.cliNotInstalled')
         return (
           <div
             key={row.id}
@@ -842,7 +947,7 @@ function RuntimeScanTable({
             <div className="min-w-0">
               <div className="font-medium text-text">{row.displayName}</div>
               <div className="mt-0.5 text-[10.5px] text-text-muted">
-                {row.loginRuntime ? 'CLI login or AI key' : 'AI key'}
+                {row.loginRuntime ? t('firstRunGuide.ai.loginOrKey') : t('firstRunGuide.ai.aiKey')}
               </div>
               <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 sm:hidden">
                 <span className={row.installed ? 'text-green' : 'text-text-muted'}>{cliText}</span>
@@ -860,8 +965,4 @@ function RuntimeScanTable({
       })}
     </div>
   )
-}
-
-function capitalize(value: string) {
-  return `${value.charAt(0).toUpperCase()}${value.slice(1)}`
 }

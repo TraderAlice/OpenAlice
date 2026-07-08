@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  FIRST_RUN_STEP_KEYS,
   buildFirstRunGuideAccess,
   buildFirstRunGuideModel,
   parseFirstRunStepOverride,
@@ -125,12 +126,17 @@ describe('buildFirstRunGuideModel', () => {
 })
 
 describe('parseFirstRunStepOverride', () => {
+  it('starts onboarding with language choice', () => {
+    expect(FIRST_RUN_STEP_KEYS[0]).toBe('language')
+  })
+
   it('only accepts onboarding step overrides in onboarding test mode', () => {
     expect(parseFirstRunStepOverride('?onboardingStep=broker', false)).toBeNull()
     expect(parseFirstRunStepOverride('?onboardingStep=broker', true)).toBe('broker')
   })
 
   it('supports short aliases for faster design checks', () => {
+    expect(parseFirstRunStepOverride('?step=locale', true)).toBe('language')
     expect(parseFirstRunStepOverride('?step=runtime', true)).toBe('ai')
     expect(parseFirstRunStepOverride('?onboardingStep=uta', true)).toBe('broker')
     expect(parseFirstRunStepOverride('?step=checklist', true)).toBe('finish')

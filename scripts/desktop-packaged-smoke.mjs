@@ -1,20 +1,14 @@
 #!/usr/bin/env node
 import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { createServer } from 'node:net'
 import { homedir, tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
+import { buildDesktopPackagedSmokePlan } from './desktop-packaged-smoke-plan.mjs'
 
 const repoRoot = resolve(import.meta.dirname, '..')
-const args = new Set(process.argv.slice(2))
-const skipBuild = args.has('--skip-build')
-const skipPack = args.has('--skip-pack')
-const keep = args.has('--keep')
-const tempData = args.has('--temp-data')
-const realDataFlag = args.has('--real-data')
-const signed = args.has('--signed')
-const help = args.has('--help') || args.has('-h')
-const knownArgs = new Set(['--skip-build', '--skip-pack', '--keep', '--temp-data', '--real-data', '--signed', '--help', '-h'])
-const unknownArgs = [...args].filter((arg) => !knownArgs.has(arg))
+const plan = buildDesktopPackagedSmokePlan(process.argv.slice(2), process.env)
+const { keep, onboarding, realData, signed, skipBuild, skipPack } = plan.options
 
 function printHelp() {
   console.log(`Usage: pnpm electron:smoke:packaged [options]
@@ -26,29 +20,26 @@ Options:
   --skip-pack    Reuse the existing dist/electron-app/OpenAlice.app
   --temp-data    Use isolated temporary data/workspace/global stores
   --real-data    Use real data explicitly (default; kept for compatibility)
+  --onboarding   Build with first-run guide enabled, use temp data, run an
+                 automated renderer onboarding smoke, then exit
   --signed       Allow local macOS code signing (default disables it)
   --keep         Keep the temporary smoke data directory after the app exits
   -h, --help     Show this help
 `)
 }
 
-if (help) {
+if (plan.options.help) {
   printHelp()
   process.exit(0)
 }
 
-if (unknownArgs.length > 0) {
-  console.error(`[desktop-smoke] unknown option(s): ${unknownArgs.join(', ')}`)
+if (plan.errors.length > 0) {
+  for (const error of plan.errors) console.error(error)
   printHelp()
   process.exit(1)
 }
 
-if (tempData && realDataFlag) {
-  console.error('[desktop-smoke] choose either --temp-data or --real-data, not both')
-  process.exit(1)
-}
-
-const realData = !tempData
+for (const warning of plan.warnings) console.warn(warning)
 
 function run(label, command, commandArgs, extraEnv = {}) {
   console.log(`\n[desktop-smoke] ${label}`)
@@ -69,19 +60,36 @@ function findPackagedApp() {
   return candidates.find((p) => existsSync(join(p, 'Contents', 'MacOS', 'OpenAlice'))) ?? null
 }
 
+function getAvailablePort() {
+  return new Promise((resolve, reject) => {
+    const server = createServer()
+    server.unref()
+    server.on('error', reject)
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address()
+      const port = typeof address === 'object' && address ? address.port : null
+      server.close((err) => {
+        if (err) reject(err)
+        else if (port) resolve(port)
+        else reject(new Error('unable to allocate a temporary port'))
+      })
+    })
+  })
+}
+
 if (process.platform !== 'darwin') {
   console.error('[desktop-smoke] packaged .app smoke currently runs on macOS only')
   process.exit(1)
 }
 
-if (!skipBuild) run('build desktop bundle', 'pnpm', ['electron:build'])
+if (!skipBuild) run('build desktop bundle', 'pnpm', ['electron:build'], plan.buildEnv)
 if (!skipPack) {
   run('vendor managed runtime', 'pnpm', ['vendor:runtime'])
   run(
     signed ? 'pack signed app directory' : 'pack unsigned app directory',
     'pnpm',
     ['-F', '@traderalice/desktop', 'run', 'pack'],
-    signed ? {} : { CSC_IDENTITY_AUTO_DISCOVERY: 'false' },
+    signed ? plan.buildEnv : { ...plan.buildEnv, CSC_IDENTITY_AUTO_DISCOVERY: 'false' },
   )
 }
 
@@ -105,8 +113,15 @@ const pathAdditions = [
 
 const env = {
   ...process.env,
+  ...plan.launchEnv,
   PATH: [process.env['PATH'], ...pathAdditions].filter(Boolean).join(delimiter),
   OPENALICE_EXTRA_AGENT_PATH: pathAdditions.join(delimiter),
+}
+
+for (const key of plan.unsetLaunchEnv) delete env[key]
+
+if (onboarding) {
+  env.OPENALICE_UTA_PORT = String(await getAvailablePort())
 }
 
 if (!realData && smokeHome && smokeWorkspaces && smokeGlobal) {
@@ -124,7 +139,12 @@ if (realData) {
   console.log(`[desktop-smoke] workspaces: ${smokeWorkspaces}`)
   console.log(`[desktop-smoke] global provider keys: ${smokeGlobal}`)
 }
-console.log('[desktop-smoke] close the app window or press Ctrl-C here to stop')
+if (onboarding) {
+  console.log('[desktop-smoke] onboarding smoke: enabled; app exits automatically after the renderer probe')
+  console.log(`[desktop-smoke] onboarding UTA port: ${env.OPENALICE_UTA_PORT}`)
+} else {
+  console.log('[desktop-smoke] close the app window or press Ctrl-C here to stop')
+}
 
 const child = spawn(join(appPath, 'Contents', 'MacOS', 'OpenAlice'), [], {
   cwd: repoRoot,

@@ -12,10 +12,13 @@ const AGENT_WIRE_PREFERENCE: Record<string, WireShape[]> = {
 
 const LOGIN_RUNTIME_AGENTS = new Set(['claude', 'codex'])
 
-export const FIRST_RUN_STEP_KEYS = ['lite', 'ai', 'broker', 'finish'] as const
+export const FIRST_RUN_STEP_KEYS = ['language', 'lite', 'ai', 'broker', 'finish'] as const
 export type FirstRunStepKey = typeof FIRST_RUN_STEP_KEYS[number]
 
 const STEP_OVERRIDE_ALIASES: Record<string, FirstRunStepKey> = {
+  language: 'language',
+  locale: 'language',
+  lang: 'language',
   lite: 'lite',
   safe: 'lite',
   ai: 'ai',
