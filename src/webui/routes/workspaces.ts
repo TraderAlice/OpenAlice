@@ -165,14 +165,22 @@ export function createWorkspaceRoutes(svc: WorkspaceService): Hono {
       return { ok: false, status: 400, body: { error: 'unknown_agent', message: `no adapter: ${agentId}` } };
     }
     const adapter = svc.resolveAdapter(meta, agentId);
+    const runtimeReadiness = svc.getAgentRuntimeReadiness().agents[adapter.id];
+    const runtimeIsGloballyReady =
+      runtimeReadiness?.ready === true &&
+      (runtimeReadiness.source === 'global-config' ||
+        runtimeReadiness.source === 'global-login' ||
+        runtimeReadiness.source === 'managed-runtime');
     try {
-      await ensureAgentCredentialReady({
-        meta,
-        agentId: adapter.id,
-        adapter,
-        ...(opts.credentialSlug ? { pickedCredentialSlug: opts.credentialSlug } : {}),
-        logger: launcherLogger,
-      });
+      if (!runtimeIsGloballyReady) {
+        await ensureAgentCredentialReady({
+          meta,
+          agentId: adapter.id,
+          adapter,
+          ...(opts.credentialSlug ? { pickedCredentialSlug: opts.credentialSlug } : {}),
+          logger: launcherLogger,
+        });
+      }
     } catch (err) {
       if (err instanceof AgentCredentialError) {
         return { ok: false, status: 400, body: err.toBody() };
@@ -370,6 +378,36 @@ export function createWorkspaceRoutes(svc: WorkspaceService): Hono {
         };
       }),
     });
+  });
+
+  app.get('/agent-runtime-readiness', (c) => {
+    return c.json(svc.getAgentRuntimeReadiness());
+  });
+
+  app.post('/agent-runtime-readiness/probe', async (c) => {
+    const body = await safeJson(c).catch(() => null);
+    const fields = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
+    const rawAgent = fields['agent'];
+    let agent: string | undefined;
+    if (rawAgent !== undefined) {
+      if (typeof rawAgent !== 'string' || rawAgent.length === 0) {
+        return c.json({ error: 'bad_request', message: 'agent must be a non-empty string' }, 400);
+      }
+      const adapter = svc.adapters.get(rawAgent);
+      if (!adapter || !isAgentRuntime(adapter)) {
+        return c.json({ error: 'unknown_agent', message: `no agent runtime: ${rawAgent}` }, 400);
+      }
+      agent = rawAgent;
+    }
+    try {
+      return c.json(await svc.probeAgentRuntimeReadiness(agent));
+    } catch (err) {
+      launcherLogger.warn('agent_runtime_readiness.probe_failed', { agent, err });
+      return c.json(
+        { error: 'runtime_readiness_probe_failed', message: (err as Error).message },
+        500,
+      );
+    }
   });
 
   // ── workspaces collection ────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 import type { TradingServiceStatus } from '../api/trading'
 import type { UTAConfig, WireShape } from '../api/types'
 import type { CredentialSummary } from '../api/config'
-import type { AgentInfo } from './workspace/api'
+import type { AgentInfo, AgentRuntimeReadinessSnapshot } from './workspace/api'
 
 const AGENT_WIRE_PREFERENCE: Record<string, WireShape[]> = {
   claude: ['anthropic'],
@@ -54,6 +54,7 @@ export function buildFirstRunGuideAccess(input: {
 
 export function buildFirstRunGuideModel(input: {
   agents: readonly Pick<AgentInfo, 'id' | 'displayName' | 'kind' | 'installed'>[]
+  runtimeReadiness: AgentRuntimeReadinessSnapshot | null
   credentials: readonly Pick<CredentialSummary, 'wires'>[]
   tradingStatus: TradingServiceStatus | null
   utas: UTAConfig[]
@@ -69,20 +70,30 @@ export function buildFirstRunGuideModel(input: {
   const hasAgentRuntime = agentsKnown && installedAgents.length > 0
   const noCredentials = input.credentials.length === 0
   const runtimeRows = agentRuntimes.map((agent) => {
-    const installed = agent.installed !== false
+    const readiness = input.runtimeReadiness?.agents[agent.id] ?? null
+    const installed = readiness?.installed ?? agent.installed !== false
     const compatibleCredentialCount = input.credentials.filter((credential) =>
       (AGENT_WIRE_PREFERENCE[agent.id] ?? ['openai-chat', 'anthropic', 'openai-responses'])
         .some((shape) => shape in credential.wires),
     ).length
     const loginRuntime = LOGIN_RUNTIME_AGENTS.has(agent.id)
-    const chainReady = installed && compatibleCredentialCount > 0
-    const accessLabel = !installed
-      ? 'CLI not installed'
-      : compatibleCredentialCount > 0
-        ? 'Ready'
-        : loginRuntime
-          ? 'Login check pending'
-          : 'Needs AI key'
+    const status = readiness?.status ?? (installed ? 'unknown' : 'not_installed')
+    const chainReady = readiness?.ready === true
+    const accessLabel = status === 'ready'
+      ? 'Ready'
+      : status === 'checking'
+        ? 'Checking'
+        : status === 'not_installed'
+          ? 'CLI not installed'
+          : status === 'auth_required'
+            ? 'CLI login needed'
+            : status === 'provider_required'
+              ? 'Provider needed'
+              : status === 'timeout'
+                ? 'Probe timed out'
+                : status === 'failed'
+                  ? 'Probe failed'
+                  : 'Not checked yet'
     return {
       id: agent.id,
       displayName: agent.displayName,
@@ -91,6 +102,11 @@ export function buildFirstRunGuideModel(input: {
       compatibleCredentialCount,
       chainReady,
       accessLabel,
+      readinessStatus: status,
+      source: readiness?.source ?? 'unknown',
+      repairTarget: readiness?.repairTarget ?? (installed ? 'retry' : 'runtime-install'),
+      readinessMessage: readiness?.message ?? null,
+      checkedAt: readiness?.checkedAt ?? null,
     }
   }).sort((a, b) => {
     if (a.chainReady !== b.chainReady) return a.chainReady ? -1 : 1
@@ -98,6 +114,21 @@ export function buildFirstRunGuideModel(input: {
     return 0
   })
   const hasUsableAiChain = runtimeRows.some((row) => row.chainReady)
+  const runtimeProbeChecking = runtimeRows.some((row) => row.readinessStatus === 'checking')
+  const runtimeProbeKnown = runtimeRows.some((row) =>
+    row.checkedAt !== null || row.readinessStatus === 'not_installed',
+  )
+  const aiRepairTarget = hasUsableAiChain
+    ? null
+    : !hasAgentRuntime
+      ? 'runtime-install' as const
+      : runtimeRows.some((row) => row.repairTarget === 'ai-provider')
+        ? 'ai-provider' as const
+        : runtimeRows.some((row) => row.repairTarget === 'cli-login')
+          ? 'cli-login' as const
+          : runtimeRows.some((row) => row.repairTarget === 'runtime-install')
+            ? 'runtime-install' as const
+            : 'retry' as const
   const mode = input.tradingStatus?.mode ?? 'lite'
   const modeSource = input.tradingStatus?.modeSource ?? 'auto'
   const hasUTA = input.utas.length > 0 || input.tradingStatus?.hasUTAConfig === true
@@ -111,11 +142,19 @@ export function buildFirstRunGuideModel(input: {
     : piAgent
       ? 'Managed Pi runtime not detected'
       : 'Agent runtime not detected'
-  const aiAccessLabel = noCredentials
-    ? hasAgentRuntime && (installedAgent?.id === 'codex' || installedAgent?.id === 'claude')
-      ? 'CLI login or AI key'
-      : 'AI key needed'
-    : 'AI key ready'
+  const aiAccessLabel = hasUsableAiChain
+    ? 'Agent runtime ready'
+    : runtimeProbeChecking
+      ? 'Testing agent runtime'
+      : aiRepairTarget === 'cli-login'
+        ? 'CLI login needed'
+        : aiRepairTarget === 'ai-provider'
+          ? 'AI provider needed'
+          : aiRepairTarget === 'runtime-install'
+            ? 'Runtime install needed'
+            : noCredentials
+              ? 'Runtime test needed'
+              : 'Retry runtime test'
 
   return {
     shouldShow,
@@ -132,5 +171,8 @@ export function buildFirstRunGuideModel(input: {
     freshLite,
     runtimeLabel,
     aiAccessLabel,
+    runtimeProbeChecking,
+    runtimeProbeKnown,
+    aiRepairTarget,
   }
 }

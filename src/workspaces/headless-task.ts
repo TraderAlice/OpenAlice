@@ -57,6 +57,12 @@ export interface HeadlessTaskArgs {
    */
   readonly extractSessionId?: (line: string) => string | null;
   readonly onSessionId?: (id: string) => void;
+  /**
+   * Default false. The normal automation path refuses Windows npm .cmd shims
+   * because the task prompt is user-controlled. Runtime readiness probes pass a
+   * launcher-owned fixed prompt and may opt in so opencode/Pi can be checked.
+   */
+  readonly allowShellShim?: boolean;
 }
 
 export interface HeadlessTaskResult {
@@ -174,7 +180,7 @@ export async function runHeadlessTask(args: HeadlessTaskArgs): Promise<HeadlessT
   // clear, recorded reason instead of a silent ENOENT. (Interactive launch of
   // the same agents works — see win-command.ts / persistent-session.ts.)
   const resolved = resolveLaunchCommand(command, { env });
-  if (resolved.viaShell) {
+  if (resolved.viaShell && !args.allowShellShim) {
     logger.error('headless.win32_shim_unsupported', { command: argv0 });
     return {
       command,

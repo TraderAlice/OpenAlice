@@ -21,10 +21,13 @@ import { useWorkspaces } from '../contexts/workspaces-context'
 import { installHintFor } from '../components/workspace/agentInstall'
 import {
   getAgentReadiness,
+  getAgentRuntimeReadiness,
   listAgentCredentials,
   detectWorkspaceCredential,
+  probeAgentRuntimeReadiness,
   QuickChatError,
   type AgentCredentialReadiness,
+  type AgentRuntimeReadinessSnapshot,
   type SavedCredential,
 } from '../components/workspace/api'
 import { useWorkspace } from '../tabs/store'
@@ -82,6 +85,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
   const [value, setValue] = useState('')
   const [launching, setLaunching] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [runtimeReadiness, setRuntimeReadiness] = useState<AgentRuntimeReadinessSnapshot | null>(null)
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null)
   const [agentMenuOpen, setAgentMenuOpen] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -116,6 +120,13 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
   // Surface install guidance when the chosen runtime isn't on PATH.
   const selectedMissing = selectedInfo != null && !isInstalled(selectedInfo)
   const installHint = selectedInfo ? installHintFor(selectedInfo.id) : undefined
+  const selectedRuntimeReadiness = effectiveAgent ? runtimeReadiness?.agents[effectiveAgent] ?? null : null
+  const selectedRuntimeReady = selectedRuntimeReadiness?.ready === true
+  const selectedRuntimeUsesGlobalConfig =
+    selectedRuntimeReady &&
+    (selectedRuntimeReadiness?.source === 'global-config' ||
+      selectedRuntimeReadiness?.source === 'managed-runtime' ||
+      selectedRuntimeReadiness?.source === 'global-login')
 
   // ── Loginless-runtime credential picker (opencode/pi) ─────────────────────
   // opencode/pi have no login of their own, so a quick-chat send must seed them
@@ -156,6 +167,14 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
     return () => { live = false }
   }, [])
 
+  useEffect(() => {
+    let live = true
+    getAgentRuntimeReadiness()
+      .then((snapshot) => { if (live) setRuntimeReadiness(snapshot) })
+      .catch(() => { if (live) setRuntimeReadiness(null) })
+    return () => { live = false }
+  }, [])
+
   // Detect the target workspace's current cred/readiness for this runtime (for the default
   // selection + the overwrite notice). Only when the workspace already exists.
   useEffect(() => {
@@ -179,7 +198,12 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
     agentReadiness?.ready === true &&
     agentReadiness.requiresCredential === true &&
     agentReadiness.source === 'workspace-config'
-  const noCreds = needsCred && !workspaceCredReady && creds !== null && creds.length === 0
+  const noCreds =
+    needsCred &&
+    !workspaceCredReady &&
+    !selectedRuntimeUsesGlobalConfig &&
+    creds !== null &&
+    creds.length === 0
   // Effective cred = explicit pick, else what the workspace already uses, else
   // the first compatible one. Mirrors the backend's resolution order.
   const effectiveCred =
@@ -208,7 +232,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
     openOrFocus({ kind: 'settings', params: { category: 'ai-provider' } })
   }
 
-  const canSend = value.trim().length > 0 && !launching && !noCreds && effectiveAgent !== null
+  const canSend = value.trim().length > 0 && !launching && effectiveAgent !== null
 
   // Close the agent menu on an outside click.
   useEffect(() => {
@@ -229,21 +253,36 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
       setAgentMenuOpen(true)
       return
     }
-    // A loginless runtime with no configured provider can't launch — send the
-    // user to set one up instead of spawning an agent that'll die immediately.
-    if (noCreds) {
-      goConfigureProvider()
-      return
-    }
     setError(null)
     setLaunching(true)
     try {
+      let readiness = runtimeReadiness
+      let runtimeRow = readiness?.agents[effectiveAgent] ?? null
+      if (runtimeRow?.ready !== true) {
+        readiness = await probeAgentRuntimeReadiness(effectiveAgent)
+        setRuntimeReadiness(readiness)
+        runtimeRow = readiness.agents[effectiveAgent] ?? null
+      }
+      if (runtimeRow?.ready !== true) {
+        if (runtimeRow?.repairTarget === 'ai-provider' || noCreds) {
+          goConfigureProvider()
+          return
+        }
+        setError(runtimeRow?.message ?? t('chatLanding.runtimeNotReady'))
+        return
+      }
+      const runtimeUsesGlobalConfig =
+        runtimeRow.source === 'global-config' ||
+        runtimeRow.source === 'managed-runtime' ||
+        runtimeRow.source === 'global-login'
+      const credentialSlug =
+        needsCred && !runtimeUsesGlobalConfig ? (effectiveCred ?? undefined) : undefined
       // On success this focuses the new session's terminal tab; the landing tab
       // stays open in the background, so clear it for next time.
       await quickChat(
         prompt,
         effectiveAgent,
-        needsCred ? (effectiveCred ?? undefined) : undefined,
+        credentialSlug,
         targetWsId,
       )
       setValue('')

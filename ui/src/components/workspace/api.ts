@@ -188,11 +188,74 @@ export interface AgentInfo {
   readonly binPath?: string | null;
 }
 
+export type AgentRuntimeReadinessStatus =
+  | 'unknown'
+  | 'checking'
+  | 'ready'
+  | 'not_installed'
+  | 'auth_required'
+  | 'provider_required'
+  | 'timeout'
+  | 'failed';
+
+export type AgentRuntimeReadinessSource =
+  | 'global-login'
+  | 'global-config'
+  | 'launcher-vault'
+  | 'workspace-override'
+  | 'managed-runtime'
+  | 'unknown';
+
+export type AgentRuntimeRepairTarget =
+  | 'runtime-install'
+  | 'cli-login'
+  | 'ai-provider'
+  | 'retry';
+
+export interface AgentRuntimeReadinessRow {
+  readonly agent: string;
+  readonly displayName: string;
+  readonly installed: boolean;
+  readonly binPath: string | null;
+  readonly status: AgentRuntimeReadinessStatus;
+  readonly ready: boolean;
+  readonly source: AgentRuntimeReadinessSource;
+  readonly checkedAt: string | null;
+  readonly durationMs: number | null;
+  readonly repairTarget?: AgentRuntimeRepairTarget;
+  readonly message?: string;
+}
+
+export interface AgentRuntimeReadinessSnapshot {
+  readonly agents: Record<string, AgentRuntimeReadinessRow>;
+  readonly overallReady: boolean;
+  readonly checkedAt: string | null;
+}
+
 export async function listAgents(): Promise<AgentInfo[]> {
   const res = await fetch('/api/workspaces/agents');
   if (!res.ok) throw new Error(`list agents failed: ${res.status}`);
   const body = (await res.json()) as { agents: AgentInfo[] };
   return body.agents;
+}
+
+export async function getAgentRuntimeReadiness(): Promise<AgentRuntimeReadinessSnapshot> {
+  const res = await fetch('/api/workspaces/agent-runtime-readiness');
+  if (!res.ok) throw new Error(`get agent runtime readiness failed: ${res.status}`);
+  return (await res.json()) as AgentRuntimeReadinessSnapshot;
+}
+
+export async function probeAgentRuntimeReadiness(agent?: string): Promise<AgentRuntimeReadinessSnapshot> {
+  const res = await fetch('/api/workspaces/agent-runtime-readiness/probe', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(agent ? { agent } : {}),
+  });
+  if (!res.ok) {
+    const msg = await res.text().catch(() => '');
+    throw new Error(`probe agent runtime readiness failed: ${res.status} ${msg}`);
+  }
+  return (await res.json()) as AgentRuntimeReadinessSnapshot;
 }
 
 export async function getWorkspaceDefaultAgent(): Promise<string | null> {
