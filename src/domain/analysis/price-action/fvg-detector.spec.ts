@@ -79,8 +79,9 @@ describe('detectFairValueGaps', () => {
     expect(fvgs[0].type).toBe('bullish')
     expect(fvgs[0].top).toBe(114)
     expect(fvgs[0].bottom).toBe(102)
-    expect(fvgs[0].isFilled).toBe(true)
-    expect(fvgs[0].filledAtIndex).toBe(3)
+    expect(fvgs[0].state).toBe('mitigated')
+    expect(fvgs[0].isFilled).toBe(false)
+    expect(fvgs[0].filledAtIndex).toBeUndefined()
     // fillPercentage = (114 - 107) / (114 - 102) = 7 / 12 ≈ 0.583
     expect(fvgs[0].fillPercentage).toBeCloseTo(0.583, 2)
     expect(fvgs[0].completelyFilled).toBe(false)
@@ -211,8 +212,8 @@ describe('detectFairValueGaps', () => {
     const fvg = detectFairValueGaps({ bars, zoneMitigationSource: 'body' })[0]
 
     expect(fvg).toMatchObject({
-      isFilled: true,
-      filledAtIndex: 3,
+      isFilled: false,
+      filledAtIndex: undefined,
       completelyFilled: false,
     })
     expect(fvg.fillPercentage).toBeCloseTo((114 - 112) / 12, 2)
@@ -229,9 +230,9 @@ describe('detectFairValueGaps', () => {
     expect(detectFairValueGaps({ bars, zoneMitigationSource: 'body' })[0].completelyFilled).toBe(false)
     expect(detectFairValueGaps({ bars, zoneMitigationSource: 'midpoint' })[0]).toMatchObject({
       state: 'mitigated',
-      isFilled: true,
+      isFilled: false,
       completelyFilled: false,
-      filledAtIndex: 3,
+      filledAtIndex: undefined,
     })
   })
 
@@ -404,8 +405,8 @@ describe('detectFairValueGaps', () => {
 
     expect(fvgs[0]).toEqual(expect.objectContaining({
       state: 'mitigated',
-      isFilled: true,
-      filledAtIndex: 3,
+      isFilled: false,
+      filledAtIndex: undefined,
       fillPercentage: 1 / 3,
       completelyFilled: false,
       lifecycle: expect.objectContaining({
@@ -421,8 +422,9 @@ describe('detectFairValueGaps', () => {
 
     expect(fvgs[0]).toEqual(expect.objectContaining({
       state: 'mitigated',
-      isFilled: true,
+      isFilled: false,
       fillPercentage: 1 / 3,
+      filledAtIndex: undefined,
       lifecycle: expect.objectContaining({
         firstTouchedAtIndex: 3,
         mitigatedAtIndex: 3,

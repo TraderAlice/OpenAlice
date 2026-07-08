@@ -22,7 +22,7 @@ import type {
   ZoneOverlapPolicy,
 } from './types.js'
 import { applyZoneOverlapFiltering, buildFamilyFilterMeta } from './overlap-filter.js'
-import { zoneTriggerPrice } from './zone-price.js'
+import { evaluateZoneLifecycle } from './zone-lifecycle.js'
 
 export interface DetectOrderBlocksParams {
   bars: OhlcvBar[]
@@ -140,28 +140,6 @@ function buildZone(
   }
 }
 
-function mitigationTarget(ob: Pick<OrderBlock, 'type' | 'bottom' | 'top' | 'middle'>, source: ZoneMitigationSource): number {
-  if (source === 'midpoint') return ob.middle
-  return ob.type === 'bullish' ? ob.bottom : ob.top
-}
-
-function mitigationPrice(bar: OhlcvBar, type: OrderBlock['type'], source: ZoneMitigationSource): number {
-  return zoneTriggerPrice(bar, type, source === 'midpoint' ? 'body' : source)
-}
-
-function findMitigationIndex(
-  bars: OhlcvBar[],
-  ob: Pick<OrderBlock, 'type' | 'bottom' | 'top' | 'middle' | 'breakoutIndex'>,
-  source: ZoneMitigationSource,
-): number | undefined {
-  const target = mitigationTarget(ob, source)
-  for (let i = ob.breakoutIndex + 1; i < bars.length; i++) {
-    const price = mitigationPrice(bars[i], ob.type, source)
-    if (ob.type === 'bullish' ? price < target : price > target) return i
-  }
-  return undefined
-}
-
 function triggerMatches(trigger: OrderBlockTrigger, filter: 'all' | OrderBlockTrigger): boolean {
   return filter === 'all' || trigger === filter
 }
@@ -259,6 +237,17 @@ export function detectOrderBlocksWithMeta(params: DetectOrderBlocksParams): Dete
     const zone = buildZone(bars, brk.type, extremeIndex, positionMode)
     if (zone.size <= 0) continue
 
+    const lifecycle = evaluateZoneLifecycle({
+      bars,
+      role: 'order_block_retrace',
+      direction: brk.type,
+      top: zone.top,
+      bottom: zone.bottom,
+      formedAtIndex: extremeIndex,
+      confirmedAtIndex: brk.index,
+      startIndex: brk.index + 1,
+      mitigationSource: zoneMitigationSource,
+    })
     const volume = bars[extremeIndex].volume
     const anchorVolumeConfirmation = volumeConfirmationFor(volumeConfirmations, extremeIndex, brk.type)
     const ob: OrderBlock = {
@@ -272,17 +261,14 @@ export function detectOrderBlocksWithMeta(params: DetectOrderBlocksParams): Dete
       brokenSwing: brk.brokenSwing,
       volume,
       candleDirection: candleDirection(bars[extremeIndex]),
-      mitigated: false,
+      mitigated: lifecycle.mitigated,
+      mitigatedAtIndex: lifecycle.mitigatedAtIndex,
+      state: lifecycle.state as OrderBlock['state'],
+      lifecycle: lifecycle.lifecycle,
       anchorVolumeConfirmation,
       breakoutVolumeConfirmation: volumeConfirmationFor(volumeConfirmations, brk.index, brk.type),
     }
     addInternalActivityFromIntrabar(ob, anchorVolumeConfirmation)
-
-    const mitigatedAtIndex = findMitigationIndex(bars, ob, zoneMitigationSource)
-    if (mitigatedAtIndex !== undefined) {
-      ob.mitigated = true
-      ob.mitigatedAtIndex = mitigatedAtIndex
-    }
 
     detected.push(ob)
   }
@@ -294,7 +280,7 @@ export function detectOrderBlocksWithMeta(params: DetectOrderBlocksParams): Dete
     direction: ob.type,
     top: ob.top,
     bottom: ob.bottom,
-    state: ob.mitigated ? 'mitigated' : 'active',
+    state: ob.state === 'mitigated' ? 'mitigated' : 'active',
     size: ob.size,
     formedAtIndex: ob.index,
     confirmedAtIndex: ob.breakoutIndex,

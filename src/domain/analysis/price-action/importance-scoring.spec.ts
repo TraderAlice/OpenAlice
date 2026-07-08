@@ -26,6 +26,30 @@ describe('price-action importance scoring', () => {
     expect(important).toBeGreaterThan(staleFilled)
   })
 
+  it('scores partially retraced FVGs below untouched FVGs after isFilled means complete fill', () => {
+    const context: ScoringContext = {
+      currentPrice: 110,
+      volatility: 2,
+      barCount: 100,
+    }
+
+    const untouched = scoreFVGImportance(
+      makeFVG({ isFilled: false, fillPercentage: 0, completelyFilled: false }),
+      context
+    )
+    const partial = scoreFVGImportance(
+      makeFVG({ isFilled: false, fillPercentage: 0.5, completelyFilled: false, state: 'mitigated' }),
+      context
+    )
+    const complete = scoreFVGImportance(
+      makeFVG({ isFilled: true, fillPercentage: 1, completelyFilled: true, state: 'filled' }),
+      context
+    )
+
+    expect(untouched).toBe(partial + 50)
+    expect(partial).toBe(complete + 50)
+  })
+
   it('同向 BOS 会提升 FVG 分数', () => {
     const fvg = makeFVG({ type: 'bullish', formationIndex: 10 })
     const baseContext: ScoringContext = {

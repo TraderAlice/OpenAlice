@@ -16,7 +16,7 @@ import type {
   ZoneKind,
   ZoneMitigationSource,
 } from './types.js'
-import { zoneTriggerPrice } from './zone-price.js'
+import { evaluateZoneLifecycle } from './zone-lifecycle.js'
 
 export interface DetectBreakersParams {
   bars: OhlcvBar[]
@@ -105,13 +105,16 @@ function buildBreaker(opts: {
   invalidationSource: Exclude<ZoneMitigationSource, 'midpoint'>
 }): BreakerZone {
   const direction = reverseDirection(opts.sourceDirection)
-  const invalidatedAtIndex = findInvalidatedAtIndex({
+  const lifecycle = evaluateZoneLifecycle({
     bars: opts.bars,
+    role: 'breaker_invalidation',
     direction,
     top: opts.top,
     bottom: opts.bottom,
+    formedAtIndex: opts.brokenAtIndex,
+    confirmedAtIndex: opts.brokenAtIndex,
     startIndex: opts.brokenAtIndex + 1,
-    source: opts.invalidationSource,
+    mitigationSource: opts.invalidationSource,
   })
   const id = `${opts.kind}:${opts.source.kind}:${opts.source.id ?? opts.source.index ?? opts.brokenAtIndex}:${opts.brokenAtIndex}`
 
@@ -126,42 +129,15 @@ function buildBreaker(opts: {
     sizeAtr: opts.sizeAtr,
     formedAtIndex: opts.brokenAtIndex,
     confirmedAtIndex: opts.brokenAtIndex,
-    state: invalidatedAtIndex === undefined ? 'active' : 'invalidated',
+    state: lifecycle.state,
     lifecycle: {
-      formedAtIndex: opts.brokenAtIndex,
-      confirmedAtIndex: opts.brokenAtIndex,
+      ...lifecycle.lifecycle,
       brokenAtIndex: opts.brokenAtIndex,
-      invalidatedAtIndex,
     },
     source: opts.source,
     sourceDirection: opts.sourceDirection,
     sourceBrokenAtIndex: opts.brokenAtIndex,
   }
-}
-
-function findInvalidatedAtIndex(opts: {
-  bars: OhlcvBar[]
-  direction: ZoneDirection
-  top: number
-  bottom: number
-  startIndex: number
-  source: Exclude<ZoneMitigationSource, 'midpoint'>
-}): number | undefined {
-  for (let i = opts.startIndex; i < opts.bars.length; i++) {
-    const price = invalidationPrice(opts.bars[i], opts.direction, opts.source)
-    if (opts.direction === 'bearish' ? price > opts.top : price < opts.bottom) {
-      return i
-    }
-  }
-  return undefined
-}
-
-function invalidationPrice(
-  bar: OhlcvBar,
-  direction: ZoneDirection,
-  source: Exclude<ZoneMitigationSource, 'midpoint'>,
-): number {
-  return zoneTriggerPrice(bar, direction, source)
 }
 
 function reverseDirection(direction: ZoneDirection): ZoneDirection {

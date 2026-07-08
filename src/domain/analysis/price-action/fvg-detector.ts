@@ -13,12 +13,12 @@ import type {
   PriceActionVolumeConfirmationInput,
   ZoneOverlapPolicy,
   ZoneMitigationSource,
-  ZoneLifecycle,
   ZoneState,
 } from './types.js'
 import { calculatePriceActionVolatility } from './indicators.js'
 import { applyZoneOverlapFiltering, buildFamilyFilterMeta } from './overlap-filter.js'
-import { bodyHigh, bodyLow, zoneTriggerPrice } from './zone-price.js'
+import { bodyHigh, bodyLow } from './zone-price.js'
+import { evaluateZoneLifecycle } from './zone-lifecycle.js'
 
 export interface FVGDetectionParams {
   bars: OhlcvBar[]
@@ -42,165 +42,6 @@ export interface FVGDetectionParams {
 export interface FVGDetectionResult {
   fvgs: FairValueGap[]
   meta: PriceActionFamilyFilterMeta
-}
-
-/**
- * 计算 FVG 的填补状态
- *
- * 遍历 gap 形成后的所有 bars，检查 close/wick 是否进入 gap 区域
- */
-function calculateLifecycle(
-  fvgType: 'bullish' | 'bearish',
-  top: number,
-  bottom: number,
-  formationIndex: number,
-  confirmationIndex: number,
-  bars: OhlcvBar[],
-  zoneMitigationSource: ZoneMitigationSource,
-): {
-  isFilled: boolean
-  fillPercentage: number
-  filledAtIndex?: number
-  completelyFilled: boolean
-  state: ZoneState
-  lifecycle: ZoneLifecycle
-} {
-  const gapSize = top - bottom
-  const midpoint = (top + bottom) / 2
-  let maxFillPercentage = 0
-  let filledAtIndex: number | undefined
-  let firstTouchedAtIndex: number | undefined
-  let lastTouchedAtIndex: number | undefined
-  let mitigatedAtIndex: number | undefined
-  let fullyFilledAtIndex: number | undefined
-  let brokenAtIndex: number | undefined
-  let currentlyInside = false
-
-  // Lifecycle starts after the signal is confirmed; the confirmation candle defines the zone.
-  for (let i = confirmationIndex + 1; i < bars.length; i++) {
-    const bar = bars[i]
-    const rangeIntersectsZone = bar.high >= bottom && bar.low <= top
-    if (rangeIntersectsZone) {
-      firstTouchedAtIndex ??= i
-      lastTouchedAtIndex = i
-      currentlyInside = true
-    } else {
-      currentlyInside = false
-    }
-
-    const price = sourcePrice(bar, fvgType, zoneMitigationSource)
-    const fillTarget = fvgType === 'bullish' ? bottom : top
-
-    // 完全填补检测：价格穿过整个 gap
-    if (
-      (fvgType === 'bullish' && price <= fillTarget) ||
-      (fvgType === 'bearish' && price >= fillTarget)
-    ) {
-      maxFillPercentage = 1.0
-      filledAtIndex ??= i
-      fullyFilledAtIndex ??= i
-      if (
-        brokenAtIndex === undefined &&
-        ((fvgType === 'bullish' && price < bottom) ||
-          (fvgType === 'bearish' && price > top))
-      ) {
-        brokenAtIndex = i
-      }
-    }
-
-    // 检查价格是否进入 gap（部分填补）
-    if (price > bottom && price < top) {
-      // 计算填补百分比
-      let fillPercentage: number
-      if (fvgType === 'bullish') {
-        // 看涨 FVG: 价格从上方回落进入 gap，越接近 bottom 填补越彻底
-        // fillPercentage = (top - close) / gapSize
-        // close 接近 top 时接近 0，close 接近 bottom 时接近 1
-        fillPercentage = (top - price) / gapSize
-      } else {
-        // 看跌 FVG: 价格从下方回升进入 gap，越接近 top 填补越彻底
-        // fillPercentage = (close - bottom) / gapSize
-        // close 接近 bottom 时接近 0，close 接近 top 时接近 1
-        fillPercentage = (price - bottom) / gapSize
-      }
-
-      fillPercentage = Math.max(0, Math.min(1, fillPercentage))
-
-      if (fillPercentage > maxFillPercentage) {
-        maxFillPercentage = fillPercentage
-        filledAtIndex ??= i
-      }
-    }
-
-    if (mitigatedAtIndex === undefined && reachesMitigationTarget(fvgType, price, top, bottom, midpoint, zoneMitigationSource)) {
-      mitigatedAtIndex = i
-    }
-  }
-
-  const state = stateFromLifecycle({
-    touched: firstTouchedAtIndex !== undefined,
-    mitigated: mitigatedAtIndex !== undefined,
-    filled: fullyFilledAtIndex !== undefined,
-    broken: brokenAtIndex !== undefined,
-  })
-
-  const lifecycle: ZoneLifecycle = {
-    formedAtIndex: formationIndex,
-    confirmedAtIndex: confirmationIndex,
-    firstTouchedAtIndex,
-    lastTouchedAtIndex,
-    currentlyInside,
-    mitigatedAtIndex,
-    fillPercentage: maxFillPercentage,
-    filledAtIndex,
-    fullyFilledAtIndex,
-    brokenAtIndex,
-  }
-
-  return {
-    isFilled: maxFillPercentage > 0,
-    fillPercentage: maxFillPercentage,
-    filledAtIndex,
-    completelyFilled: maxFillPercentage >= 1.0,
-    state,
-    lifecycle,
-  }
-}
-
-function sourcePrice(
-  bar: OhlcvBar,
-  direction: 'bullish' | 'bearish',
-  zoneMitigationSource: ZoneMitigationSource,
-): number {
-  return zoneTriggerPrice(bar, direction, zoneMitigationSource === 'midpoint' ? 'body' : zoneMitigationSource)
-}
-
-function reachesMitigationTarget(
-  direction: 'bullish' | 'bearish',
-  price: number,
-  top: number,
-  bottom: number,
-  midpoint: number,
-  zoneMitigationSource: ZoneMitigationSource,
-): boolean {
-  if (zoneMitigationSource === 'midpoint') {
-    return direction === 'bullish' ? price <= midpoint : price >= midpoint
-  }
-
-  return direction === 'bullish' ? price < top : price > bottom
-}
-
-function stateFromLifecycle(events: {
-  touched: boolean
-  mitigated: boolean
-  filled: boolean
-  broken: boolean
-}): ZoneState {
-  if (events.broken) return 'broken'
-  if (events.filled) return 'filled'
-  if (events.mitigated) return 'mitigated'
-  if (events.touched) return 'touched'
-  return 'active'
 }
 
 function bodyRatio(bar: OhlcvBar): number {
@@ -232,15 +73,25 @@ function pushGap(
   const sizeAtr = size / Math.max(opts.formationVolatility, Number.EPSILON)
   if (sizeAtr < opts.minGapAtrMultiplier) return
 
-  const fillStatus = calculateLifecycle(
-    opts.type,
-    opts.top,
-    opts.bottom,
-    opts.formationIndex,
-    opts.confirmationIndex,
-    opts.bars,
-    opts.zoneMitigationSource,
-  )
+  const lifecycle = evaluateZoneLifecycle({
+    bars: opts.bars,
+    role: 'source_zone_retrace',
+    direction: opts.type,
+    top: opts.top,
+    bottom: opts.bottom,
+    formedAtIndex: opts.formationIndex,
+    confirmedAtIndex: opts.confirmationIndex,
+    startIndex: opts.confirmationIndex + 1,
+    mitigationSource: opts.zoneMitigationSource,
+  })
+  const fillStatus = {
+    isFilled: lifecycle.filled,
+    fillPercentage: lifecycle.fillPercentage,
+    filledAtIndex: lifecycle.filledAtIndex,
+    completelyFilled: lifecycle.fullyFilled,
+    state: lifecycle.state,
+    lifecycle: lifecycle.lifecycle,
+  }
 
   const kind = opts.variant.toLowerCase() as 'fvg' | 'vi' | 'og'
   const midpoint = (opts.top + opts.bottom) / 2

@@ -331,6 +331,10 @@ export interface OrderBlock {
   mitigated: boolean
   /** 首次 mitigation 索引 */
   mitigatedAtIndex?: number
+  /** OB lifecycle state */
+  state: Extract<ZoneState, 'active' | 'touched' | 'mitigated'>
+  /** OB retrace lifecycle */
+  lifecycle: ZoneLifecycle
   /** 区域高度 */
   size: number
   /** 成交量占返回 OB 样本总成交量的百分比 */

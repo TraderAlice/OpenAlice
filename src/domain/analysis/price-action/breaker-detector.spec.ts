@@ -213,6 +213,8 @@ function makeOrderBlock(overrides: Partial<OrderBlock> = {}): OrderBlock {
     candleDirection: 'bearish',
     mitigated: true,
     mitigatedAtIndex: 7,
+    state: 'mitigated',
+    lifecycle: { formedAtIndex: 4, confirmedAtIndex: 6, mitigatedAtIndex: 7 },
     size: 9,
     ...overrides,
   }

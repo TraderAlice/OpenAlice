@@ -37,6 +37,13 @@ describe('detectOrderBlocks', () => {
         volume: 3000,
         candleDirection: 'bullish',
         mitigated: false,
+        state: 'active',
+        lifecycle: expect.objectContaining({
+          formedAtIndex: 4,
+          confirmedAtIndex: 6,
+          firstTouchedAtIndex: undefined,
+          mitigatedAtIndex: undefined,
+        }),
         volumeSharePct: 100,
       }),
     ])
@@ -132,7 +139,14 @@ describe('detectOrderBlocks', () => {
       positionMode: 'full',
       includeMitigated: true,
       zoneMitigationSource: 'body',
-    })[0]).toEqual(expect.objectContaining({ mitigated: false }))
+    })[0]).toEqual(expect.objectContaining({
+      mitigated: false,
+      state: 'touched',
+      lifecycle: expect.objectContaining({
+        firstTouchedAtIndex: 7,
+        mitigatedAtIndex: undefined,
+      }),
+    }))
     expect(detectOrderBlocks({
       bars,
       bos,
@@ -140,7 +154,15 @@ describe('detectOrderBlocks', () => {
       positionMode: 'full',
       includeMitigated: true,
       zoneMitigationSource: 'wick',
-    })[0]).toEqual(expect.objectContaining({ mitigated: true, mitigatedAtIndex: 7 }))
+    })[0]).toEqual(expect.objectContaining({
+      mitigated: true,
+      mitigatedAtIndex: 7,
+      state: 'mitigated',
+      lifecycle: expect.objectContaining({
+        firstTouchedAtIndex: 7,
+        mitigatedAtIndex: 7,
+      }),
+    }))
   })
 
   it('uses body price to trigger midpoint zone mitigation', () => {

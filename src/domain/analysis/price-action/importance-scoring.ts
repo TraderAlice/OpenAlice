@@ -52,10 +52,12 @@ function swingStrengthScoreDelta(fvg: FairValueGap, marketStructure: MarketStruc
 export function scoreFVGImportance(fvg: FairValueGap, context: ScoringContext): number {
   let score = 0
 
-  if (!fvg.isFilled) {
-    score += 100
-  } else if (!fvg.completelyFilled) {
+  if (fvg.completelyFilled) {
+    score += 0
+  } else if (fvg.fillPercentage > 0) {
     score += 50
+  } else {
+    score += 100
   }
 
   const distanceVolatility = normalizedDistance(fvg.top, fvg.bottom, context)

@@ -317,6 +317,46 @@ describe('analyzePriceAction v2 foundation', () => {
 
     expect(result.marketStructure.marketStructureMode).toBe('extreme')
   })
+
+  it('returns order-block state and lifecycle while preserving legacy mitigation fields', async () => {
+    const tools = createPriceActionTools({
+      barService: fakeBarService([
+        bar(100, 103, 98, 101, 0),
+        bar(101, 104, 99, 102, 1),
+        bar(102, 106, 100, 104, 2),
+        bar(104, 105, 95, 96, 3),
+        bar(96, 100, 94, 99, 4),
+        bar(99, 108, 98, 107, 5),
+        bar(96, 97, 90, 101, 6),
+      ]),
+    })
+
+    const result = await run(tools.analyzePriceAction, {
+      barId: 'test|OB-LIFECYCLE',
+      interval: '15m',
+      internalLookback: 2,
+      swingLookback: 2,
+      externalLookback: 2,
+      orderBlockPosition: 'full',
+      includeMitigatedOrderBlocks: true,
+      gapVolumeConfirmation: false,
+      ifvgVolumeConfirmation: false,
+      orderBlockVolumeConfirmation: false,
+    }) as Record<string, any>
+
+    expect(result.orderBlocks[0]).toEqual(expect.objectContaining({
+      type: 'bullish',
+      mitigated: false,
+      mitigatedAtIndex: undefined,
+      state: 'touched',
+      lifecycle: expect.objectContaining({
+        formedAtIndex: 4,
+        confirmedAtIndex: 5,
+        firstTouchedAtIndex: 6,
+        mitigatedAtIndex: undefined,
+      }),
+    }))
+  })
 })
 
 describe('analyzeMultiTimeframePriceAction', () => {
