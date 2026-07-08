@@ -607,6 +607,30 @@ describe('analyzeMultiTimeframePriceAction', () => {
     })
   })
 
+  it('preserves MTF breaker meta as all detected breakers, not proximity-filtered detail breakers', async () => {
+    const tools = createPriceActionTools({
+      barService: fakeBarServiceByInterval({
+        '15m': breakerFilteredBars(),
+      }),
+    })
+
+    const result = await run(tools.analyzeMultiTimeframePriceAction, {
+      barId: 'test|MTF-BREAKERS',
+      intervals: ['15m'],
+      proximityPct: 0.01,
+      gapVolumeConfirmation: false,
+      ifvgVolumeConfirmation: false,
+      orderBlockVolumeConfirmation: false,
+    }) as Record<string, any>
+
+    expect(result.status).toBe('ok')
+    expect(result.intervals[0].zone.nearestFvg).toBeUndefined()
+    expect(result.intervals[0].meta).toMatchObject({
+      totalBreakerCount: 1,
+      returnedBreakerCount: 1,
+    })
+  })
+
   it('marks the top-level result partial when one interval fetch fails', async () => {
     const tools = createPriceActionTools({
       barService: fakeBarServiceByInterval({
@@ -739,5 +763,15 @@ function eqhToolBars(): OhlcvBar[] {
     bar(99.4, 99.7, 98.9, 99.3, 6),
     bar(99.3, 99.6, 98.8, 99.2, 7),
     bar(99.2, 100.2, 98.8, 99.9, 8),
+  ]
+}
+
+function breakerFilteredBars(): OhlcvBar[] {
+  return [
+    bar(100, 102, 98, 100, 0),
+    bar(100, 120, 100, 120, 1),
+    bar(120, 125, 114, 125, 2),
+    bar(125, 126, 95, 98, 3),
+    bar(198, 202, 196, 200, 4),
   ]
 }
