@@ -1,5 +1,6 @@
 import { calculateDeltaVolume } from '@/domain/analysis/order-flow/delta-volume.js'
-import { chooseIntrabarPlan, confidenceForCoverage } from '@/domain/analysis/order-flow/intrabar-plan.js'
+import { confidenceForCoverage } from '@/domain/analysis/order-flow/intrabar-plan.js'
+import { loadIntrabarWindow } from '@/domain/analysis/order-flow/intrabar-window.js'
 import { parseBarId, type BarService, type BarSourceRef } from '@/domain/market-data/bars/index.js'
 import type { OhlcvBar } from '@/domain/market-data/bars/types.js'
 import type { PriceActionVolumeConfirmationInput } from './types.js'
@@ -57,42 +58,40 @@ export async function buildPriceActionVolumeConfirmations(params: {
   }
 
   try {
-    const intrabarPlan = chooseIntrabarPlan(interval, bars.length, barId)
-    const targetBars = bars.slice(-intrabarPlan.actualCount)
-    const indexOffset = bars.length - targetBars.length
-    const firstBar = targetBars[0]
-    const lastBar = targetBars[targetBars.length - 1]
-    const intrabarResult = await barService.getBars(ref, {
-      interval: intrabarPlan.intrabarInterval,
-      start: firstBar.date.slice(0, 10),
-      end: lastBar.date.slice(0, 10),
+    const window = await loadIntrabarWindow({
+      barService,
+      ref,
+      barId,
+      targetInterval: interval,
+      requestedCount: bars.length,
+      targetBars: bars,
     })
 
-    if (intrabarResult.bars.length === 0) {
+    if (window.status === 'no_intrabars') {
       return {
         meta: {
           volumeConfirmation: 'unavailable',
-          volumeConfirmationReason: `No intrabar data (${intrabarPlan.intrabarInterval}) returned for the target window`,
-          volumeConfirmationIntrabarInterval: intrabarPlan.intrabarInterval,
+          volumeConfirmationReason: `No intrabar data (${window.plan.intrabarInterval}) returned for the target window`,
+          volumeConfirmationIntrabarInterval: window.plan.intrabarInterval,
           volumeConfirmationIntrabarCount: 0,
         },
       }
     }
 
     const delta = calculateDeltaVolume({
-      targetBars,
-      intrabars: intrabarResult.bars,
+      targetBars: window.targetBars,
+      intrabars: window.intrabars,
       targetInterval: interval,
     })
     const confirmations = new Map<number, PriceActionVolumeConfirmationInput>()
-    for (let i = 0; i < targetBars.length; i++) {
-      confirmations.set(indexOffset + i, {
+    for (let i = 0; i < window.targetBars.length; i++) {
+      confirmations.set(window.targetIndexOffset + i, {
         delta: delta.deltas[i],
         deltaRatio: delta.deltaRatios[i],
         coverage: delta.coverage[i],
         confidence: confidenceForCoverage(delta.coverage[i]),
-        intrabarInterval: intrabarPlan.intrabarInterval,
-        intrabarCount: intrabarResult.bars.length,
+        intrabarInterval: window.plan.intrabarInterval,
+        intrabarCount: window.intrabars.length,
       })
     }
 
@@ -100,11 +99,11 @@ export async function buildPriceActionVolumeConfirmations(params: {
       confirmations,
       meta: {
         volumeConfirmation: 'available',
-        volumeConfirmationCoverageBars: targetBars.length,
+        volumeConfirmationCoverageBars: window.targetBars.length,
         volumeConfirmationLowConfidenceBars: delta.lowConfidenceIndices.length,
-        volumeConfirmationIntrabarInterval: intrabarPlan.intrabarInterval,
-        volumeConfirmationIntrabarCount: intrabarResult.bars.length,
-        volumeConfirmationReason: intrabarPlan.degradationReason,
+        volumeConfirmationIntrabarInterval: window.plan.intrabarInterval,
+        volumeConfirmationIntrabarCount: window.intrabars.length,
+        volumeConfirmationReason: window.plan.degradationReason,
       },
     }
   } catch (err) {

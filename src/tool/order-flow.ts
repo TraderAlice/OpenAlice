@@ -12,9 +12,10 @@
 
 import { tool } from 'ai'
 import { z } from 'zod'
-import { type BarService, type GetBarsOpts, type BarSourceRef } from '@/domain/market-data/bars/index'
+import { type BarService, type BarSourceRef } from '@/domain/market-data/bars/index'
 import { calculateDeltaVolume, calculateVolumeProfile } from '@/domain/analysis/order-flow/delta-volume'
-import { chooseIntrabarPlan, confidenceForCoverage } from '@/domain/analysis/order-flow/intrabar-plan'
+import { confidenceForCoverage } from '@/domain/analysis/order-flow/intrabar-plan'
+import { loadIntrabarWindow } from '@/domain/analysis/order-flow/intrabar-window'
 
 export interface OrderFlowToolsDeps {
   barService: BarService
@@ -75,61 +76,49 @@ judge precision explicitly.`,
       execute: async ({ barId, assetClass, interval, count, start, end }) => {
         const ref: BarSourceRef = assetClass ? { barId, assetClass } : { barId }
         const requestedCount = count ?? DEFAULT_DELTA_COUNT
-        const intrabarPlan = chooseIntrabarPlan(interval, requestedCount, barId)
-        const opts: GetBarsOpts = { interval, count: intrabarPlan.actualCount, start, end }
+        const window = await loadIntrabarWindow({
+          barService,
+          ref,
+          barId,
+          targetInterval: interval,
+          requestedCount,
+          start,
+          end,
+        })
 
-        // 1. 获取目标 bars
-        const targetResult = await barService.getBars(ref, opts)
-
-        if (targetResult.bars.length === 0) {
+        if (window.status === 'no_target_bars') {
           return {
             error: 'No target bars returned for the requested window',
             bars: [],
             meta: {
-              ...targetResult.meta,
-              ...intrabarPlan,
+              ...window.targetMeta,
+              ...window.plan,
               isApproximation: true,
             },
           }
         }
 
-        // 3. 确定 intrabar 时间窗口
-        // 使用 firstBar/lastBar 的日期（date-level）作为窗口
-        // 注意：这是日期级别的窗口，核心算法会按 targetInterval 精确过滤
-        const firstBar = targetResult.bars[0]
-        const lastBar = targetResult.bars[targetResult.bars.length - 1]
-        const intrabarOpts: GetBarsOpts = {
-          interval: intrabarPlan.intrabarInterval,
-          start: firstBar.date.slice(0, 10),
-          end: lastBar.date.slice(0, 10),
-        }
-
-        // 4. 获取 intrabars
-        const intrabarResult = await barService.getBars(ref, intrabarOpts)
-
-        if (intrabarResult.bars.length === 0) {
+        if (window.status === 'no_intrabars') {
           return {
-            error: `No intrabar data (${intrabarPlan.intrabarInterval}) returned for the target window`,
+            error: `No intrabar data (${window.plan.intrabarInterval}) returned for the target window`,
             bars: [],
             meta: {
-              ...targetResult.meta,
-              ...intrabarPlan,
+              ...window.targetMeta,
+              ...window.plan,
               intrabarCount: 0,
               isApproximation: true,
             },
           }
         }
 
-        // 5. 计算 Delta Volume
         const result = calculateDeltaVolume({
-          targetBars: targetResult.bars,
-          intrabars: intrabarResult.bars,
+          targetBars: window.targetBars,
+          intrabars: window.intrabars,
           targetInterval: interval,
         })
 
-        // 6. 返回带日期标签的结果
         return {
-          bars: targetResult.bars.map((bar, i) => ({
+          bars: window.targetBars.map((bar, i) => ({
             date: bar.date,
             open: bar.open,
             high: bar.high,
@@ -147,10 +136,10 @@ judge precision explicitly.`,
             isApproximation: true,
           })),
           meta: {
-            ...targetResult.meta,
-            ...intrabarPlan,
-            intrabarTimeframe: intrabarPlan.intrabarInterval,
-            intrabarCount: intrabarResult.bars.length,
+            ...window.targetMeta,
+            ...window.plan,
+            intrabarTimeframe: window.plan.intrabarInterval,
+            intrabarCount: window.intrabars.length,
             lowConfidenceBars: result.lowConfidenceIndices.length,
             isApproximation: true,
           },
@@ -193,44 +182,41 @@ so downstream agents can judge precision explicitly.`,
       execute: async ({ barId, assetClass, interval, count, start, end, numBins }) => {
         const ref: BarSourceRef = assetClass ? { barId, assetClass } : { barId }
         const requestedCount = count ?? DEFAULT_DELTA_COUNT
-        const intrabarPlan = chooseIntrabarPlan(interval, requestedCount, barId)
-        const opts: GetBarsOpts = { interval, count: intrabarPlan.actualCount, start, end }
-        const targetResult = await barService.getBars(ref, opts)
+        const window = await loadIntrabarWindow({
+          barService,
+          ref,
+          barId,
+          targetInterval: interval,
+          requestedCount,
+          start,
+          end,
+        })
 
-        if (targetResult.bars.length === 0) {
+        if (window.status === 'no_target_bars') {
           return {
             error: 'No bars returned for the requested window',
             bins: [],
             poc: null,
             valueArea: null,
             meta: {
-              ...targetResult.meta,
-              ...intrabarPlan,
+              ...window.targetMeta,
+              ...window.plan,
               isApproximation: true,
             },
           }
         }
 
-        const firstBar = targetResult.bars[0]
-        const lastBar = targetResult.bars[targetResult.bars.length - 1]
-        const intrabarOpts: GetBarsOpts = {
-          interval: intrabarPlan.intrabarInterval,
-          start: firstBar.date.slice(0, 10),
-          end: lastBar.date.slice(0, 10),
-        }
-        const intrabarResult = await barService.getBars(ref, intrabarOpts)
-
-        if (intrabarResult.bars.length === 0) {
+        if (window.status === 'no_intrabars') {
           return {
-            error: `No intrabar data (${intrabarPlan.intrabarInterval}) returned for the target window`,
+            error: `No intrabar data (${window.plan.intrabarInterval}) returned for the target window`,
             bins: [],
             poc: null,
             valueArea: null,
             meta: {
-              ...targetResult.meta,
-              ...intrabarPlan,
-              intrabarTimeframe: intrabarPlan.intrabarInterval,
-              targetBars: targetResult.bars.length,
+              ...window.targetMeta,
+              ...window.plan,
+              intrabarTimeframe: window.plan.intrabarInterval,
+              targetBars: window.targetBars.length,
               intrabarCount: 0,
               isApproximation: true,
             },
@@ -238,7 +224,7 @@ so downstream agents can judge precision explicitly.`,
         }
 
         const profile = calculateVolumeProfile({
-          bars: intrabarResult.bars,
+          bars: window.intrabars,
           numBins: numBins ?? 20,
         })
 
@@ -250,11 +236,11 @@ so downstream agents can judge precision explicitly.`,
             low: profile.valueAreaLow,
           },
           meta: {
-            ...targetResult.meta,
-            ...intrabarPlan,
-            intrabarTimeframe: intrabarPlan.intrabarInterval,
-            targetBars: targetResult.bars.length,
-            intrabarCount: intrabarResult.bars.length,
+            ...window.targetMeta,
+            ...window.plan,
+            intrabarTimeframe: window.plan.intrabarInterval,
+            targetBars: window.targetBars.length,
+            intrabarCount: window.intrabars.length,
             isApproximation: true,
           },
         }

@@ -4,10 +4,10 @@
 
 import { z } from 'zod'
 import { Fetcher } from '../../../core/provider/abstract/fetcher.js'
-import { EmptyDataError } from '../../../core/provider/utils/errors.js'
 import { CryptoHistoricalDataSchema, CryptoHistoricalQueryParamsSchema } from '../../../standard-models/crypto-historical.js'
-import { endTimestamp, estimateRange, formatUTCTime, inDateWindow, INTERVALS, isValidDateOnly } from '../utils/historical.js'
-import { fetchTradingViewBars, type TradingViewBar } from '../utils/websocket.js'
+import { isValidDateOnly } from '../utils/historical.js'
+import { fetchTradingViewHistoricalBars, transformTradingViewHistoricalData } from '../utils/historical-fetcher.js'
+import type { TradingViewBar } from '../utils/websocket.js'
 
 export const TradingViewCryptoHistoricalQueryParamsSchema = CryptoHistoricalQueryParamsSchema.extend({
   start_date: z.string().refine(isValidDateOnly, 'Expected YYYY-MM-DD date.').nullable().default(null),
@@ -29,22 +29,17 @@ export class TradingViewCryptoHistoricalFetcher extends Fetcher {
     query: TradingViewCryptoHistoricalQueryParams,
     _credentials: Record<string, string> | null,
   ): Promise<TradingViewBar[]> {
-    return fetchTradingViewBars({
-      symbol: query.symbol,
-      interval: INTERVALS[query.interval],
-      range: estimateRange(query),
-      to: endTimestamp(query),
-    })
+    return fetchTradingViewHistoricalBars(query)
   }
 
   static override transformData(
     query: TradingViewCryptoHistoricalQueryParams,
     bars: TradingViewBar[],
   ) {
-    const out = [...bars]
-      .sort((a, b) => a.time - b.time)
-      .map((bar) => ({
-        date: formatUTCTime(bar.time),
+    return transformTradingViewHistoricalData(query, bars, {
+      emptyDataMessage: 'No TradingView crypto bars returned for the requested window.',
+      mapBar: ({ bar, date }) => ({
+        date,
         open: bar.open,
         high: bar.high,
         low: bar.low,
@@ -53,13 +48,8 @@ export class TradingViewCryptoHistoricalFetcher extends Fetcher {
         vwap: null,
         symbol: query.symbol,
         provider: 'tradingview',
-      }))
-      .filter((row) => inDateWindow(row.date, query))
-
-    if (out.length === 0) {
-      throw new EmptyDataError('No TradingView crypto bars returned for the requested window.')
-    }
-
-    return out.map((row) => CryptoHistoricalDataSchema.parse(row))
+      }),
+      parse: (row) => CryptoHistoricalDataSchema.parse(row),
+    })
   }
 }
