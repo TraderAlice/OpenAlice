@@ -16,6 +16,7 @@
     "electron:dev": "pnpm electron:build && pnpm -F @traderalice/desktop dev",
     "electron:pack": "pnpm electron:build && pnpm vendor:runtime && pnpm -F @traderalice/desktop pack",
     "electron:assert-package": "node scripts/assert-desktop-package.mjs",
+    "electron:smoke-toolchain": "node scripts/smoke-packaged-toolchain.mjs",
     "electron:smoke:packaged": "node scripts/desktop-packaged-smoke.mjs",
     "electron:smoke:onboarding": "node scripts/desktop-packaged-smoke.mjs --onboarding",
     "electron:smoke:pty": "node scripts/desktop-pty-smoke.mjs",
