@@ -147,6 +147,7 @@ export const en = {
     logs: 'Logs',
     off: 'off',
     delete: 'Delete',
+    retry: 'Retry',
   },
   chat: {
     newChat: 'New chat',
@@ -408,6 +409,7 @@ export const en = {
     colDollarVolume: '$ Volume',
     boardCalendar: 'Calendar',
     calendarSubtitle: 'Upcoming earnings, IPOs and ex-dividend dates.',
+    calendarSlowLoading: 'Still fetching the calendar — first load can take a while.',
     calEarnings: 'Earnings',
     calIpos: 'IPOs',
     calDividends: 'Dividends',

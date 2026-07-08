@@ -47,6 +47,25 @@ const CPI_INDEX = 'CPIAUCSL'
 
 const MAX_POINTS = 90
 
+function sameDatePreviousYear(date: string): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date)
+  if (!m) return null
+  return `${Number(m[1]) - 1}-${m[2]}-${m[3]}`
+}
+
+function deriveCpiYoy(cpi: MacroPoint[]): MacroPoint[] {
+  const byDate = new Map(cpi.map((p) => [p.date, p.value]))
+  const out: MacroPoint[] = []
+  for (const p of cpi) {
+    const baseDate = sameDatePreviousYear(p.date)
+    if (!baseDate) continue
+    const base = byDate.get(baseDate)
+    if (typeof base !== 'number' || !Number.isFinite(base) || base === 0) continue
+    out.push({ date: p.date, value: ((p.value / base) - 1) * 100 })
+  }
+  return out
+}
+
 export async function fetchMacroBoard(economyClient: EconomyClientLike): Promise<MacroBoard> {
   // 2 years of history: enough for a 12-month YoY base plus a sparkline.
   const start = new Date()
@@ -80,11 +99,10 @@ export async function fetchMacroBoard(economyClient: EconomyClientLike): Promise
 
   const cards = CURATED.map((s) => card(s, pointsOf(s.id)))
 
-  // CPI YoY — monthly index, so YoY = value 12 observations back.
+  // CPI YoY — monthly index; match the same calendar observation one year
+  // earlier instead of assuming FRED returned a gap-free monthly sequence.
   const cpi = pointsOf(CPI_INDEX)
-  const yoy: MacroPoint[] = cpi
-    .map((p, i) => (i >= 12 ? { date: p.date, value: ((p.value / cpi[i - 12].value) - 1) * 100 } : null))
-    .filter((p): p is MacroPoint => p !== null)
+  const yoy = deriveCpiYoy(cpi)
   cards.splice(5, 0, card({ id: 'CPI_YOY', label: 'CPI YoY', unit: 'percent' }, yoy))
 
   return {

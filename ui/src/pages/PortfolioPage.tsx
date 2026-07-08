@@ -15,6 +15,7 @@ import { contractPrimary } from '../lib/contract-display'
 import { displayProviderForUTA, filterAccountTierUTAs } from '../lib/uta-account-filter'
 import { TradingModeGate } from '../components/TradingModeGate'
 import { ensureTradingModePolling, useTradingMode } from '../live/trading-mode'
+import { computeTodayDelta, type CurvePointSummary } from './portfolio-metrics'
 
 // ==================== Types ====================
 
@@ -54,8 +55,8 @@ const EMPTY: PortfolioData = { equity: null, accounts: [], fxRates: [] }
 const CUTOFF_24H_MS = 24 * 60 * 60 * 1000
 
 interface CurveSummary {
-  total: { values: number[]; firstAtCutoff: number | null; latest: number | null }
-  perAccount: Record<string, { values: number[]; firstAtCutoff: number | null; latest: number | null }>
+  total: CurvePointSummary
+  perAccount: Record<string, CurvePointSummary>
 }
 
 /** Trailing-24h baseline + sparkline values, both at the aggregate level
@@ -391,7 +392,7 @@ function NoAccountsEmpty() {
 
 function HeroMetrics({ equity, curve }: {
   equity: AggregatedEquity | null
-  curve: { values: number[]; firstAtCutoff: number | null; latest: number | null } | null
+  curve: CurvePointSummary | null
 }) {
   if (!equity) {
     return (
@@ -409,12 +410,11 @@ function HeroMetrics({ equity, curve }: {
   // Today PnL — same shape as TradingPage hero. Suppress when no baseline
   // is available yet (fresh portfolio with no 24h history).
   let todayDelta: { value: string; sign: 'up' | 'down' | 'flat' } | undefined
-  if (curve && curve.latest != null && curve.firstAtCutoff != null) {
-    const delta = curve.latest - curve.firstAtCutoff
-    const pct = curve.firstAtCutoff !== 0 ? (delta / curve.firstAtCutoff) * 100 : 0
+  const computedTodayDelta = computeTodayDelta(curve)
+  if (computedTodayDelta) {
     todayDelta = {
-      value: `${fmtPnl(delta, 'USD')} (${fmtPctSigned(pct)}) today`,
-      sign: signFromDelta(delta),
+      value: `${fmtPnl(computedTodayDelta.delta, 'USD')} (${fmtPctSigned(computedTodayDelta.pct)}) today`,
+      sign: computedTodayDelta.sign,
     }
   }
 
@@ -512,7 +512,7 @@ const HEALTH_DOT: Record<string, string> = {
 
 function AccountStrip({ sources, perAccountCurve }: {
   sources: Array<{ id: string; label: string; provider: string; equity: string; unrealizedPnL: number; error?: string; health?: string; disabled?: boolean; connecting?: boolean }>
-  perAccountCurve: Record<string, { values: number[]; firstAtCutoff: number | null; latest: number | null }>
+  perAccountCurve: Record<string, CurvePointSummary>
 }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -529,9 +529,7 @@ function AccountStrip({ sources, perAccountCurve }: {
             : (HEALTH_DOT[s.health ?? 'healthy'] ?? 'bg-text-muted')
 
         const curve = perAccountCurve[s.id]
-        const todayDelta = curve && curve.latest != null && curve.firstAtCutoff != null
-          ? curve.latest - curve.firstAtCutoff
-          : null
+        const todayDelta = computeTodayDelta(curve ?? null)
         const showSpark = !isDisabled && !isOffline && !isConnecting && curve && curve.values.length >= 2
 
         return (
@@ -553,9 +551,9 @@ function AccountStrip({ sources, perAccountCurve }: {
                     ? <span className="text-red text-[11px]">Reconnecting…</span>
                     : (
                       <span className="text-[11px] tabular-nums">
-                        {todayDelta != null && Number.isFinite(todayDelta) ? (
-                          <span className={todayDelta >= 0 ? 'text-green' : 'text-red'}>
-                            {todayDelta >= 0 ? '▲' : '▼'} {fmtPnl(todayDelta)} today
+                        {todayDelta ? (
+                          <span className={todayDelta.delta >= 0 ? 'text-green' : 'text-red'}>
+                            {todayDelta.delta >= 0 ? '▲' : '▼'} {fmtPnl(todayDelta.delta)} today
                           </span>
                         ) : s.unrealizedPnL !== 0 ? (
                           <span className={s.unrealizedPnL >= 0 ? 'text-green' : 'text-red'}>

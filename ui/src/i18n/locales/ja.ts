@@ -136,6 +136,7 @@ export const ja: Resources = {
     logs: 'ログ',
     off: 'オフ',
     delete: '削除',
+    retry: '再試行',
   },
   chat: {
     newChat: '新しいチャット',
@@ -397,6 +398,7 @@ export const ja: Resources = {
     colDollarVolume: '売買代金',
     boardCalendar: 'カレンダー',
     calendarSubtitle: '今後の決算・IPO・権利落ち日。',
+    calendarSlowLoading: 'カレンダーを取得中です。初回読み込みには少し時間がかかる場合があります。',
     calEarnings: '決算',
     calIpos: 'IPO',
     calDividends: '配当',

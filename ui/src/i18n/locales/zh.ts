@@ -136,6 +136,7 @@ export const zh: Resources = {
     logs: '日志',
     off: '关闭',
     delete: '删除',
+    retry: '重试',
   },
   chat: {
     newChat: '新对话',
@@ -397,6 +398,7 @@ export const zh: Resources = {
     colDollarVolume: '成交额',
     boardCalendar: '财经日历',
     calendarSubtitle: '近期财报、IPO 与除息日。',
+    calendarSlowLoading: '财经日历仍在加载，首次打开可能需要久一点。',
     calEarnings: '财报',
     calIpos: 'IPO',
     calDividends: '分红',

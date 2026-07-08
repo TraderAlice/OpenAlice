@@ -37,6 +37,10 @@ export interface Backlink {
 const WIKILINK_RE = /\[\[([^[\]\n]+)\]\]/g
 const SKIP_FILES = new Set(['CLAUDE.md', 'AGENTS.md', 'README.md'])
 
+export function normalizeBacklinkPath(path: string): string {
+  return path.replace(/\\/g, '/')
+}
+
 async function listMarkdown(root: string): Promise<string[]> {
   const out: string[] = []
 
@@ -47,7 +51,7 @@ async function listMarkdown(root: string): Promise<string[]> {
     const entries = await readdir(abs, { withFileTypes: true }).catch(() => [])
     for (const e of entries) {
       if (e.isFile() && e.name.endsWith('.md') && !SKIP_FILES.has(e.name)) {
-        out.push(relative(root, join(abs, e.name)))
+        out.push(normalizeBacklinkPath(relative(root, join(abs, e.name))))
       }
     }
   }
@@ -68,7 +72,7 @@ async function listMarkdown(root: string): Promise<string[]> {
         }
         await walk(child)
       } else if (e.isFile() && e.name.endsWith('.md') && !SKIP_FILES.has(e.name)) {
-        out.push(relative(root, child))
+        out.push(normalizeBacklinkPath(relative(root, child)))
       }
     }
   }

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { scanBacklinks } from './entity-backlinks.js'
+import { normalizeBacklinkPath, scanBacklinks } from './entity-backlinks.js'
 import type { WorkspaceRegistry } from '../workspaces/workspace-registry.js'
 
 function fakeRegistry(workspaces: { id: string; tag: string; dir: string }[]): WorkspaceRegistry {
@@ -43,7 +43,7 @@ describe('scanBacklinks', () => {
     // vst: power.md (deduped from two mentions) + rotation/jun.md — never the
     // CLAUDE.md / .git / .txt files. All in ws1.
     const vst = map.get('vst') ?? []
-    expect(vst.map((b) => b.path).sort()).toEqual(['power.md', join('rotation', 'jun.md')].sort())
+    expect(vst.map((b) => b.path).sort()).toEqual(['power.md', 'rotation/jun.md'].sort())
     expect(vst.every((b) => b.workspaceId === 'id1')).toBe(true)
 
     // gev spans both workspaces.
@@ -54,7 +54,7 @@ describe('scanBacklinks', () => {
 
     // dashed topic name resolves.
     expect((map.get('ai-data-center-power') ?? []).map((b) => b.path)).toEqual([
-      join('rotation', 'jun.md'),
+      'rotation/jun.md',
     ])
 
     // Nothing leaked from scaffolding: vst has exactly two backlinks.
@@ -79,8 +79,8 @@ describe('scanBacklinks', () => {
     // [[vst]] resolves, and its backlink path is the issue-note path (so the UI
     // can detect issue-notes by the `.alice/issues/` prefix).
     const vst = map.get('vst') ?? []
-    expect(vst.map((b) => b.path)).toEqual([join('.alice', 'issues', 'morning-scan.md')])
-    expect(map.get('refactor-fetcher')?.[0]?.path).toBe(join('.alice', 'issues', 'cleanup.md'))
+    expect(vst.map((b) => b.path)).toEqual(['.alice/issues/morning-scan.md'])
+    expect(map.get('refactor-fetcher')?.[0]?.path).toBe('.alice/issues/cleanup.md')
     // Nothing leaked from .alice/other or .claude.
     expect(map.has('ghost')).toBe(false)
   })
@@ -91,5 +91,10 @@ describe('scanBacklinks', () => {
     await writeFile(join(ws, 'plain.md'), 'no links here, just prose')
     const map = await scanBacklinks(fakeRegistry([{ id: 'id', tag: 'ws', dir: ws }]))
     expect(map.size).toBe(0)
+  })
+
+  it('normalizes Windows separators so UI path-prefix checks are portable', () => {
+    expect(normalizeBacklinkPath(String.raw`.alice\issues\morning-scan.md`)).toBe('.alice/issues/morning-scan.md')
+    expect(normalizeBacklinkPath(String.raw`rotation\jun.md`)).toBe('rotation/jun.md')
   })
 })

@@ -155,7 +155,7 @@ type CalendarList = 'earnings' | 'ipos' | 'dividends'
 
 function CalendarBoardView() {
   const { t } = useTranslation()
-  const { data, updatedAt, loading, error } = useReferenceBoard<CalendarBoard>(referenceApi.calendar, 30 * 60 * 1000)
+  const { data, updatedAt, loading, slow, error, retry } = useReferenceBoard<CalendarBoard>(referenceApi.calendar, 30 * 60 * 1000)
   const [list, setList] = useState<CalendarList>('earnings')
 
   return (
@@ -188,9 +188,20 @@ function CalendarBoardView() {
           ))}
         </div>
 
-        {loading && !data && <CenteredLoading label={t('common.loading')} />}
+        {loading && !data && (
+          <CenteredLoading label={slow ? t('market.calendarSlowLoading') : t('common.loading')} />
+        )}
         {error && (
-          <div className="text-[13px] text-red border border-red/30 rounded-md px-3 py-2 bg-red/5">{error}</div>
+          <div className="flex items-center justify-between gap-3 text-[13px] text-red border border-red/30 rounded-md px-3 py-2 bg-red/5">
+            <span className="min-w-0 break-words">{error}</span>
+            <button
+              type="button"
+              onClick={retry}
+              className="shrink-0 text-[12px] font-medium text-red hover:text-red/80"
+            >
+              {t('common.retry')}
+            </button>
+          </div>
         )}
         {/* Per-list upstream failure — loud, with the provider's own message. */}
         {data?.errors?.[list] && (

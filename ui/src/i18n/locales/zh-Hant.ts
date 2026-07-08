@@ -144,6 +144,7 @@ export const zhHant: Resources = {
     logs: '日誌',
     off: '關閉',
     delete: '刪除',
+    retry: '重試',
   },
   chat: {
     newChat: '新對話',
@@ -405,6 +406,7 @@ export const zhHant: Resources = {
     colDollarVolume: '成交額',
     boardCalendar: '財經日曆',
     calendarSubtitle: '近期財報、IPO 與除息日。',
+    calendarSlowLoading: '財經日曆仍在載入，首次開啟可能需要久一點。',
     calEarnings: '財報',
     calIpos: 'IPO',
     calDividends: '股息',
