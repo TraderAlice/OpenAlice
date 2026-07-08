@@ -29,6 +29,8 @@ In practice:
 
 - Open a PR when you have a concrete fix, design, refactor, or implementation
   idea.
+- Target the `dev` branch by default. `master` is the stable user-facing lane
+  and is reserved for maintainer promotions or emergency hotfixes.
 - Explain the problem, the tradeoffs, and why the approach fits OpenAlice.
 - Maintainers may use the PR as a reference, adapt it, or reimplement the idea
   internally before it lands.

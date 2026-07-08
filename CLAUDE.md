@@ -481,17 +481,26 @@ headless workspace dispatch (cron → workspace).
 ## Git Workflow
 
 - `origin` = `TraderAlice/OpenAlice` (production)
-- `master` is the only long-living branch. **All PRs target master.**
+- `dev` is the primary integration branch. **Routine work targets `dev` first.**
+- `master` is the stable, user-facing branch. **Only promotion PRs from `dev`
+  or explicit emergency hotfixes target `master`.**
 - `local` is the local-collaboration branch (see below). It's a regular
   feature branch in shape, but pinned to a fixed name so multiple local
   AI sessions sharing one git worktree don't fight over checkouts.
-- `dev` is **retired** — it accumulated a `dev`-specific paradigm from
-  the rolling-PR era. Don't open new work on it; don't delete it either.
-  Historical commits stay where they are.
-- **Never** force push master, **never** push `archive/dev` (contains
-  old API keys).
+- Release automation is master-only. A `dev -> master` promotion is the
+  boundary where user-facing builds and release metadata become eligible.
+- **Never** force push `master`, `dev`, or `archive/dev` (contains old API
+  keys). Never delete `master`, `dev`, or `local`.
 - CLAUDE.md is **committed to the repo and publicly visible** — never
   put API keys, personal paths, or sensitive information in it.
+
+### One-time `dev` migration guard
+
+`dev` existed before this policy as a historical branch. Before treating it as
+the integration lane, confirm it has been intentionally reseeded or synced from
+current `master`. If `origin/dev` appears stale, divergent, or surprising, stop
+and ask the user before opening PRs against it. Do **not** force-push or reset
+`dev` unless the user explicitly orders the branch migration.
 
 ### External PRs — quarantine and scan before any local checkout
 
@@ -504,6 +513,11 @@ sandbox first, and only after it's confirmed clean does a checkout happen.
 Most ecosystem work still belongs in satellite repos
 ([[project_satellite_repo_ecosystem]]), but a vetted main-repo
 contribution is no longer auto-closed.
+
+External PRs should target `dev` by default. A contributor PR to `master` is
+treated as a proposal against the stable lane and should usually be retargeted
+or reimplemented onto `dev`; only maintainer-declared hotfixes should target
+`master`.
 
 **Mechanical rule** for any session asked to "review / check out / run /
 evaluate / merge PR #N":
@@ -597,21 +611,32 @@ it saves. Hand parallel tracks off to cloud Claude sessions.
 
 ### Branch Safety Rules (apply to both modes)
 
-- **Never commit directly to master.** If a session opens and finds
-  `HEAD` is master, that's the cue to ask "are we local or remote?"
-  before touching anything — see the open-of-session checklist below.
+- **Never commit directly to `master`.** If a session opens and finds
+  `HEAD` is `master`, assume you are on the stable user-facing lane and ask
+  whether this is an emergency hotfix or whether to switch/branch from `dev`.
+- Prefer not to commit directly to `dev` either. Use feature branches and PRs
+  into `dev`; direct `dev` commits are only for explicit maintainer-directed
+  integration work.
 - **NEVER delete `master`, `dev`, or `local` branches** — `master` and
   `dev` are GitHub-protected (`allow_deletions: false`,
   `allow_force_pushes: false`). `local` is conventionally permanent too.
 - When merging PRs, **NEVER use `--delete-branch`** — destroys source
   branch history. The branch can stay; future tooling needs the SHAs.
-- **Prefer `--merge` over `--squash`** — squash flattens individual
-  commits. Squash only when the history is genuinely messy and even
-  then never combined with `--delete-branch`.
+- **Default PR merge command is `gh pr merge <N> --merge`**. Prefer merge
+  commits over squash commits because the original commit log is often
+  the best fine-grained index for later archaeology: detailed commit
+  messages make it much easier to trace why a dependency, workflow, or
+  subsystem changed. Squash only when the user explicitly asks for it or
+  the branch history is genuinely messy, and even then never combine it
+  with `--delete-branch`.
 - `archive/dev-pre-beta6` is a historical snapshot — do not modify or
   delete.
-- **After merging a PR**, always `git fetch origin && git pull origin master`
-  on the source branch to sync. Stale local refs cause PRs with wrong diff.
+- **After merging a PR into `dev`**, always `git fetch origin && git merge
+  origin/dev` before continuing on a related branch. Stale local refs cause
+  PRs with wrong diffs.
+- **After merging a promotion or hotfix into `master`**, fetch both long-lived
+  branches and make sure `dev` receives the same fix or promotion state. Do
+  not let `master` and `dev` silently diverge after a hotfix.
 
 ### Open-of-session checklist (every session, first action)
 
@@ -622,55 +647,65 @@ state.
 ```bash
 git fetch origin
 git status                              # what branch are we on right now?
-git log --oneline origin/master..HEAD   # what's ahead of master?
+git log --oneline origin/dev..HEAD      # routine-work diff against integration
+git log --oneline origin/master..HEAD   # stable-lane diff / promotion context
 ```
 
 Then branch on the result:
 
 1. **`HEAD` is `master`** — do NOT start work here. Ask the user:
-   *"Local or remote session? If local, do you want to work on `local`,
-   or branch off for a focused feature (`feat/<name>`)?"*
-   Wait for direction; create / switch only after.
+   *"Is this an emergency master hotfix, or should I switch/branch from
+   `dev`?"* Wait for direction; create / switch only after.
 
-2. **`HEAD` is a `feat/<name>` (or similar solo-purpose branch)** —
-   this is the cloud / solo-AI case. Bring it up to date with master
-   so the eventual PR has a clean diff:
+2. **`HEAD` is `dev`** — sync it before doing anything:
    ```bash
-   git merge origin/master  # or rebase, if no one else is on this branch
+   git pull origin dev
    ```
-   Then continue the work.
+   If the session is about routine development, create a focused feature
+   branch from the updated `dev`. Direct `dev` work requires explicit user
+   direction.
 
-3. **`HEAD` is `local`** — this is the shared local-collab branch.
-   First sync master in (because cloud sessions may have shipped while
+3. **`HEAD` is a `feat/<name>` / `codex/<name>` / similar solo branch** —
+   this is the cloud / solo-AI case. Bring it up to date with the target lane:
+   ```bash
+   git merge origin/dev     # routine work
+   # or: git merge origin/master  # explicit master hotfix / promotion work
+   ```
+   Then continue the work. If the branch was already merged, open a fresh
+   branch from the current target lane instead of pushing more commits there.
+
+4. **`HEAD` is `local`** — this is the shared local-collab branch.
+   First sync `dev` in (because cloud sessions may have shipped while
    you were away), THEN continue:
    ```bash
    git pull origin local
-   git merge origin/master
+   git merge origin/dev
    ```
    If the merge conflicts, resolve before doing anything else — another
    local session may be waiting for the working tree.
 
-4. **`HEAD` is `dev` or some other historical branch** — flag it to the
-   user, don't assume it's intentional. `dev` is retired; if a session
-   landed there it's likely an accidental hold-over from a previous flow.
+5. **`HEAD` is any other historical branch** — flag it to the user and do not
+   assume it is intentional. Confirm the target lane (`dev` for routine work,
+   `master` only for emergency hotfix/promotion) before changing files.
 
 ### Cloud / solo-AI sessions (the default)
 
 This is the multi-agent-concurrent path. Each cloud session gets its
-own branch, its own PR, its own review cycle.
+own branch, its own PR, its own review cycle. Routine work branches from
+`dev` and opens PRs back to `dev`.
 
 ```bash
-# Branch from master — never from dev or local
+# Branch from dev — never from master or local for routine work
 git fetch origin
-git checkout master
-git pull origin master
+git checkout dev
+git pull origin dev
 git checkout -b feat/<short-desc>     # cloud Claude Code may auto-name
                                       # claude/<desc>-XXXXX — that's fine too
 
 # ... do the work ...
 
 git push -u origin feat/<short-desc>
-gh pr create --base master --head feat/<short-desc> \
+gh pr create --base dev --head feat/<short-desc> \
   --title "<title>" --body-file <(...)
 ```
 
@@ -694,8 +729,8 @@ Omit if none.>
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 ```
 
-After merge: `git checkout master && git pull origin master`. Don't
-keep working on the post-merge branch.
+After merge: `git checkout dev && git pull origin dev`. Don't keep working
+on the post-merge branch.
 
 ### Local / shared `local` branch (the multi-AI-on-one-worktree exception)
 
@@ -704,17 +739,67 @@ When the user confirms a session is local and wants to work on `local`:
 ```bash
 # First-time only, if `local` doesn't yet exist:
 git fetch origin
-git checkout master
-git pull origin master
+git checkout dev
+git pull origin dev
 git checkout -b local
 git push -u origin local
 ```
 
 Subsequent local sessions: just `git checkout local` (open-of-session
-checklist already pulled origin and merged master).
+checklist already pulled origin and merged `dev`).
 
 When `local` is ready to ship — either piecewise (one PR per coherent
-chunk, base `master`) or as a batch — that's a director decision, not a
+chunk, base `dev`) or as a batch — that's a director decision, not a
 default. Ask the user before opening the PR.
 
+### Promotion: `dev` -> `master`
 
+Promotion is a human-directed stability decision, not the default end of a
+feature PR. When the user says `dev` is ready for users:
+
+```bash
+git fetch origin
+git checkout dev
+git pull origin dev
+git checkout master
+git pull origin master
+gh pr create --base master --head dev \
+  --title "Promote dev to master" --body-file <(...)
+```
+
+Before opening or merging the promotion PR, inspect the delta with
+`git log --oneline origin/master..origin/dev` and `git diff --stat
+origin/master..origin/dev`. Run the normal checks, and add focused smoke
+coverage for any entry-path, trading, runtime, or packaging changes included
+in the promotion window.
+
+### Emergency hotfixes
+
+Use a master-targeted hotfix only when the stable user-facing lane is broken or
+unsafe and waiting for `dev` promotion would be worse.
+
+```bash
+git fetch origin
+git checkout master
+git pull origin master
+git checkout -b hotfix/<short-desc>
+# ... minimal fix ...
+gh pr create --base master --head hotfix/<short-desc> \
+  --title "<hotfix title>" --body-file <(...)
+```
+
+After the hotfix merges to `master`, immediately propagate it back to `dev`
+(merge or cherry-pick, depending on branch state) so the next promotion cannot
+accidentally revert the fix.
+
+### Risk gates before merging to `dev` or promoting to `master`
+
+- **Entry path / startup / onboarding / auth** — must have a kill switch or
+  feature flag unless it is already proven in a dedicated dogfood lane.
+- **Trading, broker writes, UTA permissions, migrations** — run the relevant
+  scenario or migration tests; for trading paths, follow `docs/uta-live-testing.md`.
+- **Desktop packaging, managed runtimes, shell/process launch** — run the
+  package smoke path or explain why the touched surface is outside packaging.
+- **Public docs / contributor workflow / release workflow** — make sure
+  `AGENTS.md`, `CONTRIBUTING.md`, and GitHub Actions triggers describe the
+  same branch policy.

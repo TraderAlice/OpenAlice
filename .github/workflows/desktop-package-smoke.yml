@@ -3,7 +3,7 @@ name: Desktop Package Smoke
 on:
   workflow_dispatch:
   pull_request:
-    branches: [master]
+    branches: [dev, master]
     paths:
       - ".github/workflows/desktop-package-smoke.yml"
       - ".github/workflows/release.yml"
@@ -19,6 +19,8 @@ on:
       - "src/workspaces/**"
       - "services/uta/**"
   push:
+    # Keep push package smoke master-only: PRs into dev get coverage, while
+    # routine dev integration pushes do not burn the expensive desktop matrix.
     branches: [master]
     paths:
       - ".github/workflows/desktop-package-smoke.yml"
