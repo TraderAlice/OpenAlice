@@ -1,22 +1,22 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 const repoRoot = resolve(__dirname, '..')
 const packageRoot = resolve(repoRoot, 'dist', 'electron-app')
 
-const resourceRootCandidates = [
+export const RESOURCE_ROOT_RELATIVE_CANDIDATES = [
   'mac-arm64/OpenAlice.app/Contents/Resources/app',
   'mac/OpenAlice.app/Contents/Resources/app',
   'OpenAlice.app/Contents/Resources/app',
   'win-unpacked/resources/app',
   'linux-unpacked/resources/app',
-].map((p) => resolve(packageRoot, p))
+]
 
-const requiredFiles = [
+export const BASE_REQUIRED_FILES = [
   'package.json',
   'dist/main.js',
   'dist/electron/main.js',
@@ -31,33 +31,104 @@ const requiredFiles = [
   'vendor/pi/node_modules/@earendil-works/pi-coding-agent/dist/cli.js',
 ]
 
-const appRoot = resourceRootCandidates.find((p) => existsSync(join(p, 'package.json')))
-if (!appRoot) {
-  console.error('[desktop-package] app resources root not found. Checked:')
-  for (const candidate of resourceRootCandidates) {
-    console.error(`  - ${relative(repoRoot, candidate)}`)
+export function assertDesktopPackage(options = {}) {
+  const root = options.packageRoot ?? packageRoot
+  const repo = options.repoRoot ?? repoRoot
+  const candidates = RESOURCE_ROOT_RELATIVE_CANDIDATES.map((p) => resolve(root, p))
+  const appRoot = options.appRoot ?? candidates.find((p) => existsSync(join(p, 'package.json')))
+  const errors = []
+  if (!appRoot) {
+    errors.push('[desktop-package] app resources root not found. Checked:')
+    for (const candidate of candidates) {
+      errors.push(`  - ${relative(repo, candidate)}`)
+    }
+    return { ok: false, errors, appRoot: null, manifest: null, platform: null, platformArch: null }
   }
-  process.exit(1)
+
+  const platform = options.platform ?? platformFromAppRoot(appRoot)
+  const arch = options.arch ?? process.arch
+  const platformArch = platform === 'win32' ? `win32-${arch}` : null
+  const requiredFiles = [...BASE_REQUIRED_FILES, ...platformRequiredFiles(platform, platformArch)]
+  const missing = requiredFiles.filter((file) => !existsSync(join(appRoot, file)))
+  if (missing.length > 0) {
+    errors.push(`[desktop-package] ${relative(repo, appRoot)} is missing required packaged files:`)
+    for (const file of missing) errors.push(`  - ${file}`)
+  }
+
+  const manifestPath = join(appRoot, 'vendor', 'manifest.json')
+  let manifest = null
+  try {
+    manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+  } catch (err) {
+    errors.push(`[desktop-package] failed to read vendor manifest: ${err instanceof Error ? err.message : String(err)}`)
+  }
+
+  if (manifest?.pi?.mode !== 'npm') {
+    errors.push(`[desktop-package] expected manifest.pi.mode="npm", got ${JSON.stringify(manifest?.pi?.mode)}`)
+  }
+  const piCli = typeof manifest?.pi?.cli === 'string' ? manifest.pi.cli.replaceAll('\\', '/') : null
+  if (piCli !== 'vendor/pi/node_modules/@earendil-works/pi-coding-agent/dist/cli.js') {
+    errors.push(`[desktop-package] unexpected manifest.pi.cli: ${JSON.stringify(manifest?.pi?.cli)}`)
+  }
+
+  if (platform === 'win32' && platformArch) {
+    const git = manifest?.git?.[platformArch]
+    if (!git) {
+      errors.push(`[desktop-package] expected manifest.git.${platformArch} for Windows managed Git Bash`)
+    } else {
+      if (git.path !== `vendor/git/${platformArch}`) {
+        errors.push(`[desktop-package] unexpected manifest.git.${platformArch}.path: ${JSON.stringify(git.path)}`)
+      }
+      if (normalizeManifestPath(git.gitBin) !== 'cmd/git.exe') {
+        errors.push(`[desktop-package] unexpected manifest.git.${platformArch}.gitBin: ${JSON.stringify(git.gitBin)}`)
+      }
+      if (normalizeManifestPath(git.shellPath) !== 'bin/bash.exe') {
+        errors.push(`[desktop-package] unexpected manifest.git.${platformArch}.shellPath: ${JSON.stringify(git.shellPath)}`)
+      }
+      if (normalizeManifestPath(git.shPath) !== 'bin/sh.exe') {
+        errors.push(`[desktop-package] unexpected manifest.git.${platformArch}.shPath: ${JSON.stringify(git.shPath)}`)
+      }
+    }
+  }
+
+  return { ok: errors.length === 0, errors, appRoot, manifest, platform, platformArch }
 }
 
-const missing = requiredFiles.filter((file) => !existsSync(join(appRoot, file)))
-if (missing.length > 0) {
-  console.error(`[desktop-package] ${relative(repoRoot, appRoot)} is missing required packaged files:`)
-  for (const file of missing) console.error(`  - ${file}`)
-  process.exit(1)
+export function platformFromAppRoot(appRoot) {
+  const normalized = appRoot.replaceAll('\\', '/')
+  if (normalized.includes('/win-unpacked/')) return 'win32'
+  if (normalized.includes('/linux-unpacked/')) return 'linux'
+  if (normalized.includes('.app/Contents/Resources/app')) return 'darwin'
+  return process.platform
 }
 
-const manifestPath = join(appRoot, 'vendor', 'manifest.json')
-const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
-if (manifest?.pi?.mode !== 'npm') {
-  console.error(`[desktop-package] expected manifest.pi.mode="npm", got ${JSON.stringify(manifest?.pi?.mode)}`)
-  process.exit(1)
-}
-const piCli = typeof manifest?.pi?.cli === 'string' ? manifest.pi.cli.replaceAll('\\', '/') : null
-if (piCli !== 'vendor/pi/node_modules/@earendil-works/pi-coding-agent/dist/cli.js') {
-  console.error(`[desktop-package] unexpected manifest.pi.cli: ${JSON.stringify(manifest?.pi?.cli)}`)
-  process.exit(1)
+function platformRequiredFiles(platform, platformArch) {
+  if (platform !== 'win32' || !platformArch) return []
+  return [
+    `vendor/git/${platformArch}/cmd/git.exe`,
+    `vendor/git/${platformArch}/bin/bash.exe`,
+    `vendor/git/${platformArch}/bin/sh.exe`,
+  ]
 }
 
-console.log(`[desktop-package] app resources OK: ${relative(repoRoot, appRoot)}`)
-console.log(`[desktop-package] managed Pi: ${manifest.pi.version} (${manifest.pi.mode})`)
+function normalizeManifestPath(value) {
+  return typeof value === 'string' ? value.replaceAll('\\', '/') : null
+}
+
+function main() {
+  const result = assertDesktopPackage()
+  if (!result.ok) {
+    for (const error of result.errors) console.error(error)
+    process.exit(1)
+  }
+  console.log(`[desktop-package] app resources OK: ${relative(repoRoot, result.appRoot)}`)
+  console.log(`[desktop-package] managed Pi: ${result.manifest.pi.version} (${result.manifest.pi.mode})`)
+  if (result.platform === 'win32') {
+    const git = result.manifest.git[result.platformArch]
+    console.log(`[desktop-package] managed Git Bash: ${git.version} (${result.platformArch})`)
+  }
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main()
+}

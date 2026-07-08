@@ -36,8 +36,9 @@ Node runtime for the backend and workspace bootstrap.
 
 - Packaged OpenAlice should include a managed Pi npm runtime on macOS and
   Windows.
-- Windows packaged OpenAlice should include exactly one managed Git+shell
-  runtime. Do not ship two Git trees.
+- Windows packaged OpenAlice should include an incremental managed Git Bash
+  runtime. Dugite's embedded Git payload is retained in the first slice and
+  deduplicated only after the new runtime path is stable.
 - The managed runtime must be discovered through explicit capability/profile
   injection, not scattered `process.platform` guesses.
 - Existing Workspace semantics stay intact: Pi is a coding runtime, not a
@@ -49,8 +50,7 @@ Node runtime for the backend and workspace bootstrap.
 ## Non-Goals
 
 - Do not make Pi responsible for account/trading safety.
-- Do not introduce a second Windows Git runtime beside the existing packaged
-  Git story.
+- Do not remove or rewrite dugite in the first managed Git Bash slice.
 - Do not require WSL, Git for Windows, Node, npm, pnpm, or system Git as a
   first-run prerequisite.
 - Do not rewrite every Git call in the first implementation if a smaller step
@@ -83,7 +83,7 @@ Ship:
 
 - Electron Node (already present)
 - managed Pi npm runtime (`@earendil-works/pi-coding-agent`)
-- one managed Git for Windows / MinGit style runtime that includes:
+- one managed Git for Windows / PortableGit runtime that includes:
   - `git.exe`
   - `bash.exe`
   - `sh.exe`
@@ -93,16 +93,17 @@ Ship:
 Use:
 
 - managed `bash.exe` as Pi's `shellPath`
-- the same managed Git runtime for workspace bootstrap, Git UI, and agent shell
-  commands
+- the same managed Git runtime for agent shell commands and as the preferred
+  `LOCAL_GIT_DIRECTORY` for existing dugite call sites
 
 Rationale:
 
 - Pi's npm package does not provide a shell. OpenAlice must provide one.
 - The existing dugite Windows native payload contains Git and POSIX-ish tools,
   but not a reliable full Bash story.
-- Shipping both dugite's embedded Git and another Git for Windows tree would be
-  wasteful and hard to reason about.
+- Shipping both dugite's embedded Git and PortableGit is wasteful, but this
+  incremental slice accepts the temporary duplication so Windows gets a reliable
+  Bash/toolchain without rewriting launcher Git semantics in the same change.
 
 ## Runtime Profile
 
@@ -243,7 +244,7 @@ There are two separate concerns:
 1. Git executable/runtime payload
 2. JS API used by Alice code and bootstrap scripts
 
-### Phase 1: Replace Windows Git Payload, Keep Dugite API
+### Phase 1: Incremental Windows Git Bash, Keep Dugite API
 
 Keep `dugite.exec()` call sites initially:
 
@@ -254,15 +255,16 @@ Keep `dugite.exec()` call sites initially:
 But on Windows packaged builds:
 
 - ship the managed Git for Windows runtime as `vendor/git/...`
-- exclude or avoid packaging dugite's own `node_modules/dugite/git/**`
 - set `LOCAL_GIT_DIRECTORY` to the managed Git dir before Alice starts
+- keep dugite's own `node_modules/dugite/git/**` payload for now
 
 Dugite supports `LOCAL_GIT_DIRECTORY`; with that env set, existing
 `dugite.exec()` calls should resolve Git from the managed runtime instead of
 dugite's embedded payload.
 
-This gets us one Windows Git runtime while preserving the established API and
-test surface.
+This gives Windows a reliable Bash/toolchain while preserving the established
+API and test surface. Having both Git payloads in the package is a known
+temporary cost, not the final topology.
 
 ### Phase 2: OpenAlice Git Wrapper
 
@@ -321,15 +323,11 @@ Responsibilities:
 - download pinned Pi install package + lockfile from the Pi release
 - verify checksums
 - run an isolated `npm ci --omit=dev` under `vendor/pi`
-- emit a machine-readable manifest
-
-Later responsibilities:
-
-- download pinned Git for Windows / MinGit runtime for Windows
+- download pinned Git for Windows / PortableGit runtime on Windows only
 - verify checksums
 - unpack into a deterministic vendor directory
 - prune docs/examples only if license obligations remain satisfied
-- extend the machine-readable manifest:
+- emit a machine-readable manifest:
 
 ```json
 {
@@ -340,9 +338,12 @@ Later responsibilities:
   },
   "git": {
     "win32-x64": {
+      "version": "2.55.0.2",
+      "distribution": "PortableGit",
       "path": "vendor/git/win32-x64",
       "gitBin": "cmd/git.exe",
-      "shellPath": "bin/bash.exe"
+      "shellPath": "bin/bash.exe",
+      "shPath": "bin/sh.exe"
     }
   }
 }
@@ -487,8 +488,9 @@ Windows acceptance smoke:
 - Vendor one Windows Git+Shell runtime.
 - Set `LOCAL_GIT_DIRECTORY`.
 - Set managed `shellPath` to `bash.exe`.
-- Exclude or avoid packaging dugite's embedded Windows Git payload.
-- Confirm there is only one Git runtime in the Windows installer.
+- Keep dugite's embedded Windows Git payload in this slice.
+- Confirm PortableGit is packaged and the temporary dugite duplication is
+  visible in package assertions/docs.
 
 ### Step 5: Optional Dugite API Removal
 
@@ -498,7 +500,7 @@ Windows acceptance smoke:
 
 ## Open Questions
 
-- Which Git for Windows / MinGit artifact should be pinned for Windows?
+- When should the temporary Windows dugite + PortableGit duplication be removed?
 - Can `LOCAL_GIT_DIRECTORY` fully cover every existing dugite call in packaged
   Windows, or do any call sites depend on dugite-specific env setup?
 - Should managed Pi be updated only with app releases, or should OpenAlice
