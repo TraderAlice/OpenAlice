@@ -359,6 +359,89 @@ describe('analyzePriceAction v2 foundation', () => {
   })
 })
 
+describe('analyzePriceActionContext', () => {
+  it('exposes a compact agent-facing schema instead of detector tuning', () => {
+    const tools = createPriceActionTools({
+      barService: fakeBarService([]),
+    })
+    const schema = (tools.analyzePriceActionContext as any).inputSchema
+
+    expect(schema.safeParse({
+      barId: 'test|CTX',
+      mode: 'context',
+      intervals: ['1d', '4h', '1h'],
+      count: 100,
+    }).success).toBe(true)
+    expect(schema.safeParse({
+      barId: 'test|CTX',
+      interval: '1h',
+    }).success).toBe(false)
+    expect(schema.safeParse({
+      barId: 'test|CTX',
+      minGapAtrMultiplier: 0.5,
+    }).success).toBe(false)
+  })
+
+  it('uses the context preset when intervals are omitted', async () => {
+    const calls: string[] = []
+    const tools = createPriceActionTools({
+      barService: fakeBarServiceByInterval({
+        '1d': trendBars('bullish'),
+        '4h': trendBars('bullish'),
+        '1h': trendBars('bearish'),
+      }, {}, calls),
+    })
+
+    const result = await run(tools.analyzePriceActionContext, {
+      barId: 'test|CTX',
+      count: 100,
+    }) as Record<string, any>
+
+    expect(calls).toEqual(['1d', '4h', '1h'])
+    expect(result.status).toBe('ok')
+    expect(result.intervals.map((entry: any) => entry.interval)).toEqual(['1d', '4h', '1h'])
+    expect(result.intervals[0].detailRequest).toEqual({
+      tool: 'analyzePriceAction',
+      args: expect.objectContaining({
+        barId: 'test|CTX',
+        interval: '1d',
+        count: 100,
+        gapVolumeConfirmation: false,
+        ifvgVolumeConfirmation: false,
+        orderBlockVolumeConfirmation: false,
+        maxFVGs: 5,
+      }),
+    })
+  })
+
+  it('uses execution defaults when explicitly requested', async () => {
+    const calls: string[] = []
+    const tools = createPriceActionTools({
+      barService: fakeBarServiceByInterval({
+        '4h': trendBars('bullish'),
+        '1h': trendBars('bullish'),
+        '15m': trendBars('bearish'),
+      }, {}, calls),
+    })
+
+    const result = await run(tools.analyzePriceActionContext, {
+      barId: 'test|CTX',
+      mode: 'execution',
+    }) as Record<string, any>
+
+    expect(calls).toEqual(['4h', '1h', '15m'])
+    expect(result.status).toBe('ok')
+    expect(result.intervals[0].detailRequest.args).toMatchObject({
+      barId: 'test|CTX',
+      interval: '4h',
+      gapVolumeConfirmation: true,
+      ifvgVolumeConfirmation: true,
+      orderBlockVolumeConfirmation: true,
+      proximityPct: 0.05,
+    })
+  })
+})
+
 describe('analyzeMultiTimeframePriceAction', () => {
   it('is exposed as a separate MTF summary tool without adding intervals mode to analyzePriceAction', () => {
     const tools = createPriceActionTools({
@@ -735,10 +818,12 @@ function fakeBarService(bars: OhlcvBar[]): BarService {
 function fakeBarServiceByInterval(
   barsByInterval: Record<string, OhlcvBar[]>,
   errorsByInterval: Record<string, Error> = {},
+  calls: string[] = [],
 ): BarService {
   return {
     searchBarSources: async () => [],
     getBars: async (_ref: BarSourceRef, opts: GetBarsOpts) => {
+      calls.push(opts.interval)
       const error = errorsByInterval[opts.interval]
       if (error) throw error
       const bars = barsByInterval[opts.interval] ?? []

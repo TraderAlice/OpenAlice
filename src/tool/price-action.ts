@@ -6,19 +6,14 @@
 
 import { tool } from 'ai'
 import { z } from 'zod'
-import type { BarService, GetBarsOpts, BarSourceRef } from '@/domain/market-data/bars/index.js'
-import { analyzePriceActionBars, type AnalyzePriceActionBarsOptions } from '@/domain/analysis/price-action/analyze.js'
-import { calculatePriceActionVolatility } from '@/domain/analysis/price-action/indicators.js'
-import { buildPriceActionVolumeConfirmations } from '@/domain/analysis/price-action/volume-confirmation.js'
-import type {
-  MarketStructureAnalysis,
-  PriceActionDetailRequest,
-  PriceActionMtfAnalysis,
-  PriceActionMtfIntervalSummary,
-  PriceActionMtfSummary,
-  StructureBreakEvent,
-  TrendDirection,
-} from '@/domain/analysis/price-action/types.js'
+import type { BarService } from '@/domain/market-data/bars/index.js'
+import {
+  analyzePriceActionContext,
+  analyzePriceActionFromBars,
+  analyzePriceActionMtf,
+  buildAnalyzeOptions,
+} from '@/domain/analysis/price-action/context.js'
+import type { AnalyzePriceActionBarsOptions } from '@/domain/analysis/price-action/analyze.js'
 
 export interface PriceActionToolsDeps {
   barService: BarService
@@ -29,138 +24,6 @@ const overlapPolicySchema = z.enum(['ranked', 'older', 'newer', 'none'])
 const assetClassSchema = z.enum(['equity', 'crypto', 'currency', 'commodity'])
 const structureLevelSchema = z.enum(['internal', 'swing', 'external'])
 const marketStructureModeSchema = z.enum(['pivot', 'extreme'])
-
-function buildAnalyzeOptions(
-  input: AnalyzePriceActionBarsOptions,
-  defaults: Pick<
-    AnalyzePriceActionBarsOptions,
-    'gapVolumeConfirmation' | 'ifvgVolumeConfirmation' | 'orderBlockVolumeConfirmation' | 'maxFVGs' | 'maxIFVGs' | 'maxOrderBlocks'
-  >,
-): AnalyzePriceActionBarsOptions {
-  return {
-    ...input,
-    gapMode: input.gapMode ?? 'FVG',
-    zoneMitigationSource: input.zoneMitigationSource ?? 'body',
-    gapVolumeConfirmation: input.gapVolumeConfirmation ?? defaults.gapVolumeConfirmation,
-    maxFVGs: input.maxFVGs ?? defaults.maxFVGs,
-    maxIFVGs: input.maxIFVGs ?? defaults.maxIFVGs,
-    includeFilled: input.includeFilled ?? false,
-    ifvgVolumeConfirmation: input.ifvgVolumeConfirmation ?? defaults.ifvgVolumeConfirmation,
-    maxOrderBlocks: input.maxOrderBlocks ?? defaults.maxOrderBlocks,
-    includeMitigatedOrderBlocks: input.includeMitigatedOrderBlocks ?? false,
-    orderBlockTrigger: input.orderBlockTrigger ?? 'all',
-    orderBlockPosition: input.orderBlockPosition ?? 'precise',
-    orderBlockVolumeConfirmation: input.orderBlockVolumeConfirmation ?? defaults.orderBlockVolumeConfirmation,
-  }
-}
-
-function latestBreak(marketStructure: MarketStructureAnalysis): StructureBreakEvent | undefined {
-  return [...marketStructure.bos, ...marketStructure.choch].sort((a, b) => b.index - a.index)[0]
-}
-
-function dominantTrend(marketStructure: MarketStructureAnalysis): TrendDirection {
-  const trends = [
-    marketStructure.stateByLevel.external.trend,
-    marketStructure.stateByLevel.swing.trend,
-    marketStructure.stateByLevel.internal.trend,
-  ]
-  const bullish = trends.filter((trend) => trend === 'bullish').length
-  const bearish = trends.filter((trend) => trend === 'bearish').length
-  if (bullish > bearish) return 'bullish'
-  if (bearish > bullish) return 'bearish'
-  return 'unknown'
-}
-
-function distanceFromCurrentPrice(zone: { top: number; bottom: number }, currentPrice: number): number {
-  return Math.abs(((zone.top + zone.bottom) / 2) - currentPrice)
-}
-
-function nearestByPrice<T extends { top: number; bottom: number }>(zones: T[], currentPrice: number): T | undefined {
-  return zones
-    .map((zone) => ({ zone, distance: distanceFromCurrentPrice(zone, currentPrice) }))
-    .sort((a, b) => a.distance - b.distance)[0]?.zone
-}
-
-function buildDetailRequest(args: Record<string, unknown>, interval: string): PriceActionDetailRequest {
-  return {
-    tool: 'analyzePriceAction',
-    args: {
-      ...args,
-      interval,
-    } as PriceActionDetailRequest['args'],
-  }
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
-}
-
-function summarizeMtf(intervals: PriceActionMtfIntervalSummary[]): PriceActionMtfSummary {
-  const successful = intervals.filter((entry) => entry.status === 'ok' && entry.trend)
-  if (successful.length === 0) {
-    return {
-      bias: 'unknown',
-      alignment: 'unknown',
-      conflicts: [],
-      confluences: [],
-    }
-  }
-
-  const trendCounts = successful.reduce<Record<TrendDirection, number>>((counts, entry) => {
-    const trend = entry.trend?.dominant ?? 'unknown'
-    counts[trend] += 1
-    return counts
-  }, { bullish: 0, bearish: 0, unknown: 0 })
-  const higherTimeframeTrend = successful.find((entry) => entry.trend?.dominant !== 'unknown')?.trend?.dominant
-  const bias: PriceActionMtfSummary['bias'] =
-    higherTimeframeTrend && higherTimeframeTrend !== 'unknown'
-      ? higherTimeframeTrend
-      : trendCounts.bullish > trendCounts.bearish
-        ? 'bullish'
-        : trendCounts.bearish > trendCounts.bullish
-          ? 'bearish'
-          : trendCounts.bullish === 0 && trendCounts.bearish === 0
-            ? 'neutral'
-            : 'mixed'
-
-  const conflicts: string[] = []
-  const confluences: string[] = []
-  for (let i = 0; i < successful.length; i += 1) {
-    for (let j = i + 1; j < successful.length; j += 1) {
-      const left = successful[i]
-      const right = successful[j]
-      const leftTrend = left.trend?.swing ?? 'unknown'
-      const rightTrend = right.trend?.swing ?? 'unknown'
-      if (leftTrend === 'unknown' || rightTrend === 'unknown') continue
-      if (leftTrend === rightTrend) {
-        confluences.push(`${left.interval} and ${right.interval} swing trend both ${leftTrend}`)
-      } else {
-        conflicts.push(`${left.interval} swing trend ${leftTrend} conflicts with ${right.interval} swing trend ${rightTrend}`)
-      }
-    }
-  }
-
-  const premiumDiscountConfluences = successful
-    .filter((entry) => entry.premiumDiscount?.status === 'available')
-    .map((entry) => `${entry.interval} price is in ${entry.premiumDiscount?.status === 'available' ? entry.premiumDiscount.location : 'unknown'}`)
-  confluences.push(...premiumDiscountConfluences)
-
-  const alignment: PriceActionMtfSummary['alignment'] =
-    conflicts.length > 0
-      ? 'conflicted'
-      : confluences.length > 0 && (trendCounts.bullish > 0 || trendCounts.bearish > 0)
-        ? 'aligned'
-        : successful.length > 1
-          ? 'mixed'
-          : 'unknown'
-
-  return {
-    bias,
-    alignment,
-    conflicts,
-    confluences,
-  }
-}
 
 export function createPriceActionTools(deps: PriceActionToolsDeps) {
   const { barService } = deps
@@ -239,7 +102,6 @@ Example:
       }).strict(),
 
       execute: async (input) => {
-        const { barId, assetClass, interval, count, start, end } = input
         const analysisOptions = buildAnalyzeOptions(input, {
           gapVolumeConfirmation: true,
           ifvgVolumeConfirmation: true,
@@ -248,36 +110,40 @@ Example:
           maxIFVGs: 5,
           maxOrderBlocks: 10,
         })
-        const ref: BarSourceRef = assetClass ? { barId, assetClass } : { barId }
-        const opts: GetBarsOpts = { interval, count: count ?? 200, start, end }
 
-        // 获取 K 线数据
-        const result = await barService.getBars(ref, opts)
-
-        const volumeConfirmation = result.bars.length > 0
-          ? await buildPriceActionVolumeConfirmations({
-            barService,
-            ref,
-            barId,
-            interval,
-            bars: result.bars,
-            enabled: Boolean(
-              analysisOptions.gapVolumeConfirmation ||
-              analysisOptions.ifvgVolumeConfirmation ||
-              analysisOptions.orderBlockVolumeConfirmation,
-            ),
-          })
-          : { confirmations: undefined, meta: {} }
-
-        return analyzePriceActionBars({
-          bars: result.bars,
-          interval,
-          meta: result.meta,
+        return analyzePriceActionFromBars(barService, {
+          barId: input.barId,
+          assetClass: input.assetClass,
+          interval: input.interval,
+          count: input.count,
+          start: input.start,
+          end: input.end,
           options: analysisOptions,
-          volumeConfirmations: volumeConfirmation.confirmations,
-          volumeConfirmationMeta: volumeConfirmation.meta,
         })
       },
+    }),
+
+    analyzePriceActionContext: tool({
+      description: `Return a compact multi-timeframe price-action context for a bar source.
+
+This is the default agent-facing price-action entrypoint. It chooses opinionated
+defaults for market context, execution context, or debugging, and hides detector
+tuning unless a caller intentionally uses analyzePriceAction for full detail.`,
+
+      inputSchema: z.object({
+        barId: z.string().describe('Bar source ID from searchBars'),
+        assetClass: assetClassSchema.optional()
+          .describe('Required for vendor barIds (e.g. "equity" for tradingview|AAPL)'),
+        intervals: z.array(z.string()).min(1).max(8).optional()
+          .describe('Optional intervals ordered from higher timeframe to execution timeframe; defaults depend on mode'),
+        mode: z.enum(['context', 'execution', 'debug']).optional()
+          .describe('context: cheap higher-timeframe read; execution: nearer zones with intrabar confirmation; debug: fuller detail defaults'),
+        count: z.number().int().positive().optional().describe('Number of bars per interval (default 200)'),
+        start: z.string().optional().describe('Start date (YYYY-MM-DD)'),
+        end: z.string().optional().describe('End date (YYYY-MM-DD)'),
+      }).strict(),
+
+      execute: async (input) => analyzePriceActionContext(barService, input),
     }),
 
     analyzeMultiTimeframePriceAction: tool({
@@ -325,135 +191,29 @@ Use each interval's detailRequest with analyzePriceAction when full single-timef
         liquidityPoolLevels: z.array(structureLevelSchema).min(1).optional().describe('Structure levels used for liquidity pool derivation (default internal and swing)'),
       }).strict(),
 
-      execute: async (input): Promise<PriceActionMtfAnalysis> => {
-        const { barId, assetClass, intervals, count, start, end } = input
-        const analysisOptions = buildAnalyzeOptions(input, {
-          gapVolumeConfirmation: false,
-          ifvgVolumeConfirmation: false,
-          orderBlockVolumeConfirmation: false,
-          maxFVGs: 5,
-          maxIFVGs: 3,
-          maxOrderBlocks: 5,
-        })
-
+      execute: async (input) => {
+        const options: AnalyzePriceActionBarsOptions = input
         const baseDetailArgs = { ...input }
         delete (baseDetailArgs as { intervals?: unknown }).intervals
-        const ref: BarSourceRef = assetClass ? { barId, assetClass } : { barId }
 
-        const intervalResults = await Promise.all(intervals.map(async (interval): Promise<PriceActionMtfIntervalSummary> => {
-          const detailRequest = buildDetailRequest(baseDetailArgs, interval)
-
-          try {
-            const result = await barService.getBars(ref, { interval, count: count ?? 200, start, end })
-            if (result.bars.length < 3) {
-              return {
-                interval,
-                status: 'insufficient',
-                detailRequest,
-                error: 'Insufficient bars returned for price-action summary',
-                meta: {
-                  ...result.meta,
-                  schemaVersion: 2,
-                  volatility: calculatePriceActionVolatility(result.bars),
-                  totalFvgCount: 0,
-                  returnedFvgCount: 0,
-                  totalIfvgCount: 0,
-                  returnedIfvgCount: 0,
-                  totalBreakerCount: 0,
-                  returnedBreakerCount: 0,
-                  totalOrderBlockCount: 0,
-                  returnedOrderBlockCount: 0,
-                  mitigatedOrderBlockCount: 0,
-                  bosCount: 0,
-                  chochCount: 0,
-                },
-              }
-            }
-
-            const volumeConfirmation = await buildPriceActionVolumeConfirmations({
-              barService,
-              ref,
-              barId,
-              interval,
-              bars: result.bars,
-              enabled: Boolean(
-                analysisOptions.gapVolumeConfirmation ||
-                analysisOptions.ifvgVolumeConfirmation ||
-                analysisOptions.orderBlockVolumeConfirmation,
-              ),
-            })
-            const detail = analyzePriceActionBars({
-              bars: result.bars,
-              interval,
-              meta: result.meta,
-              options: analysisOptions,
-              volumeConfirmations: volumeConfirmation.confirmations,
-              volumeConfirmationMeta: volumeConfirmation.meta,
-            })
-            const { marketStructure, liquidityPools, liquiditySweeps, fvgs, ifvgs, orderBlocks, premiumDiscount } = detail
-            const currentPrice = result.bars[result.bars.length - 1].close
-
-            return {
-              interval,
-              status: 'ok',
-              trend: {
-                internal: marketStructure.stateByLevel.internal.trend,
-                swing: marketStructure.stateByLevel.swing.trend,
-                external: marketStructure.stateByLevel.external.trend,
-                dominant: dominantTrend(marketStructure),
-              },
-              liquidity: {
-                poolCount: liquidityPools.length,
-                sweepCount: liquiditySweeps.length,
-                recentSweeps: liquiditySweeps.slice(-3),
-              },
-              zone: {
-                fvgCount: fvgs.length,
-                ifvgCount: ifvgs.length,
-                orderBlockCount: orderBlocks.length,
-                nearestFvg: nearestByPrice(fvgs, currentPrice),
-                nearestIFVG: nearestByPrice(ifvgs, currentPrice),
-                nearestOrderBlock: nearestByPrice(orderBlocks, currentPrice),
-              },
-              premiumDiscount,
-              structure: {
-                mode: marketStructure.marketStructureMode,
-                bosCount: marketStructure.bos.length,
-                chochCount: marketStructure.choch.length,
-                lastBreak: latestBreak(marketStructure),
-                strongWeak: marketStructure.swingStrength.slice(-6),
-              },
-              detailRequest,
-              meta: {
-                ...detail.meta,
-                returnedBreakerCount: detail.meta.totalBreakerCount,
-              },
-            }
-          } catch (error) {
-            return {
-              interval,
-              status: 'error',
-              detailRequest,
-              error: errorMessage(error),
-            }
-          }
-        }))
-
-        const successfulCount = intervalResults.filter((entry) => entry.status === 'ok').length
-        const errorCount = intervalResults.filter((entry) => entry.status === 'error').length
-        const status: PriceActionMtfAnalysis['status'] =
-          successfulCount === intervalResults.length
-            ? 'ok'
-            : errorCount === intervalResults.length
-              ? 'error'
-              : 'partial'
-
-        return {
-          status,
-          summary: summarizeMtf(intervalResults),
-          intervals: intervalResults,
-          ...(status === 'error' ? { error: 'All intervals failed' } : {}),
-        }
+        return analyzePriceActionMtf(barService, {
+          barId: input.barId,
+          assetClass: input.assetClass,
+          intervals: input.intervals,
+          count: input.count,
+          start: input.start,
+          end: input.end,
+          options,
+          defaults: {
+            gapVolumeConfirmation: false,
+            ifvgVolumeConfirmation: false,
+            orderBlockVolumeConfirmation: false,
+            maxFVGs: 5,
+            maxIFVGs: 3,
+            maxOrderBlocks: 5,
+          },
+          detailBaseArgs: baseDetailArgs,
+        })
       },
     }),
 
