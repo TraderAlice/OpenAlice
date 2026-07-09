@@ -16,6 +16,7 @@ import { claudeAdapter } from './claude.js';
 import { codexAdapter } from './codex.js';
 import { opencodeAdapter } from './opencode.js';
 import { piAdapter } from './pi.js';
+import { shellAdapter } from './shell.js';
 
 let dir: string;
 
@@ -285,11 +286,20 @@ describe('assignsSessionId capability (gates the launcher\'s assign-id-at-spawn 
 describe('composeHeadlessCommand (one-shot headless argv, prompt placed per-CLI)', () => {
   const ctx = (env: Record<string, string> = {}) => ({ cwd: '/ws', env });
 
-  it('all four agent adapters declare the headless capability', () => {
+  it('agent adapters + shell declare the headless capability', () => {
     expect(claudeAdapter.capabilities.headless).toBe(true);
     expect(codexAdapter.capabilities.headless).toBe(true);
     expect(opencodeAdapter.capabilities.headless).toBe(true);
     expect(piAdapter.capabilities.headless).toBe(true);
+    expect(shellAdapter.capabilities.headless).toBe(true);
+  });
+
+  it('shell: login shell -lc <script> (zero-LLM automation path)', () => {
+    expect(shellAdapter.composeHeadlessCommand!([], ctx(), 'node work/run.mjs')).toEqual([
+      process.env['SHELL'] ?? '/bin/sh',
+      '-lc',
+      'node work/run.mjs',
+    ]);
   });
 
   it('claude: -p stream-json --verbose -- <prompt> (prompt after -- terminator, never --bare)', () => {

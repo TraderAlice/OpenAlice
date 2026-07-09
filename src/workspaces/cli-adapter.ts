@@ -143,7 +143,8 @@ export interface CliAdapter {
      * prompt, exits at the turn boundary) via `composeHeadlessCommand`. The
      * launcher dispatches automation tasks through it — spawn → run → the agent
      * reports via `inbox_push` → exit, no human attached. The four agent CLIs
-     * set this; `shell` does not (no agent-turn concept).
+     * set this; `shell` also sets it and runs `what` as `sh -lc <script>` so
+     * script-only scheduled jobs skip the LLM entirely.
      */
     readonly headless?: boolean;
   };
@@ -192,8 +193,8 @@ export interface CliAdapter {
    *   pi:       line 1 is `{"type":"session","id":…}` (echoes --session-id)
    * The runner calls this per complete line until it returns non-null; the id
    * is recorded on the task so a finished headless run can be REOPENED as a
-   * normal interactive session (resume-by-id). Present iff
-   * `capabilities.headless` (shell excluded).
+   * normal interactive session (resume-by-id). Present for agent CLIs that
+   * announce a session id; shell headless has none.
    */
   extractHeadlessSessionId?(line: string): string | null;
 

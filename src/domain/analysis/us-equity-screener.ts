@@ -333,7 +333,9 @@ function riskFlags(m: BaseMetrics, opts: { requireTrend?: boolean } = {}): strin
   if (m.vol63 !== null && m.vol63 > 0.7) risks.push('high realized volatility')
   if (m.maxDd63 !== null && m.maxDd63 < -0.25) risks.push('deep recent drawdown')
   if (m.peRatio == null && m.roe == null && m.grossMargin == null) risks.push('missing fundamentals')
-  if (m.debtToEquity !== null && m.debtToEquity > 3) risks.push('high leverage')
+  // D/E > 3 is common for buybacks / financials / capital-light models; only
+  // flag extreme leverage so the Cross table isn't noise-dominated.
+  if (m.debtToEquity !== null && m.debtToEquity > 8) risks.push('high leverage')
   return risks
 }
 
