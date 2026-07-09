@@ -99,6 +99,8 @@ describe('readWorkspaceIssues', () => {
           'when: { kind: every, every: 30m }',
           'what: run the research routine',
           'agent: codex',
+          'requireArtifacts:',
+          '  - outputs/report-*.md',
         ].join('\n'),
         'Scan overnight movers and summarize.\n',
       ),
@@ -116,6 +118,7 @@ describe('readWorkspaceIssues', () => {
         assignee: 'ws:auto-quant',
         what: 'run the research routine',
         agent: 'codex',
+        requireArtifacts: ['outputs/report-*.md'],
       })
       expect(i.when).toEqual({ kind: 'every', every: '30m' })
       expect(i.body).toBe('Scan overnight movers and summarize.')

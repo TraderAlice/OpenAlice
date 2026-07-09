@@ -74,6 +74,10 @@ export const CLI_EXPORTS: Record<string, CliExport> = {
         // path-dependent backtest. The Retrospective / Time-Machine primitives.
         snapshot: 'marketSnapshot',
         simulate: 'simulate',
+        // US equity systematic screens (RS / factor / mean-reversion).
+        'rs-pool': 'usRelativeStrengthPool',
+        'factor-rank': 'usFactorRank',
+        'mean-rev-pool': 'usMeanReversionPool',
       },
       think: {
         calc: 'calculate',

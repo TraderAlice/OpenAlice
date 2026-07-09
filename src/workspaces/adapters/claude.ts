@@ -92,9 +92,14 @@ export const claudeAdapter: CliAdapter = {
   // run's identity is captured from line 1 instead of parsed out of a final
   // result blob (verified 2.1.x, 2026-06-11).
   composeHeadlessCommand(base: readonly string[], _ctx: SpawnContext, prompt: string): readonly string[] {
+    // Unattended runs have no human to approve tool calls. Force bypass so a
+    // scheduled issue can actually run `alice*` / write outputs without hanging
+    // on permission prompts (and without depending on settings.local.json,
+    // which writeAiConfig may rewrite when injecting API keys).
     return [
       ...base,
       '--settings', AUTOTRUST_SETTINGS,
+      '--permission-mode', 'bypassPermissions',
       '-p', '--output-format', 'stream-json', '--verbose',
       '--', prompt,
     ];

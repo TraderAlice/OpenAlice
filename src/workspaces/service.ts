@@ -42,6 +42,7 @@ import {
   type AgentRuntimeReadinessSnapshot,
   type AgentRuntimeReadinessSource,
 } from './agent-runtime-readiness.js';
+import { verifyIssueArtifacts } from './issues/require-artifacts.js';
 import { ScheduleMarkerStore } from './schedule/marker-store.js';
 import { ScheduleScanner, DEFAULT_INTERVAL_MS } from './schedule/scanner.js';
 import {
@@ -65,7 +66,7 @@ import {
 } from './issues/board.js';
 import { completeOneShotIssueAfterRun } from './issues/auto-complete.js';
 import type { IInboxStore } from '@/core/inbox-store.js';
-import { HeadlessTaskRegistry, headlessLogPaths } from './headless-task-registry.js';
+import { HeadlessTaskRegistry, headlessLogPaths, type HeadlessTaskStatus } from './headless-task-registry.js';
 import {
   compatibleCredentials,
   credentialToWorkspaceAiCred,
@@ -798,10 +799,10 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       startedAt: Date.now(),
       ...(issueId ? { issueId } : {}),
     });
-    // Fire-and-forget: run to natural exit, then fill the record. NOTE: status
-    // is judged by exit code — pi can exit 0 on an in-band model error, so
-    // "done" means "process exited cleanly", not "the agent succeeded"; the
-    // operator confirms via the Inbox / the task's tail.
+    // Fire-and-forget: run to natural exit, then fill the record. Exit code is
+    // the baseline (pi/claude can exit 0 on in-band failure); when the firing
+    // issue declares `requireArtifacts`, we additionally require fresh matching
+    // files or mark the task failed.
     void runHeadlessTaskMethod(ws, adapter, prompt, timeoutMs, {
       taskId: rec.taskId,
       onSessionId: (id) =>
@@ -812,7 +813,27 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           ),
     })
       .then(async (r) => {
-        const status = r.killed ? 'failed' : r.exitCode === 0 ? 'done' : 'failed';
+        let status: HeadlessTaskStatus = r.killed ? 'failed' : r.exitCode === 0 ? 'done' : 'failed';
+        let error: string | undefined;
+        // Exit 0 ≠ success when the issue declares requireArtifacts — catch the
+        // "agent politely reported failure then exited cleanly" false positive.
+        if (status === 'done' && issueId) {
+          const gate = await verifyIssueArtifacts({
+            wsDir: ws.dir,
+            issueId,
+            sinceMs: rec.startedAt,
+          });
+          if (!gate.ok) {
+            status = 'failed';
+            error = gate.error;
+            launcherLogger.warn('headless.artifact_gate_failed', {
+              wsId: ws.id,
+              issueId,
+              taskId: rec.taskId,
+              missing: gate.missing,
+            });
+          }
+        }
         await headlessTasks.complete(rec.taskId, {
           status,
           finishedAt: Date.now(),
@@ -820,6 +841,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           exitCode: r.exitCode,
           signal: r.signal,
           killed: r.killed,
+          ...(error ? { error } : {}),
         });
         // Scheduled one-shot issues are the only board items whose lifecycle can
         // be closed mechanically from a run exit. Repeating schedules keep their

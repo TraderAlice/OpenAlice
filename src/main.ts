@@ -36,6 +36,7 @@ import { createVendorTools } from './tool/market-vendors.js'
 import { createQuantTools } from './tool/quant.js'
 import { createSnapshotTools } from './tool/snapshot.js'
 import { createSimulateTools } from './tool/simulate.js'
+import { createUsEquityScreenerTools } from './tool/us-equity-screener.js'
 import { createBarService } from './domain/market-data/bars/index.js'
 import { createReferenceData } from './domain/market-data/reference/service.js'
 import { createSectorRotationTools } from './tool/sector-rotation.js'
@@ -266,6 +267,7 @@ async function main() {
   toolCenter.register(createQuantTools({ barService }), 'quant')
   toolCenter.register(createSnapshotTools(barService), 'snapshot')
   toolCenter.register(createSimulateTools(barService), 'simulate')
+  toolCenter.register(createUsEquityScreenerTools(equityClient, barService, indexClient), 'us-screener')
   toolCenter.register(createSectorRotationTools(equityClient, config.marketData.hub), 'sector-rotation')
   if (derivativesClient) {
     toolCenter.register(createDerivativesTools(derivativesClient), 'derivatives')

@@ -90,6 +90,15 @@ function coerceIfNumber(schema: z.ZodType): z.ZodType {
     return coerced.optional()
   }
 
+  // z.number().default(N) / z.number().optional().default(N) — unwrap and
+  // re-wrap so CLI string flags ("50") still coerce. Without this, screener
+  // verbs like `alice analysis rs-pool --limit 50` fail validation.
+  if (def.type === 'default' && def.innerType) {
+    const inner = coerceIfNumber(def.innerType as z.ZodType)
+    if (inner === def.innerType) return schema
+    return (inner as any).default(def.defaultValue)
+  }
+
   return schema
 }
 

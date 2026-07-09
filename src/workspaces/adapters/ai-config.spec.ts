@@ -300,6 +300,8 @@ describe('composeHeadlessCommand (one-shot headless argv, prompt placed per-CLI)
       'claude',
       '--settings',
       '{"enableAllProjectMcpServers":true}',
+      '--permission-mode',
+      'bypassPermissions',
       '-p',
       '--output-format',
       'stream-json',

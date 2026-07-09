@@ -24,6 +24,7 @@
  *   when: { kind: at, at } | { kind: every, every } | { kind: cron, cron }  (OPTIONAL — present iff scheduled)
  *   what: <optional fire prompt; if absent, the fire prompt falls back to title+body>
  *   agent: <optional adapter id for the scheduled run>
+ *   requireArtifacts: [<workspace-relative globs>]  (OPTIONAL — post-run success gate)
  *   ---
  *   <markdown description body>
  *
@@ -88,6 +89,12 @@ export const issueFrontmatterSchema = z.object({
   what: z.string().min(1).optional(),
   /** Which agent runtime to run the scheduled fire with; omitted uses the issue default / workspace default / first runtime. */
   agent: z.string().min(1).optional(),
+  /**
+   * Optional post-run gate: workspace-relative globs (one `*` in the basename)
+   * that must exist and be fresh after a headless fire. Prevents "exit 0 but
+   * nothing was produced" false successes on scheduled issues.
+   */
+  requireArtifacts: z.array(z.string().min(1)).max(20).optional(),
 })
 export type IssueFrontmatter = z.infer<typeof issueFrontmatterSchema>
 
