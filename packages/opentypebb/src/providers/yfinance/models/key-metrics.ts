@@ -127,6 +127,12 @@ export class YFinanceKeyMetricsFetcher extends Fetcher {
       if (typeof aliased.dividend_yield_5y_avg === 'number') {
         aliased.dividend_yield_5y_avg = aliased.dividend_yield_5y_avg / 100
       }
+      // Yahoo's financialData.debtToEquity is percent-scale (79.5 ≈ 0.795×),
+      // while FMP / OpenBB consumers expect a true ratio. Divide here so
+      // downstream screens don't flag every large-cap as "high leverage".
+      if (typeof aliased.debt_to_equity === 'number') {
+        aliased.debt_to_equity = aliased.debt_to_equity / 100
+      }
       return YFinanceKeyMetricsDataSchema.parse(aliased)
     })
   }

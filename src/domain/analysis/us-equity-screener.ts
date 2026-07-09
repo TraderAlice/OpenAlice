@@ -333,9 +333,9 @@ function riskFlags(m: BaseMetrics, opts: { requireTrend?: boolean } = {}): strin
   if (m.vol63 !== null && m.vol63 > 0.7) risks.push('high realized volatility')
   if (m.maxDd63 !== null && m.maxDd63 < -0.25) risks.push('deep recent drawdown')
   if (m.peRatio == null && m.roe == null && m.grossMargin == null) risks.push('missing fundamentals')
-  // D/E > 3 is common for buybacks / financials / capital-light models; only
-  // flag extreme leverage so the Cross table isn't noise-dominated.
-  if (m.debtToEquity !== null && m.debtToEquity > 8) risks.push('high leverage')
+  // After provider normalization, D/E is a true ratio (e.g. AAPL ~0.8, GS ~6.8).
+  // Flag only clearly elevated leverage; banks/financials often sit above 3.
+  if (m.debtToEquity !== null && m.debtToEquity > 4) risks.push('high leverage')
   return risks
 }
 

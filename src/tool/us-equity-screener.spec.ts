@@ -40,19 +40,19 @@ const equityClient = {
   getKeyMetrics: vi.fn(async ({ symbol }: { symbol: string }) => [{
     symbol,
     market_cap: 100e9,
-    pe_ratio: symbol === 'QUAL' ? 20 : 30,
+    // Yahoo-shaped keys (price_to_earnings / gross_profit_margin) — the tool
+    // must accept these, not only FMP's pe_ratio / ratios endpoint.
+    price_to_earnings: symbol === 'QUAL' ? 20 : 30,
     price_to_book: 5,
-    enterprise_value_over_ebitda: 15,
-    roe: symbol === 'QUAL' ? 0.45 : 0.25,
-    roic: symbol === 'QUAL' ? 0.3 : 0.18,
+    ev_to_ebitda: 15,
+    return_on_equity: symbol === 'QUAL' ? 0.45 : 0.25,
+    return_on_invested_capital: symbol === 'QUAL' ? 0.3 : 0.18,
     debt_to_equity: 0.4,
-    free_cash_flow_yield: symbol === 'QUAL' ? 0.06 : 0.03,
-  }]),
-  getFinancialRatios: vi.fn(async ({ symbol }: { symbol: string }) => [{
-    symbol,
     gross_profit_margin: symbol === 'QUAL' ? 0.8 : 0.6,
     operating_profit_margin: symbol === 'QUAL' ? 0.35 : 0.25,
+    free_cash_flow_yield: symbol === 'QUAL' ? 0.06 : 0.03,
   }]),
+  getFinancialRatios: vi.fn(async () => []),
 } as unknown as EquityClientLike
 
 const indexClient = {
@@ -97,6 +97,48 @@ describe('US equity screener tools', () => {
     const result = await tools.usMeanReversionPool.execute!({ universe: 'sp500_nasdaq100', limit: 3 }, ctx) as { marketHealth: { enabled: boolean }; top: Array<{ symbol: string }> }
     expect(result.marketHealth.enabled).toBe(true)
     expect(result.top[0].symbol).toBe('PULL')
+  })
+
+  it('normalizeDebtToEquity converts Yahoo percent-scale values', async () => {
+    const { normalizeDebtToEquity } = await import('./us-equity-screener.js')
+    expect(normalizeDebtToEquity(79.548)).toBeCloseTo(0.79548)
+    expect(normalizeDebtToEquity(0.8)).toBeCloseTo(0.8)
+    expect(normalizeDebtToEquity(null)).toBeNull()
+  })
+
+  it('reads Yahoo-shaped key-metrics fields (price_to_earnings / gross_profit_margin)', async () => {
+    const tools = createUsEquityScreenerTools(equityClient, barService, indexClient)
+    const result = await tools.usFactorRank.execute!({ universe: 'sp500_nasdaq100', limit: 3 }, ctx) as {
+      top: Array<{ symbol: string; metrics: Record<string, number | null>; risks: string[] }>
+    }
+    const lead = result.top.find((r) => r.symbol === 'LEAD')
+    expect(lead?.metrics.pe_ratio).toBe(30)
+    expect(lead?.metrics.gross_margin).toBe(0.6)
+    expect(lead?.risks ?? []).not.toContain('missing fundamentals')
+  })
+
+  it('falls back to index constituent names when profile name is missing', async () => {
+    const thinEquity = {
+      ...equityClient,
+      getProfile: vi.fn(async ({ symbol }: { symbol: string }) => [{ symbol, sector: 'Energy' }]),
+      getKeyMetrics: vi.fn(async () => [{ symbol: 'TRGP', debt_to_equity: 58.5 }]),
+      getFinancialRatios: vi.fn(async () => []),
+    } as unknown as EquityClientLike
+    const namedIndex = {
+      getConstituents: vi.fn(async () => [
+        { symbol: 'LEAD', name: 'Leader' },
+        { symbol: 'QUAL', name: 'Quality' },
+        { symbol: 'PULL', name: 'Pullback' },
+      ]),
+    } as unknown as IndexClientLike
+    const tools = createUsEquityScreenerTools(thinEquity, barService, namedIndex)
+    const result = await tools.usRelativeStrengthPool.execute!({ universe: 'sp500_nasdaq100', limit: 3 }, ctx) as {
+      top: Array<{ symbol: string; name: string | null; metrics: Record<string, number | null>; risks: string[] }>
+    }
+    expect(result.top.every((r) => typeof r.name === 'string' && r.name.length > 0)).toBe(true)
+    const lead = result.top.find((r) => r.symbol === 'LEAD')
+    expect(lead?.metrics.debt_to_equity).toBeCloseTo(0.585)
+    expect(lead?.risks ?? []).not.toContain('high leverage')
   })
 })
 

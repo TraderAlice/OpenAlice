@@ -79,6 +79,18 @@ function firstString(row: Record<string, unknown> | undefined, keys: string[]): 
   return null
 }
 
+/**
+ * Normalize debt/equity to a true ratio.
+ * Yahoo historically returns percent-scale (79.5 ≈ 0.795×); FMP returns ratios.
+ * Values above 20 are almost never genuine non-financial ratios and are treated
+ * as percent-scale even if a provider forgot to normalize.
+ */
+export function normalizeDebtToEquity(value: number | null): number | null {
+  if (value === null) return null
+  if (!Number.isFinite(value)) return null
+  return value > 20 ? value / 100 : value
+}
+
 async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
   const out: R[] = []
   let next = 0
@@ -92,7 +104,10 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promis
   return out
 }
 
-async function getIndexSymbols(indexClient: IndexClientLike | undefined, symbol: string): Promise<string[]> {
+async function getIndexConstituents(
+  indexClient: IndexClientLike | undefined,
+  symbol: string,
+): Promise<Array<{ symbol: string; name: string | null }>> {
   if (!indexClient) return []
   const tries = symbol === 'sp500'
     ? ['sp500', 'sp500_constituent', 'SPY', '^GSPC']
@@ -100,8 +115,17 @@ async function getIndexSymbols(indexClient: IndexClientLike | undefined, symbol:
   for (const s of tries) {
     try {
       const rows = await indexClient.getConstituents({ symbol: s, provider: 'fmp' })
-      const symbols = rows.map((r) => r.symbol).filter((x): x is string => typeof x === 'string')
-      if (symbols.length > 0) return uniq(symbols)
+      const out = rows
+        .map((r) => {
+          const sym = typeof r.symbol === 'string' ? r.symbol.trim().toUpperCase() : ''
+          if (!sym) return null
+          const name = typeof (r as { name?: unknown }).name === 'string'
+            ? ((r as { name: string }).name.trim() || null)
+            : null
+          return { symbol: sym, name }
+        })
+        .filter((x): x is { symbol: string; name: string | null } => x !== null)
+      if (out.length > 0) return out
     } catch {
       /* try next alias */
     }
@@ -113,22 +137,26 @@ async function resolveUniverse(
   universe: UsEquityUniverse,
   customSymbols: string[] | undefined,
   indexClient: IndexClientLike | undefined,
-): Promise<{ symbols: string[]; source: string }> {
+): Promise<{ symbols: string[]; source: string; names: Map<string, string> }> {
+  const names = new Map<string, string>()
   if (universe === 'custom') {
     const symbols = uniq(customSymbols ?? [])
-    return { symbols, source: 'custom' }
+    return { symbols, source: 'custom', names }
   }
 
   const [sp500, nasdaq100] = await Promise.all([
-    universe === 'nasdaq100' ? Promise.resolve([]) : getIndexSymbols(indexClient, 'sp500'),
-    universe === 'sp500' ? Promise.resolve([]) : getIndexSymbols(indexClient, 'nasdaq100'),
+    universe === 'nasdaq100' ? Promise.resolve([]) : getIndexConstituents(indexClient, 'sp500'),
+    universe === 'sp500' ? Promise.resolve([]) : getIndexConstituents(indexClient, 'nasdaq100'),
   ])
-  const fetched = uniq([...sp500, ...nasdaq100])
-  if (fetched.length > 0) return { symbols: fetched, source: 'index-constituents' }
+  for (const row of [...sp500, ...nasdaq100]) {
+    if (row.name && !names.has(row.symbol)) names.set(row.symbol, row.name)
+  }
+  const fetched = uniq([...sp500, ...nasdaq100].map((r) => r.symbol))
+  if (fetched.length > 0) return { symbols: fetched, source: 'index-constituents', names }
 
-  if (universe === 'nasdaq100') return { symbols: uniq(NASDAQ100_SEED), source: 'static-nasdaq100-seed' }
-  if (universe === 'sp500') return { symbols: uniq(CORE_US_GROWTH_AND_QUALITY), source: 'static-largecap-seed' }
-  return { symbols: uniq([...CORE_US_GROWTH_AND_QUALITY, ...NASDAQ100_SEED]), source: 'static-sp500-nasdaq100-seed' }
+  if (universe === 'nasdaq100') return { symbols: uniq(NASDAQ100_SEED), source: 'static-nasdaq100-seed', names }
+  if (universe === 'sp500') return { symbols: uniq(CORE_US_GROWTH_AND_QUALITY), source: 'static-largecap-seed', names }
+  return { symbols: uniq([...CORE_US_GROWTH_AND_QUALITY, ...NASDAQ100_SEED]), source: 'static-sp500-nasdaq100-seed', names }
 }
 
 async function fetchHistory(barService: BarService, symbol: string): Promise<OhlcvBar[]> {
@@ -154,7 +182,12 @@ async function fetchFundamentals(equityClient: EquityClientLike, symbol: string)
   const r = ratios[0] as Record<string, unknown> | undefined
 
   const marketCap = firstNumber(m, ['market_cap', 'marketCap']) ?? firstNumber(p, ['market_cap', 'marketCap'])
-  const peRatio = firstNumber(m, ['pe_ratio', 'peRatio']) ?? firstNumber(r, ['price_earnings_ratio', 'pe_ratio', 'peRatio'])
+  // Yahoo key-metrics uses price_to_earnings / gross_profit_margin; FMP ratios
+  // use pe_ratio / gross_profit_margin. Accept both so a missing FMP key doesn't
+  // blank out every PE/margin and trip "missing fundamentals".
+  const peRatio =
+    firstNumber(m, ['price_to_earnings', 'pe_ratio', 'peRatio', 'forward_pe']) ??
+    firstNumber(r, ['price_earnings_ratio', 'pe_ratio', 'peRatio', 'price_to_earnings'])
   const fcfYield =
     firstNumber(m, ['free_cash_flow_yield', 'fcf_yield', 'freeCashFlowYield']) ??
     firstNumber(r, ['free_cash_flow_yield', 'fcf_yield', 'freeCashFlowYield'])
@@ -165,15 +198,30 @@ async function fetchFundamentals(equityClient: EquityClientLike, symbol: string)
     sector: firstString(p, ['sector']),
     marketCap,
     peRatio,
-    priceToBook: firstNumber(m, ['pb_ratio', 'price_to_book', 'priceToBook']) ?? firstNumber(r, ['price_to_book_ratio', 'price_to_book']),
-    evToEbitda: firstNumber(m, ['enterprise_value_over_ebitda', 'ev_to_ebitda', 'evToEbitda']) ?? firstNumber(r, ['enterprise_value_over_ebitda']),
-    roe: firstNumber(m, ['roe', 'return_on_equity']) ?? firstNumber(r, ['return_on_equity', 'roe']),
-    roic: firstNumber(m, ['roic', 'return_on_invested_capital']) ?? firstNumber(r, ['return_on_invested_capital', 'roic']),
-    grossMargin: firstNumber(r, ['gross_profit_margin', 'gross_margin']) ?? firstNumber(m, ['gross_margin']),
-    operatingMargin: firstNumber(r, ['operating_profit_margin', 'operating_margin']) ?? firstNumber(m, ['operating_margin']),
-    debtToEquity: firstNumber(r, ['debt_to_equity', 'debt_equity_ratio']) ?? firstNumber(m, ['debt_to_equity']),
-    revenueGrowth: firstNumber(m, ['revenue_growth', 'revenueGrowth']) ?? firstNumber(r, ['revenue_growth']),
-    epsGrowth: firstNumber(m, ['eps_growth', 'epsGrowth']) ?? firstNumber(r, ['eps_growth']),
+    priceToBook:
+      firstNumber(m, ['price_to_book', 'pb_ratio', 'priceToBook']) ??
+      firstNumber(r, ['price_to_book_ratio', 'price_to_book']),
+    evToEbitda:
+      firstNumber(m, ['ev_to_ebitda', 'enterprise_value_over_ebitda', 'evToEbitda']) ??
+      firstNumber(r, ['enterprise_value_over_ebitda', 'ev_to_ebitda']),
+    roe: firstNumber(m, ['return_on_equity', 'roe']) ?? firstNumber(r, ['return_on_equity', 'roe']),
+    roic:
+      firstNumber(m, ['return_on_invested_capital', 'roic']) ??
+      firstNumber(r, ['return_on_invested_capital', 'roic']),
+    grossMargin:
+      firstNumber(m, ['gross_profit_margin', 'gross_margin']) ??
+      firstNumber(r, ['gross_profit_margin', 'gross_margin']),
+    operatingMargin:
+      firstNumber(m, ['operating_profit_margin', 'operating_margin']) ??
+      firstNumber(r, ['operating_profit_margin', 'operating_margin']),
+    debtToEquity: normalizeDebtToEquity(
+      firstNumber(r, ['debt_to_equity', 'debt_equity_ratio']) ?? firstNumber(m, ['debt_to_equity']),
+    ),
+    revenueGrowth:
+      firstNumber(m, ['revenue_growth', 'revenueGrowth']) ?? firstNumber(r, ['revenue_growth']),
+    epsGrowth:
+      firstNumber(m, ['earnings_growth', 'eps_growth', 'epsGrowth']) ??
+      firstNumber(r, ['eps_growth', 'earnings_growth']),
     freeCashFlowYield: fcfYield,
   }
 }
@@ -191,14 +239,27 @@ async function buildDatasets(
   const fundamentals = await mapLimit(withBars, FUNDAMENTAL_CONCURRENCY, async ({ symbol }) => [symbol, await fetchFundamentals(deps.equityClient, symbol)] as const)
   const fMap = new Map(fundamentals)
 
-  const datasets = histories.map((h) => ({
-    symbol: h.symbol,
-    name: fMap.get(h.symbol)?.name ?? null,
-    history: h.history,
-    fundamentals: fMap.get(h.symbol),
-  }))
+  const datasets = histories.map((h) => {
+    const f = fMap.get(h.symbol)
+    const name = f?.name ?? resolved.names.get(h.symbol) ?? null
+    return {
+      symbol: h.symbol,
+      name,
+      history: h.history,
+      fundamentals: f
+        ? { ...f, name: f.name ?? name }
+        : name
+          ? { symbol: h.symbol, name }
+          : undefined,
+    }
+  })
 
   const [spy, qqq] = await Promise.all([fetchHistory(deps.barService, 'SPY'), fetchHistory(deps.barService, 'QQQ')])
+  if (spy.length < 127) {
+    console.warn(
+      `[us-screener] SPY history too short for 6M relative strength (${spy.length} bars); RS vs SPY will be n/a`,
+    )
+  }
   return {
     datasets,
     benchmarks: { SPY: spy, QQQ: qqq },
