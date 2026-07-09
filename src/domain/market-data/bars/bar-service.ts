@@ -13,6 +13,7 @@
  */
 
 import type { BarParams, BarInterval, Bar } from '@traderalice/uta-protocol'
+import { TRADINGVIEW_BAR_CAPABILITY, TRADINGVIEW_PROVIDER_ID } from '@traderalice/opentypebb'
 import { aggregateSymbolSearch, type AssetClass } from '../aggregate-search.js'
 import type {
   BarService,
@@ -44,7 +45,7 @@ const VENDOR_CAPABILITY: Record<string, BarCapability> = {
   // commonly delayed unless the account has exchange entitlements. At provider
   // granularity, "delayed" is the honest conservative label; the provider docs
   // carry the Cboe/partial-volume caveat.
-  tradingview: 'delayed',
+  [TRADINGVIEW_PROVIDER_ID]: TRADINGVIEW_BAR_CAPABILITY,
 }
 
 /** Safe VENDOR_CAPABILITY lookup with fallback. */
@@ -209,7 +210,7 @@ export function createBarService(deps: BarServiceDeps): BarService {
     const end_date = opts.end
     // TradingView consumes count server-side; do not send it to every provider
     // because several OpenTypeBB fetchers map params directly to vendor APIs.
-    const tvCountParam = provider === 'tradingview' && opts.count != null ? { count: opts.count } : {}
+    const tvCountParam = provider === TRADINGVIEW_PROVIDER_ID && opts.count != null ? { count: opts.count } : {}
     const p = (extra?: Record<string, unknown>) => ({
       symbol,
       start_date,

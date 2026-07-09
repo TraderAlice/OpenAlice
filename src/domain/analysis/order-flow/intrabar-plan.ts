@@ -1,3 +1,4 @@
+import { supportsTradingViewInternalIntrabar } from '@traderalice/opentypebb'
 import { parseBarId } from '@/domain/market-data/bars/index'
 import { intervalToMinutes } from './interval-time.js'
 
@@ -24,10 +25,6 @@ export interface IntrabarPlan {
   degradationReason?: string
 }
 
-function isTradingViewBarId(barId: string): boolean {
-  return parseBarId(barId)?.sourceId === 'tradingview'
-}
-
 function candidatesFor(targetInterval: string, barId: string): string[] {
   const targetMinutes = intervalToMinutes(targetInterval)
   const candidates = INTRABAR_CANDIDATES[targetInterval]
@@ -42,8 +39,8 @@ function candidatesFor(targetInterval: string, barId: string): string[] {
             : targetMinutes <= 1440
               ? ['3m', '5m', '15m', '1h']
               : ['1h', '4h', '1d'])
-  if (isTradingViewBarId(barId)) return candidates
-  return candidates.filter((interval) => interval !== '3m')
+  const sourceId = parseBarId(barId)?.sourceId ?? ''
+  return candidates.filter((interval) => interval !== '3m' || supportsTradingViewInternalIntrabar(sourceId, interval))
 }
 
 function intrabarsPerParent(parentInterval: string, intrabarInterval: string): number {

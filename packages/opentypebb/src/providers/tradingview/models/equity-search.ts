@@ -5,7 +5,7 @@
 import { z } from 'zod'
 import { Fetcher } from '../../../core/provider/abstract/fetcher.js'
 import { EquitySearchDataSchema, EquitySearchQueryParamsSchema } from '../../../standard-models/equity-search.js'
-import { baseSymbolAlias, fullSymbol, searchTradingViewSymbols } from '../utils/search.js'
+import { mapTradingViewSearchRows, searchTradingViewSymbols } from '../domain.js'
 
 export const TradingViewEquitySearchQueryParamsSchema = EquitySearchQueryParamsSchema
 export type TradingViewEquitySearchQueryParams = z.infer<typeof TradingViewEquitySearchQueryParamsSchema>
@@ -28,20 +28,7 @@ export class TradingViewEquitySearchFetcher extends Fetcher {
     _query: TradingViewEquitySearchQueryParams,
     rows: Record<string, unknown>[],
   ) {
-    return rows
-      .map((row) => ({
-        symbol: fullSymbol(row),
-        name: row['description'] ?? null,
-        aliases: baseSymbolAlias(row),
-        exchange: row['exchange'] ?? null,
-        listed_exchange: row['source_id'] ?? row['exchange'] ?? null,
-        provider_id: row['provider_id'] ?? null,
-        country: row['country'] ?? null,
-        type: row['type'] ?? null,
-        coverage: 'tradingview_global',
-        volume_quality: 'exchange_dependent',
-      }))
-      .filter((row) => row.symbol)
+    return mapTradingViewSearchRows(rows, 'equity')
       .map((row) => EquitySearchDataSchema.parse(row))
   }
 }

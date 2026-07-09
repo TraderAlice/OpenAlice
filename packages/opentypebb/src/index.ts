@@ -54,3 +54,8 @@ export { intrinioProvider } from './providers/intrinio/index.js'
 export { eastmoneyProvider } from './providers/eastmoney/index.js'
 export { twseProvider } from './providers/twse/index.js'
 export { tradingviewProvider } from './providers/tradingview/index.js'
+export {
+  TRADINGVIEW_BAR_CAPABILITY,
+  TRADINGVIEW_PROVIDER_ID,
+  supportsTradingViewInternalIntrabar,
+} from './providers/tradingview/domain.js'

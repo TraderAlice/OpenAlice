@@ -5,7 +5,7 @@
 import { z } from 'zod'
 import { Fetcher } from '../../../core/provider/abstract/fetcher.js'
 import { CurrencyPairsDataSchema, CurrencyPairsQueryParamsSchema } from '../../../standard-models/currency-pairs.js'
-import { baseSymbolAlias, fullSymbol, searchTradingViewSymbols } from '../utils/search.js'
+import { mapTradingViewSearchRows, searchTradingViewSymbols } from '../domain.js'
 
 export const TradingViewCurrencySearchQueryParamsSchema = CurrencyPairsQueryParamsSchema
 export type TradingViewCurrencySearchQueryParams = z.infer<typeof TradingViewCurrencySearchQueryParamsSchema>
@@ -28,17 +28,7 @@ export class TradingViewCurrencySearchFetcher extends Fetcher {
     _query: TradingViewCurrencySearchQueryParams,
     rows: Record<string, unknown>[],
   ) {
-    return rows
-      .map((row) => ({
-        symbol: fullSymbol(row),
-        name: row['description'] ?? null,
-        aliases: baseSymbolAlias(row),
-        exchange: row['exchange'] ?? null,
-        listed_exchange: row['source_id'] ?? row['exchange'] ?? null,
-        provider_id: row['provider_id'] ?? null,
-        type: row['type'] ?? null,
-      }))
-      .filter((row) => row.symbol)
+    return mapTradingViewSearchRows(rows, 'currency')
       .map((row) => CurrencyPairsDataSchema.parse(row))
   }
 }
