@@ -1,6 +1,4 @@
-import { calculateDeltaVolume } from '@/domain/analysis/order-flow/delta-volume.js'
-import { confidenceForCoverage } from '@/domain/analysis/order-flow/intrabar-plan.js'
-import { loadIntrabarWindow } from '@/domain/analysis/order-flow/intrabar-window.js'
+import { analyzeOrderFlowContext } from '@/domain/analysis/order-flow/context.js'
 import { parseBarId, type BarService, type BarSourceRef } from '@/domain/market-data/bars/index.js'
 import type { OhlcvBar } from '@/domain/market-data/bars/types.js'
 import type { PriceActionVolumeConfirmationInput } from './types.js'
@@ -58,40 +56,47 @@ export async function buildPriceActionVolumeConfirmations(params: {
   }
 
   try {
-    const window = await loadIntrabarWindow({
-      barService,
-      ref,
+    const analysis = await analyzeOrderFlowContext(barService, {
       barId,
-      targetInterval: interval,
-      requestedCount: bars.length,
+      assetClass: 'assetClass' in ref ? ref.assetClass : undefined,
+      interval,
+      count: bars.length,
+      mode: 'delta',
       targetBars: bars,
     })
 
-    if (window.status === 'no_intrabars') {
+    if (analysis.status === 'no_intrabars') {
       return {
         meta: {
           volumeConfirmation: 'unavailable',
-          volumeConfirmationReason: `No intrabar data (${window.plan.intrabarInterval}) returned for the target window`,
-          volumeConfirmationIntrabarInterval: window.plan.intrabarInterval,
+          volumeConfirmationReason: analysis.error,
+          volumeConfirmationIntrabarInterval: analysis.meta.intrabarInterval,
           volumeConfirmationIntrabarCount: 0,
         },
       }
     }
 
-    const delta = calculateDeltaVolume({
-      targetBars: window.targetBars,
-      intrabars: window.intrabars,
-      targetInterval: interval,
-    })
+    if (analysis.status !== 'ok' || !analysis.delta) {
+      return {
+        meta: {
+          volumeConfirmation: 'unavailable',
+          volumeConfirmationReason: analysis.error ?? 'Order-flow delta analysis unavailable',
+          volumeConfirmationIntrabarInterval: analysis.meta.intrabarInterval,
+          volumeConfirmationIntrabarCount: analysis.meta.intrabarCount,
+        },
+      }
+    }
+
     const confirmations = new Map<number, PriceActionVolumeConfirmationInput>()
-    for (let i = 0; i < window.targetBars.length; i++) {
-      confirmations.set(window.targetIndexOffset + i, {
-        delta: delta.deltas[i],
-        deltaRatio: delta.deltaRatios[i],
-        coverage: delta.coverage[i],
-        confidence: confidenceForCoverage(delta.coverage[i]),
-        intrabarInterval: window.plan.intrabarInterval,
-        intrabarCount: window.intrabars.length,
+    for (let i = 0; i < analysis.delta.bars.length; i++) {
+      const bar = analysis.delta.bars[i]
+      confirmations.set(analysis.meta.targetIndexOffset + i, {
+        delta: bar.delta,
+        deltaRatio: bar.deltaRatio,
+        coverage: bar.coverage,
+        confidence: bar.confidence,
+        intrabarInterval: analysis.meta.intrabarInterval,
+        intrabarCount: analysis.meta.intrabarCount,
       })
     }
 
@@ -99,11 +104,11 @@ export async function buildPriceActionVolumeConfirmations(params: {
       confirmations,
       meta: {
         volumeConfirmation: 'available',
-        volumeConfirmationCoverageBars: window.targetBars.length,
-        volumeConfirmationLowConfidenceBars: delta.lowConfidenceIndices.length,
-        volumeConfirmationIntrabarInterval: window.plan.intrabarInterval,
-        volumeConfirmationIntrabarCount: window.intrabars.length,
-        volumeConfirmationReason: window.plan.degradationReason,
+        volumeConfirmationCoverageBars: analysis.delta.bars.length,
+        volumeConfirmationLowConfidenceBars: analysis.meta.lowConfidenceBars,
+        volumeConfirmationIntrabarInterval: analysis.meta.intrabarInterval,
+        volumeConfirmationIntrabarCount: analysis.meta.intrabarCount,
+        volumeConfirmationReason: analysis.meta.degradationReason as string | undefined,
       },
     }
   } catch (err) {
