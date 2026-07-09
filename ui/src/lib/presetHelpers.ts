@@ -97,6 +97,7 @@ export const VENDOR_BY_PRESET: Record<string, string> = {
   kimi: 'kimi',
   deepseek: 'deepseek',
   longcat: 'longcat',
+  xai: 'xai',
   custom: 'custom',
 }
 
@@ -114,6 +115,7 @@ const VENDOR_BY_BASEURL: Array<[RegExp, string]> = [
   [/moonshot\.cn|moonshot\.ai/i, 'kimi'],
   [/deepseek\.com/i, 'deepseek'],
   [/longcat\.chat/i, 'longcat'],
+  [/api\.x\.ai/i, 'xai'],
 ]
 
 /**

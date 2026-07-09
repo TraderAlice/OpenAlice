@@ -18,6 +18,7 @@ const VENDORS_BY_BASEURL: Array<[RegExp, CredentialVendor]> = [
   [/moonshot\.cn|moonshot\.ai/i, 'kimi'],
   [/deepseek\.com/i, 'deepseek'],
   [/longcat\.chat/i, 'longcat'],
+  [/api\.x\.ai/i, 'xai'],
 ]
 
 /**

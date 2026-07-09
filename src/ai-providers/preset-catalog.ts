@@ -323,6 +323,31 @@ export const LONGCAT: PresetDef = {
   writeOnlyFields: ['apiKey'],
 }
 
+// ==================== Third-party: xAI (Grok) ====================
+
+export const XAI: PresetDef = {
+  id: 'xai',
+  label: 'xAI (Grok)',
+  description: 'Grok models via xAI\'s OpenAI-compatible API',
+  category: 'third-party',
+  defaultName: 'xAI (Grok)',
+  hint: 'Get your API key at console.x.ai. Single platform — no regional split.',
+  zodSchema: z.object({
+    backend: z.literal('vercel-ai-sdk'),
+    provider: z.literal('openai-compatible'),
+    baseUrl: z.string().default('https://api.x.ai/v1').describe('API endpoint'),
+    model: z.string().default('grok-4.5').describe('Model'),
+    apiKey: z.string().min(1).describe('xAI API key'),
+  }),
+  regions: [
+    { id: 'default', label: 'xAI (api.x.ai)', wires: { 'openai-chat': 'https://api.x.ai/v1' } },
+  ],
+  models: [
+    { id: 'grok-4.5', label: 'Grok 4.5' },
+  ],
+  writeOnlyFields: ['apiKey'],
+}
+
 // ==================== Custom ====================
 
 export const CUSTOM: PresetDef = {
@@ -356,6 +381,7 @@ export const PRESET_CATALOG: PresetDef[] = [
   KIMI,
   DEEPSEEK,
   LONGCAT,
+  XAI,
   GEMINI,
   CUSTOM,
 ]
@@ -378,4 +404,5 @@ export const DEFAULT_MODEL_BY_VENDOR: Record<string, string> = {
   kimi: 'kimi-k2.7-code',
   deepseek: 'deepseek-v4-pro',
   longcat: 'LongCat-2.0',
+  xai: 'grok-4.5',
 }
