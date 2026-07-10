@@ -7,12 +7,9 @@ import type { BarService } from '../domain/market-data/bars/index.js'
 import type { ReferenceDataService } from '../domain/market-data/reference/types.js'
 import type { Config, WebChannel } from './config.js'
 import type { TradingModePolicy } from '../services/trading-mode.js'
-import type { EventLog } from './event-log.js'
 import type { ToolCallLog } from './tool-call-log.js'
 import type { ToolCenter } from './tool-center.js'
 import type { WorkspaceToolCenter } from './workspace-tool-center.js'
-import type { ListenerRegistry } from './listener-registry.js'
-import type { EventBus } from './event-bus.js'
 import type { IInboxStore } from './inbox-store.js'
 import type { IEntityStore } from './entity-store.js'
 
@@ -35,23 +32,16 @@ export interface ReconnectResult {
 
 export interface EngineContext {
   config: Config
-  /** Workspace-anchored push surface (Linear-inbox style). Written by
-   *  workspace agents (via the inbox_push MCP tool) and by AgentWork's
-   *  autonomous trigger sources (cron / task), which append directly
-   *  under a synthetic `automation:<source>` workspace id. */
+  /** Workspace-anchored push surface. Written by workspace agents through
+   *  inbox_push and by headless issue runs when they report results. */
   inboxStore: IInboxStore
   /** Durable cross-workspace tracked-index (assets / topics). Written by
    *  workspace agents via the entity_upsert MCP tool; read by the Tracked
    *  tab. Notes point at entities with `[[name]]` links. */
   entityStore: IEntityStore
-  eventLog: EventLog
   toolCallLog: ToolCallLog
   toolCenter: ToolCenter
   workspaceToolCenter: WorkspaceToolCenter
-  listenerRegistry: ListenerRegistry
-  /** Ergonomic in-process producer facade. Use this to fire events from
-   *  plugins / hacks / extension code instead of plumbing eventLog. */
-  fire: EventBus
 
   // Market data
   bbEngine: QueryExecutor

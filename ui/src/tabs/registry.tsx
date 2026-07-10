@@ -150,8 +150,6 @@ const automationSectionTitle: Record<
 > = {
   runs: 'Runs',
   api: 'API',
-  flow: 'Flow',
-  webhook: 'Webhook',
 }
 
 const automationModule: ViewModule<'automation'> = {

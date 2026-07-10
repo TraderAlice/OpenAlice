@@ -1,7 +1,6 @@
 import { authHandlers } from './auth'
 import { tradingHandlers } from './trading'
 import { workspacesHandlers } from './workspaces'
-import { eventsHandlers } from './events'
 import { inboxHandlers } from './inbox'
 import { entitiesHandlers } from './entities'
 import { personaHeartbeatHandlers } from './personaHeartbeat'
@@ -25,7 +24,6 @@ export const handlers = [
   ...authHandlers,
   ...tradingHandlers,
   ...workspacesHandlers,
-  ...eventsHandlers,
   ...inboxHandlers,
   ...entitiesHandlers,
   ...personaHeartbeatHandlers,

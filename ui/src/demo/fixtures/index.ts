@@ -1,7 +1,6 @@
 export * from './auth'
 export * from './trading'
 export * from './workspaces'
-export * from './events'
 export * from './inbox'
 export * from './news'
 export * from './schedule'

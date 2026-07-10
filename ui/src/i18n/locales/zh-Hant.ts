@@ -481,9 +481,6 @@ export const zhHant: Resources = {
   automation: {
     runs: '運行',
     api: 'API',
-    legacy: '舊版',
-    flow: '流程',
-    webhook: 'Webhook',
   },
   news: {
     lookback1h: '1 小時',

@@ -473,9 +473,6 @@ export const zh: Resources = {
   automation: {
     runs: '运行',
     api: 'API',
-    legacy: '旧版',
-    flow: '流程',
-    webhook: 'Webhook',
   },
   news: {
     lookback1h: '1 小时',

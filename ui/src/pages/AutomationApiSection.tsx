@@ -2,8 +2,8 @@
  * Workspace automation — API reference (read-only docs). No interactive
  * try-it by design: triggering a run is a real side effect. Documents the two
  * ways an automation run starts (self-scheduled issue files + external POST)
- * and how a run reports back. Replaces the old event-bus webhook page's "how to
- * trigger from outside" role for the new workspace-automation system.
+ * and how a run reports back. This is the supported external execution surface;
+ * the retired event-bus webhook route is not part of the architecture.
  */
 
 const CODE = 'rounded bg-black/30 px-1 py-0.5 font-mono text-[12px] text-text/90'

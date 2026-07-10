@@ -25,7 +25,7 @@ export type ViewSpec =
   | { kind: 'issue';          params: Record<string, never> }
   | { kind: 'issue-detail';   params: { wsId: string; id: string } }
   | { kind: 'tracked-issue-detail'; params: { wsId: string; id: string } }
-  | { kind: 'automation';     params: { section: 'runs' | 'api' | 'flow' | 'webhook' } }
+  | { kind: 'automation';     params: { section: 'runs' | 'api' } }
   | { kind: 'news';           params: Record<string, never> }
   | { kind: 'market-list';    params: Record<string, never> }
   | { kind: 'market-rotation'; params: Record<string, never> }

@@ -135,7 +135,7 @@ Read the relevant guide before editing its subsystem:
   packaging, managed Pi, PortableGit/Bash, runtime profiles, and Workspace PATH.
 - [[docs/uta-live-testing.md]] — [UTA live testing](docs/uta-live-testing.md): broker/trading acceptance loops.
 - [[docs/workspace-issues-and-scheduling.md]] — [Workspace issues and scheduling](docs/workspace-issues-and-scheduling.md): Issue board, schedules, headless runs, and Inbox delivery.
-- [[docs/event-system.md]] — [Event-system retirement note](docs/event-system.md): legacy EventLog/Flow/webhook compatibility only.
+- [[docs/event-system.md]] — [Event-system retirement note](docs/event-system.md): removed Alice event-bus scheduler; UTA journal utility only.
 - [[docs/opentypebb-tutorial.md]] — [OpenTypeBB integration](docs/opentypebb-tutorial.md): market-data SDK and providers.
 - `src/migrations/INDEX.md` — generated migration inventory and affected paths.
 

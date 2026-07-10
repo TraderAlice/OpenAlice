@@ -473,9 +473,6 @@ export const ja: Resources = {
   automation: {
     runs: '実行',
     api: 'API',
-    legacy: 'レガシー',
-    flow: 'フロー',
-    webhook: 'Webhook',
   },
   news: {
     lookback1h: '1 時間',

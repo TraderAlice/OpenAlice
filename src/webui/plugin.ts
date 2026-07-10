@@ -5,14 +5,11 @@ import { serveStatic } from '@hono/node-server/serve-static'
 import { rm } from 'node:fs/promises'
 import { uiBundlePath } from '@/core/paths.js'
 import type { Plugin, EngineContext } from '../core/types.js'
-import type { ProducerHandle } from '../core/producer.js'
 import { SessionStore } from '../core/session.js'
 import { readWebSubchannels } from '../core/config.js'
 import { createMediaRoutes } from './routes/media.js'
 import { createChannelsRoutes, type SSEClient } from './routes/channels.js'
 import { createConfigRoutes, createMarketDataRoutes } from './routes/config.js'
-import { createEventsRoutes } from './routes/events.js'
-import { createTopologyRoutes } from './routes/topology.js'
 import { createScheduleRoutes } from './routes/schedule.js'
 import { createIssuesRoutes } from './routes/issues.js'
 import { createTradingProxyRoutes } from './routes/trading-proxy.js'
@@ -77,7 +74,6 @@ export class WebPlugin implements Plugin {
   private server: ReturnType<typeof serve> | null = null
   /** SSE clients grouped by channel ID. Default channel: 'default'. */
   private sseByChannel = new Map<string, Map<string, SSEClient>>()
-  private ingestProducer?: ProducerHandle<readonly ['agent.work.requested']>
   private workspaceService: WorkspaceService | null = null
   private workspacesWs: AttachedWS | null = null
   private workspacesIpc: AttachedWorkspaceIpc | null = null
@@ -204,18 +200,6 @@ export class WebPlugin implements Plugin {
       disabled: authDisabled,
     }))
 
-    // ==================== Producers ====================
-    // Chat message.received/sent events go through ConnectorCenter's shared
-    // `connectors` producer — see `ctx.connectorCenter.emitMessage*`.
-    //
-    // webhook-ingest: POST /api/events/ingest — enumerates its concrete emits so
-    // each external type shows up on the Flow graph as a real injection edge.
-    // Extend this tuple when adding new `external: true` event types.
-    this.ingestProducer = ctx.listenerRegistry.declareProducer({
-      name: 'webhook-ingest',
-      emits: ['agent.work.requested'] as const,
-    })
-
     // ==================== Mount route modules ====================
     // /api/channels is the last surviving piece of the legacy web-chat
     // stack — kept (vestigial) only because the surviving TabStrip reads
@@ -225,8 +209,6 @@ export class WebPlugin implements Plugin {
     app.route('/api/config', createConfigRoutes({ ctx }))
     app.route('/api/preferences', createPreferencesRoutes())
     app.route('/api/market-data', createMarketDataRoutes(ctx))
-    app.route('/api/events', createEventsRoutes({ ctx, ingestProducer: this.ingestProducer }))
-    app.route('/api/topology', createTopologyRoutes(ctx))
     app.route('/api/trading/config', createTradingConfigRoutes(ctx))
     // `/api/trading/*` and `/api/simulator/*` are proxied to the UTA carrier.
     // UTA is optional, so the proxy owns the unavailable response instead of
@@ -347,8 +329,6 @@ export class WebPlugin implements Plugin {
 
   async stop() {
     this.sseByChannel.clear()
-    this.ingestProducer?.dispose()
-    this.ingestProducer = undefined
     this.webIpc?.dispose()
     this.webIpc = null
     this.cliSocketServer?.close()

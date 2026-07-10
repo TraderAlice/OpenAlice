@@ -13,7 +13,7 @@ GitHub navigation.
 | [[docs/development-workflow.md]] | [Development workflow](development-workflow.md) | Branches, delivery modes, PRs, promotions, external review, risk gates |
 | [[docs/managed-workspace-runtime.md]] | [Managed Workspace runtime](managed-workspace-runtime.md) | Electron packaging, managed Pi, PortableGit/Bash, runtime profile, Workspace PATH |
 | [[docs/workspace-issues-and-scheduling.md]] | [Workspace issues and scheduling](workspace-issues-and-scheduling.md) | Markdown issue contract, global board, schedule scanner, headless execution, Inbox delivery |
-| [[docs/event-system.md]] | [Event-system retirement note](event-system.md) | Legacy EventLog/Flow/webhook compatibility and cleanup boundary |
+| [[docs/event-system.md]] | [Event-system retirement note](event-system.md) | Removed Alice event-bus scheduler and the remaining UTA journal boundary |
 | [[docs/uta-live-testing.md]] | [UTA live testing](uta-live-testing.md) | Real broker/demo acceptance scenarios and trading invariants |
 | [[docs/opentypebb-tutorial.md]] | [OpenTypeBB integration](opentypebb-tutorial.md) | In-process market-data SDK, providers, config, HTTP mount, package development |
 | [[docs/mcp-ask-connector.md]] | [MCP Ask retirement note](mcp-ask-connector.md) | Historical redirect for the removed connector/chat architecture |

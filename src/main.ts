@@ -60,11 +60,7 @@ import { createEntityStore } from './core/entity-store.js'
 import { entityUpsertFactory } from './tool/entity-upsert.js'
 import { entitySearchFactory } from './tool/entity-search.js'
 import { issueToolFactories } from './tool/issue-tools.js'
-import { createEventLog } from './core/event-log.js'
 import { createToolCallLog } from './core/tool-call-log.js'
-import { createListenerRegistry } from './core/listener-registry.js'
-import { createEventBus } from './core/event-bus.js'
-import { createMetricsListener } from './task/metrics/index.js'
 import { NewsCollectorStore, NewsCollector } from './domain/news/index.js'
 import { createNewsArchiveTools } from './tool/news.js'
 
@@ -101,15 +97,7 @@ async function main() {
 
   const config = await loadConfig()
 
-  // ==================== Event Log ====================
-
-  const eventLog = await createEventLog()
   const toolCallLog = await createToolCallLog()
-
-  // ==================== Listener Registry ====================
-  // Created early so producers can declare against it.
-
-  const listenerRegistry = createListenerRegistry(eventLog)
 
   // ==================== Tool Center (created early — UTAManager needs it) ====================
 
@@ -310,16 +298,6 @@ async function main() {
   // drives the periodic equity-curve writes. The UTA service starts
   // its own scheduler at boot.
 
-  // ==================== Event Metrics (wildcard observer) ====================
-
-  const metricsListener = createMetricsListener({ registry: listenerRegistry })
-  await metricsListener.start()
-
-  // ==================== Activate Listeners ====================
-
-  await listenerRegistry.start()
-  console.log(`listener-registry: started (${listenerRegistry.list().length} listeners)`)
-
   // ==================== News Collector ====================
 
   let newsCollector: NewsCollector | null = null
@@ -400,10 +378,8 @@ async function main() {
   // ==================== Engine Context ====================
 
   const ctx: EngineContext = {
-    config, inboxStore, entityStore, eventLog, toolCallLog, toolCenter,
+    config, inboxStore, entityStore, toolCallLog, toolCenter,
     workspaceToolCenter,
-    listenerRegistry,
-    fire: createEventBus(eventLog),
     bbEngine: getSDKExecutor(),
     marketSearch,
     equityClient,
@@ -430,14 +406,11 @@ async function main() {
   const shutdown = async () => {
     stopped = true
     newsCollector?.stop()
-    metricsListener.stop()
-    await listenerRegistry.stop()
     for (const plugin of [...corePlugins, ...optionalPlugins.values()]) {
       await plugin.stop()
     }
     await newsStore.close()
     await toolCallLog.close()
-    await eventLog.close()
     await releaseRuntimeLock()
     process.exit(0)
   }

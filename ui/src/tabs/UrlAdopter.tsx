@@ -198,7 +198,7 @@ function AdoptDev() {
 
 function AdoptAutomation() {
   const { section } = useParams<{ section: string }>()
-  const valid: ReadonlyArray<string> = ['runs', 'api', 'flow', 'webhook']
+  const valid: ReadonlyArray<string> = ['runs', 'api']
   if (!section || !valid.includes(section)) return <Navigate to="/automation/runs" replace />
   return (
     <AdoptStatic

@@ -484,9 +484,6 @@ export const en = {
   automation: {
     runs: 'Runs',
     api: 'API',
-    legacy: 'Legacy',
-    flow: 'Flow',
-    webhook: 'Webhook',
   },
   news: {
     lookback1h: '1 hour',

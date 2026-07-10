@@ -18,7 +18,7 @@ Guardian
 │   ├── Web UI transport     HTTP/Vite in dev, app:// + IPC in Electron
 │   ├── Workspace PTYs       claude / codex / opencode / pi / shell
 │   ├── ToolCenter           market, news, analysis, Inbox, UTA bridges
-│   └── file-backed state    config, sessions, issues, schedules, events
+│   └── file-backed state    config, sessions, issues, schedules, tool-call log
 └── UTA                      broker carrier and trading authority
     ├── broker connections
     ├── account state
@@ -43,8 +43,8 @@ remain usable without it; only broker/trading capabilities disappear.
 ```text
 src/                           Alice process
 ├── main.ts                    composition root
-├── core/                      config, credentials, paths, sessions, events,
-│                              Inbox, ToolCenter, sealing, runtime profile
+├── core/                      config, credentials, paths, sessions, Inbox,
+│                              ToolCenter, sealing, runtime profile, journals
 ├── ai-providers/              provider/model preset catalog only
 ├── domain/                    non-broker domains
 │   ├── market-data/           market/fundamental data access
@@ -61,10 +61,9 @@ src/                           Alice process
 │   ├── auth/                  admin token and web session services
 │   ├── uta-client/            Alice-side UTA SDK adapters
 │   └── uta-supervisor/        UTA health and restart signaling
-├── server/                    MCP and OpenTypeBB-compatible servers
+├── server/                    MCP, local CLI gateway, market-data compat mount
 ├── webui/                     Hono routes, auth middleware, Workspace WS/IPC
-├── migrations/                versioned user-state migrations
-└── task/                      metrics and remaining Alice-owned schedulers
+└── migrations/                versioned user-state migrations
 
 services/uta/                  UTA process
 ├── src/main.ts                service composition root
@@ -163,7 +162,7 @@ launcher and services agree.
 │   ├── sessions/              web/admin sessions
 │   ├── trading/               account history and snapshots
 │   ├── inbox/                 Inbox records
-│   ├── event-log/             durable events
+│   ├── event-log/             UTA account-health and snapshot journal
 │   ├── cron/                  schedules/jobs
 │   ├── news-collector/        RSS archive
 │   └── _backup/               migration snapshots
@@ -201,7 +200,7 @@ generated `src/migrations/INDEX.md`.
 | Shared Alice ↔ UTA shapes | `packages/uta-protocol/` and both callers |
 | Renderer/API surface | `ui/`, `src/webui/`, and matching demo handlers |
 | Issues, schedules, headless runs, Inbox delivery | [Workspace issues and scheduling](workspace-issues-and-scheduling.md) |
-| Legacy EventLog/Flow/webhook paths | [Event-system retirement note](event-system.md) |
+| Retired event-bus scheduler and UTA journal boundary | [Event-system retirement note](event-system.md) |
 | User-state schema | `src/migrations/` + generated migration index |
 | Process lock/recovery | `packages/guardian-runtime/` and all three launchers |
 

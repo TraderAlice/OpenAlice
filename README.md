@@ -122,7 +122,6 @@ The README is intentionally short. The real docs live at [openalice.ai/docs](htt
 - [Installation Overview](https://openalice.ai/docs/getting-started/installation) - choose macOS, Windows, source, Docker, or remote access.
 - [Workspaces](https://openalice.ai/docs/workspaces/workspaces) - the directory, git, CLI, and file-backed substrate.
 - [Workspace Automation](https://openalice.ai/docs/workspaces/automation) - scheduled runs through self-describing issues.
-- [Workspace Webhook](https://openalice.ai/docs/workspaces/webhook) - trigger OpenAlice from outside systems.
 - [Unified Trading Account](https://openalice.ai/docs/core-concepts/unified-trading-account) - the beta account layer and safety warnings.
 - [Trading as Git](https://openalice.ai/docs/core-concepts/trading-as-git) - staged, committed, approval-gated trading operations.
 - [Data & Credentials](https://openalice.ai/docs/deployment/data-and-credentials) - state layout, sealed credentials, ports, and backup.

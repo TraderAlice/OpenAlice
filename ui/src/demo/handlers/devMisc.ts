@@ -13,9 +13,5 @@ export const devMiscHandlers = [
     }),
   ),
 
-  http.get('/api/topology', () =>
-    HttpResponse.json({ eventTypes: [], producers: [], listeners: [] }),
-  ),
-
   http.get('/api/media/:date/:name', () => new HttpResponse(null, { status: 404 })),
 ]
