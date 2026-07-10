@@ -129,7 +129,7 @@ export function WorkspacePage({ spec, visible }: Props) {
   // holds for the active path); when sessionId is null, the empty
   // state needs the full list to render resume/continue cards.
   return (
-    <div className="workspaces-root flex-1 min-h-0 flex flex-col">
+    <div className="workspaces-root workspace-page-shell flex-1 min-h-0 flex flex-col">
       {/* OpenAlice-side header bar above the launcher's WorkspaceView. The
        *  launcher component itself is byte-faithful; we add the AI-provider
        *  affordance here. */}

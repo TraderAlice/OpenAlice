@@ -310,6 +310,26 @@
   min-height: 0;
 }
 
+/* Measure the space actually left for WorkspacePage after the global rail and
+ * its contextual sidebar, rather than the browser viewport. At this width a
+ * fixed 360px Files column would leave the terminal too narrow to be useful.
+ * The persisted Files preference is left untouched, so the panel comes back
+ * automatically when the surrounding layout has room again. */
+.workspace-page-shell {
+  container-type: inline-size;
+}
+
+@container (max-width: 900px) {
+  .workspace-page-shell .workspace-view {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workspace-page-shell .workspace-side,
+  .workspace-page-shell .workspace-files-toggle {
+    display: none;
+  }
+}
+
 /* Both side panels hidden (or auto-hidden on mobile) — collapse the
  * 360px aside column so the terminal pane fills the whole width. */
 .workspace-view.has-no-side {

@@ -23,7 +23,7 @@ export function WorkspaceFilesToggle(): ReactElement {
       onClick={toggleFiles}
       aria-pressed={files}
       title={files ? t('workspace.hideFilesTitle') : t('workspace.showFilesTitle')}
-      className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] transition-colors ${
+      className={`workspace-files-toggle flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] transition-colors ${
         files
           ? 'text-text bg-bg-tertiary'
           : 'text-text-muted hover:text-text hover:bg-bg-tertiary'
