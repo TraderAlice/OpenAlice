@@ -4,9 +4,13 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { fileURLToPath } from 'node:url'
 
-const repoRoot = new URL('..', import.meta.url).pathname
-const pnpmCommand = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
+const repoRoot = fileURLToPath(new URL('..', import.meta.url))
+const pnpmCommand = process.platform === 'win32' ? (process.env.ComSpec ?? 'cmd.exe') : 'pnpm'
+const pnpmArgs = (commandArgs) => process.platform === 'win32'
+  ? ['/d', '/s', '/c', ['pnpm.cmd', ...commandArgs].join(' ')]
+  : commandArgs
 const args = new Set(process.argv.slice(2))
 const skipBuild = args.has('--skip-build')
 const keep = args.has('--keep')
@@ -36,11 +40,15 @@ if (unknownArgs.length > 0) {
 
 function run(label, command, commandArgs) {
   console.log(`\n[desktop-pty-smoke] ${label}`)
-  const result = spawnSync(command === 'pnpm' ? pnpmCommand : command, commandArgs, {
-    cwd: repoRoot,
-    stdio: 'inherit',
-    env: process.env,
-  })
+  const result = spawnSync(
+    command === 'pnpm' ? pnpmCommand : command,
+    command === 'pnpm' ? pnpmArgs(commandArgs) : commandArgs,
+    {
+      cwd: repoRoot,
+      stdio: 'inherit',
+      env: process.env,
+    },
+  )
   if (result.status !== 0) process.exit(result.status ?? 1)
 }
 
@@ -108,7 +116,7 @@ console.log(`[desktop-pty-smoke] data: ${smokeHome}`)
 console.log(`[desktop-pty-smoke] workspaces: ${smokeWorkspaces}`)
 console.log(`[desktop-pty-smoke] uta port: ${utaPort}`)
 
-const child = spawn(pnpmCommand, ['-F', '@traderalice/desktop', 'dev'], {
+const child = spawn(pnpmCommand, pnpmArgs(['-F', '@traderalice/desktop', 'dev']), {
   cwd: join(repoRoot, 'apps', 'desktop'),
   stdio: ['ignore', 'pipe', 'pipe'],
   env: {
