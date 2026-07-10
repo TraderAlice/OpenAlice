@@ -20,7 +20,7 @@
  * Out of scope (future iterations): tray icon, multi-window, native menus.
  */
 
-import { app, BrowserWindow, dialog, Menu, protocol } from 'electron'
+import { app, BrowserWindow, dialog, Menu, protocol, session } from 'electron'
 import { runRendererTradingModeSmoke } from './trading-mode-smoke.js'
 import { planUTATransition } from './uta-lifecycle.js'
 import {
@@ -42,6 +42,7 @@ import { probeFreePort } from './probe-port.js'
 import { relocateLegacyData } from './relocate-data.js'
 import { configureAutoUpdate } from './auto-update.js'
 import { fetchAliceWebRequest, handleOpenAliceIpcMessage, registerOpenAliceIpc } from './ipc.js'
+import { proxyEnvFromRules } from './proxy-env.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -263,6 +264,27 @@ function resolveManagedRuntimeEnv(opts: {
   }
 
   return out
+}
+
+async function resolveChildProxyEnv(): Promise<Record<string, string>> {
+  // Existing env is authoritative on every platform. Electron 39 embeds Node
+  // 22.22, whose fetch stack consumes it only when NODE_USE_ENV_PROXY is set.
+  const explicit = proxyEnvFromRules('', process.env)
+  if (Object.keys(explicit).length > 0 || process.env['HTTPS_PROXY'] || process.env['HTTP_PROXY'] || process.env['ALL_PROXY']) {
+    return explicit
+  }
+  if (process.platform !== 'win32') return {}
+
+  try {
+    // Chromium already understands Windows Internet Options, including PAC.
+    // Resolve one representative HTTPS API URL and pass a concrete proxy to
+    // the pure-Node Alice/UTA children, whose fetch does not consult Chromium.
+    const rules = await session.defaultSession.resolveProxy('https://api.openai.com/')
+    return proxyEnvFromRules(rules, process.env)
+  } catch (err) {
+    console.warn(`[guardian] could not resolve Windows system proxy: ${err instanceof Error ? err.message : String(err)}`)
+    return {}
+  }
 }
 
 function isLiteModeEnv(env: NodeJS.ProcessEnv): boolean {
@@ -604,6 +626,7 @@ app.whenReady().then(async () => {
     appHome: homeEnv.OPENALICE_APP_HOME,
     launcherMode,
   })
+  const proxyEnv = await resolveChildProxyEnv()
   const piRuntime = runtimeEnv.OPENALICE_MANAGED_PI_PATH
     ? runtimeEnv.OPENALICE_MANAGED_PI_NODE_PATH
       ? `pi=${runtimeEnv.OPENALICE_MANAGED_PI_NODE_PATH} ${runtimeEnv.OPENALICE_MANAGED_PI_PATH}`
@@ -632,6 +655,7 @@ app.whenReady().then(async () => {
         ...(takeover ? { OPENALICE_TAKEOVER: '1' } : {}),
         ...homeEnv,
         ...runtimeEnv,
+        ...proxyEnv,
       },
       stdio: 'inherit',
     })
@@ -661,6 +685,7 @@ app.whenReady().then(async () => {
         ...(takeover ? { OPENALICE_TAKEOVER: '1' } : {}),
         ...homeEnv,
         ...runtimeEnv,
+        ...proxyEnv,
       },
       // The fourth fd opens Node child_process IPC. Electron app mode uses it
       // as the local PTY transport between BrowserWindow/preload and Alice's

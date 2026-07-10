@@ -307,13 +307,15 @@ export const LONGCAT: PresetDef = {
   zodSchema: z.object({
     backend: z.literal('vercel-ai-sdk'),
     provider: z.literal('openai-compatible'),
-    baseUrl: z.string().default('https://api.longcat.chat/openai').describe('API endpoint'),
+    baseUrl: z.string().default('https://api.longcat.chat/openai/v1').describe('API endpoint'),
     model: z.string().default('LongCat-2.0').describe('Model'),
     apiKey: z.string().min(1).describe('LongCat API key'),
   }),
   regions: [
     { id: 'default', label: 'LongCat (api.longcat.chat)', wires: {
-      'openai-chat': 'https://api.longcat.chat/openai',
+      // The OpenAI SDK appends `/chat/completions` itself, so its base must
+      // include LongCat's required `/v1` segment.
+      'openai-chat': 'https://api.longcat.chat/openai/v1',
       anthropic: 'https://api.longcat.chat/anthropic',
     } },
   ],

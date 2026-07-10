@@ -26,6 +26,35 @@ jobs:
 
       - run: pnpm test
 
+  # The full Vitest suite includes path, port-binding, process-launch, and
+  # packaged-toolchain behavior whose semantics differ materially by host OS.
+  # Ubuntu remains the build gate above; this matrix prevents a Linux-only
+  # green check from shipping regressions to macOS or Windows users.
+  cross-platform-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm build
+        timeout-minutes: 15
+
+      - run: pnpm test
+        timeout-minutes: 15
+
   # Boots the real `pnpm dev` stack and asserts UTA/Alice/Vite all spawn.
   # Exists to catch cross-platform spawn regressions (e.g. `spawn tsx ENOENT`
   # on Windows) that `pnpm test` can't see — esbuild transpiles, it never

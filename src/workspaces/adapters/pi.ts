@@ -84,7 +84,10 @@ export const piAdapter: CliAdapter = {
   composeCommand(_base: readonly string[], ctx: SpawnContext): readonly string[] {
     // Tools come from the CLI-injection path (alice on PATH + .pi/skills), not
     // flags — so the command head is just the binary + a resume flag (if any).
-    const head = piCommandHead(ctx.env);
+    // OpenAlice creates and owns the workspace, so approve its project-local
+    // resources for this invocation instead of blocking a fresh chat on Pi's
+    // interactive trust prompt. This does not mutate the user's global policy.
+    const head = [...piCommandHead(ctx.env), '--approve'];
     // Quick-chat seed: `pi [--session-id <id>] <messages…>` opens the
     // interactive TUI seeded with that first message. UNLIKE the other adapters,
     // pi appends the seed REGARDLESS of the resume branch: pi assigns its own id
@@ -108,7 +111,7 @@ export const piAdapter: CliAdapter = {
   // 0.78.1), so the prompt is a bare trailing positional — a prompt literally
   // starting with `-`/`--` is unprotected on pi (rare for task prompts).
   composeHeadlessCommand(_base: readonly string[], _ctx: SpawnContext, prompt: string): readonly string[] {
-    return [...piCommandHead(_ctx.env), '-p', '--mode', 'json', prompt];
+    return [...piCommandHead(_ctx.env), '--approve', '-p', '--mode', 'json', prompt];
   },
 
   // pi `--mode json` line 1 is `{"type":"session","id":…,"cwd":…}` — pi mints

@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { isLiteModeEnv, readPortsFile, resolveGuardianTradingMode, resolvePortConfig, resolveWindowsBin } from './shared.js'
+import { isLiteModeEnv, readPortsFile, resolveGuardianTradingMode, resolvePortConfig, resolveWindowsBin, startFlagWatcher } from './shared.js'
 
 let home: string
 
@@ -168,5 +168,28 @@ describe('resolveWindowsBin — Windows .CMD shim resolution (#378)', () => {
     const spaced = 'C:\\Program Files\\proj\\node_modules\\.bin'
     expect(resolveWindowsBin('tsx', 'win32', spaced, () => true))
       .toBe('"C:\\Program Files\\proj\\node_modules\\.bin\\tsx.CMD"')
+  })
+})
+
+describe('startFlagWatcher', () => {
+  it('detects a newly-created flag once across fs.watch and the poll fallback', async () => {
+    const flagPath = join(home, 'data', 'control', 'restart-uta.flag')
+    let calls = 0
+    const stop = await startFlagWatcher({ flagPath, onTrigger: () => { calls++ }, debounceMs: 20 })
+    try {
+      await writeFile(flagPath, 'restart')
+      const deadline = Date.now() + 3_000
+      while (calls === 0 && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      }
+      expect(calls).toBe(1)
+      await new Promise((resolve) => setTimeout(resolve, 1_100))
+      expect(calls).toBe(1)
+    } finally {
+      stop()
+      // Let the POSIX fs.watch AbortSignal settle before afterEach removes the
+      // watched temp directory; Windows uses the poll-only path.
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    }
   })
 })

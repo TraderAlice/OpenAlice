@@ -1,5 +1,5 @@
 import type { CliAdapter, SpawnContext } from '../cli-adapter.js';
-import { runtimeProfileFromEnv } from '@/core/runtime-profile.js';
+import { resolveBashPath } from '@/core/shell-resolver.js';
 
 /**
  * The bare-metal terminal — `zsh --login` (or whatever's on `$SHELL`),
@@ -32,8 +32,8 @@ export function composeShellCommand(
   env: Readonly<Record<string, string | undefined>>,
   platform: NodeJS.Platform = process.platform,
 ): readonly string[] {
-  const managedShell = runtimeProfileFromEnv(env, { platform }).managedShellPath;
-  if (managedShell) return [managedShell, '--login'];
+  const bash = resolveBashPath(env, platform);
+  if (bash) return [bash, '--login'];
   if (platform === 'win32') {
     return [env['SHELL'] ?? env['ComSpec'] ?? env['COMSPEC'] ?? 'cmd.exe'];
   }

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { resolve } from 'node:path'
 import { buildDefaultOrigins, loadConfig } from './config.js'
 
 describe('buildDefaultOrigins', () => {
@@ -60,7 +61,7 @@ describe('loadConfig (workspaces)', () => {
       webPort: 4444,
       env: { OPENALICE_HOME: '/tmp/openalice-isolated' },
     })
-    expect(cfg.launcherRoot).toBe('/tmp/openalice-isolated/workspaces')
+    expect(cfg.launcherRoot).toBe(resolve('/tmp/openalice-isolated', 'workspaces'))
   })
 
   it('still allows AQ_LAUNCHER_ROOT to split workspace storage explicitly', () => {
@@ -71,6 +72,6 @@ describe('loadConfig (workspaces)', () => {
         AQ_LAUNCHER_ROOT: '/tmp/openalice-workspaces-only',
       },
     })
-    expect(cfg.launcherRoot).toBe('/tmp/openalice-workspaces-only')
+    expect(cfg.launcherRoot).toBe(resolve('/tmp/openalice-workspaces-only'))
   })
 })

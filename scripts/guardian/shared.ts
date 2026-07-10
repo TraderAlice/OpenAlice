@@ -20,10 +20,11 @@
 
 import { spawn, spawnSync, type ChildProcess, type SpawnOptions } from 'node:child_process'
 import { setTimeout as sleep } from 'node:timers/promises'
-import { watch, mkdir, readFile } from 'node:fs/promises'
+import { watch, mkdir, readFile, stat } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { dirname, basename, resolve } from 'node:path'
 import { probeFreePort } from '../probe-port.js'
+import { resolveLaunchCommand, resolveStockNpmShim } from '../../src/workspaces/win-command.js'
 
 export {
   isLiteModeEnv,
@@ -210,7 +211,20 @@ export function resolveWindowsBin(
 }
 
 export function spawnChild(spec: SpawnSpec): ChildProcess {
-  const child = spawn(resolveWindowsBin(spec.command), spec.args, {
+  const resolvedBin = resolveWindowsBin(spec.command)
+  const unquotedBin = resolvedBin.startsWith('"') && resolvedBin.endsWith('"')
+    ? resolvedBin.slice(1, -1)
+    : resolvedBin
+  const directNpm = process.platform === 'win32'
+    ? resolveStockNpmShim(unquotedBin, spec.args, process.execPath)
+    : null
+  const pathResolved = process.platform === 'win32' && directNpm === null
+    ? resolveLaunchCommand([spec.command, ...spec.args], { env: spec.env, nodeExecPath: process.execPath })
+    : null
+  const launch = directNpm ?? pathResolved?.argv ?? [resolvedBin, ...spec.args]
+  const command = launch[0]!
+  const args = launch.slice(1)
+  const child = spawn(command, args, {
     env: spec.env,
     stdio: spec.prefixLogs ? ['inherit', 'pipe', 'pipe'] : 'inherit',
     // On Windows the dev commands (`tsx`, `pnpm`) are `.cmd` shims in
@@ -219,7 +233,12 @@ export function spawnChild(spec: SpawnSpec): ChildProcess {
     // Git-Bash PATH may not even carry .bin, so the command is resolved to its
     // absolute shim above. POSIX resolves the bin dir directly, so keep shell
     // off there. Args here have no spaces, so shell quoting isn't a concern.
-    shell: process.platform === 'win32',
+    // Stock npm shims are parsed conservatively and run as
+    // `node <real-js-entry> ...args`, avoiding cmd.exe entirely. This keeps
+    // UTA/Vite descendants attached to the child Guardian tracks, so restart
+    // and teardown can reap the whole tree. Unknown/custom batch wrappers keep
+    // the legacy shell fallback.
+    shell: process.platform === 'win32' && directNpm === null && pathResolved?.viaShell === true,
   } satisfies SpawnOptions)
 
   if (spec.prefixLogs) {
@@ -482,6 +501,17 @@ export async function startFlagWatcher(opts: FlagWatchOpts): Promise<() => void>
 
   const abort = new AbortController()
   let pending: NodeJS.Timeout | undefined
+  let checking = false
+
+  const fingerprint = async (): Promise<string | null> => {
+    try {
+      const info = await stat(opts.flagPath)
+      return `${info.mtimeMs}:${info.size}`
+    } catch {
+      return null
+    }
+  }
+  let lastFingerprint = await fingerprint()
 
   const fire = (): void => {
     if (pending) clearTimeout(pending)
@@ -493,11 +523,29 @@ export async function startFlagWatcher(opts: FlagWatchOpts): Promise<() => void>
     }, debounceMs)
   }
 
+  const checkForChange = async (): Promise<void> => {
+    if (checking) return
+    checking = true
+    try {
+      const next = await fingerprint()
+      if (next !== lastFingerprint) {
+        lastFingerprint = next
+        fire()
+      }
+    } finally {
+      checking = false
+    }
+  }
+
   ;(async () => {
     try {
+      // Node 24/libuv can native-assert (not throw) when fs.watch observes a
+      // Windows 8.3 short-path temp directory. Windows file events are also
+      // the least reliable here, so polling below is the primary Win32 path.
+      if (process.platform === 'win32') return
       const watcher = watch(dirname(opts.flagPath), { signal: abort.signal })
       for await (const evt of watcher) {
-        if (evt.filename === basename(opts.flagPath)) fire()
+        if (evt.filename === basename(opts.flagPath)) await checkForChange()
       }
     } catch (err) {
       if ((err as { name?: string }).name === 'AbortError') return
@@ -505,5 +553,15 @@ export async function startFlagWatcher(opts: FlagWatchOpts): Promise<() => void>
     }
   })().catch(() => { /* swallow — already logged */ })
 
-  return () => abort.abort()
+  // Poll the file signature as the Windows primary path and a POSIX backstop;
+  // the shared fingerprint keeps an fs.watch event and the subsequent poll
+  // from triggering two restarts for the same write.
+  const poll = setInterval(() => { void checkForChange() }, 1_000)
+  poll.unref()
+
+  return () => {
+    abort.abort()
+    clearInterval(poll)
+    if (pending) clearTimeout(pending)
+  }
 }

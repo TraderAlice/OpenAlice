@@ -33,6 +33,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve, dirname, join } from 'node:path'
 import { appendFileSync } from 'node:fs'
+import { resolveLaunchCommand } from '../../src/workspaces/win-command.js'
 
 const IS_WIN = process.platform === 'win32'
 const BOOT_TIMEOUT_MS = 120_000
@@ -124,12 +125,15 @@ async function main(): Promise<void> {
   ) {
     childEnv['OPENALICE_TRADING_MODE'] = 'pro'
   }
-  const child: ChildProcess = spawn('pnpm', ['dev'], {
+  const resolvedDev = resolveLaunchCommand(['pnpm', 'dev'], { env: childEnv, nodeExecPath: process.execPath })
+  const [devCommand, ...devArgs] = resolvedDev.argv
+  if (!devCommand) throw new Error('guardian smoke: empty dev command')
+  const child: ChildProcess = spawn(devCommand, devArgs, {
     cwd: root,
     env: childEnv,
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: !IS_WIN,
-    shell: IS_WIN,
+    shell: IS_WIN && resolvedDev.viaShell,
   })
 
   // `out` holds ANSI-stripped text for matching; raw output is mirrored to the

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { join } from 'node:path'
 
 import { buildOnboardingTestEnv } from './onboarding-test-env.js'
 
@@ -8,10 +9,10 @@ describe('buildOnboardingTestEnv', () => {
 
     expect(root).toBe('/tmp/oa-onboarding')
     expect(env['OPENALICE_ONBOARDING_TEST']).toBe('1')
-    expect(env['OPENALICE_HOME']).toBe('/tmp/oa-onboarding/home')
-    expect(env['AQ_LAUNCHER_ROOT']).toBe('/tmp/oa-onboarding/workspaces')
-    expect(env['OPENALICE_GLOBAL_DIR']).toBe('/tmp/oa-onboarding/global')
-    expect(env['PI_CODING_AGENT_DIR']).toBe('/tmp/oa-onboarding/pi-agent')
+    expect(env['OPENALICE_HOME']).toBe(join(root, 'home'))
+    expect(env['AQ_LAUNCHER_ROOT']).toBe(join(root, 'workspaces'))
+    expect(env['OPENALICE_GLOBAL_DIR']).toBe(join(root, 'global'))
+    expect(env['PI_CODING_AGENT_DIR']).toBe(join(root, 'pi-agent'))
     expect(env['OPENALICE_AGENT_RUNTIME_INSTALLS']).toBe('only:pi')
     expect(env['OPENALICE_CREDENTIAL_TEST_MODE']).toBe('mock')
     expect(env['VITE_OPENALICE_FIRST_RUN_GUIDE']).toBe('1')

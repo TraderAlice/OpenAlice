@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { resolveBashPath } from '@/core/shell-resolver.js';
 import { existsSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -324,9 +325,8 @@ const WINDOWS_BASH_HINT =
  * On macOS / Linux the script is invoked directly — the kernel reads the
  * `#!/usr/bin/env bash` shebang and launches bash. On Windows the kernel
  * doesn't read shebangs and there's no native bash, so we invoke bash
- * explicitly with the script as its first argument. This requires `bash`
- * to be on PATH, which Git for Windows provides under its default install
- * options (WSL also works if OpenAlice itself is run from inside WSL).
+ * explicitly with the script as its first argument. Git for Windows commonly
+ * puts only `git.exe` on PATH, so resolve its sibling `bin/bash.exe` as well.
  *
  * Exported for unit testing — the platform branch needs coverage that
  * doesn't depend on which OS the tests happen to run on.
@@ -345,9 +345,13 @@ export function runScript(
   // flips it to pure-Node mode (a harmless no-op for a plain `node` execPath in
   // dev). No bash, no shebang reliance → works on a bare Windows/Mac box.
   // `.sh` (third-party fallback): unix reads the `#!/usr/bin/env bash` shebang;
-  // Windows has no native bash, so we invoke `bash <script>` explicitly, which
-  // requires bash on PATH (Git for Windows / WSL).
-  const cmd = isMjs ? process.execPath : isWindows ? 'bash' : script;
+  // Windows has no native bash, so invoke the Git-for-Windows executable we
+  // resolved above (with a final bare-name fallback for WSL/custom PATHs).
+  const cmd = isMjs
+    ? process.execPath
+    : isWindows
+      ? resolveBashPath(process.env, 'win32') ?? 'bash'
+      : script;
   const cmdArgs = isMjs || isWindows ? [script, ...args] : args;
   const env = isMjs
     ? { ...process.env, ...extraEnv, ELECTRON_RUN_AS_NODE: '1' }

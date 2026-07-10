@@ -45,6 +45,24 @@ describe('buildSpawnEnv', () => {
     expect(out['PWD']).toBe('/ws/dir')
   })
 
+  it('emits one canonical PATH key after augmenting a Windows-style Path', () => {
+    const root = mkdtempSync(join(tmpdir(), 'openalice-path-case-'))
+    try {
+      const shim = join(root, 'cli-bin')
+      mkdirSync(shim, { recursive: true })
+
+      const out = buildSpawnEnv(
+        { Path: join(root, 'host-bin') },
+        { OPENALICE_WORKSPACE_CLI_BIN_PATH: shim },
+      )
+
+      expect(Object.keys(out).filter((key) => key.toUpperCase() === 'PATH')).toEqual(['PATH'])
+      expect(out['PATH'].split(delimiter)[0]).toBe(shim)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
   it('strips launcher-owned tool/MCP env from the parent and only trusts extras', () => {
     const out = buildSpawnEnv(
       {

@@ -63,12 +63,12 @@ describe('interactive seed — composeCommand initialPrompt', () => {
 
     it('pi: bare trailing positional, NO `--` terminator', () => {
       const argv = piAdapter.composeCommand([], ctx({ initialPrompt: PROMPT }));
-      expect(argv).toEqual(['pi', PROMPT]);
+      expect(argv).toEqual(['pi', '--approve', PROMPT]);
       expect(argv).not.toContain('--');
     });
   });
 
-  describe('no prompt → unchanged base command', () => {
+  describe('no prompt → no seed argument', () => {
     it('claude', () => {
       expect(claudeAdapter.composeCommand(['claude'], ctx())).not.toContain(PROMPT);
     });
@@ -76,7 +76,7 @@ describe('interactive seed — composeCommand initialPrompt', () => {
       expect(opencodeAdapter.composeCommand([], ctx())).toEqual(['opencode']);
     });
     it('pi', () => {
-      expect(piAdapter.composeCommand([], ctx())).toEqual(['pi']);
+      expect(piAdapter.composeCommand([], ctx())).toEqual(['pi', '--approve']);
     });
   });
 
@@ -114,7 +114,7 @@ describe('interactive seed — composeCommand initialPrompt', () => {
       [],
       ctx({ resume: { sessionId: 'assigned-uuid-1234' }, initialPrompt: PROMPT }),
     );
-    expect(argv).toEqual(['pi', '--session-id', 'assigned-uuid-1234', PROMPT]);
+    expect(argv).toEqual(['pi', '--approve', '--session-id', 'assigned-uuid-1234', PROMPT]);
   });
 
   it('shell ignores initialPrompt entirely (no agent to receive it)', () => {
