@@ -115,14 +115,14 @@ export const workspacesHandlers = [
   http.post('/api/workspaces/agent-runtime-readiness/probe', () =>
     HttpResponse.json(demoAgentRuntimeReadiness),
   ),
-  // One sample vault credential so the quick-chat runtime picker (opencode/pi)
-  // shows a populated dropdown — a clean showcase, not a "go configure" prompt.
-  // `?agent=` filtering is a no-op here (the sample speaks openai-chat, which
-  // every loginless runtime accepts).
+  // Two sample vault credentials let the quick-chat demo show that a remembered
+  // provider can win over the first compatible option. Both speak openai-chat,
+  // which every loginless runtime accepts.
   http.get('/api/workspaces/credentials', () =>
     HttpResponse.json({
       credentials: [
         { slug: 'openai-1', vendor: 'openai', label: 'OpenAI', authType: 'api-key', wires: { 'openai-chat': '' }, lastModel: 'gpt-5.5', apiKey: null },
+        { slug: 'minimax-1', vendor: 'minimax', label: 'MiniMax', authType: 'api-key', wires: { 'openai-chat': '' }, lastModel: 'MiniMax-M2.1', apiKey: null },
       ],
     }),
   ),
@@ -220,8 +220,8 @@ export const workspacesHandlers = [
           hasWorkspaceConfig: false,
           hasUsableWorkspaceConfig: false,
           detectedCredentialSlug: null,
-          compatibleCredentialSlugs: ['openai-1'],
-          injectableCredentialSlugs: ['openai-1'],
+          compatibleCredentialSlugs: ['openai-1', 'minimax-1'],
+          injectableCredentialSlugs: ['openai-1', 'minimax-1'],
         },
         pi: {
           agent: 'pi',
@@ -231,8 +231,8 @@ export const workspacesHandlers = [
           hasWorkspaceConfig: false,
           hasUsableWorkspaceConfig: false,
           detectedCredentialSlug: null,
-          compatibleCredentialSlugs: ['openai-1'],
-          injectableCredentialSlugs: ['openai-1'],
+          compatibleCredentialSlugs: ['openai-1', 'minimax-1'],
+          injectableCredentialSlugs: ['openai-1', 'minimax-1'],
         },
       },
     }),

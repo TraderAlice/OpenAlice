@@ -29,6 +29,7 @@ import { createEntityRoutes } from './routes/entities.js'
 import { createWikilinkRoutes } from './routes/wikilink.js'
 import { createVersionRoutes } from './routes/version.js'
 import { createAuthRoutes } from './routes/auth.js'
+import { createPreferencesRoutes } from './routes/preferences.js'
 import { createAuthMiddleware } from './middleware/auth.js'
 import { mountOpenTypeBB } from '../server/opentypebb.js'
 import { buildSDKCredentials } from '../domain/market-data/credential-map.js'
@@ -222,6 +223,7 @@ export class WebPlugin implements Plugin {
     app.route('/api/channels', createChannelsRoutes({ sessions, sseByChannel: this.sseByChannel }))
     app.route('/api/media', createMediaRoutes())
     app.route('/api/config', createConfigRoutes({ ctx }))
+    app.route('/api/preferences', createPreferencesRoutes())
     app.route('/api/market-data', createMarketDataRoutes(ctx))
     app.route('/api/events', createEventsRoutes({ ctx, ingestProducer: this.ingestProducer }))
     app.route('/api/topology', createTopologyRoutes(ctx))

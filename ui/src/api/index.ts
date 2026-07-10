@@ -18,6 +18,7 @@ import { inboxApi } from './inbox'
 import { entitiesApi } from './entities'
 import { versionApi } from './version'
 import { headlessApi } from './headless'
+import { preferencesApi } from './preferences'
 export const api = {
   config: configApi,
   events: eventsApi,
@@ -35,6 +36,7 @@ export const api = {
   entities: entitiesApi,
   version: versionApi,
   headless: headlessApi,
+  preferences: preferencesApi,
 }
 
 // Re-export all types for convenience

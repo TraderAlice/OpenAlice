@@ -317,6 +317,8 @@ data/                          # PORTABLE user state — the back-up / migrate /
                                # e2e suites read creds from the global store —
                                # adopt a legacy checkout's data/ first (dev
                                # banner shows the mv). Subdirs (via dataPath()):
+                               # preferences.json (non-sensitive, installation-
+                               # wide interaction preferences only);
                                # config/ (JSON + sealed accounts/auth +
                                # _meta.json migration journal), _backup/,
                                # sessions/ (web/admin JSONL — NOT workspace

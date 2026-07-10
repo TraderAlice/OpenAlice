@@ -77,7 +77,53 @@ describe('resolveChatCredential', () => {
     expect(resolveChatCredential(credentials, null, null, true)).toBeNull()
   })
 
+  it('uses a configured workspace default before the remembered quick-chat choice', () => {
+    expect(resolveChatCredential(
+      credentials,
+      null,
+      null,
+      false,
+      'saved-b',
+      'saved-a',
+    )).toBe('saved-b')
+  })
+
+  it('uses the remembered quick-chat choice before the first credential', () => {
+    expect(resolveChatCredential(
+      credentials,
+      null,
+      null,
+      false,
+      null,
+      'saved-b',
+    )).toBe('saved-b')
+  })
+
+  it('keeps the workspace credential ahead of global defaults and history', () => {
+    expect(resolveChatCredential(
+      credentials,
+      null,
+      'saved-b',
+      true,
+      'saved-a',
+      'saved-a',
+    )).toBe('saved-b')
+  })
+
+  it('does not expose a global fallback while workspace detection is pending', () => {
+    expect(resolveChatCredential(
+      credentials,
+      null,
+      null,
+      false,
+      'saved-a',
+      'saved-b',
+      false,
+    )).toBeNull()
+  })
+
   it('does not claim a deleted credential is available', () => {
     expect(resolveChatCredential(credentials, null, 'missing', true)).toBeNull()
+    expect(resolveChatCredential(credentials, 'missing', null, false, null, 'saved-b')).toBe('saved-b')
   })
 })

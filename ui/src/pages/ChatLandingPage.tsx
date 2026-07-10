@@ -32,6 +32,8 @@ import {
   type SavedCredential,
 } from '../components/workspace/api'
 import { useWorkspace } from '../tabs/store'
+import { configApi, type WorkspaceCredentialDefault } from '../api/config'
+import { preferencesApi } from '../api/preferences'
 
 /** Agent runtimes with no login of their own — they need an injected AI config
  *  to start (claude/codex carry their own CLI login). Mirrors the backend's
@@ -87,15 +89,22 @@ export function resolveChatCredential(
   pickedCredential: string | null,
   detectedCredential: string | null,
   workspaceCredentialReady: boolean,
+  workspaceDefaultCredential: string | null = null,
+  lastCredential: string | null = null,
+  workspaceCredentialResolved = true,
 ): string | null {
-  if (pickedCredential !== null) return pickedCredential
-  if (
-    detectedCredential !== null &&
-    credentials?.some((credential) => credential.slug === detectedCredential)
-  ) {
-    return detectedCredential
-  }
-  return workspaceCredentialReady ? null : (credentials?.[0]?.slug ?? null)
+  const available = (slug: string | null): slug is string => (
+    slug !== null && credentials?.some((credential) => credential.slug === slug) === true
+  )
+  if (available(pickedCredential)) return pickedCredential
+  // An existing workspace owns its provider choice. Do not briefly expose (or
+  // submit) a global fallback while its on-disk config is still being detected.
+  if (!workspaceCredentialResolved) return null
+  if (available(detectedCredential)) return detectedCredential
+  if (workspaceCredentialReady) return null
+  if (available(workspaceDefaultCredential)) return workspaceDefaultCredential
+  if (available(lastCredential)) return lastCredential
+  return credentials?.[0]?.slug ?? null
 }
 
 /**
@@ -183,6 +192,11 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
   // The cred today's chat workspace is already configured with, if it exists.
   const [detectedCred, setDetectedCred] = useState<string | null>(null)
   const [agentReadiness, setAgentReadiness] = useState<AgentCredentialReadiness | null>(null)
+  const [credentialWorkspaceResolved, setCredentialWorkspaceResolved] = useState(false)
+  const [workspaceCredentialDefaults, setWorkspaceCredentialDefaults] = useState<
+    Record<string, WorkspaceCredentialDefault>
+  >({})
+  const [lastCredentialByAgent, setLastCredentialByAgent] = useState<Record<string, string>>({})
   const [credMenuOpen, setCredMenuOpen] = useState(false)
   const credBoxRef = useRef<HTMLDivElement>(null)
 
@@ -203,16 +217,25 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
   // both; claude/codex never show the picker.
   useEffect(() => {
     let live = true
-    const refresh = () => {
+    const refreshCredentials = () => {
       void listAgentCredentials('opencode')
         .then((list) => { if (live) setCreds(list) })
         .catch(() => { if (live) setCreds([]) })
     }
-    refresh()
-    window.addEventListener('openalice:credentials-changed', refresh)
+    void Promise.all([
+      listAgentCredentials('opencode').catch(() => []),
+      preferencesApi.getQuickChat().catch(() => ({ lastCredentialByAgent: {} })),
+      configApi.getWorkspaceCredentialDefaults().catch(() => ({ defaults: {}, compatibleByAgent: {} })),
+    ]).then(([list, preferences, defaults]) => {
+      if (!live) return
+      setCreds(list)
+      setLastCredentialByAgent(preferences.lastCredentialByAgent)
+      setWorkspaceCredentialDefaults(defaults.defaults)
+    })
+    window.addEventListener('openalice:credentials-changed', refreshCredentials)
     return () => {
       live = false
-      window.removeEventListener('openalice:credentials-changed', refresh)
+      window.removeEventListener('openalice:credentials-changed', refreshCredentials)
     }
   }, [])
 
@@ -230,15 +253,24 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
     if (!needsCred || effectiveAgent === null || credentialWorkspace === null || credentialWorkspace === undefined) {
       setDetectedCred(null)
       setAgentReadiness(null)
+      setCredentialWorkspaceResolved(true)
       return
     }
     let live = true
-    detectWorkspaceCredential(credentialWorkspace.id, effectiveAgent)
-      .then((r) => { if (live) setDetectedCred(r.slug) })
-      .catch(() => { if (live) setDetectedCred(null) })
-    getAgentReadiness(credentialWorkspace.id)
-      .then((bundle) => { if (live) setAgentReadiness(bundle.agents[effectiveAgent] ?? null) })
-      .catch(() => { if (live) setAgentReadiness(null) })
+    setCredentialWorkspaceResolved(false)
+    void Promise.allSettled([
+      detectWorkspaceCredential(credentialWorkspace.id, effectiveAgent),
+      getAgentReadiness(credentialWorkspace.id),
+    ]).then(([detected, readiness]) => {
+      if (!live) return
+      setDetectedCred(detected.status === 'fulfilled' ? detected.value.slug : null)
+      setAgentReadiness(
+        readiness.status === 'fulfilled'
+          ? readiness.value.agents[effectiveAgent] ?? null
+          : null,
+      )
+      setCredentialWorkspaceResolved(true)
+    })
     return () => { live = false }
   }, [needsCred, effectiveAgent, credentialWorkspace])
 
@@ -249,6 +281,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
     agentReadiness.source === 'workspace-config'
   const noCreds =
     needsCred &&
+    credentialWorkspaceResolved &&
     !workspaceCredReady &&
     !selectedRuntimeUsesGlobalConfig &&
     creds !== null &&
@@ -260,6 +293,9 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
     pickedCred,
     detectedCred,
     workspaceCredReady,
+    effectiveAgent ? workspaceCredentialDefaults[effectiveAgent]?.credentialSlug ?? null : null,
+    effectiveAgent ? lastCredentialByAgent[effectiveAgent] ?? null : null,
+    credentialWorkspaceResolved,
   )
   const credInfo = creds?.find((c) => c.slug === effectiveCred) ?? null
   // Warn when sending will overwrite the workspace's existing cred with a
@@ -284,7 +320,11 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
 
   // A missing runtime choice should open the picker, not leave a mysteriously
   // disabled send button. submit() already handles that branch.
-  const canSend = value.trim().length > 0 && !launching
+  const credentialSelectionReady =
+    !needsCred ||
+    selectedRuntimeUsesGlobalConfig ||
+    (creds !== null && credentialWorkspaceResolved)
+  const canSend = value.trim().length > 0 && !launching && credentialSelectionReady
 
   // Close the agent menu on an outside click.
   useEffect(() => {
@@ -301,6 +341,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
   const submit = async () => {
     const prompt = value.trim()
     if (!prompt || launching) return
+    if (!credentialSelectionReady) return
     if (effectiveAgent === null) {
       setAgentMenuOpen(true)
       return
@@ -463,6 +504,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
                           role="menuitem"
                           onClick={() => {
                             setSelectedAgent(a.id)
+                            setPickedCred(null)
                             void setDefaultAgent(a.id)
                             setAgentMenuOpen(false)
                           }}
@@ -524,6 +566,15 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
                             role="menuitem"
                             onClick={() => {
                               setPickedCred(cr.slug)
+                              if (effectiveAgent === 'opencode' || effectiveAgent === 'pi') {
+                                setLastCredentialByAgent((current) => ({
+                                  ...current,
+                                  [effectiveAgent]: cr.slug,
+                                }))
+                                void preferencesApi.rememberQuickChatCredential(effectiveAgent, cr.slug)
+                                  .then((preferences) => setLastCredentialByAgent(preferences.lastCredentialByAgent))
+                                  .catch(() => undefined)
+                              }
                               setCredMenuOpen(false)
                             }}
                             className={`w-full flex items-center gap-2 px-3 py-1.5 text-[12px] text-left transition-colors hover:bg-bg-tertiary ${active ? 'text-accent' : 'text-text'}`}
