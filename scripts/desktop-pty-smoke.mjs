@@ -138,6 +138,18 @@ let cliStarted = false
 let socketPath = ''
 let workspaceId = ''
 
+const terminateTestProcess = (processToStop, signal) => {
+  if (processToStop.exitCode !== null || processToStop.signalCode !== null) return
+  if (process.platform === 'win32' && processToStop.pid) {
+    spawnSync('taskkill.exe', ['/pid', String(processToStop.pid), '/T', '/F'], {
+      stdio: 'ignore',
+      windowsHide: true,
+    })
+    return
+  }
+  processToStop.kill(signal)
+}
+
 const finish = (code, message) => {
   if (settled) return
   if (code === 0 && (!takeoverObserved || !recoveryOwnerExited)) {
@@ -146,9 +158,9 @@ const finish = (code, message) => {
   }
   settled = true
   clearTimeout(timer)
-  if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM')
-  if (recoveryOwner && recoveryOwner.exitCode === null && recoveryOwner.signalCode === null) recoveryOwner.kill('SIGKILL')
-  if (!keep) rmSync(smokeRoot, { recursive: true, force: true })
+  terminateTestProcess(child, 'SIGTERM')
+  if (recoveryOwner) terminateTestProcess(recoveryOwner, 'SIGKILL')
+  if (!keep) rmSync(smokeRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   if (message) console.log(message)
   process.exit(code)
 }
