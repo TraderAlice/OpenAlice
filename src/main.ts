@@ -164,7 +164,7 @@ async function main() {
   })
   await newsStore.init()
 
-  // ==================== OpenBB Clients ====================
+  // ==================== Embedded Provider Clients ====================
 
   const { providers } = config.marketData
 
@@ -211,7 +211,7 @@ async function main() {
 
   const marketSearch = { symbolIndex, equityVendors: getEquityVendors, equityClient, cryptoClient, currencyClient, commodityCatalog }
 
-  // Federated bar layer — vendor (OpenTypeBB) + broker (UTA) OHLCV behind one
+  // Federated bar layer — embedded vendor adapters + broker (UTA) OHLCV behind one
   // barId-keyed interface. Vendor branch live now; UTA branch lands with Phase 1.
   const barService = createBarService({
     marketSearch,

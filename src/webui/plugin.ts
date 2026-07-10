@@ -28,7 +28,7 @@ import { createVersionRoutes } from './routes/version.js'
 import { createAuthRoutes } from './routes/auth.js'
 import { createPreferencesRoutes } from './routes/preferences.js'
 import { createAuthMiddleware } from './middleware/auth.js'
-import { mountOpenTypeBB } from '../server/opentypebb.js'
+import { mountMarketDataCompat } from '../server/market-data-compat.js'
 import { buildSDKCredentials } from '../domain/market-data/credential-map.js'
 import { resolveUTAUrl } from '../services/uta-supervisor/url.js'
 import { createWorkspaceService, type WorkspaceService } from '../workspaces/service.js'
@@ -264,10 +264,10 @@ export class WebPlugin implements Plugin {
       createWikilinkRoutes({ entityStore: ctx.entityStore, service: this.workspaceService }),
     )
 
-    // ==================== Mount opentypebb (market data HTTP) ====================
-    // opentypebb is Alice's first-class market-data package; its router is
-    // merged into this app so UI and external consumers hit a single port.
-    mountOpenTypeBB(app, ctx.bbEngine, {
+    // ==================== Embedded market-data compatibility HTTP ====================
+    // Remaining provider routes share Alice's port and auth boundary. New
+    // product contracts belong to TraderHub and BarService.
+    mountMarketDataCompat(app, ctx.bbEngine, {
       basePath: '/api/market-data-v1',
       // Read config lazily so UI edits to marketData.providerKeys /
       // marketData.providers take effect on the next request — no remount

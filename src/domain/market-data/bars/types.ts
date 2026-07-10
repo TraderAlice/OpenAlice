@@ -2,8 +2,8 @@
  * Federated bar layer — types.
  *
  * The bar layer is the *operational* identity namespace for K-lines (vs the
- * *reference* namespace — fundamentals/macro — which stays provider-first in
- * OpenTypeBB). A bar source is identified by a `barId`:
+ * *reference* namespace for fundamentals/macro). A bar source is identified by
+ * a `barId`:
  *
  *   barId = "{sourceId}|{nativeSymbol}"
  *

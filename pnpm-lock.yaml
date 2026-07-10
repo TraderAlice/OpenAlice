@@ -207,9 +207,6 @@ importers:
 
   packages/opentypebb:
     dependencies:
-      '@hono/node-server':
-        specifier: ^2.0.0
-        version: 2.0.0(hono@4.12.25)
       hono:
         specifier: ^4.12.21
         version: 4.12.25
@@ -229,15 +226,9 @@ importers:
       tsup:
         specifier: ^8.4.0
         version: 8.5.1(jiti@2.6.1)(postcss@8.5.10)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.9.0)
-      tsx:
-        specifier: ^4.19.3
-        version: 4.21.0
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
-      vitest:
-        specifier: ^3.2.6
-        version: 3.2.6(@types/debug@4.1.13)(@types/node@22.19.15)(jiti@2.6.1)(jsdom@29.0.0(@noble/hashes@2.2.0))(lightningcss@1.32.0)(msw@2.14.6(@types/node@22.19.15)(typescript@5.9.3))(tsx@4.21.0)(yaml@2.9.0)
 
   packages/uta-protocol:
     dependencies:

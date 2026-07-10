@@ -1,6 +1,6 @@
 /**
  * Reference-data service — in-process implementation of the reference
- * contract (see types.ts). Aggregates the opentypebb SDK clients into
+ * contract (see types.ts). Aggregates the remaining provider clients into
  * board-shaped payloads with the explicit meta envelope.
  */
 

@@ -1,5 +1,5 @@
 // Real AAPL market data captured from Alice's market-data-v1 endpoints on
-// 2026-05-29 (FMP provider via in-process opentypebb). Frozen as JSON
+// 2026-05-29 (FMP via the embedded provider compatibility layer). Frozen as JSON
 // fixtures — re-snapshot if a downstream contract change forces it.
 //
 // The capture process: `pnpm dev` → backend on 47331 → curl each

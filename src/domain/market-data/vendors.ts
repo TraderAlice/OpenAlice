@@ -3,7 +3,7 @@
  * how do I drive them" surface.
  *
  * Each vendor OWNS its self-description: the prose (coverage + howToUse) lives on
- * the opentypebb Provider's `vendorMeta`, so adding a vendor carries its own
+ * the embedded Provider's `vendorMeta`, so adding a vendor carries its own
  * usage note — there is no outer table to forget to update. This module only
  * JOINS that self-description to runtime state read fresh from market-data.json:
  *

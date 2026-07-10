@@ -6,7 +6,7 @@ new long-lived process, package, or state root is introduced.
 
 Related guides: [[docs/managed-workspace-runtime.md]],
 [[docs/workspace-issues-and-scheduling.md]], and
-[[docs/opentypebb-tutorial.md]].
+[[docs/market-data-architecture.md]].
 
 ## Runtime Topology
 

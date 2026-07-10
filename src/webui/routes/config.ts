@@ -320,7 +320,7 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
       const body = await c.req.json()
       const validated = await writeConfigSection(section, body)
       // Keep the in-memory ctx.config in sync with disk so any code path
-      // reading it (opentypebb resolver, market-data helpers, …) picks up
+      // reading it (provider resolver, market-data helpers, …) picks up
       // edits without a restart. Object.assign preserves ctx.config's
       // object identity — we just swap its contents.
       if (opts?.ctx) {
@@ -334,7 +334,7 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
       if (section === 'trading') {
         triggerUTARestart().catch(() => { /* surfaced via health badges */ })
       }
-      // marketData edits are picked up lazily by the opentypebb resolver
+      // marketData edits are picked up lazily by the provider resolver
       // (it reads ctx.config per request), so no explicit hot-reload hook
       // is needed. The old connector hot-reload path was removed with the
       // legacy connector cluster.

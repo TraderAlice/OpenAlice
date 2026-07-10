@@ -1,7 +1,7 @@
 /**
- * OpenTypeBB SDK Integration
+ * Embedded provider compatibility clients
  *
- * Provides in-process data fetching via OpenTypeBB's executor,
+ * Provides in-process data fetching through the private compatibility executor,
  * replacing the Python OpenBB sidecar HTTP calls.
  */
 

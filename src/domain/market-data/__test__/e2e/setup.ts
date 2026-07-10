@@ -17,7 +17,7 @@ import { Hono } from 'hono'
 import { loadConfig, type Config } from '@/core/config.js'
 import { buildSDKCredentials } from '@/domain/market-data/credential-map.js'
 import { createExecutor, type QueryExecutor } from '@traderalice/opentypebb'
-import { mountOpenTypeBB } from '@/server/opentypebb.js'
+import { mountMarketDataCompat } from '@/server/market-data-compat.js'
 import { createMarketDataRoutes } from '@/webui/routes/config.js'
 import type { EngineContext } from '@/core/types.js'
 
@@ -48,7 +48,7 @@ async function init(): Promise<TestApp> {
 
   const app = new Hono()
   app.route('/api/market-data', createMarketDataRoutes(ctx))
-  mountOpenTypeBB(app, executor, {
+  mountMarketDataCompat(app, executor, {
     basePath: '/api/market-data-v1',
     defaultCredentials: () => credentials,
     defaultProviders: () => config.marketData.providers,
@@ -70,8 +70,7 @@ export function hasProviderKey(config: Config, userKey: string): boolean {
 // ==================== Hono app.request helpers ====================
 
 /**
- * GET an opentypebb-mounted route and unwrap the OpenBB-style envelope.
- * opentypebb returns `{ results, provider, warnings, chart, extra, error? }`.
+ * GET an embedded compatibility route and unwrap its legacy envelope.
  */
 export async function getJson(app: Hono, path: string): Promise<any[]> {
   const res = await app.request(path)

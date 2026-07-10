@@ -1,11 +1,9 @@
 /**
- * OpenTypeBB Mount Helper
+ * Embedded market-data compatibility mount.
  *
- * Merges opentypebb's REST router into an existing Hono app so market-data
- * endpoints live on the same port as the rest of the Alice web API.
- *
- * No standalone server: opentypebb is first-class inside Alice. Anyone who
- * wants it as a detached process can run `packages/opentypebb` directly.
+ * Mounts the remaining provider/model/router adapters into Alice's Hono app.
+ * This is an internal bridge for existing typed clients and compatibility HTTP
+ * routes, not a standalone OpenTypeBB server or a new product contract.
  */
 
 import type { Hono } from 'hono'
@@ -24,7 +22,7 @@ export interface DefaultProviders {
   commodity: string
 }
 
-export interface MountOpenTypeBBOptions {
+export interface MountMarketDataCompatOptions {
   /** URL prefix to mount routes under (e.g. `/api/market-data-v1`). */
   basePath: string
   /**
@@ -67,10 +65,10 @@ function makeProviderResolver(
   }
 }
 
-export function mountOpenTypeBB(
+export function mountMarketDataCompat(
   app: Hono,
   executor: QueryExecutor,
-  opts: MountOpenTypeBBOptions,
+  opts: MountMarketDataCompatOptions,
 ): void {
   const rootRouter = loadAllRouters()
   const registry = createRegistry()
@@ -91,6 +89,6 @@ export function mountOpenTypeBB(
   app.get(`${opts.basePath}/widgets.json`, (c) => c.json(widgetsJson))
 
   console.log(
-    `[opentypebb] mounted on ${opts.basePath} (${Object.keys(widgetsJson).length} widgets)`,
+    `[market-data-compat] mounted on ${opts.basePath} (${Object.keys(widgetsJson).length} entries)`,
   )
 }

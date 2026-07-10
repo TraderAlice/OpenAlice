@@ -51,7 +51,7 @@ export interface EngineContext {
   /** Equity market-data client. Shared between the equity/analysis/sector-rotation
    *  AI tools and the /api/market/* HTTP routes (e.g. sector-rotation). */
   equityClient: EquityClientLike
-  /** Federated K-line / bar layer — unifies vendor (OpenTypeBB) + broker (UTA)
+  /** Federated K-line / bar layer — unifies embedded vendors + broker (UTA)
    *  OHLCV behind one barId-keyed interface. Consumed by the analysis tools and
    *  (Phase 3) the /api/bars chart route. */
   barService: BarService

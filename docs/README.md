@@ -15,7 +15,7 @@ GitHub navigation.
 | [[docs/workspace-issues-and-scheduling.md]] | [Workspace issues and scheduling](workspace-issues-and-scheduling.md) | Markdown issue contract, global board, schedule scanner, headless execution, Inbox delivery |
 | [[docs/event-system.md]] | [Event-system retirement note](event-system.md) | Removed Alice event-bus scheduler and the remaining UTA journal boundary |
 | [[docs/uta-live-testing.md]] | [UTA live testing](uta-live-testing.md) | Real broker/demo acceptance scenarios and trading invariants |
-| [[docs/opentypebb-tutorial.md]] | [OpenTypeBB integration](opentypebb-tutorial.md) | In-process market-data SDK, providers, config, HTTP mount, package development |
+| [[docs/market-data-architecture.md]] | [Market data architecture](market-data-architecture.md) | TraderHub/reference data, BarService K-lines, and the private provider compatibility layer |
 | [[docs/mcp-ask-connector.md]] | [MCP Ask retirement note](mcp-ask-connector.md) | Historical redirect for the removed connector/chat architecture |
 
 Other files under `docs/images/` are README/product assets rather than owner

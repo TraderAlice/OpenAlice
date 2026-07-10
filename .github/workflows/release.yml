@@ -17,7 +17,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      packages: write
     outputs:
       # Whether this run actually cut a new release (version was bumped). The
       # desktop build matrix gates on this — a full per-platform Electron build
@@ -84,68 +83,6 @@ jobs:
           body_path: notes.md
           prerelease: ${{ steps.version.outputs.prerelease == 'true' }}
           generate_release_notes: false
-
-  publish-opentypebb:
-    runs-on: ubuntu-latest
-    needs: release
-    if: needs.release.result == 'success' && !github.event.inputs.mirror_tag
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          registry-url: https://npm.pkg.github.com
-
-      - name: Check published versions
-        id: check
-        working-directory: packages/opentypebb
-        run: |
-          VERSION=$(node -p "require('./package.json').version")
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-
-          if npm view "@traderalice/opentypebb@$VERSION" version --registry=https://npm.pkg.github.com 2>/dev/null; then
-            echo "ghpkg=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "ghpkg=false" >> "$GITHUB_OUTPUT"
-          fi
-
-          if npm view "@traderalice/opentypebb@$VERSION" version --registry=https://registry.npmjs.org 2>/dev/null; then
-            echo "npmjs=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "npmjs=false" >> "$GITHUB_OUTPUT"
-          fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build
-        if: steps.check.outputs.ghpkg == 'false' || steps.check.outputs.npmjs == 'false'
-        working-directory: packages/opentypebb
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm build
-
-      - name: Publish to GitHub Packages
-        if: steps.check.outputs.ghpkg == 'false'
-        working-directory: packages/opentypebb
-        run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Publish to npmjs
-        if: steps.check.outputs.npmjs == 'false'
-        working-directory: packages/opentypebb
-        run: |
-          echo "//registry.npmjs.org/:_authToken=\${NODE_AUTH_TOKEN}" > "$NPM_CONFIG_USERCONFIG"
-          npm publish --registry=https://registry.npmjs.org
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   # Per-platform desktop installers, attached to the release the `release`
   # job already created. Each runner builds only its own platform/arch, so each

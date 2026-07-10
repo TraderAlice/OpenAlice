@@ -136,7 +136,7 @@ Read the relevant guide before editing its subsystem:
 - [[docs/uta-live-testing.md]] — [UTA live testing](docs/uta-live-testing.md): broker/trading acceptance loops.
 - [[docs/workspace-issues-and-scheduling.md]] — [Workspace issues and scheduling](docs/workspace-issues-and-scheduling.md): Issue board, schedules, headless runs, and Inbox delivery.
 - [[docs/event-system.md]] — [Event-system retirement note](docs/event-system.md): removed Alice event-bus scheduler; UTA journal utility only.
-- [[docs/opentypebb-tutorial.md]] — [OpenTypeBB integration](docs/opentypebb-tutorial.md): market-data SDK and providers.
+- [[docs/market-data-architecture.md]] — [Market data architecture](docs/market-data-architecture.md): TraderHub, K-line providers, and the private compatibility package.
 - `src/migrations/INDEX.md` — generated migration inventory and affected paths.
 
 `README.md` is public product positioning. After a genuinely large product

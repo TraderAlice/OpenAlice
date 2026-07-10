@@ -190,7 +190,7 @@ export function createBarService(deps: BarServiceDeps): BarService {
     opts: GetBarsOpts,
   ): Promise<BarsResult> {
     const start_date = startDateFor(opts)
-    // Upper bound: the provider applies end_date (OpenTypeBB models support it);
+    // Upper bound: the provider compatibility models apply end_date;
     // we also post-filter defensively in case a provider ignores it.
     const end_date = opts.end
     const p = (extra?: Record<string, unknown>) => ({ symbol, start_date, provider, ...(end_date ? { end_date } : {}), ...extra })
@@ -267,7 +267,7 @@ export function createBarService(deps: BarServiceDeps): BarService {
   return {
     async searchBarSources(query, opts) {
       const limit = opts?.limit ?? 20
-      // Federate vendor (OpenTypeBB) + broker (UTA) search. allSettled so one
+      // Federate embedded vendor + broker (UTA) search. allSettled so one
       // side failing (e.g. no UTA configured) doesn't kill the other. Flat
       // candidates, no cross-source dedup — redundancy is the feature.
       const [vendorRes, utaRes, capsRes] = await Promise.allSettled([

@@ -1,50 +1,21 @@
 {
   "name": "@traderalice/opentypebb",
+  "private": true,
   "version": "0.1.3",
-  "description": "TypeScript port of OpenBB Platform — financial data infrastructure",
+  "description": "OpenAlice-internal market-data provider compatibility layer",
   "type": "module",
   "exports": {
     ".": {
       "openalice-source": "./src/index.ts",
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
-    },
-    "./server": {
-      "openalice-source": "./src/server.ts",
-      "import": "./dist/server.js",
-      "types": "./dist/server.d.ts"
-    }
-  },
-  "files": [
-    "dist"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/TraderAlice/OpenAlice.git",
-    "directory": "packages/opentypebb"
-  },
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com",
-    "exports": {
-      ".": {
-        "import": "./dist/index.js",
-        "types": "./dist/index.d.ts"
-      },
-      "./server": {
-        "import": "./dist/server.js",
-        "types": "./dist/server.d.ts"
-      }
     }
   },
   "scripts": {
-    "dev": "tsx src/server.ts",
     "build": "tsup",
-    "test": "vitest run",
-    "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@hono/node-server": "^2.0.0",
     "hono": "^4.12.21",
     "undici": "^7.28.0",
     "yahoo-finance2": "^3.13.1",
@@ -53,9 +24,7 @@
   "devDependencies": {
     "@types/node": "^22.13.4",
     "tsup": "^8.4.0",
-    "tsx": "^4.19.3",
-    "typescript": "^5.7.3",
-    "vitest": "^3.2.6"
+    "typescript": "^5.7.3"
   },
   "engines": {
     "node": ">=20.0.0"

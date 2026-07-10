@@ -302,7 +302,7 @@ const marketDataSchema = z.object({
    *  (e.g. 'eastmoney' for CN A-share Chinese-name search + 前复权 K-line).
    *  yfinance stays the always-on global default; these are purely additive,
    *  surfaced as extra searchBars candidates in their own namespace, never a
-   *  replacement. Each name must be a registered OpenTypeBB provider. */
+   *  replacement. Each name must be registered by the embedded provider layer. */
   extraVendors: z.array(z.string()).default([]),
   providerKeys: z.object({
     fred: z.string().optional(),
@@ -836,7 +836,7 @@ export async function readMarketDataConfig() {
  * into the local section (which would defeat the global-wins-on-update intent;
  * see [[project_global_data_root_sealed_creds]]). Writes directly, bypassing
  * `writeConfigSection`'s providerKeys→global mirror, which is irrelevant to a
- * vendor-list edit. Because the opentypebb resolver re-reads market-data.json
+ * vendor-list edit. Because the embedded provider resolver re-reads market-data.json
  * per request, the change takes effect on the next search with no restart.
  */
 export async function updateExtraVendors(
