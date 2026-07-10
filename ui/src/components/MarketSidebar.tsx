@@ -18,8 +18,8 @@ const ASSET_CLASS_COLORS: Record<string, string> = {
 }
 
 const CAPABILITY_COLOR: Record<string, string> = {
-  realtime: 'text-green', iex: 'text-accent', delayed: 'text-text-muted/70',
-  subscription: 'text-amber-400', free: 'text-text-muted/70',
+  realtime: 'text-green', iex: 'text-accent', delayed: 'text-text-muted',
+  subscription: 'text-amber-700 dark:text-amber-300', free: 'text-text-muted',
 }
 
 /** A crypto venue's "AAPL" is synthetic — the route segment still needs a valid
@@ -134,13 +134,13 @@ export function MarketSidebar() {
               {t('market.searchResults')}{loading ? ` (${t('common.searching')})` : results.length ? ` (${results.length})` : ''}
             </SidebarSectionHeader>
             {loading && (
-              <div className="px-3 py-2 flex items-center gap-2 text-[12px] text-text-muted/60">
+              <div className="flex items-center gap-2 px-3 py-2 text-[12px] text-text-muted">
                 <Spinner size="sm" />
                 <span>{t('common.searching')}</span>
               </div>
             )}
             {!loading && results.length === 0 && (
-              <p className="px-3 py-2 text-[12px] text-text-muted/70 leading-relaxed">{t('market.noMatches')}</p>
+              <p className="px-3 py-2 text-[12px] leading-relaxed text-text-muted">{t('market.noMatches')}</p>
             )}
             {results.map((c) => (
               <SidebarRow
@@ -162,7 +162,7 @@ export function MarketSidebar() {
         {/* Watchlist */}
         <SidebarSectionHeader>{t('market.watchlist')}{watchlist.length ? ` (${watchlist.length})` : ''}</SidebarSectionHeader>
         {watchlist.length === 0 ? (
-          <p className="px-3 py-2 text-[12px] text-text-muted/70 leading-relaxed">
+          <p className="px-3 py-2 text-[12px] leading-relaxed text-text-muted">
             {t('market.emptyWatchlistHint')}
           </p>
         ) : (
@@ -186,7 +186,7 @@ export function MarketSidebar() {
                       e.stopPropagation()
                       removeFromWatchlist(entry.assetClass, entry.symbol)
                     }}
-                    className="w-4 h-4 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 text-text-muted/60 hover:text-text hover:bg-bg-tertiary"
+                    className="flex h-4 w-4 items-center justify-center rounded text-text-muted opacity-0 hover:bg-bg-tertiary hover:text-text group-hover:opacity-100"
                     aria-label={t('market.removeFromWatchlist', { symbol: entry.symbol })}
                   >
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -225,4 +225,3 @@ function SourceTrail({ c }: { c: BarSourceCandidate }) {
     </span>
   )
 }
-

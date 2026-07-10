@@ -8,6 +8,7 @@ import { EmptyState, Skeleton } from '../components/StateViews'
 import { EquityCurve } from '../components/EquityCurve'
 import { SnapshotDetail } from '../components/SnapshotDetail'
 import { Toggle } from '../components/Toggle'
+import { SegmentedControl } from '../components/SegmentedControl'
 import { Metric, signFromDelta } from '../components/Metric'
 import { Sparkline } from '../components/Sparkline'
 import { fmt, fmtPnl, fmtNum, fmtPctSigned } from '../lib/format'
@@ -375,7 +376,7 @@ function NoAccountsEmpty() {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <p className="text-sm font-medium text-text-muted">No trading accounts connected.</p>
-      <p className="text-[12px] text-text-muted/60 mt-1.5 max-w-[320px]">
+      <p className="mt-1.5 max-w-[320px] text-[12px] text-text-muted">
         Portfolio shows live equity, positions and PnL across all your brokers. Add a connection to get started.
       </p>
       <button
@@ -560,12 +561,12 @@ function AccountStrip({ sources, perAccountCurve }: {
                             {fmtPnl(s.unrealizedPnL)} unrealized
                           </span>
                         ) : (
-                          <span className="text-text-muted/60">—</span>
+                          <span className="text-text-muted">—</span>
                         )}
                       </span>
                     )
                 }
-                {s.error && !isOffline && !isDisabled && <span className="text-text-muted/50 text-[11px]">{s.error}</span>}
+                {s.error && !isOffline && !isDisabled && <span className="text-[11px] text-text-muted">{s.error}</span>}
               </div>
             </div>
             {showSpark && (
@@ -644,7 +645,7 @@ function PositionsTable({ positions, fxRates }: { positions: PositionWithAccount
                       {isShort && (
                         <span className="text-[10px] px-1 py-0.5 rounded font-medium bg-red/15 text-red">SHORT</span>
                       )}
-                      <span className="text-[10px] text-text-muted/70">{p.accountLabel}</span>
+                      <span className="text-[10px] text-text-muted">{p.accountLabel}</span>
                     </div>
                   </td>
                   <td className="px-3 py-2 text-center text-text-muted text-[11px]">{ccy}</td>
@@ -702,7 +703,7 @@ function FxRatesPanel({ rates }: { rates: FxRateInfo[] }) {
           </tbody>
         </table>
       </div>
-      <p className="text-[10px] text-text-muted/50 mt-1.5 text-right">per 1 unit → USD</p>
+      <p className="mt-1.5 text-right text-[10px] text-text-muted">per 1 unit → USD</p>
     </div>
   )
 }
@@ -743,7 +744,7 @@ function TradeLog({ commits }: { commits: CommitWithAccount[] }) {
                   <p className="text-[13px] text-text truncate">{commit.message}</p>
                   <div className="flex items-center gap-3 mt-1">
                     <span className="text-[11px] text-text-muted font-mono">{commit.hash}</span>
-                    <span className="text-[11px] text-text-muted/50">
+                    <span className="text-[11px] text-text-muted">
                       {new Date(commit.timestamp).toLocaleString()}
                     </span>
                   </div>
@@ -752,7 +753,7 @@ function TradeLog({ commits }: { commits: CommitWithAccount[] }) {
                       {commit.operations.map((op, i) => (
                         <span key={i} className="text-[11px] text-text-muted bg-bg px-1.5 py-0.5 rounded">
                           {op.symbol} {op.change}
-                          <span className={`ml-1 ${op.status === 'filled' ? 'text-green' : op.status === 'rejected' ? 'text-red' : op.status === 'submitted' ? 'text-accent' : 'text-text-muted/50'}`}>
+                          <span className={`ml-1 ${op.status === 'filled' ? 'text-green' : op.status === 'rejected' ? 'text-red' : op.status === 'submitted' ? 'text-accent' : 'text-text-muted'}`}>
                             {op.status}
                           </span>
                         </span>
@@ -790,44 +791,42 @@ function SnapshotSettings({ enabled, every, onEnabledChange, onEveryChange, save
   const [showCustom, setShowCustom] = useState(!isPreset)
 
   return (
-    <div className="flex items-center gap-3 text-[12px] text-text-muted">
-      <span className="font-medium uppercase tracking-wide">Snapshots</span>
-      <Toggle checked={enabled} onChange={onEnabledChange} size="sm" />
-      <div className="flex gap-0.5">
-        {INTERVAL_PRESETS.map(p => (
-          <button
-            key={p.value}
-            onClick={() => { onEveryChange(p.value); setShowCustom(false) }}
-            className={`px-2 py-0.5 text-[11px] rounded transition-colors ${
-              every === p.value && !showCustom
-                ? 'bg-accent/20 text-accent font-medium'
-                : 'hover:text-text hover:bg-bg-tertiary'
-            }`}
-          >
-            {p.label}
-          </button>
-        ))}
-        <button
-          onClick={() => setShowCustom(true)}
-          className={`px-2 py-0.5 text-[11px] rounded transition-colors ${
-            showCustom
-              ? 'bg-accent/20 text-accent font-medium'
-              : 'hover:text-text hover:bg-bg-tertiary'
-          }`}
-        >
-          Custom
-        </button>
+    <div className="flex flex-col gap-2 rounded-lg border border-border/70 bg-bg-secondary/45 px-3 py-2.5 text-[12px] text-text-muted sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center gap-2">
+        <span className="font-semibold uppercase tracking-wide">Snapshots</span>
+        <Toggle checked={enabled} onChange={onEnabledChange} size="sm" ariaLabel="Enable portfolio snapshots" />
+        {saveStatus === 'saving' && <span className="text-[10px] text-accent">saving...</span>}
+        {saveStatus === 'error' && <span className="text-[10px] text-red">save failed</span>}
       </div>
-      {showCustom && (
-        <input
-          className="w-16 px-1.5 py-0.5 rounded border border-border bg-bg text-text text-[12px] text-center"
-          value={every}
-          onChange={(e) => onEveryChange(e.target.value)}
-          placeholder="e.g. 2h"
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-text-muted">Every</span>
+        <SegmentedControl
+          value={showCustom ? 'custom' : every}
+          options={[
+            ...INTERVAL_PRESETS.map((preset) => ({ value: preset.value, label: preset.label })),
+            { value: 'custom', label: 'Custom' },
+          ]}
+          onChange={(next) => {
+            if (next === 'custom') {
+              setShowCustom(true)
+              return
+            }
+            onEveryChange(next)
+            setShowCustom(false)
+          }}
+          ariaLabel="Portfolio snapshot interval"
+          compact
         />
-      )}
-      {saveStatus === 'saving' && <span className="text-accent text-[10px]">saving...</span>}
-      {saveStatus === 'error' && <span className="text-red text-[10px]">save failed</span>}
+        {showCustom && (
+          <input
+            aria-label="Custom portfolio snapshot interval"
+            className="w-16 rounded-md border border-border bg-bg px-1.5 py-1 text-center text-[12px] text-text outline-none focus:border-accent"
+            value={every}
+            onChange={(e) => onEveryChange(e.target.value)}
+            placeholder="e.g. 2h"
+          />
+        )}
+      </div>
     </div>
   )
 }

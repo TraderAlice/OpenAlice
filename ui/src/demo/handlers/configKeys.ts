@@ -7,6 +7,7 @@ export const configKeysHandlers = [
   // and useConfigPage adopts the echo, so `{}` here would wipe the page.
   http.put('/api/config/marketData', async ({ request }) => HttpResponse.json(await request.json())),
   http.put('/api/config/trading', async ({ request }) => HttpResponse.json(await request.json())),
+  http.put('/api/config/snapshot', async ({ request }) => HttpResponse.json(await request.json())),
 
   http.get('/api/config', () =>
     HttpResponse.json({

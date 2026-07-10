@@ -12,7 +12,7 @@ export function SeriesCard({ card, label, emptyText }: { card: MacroSeriesCard; 
     <div className="min-w-0 border border-border rounded-md bg-bg-secondary/40 px-3 py-2.5 flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-[12px] text-text-muted truncate" title={card.id}>{label}</span>
-        <span className="text-[10px] text-text-muted/50 shrink-0">{card.latestDate ?? ''}</span>
+        <span className="shrink-0 text-[10px] text-text-muted">{card.latestDate ?? ''}</span>
       </div>
       <div className="flex min-w-0 items-end justify-between gap-2">
         <div className="flex min-w-0 items-baseline gap-2">
@@ -32,7 +32,7 @@ export function SeriesCard({ card, label, emptyText }: { card: MacroSeriesCard; 
           )}
         </div>
       </div>
-      {empty && <span className="text-[11px] text-text-muted/60">{emptyText}</span>}
+      {empty && <span className="text-[11px] text-text-muted">{emptyText}</span>}
     </div>
   )
 }
