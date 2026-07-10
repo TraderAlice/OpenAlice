@@ -47,7 +47,7 @@ export function assertDesktopPackage(options = {}) {
 
   const platform = options.platform ?? platformFromAppRoot(appRoot)
   const arch = options.arch ?? process.arch
-  const platformArch = platform === 'win32' ? `win32-${arch}` : null
+  const platformArch = `${platform}-${arch}`
   const requiredFiles = [...BASE_REQUIRED_FILES, ...platformRequiredFiles(platform, platformArch)]
   const missing = requiredFiles.filter((file) => !existsSync(join(appRoot, file)))
   if (missing.length > 0) {
@@ -71,7 +71,15 @@ export function assertDesktopPackage(options = {}) {
     errors.push(`[desktop-package] unexpected manifest.pi.cli: ${JSON.stringify(manifest?.pi?.cli)}`)
   }
 
-  if (platform === 'win32' && platformArch) {
+  const fd = manifest?.fd?.[platformArch]
+  const expectedFdPath = managedFdPath(platform, platformArch)
+  if (!fd) {
+    errors.push(`[desktop-package] expected manifest.fd.${platformArch} for managed fd`)
+  } else if (normalizeManifestPath(fd.path) !== expectedFdPath) {
+    errors.push(`[desktop-package] unexpected manifest.fd.${platformArch}.path: ${JSON.stringify(fd.path)}`)
+  }
+
+  if (platform === 'win32') {
     const git = manifest?.git?.[platformArch]
     if (!git) {
       errors.push(`[desktop-package] expected manifest.git.${platformArch} for Windows managed Git Bash`)
@@ -103,12 +111,19 @@ export function platformFromAppRoot(appRoot) {
 }
 
 function platformRequiredFiles(platform, platformArch) {
-  if (platform !== 'win32' || !platformArch) return []
-  return [
+  const files = []
+  files.push(managedFdPath(platform, platformArch))
+  if (platform !== 'win32') return files
+  files.push(
     `vendor/git/${platformArch}/cmd/git.exe`,
     `vendor/git/${platformArch}/bin/bash.exe`,
     `vendor/git/${platformArch}/bin/sh.exe`,
-  ]
+  )
+  return files
+}
+
+function managedFdPath(platform, platformArch) {
+  return `vendor/tools/${platformArch}/${platform === 'win32' ? 'fd.exe' : 'fd'}`
 }
 
 function normalizeManifestPath(value) {
@@ -123,6 +138,7 @@ function main() {
   }
   console.log(`[desktop-package] app resources OK: ${relative(repoRoot, result.appRoot)}`)
   console.log(`[desktop-package] managed Pi: ${result.manifest.pi.version} (${result.manifest.pi.mode})`)
+  console.log(`[desktop-package] managed fd: ${result.manifest.fd[result.platformArch].version} (${result.platformArch})`)
   if (result.platform === 'win32') {
     const git = result.manifest.git[result.platformArch]
     console.log(`[desktop-package] managed Git Bash: ${git.version} (${result.platformArch})`)

@@ -36,6 +36,18 @@ export function buildPackagedToolchainSmokePlan(packageResult) {
     expectStdout: /\b0\.80\.3\b/,
   })
 
+  const fd = packageResult.manifest.fd?.[packageResult.platformArch]
+  if (!fd) {
+    errors.push(`[packaged-toolchain] missing managed fd manifest entry ${packageResult.platformArch}`)
+    return { ok: false, errors, commands }
+  }
+  commands.push({
+    label: 'managed fd',
+    command: join(packageResult.appRoot, fd.path),
+    args: ['--version'],
+    expectStdout: /^fd 10\.4\.2$/m,
+  })
+
   if (packageResult.platform === 'win32') {
     const git = packageResult.manifest.git?.[packageResult.platformArch]
     if (!git) {

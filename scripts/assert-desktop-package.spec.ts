@@ -22,27 +22,35 @@ function writeBasePackage(appRoot: string, manifest: unknown) {
   writePackageFile(appRoot, 'vendor/manifest.json', JSON.stringify(manifest))
 }
 
-function piManifest() {
+function runtimeManifest(platformArch: string, fdPath: string) {
   return {
     pi: {
       version: '0.80.3',
       mode: 'npm',
       cli: PI_CLI,
     },
+    fd: {
+      [platformArch]: {
+        version: '10.4.2',
+        path: fdPath,
+      },
+    },
   }
 }
 
 describe('assertDesktopPackage', () => {
-  it('does not require vendor Git in macOS packages', () => {
+  it('requires managed fd but not vendor Git in macOS packages', () => {
     const root = mkdtempSync(join(tmpdir(), 'openalice-package-mac-'))
     try {
       const appRoot = join(root, 'mac-arm64/OpenAlice.app/Contents/Resources/app')
-      writeBasePackage(appRoot, piManifest())
+      writeBasePackage(appRoot, runtimeManifest('darwin-arm64', 'vendor/tools/darwin-arm64/fd'))
+      writePackageFile(appRoot, 'vendor/tools/darwin-arm64/fd')
 
       const result = assertDesktopPackage({ packageRoot: root, repoRoot: root, arch: 'arm64' })
 
       expect(result.ok).toBe(true)
       expect(result.platform).toBe('darwin')
+      expect(result.platformArch).toBe('darwin-arm64')
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
@@ -52,7 +60,7 @@ describe('assertDesktopPackage', () => {
     const root = mkdtempSync(join(tmpdir(), 'openalice-package-win-missing-'))
     try {
       const appRoot = join(root, 'win-unpacked/resources/app')
-      writeBasePackage(appRoot, piManifest())
+      writeBasePackage(appRoot, runtimeManifest('win32-x64', 'vendor/tools/win32-x64/fd.exe'))
 
       const result = assertDesktopPackage({ packageRoot: root, repoRoot: root, arch: 'x64' })
 
@@ -60,6 +68,7 @@ describe('assertDesktopPackage', () => {
       expect(result.errors.join('\n')).toContain('vendor/git/win32-x64/cmd/git.exe')
       expect(result.errors.join('\n')).toContain('vendor/git/win32-x64/bin/bash.exe')
       expect(result.errors.join('\n')).toContain('expected manifest.git.win32-x64')
+      expect(result.errors.join('\n')).toContain('vendor/tools/win32-x64/fd.exe')
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
@@ -70,7 +79,7 @@ describe('assertDesktopPackage', () => {
     try {
       const appRoot = join(root, 'win-unpacked/resources/app')
       writeBasePackage(appRoot, {
-        ...piManifest(),
+        ...runtimeManifest('win32-x64', 'vendor/tools/win32-x64/fd.exe'),
         git: {
           'win32-x64': {
             version: '2.55.0.2',
@@ -84,6 +93,7 @@ describe('assertDesktopPackage', () => {
       writePackageFile(appRoot, 'vendor/git/win32-x64/cmd/git.exe')
       writePackageFile(appRoot, 'vendor/git/win32-x64/bin/bash.exe')
       writePackageFile(appRoot, 'vendor/git/win32-x64/bin/sh.exe')
+      writePackageFile(appRoot, 'vendor/tools/win32-x64/fd.exe')
 
       const result = assertDesktopPackage({ packageRoot: root, repoRoot: root, arch: 'x64' })
 

@@ -55,13 +55,54 @@ const WINDOWS_GIT_RUNTIMES = {
   },
 }
 
+const FD_VERSION = '10.4.2'
+const FD_RELEASE_BASE = `https://github.com/sharkdp/fd/releases/download/v${FD_VERSION}`
+const FD_RUNTIMES = {
+  darwin: {
+    arm64: {
+      platformArch: 'darwin-arm64',
+      assetName: `fd-v${FD_VERSION}-aarch64-apple-darwin.tar.gz`,
+      sha256: '623dc0afc81b92e4d4606b380d7bc91916ba7b97814263e554d50923a39e480a',
+      binaryName: 'fd',
+    },
+  },
+  win32: {
+    x64: {
+      platformArch: 'win32-x64',
+      assetName: `fd-v${FD_VERSION}-x86_64-pc-windows-msvc.zip`,
+      sha256: 'b2816e506390a89941c63c9187d58a3cc10e9a55f2ef0685f9ea0eccaf7c98c8',
+      binaryName: 'fd.exe',
+    },
+    arm64: {
+      platformArch: 'win32-arm64',
+      assetName: `fd-v${FD_VERSION}-aarch64-pc-windows-msvc.zip`,
+      sha256: '4f9110c2d5b33a7f760bfa5510f4c113d828109f7277d421b1053a9943c0fc92',
+      binaryName: 'fd.exe',
+    },
+  },
+  linux: {
+    x64: {
+      platformArch: 'linux-x64',
+      assetName: `fd-v${FD_VERSION}-x86_64-unknown-linux-gnu.tar.gz`,
+      sha256: 'def59805cd14b5651b68990855f426ad087f3b96881296d963910431ba3143c8',
+      binaryName: 'fd',
+    },
+    arm64: {
+      platformArch: 'linux-arm64',
+      assetName: `fd-v${FD_VERSION}-aarch64-unknown-linux-gnu.tar.gz`,
+      sha256: '6c51f7c5446b3338b1e401ff15dc194c590bb2fa64fd43ff3278300f073adec5',
+      binaryName: 'fd',
+    },
+  },
+}
+
 function printHelp() {
   console.log(`Usage: pnpm vendor:runtime [options]
 
 Prepare managed workspace runtimes under vendor/.
 
 Options:
-  --force    Remove and reinstall vendor/pi even if it already matches
+  --force    Reinstall managed runtimes even if they already match
   -h, --help Show this help
 `)
 }
@@ -70,8 +111,57 @@ async function main() {
   parseArgs(process.argv.slice(2))
   await mkdir(vendorRoot, { recursive: true })
   await vendorPi()
+  const fdSpec = await vendorFd()
   const gitSpec = await vendorWindowsGit()
-  await writeManifest(gitSpec)
+  await writeManifest(fdSpec, gitSpec)
+}
+
+async function vendorFd() {
+  const spec = resolveFdRuntimeSpec()
+  if (!spec) {
+    console.log(`[vendor-runtime] managed fd skipped on unsupported host ${process.platform}-${process.arch}`)
+    return null
+  }
+
+  const existingManifest = readManifest()
+  if (
+    !force &&
+    existingManifest?.fd?.[spec.platformArch]?.version === spec.version &&
+    existingManifest?.fd?.[spec.platformArch]?.sha256 === spec.sha256 &&
+    existsSync(resolve(repoRoot, spec.path))
+  ) {
+    console.log(`[vendor-runtime] fd ${spec.version} already present at ${spec.path}`)
+    return spec
+  }
+
+  const runtimeRoot = resolve(repoRoot, spec.root)
+  console.log(`[vendor-runtime] preparing fd ${spec.version} at ${relativeForLog(runtimeRoot)}`)
+  await rm(runtimeRoot, { recursive: true, force: true })
+  await mkdir(runtimeRoot, { recursive: true })
+
+  const bytes = await download(spec.url)
+  verifySha256(bytes, spec.sha256, spec.url)
+
+  const tmpRoot = await mkdtemp(resolve(tmpdir(), 'openalice-fd-'))
+  const archivePath = resolve(tmpRoot, basename(spec.url))
+  try {
+    await writeFile(archivePath, bytes)
+    run('extract managed fd', 'tar', [
+      '-xf',
+      archivePath,
+      '-C',
+      runtimeRoot,
+      '--strip-components=1',
+    ])
+  } finally {
+    await rm(tmpRoot, { recursive: true, force: true })
+  }
+
+  if (!existsSync(resolve(repoRoot, spec.path))) {
+    throw new Error(`fd extraction missing required binary: ${spec.path}`)
+  }
+  console.log(`[vendor-runtime] fd -> ${spec.path}`)
+  return spec
 }
 
 function parseArgs(argv) {
@@ -203,7 +293,7 @@ function readManifest() {
   }
 }
 
-export function buildVendorRuntimeManifest(gitSpec = null) {
+export function buildVendorRuntimeManifest(fdSpec = null, gitSpec = null) {
   const manifest = {
     pi: {
       version: PI_VERSION,
@@ -212,6 +302,17 @@ export function buildVendorRuntimeManifest(gitSpec = null) {
       cli: relativeForManifest(piCliPath),
       node: 'electron',
     },
+  }
+  if (fdSpec) {
+    manifest.fd = {
+      [fdSpec.platformArch]: {
+        version: fdSpec.version,
+        distribution: 'sharkdp/fd',
+        url: fdSpec.url,
+        sha256: fdSpec.sha256,
+        path: fdSpec.path,
+      },
+    }
   }
   if (gitSpec) {
     manifest.git = {
@@ -231,10 +332,30 @@ export function buildVendorRuntimeManifest(gitSpec = null) {
   return manifest
 }
 
-async function writeManifest(gitSpec) {
-  const manifest = buildVendorRuntimeManifest(gitSpec)
+async function writeManifest(fdSpec, gitSpec) {
+  const manifest = buildVendorRuntimeManifest(fdSpec, gitSpec)
   await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n')
   console.log(`[vendor-runtime] manifest -> ${relativeForLog(manifestPath)}`)
+}
+
+export function resolveFdRuntimeSpec(opts = {}) {
+  const platform = opts.platform ?? process.platform
+  const arch = opts.arch ?? process.arch
+  const platformRuntimes = FD_RUNTIMES[platform]
+  if (!platformRuntimes) return null
+  const runtime = platformRuntimes[arch]
+  if (!runtime) {
+    throw new Error(`unsupported ${platform} architecture for managed fd runtime: ${arch}`)
+  }
+  const root = `vendor/tools/${runtime.platformArch}`
+  return {
+    version: FD_VERSION,
+    platformArch: runtime.platformArch,
+    url: `${FD_RELEASE_BASE}/${runtime.assetName}`,
+    sha256: runtime.sha256,
+    root,
+    path: `${root}/${runtime.binaryName}`,
+  }
 }
 
 export function resolveWindowsGitRuntimeSpec(opts = {}) {

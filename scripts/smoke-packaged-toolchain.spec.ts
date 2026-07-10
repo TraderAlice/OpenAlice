@@ -25,10 +25,15 @@ describe('buildPackagedToolchainSmokePlan', () => {
         errors: [],
         appRoot,
         platform: 'darwin',
-        platformArch: null,
+        platformArch: 'darwin-arm64',
         manifest: {
           pi: {
             cli: 'vendor/pi/node_modules/@earendil-works/pi-coding-agent/dist/cli.js',
+          },
+          fd: {
+            'darwin-arm64': {
+              path: 'vendor/tools/darwin-arm64/fd',
+            },
           },
         },
       })
@@ -37,6 +42,7 @@ describe('buildPackagedToolchainSmokePlan', () => {
       expect(plan.commands.map((command) => command.label)).toEqual([
         'packaged Electron Node mode',
         'managed Pi through packaged Electron Node',
+        'managed fd',
       ])
       expect(packagedElectronExecutable(appRoot, 'darwin')?.replaceAll('\\', '/'))
         .toContain('OpenAlice.app/Contents/MacOS/OpenAlice')
@@ -60,6 +66,11 @@ describe('buildPackagedToolchainSmokePlan', () => {
           pi: {
             cli: 'vendor/pi/node_modules/@earendil-works/pi-coding-agent/dist/cli.js',
           },
+          fd: {
+            'win32-x64': {
+              path: 'vendor/tools/win32-x64/fd.exe',
+            },
+          },
           git: {
             'win32-x64': {
               path: 'vendor/git/win32-x64',
@@ -76,12 +87,13 @@ describe('buildPackagedToolchainSmokePlan', () => {
       expect(plan.commands.map((command) => command.label)).toEqual([
         'packaged Electron Node mode',
         'managed Pi through packaged Electron Node',
+        'managed fd',
         'managed git.exe',
         'managed bash.exe',
         'managed sh.exe can resolve git and bash on PATH',
       ])
-      expect(plan.commands[2].command.replaceAll('\\', '/')).toContain('vendor/git/win32-x64/cmd/git.exe')
-      expect(plan.commands[4].env?.PATH.replaceAll('\\', '/')).toContain('vendor/git/win32-x64/mingw64/bin')
+      expect(plan.commands[3].command.replaceAll('\\', '/')).toContain('vendor/git/win32-x64/cmd/git.exe')
+      expect(plan.commands[5].env?.PATH.replaceAll('\\', '/')).toContain('vendor/git/win32-x64/mingw64/bin')
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
@@ -93,7 +105,7 @@ describe('buildPackagedToolchainSmokePlan', () => {
       errors: [],
       appRoot: '/tmp/missing/OpenAlice.app/Contents/Resources/app',
       platform: 'darwin',
-      platformArch: null,
+      platformArch: 'darwin-arm64',
       manifest: {
         pi: {
           cli: 'vendor/pi/node_modules/@earendil-works/pi-coding-agent/dist/cli.js',
