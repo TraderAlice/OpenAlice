@@ -614,5 +614,6 @@ export const ja: Resources = {
     signIn: 'サインイン',
     noTokenHeading: '管理者トークンが設定されていません',
     loginFailed: 'ログインに失敗しました',
+    reconnecting: 'OpenAlice に再接続しています…',
   },
 }

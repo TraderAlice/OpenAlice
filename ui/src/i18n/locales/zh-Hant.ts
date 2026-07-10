@@ -622,5 +622,6 @@ export const zhHant: Resources = {
     signIn: '登入',
     noTokenHeading: '未設定管理員權杖',
     loginFailed: '登入失敗',
+    reconnecting: '正在重新連線 OpenAlice…',
   },
 }

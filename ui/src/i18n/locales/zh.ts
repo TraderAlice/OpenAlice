@@ -614,5 +614,6 @@ export const zh: Resources = {
     signIn: '登录',
     noTokenHeading: '未配置管理员令牌',
     loginFailed: '登录失败',
+    reconnecting: '正在重新连接 OpenAlice…',
   },
 }

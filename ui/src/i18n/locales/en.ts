@@ -627,6 +627,7 @@ export const en = {
     signIn: 'Sign in',
     noTokenHeading: 'No admin token configured',
     loginFailed: 'Login failed',
+    reconnecting: 'Reconnecting to OpenAlice…',
   },
 } as const
 
