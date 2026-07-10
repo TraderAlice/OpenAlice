@@ -10,9 +10,11 @@ import { readWorkspaceFile, writeWorkspaceFile } from '../file-service.js';
 // Pi's per-workspace provider override. `models.json` is read from Pi's AGENT
 // DIR, which has NO project-local layer — so we redirect the whole agent dir to
 // `<cwd>/.pi-agent` via PI_CODING_AGENT_DIR (composeEnv) and drop models.json
-// there. This is separate from project-local Agent Skills in
-// `<cwd>/.agents/skills`, keyed off cwd and unaffected by
-// PI_CODING_AGENT_DIR. Verified against global Pi 0.78.1 and bundled Pi 0.80.3.
+// there. This is a DIFFERENT dir from `<cwd>/.pi` (Pi's project-local
+// extensions/skills discovery, keyed off cwd and unaffected by
+// PI_CODING_AGENT_DIR) — so the alice* CLI skills in `<cwd>/.pi/skills` still
+// resolve. Verified against pi 0.78.1 (`dist/core/model-registry.js:144-157`,
+// `dist/config.js:378,393-407`).
 const PI_AGENT_DIR = '.pi-agent';
 const PI_MODELS_PATH = `${PI_AGENT_DIR}/models.json`;
 const PI_SETTINGS_PATH = `${PI_AGENT_DIR}/settings.json`;
@@ -37,7 +39,7 @@ function piCommandHead(env: Readonly<Record<string, string>>): readonly string[]
  * TOOL ACCESS: Pi has no native MCP, and the launcher injects NO MCP into
  * workspaces at all — Pi reaches OpenAlice purely through the `alice*` CLI
  * shims on PATH (`service.ts`) + the `alice*` / `traderhub` skills
- * copied to `<cwd>/.agents/skills` (`context-injector.ts`); Pi's built-in `bash`
+ * copied to `<cwd>/.pi/skills` (`context-injector.ts`); Pi's built-in `bash`
  * tool runs `alice` / `alice-uta` / `alice-workspace` / `traderhub`. This is
  * the full surface (data, trading, workspace, market) — same as every other
  * agent; only cron is unavailable (MCP-only by design, on no CLI). The old
@@ -80,7 +82,7 @@ export const piAdapter: CliAdapter = {
   },
 
   composeCommand(_base: readonly string[], ctx: SpawnContext): readonly string[] {
-    // Tools come from the CLI-injection path (alice on PATH + .agents/skills), not
+    // Tools come from the CLI-injection path (alice on PATH + .pi/skills), not
     // flags — so the command head is just the binary + a resume flag (if any).
     const head = piCommandHead(ctx.env);
     // Quick-chat seed: `pi [--session-id <id>] <messages…>` opens the

@@ -109,6 +109,7 @@ describe('chat workspace create: bootstrap → inject → commit', () => {
       'CLAUDE.md', 'AGENTS.md', 'README.md',
       '.claude/skills/scan-value-chain/SKILL.md',
       '.agents/skills/scan-value-chain/SKILL.md',
+      '.pi/skills/scan-value-chain/SKILL.md',
       // per-CLI playbooks injected for every tool-bearing template
       '.claude/skills/alice/SKILL.md',
       '.claude/skills/alice-analysis/SKILL.md',
@@ -171,8 +172,7 @@ describe('chat workspace create — CLI-only injection (no MCP)', () => {
     expect(existsSync(join(dir, '.claude/skills/alice-uta/SKILL.md'))).toBe(true);   // trading skill discoverable
     expect(existsSync(join(dir, '.claude/skills/traderhub/SKILL.md'))).toBe(true);
     expect(existsSync(join(dir, '.claude/skills/scan-value-chain/SKILL.md'))).toBe(true);
-    expect(existsSync(join(dir, '.agents/skills/alice-uta/SKILL.md'))).toBe(true); // Codex + Pi + opencode
-    expect(existsSync(join(dir, '.pi/skills/alice-uta/SKILL.md'))).toBe(false);    // avoids Pi collisions
+    expect(existsSync(join(dir, '.pi/skills/alice-uta/SKILL.md'))).toBe(true);  // Pi discovers .pi/skills
     expect((await run('git', ['-C', dir, 'status', '--porcelain'])).trim()).toBe('');
   });
 });

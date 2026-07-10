@@ -89,7 +89,7 @@ describe('injectWorkspaceContext — persona', () => {
 });
 
 describe('injectWorkspaceContext — skills', () => {
-  it('copies a bundled skill into the two non-overlapping CLI discovery paths', async () => {
+  it('copies a bundled skill into all three CLI discovery paths', async () => {
     await injectWorkspaceContext({
       template: makeTemplate({ bundledSkills: ['scan-value-chain'] }),
       wsId: 'ws-abc',
@@ -97,8 +97,8 @@ describe('injectWorkspaceContext — skills', () => {
     });
     const expected = await readFile(defaultPath('skills', 'scan-value-chain', 'SKILL.md'), 'utf8');
     expect(await read('.claude/skills/scan-value-chain/SKILL.md')).toBe(expected);  // Claude Code
-    expect(await read('.agents/skills/scan-value-chain/SKILL.md')).toBe(expected);  // Codex + Pi + opencode
-    expect(existsSync(join(dir, '.pi/skills/scan-value-chain/SKILL.md'))).toBe(false);
+    expect(await read('.agents/skills/scan-value-chain/SKILL.md')).toBe(expected);  // Codex (+ opencode default)
+    expect(await read('.pi/skills/scan-value-chain/SKILL.md')).toBe(expected);      // Pi
   });
 
   it('injects the per-CLI playbooks (alice* + traderhub) for a tool-bearing template', async () => {
@@ -109,7 +109,7 @@ describe('injectWorkspaceContext — skills', () => {
     });
     for (const name of ['alice', 'alice-analysis', 'alice-uta', 'alice-workspace', 'traderhub', 'scan-value-chain']) {
       expect(existsSync(join(dir, '.claude/skills', name, 'SKILL.md')), name).toBe(true);
-      expect(existsSync(join(dir, '.agents/skills', name, 'SKILL.md')), name).toBe(true);
+      expect(existsSync(join(dir, '.pi/skills', name, 'SKILL.md')), name).toBe(true);
     }
   });
 
@@ -131,6 +131,6 @@ describe('injectWorkspaceContext — skills', () => {
     });
     expect(existsSync(join(dir, '.claude/skills/self-scheduling/SKILL.md'))).toBe(true);
     expect(existsSync(join(dir, '.agents/skills/self-scheduling/SKILL.md'))).toBe(true);
-    expect(existsSync(join(dir, '.pi/skills/self-scheduling/SKILL.md'))).toBe(false);
+    expect(existsSync(join(dir, '.pi/skills/self-scheduling/SKILL.md'))).toBe(true);
   });
 });
