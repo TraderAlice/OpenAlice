@@ -394,7 +394,7 @@ function SectionHeader({
         <button
           type="button"
           onClick={onToggleCollapse}
-          className="flex-1 flex min-h-7 items-center gap-1.5 py-1 text-[12px] font-semibold text-text-muted/75 hover:text-text-muted transition-colors text-left"
+          className="flex min-h-7 flex-1 items-center gap-1.5 py-1 text-left text-[12px] font-semibold text-text-muted transition-colors hover:text-text"
           aria-expanded={!isCollapsed}
           aria-controls={controlsId}
           title={label}
@@ -424,7 +424,7 @@ function SectionHeader({
         )}
       </div>
       {showItems && description && hintOpen && (
-        <p className="px-3 mb-2 text-[11px] text-text-muted/60 leading-relaxed">
+        <p className="mb-2 px-3 text-[11px] leading-relaxed text-text-muted">
           {description}
         </p>
       )}

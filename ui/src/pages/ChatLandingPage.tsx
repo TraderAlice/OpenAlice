@@ -356,10 +356,10 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
         </div>
 
         <div
-          className={`rounded-xl md:rounded-2xl px-3 pt-3 pb-2 transition-colors ${
+          className={`rounded-xl px-3 pb-2 pt-3 shadow-[0_18px_50px_-40px_var(--color-text)] transition-[border-color,box-shadow] md:rounded-2xl ${
             targetWs
               ? 'bg-accent/[0.04] border border-accent/45 ring-1 ring-accent/15 focus-within:border-accent/70'
-              : 'bg-bg-secondary/60 border border-border/60 focus-within:border-accent/50'
+              : 'border border-border/80 bg-bg-secondary/70 focus-within:border-accent/60 focus-within:shadow-[0_20px_55px_-38px_var(--color-accent)]'
           }`}
         >
           <textarea
@@ -370,7 +370,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
             placeholder={t('chatLanding.placeholder')}
             rows={3}
             autoFocus
-            className="w-full bg-transparent resize-none outline-none text-text placeholder:text-text-muted/50 text-[15px] px-2 py-1.5 min-h-[92px] md:min-h-[72px] max-h-[40vh]"
+            className="w-full max-h-[40vh] min-h-[92px] resize-none bg-transparent px-2 py-1.5 text-[15px] text-text outline-none placeholder:text-text-muted/70 md:min-h-[72px]"
           />
           <div className="flex flex-col gap-2 px-1 pt-1 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -414,12 +414,12 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
                             void setDefaultAgent(a.id)
                             setAgentMenuOpen(false)
                           }}
-                          className={`w-full flex items-center gap-2 px-3 py-1.5 text-[12px] text-left transition-colors hover:bg-bg-tertiary ${active ? 'text-accent' : missing ? 'text-text-muted/60' : 'text-text'}`}
+                          className={`w-full flex items-center gap-2 px-3 py-1.5 text-[12px] text-left transition-colors hover:bg-bg-tertiary ${active ? 'text-accent' : missing ? 'text-text-muted' : 'text-text'}`}
                         >
                           {Icon ? <Icon className="w-3.5 h-3.5 shrink-0" /> : <span className="w-3.5 shrink-0" />}
                           <span className="flex-1">{a.displayName}</span>
                           {missing && (
-                            <span className="text-[10px] text-text-muted/70 shrink-0">
+                            <span className="text-[10px] text-text-muted shrink-0">
                               {t('chatLanding.agentNotInstalled')}
                             </span>
                           )}
@@ -477,7 +477,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
                             className={`w-full flex items-center gap-2 px-3 py-1.5 text-[12px] text-left transition-colors hover:bg-bg-tertiary ${active ? 'text-accent' : 'text-text'}`}
                           >
                             <span className="flex-1 truncate">{cr.label?.trim() || cr.slug}</span>
-                            <span className="text-[10px] text-text-muted/70 shrink-0">{cr.vendor}</span>
+                            <span className="text-[10px] text-text-muted shrink-0">{cr.vendor}</span>
                             {active && <Check className="w-3.5 h-3.5 shrink-0" />}
                           </button>
                         )
@@ -528,7 +528,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
             </p>
             {installHint?.cmd && (
               <div className="flex items-center gap-2">
-                <span className="text-text-muted/70">{t('chatLanding.installLabel')}</span>
+                <span className="text-text-muted">{t('chatLanding.installLabel')}</span>
                 <code className="font-mono text-[11px] text-text bg-bg-tertiary rounded px-2 py-1 select-all">
                   {installHint.cmd}
                 </code>
@@ -573,19 +573,25 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
           </div>
         )}
 
-        <div className="scrollbar-hide -mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:flex-wrap md:overflow-visible md:px-1 md:pb-0">
-          <span className="shrink-0 text-[11px] text-text-muted/70">{t('chatLanding.examplesLabel')}</span>
-          {[t('chatLanding.ex1'), t('chatLanding.ex2'), t('chatLanding.ex3')].map((ex) => (
-            <button
-              key={ex}
-              type="button"
-              onClick={() => useExample(ex)}
-              disabled={launching}
-              className="shrink-0 min-h-8 text-[12px] text-text-muted bg-bg-secondary/60 border border-border/50 rounded-full px-3 py-1 transition-colors hover:border-accent/40 hover:text-text disabled:opacity-40"
-            >
-              {ex}
-            </button>
-          ))}
+        <div className="relative -mx-4 md:mx-0">
+          <div className="scrollbar-hide flex items-center gap-2 overflow-x-auto px-4 pb-1 pr-14 md:flex-wrap md:overflow-visible md:px-1 md:pr-1 md:pb-0">
+            <span className="shrink-0 text-[11px] font-medium text-text-muted">{t('chatLanding.examplesLabel')}</span>
+            {[t('chatLanding.ex1'), t('chatLanding.ex2'), t('chatLanding.ex3')].map((ex) => (
+              <button
+                key={ex}
+                type="button"
+                onClick={() => useExample(ex)}
+                disabled={launching}
+                className="min-h-8 shrink-0 rounded-full border border-border/70 bg-bg-secondary/75 px-3 py-1 text-[12px] text-text-muted transition-colors hover:border-accent/50 hover:bg-bg-secondary hover:text-text disabled:opacity-40"
+              >
+                {ex}
+              </button>
+            ))}
+          </div>
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-bg via-bg/90 to-transparent md:hidden"
+          />
         </div>
       </div>
     </div>

@@ -21,7 +21,7 @@ export function SidebarSectionHeader({
 }) {
   return (
     <div className="flex items-center gap-1.5 px-3 mt-2 mb-1 select-none">
-      <h3 className="flex-1 text-[10px] font-medium uppercase tracking-wider text-text-muted/60 truncate">
+      <h3 className="flex-1 truncate text-[10px] font-semibold uppercase tracking-wider text-text-muted">
         {children}
       </h3>
       {trailing}

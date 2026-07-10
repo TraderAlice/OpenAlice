@@ -3,9 +3,10 @@ import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
 import {
   ScatterChart, Scatter, Cell, LabelList, ReferenceLine,
-  XAxis, YAxis, Tooltip, ResponsiveContainer,
+  XAxis, YAxis, Tooltip,
 } from 'recharts'
 import { BoardMeta } from '../components/market/BoardMeta'
+import { MeasuredChartFrame } from '../components/MeasuredChartFrame'
 import { PageHeader } from '../components/PageHeader'
 import { CenteredLoading } from '../components/StateViews'
 import { marketApi, type SectorRotationResult, type SectorRotationRow } from '../api/market'
@@ -119,8 +120,9 @@ function QuadrantChart({ points, t }: { points: Point[]; t: TFunction }) {
         <CornerLabel className="bottom-7 right-2 text-text-muted/60" text={t('market.quadWeakening')} />
         <CornerLabel className="bottom-7 left-12 text-red/70" text={t('market.quadRotatingOut')} />
       </div>
-      <ResponsiveContainer width="100%" height={420}>
-        <ScatterChart margin={{ top: 24, right: 28, bottom: 28, left: 8 }}>
+      <MeasuredChartFrame className="h-[420px] w-full">
+        {({ width, height }) => (
+          <ScatterChart width={width} height={height} margin={{ top: 24, right: 28, bottom: 28, left: 8 }}>
           <XAxis
             type="number" dataKey="x" name={t('market.axisRelStrength')}
             tickFormatter={(v: number) => `${v.toFixed(0)}%`}
@@ -141,8 +143,9 @@ function QuadrantChart({ points, t }: { points: Point[]; t: TFunction }) {
             {points.map((p) => <Cell key={p.symbol} fill={dotColor(p.score)} />)}
             <LabelList dataKey="symbol" position="top" style={{ fontSize: 10, fill: 'var(--text)', fontWeight: 600 }} />
           </Scatter>
-        </ScatterChart>
-      </ResponsiveContainer>
+          </ScatterChart>
+        )}
+      </MeasuredChartFrame>
       <div className="flex justify-between px-8 -mt-1 text-[10px] text-text-muted/50">
         <span>{t('market.axisRelStrength')} →</span>
         <span>↑ {t('market.axisVolumeShare')}</span>
