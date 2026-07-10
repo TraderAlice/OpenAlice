@@ -8,12 +8,14 @@ on:
       - ".github/workflows/desktop-package-smoke.yml"
       - ".github/workflows/release.yml"
       - "apps/desktop/**"
+      - "packages/guardian-runtime/**"
       - "build/entitlements*.plist"
       - "package.json"
       - "pnpm-lock.yaml"
       - "scripts/assert-desktop-package.mjs"
       - "scripts/desktop-packaged-smoke.mjs"
       - "scripts/desktop-packaged-smoke-plan.mjs"
+      - "scripts/guardian/**"
       - "scripts/smoke-packaged-toolchain.mjs"
       - "scripts/vendor-managed-runtime.mjs"
       - "src/core/paths.ts"
@@ -28,12 +30,14 @@ on:
       - ".github/workflows/desktop-package-smoke.yml"
       - ".github/workflows/release.yml"
       - "apps/desktop/**"
+      - "packages/guardian-runtime/**"
       - "build/entitlements*.plist"
       - "package.json"
       - "pnpm-lock.yaml"
       - "scripts/assert-desktop-package.mjs"
       - "scripts/desktop-packaged-smoke.mjs"
       - "scripts/desktop-packaged-smoke-plan.mjs"
+      - "scripts/guardian/**"
       - "scripts/smoke-packaged-toolchain.mjs"
       - "scripts/vendor-managed-runtime.mjs"
       - "src/core/paths.ts"
@@ -74,6 +78,10 @@ jobs:
 
       - name: Build Alice + UTA + desktop shell
         run: pnpm electron:build
+
+      - name: Smoke Guardian takeover through Electron
+        run: pnpm electron:smoke:guardian-recovery --skip-build
+        timeout-minutes: 5
 
       - name: Vendor managed workspace runtime
         run: pnpm vendor:runtime

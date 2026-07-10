@@ -21,6 +21,13 @@
  */
 
 import { app, BrowserWindow, dialog, Menu, protocol } from 'electron'
+import {
+  acquireGuardianRuntime,
+  currentProcessStartedAt,
+  inspectOpenAliceInstance,
+  takeoverRequested,
+  type RuntimeProcessLock,
+} from '@traderalice/guardian-runtime'
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import { existsSync, statSync } from 'node:fs'
 import { mkdir, readFile, watch } from 'node:fs/promises'
@@ -40,6 +47,7 @@ let alice: ChildProcess | null = null
 let appQuitting = false
 let restartingUTA = false
 let rendererOnboardingSmokeStarted = false
+let guardianRuntimeLock: RuntimeProcessLock | null = null
 
 const DEFAULT_WEB_PORT_START = 47331
 const READY_TIMEOUT_MS = 30_000
@@ -487,6 +495,59 @@ app.whenReady().then(async () => {
         OPENALICE_APP_HOME: repoRoot,
       }
 
+  // Resolve duplicate ownership before relocation, port reads, or any child
+  // process can mutate the selected store.
+  const launcherRoot = process.env['AQ_LAUNCHER_ROOT']?.trim() || join(userDataHome, 'workspaces')
+  let takeover = takeoverRequested()
+  const guardianStartedAt = currentProcessStartedAt()
+  const runtimeInspections = await inspectOpenAliceInstance({
+    userDataHome,
+    launcherRoot,
+  })
+  const activeRuntime = runtimeInspections.find((row) => row.state === 'active' && row.owner)
+  if (activeRuntime && !takeover) {
+    const owner = activeRuntime.owner!
+    const staleDetail = activeRuntime.heartbeatStale
+      ? '\n\nThe process is still present, but its health heartbeat is stale.'
+      : ''
+    const { response } = await dialog.showMessageBox({
+      type: activeRuntime.heartbeatStale ? 'warning' : 'question',
+      title: 'OpenAlice is already running',
+      message: `Another OpenAlice ${owner.launcher} instance is using this data.`,
+      detail: `PID ${owner.pid}\nData: ${userDataHome}\nLast heartbeat: ${owner.heartbeatAt}${staleDetail}`,
+      buttons: ['Keep existing instance', 'Stop it and start this OpenAlice'],
+      defaultId: activeRuntime.heartbeatStale ? 1 : 0,
+      cancelId: 0,
+      noLink: true,
+    })
+    if (response !== 1) {
+      app.quit()
+      return
+    }
+    takeover = true
+  }
+  try {
+    guardianRuntimeLock = await acquireGuardianRuntime({
+      userDataHome,
+      launcherRoot,
+      launcher: app.isPackaged ? 'guardian-electron-packaged' : 'guardian-electron-dev',
+      takeover,
+      processStartedAt: guardianStartedAt,
+      onOwnershipLost: (err) => {
+        console.error('[guardian] runtime ownership lost:', err)
+        shutdown()
+      },
+    })
+    if (takeover) console.log('[guardian] takeover → previous OpenAlice runtime stopped')
+  } catch (err) {
+    dialog.showErrorBox(
+      'OpenAlice — recovery failed',
+      `${err instanceof Error ? err.message : String(err)}\n\nThe previous writer was not confirmed stopped, so OpenAlice did not unlock the data directory.`,
+    )
+    app.quit()
+    return
+  }
+
   // Pre-global-root installs kept user data under Electron's userData dir.
   // Move it once, BEFORE ports.json is read from the new root and before the
   // backend boots (it would run migrations against an empty store). On
@@ -550,6 +611,10 @@ app.whenReady().then(async () => {
         ELECTRON_RUN_AS_NODE: '1',
         OPENALICE_UTA_PORT: String(utaPort),
         OPENALICE_LAUNCHER: 'electron',
+        OPENALICE_GUARDIAN_PID: String(process.pid),
+        OPENALICE_GUARDIAN_STARTED_AT: String(guardianStartedAt),
+        AQ_LAUNCHER_ROOT: launcherRoot,
+        ...(takeover ? { OPENALICE_TAKEOVER: '1' } : {}),
         ...homeEnv,
         ...runtimeEnv,
       },
@@ -575,6 +640,10 @@ app.whenReady().then(async () => {
         OPENALICE_TOOL_SOCKET: toolSocketPath,
         ...(liteMode ? { OPENALICE_LITE_MODE: '1' } : { OPENALICE_UTA_URL: utaUrl ?? '' }),
         OPENALICE_LAUNCHER: 'electron',
+        OPENALICE_GUARDIAN_PID: String(process.pid),
+        OPENALICE_GUARDIAN_STARTED_AT: String(guardianStartedAt),
+        AQ_LAUNCHER_ROOT: launcherRoot,
+        ...(takeover ? { OPENALICE_TAKEOVER: '1' } : {}),
         ...homeEnv,
         ...runtimeEnv,
       },
@@ -795,7 +864,10 @@ async function stopChildren(): Promise<void> {
 /** Cascade tree-kill both children, then exit once they're gone. */
 function shutdown(): void {
   if (appQuitting) return
-  void stopChildren().finally(() => {
+  void stopChildren().finally(async () => {
+    const current = guardianRuntimeLock
+    guardianRuntimeLock = null
+    await current?.release().catch((err) => console.error('[guardian] runtime lock release failed:', err))
     const exitCode = typeof process.exitCode === 'number' ? process.exitCode : 0
     app.exit(exitCode)
   })

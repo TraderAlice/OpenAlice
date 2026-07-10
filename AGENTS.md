@@ -14,6 +14,7 @@ process (UTA). All persisted state lives as files — no database.
 pnpm install                                       # Local dev (full, ~1.7G)
 pnpm install --filter='!@traderalice/desktop'      # Cloud / agent sessions (~748M, skips Electron shell)
 pnpm dev          # Dev: Guardian spawns UTA (47333) + Alice (47331) + Vite (5173)
+pnpm dev --takeover # Stop the recorded OpenAlice owner tree, then start this dev stack
 pnpm build        # Production: turbo (packages + UI + services/uta) + tsup (Alice)
 pnpm test         # Vitest across the monorepo (src/, packages/, services/, ui/)
 ```
@@ -272,6 +273,9 @@ services/uta/                  # UTA process — broker carrier
                                #   longbridge, mock, others.
 
 packages/                      # Shared workspace packages.
+├── guardian-runtime/          # @traderalice/guardian-runtime — single-writer
+│                              #   lock, heartbeat, PID identity, controlled
+│                              #   Guardian takeover shared by all launchers.
 ├── uta-protocol/              # @traderalice/uta-protocol — wire types
 │                              #   + zod schemas + client SDK. Alice and
 │                              #   UTA both depend on this; the only
@@ -283,6 +287,7 @@ packages/                      # Shared workspace packages.
 scripts/guardian/              # L2 process supervisor.
 ├── dev.ts                     # `pnpm dev` entry — spawns UTA → Alice → Vite
 ├── prod.mjs                   # Docker entry, tini-supervised
+├── runtime-recovery-smoke.ts  # Real-process duplicate/crash/hung recovery
 └── shared.ts                  # Port probe, flag-watch, cascade shutdown
 
 ui/                            # React frontend (Vite). auth/ holds the
@@ -293,21 +298,17 @@ data/                          # PORTABLE user state — the back-up / migrate /
                                # share unit at ~/.openalice/data (default). ONE
                                # global store shared by pnpm dev / pnpm start /
                                # the packaged app — configure brokers once, not
-                               # per checkout. OPENALICE_HOME moves THIS root
-                               # (and the sealing.key beside it): Docker sets
+                               # per checkout. OPENALICE_HOME moves the WHOLE
+                               # OpenAlice user root (data/, workspaces/ by
+                               # default, state/{guardian,runtime}.lock, and
+                               # sealing.key): Docker sets
                                # /data; OPENALICE_HOME="$PWD" pnpm dev pins a
-                               # checkout-local data store so an experimental
+                               # checkout-local store so an experimental
                                # branch won't touch real data (migrations run
-                               # against the real store otherwise!). NOTE:
-                               # OPENALICE_HOME moves ONLY data/ — workspaces/
-                               # and provider-keys.json have their own env vars
-                               # (AQ_LAUNCHER_ROOT, OPENALICE_GLOBAL_DIR) and
-                               # stay global BY DESIGN: data/ is the portable
-                               # per-home unit, but workspaces are user-level
-                               # git-heavy assets you keep across checkouts (and
-                               # they run no migrations, so the data-corruption
-                               # risk doesn't apply). Set AQ_LAUNCHER_ROOT too
-                               # for checkout-local workspaces. accounts.json +
+                               # against the real store otherwise!).
+                               # AQ_LAUNCHER_ROOT can still split workspaces
+                               # explicitly; OPENALICE_GLOBAL_DIR separately
+                               # controls provider-key storage. accounts.json +
                                # auth.json sealed at
                                # rest (src/core/sealing.ts); the AES key lives
                                # BESIDE data/ under the same OPENALICE_HOME root
@@ -324,16 +325,10 @@ data/                          # PORTABLE user state — the back-up / migrate /
                                # news-collector/, inbox/, entities/, media/,
                                # cache/, brain/ (legacy persona, dormant).
 
-workspaces/                    # WORKSPACE LAUNCHER ROOT — a SIBLING global root
-                               # of data/, at ~/.openalice/workspaces. Governed
-                               # by AQ_LAUNCHER_ROOT, else a homedir() default
-                               # that does NOT follow OPENALICE_HOME — by design:
-                               # workspaces are user-level git repos (Auto-Quant
-                               # etc.) kept across checkouts, running no
-                               # migrations. Guardian sets OPENALICE_HOME but NOT
-                               # AQ_LAUNCHER_ROOT, so even OPENALICE_HOME="$PWD"
-                               # leaves workspaces global; set AQ_LAUNCHER_ROOT
-                               # to isolate them. Holds: workspaces.json
+workspaces/                    # WORKSPACE LAUNCHER ROOT — defaults to
+                               # <OPENALICE_HOME>/workspaces and follows an
+                               # isolated dev/test home. AQ_LAUNCHER_ROOT can
+                               # override it explicitly. Holds: workspaces.json
                                # (registry); state/sessions/<wsId>.json
                                # (per-workspace PTY resume records — the OTHER
                                # session store); state/scrollback/<wsId>/ (PTY
@@ -342,7 +337,10 @@ workspaces/                    # WORKSPACE LAUNCHER ROOT — a SIBLING global ro
                                # workspaces/<wsId>/ (one git checkout per
                                # workspace = the agent's project root);
                                # auto-quant-mirror/ (shared quant template
-                               # clone). Also siblings under ~/.openalice (NOT
+                               # clone). state/runtime.lock remains for one
+                               # compatibility generation so older OpenAlice
+                               # builds still contend with the new home-level
+                               # writer lock. Also siblings under ~/.openalice (NOT
                                # in data/ or workspaces/): sealing.key (above) +
                                # provider-keys.json (user-global vendor API
                                # keys, OPENALICE_GLOBAL_DIR, merged at config

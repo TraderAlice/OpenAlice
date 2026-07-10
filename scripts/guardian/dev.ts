@@ -19,6 +19,13 @@ import { homedir } from 'node:os'
 import { existsSync } from 'node:fs'
 import type { ChildProcess } from 'node:child_process'
 import {
+  RuntimeAlreadyRunningError,
+  acquireGuardianRuntime,
+  currentProcessStartedAt,
+  takeoverRequested,
+  type RuntimeProcessLock,
+} from '../../packages/guardian-runtime/src/index.js'
+import {
   readPortsFile,
   resolvePortConfig,
   planPorts,
@@ -37,11 +44,49 @@ import {
   isBackendHotReloadEnabled,
 } from './dev-hot-reload.js'
 
+let guardianRuntimeLock: RuntimeProcessLock | null = null
+
+async function releaseGuardianRuntimeLock(): Promise<void> {
+  const current = guardianRuntimeLock
+  guardianRuntimeLock = null
+  await current?.release()
+}
+
 async function main(): Promise<void> {
   // One global store by default (~/.openalice) — shared with the packaged
   // app. `OPENALICE_HOME=$PWD pnpm dev` pins a checkout-local store for
   // experiments that shouldn't touch real data.
   const dataHome = process.env['OPENALICE_HOME'] ?? resolve(homedir(), '.openalice')
+  const launcherRoot = process.env['AQ_LAUNCHER_ROOT'] ?? resolve(dataHome, 'workspaces')
+  const takeover = takeoverRequested()
+  const guardianStartedAt = currentProcessStartedAt()
+
+  try {
+    guardianRuntimeLock = await acquireGuardianRuntime({
+      userDataHome: dataHome,
+      launcherRoot,
+      launcher: 'guardian-dev',
+      takeover,
+      processStartedAt: guardianStartedAt,
+      onOwnershipLost: (err) => {
+        console.error('[guardian] runtime ownership lost:', err)
+        try { process.kill(process.pid, 'SIGTERM') } catch { process.exit(1) }
+      },
+    })
+  } catch (err) {
+    if (err instanceof RuntimeAlreadyRunningError) {
+      const owner = err.inspection.owner
+      console.error(`[guardian] ${err.message}`)
+      if (owner) {
+        console.error(`[guardian] owner     → ${owner.launcher} pid=${owner.pid} heartbeat=${owner.heartbeatAt}`)
+      }
+      console.error('[guardian] keep the existing instance, or run `pnpm dev --takeover` to stop it and start this checkout')
+      process.exitCode = 2
+      return
+    }
+    throw err
+  }
+  if (takeover) console.log('[guardian] takeover → previous OpenAlice runtime stopped')
 
   // Legacy adoption notice: this checkout has a pre-global-root data/ store
   // and the global one is still virgin. Never auto-move — multiple worktrees
@@ -88,7 +133,11 @@ async function main(): Promise<void> {
     // Children must resolve the same user-data root the Guardian watches —
     // src/core/paths.ts reads OPENALICE_HOME; never rely on cwd inheritance.
     OPENALICE_HOME: dataHome,
+    AQ_LAUNCHER_ROOT: launcherRoot,
     OPENALICE_LAUNCHER: 'dev',
+    OPENALICE_GUARDIAN_PID: String(process.pid),
+    OPENALICE_GUARDIAN_STARTED_AT: String(guardianStartedAt),
+    ...(takeover ? { OPENALICE_TAKEOVER: '1' } : {}),
   }
 
   // ── UTA spec (re-used by Guardian for restart) ────────────
@@ -135,9 +184,10 @@ async function main(): Promise<void> {
   const aliceReady = await waitForHttp(`http://127.0.0.1:${ports.webPort}/api/version`, { timeoutMs: 20_000 })
   if (!aliceReady) {
     console.error(`[guardian] Alice failed to come up within 20s — aborting before Vite starts`)
-    console.error(`[guardian] If another OpenAlice/Electron instance is running on the same data root, stop it or run dev with an isolated OPENALICE_HOME/AQ_LAUNCHER_ROOT.`)
+    console.error(`[guardian] If another process won a startup race, rerun with --takeover or use an isolated OPENALICE_HOME.`)
     try { alice.kill('SIGTERM') } catch { /* noop */ }
     try { uta?.process.kill('SIGTERM') } catch { /* noop */ }
+    await releaseGuardianRuntimeLock().catch(() => undefined)
     process.exit(1)
   }
   console.log(`[guardian] Alice ready`)
@@ -159,6 +209,7 @@ async function main(): Promise<void> {
   const cascade = installCascadeShutdown({
     children: [...(uta ? [uta.process] : []), alice, vite],
     ...(uta ? { nonCriticalChildren: new Set([uta.process]) } : {}),
+    onShutdown: releaseGuardianRuntimeLock,
   })
 
   // UTA restart cooperates with cascade — old SIGTERM is "expected", new
@@ -201,7 +252,8 @@ async function main(): Promise<void> {
   })
 }
 
-main().catch((err: unknown) => {
+main().catch(async (err: unknown) => {
+  await releaseGuardianRuntimeLock().catch(() => undefined)
   console.error('[guardian] fatal:', err)
   process.exit(1)
 })

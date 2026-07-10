@@ -54,4 +54,23 @@ describe('loadConfig (workspaces)', () => {
     })
     expect(cfg.allowAnyOrigin).toBe(true)
   })
+
+  it('keeps workspaces inside an explicitly selected OpenAlice home', () => {
+    const cfg = loadConfig({
+      webPort: 4444,
+      env: { OPENALICE_HOME: '/tmp/openalice-isolated' },
+    })
+    expect(cfg.launcherRoot).toBe('/tmp/openalice-isolated/workspaces')
+  })
+
+  it('still allows AQ_LAUNCHER_ROOT to split workspace storage explicitly', () => {
+    const cfg = loadConfig({
+      webPort: 4444,
+      env: {
+        OPENALICE_HOME: '/tmp/openalice-isolated',
+        AQ_LAUNCHER_ROOT: '/tmp/openalice-workspaces-only',
+      },
+    })
+    expect(cfg.launcherRoot).toBe('/tmp/openalice-workspaces-only')
+  })
 })

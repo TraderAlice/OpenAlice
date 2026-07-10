@@ -380,6 +380,8 @@ export interface CascadeOpts {
   /** Set true on children whose exit should NOT cascade — UTA during a
    *  Guardian-initiated restart. */
   expectedExits?: Set<ChildProcess>
+  /** Release process-wide ownership only after all children have been stopped. */
+  onShutdown?: () => void | Promise<void>
 }
 
 export interface CascadeControl {
@@ -414,7 +416,9 @@ export function installCascadeShutdown(opts: CascadeOpts): CascadeControl {
           killTree(c, 'SIGKILL')
         }
       }
-      process.exit(0)
+      void Promise.resolve(opts.onShutdown?.())
+        .catch((err) => console.error('[guardian] shutdown cleanup failed:', err))
+        .finally(() => process.exit(0))
     }, graceMs).unref()
   }
 

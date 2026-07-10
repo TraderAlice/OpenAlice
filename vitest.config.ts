@@ -11,6 +11,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 // gets the same effect via NODE_OPTIONS=--conditions=source (see scripts/guardian/dev.ts).
 const workspaceAliases = {
   '@': resolve(__dirname, './src'),
+  '@traderalice/guardian-runtime': resolve(__dirname, './packages/guardian-runtime/src/index.ts'),
   '@traderalice/ibkr': resolve(__dirname, './packages/ibkr/src/index.ts'),
   '@traderalice/opentypebb/server': resolve(__dirname, './packages/opentypebb/src/server.ts'),
   '@traderalice/opentypebb': resolve(__dirname, './packages/opentypebb/src/index.ts'),

@@ -1,11 +1,17 @@
 import { readFile, writeFile, mkdir } from 'fs/promises'
 import { dirname } from 'path'
+import {
+  acquireOpenAliceRuntimeLocks,
+  takeoverRequested,
+  type OpenAliceRuntimeLock,
+} from '@traderalice/guardian-runtime'
 // The in-process AI loop (AgentCenter, then GenerateRouter + AgentWork) is gone
 // as of 0.40 — the model loop runs inside the native workspace CLIs; autonomous
 // runs go through headless workspace dispatch (cron → workspace).
 import { loadConfig, readMarketDataConfig } from './core/config.js'
 import { printLegacyDataNotice } from './core/legacy-data-notice.js'
-import { dataPath, defaultPath } from '@/core/paths.js'
+import { dataPath, defaultPath, userDataHome } from '@/core/paths.js'
+import { resolveLauncherRoot } from '@/workspaces/config.js'
 import type { Plugin, EngineContext } from './core/types.js'
 import { McpPlugin } from './server/mcp.js'
 import { LocalToolGatewayPlugin } from './server/local-tool-gateway.js'
@@ -68,6 +74,13 @@ const PERSONA_FILE = dataPath('brain', 'persona.md')
 const PERSONA_DEFAULT = defaultPath('persona.default.md')
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+let runtimeLock: OpenAliceRuntimeLock | null = null
+
+async function releaseRuntimeLock(): Promise<void> {
+  const current = runtimeLock
+  runtimeLock = null
+  await current?.release()
+}
 
 /** Read a file, copying from default if it doesn't exist yet. */
 async function readWithDefault(target: string, defaultFile: string): Promise<string> {
@@ -425,6 +438,7 @@ async function main() {
     await newsStore.close()
     await toolCallLog.close()
     await eventLog.close()
+    await releaseRuntimeLock()
     process.exit(0)
   }
   process.on('SIGINT', shutdown)
@@ -437,7 +451,38 @@ async function main() {
   }
 }
 
-main().catch((err) => {
+async function start(): Promise<void> {
+  const guardianPid = positiveInteger(process.env['OPENALICE_GUARDIAN_PID'])
+  const guardianStartedAt = positiveInteger(process.env['OPENALICE_GUARDIAN_STARTED_AT'])
+  runtimeLock = await acquireOpenAliceRuntimeLocks({
+    userDataHome,
+    launcherRoot: resolveLauncherRoot(),
+    launcher: process.env['OPENALICE_LAUNCHER'] ?? 'standalone',
+    takeover: takeoverRequested(),
+    ...(guardianPid ? { guardianPid } : {}),
+    ...(guardianStartedAt ? { guardianStartedAt } : {}),
+    onOwnershipLost: (err) => {
+      console.error('fatal: OpenAlice runtime ownership lost:', err)
+      try { process.kill(process.pid, 'SIGTERM') } catch { process.exit(1) }
+    },
+  })
+  try {
+    await main()
+  } catch (err) {
+    await releaseRuntimeLock().catch((releaseErr) => {
+      console.error('runtime lock release failed after startup error:', releaseErr)
+    })
+    throw err
+  }
+}
+
+function positiveInteger(raw: string | undefined): number | undefined {
+  if (!raw) return undefined
+  const value = Number(raw)
+  return Number.isInteger(value) && value > 0 ? value : undefined
+}
+
+start().catch((err) => {
   console.error('fatal:', err)
   process.exit(1)
 })

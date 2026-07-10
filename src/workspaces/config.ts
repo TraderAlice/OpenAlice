@@ -1,6 +1,5 @@
-import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { templatesPath } from '@/core/paths.js';
+import { templatesPath, userDataHome } from '@/core/paths.js';
 
 export interface ServerConfig {
   readonly command: readonly string[];
@@ -74,6 +73,14 @@ export interface LoadConfigOptions {
   readonly env?: NodeJS.ProcessEnv;
 }
 
+/** Keep workspace state inside the selected OpenAlice home unless the user
+ *  explicitly splits it with AQ_LAUNCHER_ROOT. */
+export function resolveLauncherRoot(env: NodeJS.ProcessEnv = process.env): string {
+  return resolve(
+    env['AQ_LAUNCHER_ROOT'] ?? join(env['OPENALICE_HOME'] ?? userDataHome, 'workspaces'),
+  );
+}
+
 export function loadConfig(opts: LoadConfigOptions): ServerConfig {
   const env = opts.env ?? process.env;
 
@@ -104,9 +111,7 @@ export function loadConfig(opts: LoadConfigOptions): ServerConfig {
     64 * 1024 * 1024,
   );
 
-  const launcherRoot = resolve(
-    env['AQ_LAUNCHER_ROOT'] ?? join(homedir(), '.openalice', 'workspaces'),
-  );
+  const launcherRoot = resolveLauncherRoot(env);
   const templatesDir = resolve(env['AQ_TEMPLATES_DIR'] ?? templatesPath());
   const legacyBootstrapScript = env['AQ_BOOTSTRAP_SCRIPT']
     ? resolve(env['AQ_BOOTSTRAP_SCRIPT'])

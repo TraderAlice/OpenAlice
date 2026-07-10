@@ -53,5 +53,11 @@ jobs:
       # and this avoids a large electron download on the Windows runner.
       - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
 
+      # Exercises duplicate-start rejection, graceful takeover, crash-stale
+      # reclamation, heartbeat renewal, and forced recovery with real child
+      # processes before the heavier full-stack boot smoke.
+      - run: pnpm test:guardian-recovery
+        timeout-minutes: 3
+
       - run: pnpm test:smoke
         timeout-minutes: 8

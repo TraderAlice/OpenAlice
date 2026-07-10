@@ -30,10 +30,18 @@ import { createDecipheriv } from 'node:crypto'
 import { mkdir, readFile, watch } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
+import {
+  acquireGuardianRuntime,
+  currentProcessStartedAt,
+  takeoverRequested,
+} from '@traderalice/guardian-runtime'
 
 const DATA_HOME = process.env.OPENALICE_HOME
   ?? process.env.OPENALICE_USER_DATA_HOME // deprecated alias, one-release courtesy
   ?? '/data'
+const LAUNCHER_ROOT = process.env.AQ_LAUNCHER_ROOT ?? resolve(DATA_HOME, 'workspaces')
+const GUARDIAN_STARTED_AT = currentProcessStartedAt()
+const TAKEOVER = takeoverRequested()
 if (!process.env.OPENALICE_HOME && process.env.OPENALICE_USER_DATA_HOME) {
   console.warn('[guardian/prod] OPENALICE_USER_DATA_HOME is deprecated — set OPENALICE_HOME instead')
 }
@@ -158,6 +166,7 @@ let stopping = false
 let utaChild = null
 let aliceChild = null
 let restartingUTA = false
+let guardianRuntimeLock = null
 
 console.log('[guardian/prod] starting')
 console.log(`[guardian/prod] mode  → ${TRADING_MODE.mode} (${TRADING_MODE.source}${TRADING_MODE.envLocked ? ', env-locked' : ''})`)
@@ -176,7 +185,11 @@ function makeUTASpec() {
       ...process.env,
       OPENALICE_UTA_PORT: String(UTA_PORT),
       OPENALICE_HOME: DATA_HOME,
+      AQ_LAUNCHER_ROOT: LAUNCHER_ROOT,
       OPENALICE_LAUNCHER: 'docker',
+      OPENALICE_GUARDIAN_PID: String(process.pid),
+      OPENALICE_GUARDIAN_STARTED_AT: String(GUARDIAN_STARTED_AT),
+      ...(TAKEOVER ? { OPENALICE_TAKEOVER: '1' } : {}),
     },
   }
 }
@@ -200,7 +213,11 @@ function spawnAlice() {
       OPENALICE_TOOL_BASE_URL: `http://127.0.0.1:${MCP_PORT}/cli`,
       OPENALICE_UTA_URL: UTA_URL,
       OPENALICE_HOME: DATA_HOME,
+      AQ_LAUNCHER_ROOT: LAUNCHER_ROOT,
       OPENALICE_LAUNCHER: 'docker',
+      OPENALICE_GUARDIAN_PID: String(process.pid),
+      OPENALICE_GUARDIAN_STARTED_AT: String(GUARDIAN_STARTED_AT),
+      ...(TAKEOVER ? { OPENALICE_TAKEOVER: '1' } : {}),
     },
     stdio: 'inherit',
   })
@@ -288,7 +305,11 @@ function shutdown() {
         try { c.kill('SIGKILL') } catch { /* noop */ }
       }
     }
-    process.exit(0)
+    const current = guardianRuntimeLock
+    guardianRuntimeLock = null
+    void Promise.resolve(current?.release())
+      .catch((err) => console.error('[guardian/prod] runtime lock release failed:', err))
+      .finally(() => process.exit(0))
   }, 5_000).unref()
 }
 
@@ -322,6 +343,19 @@ async function startFlagWatcher() {
 }
 
 async function main() {
+  guardianRuntimeLock = await acquireGuardianRuntime({
+    userDataHome: DATA_HOME,
+    launcherRoot: LAUNCHER_ROOT,
+    launcher: 'guardian-docker',
+    takeover: TAKEOVER,
+    processStartedAt: GUARDIAN_STARTED_AT,
+    onOwnershipLost: (err) => {
+      console.error('[guardian/prod] runtime ownership lost:', err)
+      shutdown()
+    },
+  })
+  if (TAKEOVER) console.log('[guardian/prod] takeover → previous OpenAlice runtime stopped')
+
   if (TRADING_MODE.mode !== 'lite') {
     utaChild = spawnUTA()
     void waitForUTA().then((ready) => {

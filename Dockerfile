@@ -22,6 +22,7 @@ RUN corepack enable && corepack prepare pnpm@10.29.2 --activate
 # of `pnpm install` and must already exist on disk.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
 COPY scripts ./scripts
+COPY packages/guardian-runtime/package.json packages/guardian-runtime/
 COPY packages/ibkr/package.json packages/ibkr/
 COPY packages/opentypebb/package.json packages/opentypebb/
 COPY packages/uta-protocol/package.json packages/uta-protocol/

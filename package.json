@@ -20,12 +20,14 @@
     "electron:smoke:packaged": "node scripts/desktop-packaged-smoke.mjs",
     "electron:smoke:onboarding": "node scripts/desktop-packaged-smoke.mjs --onboarding",
     "electron:smoke:pty": "node scripts/desktop-pty-smoke.mjs",
+    "electron:smoke:guardian-recovery": "node scripts/desktop-pty-smoke.mjs --guardian-recovery",
     "vendor:runtime": "node scripts/vendor-managed-runtime.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "test:bbProvider": "vitest run --config vitest.bbProvider.config.ts",
     "test:smoke": "tsx scripts/guardian/smoke.ts",
+    "test:guardian-recovery": "tsx scripts/guardian/runtime-recovery-smoke.ts",
     "postinstall": "node scripts/fix-pty-perms.mjs"
   },
   "keywords": [
@@ -50,6 +52,7 @@
     "@hono/node-server": "^2.0.0",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@sinclair/typebox": "0.34.48",
+    "@traderalice/guardian-runtime": "workspace:*",
     "@traderalice/ibkr": "workspace:*",
     "@traderalice/opentypebb": "workspace:*",
     "@traderalice/uta-protocol": "workspace:*",
