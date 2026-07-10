@@ -33,7 +33,7 @@ export function buildPackagedToolchainSmokePlan(packageResult) {
     command: electron,
     args: [piCli, '--version'],
     env: { ELECTRON_RUN_AS_NODE: '1' },
-    expectStdout: /\b0\.80\.3\b/,
+    expectStdout: /\b0\.80\.6\b/,
   })
 
   if (packageResult.platform === 'win32') {

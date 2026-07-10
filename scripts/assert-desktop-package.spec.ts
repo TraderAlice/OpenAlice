@@ -25,7 +25,7 @@ function writeBasePackage(appRoot: string, manifest: unknown) {
 function piManifest() {
   return {
     pi: {
-      version: '0.80.3',
+      version: '0.80.6',
       mode: 'npm',
       cli: PI_CLI,
     },

@@ -14,7 +14,7 @@ import { readWorkspaceFile, writeWorkspaceFile } from '../file-service.js';
 // officially discovers shared project skills from `<cwd>/.agents/skills`
 // (walking ancestors to the repo root), so OpenAlice can use the same canonical
 // copy as Codex without maintaining a duplicate `<cwd>/.pi/skills` tree.
-// Verified against Pi 0.78.1 and the bundled 0.80.3.
+// Verified against Pi 0.78.1 and the bundled 0.80.6.
 const PI_AGENT_DIR = '.pi-agent';
 const PI_MODELS_PATH = `${PI_AGENT_DIR}/models.json`;
 const PI_SETTINGS_PATH = `${PI_AGENT_DIR}/settings.json`;
@@ -24,11 +24,18 @@ function positiveNumber(value: number | null | undefined): number | null {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
 }
 
-function piCommandHead(env: Readonly<Record<string, string>>): readonly string[] {
+function piCommandHead(env: Readonly<Record<string, string | undefined>>): readonly string[] {
   const profile = runtimeProfileFromEnv(env);
   if (!profile.managedPiPath) return ['pi'];
   if (profile.managedPiNodePath) return [profile.managedPiNodePath, profile.managedPiPath];
   return [profile.managedPiPath];
+}
+
+function piHeadlessApproveArgs(env: Readonly<Record<string, string | undefined>>): readonly string[] {
+  // The packaged app always uses OpenAlice's pinned managed Pi. Contributor
+  // dev intentionally uses whatever `pi` is on PATH; its install/version/trust
+  // policy belongs to that developer, so do not attach version-specific flags.
+  return runtimeProfileFromEnv(env).managedPiPath ? ['--approve'] : [];
 }
 
 /**
@@ -86,10 +93,11 @@ export const piAdapter: CliAdapter = {
     // Tools come from the CLI-injection path (alice on PATH + shared
     // .agents/skills), not flags — so the command head is just the binary + a
     // resume flag (if any).
-    // OpenAlice creates and owns the workspace, so approve its project-local
-    // resources for this invocation instead of blocking a fresh chat on Pi's
-    // interactive trust prompt. This does not mutate the user's global policy.
-    const head = [...piCommandHead(ctx.env), '--approve'];
+    // Pi 0.79+ asks the user to trust project-local resources on interactive
+    // startup. Do not answer that security decision for them: the prompt makes
+    // the `.agents/skills` boundary visible, and omitting the flag also keeps
+    // external Pi 0.78.x runtimes (which predate `--approve`) compatible.
+    const head = [...piCommandHead(ctx.env)];
     // Quick-chat seed: `pi [--session-id <id>] <messages…>` opens the
     // interactive TUI seeded with that first message. UNLIKE the other adapters,
     // pi appends the seed REGARDLESS of the resume branch: pi assigns its own id
@@ -107,14 +115,22 @@ export const piAdapter: CliAdapter = {
   },
 
   // Headless: `pi -p <prompt>` is non-interactive and exits at the turn
-  // boundary. Shared skills auto-load from `<cwd>/.agents/skills` (process cwd =
-  // workspace), and the alice* CLI shims remain on PATH, so the agent reaches
-  // inbox_push without any extra flag or MCP bridge. NOTE: pi
+  // boundary, so there is nobody to answer Pi 0.79+'s project-trust prompt.
+  // The packaged app explicitly approves its pinned managed Pi; contributor
+  // dev leaves its external Pi untouched. Interactive sessions above always
+  // leave the decision to the user. NOTE: pi
   // REJECTS a `--` end-of-options terminator ("Unknown option: --", verified
   // 0.78.1), so the prompt is a bare trailing positional — a prompt literally
   // starting with `-`/`--` is unprotected on pi (rare for task prompts).
   composeHeadlessCommand(_base: readonly string[], _ctx: SpawnContext, prompt: string): readonly string[] {
-    return [...piCommandHead(_ctx.env), '--approve', '-p', '--mode', 'json', prompt];
+    return [
+      ...piCommandHead(_ctx.env),
+      ...piHeadlessApproveArgs(_ctx.env),
+      '-p',
+      '--mode',
+      'json',
+      prompt,
+    ];
   },
 
   // pi `--mode json` line 1 is `{"type":"session","id":…,"cwd":…}` — pi mints

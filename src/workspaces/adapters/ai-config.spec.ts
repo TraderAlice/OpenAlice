@@ -336,10 +336,9 @@ describe('composeHeadlessCommand (one-shot headless argv, prompt placed per-CLI)
     ]);
   });
 
-  it('pi: --approve -p --mode json <prompt> (bare trailing positional — pi rejects --)', () => {
+  it('pi: -p --mode json <prompt> (bare trailing positional — pi rejects --)', () => {
     expect(piAdapter.composeHeadlessCommand!(['pi'], ctx(), 'do x')).toEqual([
       'pi',
-      '--approve',
       '-p',
       '--mode',
       'json',
@@ -366,17 +365,17 @@ describe('composeHeadlessCommand (one-shot headless argv, prompt placed per-CLI)
 describe('piAdapter AI-config', () => {
   const mcpEnv = { OPENALICE_MCP_URL: 'http://127.0.0.1:47332/mcp', AQ_WS_ID: 'ws-abc' };
 
-  it('composeCommand: approves launcher-owned workspaces before fresh or resumed runs', () => {
-    expect(piAdapter.composeCommand(['ignored'], { cwd: dir, env: mcpEnv })).toEqual(['pi', '--approve']);
+  it('composeCommand leaves project trust to Pi and the user', () => {
+    expect(piAdapter.composeCommand(['ignored'], { cwd: dir, env: mcpEnv })).toEqual(['pi']);
     expect(piAdapter.composeCommand([], { cwd: dir, env: mcpEnv, resume: 'last' }))
-      .toEqual(['pi', '--approve', '--continue']);
+      .toEqual(['pi', '--continue']);
     expect(piAdapter.composeCommand([], { cwd: dir, env: mcpEnv, resume: { sessionId: 'sess-1' } }))
-      .toEqual(['pi', '--approve', '--session-id', 'sess-1']);
+      .toEqual(['pi', '--session-id', 'sess-1']);
   });
 
   it('composeCommand uses managed Pi binary path when the spawn env provides one', () => {
     const env = { ...mcpEnv, OPENALICE_MANAGED_PI_PATH: '/app/vendor/pi/pi' };
-    expect(piAdapter.composeCommand(['ignored'], { cwd: dir, env })).toEqual(['/app/vendor/pi/pi', '--approve']);
+    expect(piAdapter.composeCommand(['ignored'], { cwd: dir, env })).toEqual(['/app/vendor/pi/pi']);
     expect(piAdapter.composeHeadlessCommand!([], { cwd: dir, env }, 'hello')).toEqual([
       '/app/vendor/pi/pi', '--approve', '-p', '--mode', 'json', 'hello',
     ]);
@@ -391,7 +390,6 @@ describe('piAdapter AI-config', () => {
     expect(piAdapter.composeCommand(['ignored'], { cwd: dir, env })).toEqual([
       '/Applications/OpenAlice.app/Contents/MacOS/OpenAlice',
       '/app/vendor/pi/node_modules/@earendil-works/pi-coding-agent/dist/cli.js',
-      '--approve',
     ]);
     expect(piAdapter.composeHeadlessCommand!([], { cwd: dir, env }, 'hello')).toEqual([
       '/Applications/OpenAlice.app/Contents/MacOS/OpenAlice',

@@ -7,6 +7,10 @@ import {
 } from './vendor-managed-runtime.mjs'
 
 describe('vendor managed runtime helpers', () => {
+  it('pins the managed Pi release', () => {
+    expect(buildVendorRuntimeManifest(null).pi.version).toBe('0.80.6')
+  })
+
   it('does not select a managed Git runtime on non-Windows hosts', () => {
     expect(resolveWindowsGitRuntimeSpec({ platform: 'darwin', arch: 'arm64' })).toBeNull()
     expect(resolveWindowsGitRuntimeSpec({ platform: 'linux', arch: 'x64' })).toBeNull()
