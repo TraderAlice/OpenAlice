@@ -401,10 +401,10 @@ describe('piAdapter AI-config', () => {
     ]);
   });
 
-  it('composeEnv sets PI_OFFLINE always; PI_CODING_AGENT_DIR only in override mode', async () => {
+  it('composeEnv leaves Pi startup networking to the base env and redirects only in override mode', async () => {
     // No .pi-agent yet → no redirect.
     const before = piAdapter.composeEnv!({ cwd: dir, env: mcpEnv });
-    expect(before['PI_OFFLINE']).toBe('1');
+    expect(before['PI_OFFLINE']).toBeUndefined();
     expect(before['PI_CODING_AGENT_DIR']).toBeUndefined();
     // After writing a provider override, the agent dir is redirected.
     await piAdapter.writeAiConfig!(dir, { baseUrl: 'https://cn.test/v1', apiKey: 'sk-p', model: 'deepseek-chat' });

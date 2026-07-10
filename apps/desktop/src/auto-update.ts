@@ -1,5 +1,6 @@
 import { app, ipcMain, shell, type BrowserWindow } from 'electron'
 import electronUpdater from 'electron-updater'
+import { resolveAutoUpdateCapability } from './auto-update-policy.js'
 
 const { autoUpdater } = electronUpdater
 
@@ -16,8 +17,6 @@ export interface AutoUpdateHooks {
 }
 
 export function configureAutoUpdate(win: BrowserWindow, hooks: AutoUpdateHooks): void {
-  if (!app.isPackaged) return
-
   let downloadedVersion: string | null = null
   let latestStatus: UpdaterStatus | null = null
 
@@ -52,6 +51,19 @@ export function configureAutoUpdate(win: BrowserWindow, hooks: AutoUpdateHooks):
     return { ok: true }
   })
 
+  // Keep the renderer IPC contract stable in dev and non-updatable directory
+  // packages. Only the updater engine itself depends on packaged metadata.
+  const capability = resolveAutoUpdateCapability({
+    isPackaged: app.isPackaged,
+    resourcesPath: process.resourcesPath,
+  })
+  if (!capability.enabled) {
+    if (capability.reason === 'missing-config') {
+      console.info(`[updater] disabled: update metadata not found at ${capability.configPath}`)
+    }
+    return
+  }
+
   autoUpdater.autoDownload = true
   autoUpdater.autoInstallOnAppQuit = false
   autoUpdater.allowPrerelease = app.getVersion().includes('-')
@@ -81,9 +93,10 @@ export function configureAutoUpdate(win: BrowserWindow, hooks: AutoUpdateHooks):
     sendStatus({ phase: 'downloaded', version: info.version, releaseUrl: releaseUrlFor(info.version) })
   })
 
-  void autoUpdater.checkForUpdates().catch((err) => {
-    console.error('[updater] checkForUpdates threw:', err)
-  })
+  // electron-updater emits the same rejection through its `error` event
+  // before rethrowing it from this promise. The event handler above owns the
+  // diagnostic; consume the promise rejection so one failure is logged once.
+  void autoUpdater.checkForUpdates().catch(() => {})
 }
 
 function channelForVersion(version: string): string {

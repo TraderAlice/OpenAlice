@@ -126,11 +126,11 @@ export const piAdapter: CliAdapter = {
   },
 
   composeEnv(ctx: SpawnContext): Record<string, string> {
-    const env: Record<string, string> = {
-      // Disable startup-only network ops (version check / install ping). Does
-      // NOT block the `alice` CLI or the LLM call (verified pi 0.78.1).
-      PI_OFFLINE: '1',
-    };
+    // Do not force PI_OFFLINE. OpenAlice is a networked product and Pi may
+    // download missing runtime tools during startup. A user or launcher can
+    // still opt into Pi's offline behavior by setting PI_OFFLINE in the base
+    // process environment, which composeSpawnInputs preserves.
+    const env: Record<string, string> = {};
     // Override mode only: redirect the agent dir to the workspace's models.json.
     // Absent ⇒ unset ⇒ Pi uses the user's global ~/.pi/agent (its normal state).
     const piAgentDir = join(ctx.cwd, PI_AGENT_DIR);
