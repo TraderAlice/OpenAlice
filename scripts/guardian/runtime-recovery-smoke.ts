@@ -57,7 +57,10 @@ try {
 }
 
 async function expectDevEntryConflict(owner: ChildProcess): Promise<void> {
-  const child = spawn(process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm', ['dev'], {
+  const [command, args] = process.platform === 'win32'
+    ? [process.env.ComSpec ?? 'cmd.exe', ['/d', '/s', '/c', 'pnpm.cmd dev']]
+    : ['pnpm', ['dev']]
+  const child = spawn(command, args, {
     cwd: repoRoot,
     env: {
       ...process.env,
