@@ -5,8 +5,8 @@ and persistent-state layout. Update it when a top-level subsystem moves or a
 new long-lived process, package, or state root is introduced.
 
 Related guides: [[docs/managed-workspace-runtime.md]],
-[[docs/workspace-issues-and-scheduling.md]], and
-[[docs/market-data-architecture.md]].
+[[docs/workspace-issues-and-scheduling.md]],
+[[docs/conversation-provenance.md]], and [[docs/market-data-architecture.md]].
 
 ## Runtime Topology
 
@@ -139,6 +139,10 @@ Do not use a headless task id directly as a PTY/session id, and do not create a
 new Alice Session every time the same `resumeId` is opened. The run is
 execution provenance; `resumeId` is the conversation; the Session is its
 durable interactive surface.
+
+For the broader “ask the agent who produced this” model — including mutable
+Issues, Inbox deliveries, document revisions, reconstruction fallback, and
+trade-decision attribution — follow [[docs/conversation-provenance.md]].
 
 Built-in templates use cross-platform `bootstrap.mjs` files and route git
 through `src/workspaces/templates/_common.mjs`. Do not add new Bash bootstraps

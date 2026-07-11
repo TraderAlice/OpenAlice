@@ -5,7 +5,8 @@ markdown issues inside each Workspace, the global Issue board, schedule
 scanning, headless execution, and Inbox delivery.
 
 Related guides: [[docs/project-structure.md]] and
-[[docs/development-workflow.md]]. The agent-facing usage manual ships as
+[[docs/development-workflow.md]]. Follow-up identity and provenance semantics
+live in [[docs/conversation-provenance.md]]. The agent-facing usage manual ships as
 `default/skills/self-scheduling/SKILL.md`.
 
 ## One Object, Two Roles
