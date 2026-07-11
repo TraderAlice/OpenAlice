@@ -92,9 +92,9 @@ There is no Postgres or Redis to provision. Config, sessions, issues, inbox entr
 
 Pick the run path that matches your machine:
 
-- **macOS** - use the signed Apple Silicon desktop build: [macOS install](https://openalice.ai/docs/getting-started/install-macos).
+- **macOS** - use the signed Apple Silicon or Intel desktop build: [macOS install](https://openalice.ai/docs/getting-started/install-macos).
 - **Windows** - run from source today: [Windows install](https://openalice.ai/docs/getting-started/install-windows).
-- **Linux, Intel Mac, contributors, debugging** - use the source path: [Source & Dev](https://openalice.ai/docs/getting-started/developer-setup).
+- **Linux, contributors, debugging** - use the source path: [Source & Dev](https://openalice.ai/docs/getting-started/developer-setup).
 - **Server or always-on machine** - use Docker Compose: [Docker deployment](https://openalice.ai/docs/deployment/docker).
 
 The source path is still the best early-adopter path because it gives you logs and local code:

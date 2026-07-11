@@ -67,7 +67,7 @@ export function configureAutoUpdate(win: BrowserWindow, hooks: AutoUpdateHooks):
   autoUpdater.autoDownload = true
   autoUpdater.autoInstallOnAppQuit = false
   autoUpdater.allowPrerelease = app.getVersion().includes('-')
-  autoUpdater.channel = channelForVersion(app.getVersion())
+  autoUpdater.channel = channelForVersion(app.getVersion(), process.platform, process.arch)
   autoUpdater.allowDowngrade = false
 
   autoUpdater.on('error', (err) => {
@@ -99,7 +99,11 @@ export function configureAutoUpdate(win: BrowserWindow, hooks: AutoUpdateHooks):
   void autoUpdater.checkForUpdates().catch(() => {})
 }
 
-function channelForVersion(version: string): string {
+export function channelForVersion(version: string, platform: NodeJS.Platform, arch: string): string {
   const prerelease = version.match(/^\d+\.\d+\.\d+-([0-9A-Za-z-]+)/)
-  return prerelease?.[1] ?? 'latest'
+  const channel = prerelease?.[1] ?? 'latest'
+  // GenericProvider appends "-mac" to this channel. Intel therefore requests
+  // latest-intel-mac.yml / beta-intel-mac.yml, which are compatibility aliases
+  // of the public latest-mac-intel.yml / beta-mac-intel.yml feeds.
+  return platform === 'darwin' && arch === 'x64' ? `${channel}-intel` : channel
 }

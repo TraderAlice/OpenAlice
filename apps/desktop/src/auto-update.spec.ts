@@ -33,7 +33,24 @@ vi.mock('electron-updater', () => ({
   default: { autoUpdater: mocks.autoUpdater },
 }))
 
-import { configureAutoUpdate } from './auto-update.js'
+import { channelForVersion, configureAutoUpdate } from './auto-update.js'
+
+describe('channelForVersion', () => {
+  it('keeps Apple Silicon on the canonical mac feed', () => {
+    expect(channelForVersion('1.2.3', 'darwin', 'arm64')).toBe('latest')
+    expect(channelForVersion('1.2.3-beta.4', 'darwin', 'arm64')).toBe('beta')
+  })
+
+  it('routes Intel builds to architecture-specific mac feeds', () => {
+    expect(channelForVersion('1.2.3', 'darwin', 'x64')).toBe('latest-intel')
+    expect(channelForVersion('1.2.3-beta.4', 'darwin', 'x64')).toBe('beta-intel')
+  })
+
+  it('does not route Windows x64 through the Intel Mac feed', () => {
+    expect(channelForVersion('1.2.3', 'win32', 'x64')).toBe('latest')
+    expect(channelForVersion('1.2.3-beta.4', 'win32', 'x64')).toBe('beta')
+  })
+})
 
 describe('configureAutoUpdate', () => {
   beforeEach(() => {

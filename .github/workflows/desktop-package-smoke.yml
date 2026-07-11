@@ -16,6 +16,7 @@ on:
       - "scripts/desktop-packaged-smoke.mjs"
       - "scripts/desktop-packaged-smoke-plan.mjs"
       - "scripts/guardian/**"
+      - "scripts/prepare-desktop-release-assets.mjs"
       - "scripts/smoke-packaged-toolchain.mjs"
       - "scripts/vendor-managed-runtime.mjs"
       - "src/core/paths.ts"
@@ -38,6 +39,7 @@ on:
       - "scripts/desktop-packaged-smoke.mjs"
       - "scripts/desktop-packaged-smoke-plan.mjs"
       - "scripts/guardian/**"
+      - "scripts/prepare-desktop-release-assets.mjs"
       - "scripts/smoke-packaged-toolchain.mjs"
       - "scripts/vendor-managed-runtime.mjs"
       - "src/core/paths.ts"
@@ -53,7 +55,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-14, windows-latest]
+        include:
+          - os: macos-14
+            arch: arm64
+          - os: macos-15-intel
+            arch: x64
+          - os: windows-latest
+            arch: x64
 
     steps:
       - uses: actions/checkout@v4
@@ -98,7 +106,7 @@ jobs:
             ulimit -n 65536 || ulimit -n 32768 || ulimit -n 16384 || ulimit -n 10240
             echo "open files limit: $(ulimit -n)"
           fi
-          pnpm -F @traderalice/desktop exec electron-builder --dir --projectDir ../.. --publish never
+          pnpm -F @traderalice/desktop exec electron-builder --dir --projectDir ../.. --publish never --${{ matrix.arch }}
 
       - name: Assert packaged resource layout
         run: pnpm electron:assert-package

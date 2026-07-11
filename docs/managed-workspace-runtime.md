@@ -245,8 +245,14 @@ such as `node-pty` and therefore requires Visual Studio Build Tools with the
 C++ desktop workload. This is a source-build prerequisite only; users running
 the produced OpenAlice installer do not need Visual Studio.
 
-The `Desktop Package Smoke` workflow runs the macOS and Windows package
-matrix. A release-facing change should also verify a clean-machine flow:
+The `Desktop Package Smoke` workflow runs native Apple Silicon, Intel macOS,
+and Windows package jobs. macOS release builds remain separate rather than
+universal so native dependencies are installed, built, signed, and notarized
+on their matching architecture. Apple Silicon uses the canonical
+`latest-mac.yml` update feed; Intel uses `latest-mac-intel.yml` with the
+electron-updater compatibility alias `latest-intel-mac.yml`.
+
+A release-facing change should also verify a clean-machine flow:
 
 1. launch the packaged app with no system Node, Git, Bash, or Pi assumption;
 2. add one compatible AI credential;
