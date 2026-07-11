@@ -14,6 +14,7 @@ import { basename, join } from 'node:path';
 
 import { cliBinPath } from '@/core/paths.js';
 import { readCredentials, readIssueDefaultAgent, readWorkspaceDefaultAgent } from '@/core/config.js';
+import { ArtifactProvenanceStore } from '@/core/provenance-store.js';
 import {
   readQuickChatPreferences,
   rememberRecentChatWorkspace,
@@ -248,6 +249,8 @@ export interface WorkspaceService {
   headlessTasks: HeadlessTaskRegistry;
   /** Backend-only product resumeId → native runtime session-id mapping. */
   resumeRegistry: ResumeRegistry;
+  /** Durable product Session -> business artifact attribution index. */
+  provenanceStore: ArtifactProvenanceStore;
   /** True while a headless turn owns this conversation transcript. */
   isResumeActive(resumeId: string): boolean;
   /** Atomically reserve a conversation before crossing an async spawn boundary. */
@@ -319,6 +322,10 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   const resumeRegistry = await ResumeRegistry.load(
     join(config.launcherRoot, 'state', 'resume-identities.json'),
     launcherLogger.child({ scope: 'resume-registry' }),
+  );
+  const provenanceStore = await ArtifactProvenanceStore.load(
+    join(config.launcherRoot, 'state', 'artifact-provenance.json'),
+    launcherLogger.child({ scope: 'provenance-store' }),
   );
   const activeResumeIds = new Set<string>();
   const claimResume = (resumeId: string): boolean => {
@@ -1498,6 +1505,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     resolveIssuesByName,
     headlessTasks,
     resumeRegistry,
+    provenanceStore,
     isResumeActive: (resumeId) => activeResumeIds.has(resumeId),
     claimResume,
     releaseResume: (resumeId) => activeResumeIds.delete(resumeId),

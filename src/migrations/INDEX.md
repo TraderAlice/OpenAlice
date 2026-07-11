@@ -15,3 +15,4 @@ Each row corresponds to one migration in `src/migrations/`. The runner applies p
 | `0013_session_run_source` | 0.74.0-beta | 2026-07-11 | workspaces/state/sessions/*.json | Version Session records for durable headless-run provenance and idempotent return-to-session navigation. |
 | `0014_headless_resume_identity` | 0.75.0-beta | 2026-07-11 | workspaces/state/headless-tasks.json | Assign durable resumeId values to historical headless runs so execution identity and resumable conversation identity remain distinct. |
 | `0015_resume_identity_registry` | 0.75.0-beta | 2026-07-11 | workspaces/state/resume-identities.json, workspaces/state/sessions/*.json | Create the backend resumeId to native runtime session-id registry. |
+| `0016_artifact_provenance_store` | 0.75.0-beta | 2026-07-11 | workspaces/state/artifact-provenance.json | Create the durable product Session to artifact provenance store. |
