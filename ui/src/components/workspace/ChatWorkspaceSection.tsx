@@ -31,6 +31,7 @@ import { CreateWorkspaceDialog } from './CreateWorkspaceDialog'
 import { SessionRow } from './Sidebar'
 import { workspaceDisplayTitle } from './display'
 import { orderSessionsForSidebar, orderWorkspacesForSidebar } from './sidebar-order'
+import { useReorderMotion } from './useReorderMotion'
 import { preferencesApi } from '../../api/preferences'
 
 const CHAT_TEMPLATE = 'chat'
@@ -59,6 +60,9 @@ export function ChatWorkspaceSection(): ReactElement | null {
       selection,
     ),
     [ctx.workspaces, selection],
+  )
+  const workspaceListRef = useReorderMotion<HTMLUListElement>(
+    chatWorkspaces.map((workspace) => workspace.id),
   )
   const showListError = Boolean(ctx.listError && ctx.workspaces.length === 0)
 
@@ -131,7 +135,7 @@ export function ChatWorkspaceSection(): ReactElement | null {
         />
       )}
 
-      <ul className="py-0.5">
+      <ul ref={workspaceListRef} className="py-0.5">
         {/* Cold load: the list is empty because it hasn't fetched yet, NOT
             because there are no chats — show a skeleton instead of flashing the
             "no chats yet" empty text (or a blank pane) until the first list
@@ -241,6 +245,9 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
     ),
     [w.sessions, w.id, props.selection],
   )
+  const sessionListRef = useReorderMotion<HTMLDivElement>(
+    orderedSessions.map((session) => session.id),
+  )
 
   const statusClass = hasRunning
     ? 'bg-green'
@@ -249,7 +256,7 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
       : 'border border-border'
 
   return (
-    <li className="group relative">
+    <li className="group relative" data-reorder-id={w.id}>
       <div
         className={`flex items-center gap-1 pl-2 pr-2 py-1 text-[13px] cursor-pointer transition-colors ${
           isSelected ? 'bg-bg-tertiary text-text' : 'text-text hover:bg-bg-tertiary/50'
@@ -339,10 +346,11 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
         </span>
       </div>
       {expanded && orderedSessions.length > 0 && (
-        <div className="ml-[18px] border-l border-border/50">
+        <div ref={sessionListRef} className="ml-[18px] border-l border-border/50">
           {orderedSessions.map((s) => (
             <SessionRow
               key={s.id}
+              reorderId={s.id}
               session={s}
               isActive={props.selection?.sessionId === s.id}
               onSelect={() => props.onOpenSession(s.id)}

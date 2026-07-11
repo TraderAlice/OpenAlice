@@ -16,6 +16,7 @@ import { CreateWorkspaceDialog } from './CreateWorkspaceDialog';
 import { Skeleton } from '../StateViews';
 import { workspaceDisplayName, workspaceDisplayTitle } from './display';
 import { orderSessionsForSidebar, orderWorkspacesForSidebar } from './sidebar-order';
+import { useReorderMotion } from './useReorderMotion';
 
 /**
  * Workspace launcher sidebar.
@@ -85,6 +86,9 @@ export function Sidebar(props: SidebarProps): ReactElement {
   const orderedWorkspaces = useMemo(
     () => orderWorkspacesForSidebar(props.workspaces, props.selection),
     [props.workspaces, props.selection],
+  );
+  const workspaceListRef = useReorderMotion<HTMLDivElement>(
+    orderedWorkspaces.map((workspace) => workspace.id),
   );
 
   // Headless runs, polled once for the whole tree (not per-workspace) and
@@ -187,10 +191,11 @@ export function Sidebar(props: SidebarProps): ReactElement {
       )}
       {showListError && <div className="px-3 py-2 text-[12px] text-red">{props.listError}</div>}
 
-      <div className="flex flex-col mt-0.5">
+      <div ref={workspaceListRef} className="flex flex-col mt-0.5">
         {orderedWorkspaces.map((w) => (
           <WorkspaceRow
             key={w.id}
+            reorderId={w.id}
             workspace={w}
             agents={props.agents}
             defaultAgent={props.defaultAgent}
@@ -242,6 +247,7 @@ function NavRow({
 }
 
 export interface WorkspaceRowProps {
+  readonly reorderId?: string;
   readonly workspace: Workspace;
   readonly agents: readonly AgentInfo[];
   readonly defaultAgent: string | null;
@@ -315,6 +321,9 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
     ),
     [w.sessions, w.id, props.selection],
   );
+  const sessionListRef = useReorderMotion<HTMLDivElement>(
+    orderedSessions.map((session) => session.id),
+  );
 
   const [spawnMenuOpen, setSpawnMenuOpen] = useState(false);
   const plusBtnRef = useRef<HTMLButtonElement | null>(null);
@@ -375,7 +384,7 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
       : 'border border-border';
 
   return (
-    <div>
+    <div data-reorder-id={props.reorderId}>
       <div
         className={`group relative flex items-center gap-1 pl-3 pr-2 py-1.5 text-[12px] transition-colors ${
           isSelected ? 'bg-bg-tertiary text-text' : 'text-text hover:bg-bg-tertiary/50'
@@ -486,10 +495,11 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
       </div>
 
       {orderedSessions.length > 0 && (
-        <div className="ml-[18px] border-l border-border/50">
+        <div ref={sessionListRef} className="ml-[18px] border-l border-border/50">
           {orderedSessions.map((s) => (
             <SessionRow
               key={s.id}
+              reorderId={s.id}
               session={s}
               isActive={props.selection?.wsId === w.id && props.selection.sessionId === s.id}
               onSelect={() => props.onSelectSession(w.id, s.id)}
@@ -608,6 +618,7 @@ function HeadlessTaskRow(props: {
 }
 
 export interface SessionRowProps {
+  reorderId?: string;
   session: SessionRecord;
   isActive: boolean;
   onSelect: () => void;
@@ -633,6 +644,7 @@ export function SessionRow(props: SessionRowProps): ReactElement {
 
   return (
     <div
+      data-reorder-id={props.reorderId}
       className={`group relative flex items-center gap-1.5 pl-3 pr-2 py-1.5 text-[12px] transition-colors ${
         props.isActive ? 'bg-bg-tertiary' : 'hover:bg-bg-tertiary/50'
       }`}
