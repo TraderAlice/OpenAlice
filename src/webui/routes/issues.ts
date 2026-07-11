@@ -124,6 +124,12 @@ export function createIssuesRoutes(svc: WorkspaceService): Hono {
         if (res.reason === 'not_found') return c.json({ error: 'not_found' }, 404)
         return c.json({ error: 'invalid_issue', message: res.error }, 422)
       }
+      await svc.provenanceStore.append({
+        artifact: { kind: 'issue', workspaceId: wsId, issueId: id },
+        action: 'updated',
+        origin: { kind: 'human' },
+        at: Date.now(),
+      })
       launcherLogger.info('issue.updated', { wsId, id, fields: Object.keys(patch) })
       const detail = await svc.issueDetail(wsId, id)
       return c.json(detail ?? { issue: res.issue, runs: [], inboxReports: [] })
@@ -159,6 +165,12 @@ export function createIssuesRoutes(svc: WorkspaceService): Hono {
         if (res.reason === 'not_found') return c.json({ error: 'not_found' }, 404)
         return c.json({ error: 'invalid_issue', message: res.error }, 422)
       }
+      await svc.provenanceStore.append({
+        artifact: { kind: 'issue', workspaceId: wsId, issueId: id },
+        action: 'commented',
+        origin: { kind: 'human' },
+        at: Date.now(),
+      })
       launcherLogger.info('issue.comment_added', { wsId, id, author: 'human' })
       const detail = await svc.issueDetail(wsId, id)
       return c.json(detail ?? { issue: res.issue, runs: [], inboxReports: [] })

@@ -26,6 +26,7 @@ import { tool } from 'ai'
 import { z } from 'zod'
 
 import type { WorkspaceToolFactory, WorkspaceToolContext } from '../core/workspace-tool-center.js'
+import { sessionOriginFromInboxOrigin, type ProvenanceAction } from '../core/provenance-store.js'
 import { readWorkspaceFile } from '../workspaces/file-service.js'
 import {
   ISSUES_DIR_REL,
@@ -59,6 +60,25 @@ function selfDir(ctx: WorkspaceToolContext): { ok: true; dir: string } | { ok: f
 
 /** The comment / create author for this workspace's writes. */
 const author = (ctx: WorkspaceToolContext): string => `ws:${ctx.workspaceLabel}`
+
+async function recordIssueProvenance(
+  ctx: WorkspaceToolContext,
+  issueId: string,
+  action: Extract<ProvenanceAction, 'created' | 'updated' | 'commented'>,
+): Promise<void> {
+  if (!ctx.provenanceStore) return
+  const origin = sessionOriginFromInboxOrigin(ctx.workspaceId, ctx.origin) ?? {
+    kind: 'unknown' as const,
+    reason: 'missing-session-origin',
+  }
+  await ctx.provenanceStore.append({
+    artifact: { kind: 'issue', workspaceId: ctx.workspaceId, issueId },
+    action,
+    origin,
+    at: Date.now(),
+    ...(action === 'created' ? { fingerprint: `issue:${ctx.workspaceId}:${issueId}:created` } : {}),
+  })
+}
 
 /** Project a full IssueRecord into the compact row the tools return. */
 function rowOf(issue: IssueRecord, workspaceLabel?: string) {
@@ -185,7 +205,10 @@ export const issueUpdateFactory: WorkspaceToolFactory = {
           return { ok: false as const, error: 'no fields to update (pass at least one of status/priority/assignee)' }
         }
         const res = await updateIssueFields(dir.dir, id, { status, priority, assignee })
-        if (res.ok) return { ok: true as const, issue: rowOf(res.issue, ctx.workspaceLabel) }
+        if (res.ok) {
+          await recordIssueProvenance(ctx, res.issue.id, 'updated')
+          return { ok: true as const, issue: rowOf(res.issue, ctx.workspaceLabel) }
+        }
         if (res.reason === 'not_found') return { ok: false as const, error: `no such issue: ${id}` }
         return { ok: false as const, error: res.error }
       },
@@ -215,7 +238,10 @@ export const issueCommentFactory: WorkspaceToolFactory = {
         const dir = selfDir(ctx)
         if (!dir.ok) return { ok: false as const, error: dir.error }
         const res = await appendIssueComment(dir.dir, id, author(ctx), text)
-        if (res.ok) return { ok: true as const, issue: rowOf(res.issue, ctx.workspaceLabel) }
+        if (res.ok) {
+          await recordIssueProvenance(ctx, res.issue.id, 'commented')
+          return { ok: true as const, issue: rowOf(res.issue, ctx.workspaceLabel) }
+        }
         if (res.reason === 'not_found') return { ok: false as const, error: `no such issue: ${id}` }
         return { ok: false as const, error: res.error }
       },
@@ -275,7 +301,10 @@ export const issueCreateFactory: WorkspaceToolFactory = {
           agent,
           body,
         })
-        if (res.ok) return { ok: true as const, issue: rowOf(res.issue, ctx.workspaceLabel) }
+        if (res.ok) {
+          await recordIssueProvenance(ctx, res.issue.id, 'created')
+          return { ok: true as const, issue: rowOf(res.issue, ctx.workspaceLabel) }
+        }
         if (res.reason === 'conflict') return { ok: false as const, error: `issue already exists: ${res.id}` }
         return { ok: false as const, error: res.error }
       },

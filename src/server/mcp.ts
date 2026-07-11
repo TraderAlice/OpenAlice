@@ -98,6 +98,7 @@ export class McpPlugin implements Plugin {
         workspaceLabel: wsLabel,
         inboxStore,
         entityStore,
+        ...(svc ? { provenanceStore: svc.provenanceStore } : {}),
         // Parity with the CLI gateway so external MCP consumers get the same
         // workspace_path resolution — shared helper, so the two can't drift.
         resolveWorkspace: makeWorkspaceResolver(getWorkspaceService),

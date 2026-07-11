@@ -9,7 +9,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createIssuesRoutes } from './issues.js'
 import type { InboxEntry } from '../../core/inbox-store.js'
@@ -32,6 +32,7 @@ afterEach(async () => {
 // `inboxReportsForIssue` test. Here the route is a thin pass-through, so the stub
 // just echoes whatever inboxReports it's handed.
 function build(inboxReports: InboxEntry[] = []) {
+  const appendProvenance = vi.fn(async (input) => ({ id: 'p-1', ...input }))
   const svc = {
     registry: {
       get: (id: string) => (
@@ -54,8 +55,9 @@ function build(inboxReports: InboxEntry[] = []) {
       const issue = r.issues.find((i) => i.id === id)
       return issue ? { issue: detailIssue(issue, null), runs: [], inboxReports } : null
     },
+    provenanceStore: { append: appendProvenance, list: vi.fn(), latest: vi.fn() },
   } as unknown as WorkspaceService
-  return createIssuesRoutes(svc)
+  return { app: createIssuesRoutes(svc), appendProvenance }
 }
 
 async function req(app: any, method: string, path: string, body?: unknown) {
@@ -70,18 +72,18 @@ async function req(app: any, method: string, path: string, body?: unknown) {
 
 describe('PATCH /api/issues/:wsId/:id', () => {
   it('404 on a malformed id', async () => {
-    const app = build()
+    const { app } = build()
     expect((await req(app, 'PATCH', '/ws-1/bad.id', { status: 'done' })).status).toBe(404)
   })
 
   it('404 for an unknown workspace', async () => {
-    const app = build()
+    const { app } = build()
     const r = await req(app, 'PATCH', '/ws-nope/x', { status: 'done' })
     expect(r.status).toBe(404)
   })
 
   it('404 for a missing issue in a real workspace', async () => {
-    const app = build()
+    const { app } = build()
     const r = await req(app, 'PATCH', '/ws-1/ghost', { status: 'done' })
     expect(r.status).toBe(404)
     expect(r.body.error).toBe('not_found')
@@ -89,7 +91,7 @@ describe('PATCH /api/issues/:wsId/:id', () => {
 
   it('400 invalid_status for an unknown status', async () => {
     await createIssue(wsDir, { id: 'i1', title: 'T' })
-    const app = build()
+    const { app } = build()
     const r = await req(app, 'PATCH', '/ws-1/i1', { status: 'nope' })
     expect(r.status).toBe(400)
     expect(r.body.error).toBe('invalid_status')
@@ -97,14 +99,14 @@ describe('PATCH /api/issues/:wsId/:id', () => {
 
   it('400 invalid_agent for an unknown or utility runtime', async () => {
     await createIssue(wsDir, { id: 'i1', title: 'T' })
-    const app = build()
+    const { app } = build()
     expect((await req(app, 'PATCH', '/ws-1/i1', { agent: 'nope' })).body.error).toBe('invalid_agent')
     expect((await req(app, 'PATCH', '/ws-1/i1', { agent: 'shell' })).body.error).toBe('invalid_agent')
   })
 
   it('400 no_fields when the body has none of the patchable fields', async () => {
     await createIssue(wsDir, { id: 'i1', title: 'T' })
-    const app = build()
+    const { app } = build()
     const r = await req(app, 'PATCH', '/ws-1/i1', { foo: 'bar' })
     expect(r.status).toBe(400)
     expect(r.body.error).toBe('no_fields')
@@ -112,7 +114,7 @@ describe('PATCH /api/issues/:wsId/:id', () => {
 
   it('updates fields including the scheduled agent runtime and returns the detail shape', async () => {
     await createIssue(wsDir, { id: 'i1', title: 'T', body: 'keep me' })
-    const app = build()
+    const { app, appendProvenance } = build()
     const r = await req(app, 'PATCH', '/ws-1/i1', { status: 'in_progress', priority: 'high', assignee: 'human', agent: 'pi' })
     expect(r.status).toBe(200)
     expect(r.body.issue).toMatchObject({
@@ -128,11 +130,16 @@ describe('PATCH /api/issues/:wsId/:id', () => {
     const re = await readWorkspaceIssues(wsDir)
     expect(re.ok && re.issues[0].status).toBe('in_progress')
     expect(re.ok && re.issues[0].agent).toBe('pi')
+    expect(appendProvenance).toHaveBeenCalledWith(expect.objectContaining({
+      artifact: { kind: 'issue', workspaceId: 'ws-1', issueId: 'i1' },
+      action: 'updated',
+      origin: { kind: 'human' },
+    }))
   })
 
   it('clears the scheduled agent runtime with null', async () => {
     await createIssue(wsDir, { id: 'i1', title: 'T', agent: 'claude' })
-    const app = build()
+    const { app } = build()
     const r = await req(app, 'PATCH', '/ws-1/i1', { agent: null })
     expect(r.status).toBe(200)
     expect(r.body.issue.agent).toBeUndefined()
@@ -148,14 +155,14 @@ describe('GET /api/issues/:wsId/:id — inboxReports pass-through', () => {
       { id: 'e2', ts: 2, workspaceId: 'ws-1', comments: 'r2', origin: { kind: 'headless', runId: 'c', issueId: 'i1' } },
       { id: 'e1', ts: 1, workspaceId: 'ws-1', comments: 'r1', origin: { kind: 'headless', runId: 'a', issueId: 'i1' } },
     ] as unknown as InboxEntry[]
-    const r = await req(build(reports), 'GET', '/ws-1/i1')
+    const r = await req(build(reports).app, 'GET', '/ws-1/i1')
     expect(r.status).toBe(200)
     expect(r.body.inboxReports.map((e: any) => e.comments)).toEqual(['r2', 'r1'])
   })
 
   it('inboxReports defaults to [] when the issue produced none', async () => {
     await createIssue(wsDir, { id: 'i1', title: 'T' })
-    const r = await req(build(), 'GET', '/ws-1/i1')
+    const r = await req(build().app, 'GET', '/ws-1/i1')
     expect(r.status).toBe(200)
     expect(r.body.inboxReports).toEqual([])
   })
@@ -164,24 +171,28 @@ describe('GET /api/issues/:wsId/:id — inboxReports pass-through', () => {
 describe('POST /api/issues/:wsId/:id/comments', () => {
   it('400 text_required for a blank comment', async () => {
     await createIssue(wsDir, { id: 'i1', title: 'T' })
-    const app = build()
+    const { app } = build()
     expect((await req(app, 'POST', '/ws-1/i1/comments', { text: '   ' })).body.error).toBe('text_required')
   })
 
   it('404 for a missing issue', async () => {
-    const app = build()
+    const { app } = build()
     const r = await req(app, 'POST', '/ws-1/ghost/comments', { text: 'hi' })
     expect(r.status).toBe(404)
   })
 
   it('appends a human comment and returns the detail shape', async () => {
     await createIssue(wsDir, { id: 'i1', title: 'T', body: 'desc' })
-    const app = build()
+    const { app, appendProvenance } = build()
     const r = await req(app, 'POST', '/ws-1/i1/comments', { text: 'looks good' })
     expect(r.status).toBe(200)
     expect(r.body.issue.body).toContain('## Comments')
     expect(r.body.issue.body).toContain('**human**')
     expect(r.body.issue.body).toContain('looks good')
     expect(r.body.issue.body).toContain('desc')
+    expect(appendProvenance).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'commented',
+      origin: { kind: 'human' },
+    }))
   })
 })

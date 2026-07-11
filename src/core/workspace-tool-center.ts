@@ -27,6 +27,7 @@
 import type { Tool } from 'ai'
 import type { IInboxStore, InboxOrigin } from './inbox-store.js'
 import type { IEntityStore } from './entity-store.js'
+import type { IProvenanceStore } from './provenance-store.js'
 // TYPE-ONLY: the global-issue-board shapes. Importing them as types keeps
 // core/ free of any runtime dependency on the workspaces/ module (no
 // core→workspaces coupling), while letting the board reader below be typed.
@@ -49,6 +50,8 @@ export interface WorkspaceToolContext {
    *  entity_upsert / entity_search read and write. Same injection rationale
    *  as inboxStore. */
   entityStore: IEntityStore
+  /** Durable Session -> artifact occurrence trail. Optional for older/tests. */
+  provenanceStore?: IProvenanceStore
   /** Resolve ANY workspace's location by id (not just this one) — the backing
    *  for cross-workspace collaboration: an inbox entry from a peer carries its
    *  workspaceId, and `workspace_path` turns that into the peer's absolute dir

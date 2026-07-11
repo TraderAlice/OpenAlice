@@ -18,6 +18,7 @@
 import { tool } from 'ai'
 import { z } from 'zod'
 import type { WorkspaceToolFactory, WorkspaceToolContext } from '../core/workspace-tool-center.js'
+import { sessionOriginFromInboxOrigin } from '../core/provenance-store.js'
 
 export const inboxPushFactory: WorkspaceToolFactory = {
   name: 'inbox_push',
@@ -79,6 +80,26 @@ export const inboxPushFactory: WorkspaceToolFactory = {
             // when absent (interactive / no run header) so the JSONL stays clean.
             ...(ctx.origin ? { origin: ctx.origin } : {}),
           })
+          if (ctx.provenanceStore) {
+            const sessionOrigin = sessionOriginFromInboxOrigin(ctx.workspaceId, ctx.origin)
+            const origin = sessionOrigin ?? { kind: 'unknown' as const, reason: 'missing-session-origin' }
+            await ctx.provenanceStore.append({
+              artifact: { kind: 'inbox', inboxEntryId: entry.id },
+              action: 'sent',
+              origin,
+              at: entry.ts,
+              fingerprint: `inbox:${entry.id}:sent`,
+            })
+            for (const doc of entry.docs ?? []) {
+              await ctx.provenanceStore.append({
+                artifact: { kind: 'report', workspaceId: ctx.workspaceId, path: doc.path },
+                action: 'sent',
+                origin,
+                at: entry.ts,
+                fingerprint: `report:${ctx.workspaceId}:${doc.path}:sent:${entry.id}`,
+              })
+            }
+          }
           return {
             ok: true as const,
             entryId: entry.id,
