@@ -168,6 +168,20 @@ remain valid and are never renamed. `taskId` remains one execution, while
 `parentTaskId` records direct turn lineage. Runs and their logs are retained
 rather than silently pruned.
 
+Internal agents use the same identity through the embedded Workspace CLI:
+
+```bash
+alice-workspace conversation ask --resumeId <resumeId> --prompt "Why?"
+alice-workspace conversation read --taskId <taskId>
+```
+
+The ask path calls `WorkspaceService.dispatchHeadlessTask` directly; it does not
+loop back through the authenticated public `/api` surface or expose the native
+runtime session id. If no origin conversation exists, `--workspaceId` starts a
+fresh headless conversation at the owning workspace. Both paths create ordinary
+durable run records, obey global capacity and per-resume concurrency guards, and
+return a `taskId` whose normalized reply/tool blocks are polled with `read`.
+
 Scheduling never bypasses trading approval. A headless agent may research or
 stage a trade, but execution remains behind UTA/Trading-as-Git permission and
 human approval boundaries.

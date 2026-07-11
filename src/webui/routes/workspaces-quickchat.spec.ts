@@ -98,6 +98,17 @@ function build(opts: {
     resolveOrCreateChatWorkspace: (preferredWorkspaceId?: string | null) =>
       chatWorkspaceResolver.resolveOrCreate(preferredWorkspaceId),
     resolveAdapter: (_m: any, agentId?: string) => adapters[agentId ?? 'claude'] ?? claude,
+    resolveDefaultAgentId: vi.fn(async (meta: any) => {
+      const configured = await readWorkspaceDefaultAgent();
+      if (configured && meta.agents.includes(configured)) {
+        const adapter = adapters[configured];
+        if (adapter && adapter.kind !== 'utility') return configured;
+      }
+      return meta.agents.find((id: string) => {
+        const adapter = adapters[id];
+        return adapter && adapter.kind !== 'utility';
+      });
+    }),
     adapters: { get: (id: string) => adapters[id] },
     sessionRegistry,
     resumeRegistry,

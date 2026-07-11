@@ -81,6 +81,7 @@ function build(
   const svc = {
     registry: { get: (id: string) => (id === 'ws-1' ? meta : undefined) },
     adapters: { get: (a: string) => adapters[a] },
+    resolveDefaultAgentId: vi.fn(async (m: any) => m.agents[0]),
     resolveAdapter: (_m: any, a?: string) => opts.resolveTo ?? adapters[a ?? 'claude'] ?? claude,
     config: { launcherRepoRoot: '/repo' },
     runHeadlessTask,

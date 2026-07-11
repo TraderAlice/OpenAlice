@@ -145,7 +145,7 @@ export const CLI_EXPORTS: Record<string, CliExport> = {
   workspace: {
     binary: 'alice-workspace',
     scope: 'scoped',
-    description: 'Agent collaboration — push/read the user inbox, locate a peer workspace (peer path), track entities',
+    description: 'Agent collaboration — Inbox, peer workspaces, issues, tracked entities, and headless conversation follow-ups',
     commands: {
       // inbox push: surface doc(s) + comment to the user's Inbox tab. Attach
       // files with repeatable `--doc <path>` (the shim folds them into the
@@ -180,6 +180,13 @@ export const CLI_EXPORTS: Record<string, CliExport> = {
         create: 'issue_create',
         list: 'issue_list',
         show: 'issue_show',
+      },
+      // conversation: ask the exact originating worker by product resumeId,
+      // or start a fresh worker at a peer workspace when provenance is absent.
+      // Results stay in the normal headless registry and are read by taskId.
+      conversation: {
+        ask: 'conversation_ask',
+        read: 'conversation_read',
       },
     },
   },

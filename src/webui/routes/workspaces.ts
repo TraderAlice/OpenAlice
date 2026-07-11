@@ -29,7 +29,7 @@ import type { WorkspaceMeta } from '../../workspaces/workspace-registry.js';
 import { HeadlessCapacityError, HeadlessResumeError, resumeFromRecord, type SessionFactoryContext, type WorkspaceService } from '../../workspaces/service.js';
 import { isAgentRuntime, type CliAdapter, type WorkspaceAiCred } from '../../workspaces/cli-adapter.js';
 import { generatePetnameId } from '../../workspaces/petname-id.js';
-import { addCredential, readCredentials, readWorkspaceDefaultAgent, setCredentialLastModel, credentialWires, credentialWireShapeEnum, type Credential } from '../../core/config.js';
+import { addCredential, readCredentials, setCredentialLastModel, credentialWires, credentialWireShapeEnum, type Credential } from '../../core/config.js';
 import { inferCredentialVendor, resolveAnthropicAuthMode } from '../../core/credential-inference.js';
 import { compatibleCredentials, matchCredentialByApiKey } from '../../workspaces/credential-injection.js';
 import {
@@ -147,18 +147,6 @@ export function createWorkspaceRoutes(
   const app = new Hono();
   const headlessSessionInFlight = new Map<string, Promise<OpenHeadlessSessionResult>>();
 
-  const resolveDefaultAgentId = async (meta: WorkspaceMeta): Promise<string | undefined> => {
-    const configured = await readWorkspaceDefaultAgent().catch(() => null);
-    if (configured && meta.agents.includes(configured)) {
-      const adapter = svc.adapters.get(configured);
-      if (adapter && isAgentRuntime(adapter)) return configured;
-    }
-    return meta.agents.find((id) => {
-      const adapter = svc.adapters.get(id);
-      return adapter ? isAgentRuntime(adapter) : false;
-    });
-  };
-
   /**
    * Spawn one interactive PTY session in an existing workspace — the shared
    * core of `POST /:id/sessions/spawn` and `POST /quick-chat` (so the two never
@@ -198,7 +186,7 @@ export function createWorkspaceRoutes(
       return { ok: false, status: 409, body: { error: 'resume_busy', message: 'this conversation already has a running turn' } };
     }
     if (requestedIdentity?.agentSessionId) resume = { sessionId: requestedIdentity.agentSessionId };
-    const agentId = opts.agentId ?? requestedIdentity?.agent ?? await resolveDefaultAgentId(meta);
+    const agentId = opts.agentId ?? requestedIdentity?.agent ?? await svc.resolveDefaultAgentId(meta);
     if (!agentId) {
       return { ok: false, status: 400, body: { error: 'no_agent_runtime', message: 'workspace has no agent runtime enabled' } };
     }
@@ -1399,7 +1387,7 @@ export function createWorkspaceRoutes(
     if (agentId && !meta.agents.includes(agentId)) {
       return c.json({ error: 'agent_not_enabled', message: `agent "${agentId}" not enabled on this workspace` }, 400);
     }
-    const effectiveAgentId = agentId ?? resumeIdentity?.agent ?? await resolveDefaultAgentId(meta);
+    const effectiveAgentId = agentId ?? resumeIdentity?.agent ?? await svc.resolveDefaultAgentId(meta);
     if (!effectiveAgentId) {
       return c.json({ error: 'no_agent_runtime', message: 'workspace has no agent runtime enabled' }, 400);
     }

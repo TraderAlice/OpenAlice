@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { Hono } from 'hono'
 import { ToolCenter } from '../core/tool-center.js'
 import { WorkspaceToolCenter } from '../core/workspace-tool-center.js'
@@ -8,6 +8,7 @@ import { workspacePathFactory } from '../tool/workspace-path.js'
 import { createMemoryInboxStore } from '../core/inbox-store.js'
 import { extractMcpShape } from '../core/mcp-export.js'
 import { inboxPushFactory } from '../tool/inbox-push.js'
+import { conversationAskFactory } from '../tool/conversation.js'
 import { registerCliRoutes, type CliGatewayDeps } from './cli.js'
 
 /**
@@ -181,6 +182,67 @@ describe('CLI gateway — inbox read (scoped, string-arg coercion)', () => {
     expect(status).toBe(200)
     expect(payload.count).toBe(1)
     expect(payload.hasMore).toBe(true)
+  })
+})
+
+describe('CLI gateway — embedded conversation dispatch', () => {
+  it('coerces timeoutMs and dispatches by resumeId without public HTTP', async () => {
+    const adapter = {
+      id: 'pi',
+      kind: 'agent',
+      capabilities: { headless: true },
+      composeHeadlessCommand: () => ['pi'],
+    }
+    const target = {
+      id: 'ws-peer', tag: 'peer', dir: '/tmp/peer', createdAt: '2026-07-11T00:00:00.000Z', agents: ['pi'],
+    }
+    const dispatchHeadlessTask = vi.fn(async () => ({ taskId: 'task-1', resumeId: 'resume-1' }))
+    const fakeSvc = {
+      registry: {
+        get: (id: string) => id === 'ws1'
+          ? { id: 'ws1', tag: 'caller' }
+          : id === target.id ? target : undefined,
+      },
+      resumeRegistry: {
+        get: (id: string) => id === 'resume-1'
+          ? { resumeId: id, wsId: target.id, agent: 'pi' }
+          : null,
+      },
+      adapters: { get: (id: string) => id === 'pi' ? adapter : undefined },
+      config: { launcherRepoRoot: '/repo' },
+      dispatchHeadlessTask,
+    }
+    const wtc = new WorkspaceToolCenter()
+    wtc.register(conversationAskFactory)
+    const app = new Hono()
+    registerCliRoutes(app, {
+      toolCenter: new ToolCenter(),
+      workspaceToolCenter: wtc,
+      inboxStore: {} as never,
+      entityStore: {} as never,
+      getWorkspaceService: () => fakeSvc as never,
+    })
+
+    const res = await app.request('/cli/ws1/workspace/invoke', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tool: 'conversation_ask',
+        args: { resumeId: 'resume-1', prompt: 'why?', timeoutMs: '1234' },
+      }),
+    })
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { content: Array<{ text?: string }> }
+    const payload = JSON.parse(body.content.map((block) => block.text ?? '').join(''))
+    expect(payload).toMatchObject({ ok: true, taskId: 'task-1', continued: true })
+    expect(dispatchHeadlessTask).toHaveBeenCalledWith(
+      target,
+      adapter,
+      'why?',
+      1234,
+      undefined,
+      'resume-1',
+    )
   })
 })
 

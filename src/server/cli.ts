@@ -31,6 +31,7 @@ import { type WorkspaceToolCenter, makeWorkspaceResolver } from '../core/workspa
 import type { IInboxStore, InboxOrigin } from '../core/inbox-store.js'
 import type { IEntityStore } from '../core/entity-store.js'
 import type { WorkspaceService } from '../workspaces/service.js'
+import { createWorkspaceConversationControl } from '../workspaces/conversation-control.js'
 import { extractMcpShape, wrapToolExecute } from '../core/mcp-export.js'
 import { type CliExport, getExport, mappedToolNames } from './cli-commands.js'
 import { resolveInboxOrigin } from './inbox-origin.js'
@@ -87,6 +88,7 @@ export function registerCliRoutes(app: Hono, deps: CliGatewayDeps): void {
         resolveWorkspace: makeWorkspaceResolver(getWorkspaceService),
         ...(svc
           ? {
+              conversation: createWorkspaceConversationControl(svc),
               board: {
                 snapshot: () => svc.issuesSnapshot(),
                 detail: (w: string, i: string) => svc.issueDetail(w, i),

@@ -9,6 +9,7 @@ import { type WorkspaceToolCenter, makeWorkspaceResolver } from '../core/workspa
 import type { IInboxStore } from '../core/inbox-store.js'
 import type { IEntityStore } from '../core/entity-store.js'
 import type { WorkspaceService } from '../workspaces/service.js'
+import { createWorkspaceConversationControl } from '../workspaces/conversation-control.js'
 import type { InboxOrigin } from '../core/inbox-store.js'
 import { extractMcpShape, wrapToolExecute } from '../core/mcp-export.js'
 import { registerCliRoutes } from './cli.js'
@@ -103,6 +104,7 @@ export class McpPlugin implements Plugin {
         resolveWorkspace: makeWorkspaceResolver(getWorkspaceService),
         ...(svc
           ? {
+              conversation: createWorkspaceConversationControl(svc),
               board: {
                 snapshot: () => svc.issuesSnapshot(),
                 detail: (w: string, i: string) => svc.issueDetail(w, i),

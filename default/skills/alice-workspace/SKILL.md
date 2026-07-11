@@ -75,6 +75,33 @@ alice-workspace track search --query "uranium"
 alice-workspace track add --name uranium-ccj --description "Cameco — uranium miner"
 ```
 
+**Ask the agent who produced something** — continue the exact OpenAlice
+conversation when its `resumeId` is available:
+
+```bash
+alice-workspace conversation ask --resumeId <resumeId> --prompt "Why did you make this call?"
+# -> { taskId, resumeId, workspace, agent, status: "running" }
+alice-workspace conversation read --taskId <taskId>
+```
+
+`ask` is asynchronous. Poll `read` until its status is no longer `running`; the
+default response contains the latest assistant reply plus compact tool/error
+activity. Add `--mode detailed` only when you need normalized tool inputs,
+outputs, and all message blocks.
+
+If the originating conversation is unavailable but you know which desk owns the
+work, start a fresh worker there instead:
+
+```bash
+alice-workspace conversation ask --workspaceId <workspaceId> --prompt "Reconstruct why this issue exists."
+```
+
+This goes through the embedded Workspace service and normal headless registry,
+not the public HTTP API. A fresh target uses the user's configured default
+runtime when that runtime is enabled there, otherwise the workspace's first
+enabled runtime; `--agent <id>` overrides that choice. Never pass both
+`--resumeId` and `--workspaceId`.
+
 **The issue board** — the cross-workspace work list, shared by you and the user.
 It's *what's on the plate* when you've lost the thread — scan it when you start.
 **Reads are global, writes are local:**

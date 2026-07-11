@@ -31,6 +31,41 @@ import type { IEntityStore } from './entity-store.js'
 // core/ free of any runtime dependency on the workspaces/ module (no
 // core→workspaces coupling), while letting the board reader below be typed.
 import type { IssuesSnapshot, IssueDetail, WikilinkIssueRef } from '../workspaces/issues/board.js'
+import type { HeadlessStructuredOutput } from '../workspaces/headless-output.js'
+import type { HeadlessTaskStatus } from '../workspaces/headless-task-registry.js'
+
+export interface WorkspaceConversationTask {
+  readonly taskId: string
+  readonly resumeId: string
+  readonly parentTaskId?: string
+  readonly workspaceId: string
+  readonly issueId?: string
+  readonly agent: string
+  readonly status: HeadlessTaskStatus
+  readonly startedAt: number
+  readonly finishedAt?: number
+  readonly durationMs?: number
+  readonly error?: string
+  readonly structured: HeadlessStructuredOutput | null
+}
+
+export interface WorkspaceConversationControl {
+  ask(input: {
+    readonly prompt: string
+    readonly timeoutMs: number
+    readonly resumeId?: string
+    readonly workspaceId?: string
+    readonly agent?: string
+  }): Promise<{
+    readonly taskId: string
+    readonly resumeId: string
+    readonly workspaceId: string
+    readonly workspace: string
+    readonly agent: string
+    readonly continued: boolean
+  }>
+  read(taskId: string): Promise<WorkspaceConversationTask | null>
+}
 
 // ==================== Context handed to factories ====================
 
@@ -56,6 +91,8 @@ export interface WorkspaceToolContext {
    *  it needs the live WorkspaceService (created after this center); the two
    *  build sites (cli.ts, mcp.ts) inject a lazy closure, tests may omit it. */
   resolveWorkspace?: (id: string) => { id: string; dir: string; tag: string } | null
+  /** Embedded headless conversation control; never routes through public HTTP. */
+  conversation?: WorkspaceConversationControl
   /** Agent-INVISIBLE run provenance, resolved server-side from the
    *  `x-openalice-run` header by the MCP / CLI route (never supplied by the
    *  agent). Factories pass it through to call sites (e.g. inbox_push →

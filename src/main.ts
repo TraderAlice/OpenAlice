@@ -60,6 +60,7 @@ import { createEntityStore } from './core/entity-store.js'
 import { entityUpsertFactory } from './tool/entity-upsert.js'
 import { entitySearchFactory } from './tool/entity-search.js'
 import { issueToolFactories } from './tool/issue-tools.js'
+import { conversationToolFactories } from './tool/conversation.js'
 import { createToolCallLog } from './core/tool-call-log.js'
 import { NewsCollectorStore, NewsCollector } from './domain/news/index.js'
 import { createNewsArchiveTools } from './tool/news.js'
@@ -112,6 +113,7 @@ async function main() {
   workspaceToolCenter.register(entityUpsertFactory)
   workspaceToolCenter.register(entitySearchFactory)
   for (const f of issueToolFactories) workspaceToolCenter.register(f)
+  for (const f of conversationToolFactories) workspaceToolCenter.register(f)
 
   // ==================== UTA SDK (HTTP boundary) ====================
   //
