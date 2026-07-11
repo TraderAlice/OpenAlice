@@ -330,13 +330,13 @@ export async function setIssueDefaultAgent(agent: string | null): Promise<string
 
 export interface SessionRecord {
   readonly id: string;
+  readonly resumeId: string;
   readonly wsId: string;
   readonly agent: string;            // 'claude' | 'codex' | 'shell'
   readonly name: string;              // sticky 'c1' / 'x1' / 'sh1'
   readonly createdAt: string;
   readonly lastActiveAt: string;
   readonly state: 'running' | 'paused';
-  readonly agentSessionId: string | null;
   readonly pid: number | null;
   readonly startedAt: number | null;
   /** First message (seeded sessions) — the sidebar title; null → fall back to `name`. */
@@ -352,13 +352,13 @@ export interface SpawnedSession {
   readonly pid: number;
   readonly startedAt: number;
   readonly agent: string;
-  readonly agentSessionId: string | null;
+  readonly resumeId: string;
   readonly title: string | null;
 }
 
 export interface SpawnOptions {
-  /** `'last'` → adapter-specific "continue", any string → adapter-specific resume-by-id. */
-  readonly resume?: 'last' | string;
+  /** Product conversation identity; server resolves the native runtime id. */
+  readonly resumeId?: string;
   /** Explicit runtime/tool adapter for this spawn. */
   readonly agent?: string;
   /**
@@ -376,7 +376,7 @@ export async function spawnSession(
   opts: SpawnOptions = {},
 ): Promise<SpawnedSession> {
   const body: Record<string, unknown> = {};
-  if (opts.resume !== undefined) body['resume'] = opts.resume;
+  if (opts.resumeId !== undefined) body['resumeId'] = opts.resumeId;
   if (opts.agent !== undefined) body['agent'] = opts.agent;
   if (opts.initialPrompt !== undefined) body['initialPrompt'] = opts.initialPrompt;
   if (opts.terminalTheme !== undefined) body['terminalTheme'] = opts.terminalTheme;
@@ -396,8 +396,6 @@ export async function spawnSession(
 }
 
 export interface OpenHeadlessSessionOptions {
-  readonly agent?: string;
-  readonly agentSessionId?: string;
   readonly title?: string;
 }
 
@@ -407,13 +405,13 @@ export interface OpenHeadlessSessionResult {
 }
 
 /** Idempotently materialize a finished headless run as one interactive Session. */
-export async function openHeadlessRunSession(
+export async function openResumeSession(
   wsId: string,
-  taskId: string,
+  resumeId: string,
   opts: OpenHeadlessSessionOptions = {},
 ): Promise<OpenHeadlessSessionResult> {
   const res = await fetch(
-    `/api/workspaces/${encodeURIComponent(wsId)}/headless/${encodeURIComponent(taskId)}/session`,
+    `/api/workspaces/${encodeURIComponent(wsId)}/resumes/${encodeURIComponent(resumeId)}/session`,
     {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

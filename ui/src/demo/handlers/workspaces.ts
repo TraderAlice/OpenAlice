@@ -163,31 +163,31 @@ export const workspacesHandlers = [
       pid: 0,
       startedAt: Date.now(),
       agent: 'claude',
-      agentSessionId: null,
+      resumeId: 'demo-resume-spawn',
       title: null,
     }),
   ),
-  http.post('/api/workspaces/:id/headless/:taskId/session', ({ params }) => {
+  http.post('/api/workspaces/:id/resumes/:resumeId/session', ({ params }) => {
     const wsId = String(params.id)
-    const taskId = String(params.taskId)
+    const resumeId = String(params.resumeId)
     const workspace = demoWorkspaces.find((candidate) => candidate.id === wsId)
     if (!workspace) return HttpResponse.json({ error: 'workspace_not_found' }, { status: 404 })
-    const existing = workspace.sessions.find((session) => session.sourceRunId === taskId)
+    const existing = workspace.sessions.find((session) => session.resumeId === resumeId)
     if (existing) return HttpResponse.json({ session: existing, created: false })
     const now = new Date().toISOString()
     const session = {
-      id: `run-${taskId}`,
+      id: `run-${resumeId}`,
+      resumeId,
       wsId,
       agent: 'codex',
       name: `x${workspace.sessions.length + 1}`,
       createdAt: now,
       lastActiveAt: now,
       state: 'running' as const,
-      agentSessionId: '019eb75e-0b1b-7fa2-ba95-fd7db4463afe',
       pid: 0,
       startedAt: Date.now(),
       title: 'Compute a quant snapshot of NVDA and push a report to the inbox.',
-      sourceRunId: taskId,
+      sourceRunId: 'demo-headless-1',
     }
     ;(workspace.sessions as Array<typeof session>).push(session)
     return HttpResponse.json({ session, created: true }, { status: 201 })
@@ -211,7 +211,7 @@ export const workspacesHandlers = [
           pid: 0,
           startedAt: Date.now(),
           agent: 'claude',
-          agentSessionId: null,
+          resumeId: 'demo-resume-quick-chat',
           title: null,
         },
       },

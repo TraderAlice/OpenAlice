@@ -165,6 +165,11 @@ export const piAdapter: CliAdapter = {
     return [
       ...piCommandHead(_ctx.env),
       ...piHeadlessApproveArgs(_ctx.env),
+      ...(_ctx.resume === 'last'
+        ? ['--continue']
+        : _ctx.resume
+          ? ['--session-id', _ctx.resume.sessionId]
+          : []),
       '-p',
       '--mode',
       'json',

@@ -226,10 +226,12 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
     setContinuing(true)
     setSidebar('workspaces')
     try {
-      if (origin?.kind === 'headless' && origin.runId) {
-        await workspacesCtx.openHeadlessRun(entry.workspaceId, origin.runId, {
-          ...(origin.agent ? { agent: origin.agent } : {}),
-          ...(origin.agentSessionId ? { agentSessionId: origin.agentSessionId } : {}),
+      if (origin?.kind === 'headless' && (origin.resumeId || origin.runId)) {
+        // Legacy Inbox JSONL stored only taskId. Runs are retained, so one
+        // lookup upgrades that provenance to resumeId without exposing the
+        // native runtime session id.
+        const resumeId = origin.resumeId ?? (await api.headless.get(origin.runId!)).resumeId
+        await workspacesCtx.openHeadlessRun(entry.workspaceId, resumeId, {
           ...(entry.comments ? { title: entry.comments.slice(0, 200) } : {}),
         })
       } else if (sessionId && sessionRecord) {

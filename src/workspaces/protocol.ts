@@ -41,12 +41,6 @@ export interface AttachedMessage {
   readonly sessionId: string;
   /** Display name for tabs (e.g. "c1", "x2", "sh1"). */
   readonly name: string;
-  /**
-   * The CLI's own session id once discovered (claude: UUID from JSONL filename,
-   * codex: rollout UUID, etc.). Null on adapters with no transcript discovery
-   * or during the brief window before the first transcript write.
-   */
-  readonly agentSessionId: string | null;
   readonly pid: number;
   readonly command: readonly string[];
   /** Seq the replay bytes (sent as binary frames just before this) start at. */

@@ -346,6 +346,20 @@ describe('composeHeadlessCommand (one-shot headless argv, prompt placed per-CLI)
     ]);
   });
 
+  it('resumes headless conversations by backend-resolved native id for all runtimes', () => {
+    const resume = { sessionId: 'native-session-1' } as const;
+    expect(claudeAdapter.composeHeadlessCommand!(['claude'], { ...ctx(), resume }, 'next')).toContain('native-session-1');
+    expect(codexAdapter.composeHeadlessCommand!(['codex'], { ...ctx(), resume }, 'next')).toEqual(expect.arrayContaining([
+      'exec', 'resume', '--json', 'native-session-1', 'next',
+    ]));
+    expect(opencodeAdapter.composeHeadlessCommand!(['opencode'], { ...ctx(), resume }, 'next')).toEqual([
+      'opencode', 'run', '--format', 'json', '--session', 'native-session-1', '--', 'next',
+    ]);
+    expect(piAdapter.composeHeadlessCommand!(['pi'], { ...ctx(), resume }, 'next')).toEqual([
+      'pi', '--session-id', 'native-session-1', '-p', '--mode', 'json', 'next',
+    ]);
+  });
+
   it('claude/codex/opencode place a -leading prompt after a -- terminator', () => {
     const dashy = '--help me by explaining X';
     for (const a of [claudeAdapter, codexAdapter, opencodeAdapter]) {

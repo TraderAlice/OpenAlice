@@ -156,12 +156,13 @@ The launcher binds the run/issue origin; the agent does not pass its own
 identity. A no-change check should exit silently rather than generating Inbox
 noise.
 
-When a user opens an Inbox result, Alice uses the run's captured native CLI
-session id to resume the original conversation in an interactive PTY. The
-created Session stores `sourceRunId`; later opens from Inbox, the Automation
-panel, or the Workspace sidebar reuse that same Session instead of duplicating
-it. A scheduled result therefore keeps both links: its owning issue for work
-history and its originating Session for conversational follow-up.
+When a user opens an Inbox result, the frontend supplies its OpenAlice-owned
+`resumeId`. The backend `ResumeRegistry` resolves that identity to the native
+Claude/Codex/opencode/Pi session id and resumes the original conversation in an
+interactive PTY. Later opens from Inbox, Automation, or the Workspace sidebar
+reuse the Session indexed by `resumeId`; native ids never cross the product
+protocol. `taskId` remains one execution, while `parentTaskId` records direct
+turn lineage. Runs and their logs are retained rather than silently pruned.
 
 Scheduling never bypasses trading approval. A headless agent may research or
 stage a trade, but execution remains behind UTA/Trading-as-Git permission and
@@ -179,15 +180,16 @@ human approval boundaries.
 | `src/workspaces/schedule/marker-store.ts` | Atomic last-fired persistence |
 | `src/workspaces/service.ts` | Scanner composition, agent resolution, headless registry |
 | `src/workspaces/headless-task.ts` | Process lifecycle, bounded logs, live structured snapshots |
-| `src/workspaces/headless-task-registry.ts` | Concurrent run records, capacity projection, and log pruning |
+| `src/workspaces/headless-task-registry.ts` | Durable run records, resume lineage, and capacity projection |
+| `src/workspaces/resume-registry.ts` | Product `resumeId` → backend-native runtime session mapping |
 | `src/workspaces/headless-output.ts` | Vendor-neutral reply/tool block contract and accumulator |
 | `src/workspaces/adapters/{claude,codex,opencode,pi}.ts` | Runtime-specific JSON event translation |
 | `src/webui/routes/headless.ts` | Cross-workspace capacity, task, normalized output, and diagnostic-tail API |
 | `ui/src/pages/AutomationRunsSection.tsx` | Run list, final reply, tool activity, and diagnostics UI |
 | `src/tool/issue-tools.ts` | Workspace-scoped issue CLI/MCP tools |
 | `src/tool/inbox-push.ts` | Headless/interactive delivery to Inbox |
-| `src/workspaces/session-registry.ts` | Durable Session identity and run → Session source index |
-| `src/webui/routes/workspaces.ts` | Idempotent headless-run → interactive-Session materialization |
+| `src/workspaces/session-registry.ts` | Durable Session identity and resumeId → Session index |
+| `src/webui/routes/workspaces.ts` | Idempotent resumeId → interactive-Session materialization |
 | `src/webui/routes/issues.ts` | Issue board/detail HTTP API |
 | `src/webui/routes/schedule.ts` | Scheduled projection API |
 | `default/skills/self-scheduling/SKILL.md` | Agent-facing authoring instructions |

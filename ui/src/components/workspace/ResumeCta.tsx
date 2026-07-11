@@ -74,10 +74,10 @@ export function ResumeCta(props: ResumeCtaProps): ReactElement {
             <dd>{r.agent}</dd>
             <dt>Created</dt>
             <dd>{absoluteTime(r.createdAt)}</dd>
-            {r.agentSessionId && (
+            {r.resumeId && (
               <>
                 <dt>Transcript</dt>
-                <dd className="mono">{r.agentSessionId.slice(0, 8)}</dd>
+                <dd className="mono">{r.resumeId.slice(0, 8)}</dd>
               </>
             )}
           </dl>
@@ -173,4 +173,3 @@ function absoluteTime(iso: string): string {
   if (!Number.isFinite(t.getTime())) return iso;
   return t.toLocaleString();
 }
-

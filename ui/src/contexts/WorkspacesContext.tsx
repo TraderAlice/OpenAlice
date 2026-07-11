@@ -38,7 +38,7 @@ import {
   listAgents,
   listTemplates,
   listWorkspaces,
-  openHeadlessRunSession,
+  openResumeSession,
   pauseSession as apiPauseSession,
   quickChat as apiQuickChat,
   resumeSession as apiResumeSession,
@@ -149,7 +149,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
           createdAt: nowIso,
           lastActiveAt: nowIso,
           state: 'running',
-          agentSessionId: sess.agentSessionId,
+          resumeId: sess.resumeId,
           pid: sess.pid,
           startedAt: sess.startedAt,
           title: sess.title,
@@ -183,10 +183,10 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
   const openHeadlessRun = useCallback(
     async (
       wsId: string,
-      taskId: string,
-      opts: { agent?: string; agentSessionId?: string; title?: string } = {},
+      resumeId: string,
+      opts: { title?: string } = {},
     ): Promise<void> => {
-      const { session } = await openHeadlessRunSession(wsId, taskId, opts)
+      const { session } = await openResumeSession(wsId, resumeId, opts)
       let nextSession = session
       if (session.state === 'paused') {
         const resumed = await apiResumeSession(wsId, session.id, terminalTheme)
@@ -196,7 +196,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
             state: 'running',
             pid: resumed.pid,
             startedAt: resumed.startedAt,
-            agentSessionId: resumed.agentSessionId ?? session.agentSessionId,
+            resumeId: resumed.resumeId ?? session.resumeId,
             lastActiveAt: new Date().toISOString(),
           }
         }
@@ -238,7 +238,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         createdAt: nowIso,
         lastActiveAt: nowIso,
         state: 'running',
-        agentSessionId: session.agentSessionId,
+        resumeId: session.resumeId,
         pid: session.pid,
         startedAt: session.startedAt,
         title: session.title,

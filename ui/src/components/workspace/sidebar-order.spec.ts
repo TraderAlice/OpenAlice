@@ -10,13 +10,13 @@ function session(
 ): SessionRecord {
   return {
     id,
+    resumeId: `resume-${id}`,
     wsId: 'ws',
     agent: 'pi',
     name: id,
     createdAt: lastActiveAt,
     lastActiveAt,
     state,
-    agentSessionId: null,
     pid: state === 'running' ? 1 : null,
     startedAt: state === 'running' ? 1 : null,
     title: id,

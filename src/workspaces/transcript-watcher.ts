@@ -75,6 +75,8 @@ export class TranscriptWatcher {
      * `POST /sessions/:id/resume` can later invoke `claude --resume <uuid>`.
      */
     private readonly sessionRegistry?: SessionRegistry,
+    /** Backend identity mapper; keeps native ids out of product protocols. */
+    private readonly onAgentSessionId?: (wsId: string, recordId: string, agentSessionId: string) => void,
   ) {}
 
   async register(session: PersistentSession, adapter: CliAdapter): Promise<void> {
@@ -236,6 +238,7 @@ export class TranscriptWatcher {
       const pick = byOldest.find((s) => !p.existingBefore.has(s.sessionId) && !claimedThisRound.has(s.sessionId));
       if (!pick) continue;
       p.session.setAgentSessionId(pick.sessionId);
+      this.onAgentSessionId?.(p.session.wsId, p.session.recordId, pick.sessionId);
       claimedThisRound.add(pick.sessionId);
       this.logger.info('transcript.session.captured', {
         wsId: p.session.wsId,
@@ -320,6 +323,7 @@ export class TranscriptWatcher {
       const sessionId = p.adapter.extractSessionId?.(filename);
       if (!sessionId) return;
       p.session.setAgentSessionId(sessionId);
+      this.onAgentSessionId?.(p.session.wsId, p.session.recordId, sessionId);
       this.logger.info('transcript.jsonl.detected', {
         wsId: p.session.wsId,
         recordId: p.session.recordId,

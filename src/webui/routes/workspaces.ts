@@ -26,8 +26,8 @@ import { logger as launcherLogger } from '../../workspaces/logger.js';
 import { readWorkspaceMetadata, workspaceMetadataSchema, writeWorkspaceMetadata } from '../../workspaces/workspace-metadata.js';
 import type { SessionRecord } from '../../workspaces/session-registry.js';
 import type { WorkspaceMeta } from '../../workspaces/workspace-registry.js';
-import { HeadlessCapacityError, resumeFromRecord, type SessionFactoryContext, type WorkspaceService } from '../../workspaces/service.js';
-import { isAgentRuntime, type WorkspaceAiCred } from '../../workspaces/cli-adapter.js';
+import { HeadlessCapacityError, HeadlessResumeError, resumeFromRecord, type SessionFactoryContext, type WorkspaceService } from '../../workspaces/service.js';
+import { isAgentRuntime, type CliAdapter, type WorkspaceAiCred } from '../../workspaces/cli-adapter.js';
 import { generatePetnameId } from '../../workspaces/petname-id.js';
 import { addCredential, readCredentials, readWorkspaceDefaultAgent, setCredentialLastModel, credentialWires, credentialWireShapeEnum, type Credential } from '../../core/config.js';
 import { inferCredentialVendor, resolveAnthropicAuthMode } from '../../core/credential-inference.js';
@@ -111,7 +111,7 @@ interface SpawnedSessionBody {
   readonly name: string;
   readonly pid: number;
   readonly agent: string;
-  readonly agentSessionId: string | null;
+  readonly resumeId: string;
   readonly startedAt: number;
   /** The seed message, when the session was seeded — its sidebar title. */
   readonly title: string | null;
@@ -125,7 +125,7 @@ interface PublicSessionBody {
   readonly createdAt: string;
   readonly lastActiveAt: string;
   readonly state: 'running' | 'paused';
-  readonly agentSessionId: string | null;
+  readonly resumeId: string;
   readonly pid: number | null;
   readonly startedAt: number | null;
   readonly title: string | null;
@@ -172,6 +172,8 @@ export function createWorkspaceRoutes(
     opts: {
       readonly agentId?: string;
       readonly resume?: SessionFactoryContext['resume'];
+      /** Product-level conversation id. Resolved to a native id only here. */
+      readonly resumeId?: string;
       readonly initialPrompt?: string;
       readonly title?: string;
       readonly sourceRunId?: string;
@@ -180,8 +182,23 @@ export function createWorkspaceRoutes(
     },
   ): Promise<SpawnSessionResult> {
     const id = meta.id;
-    const { resume, initialPrompt } = opts;
-    const agentId = opts.agentId ?? await resolveDefaultAgentId(meta);
+    const initialPrompt = opts.initialPrompt;
+    let resume = opts.resume;
+    const requestedIdentity = opts.resumeId ? svc.resumeRegistry.get(opts.resumeId) : null;
+    if (opts.resumeId && !requestedIdentity) {
+      return { ok: false, status: 404, body: { error: 'resume_not_found' } };
+    }
+    if (requestedIdentity && requestedIdentity.wsId !== id) {
+      return { ok: false, status: 400, body: { error: 'resume_wrong_workspace' } };
+    }
+    if (requestedIdentity && !requestedIdentity.agentSessionId) {
+      return { ok: false, status: 409, body: { error: 'resume_not_ready', message: 'runtime session id has not been captured yet' } };
+    }
+    if (opts.resumeId && svc.isResumeActive?.(opts.resumeId)) {
+      return { ok: false, status: 409, body: { error: 'resume_busy', message: 'this conversation already has a running turn' } };
+    }
+    if (requestedIdentity?.agentSessionId) resume = { sessionId: requestedIdentity.agentSessionId };
+    const agentId = opts.agentId ?? requestedIdentity?.agent ?? await resolveDefaultAgentId(meta);
     if (!agentId) {
       return { ok: false, status: 400, body: { error: 'no_agent_runtime', message: 'workspace has no agent runtime enabled' } };
     }
@@ -189,6 +206,9 @@ export function createWorkspaceRoutes(
       return { ok: false, status: 400, body: { error: 'unknown_agent', message: `no adapter: ${agentId}` } };
     }
     const adapter = svc.resolveAdapter(meta, agentId);
+    if (requestedIdentity && requestedIdentity.agent !== adapter.id) {
+      return { ok: false, status: 400, body: { error: 'resume_wrong_agent' } };
+    }
     const runtimeReadiness = svc.getAgentRuntimeReadiness().agents[adapter.id];
     const runtimeIsGloballyReady =
       runtimeReadiness?.ready === true &&
@@ -232,8 +252,30 @@ export function createWorkspaceRoutes(
     const nowIso = new Date().toISOString();
     const titleSource = opts.title?.trim() || initialPrompt;
     const title = titleSource ? titleSource.slice(0, MAX_SESSION_TITLE) : undefined;
+    const claimedResume = opts.resumeId
+      ? (svc.claimResume?.(opts.resumeId) ?? true)
+      : false;
+    if (opts.resumeId && !claimedResume) {
+      return { ok: false, status: 409, body: { error: 'resume_busy', message: 'this conversation already has a running turn' } };
+    }
+    const releaseClaim = () => {
+      if (claimedResume && opts.resumeId) svc.releaseResume?.(opts.resumeId);
+    };
+    let identity: { resumeId: string };
+    try {
+      identity = await svc.resumeRegistry.ensure({
+        ...(opts.resumeId ? { resumeId: opts.resumeId } : {}),
+        wsId: id,
+        agent: adapter.id,
+        ...(resume && resume !== 'last' ? { agentSessionId: resume.sessionId } : {}),
+      });
+    } catch (err) {
+      releaseClaim();
+      return { ok: false, status: 500, body: { error: 'resume_registry_failed', message: (err as Error).message } };
+    }
     const record: SessionRecord = {
       id: recordId,
+      resumeId: identity.resumeId,
       wsId: id,
       agent: adapter.id,
       name: recordName,
@@ -249,6 +291,7 @@ export function createWorkspaceRoutes(
     try {
       await svc.sessionRegistry.create(record);
     } catch (err) {
+      releaseClaim();
       launcherLogger.error('session_registry.create_failed', { id, recordId, err });
       return { ok: false, status: 500, body: { error: 'registry_failed', message: (err as Error).message } };
     }
@@ -271,6 +314,7 @@ export function createWorkspaceRoutes(
         resume: resume === undefined ? null : resume === 'last' ? 'last' : resume.sessionId,
         seeded: resume === undefined && !!initialPrompt,
       });
+      releaseClaim();
       return {
         ok: true,
         session: {
@@ -279,12 +323,13 @@ export function createWorkspaceRoutes(
           name: session.name,
           pid: session.pid,
           agent: adapter.id,
-          agentSessionId: session.agentSessionId,
+          resumeId: identity.resumeId,
           startedAt: session.startedAt,
           title: title ?? null,
         },
       };
     } catch (err) {
+      releaseClaim();
       await svc.sessionRegistry.remove(id, recordId).catch(() => undefined);
       launcherLogger.error('workspace.session_spawn_failed', { id, err });
       return { ok: false, status: 500, body: { error: 'spawn_failed', message: (err as Error).message } };
@@ -301,7 +346,7 @@ export function createWorkspaceRoutes(
       createdAt: record.createdAt,
       lastActiveAt: record.lastActiveAt,
       state: record.state === 'running' && live ? 'running' : 'paused',
-      agentSessionId: live?.agentSessionId ?? record.resumeHint?.value ?? null,
+      resumeId: record.resumeId,
       pid: live?.pid ?? null,
       startedAt: live?.startedAt ?? null,
       title: record.title ?? null,
@@ -309,19 +354,27 @@ export function createWorkspaceRoutes(
     };
   };
 
-  const openHeadlessRunAsSession = async (
+  const mappedResumeForRecord = (
+    record: SessionRecord,
+    adapter: CliAdapter,
+  ): SessionFactoryContext['resume'] => {
+    const nativeId = svc.resumeRegistry.get(record.resumeId)?.agentSessionId;
+    return nativeId && adapter.capabilities.resumeById
+      ? { sessionId: nativeId }
+      : resumeFromRecord(record, adapter);
+  };
+
+  const openResumeAsSession = async (
     meta: WorkspaceMeta,
-    taskId: string,
-    fallback: { agent?: string; agentSessionId?: string; title?: string } = {},
+    resumeId: string,
+    title?: string,
   ): Promise<OpenHeadlessSessionResult> => {
     await svc.sessionRegistry.ensureLoaded(meta.id);
-    const existing = svc.sessionRegistry.findBySourceRunId(meta.id, taskId);
+    const existing = svc.sessionRegistry.findByResumeId(meta.id, resumeId);
     if (existing) return { ok: true, created: false, session: publicSession(existing) };
-
-    const task = svc.headlessTasks.get(taskId);
-    if (task && task.wsId !== meta.id) {
-      return { ok: false, status: 404, body: { error: 'run_not_found' } };
-    }
+    const identity = svc.resumeRegistry.get(resumeId);
+    if (!identity || identity.wsId !== meta.id) return { ok: false, status: 404, body: { error: 'resume_not_found' } };
+    const task = identity.latestTaskId ? svc.headlessTasks.get(identity.latestTaskId) : null;
     if (task?.status === 'running') {
       return {
         ok: false,
@@ -330,29 +383,27 @@ export function createWorkspaceRoutes(
       };
     }
 
-    const agent = task?.agent ?? fallback.agent;
-    const agentSessionId = task?.agentSessionId ?? fallback.agentSessionId;
-    if (!agent || !agentSessionId || !AGENT_SESSION_ID_RE.test(agentSessionId)) {
+    if (!identity.agentSessionId) {
       return {
         ok: false,
         status: 409,
         body: { error: 'session_unavailable', message: 'this run did not capture a resumable agent session id' },
       };
     }
-    const adapter = svc.adapters.get(agent);
+    const adapter = svc.adapters.get(identity.agent);
     if (!adapter || !adapter.capabilities.resumeById) {
       return {
         ok: false,
         status: 409,
-        body: { error: 'resume_unsupported', message: `${agent} cannot resume this run by session id` },
+        body: { error: 'resume_unsupported', message: `${identity.agent} cannot resume this conversation` },
       };
     }
 
     const spawned = await spawnInteractiveSession(meta, {
-      agentId: agent,
-      resume: { sessionId: agentSessionId },
-      title: task?.prompt ?? fallback.title ?? `Headless run ${taskId}`,
-      sourceRunId: taskId,
+      agentId: identity.agent,
+      resumeId,
+      title: task?.prompt ?? title ?? `Conversation ${resumeId}`,
+      ...(task ? { sourceRunId: task.taskId } : {}),
     });
     if (!spawned.ok) {
       return {
@@ -684,11 +735,35 @@ export function createWorkspaceRoutes(
 
   // ── sessions ─────────────────────────────────────────────────────────────
 
-  // Materialize a finished headless run as one stable interactive Session.
-  // The sourceRunId index makes this idempotent across Inbox, Automation, the
-  // Workspace sidebar, reloads, and server restarts. New Inbox entries carry a
-  // server-stamped native session id as a fallback after the bounded run log is
-  // pruned; recent/legacy entries resolve from HeadlessTaskRegistry instead.
+  // Materialize one product-owned conversation as a stable interactive
+  // Session. The frontend supplies only resumeId; native CLI ids stay in the
+  // backend ResumeRegistry.
+  app.post('/:id/resumes/:resumeId/session', async (c) => {
+    const id = c.req.param('id');
+    const resumeId = c.req.param('resumeId');
+    if (!validId(id) || !validId(resumeId)) return c.json({ error: 'not_found' }, 404);
+    const meta = svc.registry.get(id);
+    if (!meta) return c.json({ error: 'workspace_not_found' }, 404);
+    const body = await safeJson(c).catch(() => null);
+    const fields = body && typeof body === 'object' ? body as Record<string, unknown> : {};
+    const title = typeof fields['title'] === 'string' ? fields['title'] : undefined;
+    const key = `${id}::${resumeId}`;
+    let run = headlessSessionInFlight.get(key);
+    if (!run) {
+      run = openResumeAsSession(meta, resumeId, title);
+      headlessSessionInFlight.set(key, run);
+    }
+    try {
+      const result = await run;
+      if (!result.ok) return c.json(result.body, result.status);
+      return c.json({ session: result.session, created: result.created }, result.created ? 201 : 200);
+    } finally {
+      if (headlessSessionInFlight.get(key) === run) headlessSessionInFlight.delete(key);
+    }
+  });
+
+  // Compatibility route for bookmarked task links. It resolves taskId to the
+  // product resumeId server-side and never accepts a native session id.
   app.post('/:id/headless/:taskId/session', async (c) => {
     const id = c.req.param('id');
     const taskId = c.req.param('taskId');
@@ -696,20 +771,16 @@ export function createWorkspaceRoutes(
     const meta = svc.registry.get(id);
     if (!meta) return c.json({ error: 'workspace_not_found' }, 404);
 
+    const task = svc.headlessTasks.get(taskId);
+    if (!task || task.wsId !== id) return c.json({ error: 'run_not_found' }, 404);
     const body = await safeJson(c).catch(() => null);
     const fields = body && typeof body === 'object' ? body as Record<string, unknown> : {};
-    const fallback = {
-      ...(typeof fields['agent'] === 'string' ? { agent: fields['agent'] } : {}),
-      ...(typeof fields['agentSessionId'] === 'string'
-        ? { agentSessionId: fields['agentSessionId'] }
-        : {}),
-      ...(typeof fields['title'] === 'string' ? { title: fields['title'] } : {}),
-    };
+    const title = typeof fields['title'] === 'string' ? fields['title'] : undefined;
 
     const key = `${id}::${taskId}`;
     let run = headlessSessionInFlight.get(key);
     if (!run) {
-      run = openHeadlessRunAsSession(meta, taskId, fallback);
+      run = openResumeAsSession(meta, task.resumeId, title);
       headlessSessionInFlight.set(key, run);
     }
     try {
@@ -730,7 +801,7 @@ export function createWorkspaceRoutes(
     const meta = svc.registry.get(id);
     if (!meta) return c.json({ error: 'not_found' }, 404);
 
-    let resume: SessionFactoryContext['resume'];
+    let resumeId: string | undefined;
     let agentId: string | undefined;
     let initialPrompt: string | undefined;
     let credentialSlug: string | undefined;
@@ -738,9 +809,8 @@ export function createWorkspaceRoutes(
     try {
       const body = await safeJson(c);
       const fields = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
-      const raw = fields['resume'];
-      if (raw === 'last') resume = 'last';
-      else if (typeof raw === 'string' && AGENT_SESSION_ID_RE.test(raw)) resume = { sessionId: raw };
+      const rawResumeId = fields['resumeId'];
+      if (typeof rawResumeId === 'string' && validId(rawResumeId)) resumeId = rawResumeId;
       const rawAgent = fields['agent'];
       if (typeof rawAgent === 'string' && rawAgent.length > 0) agentId = rawAgent;
       const rawSlug = fields['credentialSlug'];
@@ -753,13 +823,13 @@ export function createWorkspaceRoutes(
       // codex's `resume <id>` / pi's `--session-id`.
       const seed = parseSeedPrompt(fields['initialPrompt']);
       if (seed && 'error' in seed) return c.json(seed, 400);
-      if (seed && resume === undefined) initialPrompt = seed.prompt;
+      if (seed && resumeId === undefined) initialPrompt = seed.prompt;
     } catch (err) {
       return c.json({ error: 'bad_request', message: (err as Error).message }, 400);
     }
     const result = await spawnInteractiveSession(meta, {
       ...(agentId !== undefined ? { agentId } : {}),
-      ...(resume !== undefined ? { resume } : {}),
+      ...(resumeId !== undefined ? { resumeId } : {}),
       ...(initialPrompt !== undefined ? { initialPrompt } : {}),
       ...(credentialSlug !== undefined ? { credentialSlug } : {}),
       ...(terminalTheme !== undefined ? { terminalTheme } : {}),
@@ -934,6 +1004,9 @@ export function createWorkspaceRoutes(
     async function doResume() {
       const record = svc.sessionRegistry.get(id, token);
       if (!record) return c.json({ error: 'not_found' }, 404);
+      if (svc.isResumeActive?.(record.resumeId)) {
+        return c.json({ error: 'resume_busy', message: 'this conversation already has a running headless turn' }, 409);
+      }
       // Re-check INSIDE the lock: a concurrent resume that just settled may have
       // already spawned this session.
       if (svc.pool.get(token)) {
@@ -962,7 +1035,7 @@ export function createWorkspaceRoutes(
         launcherLogger.warn('agent_cred.ensure_failed_on_resume', { id, agent: adapter.id, err });
         return c.json({ error: 'agent_credential_failed', message: (err as Error).message }, 500);
       }
-      const resume = resumeFromRecord(record, adapter);
+      const resume = mappedResumeForRecord(record, adapter);
       const plan = svc.computeSpawnPlan(meta, adapter, resume);
       // path.trace at the moment the resume decision is taken — captures what
       // we're ABOUT to do, before bootstrap or spawn. If a downstream step
@@ -980,7 +1053,8 @@ export function createWorkspaceRoutes(
         projectKey: plan.projectKey,
         composedCommand: plan.composedCommand,
         resumeMode: plan.resumeMode,
-        resumeId: plan.resumeId,
+        resumeId: record.resumeId,
+        nativeSessionId: plan.nativeSessionId,
         resumeHintInRecord: record.resumeHint ?? null,
       });
       try {
@@ -998,6 +1072,10 @@ export function createWorkspaceRoutes(
       let initialReplayBytes: Buffer | null = null;
       if (record.agent === 'shell' && record.scrollbackFile) {
         initialReplayBytes = await svc.scrollbackStore.read(record.scrollbackFile);
+      }
+      const claimedResume = svc.claimResume?.(record.resumeId) ?? true;
+      if (!claimedResume) {
+        return c.json({ error: 'resume_busy', message: 'this conversation already has a running turn' }, 409);
       }
       try {
         const ctx: SessionFactoryContext = {
@@ -1055,15 +1133,19 @@ export function createWorkspaceRoutes(
         return c.json({
           ok: true,
           sessionId: session.recordId,
+          resumeId: record.resumeId,
           wsId: session.wsId,
           name: session.name,
           pid: session.pid,
           agent: adapter.id,
           startedAt: session.startedAt,
+          title: record.title ?? null,
         });
       } catch (err) {
         launcherLogger.error('workspace.session_resume_failed', { id, token, err });
         return c.json({ error: 'resume_failed', message: (err as Error).message }, 500);
+      } finally {
+        if (claimedResume) svc.releaseResume?.(record.resumeId);
       }
     }
   });
@@ -1094,7 +1176,7 @@ export function createWorkspaceRoutes(
       }, 500);
     }
 
-    const resume = resumeFromRecord(record, adapter);
+    const resume = mappedResumeForRecord(record, adapter);
     const plan = svc.computeSpawnPlan(meta, adapter, resume);
 
     let transcriptFiles: { name: string; size: number; mtime: string }[] = [];
@@ -1154,7 +1236,8 @@ export function createWorkspaceRoutes(
       },
       wouldResume: {
         mode: plan.resumeMode,
-        resumeId: plan.resumeId,
+        resumeId: record.resumeId,
+        nativeSessionId: plan.nativeSessionId,
         composedCommand: plan.composedCommand,
         spawnCwd: plan.spawnCwd,
         envPWD: plan.envPWD,
@@ -1236,7 +1319,7 @@ export function createWorkspaceRoutes(
           ? 'last'
           : resumeOverride !== undefined
             ? resumeOverride
-            : resumeFromRecord(record, adapter);
+            : mappedResumeForRecord(record, adapter);
     launcherLogger.info('workspace.probe_started', {
       id, sessionId: token, agent: adapter.id, promptLen: prompt.length, timeoutMs,
       resumeMode: resume === undefined ? 'fresh' : resume === 'last' ? 'last' : 'by-id',
@@ -1269,6 +1352,7 @@ export function createWorkspaceRoutes(
     let prompt: string;
     let timeoutMs: number;
     let agentId: string | undefined;
+    let resumeId: string | undefined;
     let wait = false;
     try {
       const body = await safeJson(c);
@@ -1288,12 +1372,22 @@ export function createWorkspaceRoutes(
         typeof rawTimeout === 'number' && rawTimeout > 0 ? Math.min(rawTimeout, 1_800_000) : 300_000;
       const rawAgent = fields['agent'];
       if (typeof rawAgent === 'string' && rawAgent.length > 0) agentId = rawAgent;
+      const rawResumeId = fields['resumeId'];
+      if (typeof rawResumeId === 'string' && validId(rawResumeId)) resumeId = rawResumeId;
       wait = fields['wait'] === true;
     } catch (err) {
       return c.json({ error: 'bad_request', message: (err as Error).message }, 400);
     }
     const meta = svc.registry.get(id);
     if (!meta) return c.json({ error: 'workspace_not_found' }, 404);
+    const resumeIdentity = resumeId ? svc.resumeRegistry.get(resumeId) : null;
+    if (resumeId && !resumeIdentity) return c.json({ error: 'resume_not_found' }, 404);
+    if (resumeIdentity && resumeIdentity.wsId !== id) {
+      return c.json({ error: 'resume_wrong_workspace' }, 409);
+    }
+    if (wait && resumeId) {
+      return c.json({ error: 'resume_requires_async', message: 'resumed turns are recorded runs; omit wait:true' }, 400);
+    }
     if (agentId && !svc.adapters.get(agentId)) {
       return c.json({ error: 'unknown_agent', message: `no adapter: ${agentId}` }, 400);
     }
@@ -1305,7 +1399,7 @@ export function createWorkspaceRoutes(
     if (agentId && !meta.agents.includes(agentId)) {
       return c.json({ error: 'agent_not_enabled', message: `agent "${agentId}" not enabled on this workspace` }, 400);
     }
-    const effectiveAgentId = agentId ?? await resolveDefaultAgentId(meta);
+    const effectiveAgentId = agentId ?? resumeIdentity?.agent ?? await resolveDefaultAgentId(meta);
     if (!effectiveAgentId) {
       return c.json({ error: 'no_agent_runtime', message: 'workspace has no agent runtime enabled' }, 400);
     }
@@ -1345,11 +1439,19 @@ export function createWorkspaceRoutes(
     // run's status and normalized output are queryable under /api/headless;
     // the agent can additionally publish durable user-facing work to Inbox.
     try {
-      const { taskId } = await svc.dispatchHeadlessTask(meta, adapter, prompt, timeoutMs);
-      return c.json({ taskId, status: 'running' }, 202);
+      const dispatched = resumeId
+        ? await svc.dispatchHeadlessTask(meta, adapter, prompt, timeoutMs, undefined, resumeId)
+        : await svc.dispatchHeadlessTask(meta, adapter, prompt, timeoutMs);
+      return c.json({ ...dispatched, status: 'running' }, 202);
     } catch (err) {
       if (err instanceof HeadlessCapacityError) {
         return c.json({ error: 'capacity', message: err.message }, 429);
+      }
+      if (err instanceof HeadlessResumeError) {
+        return c.json(
+          { error: `resume_${err.code}`, message: err.message },
+          err.code === 'not_found' ? 404 : 409,
+        );
       }
       if (err instanceof AgentCredentialError) {
         return c.json(err.toBody(), 400);

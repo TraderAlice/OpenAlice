@@ -34,6 +34,7 @@ describe('HeadlessTaskRegistry', () => {
     const a = await reg.create({ wsId: 'w1', agent: 'codex', prompt: 'do A', startedAt: 1 })
     const b = await reg.create({ wsId: 'w2', agent: 'pi', prompt: 'do B', startedAt: 2 })
     expect(a.status).toBe('running')
+    expect(a.resumeId).toMatch(/^[0-9a-f-]{36}$/)
     expect(reg.list().map((t) => t.taskId)).toEqual([b.taskId, a.taskId]) // newest-first
     expect(reg.runningCount()).toBe(2)
   })
@@ -142,26 +143,40 @@ describe('HeadlessTaskRegistry', () => {
     expect(reloaded.get(a.taskId)?.agentSessionId).toBe('414d6b8c-95b4-4e01-8ffc-4b6332da17d4')
   })
 
-  it('pruning past MAX_RECORDS deletes the dropped tasks\' log files', async () => {
+  it('keeps records and logs beyond the former 200-run retention cap', async () => {
     const logsDir = join(dir, 'logs')
     await mkdir(logsDir, { recursive: true })
-    const reg = await HeadlessTaskRegistry.load(path, noopLogger, { logsDir })
+    const reg = await HeadlessTaskRegistry.load(path, noopLogger)
     const first = await reg.create({ wsId: 'w1', agent: 'codex', prompt: 'old', startedAt: 1 })
     await reg.complete(first.taskId, { status: 'done' })
     const firstLogs = headlessLogPaths(logsDir, first.taskId)
     await writeFile(firstLogs.stdout, 'old stdout')
     await writeFile(firstLogs.stderr, 'old stderr')
     await writeFile(firstLogs.structured, '{}')
-    // Fill past MAX_RECORDS (200) so `first` (oldest finished) gets pruned.
+    // Cross the historical 200-record cap. Runs are durable product history.
     for (let i = 0; i < 200; i++) {
       const t = await reg.create({ wsId: 'w1', agent: 'codex', prompt: `t${i}`, startedAt: 2 + i })
       await reg.complete(t.taskId, { status: 'done' })
     }
-    expect(reg.get(first.taskId)).toBeNull()
-    // rm is fire-and-forget; give the event loop a tick.
-    await new Promise((r) => setTimeout(r, 50))
-    expect(existsSync(firstLogs.stdout)).toBe(false)
-    expect(existsSync(firstLogs.stderr)).toBe(false)
-    expect(existsSync(firstLogs.structured)).toBe(false)
+    const reloaded = await HeadlessTaskRegistry.load(path, noopLogger)
+    expect(reloaded.get(first.taskId)?.status).toBe('done')
+    expect(reloaded.count()).toBe(201)
+    expect(existsSync(firstLogs.stdout)).toBe(true)
+    expect(existsSync(firstLogs.stderr)).toBe(true)
+    expect(existsSync(firstLogs.structured)).toBe(true)
+  })
+
+  it('keeps one resumeId across executions and records direct lineage', async () => {
+    const reg = await HeadlessTaskRegistry.load(path, noopLogger)
+    const first = await reg.create({ wsId: 'w1', agent: 'codex', prompt: 'first', startedAt: 1 })
+    await reg.complete(first.taskId, { status: 'done' })
+    const second = await reg.create({
+      wsId: 'w1', agent: 'codex', prompt: 'follow-up', startedAt: 2,
+      resumeId: first.resumeId, parentTaskId: first.taskId,
+    })
+    expect(second.taskId).not.toBe(first.taskId)
+    expect(second.resumeId).toBe(first.resumeId)
+    expect(second.parentTaskId).toBe(first.taskId)
+    expect(reg.latestForResumeId(first.resumeId)?.taskId).toBe(second.taskId)
   })
 })

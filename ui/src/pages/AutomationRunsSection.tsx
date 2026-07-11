@@ -321,7 +321,7 @@ export function AutomationRunsSection() {
           )}
           {snapshot.tasks.map((task) => {
             const isExpanded = expanded.has(task.taskId)
-            const openable = task.status !== 'running' && !!task.agentSessionId
+            const openable = task.status !== 'running' && task.resumable
             const toolSummary = task.output?.toolCalls
               ? `${task.output.toolCalls} tool${task.output.toolCalls === 1 ? '' : 's'}`
               : task.output
@@ -380,9 +380,7 @@ export function AutomationRunsSection() {
                         className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-emerald-400 hover:bg-emerald-500/10"
                         title="Resume this run's conversation in an interactive session"
                         onClick={() => {
-                          void openHeadlessRun(task.wsId, task.taskId, {
-                            agent: task.agent,
-                            agentSessionId: task.agentSessionId,
+                          void openHeadlessRun(task.wsId, task.resumeId, {
                             title: task.prompt,
                           }).catch((e) => setError(e instanceof Error ? e.message : String(e)))
                         }}

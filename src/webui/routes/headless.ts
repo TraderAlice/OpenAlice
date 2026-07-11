@@ -10,7 +10,11 @@ import { open, readFile, stat } from 'node:fs/promises'
 
 import { Hono } from 'hono'
 
-import { headlessLogPaths, type HeadlessTaskStatus } from '../../workspaces/headless-task-registry.js'
+import {
+  headlessLogPaths,
+  type HeadlessTaskRecord,
+  type HeadlessTaskStatus,
+} from '../../workspaces/headless-task-registry.js'
 import {
   parseHeadlessOutputText,
   type HeadlessStructuredOutput,
@@ -57,6 +61,13 @@ async function readStructured(path: string): Promise<HeadlessStructuredOutput | 
 
 export function createHeadlessRoutes(svc: WorkspaceService): Hono {
   const app = new Hono()
+  const publicTask = (task: HeadlessTaskRecord) => {
+    const { agentSessionId: _nativeSessionId, ...publicFields } = task
+    return {
+      ...publicFields,
+      resumable: !!svc.resumeRegistry.get(task.resumeId)?.agentSessionId,
+    }
+  }
 
   // GET /api/headless?wsId=&status=&limit=&cursor= → tasks, newest-first.
   // Cursor is the last task id from the previous page. Unlike an offset it
@@ -77,7 +88,7 @@ export function createHeadlessRoutes(svc: WorkspaceService): Hono {
     const tasks = hasMore ? page.slice(0, limit) : page
     const total = svc.headlessTasks.count(filters)
     return c.json({
-      tasks,
+      tasks: tasks.map(publicTask),
       page: {
         total,
         hasMore,
@@ -107,13 +118,13 @@ export function createHeadlessRoutes(svc: WorkspaceService): Hono {
   app.get('/:taskId', (c) => {
     const rec = svc.headlessTasks.get(c.req.param('taskId'))
     if (!rec) return c.json({ error: 'not_found' }, 404)
-    return c.json(rec)
+    return c.json(publicTask(rec))
   })
 
   // GET /api/headless/:taskId/output?tailBytes= → compact normalized output +
   // bounded diagnostic tails. New runs read their live structured snapshot;
   // historical runs are parsed from a bounded stdout tail. Streams are null
-  // when the log file doesn't exist (old task, pruned log, or spawn failure).
+  // when the log file doesn't exist (legacy task, manual deletion, or spawn failure).
   app.get('/:taskId/output', async (c) => {
     const taskId = c.req.param('taskId')
     const rec = svc.headlessTasks.get(taskId)

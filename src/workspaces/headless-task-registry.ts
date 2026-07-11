@@ -14,7 +14,7 @@
  * upgrade; see project_workspace_automation_design.)
  */
 import { randomUUID } from 'node:crypto'
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 
 import type { Logger } from './logger.js'
@@ -31,6 +31,14 @@ export interface HeadlessTaskOutputSummary {
 
 export interface HeadlessTaskRecord {
   readonly taskId: string
+  /**
+   * OpenAlice-owned identity of the resumable runtime conversation. Unlike
+   * taskId (one execution), resumeId stays stable across every headless turn
+   * that continues the same native agent session.
+   */
+  readonly resumeId: string
+  /** The immediately preceding execution in this resumed conversation. */
+  readonly parentTaskId?: string
   readonly wsId: string
   /**
    * The workspace ISSUE that triggered this run, when it was fired by the
@@ -75,8 +83,6 @@ export function headlessLogPaths(
   }
 }
 
-const MAX_RECORDS = 200 // prune oldest FINISHED records past this (bounds the file)
-
 export class HeadlessTaskRegistry {
   private tasks: HeadlessTaskRecord[] = [] // newest-last in memory
   /** Mutations may finish concurrently; serialize tmp→rename writes. */
@@ -85,16 +91,13 @@ export class HeadlessTaskRegistry {
   private constructor(
     private readonly path: string,
     private readonly logger: Logger,
-    /** Where task logs live; pruned records get their log files deleted too. */
-    private readonly logsDir: string | null,
   ) {}
 
   static async load(
     path: string,
     logger: Logger,
-    opts: { logsDir?: string } = {},
   ): Promise<HeadlessTaskRegistry> {
-    const reg = new HeadlessTaskRegistry(path, logger, opts.logsDir ?? null)
+    const reg = new HeadlessTaskRegistry(path, logger)
     await reg.read()
     await reg.reconcile()
     return reg
@@ -129,11 +132,17 @@ export class HeadlessTaskRegistry {
     agent: string
     prompt: string
     startedAt: number
+    /** Reuse when continuing a conversation; fresh runs get a new UUID. */
+    resumeId?: string
+    /** Previous execution in the same resume chain, when continuing. */
+    parentTaskId?: string
     /** Set only when an issue fired this run (scheduled scan); omitted for manual/external runs. */
     issueId?: string
   }): Promise<HeadlessTaskRecord> {
     const rec: HeadlessTaskRecord = {
       taskId: randomUUID(),
+      resumeId: input.resumeId ?? randomUUID(),
+      ...(input.parentTaskId ? { parentTaskId: input.parentTaskId } : {}),
       wsId: input.wsId,
       agent: input.agent,
       prompt: input.prompt,
@@ -174,6 +183,15 @@ export class HeadlessTaskRegistry {
     return this.tasks.find((t) => t.taskId === taskId) ?? null
   }
 
+  /** Latest execution for one OpenAlice-owned resumable conversation. */
+  latestForResumeId(resumeId: string): HeadlessTaskRecord | null {
+    for (let index = this.tasks.length - 1; index >= 0; index -= 1) {
+      const task = this.tasks[index]
+      if (task?.resumeId === resumeId) return task
+    }
+    return null
+  }
+
   /** Records newest-first, optionally filtered. */
   list(
     opts: {
@@ -194,9 +212,8 @@ export class HeadlessTaskRegistry {
     out = out.slice().reverse() // newest-first
     if (opts.cursor) {
       const cursorIndex = out.findIndex((task) => task.taskId === opts.cursor)
-      // A cursor can disappear when the bounded registry prunes old records.
-      // Returning an empty page is safer than silently restarting at page one
-      // and duplicating rows in a polling client.
+      // A cursor can still be unknown after data restoration or a client typo.
+      // Returning an empty page is safer than silently restarting at page one.
       out = cursorIndex === -1 ? [] : out.slice(cursorIndex + 1)
     }
     return opts.limit && opts.limit > 0 ? out.slice(0, opts.limit) : out
@@ -227,32 +244,10 @@ export class HeadlessTaskRegistry {
   }
 
   private async flushNow(): Promise<void> {
-    if (this.tasks.length > MAX_RECORDS) {
-      // Drop the OLDEST finished records; never drop a `running` one.
-      const dropCount = this.tasks.length - MAX_RECORDS
-      const toDrop = new Set(
-        this.tasks
-          .filter((t) => t.status !== 'running')
-          .slice(0, dropCount)
-          .map((t) => t.taskId),
-      )
-      if (toDrop.size) {
-        this.tasks = this.tasks.filter((t) => !toDrop.has(t.taskId))
-        // Best-effort: a pruned record's task logs go with it (bounds disk).
-        if (this.logsDir) {
-          for (const taskId of toDrop) {
-            const paths = headlessLogPaths(this.logsDir, taskId)
-            void rm(paths.stdout, { force: true }).catch(() => undefined)
-            void rm(paths.stderr, { force: true }).catch(() => undefined)
-            void rm(paths.structured, { force: true }).catch(() => undefined)
-          }
-        }
-      }
-    }
     try {
       await mkdir(dirname(this.path), { recursive: true })
       const tmp = `${this.path}.tmp`
-      await writeFile(tmp, JSON.stringify({ version: 1, tasks: this.tasks }, null, 2), 'utf8')
+      await writeFile(tmp, JSON.stringify({ version: 2, tasks: this.tasks }, null, 2), 'utf8')
       await rename(tmp, this.path)
     } catch (err) {
       this.logger.warn('headless_registry.flush_failed', { err })

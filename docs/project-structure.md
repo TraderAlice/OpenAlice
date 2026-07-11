@@ -120,19 +120,25 @@ Load-bearing paths:
 - `src/workspaces/adapters/` — CLI-specific command/config behavior.
 - `src/workspaces/protocol.ts` — UI ↔ Workspace contract.
 
-Sessions have three deliberately separate identities:
+Conversation execution has four deliberately separate identities, plus one
+provenance link:
 
 - `SessionRecord.id` is Alice's durable UI/runtime key. Tabs, PTY attachment,
   pause/resume routes, and Inbox links use it.
-- `agentSessionId` is the native CLI conversation id used by an adapter to
-  resume Claude, Codex, opencode, or Pi.
+- `taskId` identifies one headless execution. Every follow-up turn gets a new
+  task id, so run history remains append-only.
+- `resumeId` is Alice's stable conversation identity across headless and
+  interactive turns. Product APIs and frontend code resume only by this id.
+- `agentSessionId` is the backend-only native CLI conversation id. The
+  `ResumeRegistry` maps `resumeId` to this adapter-specific value; it must not
+  appear in frontend resume requests or Inbox provenance.
 - `sourceRunId` is present when a finished headless run has been materialized
-  as an interactive Session. It is the persistent, idempotent run → Session
-  index: opening the same result again returns to the same Alice Session.
+  as an interactive Session and preserves execution provenance.
 
 Do not use a headless task id directly as a PTY/session id, and do not create a
-new Alice Session every time the same run is opened. The run is execution
-provenance; the Session is the durable conversation surface.
+new Alice Session every time the same `resumeId` is opened. The run is
+execution provenance; `resumeId` is the conversation; the Session is its
+durable interactive surface.
 
 Built-in templates use cross-platform `bootstrap.mjs` files and route git
 through `src/workspaces/templates/_common.mjs`. Do not add new Bash bootstraps

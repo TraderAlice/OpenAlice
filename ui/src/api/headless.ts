@@ -4,6 +4,10 @@ export type HeadlessTaskStatus = 'running' | 'done' | 'failed' | 'interrupted'
 
 export interface HeadlessTaskRecord {
   taskId: string
+  /** Stable product conversation identity shared by every resumed turn. */
+  resumeId: string
+  /** Direct execution lineage within this resumable conversation. */
+  parentTaskId?: string
   wsId: string
   /** The workspace ISSUE that fired this run (the issue filename stem), when it
    *  was dispatched by the scheduler from a scheduled `.alice/issues/<id>.md`.
@@ -20,10 +24,8 @@ export interface HeadlessTaskRecord {
   signal?: string | null
   killed?: boolean
   error?: string
-  /** The agent CLI's own session id, captured from the run's stdout — when
-   *  present (and the run is finished) the run can be reopened as a normal
-   *  interactive session via spawn { resume: agentSessionId }. */
-  agentSessionId?: string
+  /** Backend has resolved this product identity to a native runtime session. */
+  resumable: boolean
   output?: {
     hasAssistantReply: boolean
     assistantPreview?: string
@@ -88,6 +90,11 @@ export const headlessApi = {
     opts: { wsId?: string; status?: HeadlessTaskStatus; limit?: number; cursor?: string } = {},
   ): Promise<HeadlessTaskRecord[]> {
     return (await this.snapshot(opts)).tasks
+  },
+
+  /** Resolve legacy task provenance to its product conversation identity. */
+  async get(taskId: string): Promise<HeadlessTaskRecord> {
+    return fetchJson<HeadlessTaskRecord>(`/api/headless/${encodeURIComponent(taskId)}`)
   },
 
   /** Tail of a run's on-disk stdout/stderr log (poll while running). */

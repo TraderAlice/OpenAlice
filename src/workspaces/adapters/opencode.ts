@@ -107,8 +107,12 @@ export const opencodeAdapter: CliAdapter = {
   // boundary. Tool access is via the injected CLI shims and bundled skills;
   // prompt is the trailing positional after a `--` end-of-options terminator
   // (so a `-`-leading prompt isn't read as a flag).
-  composeHeadlessCommand(_base: readonly string[], _ctx: SpawnContext, prompt: string): readonly string[] {
-    return ['opencode', 'run', '--format', 'json', '--', prompt];
+  composeHeadlessCommand(_base: readonly string[], ctx: SpawnContext, prompt: string): readonly string[] {
+    return [
+      'opencode', 'run', '--format', 'json',
+      ...(ctx.resume === 'last' ? ['--continue'] : ctx.resume ? ['--session', ctx.resume.sessionId] : []),
+      '--', prompt,
+    ];
   },
 
   // `opencode run --format json` events carry a top-level `sessionID`

@@ -67,7 +67,12 @@ import {
 } from './issues/board.js';
 import { completeOneShotIssueAfterRun } from './issues/auto-complete.js';
 import type { IInboxStore } from '@/core/inbox-store.js';
-import { HeadlessTaskRegistry, headlessLogPaths } from './headless-task-registry.js';
+import {
+  HeadlessTaskRegistry,
+  headlessLogPaths,
+  type HeadlessTaskRecord,
+} from './headless-task-registry.js';
+import { ResumeRegistry } from './resume-registry.js';
 import {
   compatibleCredentials,
   credentialToWorkspaceAiCred,
@@ -86,6 +91,16 @@ export class HeadlessCapacityError extends Error {
   constructor(public readonly limit: number) {
     super(`headless capacity reached (${limit} tasks running)`);
     this.name = 'HeadlessCapacityError';
+  }
+}
+
+export class HeadlessResumeError extends Error {
+  constructor(
+    public readonly code: 'not_found' | 'wrong_workspace' | 'wrong_agent' | 'not_ready' | 'busy',
+    message: string,
+  ) {
+    super(message);
+    this.name = 'HeadlessResumeError';
   }
 }
 import { ScrollbackStore } from './scrollback-store.js';
@@ -110,7 +125,8 @@ import { WorkspaceRegistry, type WorkspaceMeta } from './workspace-registry.js';
  */
 export interface SpawnPlan {
   readonly resumeMode: 'fresh' | 'last' | 'by-id';
-  readonly resumeId: string | null;
+  /** Adapter-native id used only for backend diagnostics. */
+  readonly nativeSessionId: string | null;
   readonly composedCommand: readonly string[];
   readonly spawnCwd: string;
   readonly envPWD: string | null;
@@ -207,7 +223,10 @@ export interface WorkspaceService {
      *  the run as `issueId` so the issue detail's Activity feed can join on it.
      *  Manual/external runs omit it. */
     issueId?: string,
-  ): Promise<{ taskId: string }>;
+    /** Continue this OpenAlice-owned conversation. Native runtime ids are
+     * resolved only inside the service. */
+    resumeId?: string,
+  ): Promise<{ taskId: string; resumeId: string }>;
   /** Read-only scheduling projection of every workspace's `.alice/issues/`
    *  directory (scheduled issues only) + each task's last-fired marker and
    *  computed next-due. Powers GET /api/schedule. */
@@ -227,6 +246,13 @@ export interface WorkspaceService {
   resolveIssuesByName(name: string): Promise<WikilinkIssueRef[]>;
   /** The headless-task management plane (cross-workspace; powers GET /api/headless). */
   headlessTasks: HeadlessTaskRegistry;
+  /** Backend-only product resumeId → native runtime session-id mapping. */
+  resumeRegistry: ResumeRegistry;
+  /** True while a headless turn owns this conversation transcript. */
+  isResumeActive(resumeId: string): boolean;
+  /** Atomically reserve a conversation before crossing an async spawn boundary. */
+  claimResume(resumeId: string): boolean;
+  releaseResume(resumeId: string): void;
   /** Global in-flight capacity exposed to the Automation control plane. */
   headlessCapacity: number;
   /** Where dispatched tasks' full stdout/stderr logs land (read by the output route). */
@@ -284,13 +310,22 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
 
   // The headless-task management plane. load() reconciles leftover `running`
   // records (zombies from a previous Alice life) → `interrupted`. Each task's
-  // full stdout/stderr lands in `headlessLogsDir` (pruned with its record).
+  // full stdout/stderr lands in `headlessLogsDir` and is retained with history.
   const headlessLogsDir = join(config.launcherRoot, 'state', 'headless-logs');
   const headlessTasks = await HeadlessTaskRegistry.load(
     join(config.launcherRoot, 'state', 'headless-tasks.json'),
     launcherLogger.child({ scope: 'headless-registry' }),
-    { logsDir: headlessLogsDir },
   );
+  const resumeRegistry = await ResumeRegistry.load(
+    join(config.launcherRoot, 'state', 'resume-identities.json'),
+    launcherLogger.child({ scope: 'resume-registry' }),
+  );
+  const activeResumeIds = new Set<string>();
+  const claimResume = (resumeId: string): boolean => {
+    if (activeResumeIds.has(resumeId)) return false;
+    activeResumeIds.add(resumeId);
+    return true;
+  };
 
   const scrollbackStore = new ScrollbackStore(
     join(config.launcherRoot, 'state'),
@@ -348,6 +383,15 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   const transcriptWatcher = new TranscriptWatcher(
     launcherLogger.child({ scope: 'transcript-watch' }),
     sessionRegistry,
+    (wsId, recordId, agentSessionId) => {
+      const record = sessionRegistry.get(wsId, recordId);
+      if (!record) return;
+      void resumeRegistry.bindAgentSessionId(record.resumeId, agentSessionId).catch((err) =>
+        launcherLogger.warn('resume_registry.native_id_bind_failed', {
+          wsId, recordId, resumeId: record.resumeId, err,
+        }),
+      );
+    },
   );
 
   const resolveAdapter = (wsMeta: WorkspaceMeta, agentId?: string): CliAdapter => {
@@ -786,7 +830,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     const { command, cwd, env, transcriptDir } = composeSpawnInputs(ws, adapter, resume);
     return {
       resumeMode: resume === undefined ? 'fresh' : resume === 'last' ? 'last' : 'by-id',
-      resumeId: resume && resume !== 'last' ? resume.sessionId : null,
+      nativeSessionId: resume && resume !== 'last' ? resume.sessionId : null,
       composedCommand: command,
       spawnCwd: cwd,
       envPWD: env['PWD'] ?? null,
@@ -829,7 +873,11 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     // Dispatch-path extras: a taskId keys the on-disk task log; onSessionId
     // fires when the adapter's stdout scanner captures the agent's own session
     // id (recorded WHILE running, so the panel can offer "open as session").
-    opts: { taskId?: string; onSessionId?: (id: string) => void } = {},
+    opts: {
+      taskId?: string;
+      resume?: SessionFactoryContext['resume'];
+      onSessionId?: (id: string) => void;
+    } = {},
   ): Promise<HeadlessTaskResult> => {
     if (!adapter.capabilities.headless || !adapter.composeHeadlessCommand) {
       throw new Error(`adapter "${adapter.id}" has no headless mode`);
@@ -849,11 +897,15 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     const { cwd, env } = composeSpawnInputs(
       ws,
       adapter,
-      undefined,
+      opts.resume,
       undefined,
       opts.taskId ? { AQ_RUN_ID: opts.taskId } : undefined,
     );
-    const command = adapter.composeHeadlessCommand(config.command, { cwd, env }, prompt);
+    const command = adapter.composeHeadlessCommand(
+      config.command,
+      { cwd, env, ...(opts.resume !== undefined ? { resume: opts.resume } : {}) },
+      prompt,
+    );
     const logPaths = opts.taskId ? headlessLogPaths(headlessLogsDir, opts.taskId) : null;
     return runHeadlessTask({
       command,
@@ -895,7 +947,8 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     // The firing issue's id, when this dispatch came from the ScheduleScanner.
     // Manual/external runs (the workspace "run task" route) leave it undefined.
     issueId?: string,
-  ): Promise<{ taskId: string }> => {
+    resumeId?: string,
+  ): Promise<{ taskId: string; resumeId: string }> => {
     if (!adapter.capabilities.headless || !adapter.composeHeadlessCommand) {
       throw new Error(`adapter "${adapter.id}" has no headless mode`);
     }
@@ -908,25 +961,72 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     if (headlessTasks.runningCount() >= MAX_CONCURRENT_HEADLESS) {
       throw new HeadlessCapacityError(MAX_CONCURRENT_HEADLESS);
     }
-    const rec = await headlessTasks.create({
-      wsId: ws.id,
-      agent: adapter.id,
-      prompt,
-      startedAt: Date.now(),
-      ...(issueId ? { issueId } : {}),
-    });
+    let nativeResume: SessionFactoryContext['resume'];
+    let parentTaskId: string | undefined;
+    if (resumeId) {
+      const identity = resumeRegistry.get(resumeId);
+      if (!identity) throw new HeadlessResumeError('not_found', 'resume conversation not found');
+      if (identity.wsId !== ws.id) {
+        throw new HeadlessResumeError('wrong_workspace', 'resume conversation belongs to another workspace');
+      }
+      if (identity.agent !== adapter.id) {
+        throw new HeadlessResumeError('wrong_agent', `resume conversation belongs to ${identity.agent}`);
+      }
+      if (!identity.agentSessionId) {
+        throw new HeadlessResumeError('not_ready', 'runtime session id has not been captured yet');
+      }
+      await sessionRegistry.ensureLoaded(ws.id);
+      const interactive = sessionRegistry.findByResumeId(ws.id, resumeId);
+      if (interactive?.state === 'running') {
+        throw new HeadlessResumeError('busy', 'this conversation is open in an interactive session');
+      }
+      // Reserve before the first await below. Without this, two HTTP requests
+      // can both pass the check and mutate one native transcript concurrently.
+      if (!claimResume(resumeId)) {
+        throw new HeadlessResumeError('busy', 'this conversation already has a running turn');
+      }
+      nativeResume = { sessionId: identity.agentSessionId };
+      parentTaskId = identity.latestTaskId ?? headlessTasks.latestForResumeId(resumeId)?.taskId;
+    }
+    let rec: HeadlessTaskRecord;
+    try {
+      rec = await headlessTasks.create({
+        wsId: ws.id,
+        agent: adapter.id,
+        prompt,
+        startedAt: Date.now(),
+        ...(resumeId ? { resumeId } : {}),
+        ...(parentTaskId ? { parentTaskId } : {}),
+        ...(issueId ? { issueId } : {}),
+      });
+      await resumeRegistry.ensure({
+        resumeId: rec.resumeId,
+        wsId: ws.id,
+        agent: adapter.id,
+        latestTaskId: rec.taskId,
+      });
+    } catch (err) {
+      if (resumeId) activeResumeIds.delete(resumeId);
+      throw err;
+    }
+    if (!resumeId) activeResumeIds.add(rec.resumeId);
     // Fire-and-forget: run to natural exit, then fill the record. NOTE: status
     // is judged by exit code — pi can exit 0 on an in-band model error, so
     // "done" means "process exited cleanly", not "the agent succeeded"; the
     // operator confirms via the normalized output / Inbox.
     void runHeadlessTaskMethod(ws, adapter, prompt, timeoutMs, {
       taskId: rec.taskId,
-      onSessionId: (id) =>
-        void headlessTasks
-          .setAgentSessionId(rec.taskId, id)
-          .catch((err) =>
-            launcherLogger.warn('headless.session_id_record_failed', { taskId: rec.taskId, err }),
-          ),
+      ...(nativeResume ? { resume: nativeResume } : {}),
+      onSessionId: (id) => {
+        void Promise.all([
+          headlessTasks.setAgentSessionId(rec.taskId, id),
+          resumeRegistry.bindAgentSessionId(rec.resumeId, id),
+        ]).catch((err) =>
+          launcherLogger.warn('headless.session_id_record_failed', {
+            taskId: rec.taskId, resumeId: rec.resumeId, err,
+          }),
+        );
+      },
     })
       .then(async (r) => {
         const runtimeReportedError = r.structured.blocks.some((block) => block.type === 'error');
@@ -991,8 +1091,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           finishedAt: Date.now(),
           error: err instanceof Error ? err.message : String(err),
         }),
-      );
-    return { taskId: rec.taskId };
+      )
+      .finally(() => activeResumeIds.delete(rec.resumeId));
+    return { taskId: rec.taskId, resumeId: rec.resumeId };
   };
 
   // ── Workspace self-scheduling. Scan each workspace's own `.alice/issues/*.md`
@@ -1196,6 +1297,14 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           .catch((err) =>
             launcherLogger.warn('assigned_session_id.persist_failed', { wsId, recordId: ctx.recordId, err }),
           );
+        const record = sessionRegistry.get(wsId, ctx.recordId);
+        if (record) {
+          void resumeRegistry.bindAgentSessionId(record.resumeId, sessionId).catch((err) =>
+            launcherLogger.warn('assigned_session_id.resume_map_failed', {
+              wsId, recordId: ctx.recordId, resumeId: record.resumeId, err,
+            }),
+          );
+        }
       }
       const { command: composedCommand, env, transcriptDir } = composeSpawnInputs(
         ws,
@@ -1295,7 +1404,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         createdAt: r.createdAt,
         lastActiveAt: r.lastActiveAt,
         state: r.state === 'running' && liveEntry ? 'running' : 'paused',
-        agentSessionId: liveEntry?.agentSessionId ?? r.resumeHint?.value ?? null,
+        resumeId: r.resumeId,
         pid: liveEntry?.pid ?? null,
         startedAt: liveEntry?.startedAt ?? null,
         title: r.title ?? null,
@@ -1381,6 +1490,10 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     issueDetail,
     resolveIssuesByName,
     headlessTasks,
+    resumeRegistry,
+    isResumeActive: (resumeId) => activeResumeIds.has(resumeId),
+    claimResume,
+    releaseResume: (resumeId) => activeResumeIds.delete(resumeId),
     headlessCapacity: MAX_CONCURRENT_HEADLESS,
     headlessLogsDir,
     isShuttingDown: () => shuttingDown,

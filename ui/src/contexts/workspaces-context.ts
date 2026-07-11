@@ -25,8 +25,8 @@ export interface WorkspacesContextValue {
   spawn(wsId: string, opts?: SpawnOpts, source?: WorkspaceSource): Promise<void>
   openHeadlessRun(
     wsId: string,
-    taskId: string,
-    opts?: { agent?: string; agentSessionId?: string; title?: string },
+    resumeId: string,
+    opts?: { title?: string },
   ): Promise<void>
   setDefaultAgent(agent: string | null): Promise<void>
   setIssueDefaultAgent(agent: string | null): Promise<void>

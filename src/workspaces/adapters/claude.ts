@@ -92,10 +92,14 @@ export const claudeAdapter: CliAdapter = {
   // progress in the task log AND every event carries `session_id`, so the
   // run's identity is captured from line 1 instead of parsed out of a final
   // result blob (verified 2.1.x, 2026-06-11).
-  composeHeadlessCommand(base: readonly string[], _ctx: SpawnContext, prompt: string): readonly string[] {
+  composeHeadlessCommand(base: readonly string[], ctx: SpawnContext, prompt: string): readonly string[] {
+    if (ctx.resume === 'last') {
+      throw new Error('claude headless: resume requires a concrete resumeId mapping')
+    }
     return [
       ...base,
       '--settings', AUTOTRUST_SETTINGS,
+      ...(ctx.resume ? ['--resume', ctx.resume.sessionId] : []),
       '-p', '--output-format', 'stream-json', '--verbose',
       '--', prompt,
     ];

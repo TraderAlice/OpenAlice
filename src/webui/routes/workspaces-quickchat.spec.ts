@@ -75,6 +75,16 @@ function build(opts: {
     create: vi.fn(async () => {}),
     remove: vi.fn(async () => {}),
   };
+  const resumeRecords = new Map<string, any>();
+  const resumeRegistry = {
+    get: (id: string) => resumeRecords.get(id) ?? null,
+    ensure: vi.fn(async (input: any) => {
+      const resumeId = input.resumeId ?? `resume-${resumeRecords.size + 1}`;
+      const record = { resumeId, ...input };
+      resumeRecords.set(resumeId, record);
+      return record;
+    }),
+  };
   const chatWorkspaceResolver = new ChatWorkspaceResolver({
     registry: registry as any,
     sessionRegistry: sessionRegistry as any,
@@ -90,6 +100,7 @@ function build(opts: {
     resolveAdapter: (_m: any, agentId?: string) => adapters[agentId ?? 'claude'] ?? claude,
     adapters: { get: (id: string) => adapters[id] },
     sessionRegistry,
+    resumeRegistry,
     pool: { spawn, get: vi.fn(() => undefined) },
     publicMeta: vi.fn(async () => META),
     config: { launcherRepoRoot: '/repo' },

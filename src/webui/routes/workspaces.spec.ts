@@ -32,6 +32,7 @@ function build(
     resolveTo?: any;
     dispatch?: any;
     runtimeReadiness?: any;
+    resumeIdentity?: any;
   } = {},
 ) {
   const claude = {
@@ -43,7 +44,7 @@ function build(
   const meta = opts.meta ?? { id: 'ws-1', dir: '/w', agents: ['claude'] };
   const adapters = opts.adapters ?? { claude };
   const runHeadlessTask = vi.fn(async () => HEADLESS_RESULT);
-  const dispatchHeadlessTask = opts.dispatch ?? vi.fn(async () => ({ taskId: 'task-1' }));
+  const dispatchHeadlessTask = opts.dispatch ?? vi.fn(async () => ({ taskId: 'task-1', resumeId: 'resume-1' }));
   const runtimeReadiness = opts.runtimeReadiness ?? {
     agents: {
       claude: {
@@ -84,6 +85,10 @@ function build(
     config: { launcherRepoRoot: '/repo' },
     runHeadlessTask,
     dispatchHeadlessTask,
+    resumeRegistry: {
+      get: vi.fn(() => opts.resumeIdentity ?? null),
+      ensure: vi.fn(async (input: any) => ({ resumeId: input.resumeId ?? 'resume-1', ...input })),
+    },
     getAgentRuntimeReadiness,
     probeAgentRuntimeReadiness,
     publicMeta: vi.fn(async (m: any) => {
@@ -248,6 +253,32 @@ describe('POST /:id/headless', () => {
     expect(dispatchHeadlessTask).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), 'x', 300_000);
   });
 
+  it('continues a headless conversation by product resumeId only', async () => {
+    const { app, dispatchHeadlessTask } = build({
+      resumeIdentity: {
+        resumeId: 'resume-1', wsId: 'ws-1', agent: 'claude', agentSessionId: 'native-hidden',
+      },
+    });
+    const response = await post(app, '/ws-1/headless', { prompt: 'follow up', resumeId: 'resume-1' });
+    expect(response.status).toBe(202);
+    expect(response.body).toMatchObject({ taskId: 'task-1', resumeId: 'resume-1' });
+    expect(dispatchHeadlessTask).toHaveBeenCalledWith(
+      expect.anything(), expect.anything(), 'follow up', 300_000, undefined, 'resume-1',
+    );
+  });
+
+  it('does not allow wait:true to bypass recorded resume lineage', async () => {
+    const { app, dispatchHeadlessTask } = build({
+      resumeIdentity: { resumeId: 'resume-1', wsId: 'ws-1', agent: 'claude' },
+    });
+    const response = await post(app, '/ws-1/headless', {
+      prompt: 'follow up', resumeId: 'resume-1', wait: true,
+    });
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('resume_requires_async');
+    expect(dispatchHeadlessTask).not.toHaveBeenCalled();
+  });
+
   it('async by default → 202 + taskId, dispatches in the background', async () => {
     const { app, dispatchHeadlessTask, runHeadlessTask } = build();
     const r = await post(app, '/ws-1/headless', { prompt: 'do the thing' });
@@ -290,6 +321,7 @@ describe('POST /:id/headless/:taskId/session', () => {
     };
     const task = opts.task ?? {
       taskId: 'run-1',
+      resumeId: 'resume-run-1',
       wsId: 'ws-1',
       agent: 'codex',
       prompt: 'Investigate the earnings anomaly',
@@ -310,6 +342,8 @@ describe('POST /:id/headless/:taskId/session', () => {
     });
     const sessionRegistry = {
       ensureLoaded: vi.fn(async () => {}),
+      findByResumeId: (_wsId: string, resumeId: string) =>
+        Array.from(records.values()).find((record) => record.resumeId === resumeId),
       findBySourceRunId: (_wsId: string, runId: string) =>
         Array.from(records.values()).find((record) => record.sourceRunId === runId),
       findById: (id: string) => records.get(id),
@@ -318,10 +352,29 @@ describe('POST /:id/headless/:taskId/session', () => {
       get: (_wsId: string, id: string) => records.get(id),
       remove: vi.fn(async (_wsId: string, id: string) => records.delete(id)),
     };
+    const resumeRecords = new Map<string, any>();
+    if (task.resumeId) {
+      resumeRecords.set(task.resumeId, {
+        resumeId: task.resumeId,
+        wsId: task.wsId ?? 'ws-1',
+        agent: task.agent ?? 'codex',
+        agentSessionId: task.agentSessionId ?? '019eb75e-0b1b-7fa2',
+        latestTaskId: task.taskId,
+      });
+    }
     const svc = {
       registry: { get: (id: string) => id === 'ws-1' ? { id, dir: '/w', agents: ['codex'] } : undefined },
       headlessTasks: { get: (id: string) => id === task.taskId ? task : null },
       sessionRegistry,
+      resumeRegistry: {
+        get: (id: string) => resumeRecords.get(id) ?? null,
+        ensure: vi.fn(async (input: any) => {
+          const prior = resumeRecords.get(input.resumeId) ?? {};
+          const record = { ...prior, ...input, resumeId: input.resumeId ?? 'resume-created' };
+          resumeRecords.set(record.resumeId, record);
+          return record;
+        }),
+      },
       adapters: { get: (id: string) => id === 'codex' ? adapter : undefined },
       resolveAdapter: () => adapter,
       getAgentRuntimeReadiness: () => ({
@@ -344,6 +397,7 @@ describe('POST /:id/headless/:taskId/session', () => {
     expect(spawn).toHaveBeenCalledOnce();
     expect(Array.from(records.values())[0]).toMatchObject({
       sourceRunId: 'run-1',
+      resumeId: 'resume-run-1',
       title: 'Investigate the earnings anomaly',
       resumeHint: { kind: 'agent-session-id', value: '019eb75e-0b1b-7fa2' },
     });
@@ -362,18 +416,16 @@ describe('POST /:id/headless/:taskId/session', () => {
     expect(spawn).toHaveBeenCalledOnce();
   });
 
-  it('uses server-stamped Inbox fallback identity after the bounded run log is pruned', async () => {
-    const { app } = buildHeadlessSession({ task: { taskId: 'different-run' } });
-    const opened = await post(app, '/ws-1/headless/pruned-run/session', {
-      agent: 'codex',
-      agentSessionId: '019eb75e-0b1b-7fa2',
+  it('opens the same conversation directly by resumeId without a native id in the request', async () => {
+    const { app } = buildHeadlessSession();
+    const opened = await post(app, '/ws-1/resumes/resume-run-1/session', {
       title: 'Durable Inbox report',
     });
 
     expect(opened.status).toBe(201);
     expect(opened.body.session).toMatchObject({
-      sourceRunId: 'pruned-run',
-      title: 'Durable Inbox report',
+      sourceRunId: 'run-1',
+      resumeId: 'resume-run-1',
     });
   });
 
@@ -381,6 +433,7 @@ describe('POST /:id/headless/:taskId/session', () => {
     const { app, spawn } = buildHeadlessSession({
       task: {
         taskId: 'run-1',
+        resumeId: 'resume-run-1',
         wsId: 'ws-1',
         agent: 'codex',
         prompt: 'Still running',
@@ -415,6 +468,7 @@ describe('POST /:id/sessions/:sid/resume — concurrent coalescing (ANG-120)', (
     });
     const record = {
       id: TOKEN,
+      resumeId: 'resume-aid',
       wsId: 'ws-1',
       agent: 'claude',
       name: 'c1',
@@ -424,6 +478,7 @@ describe('POST /:id/sessions/:sid/resume — concurrent coalescing (ANG-120)', (
     const adapter = { id: 'claude', capabilities: { resumeById: true, resumeLast: false } };
     const svc = {
       sessionRegistry: { get: () => record, update: vi.fn(async () => {}) },
+      resumeRegistry: { get: () => ({ agentSessionId: 'aid' }) },
       pool: { get: () => live, spawn, disposeToken: vi.fn() },
       registry: { get: () => ({ id: 'ws-1', dir: '/w', agents: ['claude'] }) },
       adapters: { get: () => adapter },
@@ -434,7 +489,7 @@ describe('POST /:id/sessions/:sid/resume — concurrent coalescing (ANG-120)', (
         projectKey: 'k',
         composedCommand: ['claude'],
         resumeMode: 'by-id',
-        resumeId: 'aid',
+        nativeSessionId: 'aid',
       }),
       config: { launcherRepoRoot: '/repo' },
     } as unknown as WorkspaceService;

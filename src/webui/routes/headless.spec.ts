@@ -11,8 +11,8 @@ import type { WorkspaceService } from '../../workspaces/service.js'
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 const TASKS = [
-  { taskId: 't1', wsId: 'w1', agent: 'codex', status: 'done', startedAt: 1 },
-  { taskId: 't2', wsId: 'w2', agent: 'pi', status: 'running', startedAt: 2 },
+  { taskId: 't1', resumeId: 'resume-t1', wsId: 'w1', agent: 'codex', status: 'done', startedAt: 1 },
+  { taskId: 't2', resumeId: 'resume-t2', wsId: 'w2', agent: 'pi', status: 'running', startedAt: 2 },
 ]
 
 function build(logsDir = '/tmp/openalice-headless-route-test') {
@@ -33,6 +33,7 @@ function build(logsDir = '/tmp/openalice-headless-route-test') {
   const runningCount = vi.fn(() => TASKS.filter((task) => task.status === 'running').length)
   const svc = {
     headlessTasks: { list, count, get, runningCount },
+    resumeRegistry: { get: (id: string) => id === 'resume-t1' ? { agentSessionId: 'native' } : null },
     headlessCapacity: 8,
     headlessLogsDir: logsDir,
     adapters: { get: vi.fn(() => null) },

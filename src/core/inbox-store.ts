@@ -58,8 +58,8 @@ export interface InboxDoc {
  *
  * Two live kinds: `kind:'headless'` (a dispatched run — `runId` always, set from
  * the spawn-injected AQ_RUN_ID and resolved against the HeadlessTaskRegistry;
- * `issueId` when a scheduled issue fired it, plus the captured native
- * `agentSessionId` when available) and `kind:'interactive'` (a
+ * `issueId` when a scheduled issue fired it, plus the product-owned
+ * `resumeId`) and `kind:'interactive'` (a
  * human-attended PTY session — `sessionId`, the pre-allocated SessionRegistry
  * record id, set from the spawn-injected AQ_SESSION_ID and resolved against the
  * session registry). `agent` comes off the authoritative record in both. Absent
@@ -73,9 +73,8 @@ export interface InboxOrigin {
   issueId?: string
   /** The interactive session's pre-allocated SessionRegistry record id. */
   sessionId?: string
-  /** The native CLI session id captured for a headless run. This lets a durable
-   *  Inbox entry remain resumable after the bounded headless-run log is pruned. */
-  agentSessionId?: string
+  /** Stable product conversation identity. Native runtime ids stay server-side. */
+  resumeId?: string
   /** The agent CLI id (claude/codex/…) from the run record. */
   agent?: string
 }

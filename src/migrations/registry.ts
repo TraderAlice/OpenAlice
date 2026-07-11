@@ -25,6 +25,8 @@ import { migration as migration_0010_workspace_issues_to_markdown } from './0010
 import { migration as migration_0011_workspace_issue_assignee_defaults } from './0011_workspace_issue_assignee_defaults/index.js'
 import { migration as migration_0012_recent_chat_workspace_preference } from './0012_recent_chat_workspace_preference/index.js'
 import { migration as migration_0013_session_run_source } from './0013_session_run_source/index.js'
+import { migration as migration_0014_headless_resume_identity } from './0014_headless_resume_identity/index.js'
+import { migration as migration_0015_resume_identity_registry } from './0015_resume_identity_registry/index.js'
 
 export const REGISTRY: Migration[] = [
   migration_0008_disable_targetless_cron_jobs,
@@ -33,4 +35,6 @@ export const REGISTRY: Migration[] = [
   migration_0011_workspace_issue_assignee_defaults,
   migration_0012_recent_chat_workspace_preference,
   migration_0013_session_run_source,
+  migration_0014_headless_resume_identity,
+  migration_0015_resume_identity_registry,
 ]

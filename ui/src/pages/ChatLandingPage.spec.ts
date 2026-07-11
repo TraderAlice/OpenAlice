@@ -46,13 +46,13 @@ function workspace(
     sessions: lastActiveAt
       ? [{
           id: `${id}-session`,
+          resumeId: `${id}-resume`,
           wsId: id,
           agent: 'pi',
           name: 'p1',
           createdAt,
           lastActiveAt,
           state: 'paused',
-          agentSessionId: null,
           pid: null,
           startedAt: null,
           title: null,

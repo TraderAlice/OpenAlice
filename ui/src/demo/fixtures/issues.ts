@@ -209,6 +209,8 @@ const demoIssueExtras: Record<string, IssueDetailExtras> = {
     runs: [
       {
         taskId: 'demo-run-morning-1',
+        resumeId: 'demo-resume-morning-1',
+        resumable: true,
         wsId: 'demo-ws-auto-quant',
         agent: 'codex',
         prompt: 'Run the morning movers scan and push a ranked Inbox digest.',
@@ -217,10 +219,11 @@ const demoIssueExtras: Record<string, IssueDetailExtras> = {
         finishedAt: now - HOUR + 84_000,
         durationMs: 84_000,
         exitCode: 0,
-        agentSessionId: '019eb75e-0b1b-7fa2-ba95-fd7db4463afe',
       },
       {
         taskId: 'demo-run-morning-2',
+        resumeId: 'demo-resume-morning-2',
+        resumable: false,
         wsId: 'demo-ws-auto-quant',
         agent: 'codex',
         prompt: 'Run the morning movers scan and push a ranked Inbox digest.',
@@ -233,6 +236,8 @@ const demoIssueExtras: Record<string, IssueDetailExtras> = {
       },
       {
         taskId: 'demo-run-morning-3',
+        resumeId: 'demo-resume-morning-3',
+        resumable: true,
         wsId: 'demo-ws-auto-quant',
         agent: 'codex',
         prompt: 'Run the morning movers scan and push a ranked Inbox digest.',
@@ -241,7 +246,6 @@ const demoIssueExtras: Record<string, IssueDetailExtras> = {
         finishedAt: now - 2 * DAY + 79_000,
         durationMs: 79_000,
         exitCode: 0,
-        agentSessionId: '019eb6aa-2c4f-7b10-9d22-aa1c0f7711be',
       },
     ],
   },
@@ -256,15 +260,18 @@ const demoIssueExtras: Record<string, IssueDetailExtras> = {
     runs: [
       {
         taskId: 'demo-run-thesis-1',
+        resumeId: 'demo-resume-thesis-1',
+        resumable: false,
         wsId: 'demo-ws-auto-quant',
         agent: 'claude',
         prompt: 'Re-check every active thesis against the latest quotes; flag invalidations.',
         status: 'running',
         startedAt: now - 2 * 60_000,
-        agentSessionId: '414d6b8c-95b4-4e01-8ffc-4b6332da17d4',
       },
       {
         taskId: 'demo-run-thesis-2',
+        resumeId: 'demo-resume-thesis-2',
+        resumable: false,
         wsId: 'demo-ws-auto-quant',
         agent: 'claude',
         prompt: 'Re-check every active thesis against the latest quotes; flag invalidations.',
@@ -276,6 +283,8 @@ const demoIssueExtras: Record<string, IssueDetailExtras> = {
       },
       {
         taskId: 'demo-run-thesis-3',
+        resumeId: 'demo-resume-thesis-3',
+        resumable: false,
         wsId: 'demo-ws-auto-quant',
         agent: 'claude',
         prompt: 'Re-check every active thesis against the latest quotes; flag invalidations.',
@@ -304,6 +313,8 @@ const demoIssueExtras: Record<string, IssueDetailExtras> = {
     runs: [
       {
         taskId: 'demo-run-digest-1',
+        resumeId: 'demo-resume-digest-1',
+        resumable: true,
         wsId: 'demo-ws-macro',
         agent: 'codex',
         prompt: 'Write the weekly macro digest and push it to the Inbox.',
@@ -312,10 +323,11 @@ const demoIssueExtras: Record<string, IssueDetailExtras> = {
         finishedAt: now - 2 * DAY + 156_000,
         durationMs: 156_000,
         exitCode: 0,
-        agentSessionId: '019eb5c1-7d80-7a44-8f3e-3b6e2c9d4401',
       },
       {
         taskId: 'demo-run-digest-2',
+        resumeId: 'demo-resume-digest-2',
+        resumable: false,
         wsId: 'demo-ws-macro',
         agent: 'codex',
         prompt: 'Write the weekly macro digest and push it to the Inbox.',

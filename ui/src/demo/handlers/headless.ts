@@ -6,6 +6,8 @@ const now = Date.now()
 const demoHeadlessTasks: HeadlessTaskRecord[] = [
   {
     taskId: 'demo-headless-1',
+    resumeId: 'demo-resume-1',
+    resumable: true,
     wsId: 'demo-ws',
     agent: 'codex',
     prompt: 'Compute a quant snapshot of NVDA and push a report to the inbox.',
@@ -14,19 +16,21 @@ const demoHeadlessTasks: HeadlessTaskRecord[] = [
     finishedAt: now - 20_000,
     durationMs: 72_000,
     exitCode: 0,
-    agentSessionId: '019eb75e-0b1b-7fa2-ba95-fd7db4463afe',
   },
   {
     taskId: 'demo-headless-2',
+    resumeId: 'demo-resume-2',
+    resumable: false,
     wsId: 'demo-chat',
     agent: 'claude',
     prompt: "Summarize today's AI-sector headlines and flag anything actionable.",
     status: 'running',
     startedAt: now - 6_000,
-    agentSessionId: '414d6b8c-95b4-4e01-8ffc-4b6332da17d4',
   },
   {
     taskId: 'demo-headless-3',
+    resumeId: 'demo-resume-3',
+    resumable: false,
     wsId: 'demo-ws',
     agent: 'pi',
     prompt: 'Refresh the uranium watchlist and note any breakouts.',
@@ -40,7 +44,7 @@ const demoOutput = (taskId: string): HeadlessOutput | null => {
   const t = demoHeadlessTasks.find((x) => x.taskId === taskId)
   if (!t) return null
   const lines = [
-    `{"type":"thread.started","thread_id":"${t.agentSessionId ?? 'demo'}"}`,
+    `{"type":"thread.started","thread_id":"demo-native"}`,
     '{"type":"turn.started"}',
     '{"type":"item.completed","item":{"type":"agent_message","text":"Report pushed to the inbox."}}',
   ]

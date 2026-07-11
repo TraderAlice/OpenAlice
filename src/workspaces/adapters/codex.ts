@@ -103,8 +103,8 @@ export const codexAdapter: CliAdapter = {
   //                       loopback CLI gateway (else: "...fetch failed").
   // No mcp_servers head (interactive composeCommand keeps it — MCP works there
   // with a human approver). `--` terminates options before the trailing prompt.
-  composeHeadlessCommand(_base: readonly string[], _ctx: SpawnContext, prompt: string): readonly string[] {
-    return [
+  composeHeadlessCommand(_base: readonly string[], ctx: SpawnContext, prompt: string): readonly string[] {
+    const head = [
       'codex',
       '-c',
       'approval_policy="never"',
@@ -113,6 +113,11 @@ export const codexAdapter: CliAdapter = {
       '-c',
       'sandbox_workspace_write.network_access=true',
       'exec',
+    ];
+    if (ctx.resume === 'last') return [...head, 'resume', '--json', '--last', prompt];
+    if (ctx.resume) return [...head, 'resume', '--json', ctx.resume.sessionId, prompt];
+    return [
+      ...head,
       '--json',
       '--',
       prompt,

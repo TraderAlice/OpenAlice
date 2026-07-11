@@ -58,8 +58,8 @@ export interface SidebarProps {
   readonly onSpawn: (wsId: string, opts?: SpawnOpts) => void;
   readonly onOpenHeadlessRun: (
     wsId: string,
-    taskId: string,
-    opts: { agent?: string; agentSessionId?: string; title?: string },
+    resumeId: string,
+    opts: { title?: string },
   ) => void;
   readonly onSetDefaultAgent: (agent: string | null) => void;
   readonly onPauseSession: (wsId: string, sessionId: string) => void;
@@ -514,9 +514,7 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
       {(props.headlessTasks?.length ?? 0) > 0 && (
         <HeadlessGroup
           tasks={props.headlessTasks!}
-          onOpenAsSession={(task) => props.onOpenHeadlessRun(w.id, task.taskId, {
-            agent: task.agent,
-            agentSessionId: task.agentSessionId,
+          onOpenAsSession={(task) => props.onOpenHeadlessRun(w.id, task.resumeId, {
             title: task.prompt,
           })}
         />
@@ -588,7 +586,7 @@ function HeadlessTaskRow(props: {
 }): ReactElement {
   const { t } = useTranslation();
   const task = props.task;
-  const openable = task.status !== 'running' && !!task.agentSessionId;
+  const openable = task.status !== 'running' && task.resumable;
   const titleParts = [`${task.agent} · ${task.status}`, formatRelativeTime(task.startedAt)];
   if (task.error) titleParts.push(task.error);
   titleParts.push(task.prompt);
@@ -633,7 +631,7 @@ export function SessionRow(props: SessionRowProps): ReactElement {
   const isPaused = s.state === 'paused';
   // Title: the captured first message (seeded sessions), else the sticky name.
   const display = s.title?.trim() || s.name;
-  const tidShort = s.agentSessionId ? s.agentSessionId.slice(0, 8) : null;
+  const tidShort = s.resumeId ? s.resumeId.slice(0, 8) : null;
   const metaParts: string[] = [`agent ${s.agent}`];
   if (s.pid !== null) metaParts.push(`pid ${s.pid}`);
   if (tidShort) metaParts.push(tidShort);

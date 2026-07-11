@@ -21,7 +21,7 @@ export const demoInboxEntry: InboxEntry = {
     '',
     'Want me to set up a watchlist alert on next quarter\'s services number?',
   ].join('\n'),
-  origin: { kind: 'interactive', sessionId: DEMO_SESSION_ID, agent: 'claude' },
+  origin: { kind: 'interactive', sessionId: DEMO_SESSION_ID, resumeId: 'demo-resume-main', agent: 'claude' },
 }
 
 export const demoHeadlessSessionReport: InboxEntry = {
@@ -33,8 +33,8 @@ export const demoHeadlessSessionReport: InboxEntry = {
   origin: {
     kind: 'headless',
     runId: 'demo-headless-1',
+    resumeId: 'demo-resume-1',
     agent: 'codex',
-    agentSessionId: '019eb75e-0b1b-7fa2-ba95-fd7db4463afe',
   },
 }
 

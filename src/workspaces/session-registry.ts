@@ -15,10 +15,9 @@ import type { Logger } from './logger.js';
  * pool keyed by this id; 'paused' means the record exists but no PTY. On a
  * crash recovery we flip any 'running' to 'paused' (see `bootFixup`).
  *
- * `resumeHint` is adapter-specific guidance written when the adapter has
- * enough information to recover the agent's own session id (claude's JSONL
- * UUID, discovered by the transcript watcher). Codex doesn't have this — its
- * `resume --last` is cwd-filtered so we don't need to track the id ourselves.
+ * `resumeId` is the product-level conversation identity. `resumeHint` remains
+ * an internal compatibility cache of the adapter-native id; ResumeRegistry is
+ * the authoritative translation layer for new product/API flows.
  *
  * `scrollbackFile` is a path **relative to** the launcher's scrollback dir
  * (see `scrollback-store.ts`), populated when a shell session is paused so
@@ -26,6 +25,8 @@ import type { Logger } from './logger.js';
  */
 export interface SessionRecord {
   readonly id: string;
+  /** Stable product conversation identity; frontend resume contracts use this. */
+  readonly resumeId: string;
   readonly wsId: string;
   readonly agent: string;
   readonly name: string;
@@ -189,6 +190,16 @@ export class SessionRegistry {
     return undefined;
   }
 
+  /** Find the interactive wrapper for one product-owned conversation. */
+  findByResumeId(wsId: string, resumeId: string): SessionRecord | undefined {
+    const records = this.byWs.get(wsId);
+    if (!records) return undefined;
+    for (const record of records.values()) {
+      if (record.resumeId === resumeId) return record;
+    }
+    return undefined;
+  }
+
   async create(record: SessionRecord): Promise<void> {
     await this.ensureLoaded(record.wsId);
     const records = this.byWs.get(record.wsId)!;
@@ -306,6 +317,7 @@ function validateFile(value: unknown): SessionRecord[] {
     }
     const base: SessionRecord = {
       id: r['id'],
+      resumeId: typeof r['resumeId'] === 'string' ? r['resumeId'] : r['id'],
       wsId: r['wsId'],
       agent: r['agent'],
       name: r['name'],
