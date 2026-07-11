@@ -163,6 +163,34 @@ describe('trading tools — partial tolerance (#390)', () => {
   })
 })
 
+describe('inline trading commits', () => {
+  it('returns the resolved account id beside the UTA commit hash', async () => {
+    const uta = {
+      id: 'alpaca-paper',
+      stagePlaceOrder: async () => ({
+        staged: true,
+        index: 0,
+        operation: { action: 'placeOrder', contract: { symbol: 'AAPL' }, order: { action: 'BUY' } },
+      }),
+      commit: async (message: string) => ({ hash: 'commit-1', message }),
+    }
+    const tools = createTradingTools({ resolveOne: async () => uta } as never)
+    const result = await run(tools.placeOrder, {
+      aliceId: 'alpaca-paper|AAPL',
+      action: 'BUY',
+      orderType: 'MKT',
+      totalQuantity: '1',
+      tif: 'DAY',
+      commitMessage: 'Entry thesis',
+    }) as Record<string, unknown>
+
+    expect(result).toMatchObject({
+      source: 'alpaca-paper',
+      committed: { hash: 'commit-1', message: 'Entry thesis' },
+    })
+  })
+})
+
 describe('searchContracts — data-source participation', () => {
   it('defaults to accounts with UTA data-source participation enabled', async () => {
     const tools = createTradingTools(fakeManager([

@@ -23,6 +23,7 @@ import { workspaceSessionsFactory } from '../tool/workspace-sessions.js'
 import { entityUpsertFactory } from '../tool/entity-upsert.js'
 import { entitySearchFactory } from '../tool/entity-search.js'
 import { issueToolFactories } from '../tool/issue-tools.js'
+import { provenanceShowFactory } from '../tool/provenance-show.js'
 import { createTradingTools } from '../tool/trading.js'
 
 /**
@@ -89,6 +90,7 @@ describe('CLI_EXPORTS — workspace export (scoped collaboration tools)', () => 
   wtc.register(entityUpsertFactory)
   wtc.register(entitySearchFactory)
   for (const f of issueToolFactories) wtc.register(f)
+  wtc.register(provenanceShowFactory)
   const built = wtc.build({
     workspaceId: 'ws-test',
     workspaceLabel: 'test',

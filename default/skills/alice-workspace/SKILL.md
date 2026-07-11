@@ -65,6 +65,20 @@ alice-workspace peer sessions --id 550e8400-e29b-41d4-a716-446655440000
 (Reading a peer's files is fine. For your OWN entries you don't need this at all;
 their doc paths are already relative to your cwd.)
 
+**Trace an artifact back to a Session** — query the immutable attribution trail
+without exposing a runtime-native session id:
+
+```bash
+alice-workspace provenance show --kind issue --issue-id <id>
+alice-workspace provenance show --kind report --path research/report.md --revision <sha256:...>
+alice-workspace provenance show --kind trade-decision --account-id <account> --decision-id <uta-commit-hash>
+alice-workspace provenance show --resume-id <resumeId>  # reverse lookup: artifacts attributed to one Session
+```
+
+For Issue/report keys, `--workspace-id` defaults to your current Workspace.
+`resumeId` is the follow-up handle; `taskId` is only execution evidence. A
+missing origin is not permission to pick an arbitrary old Session.
+
 > **Editing a peer is interactive-only.** Reading another workspace is always OK.
 > *Editing* one means reaching outside your own workspace — only do that in an
 > interactive session where a person is present to approve it. An autonomous /

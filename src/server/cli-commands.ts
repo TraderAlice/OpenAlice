@@ -182,6 +182,9 @@ export const CLI_EXPORTS: Record<string, CliExport> = {
         list: 'issue_list',
         show: 'issue_show',
       },
+      provenance: {
+        show: 'provenance_show',
+      },
     },
   },
   uta: {

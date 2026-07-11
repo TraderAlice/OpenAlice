@@ -299,19 +299,34 @@ A trade has a causal chain, not one undifferentiated author:
 Session decision/request -> human or policy approval -> UTA operation -> broker fills
 ```
 
-The trade request sent from Alice to UTA should carry non-authoritative
-correlation metadata:
+The UTA Git commit is the durable decision artifact. Its identity is scoped by
+the account and uses the real commit hash:
 
 ```ts
-interface TradeDecisionOrigin extends SessionOrigin {
-  decisionId: string
+type TradeDecisionRef = {
+  kind: 'trade-decision'
+  accountId: string
+  decisionId: string // UTA Git commit hash
 }
 ```
 
 - `resumeId`, `workspaceId`, and `agent` identify who initiated the decision.
 - `taskId` identifies the exact headless turn when applicable.
+- staging without a commit is not yet a durable decision occurrence.
+- `tradingPush` and broker order/fill ids are execution evidence, not new
+  decision identities.
 - approval records identify the human/policy gate separately.
 - UTA operations and broker records remain the authority for execution/fills.
+
+When an internal agent creates a commit through the Workspace-owned
+`alice-uta` CLI, the gateway resolves the out-of-band run/session header and
+records a `decided` occurrence. A call without an authoritative Session header
+remains unattributed rather than being guessed. Query it with:
+
+```bash
+alice-workspace provenance show --kind trade-decision \
+  --account-id <account> --decision-id <uta-commit-hash>
+```
 
 “Why did you take this trade?” resumes the decision Session. “Why did it fill at
 this price?” reads UTA/broker execution evidence. Correlation must not move
@@ -390,6 +405,8 @@ responsible?” It owns:
   responsibility;
 - report revision/write attribution where observable;
 - trade-decision correlation across the Alice -> UTA boundary;
+- read-only artifact and reverse-Session queries through
+  `alice-workspace provenance show`;
 - honest `unknown`/`unavailable` records for legacy, human, or external changes;
 - read-only provenance queries and diagnostics.
 
