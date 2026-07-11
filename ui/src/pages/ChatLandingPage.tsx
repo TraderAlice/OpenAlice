@@ -152,6 +152,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
   const [recentChatWorkspaceId, setRecentChatWorkspaceId] = useState<string | null>(null)
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false)
   const workspaceBoxRef = useRef<HTMLDivElement>(null)
+  const activeWorkspaceOptionRef = useRef<HTMLButtonElement>(null)
   const selectedChatWorkspace = useMemo(
     () => resolveChatWorkspaceTarget(
       workspaces,
@@ -392,6 +393,17 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
     return () => document.removeEventListener('mousedown', onDown)
   }, [workspaceMenuOpen])
 
+  // The picker opens upward from the composer. Keep the active option inside
+  // its own scroll viewport so a long Workspace history cannot push recent or
+  // currently selected targets beyond the top of the window.
+  useEffect(() => {
+    if (!workspaceMenuOpen) return
+    const frame = requestAnimationFrame(() => {
+      activeWorkspaceOptionRef.current?.scrollIntoView({ block: 'nearest' })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [workspaceMenuOpen, workspaceTarget?.id])
+
   const submit = async () => {
     const prompt = value.trim()
     if (!prompt || launching) return
@@ -548,13 +560,14 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
                 {workspaceMenuOpen && targetWs === undefined && chatWorkspaceOptions.length > 0 && (
                   <div
                     role="menu"
-                    className="absolute bottom-full left-0 z-10 mb-1 min-w-[220px] max-w-[320px] py-1 rounded-lg border border-border/70 bg-bg-secondary shadow-lg"
+                    className="absolute bottom-full left-0 z-10 mb-1 max-h-[min(24rem,calc(100vh-8rem))] min-w-[220px] max-w-[320px] overflow-y-auto overscroll-contain rounded-lg border border-border/70 bg-bg-secondary py-1 shadow-lg [scrollbar-gutter:stable]"
                   >
                     {chatWorkspaceOptions.map((workspace) => {
                       const active = workspace.id === workspaceTarget?.id
                       return (
                         <button
                           key={workspace.id}
+                          ref={active ? activeWorkspaceOptionRef : undefined}
                           type="button"
                           role="menuitem"
                           onClick={() => {
