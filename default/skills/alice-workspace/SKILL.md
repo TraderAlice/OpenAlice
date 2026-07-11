@@ -26,13 +26,14 @@ alice-workspace inbox push --doc research/tsla.md --comments "Done — TSLA look
 ```
 
 (Attach files with repeatable `--doc <path>` — workspace-relative; each renders
-live in the inbox UI, not snapshotted. `--comments` is your markdown note. At
+live in the inbox UI. OpenAlice records the exact published content hash even
+though later edits remain visible. `--comments` is your markdown note. At
 least one of `--doc` / `--comments` must be present.)
 
 > **Commit before you push.** The inbox renders your files live, not a snapshot —
 > a `git commit` is the only durable record of what you actually sent. Skip it and
-> a later edit (yours or a collaborator's) silently rewrites what the entry shows,
-> with nothing to recover.
+> a later edit changes what the entry shows. The publication hash proves which
+> revision was sent, while the commit preserves content you can recover.
 
 **Look back at the inbox** — recall what's been surfaced, newest first:
 

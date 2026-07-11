@@ -161,8 +161,10 @@ alice-workspace inbox push --doc <path> --comments "<summary>"
 ```
 
 The launcher binds the run/issue origin; the agent does not pass its own
-identity. A no-change check should exit silently rather than generating Inbox
-noise. `alice-workspace inbox read` returns this safe provenance to internal
+identity. Attached reports also receive a publication-time SHA-256 revision;
+the Inbox still renders the live file, but provenance can distinguish the sent
+revision from later edits. A no-change check should exit silently rather than
+generating Inbox noise. `alice-workspace inbox read` returns this safe provenance to internal
 agents as `origin` (`runId` / `sessionId`, `resumeId`, `issueId`, and `agent`
 when available). For append-only entries created before `resumeId` was stamped,
 the read path joins the stored run/session handle against the live registries;

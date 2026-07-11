@@ -186,6 +186,11 @@ Reports are currently Markdown files. Their durable identity is at least
 `{ workspaceId, path }`; asking about mutable contents additionally needs a
 revision (git commit, content hash, or another immutable version handle).
 
+`inbox_push` stamps a `sha256:<hex>` revision from the report bytes it publishes
+and uses that same revision in both the Inbox attachment and report provenance
+edge. Rendering remains live; the hash identifies what was sent rather than
+freezing a second copy of the file.
+
 A report can have separate provenance for:
 
 - initial creation;

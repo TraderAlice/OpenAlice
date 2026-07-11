@@ -45,6 +45,8 @@ import { EventEmitter } from 'node:events'
 export interface InboxDoc {
   /** Path relative to the workspace root. */
   path: string
+  /** Content identity at publication time. The file is still rendered live. */
+  revision?: string
 }
 
 /**

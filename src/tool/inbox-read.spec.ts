@@ -20,6 +20,7 @@ async function run(tool: Tool, args: Record<string, unknown>) {
       workspace: string
       comments?: string
       docs: string[]
+      docRevisions?: Record<string, string>
       origin?: InboxOrigin
     }>
   }
@@ -39,7 +40,11 @@ async function seeded(): Promise<WorkspaceToolContext> {
       agent: 'pi',
     },
   })
-  await inboxStore.append({ workspaceId: WS, workspaceLabel: 'Mine', docs: [{ path: 'b.md' }, { path: 'c.md' }] })
+  await inboxStore.append({
+    workspaceId: WS,
+    workspaceLabel: 'Mine',
+    docs: [{ path: 'b.md', revision: 'sha256:bbbb' }, { path: 'c.md' }],
+  })
   return {
     workspaceId: WS,
     workspaceLabel: 'Mine',
@@ -94,6 +99,12 @@ describe('inbox_read', () => {
       issueId: 'daily-scan',
       agent: 'pi',
     })
+  })
+
+  it('keeps path compatibility and adds published revision metadata', async () => {
+    const res = await run(inboxReadFactory.build(await seeded()), { self: true })
+    expect(res.entries[0].docs).toEqual(['b.md', 'c.md'])
+    expect(res.entries[0].docRevisions).toEqual({ 'b.md': 'sha256:bbbb' })
   })
 
   it('`limit` caps the newest-first window and reports hasMore', async () => {

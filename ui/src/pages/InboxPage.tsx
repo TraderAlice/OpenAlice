@@ -462,6 +462,14 @@ function DocBlock({
         />
         <span className="text-[12px]">📄</span>
         <span className="flex-1 truncate text-[12px] font-mono text-text-muted">{doc.path}</span>
+        {doc.revision && (
+          <span
+            className="shrink-0 rounded bg-bg-tertiary px-1.5 py-0.5 font-mono text-[9px] text-text-muted/60"
+            title={`Published revision ${doc.revision}`}
+          >
+            sent {doc.revision.replace(/^sha256:/, '').slice(0, 8)}
+          </span>
+        )}
         <span className="shrink-0 text-[10px] uppercase tracking-wider text-text-muted/45">
           {expanded ? t('inbox.docCollapse') : t('inbox.docExpand')}
         </span>

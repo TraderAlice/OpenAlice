@@ -84,6 +84,15 @@ export const inboxReadFactory: WorkspaceToolFactory = {
                 workspace: e.workspaceLabel ?? e.workspaceId,
                 comments: e.comments,
                 docs: (e.docs ?? []).map((d) => d.path),
+                ...((e.docs ?? []).some((doc) => doc.revision)
+                  ? {
+                      docRevisions: Object.fromEntries(
+                        (e.docs ?? [])
+                          .filter((doc) => doc.revision)
+                          .map((doc) => [doc.path, doc.revision]),
+                      ),
+                    }
+                  : {}),
                 ...(origin ? { origin } : {}),
               }
             }),

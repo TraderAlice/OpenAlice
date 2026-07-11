@@ -1,8 +1,11 @@
 import type { Tool } from 'ai'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { WorkspaceToolContext } from '../core/workspace-tool-center.js'
-import { inboxPushFactory } from './inbox-push.js'
+import { inboxPushFactory, reportContentRevision } from './inbox-push.js'
 
 async function run(tool: Tool, args: Record<string, unknown>) {
   return tool.execute!(args, { toolCallId: 'test', messages: [] })
@@ -21,6 +24,32 @@ function context(over: Partial<WorkspaceToolContext> = {}): WorkspaceToolContext
 }
 
 describe('inbox_push provenance', () => {
+  it('stamps the exact published report revision onto Inbox and provenance', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'inbox-report-revision-'))
+    try {
+      await mkdir(join(dir, 'research'), { recursive: true })
+      await writeFile(join(dir, 'research', 'a.md'), '# Published\n', 'utf8')
+      const appendInbox = vi.fn(async (input) => ({ ...input, id: 'entry-1', ts: 123 }))
+      const appendProvenance = vi.fn(async (input) => ({ id: 'p-1', ...input }))
+      const ctx = context({
+        inboxStore: { append: appendInbox } as never,
+        provenanceStore: { append: appendProvenance, list: vi.fn(), latest: vi.fn() },
+        resolveWorkspace: () => ({ id: 'ws-1', tag: 'desk', dir }),
+      })
+
+      await run(inboxPushFactory.build(ctx), { docs: [{ path: 'research/a.md' }] })
+      const revision = reportContentRevision('# Published\n')
+      expect(appendInbox).toHaveBeenCalledWith(expect.objectContaining({
+        docs: [{ path: 'research/a.md', revision }],
+      }))
+      expect(appendProvenance).toHaveBeenCalledWith(expect.objectContaining({
+        artifact: { kind: 'report', workspaceId: 'ws-1', path: 'research/a.md', revision },
+      }))
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
   it('records the notification and published report against the caller Session', async () => {
     const append = vi.fn(async (input) => ({ id: `p-${input.action}`, ...input }))
     const ctx = context({

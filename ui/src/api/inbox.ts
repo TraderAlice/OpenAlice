@@ -2,6 +2,8 @@ import { fetchJson } from './client'
 
 export interface InboxDoc {
   path: string
+  /** Content hash captured when this doc was published; rendering stays live. */
+  revision?: string
 }
 
 /**
