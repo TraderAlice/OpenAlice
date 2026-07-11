@@ -112,6 +112,19 @@ describe('HeadlessTaskRegistry', () => {
     expect(reloaded.list().every((task) => task.status === 'done' && task.output?.toolCalls === 1)).toBe(true)
   })
 
+  it('pages newest-first with a stable task cursor', async () => {
+    const reg = await HeadlessTaskRegistry.load(path, noopLogger)
+    const oldest = await reg.create({ wsId: 'w1', agent: 'claude', prompt: 'oldest', startedAt: 1 })
+    const middle = await reg.create({ wsId: 'w1', agent: 'codex', prompt: 'middle', startedAt: 2 })
+    const newest = await reg.create({ wsId: 'w1', agent: 'pi', prompt: 'newest', startedAt: 3 })
+
+    expect(reg.list({ limit: 2 }).map((task) => task.taskId)).toEqual([newest.taskId, middle.taskId])
+    expect(reg.list({ cursor: middle.taskId, limit: 2 }).map((task) => task.taskId)).toEqual([oldest.taskId])
+    expect(reg.list({ cursor: 'pruned-task', limit: 2 })).toEqual([])
+    expect(reg.count({ wsId: 'w1' })).toBe(3)
+    expect(reg.count({ status: 'running' })).toBe(3)
+  })
+
   it('reconcile-on-boot flips a leftover running task → interrupted', async () => {
     const reg = await HeadlessTaskRegistry.load(path, noopLogger)
     await reg.create({ wsId: 'w1', agent: 'codex', prompt: 'x', startedAt: 1 }) // stays running

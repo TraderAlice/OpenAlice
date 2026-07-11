@@ -67,7 +67,15 @@ export const headlessHandlers = [
   http.get('/api/headless', ({ request }) => {
     const wsId = new URL(request.url).searchParams.get('wsId')
     const tasks = wsId ? demoHeadlessTasks.filter((t) => t.wsId === wsId) : demoHeadlessTasks
-    return HttpResponse.json({ tasks, capacity: { running: tasks.filter((task) => task.status === 'running').length, limit: 8 } })
+    return HttpResponse.json({
+      tasks,
+      page: { total: tasks.length, hasMore: false, nextCursor: null },
+      summary: {
+        done: tasks.filter((task) => task.status === 'done').length,
+        needsAttention: tasks.filter((task) => task.status === 'failed' || task.status === 'interrupted').length,
+      },
+      capacity: { running: tasks.filter((task) => task.status === 'running').length, limit: 8 },
+    })
   }),
   // Path-specific route BEFORE the :taskId catch-all (msw matches in order).
   http.get('/api/headless/:taskId/output', ({ params }) => {

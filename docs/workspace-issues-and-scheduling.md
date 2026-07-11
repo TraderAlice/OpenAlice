@@ -129,8 +129,11 @@ The native stream contracts differ materially:
 
 Automation reads a debounced `.structured.json` snapshot instead of replaying
 an entire vendor log. This makes live polling cheap and gives future workbench
-orchestration a stable contract independent of CLI versions. Runs created before
-this contract are parsed best-effort from the last 2 MB of stdout when opened.
+orchestration a stable contract independent of CLI versions. The Runs panel
+loads records newest-first in cursor pages (25 initially and 25 older records
+on demand), so polling refreshes the active page without repeatedly transferring
+the full bounded history. Runs created before this contract are parsed
+best-effort from the last 2 MB of stdout when opened.
 
 Bounded stdout/stderr diagnostics remain as a fallback. Adapters may discard
 documented high-frequency transient events before persistence: Pi drops

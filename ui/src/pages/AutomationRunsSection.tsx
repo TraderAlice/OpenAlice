@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   Bot,
   ChevronDown,
@@ -29,6 +29,8 @@ const STATUS_STYLE: Record<HeadlessTaskStatus, string> = {
   failed: 'bg-red-500/15 text-red-400',
   interrupted: 'bg-amber-500/15 text-amber-400',
 }
+
+const RUNS_PAGE_SIZE = 25
 
 function fmtDuration(ms?: number): string {
   if (ms == null) return '—'
@@ -200,6 +202,7 @@ function SummaryCard({ label, value, detail }: { label: string; value: string; d
 export function AutomationRunsSection() {
   const [snapshot, setSnapshot] = useState<HeadlessListSnapshot | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const { openHeadlessRun } = useWorkspaces()
 
@@ -212,7 +215,31 @@ export function AutomationRunsSection() {
 
   const load = useCallback(async () => {
     try {
-      setSnapshot(await api.headless.snapshot({ limit: 100 }))
+      const fresh = await api.headless.snapshot({ limit: RUNS_PAGE_SIZE })
+      setSnapshot((previous) => {
+        if (!previous) {
+          return fresh
+        }
+        // Poll only the cheap first page, then retain already-loaded older
+        // pages. Cursor pagination stays stable even when new runs arrive at
+        // the top between refreshes.
+        const seen = new Set<string>()
+        const tasks = [...fresh.tasks, ...previous.tasks].filter((task) => {
+          if (seen.has(task.taskId)) return false
+          seen.add(task.taskId)
+          return true
+        }).slice(0, fresh.page.total)
+        const hasMore = tasks.length < fresh.page.total
+        return {
+          ...fresh,
+          tasks,
+          page: {
+            ...fresh.page,
+            hasMore,
+            nextCursor: hasMore ? tasks.at(-1)?.taskId ?? null : null,
+          },
+        }
+      })
       setError(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -225,15 +252,35 @@ export function AutomationRunsSection() {
     return () => clearInterval(id)
   }, [load])
 
-  const counts = useMemo(() => {
-    const tasks = snapshot?.tasks ?? []
-    return {
-      done: tasks.filter((task) => task.status === 'done').length,
-      failed: tasks.filter((task) => task.status === 'failed' || task.status === 'interrupted').length,
+  const loadMore = async () => {
+    const cursor = snapshot?.page.nextCursor
+    if (!snapshot || !cursor || loadingMore) return
+    setLoadingMore(true)
+    try {
+      const older = await api.headless.snapshot({ limit: RUNS_PAGE_SIZE, cursor })
+      setSnapshot((previous) => {
+        if (!previous) return older
+        const seen = new Set(previous.tasks.map((task) => task.taskId))
+        const tasks = [...previous.tasks, ...older.tasks.filter((task) => !seen.has(task.taskId))]
+        return {
+          ...older,
+          tasks,
+          page: {
+            ...older.page,
+            hasMore: older.page.hasMore,
+            nextCursor: older.page.hasMore ? tasks.at(-1)?.taskId ?? null : null,
+          },
+        }
+      })
+      setError(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setLoadingMore(false)
     }
-  }, [snapshot])
+  }
 
-  if (error) return <div className="text-sm text-red-400">Failed to load runs: {error}</div>
+  if (error && !snapshot) return <div className="text-sm text-red-400">Failed to load runs: {error}</div>
   if (!snapshot) {
     return (
       <div className="space-y-3" aria-hidden="true">
@@ -253,7 +300,11 @@ export function AutomationRunsSection() {
           value={`${snapshot.capacity.running} / ${snapshot.capacity.limit}`}
           detail={snapshot.capacity.running === 0 ? 'No workers active' : 'Native agent workers active'}
         />
-        <SummaryCard label="Recent runs" value={String(snapshot.tasks.length)} detail={`${counts.done} completed · ${counts.failed} need attention`} />
+        <SummaryCard
+          label="Runs"
+          value={String(snapshot.page.total)}
+          detail={`Showing ${snapshot.tasks.length} · ${snapshot.summary.done} completed · ${snapshot.summary.needsAttention} need attention`}
+        />
         <SummaryCard label="Runtime parsers" value="4" detail="Claude · Codex · OpenCode · Pi" />
       </div>
 
@@ -263,6 +314,11 @@ export function AutomationRunsSection() {
         </div>
       ) : (
         <div className="space-y-2">
+          {error && (
+            <div className="rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-2 text-xs text-red-400">
+              Refresh failed: {error}
+            </div>
+          )}
           {snapshot.tasks.map((task) => {
             const isExpanded = expanded.has(task.taskId)
             const openable = task.status !== 'running' && !!task.agentSessionId
@@ -272,7 +328,11 @@ export function AutomationRunsSection() {
                 ? 'No tools used'
                 : 'Parse on open'
             return (
-              <article key={task.taskId} className="overflow-hidden rounded-xl border border-border/70 bg-bg-secondary/15">
+              <article
+                key={task.taskId}
+                data-task-id={task.taskId}
+                className="overflow-hidden rounded-xl border border-border/70 bg-bg-secondary/15"
+              >
                 <button
                   type="button"
                   onClick={() => toggle(task.taskId)}
@@ -337,6 +397,22 @@ export function AutomationRunsSection() {
               </article>
             )
           })}
+          {snapshot.page.hasMore && (
+            <div className="flex flex-col items-center gap-1 pt-2">
+              <button
+                type="button"
+                data-testid="runs-load-more"
+                disabled={loadingMore}
+                onClick={() => void loadMore()}
+                className="rounded-lg border border-border bg-bg-secondary/35 px-4 py-2 text-xs font-medium text-text hover:bg-bg-tertiary disabled:cursor-wait disabled:opacity-60"
+              >
+                {loadingMore ? 'Loading older runs…' : `Load ${Math.min(RUNS_PAGE_SIZE, snapshot.page.total - snapshot.tasks.length)} older runs`}
+              </button>
+              <span className="text-[11px] text-text-muted">
+                {snapshot.tasks.length} of {snapshot.page.total} loaded
+              </span>
+            </div>
+          )}
         </div>
       )}
     </div>

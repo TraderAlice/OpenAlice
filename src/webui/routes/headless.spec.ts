@@ -16,20 +16,28 @@ const TASKS = [
 ]
 
 function build(logsDir = '/tmp/openalice-headless-route-test') {
-  const list = vi.fn((opts: any = {}) =>
-    TASKS.filter(
+  const list = vi.fn((opts: any = {}) => {
+    let tasks = TASKS.filter(
       (t) => (!opts.wsId || t.wsId === opts.wsId) && (!opts.status || t.status === opts.status),
-    ),
-  )
+    ).slice().reverse()
+    if (opts.cursor) {
+      const index = tasks.findIndex((task) => task.taskId === opts.cursor)
+      tasks = index === -1 ? [] : tasks.slice(index + 1)
+    }
+    return opts.limit ? tasks.slice(0, opts.limit) : tasks
+  })
+  const count = vi.fn((opts: any = {}) => TASKS.filter(
+    (t) => (!opts.wsId || t.wsId === opts.wsId) && (!opts.status || t.status === opts.status),
+  ).length)
   const get = vi.fn((id: string) => TASKS.find((t) => t.taskId === id) ?? null)
   const runningCount = vi.fn(() => TASKS.filter((task) => task.status === 'running').length)
   const svc = {
-    headlessTasks: { list, get, runningCount },
+    headlessTasks: { list, count, get, runningCount },
     headlessCapacity: 8,
     headlessLogsDir: logsDir,
     adapters: { get: vi.fn(() => null) },
   } as unknown as WorkspaceService
-  return { app: createHeadlessRoutes(svc), list, get }
+  return { app: createHeadlessRoutes(svc), list, count, get }
 }
 
 describe('GET /api/headless', () => {
@@ -39,13 +47,28 @@ describe('GET /api/headless', () => {
     expect(r.status).toBe(200)
     const body = (await r.json()) as any
     expect(body.tasks.length).toBe(2)
+    expect(body.page).toEqual({ total: 2, hasMore: false, nextCursor: null })
+    expect(body.summary).toEqual({ done: 1, needsAttention: 0 })
     expect(body.capacity).toEqual({ running: 1, limit: 8 })
   })
 
   it('passes wsId/status/limit filters through to the registry', async () => {
     const { app, list } = build()
     await app.request('/?wsId=w1&status=done&limit=5')
-    expect(list).toHaveBeenCalledWith({ wsId: 'w1', status: 'done', limit: 5 })
+    expect(list).toHaveBeenCalledWith({ wsId: 'w1', status: 'done', cursor: undefined, limit: 6 })
+  })
+
+  it('returns a stable next-page cursor', async () => {
+    const { app } = build()
+    const first = await app.request('/?limit=1')
+    const firstBody = (await first.json()) as any
+    expect(firstBody.tasks.map((task: any) => task.taskId)).toEqual(['t2'])
+    expect(firstBody.page).toEqual({ total: 2, hasMore: true, nextCursor: 't2' })
+
+    const second = await app.request('/?limit=1&cursor=t2')
+    const secondBody = (await second.json()) as any
+    expect(secondBody.tasks.map((task: any) => task.taskId)).toEqual(['t1'])
+    expect(secondBody.page).toEqual({ total: 2, hasMore: false, nextCursor: null })
   })
 
   it('ignores an invalid status (→ undefined)', async () => {

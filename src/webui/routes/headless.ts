@@ -58,7 +58,9 @@ async function readStructured(path: string): Promise<HeadlessStructuredOutput | 
 export function createHeadlessRoutes(svc: WorkspaceService): Hono {
   const app = new Hono()
 
-  // GET /api/headless?wsId=&status=&limit=  → tasks, newest-first.
+  // GET /api/headless?wsId=&status=&limit=&cursor= → tasks, newest-first.
+  // Cursor is the last task id from the previous page. Unlike an offset it
+  // remains stable while polling inserts newer runs at the front.
   app.get('/', (c) => {
     const wsId = c.req.query('wsId') || undefined
     const statusRaw = c.req.query('status')
@@ -68,8 +70,32 @@ export function createHeadlessRoutes(svc: WorkspaceService): Hono {
         : undefined
     const limitRaw = Number(c.req.query('limit'))
     const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 500) : 100
+    const cursor = c.req.query('cursor') || undefined
+    const filters = { wsId, status }
+    const page = svc.headlessTasks.list({ ...filters, cursor, limit: limit + 1 })
+    const hasMore = page.length > limit
+    const tasks = hasMore ? page.slice(0, limit) : page
+    const total = svc.headlessTasks.count(filters)
     return c.json({
-      tasks: svc.headlessTasks.list({ wsId, status, limit }),
+      tasks,
+      page: {
+        total,
+        hasMore,
+        nextCursor: hasMore ? tasks.at(-1)?.taskId ?? null : null,
+      },
+      summary: {
+        done:
+          !status || status === 'done'
+            ? svc.headlessTasks.count({ wsId, status: 'done' })
+            : 0,
+        needsAttention:
+          (!status || status === 'failed'
+            ? svc.headlessTasks.count({ wsId, status: 'failed' })
+            : 0) +
+          (!status || status === 'interrupted'
+            ? svc.headlessTasks.count({ wsId, status: 'interrupted' })
+            : 0),
+      },
       capacity: {
         running: svc.headlessTasks.runningCount(),
         limit: svc.headlessCapacity,

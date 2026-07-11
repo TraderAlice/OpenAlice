@@ -50,6 +50,8 @@ export interface HeadlessStructuredOutput {
 
 export interface HeadlessListSnapshot {
   tasks: HeadlessTaskRecord[]
+  page: { total: number; hasMore: boolean; nextCursor: string | null }
+  summary: { done: number; needsAttention: number }
   capacity: { running: number; limit: number }
 }
 
@@ -70,19 +72,20 @@ export interface HeadlessOutput {
 
 export const headlessApi = {
   async snapshot(
-    opts: { wsId?: string; status?: HeadlessTaskStatus; limit?: number } = {},
+    opts: { wsId?: string; status?: HeadlessTaskStatus; limit?: number; cursor?: string } = {},
   ): Promise<HeadlessListSnapshot> {
     const q = new URLSearchParams()
     if (opts.wsId) q.set('wsId', opts.wsId)
     if (opts.status) q.set('status', opts.status)
     if (opts.limit) q.set('limit', String(opts.limit))
+    if (opts.cursor) q.set('cursor', opts.cursor)
     const qs = q.toString()
     return fetchJson<HeadlessListSnapshot>(`/api/headless${qs ? `?${qs}` : ''}`)
   },
 
   /** List headless runs across all workspaces, newest-first. */
   async list(
-    opts: { wsId?: string; status?: HeadlessTaskStatus; limit?: number } = {},
+    opts: { wsId?: string; status?: HeadlessTaskStatus; limit?: number; cursor?: string } = {},
   ): Promise<HeadlessTaskRecord[]> {
     return (await this.snapshot(opts)).tasks
   },

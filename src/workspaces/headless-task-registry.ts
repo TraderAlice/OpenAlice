@@ -176,7 +176,14 @@ export class HeadlessTaskRegistry {
 
   /** Records newest-first, optionally filtered. */
   list(
-    opts: { wsId?: string; issueId?: string; status?: HeadlessTaskStatus; limit?: number } = {},
+    opts: {
+      wsId?: string
+      issueId?: string
+      status?: HeadlessTaskStatus
+      /** Return records older than this task in the filtered newest-first view. */
+      cursor?: string
+      limit?: number
+    } = {},
   ): HeadlessTaskRecord[] {
     let out = this.tasks.filter(
       (t) =>
@@ -185,7 +192,28 @@ export class HeadlessTaskRegistry {
         (!opts.status || t.status === opts.status),
     )
     out = out.slice().reverse() // newest-first
+    if (opts.cursor) {
+      const cursorIndex = out.findIndex((task) => task.taskId === opts.cursor)
+      // A cursor can disappear when the bounded registry prunes old records.
+      // Returning an empty page is safer than silently restarting at page one
+      // and duplicating rows in a polling client.
+      out = cursorIndex === -1 ? [] : out.slice(cursorIndex + 1)
+    }
     return opts.limit && opts.limit > 0 ? out.slice(0, opts.limit) : out
+  }
+
+  /** Count filtered records without materializing them over the HTTP boundary. */
+  count(opts: { wsId?: string; issueId?: string; status?: HeadlessTaskStatus } = {}): number {
+    return this.tasks.reduce(
+      (count, task) => count + (
+        (!opts.wsId || task.wsId === opts.wsId) &&
+        (!opts.issueId || task.issueId === opts.issueId) &&
+        (!opts.status || task.status === opts.status)
+          ? 1
+          : 0
+      ),
+      0,
+    )
   }
 
   runningCount(): number {
