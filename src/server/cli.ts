@@ -41,6 +41,7 @@ import { extractMcpShape, wrapToolExecute } from '../core/mcp-export.js'
 import { type CliExport, getExport, mappedToolNames } from './cli-commands.js'
 import { resolveInboxOrigin } from './inbox-origin.js'
 import { extractTradeDecisionRefs } from './trade-provenance.js'
+import { createWorkspaceConversationControl } from '../workspaces/conversation-control.js'
 
 export interface CliGatewayDeps {
   toolCenter: ToolCenter
@@ -89,6 +90,7 @@ export function registerCliRoutes(app: Hono, deps: CliGatewayDeps): void {
         inboxStore,
         entityStore,
         ...(svc ? { provenanceStore: svc.provenanceStore } : {}),
+        ...(svc ? { conversation: createWorkspaceConversationControl(svc) } : {}),
         // Lets workspace_path resolve ANY peer's dir (not just the caller) —
         // the in-workspace cross-workspace addressing path. Shared with the
         // mcp.ts build site so the two never drift.

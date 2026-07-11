@@ -127,7 +127,7 @@ type ArtifactRef =
 
 interface ProvenanceEdge {
   artifact: ArtifactRef
-  action: 'created' | 'updated' | 'commented' | 'sent' | 'decided'
+  action: 'created' | 'updated' | 'commented' | 'sent' | 'decided' | 'reconstructed'
   origin: SessionOrigin | { kind: 'human' } | { kind: 'external'; system: string }
   at: number
 }
@@ -427,13 +427,29 @@ Phase 2 consumes Phase 1; it does not infer provenance independently. It owns:
 - business-level CLI and UI actions for Inbox, Issues, reports, and trades;
 - labeling reconstructed answers so they cannot impersonate an original author.
 
-Existing collaboration experiments remain candidates for Phase 2. They should
-be rebased onto the Phase 1 resolver/index instead of becoming a second source
-of origin rules.
+The embedded generic entry point is:
+
+```bash
+alice-workspace conversation ask --target '<typed JSON target>' --prompt '<question>'
+alice-workspace conversation read --task-id <taskId>
+```
+
+`target.kind` supports `resume`, `workspace`, `inbox`, `issue`, `report`, and
+`trade-decision`. Artifact targets always consult the Phase 1 index. The ask
+result reports `resolution.mode`; read returns normalized assistant text,
+compact tool/error activity, and the real runtime status. A response may carry
+usable assistant text and runtime errors together; consumers preserve both
+rather than rewriting failure into success.
+
+The first fresh reconstruction appends a `reconstructed` occurrence to the
+artifact. Later questions about that same otherwise-unattributed artifact
+continue the reconstruction Session instead of recruiting another worker, but
+the resolution mode remains `reconstructed`: continuity does not turn that
+worker into the historical author.
 
 ## Phase 2 Feature Design Skeleton
 
-All future convenience features should delegate to one provenance resolver:
+All future convenience wrappers should delegate to the same shipped resolver:
 
 ```text
 inbox ask <entry>             -> sender Session or reconstructed Workspace Session
@@ -445,7 +461,7 @@ trade ask <order> --decision  -> initiating Session
 trade ask <order> --execution -> UTA/broker evidence, not an AI conversation
 ```
 
-Cross-Session collaboration uses the same contract: an agent asks a known peer
+Cross-Session collaboration uses one contract: an agent asks a known peer
 by `resumeId`; without one, it asks the peer Workspace to create a fresh Session.
 No feature should invent its own meaning of “the agent who made this.”
 
@@ -460,10 +476,10 @@ No feature should invent its own meaning of “the agent who made this.”
 | Report | Workspace path and git repository | Revision-level creation/update attribution | Ask writer of the selected revision |
 | Trade | UTA operation/order authority | Alice Session decision correlation across the UTA boundary | Ask initiator; route execution questions to UTA evidence |
 
-Complete the Phase 1 trail/index before layering collaboration or one-click
-features on individual surfaces. This document is the semantic owner; surface
-code and API shapes should point back here rather than restating the rules
-differently.
+Phase 1 remains the only source of attribution. Business-specific one-click
+features may wrap the generic conversation command, but must not reimplement
+origin selection. This document is the semantic owner; surface code and API
+shapes should point back here rather than restating the rules differently.
 
 ## Load-Bearing Paths
 
@@ -473,6 +489,8 @@ differently.
 | `src/workspaces/headless-task-registry.ts` | Per-turn history and Session lineage |
 | `src/workspaces/session-registry.ts` | Interactive materializations and resume indexes |
 | `src/workspaces/service.ts` | Dispatch, resume, and per-Session concurrency |
+| `src/workspaces/conversation-control.ts` | Provenance resolution plus exact/reconstructed headless dispatch |
+| `src/tool/conversation.ts` | Embedded business-target ask/read CLI tools |
 | `src/core/inbox-store.ts` | Immutable notification records and sender provenance |
 | `src/server/inbox-origin.ts` | Server-side run/session attribution |
 | `src/workspaces/issues/declaration.ts` | Workspace-local Issue declaration |

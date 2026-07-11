@@ -44,7 +44,7 @@ export const artifactRefSchema = z.discriminatedUnion('kind', [
 ])
 export type ArtifactRef = z.infer<typeof artifactRefSchema>
 
-export const provenanceActions = ['created', 'updated', 'commented', 'sent', 'decided'] as const
+export const provenanceActions = ['created', 'updated', 'commented', 'sent', 'decided', 'reconstructed'] as const
 export type ProvenanceAction = (typeof provenanceActions)[number]
 
 const originSchema = z.union([

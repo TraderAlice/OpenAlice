@@ -79,6 +79,34 @@ For Issue/report keys, `--workspace-id` defaults to your current Workspace.
 `resumeId` is the follow-up handle; `taskId` is only execution evidence. A
 missing origin is not permission to pick an arbitrary old Session.
 
+**Ask who was responsible** — resolve the business target, then dispatch a
+headless follow-up without leaving the embedded Workspace CLI:
+
+```bash
+alice-workspace conversation ask \
+  --target '{"kind":"issue","workspaceId":"<ws>","issueId":"<id>"}' \
+  --prompt 'Why did you create this issue?'
+alice-workspace conversation ask \
+  --target '{"kind":"inbox","inboxEntryId":"<id>","workspaceId":"<ws>"}' \
+  --prompt 'Why did you send this?'
+alice-workspace conversation ask \
+  --target '{"kind":"trade-decision","accountId":"<account>","decisionId":"<commit>"}' \
+  --prompt 'What thesis justified this decision?'
+alice-workspace conversation read --task-id <taskId>
+```
+
+Inspect `resolution.mode` on the ask result:
+
+- `exact` continues the attributable product Session;
+- `reconstructed` starts a fresh worker only in the target's known Workspace,
+  records it against the artifact, and reuses it on later questions without
+  letting it impersonate the original author;
+- `unavailable` means an attributed Session cannot resume, or no safe
+  Workspace target exists. Do not work around it by picking another old
+  Session. Poll `conversation read` until `status` leaves `running`; a runtime
+  may still return usable `assistantText` alongside error blocks, so preserve
+  both the status and the answer.
+
 > **Editing a peer is interactive-only.** Reading another workspace is always OK.
 > *Editing* one means reaching outside your own workspace — only do that in an
 > interactive session where a person is present to approve it. An autonomous /

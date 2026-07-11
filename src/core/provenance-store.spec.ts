@@ -67,6 +67,26 @@ describe('ArtifactProvenanceStore', () => {
     expect(value.list()).toHaveLength(1)
   })
 
+  it('persists a reconstruction Session without changing historical authorship', async () => {
+    const { value } = await store()
+    await value.append({
+      artifact: { kind: 'report', workspaceId: 'ws-1', path: 'legacy.md' },
+      action: 'reconstructed',
+      origin: {
+        kind: 'session', workspaceId: 'ws-1', resumeId: 'resume-reconstruction', agent: 'pi',
+      },
+      at: 30,
+    })
+    expect(value.latest({
+      artifact: { kind: 'report', workspaceId: 'ws-1', path: 'legacy.md' },
+      action: 'reconstructed',
+    })).toMatchObject({ origin: { resumeId: 'resume-reconstruction' } })
+    expect(value.latest({
+      artifact: { kind: 'report', workspaceId: 'ws-1', path: 'legacy.md' },
+      action: 'created',
+    })).toBeNull()
+  })
+
   it('derives a safe Session origin without exposing native ids', () => {
     expect(sessionOriginFromInboxOrigin('ws-1', {
       kind: 'headless',

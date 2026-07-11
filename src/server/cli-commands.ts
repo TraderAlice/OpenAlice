@@ -185,6 +185,10 @@ export const CLI_EXPORTS: Record<string, CliExport> = {
       provenance: {
         show: 'provenance_show',
       },
+      conversation: {
+        ask: 'conversation_ask',
+        read: 'conversation_read',
+      },
     },
   },
   uta: {

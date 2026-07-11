@@ -603,6 +603,7 @@ const PROVENANCE_ACTION_LABEL: Record<IssueProvenanceRecord['action'], string> =
   commented: 'Commented',
   sent: 'Sent',
   decided: 'Decided',
+  reconstructed: 'Reconstructed',
 }
 
 function ProvenanceTimeline({

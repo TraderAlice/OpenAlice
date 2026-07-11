@@ -28,11 +28,99 @@ import type { Tool } from 'ai'
 import type { IInboxStore, InboxEntry, InboxOrigin } from './inbox-store.js'
 import type { IEntityStore } from './entity-store.js'
 import type { IProvenanceStore } from './provenance-store.js'
+import type { ArtifactRef, SessionOrigin } from './provenance-store.js'
 // TYPE-ONLY: the global-issue-board shapes. Importing them as types keeps
 // core/ free of any runtime dependency on the workspaces/ module (no
 // core→workspaces coupling), while letting the board reader below be typed.
 import type { IssuesSnapshot, IssueDetail, WikilinkIssueRef } from '../workspaces/issues/board.js'
 import type { WorkspaceSessionDirectory } from '../workspaces/session-directory.js'
+import type { HeadlessStructuredOutput } from '../workspaces/headless-output.js'
+import type { HeadlessTaskStatus } from '../workspaces/headless-task-registry.js'
+
+export type WorkspaceConversationTarget =
+  | { kind: 'resume'; resumeId: string }
+  | { kind: 'workspace'; workspaceId: string }
+  | { kind: 'inbox'; inboxEntryId: string; workspaceId?: string }
+  | {
+      kind: 'issue'
+      workspaceId: string
+      issueId: string
+      action?: 'created' | 'updated' | 'commented'
+    }
+  | {
+      kind: 'report'
+      workspaceId: string
+      path: string
+      revision?: string
+      action?: 'created' | 'updated' | 'sent'
+    }
+  | {
+      kind: 'trade-decision'
+      accountId: string
+      decisionId: string
+      workspaceId?: string
+    }
+
+export type WorkspaceConversationResolution =
+  | {
+      mode: 'exact'
+      origin: SessionOrigin
+      artifact?: ArtifactRef
+    }
+  | {
+      mode: 'reconstructed'
+      workspaceId: string
+      reason: 'explicit-workspace' | 'missing-origin' | 'non-session-origin' | 'prior-reconstruction' | 'unavailable-reconstruction'
+      /** Present when continuing a previously recruited reconstruction worker. */
+      origin?: SessionOrigin
+      artifact?: ArtifactRef
+    }
+  | {
+      mode: 'unavailable'
+      reason: 'missing-session' | 'missing-native-session' | 'deleted-workspace' | 'missing-workspace'
+      attributedOrigin?: SessionOrigin
+      artifact?: ArtifactRef
+    }
+
+export interface WorkspaceConversationTask {
+  readonly taskId: string
+  readonly resumeId: string
+  readonly parentTaskId?: string
+  readonly workspaceId: string
+  readonly issueId?: string
+  readonly agent: string
+  readonly status: HeadlessTaskStatus
+  readonly startedAt: number
+  readonly finishedAt?: number
+  readonly durationMs?: number
+  readonly error?: string
+  readonly structured: HeadlessStructuredOutput | null
+}
+
+export type WorkspaceConversationAskResult =
+  | {
+      readonly status: 'dispatched'
+      readonly taskId: string
+      readonly resumeId: string
+      readonly workspaceId: string
+      readonly workspace: string
+      readonly agent: string
+      readonly resolution: Exclude<WorkspaceConversationResolution, { mode: 'unavailable' }>
+    }
+  | {
+      readonly status: 'unavailable'
+      readonly resolution: Extract<WorkspaceConversationResolution, { mode: 'unavailable' }>
+    }
+
+export interface WorkspaceConversationControl {
+  ask(input: {
+    readonly prompt: string
+    readonly timeoutMs: number
+    readonly target: WorkspaceConversationTarget
+    readonly agent?: string
+  }): Promise<WorkspaceConversationAskResult>
+  read(taskId: string): Promise<WorkspaceConversationTask | null>
+}
 
 // ==================== Context handed to factories ====================
 
@@ -75,6 +163,9 @@ export interface WorkspaceToolContext {
     agent: string
     resumable: boolean
   } | null
+  /** Embedded provenance-aware headless conversation control; never routes
+   * through the public HTTP API. */
+  conversation?: WorkspaceConversationControl
   /** Agent-INVISIBLE run provenance, resolved server-side from the
    *  `x-openalice-run` header by the MCP / CLI route (never supplied by the
    *  agent). Factories pass it through to call sites (e.g. inbox_push →

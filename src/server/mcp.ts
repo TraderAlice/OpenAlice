@@ -17,6 +17,7 @@ import type { InboxOrigin } from '../core/inbox-store.js'
 import { extractMcpShape, wrapToolExecute } from '../core/mcp-export.js'
 import { registerCliRoutes } from './cli.js'
 import { resolveInboxOrigin } from './inbox-origin.js'
+import { createWorkspaceConversationControl } from '../workspaces/conversation-control.js'
 
 /**
  * MCP Plugin — exposes OpenAlice tools via Streamable HTTP, plus the CLI gateway.
@@ -103,6 +104,7 @@ export class McpPlugin implements Plugin {
         inboxStore,
         entityStore,
         ...(svc ? { provenanceStore: svc.provenanceStore } : {}),
+        ...(svc ? { conversation: createWorkspaceConversationControl(svc) } : {}),
         // Parity with the CLI gateway so external MCP consumers get the same
         // workspace_path resolution — shared helper, so the two can't drift.
         resolveWorkspace: makeWorkspaceResolver(getWorkspaceService),

@@ -154,6 +154,8 @@ export interface WorkspaceService {
   readonly transcriptWatcher: TranscriptWatcher;
   /** Resolve the preferred/recent durable Chat Workspace, creating one starter when absent. */
   resolveOrCreateChatWorkspace(preferredWorkspaceId?: string | null): Promise<ChatWorkspaceResolution>;
+  /** Resolve the configured Workspace runtime, then fall back to its first enabled runtime. */
+  resolveDefaultAgentId(meta: WorkspaceMeta): Promise<string | undefined>;
   resolveAdapter(meta: WorkspaceMeta, agentId?: string): CliAdapter;
   publicMeta(w: WorkspaceMeta): Promise<unknown>;
   /**
@@ -443,10 +445,13 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
    * setting first, then the interactive workspace default for backwards
    * continuity, then the workspace's first enabled runtime.
    */
-  const resolveIssueDefaultAgentId = async (wsMeta: WorkspaceMeta): Promise<string | undefined> =>
-    validRuntimeForWorkspace(wsMeta, await readIssueDefaultAgent().catch(() => null)) ??
+  const resolveDefaultAgentId = async (wsMeta: WorkspaceMeta): Promise<string | undefined> =>
     validRuntimeForWorkspace(wsMeta, await readWorkspaceDefaultAgent().catch(() => null)) ??
     firstWorkspaceRuntime(wsMeta);
+
+  const resolveIssueDefaultAgentId = async (wsMeta: WorkspaceMeta): Promise<string | undefined> =>
+    validRuntimeForWorkspace(wsMeta, await readIssueDefaultAgent().catch(() => null)) ??
+    await resolveDefaultAgentId(wsMeta);
 
   /**
    * Single source of truth for "given a workspace + adapter + resume intent,
@@ -1536,6 +1541,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     pool,
     transcriptWatcher,
     resolveOrCreateChatWorkspace: resolveOrCreateChatWorkspaceMethod,
+    resolveDefaultAgentId,
     resolveAdapter,
     publicMeta,
     detectAgents,

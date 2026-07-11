@@ -26,7 +26,7 @@ export type IssueExecution =
   | { mode: 'fresh' }
   | { mode: 'resume'; resumeId: string }
 
-export type IssueProvenanceAction = 'created' | 'updated' | 'commented' | 'sent' | 'decided'
+export type IssueProvenanceAction = 'created' | 'updated' | 'commented' | 'sent' | 'decided' | 'reconstructed'
 export type IssueProvenanceOrigin =
   | {
       kind: 'session'

@@ -24,6 +24,7 @@ import { entityUpsertFactory } from '../tool/entity-upsert.js'
 import { entitySearchFactory } from '../tool/entity-search.js'
 import { issueToolFactories } from '../tool/issue-tools.js'
 import { provenanceShowFactory } from '../tool/provenance-show.js'
+import { conversationToolFactories } from '../tool/conversation.js'
 import { createTradingTools } from '../tool/trading.js'
 
 /**
@@ -91,6 +92,7 @@ describe('CLI_EXPORTS — workspace export (scoped collaboration tools)', () => 
   wtc.register(entitySearchFactory)
   for (const f of issueToolFactories) wtc.register(f)
   wtc.register(provenanceShowFactory)
+  for (const f of conversationToolFactories) wtc.register(f)
   const built = wtc.build({
     workspaceId: 'ws-test',
     workspaceLabel: 'test',
