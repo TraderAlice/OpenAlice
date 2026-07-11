@@ -48,6 +48,56 @@ describe('analyzeOrderFlowContext', () => {
       high: expect.any(Number),
       low: expect.any(Number),
     }))
+    expect(result.summary).toMatchObject({
+      fidelity: 'bar_proxy',
+      isApproximation: true,
+      currentState: {
+        bar: {
+          index: 0,
+          sourceIndex: 0,
+          timestamp: '2024-01-01 09:00:00',
+          close: 104,
+          barCompletion: 'unknown',
+        },
+        delta: {
+          status: 'available',
+          direction: 'positive',
+          normalizedStrength: 1,
+          delta: 3000,
+          cvd: 3000,
+          cvdDirection: 'positive',
+          recentCvdTendency: 'flat',
+          recentCvdChange: 0,
+          sampleCount: 1,
+        },
+        profile: {
+          status: 'available',
+          close: 104,
+          poc: expect.any(Number),
+          distanceFromPoc: expect.any(Number),
+          pocRelation: expect.stringMatching(/above|inside|below/),
+          valueArea: {
+            high: expect.any(Number),
+            low: expect.any(Number),
+            location: expect.stringMatching(/above|inside|below/),
+            distanceToValueArea: expect.any(Number),
+          },
+          sampleCount: 3,
+        },
+      },
+      methods: {
+        delta: 'lower_timeframe_ohlcv_signed_volume',
+        deltaStrength: 'absolute_delta_ratio',
+        cvdTendency: 'endpoint_change',
+        cvdTendencyLookback: 5,
+        profileLocation: 'latest_close_vs_window_profile',
+      },
+      window: {
+        targetBarCount: 1,
+        intrabarCount: 3,
+        targetIndexOffset: 0,
+      },
+    })
     expect(result.meta).toMatchObject({
       intrabarInterval: '1m',
       intrabarTimeframe: '1m',
@@ -80,6 +130,74 @@ describe('analyzeOrderFlowContext', () => {
 
     expect(result.delta?.bars).toHaveLength(1)
     expect(result.profile).toBeUndefined()
+    expect(result.summary).toBeUndefined()
+  })
+
+  it('returns the same interpreted state without raw views in summary mode', async () => {
+    const getBars = vi.fn()
+      .mockResolvedValueOnce({
+        bars: [
+          { date: '2024-01-01 09:00:00', open: 100, high: 105, low: 99, close: 104, volume: 1000 },
+        ],
+        meta: { symbol: 'AAPL', from: '2024-01-01', to: '2024-01-01', bars: 1 },
+      } as BarsResult)
+      .mockResolvedValueOnce({
+        bars: [
+          { date: '2024-01-01 09:00:00', open: 100, high: 105, low: 99, close: 104, volume: 1000 },
+        ],
+        meta: { symbol: 'AAPL', from: '2024-01-01', to: '2024-01-01', bars: 1 },
+      } as BarsResult)
+    const barService = { searchBarSources: vi.fn(), getBars } as unknown as BarService
+
+    const result = await analyzeOrderFlowContext(barService, {
+      barId: 'tradingview|AAPL',
+      assetClass: 'equity',
+      interval: '15m',
+      count: 1,
+      mode: 'summary',
+      numBins: 5,
+    })
+
+    expect(result.status).toBe('ok')
+    expect(result.delta).toBeUndefined()
+    expect(result.profile).toBeUndefined()
+    expect(result.summary).toMatchObject({
+      fidelity: 'bar_proxy',
+      currentState: {
+        bar: { timestamp: '2024-01-01 09:00:00', barCompletion: 'unknown' },
+        delta: { status: 'available', delta: 1000 },
+        profile: { status: 'available', close: 104 },
+      },
+    })
+  })
+
+  it('preserves profile-only mode without adding delta or summary views', async () => {
+    const getBars = vi.fn()
+      .mockResolvedValueOnce({
+        bars: [
+          { date: '2024-01-01 09:00:00', open: 100, high: 105, low: 99, close: 104, volume: 1000 },
+        ],
+        meta: { symbol: 'AAPL', from: '2024-01-01', to: '2024-01-01', bars: 1 },
+      } as BarsResult)
+      .mockResolvedValueOnce({
+        bars: [
+          { date: '2024-01-01 09:00:00', open: 100, high: 105, low: 99, close: 104, volume: 1000 },
+        ],
+        meta: { symbol: 'AAPL', from: '2024-01-01', to: '2024-01-01', bars: 1 },
+      } as BarsResult)
+    const barService = { searchBarSources: vi.fn(), getBars } as unknown as BarService
+
+    const result = await analyzeOrderFlowContext(barService, {
+      barId: 'tradingview|AAPL',
+      assetClass: 'equity',
+      interval: '15m',
+      count: 1,
+      mode: 'profile',
+    })
+
+    expect(result.profile).toEqual(expect.objectContaining({ bins: expect.any(Array) }))
+    expect(result.delta).toBeUndefined()
+    expect(result.summary).toBeUndefined()
   })
 
   it('chooses TradingView 3m intrabars for a long 1h window', async () => {
@@ -146,12 +264,63 @@ describe('analyzeOrderFlowContext', () => {
       error: 'No target bars returned for the requested window',
       delta: { bars: [] },
       profile: { bins: [], poc: null, valueArea: null },
+      summary: {
+        fidelity: 'bar_proxy',
+        isApproximation: true,
+        currentState: {
+          bar: null,
+          delta: { status: 'unavailable', reason: 'missing_target_bars', sampleCount: 0 },
+          profile: { status: 'unavailable', reason: 'missing_target_bars', sampleCount: 0 },
+        },
+      },
       meta: {
         intrabarCount: 0,
         targetBars: 0,
         isApproximation: true,
       },
     })
+  })
+
+  it('preserves no-intrabars status and returns an honest summary envelope', async () => {
+    const getBars = vi.fn()
+      .mockResolvedValueOnce({
+        bars: [
+          { date: '2024-01-01 09:00:00', open: 100, high: 105, low: 99, close: 104, volume: 1000 },
+        ],
+        meta: { symbol: 'AAPL', from: '2024-01-01', to: '2024-01-01', bars: 1 },
+      } as BarsResult)
+      .mockResolvedValueOnce({
+        bars: [],
+        meta: { symbol: 'AAPL', from: '', to: '', bars: 0 },
+      } as BarsResult)
+    const barService = { searchBarSources: vi.fn(), getBars } as unknown as BarService
+
+    const result = await analyzeOrderFlowContext(barService, {
+      barId: 'tradingview|AAPL',
+      assetClass: 'equity',
+      interval: '15m',
+      mode: 'summary',
+    })
+
+    expect(result).toMatchObject({
+      status: 'no_intrabars',
+      error: 'No intrabar data (1m) returned for the target window',
+      summary: {
+        fidelity: 'bar_proxy',
+        currentState: {
+          bar: {
+            index: 0,
+            sourceIndex: 0,
+            timestamp: '2024-01-01 09:00:00',
+            barCompletion: 'unknown',
+          },
+          delta: { status: 'unavailable', reason: 'missing_intrabars', sampleCount: 0 },
+          profile: { status: 'unavailable', reason: 'missing_intrabars', sampleCount: 0 },
+        },
+      },
+    })
+    expect(result.delta).toBeUndefined()
+    expect(result.profile).toBeUndefined()
   })
 
   it('reports target index offset when supplied bars are capped to the supported intrabar window', async () => {
@@ -176,12 +345,14 @@ describe('analyzeOrderFlowContext', () => {
       assetClass: 'equity',
       interval: '1000h',
       count: targetBars.length,
-      mode: 'delta',
+      mode: 'summary',
       targetBars,
     })
 
     expect(result.status).toBe('ok')
     expect(result.meta.targetIndexOffset).toBe(3)
     expect(result.meta.targetBars).toBe(119)
+    expect(result.summary?.window.targetIndexOffset).toBe(3)
+    expect(result.summary?.currentState.bar).toMatchObject({ index: 118, sourceIndex: 121 })
   })
 })

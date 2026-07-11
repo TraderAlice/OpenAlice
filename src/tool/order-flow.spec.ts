@@ -33,6 +33,12 @@ describe('createOrderFlowTools', () => {
     }).success).toBe(true)
     expect(schema.safeParse({
       barId: 'tradingview|AAPL',
+      assetClass: 'equity',
+      interval: '15m',
+      mode: 'summary',
+    }).success).toBe(true)
+    expect(schema.safeParse({
+      barId: 'tradingview|AAPL',
       interval: '15m',
       targetInterval: '15m',
     }).success).toBe(false)
@@ -97,5 +103,8 @@ describe('createOrderFlowTools', () => {
     expect(tools.analyzeOrderFlowContext.description).toContain('approximation-only')
     expect(tools.analyzeOrderFlowContext.description).toContain('degradationReason')
     expect(tools.analyzeOrderFlowContext.description).toContain('MAX_BARS=5000')
+    expect(tools.analyzeOrderFlowContext.description).toContain('bar_proxy')
+    expect(tools.analyzeOrderFlowContext.description).toContain('bar completion is unknown')
+    expect(tools.analyzeOrderFlowContext.description).toContain('summary: structured summary without raw delta bars or profile bins')
   })
 })

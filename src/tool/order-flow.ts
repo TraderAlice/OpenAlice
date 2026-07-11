@@ -27,10 +27,12 @@ export function createOrderFlowTools(deps: OrderFlowToolsDeps) {
 Returns approximate delta volume / CVD and volume profile from lower-timeframe
 intrabars, plus precision metadata (intrabar interval, truncation,
 degradationReason, coverage, low-confidence bars). This is window-scoped and
-approximation-only, not true tick-by-tick order flow.
+approximation-only, not true tick-by-tick order flow. Summary-bearing responses
+identify this fidelity as bar_proxy; latest bar completion is unknown.
 
 Modes:
-  - context: delta/CVD plus volume profile
+  - context: delta/CVD plus volume profile and structured summary
+  - summary: structured summary without raw delta bars or profile bins
   - delta: delta/CVD only
   - profile: volume profile only
 
@@ -46,8 +48,8 @@ sources may use internal 3m intrabars; other sources avoid 3m.`,
           .describe('Requested number of most-recent target bars (default 100; dynamically capped for intrabar safety)'),
         start: z.string().optional().describe('Start date (YYYY-MM-DD)'),
         end: z.string().optional().describe('End date (YYYY-MM-DD)'),
-        mode: z.enum(['context', 'delta', 'profile']).optional()
-          .describe('context returns both delta and profile; delta/profile return only that view'),
+        mode: z.enum(['context', 'summary', 'delta', 'profile']).optional()
+          .describe('context returns raw views and summary; summary omits raw views; delta/profile return only that view'),
         numBins: z.number().int().positive().optional().describe('Volume profile bin count (default 20)'),
       }).strict(),
 

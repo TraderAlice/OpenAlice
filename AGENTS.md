@@ -174,3 +174,19 @@ the tagline, pillars, or other marketing copy.
 - `decimal.js` for financial arithmetic.
 - Prefer structured Workspace launcher logs; the main process currently uses
   `console` and does not have a universal pino sink.
+
+## Agent Skills
+
+### Issue Tracker
+
+Specs and issues are tracked as local Markdown under `.scratch/`. See
+`docs/agents/issue-tracker.md`.
+
+### Triage Labels
+
+Triage uses the five canonical role labels. See `docs/agents/triage-labels.md`.
+
+### Domain Docs
+
+This repo uses a single-context glossary and system-level ADRs. See
+`docs/agents/domain.md`.

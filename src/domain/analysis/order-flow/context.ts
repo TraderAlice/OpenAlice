@@ -6,8 +6,9 @@ import {
 } from './delta-volume.js'
 import { confidenceForCoverage, type IntrabarPlan } from './intrabar-plan.js'
 import { loadIntrabarWindow } from './intrabar-window.js'
+import { buildOrderFlowStructureSummary, type OrderFlowStructureSummary } from './summary.js'
 
-export type OrderFlowContextMode = 'context' | 'delta' | 'profile'
+export type OrderFlowContextMode = 'context' | 'summary' | 'delta' | 'profile'
 export type OrderFlowContextStatus = 'ok' | 'no_target_bars' | 'no_intrabars'
 
 export interface OrderFlowSourceRequest {
@@ -66,6 +67,7 @@ export interface OrderFlowContextAnalysis {
   error?: string
   delta?: OrderFlowDeltaContext
   profile?: OrderFlowProfileContext
+  summary?: OrderFlowStructureSummary
   meta: OrderFlowMeta
 }
 
@@ -82,6 +84,10 @@ function wantsDelta(mode: OrderFlowContextMode): boolean {
 
 function wantsProfile(mode: OrderFlowContextMode): boolean {
   return mode === 'context' || mode === 'profile'
+}
+
+function wantsSummary(mode: OrderFlowContextMode): boolean {
+  return mode === 'context' || mode === 'summary'
 }
 
 function baseMeta(params: {
@@ -137,6 +143,16 @@ export async function analyzeOrderFlowContext(
       error: 'No target bars returned for the requested window',
       delta: emptyDelta(wantsDelta(mode)),
       profile: emptyProfile(wantsProfile(mode)),
+      summary: wantsSummary(mode)
+        ? buildOrderFlowStructureSummary({
+          targetBars: [],
+          deltaBars: [],
+          profile: null,
+          intrabarCount: 0,
+          targetIndexOffset: window.targetIndexOffset,
+          unavailableReason: 'missing_target_bars',
+        })
+        : undefined,
       meta: baseMeta({
         targetMeta: window.targetMeta,
         plan: window.plan,
@@ -153,6 +169,16 @@ export async function analyzeOrderFlowContext(
       error: `No intrabar data (${window.plan.intrabarInterval}) returned for the target window`,
       delta: emptyDelta(wantsDelta(mode)),
       profile: emptyProfile(wantsProfile(mode)),
+      summary: wantsSummary(mode)
+        ? buildOrderFlowStructureSummary({
+          targetBars: window.targetBars,
+          deltaBars: [],
+          profile: null,
+          intrabarCount: 0,
+          targetIndexOffset: window.targetIndexOffset,
+          unavailableReason: 'missing_intrabars',
+        })
+        : undefined,
       meta: baseMeta({
         targetMeta: window.targetMeta,
         plan: window.plan,
@@ -163,47 +189,58 @@ export async function analyzeOrderFlowContext(
     }
   }
 
-  const delta = wantsDelta(mode)
+  const delta = (wantsDelta(mode) || wantsSummary(mode))
     ? calculateDeltaVolume({
       targetBars: window.targetBars,
       intrabars: window.intrabars,
       targetInterval: params.interval,
     })
     : undefined
-  const profile = wantsProfile(mode)
+  const profile = (wantsProfile(mode) || wantsSummary(mode))
     ? calculateVolumeProfile({
       bars: window.intrabars,
       numBins: params.numBins ?? DEFAULT_PROFILE_BINS,
     })
     : undefined
 
+  const deltaBars: OrderFlowDeltaBar[] = delta
+    ? window.targetBars.map((bar, i) => ({
+      ...bar,
+      delta: delta.deltas[i],
+      approxDelta: delta.deltas[i],
+      cumulativeDelta: delta.cumulativeDeltas[i],
+      cvd: delta.cumulativeDeltas[i],
+      deltaRatio: delta.deltaRatios[i],
+      coverage: delta.coverage[i],
+      confidence: confidenceForCoverage(delta.coverage[i]),
+      lowConfidence: delta.lowConfidenceIndices.includes(i),
+      isApproximation: true,
+    }))
+    : []
+  const profileContext: OrderFlowProfileContext | null = profile
+    ? {
+      bins: profile.bins,
+      poc: profile.poc,
+      valueArea: {
+        high: profile.valueAreaHigh,
+        low: profile.valueAreaLow,
+      },
+    }
+    : null
+
   return {
     status: 'ok',
-    delta: delta
-      ? {
-        bars: window.targetBars.map((bar, i) => ({
-          ...bar,
-          delta: delta.deltas[i],
-          approxDelta: delta.deltas[i],
-          cumulativeDelta: delta.cumulativeDeltas[i],
-          cvd: delta.cumulativeDeltas[i],
-          deltaRatio: delta.deltaRatios[i],
-          coverage: delta.coverage[i],
-          confidence: confidenceForCoverage(delta.coverage[i]),
-          lowConfidence: delta.lowConfidenceIndices.includes(i),
-          isApproximation: true,
-        })),
-      }
-      : undefined,
-    profile: profile
-      ? {
-        bins: profile.bins,
-        poc: profile.poc,
-        valueArea: {
-          high: profile.valueAreaHigh,
-          low: profile.valueAreaLow,
-        },
-      }
+    delta: wantsDelta(mode) ? { bars: deltaBars } : undefined,
+    profile: wantsProfile(mode) ? profileContext ?? undefined : undefined,
+    summary: wantsSummary(mode)
+      ? buildOrderFlowStructureSummary({
+        targetBars: window.targetBars,
+        deltaBars,
+        profile: profileContext,
+        intrabarCount: window.intrabars.length,
+        targetIndexOffset: window.targetIndexOffset,
+        degraded: window.plan.degradationReason !== undefined,
+      })
       : undefined,
     meta: baseMeta({
       targetMeta: window.targetMeta,

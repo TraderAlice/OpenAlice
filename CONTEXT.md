@@ -64,6 +64,46 @@ _Avoid_: original full object
 The rule for removing redundant same-group zones after lifecycle filtering. OpenAlice defaults to ranked overlap filtering within the same kind, direction, timeframe, and state bucket.
 _Avoid_: previous/recent as primary semantics
 
+**Delta Proxy**:
+OpenAlice's bar-derived order-flow context: approximate delta/CVD and volume profile estimated from lower-timeframe OHLCV. It excludes native order-book depth, trade prints, footprint, and trade-order lifecycle.
+_Avoid_: true order flow, tape, footprint
+
+**Order-Flow Structure Summary**:
+An agent-facing description centered on the latest target bar returned by the source, with window context and a bounded set of recent candidate events. The latest bar's completion is unknown; the summary covers profile location, delta/CVD structure, candidate divergences, candidate absorption or exhaustion, and data reliability without prescribing a trade direction or entry.
+_Avoid_: trading signal, bullish/bearish score
+
+**Order-Flow Divergence Candidate**:
+A mismatch between the last two confirmed price pivots and CVD at those same indexes: price extends to a higher high or lower low while CVD does not confirm the extension. It remains a candidate because CVD is derived from the Delta Proxy.
+_Avoid_: divergence signal, divergence at an unconfirmed window endpoint
+
+**Order-Flow Absorption Candidate**:
+A target bar whose absolute delta ratio is extreme relative to the request window but whose open-to-close progress in the delta direction is weak or opposing after ATR normalization. It is evidence of limited price response to the Delta Proxy, not proof of native-order absorption.
+_Avoid_: confirmed absorption, small full-range candle
+
+**Order-Flow Exhaustion Candidate**:
+A short sequence in which price continues to progress in one direction while same-direction delta-ratio strength fades. It describes participation decay in the Delta Proxy and is distinct from a pivot-based order-flow divergence candidate.
+_Avoid_: single low-delta bar, divergence
+
+**Profile Node**:
+A contiguous price region derived from local peaks or valleys in the lightly smoothed, window-scoped volume-profile distribution. HVNs are significant local peaks, LVNs are significant local valleys, and adjacent qualifying bins merge into one node.
+_Avoid_: highest/lowest bins by global rank
+
+**Volume Gap**:
+A contiguous run of profile bins whose volume is zero or below a window-relative floor and that lies between populated volume regions. It is more selective than an LVN and is unrelated to an OHLCV price gap.
+_Avoid_: any LVN, price gap, profile-edge tail
+
+**Order-Flow Reliability Gate**:
+A component-level availability check that suppresses order-flow candidates when their sample size, intrabar coverage, or degradation state cannot support them while preserving other usable summary facts. An unavailable component reports why it could not be evaluated, which is distinct from evaluating successfully and finding no candidate.
+_Avoid_: low-confidence candidate, whole-analysis failure
+
+**Provisional Order-Flow Candidate**:
+An absorption or exhaustion candidate whose evidence includes the latest target bar returned by the source when that bar's completion is unknown. It may be reported for freshness but must remain distinguishable from candidates based entirely on historical bars.
+_Avoid_: confirmed candidate, completed-bar event
+
+**Order-Flow Fidelity**:
+A machine-readable classification of the source evidence behind an order-flow result. `bar_proxy` means signed volume and derived structures are estimated from lower-timeframe OHLCV rather than native depth or trade prints; fidelity is distinct from confidence in the available proxy data.
+_Avoid_: confidence, precision
+
 **Liquidity Sweep**:
 A wick penetration of a liquidity target followed by body or close reclaim back inside the level. A body-confirmed break is market structure, not a sweep.
 _Avoid_: BOS, CHoCH
