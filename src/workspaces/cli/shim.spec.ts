@@ -136,6 +136,79 @@ describe('CLI launchers and payload', () => {
     }
   })
 
+  it('shows kebab-case flags and maps them back to exact schema properties', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'openalice-cli-shim-flags-'))
+    const socketPath = process.platform === 'win32'
+      ? `\\\\.\\pipe\\openalice-cli-shim-flags-${process.pid}-${Date.now()}`
+      : join(dir, 'tools.sock')
+    const invocations: Array<{ tool?: string; args?: Record<string, unknown> }> = []
+    const manifest = {
+      description: 'test manifest',
+      groups: {
+        conversation: {
+          ask: {
+            tool: 'conversation_ask',
+            description: 'Ask a peer conversation',
+            schema: {
+              type: 'object',
+              properties: {
+                resumeId: { type: 'string', description: 'Conversation identity' },
+                timeoutMs: { type: 'number', description: 'Watchdog' },
+                prompt: { type: 'string', description: 'Question' },
+              },
+              required: ['prompt'],
+            },
+          },
+        },
+      },
+    }
+    const server = createServer((req, res) => {
+      if (req.method === 'GET') {
+        res.writeHead(200, { 'content-type': 'application/json' })
+        res.end(JSON.stringify(manifest))
+        return
+      }
+      let raw = ''
+      req.setEncoding('utf8')
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        invocations.push(JSON.parse(raw))
+        res.writeHead(200, { 'content-type': 'application/json' })
+        res.end(JSON.stringify({ content: [{ type: 'text', text: '{"ok":true}' }] }))
+      })
+    })
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject)
+      server.listen(socketPath, resolve)
+    })
+    const env = {
+      ...process.env,
+      AQ_WS_ID: 'ws1',
+      OPENALICE_TOOL_SOCKET: socketPath,
+      OPENALICE_TOOL_URL: '/cli',
+    }
+    try {
+      const help = await runCli('alice-workspace', ['conversation', 'ask', '--help'], env)
+      expect(help.stdout).toContain('--resume-id <string>')
+      expect(help.stdout).toContain('--timeout-ms <number>')
+      expect(help.stdout).not.toContain('--resumeId')
+
+      await runCli('alice-workspace', [
+        'conversation', 'ask',
+        '--resume-id', 'resume-1',
+        '--timeout-ms', '300000',
+        '--prompt', 'why?',
+      ], env)
+      expect(invocations).toEqual([{
+        tool: 'conversation_ask',
+        args: { resumeId: 'resume-1', timeoutMs: '300000', prompt: 'why?' },
+      }])
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
   it('every Windows `.cmd` twin derives its export and selects the managed Node runtime', () => {
     const canonical = read('alice.cmd')
     for (const name of EXPORT_BINARIES) {

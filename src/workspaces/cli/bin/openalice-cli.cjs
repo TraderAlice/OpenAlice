@@ -77,7 +77,10 @@ async function main() {
   if (wantsHelp) return printVerbHelp(group, verb, cmd)
 
   // Run it.
-  const args = parseFlags(argv.slice(argv.indexOf(verb) + 1))
+  const args = parseFlags(
+    argv.slice(argv.indexOf(verb) + 1),
+    (cmd.schema && cmd.schema.properties) || {},
+  )
   const res = await invoke(base, cmd.tool, args)
   process.stdout.write(res.endsWith('\n') ? res : res + '\n')
 }
@@ -186,7 +189,7 @@ async function fetchSocketJson(socketPath, path, opts) {
 
 // ---- flag parsing ---------------------------------------------------------
 
-function parseFlags(tokens) {
+function parseFlags(tokens, properties) {
   const args = {}
   const meta = {}
   const docs = []
@@ -225,12 +228,29 @@ function parseFlags(tokens) {
       // per-doc fields keep working; a bare path is wrapped into { path }.
       docs.push(val && typeof val === 'object' ? val : { path: String(val) })
     } else {
-      args[key] = val
+      args[canonicalFlagName(key, properties)] = val
     }
   }
   if (Object.keys(meta).length) args.metadataFilter = meta
   if (docs.length) args.docs = docs
   return args
+}
+
+/**
+ * JSON-schema properties use JavaScript camelCase, while shell users naturally
+ * write kebab-case flags. Preserve exact schema keys for compatibility, then
+ * accept their kebab-case spelling only when it maps to a real property. An
+ * unknown flag stays unknown so the gateway's strict validation still catches
+ * typos instead of silently rewriting them.
+ */
+function canonicalFlagName(name, properties) {
+  if (Object.prototype.hasOwnProperty.call(properties, name)) return name
+  const camel = name.replace(/-([a-zA-Z0-9])/g, (_, c) => c.toUpperCase())
+  return Object.prototype.hasOwnProperty.call(properties, camel) ? camel : name
+}
+
+function displayFlagName(name) {
+  return name.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase())
 }
 
 // ---- help rendering -------------------------------------------------------
@@ -271,7 +291,7 @@ function printVerbHelp(group, verb, cmd) {
     const p = props[n] || {}
     const type = p.type || (p.enum ? 'enum' : '')
     const req = required.has(n) ? ' (required)' : ''
-    out(`  --${n}${type ? ' <' + type + '>' : ''}${req}   ${firstLine(p.description || '')}`)
+    out(`  --${displayFlagName(n)}${type ? ' <' + type + '>' : ''}${req}   ${firstLine(p.description || '')}`)
   }
 }
 
