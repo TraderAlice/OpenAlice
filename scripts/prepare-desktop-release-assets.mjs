@@ -24,16 +24,16 @@ export function prepareBuildMetadata({ outDir, platform, arch, version }) {
   const channel = prereleaseChannel(version)
 
   if (normalizedPlatform === 'macos' || normalizedPlatform === 'darwin') {
-    const source = 'latest-mac.yml'
+    // electron-builder names generic-provider metadata after the configured
+    // prerelease channel (for example beta-mac.yml), while stable builds use
+    // latest-mac.yml. Do not assume every build starts from the stable name.
+    const source = `${channel}-mac.yml`
     if (!existsSync(join(outDir, source))) {
       throw new Error(`[release-assets] missing ${source} for macOS ${arch}`)
     }
 
     if (arch === 'arm64') {
-      copyIfPresent(outDir, source, ['latest-mac-arm64.yml'])
-      if (channel !== 'latest') {
-        copyIfPresent(outDir, source, [`${channel}-mac.yml`, `${channel}-mac-arm64.yml`])
-      }
+      copyIfPresent(outDir, source, ['latest-mac-arm64.yml', `${channel}-mac-arm64.yml`])
       return
     }
 
@@ -44,8 +44,9 @@ export function prepareBuildMetadata({ outDir, platform, arch, version }) {
       if (channel !== 'latest') {
         copyIfPresent(outDir, source, [`${channel}-mac-intel.yml`, `${channel}-intel-mac.yml`])
       }
-      // Keep the established latest-mac.yml owned by the arm64 build. Intel
-      // clients request the architecture-specific compatibility alias above.
+      // Keep the generic channel metadata owned by the arm64 build. Intel
+      // clients request the architecture-specific compatibility alias above,
+      // and merged release artifacts must not contain two competing copies.
       rmSync(join(outDir, source), { force: true })
       return
     }

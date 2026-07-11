@@ -18,22 +18,22 @@ function withTempDir(run: (dir: string) => void) {
 describe('prepareBuildMetadata', () => {
   it('keeps arm64 canonical metadata and gives Intel its own feeds', () => {
     withTempDir((dir) => {
-      writeFileSync(join(dir, 'latest-mac.yml'), 'version: 1.2.3-beta\n')
+      writeFileSync(join(dir, 'beta-mac.yml'), 'version: 1.2.3-beta\n')
       prepareBuildMetadata({ outDir: dir, platform: 'macOS', arch: 'x64', version: '1.2.3-beta' })
 
       expect(readFileSync(join(dir, 'latest-mac-intel.yml'), 'utf8')).toContain('1.2.3-beta')
       expect(readFileSync(join(dir, 'latest-intel-mac.yml'), 'utf8')).toContain('1.2.3-beta')
       expect(readFileSync(join(dir, 'beta-mac-intel.yml'), 'utf8')).toContain('1.2.3-beta')
       expect(readFileSync(join(dir, 'beta-intel-mac.yml'), 'utf8')).toContain('1.2.3-beta')
-      expect(() => readFileSync(join(dir, 'latest-mac.yml'))).toThrow()
+      expect(() => readFileSync(join(dir, 'beta-mac.yml'))).toThrow()
     })
 
     withTempDir((dir) => {
-      writeFileSync(join(dir, 'latest-mac.yml'), 'version: 1.2.3-beta\n')
+      writeFileSync(join(dir, 'beta-mac.yml'), 'version: 1.2.3-beta\n')
       prepareBuildMetadata({ outDir: dir, platform: 'macOS', arch: 'arm64', version: '1.2.3-beta' })
 
-      expect(readFileSync(join(dir, 'latest-mac.yml'), 'utf8')).toContain('1.2.3-beta')
       expect(readFileSync(join(dir, 'beta-mac.yml'), 'utf8')).toContain('1.2.3-beta')
+      expect(readFileSync(join(dir, 'beta-mac-arm64.yml'), 'utf8')).toContain('1.2.3-beta')
       expect(readFileSync(join(dir, 'latest-mac-arm64.yml'), 'utf8')).toContain('1.2.3-beta')
     })
   })
