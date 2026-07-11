@@ -237,27 +237,29 @@ execution:
 
 - Every scheduled fire continues that exact `resumeId`.
 - The responsible Session must belong to the Issue's owning Workspace.
+- The Session's bound runtime is authoritative; the Issue's top-level `agent`
+  cannot override it.
 - Run `taskId`s change; the product Session does not.
 - Per-`resumeId` serialization prevents overlapping turns.
 - If the Session becomes unresumable, the Issue becomes blocked/unavailable;
   it must not silently recruit a replacement and pretend continuity.
 
-For agent-facing `issue_create`, the author should express an intent such as
-`executionMode: "self"`; OpenAlice resolves and stamps the caller's authoritative
-`resumeId`. A human UI may select an existing Session explicitly.
+For agent-facing `issue_create`, `execution: { mode: "resume" }` without a
+`resumeId` binds the caller's authoritative product Session; OpenAlice resolves
+and stamps the id server-side. A human UI may select an existing Session.
 
 #### Mode B: a fresh worker per fire
 
 ```yaml
 execution:
   mode: fresh
-  agent: pi # optional runtime selection, not identity
 ```
 
 - Every scheduled fire creates a new headless product Session and `resumeId`.
 - The Issue and Workspace files provide shared continuity; conversational
   memory does not.
-- `agent` may constrain the runtime kind, but does not name a unique worker.
+- The Issue's top-level `agent` may constrain the runtime kind, but does not name
+  a unique worker.
 - Each run keeps its own origin so a user can still ask that specific worker.
 
 The Issue's creator provenance is stamped separately in both modes. Choosing

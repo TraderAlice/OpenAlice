@@ -24,6 +24,7 @@
  *   when: { kind: at, at } | { kind: every, every } | { kind: cron, cron }  (OPTIONAL — present iff scheduled)
  *   what: <optional fire prompt; if absent, the fire prompt falls back to title+body>
  *   agent: <optional adapter id for the scheduled run>
+ *   execution: { mode: fresh } | { mode: resume, resumeId: <product Session id> }
  *   ---
  *   <markdown description body>
  *
@@ -71,6 +72,14 @@ export const issueWhenSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('cron'), cron: z.string().min(1) }),
 ])
 
+/** Who receives each scheduled fire. Legacy files omit this and retain the
+ * historical behavior (`fresh`); new agent-created schedules must choose. */
+export const issueExecutionSchema = z.discriminatedUnion('mode', [
+  z.object({ mode: z.literal('fresh') }),
+  z.object({ mode: z.literal('resume'), resumeId: z.string().min(1) }),
+])
+export type IssueExecution = z.infer<typeof issueExecutionSchema>
+
 /**
  * The validated frontmatter of one issue. `id` and `body` are NOT here — `id`
  * comes from the filename, `body` from below the frontmatter (see IssueRecord).
@@ -88,6 +97,17 @@ export const issueFrontmatterSchema = z.object({
   what: z.string().min(1).optional(),
   /** Which agent runtime to run the scheduled fire with; omitted uses the issue default / workspace default / first runtime. */
   agent: z.string().min(1).optional(),
+  /** `fresh`: create a new product Session each fire. `resume`: continue the
+   * exact OpenAlice-owned product Session named by resumeId. */
+  execution: issueExecutionSchema.optional(),
+}).superRefine((value, ctx) => {
+  if (value.execution && !value.when) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['execution'],
+      message: 'execution only applies to a scheduled issue with `when`',
+    })
+  }
 })
 export type IssueFrontmatter = z.infer<typeof issueFrontmatterSchema>
 
@@ -129,6 +149,11 @@ export function issueFirePrompt(issue: IssueRecord): string {
   if (what) return what
   const body = issue.body.trim()
   return body ? `${issue.title}\n\n${body}` : issue.title
+}
+
+/** Backward-compatible effective execution policy for the scanner/UI. */
+export function issueExecution(issue: IssueRecord): IssueExecution {
+  return issue.execution ?? { mode: 'fresh' }
 }
 
 /**

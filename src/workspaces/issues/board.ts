@@ -18,7 +18,7 @@ import type {
   HeadlessTaskRecord,
   HeadlessTaskStatus,
 } from '../headless-task-registry.js'
-import type { IssuePriority, IssueRecord, IssueStatus } from './declaration.js'
+import { issueExecution, type IssueExecution, type IssuePriority, type IssueRecord, type IssueStatus } from './declaration.js'
 
 /** One board row: the issue's display fields, plus — iff it self-schedules — its
  *  `when` and the scanner's firing markers. No markdown body (Phase 2 loads it). */
@@ -30,6 +30,8 @@ export interface IssuesSnapshotIssue {
   assignee: string
   /** Adapter id for the scheduled fire (frontmatter `agent`), if set. */
   agent?: string
+  /** Effective scheduled owner policy. */
+  execution: IssueExecution
   /** Present iff the issue self-schedules. */
   when?: Schedule
   /** When the scanner last fired this issue (epoch ms); only for scheduled issues. */
@@ -125,6 +127,8 @@ export interface BoardRow {
   assignee: string
   /** Adapter id for the scheduled fire override, if set. */
   agent?: string
+  /** Effective scheduled owner policy. */
+  execution?: IssueExecution
   /** True iff the issue self-schedules (snapshot `when` present). */
   scheduled: boolean
   workspace: { wsId: string; tag: string }
@@ -163,6 +167,7 @@ export function flattenBoardRows(snapshot: IssuesSnapshot): {
         priority: issue.priority,
         assignee: issue.assignee,
         ...(issue.agent ? { agent: issue.agent } : {}),
+        execution: issue.execution,
         scheduled: issue.when !== undefined,
         workspace: { wsId: ws.wsId, tag: ws.tag },
         ...(issue.nameCollision ? { nameCollision: true } : {}),
@@ -212,6 +217,8 @@ export interface IssueDetailIssue {
   what?: string
   /** Adapter id for the scheduled fire (frontmatter `agent`), if set. */
   agent?: string
+  /** Effective policy; legacy files project as fresh. */
+  execution: IssueExecution
   /** When the scanner last fired this issue (epoch ms); only for scheduled issues. */
   lastFiredAtMs?: number | null
   /** When it is next due (epoch ms); only for scheduled issues. */
@@ -309,6 +316,7 @@ export function detailIssue(
     ...(issue.when ? { when: issue.when } : {}),
     ...(issue.what ? { what: issue.what } : {}),
     ...(issue.agent ? { agent: issue.agent } : {}),
+    execution: issueExecution(issue),
     ...(markers ? { lastFiredAtMs: markers.lastFiredAtMs, nextDueAtMs: markers.nextDueAtMs } : {}),
   }
 }
@@ -328,6 +336,7 @@ export function snapshotBoardIssue(
     priority: issue.priority,
     assignee: issueAssigneeForWorkspace(issue, workspaceTag),
     ...(issue.agent ? { agent: issue.agent } : {}),
+    execution: issueExecution(issue),
     ...(issue.when ? { when: issue.when } : {}),
     ...(markers ? { lastFiredAtMs: markers.lastFiredAtMs, nextDueAtMs: markers.nextDueAtMs } : {}),
   }

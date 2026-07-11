@@ -19,8 +19,10 @@ import {
   isFireable,
   isTerminalStatus,
   issueFirePrompt,
+  issueExecution,
   readWorkspaceIssues,
   type IssueRecord,
+  type IssueExecution,
 } from '../issues/declaration.js'
 
 export {
@@ -45,6 +47,7 @@ export interface ScheduleSnapshotTask {
   /** The prompt this fire hands to the headless run (resolved `what`/title+body). */
   what: string
   agent?: string
+  execution: IssueExecution
   /** False once the owning issue reaches a terminal status (done/canceled). */
   enabled: boolean
   /** When the scanner last fired this issue (epoch ms), null if never. */
@@ -99,6 +102,7 @@ export function snapshotScheduledIssue(
     when,
     what: issueFirePrompt(issue),
     ...(issue.agent ? { agent: issue.agent } : {}),
+    execution: issueExecution(issue),
     enabled: !isTerminalStatus(issue.status),
     lastFiredAtMs,
     // An overdue computed time clamps to now: a due-now task reads "due now",

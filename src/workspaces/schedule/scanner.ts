@@ -30,7 +30,7 @@ import type { CliAdapter } from '../cli-adapter.js'
 import type { Logger } from '../logger.js'
 import type { WorkspaceMeta, WorkspaceRegistry } from '../workspace-registry.js'
 
-import { isFireable, issueFirePrompt, readWorkspaceIssues } from '../issues/declaration.js'
+import { isFireable, issueExecution, issueFirePrompt, readWorkspaceIssues, type IssueExecution } from '../issues/declaration.js'
 
 import {
   fireBase,
@@ -54,7 +54,7 @@ export interface MarkerStore {
 
 export interface ScheduleScannerDeps {
   registry: WorkspaceRegistry
-  resolveAdapter: (meta: WorkspaceMeta, agentId?: string) => CliAdapter | Promise<CliAdapter>
+  resolveAdapter: (meta: WorkspaceMeta, agentId?: string, resumeId?: string) => CliAdapter | Promise<CliAdapter>
   dispatch: (
     meta: WorkspaceMeta,
     adapter: CliAdapter,
@@ -64,6 +64,8 @@ export interface ScheduleScannerDeps {
      *  its real run history. The scanner ALWAYS passes it (it only fires from an
      *  issue); manual/external dispatch callers omit it. */
     issueId?: string,
+    /** Product Session to continue. Omitted means allocate a fresh Session. */
+    resumeId?: string,
   ) => Promise<{ taskId: string }>
   markers: MarkerStore
   logger: Logger
@@ -186,7 +188,7 @@ export class ScheduleScanner {
       if (!when) continue
       seen.add(this.deps.markers.key(ws.id, issue.id))
       if (isFireable(issue) && this.isDue(ws.id, issue.id, when, nowMs)) {
-        await this.fire(ws, issue.id, issueFirePrompt(issue), issue.agent, nowMs)
+        await this.fire(ws, issue.id, issueFirePrompt(issue), issue.agent, issueExecution(issue), nowMs)
       }
       // Read the marker AFTER any fire so last/next reflect a just-fired run.
       const last = this.deps.markers.get(ws.id, issue.id) ?? null
@@ -206,19 +208,30 @@ export class ScheduleScanner {
     taskId: string,
     what: string,
     agentId: string | undefined,
+    execution: IssueExecution,
     nowMs: number,
   ): Promise<void> {
-    const adapter = await this.deps.resolveAdapter(ws, agentId)
-    if (!adapter.capabilities.headless || !adapter.composeHeadlessCommand) {
-      this.deps.logger.warn('schedule.adapter_not_headless', { wsId: ws.id, taskId, agent: adapter.id })
-      return
-    }
     try {
+      const resumeId = execution.mode === 'resume' ? execution.resumeId : undefined
+      const adapter = await this.deps.resolveAdapter(ws, agentId, resumeId)
+      if (!adapter.capabilities.headless || !adapter.composeHeadlessCommand) {
+        this.deps.logger.warn('schedule.adapter_not_headless', { wsId: ws.id, taskId, agent: adapter.id })
+        return
+      }
       // `taskId` here is the firing ISSUE's id (keyed by filename stem) — thread
       // it so the run records which issue triggered it.
-      const { taskId: runId } = await this.deps.dispatch(ws, adapter, what, RUN_TIMEOUT_MS, taskId)
+      const { taskId: runId } = resumeId
+        ? await this.deps.dispatch(ws, adapter, what, RUN_TIMEOUT_MS, taskId, resumeId)
+        : await this.deps.dispatch(ws, adapter, what, RUN_TIMEOUT_MS, taskId)
       await this.deps.markers.set(ws.id, taskId, nowMs)
-      this.deps.logger.info('schedule.fired', { wsId: ws.id, taskId, agent: adapter.id, runId })
+      this.deps.logger.info('schedule.fired', {
+        wsId: ws.id,
+        taskId,
+        agent: adapter.id,
+        runId,
+        executionMode: execution.mode,
+        ...(resumeId ? { resumeId } : {}),
+      })
     } catch (err) {
       // Capacity full (or transient) - do NOT mark; the task stays due and
       // retries on the next tick once a headless slot frees.

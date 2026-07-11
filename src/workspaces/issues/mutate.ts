@@ -29,9 +29,11 @@ import {
   ISSUE_STATUSES,
   ISSUES_DIR_REL,
   issueFrontmatterSchema,
+  issueExecutionSchema,
   parseIssueContent,
   splitFrontmatter,
   type IssuePriority,
+  type IssueExecution,
   type IssueRecord,
   type IssueStatus,
 } from './declaration.js'
@@ -48,6 +50,8 @@ export interface IssueFieldPatch {
   assignee?: string
   /** Runtime override for scheduled fires; null removes the override. */
   agent?: string | null
+  /** Scheduled execution owner. Use `{mode:'fresh'}` instead of deleting it. */
+  execution?: IssueExecution
 }
 
 /** Input to `createIssue`. `id` is optional — derived as a kebab slug from the
@@ -61,6 +65,7 @@ export interface CreateIssueInput {
   when?: unknown
   what?: string
   agent?: string
+  execution?: IssueExecution
   body?: string
 }
 
@@ -154,6 +159,16 @@ export async function updateIssueFields(
       data.agent = a
     }
   }
+  if (patch.execution !== undefined) {
+    if (!current.issue.when) {
+      return { ok: false, reason: 'invalid', error: 'execution only applies to a scheduled issue with `when`' }
+    }
+    const execution = issueExecutionSchema.safeParse(patch.execution)
+    if (!execution.success) {
+      return { ok: false, reason: 'invalid', error: 'execution must be {mode:"fresh"} or {mode:"resume",resumeId}' }
+    }
+    data.execution = execution.data
+  }
 
   const content = serializeIssue(data, split.body)
   // Final guard: never persist a file that wouldn't read back cleanly.
@@ -224,6 +239,9 @@ export async function createIssue(wsDir: string, input: CreateIssueInput): Promi
 
   const existing = await readWorkspaceFile(wsDir, relFor(id))
   if (existing !== null) return { ok: false, reason: 'conflict', id }
+  if (input.execution !== undefined && input.when === undefined) {
+    return { ok: false, reason: 'invalid', error: 'execution only applies to a scheduled issue with `when`' }
+  }
 
   // Assemble frontmatter from only the provided keys (so we don't write default
   // noise), then validate the whole thing against the issue schema.
@@ -234,6 +252,7 @@ export async function createIssue(wsDir: string, input: CreateIssueInput): Promi
   if (input.when !== undefined) data.when = input.when
   if (input.what !== undefined) data.what = input.what
   if (input.agent !== undefined) data.agent = input.agent
+  if (input.execution !== undefined) data.execution = input.execution
 
   const parsed = issueFrontmatterSchema.safeParse(data)
   if (!parsed.success) {

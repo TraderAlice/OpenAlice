@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { issueFirePrompt, isFireable, readWorkspaceIssues } from './declaration.js'
+import { issueExecution, issueFirePrompt, isFireable, readWorkspaceIssues } from './declaration.js'
 
 let dir: string
 beforeEach(async () => {
@@ -121,6 +121,21 @@ describe('readWorkspaceIssues', () => {
       expect(i.body).toBe('Scan overnight movers and summarize.')
       expect(isFireable(i)).toBe(true)
     }
+  })
+
+  it('parses resume ownership and treats legacy omission as fresh', async () => {
+    await writeIssue('owned', fm([
+      'title: Owned work',
+      'when: { kind: every, every: 30m }',
+      'execution: { mode: resume, resumeId: resume-kind-owl-abc123 }',
+    ].join('\n')))
+    await writeIssue('legacy', fm('title: Legacy\nwhen: { kind: every, every: 30m }'))
+    const result = await readWorkspaceIssues(dir)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    const byId = Object.fromEntries(result.issues.map((issue) => [issue.id, issue]))
+    expect(issueExecution(byId['owned'])).toEqual({ mode: 'resume', resumeId: 'resume-kind-owl-abc123' })
+    expect(issueExecution(byId['legacy'])).toEqual({ mode: 'fresh' })
   })
 
   it('parses block-style and cron/at `when` shapes', async () => {

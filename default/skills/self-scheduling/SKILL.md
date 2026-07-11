@@ -88,6 +88,7 @@ as `--when`:
 ```bash
 alice-workspace issue create --title "Pre-market brief" --priority high \
   --when '{"kind":"cron","cron":"30 8 * * 1-5"}' \
+  --execution '{"mode":"resume"}' \
   --what "Pull pre-market movers and overnight news for my watchlist, write a short brief to research/premarket.md, then run: alice-workspace inbox push --doc research/premarket.md --comments 'Pre-market brief'." \
   --agent claude
 ```
@@ -115,6 +116,7 @@ what: >
   brief to research/premarket.md, then run:
   alice-workspace inbox push --doc research/premarket.md --comments "Pre-market brief".
 agent: claude
+execution: { mode: resume, resumeId: resume-calm-amber-river-a1b2c3 }
 ---
 
 Every trading morning at 08:30, assemble the pre-market picture for the
@@ -138,7 +140,8 @@ can be unit-tested without the network. No rush — picking this up next time we
 touch fetching.
 ```
 
-The first self-schedules (it has `when`); the second is a pure work item the
+The first self-schedules (it has `when`) and keeps one accountable product
+Session; the second is a pure work item the
 scanner ignores. Drop the `when`/`what`/`agent` lines and any issue becomes a
 plain tracked item; add a `when` and it starts firing.
 
@@ -169,7 +172,15 @@ plain tracked item; add a `when` and it starts firing.
   below). If omitted, the fire prompt falls back to the title plus the markdown
   body. Only meaningful when `when` is present.
 - **`agent`** *(optional)* — which CLI runs the scheduled job; defaults to this
-  workspace's default agent. Only meaningful when `when` is present.
+  workspace's default agent. It selects the worker kind for `fresh`; a `resume`
+  owner already has an immutable runtime, so that Session's runtime wins.
+- **`execution`** *(required for newly created scheduled issues)* — choose who
+  receives each fire:
+  - `{ mode: fresh }` recruits a new product Session each time;
+  - `{ mode: resume, resumeId: <id> }` continues that exact accountable Session.
+    With `alice-workspace issue create`, pass `--execution '{"mode":"resume"}'`
+    to bind the current Session without guessing its id. Existing legacy Issues
+    that omit this field keep the historical `fresh` behavior.
 
 The markdown **body** below the closing `---` is the issue's description: free
 prose for you and the user. For an unscheduled item it's the whole point; for a

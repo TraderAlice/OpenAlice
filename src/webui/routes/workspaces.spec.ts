@@ -33,6 +33,7 @@ function build(
     dispatch?: any;
     runtimeReadiness?: any;
     resumeIdentity?: any;
+    sessionDirectory?: any;
   } = {},
 ) {
   const claude = {
@@ -91,6 +92,12 @@ function build(
     },
     getAgentRuntimeReadiness,
     probeAgentRuntimeReadiness,
+    sessionDirectory: vi.fn(async (id: string) => id === 'ws-1'
+      ? (opts.sessionDirectory ?? {
+          workspace: { id: 'ws-1', tag: 'demo' },
+          sessions: [{ resumeId: 'resume-1', agent: 'claude', createdAt: 1, updatedAt: 2, resumable: true, active: false }],
+        })
+      : null),
     publicMeta: vi.fn(async (m: any) => {
       const res = await readWorkspaceMetadata(m.dir);
       return { ...m, ...(res.ok ? res.metadata : {}) };
@@ -104,6 +111,23 @@ function build(
     probeAgentRuntimeReadiness,
   };
 }
+
+async function get(app: any, path: string) {
+  const res = await app.request(path)
+  return { status: res.status, body: await res.json().catch(() => null) as any }
+}
+
+describe('GET /:id/resumes', () => {
+  it('returns the safe product Session directory', async () => {
+    const { app } = build()
+    const result = await get(app, '/ws-1/resumes')
+    expect(result.status).toBe(200)
+    expect(result.body.sessions).toEqual([
+      expect.objectContaining({ resumeId: 'resume-1', agent: 'claude', resumable: true }),
+    ])
+    expect(JSON.stringify(result.body)).not.toContain('agentSessionId')
+  })
+})
 
 async function post(app: any, path: string, body?: unknown) {
   const res = await app.request(path, {

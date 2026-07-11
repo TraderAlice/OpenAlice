@@ -32,10 +32,13 @@ import {
   ISSUES_DIR_REL,
   ISSUE_PRIORITIES,
   ISSUE_STATUSES,
+  issueExecution as effectiveIssueExecution,
+  issueExecutionSchema,
   issueWhenSchema,
   parseIssueContent,
   readWorkspaceIssues,
   type IssueRecord,
+  type IssueExecution,
 } from '../workspaces/issues/declaration.js'
 import {
   appendIssueComment,
@@ -56,6 +59,39 @@ function selfDir(ctx: WorkspaceToolContext): { ok: true; dir: string } | { ok: f
   const meta = resolve(ctx.workspaceId)
   if (!meta) return { ok: false, error: `cannot locate this workspace (${ctx.workspaceId})` }
   return { ok: true, dir: meta.dir }
+}
+
+const issueExecutionInputSchema = z.discriminatedUnion('mode', [
+  z.object({ mode: z.literal('fresh') }),
+  z.object({
+    mode: z.literal('resume'),
+    resumeId: z.string().min(1).optional().describe('Omit to bind the current product Session.'),
+  }),
+])
+
+function resolveIssueExecution(
+  ctx: WorkspaceToolContext,
+  execution: z.infer<typeof issueExecutionInputSchema> | undefined,
+): { ok: true; execution?: IssueExecution } | { ok: false; error: string } {
+  if (!execution) return { ok: true }
+  if (execution.mode === 'fresh') return { ok: true, execution: { mode: 'fresh' } }
+  const resumeId = execution.resumeId ?? sessionOriginFromInboxOrigin(ctx.workspaceId, ctx.origin)?.resumeId
+  if (!resumeId) {
+    return {
+      ok: false,
+      error: 'execution.mode "resume" needs resumeId outside an attributable product Session',
+    }
+  }
+  const parsed = issueExecutionSchema.safeParse({ mode: 'resume', resumeId })
+  if (!parsed.success) return { ok: false, error: 'invalid resume execution policy' }
+  const identity = ctx.resolveSessionIdentity?.(resumeId)
+  if (ctx.resolveSessionIdentity && !identity) {
+    return { ok: false, error: `unknown product Session: ${resumeId}` }
+  }
+  if (identity && identity.workspaceId !== ctx.workspaceId) {
+    return { ok: false, error: `product Session ${resumeId} belongs to another workspace` }
+  }
+  return { ok: true, execution: parsed.data }
 }
 
 /** The comment / create author for this workspace's writes. */
@@ -89,6 +125,7 @@ function rowOf(issue: IssueRecord, workspaceLabel?: string) {
     priority: issue.priority,
     assignee: issueAssigneeForWorkspace(issue, workspaceLabel),
     ...(issue.agent ? { agent: issue.agent } : {}),
+    ...(issue.when ? { execution: effectiveIssueExecution(issue) } : {}),
     scheduled: issue.when !== undefined,
   }
 }
@@ -159,6 +196,7 @@ function summarizeIssueRows(
       priority: row.priority,
       assignee: row.assignee,
       scheduled: row.scheduled,
+      ...(row.scheduled ? { execution: row.execution } : {}),
       workspace: row.workspace.tag,
       ...(row.nameCollision ? { nameCollision: true as const } : {}),
     })),
@@ -180,8 +218,10 @@ export const issueUpdateFactory: WorkspaceToolFactory = {
       description: [
         "Update one of THIS workspace's issues — its board fields.",
         '',
-        'Patch any subset of `status`, `priority`, `assignee`; omitted fields are',
-        'left untouched. Scheduling frontmatter (`when`/`what`/`agent`) and the',
+        'Patch any subset of `status`, `priority`, `assignee`, `execution`; omitted fields are',
+        'left untouched. `execution:{mode:"resume"}` binds this current product',
+        'Session; pass a resumeId to assign another known Session. Other scheduling',
+        'frontmatter (`when`/`what`/`agent`) and the',
         'markdown body are preserved — edit those by writing the file directly',
         '(`.alice/issues/<id>.md`).',
         '',
@@ -197,14 +237,22 @@ export const issueUpdateFactory: WorkspaceToolFactory = {
           .min(1)
           .optional()
           .describe('New assignee, e.g. "human", "ws:<tag>", or "unassigned".'),
+        execution: issueExecutionInputSchema.optional().describe('Scheduled ownership: fresh each fire, or resume one exact product Session.'),
       }),
-      execute: async ({ id, status, priority, assignee }) => {
+      execute: async ({ id, status, priority, assignee, execution }) => {
         const dir = selfDir(ctx)
         if (!dir.ok) return { ok: false as const, error: dir.error }
-        if (status === undefined && priority === undefined && assignee === undefined) {
-          return { ok: false as const, error: 'no fields to update (pass at least one of status/priority/assignee)' }
+        const resolvedExecution = resolveIssueExecution(ctx, execution)
+        if (!resolvedExecution.ok) return { ok: false as const, error: resolvedExecution.error }
+        if (status === undefined && priority === undefined && assignee === undefined && !resolvedExecution.execution) {
+          return { ok: false as const, error: 'no fields to update (pass status/priority/assignee/execution)' }
         }
-        const res = await updateIssueFields(dir.dir, id, { status, priority, assignee })
+        const res = await updateIssueFields(dir.dir, id, {
+          status,
+          priority,
+          assignee,
+          ...(resolvedExecution.execution ? { execution: resolvedExecution.execution } : {}),
+        })
         if (res.ok) {
           await recordIssueProvenance(ctx, res.issue.id, 'updated')
           return { ok: true as const, issue: rowOf(res.issue, ctx.workspaceLabel) }
@@ -264,7 +312,9 @@ export const issueCreateFactory: WorkspaceToolFactory = {
         '',
         'Add a `when` to make the issue self-schedule (the scanner fires `what`,',
         'or the title+body if `what` is absent, on the schedule) — otherwise it’s',
-        'a pure board work item. `body` is the markdown description.',
+        'a pure board work item. Every new scheduled issue must choose execution:',
+        '`fresh` recruits a new Session each fire; `resume` keeps one accountable',
+        'Session. Omit resumeId to bind the current Session. `body` is markdown.',
       ].join('\n'),
       inputSchema: z.object({
         title: z.string().min(1).describe('Short human title (required).'),
@@ -284,12 +334,21 @@ export const issueCreateFactory: WorkspaceToolFactory = {
           .optional()
           .describe('Schedule shape — { kind:"at", at } | { kind:"every", every } | { kind:"cron", cron }. Present iff the issue self-schedules.'),
         what: z.string().min(1).optional().describe('Prompt fired on schedule; falls back to title+body if absent.'),
-        agent: z.string().min(1).optional().describe('Adapter id to run the scheduled fire with.'),
+        agent: z.string().min(1).optional().describe('Adapter id for fresh execution; resume uses its Session-bound runtime.'),
+        execution: issueExecutionInputSchema.optional().describe('Required with `when`: fresh each fire, or resume an exact product Session.'),
         body: z.string().optional().describe('Markdown description body.'),
       }),
-      execute: async ({ title, id, status, priority, assignee, when, what, agent, body }) => {
+      execute: async ({ title, id, status, priority, assignee, when, what, agent, execution, body }) => {
         const dir = selfDir(ctx)
         if (!dir.ok) return { ok: false as const, error: dir.error }
+        if (when && !execution) {
+          return { ok: false as const, error: 'scheduled issues must explicitly choose execution.mode "fresh" or "resume"' }
+        }
+        if (!when && execution) {
+          return { ok: false as const, error: 'execution only applies to a scheduled issue with `when`' }
+        }
+        const resolvedExecution = resolveIssueExecution(ctx, execution)
+        if (!resolvedExecution.ok) return { ok: false as const, error: resolvedExecution.error }
         const res = await createIssue(dir.dir, {
           title,
           id,
@@ -299,6 +358,7 @@ export const issueCreateFactory: WorkspaceToolFactory = {
           when,
           what,
           agent,
+          ...(resolvedExecution.execution ? { execution: resolvedExecution.execution } : {}),
           body,
         })
         if (res.ok) {
