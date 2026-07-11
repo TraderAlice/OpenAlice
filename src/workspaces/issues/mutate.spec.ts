@@ -49,6 +49,7 @@ describe('createIssue', () => {
       when: { kind: 'every', every: '30m' },
       what: 'run the research routine',
       agent: 'codex',
+      execution: { mode: 'resume', resumeId: 'resume-kind-owl-abc123' },
       body: 'Scan overnight movers.',
     })
     expect(res.ok).toBe(true)
@@ -61,6 +62,7 @@ describe('createIssue', () => {
       assignee: 'ws:auto-quant',
       what: 'run the research routine',
       agent: 'codex',
+      execution: { mode: 'resume', resumeId: 'resume-kind-owl-abc123' },
     })
     expect(issue?.when).toEqual({ kind: 'every', every: '30m' })
     expect(issue?.body).toBe('Scan overnight movers.')
@@ -130,6 +132,22 @@ describe('updateIssueFields', () => {
     expect(res.ok).toBe(true)
     const { issue } = await readBack('agent-clear')
     expect(issue?.agent).toBeUndefined()
+  })
+
+  it('changes scheduled ownership without disturbing the schedule', async () => {
+    await createIssue(dir, {
+      id: 'owned',
+      title: 'Owned',
+      when: { kind: 'every', every: '15m' },
+      execution: { mode: 'fresh' },
+    })
+    const res = await updateIssueFields(dir, 'owned', {
+      execution: { mode: 'resume', resumeId: 'resume-kind-owl-abc123' },
+    })
+    expect(res.ok).toBe(true)
+    const { issue } = await readBack('owned')
+    expect(issue?.execution).toEqual({ mode: 'resume', resumeId: 'resume-kind-owl-abc123' })
+    expect(issue?.when).toEqual({ kind: 'every', every: '15m' })
   })
 
   it('supports a partial patch (only status)', async () => {

@@ -69,6 +69,12 @@ export interface WorkspaceToolContext {
   /** Safe per-workspace conversation directory. It exposes product resumeIds,
    * never adapter-native session ids or launcher record ids. */
   sessionDirectory?: (workspaceId: string, limit?: number) => Promise<WorkspaceSessionDirectory | null>
+  /** Safe point lookup used to validate declared Issue ownership. */
+  resolveSessionIdentity?: (resumeId: string) => {
+    workspaceId: string
+    agent: string
+    resumable: boolean
+  } | null
   /** Agent-INVISIBLE run provenance, resolved server-side from the
    *  `x-openalice-run` header by the MCP / CLI route (never supplied by the
    *  agent). Factories pass it through to call sites (e.g. inbox_push →

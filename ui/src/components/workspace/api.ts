@@ -371,6 +371,39 @@ export interface SpawnOptions {
   readonly terminalTheme?: TerminalThemeVariant;
 }
 
+export interface WorkspaceSessionDirectoryEntry {
+  readonly resumeId: string;
+  readonly agent: string;
+  readonly createdAt: number;
+  readonly updatedAt: number;
+  readonly resumable: boolean;
+  readonly active: boolean;
+  readonly latestExecution?: {
+    readonly taskId: string;
+    readonly status: 'running' | 'done' | 'failed' | 'interrupted';
+    readonly startedAt: number;
+    readonly issueId?: string;
+    readonly assistantPreview?: string;
+  };
+  readonly interactive?: {
+    readonly name: string;
+    readonly title?: string;
+    readonly state: 'running' | 'paused';
+    readonly lastActiveAt: string;
+  };
+}
+
+export interface WorkspaceSessionDirectory {
+  readonly workspace: { readonly id: string; readonly tag: string };
+  readonly sessions: readonly WorkspaceSessionDirectoryEntry[];
+}
+
+export async function getWorkspaceSessionDirectory(id: string): Promise<WorkspaceSessionDirectory> {
+  const res = await fetch(`/api/workspaces/${encodeURIComponent(id)}/resumes`);
+  if (!res.ok) throw new Error(`Failed to load Workspace Sessions (${res.status})`);
+  return res.json() as Promise<WorkspaceSessionDirectory>;
+}
+
 export async function spawnSession(
   id: string,
   opts: SpawnOptions = {},

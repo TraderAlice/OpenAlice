@@ -7,12 +7,19 @@ import type { InboxEntry } from '../api/inbox'
 import type {
   IssueDetail as IssueDetailData,
   IssueDetailIssue,
+  IssueExecution,
   IssuePriority,
   IssueStatus,
   WikilinkIssueRef,
   WikilinkResolution,
 } from '../api/issues'
-import { getAgentReadiness, type AgentCredentialReadiness, type AgentId } from './workspace/api'
+import {
+  getAgentReadiness,
+  getWorkspaceSessionDirectory,
+  type AgentCredentialReadiness,
+  type AgentId,
+  type WorkspaceSessionDirectoryEntry,
+} from './workspace/api'
 import { issuesApi } from '../api/issues'
 import { useIssueDetail } from '../hooks/useIssueDetail'
 import { useIssues } from '../hooks/useIssues'
@@ -240,6 +247,51 @@ function AgentEditor({
   )
 }
 
+function ExecutionEditor({
+  value,
+  sessions,
+  disabled,
+  onChange,
+}: {
+  value?: IssueExecution
+  sessions: readonly WorkspaceSessionDirectoryEntry[]
+  disabled?: boolean
+  onChange: (next: IssueExecution) => void
+}) {
+  const labelFor = (session: WorkspaceSessionDirectoryEntry) => {
+    const raw = session.interactive?.title
+      || session.interactive?.name
+      || session.latestExecution?.assistantPreview
+      || session.resumeId
+    return raw.length > 44 ? `${raw.slice(0, 43)}…` : raw
+  }
+  const selected = value?.mode === 'resume' ? value.resumeId : '__fresh__'
+  const choices = sessions.filter((session) => session.resumeId && session.agent !== 'shell')
+  const hasSelected = value?.mode !== 'resume' || choices.some((session) => session.resumeId === value.resumeId)
+
+  return (
+    <select
+      className={railControl}
+      value={selected}
+      disabled={disabled}
+      onChange={(event) => {
+        const resumeId = event.target.value
+        onChange(resumeId === '__fresh__' ? { mode: 'fresh' } : { mode: 'resume', resumeId })
+      }}
+    >
+      <option value="__fresh__">Fresh Session each fire</option>
+      {choices.map((session) => (
+        <option key={session.resumeId} value={session.resumeId}>
+          Continue {labelFor(session)} · {session.agent}
+        </option>
+      ))}
+      {!hasSelected && value?.mode === 'resume' && (
+        <option value={value.resumeId}>Continue {value.resumeId}</option>
+      )}
+    </select>
+  )
+}
+
 function PropertiesRail({
   issue,
   wsTag,
@@ -247,6 +299,7 @@ function PropertiesRail({
   issueDefaultAgent,
   defaultAgent,
   agentReadiness,
+  sessions,
   saving,
   error,
   onPatch,
@@ -258,15 +311,20 @@ function PropertiesRail({
   issueDefaultAgent: string | null
   defaultAgent: string | null
   agentReadiness: Readonly<Record<string, AgentCredentialReadiness>>
+  sessions: readonly WorkspaceSessionDirectoryEntry[]
   saving: boolean
   error: string | null
-  onPatch: (patch: { status?: IssueStatus; priority?: IssuePriority; assignee?: string; agent?: string | null }) => void
+  onPatch: (patch: { status?: IssueStatus; priority?: IssuePriority; assignee?: string; agent?: string | null; execution?: IssueExecution }) => void
   onConfigureAgent: (agent: AgentId) => void
 }) {
   const meta = STATUS_META[issue.status]
   const issueDefaultInOptions = issueDefaultAgent && agentOptions.some((a) => a.id === issueDefaultAgent) ? issueDefaultAgent : null
   const defaultInOptions = defaultAgent && agentOptions.some((a) => a.id === defaultAgent) ? defaultAgent : null
-  const effectiveAgent = issue.agent || issueDefaultInOptions || defaultInOptions || agentOptions[0]?.id || null
+  const ownerResumeId = issue.execution?.mode === 'resume' ? issue.execution.resumeId : null
+  const ownerSession = ownerResumeId
+    ? sessions.find((session) => session.resumeId === ownerResumeId)
+    : undefined
+  const effectiveAgent = ownerSession?.agent || issue.agent || issueDefaultInOptions || defaultInOptions || agentOptions[0]?.id || null
   const selectedReadiness = effectiveAgent ? agentReadiness[effectiveAgent] : undefined
   const agentNeedsCredential = selectedReadiness?.requiresCredential === true && !selectedReadiness.ready
   return (
@@ -314,18 +372,36 @@ function PropertiesRail({
         <PropRow label="Cadence">
           {issue.when ? <CadencePill when={issue.when} /> : <span className="text-muted">—</span>}
         </PropRow>
-        <EditRow label="Agent">
-          <AgentEditor
-            value={issue.agent}
-            issueDefaultAgent={issueDefaultAgent}
-            defaultAgent={defaultAgent}
-            options={agentOptions}
-            readiness={agentReadiness}
-            disabled={saving}
-            onChange={(agent) => onPatch({ agent })}
-            onConfigure={onConfigureAgent}
-          />
-        </EditRow>
+        {issue.when && (
+          <EditRow label="Ownership">
+            <ExecutionEditor
+              value={issue.execution}
+              sessions={sessions}
+              disabled={saving}
+              onChange={(execution) => onPatch({ execution })}
+            />
+          </EditRow>
+        )}
+        {issue.execution?.mode === 'resume' ? (
+          <PropRow label="Agent">
+            <span title="The responsible Session determines its runtime">
+              {ownerSession?.agent ?? 'Session-owned'}
+            </span>
+          </PropRow>
+        ) : (
+          <EditRow label="Agent">
+            <AgentEditor
+              value={issue.agent}
+              issueDefaultAgent={issueDefaultAgent}
+              defaultAgent={defaultAgent}
+              options={agentOptions}
+              readiness={agentReadiness}
+              disabled={saving}
+              onChange={(agent) => onPatch({ agent })}
+              onConfigure={onConfigureAgent}
+            />
+          </EditRow>
+        )}
         {agentNeedsCredential && (
           <p className="-mt-1 pb-2 text-right text-[11px] leading-snug text-amber-400">
             AI credential missing.
@@ -650,6 +726,7 @@ export function IssueDetail({
   const [saving, setSaving] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [agentReadiness, setAgentReadiness] = useState<Record<string, AgentCredentialReadiness>>({})
+  const [sessionDirectory, setSessionDirectory] = useState<readonly WorkspaceSessionDirectoryEntry[]>([])
   // Set when a clicked `[[name]]` resolves to >1 target — drives the picker.
   const [picker, setPicker] = useState<WikilinkResolution | null>(null)
 
@@ -661,6 +738,18 @@ export function IssueDetail({
       })
       .catch(() => {
         if (live) setAgentReadiness({})
+      })
+    return () => { live = false }
+  }, [wsId])
+
+  useEffect(() => {
+    let live = true
+    getWorkspaceSessionDirectory(wsId)
+      .then((directory) => {
+        if (live) setSessionDirectory(directory.sessions)
+      })
+      .catch(() => {
+        if (live) setSessionDirectory([])
       })
     return () => { live = false }
   }, [wsId])
@@ -728,7 +817,7 @@ export function IssueDetail({
   )
 
   const onPatch = useCallback(
-    async (patch: { status?: IssueStatus; priority?: IssuePriority; assignee?: string; agent?: string | null }) => {
+    async (patch: { status?: IssueStatus; priority?: IssuePriority; assignee?: string; agent?: string | null; execution?: IssueExecution }) => {
       setSaving(true)
       setActionError(null)
       try {
@@ -812,6 +901,7 @@ export function IssueDetail({
           issueDefaultAgent={issueDefaultAgent}
           defaultAgent={defaultAgent}
           agentReadiness={agentReadiness}
+          sessions={sessionDirectory}
           saving={saving}
           error={actionError}
           onPatch={onPatch}

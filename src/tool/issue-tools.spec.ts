@@ -94,6 +94,59 @@ describe('issue_create', () => {
     expect(res.ok).toBe(false)
     expect(res.error).toMatch(/already exists/)
   })
+
+  it('requires scheduled creators to choose fresh or resume ownership', async () => {
+    const rejected = await run(issueCreateFactory.build(ctx()), {
+      id: 'ambiguous-owner',
+      title: 'Ambiguous owner',
+      when: { kind: 'every', every: '30m' },
+    })
+    expect(rejected.ok).toBe(false)
+    expect(rejected.error).toMatch(/explicitly choose/)
+
+    const created = await run(issueCreateFactory.build(ctx()), {
+      id: 'fresh-owner',
+      title: 'Fresh owner',
+      when: { kind: 'every', every: '30m' },
+      execution: { mode: 'fresh' },
+    })
+    expect(created.ok).toBe(true)
+    expect((await readBack('fresh-owner'))?.execution).toEqual({ mode: 'fresh' })
+  })
+
+  it('binds resume ownership to the server-attributed current Session', async () => {
+    const context = ctx({
+      origin: {
+        kind: 'interactive',
+        sessionId: 'surface-1',
+        resumeId: 'resume-kind-owl-abc123',
+        agent: 'codex',
+      },
+    })
+    const created = await run(issueCreateFactory.build(context), {
+      id: 'owned-schedule',
+      title: 'Owned schedule',
+      when: { kind: 'every', every: '30m' },
+      execution: { mode: 'resume' },
+    })
+    expect(created.ok).toBe(true)
+    expect((await readBack('owned-schedule'))?.execution)
+      .toEqual({ mode: 'resume', resumeId: 'resume-kind-owl-abc123' })
+  })
+
+  it('refuses to assign a Session from another workspace', async () => {
+    const context = ctx({
+      resolveSessionIdentity: () => ({ workspaceId: 'ws-peer', agent: 'pi', resumable: true }),
+    })
+    const result = await run(issueCreateFactory.build(context), {
+      id: 'foreign-owner',
+      title: 'Foreign owner',
+      when: { kind: 'every', every: '30m' },
+      execution: { mode: 'resume', resumeId: 'resume-peer' },
+    })
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/another workspace/)
+  })
 })
 
 describe('issue_update', () => {
@@ -102,6 +155,7 @@ describe('issue_update', () => {
       id: 'sched',
       title: 'scheduled work',
       when: { kind: 'every', every: '30m' },
+      execution: { mode: 'fresh' },
       body: 'keep me',
     })
     const res = await run(issueUpdateFactory.build(ctx()), { id: 'sched', status: 'in_progress', priority: 'high' })
@@ -192,13 +246,14 @@ describe('global board (ctx.board present)', () => {
         tag: 'auto-quant',
         status: 'ok',
         issues: [
-          { id: 'alpha', title: 'Alpha', status: 'todo', priority: 'high', assignee: 'human' },
+          { id: 'alpha', title: 'Alpha', status: 'todo', priority: 'high', assignee: 'human', execution: { mode: 'fresh' } },
           {
             id: 'shared-a',
             title: 'Shared',
             status: 'in_progress',
             priority: 'none',
             assignee: 'ws:auto-quant',
+            execution: { mode: 'fresh' },
             when: { kind: 'every', every: '30m' },
             nameCollision: true,
           },
@@ -215,6 +270,7 @@ describe('global board (ctx.board present)', () => {
             status: 'todo',
             priority: 'low',
             assignee: 'unassigned',
+            execution: { mode: 'fresh' },
             nameCollision: true,
           },
         ],
@@ -233,6 +289,7 @@ describe('global board (ctx.board present)', () => {
         status: 'todo',
         priority: 'high',
         assignee: 'human',
+        execution: { mode: 'fresh' },
       },
       runs: [],
       inboxReports: [],
@@ -329,7 +386,7 @@ describe('global board (ctx.board present)', () => {
     const detail: IssueDetail = {
       issue: {
         id: 'alpha', title: 'Alpha', body: 'one canonical body', status: 'todo',
-        priority: 'high', assignee: 'human', what: 'one canonical prompt',
+        priority: 'high', assignee: 'human', what: 'one canonical prompt', execution: { mode: 'fresh' },
       },
       runs: [{
         taskId: 'task-1', resumeId: 'resume-kind-owl-abc123', wsId: 'ws-a', issueId: 'alpha',

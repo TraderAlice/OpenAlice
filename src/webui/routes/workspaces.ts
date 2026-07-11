@@ -735,6 +735,16 @@ export function createWorkspaceRoutes(
 
   // ── sessions ─────────────────────────────────────────────────────────────
 
+  // Safe product Session directory for attribution/ownership pickers. Native
+  // runtime ids and launcher record ids stay inside WorkspaceService.
+  app.get('/:id/resumes', async (c) => {
+    const id = c.req.param('id');
+    if (!validId(id)) return c.json({ error: 'not_found' }, 404);
+    const directory = await svc.sessionDirectory(id, 100);
+    if (!directory) return c.json({ error: 'workspace_not_found' }, 404);
+    return c.json(directory);
+  });
+
   // Materialize one product-owned conversation as a stable interactive
   // Session. The frontend supplies only resumeId; native CLI ids stay in the
   // backend ResumeRegistry.

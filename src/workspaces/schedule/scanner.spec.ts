@@ -8,8 +8,9 @@ import type { Schedule } from '../../core/schedule-expr.js'
 import type { CliAdapter } from '../cli-adapter.js'
 import type { Logger } from '../logger.js'
 import type { WorkspaceMeta, WorkspaceRegistry } from '../workspace-registry.js'
+import type { IssueExecution } from '../issues/declaration.js'
 
-import { ScheduleScanner, type MarkerStore } from './scanner.js'
+import { ScheduleScanner, type MarkerStore, type ScheduleScannerDeps } from './scanner.js'
 
 const NOW = 1_700_000_000_000 // realistic epoch ms — `every` is relative-from-0, so first-sight needs a large clock
 
@@ -69,6 +70,7 @@ interface IssueSpec {
   status?: string
   priority?: string
   agent?: string
+  execution?: IssueExecution
   body?: string
 }
 
@@ -79,6 +81,10 @@ function issueMd(spec: IssueSpec): string {
   if (spec.priority) lines.push(`priority: ${spec.priority}`)
   if (spec.what) lines.push(`what: ${spec.what}`)
   if (spec.agent) lines.push(`agent: ${spec.agent}`)
+  if (spec.execution?.mode === 'fresh') lines.push('execution: { mode: fresh }')
+  if (spec.execution?.mode === 'resume') {
+    lines.push(`execution: { mode: resume, resumeId: ${spec.execution.resumeId} }`)
+  }
   if (spec.when) {
     const w = spec.when
     const inner =
@@ -111,17 +117,19 @@ function scannerFor(
       p: string,
       t: number,
       issueId?: string,
+      resumeId?: string,
     ) => Promise<{ taskId: string }>
     markers?: MarkerStore
     now?: number
     adapter?: CliAdapter
+    resolveAdapter?: ScheduleScannerDeps['resolveAdapter']
   } = {},
 ) {
   const dispatch = opts.dispatch ?? vi.fn(async () => ({ taskId: 'run-1' }))
   const markers = opts.markers ?? new FakeMarkers()
   const scanner = new ScheduleScanner({
     registry: { list: () => workspaces } as unknown as WorkspaceRegistry,
-    resolveAdapter: () => opts.adapter ?? headlessAdapter,
+    resolveAdapter: opts.resolveAdapter ?? (() => opts.adapter ?? headlessAdapter),
     dispatch,
     markers,
     logger: noopLogger,
@@ -139,6 +147,31 @@ describe('ScheduleScanner', () => {
     // 5th arg = the firing issue's id, threaded so the run records its origin.
     expect(dispatch).toHaveBeenCalledWith(ws, headlessAdapter, 'go', expect.any(Number), 't1')
     expect(markers.get('w1', 't1')).toBe(NOW)
+  })
+
+  it('passes one exact resumeId through adapter resolution and dispatch', async () => {
+    const ws = await makeWs('w1', [{
+      id: 'owned',
+      title: 'owned work',
+      when: { kind: 'every', every: '30m' },
+      what: 'continue',
+      execution: { mode: 'resume', resumeId: 'resume-kind-owl-abc123' },
+    }])
+    const resolveAdapter = vi.fn(async () => headlessAdapter)
+    const { scanner, dispatch } = scannerFor([ws], { resolveAdapter })
+    await scanner.scan()
+
+    expect(resolveAdapter).toHaveBeenCalledWith(ws, undefined, 'resume-kind-owl-abc123')
+    expect(dispatch).toHaveBeenCalledWith(
+      ws,
+      headlessAdapter,
+      'continue',
+      expect.any(Number),
+      'owned',
+      'resume-kind-owl-abc123',
+    )
+    expect(scanner.snapshot()!.workspaces[0].tasks[0].execution)
+      .toEqual({ mode: 'resume', resumeId: 'resume-kind-owl-abc123' })
   })
 
   it('ignores an UNSCHEDULED issue (no when): never fires, never in the snapshot', async () => {

@@ -24,7 +24,14 @@
  */
 import { Hono } from 'hono'
 
-import { ISSUE_PRIORITIES, ISSUE_STATUSES, type IssuePriority, type IssueStatus } from '../../workspaces/issues/declaration.js'
+import {
+  ISSUE_PRIORITIES,
+  ISSUE_STATUSES,
+  issueExecutionSchema,
+  type IssueExecution,
+  type IssuePriority,
+  type IssueStatus,
+} from '../../workspaces/issues/declaration.js'
 import { appendIssueComment, updateIssueFields } from '../../workspaces/issues/mutate.js'
 import { isAgentRuntime } from '../../workspaces/cli-adapter.js'
 import { logger as launcherLogger } from '../../workspaces/logger.js'
@@ -77,7 +84,7 @@ export function createIssuesRoutes(svc: WorkspaceService): Hono {
 
     const body = await safeJson(c)
     const fields = body && typeof body === 'object' ? (body as Record<string, unknown>) : {}
-    const patch: { status?: IssueStatus; priority?: IssuePriority; assignee?: string; agent?: string | null } = {}
+    const patch: { status?: IssueStatus; priority?: IssuePriority; assignee?: string; agent?: string | null; execution?: IssueExecution } = {}
     if ('status' in fields) {
       const s = fields['status']
       if (typeof s !== 'string' || !ISSUE_STATUSES.includes(s as IssueStatus)) {
@@ -114,8 +121,27 @@ export function createIssuesRoutes(svc: WorkspaceService): Hono {
         patch.agent = agent
       }
     }
+    if ('execution' in fields) {
+      const execution = issueExecutionSchema.safeParse(fields['execution'])
+      if (!execution.success) {
+        return c.json({
+          error: 'invalid_execution',
+          message: 'execution must be {mode:"fresh"} or {mode:"resume",resumeId}',
+        }, 400)
+      }
+      if (execution.data.mode === 'resume') {
+        const identity = svc.resumeRegistry.get(execution.data.resumeId)
+        if (!identity || identity.wsId !== wsId) {
+          return c.json({
+            error: 'invalid_execution_owner',
+            message: 'resumeId must identify a product Session in this Workspace',
+          }, 400)
+        }
+      }
+      patch.execution = execution.data
+    }
     if (Object.keys(patch).length === 0) {
-      return c.json({ error: 'no_fields', message: 'provide at least one of status, priority, assignee, agent' }, 400)
+      return c.json({ error: 'no_fields', message: 'provide at least one of status, priority, assignee, agent, execution' }, 400)
     }
 
     try {

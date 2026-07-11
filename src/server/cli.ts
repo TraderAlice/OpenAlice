@@ -92,6 +92,14 @@ export function registerCliRoutes(app: Hono, deps: CliGatewayDeps): void {
         resolveWorkspace: makeWorkspaceResolver(getWorkspaceService),
         resolveInboxOrigin: makeInboxEntryOriginResolver(getWorkspaceService),
         ...(svc ? { sessionDirectory: (id: string, limit?: number) => svc.sessionDirectory(id, limit) } : {}),
+        ...(svc ? {
+          resolveSessionIdentity: (resumeId: string) => {
+            const identity = svc.resumeRegistry.get(resumeId)
+            return identity
+              ? { workspaceId: identity.wsId, agent: identity.agent, resumable: Boolean(identity.agentSessionId) }
+              : null
+          },
+        } : {}),
         ...(svc
           ? {
               board: {

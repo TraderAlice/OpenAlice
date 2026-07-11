@@ -48,6 +48,11 @@ function build(inboxReports: InboxEntry[] = []) {
         return undefined
       },
     },
+    resumeRegistry: {
+      get: (resumeId: string) => resumeId === 'resume-kind-owl-abc123'
+        ? { resumeId, wsId: 'ws-1', agent: 'codex', createdAt: 1, updatedAt: 1 }
+        : null,
+    },
     issueDetail: async (wsId: string, id: string) => {
       if (wsId !== 'ws-1') return null
       const r = await readWorkspaceIssues(wsDir)
@@ -102,6 +107,20 @@ describe('PATCH /api/issues/:wsId/:id', () => {
     const { app } = build()
     expect((await req(app, 'PATCH', '/ws-1/i1', { agent: 'nope' })).body.error).toBe('invalid_agent')
     expect((await req(app, 'PATCH', '/ws-1/i1', { agent: 'shell' })).body.error).toBe('invalid_agent')
+  })
+
+  it('validates and persists explicit scheduled ownership', async () => {
+    await createIssue(wsDir, { id: 'i1', title: 'T', when: { kind: 'every', every: '1h' } })
+    const { app } = build()
+    const invalid = await req(app, 'PATCH', '/ws-1/i1', { execution: { mode: 'resume' } })
+    expect(invalid.status).toBe(400)
+    expect(invalid.body.error).toBe('invalid_execution')
+
+    const updated = await req(app, 'PATCH', '/ws-1/i1', {
+      execution: { mode: 'resume', resumeId: 'resume-kind-owl-abc123' },
+    })
+    expect(updated.status).toBe(200)
+    expect(updated.body.issue.execution).toEqual({ mode: 'resume', resumeId: 'resume-kind-owl-abc123' })
   })
 
   it('400 no_fields when the body has none of the patchable fields', async () => {

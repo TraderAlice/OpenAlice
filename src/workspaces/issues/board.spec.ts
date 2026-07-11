@@ -46,6 +46,7 @@ function ws(wsId: string, titles: string[]): IssuesSnapshotWorkspace {
       status: 'todo',
       priority: 'none',
       assignee: 'unassigned',
+      execution: { mode: 'fresh' },
     })),
   }
 }
@@ -85,13 +86,14 @@ describe('flattenBoardRows', () => {
           tag: 'auto-quant',
           status: 'ok',
           issues: [
-            { id: 'x', title: 'X', status: 'todo', priority: 'high', assignee: 'human' },
+            { id: 'x', title: 'X', status: 'todo', priority: 'high', assignee: 'human', execution: { mode: 'fresh' } },
             {
               id: 'y',
               title: 'Y',
               status: 'todo',
               priority: 'none',
               assignee: 'unassigned',
+              execution: { mode: 'fresh' },
               agent: 'pi',
               when: { kind: 'every', every: '1h' },
               nameCollision: true,
@@ -110,6 +112,7 @@ describe('flattenBoardRows', () => {
         status: 'todo',
         priority: 'high',
         assignee: 'human',
+        execution: { mode: 'fresh' },
         scheduled: false,
         workspace: { wsId: 'a', tag: 'auto-quant' },
       },
@@ -120,6 +123,7 @@ describe('flattenBoardRows', () => {
         priority: 'none',
         assignee: 'unassigned',
         agent: 'pi',
+        execution: { mode: 'fresh' },
         scheduled: true,
         workspace: { wsId: 'a', tag: 'auto-quant' },
         nameCollision: true,

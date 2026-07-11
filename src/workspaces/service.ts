@@ -1130,10 +1130,16 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   );
   const scheduleScanner = new ScheduleScanner({
     registry,
-    resolveAdapter: async (ws, agentId) => resolveAdapter(
-      ws,
-      agentId ?? await resolveIssueDefaultAgentId(ws),
-    ),
+    resolveAdapter: async (ws, agentId, resumeId) => {
+      if (resumeId) {
+        const identity = resumeRegistry.get(resumeId);
+        if (!identity) throw new Error(`unknown resume conversation: ${resumeId}`);
+        if (identity.wsId !== ws.id) throw new Error(`resume conversation belongs to another workspace`);
+        return resolveAdapter(ws, identity.agent);
+      }
+      if (agentId) return resolveAdapter(ws, agentId);
+      return resolveAdapter(ws, await resolveIssueDefaultAgentId(ws));
+    },
     dispatch: dispatchHeadlessTaskMethod,
     markers: scheduleMarkers,
     logger: launcherLogger.child({ scope: 'schedule' }),

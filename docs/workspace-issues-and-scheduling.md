@@ -39,6 +39,7 @@ what: >
   Pull pre-market movers and overnight news, write research/premarket.md,
   then push the report to Inbox.
 agent: pi
+execution: { mode: fresh }
 ---
 
 Prepare a concise brief before the trading day.
@@ -56,7 +57,12 @@ The filename stem is the stable issue id. Frontmatter:
   - `{ kind: cron, cron: <5-field expression> }`
 - `what` — optional standalone headless prompt; falls back to title + body.
 - `agent` — optional CLI adapter id; otherwise Workspace/default resolution is
-  used.
+  used. It selects the runtime for `fresh`; `resume` uses the declared Session's
+  immutable runtime.
+- `execution` — scheduled ownership: `{ mode: fresh }` creates a new product
+  Session per fire; `{ mode: resume, resumeId: <id> }` continues one exact
+  accountable Session. Existing files without it remain fresh for compatibility;
+  new agent-created schedules must choose explicitly.
 
 `done` and `canceled` are terminal and stop scheduled firing. There is no
 separate `enabled` flag. A successful one-shot `at` issue is automatically
@@ -69,14 +75,14 @@ Agents normally use:
 ```bash
 alice-workspace issue list
 alice-workspace issue show --id <id-or-title>
-alice-workspace issue create --title "..."
+alice-workspace issue create --title "..." --when '{"kind":"every","every":"1h"}' --execution '{"mode":"fresh"}'
 alice-workspace issue update --id <id> --status done
 alice-workspace issue comment --id <id> --text "..."
 ```
 
 The CLI and MCP tools use the same implementation and write the same markdown
 files. Direct file editing is also valid and is the clearest way to author the
-body plus `when` / `what` / `agent` fields.
+body plus `when` / `what` / `agent` / `execution` fields.
 
 Reads such as list/show aggregate all workspaces. Writes from an autonomous or
 headless run stay inside its own Workspace. Editing a peer Workspace requires
@@ -88,6 +94,7 @@ an attended, human-approved path and a commit in the peer repository.
 .alice/issues/<id>.md
   -> ScheduleScanner (~60s)
   -> due calculation from `when` + last-fired marker
+  -> execution policy selects a fresh Session or exact resumeId
   -> headless run of the owning Workspace
   -> native agent CLI
   -> normalized reply + message/tool blocks
