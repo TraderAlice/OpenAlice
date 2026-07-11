@@ -36,6 +36,61 @@ export function buildPackagedToolchainSmokePlan(packageResult) {
     expectStdout: /\b0\.80\.6\b/,
   })
 
+  const searchTools = packageResult.manifest.searchTools?.[packageResult.platformArch]
+  if ((packageResult.platform === 'win32' || packageResult.platform === 'darwin') && !searchTools) {
+    errors.push(`[packaged-toolchain] missing managed fd/rg manifest entry ${packageResult.platformArch}`)
+    return { ok: false, errors, commands }
+  }
+  if (searchTools) {
+    const searchToolsRoot = join(packageResult.appRoot, searchTools.path)
+    const searchToolsBin = join(searchToolsRoot, searchTools.binPath)
+    const fdBinary = join(searchToolsRoot, searchTools.fd.binary)
+    const rgBinary = join(searchToolsRoot, searchTools.rg.binary)
+    const searchToolsEnv = {
+      PATH: [searchToolsBin, process.env['PATH']].filter(Boolean).join(delimiter),
+    }
+    commands.push({
+      label: 'managed fd',
+      command: fdBinary,
+      args: ['--version'],
+      expectStdout: /^fd \d+\.\d+\.\d+/m,
+    })
+    commands.push({
+      label: 'managed ripgrep',
+      command: rgBinary,
+      args: ['--version'],
+      expectStdout: /^ripgrep \d+\.\d+\.\d+/m,
+    })
+
+    const piToolsManager = join(
+      packageResult.appRoot,
+      'vendor',
+      'pi',
+      'node_modules',
+      '@earendil-works',
+      'pi-coding-agent',
+      'dist',
+      'utils',
+      'tools-manager.js',
+    )
+    const piProbe = [
+      `import(${JSON.stringify(pathToFileURL(piToolsManager).href)})`,
+      '.then((m) => console.log("OPENALICE_PI_SEARCH_TOOLS_OK " + m.getToolPath("fd") + " " + m.getToolPath("rg")))',
+      '.catch((err) => { console.error(err); process.exit(1) })',
+    ].join('')
+    commands.push({
+      label: 'managed Pi resolves packaged fd/rg without download',
+      command: electron,
+      args: ['-e', piProbe],
+      env: {
+        ...searchToolsEnv,
+        ELECTRON_RUN_AS_NODE: '1',
+        PI_CODING_AGENT_DIR: join(packageResult.appRoot, '.missing-smoke-pi-agent'),
+      },
+      expectStdout: /OPENALICE_PI_SEARCH_TOOLS_OK fd rg/,
+    })
+  }
+
   commands.push({
     label: 'workspace CLI payload through packaged Electron Node',
     command: electron,
@@ -62,8 +117,13 @@ export function buildPackagedToolchainSmokePlan(packageResult) {
     const toolchainPath = (Array.isArray(git.toolchainPaths) ? git.toolchainPaths : ['cmd', 'bin', 'usr/bin'])
       .map((entry) => join(gitRoot, entry))
       .join(delimiter)
+    const managedSearchToolsBin = searchTools
+      ? join(packageResult.appRoot, searchTools.path, searchTools.binPath)
+      : null
     const winEnv = {
-      PATH: [workspaceCliDir, toolchainPath, process.env['PATH']].filter(Boolean).join(delimiter),
+      PATH: [workspaceCliDir, managedSearchToolsBin, toolchainPath, process.env['PATH']]
+        .filter(Boolean)
+        .join(delimiter),
       CHERE_INVOKING: '1',
       MSYSTEM: packageResult.platformArch.endsWith('arm64') ? 'CLANGARM64' : 'MINGW64',
       OPENALICE_MANAGED_PI_NODE_PATH: electron,

@@ -2,13 +2,36 @@ import { describe, expect, it } from 'vitest'
 
 import {
   buildVendorRuntimeManifest,
+  requiredManagedSearchToolFiles,
   requiredWindowsGitFiles,
+  resolveManagedSearchToolsSpec,
   resolveWindowsGitRuntimeSpec,
 } from './vendor-managed-runtime.mjs'
 
 describe('vendor managed runtime helpers', () => {
   it('pins the managed Pi release', () => {
     expect(buildVendorRuntimeManifest(null).pi.version).toBe('0.80.6')
+  })
+
+  it('pins fd and ripgrep for every supported desktop architecture', () => {
+    const win = resolveManagedSearchToolsSpec({ platform: 'win32', arch: 'x64' })
+    expect(win).toMatchObject({
+      platformArch: 'win32-x64',
+      root: 'vendor/tools/win32-x64',
+      binPath: 'bin',
+      tools: {
+        fd: { version: '10.4.2', binaryName: 'fd.exe' },
+        rg: { version: '15.1.0', binaryName: 'rg.exe' },
+      },
+    })
+    expect(requiredManagedSearchToolFiles(win!)).toEqual(['bin/fd.exe', 'bin/rg.exe'])
+
+    const intelMac = resolveManagedSearchToolsSpec({ platform: 'darwin', arch: 'x64' })
+    expect(intelMac?.tools.fd.version).toBe('10.3.0')
+    expect(intelMac?.tools.rg.version).toBe('15.1.0')
+    expect(requiredManagedSearchToolFiles(intelMac!)).toEqual(['bin/fd', 'bin/rg'])
+
+    expect(resolveManagedSearchToolsSpec({ platform: 'linux', arch: 'x64' })).toBeNull()
   })
 
   it('does not select a managed Git runtime on non-Windows hosts', () => {
@@ -48,6 +71,18 @@ describe('vendor managed runtime helpers', () => {
       gitBin: 'cmd/git.exe',
       shellPath: 'bin/bash.exe',
       shPath: 'bin/sh.exe',
+    })
+  })
+
+  it('writes managed search tool metadata for the selected package architecture', () => {
+    const tools = resolveManagedSearchToolsSpec({ platform: 'darwin', arch: 'arm64' })
+    const manifest = buildVendorRuntimeManifest(null, tools)
+
+    expect(manifest.searchTools['darwin-arm64']).toMatchObject({
+      path: 'vendor/tools/darwin-arm64',
+      binPath: 'bin',
+      fd: { version: '10.4.2', binary: 'bin/fd' },
+      rg: { version: '15.1.0', binary: 'bin/rg' },
     })
   })
 })

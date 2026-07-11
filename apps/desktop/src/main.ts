@@ -233,6 +233,15 @@ function resolveManagedRuntimeEnv(opts: {
   }
 
   const toolchainPaths: string[] = []
+  const managedSearchToolsDir = existingDir(join(
+    opts.appHome,
+    'vendor',
+    'tools',
+    platformArch,
+    'bin',
+  ))
+  if (managedSearchToolsDir) toolchainPaths.push(managedSearchToolsDir)
+
   if (process.platform === 'win32') {
     const gitDir = existingDir(join(opts.appHome, 'vendor', 'git', platformArch))
     if (gitDir) {
