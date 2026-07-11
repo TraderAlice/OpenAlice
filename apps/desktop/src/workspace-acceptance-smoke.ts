@@ -127,18 +127,18 @@ export async function runRendererWorkspaceAcceptanceSmoke(
           'command -v alice-workspace >/dev/null',
           'command -v traderhub >/dev/null',
           'command -v alice-uta >/dev/null',
-          "printf '__OPENALICE_%s_OK__\\n' 'CLI_ENV'",
+          "printf '__OPENALICE_%s_OK__\\\\n' 'CLI_ENV'",
           'alice --help >/dev/null',
           'alice-workspace --help >/dev/null',
           'traderhub --help >/dev/null',
           'alice-uta --help >/dev/null',
-          "printf '__OPENALICE_%s_OK__\\n' 'CLI_MANIFESTS'",
+          "printf '__OPENALICE_%s_OK__\\\\n' 'CLI_MANIFESTS'",
           'git rev-parse --is-inside-work-tree | grep -qx true',
-          "printf '__OPENALICE_%s_OK__\\n' 'GIT'",
+          "printf '__OPENALICE_%s_OK__\\\\n' 'GIT'",
           'alice-workspace issue create --id ' + shellIssueId + ' --title "OpenAlice shell CLI contract" >/dev/null',
           'alice-workspace issue show --id ' + shellIssueId + ' >/dev/null',
           // Split the sentinel so terminal command echo cannot satisfy it.
-          "printf '__OPENALICE_%s_OK__\\n' 'WORKSPACE_CLI_CONTRACT'",
+          "printf '__OPENALICE_%s_OK__\\\\n' 'WORKSPACE_CLI_CONTRACT'",
         ].join('; ')
         bridge.send(connectionId, new TextEncoder().encode(command + '\\r'))
         await marker
