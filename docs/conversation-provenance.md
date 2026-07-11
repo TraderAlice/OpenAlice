@@ -364,6 +364,9 @@ useful without starting or messaging an agent.
 Phase 1 answers “what produced or changed this, and which Session was
 responsible?” It owns:
 
+- a safe Workspace Session directory (`alice-workspace peer sessions`) whose
+  only conversation handle is `resumeId`; it is an audit/addressing surface,
+  not permission to choose an arbitrary old Session when provenance is absent;
 - the standard `SessionOrigin` envelope;
 - immutable artifact occurrence edges and their forward/reverse indexes;
 - reliable propagation of `resumeId`, Workspace, runtime kind, and optional

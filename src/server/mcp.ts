@@ -107,6 +107,7 @@ export class McpPlugin implements Plugin {
         // workspace_path resolution — shared helper, so the two can't drift.
         resolveWorkspace: makeWorkspaceResolver(getWorkspaceService),
         resolveInboxOrigin: makeInboxEntryOriginResolver(getWorkspaceService),
+        ...(svc ? { sessionDirectory: (id: string, limit?: number) => svc.sessionDirectory(id, limit) } : {}),
         ...(svc
           ? {
               board: {

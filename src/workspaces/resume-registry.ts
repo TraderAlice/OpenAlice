@@ -73,6 +73,15 @@ export class ResumeRegistry {
     return this.records.get(resumeId) ?? null
   }
 
+  /** Backend records newest-first. Callers must project them before crossing an
+   * API/tool boundary because records also carry the native runtime mapping. */
+  list(opts: { wsId?: string; limit?: number } = {}): ResumeIdentityRecord[] {
+    const records = [...this.records.values()]
+      .filter((record) => !opts.wsId || record.wsId === opts.wsId)
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+    return opts.limit && opts.limit > 0 ? records.slice(0, opts.limit) : records
+  }
+
   async ensure(input: {
     resumeId?: string
     wsId: string

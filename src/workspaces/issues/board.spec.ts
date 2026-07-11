@@ -6,10 +6,34 @@ import {
   detailIssue,
   flattenBoardRows,
   inboxReportsForIssue,
+  issueRunRecord,
   snapshotBoardIssue,
   type IssuesSnapshot,
   type IssuesSnapshotWorkspace,
 } from './board.js'
+
+describe('issueRunRecord', () => {
+  it('projects a resumable run without leaking its native runtime session id', () => {
+    const projected = issueRunRecord({
+      taskId: 'task-1',
+      resumeId: 'resume-gentle-otter-abc123',
+      wsId: 'ws-1',
+      issueId: 'audit',
+      agent: 'codex',
+      prompt: 'inspect it',
+      status: 'done',
+      startedAt: 1,
+      agentSessionId: 'native-secret-id',
+    }, true)
+
+    expect(projected).toMatchObject({
+      taskId: 'task-1',
+      resumeId: 'resume-gentle-otter-abc123',
+      resumable: true,
+    })
+    expect(projected).not.toHaveProperty('agentSessionId')
+  })
+})
 
 function ws(wsId: string, titles: string[]): IssuesSnapshotWorkspace {
   return {

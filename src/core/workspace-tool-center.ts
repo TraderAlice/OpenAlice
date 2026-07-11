@@ -32,6 +32,7 @@ import type { IProvenanceStore } from './provenance-store.js'
 // core/ free of any runtime dependency on the workspaces/ module (no
 // core→workspaces coupling), while letting the board reader below be typed.
 import type { IssuesSnapshot, IssueDetail, WikilinkIssueRef } from '../workspaces/issues/board.js'
+import type { WorkspaceSessionDirectory } from '../workspaces/session-directory.js'
 
 // ==================== Context handed to factories ====================
 
@@ -65,6 +66,9 @@ export interface WorkspaceToolContext {
    * without rewriting their stored history.
    */
   resolveInboxOrigin?: (entry: InboxEntry) => InboxOrigin | undefined
+  /** Safe per-workspace conversation directory. It exposes product resumeIds,
+   * never adapter-native session ids or launcher record ids. */
+  sessionDirectory?: (workspaceId: string, limit?: number) => Promise<WorkspaceSessionDirectory | null>
   /** Agent-INVISIBLE run provenance, resolved server-side from the
    *  `x-openalice-run` header by the MCP / CLI route (never supplied by the
    *  agent). Factories pass it through to call sites (e.g. inbox_push →

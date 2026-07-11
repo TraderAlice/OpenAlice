@@ -91,6 +91,7 @@ export function registerCliRoutes(app: Hono, deps: CliGatewayDeps): void {
         // mcp.ts build site so the two never drift.
         resolveWorkspace: makeWorkspaceResolver(getWorkspaceService),
         resolveInboxOrigin: makeInboxEntryOriginResolver(getWorkspaceService),
+        ...(svc ? { sessionDirectory: (id: string, limit?: number) => svc.sessionDirectory(id, limit) } : {}),
         ...(svc
           ? {
               board: {

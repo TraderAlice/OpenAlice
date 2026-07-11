@@ -51,4 +51,14 @@ describe('ResumeRegistry', () => {
     expect(record.resumeId).toBe(legacyId)
     expect((await ResumeRegistry.load(path, noopLogger)).get(legacyId)?.resumeId).toBe(legacyId)
   })
+
+  it('lists one workspace newest-first for directory projection', async () => {
+    const registry = await ResumeRegistry.load(path, noopLogger)
+    await registry.ensure({ resumeId: 'resume-old', wsId: 'ws-1', agent: 'pi', now: 1 })
+    await registry.ensure({ resumeId: 'resume-other', wsId: 'ws-2', agent: 'codex', now: 3 })
+    await registry.ensure({ resumeId: 'resume-new', wsId: 'ws-1', agent: 'claude', now: 2 })
+
+    expect(registry.list({ wsId: 'ws-1' }).map((record) => record.resumeId))
+      .toEqual(['resume-new', 'resume-old'])
+  })
 })

@@ -19,6 +19,7 @@ import { createThinkingTools } from '../tool/thinking.js'
 import { inboxPushFactory } from '../tool/inbox-push.js'
 import { inboxReadFactory } from '../tool/inbox-read.js'
 import { workspacePathFactory } from '../tool/workspace-path.js'
+import { workspaceSessionsFactory } from '../tool/workspace-sessions.js'
 import { entityUpsertFactory } from '../tool/entity-upsert.js'
 import { entitySearchFactory } from '../tool/entity-search.js'
 import { issueToolFactories } from '../tool/issue-tools.js'
@@ -84,6 +85,7 @@ describe('CLI_EXPORTS — workspace export (scoped collaboration tools)', () => 
   wtc.register(inboxPushFactory)
   wtc.register(inboxReadFactory)
   wtc.register(workspacePathFactory)
+  wtc.register(workspaceSessionsFactory)
   wtc.register(entityUpsertFactory)
   wtc.register(entitySearchFactory)
   for (const f of issueToolFactories) wtc.register(f)

@@ -163,6 +163,7 @@ export const CLI_EXPORTS: Record<string, CliExport> = {
       // that peer's files with native tools — cross-workspace collaboration.
       peer: {
         path: 'workspace_path',
+        sessions: 'workspace_sessions',
       },
       // track: the durable cross-workspace tracked-entity index ([[name]]).
       track: {

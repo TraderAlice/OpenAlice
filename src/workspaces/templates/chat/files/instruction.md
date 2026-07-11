@@ -28,7 +28,7 @@ Discover any command live with `<cli> --help` and `<cli> <group> <verb> --help`
 |---|---|---|
 | `alice` | **Research & data** — collected-RSS archive, symbol search (barIds), quant analysis | `alice` |
 | `alice-uta` | **Trading** — accounts, portfolio, orders, positions, trading-as-git approval (MUTATES real broker state) | `alice-uta` |
-| `alice-workspace` | **Collaboration** — push/read the user's Inbox, locate a peer workspace's files (`peer path`), track entities, the shared issue board | `alice-workspace` |
+| `alice-workspace` | **Collaboration** — push/read Inbox, locate peer files (`peer path`) and product Sessions (`peer sessions`), track entities, the shared issue board | `alice-workspace` |
 | `traderhub` | **Low-frequency market data** — fundamentals, macro series, calendars, ETF, boards, shipping, Fed | `traderhub` |
 
 ```bash
@@ -89,6 +89,12 @@ always fine. Collaboration runs on git, so:
   workspace. If you do edit a peer (with approval), commit it in that repo with a
   clear message so the owner can review or revert it — never edit-and-walk-away.
 
+When an artifact already identifies a `resumeId`, inspect that workspace with
+`alice-workspace peer sessions --id <workspaceId>`. This directory exposes only
+OpenAlice's product Session handle, never a runtime-native session id. If the
+artifact has no exact owner, do not pick an arbitrary old Session; the later
+collaboration flow must recruit a fresh Session at that Workspace.
+
 ## Issues — your standing work list
 
 An issue board spans every workspace and persists intent across sessions. In
@@ -107,6 +113,7 @@ issue in full (body + run history + inbox reports). You pass the issue's
 ```bash
 alice-workspace issue list                 # scan every workspace's issue titles
 alice-workspace issue show --id ai-power-rotation   # then read one in full, by name
+alice-workspace issue show --id ai-power-rotation --mode detailed  # only when every run prompt is needed
 alice-workspace issue create --title "Watch AI power names" --priority high
 ```
 

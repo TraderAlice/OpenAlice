@@ -13,7 +13,11 @@
 
 import type { InboxEntry } from '../../core/inbox-store.js'
 import type { Schedule } from '../../core/schedule-expr.js'
-import type { HeadlessTaskRecord } from '../headless-task-registry.js'
+import type {
+  HeadlessTaskOutputSummary,
+  HeadlessTaskRecord,
+  HeadlessTaskStatus,
+} from '../headless-task-registry.js'
 import type { IssuePriority, IssueRecord, IssueStatus } from './declaration.js'
 
 /** One board row: the issue's display fields, plus — iff it self-schedules — its
@@ -218,12 +222,60 @@ export interface IssueDetailIssue {
  *  the inbox reports it produced. */
 export interface IssueDetail {
   issue: IssueDetailIssue
-  /** This issue's headless runs (wsId + issueId match), newest first. */
-  runs: HeadlessTaskRecord[]
+  /** This issue's headless runs (wsId + issueId match), newest first.
+   *  Runtime-native session ids are deliberately not part of this projection. */
+  runs: IssueRunRecord[]
   /** Inbox reports this issue produced — entries whose server-stamped
    *  `origin.issueId` is this issue, newest-first. The issue→inbox direction of
    *  the cross-link (`runs` is the run→issue one). */
   inboxReports: InboxEntry[]
+}
+
+/** Agent/UI-safe projection of one execution. `resumeId` is the only public
+ * conversation handle; adapter-native session ids stay in ResumeRegistry. */
+export interface IssueRunRecord {
+  taskId: string
+  resumeId: string
+  parentTaskId?: string
+  wsId: string
+  issueId?: string
+  agent: string
+  prompt: string
+  status: HeadlessTaskStatus
+  startedAt: number
+  finishedAt?: number
+  durationMs?: number
+  exitCode?: number | null
+  signal?: string | null
+  killed?: boolean
+  error?: string
+  output?: HeadlessTaskOutputSummary
+  /** Whether OpenAlice currently has a native runtime mapping for resumeId. */
+  resumable: boolean
+}
+
+/** Explicit whitelist: do not spread HeadlessTaskRecord here. Old registry
+ * records may contain adapter-specific compatibility fields. */
+export function issueRunRecord(task: HeadlessTaskRecord, resumable: boolean): IssueRunRecord {
+  return {
+    taskId: task.taskId,
+    resumeId: task.resumeId,
+    ...(task.parentTaskId ? { parentTaskId: task.parentTaskId } : {}),
+    wsId: task.wsId,
+    ...(task.issueId ? { issueId: task.issueId } : {}),
+    agent: task.agent,
+    prompt: task.prompt,
+    status: task.status,
+    startedAt: task.startedAt,
+    ...(task.finishedAt !== undefined ? { finishedAt: task.finishedAt } : {}),
+    ...(task.durationMs !== undefined ? { durationMs: task.durationMs } : {}),
+    ...(task.exitCode !== undefined ? { exitCode: task.exitCode } : {}),
+    ...(task.signal !== undefined ? { signal: task.signal } : {}),
+    ...(task.killed !== undefined ? { killed: task.killed } : {}),
+    ...(task.error !== undefined ? { error: task.error } : {}),
+    ...(task.output !== undefined ? { output: task.output } : {}),
+    resumable,
+  }
 }
 
 /** Filter a workspace's inbox entries to the ones a given issue produced

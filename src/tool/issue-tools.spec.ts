@@ -318,10 +318,36 @@ describe('global board (ctx.board present)', () => {
   it('issue_show returns full detail for a unique name', async () => {
     const show = await run(issueShowFactory.build(boardCtx()), { id: 'Alpha' })
     expect(show.ok).toBe(true)
+    expect(show.mode).toBe('summary')
     expect(show.issue).toMatchObject({ id: 'alpha', body: 'the alpha body' })
     expect(show.runs).toEqual([])
     expect(show.inboxReports).toEqual([])
     expect(show.ambiguous).toBeUndefined()
+  })
+
+  it('issue_show keeps repeated prompts out of summary mode but includes them on request', async () => {
+    const detail: IssueDetail = {
+      issue: {
+        id: 'alpha', title: 'Alpha', body: 'one canonical body', status: 'todo',
+        priority: 'high', assignee: 'human', what: 'one canonical prompt',
+      },
+      runs: [{
+        taskId: 'task-1', resumeId: 'resume-kind-owl-abc123', wsId: 'ws-a', issueId: 'alpha',
+        agent: 'codex', prompt: 'large repeated execution prompt', status: 'done', startedAt: 1,
+        resumable: true,
+      }],
+      inboxReports: [],
+    }
+    const context = boardCtx({ detail: async () => detail })
+
+    const summary = await run(issueShowFactory.build(context), { id: 'Alpha' })
+    expect(JSON.stringify(summary)).not.toContain('large repeated execution prompt')
+    expect(summary.runs).toEqual([expect.objectContaining({
+      taskId: 'task-1', resumeId: 'resume-kind-owl-abc123', resumable: true,
+    })])
+
+    const detailed = await run(issueShowFactory.build(context), { id: 'Alpha', mode: 'detailed' })
+    expect(JSON.stringify(detailed)).toContain('large repeated execution prompt')
   })
 
   it('issue_show returns an ambiguous candidate list for a colliding name', async () => {

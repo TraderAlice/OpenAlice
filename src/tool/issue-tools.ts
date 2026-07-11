@@ -405,16 +405,18 @@ export const issueShowFactory: WorkspaceToolFactory = {
         'Show one issue from the global board in full — resolved by its NAME',
         '(case-insensitive id OR title), across every workspace.',
         '',
-        'Returns the full detail: frontmatter + markdown body (incl. any',
-        '`## Comments`), the run history, and the inbox reports the issue produced.',
+        'Summary mode (default) returns the issue once plus compact execution and',
+        'report references. Detailed mode includes each run prompt and full report.',
         'If the name matches issues in MORE THAN ONE workspace, returns',
         '`ambiguous` (candidate { wsId, wsTag, id, title } list) — pick one by',
         'workspace and call again. Use this before updating or commenting.',
       ].join('\n'),
       inputSchema: z.object({
         id: z.string().min(1).describe("The issue's name to show — its id OR title (case-insensitive)."),
+        mode: z.enum(['summary', 'detailed']).optional().default('summary'),
       }),
-      execute: async ({ id }) => {
+      execute: async ({ id, mode }) => {
+        const outputMode = mode ?? 'summary'
         // GLOBAL by-name resolution when the service-backed reader is wired.
         // Handle-addressed: the agent never supplies a wsId UUID up front; a
         // collision returns candidates so it can disambiguate by workspace.
@@ -422,7 +424,36 @@ export const issueShowFactory: WorkspaceToolFactory = {
           const refs = await ctx.board.resolveByName(id)
           if (refs.length === 1) {
             const detail = await ctx.board.detail(refs[0].wsId, refs[0].id)
-            if (detail) return { ok: true as const, ...detail }
+            if (detail) {
+              if (outputMode === 'detailed') return { ok: true as const, mode: outputMode, ...detail }
+              return {
+                ok: true as const,
+                mode: outputMode,
+                issue: detail.issue,
+                runs: detail.runs.map((run) => ({
+                  taskId: run.taskId,
+                  resumeId: run.resumeId,
+                  ...(run.parentTaskId ? { parentTaskId: run.parentTaskId } : {}),
+                  agent: run.agent,
+                  status: run.status,
+                  startedAt: run.startedAt,
+                  ...(run.durationMs !== undefined ? { durationMs: run.durationMs } : {}),
+                  ...(run.error ? { error: run.error } : {}),
+                  ...(run.output ? { output: run.output } : {}),
+                  resumable: run.resumable,
+                })),
+                inboxReports: detail.inboxReports.map((entry) => ({
+                  id: entry.id,
+                  workspaceId: entry.workspaceId,
+                  workspaceLabel: entry.workspaceLabel,
+                  ts: entry.ts,
+                  ...(entry.docs ? { docs: entry.docs.map((doc) => ({ path: doc.path })) } : {}),
+                  ...(entry.comments ? { comments: entry.comments } : {}),
+                  ...(entry.origin ? { origin: entry.origin } : {}),
+                })),
+                hint: 'Use --mode detailed only when you need every execution prompt and full report metadata.',
+              }
+            }
             // detail vanished between resolve and read → fall through to self.
           } else if (refs.length > 1) {
             return {

@@ -4,7 +4,8 @@ description: >
   Agent collaboration on your shell PATH via the `alice-workspace` CLI: push
   finished work to the user's Inbox (`inbox push`, with repeatable `--doc`
   file attachments), read the inbox back (`inbox read`, `--self` for your own
-  pushes), locate a peer workspace's files to read/edit them (`peer path`),
+  pushes), locate a peer workspace's files (`peer path`) and product Sessions
+  (`peer sessions`),
   track entities across workspaces (`track`), and read & manage the
   cross-workspace issue board (`issue list`/`show`/`create`/`update`/`comment`).
   Use for: "push my findings to the inbox", "surface this report to the user",
@@ -55,6 +56,7 @@ own file tools:
 ```bash
 # --id is the `workspaceId` from an inbox_read entry (a uuid), e.g.:
 alice-workspace peer path --id 550e8400-e29b-41d4-a716-446655440000
+alice-workspace peer sessions --id 550e8400-e29b-41d4-a716-446655440000
 # -> { path: "/…/workspaces/550e8400-…", tag, id }
 # then read <path>/<the doc path from the inbox entry> with your native tools
 ```
@@ -84,7 +86,8 @@ It's *what's on the plate* when you've lost the thread — scan it when you star
 ```bash
 alice-workspace issue list                  # startup-safe summary: local + active urgent/high/medium rows
 alice-workspace issue list --mode detailed  # full global board, including low-priority scheduled noise
-alice-workspace issue show --id <name>      # one issue in full — body + run history + inbox reports (resolves the name across the board)
+alice-workspace issue show --id <name>      # compact issue + resumeId run/report references
+alice-workspace issue show --id <name> --mode detailed  # every execution prompt + full reports
 alice-workspace issue create --title "…"    # a new issue on THIS workspace's board
 alice-workspace issue update --id <id> --status in_progress
 alice-workspace issue comment --id <id> --text "progress note / finding"
