@@ -11,7 +11,15 @@
 
 import { useMemo, useState, type ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronDown, ChevronRight, FolderPlus, Plus, Settings as SettingsIcon, X } from 'lucide-react'
+import {
+  ChevronDown,
+  ChevronRight,
+  FolderPlus,
+  MessageSquarePlus,
+  Plus,
+  Settings as SettingsIcon,
+  X,
+} from 'lucide-react'
 
 import { useWorkspaces } from '../../contexts/workspaces-context'
 import { Skeleton } from '../StateViews'
@@ -77,27 +85,33 @@ export function ChatWorkspaceSection(): ReactElement | null {
 
   return (
     <>
-      {/* A conversation is a Session inside the recent Chat Workspace; creating
-          a new Workspace is a separate, explicit context-boundary action. */}
-      <div className="px-2 pt-2 pb-1.5">
-        <div className="grid grid-cols-2 gap-1">
-          <button
-            type="button"
-            onClick={() => openOrFocus({ kind: 'chat-landing', params: {} })}
-            className="min-w-0 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg border border-border/60 bg-bg-tertiary/30 text-[12px] font-medium text-text-muted transition-colors hover:text-text hover:border-accent/50 hover:bg-bg-tertiary/60"
-          >
-            <Plus size={14} strokeWidth={2.25} className="shrink-0" />
-            <span className="truncate">{t('chat.newChat')}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowCreate(true)}
-            className="min-w-0 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg border border-border/60 bg-bg-tertiary/15 text-[12px] font-medium text-text-muted transition-colors hover:text-text hover:border-accent/50 hover:bg-bg-tertiary/50"
-          >
-            <FolderPlus size={14} strokeWidth={2} className="shrink-0" />
-            <span className="truncate">{t('chat.newWorkspace')}</span>
-          </button>
-        </div>
+      {/* Starting a conversation is the primary action. Creating a Workspace is
+          a lower-frequency context-boundary action attached to the list it
+          affects, rather than a competing half-width CTA. */}
+      <div className="px-2 pt-2 pb-1">
+        <button
+          type="button"
+          onClick={() => openOrFocus({ kind: 'chat-landing', params: {} })}
+          className="flex w-full items-center gap-2 rounded-lg border border-accent/25 bg-accent/10 px-3 py-2.5 text-left text-[13px] font-medium text-text transition-colors hover:border-accent/45 hover:bg-accent/15"
+        >
+          <Plus size={15} strokeWidth={2.25} className="shrink-0 text-accent" />
+          <span>{t('chat.newChat')}</span>
+        </button>
+      </div>
+
+      <div className="flex items-center justify-between gap-2 px-3 pb-1 pt-1.5">
+        <span className="min-w-0 truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-text-muted/60">
+          {t('nav.item.workspaces')}
+        </span>
+        <button
+          type="button"
+          onClick={() => setShowCreate(true)}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-text-muted/65 transition-colors hover:bg-bg-tertiary hover:text-text"
+          title={t('chat.newWorkspace')}
+          aria-label={t('chat.newWorkspace')}
+        >
+          <FolderPlus size={14} strokeWidth={2} />
+        </button>
       </div>
 
       {showCreate && (
@@ -135,7 +149,17 @@ export function ChatWorkspaceSection(): ReactElement | null {
           </li>
         )}
         {ctx.hasLoaded && chatWorkspaces.length === 0 && !showListError && (
-          <li className="px-3 py-2 text-[12px] text-text-muted/60">{t('chat.noChatWorkspacesYet')}</li>
+          <li className="px-3 py-2.5">
+            <p className="text-[12px] text-text-muted/60">{t('chat.noChatWorkspacesYet')}</p>
+            <button
+              type="button"
+              onClick={() => setShowCreate(true)}
+              className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-medium text-text-muted transition-colors hover:text-text"
+            >
+              <FolderPlus size={13} strokeWidth={2} />
+              <span>{t('chat.newWorkspace')}</span>
+            </button>
+          </li>
         )}
         {showListError && <li className="px-3 py-1 text-[11px] text-red">{ctx.listError}</li>}
         {chatWorkspaces.map((w) => (
@@ -269,8 +293,9 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
             </span>
           )}
         </button>
-        {/* Always-visible "+" — spawn a fresh agent runtime in THIS day's
-            workspace (vs "New chat" which starts a whole new one). */}
+        {/* Always-visible conversation action for THIS workspace. The icon is
+            intentionally distinct from the global New chat and New workspace
+            actions so three different meanings do not collapse into bare +s. */}
         <button
           type="button"
           onClick={(e) => {
@@ -281,7 +306,7 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
           title={t('chat.newSession')}
           aria-label={t('chat.newSession')}
         >
-          <Plus size={13} strokeWidth={2.25} />
+          <MessageSquarePlus size={13} strokeWidth={2.1} />
         </button>
         <span className="shrink-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
