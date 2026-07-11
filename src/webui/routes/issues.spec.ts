@@ -58,7 +58,7 @@ function build(inboxReports: InboxEntry[] = []) {
       const r = await readWorkspaceIssues(wsDir)
       if (!r.ok) return null
       const issue = r.issues.find((i) => i.id === id)
-      return issue ? { issue: detailIssue(issue, null), runs: [], inboxReports } : null
+      return issue ? { issue: detailIssue(issue, null), runs: [], inboxReports, provenance: [] } : null
     },
     provenanceStore: { append: appendProvenance, list: vi.fn(), latest: vi.fn() },
   } as unknown as WorkspaceService

@@ -26,6 +26,28 @@ export type IssueExecution =
   | { mode: 'fresh' }
   | { mode: 'resume'; resumeId: string }
 
+export type IssueProvenanceAction = 'created' | 'updated' | 'commented' | 'sent' | 'decided'
+export type IssueProvenanceOrigin =
+  | {
+      kind: 'session'
+      workspaceId: string
+      resumeId: string
+      agent: string
+      execution?:
+        | { kind: 'headless'; taskId: string }
+        | { kind: 'interactive'; sessionRecordId: string }
+    }
+  | { kind: 'human' }
+  | { kind: 'external'; system: string }
+  | { kind: 'unknown'; reason: string }
+
+export interface IssueProvenanceRecord {
+  id: string
+  action: IssueProvenanceAction
+  origin: IssueProvenanceOrigin
+  at: number
+}
+
 export interface IssueListItem {
   id: string
   title: string
@@ -149,6 +171,9 @@ export interface IssueDetail {
    * issue with no reports yields an empty array.
    */
   inboxReports?: InboxEntry[]
+  /** Immutable creation/update/comment attribution, newest first. Optional for
+   * legacy/demo payloads written before provenance projection existed. */
+  provenance?: IssueProvenanceRecord[]
 }
 
 export const issuesApi = {

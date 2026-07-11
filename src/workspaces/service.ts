@@ -58,6 +58,7 @@ import {
   annotateNameCollisions,
   detailIssue,
   inboxReportsForIssue,
+  issueProvenanceRecords,
   snapshotBoardIssue,
   type IssueDetail,
   issueRunRecord,
@@ -1286,7 +1287,10 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         return { ...entry, ...(origin ? { origin } : { origin: undefined }) };
       });
     }
-    return { issue: detailIssue(issue, markers, ws.tag), runs, inboxReports };
+    const provenance = issueProvenanceRecords(provenanceStore.list({
+      artifact: { kind: 'issue', workspaceId: ws.id, issueId: issue.id },
+    }));
+    return { issue: detailIssue(issue, markers, ws.tag), runs, inboxReports, provenance };
   };
 
   const sessionDirectory = async (

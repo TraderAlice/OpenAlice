@@ -12,6 +12,11 @@
  */
 
 import type { InboxEntry } from '../../core/inbox-store.js'
+import type {
+  ArtifactOrigin,
+  ProvenanceAction,
+  ProvenanceRecord,
+} from '../../core/provenance-store.js'
 import type { Schedule } from '../../core/schedule-expr.js'
 import type {
   HeadlessTaskOutputSummary,
@@ -236,6 +241,23 @@ export interface IssueDetail {
    *  `origin.issueId` is this issue, newest-first. The issue→inbox direction of
    *  the cross-link (`runs` is the run→issue one). */
   inboxReports: InboxEntry[]
+  /** Immutable attribution events for this Issue, newest first. The product
+   *  `resumeId` is the only conversation handle exposed for Session origins. */
+  provenance: IssueProvenanceRecord[]
+}
+
+export interface IssueProvenanceRecord {
+  id: string
+  action: ProvenanceAction
+  origin: ArtifactOrigin
+  at: number
+}
+
+/** Strip persistence-only artifact/fingerprint fields from Issue detail. */
+export function issueProvenanceRecords(
+  records: readonly ProvenanceRecord[],
+): IssueProvenanceRecord[] {
+  return records.map(({ id, action, origin, at }) => ({ id, action, origin, at }))
 }
 
 /** Agent/UI-safe projection of one execution. `resumeId` is the only public

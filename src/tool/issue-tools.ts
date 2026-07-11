@@ -516,6 +516,7 @@ export const issueShowFactory: WorkspaceToolFactory = {
                   ...(entry.comments ? { comments: entry.comments } : {}),
                   ...(entry.origin ? { origin: entry.origin } : {}),
                 })),
+                provenance: detail.provenance,
                 hint: 'Use --mode detailed only when you need every execution prompt and full report metadata.',
               }
             }

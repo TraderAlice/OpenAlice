@@ -6,11 +6,46 @@ import {
   detailIssue,
   flattenBoardRows,
   inboxReportsForIssue,
+  issueProvenanceRecords,
   issueRunRecord,
   snapshotBoardIssue,
   type IssuesSnapshot,
   type IssuesSnapshotWorkspace,
 } from './board.js'
+
+describe('issueProvenanceRecords', () => {
+  it('keeps product Session attribution while stripping storage-only fields', () => {
+    const projected = issueProvenanceRecords([{
+      id: 'p-1',
+      artifact: { kind: 'issue', workspaceId: 'ws-1', issueId: 'audit' },
+      action: 'created',
+      origin: {
+        kind: 'session',
+        workspaceId: 'ws-1',
+        resumeId: 'resume-gentle-otter-abc123',
+        agent: 'codex',
+        execution: { kind: 'headless', taskId: 'task-1' },
+      },
+      at: 123,
+      fingerprint: 'internal-dedupe-key',
+    }])
+
+    expect(projected).toEqual([{
+      id: 'p-1',
+      action: 'created',
+      origin: {
+        kind: 'session',
+        workspaceId: 'ws-1',
+        resumeId: 'resume-gentle-otter-abc123',
+        agent: 'codex',
+        execution: { kind: 'headless', taskId: 'task-1' },
+      },
+      at: 123,
+    }])
+    expect(projected[0]).not.toHaveProperty('artifact')
+    expect(projected[0]).not.toHaveProperty('fingerprint')
+  })
+})
 
 describe('issueRunRecord', () => {
   it('projects a resumable run without leaking its native runtime session id', () => {

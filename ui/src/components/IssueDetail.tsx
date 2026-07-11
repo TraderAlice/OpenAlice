@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { ArrowLeft, Hash, Inbox, ListChecks, Settings, TrendingUp, X } from 'lucide-react'
+import { ArrowLeft, Hash, History, Inbox, ListChecks, Settings, TrendingUp, X } from 'lucide-react'
 
 import type { HeadlessTaskRecord, HeadlessTaskStatus } from '../api/headless'
 import type { InboxEntry } from '../api/inbox'
@@ -9,6 +9,7 @@ import type {
   IssueDetailIssue,
   IssueExecution,
   IssuePriority,
+  IssueProvenanceRecord,
   IssueStatus,
   WikilinkIssueRef,
   WikilinkResolution,
@@ -594,6 +595,91 @@ function InboxReportsSection({
   )
 }
 
+// ==================== Provenance timeline (Issue → Session) ====================
+
+const PROVENANCE_ACTION_LABEL: Record<IssueProvenanceRecord['action'], string> = {
+  created: 'Created',
+  updated: 'Updated',
+  commented: 'Commented',
+  sent: 'Sent',
+  decided: 'Decided',
+}
+
+function ProvenanceTimeline({
+  records,
+  onContinue,
+}: {
+  records: IssueProvenanceRecord[]
+  onContinue: (record: IssueProvenanceRecord) => Promise<void>
+}) {
+  const [continuingId, setContinuingId] = useState<string | null>(null)
+  const [continueError, setContinueError] = useState<string | null>(null)
+
+  const continueSession = async (record: IssueProvenanceRecord) => {
+    setContinuingId(record.id)
+    setContinueError(null)
+    try {
+      await onContinue(record)
+    } catch (err) {
+      setContinueError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setContinuingId(null)
+    }
+  }
+
+  return (
+    <section className="mt-8">
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted/70">Provenance</h3>
+      {records.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-border px-4 py-4 text-center text-xs text-muted">
+          No attribution was recorded for this legacy or manually-created issue.
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {records.map((record) => {
+            const origin = record.origin
+            const isSession = origin.kind === 'session'
+            const originLabel = isSession
+              ? `${origin.agent} · ${origin.resumeId}`
+              : origin.kind === 'human'
+                ? 'Human'
+                : origin.kind === 'external'
+                  ? `External · ${origin.system}`
+                  : `Unknown · ${origin.reason}`
+            return (
+              <li key={record.id} className="flex items-center gap-2.5 rounded-lg border border-border bg-bg-secondary px-3 py-2.5">
+                <History size={14} className="shrink-0 text-muted/70" aria-hidden />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-text">{PROVENANCE_ACTION_LABEL[record.action]}</span>
+                    <span className="text-xs text-muted" title={new Date(record.at).toLocaleString()}>
+                      {formatRelativeTime(record.at)}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 truncate font-mono text-[11px] text-muted" title={originLabel}>
+                    {originLabel}
+                  </p>
+                </div>
+                {isSession && (
+                  <button
+                    type="button"
+                    onClick={() => void continueSession(record)}
+                    disabled={continuingId !== null}
+                    className="shrink-0 rounded-md border border-border px-2 py-1 text-[11px] text-muted transition-colors hover:border-accent/50 hover:text-text disabled:cursor-wait disabled:opacity-50"
+                  >
+                    {continuingId === record.id ? 'Opening…' : 'Continue'}
+                  </button>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      {continueError && <p className="mt-2 text-xs text-red-400">Could not continue Session: {continueError}</p>}
+    </section>
+  )
+}
+
 // ==================== Wikilink disambiguation picker ====================
 
 /**
@@ -713,7 +799,7 @@ export function IssueDetail({
 }: IssueDetailProps) {
   const { data, error, loading, mutate } = useIssueDetail(wsId, id)
   const { data: board } = useIssues()
-  const { agents, defaultAgent, issueDefaultAgent, openAgentConfig, workspaces } = useWorkspaces()
+  const { agents, defaultAgent, issueDefaultAgent, openAgentConfig, openHeadlessRun, workspaces } = useWorkspaces()
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const setSidebar = useWorkspace((s) => s.setSidebar)
   const selectInboxEntry = useInboxSelection((s) => s.select)
@@ -776,6 +862,17 @@ export function IssueDetail({
       openOrFocus({ kind: 'inbox', params: {} })
     },
     [selectInboxEntry, markInboxRead, setSidebar, openOrFocus],
+  )
+
+  const continueProvenanceSession = useCallback(
+    async (record: IssueProvenanceRecord) => {
+      if (record.origin.kind !== 'session') return
+      setSidebar('workspaces')
+      await openHeadlessRun(record.origin.workspaceId, record.origin.resumeId, {
+        title: `${data?.issue.title ?? id} · ${record.action}`,
+      })
+    },
+    [data?.issue.title, id, openHeadlessRun, setSidebar],
   )
 
   // Clicking a `[[name]]` in the body resolves it across BOTH namespaces. A
@@ -872,6 +969,7 @@ export function IssueDetail({
 
   const { issue, runs } = data
   const inboxReports = data.inboxReports ?? []
+  const provenance = data.provenance ?? []
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-5 md:px-6">
@@ -891,6 +989,7 @@ export function IssueDetail({
             )}
           </div>
           <CommentComposer wsId={wsId} id={id} onPosted={mutate} />
+          <ProvenanceTimeline records={provenance} onContinue={continueProvenanceSession} />
           <ActivityFeed runs={runs} />
           <InboxReportsSection reports={inboxReports} onOpen={gotoInbox} />
         </main>

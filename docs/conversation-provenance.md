@@ -127,7 +127,7 @@ type ArtifactRef =
 
 interface ProvenanceEdge {
   artifact: ArtifactRef
-  action: 'created' | 'updated' | 'sent' | 'decided'
+  action: 'created' | 'updated' | 'commented' | 'sent' | 'decided'
   origin: SessionOrigin | { kind: 'human' } | { kind: 'external'; system: string }
   at: number
 }
@@ -231,6 +231,13 @@ An Issue has two independent identity questions:
    Session, or should the Workspace pull a fresh worker every time?
 
 Creating an Issue must explicitly choose one execution mode.
+
+Issue detail and `alice-workspace issue show` expose the immutable
+`created` / `updated` / `commented` occurrences newest-first. Session origins
+carry a product `resumeId`, so a human or agent can continue that exact author
+without learning a runtime-native session id. Missing history remains visibly
+unattributed for legacy or manual files; it is never inferred from the current
+assignee, scheduled owner, or Workspace default runtime.
 
 #### Mode A: one responsible Session
 

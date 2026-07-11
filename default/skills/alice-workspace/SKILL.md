@@ -87,7 +87,7 @@ It's *what's on the plate* when you've lost the thread — scan it when you star
 ```bash
 alice-workspace issue list                  # startup-safe summary: local + active urgent/high/medium rows
 alice-workspace issue list --mode detailed  # full global board, including low-priority scheduled noise
-alice-workspace issue show --id <name>      # compact issue + resumeId run/report references
+alice-workspace issue show --id <name>      # compact issue + provenance/resumeId run/report references
 alice-workspace issue show --id <name> --mode detailed  # every execution prompt + full reports
 alice-workspace issue create --title "…"    # a new issue on THIS workspace's board
 alice-workspace issue create --title "…" --when '{"kind":"every","every":"1h"}' --execution '{"mode":"resume"}'

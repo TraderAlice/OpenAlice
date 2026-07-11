@@ -293,6 +293,7 @@ describe('global board (ctx.board present)', () => {
       },
       runs: [],
       inboxReports: [],
+      provenance: [],
     },
   }
 
@@ -394,6 +395,10 @@ describe('global board (ctx.board present)', () => {
         resumable: true,
       }],
       inboxReports: [],
+      provenance: [{
+        id: 'p-1', action: 'created', at: 1,
+        origin: { kind: 'session', workspaceId: 'ws-a', resumeId: 'resume-kind-owl-abc123', agent: 'codex' },
+      }],
     }
     const context = boardCtx({ detail: async () => detail })
 
@@ -401,6 +406,10 @@ describe('global board (ctx.board present)', () => {
     expect(JSON.stringify(summary)).not.toContain('large repeated execution prompt')
     expect(summary.runs).toEqual([expect.objectContaining({
       taskId: 'task-1', resumeId: 'resume-kind-owl-abc123', resumable: true,
+    })])
+    expect(summary.provenance).toEqual([expect.objectContaining({
+      action: 'created',
+      origin: expect.objectContaining({ resumeId: 'resume-kind-owl-abc123' }),
     })])
 
     const detailed = await run(issueShowFactory.build(context), { id: 'Alpha', mode: 'detailed' })
