@@ -25,7 +25,7 @@
  */
 
 import type { Tool } from 'ai'
-import type { IInboxStore, InboxOrigin } from './inbox-store.js'
+import type { IInboxStore, InboxEntry, InboxOrigin } from './inbox-store.js'
 import type { IEntityStore } from './entity-store.js'
 import type { IProvenanceStore } from './provenance-store.js'
 // TYPE-ONLY: the global-issue-board shapes. Importing them as types keeps
@@ -59,6 +59,12 @@ export interface WorkspaceToolContext {
    *  it needs the live WorkspaceService (created after this center); the two
    *  build sites (cli.ts, mcp.ts) inject a lazy closure, tests may omit it. */
   resolveWorkspace?: (id: string) => { id: string; dir: string; tag: string } | null
+  /**
+   * Return safe provenance an agent may use to follow up on an Inbox entry.
+   * Older append-only entries can be enriched from live run/session registries
+   * without rewriting their stored history.
+   */
+  resolveInboxOrigin?: (entry: InboxEntry) => InboxOrigin | undefined
   /** Agent-INVISIBLE run provenance, resolved server-side from the
    *  `x-openalice-run` header by the MCP / CLI route (never supplied by the
    *  agent). Factories pass it through to call sites (e.g. inbox_push →
@@ -126,6 +132,13 @@ interface WorkspaceRegistryLike {
   registry: { get(id: string): { id: string; dir: string; tag: string } | undefined }
 }
 
+interface InboxOriginRegistryLike {
+  headlessTasks: { get(id: string): { resumeId: string } | null }
+  sessionRegistry: {
+    get(wsId: string, id: string): { resumeId: string } | undefined
+  }
+}
+
 /**
  * Build the `resolveWorkspace` closure both tool-context build sites
  * (cli.ts, mcp.ts) inject. Single source so the two never drift. Lazy over
@@ -140,5 +153,46 @@ export function makeWorkspaceResolver(
   return (id) => {
     const meta = getService()?.registry.get(id)
     return meta ? { id: meta.id, dir: meta.dir, tag: meta.tag } : null
+  }
+}
+
+/**
+ * Resolve agent-visible Inbox provenance without exposing native runtime ids.
+ * New entries already carry resumeId; older ones are joined at read time.
+ */
+export function makeInboxEntryOriginResolver(
+  getService: () => InboxOriginRegistryLike | null,
+): NonNullable<WorkspaceToolContext['resolveInboxOrigin']> {
+  return (entry) => {
+    const origin = toSafeInboxOrigin(entry.origin)
+    if (!origin || origin.resumeId) return origin
+
+    if (origin.kind === 'headless' && origin.runId) {
+      const resumeId = getService()?.headlessTasks.get(origin.runId)?.resumeId
+      return resumeId ? { ...origin, resumeId } : origin
+    }
+
+    if (origin.kind === 'interactive' && origin.sessionId) {
+      const resumeId = getService()?.sessionRegistry.get(
+        entry.workspaceId,
+        origin.sessionId,
+      )?.resumeId
+      return resumeId ? { ...origin, resumeId } : origin
+    }
+
+    return origin
+  }
+}
+
+/** Runtime whitelist for append-only entries that may contain legacy fields. */
+export function toSafeInboxOrigin(origin: InboxOrigin | undefined): InboxOrigin | undefined {
+  if (!origin || !['headless', 'interactive', 'manual'].includes(origin.kind)) return undefined
+  return {
+    kind: origin.kind,
+    ...(typeof origin.runId === 'string' ? { runId: origin.runId } : {}),
+    ...(typeof origin.issueId === 'string' ? { issueId: origin.issueId } : {}),
+    ...(typeof origin.sessionId === 'string' ? { sessionId: origin.sessionId } : {}),
+    ...(typeof origin.resumeId === 'string' ? { resumeId: origin.resumeId } : {}),
+    ...(typeof origin.agent === 'string' ? { agent: origin.agent } : {}),
   }
 }

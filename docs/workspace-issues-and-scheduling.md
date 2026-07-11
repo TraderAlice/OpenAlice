@@ -155,7 +155,11 @@ alice-workspace inbox push --doc <path> --comments "<summary>"
 
 The launcher binds the run/issue origin; the agent does not pass its own
 identity. A no-change check should exit silently rather than generating Inbox
-noise.
+noise. `alice-workspace inbox read` returns this safe provenance to internal
+agents as `origin` (`runId` / `sessionId`, `resumeId`, `issueId`, and `agent`
+when available). For append-only entries created before `resumeId` was stamped,
+the read path joins the stored run/session handle against the live registries;
+native runtime session ids remain backend-only.
 
 When a user opens an Inbox result, the frontend supplies its OpenAlice-owned
 `resumeId`. The backend `ResumeRegistry` resolves that identity to the native

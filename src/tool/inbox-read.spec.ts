@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { Tool } from 'ai'
 import { inboxReadFactory } from './inbox-read.js'
-import { createMemoryInboxStore } from '../core/inbox-store.js'
+import { createMemoryInboxStore, type InboxOrigin } from '../core/inbox-store.js'
 import type { WorkspaceToolContext } from '../core/workspace-tool-center.js'
 
 const WS = 'ws-self'
@@ -20,6 +20,7 @@ async function run(tool: Tool, args: Record<string, unknown>) {
       workspace: string
       comments?: string
       docs: string[]
+      origin?: InboxOrigin
     }>
   }
 }
@@ -27,9 +28,27 @@ async function run(tool: Tool, args: Record<string, unknown>) {
 async function seeded(): Promise<WorkspaceToolContext> {
   const inboxStore = createMemoryInboxStore()
   await inboxStore.append({ workspaceId: WS, workspaceLabel: 'Mine', docs: [{ path: 'a.md' }], comments: 'first' })
-  await inboxStore.append({ workspaceId: OTHER, workspaceLabel: 'Theirs', comments: 'from elsewhere' })
+  await inboxStore.append({
+    workspaceId: OTHER,
+    workspaceLabel: 'Theirs',
+    comments: 'from elsewhere',
+    origin: {
+      kind: 'headless',
+      runId: 'run-peer',
+      issueId: 'daily-scan',
+      agent: 'pi',
+    },
+  })
   await inboxStore.append({ workspaceId: WS, workspaceLabel: 'Mine', docs: [{ path: 'b.md' }, { path: 'c.md' }] })
-  return { workspaceId: WS, workspaceLabel: 'Mine', inboxStore, entityStore: {} as never }
+  return {
+    workspaceId: WS,
+    workspaceLabel: 'Mine',
+    inboxStore,
+    entityStore: {} as never,
+    resolveInboxOrigin: (entry) => entry.origin?.runId === 'run-peer'
+      ? { ...entry.origin, resumeId: 'resume-peer' }
+      : entry.origin,
+  }
 }
 
 describe('inbox_read', () => {
@@ -61,6 +80,20 @@ describe('inbox_read', () => {
     expect(foreign?.workspaceId).toBe(OTHER)
     // self entries carry this workspace's own id
     expect(res.entries.filter((e) => e.mine).every((e) => e.workspaceId === WS)).toBe(true)
+  })
+
+  it('surfaces safe, enriched provenance for following up with the originating agent', async () => {
+    const tool = inboxReadFactory.build(await seeded())
+    const res = await run(tool, {})
+    const foreign = res.entries.find((entry) => !entry.mine)
+
+    expect(foreign?.origin).toEqual({
+      kind: 'headless',
+      runId: 'run-peer',
+      resumeId: 'resume-peer',
+      issueId: 'daily-scan',
+      agent: 'pi',
+    })
   })
 
   it('`limit` caps the newest-first window and reports hasMore', async () => {
