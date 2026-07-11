@@ -161,8 +161,12 @@ When a user opens an Inbox result, the frontend supplies its OpenAlice-owned
 Claude/Codex/opencode/Pi session id and resumes the original conversation in an
 interactive PTY. Later opens from Inbox, Automation, or the Workspace sidebar
 reuse the Session indexed by `resumeId`; native ids never cross the product
-protocol. `taskId` remains one execution, while `parentTaskId` records direct
-turn lineage. Runs and their logs are retained rather than silently pruned.
+protocol. New identities use one stable, human-readable key such as
+`resume-calm-amber-river-a1b2c3`: the petname makes product surfaces legible and
+the six-character base36 tail supplies global entropy. Existing UUID identities
+remain valid and are never renamed. `taskId` remains one execution, while
+`parentTaskId` records direct turn lineage. Runs and their logs are retained
+rather than silently pruned.
 
 Scheduling never bypasses trading approval. A headless agent may research or
 stage a trade, but execution remains behind UTA/Trading-as-Git permission and

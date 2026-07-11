@@ -77,7 +77,7 @@ export function ResumeCta(props: ResumeCtaProps): ReactElement {
             {r.resumeId && (
               <>
                 <dt>Transcript</dt>
-                <dd className="mono">{r.resumeId.slice(0, 8)}</dd>
+                <dd className="mono">{r.resumeId}</dd>
               </>
             )}
           </dl>

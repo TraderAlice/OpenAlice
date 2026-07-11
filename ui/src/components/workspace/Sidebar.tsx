@@ -631,10 +631,9 @@ export function SessionRow(props: SessionRowProps): ReactElement {
   const isPaused = s.state === 'paused';
   // Title: the captured first message (seeded sessions), else the sticky name.
   const display = s.title?.trim() || s.name;
-  const tidShort = s.resumeId ? s.resumeId.slice(0, 8) : null;
   const metaParts: string[] = [`agent ${s.agent}`];
   if (s.pid !== null) metaParts.push(`pid ${s.pid}`);
-  if (tidShort) metaParts.push(tidShort);
+  if (s.resumeId) metaParts.push(s.resumeId);
   if (isPaused) metaParts.push(t('workspace.paused'));
   const meta = metaParts.join(' · ');
   // Full message on hover when it's been truncated, then the technical meta.

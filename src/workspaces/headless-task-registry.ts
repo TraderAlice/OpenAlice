@@ -132,8 +132,8 @@ export class HeadlessTaskRegistry {
     agent: string
     prompt: string
     startedAt: number
-    /** Reuse when continuing a conversation; fresh runs get a new UUID. */
-    resumeId?: string
+    /** Product identity allocated by ResumeRegistry; reused across continued turns. */
+    resumeId: string
     /** Previous execution in the same resume chain, when continuing. */
     parentTaskId?: string
     /** Set only when an issue fired this run (scheduled scan); omitted for manual/external runs. */
@@ -141,7 +141,7 @@ export class HeadlessTaskRegistry {
   }): Promise<HeadlessTaskRecord> {
     const rec: HeadlessTaskRecord = {
       taskId: randomUUID(),
-      resumeId: input.resumeId ?? randomUUID(),
+      resumeId: input.resumeId,
       ...(input.parentTaskId ? { parentTaskId: input.parentTaskId } : {}),
       wsId: input.wsId,
       agent: input.agent,

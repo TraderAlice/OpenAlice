@@ -990,17 +990,24 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     }
     let rec: HeadlessTaskRecord;
     try {
+      // ResumeRegistry is the sole allocator for product conversation ids.
+      // HeadlessTaskRegistry only records executions against that identity.
+      const identity = await resumeRegistry.ensure({
+        ...(resumeId ? { resumeId } : {}),
+        wsId: ws.id,
+        agent: adapter.id,
+      });
       rec = await headlessTasks.create({
         wsId: ws.id,
         agent: adapter.id,
         prompt,
         startedAt: Date.now(),
-        ...(resumeId ? { resumeId } : {}),
+        resumeId: identity.resumeId,
         ...(parentTaskId ? { parentTaskId } : {}),
         ...(issueId ? { issueId } : {}),
       });
       await resumeRegistry.ensure({
-        resumeId: rec.resumeId,
+        resumeId: identity.resumeId,
         wsId: ws.id,
         agent: adapter.id,
         latestTaskId: rec.taskId,

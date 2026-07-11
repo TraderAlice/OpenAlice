@@ -12,6 +12,7 @@ import { randomInt as cryptoRandomInt } from 'node:crypto'
 const MAX_ATTEMPTS = 128
 const PREFIX_MAX = 24
 const DEFAULT_FALLBACK_PREFIX = 'item'
+const RANDOM_SUFFIX_ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyz'
 
 const ADJECTIVES = [
   'calm',
@@ -125,6 +126,8 @@ export interface PetnameOptions {
   readonly isTaken?: (id: string) => boolean
   readonly maxAttempts?: number
   readonly randomInt?: RandomInt
+  /** Append fixed-width base36 entropy when the id lives in a large namespace. */
+  readonly randomSuffixLength?: number
 }
 
 export function normalizeIdPrefix(input: string, fallback = DEFAULT_FALLBACK_PREFIX): string {
@@ -145,13 +148,24 @@ export function generatePetnameId(prefix: string, opts: PetnameOptions = {}): st
   const safePrefix = normalizeIdPrefix(prefix, opts.fallbackPrefix)
 
   for (let i = 0; i < attempts; i += 1) {
-    const id = [
+    const parts = [
       safePrefix,
       pick(ADJECTIVES, randomInt),
       pick(MATERIALS, randomInt),
       pick(PLACES, randomInt),
-    ].join('-')
+    ]
+    if (opts.randomSuffixLength !== undefined) {
+      parts.push(randomSuffix(opts.randomSuffixLength, randomInt))
+    }
+    const id = parts.join('-')
     if (!isTaken(id)) return id
+  }
+
+  // A caller that requested explicit entropy also requested a stable format.
+  // Its namespace is large enough that exhausting every retry is an error,
+  // rather than a reason to silently switch to another suffix shape.
+  if (opts.randomSuffixLength !== undefined) {
+    throw new Error(`could not allocate a petname id for prefix "${safePrefix}"`)
   }
 
   // Extremely unlikely unless the candidate space is exhausted or tests force
@@ -172,4 +186,14 @@ export function generatePetnameId(prefix: string, opts: PetnameOptions = {}): st
 
 function pick<T>(items: readonly T[], randomInt: RandomInt): T {
   return items[randomInt(items.length)]!
+}
+
+function randomSuffix(length: number, randomInt: RandomInt): string {
+  if (!Number.isSafeInteger(length) || length < 1) {
+    throw new Error('randomSuffixLength must be a positive integer')
+  }
+  return Array.from(
+    { length },
+    () => RANDOM_SUFFIX_ALPHABET[randomInt(RANDOM_SUFFIX_ALPHABET.length)]!,
+  ).join('')
 }

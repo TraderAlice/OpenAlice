@@ -5,11 +5,11 @@
  * the backend boundary. This registry is the translation table between that
  * stable product identity and the current CLI-specific conversation id.
  */
-import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
 import type { Logger } from './logger.js'
+import { generateResumeId } from './resume-id.js'
 
 export interface ResumeIdentityRecord {
   readonly resumeId: string
@@ -81,7 +81,9 @@ export class ResumeRegistry {
     latestTaskId?: string
     now?: number
   }): Promise<ResumeIdentityRecord> {
-    const resumeId = input.resumeId ?? randomUUID()
+    const resumeId = input.resumeId ?? generateResumeId({
+      isTaken: (candidate) => this.records.has(candidate),
+    })
     const existing = this.records.get(resumeId)
     if (existing) {
       if (existing.wsId !== input.wsId || existing.agent !== input.agent) {

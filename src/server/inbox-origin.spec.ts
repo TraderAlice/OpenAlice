@@ -32,9 +32,14 @@ describe('resolveInboxOrigin — headless (Phase 1)', () => {
 
   it('omits issueId when the run had none (manual/external dispatch)', () => {
     const origin = resolveInboxOrigin({ run: 'run-8' }, () =>
-      svc({ headless: { 'run-8': { taskId: 'run-8', agent: 'opencode' } } }) as any,
+      svc({ headless: { 'run-8': { taskId: 'run-8', resumeId: 'resume-8', agent: 'opencode' } } }) as any,
     )
-    expect(origin).toEqual({ kind: 'headless', runId: 'run-8', agent: 'opencode' })
+    expect(origin).toEqual({
+      kind: 'headless',
+      runId: 'run-8',
+      resumeId: 'resume-8',
+      agent: 'opencode',
+    })
   })
 
   it('undefined for a missing/blank run header (no session either)', () => {
@@ -93,11 +98,24 @@ describe('resolveInboxOrigin — precedence + both-absent', () => {
   it('a resolvable run header wins over a present session header', () => {
     const origin = resolveInboxOrigin({ run: 'run-7', session: 'sess-1', wsId: 'ws1' }, () =>
       svc({
-        headless: { 'run-7': { taskId: 'run-7', issueId: 'macro', agent: 'claude' } },
+        headless: {
+          'run-7': {
+            taskId: 'run-7',
+            resumeId: 'resume-7',
+            issueId: 'macro',
+            agent: 'claude',
+          },
+        },
         sessions: { ws1: { 'sess-1': { id: 'sess-1', wsId: 'ws1', agent: 'codex' } } },
       }) as any,
     )
-    expect(origin).toEqual({ kind: 'headless', runId: 'run-7', issueId: 'macro', agent: 'claude' })
+    expect(origin).toEqual({
+      kind: 'headless',
+      runId: 'run-7',
+      resumeId: 'resume-7',
+      issueId: 'macro',
+      agent: 'claude',
+    })
   })
 
   it('falls through to the session header when the run id is unknown', () => {
