@@ -104,6 +104,26 @@ function resolveIssueAssignee(
   return { ok: true, assignee: parsed.data }
 }
 
+/**
+ * "Who creates it owns it" only applies when the caller is an actual product
+ * Session that Alice can resume. Shell PTYs also carry an interactive
+ * SessionRecord/resumeId for terminal bookkeeping, but they have no native
+ * Agent Runtime conversation to continue. Treating those as owners creates an
+ * Issue that cannot ever run; an omitted owner therefore falls back to the
+ * Workspace, while an explicit `@me` remains a strict validation error.
+ *
+ * Older/test contexts may not expose the identity resolver. Preserve their
+ * attributable-session behavior; production always supplies the resolver.
+ */
+function defaultIssueAssignee(ctx: WorkspaceToolContext): string {
+  const origin = sessionOriginFromInboxOrigin(ctx.workspaceId, ctx.origin)
+  if (!origin) return WORKSPACE_ASSIGNEE
+  if (!ctx.resolveSessionIdentity) return '@me'
+  return ctx.resolveSessionIdentity(origin.resumeId)?.resumable
+    ? '@me'
+    : WORKSPACE_ASSIGNEE
+}
+
 /** The comment / create author for this workspace's writes. */
 const author = (ctx: WorkspaceToolContext): string => `ws:${ctx.workspaceLabel}`
 
@@ -353,9 +373,7 @@ export const issueCreateFactory: WorkspaceToolFactory = {
         // Structured creation is attributable: "who creates it owns it". A
         // human/unattributed caller has no Session to sign with, so its safe
         // fallback is the Issue's home Workspace recruiting a fresh worker.
-        const defaultAssignee = sessionOriginFromInboxOrigin(ctx.workspaceId, ctx.origin)
-          ? '@me'
-          : WORKSPACE_ASSIGNEE
+        const defaultAssignee = defaultIssueAssignee(ctx)
         const resolvedAssignee = resolveIssueAssignee(ctx, assignee ?? defaultAssignee)
         if (!resolvedAssignee.ok) return { ok: false as const, error: resolvedAssignee.error }
         const res = await createIssue(dir.dir, {

@@ -14,7 +14,7 @@
     "electron:tsc": "pnpm -F @traderalice/desktop build",
     "electron:build": "pnpm build && pnpm electron:tsc",
     "electron:dev": "pnpm electron:build && pnpm -F @traderalice/desktop dev",
-    "electron:pack": "pnpm electron:build && pnpm vendor:runtime && pnpm -F @traderalice/desktop pack",
+    "electron:pack": "pnpm electron:build && pnpm vendor:runtime && pnpm -F @traderalice/desktop run pack",
     "electron:assert-package": "node scripts/assert-desktop-package.mjs",
     "electron:smoke-toolchain": "node scripts/smoke-packaged-toolchain.mjs",
     "electron:smoke:packaged": "node scripts/desktop-packaged-smoke.mjs",

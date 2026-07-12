@@ -114,6 +114,7 @@ describe('issue_create', () => {
         resumeId: 'resume-kind-owl-abc123',
         agent: 'codex',
       },
+      resolveSessionIdentity: () => ({ workspaceId: 'ws-self', agent: 'codex', resumable: true }),
     })
     const created = await run(issueCreateFactory.build(context), {
       id: 'owned-schedule',
@@ -129,6 +130,30 @@ describe('issue_create', () => {
     })
     expect(explicit.ok).toBe(true)
     expect((await readBack('owned-explicit'))?.assignee).toBe('@resume-kind-owl-abc123')
+  })
+
+  it('does not make a non-resumable Shell PTY the implicit owner', async () => {
+    const context = ctx({
+      origin: {
+        kind: 'interactive',
+        sessionId: 'shell-surface',
+        resumeId: 'resume-shell-terminal',
+        agent: 'shell',
+      },
+      resolveSessionIdentity: () => ({ workspaceId: 'ws-self', agent: 'shell', resumable: false }),
+    })
+
+    const implicit = await run(issueCreateFactory.build(context), {
+      id: 'shell-created', title: 'Shell-created issue',
+    })
+    expect(implicit.ok).toBe(true)
+    expect((await readBack('shell-created'))?.assignee).toBe('@workspace')
+
+    const explicit = await run(issueCreateFactory.build(context), {
+      id: 'shell-owned', title: 'Invalid shell owner', assignee: '@me',
+    })
+    expect(explicit.ok).toBe(false)
+    expect(explicit.error).toMatch(/not resumable yet/)
   })
 
   it('allows assigning an exact signed Session from another workspace', async () => {
