@@ -92,6 +92,14 @@ MCP trust prompt.
 - **`pnpm install` fails in the Electron postinstall (403/network)** — use
   `ELECTRON_SKIP_BINARY_DOWNLOAD=1 pnpm install`; only `electron:*` scripts
   need the binary.
+- **`Failed to switch pnpm to v11.7.0 … pnpm CLI is missing at …\bin` on
+  Windows** — an older standalone pnpm (≤ 10.16) can't materialize pnpm 11's
+  native `@pnpm/win-x64` artifact: it leaves the versioned tool dir without a
+  `bin/pnpm` shim and aborts before any command runs. Resolve the
+  `packageManager` pin through Corepack instead:
+  `corepack prepare pnpm@11.7.0 --activate`, then run `corepack pnpm …` (or
+  `corepack enable pnpm` to put it on `PATH`). Upgrading the standalone pnpm to
+  11.x also fixes it.
 - **`node-pty` build errors** — install Python 3 and a C/C++ toolchain, then
   reinstall. `postinstall` (`scripts/fix-pty-perms.mjs`) repairs helper
   permissions.
