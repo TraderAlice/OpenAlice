@@ -608,3 +608,85 @@ describe('POST /:id/sessions/:sid/resume — concurrent coalescing (ANG-120)', (
     expect([a.body, b.body].filter((x) => x.alreadyRunning)).toHaveLength(1);
   });
 });
+
+describe('WebPi surface routes', () => {
+  const TOKEN = 'pi-calm-amber-river';
+
+  function buildWebPi() {
+    const order: string[] = [];
+    const record = {
+      id: TOKEN,
+      resumeId: 'resume-webpi',
+      wsId: 'ws-1',
+      agent: 'pi',
+      name: 'p1',
+      createdAt: '2026-07-12T00:00:00.000Z',
+      lastActiveAt: '2026-07-12T00:00:00.000Z',
+      state: 'running',
+      surface: 'terminal',
+    };
+    const snapshot = {
+      recordId: TOKEN,
+      wsId: 'ws-1',
+      resumeId: 'resume-webpi',
+      pid: 9001,
+      startedAt: 1,
+      phase: 'idle',
+      state: {},
+      messages: [],
+      streamingMessage: null,
+      error: null,
+      stderrTail: '',
+      revision: 1,
+    };
+    const adapter = {
+      id: 'pi',
+      capabilities: { resumeById: true },
+      readAiConfig: vi.fn(async () => ({ baseUrl: 'https://example.test', apiKey: 'test', model: 'model' })),
+      writeAiConfig: vi.fn(async () => undefined),
+      bootstrap: vi.fn(async () => order.push('bootstrap')),
+    };
+    const webPi = {
+      get: vi.fn(() => null),
+      has: vi.fn(() => false),
+      stop: vi.fn(async () => false),
+      prompt: vi.fn(async () => ({ ...snapshot, phase: 'working' })),
+      abort: vi.fn(async () => snapshot),
+    };
+    const svc = {
+      registry: { get: () => ({ id: 'ws-1', dir: '/w', agents: ['pi'] }) },
+      sessionRegistry: {
+        get: () => record,
+        update: vi.fn(async (_wsId: string, _id: string, patch: any) => Object.assign(record, patch)),
+      },
+      resumeRegistry: { get: () => ({ agentSessionId: 'native-pi' }) },
+      adapters: { get: () => adapter },
+      pool: {
+        get: vi.fn(() => ({ pid: 123, startedAt: 1 })),
+        disposeToken: vi.fn(() => { order.push('terminal-stopped'); return true; }),
+      },
+      webPi,
+      startWebPiSession: vi.fn(async () => { order.push('webpi-started'); return snapshot; }),
+      isResumeActive: vi.fn(() => false),
+      config: { launcherRepoRoot: '/repo' },
+    } as unknown as WorkspaceService;
+    return { app: createWorkspaceRoutes(svc), order, svc, webPi };
+  }
+
+  it('hands an existing Pi Session from its PTY to WebPi', async () => {
+    const { app, order, svc } = buildWebPi();
+    const result = await post(app, `/ws-1/sessions/${TOKEN}/webpi/open`);
+    expect(result.status).toBe(200);
+    expect(result.body.snapshot).toMatchObject({ resumeId: 'resume-webpi', phase: 'idle' });
+    expect(order).toEqual(['bootstrap', 'terminal-stopped', 'webpi-started']);
+    expect(svc.startWebPiSession).toHaveBeenCalledOnce();
+  });
+
+  it('passes browser prompts straight to the live Pi RPC host', async () => {
+    const { app, webPi } = buildWebPi();
+    const result = await post(app, `/ws-1/sessions/${TOKEN}/webpi/prompt`, { message: 'hello Pi' });
+    expect(result.status).toBe(200);
+    expect(webPi.prompt).toHaveBeenCalledWith(TOKEN, 'hello Pi');
+    expect(result.body.snapshot.phase).toBe('working');
+  });
+});

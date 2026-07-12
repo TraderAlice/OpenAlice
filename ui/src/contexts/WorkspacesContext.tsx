@@ -38,6 +38,7 @@ import {
   listAgents,
   listTemplates,
   listWorkspaces,
+  openWebPiSession as apiOpenWebPiSession,
   openResumeSession,
   pauseSession as apiPauseSession,
   quickChat as apiQuickChat,
@@ -149,6 +150,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
           createdAt: nowIso,
           lastActiveAt: nowIso,
           state: 'running',
+          surface: 'terminal',
           resumeId: sess.resumeId,
           pid: sess.pid,
           startedAt: sess.startedAt,
@@ -194,6 +196,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
           nextSession = {
             ...session,
             state: 'running',
+            surface: 'terminal',
             pid: resumed.pid,
             startedAt: resumed.startedAt,
             resumeId: resumed.resumeId ?? session.resumeId,
@@ -238,6 +241,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         createdAt: nowIso,
         lastActiveAt: nowIso,
         state: 'running',
+        surface: 'terminal',
         resumeId: session.resumeId,
         pid: session.pid,
         startedAt: session.startedAt,
@@ -293,6 +297,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         setWorkspaces((prev) =>
           patchSession(prev, wsId, sessionId, {
             state: 'running',
+            surface: 'terminal',
             pid: resp.pid,
             startedAt: resp.startedAt,
             lastActiveAt: new Date().toISOString(),
@@ -310,6 +315,27 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
       void refresh()
     },
     [refresh, openOrFocus, terminalTheme],
+  )
+
+  const openWebPiSession = useCallback(
+    async (wsId: string, sessionId: string, source?: WorkspaceSource): Promise<void> => {
+      const snapshot = await apiOpenWebPiSession(wsId, sessionId)
+      setWorkspaces((prev) =>
+        patchSession(prev, wsId, sessionId, {
+          state: 'running',
+          surface: 'webpi',
+          pid: snapshot.pid,
+          startedAt: snapshot.startedAt,
+          lastActiveAt: new Date().toISOString(),
+        }),
+      )
+      openOrFocus({
+        kind: 'workspace',
+        params: { wsId, sessionId, ...(source ? { source } : {}) },
+      })
+      void refresh()
+    },
+    [openOrFocus, refresh],
   )
 
   const saveWorkspaceMetadata = useCallback(
@@ -386,6 +412,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         quickChat,
         pauseSession,
         resumeSession,
+        openWebPiSession,
         requestDeleteSession,
         openAgentConfig: (wsId: string, agent?: AgentId) =>
           setConfiguringAgentTarget({ wsId, ...(agent ? { agent } : {}) }),

@@ -387,6 +387,25 @@ describe('piAdapter AI-config', () => {
       .toEqual(['pi', '--session-id', 'sess-1']);
   });
 
+  it('composeWebCommand is opt-in RPC and does not alter the TUI command', () => {
+    const spawn = { cwd: dir, env: mcpEnv, resume: { sessionId: 'sess-web' } } as const;
+    expect(piAdapter.composeCommand([], spawn)).toEqual(['pi', '--session-id', 'sess-web']);
+    expect(piAdapter.composeWebCommand?.([], spawn)).toEqual([
+      'pi', '--session-id', 'sess-web', '--mode', 'rpc',
+    ]);
+  });
+
+  it('composeWebCommand uses the packaged managed Pi trust flag only on the RPC surface', () => {
+    const env = { ...mcpEnv, OPENALICE_MANAGED_PI_PATH: '/app/vendor/pi/pi' };
+    const spawn = { cwd: dir, env, resume: { sessionId: 'sess-web' } } as const;
+    expect(piAdapter.composeCommand([], spawn)).toEqual([
+      '/app/vendor/pi/pi', '--session-id', 'sess-web',
+    ]);
+    expect(piAdapter.composeWebCommand?.([], spawn)).toEqual([
+      '/app/vendor/pi/pi', '--approve', '--session-id', 'sess-web', '--mode', 'rpc',
+    ]);
+  });
+
   it('composeCommand uses managed Pi binary path when the spawn env provides one', () => {
     const env = { ...mcpEnv, OPENALICE_MANAGED_PI_PATH: '/app/vendor/pi/pi' };
     expect(piAdapter.composeCommand(['ignored'], { cwd: dir, env })).toEqual(['/app/vendor/pi/pi']);

@@ -17,7 +17,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Bot, Monitor, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import '@xterm/xterm/css/xterm.css'
 
@@ -136,6 +136,25 @@ export function WorkspacePage({ spec, visible }: Props) {
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-bg-secondary/30 shrink-0">
         <span className="text-[12px] text-text-muted font-medium">{workspace.tag}</span>
         <div className="flex items-center gap-1">
+          {activeRecord?.agent === 'pi' && activeRecord.state === 'running' && (
+            <button
+              type="button"
+              onClick={() => {
+                if ((activeRecord.surface ?? 'terminal') === 'webpi') {
+                  void ctx.resumeSession(wsId, activeRecord.id, source)
+                } else {
+                  void ctx.openWebPiSession(wsId, activeRecord.id, source)
+                }
+              }}
+              className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] text-text-muted hover:text-text hover:bg-bg-tertiary transition-colors"
+              title={(activeRecord.surface ?? 'terminal') === 'webpi' ? 'Open this Pi Session in the terminal' : 'Open this Pi Session in WebPi'}
+            >
+              {(activeRecord.surface ?? 'terminal') === 'webpi'
+                ? <Monitor size={13} strokeWidth={2.25} aria-hidden="true" />
+                : <Bot size={13} strokeWidth={2.25} aria-hidden="true" />}
+              {(activeRecord.surface ?? 'terminal') === 'webpi' ? 'Open TUI' : 'WebPi · Beta'}
+            </button>
+          )}
           <div ref={spawnMenuRef} className="relative">
             <button
               type="button"
@@ -200,6 +219,7 @@ export function WorkspacePage({ spec, visible }: Props) {
           keyMap={keyMap}
           onSpawnFresh={spawnDefault}
           onResume={(id) => void ctx.resumeSession(wsId, id, source)}
+          onOpenWebPi={(id) => void ctx.openWebPiSession(wsId, id, source)}
           onSelectSession={(id) => {
             // Running session — already alive on the server, just
             // navigate. Mirrors the sidebar's onSelectSession path.

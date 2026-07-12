@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { formatRelativeTime } from '../../lib/intl';
 import type { ReactElement } from 'react';
-import { MessageSquare } from 'lucide-react';
+import { Bot, MessageSquare } from 'lucide-react';
 
 import type { SessionRecord } from './api';
 
 export interface ResumeCtaProps {
   readonly record: SessionRecord;
   readonly onResume: () => void;
+  readonly onOpenWebPi?: () => void;
 }
 
 /**
@@ -32,12 +33,12 @@ export interface ResumeCtaProps {
  *      `resume --last`; shell fresh + scrollback restore).
  */
 export function ResumeCta(props: ResumeCtaProps): ReactElement {
-  const [resuming, setResuming] = useState(false);
+  const [resuming, setResuming] = useState<'terminal' | 'webpi' | null>(null);
   const r = props.record;
 
   const onClick = (): void => {
     if (resuming) return;
-    setResuming(true);
+    setResuming('terminal');
     props.onResume();
     // No setResuming(false) — the parent re-renders once state flips to
     // 'running' which unmounts this component entirely.
@@ -58,16 +59,33 @@ export function ResumeCta(props: ResumeCtaProps): ReactElement {
             </div>
           </div>
 
-          <button
-            type="button"
-            className="resume-cta-btn"
-            onClick={onClick}
-            disabled={resuming}
-            aria-label={resuming ? 'Resuming conversation…' : 'Continue conversation'}
-          >
-            <MessageSquare size={14} strokeWidth={2.25} aria-hidden="true" />
-            <span>{resuming ? 'Resuming…' : 'Continue conversation'}</span>
-          </button>
+          <div className="resume-cta-actions">
+            <button
+              type="button"
+              className="resume-cta-btn"
+              onClick={onClick}
+              disabled={resuming !== null}
+              aria-label={resuming ? 'Resuming conversation…' : 'Continue in terminal'}
+            >
+              <MessageSquare size={14} strokeWidth={2.25} aria-hidden="true" />
+              <span>{resuming === 'terminal' ? 'Opening…' : 'Open TUI'}</span>
+            </button>
+            {r.agent === 'pi' && props.onOpenWebPi && (
+              <button
+                type="button"
+                className="resume-cta-btn is-webpi"
+                onClick={() => {
+                  if (resuming) return
+                  setResuming('webpi')
+                  props.onOpenWebPi?.()
+                }}
+                disabled={resuming !== null}
+              >
+                <Bot size={14} strokeWidth={2.25} aria-hidden="true" />
+                <span>{resuming === 'webpi' ? 'Opening…' : 'Open WebPi · Beta'}</span>
+              </button>
+            )}
+          </div>
 
           <dl className="resume-cta-meta">
             <dt>Agent</dt>

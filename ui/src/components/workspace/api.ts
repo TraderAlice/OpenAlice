@@ -337,6 +337,8 @@ export interface SessionRecord {
   readonly createdAt: string;
   readonly lastActiveAt: string;
   readonly state: 'running' | 'paused';
+  /** UI surface only; `agent` remains `pi` for WebPi. */
+  readonly surface?: 'terminal' | 'webpi';
   readonly pid: number | null;
   readonly startedAt: number | null;
   /** First message (seeded sessions) — the sidebar title; null → fall back to `name`. */
@@ -354,6 +356,21 @@ export interface SpawnedSession {
   readonly agent: string;
   readonly resumeId: string;
   readonly title: string | null;
+}
+
+export interface WebPiSnapshot {
+  readonly recordId: string;
+  readonly wsId: string;
+  readonly resumeId: string;
+  readonly pid: number | null;
+  readonly startedAt: number;
+  readonly phase: 'starting' | 'idle' | 'working' | 'compacting' | 'retrying' | 'stopped' | 'failed';
+  readonly state: Record<string, unknown> | null;
+  readonly messages: readonly unknown[];
+  readonly streamingMessage: unknown | null;
+  readonly error: string | null;
+  readonly stderrTail: string;
+  readonly revision: number;
 }
 
 export interface SpawnOptions {
@@ -553,6 +570,53 @@ export async function resumeSession(
   );
   if (!res.ok) return null;
   return (await res.json()) as SpawnedSession;
+}
+
+export async function openWebPiSession(wsId: string, sessionId: string): Promise<WebPiSnapshot> {
+  const res = await fetch(
+    `/api/workspaces/${encodeURIComponent(wsId)}/sessions/${encodeURIComponent(sessionId)}/webpi/open`,
+    { method: 'POST' },
+  );
+  const body = (await res.json().catch(() => null)) as { snapshot?: WebPiSnapshot; message?: string } | null;
+  if (!res.ok || !body?.snapshot) throw new Error(body?.message ?? `WebPi open failed: ${res.status}`);
+  return body.snapshot;
+}
+
+export async function getWebPiSession(wsId: string, sessionId: string): Promise<WebPiSnapshot> {
+  const res = await fetch(
+    `/api/workspaces/${encodeURIComponent(wsId)}/sessions/${encodeURIComponent(sessionId)}/webpi`,
+  );
+  const body = (await res.json().catch(() => null)) as { snapshot?: WebPiSnapshot; message?: string } | null;
+  if (!res.ok || !body?.snapshot) throw new Error(body?.message ?? `WebPi read failed: ${res.status}`);
+  return body.snapshot;
+}
+
+export async function promptWebPiSession(
+  wsId: string,
+  sessionId: string,
+  message: string,
+): Promise<WebPiSnapshot> {
+  const res = await fetch(
+    `/api/workspaces/${encodeURIComponent(wsId)}/sessions/${encodeURIComponent(sessionId)}/webpi/prompt`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ message }),
+    },
+  );
+  const body = (await res.json().catch(() => null)) as { snapshot?: WebPiSnapshot; message?: string } | null;
+  if (!res.ok || !body?.snapshot) throw new Error(body?.message ?? `WebPi prompt failed: ${res.status}`);
+  return body.snapshot;
+}
+
+export async function abortWebPiSession(wsId: string, sessionId: string): Promise<WebPiSnapshot> {
+  const res = await fetch(
+    `/api/workspaces/${encodeURIComponent(wsId)}/sessions/${encodeURIComponent(sessionId)}/webpi/abort`,
+    { method: 'POST' },
+  );
+  const body = (await res.json().catch(() => null)) as { snapshot?: WebPiSnapshot; message?: string } | null;
+  if (!res.ok || !body?.snapshot) throw new Error(body?.message ?? `WebPi abort failed: ${res.status}`);
+  return body.snapshot;
 }
 
 /** Permanently remove a session record (kills PTY first if running). */

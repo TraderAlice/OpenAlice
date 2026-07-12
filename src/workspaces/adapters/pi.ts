@@ -153,6 +153,25 @@ export const piAdapter: CliAdapter = {
     return [...head, '--session-id', ctx.resume.sessionId, ...seed];
   },
 
+  // WebPi is a second VIEW over the same Pi session, not another runtime.
+  // RPC stays completely separate from the TUI argv above: selecting WebPi
+  // cannot change ordinary Pi startup, trust prompts, input handling, or PTY
+  // behavior. It is always by-id so switching surfaces reopens the exact
+  // conversation that the OpenAlice resume registry already owns.
+  composeWebCommand(_base: readonly string[], ctx: SpawnContext): readonly string[] {
+    if (!ctx.resume || ctx.resume === 'last') {
+      throw new Error('WebPi requires a concrete Pi session id');
+    }
+    return [
+      ...piCommandHead(ctx.env),
+      ...piHeadlessApproveArgs(ctx.env),
+      '--session-id',
+      ctx.resume.sessionId,
+      '--mode',
+      'rpc',
+    ];
+  },
+
   // Headless: `pi -p <prompt>` is non-interactive and exits at the turn
   // boundary, so there is nobody to answer Pi 0.79+'s project-trust prompt.
   // The packaged app explicitly approves its pinned managed Pi; contributor

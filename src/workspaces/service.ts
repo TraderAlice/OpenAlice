@@ -144,6 +144,7 @@ import { resolveLaunchCommand } from './win-command.js';
 import { WorkspaceCreator } from './workspace-creator.js';
 import { WorkspaceCatalog } from './workspace-catalog.js';
 import { WorkspaceLifecycleManager } from './workspace-lifecycle.js';
+import { WebPiSessionHost, type WebPiSnapshot } from './webpi-session-host.js';
 import { WorkspaceRegistry, type WorkspaceMeta } from './workspace-registry.js';
 
 /**
@@ -175,12 +176,15 @@ export interface WorkspaceService {
   readonly adapters: AdapterRegistry;
   readonly creator: WorkspaceCreator;
   readonly pool: SessionPool;
+  readonly webPi: WebPiSessionHost;
   readonly transcriptWatcher: TranscriptWatcher;
   /** Resolve the preferred/recent durable Chat Workspace, creating one starter when absent. */
   resolveOrCreateChatWorkspace(preferredWorkspaceId?: string | null): Promise<ChatWorkspaceResolution>;
   /** Resolve the configured Workspace runtime, then fall back to its first enabled runtime. */
   resolveDefaultAgentId(meta: WorkspaceMeta): Promise<string | undefined>;
   resolveAdapter(meta: WorkspaceMeta, agentId?: string): CliAdapter;
+  /** Open the same persisted Pi Session through Pi RPC instead of its PTY. */
+  startWebPiSession(meta: WorkspaceMeta, record: SessionRecord): Promise<WebPiSnapshot>;
   publicMeta(w: WorkspaceMeta): Promise<unknown>;
   /**
    * Probe the host PATH for each registered adapter's CLI binary. Keyed by
@@ -1540,6 +1544,66 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     transcriptWatcher,
   );
 
+  const webPi = new WebPiSessionHost(
+    launcherLogger.child({ scope: 'webpi-host' }),
+    {
+      onExit: (recordId, reason) => {
+        // Intentional handoffs are followed by an explicit caller-owned state
+        // update (paused, terminal-running, or deleted). Letting this async
+        // callback also write `paused` would race a WebPi -> TUI switch.
+        if (reason.intentional) return;
+        const record = sessionRegistry.findById(recordId);
+        if (!record) return;
+        void sessionRegistry.update(record.wsId, record.id, {
+          state: 'paused',
+          lastActiveAt: new Date().toISOString(),
+        }).catch((err) => launcherLogger.warn('webpi.pause_update_failed', { recordId, err }));
+      },
+    },
+  );
+
+  const startWebPiSession = async (
+    meta: WorkspaceMeta,
+    record: SessionRecord,
+  ): Promise<WebPiSnapshot> => {
+    if (record.agent !== 'pi') throw new Error('WebPi is available only for Pi Sessions');
+    const adapter = adapters.get('pi');
+    if (!adapter?.composeWebCommand) throw new Error('installed Pi adapter has no WebPi surface');
+    const nativeSessionId = resumeRegistry.get(record.resumeId)?.agentSessionId
+      ?? record.resumeHint?.value;
+    if (!nativeSessionId) throw new Error('Pi Session has no resumable native session id');
+    const resume = { sessionId: nativeSessionId } as const;
+    const { cwd, env } = composeSpawnInputs(meta, adapter, resume, undefined, {
+      AQ_SESSION_ID: record.id,
+      OPENALICE_RESUME_ID: record.resumeId,
+      OPENALICE_SIGNATURE: `@${record.resumeId}`,
+    });
+    const command = adapter.composeWebCommand(config.command, { cwd, env, resume });
+    launcherLogger.event('path.trace', {
+      where: 'webpi.spawn',
+      wsId: meta.id,
+      recordId: record.id,
+      resumeId: record.resumeId,
+      nativeSessionId,
+      spawnCwd: cwd,
+      composedCommand: command,
+    });
+    const snapshot = await webPi.start({
+      recordId: record.id,
+      wsId: record.wsId,
+      resumeId: record.resumeId,
+      command,
+      cwd,
+      env,
+    });
+    await sessionRegistry.update(record.wsId, record.id, {
+      state: 'running',
+      surface: 'webpi',
+      lastActiveAt: new Date().toISOString(),
+    });
+    return snapshot;
+  };
+
   const lifecycle = new WorkspaceLifecycleManager({
     launcherRoot: config.launcherRoot,
     registry,
@@ -1549,6 +1613,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     scrollbackStore,
     headlessTasks,
     pool,
+    webPi,
     isWorkspaceHeadlessActive: (id) => (activeHeadlessByWorkspace.get(id) ?? 0) > 0,
     logger: launcherLogger.child({ scope: 'workspace-lifecycle' }),
   });
@@ -1576,11 +1641,10 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
 
   const publicMeta = async (w: WorkspaceMeta): Promise<unknown> => {
     const metadata = await readWorkspaceMetadata(w.dir);
-    const live = pool.liveSessionsFor(w.id);
     await sessionRegistry.ensureLoaded(w.id).catch(() => undefined);
-    const liveById = new Map(live.map((l) => [l.id, l]));
     const sessions = sessionRegistry.listFor(w.id).map((r) => {
-      const liveEntry = liveById.get(r.id);
+      const terminal = pool.get(r.id);
+      const browser = webPi.get(r.id);
       return {
         id: r.id,
         wsId: r.wsId,
@@ -1588,10 +1652,11 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         name: r.name,
         createdAt: r.createdAt,
         lastActiveAt: r.lastActiveAt,
-        state: r.state === 'running' && liveEntry ? 'running' : 'paused',
+        state: r.state === 'running' && (terminal || browser) ? 'running' : 'paused',
+        surface: browser ? 'webpi' : (r.surface ?? 'terminal'),
         resumeId: r.resumeId,
-        pid: liveEntry?.pid ?? null,
-        startedAt: liveEntry?.startedAt ?? null,
+        pid: terminal?.pid ?? browser?.pid ?? null,
+        startedAt: terminal?.startedAt ?? browser?.startedAt ?? null,
         title: r.title ?? null,
         sourceRunId: r.sourceRunId ?? null,
       };
@@ -1646,6 +1711,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     launcherLogger.info('workspaces.dispose', { reason, activeSessions: pool.size() });
     scheduleScanner.stop();
     pool.disposeAll('plugin shutdown');
+    await webPi.stopAll('plugin shutdown');
     transcriptWatcher.disposeAll();
   };
 
@@ -1660,10 +1726,12 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     adapters,
     creator,
     pool,
+    webPi,
     transcriptWatcher,
     resolveOrCreateChatWorkspace: resolveOrCreateChatWorkspaceMethod,
     resolveDefaultAgentId,
     resolveAdapter,
+    startWebPiSession,
     publicMeta,
     detectAgents,
     getAgentRuntimeReadiness: getAgentRuntimeReadinessMethod,

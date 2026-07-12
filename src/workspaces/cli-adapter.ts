@@ -167,6 +167,16 @@ export interface CliAdapter {
   composeCommand(base: readonly string[], ctx: SpawnContext): readonly string[];
 
   /**
+   * Optional long-lived structured interactive surface. Unlike headless mode,
+   * this process remains alive and accepts multiple prompts over stdin/stdout.
+   * WebPi is the first consumer: it opens the SAME native Pi session through
+   * Pi's documented RPC mode while the ordinary terminal keeps using
+   * `composeCommand`. Keeping this opt-in prevents any other runtime's launch
+   * path from changing merely because WebPi exists.
+   */
+  composeWebCommand?(base: readonly string[], ctx: SpawnContext): readonly string[];
+
+  /**
    * One-shot HEADLESS argv for an automation task — like `composeCommand`, but
    * the process consumes `prompt` and EXITS at the turn boundary (vs the
    * interactive TUI that waits for input). The adapter places `prompt` at the

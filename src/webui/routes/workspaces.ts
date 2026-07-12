@@ -125,6 +125,7 @@ interface PublicSessionBody {
   readonly createdAt: string;
   readonly lastActiveAt: string;
   readonly state: 'running' | 'paused';
+  readonly surface: 'terminal' | 'webpi';
   readonly resumeId: string;
   readonly pid: number | null;
   readonly startedAt: number | null;
@@ -285,6 +286,7 @@ export function createWorkspaceRoutes(
       createdAt: nowIso,
       lastActiveAt: nowIso,
       state: 'running',
+      surface: 'terminal',
       ...(title !== undefined ? { title } : {}),
       ...(opts.sourceRunId ? { sourceRunId: opts.sourceRunId } : {}),
       ...(resume && resume !== 'last'
@@ -340,7 +342,8 @@ export function createWorkspaceRoutes(
   }
 
   const publicSession = (record: SessionRecord): PublicSessionBody => {
-    const live = svc.pool.get(record.id);
+    const terminal = svc.pool.get(record.id);
+    const browser = svc.webPi?.get(record.id) ?? null;
     return {
       id: record.id,
       wsId: record.wsId,
@@ -348,10 +351,11 @@ export function createWorkspaceRoutes(
       name: record.name,
       createdAt: record.createdAt,
       lastActiveAt: record.lastActiveAt,
-      state: record.state === 'running' && live ? 'running' : 'paused',
+      state: record.state === 'running' && (terminal || browser) ? 'running' : 'paused',
+      surface: browser ? 'webpi' : (record.surface ?? 'terminal'),
       resumeId: record.resumeId,
-      pid: live?.pid ?? null,
-      startedAt: live?.startedAt ?? null,
+      pid: terminal?.pid ?? browser?.pid ?? null,
+      startedAt: terminal?.startedAt ?? browser?.startedAt ?? null,
       title: record.title ?? null,
       sourceRunId: record.sourceRunId ?? null,
     };
@@ -1021,7 +1025,9 @@ export function createWorkspaceRoutes(
           launcherLogger.warn('scrollback.dump_failed', { id, token, err });
         }
       }
-      const wasRunning = svc.pool.disposeToken(token, action === 'pause' ? 'paused' : 'tab stop');
+      const wasTerminalRunning = svc.pool.disposeToken(token, action === 'pause' ? 'paused' : 'tab stop');
+      const wasWebPiRunning = await svc.webPi?.stop(token, action === 'pause' ? 'paused' : 'tab stop') ?? false;
+      const wasRunning = wasTerminalRunning || wasWebPiRunning;
       if (record) {
         const patch: Partial<SessionRecord> = {
           state: 'paused',
@@ -1091,6 +1097,9 @@ export function createWorkspaceRoutes(
       if (svc.pool.get(token)) {
         return c.json({ ok: true, alreadyRunning: true });
       }
+      // Choosing the terminal surface is an explicit handoff. Never leave Pi's
+      // RPC host and PTY alive against the same native session file.
+      if (svc.webPi?.has(token)) await svc.webPi.stop(token, 'switch to terminal');
       const meta = svc.registry.get(id);
       if (!meta) return c.json({ error: 'workspace_not_found' }, 404);
       const adapter = svc.adapters.get(record.agent);
@@ -1196,7 +1205,7 @@ export function createWorkspaceRoutes(
           delete (record as { scrollbackFile?: string }).scrollbackFile;
         }
         await svc.sessionRegistry
-          .update(id, token, { state: 'running', lastActiveAt: new Date().toISOString() })
+          .update(id, token, { state: 'running', surface: 'terminal', lastActiveAt: new Date().toISOString() })
           .catch((err) =>
             launcherLogger.warn('session_registry.resume_update_failed', { id, token, err }),
           );
@@ -1226,6 +1235,88 @@ export function createWorkspaceRoutes(
       } finally {
         if (claimedResume) svc.releaseResume?.(record.resumeId);
       }
+    }
+  });
+
+  // WebPi is a presentation of an existing Pi Session, not another runtime.
+  // The four routes below expose Pi's own RPC state/messages without adapting
+  // them into OpenAlice message blocks.
+  app.post('/:id/sessions/:sid/webpi/open', async (c) => {
+    const id = c.req.param('id');
+    const token = c.req.param('sid');
+    if (!validId(id) || !validId(token)) return c.json({ error: 'not_found' }, 404);
+    const meta = svc.registry.get(id);
+    const record = svc.sessionRegistry.get(id, token);
+    if (!meta || !record) return c.json({ error: 'not_found' }, 404);
+    if (record.agent !== 'pi') {
+      return c.json({ error: 'unsupported_surface', message: 'WebPi is available only for Pi Sessions' }, 409);
+    }
+    if (svc.isResumeActive(record.resumeId)) {
+      return c.json({ error: 'resume_busy', message: 'this conversation has a running headless turn' }, 409);
+    }
+    const adapter = svc.adapters.get('pi');
+    if (!adapter) return c.json({ error: 'unknown_agent' }, 500);
+    try {
+      await ensureAgentCredentialReady({ meta, agentId: 'pi', adapter, logger: launcherLogger });
+      if (adapter.bootstrap) {
+        await adapter.bootstrap({ wsId: id, cwd: meta.dir, launcherRepoRoot: svc.config.launcherRepoRoot });
+      }
+      if (svc.pool.get(token)) svc.pool.disposeToken(token, 'switch to WebPi');
+      const snapshot = await svc.startWebPiSession(meta, record);
+      return c.json({ ok: true, snapshot, session: publicSession(record) });
+    } catch (err) {
+      await svc.sessionRegistry.update(id, token, {
+        state: 'paused',
+        surface: 'webpi',
+        lastActiveAt: new Date().toISOString(),
+      }).catch(() => undefined);
+      if (err instanceof AgentCredentialError) return c.json(err.toBody(), 400);
+      launcherLogger.error('webpi.open_failed', { id, token, err });
+      return c.json({ error: 'webpi_open_failed', message: (err as Error).message }, 500);
+    }
+  });
+
+  app.get('/:id/sessions/:sid/webpi', (c) => {
+    const id = c.req.param('id');
+    const token = c.req.param('sid');
+    if (!validId(id) || !validId(token)) return c.json({ error: 'not_found' }, 404);
+    const record = svc.sessionRegistry.get(id, token);
+    if (!record) return c.json({ error: 'not_found' }, 404);
+    const snapshot = svc.webPi.get(token);
+    if (!snapshot) return c.json({ error: 'webpi_not_running' }, 409);
+    return c.json({ snapshot });
+  });
+
+  app.post('/:id/sessions/:sid/webpi/prompt', async (c) => {
+    const id = c.req.param('id');
+    const token = c.req.param('sid');
+    if (!validId(id) || !validId(token)) return c.json({ error: 'not_found' }, 404);
+    const record = svc.sessionRegistry.get(id, token);
+    if (!record || record.agent !== 'pi') return c.json({ error: 'not_found' }, 404);
+    const body = await safeJson(c).catch(() => null);
+    const message = body && typeof body === 'object' ? (body as Record<string, unknown>)['message'] : null;
+    if (typeof message !== 'string' || !message.trim()) {
+      return c.json({ error: 'bad_request', message: 'message is required' }, 400);
+    }
+    try {
+      const snapshot = await svc.webPi.prompt(token, message);
+      await svc.sessionRegistry.update(id, token, { lastActiveAt: new Date().toISOString() });
+      return c.json({ ok: true, snapshot });
+    } catch (err) {
+      return c.json({ error: 'webpi_prompt_failed', message: (err as Error).message }, 409);
+    }
+  });
+
+  app.post('/:id/sessions/:sid/webpi/abort', async (c) => {
+    const id = c.req.param('id');
+    const token = c.req.param('sid');
+    if (!validId(id) || !validId(token)) return c.json({ error: 'not_found' }, 404);
+    const record = svc.sessionRegistry.get(id, token);
+    if (!record || record.agent !== 'pi') return c.json({ error: 'not_found' }, 404);
+    try {
+      return c.json({ ok: true, snapshot: await svc.webPi.abort(token) });
+    } catch (err) {
+      return c.json({ error: 'webpi_abort_failed', message: (err as Error).message }, 409);
     }
   });
 
@@ -1548,7 +1639,9 @@ export function createWorkspaceRoutes(
     }
     const record = svc.sessionRegistry.get(id, token);
     if (!record) return c.json({ error: 'not_found' }, 404);
-    const wasRunning = svc.pool.disposeToken(token, 'session deleted');
+    const wasTerminalRunning = svc.pool.disposeToken(token, 'session deleted');
+    const wasWebPiRunning = await svc.webPi?.stop(token, 'session deleted') ?? false;
+    const wasRunning = wasTerminalRunning || wasWebPiRunning;
     if (record.scrollbackFile) {
       await svc.scrollbackStore.remove(record.scrollbackFile);
     }

@@ -33,6 +33,8 @@ export interface SessionRecord {
   readonly createdAt: string;
   lastActiveAt: string;
   state: 'running' | 'paused';
+  /** Preferred/live presentation for this Session. The runtime remains Pi. */
+  surface?: 'terminal' | 'webpi';
   resumeHint?: { kind: 'agent-session-id'; value: string };
   scrollbackFile?: string;
   /**
@@ -324,6 +326,9 @@ function validateFile(value: unknown): SessionRecord[] {
       createdAt: r['createdAt'],
       lastActiveAt: r['lastActiveAt'],
       state: r['state'],
+      ...(r['surface'] === 'terminal' || r['surface'] === 'webpi'
+        ? { surface: r['surface'] }
+        : {}),
       // Carry the session title (the captured first message) across reloads —
       // it's written to disk by `flush`, so it must be read back here too, or
       // every server restart / registry reload reverts the row to the `c1` name.
