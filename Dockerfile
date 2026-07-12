@@ -87,6 +87,19 @@ COPY --from=build /src/services/uta/dist          ./services/uta/dist
 COPY --from=build /src/ui/dist                    ./ui/dist
 COPY --from=build /src/default                    ./default
 COPY --from=build /src/src/workspaces/templates   ./src/workspaces/templates
+# Workspace CLIs (alice, alice-uta, alice-workspace, traderhub) — the launcher
+# injects these as the agent's ONLY path to OpenAlice's tools (no MCP in
+# workspaces). Without them on PATH, spawned agent sessions (claude, codex)
+# start but cannot reach any of the 72 registered tool-center tools.
+COPY --from=build /src/src/workspaces/cli/bin      ./src/workspaces/cli/bin
+RUN chmod +x /app/src/workspaces/cli/bin/alice \
+             /app/src/workspaces/cli/bin/alice-uta \
+             /app/src/workspaces/cli/bin/alice-workspace \
+             /app/src/workspaces/cli/bin/traderhub \
+ && ln -sf /app/src/workspaces/cli/bin/alice          /usr/local/bin/alice \
+ && ln -sf /app/src/workspaces/cli/bin/alice-uta      /usr/local/bin/alice-uta \
+ && ln -sf /app/src/workspaces/cli/bin/alice-workspace /usr/local/bin/alice-workspace \
+ && ln -sf /app/src/workspaces/cli/bin/traderhub      /usr/local/bin/traderhub
 # tsup bundles backend deps into the entry files where possible, but
 # native modules (node-pty, longbridge, etc.) stay as runtime requires.
 COPY --from=build /src/node_modules               ./node_modules
