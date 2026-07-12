@@ -1,10 +1,5 @@
 import type { SessionRecord, Workspace } from './api'
 
-export interface SidebarSelection {
-  readonly wsId: string
-  readonly sessionId: string | null
-}
-
 function timestamp(value: string): number {
   const parsed = Date.parse(value)
   return Number.isFinite(parsed) ? parsed : 0
@@ -18,18 +13,15 @@ function workspaceActivityMs(workspace: Workspace): number {
 }
 
 /**
- * Rank the workspace tree by current attention, then by recency. Selection is
- * deliberately UI-local: opening an old Inbox-linked session should lift its
- * whole workspace immediately without rewriting durable session timestamps.
+ * Rank the workspace tree by active work, then by recency. Selection is
+ * deliberately presentation-only: inspecting a paused session must not move
+ * its workspace. A workspace is lifted only when one of its sessions is
+ * actually running.
  */
 export function orderWorkspacesForSidebar(
   workspaces: readonly Workspace[],
-  selection: SidebarSelection | null,
 ): Workspace[] {
   return [...workspaces].sort((a, b) => {
-    const selected = Number(b.id === selection?.wsId) - Number(a.id === selection?.wsId)
-    if (selected !== 0) return selected
-
     const running = Number(b.sessions.some((session) => session.state === 'running'))
       - Number(a.sessions.some((session) => session.state === 'running'))
     if (running !== 0) return running
@@ -43,16 +35,12 @@ export function orderWorkspacesForSidebar(
   })
 }
 
-/** Selected and running sessions are the ones most likely to need attention;
- * within the same state, the latest activity wins. */
+/** Running sessions need immediate attention; within the same state, the
+ * latest activity wins. Merely selecting a paused session never reorders it. */
 export function orderSessionsForSidebar(
   sessions: readonly SessionRecord[],
-  selectedSessionId: string | null,
 ): SessionRecord[] {
   return [...sessions].sort((a, b) => {
-    const selected = Number(b.id === selectedSessionId) - Number(a.id === selectedSessionId)
-    if (selected !== 0) return selected
-
     const running = Number(b.state === 'running') - Number(a.state === 'running')
     if (running !== 0) return running
 

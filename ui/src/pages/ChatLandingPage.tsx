@@ -128,6 +128,16 @@ export function resolveChatCredential(
   return credentials?.[0]?.slug ?? null
 }
 
+/** The provider pill is a per-Workspace launch choice. Global runtime
+ * readiness may let a loginless runtime start without a vault credential, but
+ * it must not erase a credential the composer resolved for this launch. */
+export function resolveQuickChatCredentialSlug(
+  needsCredential: boolean,
+  effectiveCredential: string | null,
+): string | undefined {
+  return needsCredential ? (effectiveCredential ?? undefined) : undefined
+}
+
 /**
  * Quick-chat landing — the "type a message → you're in" front door for the
  * "Ask Alice" activity. A single composer: the user types a first message and
@@ -142,10 +152,10 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
   const { quickChat, agents, workspaces, defaultAgent, setDefaultAgent } = useWorkspaces()
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
 
-  // Targeted launch: the chat sidebar's per-workspace "+" routes here with a
-  // targetWsId — "Ask Alice, but spawn the session in THIS workspace" rather
-  // than the recent Chat workspace. Same composer; the send just
-  // carries the target.
+  // Targeted launch: the chat sidebar's Workspace row and per-workspace "+"
+  // route here with a targetWsId — "Ask Alice, but spawn the session in THIS
+  // workspace" rather than the recent Chat workspace. Same composer; the send
+  // just carries the target.
   const targetWsId = spec.params.targetWsId
   const targetWs = targetWsId ? workspaces.find((w) => w.id === targetWsId) : undefined
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null)
@@ -430,12 +440,11 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
         setError(runtimeRow?.message ?? t('chatLanding.runtimeNotReady'))
         return
       }
-      const runtimeUsesGlobalConfig =
-        runtimeRow.source === 'global-config' ||
-        runtimeRow.source === 'managed-runtime' ||
-        runtimeRow.source === 'global-login'
-      const credentialSlug =
-        needsCred && !runtimeUsesGlobalConfig ? (effectiveCred ?? undefined) : undefined
+      // A global OpenCode/Pi config is only a fallback when the user has not
+      // selected a vault credential for this launch. The provider pill is an
+      // explicit per-Workspace choice: always send it so the backend can write
+      // the selected provider/model before spawning the runtime.
+      const credentialSlug = resolveQuickChatCredentialSlug(needsCred, effectiveCred)
       // On success this focuses the new session's terminal tab; the landing tab
       // stays open in the background, so clear it for next time.
       const workspaceId = await quickChat(

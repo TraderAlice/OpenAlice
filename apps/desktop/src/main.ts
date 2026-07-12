@@ -34,15 +34,15 @@ import {
   type RuntimeProcessLock,
 } from '@traderalice/guardian-runtime'
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
-import { existsSync, statSync } from 'node:fs'
 import { mkdir, readFile, watch, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { homedir } from 'node:os'
-import { delimiter, dirname, join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { probeFreePort } from './probe-port.js'
 import { relocateLegacyData } from './relocate-data.js'
 import { configureAutoUpdate } from './auto-update.js'
 import { fetchAliceWebRequest, handleOpenAliceIpcMessage, registerOpenAliceIpc } from './ipc.js'
+import { resolveManagedRuntimeEnv } from './managed-runtime.js'
 import { proxyEnvFromRules } from './proxy-env.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -181,91 +181,6 @@ function truthyEnv(raw: string | undefined): boolean {
   if (raw === undefined || raw === '') return false
   const normalized = raw.toLowerCase()
   return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on'
-}
-
-function existingFile(path: string): string | null {
-  try {
-    return existsSync(path) && statSync(path).isFile() ? path : null
-  } catch {
-    return null
-  }
-}
-
-function existingDir(path: string): string | null {
-  try {
-    return existsSync(path) && statSync(path).isDirectory() ? path : null
-  } catch {
-    return null
-  }
-}
-
-function resolveManagedRuntimeEnv(opts: {
-  readonly appHome: string
-  readonly launcherMode: 'electron-dev' | 'electron-packaged'
-}): Record<string, string> {
-  const out: Record<string, string> = {
-    OPENALICE_RUNTIME_PROFILE: opts.launcherMode,
-  }
-  const platformArch = `${process.platform}-${process.arch}`
-
-  const managedPiCli = existingFile(join(
-    opts.appHome,
-    'vendor',
-    'pi',
-    'node_modules',
-    '@earendil-works',
-    'pi-coding-agent',
-    'dist',
-    'cli.js',
-  ))
-  const managedPiBinary = existingFile(join(
-    opts.appHome,
-    'vendor',
-    'pi',
-    platformArch,
-    process.platform === 'win32' ? 'pi.exe' : 'pi',
-  ))
-  if (managedPiCli) {
-    out.OPENALICE_MANAGED_PI_PATH = managedPiCli
-    out.OPENALICE_MANAGED_PI_NODE_PATH = process.execPath
-  } else if (managedPiBinary) {
-    out.OPENALICE_MANAGED_PI_PATH = managedPiBinary
-  }
-
-  const toolchainPaths: string[] = []
-  if (process.platform === 'win32') {
-    const gitDir = existingDir(join(opts.appHome, 'vendor', 'git', platformArch))
-    if (gitDir) {
-      out.OPENALICE_MANAGED_GIT_DIR = gitDir
-      out.LOCAL_GIT_DIRECTORY = gitDir
-
-      const gitBin =
-        existingFile(join(gitDir, 'cmd', 'git.exe')) ??
-        existingFile(join(gitDir, 'bin', 'git.exe')) ??
-        existingFile(join(gitDir, 'mingw64', 'bin', 'git.exe')) ??
-        existingFile(join(gitDir, 'clangarm64', 'bin', 'git.exe'))
-      if (gitBin) out.OPENALICE_MANAGED_GIT_BIN = gitBin
-
-      const shellPath =
-        existingFile(join(gitDir, 'bin', 'bash.exe')) ??
-        existingFile(join(gitDir, 'usr', 'bin', 'bash.exe'))
-      if (shellPath) out.OPENALICE_MANAGED_SHELL_PATH = shellPath
-
-      for (const rel of ['cmd', 'bin', 'usr/bin', 'mingw64/bin', 'clangarm64/bin']) {
-        const dir = existingDir(join(gitDir, ...rel.split('/')))
-        if (dir) toolchainPaths.push(dir)
-      }
-    }
-  } else if (opts.launcherMode === 'electron-packaged') {
-    const shellPath = existingFile('/bin/bash') ?? existingFile('/bin/sh')
-    if (shellPath) out.OPENALICE_MANAGED_SHELL_PATH = shellPath
-  }
-
-  if (toolchainPaths.length > 0) {
-    out.OPENALICE_MANAGED_TOOLCHAIN_PATH = toolchainPaths.join(delimiter)
-  }
-
-  return out
 }
 
 async function resolveChildProxyEnv(): Promise<Record<string, string>> {

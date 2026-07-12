@@ -52,6 +52,7 @@ function workspaceContext(workspaces: readonly Workspace[]): WorkspacesContextVa
     quickChat: vi.fn(async () => 'session-1'),
     pauseSession: vi.fn(async () => undefined),
     resumeSession: vi.fn(async () => undefined),
+    openWebPiSession: vi.fn(async () => undefined),
     requestDeleteSession: vi.fn(),
     openAgentConfig: vi.fn(),
     saveWorkspaceMetadata: vi.fn(async () => undefined),
@@ -81,19 +82,29 @@ describe('ChatWorkspaceSection actions', () => {
     const newChat = screen.getByRole('button', { name: 'New chat' })
     const newWorkspace = screen.getByRole('button', { name: 'New workspace' })
     const workspaceHeading = screen.getByText('Workspaces', { selector: 'span' })
+    const workspaceButton = screen.getByRole('button', { name: chatWorkspace.tag })
     const newSession = screen.getByRole('button', { name: 'New conversation in this workspace' })
 
     expect(newChat.className).toContain('w-full')
     expect(newChat.textContent).toBe('New chat')
-    expect(workspaceHeading.parentElement?.contains(newWorkspace)).toBe(true)
-    expect(newWorkspace.querySelector('.lucide-folder-plus')).toBeTruthy()
+    expect(newChat.querySelector('.lucide-message-square-plus')).toBeTruthy()
+    expect(workspaceHeading.parentElement?.nextElementSibling?.contains(newWorkspace)).toBe(true)
+    expect(newWorkspace.className).toContain('w-full')
+    expect(newWorkspace.textContent).toBe('New workspace')
+    expect(newWorkspace.querySelector('.lucide-panels-top-left')).toBeTruthy()
     expect(newSession.querySelector('.lucide-message-square-plus')).toBeTruthy()
 
     fireEvent.click(newChat)
     expect(openOrFocus).toHaveBeenCalledWith({ kind: 'chat-landing', params: {} })
 
+    fireEvent.click(workspaceButton)
+    expect(openOrFocus).toHaveBeenLastCalledWith({
+      kind: 'chat-landing',
+      params: { targetWsId: chatWorkspace.id },
+    })
+
     fireEvent.click(newSession)
-    expect(openOrFocus).toHaveBeenCalledWith({
+    expect(openOrFocus).toHaveBeenLastCalledWith({
       kind: 'chat-landing',
       params: { targetWsId: chatWorkspace.id },
     })

@@ -46,4 +46,11 @@ describe('renderMarkdownHtml', () => {
     expect(html).toContain('data-entity="stock-glw"')
     expect(html).toContain('data-entity="ai-data-center-power"')
   })
+
+  it('renders a Session signature as a resumable link but leaves code examples alone', () => {
+    const html = renderMarkdownHtml('Signed-by: @resume-kind-owl-abc123 and `@resume-example`')
+    expect(html).toContain('class="session-signature"')
+    expect(html).toContain('data-resume-id="resume-kind-owl-abc123"')
+    expect(html).toContain('<code>@resume-example</code>')
+  })
 })

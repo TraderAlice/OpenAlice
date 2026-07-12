@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync } from 'node:fs'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { chmod, copyFile, mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, relative, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -55,13 +55,106 @@ const WINDOWS_GIT_RUNTIMES = {
   },
 }
 
+const MANAGED_SEARCH_TOOL_RUNTIMES = {
+  'darwin-arm64': searchToolRuntime('darwin', 'arm64', {
+    fd: releaseAsset({
+      id: 'fd',
+      version: '10.4.2',
+      binaryName: 'fd',
+      url: 'https://github.com/sharkdp/fd/releases/download/v10.4.2/fd-v10.4.2-aarch64-apple-darwin.tar.gz',
+      sha256: '623dc0afc81b92e4d4606b380d7bc91916ba7b97814263e554d50923a39e480a',
+      licenses: ['LICENSE-APACHE', 'LICENSE-MIT'],
+    }),
+    rg: releaseAsset({
+      id: 'rg',
+      version: '15.1.0',
+      binaryName: 'rg',
+      url: 'https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15.1.0-aarch64-apple-darwin.tar.gz',
+      sha256: '378e973289176ca0c6054054ee7f631a065874a352bf43f0fa60ef079b6ba715',
+      licenses: ['LICENSE-MIT', 'UNLICENSE'],
+    }),
+  }),
+  'darwin-x64': searchToolRuntime('darwin', 'x64', {
+    // fd 10.4.x no longer publishes an Intel macOS asset.
+    fd: releaseAsset({
+      id: 'fd',
+      version: '10.3.0',
+      binaryName: 'fd',
+      url: 'https://github.com/sharkdp/fd/releases/download/v10.3.0/fd-v10.3.0-x86_64-apple-darwin.tar.gz',
+      sha256: '50d30f13fe3d5914b14c4fff5abcbd4d0cdab4b855970a6956f4f006c17117a3',
+      licenses: ['LICENSE-APACHE', 'LICENSE-MIT'],
+    }),
+    rg: releaseAsset({
+      id: 'rg',
+      version: '15.1.0',
+      binaryName: 'rg',
+      url: 'https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15.1.0-x86_64-apple-darwin.tar.gz',
+      sha256: '64811cb24e77cac3057d6c40b63ac9becf9082eedd54ca411b475b755d334882',
+      licenses: ['LICENSE-MIT', 'UNLICENSE'],
+    }),
+  }),
+  'win32-x64': searchToolRuntime('win32', 'x64', {
+    fd: releaseAsset({
+      id: 'fd',
+      version: '10.4.2',
+      binaryName: 'fd.exe',
+      url: 'https://github.com/sharkdp/fd/releases/download/v10.4.2/fd-v10.4.2-x86_64-pc-windows-msvc.zip',
+      sha256: 'b2816e506390a89941c63c9187d58a3cc10e9a55f2ef0685f9ea0eccaf7c98c8',
+      licenses: ['LICENSE-APACHE', 'LICENSE-MIT'],
+    }),
+    rg: releaseAsset({
+      id: 'rg',
+      version: '15.1.0',
+      binaryName: 'rg.exe',
+      url: 'https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15.1.0-x86_64-pc-windows-msvc.zip',
+      sha256: '124510b94b6baa3380d051fdf4650eaa80a302c876d611e9dba0b2e18d87493a',
+      licenses: ['LICENSE-MIT', 'UNLICENSE'],
+    }),
+  }),
+  'win32-arm64': searchToolRuntime('win32', 'arm64', {
+    fd: releaseAsset({
+      id: 'fd',
+      version: '10.4.2',
+      binaryName: 'fd.exe',
+      url: 'https://github.com/sharkdp/fd/releases/download/v10.4.2/fd-v10.4.2-aarch64-pc-windows-msvc.zip',
+      sha256: '4f9110c2d5b33a7f760bfa5510f4c113d828109f7277d421b1053a9943c0fc92',
+      licenses: ['LICENSE-APACHE', 'LICENSE-MIT'],
+    }),
+    rg: releaseAsset({
+      id: 'rg',
+      version: '15.1.0',
+      binaryName: 'rg.exe',
+      url: 'https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15.1.0-aarch64-pc-windows-msvc.zip',
+      sha256: '00d931fb5237c9696ca49308818edb76d8eb6fc132761cb2a1bd616b2df02f8e',
+      licenses: ['LICENSE-MIT', 'UNLICENSE'],
+    }),
+  }),
+}
+
+function releaseAsset(spec) {
+  return spec
+}
+
+function searchToolRuntime(platform, arch, tools) {
+  const platformArch = `${platform}-${arch}`
+  return {
+    platform,
+    arch,
+    platformArch,
+    root: `vendor/tools/${platformArch}`,
+    binPath: 'bin',
+    licensesPath: 'licenses',
+    tools,
+  }
+}
+
 function printHelp() {
   console.log(`Usage: pnpm vendor:runtime [options]
 
 Prepare managed workspace runtimes under vendor/.
 
 Options:
-  --force    Remove and reinstall vendor/pi even if it already matches
+  --force    Reinstall managed runtimes even if they already match
   -h, --help Show this help
 `)
 }
@@ -70,8 +163,9 @@ async function main() {
   parseArgs(process.argv.slice(2))
   await mkdir(vendorRoot, { recursive: true })
   await vendorPi()
+  const searchToolsSpec = await vendorManagedSearchTools()
   const gitSpec = await vendorWindowsGit()
-  await writeManifest(gitSpec)
+  await writeManifest(gitSpec, searchToolsSpec)
 }
 
 function parseArgs(argv) {
@@ -167,11 +261,128 @@ async function vendorWindowsGit() {
   return spec
 }
 
-async function download(url) {
-  console.log(`[vendor-runtime] download ${url}`)
-  const res = await fetch(url)
-  if (!res.ok) throw new Error(`${url} returned HTTP ${res.status}`)
-  return Buffer.from(await res.arrayBuffer())
+async function vendorManagedSearchTools() {
+  const spec = resolveManagedSearchToolsSpec()
+  if (!spec) {
+    console.log(`[vendor-runtime] managed fd/rg skipped on unsupported ${process.platform}-${process.arch} host`)
+    return null
+  }
+
+  const existingManifest = readManifest()
+  const existing = existingManifest?.searchTools?.[spec.platformArch]
+  const isCurrent = Object.values(spec.tools).every((tool) => (
+    existing?.[tool.id]?.version === tool.version &&
+    existing?.[tool.id]?.sha256 === tool.sha256
+  ))
+  if (
+    !force &&
+    isCurrent &&
+    requiredManagedSearchToolFiles(spec).every((file) => existsSync(resolve(repoRoot, spec.root, file)))
+  ) {
+    console.log(`[vendor-runtime] managed fd/rg already present at ${spec.root}`)
+    return spec
+  }
+
+  const toolsParent = resolve(vendorRoot, 'tools')
+  const finalRoot = resolve(repoRoot, spec.root)
+  await mkdir(toolsParent, { recursive: true })
+  let stagingRoot = await mkdtemp(resolve(toolsParent, `.${spec.platformArch}-`))
+  try {
+    const binDir = resolve(stagingRoot, spec.binPath)
+    await mkdir(binDir, { recursive: true })
+
+    for (const tool of Object.values(spec.tools)) {
+      const bytes = await download(tool.url)
+      verifySha256(bytes, tool.sha256, tool.url)
+
+      const extractRoot = await mkdtemp(resolve(tmpdir(), `openalice-${tool.id}-`))
+      const archivePath = resolve(extractRoot, basename(tool.url))
+      try {
+        await writeFile(archivePath, bytes)
+        extractArchive(tool.id, archivePath, extractRoot)
+
+        const binary = findFileRecursively(extractRoot, tool.binaryName)
+        if (!binary) throw new Error(`${tool.binaryName} missing after extracting ${tool.url}`)
+        const destination = resolve(binDir, tool.binaryName)
+        await copyFile(binary, destination)
+        if (spec.platform !== 'win32') await chmod(destination, 0o755)
+
+        const licenseDir = resolve(stagingRoot, spec.licensesPath, tool.id)
+        await mkdir(licenseDir, { recursive: true })
+        for (const licenseName of tool.licenses) {
+          const license = findFileRecursively(extractRoot, licenseName)
+          if (!license) throw new Error(`${licenseName} missing after extracting ${tool.url}`)
+          await copyFile(license, resolve(licenseDir, licenseName))
+        }
+      } finally {
+        await rm(extractRoot, { recursive: true, force: true })
+      }
+    }
+
+    const missing = requiredManagedSearchToolFiles(spec)
+      .filter((file) => !existsSync(resolve(stagingRoot, file)))
+    if (missing.length > 0) {
+      throw new Error(`managed fd/rg staging missing required files: ${missing.join(', ')}`)
+    }
+
+    await rm(finalRoot, { recursive: true, force: true })
+    await rename(stagingRoot, finalRoot)
+    stagingRoot = null
+    console.log(`[vendor-runtime] managed fd/rg -> ${relativeForLog(resolve(finalRoot, spec.binPath))}`)
+    return spec
+  } finally {
+    if (stagingRoot) await rm(stagingRoot, { recursive: true, force: true })
+  }
+}
+
+function extractArchive(toolId, archivePath, destination) {
+  if (archivePath.endsWith('.tar.gz')) {
+    run(`extract ${toolId}`, windowsTarCommand(), ['-xzf', archivePath, '-C', destination])
+    return
+  }
+  if (archivePath.endsWith('.zip')) {
+    run(`extract ${toolId}`, windowsTarCommand(), ['-xf', archivePath, '-C', destination])
+    return
+  }
+  throw new Error(`unsupported managed tool archive: ${archivePath}`)
+}
+
+function windowsTarCommand() {
+  if (process.platform !== 'win32') return 'tar'
+  const systemRoot = process.env['SystemRoot'] ?? process.env['WINDIR']
+  const systemTar = systemRoot ? resolve(systemRoot, 'System32', 'tar.exe') : null
+  return systemTar && existsSync(systemTar) ? systemTar : 'tar.exe'
+}
+
+function findFileRecursively(root, fileName) {
+  for (const entry of readdirSync(root, { withFileTypes: true })) {
+    const path = resolve(root, entry.name)
+    if (entry.isFile() && entry.name === fileName) return path
+    if (entry.isDirectory()) {
+      const nested = findFileRecursively(path, fileName)
+      if (nested) return nested
+    }
+  }
+  return null
+}
+
+async function download(url, attempts = 3) {
+  let lastError = null
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    console.log(`[vendor-runtime] download ${url}${attempt > 1 ? ` (attempt ${attempt}/${attempts})` : ''}`)
+    try {
+      const res = await fetch(url)
+      if (!res.ok) throw new Error(`${url} returned HTTP ${res.status}`)
+      return Buffer.from(await res.arrayBuffer())
+    } catch (err) {
+      lastError = err
+      if (attempt < attempts) await new Promise((resolveDelay) => setTimeout(resolveDelay, attempt * 1_000))
+    }
+  }
+  const detail = lastError instanceof Error
+    ? `${lastError.message}${lastError.cause instanceof Error ? `: ${lastError.cause.message}` : ''}`
+    : String(lastError)
+  throw new Error(`failed to download ${url} after ${attempts} attempts: ${detail}`)
 }
 
 function verifySha256(bytes, expected, label) {
@@ -190,9 +401,11 @@ function run(label, command, commandArgs, opts = {}) {
     shell: opts.shell ?? false,
   })
   if (result.error) {
-    console.error(`[vendor-runtime] failed to start ${command}: ${result.error.message}`)
+    throw new Error(`${label} failed to start ${command}: ${result.error.message}`)
   }
-  if (result.status !== 0 || result.error) process.exit(result.status ?? 1)
+  if (result.status !== 0) {
+    throw new Error(`${label} exited ${result.status ?? 'unknown'}${result.signal ? ` (${result.signal})` : ''}`)
+  }
 }
 
 function readManifest() {
@@ -203,7 +416,7 @@ function readManifest() {
   }
 }
 
-export function buildVendorRuntimeManifest(gitSpec = null) {
+export function buildVendorRuntimeManifest(gitSpec = null, searchToolsSpec = null) {
   const manifest = {
     pi: {
       version: PI_VERSION,
@@ -212,6 +425,25 @@ export function buildVendorRuntimeManifest(gitSpec = null) {
       cli: relativeForManifest(piCliPath),
       node: 'electron',
     },
+  }
+  if (searchToolsSpec) {
+    manifest.searchTools = {
+      [searchToolsSpec.platformArch]: {
+        path: searchToolsSpec.root,
+        binPath: searchToolsSpec.binPath,
+        ...Object.fromEntries(Object.values(searchToolsSpec.tools).map((tool) => [
+          tool.id,
+          {
+            version: tool.version,
+            binary: `${searchToolsSpec.binPath}/${tool.binaryName}`,
+            distribution: tool.id === 'fd' ? 'sharkdp/fd' : 'BurntSushi/ripgrep',
+            url: tool.url,
+            sha256: tool.sha256,
+            licenses: tool.licenses.map((name) => `${searchToolsSpec.licensesPath}/${tool.id}/${name}`),
+          },
+        ])),
+      },
+    }
   }
   if (gitSpec) {
     manifest.git = {
@@ -231,10 +463,23 @@ export function buildVendorRuntimeManifest(gitSpec = null) {
   return manifest
 }
 
-async function writeManifest(gitSpec) {
-  const manifest = buildVendorRuntimeManifest(gitSpec)
+async function writeManifest(gitSpec, searchToolsSpec) {
+  const manifest = buildVendorRuntimeManifest(gitSpec, searchToolsSpec)
   await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n')
   console.log(`[vendor-runtime] manifest -> ${relativeForLog(manifestPath)}`)
+}
+
+export function resolveManagedSearchToolsSpec(opts = {}) {
+  const platform = opts.platform ?? process.platform
+  const arch = opts.arch ?? process.arch
+  return MANAGED_SEARCH_TOOL_RUNTIMES[`${platform}-${arch}`] ?? null
+}
+
+export function requiredManagedSearchToolFiles(spec) {
+  return Object.values(spec.tools).flatMap((tool) => [
+    `${spec.binPath}/${tool.binaryName}`,
+    ...tool.licenses.map((name) => `${spec.licensesPath}/${tool.id}/${name}`),
+  ])
 }
 
 export function resolveWindowsGitRuntimeSpec(opts = {}) {

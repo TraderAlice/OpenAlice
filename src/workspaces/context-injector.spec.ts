@@ -86,6 +86,17 @@ describe('injectWorkspaceContext — persona', () => {
     expect(existsSync(join(dir, 'CLAUDE.md'))).toBe(false);
     expect(existsSync(join(dir, 'AGENTS.md'))).toBe(false);
   });
+
+  it('keeps the always-loaded Chat contract compact and routes manuals to skills', async () => {
+    const instruction = await readFile(join(CHAT_FILES, 'instruction.md'), 'utf8');
+    expect(instruction.split('\n').length).toBeLessThan(120);
+    expect(instruction).toContain('Every price, return, date, ratio');
+    expect(instruction).toContain('A comment is a board');
+    expect(instruction).toContain('The `alice-workspace` skill contains the exact commands');
+    expect(instruction).not.toContain('alice-workspace issue comment --text');
+    expect(instruction).not.toContain('alice-workspace inbox push --doc');
+    expect(instruction).not.toContain('--when');
+  });
 });
 
 describe('injectWorkspaceContext — skills', () => {

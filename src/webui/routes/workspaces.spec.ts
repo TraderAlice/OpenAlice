@@ -32,6 +32,9 @@ function build(
     resolveTo?: any;
     dispatch?: any;
     runtimeReadiness?: any;
+    resumeIdentity?: any;
+    sessionDirectory?: any;
+    lifecycle?: any;
   } = {},
 ) {
   const claude = {
@@ -43,7 +46,7 @@ function build(
   const meta = opts.meta ?? { id: 'ws-1', dir: '/w', agents: ['claude'] };
   const adapters = opts.adapters ?? { claude };
   const runHeadlessTask = vi.fn(async () => HEADLESS_RESULT);
-  const dispatchHeadlessTask = opts.dispatch ?? vi.fn(async () => ({ taskId: 'task-1' }));
+  const dispatchHeadlessTask = opts.dispatch ?? vi.fn(async () => ({ taskId: 'task-1', resumeId: 'resume-1' }));
   const runtimeReadiness = opts.runtimeReadiness ?? {
     agents: {
       claude: {
@@ -77,6 +80,13 @@ function build(
       },
     },
   }));
+  const lifecycle = opts.lifecycle ?? {
+    listDeparted: vi.fn(() => []),
+    assess: vi.fn(async () => null),
+    offboard: vi.fn(async () => ({ ok: true, workspace: { id: 'ws-1', lifecycle: 'departed' }, assessment: {} })),
+    restore: vi.fn(async () => ({ ok: true, workspace: { id: 'ws-1', lifecycle: 'active' }, assessment: {} })),
+    purge: vi.fn(async () => ({ ok: true, workspace: { id: 'ws-1', lifecycle: 'purged' }, assessment: {} })),
+  };
   const svc = {
     registry: { get: (id: string) => (id === 'ws-1' ? meta : undefined) },
     adapters: { get: (a: string) => adapters[a] },
@@ -84,8 +94,19 @@ function build(
     config: { launcherRepoRoot: '/repo' },
     runHeadlessTask,
     dispatchHeadlessTask,
+    resumeRegistry: {
+      get: vi.fn(() => opts.resumeIdentity ?? null),
+      ensure: vi.fn(async (input: any) => ({ resumeId: input.resumeId ?? 'resume-1', ...input })),
+    },
     getAgentRuntimeReadiness,
     probeAgentRuntimeReadiness,
+    lifecycle,
+    sessionDirectory: vi.fn(async (id: string) => id === 'ws-1'
+      ? (opts.sessionDirectory ?? {
+          workspace: { id: 'ws-1', tag: 'demo' },
+          sessions: [{ resumeId: 'resume-1', agent: 'claude', createdAt: 1, updatedAt: 2, resumable: true, active: false }],
+        })
+      : null),
     publicMeta: vi.fn(async (m: any) => {
       const res = await readWorkspaceMetadata(m.dir);
       return { ...m, ...(res.ok ? res.metadata : {}) };
@@ -97,8 +118,44 @@ function build(
     dispatchHeadlessTask,
     getAgentRuntimeReadiness,
     probeAgentRuntimeReadiness,
+    lifecycle,
   };
 }
+
+async function get(app: any, path: string) {
+  const res = await app.request(path)
+  return { status: res.status, body: await res.json().catch(() => null) as any }
+}
+
+describe('GET /:id/resumes', () => {
+  it('returns the safe product Session directory', async () => {
+    const { app } = build()
+    const result = await get(app, '/ws-1/resumes')
+    expect(result.status).toBe(200)
+    expect(result.body.sessions).toEqual([
+      expect.objectContaining({ resumeId: 'resume-1', agent: 'claude', resumable: true }),
+    ])
+    expect(JSON.stringify(result.body)).not.toContain('agentSessionId')
+  })
+})
+
+describe('GET /signatures/:resumeId', () => {
+  it('resolves a globally signed Session without exposing its native runtime id', async () => {
+    const { app } = build({ resumeIdentity: {
+      resumeId: 'resume-kind-owl-abc123', wsId: 'ws-peer', agent: 'codex', agentSessionId: 'native-secret',
+    } })
+    const result = await get(app, '/signatures/resume-kind-owl-abc123')
+    expect(result.status).toBe(200)
+    expect(result.body).toEqual({
+      signature: '@resume-kind-owl-abc123',
+      resumeId: 'resume-kind-owl-abc123',
+      workspaceId: 'ws-peer',
+      agent: 'codex',
+      resumable: true,
+    })
+    expect(JSON.stringify(result.body)).not.toContain('native-secret')
+  })
+})
 
 async function post(app: any, path: string, body?: unknown) {
   const res = await app.request(path, {
@@ -119,6 +176,54 @@ async function patch(app: any, path: string, body?: unknown) {
   const json = await res.json().catch(() => null);
   return { status: res.status, body: json as any };
 }
+
+async function del(app: any, path: string) {
+  const res = await app.request(path, { method: 'DELETE' });
+  return { status: res.status, body: await res.json().catch(() => null) as any };
+}
+
+describe('Workspace lifecycle routes', () => {
+  it('lists departed Workspaces and restores one through the lifecycle manager', async () => {
+    const lifecycle = {
+      listDeparted: vi.fn(() => [{ id: 'ws-old', lifecycle: 'departed' }]),
+      restore: vi.fn(async () => ({ ok: true, workspace: { id: 'ws-old', lifecycle: 'active' }, assessment: {} })),
+      assess: vi.fn(), offboard: vi.fn(), purge: vi.fn(),
+    };
+    const { app } = build({ lifecycle });
+    expect(await get(app, '/departed')).toMatchObject({
+      status: 200,
+      body: { workspaces: [{ id: 'ws-old', lifecycle: 'departed' }] },
+    });
+    expect((await post(app, '/departed/ws-old/restore')).status).toBe(200);
+    expect(lifecycle.restore).toHaveBeenCalledWith('ws-old');
+  });
+
+  it('maps a live-run offboarding blocker to 409 without deleting state', async () => {
+    const lifecycle = {
+      listDeparted: vi.fn(), restore: vi.fn(), assess: vi.fn(), purge: vi.fn(),
+      offboard: vi.fn(async () => ({
+        ok: false, code: 'blocked', message: '1 headless run is still active',
+        assessment: { canOffboard: false },
+      })),
+    };
+    const { app } = build({ lifecycle });
+    const result = await del(app, '/ws-1');
+    expect(result).toMatchObject({
+      status: 409,
+      body: { error: 'blocked', assessment: { canOffboard: false } },
+    });
+  });
+
+  it('purges only through the departed route', async () => {
+    const lifecycle = {
+      listDeparted: vi.fn(), restore: vi.fn(), assess: vi.fn(), offboard: vi.fn(),
+      purge: vi.fn(async () => ({ ok: true, workspace: { id: 'ws-old', lifecycle: 'purged' }, assessment: {} })),
+    };
+    const { app } = build({ lifecycle });
+    expect((await del(app, '/departed/ws-old')).status).toBe(200);
+    expect(lifecycle.purge).toHaveBeenCalledWith('ws-old');
+  });
+});
 
 describe('PATCH /:id/metadata', () => {
   it('writes workspace-owned display metadata without changing launcher identity', async () => {
@@ -248,6 +353,32 @@ describe('POST /:id/headless', () => {
     expect(dispatchHeadlessTask).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), 'x', 300_000);
   });
 
+  it('continues a headless conversation by product resumeId only', async () => {
+    const { app, dispatchHeadlessTask } = build({
+      resumeIdentity: {
+        resumeId: 'resume-1', wsId: 'ws-1', agent: 'claude', agentSessionId: 'native-hidden',
+      },
+    });
+    const response = await post(app, '/ws-1/headless', { prompt: 'follow up', resumeId: 'resume-1' });
+    expect(response.status).toBe(202);
+    expect(response.body).toMatchObject({ taskId: 'task-1', resumeId: 'resume-1' });
+    expect(dispatchHeadlessTask).toHaveBeenCalledWith(
+      expect.anything(), expect.anything(), 'follow up', 300_000, undefined, 'resume-1',
+    );
+  });
+
+  it('does not allow wait:true to bypass recorded resume lineage', async () => {
+    const { app, dispatchHeadlessTask } = build({
+      resumeIdentity: { resumeId: 'resume-1', wsId: 'ws-1', agent: 'claude' },
+    });
+    const response = await post(app, '/ws-1/headless', {
+      prompt: 'follow up', resumeId: 'resume-1', wait: true,
+    });
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('resume_requires_async');
+    expect(dispatchHeadlessTask).not.toHaveBeenCalled();
+  });
+
   it('async by default → 202 + taskId, dispatches in the background', async () => {
     const { app, dispatchHeadlessTask, runHeadlessTask } = build();
     const r = await post(app, '/ws-1/headless', { prompt: 'do the thing' });
@@ -290,6 +421,7 @@ describe('POST /:id/headless/:taskId/session', () => {
     };
     const task = opts.task ?? {
       taskId: 'run-1',
+      resumeId: 'resume-run-1',
       wsId: 'ws-1',
       agent: 'codex',
       prompt: 'Investigate the earnings anomaly',
@@ -310,6 +442,8 @@ describe('POST /:id/headless/:taskId/session', () => {
     });
     const sessionRegistry = {
       ensureLoaded: vi.fn(async () => {}),
+      findByResumeId: (_wsId: string, resumeId: string) =>
+        Array.from(records.values()).find((record) => record.resumeId === resumeId),
       findBySourceRunId: (_wsId: string, runId: string) =>
         Array.from(records.values()).find((record) => record.sourceRunId === runId),
       findById: (id: string) => records.get(id),
@@ -318,10 +452,29 @@ describe('POST /:id/headless/:taskId/session', () => {
       get: (_wsId: string, id: string) => records.get(id),
       remove: vi.fn(async (_wsId: string, id: string) => records.delete(id)),
     };
+    const resumeRecords = new Map<string, any>();
+    if (task.resumeId) {
+      resumeRecords.set(task.resumeId, {
+        resumeId: task.resumeId,
+        wsId: task.wsId ?? 'ws-1',
+        agent: task.agent ?? 'codex',
+        agentSessionId: task.agentSessionId ?? '019eb75e-0b1b-7fa2',
+        latestTaskId: task.taskId,
+      });
+    }
     const svc = {
       registry: { get: (id: string) => id === 'ws-1' ? { id, dir: '/w', agents: ['codex'] } : undefined },
       headlessTasks: { get: (id: string) => id === task.taskId ? task : null },
       sessionRegistry,
+      resumeRegistry: {
+        get: (id: string) => resumeRecords.get(id) ?? null,
+        ensure: vi.fn(async (input: any) => {
+          const prior = resumeRecords.get(input.resumeId) ?? {};
+          const record = { ...prior, ...input, resumeId: input.resumeId ?? 'resume-created' };
+          resumeRecords.set(record.resumeId, record);
+          return record;
+        }),
+      },
       adapters: { get: (id: string) => id === 'codex' ? adapter : undefined },
       resolveAdapter: () => adapter,
       getAgentRuntimeReadiness: () => ({
@@ -344,6 +497,7 @@ describe('POST /:id/headless/:taskId/session', () => {
     expect(spawn).toHaveBeenCalledOnce();
     expect(Array.from(records.values())[0]).toMatchObject({
       sourceRunId: 'run-1',
+      resumeId: 'resume-run-1',
       title: 'Investigate the earnings anomaly',
       resumeHint: { kind: 'agent-session-id', value: '019eb75e-0b1b-7fa2' },
     });
@@ -362,18 +516,16 @@ describe('POST /:id/headless/:taskId/session', () => {
     expect(spawn).toHaveBeenCalledOnce();
   });
 
-  it('uses server-stamped Inbox fallback identity after the bounded run log is pruned', async () => {
-    const { app } = buildHeadlessSession({ task: { taskId: 'different-run' } });
-    const opened = await post(app, '/ws-1/headless/pruned-run/session', {
-      agent: 'codex',
-      agentSessionId: '019eb75e-0b1b-7fa2',
+  it('opens the same conversation directly by resumeId without a native id in the request', async () => {
+    const { app } = buildHeadlessSession();
+    const opened = await post(app, '/ws-1/resumes/resume-run-1/session', {
       title: 'Durable Inbox report',
     });
 
     expect(opened.status).toBe(201);
     expect(opened.body.session).toMatchObject({
-      sourceRunId: 'pruned-run',
-      title: 'Durable Inbox report',
+      sourceRunId: 'run-1',
+      resumeId: 'resume-run-1',
     });
   });
 
@@ -381,6 +533,7 @@ describe('POST /:id/headless/:taskId/session', () => {
     const { app, spawn } = buildHeadlessSession({
       task: {
         taskId: 'run-1',
+        resumeId: 'resume-run-1',
         wsId: 'ws-1',
         agent: 'codex',
         prompt: 'Still running',
@@ -415,6 +568,7 @@ describe('POST /:id/sessions/:sid/resume — concurrent coalescing (ANG-120)', (
     });
     const record = {
       id: TOKEN,
+      resumeId: 'resume-aid',
       wsId: 'ws-1',
       agent: 'claude',
       name: 'c1',
@@ -424,6 +578,7 @@ describe('POST /:id/sessions/:sid/resume — concurrent coalescing (ANG-120)', (
     const adapter = { id: 'claude', capabilities: { resumeById: true, resumeLast: false } };
     const svc = {
       sessionRegistry: { get: () => record, update: vi.fn(async () => {}) },
+      resumeRegistry: { get: () => ({ agentSessionId: 'aid' }) },
       pool: { get: () => live, spawn, disposeToken: vi.fn() },
       registry: { get: () => ({ id: 'ws-1', dir: '/w', agents: ['claude'] }) },
       adapters: { get: () => adapter },
@@ -434,7 +589,7 @@ describe('POST /:id/sessions/:sid/resume — concurrent coalescing (ANG-120)', (
         projectKey: 'k',
         composedCommand: ['claude'],
         resumeMode: 'by-id',
-        resumeId: 'aid',
+        nativeSessionId: 'aid',
       }),
       config: { launcherRepoRoot: '/repo' },
     } as unknown as WorkspaceService;
@@ -451,5 +606,94 @@ describe('POST /:id/sessions/:sid/resume — concurrent coalescing (ANG-120)', (
     expect(a.body.ok).toBe(true);
     expect(b.body.ok).toBe(true);
     expect([a.body, b.body].filter((x) => x.alreadyRunning)).toHaveLength(1);
+  });
+});
+
+describe('WebPi surface routes', () => {
+  const TOKEN = 'pi-calm-amber-river';
+
+  function buildWebPi() {
+    const order: string[] = [];
+    const record = {
+      id: TOKEN,
+      resumeId: 'resume-webpi',
+      wsId: 'ws-1',
+      agent: 'pi',
+      name: 'p1',
+      createdAt: '2026-07-12T00:00:00.000Z',
+      lastActiveAt: '2026-07-12T00:00:00.000Z',
+      state: 'running',
+      surface: 'terminal',
+    };
+    const snapshot = {
+      recordId: TOKEN,
+      wsId: 'ws-1',
+      resumeId: 'resume-webpi',
+      pid: 9001,
+      startedAt: 1,
+      phase: 'idle',
+      state: {},
+      messages: [],
+      streamingMessage: null,
+      error: null,
+      stderrTail: '',
+      revision: 1,
+    };
+    const adapter = {
+      id: 'pi',
+      capabilities: { resumeById: true },
+      readAiConfig: vi.fn(async () => ({ baseUrl: 'https://example.test', apiKey: 'test', model: 'model' })),
+      writeAiConfig: vi.fn(async () => undefined),
+      bootstrap: vi.fn(async () => order.push('bootstrap')),
+    };
+    const webPi = {
+      get: vi.fn(() => snapshot),
+      has: vi.fn(() => false),
+      stop: vi.fn(async () => false),
+      prompt: vi.fn(async () => ({ ...snapshot, phase: 'working' })),
+      abort: vi.fn(async () => snapshot),
+    };
+    const svc = {
+      registry: { get: () => ({ id: 'ws-1', dir: '/w', agents: ['pi'] }) },
+      sessionRegistry: {
+        get: () => record,
+        update: vi.fn(async (_wsId: string, _id: string, patch: any) => Object.assign(record, patch)),
+      },
+      resumeRegistry: { get: () => ({ agentSessionId: 'native-pi' }) },
+      adapters: { get: () => adapter },
+      pool: {
+        get: vi.fn(() => ({ pid: 123, startedAt: 1 })),
+        disposeToken: vi.fn(() => { order.push('terminal-stopped'); return true; }),
+      },
+      webPi,
+      startWebPiSession: vi.fn(async () => { order.push('webpi-started'); return snapshot; }),
+      isResumeActive: vi.fn(() => false),
+      config: { launcherRepoRoot: '/repo' },
+    } as unknown as WorkspaceService;
+    return { app: createWorkspaceRoutes(svc), order, svc, webPi };
+  }
+
+  it('hands an existing Pi Session from its PTY to WebPi', async () => {
+    const { app, order, svc } = buildWebPi();
+    const result = await post(app, `/ws-1/sessions/${TOKEN}/webpi/open`);
+    expect(result.status).toBe(200);
+    expect(result.body.snapshot).toMatchObject({ resumeId: 'resume-webpi', phase: 'idle' });
+    expect(order).toEqual(['bootstrap', 'terminal-stopped', 'webpi-started']);
+    expect(svc.startWebPiSession).toHaveBeenCalledOnce();
+  });
+
+  it('passes browser prompts straight to the live Pi RPC host', async () => {
+    const { app, webPi } = buildWebPi();
+    const result = await post(app, `/ws-1/sessions/${TOKEN}/webpi/prompt`, { message: 'hello Pi' });
+    expect(result.status).toBe(200);
+    expect(webPi.prompt).toHaveBeenCalledWith(TOKEN, 'hello Pi');
+    expect(result.body.snapshot.phase).toBe('working');
+  });
+
+  it('returns a tiny unchanged response when the browser already has the revision', async () => {
+    const { app } = buildWebPi();
+    const result = await get(app, `/ws-1/sessions/${TOKEN}/webpi?revision=1`);
+    expect(result.status).toBe(200);
+    expect(result.body).toEqual({ unchanged: true, revision: 1 });
   });
 });

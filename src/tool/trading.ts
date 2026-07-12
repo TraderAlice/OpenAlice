@@ -672,7 +672,10 @@ Optional: attach takeProfit and/or stopLoss for automatic exit orders.`,
       }).meta({ examples: [{ aliceId: 'alpaca-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '1', commitMessage: 'Entry: momentum breakout' }] }),
       execute: async ({ source, commitMessage, ...params }) => {
         const uta = await manager.resolveOne(source ?? parseAliceId(params.aliceId)?.utaId ?? '')
-        return stageAndMaybeCommit({ stage: () => uta.stagePlaceOrder(params), commit: (m) => uta.commit(m) }, commitMessage)
+        return {
+          source: uta.id,
+          ...await stageAndMaybeCommit({ stage: () => uta.stagePlaceOrder(params), commit: (m) => uta.commit(m) }, commitMessage),
+        }
       },
     }),
 
@@ -693,7 +696,10 @@ Optional: attach takeProfit and/or stopLoss for automatic exit orders.`,
       }).meta({ examples: [{ source: 'alpaca-paper', orderId: '1', lmtPrice: '150' }] }),
       execute: async ({ source, commitMessage, ...params }) => {
         const uta = await manager.resolveOne(source)
-        return stageAndMaybeCommit({ stage: () => uta.stageModifyOrder(params), commit: (m) => uta.commit(m) }, commitMessage)
+        return {
+          source: uta.id,
+          ...await stageAndMaybeCommit({ stage: () => uta.stageModifyOrder(params), commit: (m) => uta.commit(m) }, commitMessage),
+        }
       },
     }),
 
@@ -709,7 +715,10 @@ Optional: attach takeProfit and/or stopLoss for automatic exit orders.`,
       }).meta({ examples: [{ aliceId: 'alpaca-paper|AAPL', commitMessage: 'Exit: thesis invalidated' }] }),
       execute: async ({ source, commitMessage, ...params }) => {
         const uta = await manager.resolveOne(source ?? parseAliceId(params.aliceId)?.utaId ?? '')
-        return stageAndMaybeCommit({ stage: () => uta.stageClosePosition(params), commit: (m) => uta.commit(m) }, commitMessage)
+        return {
+          source: uta.id,
+          ...await stageAndMaybeCommit({ stage: () => uta.stageClosePosition(params), commit: (m) => uta.commit(m) }, commitMessage),
+        }
       },
     }),
 
@@ -722,7 +731,10 @@ Optional: attach takeProfit and/or stopLoss for automatic exit orders.`,
       }).meta({ examples: [{ source: 'alpaca-paper', orderId: '1', commitMessage: 'Cancel: stale level' }] }),
       execute: async ({ source, orderId, commitMessage }) => {
         const uta = await manager.resolveOne(source)
-        return stageAndMaybeCommit({ stage: () => uta.stageCancelOrder({ orderId }), commit: (m) => uta.commit(m) }, commitMessage)
+        return {
+          source: uta.id,
+          ...await stageAndMaybeCommit({ stage: () => uta.stageCancelOrder({ orderId }), commit: (m) => uta.commit(m) }, commitMessage),
+        }
       },
     }),
 

@@ -45,6 +45,8 @@ import { EventEmitter } from 'node:events'
 export interface InboxDoc {
   /** Path relative to the workspace root. */
   path: string
+  /** Content identity at publication time. The file is still rendered live. */
+  revision?: string
 }
 
 /**
@@ -58,8 +60,8 @@ export interface InboxDoc {
  *
  * Two live kinds: `kind:'headless'` (a dispatched run — `runId` always, set from
  * the spawn-injected AQ_RUN_ID and resolved against the HeadlessTaskRegistry;
- * `issueId` when a scheduled issue fired it, plus the captured native
- * `agentSessionId` when available) and `kind:'interactive'` (a
+ * `issueId` when a scheduled issue fired it, plus the product-owned
+ * `resumeId`) and `kind:'interactive'` (a
  * human-attended PTY session — `sessionId`, the pre-allocated SessionRegistry
  * record id, set from the spawn-injected AQ_SESSION_ID and resolved against the
  * session registry). `agent` comes off the authoritative record in both. Absent
@@ -71,11 +73,12 @@ export interface InboxOrigin {
   runId?: string
   /** The scheduled issue that fired the run, when applicable. */
   issueId?: string
+  /** The Issue's home Workspace; may differ from the executing Session's Workspace. */
+  issueWorkspaceId?: string
   /** The interactive session's pre-allocated SessionRegistry record id. */
   sessionId?: string
-  /** The native CLI session id captured for a headless run. This lets a durable
-   *  Inbox entry remain resumable after the bounded headless-run log is pruned. */
-  agentSessionId?: string
+  /** Stable product conversation identity. Native runtime ids stay server-side. */
+  resumeId?: string
   /** The agent CLI id (claude/codex/…) from the run record. */
   agent?: string
 }
@@ -112,6 +115,8 @@ export interface InboxReadOpts {
 export interface IInboxStore {
   append(input: InboxInput): Promise<InboxEntry>
   read(opts?: InboxReadOpts): Promise<{ entries: InboxEntry[]; hasMore: boolean }>
+  /** Point lookup for business actions such as "ask this entry's sender". */
+  get(id: string): Promise<InboxEntry | null>
   /** Mark an entry read. Returns false when the entry id does not exist. */
   markRead(id: string, readAt?: number): Promise<boolean>
   /** Mark an entry unread. Returns false when the entry id does not exist. */
@@ -277,6 +282,28 @@ export function createInboxStore(opts: InboxStoreOptions = {}): IInboxStore {
     return { entries, hasMore }
   }
 
+  async function get(id: string): Promise<InboxEntry | null> {
+    let raw: string
+    try {
+      raw = await readFile(filePath, 'utf-8')
+    } catch (err: unknown) {
+      if (err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code === 'ENOENT') {
+        return null
+      }
+      throw err
+    }
+    for (const line of raw.split('\n')) {
+      if (!line.trim()) continue
+      try {
+        const entry = JSON.parse(line) as InboxEntry
+        if (entry.id === id) return entry
+      } catch {
+        // A malformed sibling entry must not hide a later valid id.
+      }
+    }
+    return null
+  }
+
   async function markRead(id: string, readAt = Date.now()): Promise<boolean> {
     if (!await entryExists(id)) return false
     await withReadStateLock(async () => {
@@ -357,7 +384,7 @@ export function createInboxStore(opts: InboxStoreOptions = {}): IInboxStore {
     }
   }
 
-  return { append, read, markRead, markUnread, delete: deleteEntry, onAppended, onRemoved }
+  return { append, read, get, markRead, markUnread, delete: deleteEntry, onAppended, onRemoved }
 }
 
 // ==================== In-memory store (tests) ====================
@@ -388,6 +415,10 @@ export function createMemoryInboxStore(): IInboxStore {
     const limit = opts.limit ?? 100
     const window = scoped.slice(-limit)
     return { entries: [...window].reverse(), hasMore: window.length < scoped.length }
+  }
+
+  async function get(id: string): Promise<InboxEntry | null> {
+    return entries.find((entry) => entry.id === id) ?? null
   }
 
   async function deleteEntry(id: string): Promise<boolean> {
@@ -426,5 +457,5 @@ export function createMemoryInboxStore(): IInboxStore {
     }
   }
 
-  return { append, read, markRead, markUnread, delete: deleteEntry, onAppended, onRemoved }
+  return { append, read, get, markRead, markUnread, delete: deleteEntry, onAppended, onRemoved }
 }

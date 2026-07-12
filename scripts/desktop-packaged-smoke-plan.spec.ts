@@ -127,4 +127,40 @@ describe('buildDesktopPackagedSmokePlan', () => {
 
     expect(plan.errors).toContain('[desktop-smoke] choose either --temp-data or --real-data, not both')
   })
+
+  it('treats an explicit package root as externally owned reuse', () => {
+    const plan = buildDesktopPackagedSmokePlan([
+      '--skip-pack',
+      '--package-root',
+      '/tmp/openalice-package',
+    ])
+
+    expect(plan.errors).toEqual([])
+    expect(plan.options).toMatchObject({
+      packageRoot: '/tmp/openalice-package',
+      skipPack: true,
+    })
+  })
+
+  it('rejects package roots for package-producing runs', () => {
+    const plan = buildDesktopPackagedSmokePlan(['--package-root', '/tmp/openalice-package'])
+
+    expect(plan.errors).toContain(
+      '[desktop-smoke] --package-root reuses an existing package and requires --skip-pack',
+    )
+  })
+
+  it('rejects a missing package root value', () => {
+    const plan = buildDesktopPackagedSmokePlan(['--skip-pack', '--package-root'])
+
+    expect(plan.errors).toContain('[desktop-smoke] unknown option(s): --package-root (missing path)')
+  })
+
+  it('explains that reused packages are never deleted', () => {
+    const plan = buildDesktopPackagedSmokePlan(['--skip-pack', '--keep-package'])
+
+    expect(plan.warnings).toContain(
+      '[desktop-smoke] --keep-package has no effect with --skip-pack; reused packages are never deleted',
+    )
+  })
 })

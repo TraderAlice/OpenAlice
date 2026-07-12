@@ -6,13 +6,13 @@ import { useTranslation } from 'react-i18next';
 
 import { headlessApi, type HeadlessTaskRecord } from '../../api/headless';
 import {
-  deleteWorkspace,
   type AgentInfo,
   type SessionRecord,
   type TemplateInfo,
   type Workspace,
 } from './api';
 import { CreateWorkspaceDialog } from './CreateWorkspaceDialog';
+import { WorkspaceOffboardingDialog } from './WorkspaceOffboardingDialog';
 import { Skeleton } from '../StateViews';
 import { workspaceDisplayName, workspaceDisplayTitle } from './display';
 import { orderSessionsForSidebar, orderWorkspacesForSidebar } from './sidebar-order';
@@ -58,8 +58,8 @@ export interface SidebarProps {
   readonly onSpawn: (wsId: string, opts?: SpawnOpts) => void;
   readonly onOpenHeadlessRun: (
     wsId: string,
-    taskId: string,
-    opts: { agent?: string; agentSessionId?: string; title?: string },
+    resumeId: string,
+    opts: { title?: string },
   ) => void;
   readonly onSetDefaultAgent: (agent: string | null) => void;
   readonly onPauseSession: (wsId: string, sessionId: string) => void;
@@ -82,10 +82,11 @@ export interface SidebarProps {
 export function Sidebar(props: SidebarProps): ReactElement {
   const { t } = useTranslation();
   const [showCreate, setShowCreate] = useState(false);
+  const [pendingOffboard, setPendingOffboard] = useState<Workspace | null>(null);
   const showListError = Boolean(props.listError && props.workspaces.length === 0);
   const orderedWorkspaces = useMemo(
-    () => orderWorkspacesForSidebar(props.workspaces, props.selection),
-    [props.workspaces, props.selection],
+    () => orderWorkspacesForSidebar(props.workspaces),
+    [props.workspaces],
   );
   const workspaceListRef = useReorderMotion<HTMLDivElement>(
     orderedWorkspaces.map((workspace) => workspace.id),
@@ -122,12 +123,8 @@ export function Sidebar(props: SidebarProps): ReactElement {
   }, [headlessTasks]);
 
   const onDelete = async (id: string): Promise<void> => {
-    if (!window.confirm(t('workspace.deleteConfirm'))) return;
-    const ok = await deleteWorkspace(id);
-    if (ok) {
-      props.onChanged();
-      if (props.selection?.wsId === id) props.onSelectWorkspace('');
-    }
+    const workspace = props.workspaces.find((candidate) => candidate.id === id);
+    if (workspace) setPendingOffboard(workspace);
   };
 
   return (
@@ -154,6 +151,19 @@ export function Sidebar(props: SidebarProps): ReactElement {
             props.onSelectWorkspace(workspace.id);
           }}
           onClose={() => setShowCreate(false)}
+        />
+      )}
+
+      {pendingOffboard && (
+        <WorkspaceOffboardingDialog
+          workspace={pendingOffboard}
+          onOffboarded={() => {
+            const id = pendingOffboard.id;
+            setPendingOffboard(null);
+            props.onChanged();
+            if (props.selection?.wsId === id) props.onSelectWorkspace('');
+          }}
+          onClose={() => setPendingOffboard(null)}
         />
       )}
 
@@ -315,11 +325,8 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
   const hasRunning = w.sessions.some((s) => s.state === 'running');
   const runningCount = w.sessions.filter((s) => s.state === 'running').length;
   const orderedSessions = useMemo(
-    () => orderSessionsForSidebar(
-      w.sessions,
-      props.selection?.wsId === w.id ? props.selection.sessionId : null,
-    ),
-    [w.sessions, w.id, props.selection],
+    () => orderSessionsForSidebar(w.sessions),
+    [w.sessions],
   );
   const sessionListRef = useReorderMotion<HTMLDivElement>(
     orderedSessions.map((session) => session.id),
@@ -514,9 +521,7 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
       {(props.headlessTasks?.length ?? 0) > 0 && (
         <HeadlessGroup
           tasks={props.headlessTasks!}
-          onOpenAsSession={(task) => props.onOpenHeadlessRun(w.id, task.taskId, {
-            agent: task.agent,
-            agentSessionId: task.agentSessionId,
+          onOpenAsSession={(task) => props.onOpenHeadlessRun(w.id, task.resumeId, {
             title: task.prompt,
           })}
         />
@@ -588,7 +593,7 @@ function HeadlessTaskRow(props: {
 }): ReactElement {
   const { t } = useTranslation();
   const task = props.task;
-  const openable = task.status !== 'running' && !!task.agentSessionId;
+  const openable = task.status !== 'running' && task.resumable;
   const titleParts = [`${task.agent} · ${task.status}`, formatRelativeTime(task.startedAt)];
   if (task.error) titleParts.push(task.error);
   titleParts.push(task.prompt);
@@ -633,10 +638,9 @@ export function SessionRow(props: SessionRowProps): ReactElement {
   const isPaused = s.state === 'paused';
   // Title: the captured first message (seeded sessions), else the sticky name.
   const display = s.title?.trim() || s.name;
-  const tidShort = s.agentSessionId ? s.agentSessionId.slice(0, 8) : null;
   const metaParts: string[] = [`agent ${s.agent}`];
   if (s.pid !== null) metaParts.push(`pid ${s.pid}`);
-  if (tidShort) metaParts.push(tidShort);
+  if (s.resumeId) metaParts.push(s.resumeId);
   if (isPaused) metaParts.push(t('workspace.paused'));
   const meta = metaParts.join(' · ');
   // Full message on hover when it's been truncated, then the technical meta.

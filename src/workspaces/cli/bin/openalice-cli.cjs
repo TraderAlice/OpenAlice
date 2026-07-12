@@ -77,7 +77,7 @@ async function main() {
   if (wantsHelp) return printVerbHelp(group, verb, cmd)
 
   // Run it.
-  const args = parseFlags(argv.slice(argv.indexOf(verb) + 1))
+  const args = parseFlags(argv.slice(argv.indexOf(verb) + 1), cmd.schema)
   const res = await invoke(base, cmd.tool, args)
   process.stdout.write(res.endsWith('\n') ? res : res + '\n')
 }
@@ -186,10 +186,11 @@ async function fetchSocketJson(socketPath, path, opts) {
 
 // ---- flag parsing ---------------------------------------------------------
 
-function parseFlags(tokens) {
+function parseFlags(tokens, schema) {
   const args = {}
   const meta = {}
   const docs = []
+  const properties = (schema && schema.properties) || {}
   for (let i = 0; i < tokens.length; i++) {
     let tok = tokens[i]
     if (!tok.startsWith('--')) continue
@@ -215,17 +216,34 @@ function parseFlags(tokens) {
     if (typeof val === 'string' && (val.startsWith('{') || val.startsWith('['))) {
       try { val = JSON.parse(val) } catch { /* keep the raw string */ }
     }
-    if (key === 'meta') {
+    // Shell-facing flags are kebab-case; tool schemas are commonly camelCase.
+    // Preserve an exact schema key first (some data tools intentionally use
+    // hyphenated keys), then normalize only when the camelCase key exists.
+    const camelKey = key.replace(/-([a-zA-Z0-9])/g, (_, ch) => ch.toUpperCase())
+    const schemaKey = Object.prototype.hasOwnProperty.call(properties, key)
+      ? key
+      : Object.prototype.hasOwnProperty.call(properties, camelKey)
+        ? camelKey
+        : key
+    const propertySchema = properties[schemaKey]
+    if (propertySchema && propertySchema.type === 'boolean' && typeof val === 'string') {
+      if (val === 'true') val = true
+      else if (val === 'false') val = false
+    }
+    if (schemaKey === 'meta') {
       // repeatable: --meta key=value -> metadataFilter
       const e = val.indexOf('=')
       if (e >= 0) meta[val.slice(0, e)] = val.slice(e + 1)
-    } else if (key === 'doc') {
+    } else if (schemaKey === 'doc') {
       // repeatable: --doc <path> -> docs: [{ path }] (inbox_push attachments).
       // A JSON object value (--doc '{"path":"x"}') is kept as-is so future
       // per-doc fields keep working; a bare path is wrapped into { path }.
       docs.push(val && typeof val === 'object' ? val : { path: String(val) })
+    } else if (propertySchema && propertySchema.type === 'array') {
+      const current = Array.isArray(args[schemaKey]) ? args[schemaKey] : []
+      args[schemaKey] = current.concat(Array.isArray(val) ? val : [val])
     } else {
-      args[key] = val
+      args[schemaKey] = val
     }
   }
   if (Object.keys(meta).length) args.metadataFilter = meta
@@ -271,7 +289,14 @@ function printVerbHelp(group, verb, cmd) {
     const p = props[n] || {}
     const type = p.type || (p.enum ? 'enum' : '')
     const req = required.has(n) ? ' (required)' : ''
-    out(`  --${n}${type ? ' <' + type + '>' : ''}${req}   ${firstLine(p.description || '')}`)
+    const flag = n.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()
+    const valueHint = type === 'array'
+      ? ' <value>'
+      : type && type !== 'boolean'
+        ? ' <' + type + '>'
+        : ''
+    const repeatable = type === 'array' ? ' (repeatable)' : ''
+    out(`  --${flag}${valueHint}${req}${repeatable}   ${firstLine(p.description || '')}`)
   }
 }
 

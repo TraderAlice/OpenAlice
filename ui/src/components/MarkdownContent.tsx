@@ -13,6 +13,8 @@ import DOMPurify from 'dompurify'
 import 'highlight.js/styles/github-dark.min.css'
 
 import { useWikilinkHandler } from '../live/wikilink'
+import { useWorkspaces } from '../contexts/workspaces-context'
+import { resolveSessionSignature } from './workspace/api'
 
 function escapeHtml(s: string): string {
   return s
@@ -60,6 +62,22 @@ function createWikilinkExtension(opts: { codeSpanWikilinks: boolean }): Tokenize
   }
 }
 
+/** `@resumeId` is the visible signature of an accountable product Session.
+ * Like wikilinks this is an inline tokenizer, so examples in code remain text. */
+const sessionSignatureExtension: TokenizerAndRendererExtension = {
+  name: 'sessionSignature',
+  level: 'inline',
+  start: (src) => src.indexOf('@resume-'),
+  tokenizer(src) {
+    const match = /^@(resume-[A-Za-z0-9_-]+)/.exec(src)
+    return match ? { type: 'sessionSignature', raw: match[0], text: match[1] } : undefined
+  },
+  renderer(token) {
+    const resumeId = token.text as string
+    return `<a class="session-signature" data-resume-id="${escapeHtml(resumeId)}">@${escapeHtml(resumeId)}</a>`
+  },
+}
+
 function createMarked(opts: { strikethrough: boolean; codeSpanWikilinks: boolean }): Marked {
   const instance = new Marked(
     markedHighlight({
@@ -73,7 +91,10 @@ function createMarked(opts: { strikethrough: boolean; codeSpanWikilinks: boolean
     }),
     { breaks: true },
   )
-  instance.use({ extensions: [createWikilinkExtension({ codeSpanWikilinks: opts.codeSpanWikilinks })] })
+  instance.use({ extensions: [
+    createWikilinkExtension({ codeSpanWikilinks: opts.codeSpanWikilinks }),
+    sessionSignatureExtension,
+  ] })
   if (!opts.strikethrough) {
     instance.use({
       tokenizer: {
@@ -152,6 +173,7 @@ export function MarkdownContent({
 }: MarkdownContentProps) {
   const contentRef = useRef<HTMLDivElement>(null)
   const defaultWikilink = useWikilinkHandler()
+  const { openHeadlessRun } = useWorkspaces()
   const wikilink = onWikilink ?? defaultWikilink
 
   const html = useMemo(() => {
@@ -168,6 +190,20 @@ export function MarkdownContent({
         if (key) wikilink(key)
         return
       }
+      const signature = target.closest('a.session-signature') as HTMLElement | null
+      if (signature) {
+        e.preventDefault()
+        const resumeId = signature.getAttribute('data-resume-id')
+        if (resumeId) {
+          void resolveSessionSignature(resumeId)
+            .then((identity) => {
+              if (!identity.resumable) throw new Error('This Session has not captured a resumable runtime conversation yet.')
+              return openHeadlessRun(identity.workspaceId, identity.resumeId)
+            })
+            .catch((err) => console.error('session_signature.open_failed', { resumeId, err }))
+        }
+        return
+      }
       const btn = target.closest('.code-copy-btn') as HTMLButtonElement | null
       if (!btn) return
       const wrapper = btn.closest('.code-block-wrapper')
@@ -181,7 +217,7 @@ export function MarkdownContent({
         }, 2000)
       })
     },
-    [wikilink],
+    [wikilink, openHeadlessRun],
   )
 
   useEffect(() => {

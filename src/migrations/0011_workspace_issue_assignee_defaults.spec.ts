@@ -7,6 +7,7 @@ import { readWorkspaceIssues } from '@/workspaces/issues/declaration.js'
 import { snapshotBoardIssue } from '@/workspaces/issues/board.js'
 
 import { migrateWorkspaceIssueAssigneeDefaults } from './0011_workspace_issue_assignee_defaults/index.js'
+import { migrateIssueSessionSignatures } from './0019_issue_session_signatures/index.js'
 
 let root: string
 const wsDir: Record<string, string> = {}
@@ -48,11 +49,13 @@ describe('0011 workspace issue assignee defaults', () => {
     const raw = await readFile(join(wsDir['chat-jul3'], '.alice', 'issues', 'scan.md'), 'utf-8')
     expect(raw).not.toContain('assignee:')
 
+    await migrateIssueSessionSignatures(root)
+
     const read = await readWorkspaceIssues(wsDir['chat-jul3'])
     expect(read.ok).toBe(true)
     if (!read.ok) return
-    expect(read.issues[0].assigneeDefaulted).toBe(true)
-    expect(snapshotBoardIssue(read.issues[0], null, 'chat-jul3').assignee).toBe('ws:chat-jul3')
+    expect(read.issues[0].assignee).toBe('@workspace')
+    expect(snapshotBoardIssue(read.issues[0], null).assignee).toBe('@workspace')
   })
 
   it('leaves explicit non-default assignees untouched and is idempotent', async () => {
@@ -63,13 +66,12 @@ describe('0011 workspace issue assignee defaults', () => {
     expect(await migrateWorkspaceIssueAssigneeDefaults(root)).toEqual({ updated: 0, workspaces: 0 })
     expect(await migrateWorkspaceIssueAssigneeDefaults(root)).toEqual({ updated: 0, workspaces: 0 })
 
+    await migrateIssueSessionSignatures(root)
+
     const read = await readWorkspaceIssues(wsDir['chat-jul4'])
     expect(read.ok).toBe(true)
     if (!read.ok) return
-    expect(Object.fromEntries(read.issues.map((issue) => [issue.id, issue.assignee]))).toEqual({
-      human: 'human',
-      workspace: 'ws:chat-jul4',
-    })
+    expect(read.issues.find((issue) => issue.id === 'human')?.assignee).toBe('@human')
   })
 
   it('skips malformed issue files without blocking other files', async () => {

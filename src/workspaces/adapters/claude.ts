@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 
 import type { CliAdapter, SpawnContext, WorkspaceAiCred } from '../cli-adapter.js';
 import { readWorkspaceFile, writeWorkspaceFile } from '../file-service.js';
+import type { HeadlessOutputEvent } from '../headless-output.js';
 
 const SESSION_FILE_RE = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/i;
 
@@ -22,6 +23,18 @@ const CLAUDE_SETTINGS_PATH = '.claude/settings.local.json';
  * closes that gap.
  */
 const AUTOTRUST_SETTINGS = '{"enableAllProjectMcpServers":true}';
+
+// `claude -p` has nobody available to answer a permission prompt. Keep its
+// autonomous Bash surface limited to the four launcher-owned CLI shims rather
+// than bypassing every Claude Code permission. The gateway still validates the
+// Workspace/run identity and each command's argument schema server-side.
+// Syntax follows Claude Code's documented command-prefix permission rules.
+const HEADLESS_ALLOWED_TOOLS = [
+  'Bash(alice:*)',
+  'Bash(alice-workspace:*)',
+  'Bash(alice-uta:*)',
+  'Bash(traderhub:*)',
+].join(',');
 
 /** dashed-cwd convention used by Claude Code's project store. */
 function projectKey(workspaceDir: string): string {
@@ -91,10 +104,15 @@ export const claudeAdapter: CliAdapter = {
   // progress in the task log AND every event carries `session_id`, so the
   // run's identity is captured from line 1 instead of parsed out of a final
   // result blob (verified 2.1.x, 2026-06-11).
-  composeHeadlessCommand(base: readonly string[], _ctx: SpawnContext, prompt: string): readonly string[] {
+  composeHeadlessCommand(base: readonly string[], ctx: SpawnContext, prompt: string): readonly string[] {
+    if (ctx.resume === 'last') {
+      throw new Error('claude headless: resume requires a concrete resumeId mapping')
+    }
     return [
       ...base,
       '--settings', AUTOTRUST_SETTINGS,
+      '--allowedTools', HEADLESS_ALLOWED_TOOLS,
+      ...(ctx.resume ? ['--resume', ctx.resume.sessionId] : []),
       '-p', '--output-format', 'stream-json', '--verbose',
       '--', prompt,
     ];
@@ -132,6 +150,61 @@ export const claudeAdapter: CliAdapter = {
       return text || null;
     } catch {
       return null;
+    }
+  },
+
+  extractHeadlessOutputEvents(line: string): readonly HeadlessOutputEvent[] {
+    try {
+      const evt = JSON.parse(line) as Record<string, unknown>;
+      const message = evt['message'];
+      if (message && typeof message === 'object') {
+        const record = message as Record<string, unknown>;
+        const content = record['content'];
+        if (Array.isArray(content)) {
+          if (evt['type'] === 'assistant' && record['role'] === 'assistant') {
+            return content.flatMap((part): HeadlessOutputEvent[] => {
+              if (!part || typeof part !== 'object') return [];
+              const block = part as Record<string, unknown>;
+              if (block['type'] === 'text' && typeof block['text'] === 'string') {
+                return [{ type: 'text', text: block['text'] }];
+              }
+              if (
+                block['type'] === 'tool_use' &&
+                typeof block['id'] === 'string' &&
+                typeof block['name'] === 'string'
+              ) {
+                return [{
+                  type: 'tool-start',
+                  id: block['id'],
+                  name: block['name'],
+                  ...(block['input'] !== undefined ? { input: block['input'] } : {}),
+                }];
+              }
+              return [];
+            });
+          }
+          if (evt['type'] === 'user' && record['role'] === 'user') {
+            return content.flatMap((part): HeadlessOutputEvent[] => {
+              if (!part || typeof part !== 'object') return [];
+              const block = part as Record<string, unknown>;
+              if (block['type'] !== 'tool_result' || typeof block['tool_use_id'] !== 'string') return [];
+              return [{
+                type: 'tool-finish',
+                id: block['tool_use_id'],
+                ...(block['content'] !== undefined ? { output: block['content'] } : {}),
+                ...(block['is_error'] === true ? { isError: true } : {}),
+              }];
+            });
+          }
+        }
+      }
+      if (evt['type'] === 'result' && evt['is_error'] === true) {
+        const result = evt['result'];
+        return [{ type: 'error', message: typeof result === 'string' ? result : 'Claude run failed' }];
+      }
+      return [];
+    } catch {
+      return [];
     }
   },
 

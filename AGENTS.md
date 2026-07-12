@@ -70,14 +70,22 @@ for current ownership and entry points.
 
 Choose delivery authority before implementation:
 
-| Mode | Trigger | After a green PR to `dev` |
+| Mode | Trigger | Delivery to `dev` |
 |---|---|---|
-| Serial / interactive | Default: the user is actively requesting and steering concrete work | Merge it, delete the feature branch, and return to updated `dev` unless the user says to pause |
+| Serial / interactive | Default: the user is actively requesting and steering concrete work | After proportional local verification, open and merge the PR without waiting for pending remote CI; delete the feature branch and return to updated `dev` unless the user says to pause |
 | Parallel / contribution | Explicit `/goal` or direct request to autonomously find and contribute improvements | Leave each PR open for later review, return to `dev`, and continue from a fresh branch |
 
 A later interactive message does not retroactively authorize merging a parallel
-PR queue. Detailed branch, PR, promotion, hotfix, and external-contribution
-procedures live in [[docs/development-workflow.md]]
+PR queue. Parallel work is already non-blocking because opening a PR does not
+pause the next contribution. In serial work the PR exists to durably integrate
+each completed increment into `dev`, so pending CI must not turn it into a
+synchronous lock. Before publishing the next serial increment, inspect the
+previous increment's PR checks and post-merge `dev` run. A known failure blocks
+further stacking until repaired; a still-pending run does not by itself block
+serial work. `master` promotions, releases, explicit review pauses, and
+untrusted contributions keep their full synchronous gates. Detailed branch,
+PR, promotion, hotfix, and external-contribution procedures live in
+[[docs/development-workflow.md]]
 ([Development workflow](docs/development-workflow.md)).
 
 ## Verification
@@ -100,11 +108,19 @@ Add checks according to the touched surface:
 | Workspace issues, schedules, headless dispatch | Follow [Workspace issues and scheduling](docs/workspace-issues-and-scheduling.md) |
 | Guardian locks, process ownership, takeover | `pnpm test:guardian-recovery`; exercise the real launcher path |
 | Desktop, IPC, PTY, managed Pi, shell, packaging | Follow [Managed Workspace runtime](docs/managed-workspace-runtime.md) and run the matching Electron/package smoke |
+| Docker/server image, Compose, remote deployment | Follow [Docker deployment](docs/docker-deployment.md) and run `pnpm docker:smoke`; before release, opt into the credentialed agent/CLI check documented there |
 | Persisted data shape | Add an idempotent migration + spec, register it, then run `pnpm build:migration-index` |
 | Onboarding/first run/auth | Use isolated data; exercise dev and packaged onboarding paths where relevant |
 
 Do not run live-broker tests on real-money accounts. Do not call a change
 verified when the surface-specific path was skipped; state the remaining gap.
+
+For local package verification, prefer `pnpm electron:smoke:workspace`: it owns
+an isolated package output and removes that large expanded app after the smoke
+exits. Use `pnpm electron:pack` only when a persistent artifact is actually
+needed. A package passed through `--skip-pack` is externally owned and must
+never be deleted by the smoke runner; use `--keep-package` to preserve a
+temporary smoke package for investigation.
 
 ## Deferred Work and Issues
 
@@ -133,8 +149,15 @@ Read the relevant guide before editing its subsystem:
   delivery modes, promotions, external contributions, and risk gates.
 - [[docs/managed-workspace-runtime.md]] — [Managed Workspace runtime](docs/managed-workspace-runtime.md): Electron
   packaging, managed Pi, PortableGit/Bash, runtime profiles, and Workspace PATH.
+- [[docs/docker-deployment.md]] — [Docker deployment](docs/docker-deployment.md): server image topology,
+  remote-host safety, persistence, health, and container acceptance.
+- [[docs/workspace-agent-guidance.md]] — [Workspace agent guidance](docs/workspace-agent-guidance.md): prompt
+  layers, skill ownership, live CLI authority, and guidance versioning.
+- [[docs/workspace-lifecycle.md]] — [Workspace and Session lifecycle](docs/workspace-lifecycle.md): offboarding,
+  departed desks, handoff, restore/purge, and resumeId retirement.
 - [[docs/uta-live-testing.md]] — [UTA live testing](docs/uta-live-testing.md): broker/trading acceptance loops.
 - [[docs/workspace-issues-and-scheduling.md]] — [Workspace issues and scheduling](docs/workspace-issues-and-scheduling.md): Issue board, schedules, headless runs, and Inbox delivery.
+- [[docs/conversation-provenance.md]] — [Workspace Session and artifact provenance](docs/conversation-provenance.md): `resumeId` identity, artifact trails, Issue responsibility, and the provenance-before-collaboration delivery order.
 - [[docs/event-system.md]] — [Event-system retirement note](docs/event-system.md): removed Alice event-bus scheduler; UTA journal utility only.
 - [[docs/market-data-architecture.md]] — [Market data architecture](docs/market-data-architecture.md): TraderHub, K-line providers, and the private compatibility package.
 - `src/migrations/INDEX.md` — generated migration inventory and affected paths.

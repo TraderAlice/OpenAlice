@@ -31,4 +31,11 @@ describe('petname ids', () => {
 
     expect(id).toBe('chat-clear-copper-harbor')
   })
+
+  it('adds fixed-width base36 entropy for large namespaces', () => {
+    expect(generatePetnameId('resume', {
+      randomInt: sequence(0, 0, 0, 10, 11, 12, 13, 14, 15),
+      randomSuffixLength: 6,
+    })).toBe('resume-calm-amber-river-abcdef')
+  })
 })

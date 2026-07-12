@@ -17,6 +17,7 @@ import { entitiesApi } from './entities'
 import { versionApi } from './version'
 import { headlessApi } from './headless'
 import { preferencesApi } from './preferences'
+import { inquiriesApi } from './inquiries'
 export const api = {
   config: configApi,
   schedule: scheduleApi,
@@ -33,6 +34,7 @@ export const api = {
   version: versionApi,
   headless: headlessApi,
   preferences: preferencesApi,
+  inquiries: inquiriesApi,
 }
 
 // Re-export all types for convenience

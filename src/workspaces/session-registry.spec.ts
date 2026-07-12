@@ -33,6 +33,7 @@ const LEGACY_UUID_WS = '4894ef8b-66e1-4a41-a222-ba564e51a8c0'
 function rec(over: Partial<SessionRecord> = {}): SessionRecord {
   return {
     id: 'claude-calm-amber-river',
+    resumeId: 'resume-calm-amber-river-a1b2c3',
     wsId: WS,
     agent: 'claude',
     name: 'c1',

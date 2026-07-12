@@ -14,9 +14,8 @@ import { useTranslation } from 'react-i18next'
 import {
   ChevronDown,
   ChevronRight,
-  FolderPlus,
   MessageSquarePlus,
-  Plus,
+  PanelsTopLeft,
   Settings as SettingsIcon,
   X,
 } from 'lucide-react'
@@ -25,9 +24,9 @@ import { useWorkspaces } from '../../contexts/workspaces-context'
 import { Skeleton } from '../StateViews'
 import { useWorkspace } from '../../tabs/store'
 import { getFocusedTab } from '../../tabs/types'
-import { ConfirmDialog } from '../ConfirmDialog'
-import { deleteWorkspace, type Workspace } from './api'
+import { type Workspace } from './api'
 import { CreateWorkspaceDialog } from './CreateWorkspaceDialog'
+import { WorkspaceOffboardingDialog } from './WorkspaceOffboardingDialog'
 import { SessionRow } from './Sidebar'
 import { workspaceDisplayTitle } from './display'
 import { orderSessionsForSidebar, orderWorkspacesForSidebar } from './sidebar-order'
@@ -57,9 +56,8 @@ export function ChatWorkspaceSection(): ReactElement | null {
   const chatWorkspaces = useMemo(
     () => orderWorkspacesForSidebar(
       ctx.workspaces.filter((workspace) => workspace.template === CHAT_TEMPLATE),
-      selection,
     ),
-    [ctx.workspaces, selection],
+    [ctx.workspaces],
   )
   const workspaceListRef = useReorderMotion<HTMLUListElement>(
     chatWorkspaces.map((workspace) => workspace.id),
@@ -72,16 +70,6 @@ export function ChatWorkspaceSection(): ReactElement | null {
 
   const rememberChatWorkspace = (workspaceId: string): void => {
     void preferencesApi.rememberRecentChatWorkspace(workspaceId).catch(() => undefined)
-  }
-
-  const handleConfirmDelete = async (): Promise<void> => {
-    if (!pendingDelete) return
-    try {
-      const ok = await deleteWorkspace(pendingDelete.id)
-      if (ok) ctx.refresh()
-    } finally {
-      setPendingDelete(null)
-    }
   }
 
   // Don't collapse the whole section while templates are still loading — doing
@@ -101,23 +89,26 @@ export function ChatWorkspaceSection(): ReactElement | null {
           onClick={() => openOrFocus({ kind: 'chat-landing', params: {} })}
           className="flex w-full items-center gap-2 rounded-lg border border-accent/25 bg-accent/10 px-3 py-2.5 text-left text-[13px] font-medium text-text transition-colors hover:border-accent/45 hover:bg-accent/15"
         >
-          <Plus size={15} strokeWidth={2.25} className="shrink-0 text-accent" />
+          <MessageSquarePlus size={15} strokeWidth={2.15} className="shrink-0 text-accent" />
           <span>{t('chat.newChat')}</span>
         </button>
       </div>
 
-      <div className="flex items-center justify-between gap-2 px-3 pb-1 pt-1.5">
+      <div className="px-3 pb-1 pt-1.5">
         <span className="min-w-0 truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-text-muted/60">
           {t('nav.item.workspaces')}
         </span>
+      </div>
+      <div className="px-2 pb-1">
         <button
           type="button"
           onClick={() => setShowCreate(true)}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-text-muted/65 transition-colors hover:bg-bg-tertiary hover:text-text"
+          className="flex w-full items-center gap-2 rounded-lg border border-border/70 bg-bg-secondary/45 px-3 py-2 text-left text-[12px] font-medium text-text-muted transition-colors hover:border-border hover:bg-bg-tertiary hover:text-text"
           title={t('chat.newWorkspace')}
           aria-label={t('chat.newWorkspace')}
         >
-          <FolderPlus size={14} strokeWidth={2} />
+          <PanelsTopLeft size={14} strokeWidth={2} className="shrink-0" />
+          <span>{t('chat.newWorkspace')}</span>
         </button>
       </div>
 
@@ -163,7 +154,7 @@ export function ChatWorkspaceSection(): ReactElement | null {
               onClick={() => setShowCreate(true)}
               className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-medium text-text-muted transition-colors hover:text-text"
             >
-              <FolderPlus size={13} strokeWidth={2} />
+              <PanelsTopLeft size={13} strokeWidth={2} />
               <span>{t('chat.newWorkspace')}</span>
             </button>
           </li>
@@ -177,13 +168,7 @@ export function ChatWorkspaceSection(): ReactElement | null {
             selection={selection}
             onOpen={() => {
               rememberChatWorkspace(w.id)
-              const preferred = orderSessionsForSidebar(w.sessions, null)[0]
-              openOrFocus({
-                kind: 'workspace',
-                params: preferred
-                  ? { wsId: w.id, sessionId: preferred.id, source: 'chat' }
-                  : { wsId: w.id, source: 'chat' },
-              })
+              openOrFocus({ kind: 'chat-landing', params: { targetWsId: w.id } })
             }}
             onOpenSession={(sid) => {
               rememberChatWorkspace(w.id)
@@ -203,11 +188,12 @@ export function ChatWorkspaceSection(): ReactElement | null {
       </ul>
 
       {pendingDelete && (
-        <ConfirmDialog
-          title={t('chat.deleteWorkspaceTitle')}
-          message={t('chat.deleteWorkspaceMessage', { tag: pendingDelete.tag })}
-          confirmLabel={t('common.delete')}
-          onConfirm={handleConfirmDelete}
+        <WorkspaceOffboardingDialog
+          workspace={pendingDelete}
+          onOffboarded={() => {
+            setPendingDelete(null)
+            ctx.refresh()
+          }}
           onClose={() => setPendingDelete(null)}
         />
       )}
@@ -239,11 +225,8 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
   const displayName = w.displayName?.trim()
   const subtitle = displayName && displayName !== props.label ? displayName : null
   const orderedSessions = useMemo(
-    () => orderSessionsForSidebar(
-      w.sessions,
-      props.selection?.wsId === w.id ? props.selection.sessionId : null,
-    ),
-    [w.sessions, w.id, props.selection],
+    () => orderSessionsForSidebar(w.sessions),
+    [w.sessions],
   )
   const sessionListRef = useReorderMotion<HTMLDivElement>(
     orderedSessions.map((session) => session.id),

@@ -124,6 +124,12 @@ describe('InboxStore (in-memory)', () => {
     expect(entries.map((e) => e.id)).toEqual([e2.id, e1.id])
   })
 
+  it('gets one entry directly by its immutable id', async () => {
+    const entry = await store.append({ workspaceId: 'ws-1', comments: 'find me' })
+    expect(await store.get(entry.id)).toMatchObject({ id: entry.id, comments: 'find me' })
+    expect(await store.get('missing')).toBeNull()
+  })
+
   it('delete removes an entry and returns true; missing id returns false', async () => {
     const a = await store.append({ workspaceId: 'ws-1', comments: 'a' })
     await store.append({ workspaceId: 'ws-1', comments: 'b' })
@@ -200,6 +206,14 @@ describe('InboxStore (JSONL persistence)', () => {
     expect(entries).toHaveLength(1)
     expect(entries[0].docs).toEqual([{ path: 'report.md' }])
     expect(entries[0].comments).toBe('final draft')
+    await rm(dir, { recursive: true, force: true })
+  })
+
+  it('gets a persisted entry directly by id', async () => {
+    const entry = await store.append({ workspaceId: 'ws-1', comments: 'find me' })
+    const fresh = createInboxStore({ filePath: path, readStatePath })
+    expect(await fresh.get(entry.id)).toMatchObject({ id: entry.id, comments: 'find me' })
+    expect(await fresh.get('missing')).toBeNull()
     await rm(dir, { recursive: true, force: true })
   })
 

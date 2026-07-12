@@ -4,6 +4,8 @@ export const DESKTOP_PACKAGED_SMOKE_ARGS = new Set([
   '--skip-build',
   '--skip-pack',
   '--keep',
+  '--keep-package',
+  '--package-root',
   '--temp-data',
   '--real-data',
   '--signed',
@@ -15,8 +17,25 @@ export const DESKTOP_PACKAGED_SMOKE_ARGS = new Set([
 ])
 
 export function buildDesktopPackagedSmokePlan(argv, env = process.env, opts = {}) {
-  const args = new Set(argv)
-  const unknownArgs = [...args].filter((arg) => !DESKTOP_PACKAGED_SMOKE_ARGS.has(arg))
+  const args = new Set()
+  const unknownArgs = []
+  let packageRoot = null
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index]
+    if (arg === '--') continue
+    if (arg === '--package-root') {
+      const value = argv[index + 1]
+      if (!value || value.startsWith('--')) {
+        unknownArgs.push('--package-root (missing path)')
+      } else {
+        packageRoot = value
+        index += 1
+      }
+      continue
+    }
+    if (!DESKTOP_PACKAGED_SMOKE_ARGS.has(arg)) unknownArgs.push(arg)
+    else args.add(arg)
+  }
   const onboarding = args.has('--onboarding')
   const tradingMode = args.has('--trading-mode')
   const workspaceAcceptance = args.has('--workspace-acceptance')
@@ -46,6 +65,12 @@ export function buildDesktopPackagedSmokePlan(argv, env = process.env, opts = {}
 
   const skipBuild = args.has('--skip-build')
   const skipPack = args.has('--skip-pack')
+  if (packageRoot && !skipPack) {
+    errors.push('[desktop-smoke] --package-root reuses an existing package and requires --skip-pack')
+  }
+  if (args.has('--keep-package') && skipPack) {
+    warnings.push('[desktop-smoke] --keep-package has no effect with --skip-pack; reused packages are never deleted')
+  }
   if (onboarding && skipBuild) {
     warnings.push('[desktop-smoke] --onboarding with --skip-build assumes ui/dist was already built with first-run guide flags')
   }
@@ -93,7 +118,9 @@ export function buildDesktopPackagedSmokePlan(argv, env = process.env, opts = {}
     options: {
       help: args.has('--help') || args.has('-h'),
       keep: args.has('--keep'),
+      keepPackage: args.has('--keep-package'),
       onboarding,
+      packageRoot,
       tradingMode,
       realData,
       signed: args.has('--signed'),

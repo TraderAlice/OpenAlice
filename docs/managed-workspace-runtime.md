@@ -37,6 +37,7 @@ The app ships:
 
 - Electron's bundled Node runtime;
 - the pinned managed Pi npm runtime under `vendor/pi/`;
+- pinned `fd` and `ripgrep` binaries under `vendor/tools/darwin-<arch>/`;
 - the existing packaged Git path used by Workspace bootstrap.
 
 Pi uses `/bin/bash` when available and falls back to `/bin/sh`. The packaged
@@ -49,6 +50,7 @@ The app ships:
 
 - Electron's bundled Node runtime;
 - the same pinned managed Pi npm runtime;
+- pinned `fd` and `ripgrep` binaries under `vendor/tools/win32-<arch>/`;
 - a pinned PortableGit payload under `vendor/git/<platform>-<arch>/`, including
   `git.exe`, `bash.exe`, `sh.exe`, and the command-line tools Pi needs.
 
@@ -113,12 +115,19 @@ machine-local preference remains the source of truth.
 - downloads Pi's pinned install package and lockfile;
 - verifies their checksums;
 - runs an isolated `npm ci --omit=dev` under `vendor/pi/`;
+- downloads the platform's pinned `fd` and `ripgrep` archives, verifies their
+  release checksums, and retains their license files;
+- publishes both search binaries from one shared `vendor/tools/<platform>-<arch>/bin`
+  directory so Pi never needs a per-Workspace tool download;
 - downloads and verifies PortableGit on supported Windows targets;
 - extracts it into the deterministic `vendor/git/<platform>-<arch>/` path;
 - writes `vendor/manifest.json` with versions, paths, and toolchain entries.
 
 `pnpm electron:pack` runs this through `pnpm vendor:runtime`. The desktop
 builder keeps `asar` disabled and includes `vendor/**` in the packaged files.
+Contributors who run `pnpm vendor:runtime` also get the generated search-tool
+directory on `pnpm dev`'s managed PATH; dev startup never downloads or mutates
+that payload implicitly.
 
 ### 2. Resolve packaged capabilities
 
@@ -132,7 +141,7 @@ OPENALICE_MANAGED_PI_NODE_PATH=/.../OpenAlice(.exe)
 OPENALICE_MANAGED_GIT_DIR=/.../vendor/git/win32-x64
 OPENALICE_MANAGED_GIT_BIN=/.../vendor/git/win32-x64/cmd/git.exe
 OPENALICE_MANAGED_SHELL_PATH=/.../vendor/git/win32-x64/bin/bash.exe
-OPENALICE_MANAGED_TOOLCHAIN_PATH=/.../cmd:/.../bin:/.../usr/bin
+OPENALICE_MANAGED_TOOLCHAIN_PATH=/.../vendor/tools/win32-x64/bin:/.../cmd:/.../bin:/.../usr/bin
 LOCAL_GIT_DIRECTORY=/.../vendor/git/win32-x64
 ```
 
@@ -211,6 +220,11 @@ Keep these true together:
   incomplete package.
 - Pi and PortableGit versions, download URLs, and checksums remain pinned in
   `scripts/vendor-managed-runtime.mjs`.
+- Managed `fd` and `ripgrep` versions, release URLs, checksums, binaries, and
+  license files remain pinned together in `scripts/vendor-managed-runtime.mjs`.
+- Pi remains network-capable. The managed search tools prevent its normal
+  startup probe from downloading a separate copy into each redirected
+  `PI_CODING_AGENT_DIR`; they do not force `PI_OFFLINE` or patch Pi itself.
 - Every packaged Workspace CLI includes the shared `openalice-cli.cjs` payload,
   its POSIX launcher, and its Windows `.cmd` twin; packaged smoke must execute
   the payload through Electron Node.
@@ -269,13 +283,42 @@ pnpm vitest run \
 Then exercise the packaged path:
 
 ```bash
-pnpm electron:build
-pnpm vendor:runtime
-pnpm -F @traderalice/desktop exec electron-builder --dir --projectDir ../.. --publish never
+pnpm electron:smoke:workspace
+```
+
+That command is the standard local acceptance path. It builds and vendors the
+runtime, packages into a unique owner directory under the OS temp directory,
+launches the packaged Workspace acceptance, waits for every child to exit, and
+then removes both isolated data and the expanded app. Cleanup uses bounded
+retries for Windows `EBUSY`, `EPERM`, and `ENOTEMPTY` release races. A cleanup
+failure is reported as a smoke failure instead of silently leaking a large
+directory.
+
+Package artifact ownership is explicit:
+
+- A package-producing smoke owns its unique temporary directory and cleans it.
+- `--keep-package` preserves that temporary package and prints its path.
+- `--skip-pack` reuses an external package and never deletes it. With no
+  `--package-root`, the compatibility default is `dist/electron-app`.
+- `--package-root <path>` requires `--skip-pack`; it lets assertions and smokes
+  target a caller-owned output without transferring ownership.
+- `pnpm electron:pack` and CI/release builders intentionally keep using
+  `dist/electron-app`, because installers and update metadata are consumed by
+  later release steps.
+
+When a persistent package is required for focused inspection or CI, use the
+explicit multi-step flow:
+
+```bash
+pnpm electron:pack
 pnpm electron:assert-package
 pnpm electron:smoke-toolchain
 pnpm electron:smoke:workspace --skip-build --skip-pack
 ```
+
+An alternate persistent output can be checked with
+`pnpm electron:assert-package -- --package-root <path>` and
+`pnpm electron:smoke-toolchain -- --package-root <path>`.
 
 On Windows, the standard `electron-builder` step rebuilds native dependencies
 such as `node-pty` and therefore requires Visual Studio Build Tools with the

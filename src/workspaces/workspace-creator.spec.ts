@@ -16,7 +16,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { resolveCreateAgents, runScript } from './workspace-creator.js';
 
-vi.mock('node:child_process', () => ({
+vi.mock('node:child_process', async (importOriginal) => ({
+  ...await importOriginal<typeof import('node:child_process')>(),
   spawn: vi.fn(),
 }));
 

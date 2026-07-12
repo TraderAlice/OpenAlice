@@ -18,6 +18,7 @@ services:
     image: openalice:local
     container_name: openalice
     restart: unless-stopped
+    stop_grace_period: 30s
     ports:
       # Web UI. The MCP server (47332) is intentionally NOT exposed — it's
       # only consumed by the CLIs running inside this container.
@@ -32,6 +33,13 @@ services:
     # the interactive OAuth flow.
     stdin_open: true
     tty: true
+    # Bound Docker's json-file growth on long-running remote hosts. Product
+    # state remains in /data; these are only container stdout/stderr logs.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   openalice-data:

@@ -21,7 +21,11 @@
 
 import { tool } from 'ai'
 import { z } from 'zod'
-import type { WorkspaceToolFactory, WorkspaceToolContext } from '../core/workspace-tool-center.js'
+import {
+  toSafeInboxOrigin,
+  type WorkspaceToolFactory,
+  type WorkspaceToolContext,
+} from '../core/workspace-tool-center.js'
 
 const DEFAULT_LIMIT = 20
 
@@ -37,6 +41,8 @@ export const inboxReadFactory: WorkspaceToolFactory = {
         "Pass `self` to limit the list to entries THIS workspace pushed; their `docs` paths are relative to your own workspace root, so you can open them directly with your shell (cat / read the path).",
         '',
         'Entries from other workspaces each carry a `workspaceId` — resolve it with `workspace_path` (CLI: `alice-workspace peer path`) to locate and read that peer\'s files.',
+        '',
+        'When an entry came from an agent run/session, `origin` carries its safe OpenAlice provenance (`runId` / `sessionId`, `resumeId`, `issueId`, `agent`). Native runtime session ids are never exposed.',
         '',
         `\`limit\` caps how many most-recent entries come back (newest first; default ${DEFAULT_LIMIT}).`,
       ].join('\n'),
@@ -64,19 +70,32 @@ export const inboxReadFactory: WorkspaceToolFactory = {
             ok: true as const,
             count: entries.length,
             hasMore,
-            entries: entries.map((e) => ({
-              id: e.id,
-              ts: new Date(e.ts).toISOString(),
-              // mine === true → the doc paths below are relative to your own
-              // workspace root and you can open them with shell tools.
-              mine: e.workspaceId === ctx.workspaceId,
-              // The dir-resolvable id (vs the human `workspace` label). For a
-              // peer entry, feed this to `workspace_path` to locate its files.
-              workspaceId: e.workspaceId,
-              workspace: e.workspaceLabel ?? e.workspaceId,
-              comments: e.comments,
-              docs: (e.docs ?? []).map((d) => d.path),
-            })),
+            entries: entries.map((e) => {
+              const origin = toSafeInboxOrigin(ctx.resolveInboxOrigin?.(e) ?? e.origin)
+              return {
+                id: e.id,
+                ts: new Date(e.ts).toISOString(),
+                // mine === true → the doc paths below are relative to your own
+                // workspace root and you can open them with shell tools.
+                mine: e.workspaceId === ctx.workspaceId,
+                // The dir-resolvable id (vs the human `workspace` label). For a
+                // peer entry, feed this to `workspace_path` to locate its files.
+                workspaceId: e.workspaceId,
+                workspace: e.workspaceLabel ?? e.workspaceId,
+                comments: e.comments,
+                docs: (e.docs ?? []).map((d) => d.path),
+                ...((e.docs ?? []).some((doc) => doc.revision)
+                  ? {
+                      docRevisions: Object.fromEntries(
+                        (e.docs ?? [])
+                          .filter((doc) => doc.revision)
+                          .map((doc) => [doc.path, doc.revision]),
+                      ),
+                    }
+                  : {}),
+                ...(origin ? { origin } : {}),
+              }
+            }),
           }
         } catch (err) {
           return {

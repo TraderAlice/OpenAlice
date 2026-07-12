@@ -330,13 +330,15 @@ export async function setIssueDefaultAgent(agent: string | null): Promise<string
 
 export interface SessionRecord {
   readonly id: string;
+  readonly resumeId: string;
   readonly wsId: string;
   readonly agent: string;            // 'claude' | 'codex' | 'shell'
   readonly name: string;              // sticky 'c1' / 'x1' / 'sh1'
   readonly createdAt: string;
   readonly lastActiveAt: string;
   readonly state: 'running' | 'paused';
-  readonly agentSessionId: string | null;
+  /** UI surface only; `agent` remains `pi` for WebPi. */
+  readonly surface?: 'terminal' | 'webpi';
   readonly pid: number | null;
   readonly startedAt: number | null;
   /** First message (seeded sessions) — the sidebar title; null → fall back to `name`. */
@@ -352,13 +354,28 @@ export interface SpawnedSession {
   readonly pid: number;
   readonly startedAt: number;
   readonly agent: string;
-  readonly agentSessionId: string | null;
+  readonly resumeId: string;
   readonly title: string | null;
 }
 
+export interface WebPiSnapshot {
+  readonly recordId: string;
+  readonly wsId: string;
+  readonly resumeId: string;
+  readonly pid: number | null;
+  readonly startedAt: number;
+  readonly phase: 'starting' | 'idle' | 'working' | 'compacting' | 'retrying' | 'stopped' | 'failed';
+  readonly state: Record<string, unknown> | null;
+  readonly messages: readonly unknown[];
+  readonly streamingMessage: unknown | null;
+  readonly error: string | null;
+  readonly stderrTail: string;
+  readonly revision: number;
+}
+
 export interface SpawnOptions {
-  /** `'last'` → adapter-specific "continue", any string → adapter-specific resume-by-id. */
-  readonly resume?: 'last' | string;
+  /** Product conversation identity; server resolves the native runtime id. */
+  readonly resumeId?: string;
   /** Explicit runtime/tool adapter for this spawn. */
   readonly agent?: string;
   /**
@@ -371,12 +388,45 @@ export interface SpawnOptions {
   readonly terminalTheme?: TerminalThemeVariant;
 }
 
+export interface WorkspaceSessionDirectoryEntry {
+  readonly resumeId: string;
+  readonly agent: string;
+  readonly createdAt: number;
+  readonly updatedAt: number;
+  readonly resumable: boolean;
+  readonly active: boolean;
+  readonly latestExecution?: {
+    readonly taskId: string;
+    readonly status: 'running' | 'done' | 'failed' | 'interrupted';
+    readonly startedAt: number;
+    readonly issueId?: string;
+    readonly assistantPreview?: string;
+  };
+  readonly interactive?: {
+    readonly name: string;
+    readonly title?: string;
+    readonly state: 'running' | 'paused';
+    readonly lastActiveAt: string;
+  };
+}
+
+export interface WorkspaceSessionDirectory {
+  readonly workspace: { readonly id: string; readonly tag: string };
+  readonly sessions: readonly WorkspaceSessionDirectoryEntry[];
+}
+
+export async function getWorkspaceSessionDirectory(id: string): Promise<WorkspaceSessionDirectory> {
+  const res = await fetch(`/api/workspaces/${encodeURIComponent(id)}/resumes`);
+  if (!res.ok) throw new Error(`Failed to load Workspace Sessions (${res.status})`);
+  return res.json() as Promise<WorkspaceSessionDirectory>;
+}
+
 export async function spawnSession(
   id: string,
   opts: SpawnOptions = {},
 ): Promise<SpawnedSession> {
   const body: Record<string, unknown> = {};
-  if (opts.resume !== undefined) body['resume'] = opts.resume;
+  if (opts.resumeId !== undefined) body['resumeId'] = opts.resumeId;
   if (opts.agent !== undefined) body['agent'] = opts.agent;
   if (opts.initialPrompt !== undefined) body['initialPrompt'] = opts.initialPrompt;
   if (opts.terminalTheme !== undefined) body['terminalTheme'] = opts.terminalTheme;
@@ -396,9 +446,21 @@ export async function spawnSession(
 }
 
 export interface OpenHeadlessSessionOptions {
-  readonly agent?: string;
-  readonly agentSessionId?: string;
   readonly title?: string;
+}
+
+export interface SessionSignatureIdentity {
+  readonly signature: string;
+  readonly resumeId: string;
+  readonly workspaceId: string;
+  readonly agent: string;
+  readonly resumable: boolean;
+}
+
+export async function resolveSessionSignature(resumeId: string): Promise<SessionSignatureIdentity> {
+  const res = await fetch(`/api/workspaces/signatures/${encodeURIComponent(resumeId)}`);
+  if (!res.ok) throw new Error(res.status === 404 ? 'Session signature not found' : `signature lookup failed: ${res.status}`);
+  return (await res.json()) as SessionSignatureIdentity;
 }
 
 export interface OpenHeadlessSessionResult {
@@ -407,13 +469,13 @@ export interface OpenHeadlessSessionResult {
 }
 
 /** Idempotently materialize a finished headless run as one interactive Session. */
-export async function openHeadlessRunSession(
+export async function openResumeSession(
   wsId: string,
-  taskId: string,
+  resumeId: string,
   opts: OpenHeadlessSessionOptions = {},
 ): Promise<OpenHeadlessSessionResult> {
   const res = await fetch(
-    `/api/workspaces/${encodeURIComponent(wsId)}/headless/${encodeURIComponent(taskId)}/session`,
+    `/api/workspaces/${encodeURIComponent(wsId)}/resumes/${encodeURIComponent(resumeId)}/session`,
     {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -510,6 +572,64 @@ export async function resumeSession(
   return (await res.json()) as SpawnedSession;
 }
 
+export async function openWebPiSession(wsId: string, sessionId: string): Promise<WebPiSnapshot> {
+  const res = await fetch(
+    `/api/workspaces/${encodeURIComponent(wsId)}/sessions/${encodeURIComponent(sessionId)}/webpi/open`,
+    { method: 'POST' },
+  );
+  const body = (await res.json().catch(() => null)) as { snapshot?: WebPiSnapshot; message?: string } | null;
+  if (!res.ok || !body?.snapshot) throw new Error(body?.message ?? `WebPi open failed: ${res.status}`);
+  return body.snapshot;
+}
+
+export async function getWebPiSession(
+  wsId: string,
+  sessionId: string,
+  revision?: number,
+): Promise<WebPiSnapshot | null> {
+  const query = revision === undefined ? '' : `?revision=${encodeURIComponent(String(revision))}`;
+  const res = await fetch(
+    `/api/workspaces/${encodeURIComponent(wsId)}/sessions/${encodeURIComponent(sessionId)}/webpi${query}`,
+  );
+  const body = (await res.json().catch(() => null)) as {
+    snapshot?: WebPiSnapshot;
+    unchanged?: boolean;
+    message?: string;
+  } | null;
+  if (!res.ok) throw new Error(body?.message ?? `WebPi read failed: ${res.status}`);
+  if (body?.unchanged) return null;
+  if (!body?.snapshot) throw new Error('WebPi response has no snapshot');
+  return body.snapshot;
+}
+
+export async function promptWebPiSession(
+  wsId: string,
+  sessionId: string,
+  message: string,
+): Promise<WebPiSnapshot> {
+  const res = await fetch(
+    `/api/workspaces/${encodeURIComponent(wsId)}/sessions/${encodeURIComponent(sessionId)}/webpi/prompt`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ message }),
+    },
+  );
+  const body = (await res.json().catch(() => null)) as { snapshot?: WebPiSnapshot; message?: string } | null;
+  if (!res.ok || !body?.snapshot) throw new Error(body?.message ?? `WebPi prompt failed: ${res.status}`);
+  return body.snapshot;
+}
+
+export async function abortWebPiSession(wsId: string, sessionId: string): Promise<WebPiSnapshot> {
+  const res = await fetch(
+    `/api/workspaces/${encodeURIComponent(wsId)}/sessions/${encodeURIComponent(sessionId)}/webpi/abort`,
+    { method: 'POST' },
+  );
+  const body = (await res.json().catch(() => null)) as { snapshot?: WebPiSnapshot; message?: string } | null;
+  if (!res.ok || !body?.snapshot) throw new Error(body?.message ?? `WebPi abort failed: ${res.status}`);
+  return body.snapshot;
+}
+
 /** Permanently remove a session record (kills PTY first if running). */
 export async function deleteSession(wsId: string, sessionId: string): Promise<boolean> {
   const res = await fetch(
@@ -523,7 +643,100 @@ export async function deleteWorkspace(id: string): Promise<boolean> {
   const res = await fetch(`/api/workspaces/${encodeURIComponent(id)}`, {
     method: 'DELETE',
   });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null) as { message?: string } | null
+    throw new Error(body?.message ?? `offboard failed: ${res.status}`)
+  }
   return res.ok;
+}
+
+export interface WorkspaceOffboardingAssessment {
+  readonly workspace: { readonly id: string; readonly tag: string; readonly dir: string }
+  readonly canOffboard: boolean
+  readonly blockers: readonly string[]
+  readonly runningHeadless: readonly { readonly taskId: string; readonly resumeId: string; readonly agent: string }[]
+  readonly untrackedHeadlessActive: boolean
+  readonly runningSessions: number
+  readonly sessionRecords: number
+  readonly resumeIds: readonly string[]
+  readonly openIssueIds: readonly string[]
+  readonly scheduledIssueIds: readonly string[]
+  readonly git: GitStatus | null
+}
+
+export async function getWorkspaceOffboardingAssessment(id: string): Promise<WorkspaceOffboardingAssessment> {
+  const res = await fetch(`/api/workspaces/${encodeURIComponent(id)}/offboarding`)
+  if (!res.ok) throw new Error(`offboarding assessment failed: ${res.status}`)
+  return ((await res.json()) as { assessment: WorkspaceOffboardingAssessment }).assessment
+}
+
+export async function offboardWorkspace(
+  id: string,
+  input: { reason: string; notes?: string },
+): Promise<void> {
+  const res = await fetch(`/api/workspaces/${encodeURIComponent(id)}/offboard`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null) as { message?: string } | null
+    throw new Error(body?.message ?? `offboard failed: ${res.status}`)
+  }
+}
+
+export type WorkspaceLifecycleState =
+  | 'active'
+  | 'offboarding'
+  | 'departed'
+  | 'restoring'
+  | 'purging'
+  | 'purged'
+
+export interface DepartedWorkspace {
+  readonly id: string
+  readonly tag: string
+  readonly activeDir: string
+  readonly departedDir?: string
+  readonly createdAt: string
+  readonly updatedAt: string
+  readonly departedAt?: string
+  readonly purgedAt?: string
+  readonly lifecycle: WorkspaceLifecycleState
+  readonly reason?: string
+  readonly legacyImported?: boolean
+  readonly handoff?: {
+    readonly preparedAt: string
+    readonly notes?: string
+    readonly dirtyFiles: readonly string[]
+    readonly openIssueIds: readonly string[]
+    readonly scheduledIssueIds: readonly string[]
+    readonly resumeIds: readonly string[]
+    readonly successors?: Readonly<Record<string, string>>
+    readonly sessionRecords: number
+  }
+}
+
+export async function listDepartedWorkspaces(): Promise<DepartedWorkspace[]> {
+  const res = await fetch('/api/workspaces/departed')
+  if (!res.ok) throw new Error(`list departed workspaces failed: ${res.status}`)
+  return ((await res.json()) as { workspaces: DepartedWorkspace[] }).workspaces
+}
+
+export async function restoreWorkspace(id: string): Promise<void> {
+  const res = await fetch(`/api/workspaces/departed/${encodeURIComponent(id)}/restore`, { method: 'POST' })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null) as { message?: string } | null
+    throw new Error(body?.message ?? `restore failed: ${res.status}`)
+  }
+}
+
+export async function purgeDepartedWorkspace(id: string): Promise<void> {
+  const res = await fetch(`/api/workspaces/departed/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null) as { message?: string } | null
+    throw new Error(body?.message ?? `purge failed: ${res.status}`)
+  }
 }
 
 export type WorkspaceMetadataPatch = { displayName?: string | null; description?: string | null };

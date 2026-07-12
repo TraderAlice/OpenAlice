@@ -5,6 +5,7 @@ import { delimiter, dirname, join, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import { assertDesktopPackage } from './assert-desktop-package.mjs'
+import { resolveDesktopPackageRootArg } from './desktop-package-artifact.mjs'
 
 export function buildPackagedToolchainSmokePlan(packageResult) {
   const errors = [...packageResult.errors]
@@ -36,6 +37,64 @@ export function buildPackagedToolchainSmokePlan(packageResult) {
     expectStdout: /\b0\.80\.6\b/,
   })
 
+  const searchTools = packageResult.manifest.searchTools?.[packageResult.platformArch]
+  if ((packageResult.platform === 'win32' || packageResult.platform === 'darwin') && !searchTools) {
+    errors.push(`[packaged-toolchain] missing managed fd/rg manifest entry ${packageResult.platformArch}`)
+    return { ok: false, errors, commands }
+  }
+  let searchToolsBin = null
+  if (searchTools) {
+    const searchToolsRoot = join(packageResult.appRoot, searchTools.path)
+    searchToolsBin = join(searchToolsRoot, searchTools.binPath)
+    const searchToolsEnv = {
+      PATH: [searchToolsBin, process.env['PATH']].filter(Boolean).join(delimiter),
+    }
+    commands.push({
+      label: 'managed fd',
+      command: join(searchToolsRoot, searchTools.fd.binary),
+      args: ['--version'],
+      expectStdout: /^fd \d+\.\d+\.\d+/m,
+    })
+    commands.push({
+      label: 'managed ripgrep',
+      command: join(searchToolsRoot, searchTools.rg.binary),
+      args: ['--version'],
+      expectStdout: /^ripgrep \d+\.\d+\.\d+/m,
+    })
+
+    // Pi's interactive startup calls getToolPath("fd"/"rg") before rendering
+    // the TUI. Point its private agent dir at a missing location so this proves
+    // the packaged PATH satisfies both probes without touching a Workspace or
+    // entering Pi's download/cache path.
+    const piToolsManager = join(
+      packageResult.appRoot,
+      'vendor',
+      'pi',
+      'node_modules',
+      '@earendil-works',
+      'pi-coding-agent',
+      'dist',
+      'utils',
+      'tools-manager.js',
+    )
+    const piProbe = [
+      `import(${JSON.stringify(pathToFileURL(piToolsManager).href)})`,
+      '.then((m) => console.log("OPENALICE_PI_SEARCH_TOOLS_OK " + m.getToolPath("fd") + " " + m.getToolPath("rg")))',
+      '.catch((err) => { console.error(err); process.exit(1) })',
+    ].join('')
+    commands.push({
+      label: 'managed Pi resolves packaged fd/rg without download',
+      command: electron,
+      args: ['-e', piProbe],
+      env: {
+        ...searchToolsEnv,
+        ELECTRON_RUN_AS_NODE: '1',
+        PI_CODING_AGENT_DIR: join(packageResult.appRoot, '.missing-smoke-pi-agent'),
+      },
+      expectStdout: /OPENALICE_PI_SEARCH_TOOLS_OK fd rg/,
+    })
+  }
+
   commands.push({
     label: 'workspace CLI payload through packaged Electron Node',
     command: electron,
@@ -63,7 +122,9 @@ export function buildPackagedToolchainSmokePlan(packageResult) {
       .map((entry) => join(gitRoot, entry))
       .join(delimiter)
     const winEnv = {
-      PATH: [workspaceCliDir, toolchainPath, process.env['PATH']].filter(Boolean).join(delimiter),
+      PATH: [workspaceCliDir, searchToolsBin, toolchainPath, process.env['PATH']]
+        .filter(Boolean)
+        .join(delimiter),
       CHERE_INVOKING: '1',
       MSYSTEM: packageResult.platformArch.endsWith('arm64') ? 'CLANGARM64' : 'MINGW64',
       OPENALICE_MANAGED_PI_NODE_PATH: electron,
@@ -156,13 +217,14 @@ function runCommand(repoRoot, appRoot, spec) {
 }
 
 function main() {
-  const packageResult = assertDesktopPackage()
+  const repoRoot = resolve(import.meta.dirname, '..')
+  const packageRoot = resolveDesktopPackageRootArg(process.argv.slice(2), repoRoot)
+  const packageResult = assertDesktopPackage({ packageRoot })
   const plan = buildPackagedToolchainSmokePlan(packageResult)
   if (!plan.ok) {
     for (const error of plan.errors) console.error(error)
     process.exit(1)
   }
-  const repoRoot = resolve(import.meta.dirname, '..')
   for (const command of plan.commands) {
     runCommand(repoRoot, packageResult.appRoot, command)
   }

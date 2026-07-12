@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { migrateWorkspaceIssues } from './0010_workspace_issues_to_markdown/index.js'
+import { migrateIssueSessionSignatures } from './0019_issue_session_signatures/index.js'
 // Round-trip through the REAL reader — the strongest guarantee that what the
 // migration writes is exactly what the running launcher will read back.
 import { readWorkspaceIssues } from '@/workspaces/issues/declaration.js'
@@ -49,7 +50,8 @@ describe('0010 workspace issues → markdown', () => {
     // legacy file removed
     await expect(stat(join(wsDir['ws1'], '.alice', 'issue.json'))).rejects.toThrow()
 
-    // round-trip through the real reader
+    await migrateIssueSessionSignatures(root)
+    // round-trip through the current real reader after the ownership migrations
     const read = await readWorkspaceIssues(wsDir['ws1'])
     expect(read.ok).toBe(true)
     if (!read.ok) return
@@ -61,7 +63,7 @@ describe('0010 workspace issues → markdown', () => {
     expect(byId['morning-scan'].agent).toBe('codex')
     expect(byId['morning-scan'].status).toBe('todo') // board default
     expect(byId['morning-scan'].priority).toBe('none')
-    expect(byId['morning-scan'].assignee).toBe('unassigned')
+    expect(byId['morning-scan'].assignee).toBe('@workspace')
 
     // enabled:false → terminal status so the schedule stops firing
     expect(byId['paused-one'].status).toBe('canceled')

@@ -6,6 +6,7 @@ import { createInterface } from 'node:readline';
 
 import type { BootstrapContext, CliAdapter, OnDiskSession, SpawnContext, WorkspaceAiCred } from '../cli-adapter.js';
 import { readWorkspaceFile, writeWorkspaceFile } from '../file-service.js';
+import type { HeadlessOutputEvent } from '../headless-output.js';
 
 const CODEX_CONFIG_PATH = '.codex/config.toml';
 const CODEX_ENV_PATH = '.codex/env.json';
@@ -102,8 +103,8 @@ export const codexAdapter: CliAdapter = {
   //                       loopback CLI gateway (else: "...fetch failed").
   // No mcp_servers head (interactive composeCommand keeps it — MCP works there
   // with a human approver). `--` terminates options before the trailing prompt.
-  composeHeadlessCommand(_base: readonly string[], _ctx: SpawnContext, prompt: string): readonly string[] {
-    return [
+  composeHeadlessCommand(_base: readonly string[], ctx: SpawnContext, prompt: string): readonly string[] {
+    const head = [
       'codex',
       '-c',
       'approval_policy="never"',
@@ -112,6 +113,11 @@ export const codexAdapter: CliAdapter = {
       '-c',
       'sandbox_workspace_write.network_access=true',
       'exec',
+    ];
+    if (ctx.resume === 'last') return [...head, 'resume', '--json', '--last', prompt];
+    if (ctx.resume) return [...head, 'resume', '--json', ctx.resume.sessionId, prompt];
+    return [
+      ...head,
       '--json',
       '--',
       prompt,
@@ -144,6 +150,102 @@ export const codexAdapter: CliAdapter = {
         : null;
     } catch {
       return null;
+    }
+  },
+
+  extractHeadlessOutputEvents(line: string): readonly HeadlessOutputEvent[] {
+    try {
+      const evt = JSON.parse(line) as Record<string, unknown>;
+      if (evt['type'] === 'error' && typeof evt['message'] === 'string') {
+        return [{ type: 'error', message: evt['message'] }];
+      }
+      if (evt['type'] === 'turn.failed') {
+        const error = evt['error'];
+        const message = error && typeof error === 'object' && typeof (error as Record<string, unknown>)['message'] === 'string'
+          ? (error as Record<string, unknown>)['message'] as string
+          : typeof error === 'string'
+            ? error
+            : 'Codex turn failed';
+        return [{ type: 'error', message }];
+      }
+      if (evt['type'] !== 'item.started' && evt['type'] !== 'item.completed') return [];
+      const item = evt['item'];
+      if (!item || typeof item !== 'object') return [];
+      const record = item as Record<string, unknown>;
+      const id = typeof record['id'] === 'string' ? record['id'] : `codex-${record['type'] ?? 'item'}`;
+      if (evt['type'] === 'item.completed' && record['type'] === 'error' && typeof record['message'] === 'string') {
+        return [{ type: 'error', message: record['message'] }];
+      }
+      if (evt['type'] === 'item.completed' && record['type'] === 'agent_message' && typeof record['text'] === 'string') {
+        return [{ type: 'text', text: record['text'] }];
+      }
+      if (record['type'] === 'command_execution') {
+        const input = typeof record['command'] === 'string' ? { command: record['command'] } : record['command'];
+        if (evt['type'] === 'item.started') return [{ type: 'tool-start', id, name: 'Shell', input }];
+        const failed = record['status'] === 'failed' ||
+          record['status'] === 'declined' ||
+          (typeof record['exit_code'] === 'number' && record['exit_code'] !== 0);
+        return [{
+          type: 'tool-finish',
+          id,
+          name: 'Shell',
+          ...(record['aggregated_output'] !== undefined ? { output: record['aggregated_output'] } : {}),
+          ...(failed ? { isError: true } : {}),
+        }];
+      }
+      if (record['type'] === 'file_change') {
+        if (evt['type'] === 'item.started') {
+          return [{ type: 'tool-start', id, name: 'File changes', input: record['changes'] }];
+        }
+        return [{
+          type: 'tool-finish',
+          id,
+          name: 'File changes',
+          output: record['changes'],
+          ...(record['status'] === 'failed' ? { isError: true } : {}),
+        }];
+      }
+      if (record['type'] === 'mcp_tool_call' || record['type'] === 'tool_call') {
+        const name = typeof record['tool'] === 'string'
+          ? record['tool']
+          : typeof record['name'] === 'string'
+            ? record['name']
+            : 'Tool';
+        if (evt['type'] === 'item.started') {
+          return [{ type: 'tool-start', id, name, input: record['arguments'] ?? record['input'] }];
+        }
+        return [{
+          type: 'tool-finish',
+          id,
+          name,
+          output: record['result'] ?? record['output'] ?? record['error'],
+          ...(record['status'] === 'failed' ? { isError: true } : {}),
+        }];
+      }
+      if (record['type'] === 'web_search') {
+        const input = { query: record['query'], action: record['action'] };
+        if (evt['type'] === 'item.started') return [{ type: 'tool-start', id, name: 'Web search', input }];
+        return [{ type: 'tool-finish', id, name: 'Web search', output: input }];
+      }
+      if (record['type'] === 'collab_tool_call') {
+        const rawTool = typeof record['tool'] === 'string' ? record['tool'] : 'collaboration';
+        const name = `Collaboration · ${rawTool.replaceAll('_', ' ')}`;
+        const input = {
+          ...(record['receiver_thread_ids'] !== undefined ? { receiverThreadIds: record['receiver_thread_ids'] } : {}),
+          ...(record['prompt'] !== undefined ? { prompt: record['prompt'] } : {}),
+        };
+        if (evt['type'] === 'item.started') return [{ type: 'tool-start', id, name, input }];
+        return [{
+          type: 'tool-finish',
+          id,
+          name,
+          output: record['agents_states'],
+          ...(record['status'] === 'failed' ? { isError: true } : {}),
+        }];
+      }
+      return [];
+    } catch {
+      return [];
     }
   },
 

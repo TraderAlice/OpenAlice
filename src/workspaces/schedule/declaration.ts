@@ -44,6 +44,8 @@ export interface ScheduleSnapshotTask {
   when: Schedule
   /** The prompt this fire hands to the headless run (resolved `what`/title+body). */
   what: string
+  /** Unified owner. `@workspace` recruits a fresh Session; exact `@resumeId` resumes one. */
+  assignee: string
   agent?: string
   /** False once the owning issue reaches a terminal status (done/canceled). */
   enabled: boolean
@@ -98,6 +100,7 @@ export function snapshotScheduledIssue(
     issue: issue.title,
     when,
     what: issueFirePrompt(issue),
+    assignee: issue.assignee,
     ...(issue.agent ? { agent: issue.agent } : {}),
     enabled: !isTerminalStatus(issue.status),
     lastFiredAtMs,

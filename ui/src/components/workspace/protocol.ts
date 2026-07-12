@@ -29,7 +29,6 @@ export interface AttachedMessage {
   /** Stable session record id. */
   readonly sessionId: string;
   readonly name: string;
-  readonly agentSessionId: string | null;
   readonly pid: number;
   readonly command: readonly string[];
   readonly replayFromSeq: number;
@@ -86,7 +85,6 @@ export function parseServerControl(text: string): ServerControlMessage | null {
         typeof v['wsId'] === 'string' &&
         typeof v['sessionId'] === 'string' &&
         typeof v['name'] === 'string' &&
-        (typeof v['agentSessionId'] === 'string' || v['agentSessionId'] === null) &&
         typeof v['pid'] === 'number' &&
         Array.isArray(v['command']) &&
         v['command'].every((c) => typeof c === 'string') &&
@@ -99,7 +97,6 @@ export function parseServerControl(text: string): ServerControlMessage | null {
           wsId: v['wsId'],
           sessionId: v['sessionId'],
           name: v['name'],
-          agentSessionId: v['agentSessionId'] as string | null,
           pid: v['pid'],
           command: v['command'] as string[],
           replayFromSeq: v['replayFromSeq'],

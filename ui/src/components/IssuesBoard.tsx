@@ -8,7 +8,14 @@ import {
   ListChecks,
 } from 'lucide-react'
 
-import type { IssueListItem, IssuePriority, IssueStatus, IssueWorkspace } from '../api/issues'
+import type {
+  IssueAutomationHealth,
+  IssueAutomationHealthState,
+  IssueListItem,
+  IssuePriority,
+  IssueStatus,
+  IssueWorkspace,
+} from '../api/issues'
 import type { ScheduleWhen } from '../api/schedule'
 import { useIssues } from '../hooks/useIssues'
 import { useWorkspaces } from '../contexts/workspaces-context'
@@ -117,7 +124,7 @@ function cadenceTitle(when: ScheduleWhen): string {
     case 'every':
       return `Every ${when.every}`
     case 'cron':
-      return `${cronLabel(when.cron)} (${when.cron})`
+      return `${cronLabel(when.cron)} · ${when.timezone ?? 'local time'} (${when.cron})`
   }
 }
 
@@ -129,6 +136,32 @@ export function CadencePill({ when }: { when: ScheduleWhen }) {
     >
       <Clock size={10} className="text-muted/70" />
       {cadenceLabel(when)}
+      {when.kind === 'cron' && (
+        <span className="text-muted/70">· {when.timezone ?? 'local'}</span>
+      )}
+    </span>
+  )
+}
+
+const AUTOMATION_HEALTH_META: Record<IssueAutomationHealthState, { label: string; className: string }> = {
+  inactive: { label: 'Inactive', className: 'bg-bg-tertiary text-muted' },
+  not_started: { label: 'Not started', className: 'bg-bg-tertiary text-muted' },
+  due: { label: 'Due', className: 'bg-amber-500/15 text-amber-400' },
+  running: { label: 'Running', className: 'bg-blue-500/15 text-blue-400' },
+  healthy: { label: 'Healthy', className: 'bg-emerald-500/15 text-emerald-400' },
+  failed: { label: 'Failed', className: 'bg-red-500/15 text-red-400' },
+  blocked: { label: 'Blocked', className: 'bg-red-500/15 text-red-400' },
+}
+
+export function AutomationHealthPill({ health }: { health: IssueAutomationHealth }) {
+  const meta = AUTOMATION_HEALTH_META[health.state]
+  return (
+    <span
+      title={health.message}
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium ${meta.className}`}
+    >
+      <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />
+      {meta.label}
     </span>
   )
 }
@@ -293,6 +326,7 @@ function IssueRow({ wsId, wsTag, issue, agentRuntime, dupOthers, onOpen }: Board
           </span>
         )}
         {issue.when && <CadencePill when={issue.when} />}
+        {issue.automationHealth && <AutomationHealthPill health={issue.automationHealth} />}
         {(issue.when || issue.agent) && agentRuntime && <AgentRuntimePill runtime={agentRuntime} />}
         <span className="hidden shrink-0 text-xs text-muted sm:inline" title={`Assignee: ${issue.assignee}`}>
           {issue.assignee}

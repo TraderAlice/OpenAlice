@@ -300,6 +300,8 @@ describe('composeHeadlessCommand (one-shot headless argv, prompt placed per-CLI)
       'claude',
       '--settings',
       '{"enableAllProjectMcpServers":true}',
+      '--allowedTools',
+      'Bash(alice:*),Bash(alice-workspace:*),Bash(alice-uta:*),Bash(traderhub:*)',
       '-p',
       '--output-format',
       'stream-json',
@@ -346,6 +348,26 @@ describe('composeHeadlessCommand (one-shot headless argv, prompt placed per-CLI)
     ]);
   });
 
+  it('pi: Docker headless explicitly approves the image-pinned runtime', () => {
+    expect(piAdapter.composeHeadlessCommand!(['pi'], ctx({ OPENALICE_LAUNCHER: 'docker' }), 'do x')).toEqual([
+      'pi', '--approve', '-p', '--mode', 'json', 'do x',
+    ]);
+  });
+
+  it('resumes headless conversations by backend-resolved native id for all runtimes', () => {
+    const resume = { sessionId: 'native-session-1' } as const;
+    expect(claudeAdapter.composeHeadlessCommand!(['claude'], { ...ctx(), resume }, 'next')).toContain('native-session-1');
+    expect(codexAdapter.composeHeadlessCommand!(['codex'], { ...ctx(), resume }, 'next')).toEqual(expect.arrayContaining([
+      'exec', 'resume', '--json', 'native-session-1', 'next',
+    ]));
+    expect(opencodeAdapter.composeHeadlessCommand!(['opencode'], { ...ctx(), resume }, 'next')).toEqual([
+      'opencode', 'run', '--format', 'json', '--session', 'native-session-1', '--', 'next',
+    ]);
+    expect(piAdapter.composeHeadlessCommand!(['pi'], { ...ctx(), resume }, 'next')).toEqual([
+      'pi', '--session-id', 'native-session-1', '-p', '--mode', 'json', 'next',
+    ]);
+  });
+
   it('claude/codex/opencode place a -leading prompt after a -- terminator', () => {
     const dashy = '--help me by explaining X';
     for (const a of [claudeAdapter, codexAdapter, opencodeAdapter]) {
@@ -371,6 +393,25 @@ describe('piAdapter AI-config', () => {
       .toEqual(['pi', '--continue']);
     expect(piAdapter.composeCommand([], { cwd: dir, env: mcpEnv, resume: { sessionId: 'sess-1' } }))
       .toEqual(['pi', '--session-id', 'sess-1']);
+  });
+
+  it('composeWebCommand is opt-in RPC and does not alter the TUI command', () => {
+    const spawn = { cwd: dir, env: mcpEnv, resume: { sessionId: 'sess-web' } } as const;
+    expect(piAdapter.composeCommand([], spawn)).toEqual(['pi', '--session-id', 'sess-web']);
+    expect(piAdapter.composeWebCommand?.([], spawn)).toEqual([
+      'pi', '--session-id', 'sess-web', '--mode', 'rpc',
+    ]);
+  });
+
+  it('composeWebCommand uses the packaged managed Pi trust flag only on the RPC surface', () => {
+    const env = { ...mcpEnv, OPENALICE_MANAGED_PI_PATH: '/app/vendor/pi/pi' };
+    const spawn = { cwd: dir, env, resume: { sessionId: 'sess-web' } } as const;
+    expect(piAdapter.composeCommand([], spawn)).toEqual([
+      '/app/vendor/pi/pi', '--session-id', 'sess-web',
+    ]);
+    expect(piAdapter.composeWebCommand?.([], spawn)).toEqual([
+      '/app/vendor/pi/pi', '--approve', '--session-id', 'sess-web', '--mode', 'rpc',
+    ]);
   });
 
   it('composeCommand uses managed Pi binary path when the spawn env provides one', () => {

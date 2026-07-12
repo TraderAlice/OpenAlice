@@ -45,6 +45,7 @@ describe('composeShellCommand', () => {
 
   it('keeps POSIX login-shell behavior without a managed shell', () => {
     expect(composeShellCommand({ SHELL: '/bin/bash' }, 'darwin')).toEqual(['/bin/bash', '--login']);
-    expect(composeShellCommand({}, 'linux')).toEqual(['/bin/zsh', '--login']);
+    expect(composeShellCommand({}, 'darwin')).toEqual(['/bin/zsh', '--login']);
+    expect(composeShellCommand({}, 'linux')).toEqual(['/bin/bash', '--login']);
   });
 });

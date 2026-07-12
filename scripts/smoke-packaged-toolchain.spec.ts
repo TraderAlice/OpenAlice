@@ -25,10 +25,18 @@ describe('buildPackagedToolchainSmokePlan', () => {
         errors: [],
         appRoot,
         platform: 'darwin',
-        platformArch: null,
+        platformArch: 'darwin-arm64',
         manifest: {
           pi: {
             cli: 'vendor/pi/node_modules/@earendil-works/pi-coding-agent/dist/cli.js',
+          },
+          searchTools: {
+            'darwin-arm64': {
+              path: 'vendor/tools/darwin-arm64',
+              binPath: 'bin',
+              fd: { binary: 'bin/fd' },
+              rg: { binary: 'bin/rg' },
+            },
           },
         },
       })
@@ -37,6 +45,9 @@ describe('buildPackagedToolchainSmokePlan', () => {
       expect(plan.commands.map((command) => command.label)).toEqual([
         'packaged Electron Node mode',
         'managed Pi through packaged Electron Node',
+        'managed fd',
+        'managed ripgrep',
+        'managed Pi resolves packaged fd/rg without download',
         'workspace CLI payload through packaged Electron Node',
       ])
       expect(packagedElectronExecutable(appRoot, 'darwin')?.replaceAll('\\', '/'))
@@ -61,6 +72,14 @@ describe('buildPackagedToolchainSmokePlan', () => {
           pi: {
             cli: 'vendor/pi/node_modules/@earendil-works/pi-coding-agent/dist/cli.js',
           },
+          searchTools: {
+            'win32-x64': {
+              path: 'vendor/tools/win32-x64',
+              binPath: 'bin',
+              fd: { binary: 'bin/fd.exe' },
+              rg: { binary: 'bin/rg.exe' },
+            },
+          },
           git: {
             'win32-x64': {
               path: 'vendor/git/win32-x64',
@@ -77,6 +96,9 @@ describe('buildPackagedToolchainSmokePlan', () => {
       expect(plan.commands.map((command) => command.label)).toEqual([
         'packaged Electron Node mode',
         'managed Pi through packaged Electron Node',
+        'managed fd',
+        'managed ripgrep',
+        'managed Pi resolves packaged fd/rg without download',
         'workspace CLI payload through packaged Electron Node',
         'managed git.exe',
         'managed bash.exe',
@@ -84,11 +106,13 @@ describe('buildPackagedToolchainSmokePlan', () => {
         'Workspace CLI launcher through managed Git Bash',
         'Workspace CLI transport env through managed Git Bash',
       ])
-      expect(plan.commands[3].command.replaceAll('\\', '/')).toContain('vendor/git/win32-x64/cmd/git.exe')
-      expect(plan.commands[5].env?.PATH.replaceAll('\\', '/')).toContain('vendor/git/win32-x64/mingw64/bin')
-      expect(plan.commands[6].env?.OPENALICE_MANAGED_PI_NODE_PATH.replaceAll('\\', '/'))
+      expect(plan.commands[2].command.replaceAll('\\', '/')).toContain('vendor/tools/win32-x64/bin/fd.exe')
+      expect(plan.commands[6].command.replaceAll('\\', '/')).toContain('vendor/git/win32-x64/cmd/git.exe')
+      expect(plan.commands[8].env?.PATH.replaceAll('\\', '/')).toContain('vendor/git/win32-x64/mingw64/bin')
+      expect(plan.commands[8].env?.PATH.replaceAll('\\', '/')).toContain('vendor/tools/win32-x64/bin')
+      expect(plan.commands[9].env?.OPENALICE_MANAGED_PI_NODE_PATH.replaceAll('\\', '/'))
         .toContain('win-unpacked/OpenAlice.exe')
-      expect(plan.commands[7].env?.OPENALICE_TOOL_URL).toBe('/cli')
+      expect(plan.commands[10].env?.OPENALICE_TOOL_URL).toBe('/cli')
     } finally {
       rmSync(root, { recursive: true, force: true })
     }

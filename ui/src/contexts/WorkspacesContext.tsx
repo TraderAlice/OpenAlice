@@ -38,7 +38,8 @@ import {
   listAgents,
   listTemplates,
   listWorkspaces,
-  openHeadlessRunSession,
+  openWebPiSession as apiOpenWebPiSession,
+  openResumeSession,
   pauseSession as apiPauseSession,
   quickChat as apiQuickChat,
   resumeSession as apiResumeSession,
@@ -149,7 +150,8 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
           createdAt: nowIso,
           lastActiveAt: nowIso,
           state: 'running',
-          agentSessionId: sess.agentSessionId,
+          surface: 'terminal',
+          resumeId: sess.resumeId,
           pid: sess.pid,
           startedAt: sess.startedAt,
           title: sess.title,
@@ -183,10 +185,10 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
   const openHeadlessRun = useCallback(
     async (
       wsId: string,
-      taskId: string,
-      opts: { agent?: string; agentSessionId?: string; title?: string } = {},
+      resumeId: string,
+      opts: { title?: string } = {},
     ): Promise<void> => {
-      const { session } = await openHeadlessRunSession(wsId, taskId, opts)
+      const { session } = await openResumeSession(wsId, resumeId, opts)
       let nextSession = session
       if (session.state === 'paused') {
         const resumed = await apiResumeSession(wsId, session.id, terminalTheme)
@@ -194,9 +196,10 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
           nextSession = {
             ...session,
             state: 'running',
+            surface: 'terminal',
             pid: resumed.pid,
             startedAt: resumed.startedAt,
-            agentSessionId: resumed.agentSessionId ?? session.agentSessionId,
+            resumeId: resumed.resumeId ?? session.resumeId,
             lastActiveAt: new Date().toISOString(),
           }
         }
@@ -238,7 +241,8 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         createdAt: nowIso,
         lastActiveAt: nowIso,
         state: 'running',
-        agentSessionId: session.agentSessionId,
+        surface: 'terminal',
+        resumeId: session.resumeId,
         pid: session.pid,
         startedAt: session.startedAt,
         title: session.title,
@@ -293,6 +297,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         setWorkspaces((prev) =>
           patchSession(prev, wsId, sessionId, {
             state: 'running',
+            surface: 'terminal',
             pid: resp.pid,
             startedAt: resp.startedAt,
             lastActiveAt: new Date().toISOString(),
@@ -310,6 +315,27 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
       void refresh()
     },
     [refresh, openOrFocus, terminalTheme],
+  )
+
+  const openWebPiSession = useCallback(
+    async (wsId: string, sessionId: string, source?: WorkspaceSource): Promise<void> => {
+      const snapshot = await apiOpenWebPiSession(wsId, sessionId)
+      setWorkspaces((prev) =>
+        patchSession(prev, wsId, sessionId, {
+          state: 'running',
+          surface: 'webpi',
+          pid: snapshot.pid,
+          startedAt: snapshot.startedAt,
+          lastActiveAt: new Date().toISOString(),
+        }),
+      )
+      openOrFocus({
+        kind: 'workspace',
+        params: { wsId, sessionId, ...(source ? { source } : {}) },
+      })
+      void refresh()
+    },
+    [openOrFocus, refresh],
   )
 
   const saveWorkspaceMetadata = useCallback(
@@ -386,6 +412,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         quickChat,
         pauseSession,
         resumeSession,
+        openWebPiSession,
         requestDeleteSession,
         openAgentConfig: (wsId: string, agent?: AgentId) =>
           setConfiguringAgentTarget({ wsId, ...(agent ? { agent } : {}) }),

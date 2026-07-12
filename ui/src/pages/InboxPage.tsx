@@ -6,6 +6,7 @@ import { PageHeader } from '../components/PageHeader'
 import { Skeleton } from '../components/StateViews'
 import { MarkdownContent } from '../components/MarkdownContent'
 import { FileContentView } from '../components/FileContentView'
+import { InquiryPanel } from '../components/InquiryPanel'
 import { api } from '../api'
 import { inboxLive, refreshInbox, removeInboxOptimistically } from '../live/inbox'
 import { useInboxSelection } from '../live/inbox-selection'
@@ -226,10 +227,12 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
     setContinuing(true)
     setSidebar('workspaces')
     try {
-      if (origin?.kind === 'headless' && origin.runId) {
-        await workspacesCtx.openHeadlessRun(entry.workspaceId, origin.runId, {
-          ...(origin.agent ? { agent: origin.agent } : {}),
-          ...(origin.agentSessionId ? { agentSessionId: origin.agentSessionId } : {}),
+      if (origin?.kind === 'headless' && (origin.resumeId || origin.runId)) {
+        // Legacy Inbox JSONL stored only taskId. Runs are retained, so one
+        // lookup upgrades that provenance to resumeId without exposing the
+        // native runtime session id.
+        const resumeId = origin.resumeId ?? (await api.headless.get(origin.runId!)).resumeId
+        await workspacesCtx.openHeadlessRun(entry.workspaceId, resumeId, {
           ...(entry.comments ? { title: entry.comments.slice(0, 200) } : {}),
         })
       } else if (sessionId && sessionRecord) {
@@ -250,6 +253,14 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
 
   const hasHeadlessOrigin = origin?.kind === 'headless' && !!origin.runId
   const canContinueOrigin = hasHeadlessOrigin || !!sessionRecord
+  const loadInquiries = useCallback(
+    () => api.inquiries.forInbox(entry.id),
+    [entry.id],
+  )
+  const askInbox = useCallback(
+    (prompt: string) => api.inquiries.askInbox(entry.id, prompt),
+    [entry.id],
+  )
 
   return (
     <div className="max-w-[1040px] mx-auto py-6 px-4 md:px-8">
@@ -346,6 +357,19 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
             className="leading-relaxed text-text/90"
           />
         </div>
+      )}
+
+      {wsAlive && (
+        <InquiryPanel
+          title={origin?.resumeId || origin?.runId || origin?.sessionId ? 'Ask the sender' : 'Ask this Workspace'}
+          description={origin?.resumeId || origin?.runId || origin?.sessionId
+            ? 'Send a background follow-up to the Session that produced this Inbox entry. You can leave while it works.'
+            : 'No sender Session was recorded. OpenAlice will recruit a fresh agent in the source Workspace and label the answer reconstructed.'}
+          actionLabel={origin?.resumeId || origin?.runId || origin?.sessionId ? 'Ask sender' : 'Ask workspace'}
+          placeholder="What do you want to ask about this message?"
+          load={loadInquiries}
+          ask={askInbox}
+        />
       )}
 
       {/* Follow-up bar — exact originating Session when available; Workspace
@@ -460,6 +484,14 @@ function DocBlock({
         />
         <span className="text-[12px]">📄</span>
         <span className="flex-1 truncate text-[12px] font-mono text-text-muted">{doc.path}</span>
+        {doc.revision && (
+          <span
+            className="shrink-0 rounded bg-bg-tertiary px-1.5 py-0.5 font-mono text-[9px] text-text-muted/60"
+            title={`Published revision ${doc.revision}`}
+          >
+            sent {doc.revision.replace(/^sha256:/, '').slice(0, 8)}
+          </span>
+        )}
         <span className="shrink-0 text-[10px] uppercase tracking-wider text-text-muted/45">
           {expanded ? t('inbox.docCollapse') : t('inbox.docExpand')}
         </span>

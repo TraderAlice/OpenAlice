@@ -5,8 +5,10 @@ and persistent-state layout. Update it when a top-level subsystem moves or a
 new long-lived process, package, or state root is introduced.
 
 Related guides: [[docs/managed-workspace-runtime.md]],
-[[docs/workspace-issues-and-scheduling.md]], and
-[[docs/market-data-architecture.md]].
+[[docs/docker-deployment.md]],
+[[docs/workspace-lifecycle.md]],
+[[docs/workspace-issues-and-scheduling.md]],
+[[docs/conversation-provenance.md]], and [[docs/market-data-architecture.md]].
 
 ## Runtime Topology
 
@@ -120,19 +122,30 @@ Load-bearing paths:
 - `src/workspaces/adapters/` — CLI-specific command/config behavior.
 - `src/workspaces/protocol.ts` — UI ↔ Workspace contract.
 
-Sessions have three deliberately separate identities:
+Conversation execution has four deliberately separate identities, plus one
+provenance link:
 
-- `SessionRecord.id` is Alice's durable UI/runtime key. Tabs, PTY attachment,
-  pause/resume routes, and Inbox links use it.
-- `agentSessionId` is the native CLI conversation id used by an adapter to
-  resume Claude, Codex, opencode, or Pi.
+- `resumeId` is Alice's canonical product Session identity across headless and
+  interactive turns. Product APIs, artifact provenance, and follow-up flows
+  identify the same stateful Session by this id.
+- `taskId` identifies one headless execution. Every follow-up turn gets a new
+  task id, so run history remains append-only.
+- `SessionRecord.id` is Alice's durable interactive materialization key. Tabs,
+  PTY attachment, and pause/resume routes use it; it is not Session identity.
+- `agentSessionId` is the backend-only native CLI conversation id. The
+  `ResumeRegistry` maps `resumeId` to this adapter-specific value; it must not
+  appear in frontend resume requests or Inbox provenance.
 - `sourceRunId` is present when a finished headless run has been materialized
-  as an interactive Session. It is the persistent, idempotent run → Session
-  index: opening the same result again returns to the same Alice Session.
+  as an interactive Session and preserves execution provenance.
 
 Do not use a headless task id directly as a PTY/session id, and do not create a
-new Alice Session every time the same run is opened. The run is execution
-provenance; the Session is the durable conversation surface.
+new interactive materialization every time the same `resumeId` is opened. The
+run is execution provenance; `resumeId` is the product Session; the
+`SessionRecord` is one durable interactive surface.
+
+For the broader “ask the agent who produced this” model — including mutable
+Issues, Inbox deliveries, document revisions, reconstruction fallback, and
+trade-decision attribution — follow [[docs/conversation-provenance.md]].
 
 Built-in templates use cross-platform `bootstrap.mjs` files and route git
 through `src/workspaces/templates/_common.mjs`. Do not add new Bash bootstraps
@@ -196,9 +209,11 @@ launcher and services agree.
 │   ├── news-collector/        RSS archive
 │   └── _backup/               migration snapshots
 ├── workspaces/                default launcher root
-│   ├── workspaces.json        Workspace registry
-│   ├── workspaces/            Workspace repositories
-│   ├── state/                 sessions, scrollback, tasks, compatibility lock
+│   ├── workspaces.json        active Workspace registry
+│   ├── workspaces/            active Workspace repositories only
+│   ├── departed-workspaces/   retained offboarded repositories
+│   ├── state/                 lifecycle catalog, Sessions, scrollback, tasks,
+│   │                          provenance, compatibility lock
 │   └── auto-quant-mirror/     shared Auto-Quant source mirror
 ├── state/
 │   ├── guardian.lock          launcher ownership
@@ -225,6 +240,7 @@ generated `src/migrations/INDEX.md`.
 | Change | Start with |
 |---|---|
 | Workspace lifecycle, agent launch, packaged Pi, shell/PATH | `src/workspaces/` + [Managed Workspace runtime](managed-workspace-runtime.md) |
+| Workspace offboarding, restore/purge, Session retirement | [Workspace and Session lifecycle](workspace-lifecycle.md) |
 | Broker/account/execution behavior | `services/uta/src/domain/trading/` + [UTA live testing](uta-live-testing.md) |
 | Shared Alice ↔ UTA shapes | `packages/uta-protocol/` and both callers |
 | Renderer/API surface | `ui/`, `src/webui/`, and matching demo handlers |

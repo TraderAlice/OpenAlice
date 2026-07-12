@@ -2,6 +2,8 @@ import { fetchJson } from './client'
 
 export interface InboxDoc {
   path: string
+  /** Content hash captured when this doc was published; rendering stays live. */
+  revision?: string
 }
 
 /**
@@ -14,7 +16,7 @@ export interface InboxDoc {
  * detail → the inbox reports it produced.
  *
  * Two live kinds: `kind:'headless'` (a dispatched run — `runId` always, `issueId`
- * when a scheduled issue fired it, and the native `agentSessionId` when captured)
+ * when a scheduled issue fired it, and the product `resumeId`)
  * and `kind:'interactive'` (a human-attended
  * session — `sessionId`, the pre-allocated record id, navigable to that session
  * tab). `agent` (claude/codex/…) comes off the authoritative record in both.
@@ -30,8 +32,8 @@ export interface InboxOrigin {
   issueId?: string
   /** The interactive session's pre-allocated record id (navigable to its tab). */
   sessionId?: string
-  /** Native CLI session id captured for a headless run. Server-stamped. */
-  agentSessionId?: string
+  /** Stable product conversation identity. Native runtime ids stay server-side. */
+  resumeId?: string
   /** The agent CLI id (claude/codex/…) from the run record. */
   agent?: string
 }

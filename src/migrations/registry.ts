@@ -14,7 +14,7 @@
  * deletion + Workspace pivot turned the pre-0.40 data shapes over completely, so
  * pre-0.40 installs rebuild `data/` rather than migrate. The framework stays for
  * future upgrades. Numbering continues FORWARD from the highest id ever shipped
- * (next: 0013) — never reuse a retired id, since existing installs' journals
+ * (next: 0021) — never reuse a retired id, since existing installs' journals
  * recorded the old ones.
  */
 
@@ -25,6 +25,14 @@ import { migration as migration_0010_workspace_issues_to_markdown } from './0010
 import { migration as migration_0011_workspace_issue_assignee_defaults } from './0011_workspace_issue_assignee_defaults/index.js'
 import { migration as migration_0012_recent_chat_workspace_preference } from './0012_recent_chat_workspace_preference/index.js'
 import { migration as migration_0013_session_run_source } from './0013_session_run_source/index.js'
+import { migration as migration_0014_headless_resume_identity } from './0014_headless_resume_identity/index.js'
+import { migration as migration_0015_resume_identity_registry } from './0015_resume_identity_registry/index.js'
+import { migration as migration_0016_artifact_provenance_store } from './0016_artifact_provenance_store/index.js'
+import { migration as migration_0017_issue_what_and_comment_sidecars } from './0017_issue_what_and_comment_sidecars/index.js'
+import { migration as migration_0018_issue_assignee_ownership } from './0018_issue_assignee_ownership/index.js'
+import { migration as migration_0019_issue_session_signatures } from './0019_issue_session_signatures/index.js'
+import { migration as migration_0020_headless_issue_trigger } from './0020_headless_issue_trigger/index.js'
+import { migration as migration_0021_workspace_departure_catalog } from './0021_workspace_departure_catalog/index.js'
 
 export const REGISTRY: Migration[] = [
   migration_0008_disable_targetless_cron_jobs,
@@ -33,4 +41,12 @@ export const REGISTRY: Migration[] = [
   migration_0011_workspace_issue_assignee_defaults,
   migration_0012_recent_chat_workspace_preference,
   migration_0013_session_run_source,
+  migration_0014_headless_resume_identity,
+  migration_0015_resume_identity_registry,
+  migration_0016_artifact_provenance_store,
+  migration_0017_issue_what_and_comment_sidecars,
+  migration_0018_issue_assignee_ownership,
+  migration_0019_issue_session_signatures,
+  migration_0020_headless_issue_trigger,
+  migration_0021_workspace_departure_catalog,
 ]

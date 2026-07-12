@@ -37,6 +37,13 @@ function result(overrides: Partial<HeadlessTaskResult>): HeadlessTaskResult {
     stderrTail: '',
     agentSessionId: null,
     assistantText: null,
+    structured: {
+      schemaVersion: 1,
+      assistantText: null,
+      blocks: [],
+      metrics: { textBlocks: 0, toolCalls: 0, toolFailures: 0 },
+      truncated: false,
+    },
     ...overrides,
   };
 }

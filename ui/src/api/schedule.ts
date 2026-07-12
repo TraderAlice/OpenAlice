@@ -3,7 +3,7 @@ import { fetchJson } from './client'
 export type ScheduleWhen =
   | { kind: 'at'; at: string }
   | { kind: 'every'; every: string }
-  | { kind: 'cron'; cron: string }
+  | { kind: 'cron'; cron: string; timezone?: string }
 
 export interface ScheduleTask {
   id: string
@@ -12,6 +12,7 @@ export interface ScheduleTask {
   when: ScheduleWhen
   what: string
   agent?: string
+  assignee: string
   enabled: boolean
   /** When the scanner last fired this task (epoch ms), null if never. */
   lastFiredAtMs: number | null

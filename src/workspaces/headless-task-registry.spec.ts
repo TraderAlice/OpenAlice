@@ -20,27 +20,43 @@ const noopLogger = {
 
 let dir: string
 let path: string
+let resumeSequence: number
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), 'htr-'))
   path = join(dir, 'tasks.json')
+  resumeSequence = 0
 })
 afterEach(async () => {
   await rm(dir, { recursive: true, force: true })
 })
 
+type CreateInput = Parameters<HeadlessTaskRegistry['create']>[0]
+
+function createTask(
+  registry: HeadlessTaskRegistry,
+  input: Omit<CreateInput, 'resumeId'> & { resumeId?: string },
+) {
+  return registry.create({
+    ...input,
+    resumeId: input.resumeId ?? `resume-test-${++resumeSequence}`,
+  })
+}
+
 describe('HeadlessTaskRegistry', () => {
   it('create → running record, listed newest-first', async () => {
     const reg = await HeadlessTaskRegistry.load(path, noopLogger)
-    const a = await reg.create({ wsId: 'w1', agent: 'codex', prompt: 'do A', startedAt: 1 })
-    const b = await reg.create({ wsId: 'w2', agent: 'pi', prompt: 'do B', startedAt: 2 })
+    const a = await createTask(reg, { wsId: 'w1', agent: 'codex', prompt: 'do A', startedAt: 1 })
+    const b = await createTask(reg, { wsId: 'w2', agent: 'pi', prompt: 'do B', startedAt: 2 })
     expect(a.status).toBe('running')
+    expect(a.taskId).toMatch(/^run-[A-Za-z0-9_-]{8}$/)
+    expect(a.resumeId).toBe('resume-test-1')
     expect(reg.list().map((t) => t.taskId)).toEqual([b.taskId, a.taskId]) // newest-first
     expect(reg.runningCount()).toBe(2)
   })
 
   it('complete updates status; get returns it; runningCount drops', async () => {
     const reg = await HeadlessTaskRegistry.load(path, noopLogger)
-    const a = await reg.create({ wsId: 'w1', agent: 'codex', prompt: 'x', startedAt: 1 })
+    const a = await createTask(reg, { wsId: 'w1', agent: 'codex', prompt: 'x', startedAt: 1 })
     await reg.complete(a.taskId, { status: 'done', exitCode: 0, durationMs: 5, finishedAt: 2 })
     expect(reg.get(a.taskId)?.status).toBe('done')
     expect(reg.get(a.taskId)?.exitCode).toBe(0)
@@ -49,53 +65,120 @@ describe('HeadlessTaskRegistry', () => {
 
   it('list filters by wsId / status / limit', async () => {
     const reg = await HeadlessTaskRegistry.load(path, noopLogger)
-    const a = await reg.create({ wsId: 'w1', agent: 'codex', prompt: 'x', startedAt: 1 })
-    await reg.create({ wsId: 'w2', agent: 'pi', prompt: 'y', startedAt: 2 })
+    const a = await createTask(reg, { wsId: 'w1', agent: 'codex', prompt: 'x', startedAt: 1 })
+    await createTask(reg, { wsId: 'w2', agent: 'pi', prompt: 'y', startedAt: 2 })
     await reg.complete(a.taskId, { status: 'done' })
     expect(reg.list({ wsId: 'w2' }).length).toBe(1)
     expect(reg.list({ status: 'done' }).map((t) => t.taskId)).toEqual([a.taskId])
     expect(reg.list({ limit: 1 }).length).toBe(1)
   })
 
-  it('records issueId when an issue fired the run; omits it for manual runs', async () => {
+  it('records a composite Issue trigger when an issue fired the run', async () => {
     const reg = await HeadlessTaskRegistry.load(path, noopLogger)
-    const fired = await reg.create({ wsId: 'w1', agent: 'codex', prompt: 'x', startedAt: 1, issueId: 'daily-scan' })
-    const manual = await reg.create({ wsId: 'w1', agent: 'codex', prompt: 'y', startedAt: 2 })
-    expect(fired.issueId).toBe('daily-scan')
+    const fired = await createTask(reg, { wsId: 'w1', agent: 'codex', prompt: 'x', startedAt: 1, trigger: { kind: 'issue', workspaceId: 'home', issueId: 'daily-scan' } })
+    const manual = await createTask(reg, { wsId: 'w1', agent: 'codex', prompt: 'y', startedAt: 2 })
+    expect(fired.trigger).toEqual({ kind: 'issue', workspaceId: 'home', issueId: 'daily-scan' })
     // Manual runs leave the field absent (not undefined-valued) so the JSON stays clean.
-    expect('issueId' in manual).toBe(false)
+    expect('trigger' in manual).toBe(false)
     // Persists across reload.
     const reg2 = await HeadlessTaskRegistry.load(path, noopLogger)
-    expect(reg2.get(fired.taskId)?.issueId).toBe('daily-scan')
+    expect(reg2.get(fired.taskId)?.trigger?.issueId).toBe('daily-scan')
+  })
+
+  it('persists and reverse-filters business inquiry subjects', async () => {
+    const reg = await HeadlessTaskRegistry.load(path, noopLogger)
+    const inbox = await createTask(reg, {
+      wsId: 'w1', agent: 'pi', prompt: 'why?', startedAt: 1,
+      inquiry: {
+        subject: { kind: 'inbox', entryId: 'entry-1' },
+        question: 'why?',
+        resolution: { mode: 'exact' },
+      },
+    })
+    const owner = await createTask(reg, {
+      wsId: 'w1', agent: 'codex', prompt: 'status?', startedAt: 2,
+      inquiry: {
+        subject: { kind: 'issue', workspaceId: 'w1', issueId: 'issue-1', relation: 'owner' },
+        question: 'status?',
+        resolution: { mode: 'exact' },
+      },
+    })
+    const run = await createTask(reg, {
+      wsId: 'w1', agent: 'codex', prompt: 'what happened?', startedAt: 3,
+      inquiry: {
+        subject: { kind: 'issue', workspaceId: 'w1', issueId: 'issue-1', relation: 'run', runId: 'run-old' },
+        question: 'what happened?',
+        resolution: { mode: 'reconstructed', reason: 'missing-origin' },
+      },
+    })
+
+    expect(reg.list({ inquiry: { kind: 'inbox', entryId: 'entry-1' } }).map((task) => task.taskId))
+      .toEqual([inbox.taskId])
+    expect(reg.list({ inquiry: { kind: 'issue', workspaceId: 'w1', issueId: 'issue-1' } }).map((task) => task.taskId))
+      .toEqual([run.taskId, owner.taskId])
+    const reloaded = await HeadlessTaskRegistry.load(path, noopLogger)
+    expect(reloaded.get(owner.taskId)?.inquiry?.subject).toMatchObject({ relation: 'owner' })
   })
 
   it('list filters by issueId (the issue detail Activity feed join)', async () => {
     const reg = await HeadlessTaskRegistry.load(path, noopLogger)
-    const a = await reg.create({ wsId: 'w1', agent: 'codex', prompt: 'x', startedAt: 1, issueId: 'iss-a' })
-    const b = await reg.create({ wsId: 'w1', agent: 'codex', prompt: 'y', startedAt: 2, issueId: 'iss-a' })
-    await reg.create({ wsId: 'w1', agent: 'codex', prompt: 'z', startedAt: 3, issueId: 'iss-b' })
-    await reg.create({ wsId: 'w1', agent: 'codex', prompt: 'm', startedAt: 4 }) // manual, no issueId
+    const a = await createTask(reg, { wsId: 'w1', agent: 'codex', prompt: 'x', startedAt: 1, trigger: { kind: 'issue', workspaceId: 'home', issueId: 'iss-a' } })
+    const b = await createTask(reg, { wsId: 'w1', agent: 'codex', prompt: 'y', startedAt: 2, trigger: { kind: 'issue', workspaceId: 'home', issueId: 'iss-a' } })
+    await createTask(reg, { wsId: 'w1', agent: 'codex', prompt: 'z', startedAt: 3, trigger: { kind: 'issue', workspaceId: 'home', issueId: 'iss-b' } })
+    await createTask(reg, { wsId: 'w1', agent: 'codex', prompt: 'm', startedAt: 4 }) // manual, no issueId
     // newest-first, only iss-a's runs.
-    expect(reg.list({ wsId: 'w1', issueId: 'iss-a' }).map((t) => t.taskId)).toEqual([b.taskId, a.taskId])
+    expect(reg.list({ issue: { workspaceId: 'home', issueId: 'iss-a' } }).map((t) => t.taskId)).toEqual([b.taskId, a.taskId])
   })
 
   it('stores the full task prompt (not truncated — collapsible in the UI)', async () => {
     const reg = await HeadlessTaskRegistry.load(path, noopLogger)
-    const a = await reg.create({ wsId: 'w1', agent: 'codex', prompt: 'x'.repeat(1000), startedAt: 1 })
+    const a = await createTask(reg, { wsId: 'w1', agent: 'codex', prompt: 'x'.repeat(1000), startedAt: 1 })
     expect(a.prompt.length).toBe(1000)
   })
 
   it('persists completed records across reload', async () => {
     const reg = await HeadlessTaskRegistry.load(path, noopLogger)
-    const a = await reg.create({ wsId: 'w1', agent: 'codex', prompt: 'x', startedAt: 1 })
+    const a = await createTask(reg, { wsId: 'w1', agent: 'codex', prompt: 'x', startedAt: 1 })
     await reg.complete(a.taskId, { status: 'done', finishedAt: 2 })
     const reg2 = await HeadlessTaskRegistry.load(path, noopLogger)
     expect(reg2.get(a.taskId)?.status).toBe('done')
   })
 
+  it('serializes concurrent registry writes without losing records', async () => {
+    const reg = await HeadlessTaskRegistry.load(path, noopLogger)
+    const created = await Promise.all(
+      Array.from({ length: 24 }, (_, index) => createTask(reg, {
+        wsId: `w${index % 3}`,
+        agent: index % 2 ? 'pi' : 'codex',
+        prompt: `task ${index}`,
+        startedAt: index,
+      })),
+    )
+    await Promise.all(created.map((task, index) => reg.complete(task.taskId, {
+      status: 'done',
+      output: { hasAssistantReply: true, assistantPreview: `reply ${index}`, blockCount: 2, toolCalls: 1, toolFailures: 0 },
+    })))
+    const reloaded = await HeadlessTaskRegistry.load(path, noopLogger)
+    expect(reloaded.list()).toHaveLength(24)
+    expect(reloaded.list().every((task) => task.status === 'done' && task.output?.toolCalls === 1)).toBe(true)
+  })
+
+  it('pages newest-first with a stable task cursor', async () => {
+    const reg = await HeadlessTaskRegistry.load(path, noopLogger)
+    const oldest = await createTask(reg, { wsId: 'w1', agent: 'claude', prompt: 'oldest', startedAt: 1 })
+    const middle = await createTask(reg, { wsId: 'w1', agent: 'codex', prompt: 'middle', startedAt: 2 })
+    const newest = await createTask(reg, { wsId: 'w1', agent: 'pi', prompt: 'newest', startedAt: 3 })
+
+    expect(reg.list({ limit: 2 }).map((task) => task.taskId)).toEqual([newest.taskId, middle.taskId])
+    expect(reg.list({ cursor: middle.taskId, limit: 2 }).map((task) => task.taskId)).toEqual([oldest.taskId])
+    expect(reg.list({ cursor: 'pruned-task', limit: 2 })).toEqual([])
+    expect(reg.count({ wsId: 'w1' })).toBe(3)
+    expect(reg.count({ status: 'running' })).toBe(3)
+  })
+
   it('reconcile-on-boot flips a leftover running task → interrupted', async () => {
     const reg = await HeadlessTaskRegistry.load(path, noopLogger)
-    await reg.create({ wsId: 'w1', agent: 'codex', prompt: 'x', startedAt: 1 }) // stays running
+    await createTask(reg, { wsId: 'w1', agent: 'codex', prompt: 'x', startedAt: 1 }) // stays running
     const reloaded = await HeadlessTaskRegistry.load(path, noopLogger)
     expect(reloaded.runningCount()).toBe(0)
     expect(reloaded.list()[0]?.status).toBe('interrupted')
@@ -103,31 +186,47 @@ describe('HeadlessTaskRegistry', () => {
 
   it('setAgentSessionId records the id mid-run and persists across reload', async () => {
     const reg = await HeadlessTaskRegistry.load(path, noopLogger)
-    const a = await reg.create({ wsId: 'w1', agent: 'claude', prompt: 'x', startedAt: 1 })
+    const a = await createTask(reg, { wsId: 'w1', agent: 'claude', prompt: 'x', startedAt: 1 })
     await reg.setAgentSessionId(a.taskId, '414d6b8c-95b4-4e01-8ffc-4b6332da17d4')
     expect(reg.get(a.taskId)?.agentSessionId).toBe('414d6b8c-95b4-4e01-8ffc-4b6332da17d4')
     const reloaded = await HeadlessTaskRegistry.load(path, noopLogger)
     expect(reloaded.get(a.taskId)?.agentSessionId).toBe('414d6b8c-95b4-4e01-8ffc-4b6332da17d4')
   })
 
-  it('pruning past MAX_RECORDS deletes the dropped tasks\' log files', async () => {
+  it('keeps records and logs beyond the former 200-run retention cap', async () => {
     const logsDir = join(dir, 'logs')
     await mkdir(logsDir, { recursive: true })
-    const reg = await HeadlessTaskRegistry.load(path, noopLogger, { logsDir })
-    const first = await reg.create({ wsId: 'w1', agent: 'codex', prompt: 'old', startedAt: 1 })
+    const reg = await HeadlessTaskRegistry.load(path, noopLogger)
+    const first = await createTask(reg, { wsId: 'w1', agent: 'codex', prompt: 'old', startedAt: 1 })
     await reg.complete(first.taskId, { status: 'done' })
     const firstLogs = headlessLogPaths(logsDir, first.taskId)
     await writeFile(firstLogs.stdout, 'old stdout')
     await writeFile(firstLogs.stderr, 'old stderr')
-    // Fill past MAX_RECORDS (200) so `first` (oldest finished) gets pruned.
+    await writeFile(firstLogs.structured, '{}')
+    // Cross the historical 200-record cap. Runs are durable product history.
     for (let i = 0; i < 200; i++) {
-      const t = await reg.create({ wsId: 'w1', agent: 'codex', prompt: `t${i}`, startedAt: 2 + i })
+      const t = await createTask(reg, { wsId: 'w1', agent: 'codex', prompt: `t${i}`, startedAt: 2 + i })
       await reg.complete(t.taskId, { status: 'done' })
     }
-    expect(reg.get(first.taskId)).toBeNull()
-    // rm is fire-and-forget; give the event loop a tick.
-    await new Promise((r) => setTimeout(r, 50))
-    expect(existsSync(firstLogs.stdout)).toBe(false)
-    expect(existsSync(firstLogs.stderr)).toBe(false)
+    const reloaded = await HeadlessTaskRegistry.load(path, noopLogger)
+    expect(reloaded.get(first.taskId)?.status).toBe('done')
+    expect(reloaded.count()).toBe(201)
+    expect(existsSync(firstLogs.stdout)).toBe(true)
+    expect(existsSync(firstLogs.stderr)).toBe(true)
+    expect(existsSync(firstLogs.structured)).toBe(true)
+  })
+
+  it('keeps one resumeId across executions and records direct lineage', async () => {
+    const reg = await HeadlessTaskRegistry.load(path, noopLogger)
+    const first = await createTask(reg, { wsId: 'w1', agent: 'codex', prompt: 'first', startedAt: 1 })
+    await reg.complete(first.taskId, { status: 'done' })
+    const second = await createTask(reg, {
+      wsId: 'w1', agent: 'codex', prompt: 'follow-up', startedAt: 2,
+      resumeId: first.resumeId, parentTaskId: first.taskId,
+    })
+    expect(second.taskId).not.toBe(first.taskId)
+    expect(second.resumeId).toBe(first.resumeId)
+    expect(second.parentTaskId).toBe(first.taskId)
+    expect(reg.latestForResumeId(first.resumeId)?.taskId).toBe(second.taskId)
   })
 })

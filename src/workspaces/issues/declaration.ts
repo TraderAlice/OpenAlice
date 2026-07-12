@@ -15,17 +15,18 @@
  * size-capped, and isolated — one bad file is reported (not propagated), and one
  * bad workspace can't break the whole scan. Nothing here ever throws.
  *
- * File shape — YAML frontmatter + markdown body:
+ * File shape — YAML frontmatter + canonical markdown What:
  *   ---
  *   title: <required, short human title>
  *   status: backlog | todo | in_progress | done | canceled   (optional → 'todo')
  *   priority: urgent | high | medium | low | none             (optional → 'none')
- *   assignee: "human" | "ws:<tag|id>" | "unassigned"          (optional → 'unassigned')
- *   when: { kind: at, at } | { kind: every, every } | { kind: cron, cron }  (OPTIONAL — present iff scheduled)
- *   what: <optional fire prompt; if absent, the fire prompt falls back to title+body>
+ *   assignee: "@workspace" | "@human" | "@unassigned" | "@<resumeId>"  (optional → '@workspace')
+ *   when: { kind: at, at } | { kind: every, every } |
+ *         { kind: cron, cron, timezone?: local | IANA zone }  (OPTIONAL — present iff scheduled)
+ *   what: <legacy fire prompt; migrated into the markdown What body>
  *   agent: <optional adapter id for the scheduled run>
  *   ---
- *   <markdown description body>
+ *   <markdown What — the exact work definition and scheduled prompt>
  *
  * `id` is the filename stem (kebab-case slug), stable; it keys the scanner's
  * last-fired marker for scheduled issues.
@@ -37,7 +38,13 @@ import { join } from 'node:path'
 import { parse as parseYaml } from 'yaml'
 import { z } from 'zod'
 
-import type { Schedule } from '../../core/schedule-expr.js'
+import { isValidScheduleTimezone, type Schedule } from '../../core/schedule-expr.js'
+import {
+  HUMAN_ASSIGNEE,
+  UNASSIGNED_ASSIGNEE,
+  WORKSPACE_ASSIGNEE,
+  resumeIdFromSignature,
+} from '../session-signature.js'
 
 /** Directory of per-issue markdown files, relative to a workspace's `dir`. */
 export const ISSUES_DIR_REL = join('.alice', 'issues')
@@ -68,12 +75,32 @@ export function isTerminalStatus(status: IssueStatus): boolean {
 export const issueWhenSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('at'), at: z.string().min(1) }),
   z.object({ kind: z.literal('every'), every: z.string().min(1) }),
-  z.object({ kind: z.literal('cron'), cron: z.string().min(1) }),
+  z.object({
+    kind: z.literal('cron'),
+    cron: z.string().min(1),
+    /** Omitted is legacy machine-local time; explicit `local` is recommended
+     * for personal reminders, while market clocks should use an IANA zone. */
+    timezone: z.string().min(1).refine(isValidScheduleTimezone, 'timezone must be `local` or a valid IANA timezone').optional(),
+  }),
 ])
 
+/** Who owns the Issue. Workspace ownership recruits a fresh Session for each
+ * scheduled fire; Session ownership resumes exactly one product Session. */
+export const issueAssigneeSchema = z.union([
+  z.literal(WORKSPACE_ASSIGNEE),
+  z.literal(HUMAN_ASSIGNEE),
+  z.literal(UNASSIGNED_ASSIGNEE),
+  z.string().regex(/^@resume-[^\s]+$/, 'Session assignee must be @<resumeId>'),
+])
+
+/** Exact product Session owner encoded by the single assignee contract. */
+export function issueAssigneeResumeId(assignee: string): string | null {
+  return resumeIdFromSignature(assignee)
+}
+
 /**
- * The validated frontmatter of one issue. `id` and `body` are NOT here — `id`
- * comes from the filename, `body` from below the frontmatter (see IssueRecord).
+ * The validated frontmatter of one issue. `id` and `what` are NOT here — `id`
+ * comes from the filename, What from below the frontmatter (see IssueRecord).
  * Optional fields carry their board defaults so every read yields a complete row.
  */
 export const issueFrontmatterSchema = z.object({
@@ -81,28 +108,45 @@ export const issueFrontmatterSchema = z.object({
   title: z.string().min(1),
   status: z.enum(ISSUE_STATUSES).default('todo'),
   priority: z.enum(ISSUE_PRIORITIES).default('none'),
-  assignee: z.string().min(1).default('unassigned'),
+  assignee: issueAssigneeSchema.default(WORKSPACE_ASSIGNEE),
   /** Present iff the issue self-schedules. Absent ⇒ pure board work item. */
   when: issueWhenSchema.optional(),
-  /** Prompt fired on schedule; if absent, the fire prompt falls back to title+body. */
+  /** Legacy compatibility only. New files keep What in the markdown document
+   * below frontmatter so the human-visible work definition and runtime prompt
+   * cannot drift. Migration 0017 removes this key from existing files. */
   what: z.string().min(1).optional(),
-  /** Which agent runtime to run the scheduled fire with; omitted uses the issue default / workspace default / first runtime. */
+  /** Runtime override for Workspace-owned scheduled work. A Session owner
+   * already carries its runtime identity and therefore cannot set this. */
   agent: z.string().min(1).optional(),
+  /** Migration 0018 removes the former parallel ownership field. Keeping a
+   * `never` key makes stale files fail loudly instead of being silently read. */
+  execution: z.never().optional(),
+}).superRefine((value, ctx) => {
+  if (value.when && (value.assignee === HUMAN_ASSIGNEE || value.assignee === UNASSIGNED_ASSIGNEE)) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['assignee'],
+      message: 'scheduled issues must be assigned to @workspace or an exact @resumeId',
+    })
+  }
+  if (issueAssigneeResumeId(value.assignee) && value.agent) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['agent'],
+      message: 'session assignee owns its runtime; remove the agent override',
+    })
+  }
 })
-export type IssueFrontmatter = z.infer<typeof issueFrontmatterSchema>
+type IssueFrontmatterFile = z.infer<typeof issueFrontmatterSchema>
+export type IssueFrontmatter = Omit<IssueFrontmatterFile, 'what' | 'execution'>
 
-/** A fully read issue: validated frontmatter + its filename id + markdown body. */
+/** A fully read issue: validated frontmatter + filename id + markdown What. */
 export interface IssueRecord extends IssueFrontmatter {
   /** Filename stem (kebab-case slug) — stable; keys the scanner's marker. */
   id: string
-  /** Markdown description below the frontmatter (trimmed). */
-  body: string
-  /**
-   * True when `assignee` came from the schema default rather than frontmatter.
-   * Board projections can then default it to `ws:<workspace>` while still
-   * respecting a human who explicitly wrote `assignee: unassigned`.
-   */
-  assigneeDefaulted: boolean
+  /** Markdown work definition below frontmatter. For a scheduled Issue this is
+   * the exact prompt sent to the Agent Runtime. */
+  what: string
 }
 
 /** A file that could not be read/validated — reported, never propagated. */
@@ -122,13 +166,11 @@ export function isFireable(issue: IssueRecord): issue is IssueRecord & { when: S
   return issue.when !== undefined && !isTerminalStatus(issue.status)
 }
 
-/** The prompt a scheduled fire hands to the headless run: explicit `what`, else
- *  title + body, else just the title. The launcher interprets none of it. */
+/** The prompt a scheduled fire hands to the headless run. `what` is already the
+ * canonical, human-visible markdown work definition; there is no second hidden
+ * prompt field for it to disagree with. */
 export function issueFirePrompt(issue: IssueRecord): string {
-  const what = issue.what?.trim()
-  if (what) return what
-  const body = issue.body.trim()
-  return body ? `${issue.title}\n\n${body}` : issue.title
+  return issue.what
 }
 
 /**
@@ -191,7 +233,7 @@ async function readOneIssue(
 }
 
 /**
- * Pure parse of one issue's file content (frontmatter + body) into a validated
+ * Pure parse of one issue's file content (frontmatter + markdown What) into a validated
  * IssueRecord — no disk IO, no size cap. The shared validation seam: the reader
  * (`readOneIssue`) calls it after the file read + size check, and the mutation
  * helper (`./mutate.ts`) calls it to re-validate the content it just wrote so
@@ -213,22 +255,48 @@ export function parseIssueContent(
   if (data === null || typeof data !== 'object' || Array.isArray(data)) {
     return { ok: false, error: 'frontmatter is not a mapping' }
   }
-  const rawFrontmatter = data as Record<string, unknown>
-
   const parsed = issueFrontmatterSchema.safeParse(data)
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ') }
   }
 
+  const { what: legacyWhat, execution: _retiredExecution, ...frontmatter } = parsed.data
+  const document = splitLegacyIssueDocument(split.body)
   return {
     ok: true,
     issue: {
       id,
-      ...parsed.data,
-      body: split.body,
-      assigneeDefaulted: !Object.prototype.hasOwnProperty.call(rawFrontmatter, 'assignee'),
+      ...frontmatter,
+      what: mergeLegacyWhat(legacyWhat, document.what, frontmatter.title),
     },
   }
+}
+
+/**
+ * Before comments moved to `<id>.comments.json`, the mutation helper appended
+ * them under a reserved `## Comments` heading in the Issue markdown. Keep this
+ * small compatibility splitter until every live Workspace has crossed migration
+ * 0017: legacy comments must never leak into the scheduled prompt.
+ */
+export function splitLegacyIssueDocument(body: string): { what: string; legacyComments: string } {
+  const lines = body.split(/\r?\n/)
+  const index = lines.findIndex((line) => /^##\s+Comments\s*$/.test(line.trim()))
+  if (index < 0) return { what: body.trim(), legacyComments: '' }
+  return {
+    what: lines.slice(0, index).join('\n').trim(),
+    legacyComments: lines.slice(index + 1).join('\n').trim(),
+  }
+}
+
+/** Merge the two historical work-definition locations without dropping either.
+ * The old frontmatter `what` remains the primary instruction; a distinct body
+ * becomes explicit Context. Empty legacy Issues materialize their title so the
+ * UI and runtime still agree on the exact prompt. */
+export function mergeLegacyWhat(legacyWhat: string | undefined, markdownWhat: string, title: string): string {
+  const explicit = legacyWhat?.trim() ?? ''
+  const markdown = markdownWhat.trim()
+  if (explicit && markdown && explicit !== markdown) return `${explicit}\n\n## Context\n\n${markdown}`
+  return explicit || markdown || title.trim()
 }
 
 /** Split a `---\n<yaml>\n---\n<body>` document. Line-based so a `---` inside the

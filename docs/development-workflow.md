@@ -54,11 +54,17 @@ steering concrete work.
 1. Branch from current `dev`.
 2. Explain material design choices while working.
 3. Implement and run proportional verification.
-4. Open a PR to `dev` and monitor the latest-head checks.
-5. Unless the user requests a review pause, merge when green.
+4. Before publishing the next increment, inspect the previous serial PR checks
+   and its post-merge `dev` run. Repair a completed failure before stacking more
+   work; record a still-pending run without waiting on it.
+5. Open a PR to `dev`, confirm the intended base and head, and merge immediately
+   unless the user requests a review pause or earlier CI has a known failure.
 6. Delete the merged feature branch and return to updated `dev`.
 
-The PR is the integration carrier, not an automatic approval pause.
+The PR durably integrates the completed increment into `dev` and records its
+diff; it is not a synchronous CI or approval pause. Remote CI is
+one-increment-delayed feedback in this mode: it continues after merge and must
+be checked before the next serial publication.
 
 ### Parallel / contribution
 
@@ -75,6 +81,8 @@ For each coherent contribution:
 
 The open PR queue becomes the later acceptance surface. A subsequent
 interactive request does not retroactively authorize merging that queue.
+Because these PRs are not merged during the contribution loop, their pending CI
+never blocks starting the next independent contribution.
 
 ## Routine PR Flow
 
@@ -89,6 +97,9 @@ git add <intentional-files>
 git commit -m "<terse outcome>"
 git push -u origin HEAD
 gh pr create --base dev --head "$(git branch --show-current)"
+
+# Serial mode: after confirming the PR base/head, do not wait on pending CI.
+gh pr merge <number> --merge --delete-branch
 ```
 
 The PR body should contain:
@@ -110,14 +121,22 @@ the issue/PR that shaped the work.
 
 ## CI Feedback Lanes
 
-CI distinguishes pre-merge confidence from post-merge integration so routine
-agent iterations do not wait for the same full matrix twice:
+CI provides both change-level confidence and post-merge integration feedback.
+Its execution stays the same, but its blocking authority depends on the
+delivery lane:
 
 - Every PR to `dev` or `master` runs the Ubuntu build and test gate.
 - PRs whose complete diff is limited to `ui/`, `docs/`, or root documentation
   skip the macOS/Windows runtime matrix. Any other path keeps the full matrix.
-- Superseded runs for the same PR are cancelled. Only the latest head is a
-  merge candidate.
+- Superseded runs for the same PR are cancelled. Only the latest-head result is
+  actionable evidence.
+- In serial mode, a `dev` PR may merge after proportional local verification
+  while its remote checks are pending. Before the next serial PR is published,
+  inspect both that PR's checks and the resulting `dev` push run. A completed
+  failure blocks further stacking until it is understood and repaired; pending
+  status alone does not block progress.
+- Parallel/contribution PRs remain open for later acceptance. Their CI result
+  informs review but does not grant merge authority.
 - A push to `dev` runs the focused Ubuntu Guardian/full-stack smoke instead of
   repeating the PR's complete build, test, and cross-platform jobs.
 - A push to `master` always runs the complete matrix.
@@ -127,7 +146,9 @@ agent iterations do not wait for the same full matrix twice:
 
 Keep the lightweight-path allowlist narrow. Changes to dependencies, runtime,
 Guardian, Electron, packaging, scripts, workflows, or any unclassified path
-must continue through Windows and macOS before merge.
+must still produce Windows and macOS evidence. In serial `dev` work that
+evidence may arrive after merge, but a known failure stops the next increment;
+it must be green before promotion to `master` or release.
 
 ## Merge and Cleanup
 
@@ -250,7 +271,12 @@ Keep `AGENTS.md` and `CONTRIBUTING.md` consistent with this guide and with
 
 ## Risk Gates
 
-| Boundary | Gate before merge/promotion |
+For a serial PR to `dev`, satisfy the locally runnable, surface-specific gate
+before merging and report any platform-only residual risk. Remote platform
+evidence may trail that merge under the feedback rule above. Before promotion
+to `master` or release, every applicable gate must be complete and green.
+
+| Boundary | Required evidence |
 |---|---|
 | Entry path, startup, onboarding, auth | Isolated first-run verification; keep a recovery/kill path for broad behavioral changes |
 | Trading, broker writes, UTA permissions | Relevant demo/paper scenarios from `docs/uta-live-testing.md`; leave accounts flat |

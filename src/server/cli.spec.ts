@@ -1,5 +1,7 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { Hono } from 'hono'
+import { tool } from 'ai'
+import { z } from 'zod'
 import { ToolCenter } from '../core/tool-center.js'
 import { WorkspaceToolCenter } from '../core/workspace-tool-center.js'
 import { createThinkingTools } from '../tool/thinking.js'
@@ -125,6 +127,65 @@ describe('CLI gateway — export scope isolation', () => {
   })
 })
 
+describe('CLI gateway — UTA decision provenance', () => {
+  function makeTradeApp() {
+    const append = vi.fn(async (input) => ({ id: 'p-1', ...input }))
+    const toolCenter = new ToolCenter()
+    toolCenter.register({
+      tradingCommit: tool({
+        description: 'fake UTA commit',
+        inputSchema: z.object({ message: z.string() }),
+        execute: async () => ({ source: 'alpaca-paper', hash: 'commit-abc', message: 'thesis' }),
+      }),
+    }, 'trading')
+    const fakeSvc = {
+      registry: {
+        get: (id: string) => id === 'ws1' ? { id: 'ws1', tag: 'demo' } : undefined,
+      },
+      headlessTasks: {
+        get: (id: string) => id === 'run-1'
+          ? { taskId: 'run-1', resumeId: 'resume-1', agent: 'codex' }
+          : null,
+      },
+      sessionRegistry: { get: () => undefined },
+      provenanceStore: { append },
+    }
+    const app = new Hono()
+    registerCliRoutes(app, {
+      toolCenter,
+      workspaceToolCenter: new WorkspaceToolCenter(),
+      inboxStore: {} as never,
+      entityStore: {} as never,
+      getWorkspaceService: () => fakeSvc as never,
+    })
+    return { app, append }
+  }
+
+  const commit = (app: Hono, headers: Record<string, string> = {}) => app.request('/cli/ws1/uta/invoke', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify({ tool: 'tradingCommit', args: { message: 'thesis' } }),
+  })
+
+  it('attributes a successful UTA commit to the authoritative product Session', async () => {
+    const { app, append } = makeTradeApp()
+    expect((await commit(app, { 'x-openalice-run': 'run-1' })).status).toBe(200)
+    expect(append).toHaveBeenCalledWith(expect.objectContaining({
+      artifact: { kind: 'trade-decision', accountId: 'alpaca-paper', decisionId: 'commit-abc' },
+      action: 'decided',
+      origin: expect.objectContaining({
+        kind: 'session', workspaceId: 'ws1', resumeId: 'resume-1', agent: 'codex',
+      }),
+    }))
+  })
+
+  it('does not invent attribution for a commit without a valid Session header', async () => {
+    const { app, append } = makeTradeApp()
+    expect((await commit(app)).status).toBe(200)
+    expect(append).not.toHaveBeenCalled()
+  })
+})
+
 describe('CLI gateway — inbox read (scoped, string-arg coercion)', () => {
   // A real workspace export wired with a memory inbox store, so the CLI shim's
   // all-strings args (`--self` -> 'true', `--limit 1` -> '1') exercise the
@@ -196,7 +257,10 @@ describe('CLI gateway — agent-invisible origin (x-openalice-run → registry)'
       headlessTasks: {
         get: (taskId: string) =>
           taskId === 'run-7'
-            ? { taskId: 'run-7', issueId: 'macro-scan', agent: 'opencode' }
+            ? {
+                taskId: 'run-7', resumeId: 'resume-7', agent: 'opencode',
+                trigger: { kind: 'issue', workspaceId: 'ws1', issueId: 'macro-scan' },
+              }
             : null,
       },
       sessionRegistry: {
@@ -234,7 +298,9 @@ describe('CLI gateway — agent-invisible origin (x-openalice-run → registry)'
     expect(entries[0].origin).toEqual({
       kind: 'headless',
       runId: 'run-7',
+      resumeId: 'resume-7',
       issueId: 'macro-scan',
+      issueWorkspaceId: 'ws1',
       agent: 'opencode',
     })
   })
@@ -275,7 +341,9 @@ describe('CLI gateway — agent-invisible origin (x-openalice-run → registry)'
     expect(entries[0].origin).toEqual({
       kind: 'headless',
       runId: 'run-7',
+      resumeId: 'resume-7',
       issueId: 'macro-scan',
+      issueWorkspaceId: 'ws1',
       agent: 'opencode',
     })
   })

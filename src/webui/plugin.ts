@@ -12,6 +12,7 @@ import { createChannelsRoutes, type SSEClient } from './routes/channels.js'
 import { createConfigRoutes, createMarketDataRoutes } from './routes/config.js'
 import { createScheduleRoutes } from './routes/schedule.js'
 import { createIssuesRoutes } from './routes/issues.js'
+import { createInquiryRoutes } from './routes/inquiries.js'
 import { createTradingProxyRoutes } from './routes/trading-proxy.js'
 import { createTradingConfigRoutes } from './routes/trading-config.js'
 import { createToolsRoutes } from './routes/tools.js'
@@ -256,6 +257,10 @@ export class WebPlugin implements Plugin {
     app.route('/api/headless', createHeadlessRoutes(this.workspaceService))
     app.route('/api/schedule', createScheduleRoutes(this.workspaceService))
     app.route('/api/issues', createIssuesRoutes(this.workspaceService))
+    app.route('/api/inquiries', createInquiryRoutes({
+      service: this.workspaceService,
+      inboxStore: ctx.inboxStore,
+    }))
     // Tracked entities — read surface for the Tracked tab. Mounted here (not
     // with the other /api/* routes above) because backlink scanning needs the
     // workspace registry, which only exists once workspaceService is created.

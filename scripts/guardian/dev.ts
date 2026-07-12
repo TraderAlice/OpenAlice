@@ -14,7 +14,7 @@
  * Replaces the previous `scripts/dev.ts`. Same `pnpm dev` UX.
  */
 
-import { resolve } from 'node:path'
+import { delimiter, resolve } from 'node:path'
 import { homedir } from 'node:os'
 import { existsSync } from 'node:fs'
 import type { ChildProcess } from 'node:child_process'
@@ -113,6 +113,21 @@ async function main(): Promise<void> {
   const flagPath = resolve(dataHome, 'data/control/restart-uta.flag')
   const utaUrl = `http://127.0.0.1:${ports.utaPort}`
   const backendHotReload = isBackendHotReloadEnabled(process.env)
+  const managedSearchToolsBin = resolve(
+    process.cwd(),
+    'vendor',
+    'tools',
+    `${process.platform}-${process.arch}`,
+    'bin',
+  )
+  const searchToolSuffix = process.platform === 'win32' ? '.exe' : ''
+  const hasManagedSearchTools = ['fd', 'rg'].every((name) => (
+    existsSync(resolve(managedSearchToolsBin, `${name}${searchToolSuffix}`))
+  ))
+  const managedToolchainPath = [
+    ...(hasManagedSearchTools ? [managedSearchToolsBin] : []),
+    ...(process.env['OPENALICE_MANAGED_TOOLCHAIN_PATH'] ?? '').split(delimiter).filter(Boolean),
+  ].join(delimiter)
 
   console.log('')
   console.log(`[guardian] mode     →  ${initialMode.mode} (${initialMode.source}${initialMode.envLocked ? ', env-locked' : ''})`)
@@ -137,6 +152,7 @@ async function main(): Promise<void> {
     OPENALICE_LAUNCHER: 'dev',
     OPENALICE_GUARDIAN_PID: String(process.pid),
     OPENALICE_GUARDIAN_STARTED_AT: String(guardianStartedAt),
+    ...(managedToolchainPath ? { OPENALICE_MANAGED_TOOLCHAIN_PATH: managedToolchainPath } : {}),
     ...(takeover ? { OPENALICE_TAKEOVER: '1' } : {}),
   }
 

@@ -3,10 +3,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import type { Tool } from 'ai'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { WorkspaceToolContext } from '../core/workspace-tool-center.js'
 import { readWorkspaceIssues } from '../workspaces/issues/declaration.js'
+import { readIssueComments } from '../workspaces/issues/comments.js'
 import type {
   IssueDetail,
   IssuesSnapshot,
@@ -58,9 +59,34 @@ describe('issue_create', () => {
   it('creates an issue, stamps the workspace assignee, and is reachable via the reader', async () => {
     const res = await run(issueCreateFactory.build(ctx()), { title: 'Fix the thing' })
     expect(res.ok).toBe(true)
-    expect(res.issue).toMatchObject({ id: 'fix-the-thing', title: 'Fix the thing', assignee: 'ws:auto-quant' })
+    expect(res.issue).toMatchObject({ id: 'fix-the-thing', title: 'Fix the thing', assignee: '@workspace' })
     const issue = await readBack('fix-the-thing')
     expect(issue?.title).toBe('Fix the thing')
+  })
+
+  it('records the creating product Session without accepting identity args', async () => {
+    const append = vi.fn(async (input) => ({ id: 'p-1', ...input }))
+    const context = ctx({
+      provenanceStore: { append, list: vi.fn(), latest: vi.fn() },
+      origin: {
+        kind: 'interactive',
+        sessionId: 'surface-1',
+        resumeId: 'resume-1',
+        agent: 'codex',
+      },
+    })
+    await run(issueCreateFactory.build(context), { id: 'owned', title: 'Owned issue' })
+    expect(append).toHaveBeenCalledWith(expect.objectContaining({
+      artifact: { kind: 'issue', workspaceId: 'ws-self', issueId: 'owned' },
+      action: 'created',
+      origin: {
+        kind: 'session',
+        workspaceId: 'ws-self',
+        resumeId: 'resume-1',
+        agent: 'codex',
+        execution: { kind: 'interactive', sessionRecordId: 'surface-1' },
+      },
+    }))
   })
 
   it('refuses to overwrite an existing id (conflict → clean error)', async () => {
@@ -69,22 +95,126 @@ describe('issue_create', () => {
     expect(res.ok).toBe(false)
     expect(res.error).toMatch(/already exists/)
   })
+
+  it('defaults scheduled work to Workspace ownership', async () => {
+    const created = await run(issueCreateFactory.build(ctx()), {
+      id: 'fresh-owner',
+      title: 'Fresh owner',
+      when: { kind: 'every', every: '30m' },
+    })
+    expect(created.ok).toBe(true)
+    expect((await readBack('fresh-owner'))?.assignee).toBe('@workspace')
+  })
+
+  it('defaults creation to the server-attributed current Session', async () => {
+    const context = ctx({
+      origin: {
+        kind: 'interactive',
+        sessionId: 'surface-1',
+        resumeId: 'resume-kind-owl-abc123',
+        agent: 'codex',
+      },
+      resolveSessionIdentity: () => ({ workspaceId: 'ws-self', agent: 'codex', resumable: true }),
+    })
+    const created = await run(issueCreateFactory.build(context), {
+      id: 'owned-schedule',
+      title: 'Owned schedule',
+      when: { kind: 'every', every: '30m' },
+    })
+    expect(created.ok).toBe(true)
+    expect((await readBack('owned-schedule'))?.assignee)
+      .toBe('@resume-kind-owl-abc123')
+
+    const explicit = await run(issueCreateFactory.build(context), {
+      id: 'owned-explicit', title: 'Owned explicit', assignee: '@me',
+    })
+    expect(explicit.ok).toBe(true)
+    expect((await readBack('owned-explicit'))?.assignee).toBe('@resume-kind-owl-abc123')
+  })
+
+  it('does not make a non-resumable Shell PTY the implicit owner', async () => {
+    const context = ctx({
+      origin: {
+        kind: 'interactive',
+        sessionId: 'shell-surface',
+        resumeId: 'resume-shell-terminal',
+        agent: 'shell',
+      },
+      resolveSessionIdentity: () => ({ workspaceId: 'ws-self', agent: 'shell', resumable: false }),
+    })
+
+    const implicit = await run(issueCreateFactory.build(context), {
+      id: 'shell-created', title: 'Shell-created issue',
+    })
+    expect(implicit.ok).toBe(true)
+    expect((await readBack('shell-created'))?.assignee).toBe('@workspace')
+
+    const explicit = await run(issueCreateFactory.build(context), {
+      id: 'shell-owned', title: 'Invalid shell owner', assignee: '@me',
+    })
+    expect(explicit.ok).toBe(false)
+    expect(explicit.error).toMatch(/not resumable yet/)
+  })
+
+  it('allows assigning an exact signed Session from another workspace', async () => {
+    const context = ctx({
+      resolveSessionIdentity: () => ({ workspaceId: 'ws-peer', agent: 'pi', resumable: true }),
+    })
+    const result = await run(issueCreateFactory.build(context), {
+      id: 'foreign-owner',
+      title: 'Foreign owner',
+      when: { kind: 'every', every: '30m' },
+      assignee: '@resume-peer',
+    })
+    expect(result.ok).toBe(true)
+  })
+
+  it('refuses to assign a Session that has no resumable runtime identity yet', async () => {
+    const context = ctx({
+      resolveSessionIdentity: () => ({ workspaceId: 'ws-self', agent: 'pi', resumable: false }),
+    })
+    const result = await run(issueCreateFactory.build(context), {
+      id: 'unready-owner',
+      title: 'Unready owner',
+      when: { kind: 'every', every: '30m' },
+      assignee: '@resume-unready',
+    })
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/not resumable yet/)
+  })
 })
 
 describe('issue_update', () => {
-  it('validates and writes patched fields, preserving body + scheduling', async () => {
+  it('updates canonical What while preserving scheduling', async () => {
     await run(issueCreateFactory.build(ctx()), {
       id: 'sched',
       title: 'scheduled work',
       when: { kind: 'every', every: '30m' },
-      body: 'keep me',
+      assignee: '@workspace',
+      what: 'keep me',
     })
-    const res = await run(issueUpdateFactory.build(ctx()), { id: 'sched', status: 'in_progress', priority: 'high' })
+    const res = await run(issueUpdateFactory.build(ctx()), {
+      id: 'sched', status: 'in_progress', priority: 'high', what: 'new exact work',
+    })
     expect(res.ok).toBe(true)
     const issue = await readBack('sched')
-    expect(issue).toMatchObject({ status: 'in_progress', priority: 'high', body: 'keep me' })
+    expect(issue).toMatchObject({ status: 'in_progress', priority: 'high', what: 'new exact work' })
     // scheduling frontmatter survives a board-field patch
     expect(issue?.when).toEqual({ kind: 'every', every: '30m' })
+  })
+
+  it('records successful mutations but not rejected ones', async () => {
+    const append = vi.fn(async (input) => ({ id: 'p-1', ...input }))
+    const context = ctx({ provenanceStore: { append, list: vi.fn(), latest: vi.fn() } })
+    await run(issueCreateFactory.build(context), { id: 'trail', title: 'trail' })
+    append.mockClear()
+    await run(issueUpdateFactory.build(context), { id: 'trail', status: 'in_progress' })
+    await run(issueUpdateFactory.build(context), { id: 'missing', status: 'done' })
+    expect(append).toHaveBeenCalledTimes(1)
+    expect(append).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'updated' }),
+      { coalesceWithinMs: 900000 },
+    )
   })
 
   it('errors with no fields to update', async () => {
@@ -102,14 +232,12 @@ describe('issue_update', () => {
 })
 
 describe('issue_comment', () => {
-  it('appends a ws-authored comment into the issue body', async () => {
-    await run(issueCreateFactory.build(ctx()), { id: 'c1', title: 'commentable', body: 'desc' })
+  it('appends a ws-authored structured markdown comment', async () => {
+    await run(issueCreateFactory.build(ctx()), { id: 'c1', title: 'commentable', what: 'desc' })
     const res = await run(issueCommentFactory.build(ctx()), { id: 'c1', text: 'progress note' })
     expect(res.ok).toBe(true)
-    const issue = await readBack('c1')
-    expect(issue?.body).toMatch(/## Comments/)
-    expect(issue?.body).toMatch(/\*\*ws:auto-quant\*\*/)
-    expect(issue?.body).toMatch(/progress note/)
+    const comments = await readIssueComments(dir, 'c1')
+    expect(comments.ok && comments.comments[0]).toMatchObject({ author: 'ws:auto-quant', markdown: 'progress note' })
   })
 
   it('errors cleanly on a missing issue', async () => {
@@ -156,13 +284,13 @@ describe('global board (ctx.board present)', () => {
         tag: 'auto-quant',
         status: 'ok',
         issues: [
-          { id: 'alpha', title: 'Alpha', status: 'todo', priority: 'high', assignee: 'human' },
+          { id: 'alpha', title: 'Alpha', status: 'todo', priority: 'high', assignee: '@human' },
           {
             id: 'shared-a',
             title: 'Shared',
             status: 'in_progress',
             priority: 'none',
-            assignee: 'ws:auto-quant',
+            assignee: '@workspace',
             when: { kind: 'every', every: '30m' },
             nameCollision: true,
           },
@@ -178,7 +306,7 @@ describe('global board (ctx.board present)', () => {
             title: 'Shared',
             status: 'todo',
             priority: 'low',
-            assignee: 'unassigned',
+            assignee: '@unassigned',
             nameCollision: true,
           },
         ],
@@ -193,13 +321,16 @@ describe('global board (ctx.board present)', () => {
       issue: {
         id: 'alpha',
         title: 'Alpha',
-        body: 'the alpha body',
+        what: 'the alpha body',
         status: 'todo',
         priority: 'high',
-        assignee: 'human',
+        assignee: '@human',
       },
+      comments: [],
       runs: [],
       inboxReports: [],
+      provenance: [],
+      activity: [],
     },
   }
 
@@ -251,6 +382,17 @@ describe('global board (ctx.board present)', () => {
     expect(list.invalid).toEqual([{ wsId: 'ws-c', tag: 'broken', error: 'retired .alice/issue.json' }])
   })
 
+  it('redirects a failed local write to the attributable cross-workspace ask flow', async () => {
+    const result = await run(issueCommentFactory.build(boardCtx()), {
+      id: 'shared-b',
+      text: 'why?',
+    })
+    expect(result.ok).toBe(false)
+    expect(result.error).toContain('writes only this workspace')
+    expect(result.error).toContain('issue ask --id "shared-b" --owner')
+    expect(result.error).toContain('--await')
+  })
+
   it('issue_list summary hides low-priority global noise but keeps local issues', async () => {
     const list = await run(issueListFactory.build(boardCtx()), {})
     expect(list.ok).toBe(true)
@@ -282,10 +424,46 @@ describe('global board (ctx.board present)', () => {
   it('issue_show returns full detail for a unique name', async () => {
     const show = await run(issueShowFactory.build(boardCtx()), { id: 'Alpha' })
     expect(show.ok).toBe(true)
-    expect(show.issue).toMatchObject({ id: 'alpha', body: 'the alpha body' })
+    expect(show.mode).toBe('summary')
+    expect(show.issue).toMatchObject({ id: 'alpha', what: 'the alpha body' })
     expect(show.runs).toEqual([])
     expect(show.inboxReports).toEqual([])
     expect(show.ambiguous).toBeUndefined()
+  })
+
+  it('issue_show keeps repeated prompts out of summary mode but includes them on request', async () => {
+    const detail: IssueDetail = {
+      issue: {
+        id: 'alpha', title: 'Alpha', what: 'one canonical prompt', status: 'todo',
+        priority: 'high', assignee: '@human',
+      },
+      comments: [],
+      runs: [{
+        taskId: 'task-1', resumeId: 'resume-kind-owl-abc123', wsId: 'ws-a', issueId: 'alpha',
+        agent: 'codex', prompt: 'large repeated execution prompt', status: 'done', startedAt: 1,
+        resumable: true,
+      }],
+      inboxReports: [],
+      provenance: [{
+        id: 'p-1', action: 'created', at: 1,
+        origin: { kind: 'session', workspaceId: 'ws-a', resumeId: 'resume-kind-owl-abc123', agent: 'codex' },
+      }],
+      activity: [],
+    }
+    const context = boardCtx({ detail: async () => detail })
+
+    const summary = await run(issueShowFactory.build(context), { id: 'Alpha' })
+    expect(JSON.stringify(summary)).not.toContain('large repeated execution prompt')
+    expect(summary.runs).toEqual([expect.objectContaining({
+      taskId: 'task-1', resumeId: 'resume-kind-owl-abc123', resumable: true,
+    })])
+    expect(summary.provenance).toEqual([expect.objectContaining({
+      action: 'created',
+      origin: expect.objectContaining({ resumeId: 'resume-kind-owl-abc123' }),
+    })])
+
+    const detailed = await run(issueShowFactory.build(context), { id: 'Alpha', mode: 'detailed' })
+    expect(JSON.stringify(detailed)).toContain('large repeated execution prompt')
   })
 
   it('issue_show returns an ambiguous candidate list for a colliding name', async () => {

@@ -136,6 +136,84 @@ describe('CLI launchers and payload', () => {
     }
   })
 
+  it('accepts kebab-case shell flags for camelCase tool schema keys', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'openalice-cli-shim-flags-'))
+    const socketPath = process.platform === 'win32'
+      ? `\\\\.\\pipe\\openalice-cli-shim-flags-${process.pid}-${Date.now()}`
+      : join(dir, 'tools.sock')
+    let invocation: { tool?: string; args?: Record<string, unknown> } | null = null
+    const manifest = {
+      description: 'test manifest',
+      groups: {
+        provenance: {
+          show: {
+            tool: 'provenance_show',
+            description: 'Show provenance',
+            schema: {
+              type: 'object',
+              properties: {
+                issueId: { type: 'string' },
+                accountId: { type: 'string' },
+                await: { type: 'boolean' },
+                taskId: { type: 'array', items: { type: 'string' } },
+              },
+            },
+          },
+        },
+      },
+    }
+    const server = createServer((req, res) => {
+      if (req.method === 'POST') {
+        const chunks: Buffer[] = []
+        req.on('data', (chunk) => chunks.push(Buffer.from(chunk)))
+        req.on('end', () => {
+          invocation = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+          res.writeHead(200, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ content: [{ type: 'text', text: '{"ok":true}' }] }))
+        })
+        return
+      }
+      res.writeHead(200, { 'content-type': 'application/json' })
+      res.end(JSON.stringify(manifest))
+    })
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject)
+      server.listen(socketPath, resolve)
+    })
+    const env = {
+      ...process.env,
+      AQ_WS_ID: 'ws1',
+      OPENALICE_TOOL_SOCKET: socketPath,
+      OPENALICE_TOOL_URL: '/cli',
+    }
+    try {
+      const help = await runCli('alice-workspace', ['provenance', 'show', '--help'], env)
+      expect(help.stdout).toContain('--issue-id')
+      expect(help.stdout).toContain('--await')
+      expect(help.stdout).not.toContain('--await <boolean>')
+      expect(help.stdout).toContain('--task-id <value> (repeatable)')
+      expect(help.stdout).not.toContain('--task-id <array>')
+      expect(help.stdout).not.toContain('--issueId')
+
+      await runCli('alice-workspace', [
+        'provenance', 'show', '--issue-id', 'audit', '--account-id', 'alpaca-paper', '--await',
+        '--task-id', 'run-a', '--task-id', 'run-b',
+      ], env)
+      expect(invocation).toEqual({
+        tool: 'provenance_show',
+        args: {
+          issueId: 'audit',
+          accountId: 'alpaca-paper',
+          await: true,
+          taskId: ['run-a', 'run-b'],
+        },
+      })
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
   it('every Windows `.cmd` twin derives its export and selects the managed Node runtime', () => {
     const canonical = read('alice.cmd')
     for (const name of EXPORT_BINARIES) {

@@ -49,7 +49,7 @@ describe('completeOneShotIssueAfterRun', () => {
       expect(issue).toMatchObject({
         status: 'done',
         agent: 'pi',
-        body: 'Make sure this keeps the body.',
+        what: 'Make sure this keeps the body.',
       })
       expect(issue?.when).toEqual({ kind: 'at', at: '2030-01-01T09:00:00Z' })
     }

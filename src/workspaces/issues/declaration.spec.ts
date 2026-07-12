@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { issueFirePrompt, isFireable, readWorkspaceIssues } from './declaration.js'
+import { issueAssigneeResumeId, issueFirePrompt, isFireable, readWorkspaceIssues } from './declaration.js'
 
 let dir: string
 beforeEach(async () => {
@@ -69,25 +69,23 @@ describe('readWorkspaceIssues', () => {
         title: 'Fix the login bug',
         status: 'todo',
         priority: 'none',
-        assignee: 'unassigned',
+        assignee: '@workspace',
       })
-      expect(i.assigneeDefaulted).toBe(true)
       expect(i.when).toBeUndefined()
       expect(isFireable(i)).toBe(false)
     }
   })
 
-  it('distinguishes explicit unassigned from a defaulted assignee', async () => {
-    await writeIssue('explicit', fm('title: Explicit\nassignee: unassigned'))
+  it('preserves an explicit unassigned owner for an unscheduled issue', async () => {
+    await writeIssue('explicit', fm('title: Explicit\nassignee: "@unassigned"'))
     const r = await readWorkspaceIssues(dir)
     expect(r.ok).toBe(true)
     if (r.ok) {
-      expect(r.issues[0].assignee).toBe('unassigned')
-      expect(r.issues[0].assigneeDefaulted).toBe(false)
+      expect(r.issues[0].assignee).toBe('@unassigned')
     }
   })
 
-  it('parses a SCHEDULED issue (with when) including its body', async () => {
+  it('merges a legacy frontmatter prompt and body into canonical What', async () => {
     await writeIssue(
       'morning-research',
       fm(
@@ -95,7 +93,7 @@ describe('readWorkspaceIssues', () => {
           'title: Morning research sweep',
           'status: in_progress',
           'priority: high',
-          'assignee: "ws:auto-quant"',
+          'assignee: "@workspace"',
           'when: { kind: every, every: 30m }',
           'what: run the research routine',
           'agent: codex',
@@ -113,26 +111,63 @@ describe('readWorkspaceIssues', () => {
         title: 'Morning research sweep',
         status: 'in_progress',
         priority: 'high',
-        assignee: 'ws:auto-quant',
-        what: 'run the research routine',
+        assignee: '@workspace',
+        what: 'run the research routine\n\n## Context\n\nScan overnight movers and summarize.',
         agent: 'codex',
       })
       expect(i.when).toEqual({ kind: 'every', every: '30m' })
-      expect(i.body).toBe('Scan overnight movers and summarize.')
+      expect(i.what).toBe('run the research routine\n\n## Context\n\nScan overnight movers and summarize.')
       expect(isFireable(i)).toBe(true)
     }
   })
 
+  it('parses Session ownership and defaults scheduled work to the Workspace', async () => {
+    await writeIssue('owned', fm([
+      'title: Owned work',
+      'when: { kind: every, every: 30m }',
+      'assignee: "@resume-kind-owl-abc123"',
+    ].join('\n')))
+    await writeIssue('legacy', fm('title: Legacy\nwhen: { kind: every, every: 30m }'))
+    const result = await readWorkspaceIssues(dir)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    const byId = Object.fromEntries(result.issues.map((issue) => [issue.id, issue]))
+    expect(issueAssigneeResumeId(byId['owned'].assignee)).toBe('resume-kind-owl-abc123')
+    expect(byId['legacy'].assignee).toBe('@workspace')
+  })
+
+  it('rejects retired execution declarations instead of silently keeping two owner models', async () => {
+    await writeIssue('retired', fm([
+      'title: Retired owner field',
+      'when: { kind: every, every: 30m }',
+      'execution: { mode: fresh }',
+    ].join('\n')))
+    const result = await readWorkspaceIssues(dir)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.issues).toEqual([])
+    expect(result.invalid[0]?.error).toMatch(/execution/)
+  })
+
   it('parses block-style and cron/at `when` shapes', async () => {
-    await writeIssue('eod', fm('title: EOD summary\nwhen:\n  kind: cron\n  cron: "0 16 * * 1-5"'))
+    await writeIssue('eod', fm('title: EOD summary\nwhen:\n  kind: cron\n  cron: "0 16 * * 1-5"\n  timezone: America/New_York'))
     await writeIssue('oneshot', fm('title: One-shot\nwhen: { kind: at, at: "2030-01-01T09:00:00Z" }'))
     const r = await readWorkspaceIssues(dir)
     expect(r.ok).toBe(true)
     if (r.ok) {
       const byId = Object.fromEntries(r.issues.map((i) => [i.id, i]))
-      expect(byId['eod'].when).toEqual({ kind: 'cron', cron: '0 16 * * 1-5' })
+      expect(byId['eod'].when).toEqual({ kind: 'cron', cron: '0 16 * * 1-5', timezone: 'America/New_York' })
       expect(byId['oneshot'].when).toEqual({ kind: 'at', at: '2030-01-01T09:00:00Z' })
     }
+  })
+
+  it('rejects a cron timezone that is neither local nor an IANA zone', async () => {
+    await writeIssue('bad-zone', fm('title: Bad zone\nwhen: { kind: cron, cron: "0 9 * * *", timezone: "New York-ish" }'))
+    const result = await readWorkspaceIssues(dir)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.issues).toEqual([])
+    expect(result.invalid[0]?.error).toMatch(/timezone.*IANA/)
   })
 
   it('keys the id off the filename stem (not any frontmatter id)', async () => {
@@ -190,7 +225,7 @@ describe('isFireable / issueFirePrompt', () => {
     if (r.ok) for (const i of r.issues) expect(isFireable(i)).toBe(false)
   })
 
-  it('fire prompt prefers `what`, else falls back to title+body, else title', async () => {
+  it('fire prompt is exactly the canonical visible What', async () => {
     await writeIssue('with-what', fm('title: T\nwhat: explicit prompt', 'ignored body'))
     await writeIssue('no-what', fm('title: Do the thing', 'with detail'))
     await writeIssue('bare', fm('title: Just a title'))
@@ -198,9 +233,18 @@ describe('isFireable / issueFirePrompt', () => {
     expect(r.ok).toBe(true)
     if (r.ok) {
       const byId = Object.fromEntries(r.issues.map((i) => [i.id, i]))
-      expect(issueFirePrompt(byId['with-what'])).toBe('explicit prompt')
-      expect(issueFirePrompt(byId['no-what'])).toBe('Do the thing\n\nwith detail')
+      expect(issueFirePrompt(byId['with-what'])).toBe('explicit prompt\n\n## Context\n\nignored body')
+      expect(issueFirePrompt(byId['no-what'])).toBe('with detail')
       expect(issueFirePrompt(byId['bare'])).toBe('Just a title')
     }
+  })
+
+  it('keeps legacy inline comments out of canonical What', async () => {
+    await writeIssue('commented', fm('title: Commented', 'Do the work.\n\n## Comments\n\n**human** · 2026-07-12T00:00:00.000Z\n\nLooks good.'))
+    const result = await readWorkspaceIssues(dir)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.issues[0].what).toBe('Do the work.')
+    expect(issueFirePrompt(result.issues[0])).toBe('Do the work.')
   })
 })

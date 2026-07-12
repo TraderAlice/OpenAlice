@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { readWorkspaceIssues } from './declaration.js'
+import { readIssueComments } from './comments.js'
 import { appendIssueComment, createIssue, updateIssueFields } from './mutate.js'
 
 let dir: string
@@ -33,23 +34,21 @@ describe('createIssue', () => {
       // Defaults applied on read-back.
       expect(res.issue.status).toBe('todo')
       expect(res.issue.priority).toBe('none')
-      expect(res.issue.assignee).toBe('unassigned')
+      expect(res.issue.assignee).toBe('@workspace')
     }
     const { issue } = await readBack('fix-the-login-bug')
     expect(issue?.title).toBe('Fix the Login Bug!')
   })
 
-  it('honors an explicit id, frontmatter fields, and a body', async () => {
+  it('honors an explicit id, frontmatter fields, and canonical What', async () => {
     const res = await createIssue(dir, {
       id: 'morning-sweep',
       title: 'Morning research sweep',
       status: 'in_progress',
       priority: 'high',
-      assignee: 'ws:auto-quant',
+      assignee: '@resume-kind-owl-abc123',
       when: { kind: 'every', every: '30m' },
       what: 'run the research routine',
-      agent: 'codex',
-      body: 'Scan overnight movers.',
     })
     expect(res.ok).toBe(true)
     const { issue } = await readBack('morning-sweep')
@@ -58,12 +57,11 @@ describe('createIssue', () => {
       title: 'Morning research sweep',
       status: 'in_progress',
       priority: 'high',
-      assignee: 'ws:auto-quant',
+      assignee: '@resume-kind-owl-abc123',
       what: 'run the research routine',
-      agent: 'codex',
     })
     expect(issue?.when).toEqual({ kind: 'every', every: '30m' })
-    expect(issue?.body).toBe('Scan overnight movers.')
+    expect(issue?.what).toBe('run the research routine')
   })
 
   it('refuses to overwrite an existing issue (conflict)', async () => {
@@ -90,38 +88,37 @@ describe('createIssue', () => {
 })
 
 describe('updateIssueFields', () => {
-  it('patches status/priority/assignee/agent and preserves body + other scheduling frontmatter', async () => {
+  it('patches properties and preserves canonical What + scheduling frontmatter', async () => {
     await createIssue(dir, {
       id: 'task-1',
       title: 'Do the thing',
       when: { kind: 'every', every: '15m' },
       what: 'keep the fire prompt',
       agent: 'claude',
-      body: 'Body text to preserve.',
     })
     const res = await updateIssueFields(dir, 'task-1', {
       status: 'in_progress',
       priority: 'urgent',
-      assignee: 'human',
+      assignee: '@workspace',
       agent: 'pi',
     })
     expect(res.ok).toBe(true)
     if (res.ok) {
       expect(res.issue.status).toBe('in_progress')
       expect(res.issue.priority).toBe('urgent')
-      expect(res.issue.assignee).toBe('human')
+      expect(res.issue.assignee).toBe('@workspace')
       expect(res.issue.agent).toBe('pi')
     }
     const { issue } = await readBack('task-1')
     expect(issue).toMatchObject({
       status: 'in_progress',
       priority: 'urgent',
-      assignee: 'human',
+      assignee: '@workspace',
       what: 'keep the fire prompt',
       agent: 'pi',
     })
     expect(issue?.when).toEqual({ kind: 'every', every: '15m' })
-    expect(issue?.body).toBe('Body text to preserve.')
+    expect(issue?.what).toBe('keep the fire prompt')
   })
 
   it('clears an issue agent override with null', async () => {
@@ -130,6 +127,24 @@ describe('updateIssueFields', () => {
     expect(res.ok).toBe(true)
     const { issue } = await readBack('agent-clear')
     expect(issue?.agent).toBeUndefined()
+  })
+
+  it('changes scheduled ownership without disturbing the schedule', async () => {
+    await createIssue(dir, {
+      id: 'owned',
+      title: 'Owned',
+      when: { kind: 'every', every: '15m' },
+      assignee: '@workspace',
+      agent: 'codex',
+    })
+    const res = await updateIssueFields(dir, 'owned', {
+      assignee: '@resume-kind-owl-abc123',
+    })
+    expect(res.ok).toBe(true)
+    const { issue } = await readBack('owned')
+    expect(issue?.assignee).toBe('@resume-kind-owl-abc123')
+    expect(issue?.agent).toBeUndefined()
+    expect(issue?.when).toEqual({ kind: 'every', every: '15m' })
   })
 
   it('supports a partial patch (only status)', async () => {
@@ -164,29 +179,27 @@ describe('updateIssueFields', () => {
 })
 
 describe('appendIssueComment', () => {
-  it('creates a ## Comments section then appends a stamped block under it', async () => {
-    await createIssue(dir, { id: 'c1', title: 'Talk', body: 'Original description.' })
+  it('writes a structured sidecar without changing What', async () => {
+    await createIssue(dir, { id: 'c1', title: 'Talk', what: 'Original description.' })
     const res = await appendIssueComment(dir, 'c1', 'human', 'first comment')
     expect(res.ok).toBe(true)
     const { issue } = await readBack('c1')
-    expect(issue?.body).toContain('Original description.')
-    expect(issue?.body).toContain('## Comments')
-    expect(issue?.body).toContain('**human**')
-    expect(issue?.body).toContain('first comment')
+    expect(issue?.what).toBe('Original description.')
+    const comments = await readIssueComments(dir, 'c1')
+    expect(comments.ok && comments.comments).toEqual([
+      expect.objectContaining({ author: 'human', markdown: 'first comment' }),
+    ])
   })
 
-  it('appends a second comment under the same section (one heading only)', async () => {
+  it('appends comments in order to one per-Issue sidecar', async () => {
     await createIssue(dir, { id: 'c2', title: 'Talk' })
     await appendIssueComment(dir, 'c2', 'human', 'one')
     await appendIssueComment(dir, 'c2', 'ws:auto-quant', 'two')
-    const { issue } = await readBack('c2')
-    const headingCount = (issue?.body.match(/^##\s+Comments\s*$/gm) ?? []).length
-    expect(headingCount).toBe(1)
-    expect(issue?.body).toContain('one')
-    expect(issue?.body).toContain('two')
-    expect(issue?.body).toContain('**ws:auto-quant**')
-    // First comment precedes the second.
-    expect(issue!.body.indexOf('one')).toBeLessThan(issue!.body.indexOf('two'))
+    const comments = await readIssueComments(dir, 'c2')
+    expect(comments.ok && comments.comments.map((comment) => [comment.author, comment.markdown])).toEqual([
+      ['human', 'one'],
+      ['ws:auto-quant', 'two'],
+    ])
   })
 
   it('returns not_found for a missing issue', async () => {
@@ -198,9 +211,9 @@ describe('appendIssueComment', () => {
 })
 
 describe('round-trip: create → update → comment → read back', () => {
-  it('reflects every mutation through readWorkspaceIssues', async () => {
-    await createIssue(dir, { id: 'rt', title: 'Round trip', body: 'desc' })
-    await updateIssueFields(dir, 'rt', { status: 'in_progress', assignee: 'human' })
+  it('keeps work definition and comments independently readable', async () => {
+    await createIssue(dir, { id: 'rt', title: 'Round trip', what: 'desc' })
+    await updateIssueFields(dir, 'rt', { status: 'in_progress', assignee: '@human' })
     await appendIssueComment(dir, 'rt', 'human', 'looks good')
     const { issue, invalid } = await readBack('rt')
     expect(invalid).toHaveLength(0)
@@ -208,10 +221,10 @@ describe('round-trip: create → update → comment → read back', () => {
       id: 'rt',
       title: 'Round trip',
       status: 'in_progress',
-      assignee: 'human',
+      assignee: '@human',
     })
-    expect(issue?.body).toContain('desc')
-    expect(issue?.body).toContain('## Comments')
-    expect(issue?.body).toContain('looks good')
+    expect(issue?.what).toBe('desc')
+    const comments = await readIssueComments(dir, 'rt')
+    expect(comments.ok && comments.comments[0]).toMatchObject({ author: 'human', markdown: 'looks good' })
   })
 })

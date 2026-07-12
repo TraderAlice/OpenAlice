@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { execFile, spawn, spawnSync } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync } from 'node:fs'
+import { rm } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -150,7 +151,18 @@ const terminateTestProcess = (processToStop, signal) => {
   processToStop.kill(signal)
 }
 
-const finish = (code, message) => {
+const waitForProcessExit = async (processToStop, timeout = 5_000) => {
+  if (processToStop.exitCode !== null || processToStop.signalCode !== null) return
+  await new Promise((resolvePromise) => {
+    const timer = setTimeout(resolvePromise, timeout)
+    processToStop.once('exit', () => {
+      clearTimeout(timer)
+      resolvePromise()
+    })
+  })
+}
+
+const finish = async (code, message) => {
   if (settled) return
   if (code === 0 && (!takeoverObserved || !recoveryOwnerExited)) {
     code = 1
@@ -160,7 +172,22 @@ const finish = (code, message) => {
   clearTimeout(timer)
   terminateTestProcess(child, 'SIGTERM')
   if (recoveryOwner) terminateTestProcess(recoveryOwner, 'SIGKILL')
-  if (!keep) rmSync(smokeRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  // On Windows, taskkill can return before Git Bash/node-pty releases its cwd
+  // directory handle. Wait for the process events, then use Node's bounded
+  // EBUSY/EPERM retry loop. A persistent cleanup failure still fails the smoke
+  // so a real leaked process is never hidden as a successful takeover.
+  await Promise.all([
+    waitForProcessExit(child),
+    ...(recoveryOwner ? [waitForProcessExit(recoveryOwner)] : []),
+  ])
+  if (!keep) {
+    try {
+      await rm(smokeRoot, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 })
+    } catch (err) {
+      code = 1
+      message = `\n[desktop-pty-smoke] cleanup failed after process exit: ${err instanceof Error ? err.message : String(err)}`
+    }
+  }
   if (message) console.log(message)
   process.exit(code)
 }
@@ -193,16 +220,16 @@ const maybeRunCliSmoke = () => {
     if (err) {
       console.error(stdout)
       console.error(stderr)
-      finish(1, `\n[desktop-pty-smoke] CLI socket smoke failed: ${err.message}`)
+      void finish(1, `\n[desktop-pty-smoke] CLI socket smoke failed: ${err.message}`)
       return
     }
     if (!stdout.includes('OpenAlice CLI')) {
       console.error(stdout)
-      finish(1, '\n[desktop-pty-smoke] CLI socket smoke failed: manifest output missing')
+      void finish(1, '\n[desktop-pty-smoke] CLI socket smoke failed: manifest output missing')
       return
     }
     console.log('[desktop-pty-smoke] CLI socket smoke -> ok')
-    finish(0, '\n[desktop-pty-smoke] passed')
+    void finish(0, '\n[desktop-pty-smoke] passed')
   })
 }
 
@@ -222,7 +249,7 @@ const onData = (chunk) => {
     takeoverObserved = true
   }
   if (text.includes('electron smoke pty → failed') || text.includes('electron smoke pty -> failed')) {
-    finish(1, '\n[desktop-pty-smoke] failed')
+    void finish(1, '\n[desktop-pty-smoke] failed')
   }
   maybeRunCliSmoke()
 }
@@ -233,10 +260,10 @@ child.stderr.on('data', onData)
 const timer = setTimeout(() => {
   console.error('\n[desktop-pty-smoke] timed out')
   console.error(output.split('\n').slice(-80).join('\n'))
-  finish(1)
+  void finish(1)
 }, timeoutMs)
 
 child.on('exit', (code, signal) => {
   if (settled) return
-  finish(code ?? (signal ? 1 : 0), `\n[desktop-pty-smoke] Electron exited before smoke passed code=${code} signal=${signal}`)
+  void finish(code ?? (signal ? 1 : 0), `\n[desktop-pty-smoke] Electron exited before smoke passed code=${code} signal=${signal}`)
 })

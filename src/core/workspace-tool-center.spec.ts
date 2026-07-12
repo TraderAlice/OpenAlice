@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { makeWorkspaceResolver } from './workspace-tool-center.js'
+import type { InboxEntry } from './inbox-store.js'
+import {
+  makeInboxEntryOriginResolver,
+  makeWorkspaceResolver,
+  toSafeInboxOrigin,
+} from './workspace-tool-center.js'
 
 type Meta = { id: string; dir: string; tag: string }
 
@@ -31,5 +36,77 @@ describe('makeWorkspaceResolver', () => {
     expect(resolve('ws9')).toBeNull()
     map['ws9'] = { id: 'ws9', dir: '/wsroot/ws9', tag: 'Late' }
     expect(resolve('ws9')).toEqual({ id: 'ws9', dir: '/wsroot/ws9', tag: 'Late' })
+  })
+})
+
+describe('makeInboxEntryOriginResolver', () => {
+  const entry = (origin: InboxEntry['origin']): InboxEntry => ({
+    id: 'inbox-1',
+    ts: 1,
+    workspaceId: 'ws2',
+    comments: 'hello',
+    ...(origin ? { origin } : {}),
+  })
+
+  it('backfills a headless resumeId from the durable run registry', () => {
+    const resolve = makeInboxEntryOriginResolver(() => ({
+      headlessTasks: {
+        get: (id) => id === 'run-1' ? { resumeId: 'resume-run-1' } : null,
+      },
+      sessionRegistry: { get: () => undefined },
+    }))
+
+    expect(resolve(entry({ kind: 'headless', runId: 'run-1', agent: 'pi' })))
+      .toEqual({
+        kind: 'headless',
+        runId: 'run-1',
+        resumeId: 'resume-run-1',
+        agent: 'pi',
+      })
+  })
+
+  it('backfills an interactive resumeId from the workspace session registry', () => {
+    const resolve = makeInboxEntryOriginResolver(() => ({
+      headlessTasks: { get: () => null },
+      sessionRegistry: {
+        get: (wsId, id) => wsId === 'ws2' && id === 'session-1'
+          ? { resumeId: 'resume-session-1' }
+          : undefined,
+      },
+    }))
+
+    expect(resolve(entry({ kind: 'interactive', sessionId: 'session-1' })))
+      .toEqual({
+        kind: 'interactive',
+        sessionId: 'session-1',
+        resumeId: 'resume-session-1',
+      })
+  })
+
+  it('preserves stored provenance when it is already complete or unresolvable', () => {
+    const resolve = makeInboxEntryOriginResolver(() => null)
+    const complete = { kind: 'headless' as const, runId: 'run-1', resumeId: 'resume-1' }
+
+    expect(resolve(entry(complete))).toEqual(complete)
+    expect(resolve(entry({ kind: 'manual' }))).toEqual({ kind: 'manual' })
+    expect(resolve(entry(undefined))).toBeUndefined()
+  })
+
+  it('whitelists public fields from legacy append-only origin objects', () => {
+    const dirty = {
+      kind: 'headless' as const,
+      runId: 'run-1',
+      resumeId: 'resume-1',
+      agent: 'pi',
+      agentSessionId: 'native-secret',
+      arbitrary: true,
+    } as InboxEntry['origin']
+
+    expect(toSafeInboxOrigin(dirty)).toEqual({
+      kind: 'headless',
+      runId: 'run-1',
+      resumeId: 'resume-1',
+      agent: 'pi',
+    })
   })
 })

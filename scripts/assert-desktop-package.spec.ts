@@ -32,12 +32,38 @@ function piManifest() {
   }
 }
 
+function searchToolsManifest(platformArch: string, windows = false) {
+  return {
+    searchTools: {
+      [platformArch]: {
+        path: `vendor/tools/${platformArch}`,
+        binPath: 'bin',
+        fd: {
+          version: windows || platformArch.endsWith('arm64') ? '10.4.2' : '10.3.0',
+          binary: `bin/fd${windows ? '.exe' : ''}`,
+        },
+        rg: { version: '15.1.0', binary: `bin/rg${windows ? '.exe' : ''}` },
+      },
+    },
+  }
+}
+
+function writeSearchToolFiles(appRoot: string, platformArch: string, windows = false) {
+  writePackageFile(appRoot, `vendor/tools/${platformArch}/bin/fd${windows ? '.exe' : ''}`)
+  writePackageFile(appRoot, `vendor/tools/${platformArch}/bin/rg${windows ? '.exe' : ''}`)
+  writePackageFile(appRoot, `vendor/tools/${platformArch}/licenses/fd/LICENSE-APACHE`)
+  writePackageFile(appRoot, `vendor/tools/${platformArch}/licenses/fd/LICENSE-MIT`)
+  writePackageFile(appRoot, `vendor/tools/${platformArch}/licenses/rg/LICENSE-MIT`)
+  writePackageFile(appRoot, `vendor/tools/${platformArch}/licenses/rg/UNLICENSE`)
+}
+
 describe('assertDesktopPackage', () => {
-  it('does not require vendor Git in macOS packages', () => {
+  it('requires managed search tools but not vendor Git in macOS packages', () => {
     const root = mkdtempSync(join(tmpdir(), 'openalice-package-mac-'))
     try {
       const appRoot = join(root, 'mac-arm64/OpenAlice.app/Contents/Resources/app')
-      writeBasePackage(appRoot, piManifest())
+      writeBasePackage(appRoot, { ...piManifest(), ...searchToolsManifest('darwin-arm64') })
+      writeSearchToolFiles(appRoot, 'darwin-arm64')
 
       const result = assertDesktopPackage({ packageRoot: root, repoRoot: root, arch: 'arm64' })
 
@@ -57,6 +83,8 @@ describe('assertDesktopPackage', () => {
       const result = assertDesktopPackage({ packageRoot: root, repoRoot: root, arch: 'x64' })
 
       expect(result.ok).toBe(false)
+      expect(result.errors.join('\n')).toContain('vendor/tools/win32-x64/bin/fd.exe')
+      expect(result.errors.join('\n')).toContain('expected manifest.searchTools.win32-x64')
       expect(result.errors.join('\n')).toContain('vendor/git/win32-x64/cmd/git.exe')
       expect(result.errors.join('\n')).toContain('vendor/git/win32-x64/bin/bash.exe')
       expect(result.errors.join('\n')).toContain('expected manifest.git.win32-x64')
@@ -71,6 +99,7 @@ describe('assertDesktopPackage', () => {
       const appRoot = join(root, 'win-unpacked/resources/app')
       writeBasePackage(appRoot, {
         ...piManifest(),
+        ...searchToolsManifest('win32-x64', true),
         git: {
           'win32-x64': {
             version: '2.55.0.2',
@@ -84,6 +113,7 @@ describe('assertDesktopPackage', () => {
       writePackageFile(appRoot, 'vendor/git/win32-x64/cmd/git.exe')
       writePackageFile(appRoot, 'vendor/git/win32-x64/bin/bash.exe')
       writePackageFile(appRoot, 'vendor/git/win32-x64/bin/sh.exe')
+      writeSearchToolFiles(appRoot, 'win32-x64', true)
 
       const result = assertDesktopPackage({ packageRoot: root, repoRoot: root, arch: 'x64' })
 

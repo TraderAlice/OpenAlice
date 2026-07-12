@@ -34,6 +34,10 @@ export interface CreatorOptions {
   readonly bootstrapEnv: BootstrapEnv;
   readonly bootstrapTimeoutMs: number;
   readonly registry: WorkspaceRegistry;
+  /** Catalog keeps ids reserved after departure/purge; active registry cannot. */
+  readonly isWorkspaceIdReserved?: (id: string) => boolean;
+  /** Persist the new active row in the complete lifecycle catalog. */
+  readonly onWorkspaceCreated?: (workspace: WorkspaceMeta) => Promise<void>;
   readonly logger: Logger;
 }
 
@@ -143,6 +147,7 @@ export class WorkspaceCreator {
       fallbackPrefix: 'workspace',
       isTaken: (candidate) =>
         this.opts.registry.hasId(candidate) ||
+        this.opts.isWorkspaceIdReserved?.(candidate) === true ||
         existsSync(join(this.opts.workspacesRoot, candidate)),
     });
     const dir = join(this.opts.workspacesRoot, id);
@@ -273,6 +278,18 @@ export class WorkspaceCreator {
       agents,
     };
     await this.opts.registry.add(workspace);
+    try {
+      await this.opts.onWorkspaceCreated?.(workspace);
+    } catch (err) {
+      await this.opts.registry.remove(workspace.id).catch(() => undefined);
+      await rm(dir, { recursive: true, force: true });
+      log.error('catalog.register_failed', { err });
+      return {
+        ok: false,
+        code: 'injection_failed',
+        message: `workspace catalog update failed: ${(err as Error).message}`,
+      };
+    }
     log.info('bootstrap.ok', { stdout: result.stdout.slice(-400) });
     return { ok: true, workspace };
   }

@@ -8,6 +8,7 @@ import { FilesPanel } from './FilesPanel';
 import { ResumeCta, prefixOf } from './ResumeCta';
 import { formatRelativeTime } from '../../lib/intl';
 import { TerminalView, type KeyMap } from './Terminal';
+import { WebPiView } from './WebPiView';
 import { useIsDesktop } from '../../live/use-is-desktop';
 import { useWorkspaceSidePanels } from '../../live/workspace-side-panels';
 
@@ -29,6 +30,7 @@ export interface WorkspaceViewProps {
   readonly keyMap?: KeyMap;
   readonly onSpawnFresh: () => void;
   readonly onResume: (sessionId: string) => void;
+  readonly onOpenWebPi: (sessionId: string) => void;
   /** Navigate to an already-running session without re-spawning it. The
    *  empty-state cards call this for running entries; resume-spawn for
    *  paused entries goes through `onResume`. */
@@ -93,6 +95,7 @@ export function WorkspaceView(props: WorkspaceViewProps): ReactElement {
           <ResumeCta
             record={props.activeRecord}
             onResume={() => props.onResume(props.activeRecord!.id)}
+            onOpenWebPi={() => props.onOpenWebPi(props.activeRecord!.id)}
           />
         )}
         {!showPausedCta &&
@@ -103,13 +106,22 @@ export function WorkspaceView(props: WorkspaceViewProps): ReactElement {
                 key={s.id}
                 className={`workspace-terminal-slot ${isActive ? 'is-active' : 'is-hidden'}`}
               >
-                <TerminalView
-                  wsId={props.wsId}
-                  sessionId={s.id}
-                  {...(props.label !== undefined ? { label: `${props.label} · ${s.name}` } : {})}
-                  {...(props.keyMap !== undefined ? { keyMap: props.keyMap } : {})}
-                  onSessionLost={props.onSessionLost}
-                />
+                {(s.surface ?? 'terminal') === 'webpi' && s.agent === 'pi' ? (
+                  <WebPiView
+                    wsId={props.wsId}
+                    sessionId={s.id}
+                    {...(props.label !== undefined ? { label: `${props.label} · ${s.name}` } : {})}
+                    onSessionLost={props.onSessionLost}
+                  />
+                ) : (
+                  <TerminalView
+                    wsId={props.wsId}
+                    sessionId={s.id}
+                    {...(props.label !== undefined ? { label: `${props.label} · ${s.name}` } : {})}
+                    {...(props.keyMap !== undefined ? { keyMap: props.keyMap } : {})}
+                    onSessionLost={props.onSessionLost}
+                  />
+                )}
               </div>
             );
           })}

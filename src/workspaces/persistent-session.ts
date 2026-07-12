@@ -370,7 +370,6 @@ export class PersistentSession {
       wsId: this.opts.wsId,
       sessionId: this.opts.recordId,
       name: this.opts.name,
-      agentSessionId: this._agentSessionId,
       pid: this.term.pid,
       command: this.opts.command,
       replayFromSeq: slice.effectiveSeq,

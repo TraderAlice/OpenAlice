@@ -26,8 +26,8 @@ import { logger as launcherLogger } from '../../workspaces/logger.js';
 import { readWorkspaceMetadata, workspaceMetadataSchema, writeWorkspaceMetadata } from '../../workspaces/workspace-metadata.js';
 import type { SessionRecord } from '../../workspaces/session-registry.js';
 import type { WorkspaceMeta } from '../../workspaces/workspace-registry.js';
-import { HeadlessCapacityError, resumeFromRecord, type SessionFactoryContext, type WorkspaceService } from '../../workspaces/service.js';
-import { isAgentRuntime, type WorkspaceAiCred } from '../../workspaces/cli-adapter.js';
+import { HeadlessCapacityError, HeadlessResumeError, resumeFromRecord, type SessionFactoryContext, type WorkspaceService } from '../../workspaces/service.js';
+import { isAgentRuntime, type CliAdapter, type WorkspaceAiCred } from '../../workspaces/cli-adapter.js';
 import { generatePetnameId } from '../../workspaces/petname-id.js';
 import { addCredential, readCredentials, readWorkspaceDefaultAgent, setCredentialLastModel, credentialWires, credentialWireShapeEnum, type Credential } from '../../core/config.js';
 import { inferCredentialVendor, resolveAnthropicAuthMode } from '../../core/credential-inference.js';
@@ -111,7 +111,7 @@ interface SpawnedSessionBody {
   readonly name: string;
   readonly pid: number;
   readonly agent: string;
-  readonly agentSessionId: string | null;
+  readonly resumeId: string;
   readonly startedAt: number;
   /** The seed message, when the session was seeded — its sidebar title. */
   readonly title: string | null;
@@ -125,7 +125,8 @@ interface PublicSessionBody {
   readonly createdAt: string;
   readonly lastActiveAt: string;
   readonly state: 'running' | 'paused';
-  readonly agentSessionId: string | null;
+  readonly surface: 'terminal' | 'webpi';
+  readonly resumeId: string;
   readonly pid: number | null;
   readonly startedAt: number | null;
   readonly title: string | null;
@@ -172,6 +173,8 @@ export function createWorkspaceRoutes(
     opts: {
       readonly agentId?: string;
       readonly resume?: SessionFactoryContext['resume'];
+      /** Product-level conversation id. Resolved to a native id only here. */
+      readonly resumeId?: string;
       readonly initialPrompt?: string;
       readonly title?: string;
       readonly sourceRunId?: string;
@@ -180,8 +183,26 @@ export function createWorkspaceRoutes(
     },
   ): Promise<SpawnSessionResult> {
     const id = meta.id;
-    const { resume, initialPrompt } = opts;
-    const agentId = opts.agentId ?? await resolveDefaultAgentId(meta);
+    const initialPrompt = opts.initialPrompt;
+    let resume = opts.resume;
+    const requestedIdentity = opts.resumeId ? svc.resumeRegistry.get(opts.resumeId) : null;
+    if (opts.resumeId && !requestedIdentity) {
+      return { ok: false, status: 404, body: { error: 'resume_not_found' } };
+    }
+    if (requestedIdentity && requestedIdentity.wsId !== id) {
+      return { ok: false, status: 400, body: { error: 'resume_wrong_workspace' } };
+    }
+    if (requestedIdentity?.lifecycle === 'retired') {
+      return { ok: false, status: 409, body: { error: 'resume_retired', message: 'this Session retired with its Workspace' } };
+    }
+    if (requestedIdentity && !requestedIdentity.agentSessionId) {
+      return { ok: false, status: 409, body: { error: 'resume_not_ready', message: 'runtime session id has not been captured yet' } };
+    }
+    if (opts.resumeId && svc.isResumeActive?.(opts.resumeId)) {
+      return { ok: false, status: 409, body: { error: 'resume_busy', message: 'this conversation already has a running turn' } };
+    }
+    if (requestedIdentity?.agentSessionId) resume = { sessionId: requestedIdentity.agentSessionId };
+    const agentId = opts.agentId ?? requestedIdentity?.agent ?? await resolveDefaultAgentId(meta);
     if (!agentId) {
       return { ok: false, status: 400, body: { error: 'no_agent_runtime', message: 'workspace has no agent runtime enabled' } };
     }
@@ -189,6 +210,9 @@ export function createWorkspaceRoutes(
       return { ok: false, status: 400, body: { error: 'unknown_agent', message: `no adapter: ${agentId}` } };
     }
     const adapter = svc.resolveAdapter(meta, agentId);
+    if (requestedIdentity && requestedIdentity.agent !== adapter.id) {
+      return { ok: false, status: 400, body: { error: 'resume_wrong_agent' } };
+    }
     const runtimeReadiness = svc.getAgentRuntimeReadiness().agents[adapter.id];
     const runtimeIsGloballyReady =
       runtimeReadiness?.ready === true &&
@@ -196,7 +220,10 @@ export function createWorkspaceRoutes(
         runtimeReadiness.source === 'global-login' ||
         runtimeReadiness.source === 'managed-runtime');
     try {
-      if (!runtimeIsGloballyReady) {
+      // Global login/config is a valid no-pick fallback, but it must never
+      // suppress an explicit Quick Chat credential choice. The selected vault
+      // credential belongs to this Workspace and must be written before spawn.
+      if (!runtimeIsGloballyReady || opts.credentialSlug !== undefined) {
         await ensureAgentCredentialReady({
           meta,
           agentId: adapter.id,
@@ -232,14 +259,37 @@ export function createWorkspaceRoutes(
     const nowIso = new Date().toISOString();
     const titleSource = opts.title?.trim() || initialPrompt;
     const title = titleSource ? titleSource.slice(0, MAX_SESSION_TITLE) : undefined;
+    const claimedResume = opts.resumeId
+      ? (svc.claimResume?.(opts.resumeId) ?? true)
+      : false;
+    if (opts.resumeId && !claimedResume) {
+      return { ok: false, status: 409, body: { error: 'resume_busy', message: 'this conversation already has a running turn' } };
+    }
+    const releaseClaim = () => {
+      if (claimedResume && opts.resumeId) svc.releaseResume?.(opts.resumeId);
+    };
+    let identity: { resumeId: string };
+    try {
+      identity = await svc.resumeRegistry.ensure({
+        ...(opts.resumeId ? { resumeId: opts.resumeId } : {}),
+        wsId: id,
+        agent: adapter.id,
+        ...(resume && resume !== 'last' ? { agentSessionId: resume.sessionId } : {}),
+      });
+    } catch (err) {
+      releaseClaim();
+      return { ok: false, status: 500, body: { error: 'resume_registry_failed', message: (err as Error).message } };
+    }
     const record: SessionRecord = {
       id: recordId,
+      resumeId: identity.resumeId,
       wsId: id,
       agent: adapter.id,
       name: recordName,
       createdAt: nowIso,
       lastActiveAt: nowIso,
       state: 'running',
+      surface: 'terminal',
       ...(title !== undefined ? { title } : {}),
       ...(opts.sourceRunId ? { sourceRunId: opts.sourceRunId } : {}),
       ...(resume && resume !== 'last'
@@ -249,6 +299,7 @@ export function createWorkspaceRoutes(
     try {
       await svc.sessionRegistry.create(record);
     } catch (err) {
+      releaseClaim();
       launcherLogger.error('session_registry.create_failed', { id, recordId, err });
       return { ok: false, status: 500, body: { error: 'registry_failed', message: (err as Error).message } };
     }
@@ -271,6 +322,7 @@ export function createWorkspaceRoutes(
         resume: resume === undefined ? null : resume === 'last' ? 'last' : resume.sessionId,
         seeded: resume === undefined && !!initialPrompt,
       });
+      releaseClaim();
       return {
         ok: true,
         session: {
@@ -279,12 +331,13 @@ export function createWorkspaceRoutes(
           name: session.name,
           pid: session.pid,
           agent: adapter.id,
-          agentSessionId: session.agentSessionId,
+          resumeId: identity.resumeId,
           startedAt: session.startedAt,
           title: title ?? null,
         },
       };
     } catch (err) {
+      releaseClaim();
       await svc.sessionRegistry.remove(id, recordId).catch(() => undefined);
       launcherLogger.error('workspace.session_spawn_failed', { id, err });
       return { ok: false, status: 500, body: { error: 'spawn_failed', message: (err as Error).message } };
@@ -292,7 +345,8 @@ export function createWorkspaceRoutes(
   }
 
   const publicSession = (record: SessionRecord): PublicSessionBody => {
-    const live = svc.pool.get(record.id);
+    const terminal = svc.pool.get(record.id);
+    const browser = svc.webPi?.get(record.id) ?? null;
     return {
       id: record.id,
       wsId: record.wsId,
@@ -300,28 +354,40 @@ export function createWorkspaceRoutes(
       name: record.name,
       createdAt: record.createdAt,
       lastActiveAt: record.lastActiveAt,
-      state: record.state === 'running' && live ? 'running' : 'paused',
-      agentSessionId: live?.agentSessionId ?? record.resumeHint?.value ?? null,
-      pid: live?.pid ?? null,
-      startedAt: live?.startedAt ?? null,
+      state: record.state === 'running' && (terminal || browser) ? 'running' : 'paused',
+      surface: browser ? 'webpi' : (record.surface ?? 'terminal'),
+      resumeId: record.resumeId,
+      pid: terminal?.pid ?? browser?.pid ?? null,
+      startedAt: terminal?.startedAt ?? browser?.startedAt ?? null,
       title: record.title ?? null,
       sourceRunId: record.sourceRunId ?? null,
     };
   };
 
-  const openHeadlessRunAsSession = async (
+  const mappedResumeForRecord = (
+    record: SessionRecord,
+    adapter: CliAdapter,
+  ): SessionFactoryContext['resume'] => {
+    const nativeId = svc.resumeRegistry.get(record.resumeId)?.agentSessionId;
+    return nativeId && adapter.capabilities.resumeById
+      ? { sessionId: nativeId }
+      : resumeFromRecord(record, adapter);
+  };
+
+  const openResumeAsSession = async (
     meta: WorkspaceMeta,
-    taskId: string,
-    fallback: { agent?: string; agentSessionId?: string; title?: string } = {},
+    resumeId: string,
+    title?: string,
   ): Promise<OpenHeadlessSessionResult> => {
     await svc.sessionRegistry.ensureLoaded(meta.id);
-    const existing = svc.sessionRegistry.findBySourceRunId(meta.id, taskId);
+    const existing = svc.sessionRegistry.findByResumeId(meta.id, resumeId);
     if (existing) return { ok: true, created: false, session: publicSession(existing) };
-
-    const task = svc.headlessTasks.get(taskId);
-    if (task && task.wsId !== meta.id) {
-      return { ok: false, status: 404, body: { error: 'run_not_found' } };
+    const identity = svc.resumeRegistry.get(resumeId);
+    if (!identity || identity.wsId !== meta.id) return { ok: false, status: 404, body: { error: 'resume_not_found' } };
+    if (identity.lifecycle === 'retired') {
+      return { ok: false, status: 409, body: { error: 'resume_retired', message: 'this Session retired with its Workspace' } };
     }
+    const task = identity.latestTaskId ? svc.headlessTasks.get(identity.latestTaskId) : null;
     if (task?.status === 'running') {
       return {
         ok: false,
@@ -330,29 +396,27 @@ export function createWorkspaceRoutes(
       };
     }
 
-    const agent = task?.agent ?? fallback.agent;
-    const agentSessionId = task?.agentSessionId ?? fallback.agentSessionId;
-    if (!agent || !agentSessionId || !AGENT_SESSION_ID_RE.test(agentSessionId)) {
+    if (!identity.agentSessionId) {
       return {
         ok: false,
         status: 409,
         body: { error: 'session_unavailable', message: 'this run did not capture a resumable agent session id' },
       };
     }
-    const adapter = svc.adapters.get(agent);
+    const adapter = svc.adapters.get(identity.agent);
     if (!adapter || !adapter.capabilities.resumeById) {
       return {
         ok: false,
         status: 409,
-        body: { error: 'resume_unsupported', message: `${agent} cannot resume this run by session id` },
+        body: { error: 'resume_unsupported', message: `${identity.agent} cannot resume this conversation` },
       };
     }
 
     const spawned = await spawnInteractiveSession(meta, {
-      agentId: agent,
-      resume: { sessionId: agentSessionId },
-      title: task?.prompt ?? fallback.title ?? `Headless run ${taskId}`,
-      sourceRunId: taskId,
+      agentId: identity.agent,
+      resumeId,
+      title: task?.prompt ?? title ?? `Conversation ${resumeId}`,
+      ...(task ? { sourceRunId: task.taskId } : {}),
     });
     if (!spawned.ok) {
       return {
@@ -483,6 +547,38 @@ export function createWorkspaceRoutes(
     return c.json({ workspaces });
   });
 
+  app.get('/departed', (c) => {
+    return c.json({ workspaces: svc.lifecycle.listDeparted() });
+  });
+
+  app.post('/departed/:id/restore', async (c) => {
+    const id = c.req.param('id');
+    if (!validId(id)) return c.json({ error: 'not_found' }, 404);
+    try {
+      const result = await svc.lifecycle.restore(id);
+      if (result.ok) return c.json(result);
+      const status = result.code === 'not_found' ? 404 : 409;
+      return c.json({ error: result.code, message: result.message }, status);
+    } catch (err) {
+      launcherLogger.error('workspace.restore_failed', { id, err });
+      return c.json({ error: 'restore_failed', message: (err as Error).message }, 500);
+    }
+  });
+
+  app.delete('/departed/:id', async (c) => {
+    const id = c.req.param('id');
+    if (!validId(id)) return c.json({ error: 'not_found' }, 404);
+    try {
+      const result = await svc.lifecycle.purge(id);
+      if (result.ok) return c.json(result);
+      const status = result.code === 'not_found' ? 404 : 409;
+      return c.json({ error: result.code, message: result.message }, status);
+    } catch (err) {
+      launcherLogger.error('workspace.purge_failed', { id, err });
+      return c.json({ error: 'purge_failed', message: (err as Error).message }, 500);
+    }
+  });
+
   app.post('/', async (c) => {
     const body = await safeJson(c);
     const fields = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
@@ -567,39 +663,48 @@ export function createWorkspaceRoutes(
     }
   });
 
-  // ── single workspace (DELETE + git/files sub-resources) ──────────────────
+  // ── single workspace (offboarding + git/files sub-resources) ─────────────
 
+  app.get('/:id/offboarding', async (c) => {
+    const id = c.req.param('id');
+    if (!validId(id)) return c.json({ error: 'not_found' }, 404);
+    const assessment = await svc.lifecycle.assess(id);
+    return assessment ? c.json({ assessment }) : c.json({ error: 'not_found' }, 404);
+  });
+
+  app.post('/:id/offboard', async (c) => {
+    const id = c.req.param('id');
+    if (!validId(id)) return c.json({ error: 'not_found' }, 404);
+    const body = await safeJson(c);
+    const fields = body && typeof body === 'object' ? body as Record<string, unknown> : {};
+    const successors = fields['successors'] && typeof fields['successors'] === 'object' && !Array.isArray(fields['successors'])
+      ? Object.fromEntries(Object.entries(fields['successors'] as Record<string, unknown>)
+          .filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
+      : undefined;
+    try {
+      const result = await svc.lifecycle.offboard({
+        id,
+        ...(typeof fields['reason'] === 'string' ? { reason: fields['reason'] } : {}),
+        ...(typeof fields['notes'] === 'string' ? { notes: fields['notes'] } : {}),
+        ...(successors ? { successors } : {}),
+      });
+      if (result.ok) return c.json(result);
+      const status = result.code === 'not_found' ? 404 : 409;
+      return c.json({ error: result.code, message: result.message, assessment: result.assessment }, status);
+    } catch (err) {
+      launcherLogger.error('workspace.offboard_failed', { id, err });
+      return c.json({ error: 'offboard_failed', message: (err as Error).message }, 500);
+    }
+  });
+
+  /** Backwards-compatible surface: Delete now means offboard, never orphan. */
   app.delete('/:id', async (c) => {
     const id = c.req.param('id');
     if (!validId(id)) return c.json({ error: 'not_found' }, 404);
-    const purge = c.req.query('purge') === 'true';
-    svc.pool.dispose(id, 'workspace deleted');
-    const removed = await svc.registry.remove(id);
-    if (!removed) return c.json({ error: 'not_found' }, 404);
-    const droppedRecords = await svc.sessionRegistry
-      .removeAllFor(id)
-      .catch((err) => {
-        launcherLogger.warn('session_registry.remove_all_failed', { id, err });
-        return [] as readonly SessionRecord[];
-      });
-    await svc.scrollbackStore.removeAllFor(id);
-    let purged = false;
-    if (purge) {
-      try {
-        const { rm } = await import('node:fs/promises');
-        await rm(removed.dir, { recursive: true, force: true });
-        purged = true;
-      } catch (err) {
-        launcherLogger.error('workspace.purge_failed', { id, dir: removed.dir, err });
-      }
-    }
-    launcherLogger.info('workspace.removed', {
-      id,
-      dir: removed.dir,
-      purged,
-      droppedSessions: droppedRecords.length,
-    });
-    return c.json({ ok: true, purged });
+    const result = await svc.lifecycle.offboard({ id });
+    if (result.ok) return c.json(result);
+    const status = result.code === 'not_found' ? 404 : 409;
+    return c.json({ error: result.code, message: result.message, assessment: result.assessment }, status);
   });
 
   app.get('/:id/git/log', async (c) => {
@@ -659,6 +764,24 @@ export function createWorkspaceRoutes(
    * use this to render tombstone states. Larger than 1 MiB returns 413
    * so the inbox can't be weaponised into a large-file viewer.
    */
+  app.get('/signatures/:resumeId', (c) => {
+    const resumeId = c.req.param('resumeId');
+    if (!validId(resumeId)) return c.json({ error: 'not_found' }, 404);
+    const identity = svc.resumeRegistry.get(resumeId);
+    if (!identity) return c.json({ error: 'not_found' }, 404);
+    return c.json({
+      signature: `@${identity.resumeId}`,
+      resumeId: identity.resumeId,
+      workspaceId: identity.wsId,
+      agent: identity.agent,
+      ...(identity.lifecycle === 'retired' ? {
+        lifecycle: 'retired',
+        ...(identity.successorResumeId ? { successorResumeId: identity.successorResumeId } : {}),
+      } : {}),
+      resumable: identity.lifecycle !== 'retired' && Boolean(identity.agentSessionId),
+    });
+  });
+
   app.get('/:id/file', async (c) => {
     const id = c.req.param('id');
     if (!validId(id)) return c.json({ error: 'not_found' }, 404);
@@ -684,11 +807,45 @@ export function createWorkspaceRoutes(
 
   // ── sessions ─────────────────────────────────────────────────────────────
 
-  // Materialize a finished headless run as one stable interactive Session.
-  // The sourceRunId index makes this idempotent across Inbox, Automation, the
-  // Workspace sidebar, reloads, and server restarts. New Inbox entries carry a
-  // server-stamped native session id as a fallback after the bounded run log is
-  // pruned; recent/legacy entries resolve from HeadlessTaskRegistry instead.
+  // Safe product Session directory for attribution/ownership pickers. Native
+  // runtime ids and launcher record ids stay inside WorkspaceService.
+  app.get('/:id/resumes', async (c) => {
+    const id = c.req.param('id');
+    if (!validId(id)) return c.json({ error: 'not_found' }, 404);
+    const directory = await svc.sessionDirectory(id, 100);
+    if (!directory) return c.json({ error: 'workspace_not_found' }, 404);
+    return c.json(directory);
+  });
+
+  // Materialize one product-owned conversation as a stable interactive
+  // Session. The frontend supplies only resumeId; native CLI ids stay in the
+  // backend ResumeRegistry.
+  app.post('/:id/resumes/:resumeId/session', async (c) => {
+    const id = c.req.param('id');
+    const resumeId = c.req.param('resumeId');
+    if (!validId(id) || !validId(resumeId)) return c.json({ error: 'not_found' }, 404);
+    const meta = svc.registry.get(id);
+    if (!meta) return c.json({ error: 'workspace_not_found' }, 404);
+    const body = await safeJson(c).catch(() => null);
+    const fields = body && typeof body === 'object' ? body as Record<string, unknown> : {};
+    const title = typeof fields['title'] === 'string' ? fields['title'] : undefined;
+    const key = `${id}::${resumeId}`;
+    let run = headlessSessionInFlight.get(key);
+    if (!run) {
+      run = openResumeAsSession(meta, resumeId, title);
+      headlessSessionInFlight.set(key, run);
+    }
+    try {
+      const result = await run;
+      if (!result.ok) return c.json(result.body, result.status);
+      return c.json({ session: result.session, created: result.created }, result.created ? 201 : 200);
+    } finally {
+      if (headlessSessionInFlight.get(key) === run) headlessSessionInFlight.delete(key);
+    }
+  });
+
+  // Compatibility route for bookmarked task links. It resolves taskId to the
+  // product resumeId server-side and never accepts a native session id.
   app.post('/:id/headless/:taskId/session', async (c) => {
     const id = c.req.param('id');
     const taskId = c.req.param('taskId');
@@ -696,20 +853,16 @@ export function createWorkspaceRoutes(
     const meta = svc.registry.get(id);
     if (!meta) return c.json({ error: 'workspace_not_found' }, 404);
 
+    const task = svc.headlessTasks.get(taskId);
+    if (!task || task.wsId !== id) return c.json({ error: 'run_not_found' }, 404);
     const body = await safeJson(c).catch(() => null);
     const fields = body && typeof body === 'object' ? body as Record<string, unknown> : {};
-    const fallback = {
-      ...(typeof fields['agent'] === 'string' ? { agent: fields['agent'] } : {}),
-      ...(typeof fields['agentSessionId'] === 'string'
-        ? { agentSessionId: fields['agentSessionId'] }
-        : {}),
-      ...(typeof fields['title'] === 'string' ? { title: fields['title'] } : {}),
-    };
+    const title = typeof fields['title'] === 'string' ? fields['title'] : undefined;
 
     const key = `${id}::${taskId}`;
     let run = headlessSessionInFlight.get(key);
     if (!run) {
-      run = openHeadlessRunAsSession(meta, taskId, fallback);
+      run = openResumeAsSession(meta, task.resumeId, title);
       headlessSessionInFlight.set(key, run);
     }
     try {
@@ -730,7 +883,7 @@ export function createWorkspaceRoutes(
     const meta = svc.registry.get(id);
     if (!meta) return c.json({ error: 'not_found' }, 404);
 
-    let resume: SessionFactoryContext['resume'];
+    let resumeId: string | undefined;
     let agentId: string | undefined;
     let initialPrompt: string | undefined;
     let credentialSlug: string | undefined;
@@ -738,9 +891,8 @@ export function createWorkspaceRoutes(
     try {
       const body = await safeJson(c);
       const fields = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
-      const raw = fields['resume'];
-      if (raw === 'last') resume = 'last';
-      else if (typeof raw === 'string' && AGENT_SESSION_ID_RE.test(raw)) resume = { sessionId: raw };
+      const rawResumeId = fields['resumeId'];
+      if (typeof rawResumeId === 'string' && validId(rawResumeId)) resumeId = rawResumeId;
       const rawAgent = fields['agent'];
       if (typeof rawAgent === 'string' && rawAgent.length > 0) agentId = rawAgent;
       const rawSlug = fields['credentialSlug'];
@@ -753,13 +905,13 @@ export function createWorkspaceRoutes(
       // codex's `resume <id>` / pi's `--session-id`.
       const seed = parseSeedPrompt(fields['initialPrompt']);
       if (seed && 'error' in seed) return c.json(seed, 400);
-      if (seed && resume === undefined) initialPrompt = seed.prompt;
+      if (seed && resumeId === undefined) initialPrompt = seed.prompt;
     } catch (err) {
       return c.json({ error: 'bad_request', message: (err as Error).message }, 400);
     }
     const result = await spawnInteractiveSession(meta, {
       ...(agentId !== undefined ? { agentId } : {}),
-      ...(resume !== undefined ? { resume } : {}),
+      ...(resumeId !== undefined ? { resumeId } : {}),
       ...(initialPrompt !== undefined ? { initialPrompt } : {}),
       ...(credentialSlug !== undefined ? { credentialSlug } : {}),
       ...(terminalTheme !== undefined ? { terminalTheme } : {}),
@@ -876,7 +1028,9 @@ export function createWorkspaceRoutes(
           launcherLogger.warn('scrollback.dump_failed', { id, token, err });
         }
       }
-      const wasRunning = svc.pool.disposeToken(token, action === 'pause' ? 'paused' : 'tab stop');
+      const wasTerminalRunning = svc.pool.disposeToken(token, action === 'pause' ? 'paused' : 'tab stop');
+      const wasWebPiRunning = await svc.webPi?.stop(token, action === 'pause' ? 'paused' : 'tab stop') ?? false;
+      const wasRunning = wasTerminalRunning || wasWebPiRunning;
       if (record) {
         const patch: Partial<SessionRecord> = {
           state: 'paused',
@@ -934,11 +1088,21 @@ export function createWorkspaceRoutes(
     async function doResume() {
       const record = svc.sessionRegistry.get(id, token);
       if (!record) return c.json({ error: 'not_found' }, 404);
+      const identity = svc.resumeRegistry.get(record.resumeId);
+      if (identity?.lifecycle === 'retired') {
+        return c.json({ error: 'resume_retired', message: 'this Session retired with its Workspace' }, 409);
+      }
+      if (svc.isResumeActive?.(record.resumeId)) {
+        return c.json({ error: 'resume_busy', message: 'this conversation already has a running headless turn' }, 409);
+      }
       // Re-check INSIDE the lock: a concurrent resume that just settled may have
       // already spawned this session.
       if (svc.pool.get(token)) {
         return c.json({ ok: true, alreadyRunning: true });
       }
+      // Choosing the terminal surface is an explicit handoff. Never leave Pi's
+      // RPC host and PTY alive against the same native session file.
+      if (svc.webPi?.has(token)) await svc.webPi.stop(token, 'switch to terminal');
       const meta = svc.registry.get(id);
       if (!meta) return c.json({ error: 'workspace_not_found' }, 404);
       const adapter = svc.adapters.get(record.agent);
@@ -962,7 +1126,7 @@ export function createWorkspaceRoutes(
         launcherLogger.warn('agent_cred.ensure_failed_on_resume', { id, agent: adapter.id, err });
         return c.json({ error: 'agent_credential_failed', message: (err as Error).message }, 500);
       }
-      const resume = resumeFromRecord(record, adapter);
+      const resume = mappedResumeForRecord(record, adapter);
       const plan = svc.computeSpawnPlan(meta, adapter, resume);
       // path.trace at the moment the resume decision is taken — captures what
       // we're ABOUT to do, before bootstrap or spawn. If a downstream step
@@ -980,7 +1144,8 @@ export function createWorkspaceRoutes(
         projectKey: plan.projectKey,
         composedCommand: plan.composedCommand,
         resumeMode: plan.resumeMode,
-        resumeId: plan.resumeId,
+        resumeId: record.resumeId,
+        nativeSessionId: plan.nativeSessionId,
         resumeHintInRecord: record.resumeHint ?? null,
       });
       try {
@@ -998,6 +1163,10 @@ export function createWorkspaceRoutes(
       let initialReplayBytes: Buffer | null = null;
       if (record.agent === 'shell' && record.scrollbackFile) {
         initialReplayBytes = await svc.scrollbackStore.read(record.scrollbackFile);
+      }
+      const claimedResume = svc.claimResume?.(record.resumeId) ?? true;
+      if (!claimedResume) {
+        return c.json({ error: 'resume_busy', message: 'this conversation already has a running turn' }, 409);
       }
       try {
         const ctx: SessionFactoryContext = {
@@ -1039,7 +1208,7 @@ export function createWorkspaceRoutes(
           delete (record as { scrollbackFile?: string }).scrollbackFile;
         }
         await svc.sessionRegistry
-          .update(id, token, { state: 'running', lastActiveAt: new Date().toISOString() })
+          .update(id, token, { state: 'running', surface: 'terminal', lastActiveAt: new Date().toISOString() })
           .catch((err) =>
             launcherLogger.warn('session_registry.resume_update_failed', { id, token, err }),
           );
@@ -1055,16 +1224,106 @@ export function createWorkspaceRoutes(
         return c.json({
           ok: true,
           sessionId: session.recordId,
+          resumeId: record.resumeId,
           wsId: session.wsId,
           name: session.name,
           pid: session.pid,
           agent: adapter.id,
           startedAt: session.startedAt,
+          title: record.title ?? null,
         });
       } catch (err) {
         launcherLogger.error('workspace.session_resume_failed', { id, token, err });
         return c.json({ error: 'resume_failed', message: (err as Error).message }, 500);
+      } finally {
+        if (claimedResume) svc.releaseResume?.(record.resumeId);
       }
+    }
+  });
+
+  // WebPi is a presentation of an existing Pi Session, not another runtime.
+  // The four routes below expose Pi's own RPC state/messages without adapting
+  // them into OpenAlice message blocks.
+  app.post('/:id/sessions/:sid/webpi/open', async (c) => {
+    const id = c.req.param('id');
+    const token = c.req.param('sid');
+    if (!validId(id) || !validId(token)) return c.json({ error: 'not_found' }, 404);
+    const meta = svc.registry.get(id);
+    const record = svc.sessionRegistry.get(id, token);
+    if (!meta || !record) return c.json({ error: 'not_found' }, 404);
+    if (record.agent !== 'pi') {
+      return c.json({ error: 'unsupported_surface', message: 'WebPi is available only for Pi Sessions' }, 409);
+    }
+    if (svc.isResumeActive(record.resumeId)) {
+      return c.json({ error: 'resume_busy', message: 'this conversation has a running headless turn' }, 409);
+    }
+    const adapter = svc.adapters.get('pi');
+    if (!adapter) return c.json({ error: 'unknown_agent' }, 500);
+    try {
+      await ensureAgentCredentialReady({ meta, agentId: 'pi', adapter, logger: launcherLogger });
+      if (adapter.bootstrap) {
+        await adapter.bootstrap({ wsId: id, cwd: meta.dir, launcherRepoRoot: svc.config.launcherRepoRoot });
+      }
+      if (svc.pool.get(token)) svc.pool.disposeToken(token, 'switch to WebPi');
+      const snapshot = await svc.startWebPiSession(meta, record);
+      return c.json({ ok: true, snapshot, session: publicSession(record) });
+    } catch (err) {
+      await svc.sessionRegistry.update(id, token, {
+        state: 'paused',
+        surface: 'webpi',
+        lastActiveAt: new Date().toISOString(),
+      }).catch(() => undefined);
+      if (err instanceof AgentCredentialError) return c.json(err.toBody(), 400);
+      launcherLogger.error('webpi.open_failed', { id, token, err });
+      return c.json({ error: 'webpi_open_failed', message: (err as Error).message }, 500);
+    }
+  });
+
+  app.get('/:id/sessions/:sid/webpi', (c) => {
+    const id = c.req.param('id');
+    const token = c.req.param('sid');
+    if (!validId(id) || !validId(token)) return c.json({ error: 'not_found' }, 404);
+    const record = svc.sessionRegistry.get(id, token);
+    if (!record) return c.json({ error: 'not_found' }, 404);
+    const snapshot = svc.webPi.get(token);
+    if (!snapshot) return c.json({ error: 'webpi_not_running' }, 409);
+    const knownRevision = Number.parseInt(c.req.query('revision') ?? '', 10);
+    if (Number.isSafeInteger(knownRevision) && knownRevision === snapshot.revision) {
+      return c.json({ unchanged: true, revision: snapshot.revision });
+    }
+    return c.json({ snapshot });
+  });
+
+  app.post('/:id/sessions/:sid/webpi/prompt', async (c) => {
+    const id = c.req.param('id');
+    const token = c.req.param('sid');
+    if (!validId(id) || !validId(token)) return c.json({ error: 'not_found' }, 404);
+    const record = svc.sessionRegistry.get(id, token);
+    if (!record || record.agent !== 'pi') return c.json({ error: 'not_found' }, 404);
+    const body = await safeJson(c).catch(() => null);
+    const message = body && typeof body === 'object' ? (body as Record<string, unknown>)['message'] : null;
+    if (typeof message !== 'string' || !message.trim()) {
+      return c.json({ error: 'bad_request', message: 'message is required' }, 400);
+    }
+    try {
+      const snapshot = await svc.webPi.prompt(token, message);
+      await svc.sessionRegistry.update(id, token, { lastActiveAt: new Date().toISOString() });
+      return c.json({ ok: true, snapshot });
+    } catch (err) {
+      return c.json({ error: 'webpi_prompt_failed', message: (err as Error).message }, 409);
+    }
+  });
+
+  app.post('/:id/sessions/:sid/webpi/abort', async (c) => {
+    const id = c.req.param('id');
+    const token = c.req.param('sid');
+    if (!validId(id) || !validId(token)) return c.json({ error: 'not_found' }, 404);
+    const record = svc.sessionRegistry.get(id, token);
+    if (!record || record.agent !== 'pi') return c.json({ error: 'not_found' }, 404);
+    try {
+      return c.json({ ok: true, snapshot: await svc.webPi.abort(token) });
+    } catch (err) {
+      return c.json({ error: 'webpi_abort_failed', message: (err as Error).message }, 409);
     }
   });
 
@@ -1094,7 +1353,7 @@ export function createWorkspaceRoutes(
       }, 500);
     }
 
-    const resume = resumeFromRecord(record, adapter);
+    const resume = mappedResumeForRecord(record, adapter);
     const plan = svc.computeSpawnPlan(meta, adapter, resume);
 
     let transcriptFiles: { name: string; size: number; mtime: string }[] = [];
@@ -1154,7 +1413,8 @@ export function createWorkspaceRoutes(
       },
       wouldResume: {
         mode: plan.resumeMode,
-        resumeId: plan.resumeId,
+        resumeId: record.resumeId,
+        nativeSessionId: plan.nativeSessionId,
         composedCommand: plan.composedCommand,
         spawnCwd: plan.spawnCwd,
         envPWD: plan.envPWD,
@@ -1236,7 +1496,7 @@ export function createWorkspaceRoutes(
           ? 'last'
           : resumeOverride !== undefined
             ? resumeOverride
-            : resumeFromRecord(record, adapter);
+            : mappedResumeForRecord(record, adapter);
     launcherLogger.info('workspace.probe_started', {
       id, sessionId: token, agent: adapter.id, promptLen: prompt.length, timeoutMs,
       resumeMode: resume === undefined ? 'fresh' : resume === 'last' ? 'last' : 'by-id',
@@ -1255,10 +1515,11 @@ export function createWorkspaceRoutes(
 
   // Headless task dispatch — the standard automation API. Spawns the
   // workspace's agent CLI in one-shot headless mode with a positional prompt,
-  // runs to natural exit, returns exit/duration + bounded output tails. The
-  // agent reports its actual result via `inbox_push`; this endpoint just waits
-  // on the process exit (the turn boundary). No session/PTY — a fresh one-shot
-  // clone each call (no respawn, not pooled). Synchronous: the request stays
+  // runs to natural exit, returns exit/duration, a normalized reply/tool
+  // timeline, and bounded output tails. `inbox_push` remains the durable
+  // user-delivery channel; structured output powers readiness, Automation, and
+  // orchestration. No session/PTY — a fresh one-shot clone each call (no
+  // respawn, not pooled). Synchronous: the request stays
   // open until the task exits (the cron/automation trigger calls
   // `svc.runHeadlessTask` directly instead). Body: { prompt, agent?, timeoutMs? }.
   //   curl -XPOST .../:id/headless -d '{"prompt":"...","agent":"claude"}'
@@ -1268,6 +1529,7 @@ export function createWorkspaceRoutes(
     let prompt: string;
     let timeoutMs: number;
     let agentId: string | undefined;
+    let resumeId: string | undefined;
     let wait = false;
     try {
       const body = await safeJson(c);
@@ -1287,12 +1549,22 @@ export function createWorkspaceRoutes(
         typeof rawTimeout === 'number' && rawTimeout > 0 ? Math.min(rawTimeout, 1_800_000) : 300_000;
       const rawAgent = fields['agent'];
       if (typeof rawAgent === 'string' && rawAgent.length > 0) agentId = rawAgent;
+      const rawResumeId = fields['resumeId'];
+      if (typeof rawResumeId === 'string' && validId(rawResumeId)) resumeId = rawResumeId;
       wait = fields['wait'] === true;
     } catch (err) {
       return c.json({ error: 'bad_request', message: (err as Error).message }, 400);
     }
     const meta = svc.registry.get(id);
     if (!meta) return c.json({ error: 'workspace_not_found' }, 404);
+    const resumeIdentity = resumeId ? svc.resumeRegistry.get(resumeId) : null;
+    if (resumeId && !resumeIdentity) return c.json({ error: 'resume_not_found' }, 404);
+    if (resumeIdentity && resumeIdentity.wsId !== id) {
+      return c.json({ error: 'resume_wrong_workspace' }, 409);
+    }
+    if (wait && resumeId) {
+      return c.json({ error: 'resume_requires_async', message: 'resumed turns are recorded runs; omit wait:true' }, 400);
+    }
     if (agentId && !svc.adapters.get(agentId)) {
       return c.json({ error: 'unknown_agent', message: `no adapter: ${agentId}` }, 400);
     }
@@ -1304,7 +1576,7 @@ export function createWorkspaceRoutes(
     if (agentId && !meta.agents.includes(agentId)) {
       return c.json({ error: 'agent_not_enabled', message: `agent "${agentId}" not enabled on this workspace` }, 400);
     }
-    const effectiveAgentId = agentId ?? await resolveDefaultAgentId(meta);
+    const effectiveAgentId = agentId ?? resumeIdentity?.agent ?? await resolveDefaultAgentId(meta);
     if (!effectiveAgentId) {
       return c.json({ error: 'no_agent_runtime', message: 'workspace has no agent runtime enabled' }, 400);
     }
@@ -1341,14 +1613,22 @@ export function createWorkspaceRoutes(
       }
     }
     // Default → async: record + spawn in the background, return the taskId. The
-    // run's status is queryable at GET /api/headless/:taskId; the agent reports
-    // its actual result via the Inbox.
+    // run's status and normalized output are queryable under /api/headless;
+    // the agent can additionally publish durable user-facing work to Inbox.
     try {
-      const { taskId } = await svc.dispatchHeadlessTask(meta, adapter, prompt, timeoutMs);
-      return c.json({ taskId, status: 'running' }, 202);
+      const dispatched = resumeId
+        ? await svc.dispatchHeadlessTask(meta, adapter, prompt, timeoutMs, undefined, resumeId)
+        : await svc.dispatchHeadlessTask(meta, adapter, prompt, timeoutMs);
+      return c.json({ ...dispatched, status: 'running' }, 202);
     } catch (err) {
       if (err instanceof HeadlessCapacityError) {
         return c.json({ error: 'capacity', message: err.message }, 429);
+      }
+      if (err instanceof HeadlessResumeError) {
+        return c.json(
+          { error: `resume_${err.code}`, message: err.message },
+          err.code === 'not_found' ? 404 : 409,
+        );
       }
       if (err instanceof AgentCredentialError) {
         return c.json(err.toBody(), 400);
@@ -1366,7 +1646,9 @@ export function createWorkspaceRoutes(
     }
     const record = svc.sessionRegistry.get(id, token);
     if (!record) return c.json({ error: 'not_found' }, 404);
-    const wasRunning = svc.pool.disposeToken(token, 'session deleted');
+    const wasTerminalRunning = svc.pool.disposeToken(token, 'session deleted');
+    const wasWebPiRunning = await svc.webPi?.stop(token, 'session deleted') ?? false;
+    const wasRunning = wasTerminalRunning || wasWebPiRunning;
     if (record.scrollbackFile) {
       await svc.scrollbackStore.remove(record.scrollbackFile);
     }

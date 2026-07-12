@@ -1,5 +1,5 @@
 ---
-version: 1.2.0
+version: 1.6.0
 ---
 
 # Chat
@@ -18,6 +18,11 @@ and turn follow-up into `.alice/issues/<id>.md` work items. The bundled
 `opencli-reader` skill additionally teaches it to reach long-tail sources
 (social sentiment, options flow, global news frontpages) through the optional
 community `opencli` CLI — it will ask before assuming you have it.
+
+When an Inbox result or Issue is hard to interpret, the workspace can ask its
+attributable product Session directly. It can also dispatch several peer
+questions concurrently, await them server-side, and synthesize the replies
+without hand-written sleep loops or leaking runtime-native session ids.
 
 Trading runs through the `alice-uta` CLI against your UTA accounts — orders go
 through the trading-as-git approval flow. Recurring/headless work runs through
