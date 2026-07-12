@@ -142,10 +142,10 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
   const { quickChat, agents, workspaces, defaultAgent, setDefaultAgent } = useWorkspaces()
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
 
-  // Targeted launch: the chat sidebar's per-workspace "+" routes here with a
-  // targetWsId — "Ask Alice, but spawn the session in THIS workspace" rather
-  // than the recent Chat workspace. Same composer; the send just
-  // carries the target.
+  // Targeted launch: the chat sidebar's Workspace row and per-workspace "+"
+  // route here with a targetWsId — "Ask Alice, but spawn the session in THIS
+  // workspace" rather than the recent Chat workspace. Same composer; the send
+  // just carries the target.
   const targetWsId = spec.params.targetWsId
   const targetWs = targetWsId ? workspaces.find((w) => w.id === targetWsId) : undefined
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null)

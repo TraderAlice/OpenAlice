@@ -168,13 +168,7 @@ export function ChatWorkspaceSection(): ReactElement | null {
             selection={selection}
             onOpen={() => {
               rememberChatWorkspace(w.id)
-              const preferred = orderSessionsForSidebar(w.sessions)[0]
-              openOrFocus({
-                kind: 'workspace',
-                params: preferred
-                  ? { wsId: w.id, sessionId: preferred.id, source: 'chat' }
-                  : { wsId: w.id, source: 'chat' },
-              })
+              openOrFocus({ kind: 'chat-landing', params: { targetWsId: w.id } })
             }}
             onOpenSession={(sid) => {
               rememberChatWorkspace(w.id)
