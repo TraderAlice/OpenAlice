@@ -79,7 +79,7 @@ export async function migrateIssueSessionSignatures(
 
 export const migration: Migration = {
   id: '0019_issue_session_signatures',
-  appVersion: '0.75.0-beta',
+  appVersion: '0.80.0-beta',
   introducedAt: '2026-07-12',
   affects: ['workspaces/<id>/.alice/issues/*.md'],
   summary: 'Write Issue ownership as @workspace or an exact @resumeId Session signature.',

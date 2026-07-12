@@ -38,11 +38,10 @@ export async function migrateHeadlessIssueTrigger(
 
 export const migration: Migration = {
   id: '0020_headless_issue_trigger',
-  appVersion: '0.75.0-beta',
+  appVersion: '0.80.0-beta',
   introducedAt: '2026-07-12',
   affects: ['workspaces/state/headless-tasks.json'],
   summary: 'Store the composite Issue trigger separately from a run execution Workspace.',
   rationale: 'An exact signed Session may execute a scheduled Issue across Workspace boundaries without breaking Activity attribution.',
   up: async () => { await migrateHeadlessIssueTrigger() },
 }
-

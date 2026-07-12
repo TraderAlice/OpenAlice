@@ -58,7 +58,7 @@ export async function migrateHeadlessResumeIdentity(
 
 export const migration: Migration = {
   id: '0014_headless_resume_identity',
-  appVersion: '0.75.0-beta',
+  appVersion: '0.80.0-beta',
   introducedAt: '2026-07-11',
   affects: ['workspaces/state/headless-tasks.json'],
   summary:

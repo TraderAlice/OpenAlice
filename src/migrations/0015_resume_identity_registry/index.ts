@@ -143,7 +143,7 @@ export async function migrateResumeIdentityRegistry(
 
 export const migration: Migration = {
   id: '0015_resume_identity_registry',
-  appVersion: '0.75.0-beta',
+  appVersion: '0.80.0-beta',
   introducedAt: '2026-07-11',
   affects: [
     'workspaces/state/resume-identities.json',

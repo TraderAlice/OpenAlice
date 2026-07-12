@@ -32,7 +32,7 @@ export async function ensureArtifactProvenanceStore(
 
 export const migration: Migration = {
   id: '0016_artifact_provenance_store',
-  appVersion: '0.75.0-beta',
+  appVersion: '0.80.0-beta',
   introducedAt: '2026-07-11',
   affects: ['workspaces/state/artifact-provenance.json'],
   summary: 'Create the durable product Session to artifact provenance store.',

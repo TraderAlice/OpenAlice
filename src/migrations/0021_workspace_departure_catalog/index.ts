@@ -233,7 +233,7 @@ export async function migrateWorkspaceDepartureCatalog(
 
 export const migration: Migration = {
   id: '0021_workspace_departure_catalog',
-  appVersion: '0.75.0-beta',
+  appVersion: '0.80.0-beta',
   introducedAt: '2026-07-12',
   affects: ['workspaces/workspaces.json', 'workspaces/workspaces/*', 'workspaces/departed-workspaces/*', 'workspaces/state/workspace-catalog.json'],
   summary: 'Move unregistered Workspace directories into a durable departed catalog without deleting them.',

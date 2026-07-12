@@ -164,7 +164,7 @@ export async function migrateIssueWhatAndCommentSidecars(
 
 export const migration: Migration = {
   id: '0017_issue_what_and_comment_sidecars',
-  appVersion: '0.75.0-beta',
+  appVersion: '0.80.0-beta',
   introducedAt: '2026-07-12',
   affects: ['workspaces/<id>/.alice/issues/*.md', 'workspaces/<id>/.alice/issues/*.comments.json'],
   summary: 'Make markdown What the sole Issue work definition and move comments into structured per-Issue JSON sidecars.',

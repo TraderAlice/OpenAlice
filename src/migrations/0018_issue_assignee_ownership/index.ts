@@ -120,7 +120,7 @@ export async function migrateIssueAssigneeOwnership(
 
 export const migration: Migration = {
   id: '0018_issue_assignee_ownership',
-  appVersion: '0.75.0-beta',
+  appVersion: '0.80.0-beta',
   introducedAt: '2026-07-12',
   affects: ['workspaces/<id>/.alice/issues/*.md'],
   summary: 'Replace Issue execution ownership with one workspace, human, unassigned, or Session assignee.',
