@@ -5,6 +5,7 @@ import { delimiter, dirname, join, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import { assertDesktopPackage } from './assert-desktop-package.mjs'
+import { resolveDesktopPackageRootArg } from './desktop-package-artifact.mjs'
 
 export function buildPackagedToolchainSmokePlan(packageResult) {
   const errors = [...packageResult.errors]
@@ -216,13 +217,14 @@ function runCommand(repoRoot, appRoot, spec) {
 }
 
 function main() {
-  const packageResult = assertDesktopPackage()
+  const repoRoot = resolve(import.meta.dirname, '..')
+  const packageRoot = resolveDesktopPackageRootArg(process.argv.slice(2), repoRoot)
+  const packageResult = assertDesktopPackage({ packageRoot })
   const plan = buildPackagedToolchainSmokePlan(packageResult)
   if (!plan.ok) {
     for (const error of plan.errors) console.error(error)
     process.exit(1)
   }
-  const repoRoot = resolve(import.meta.dirname, '..')
   for (const command of plan.commands) {
     runCommand(repoRoot, packageResult.appRoot, command)
   }

@@ -283,13 +283,42 @@ pnpm vitest run \
 Then exercise the packaged path:
 
 ```bash
-pnpm electron:build
-pnpm vendor:runtime
-pnpm -F @traderalice/desktop exec electron-builder --dir --projectDir ../.. --publish never
+pnpm electron:smoke:workspace
+```
+
+That command is the standard local acceptance path. It builds and vendors the
+runtime, packages into a unique owner directory under the OS temp directory,
+launches the packaged Workspace acceptance, waits for every child to exit, and
+then removes both isolated data and the expanded app. Cleanup uses bounded
+retries for Windows `EBUSY`, `EPERM`, and `ENOTEMPTY` release races. A cleanup
+failure is reported as a smoke failure instead of silently leaking a large
+directory.
+
+Package artifact ownership is explicit:
+
+- A package-producing smoke owns its unique temporary directory and cleans it.
+- `--keep-package` preserves that temporary package and prints its path.
+- `--skip-pack` reuses an external package and never deletes it. With no
+  `--package-root`, the compatibility default is `dist/electron-app`.
+- `--package-root <path>` requires `--skip-pack`; it lets assertions and smokes
+  target a caller-owned output without transferring ownership.
+- `pnpm electron:pack` and CI/release builders intentionally keep using
+  `dist/electron-app`, because installers and update metadata are consumed by
+  later release steps.
+
+When a persistent package is required for focused inspection or CI, use the
+explicit multi-step flow:
+
+```bash
+pnpm electron:pack
 pnpm electron:assert-package
 pnpm electron:smoke-toolchain
 pnpm electron:smoke:workspace --skip-build --skip-pack
 ```
+
+An alternate persistent output can be checked with
+`pnpm electron:assert-package -- --package-root <path>` and
+`pnpm electron:smoke-toolchain -- --package-root <path>`.
 
 On Windows, the standard `electron-builder` step rebuilds native dependencies
 such as `node-pty` and therefore requires Visual Studio Build Tools with the

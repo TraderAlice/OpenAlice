@@ -2,11 +2,11 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { DEFAULT_DESKTOP_PACKAGE_ROOT, resolveDesktopPackageRootArg } from './desktop-package-artifact.mjs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 const repoRoot = resolve(__dirname, '..')
-const packageRoot = resolve(repoRoot, 'dist', 'electron-app')
 
 export const RESOURCE_ROOT_RELATIVE_CANDIDATES = [
   'mac-arm64/OpenAlice.app/Contents/Resources/app',
@@ -39,7 +39,7 @@ export const BASE_REQUIRED_FILES = [
 ]
 
 export function assertDesktopPackage(options = {}) {
-  const root = options.packageRoot ?? packageRoot
+  const root = options.packageRoot ?? DEFAULT_DESKTOP_PACKAGE_ROOT
   const repo = options.repoRoot ?? repoRoot
   const candidates = RESOURCE_ROOT_RELATIVE_CANDIDATES.map((p) => resolve(root, p))
   const appRoot = options.appRoot ?? candidates.find((p) => existsSync(join(p, 'package.json')))
@@ -158,7 +158,8 @@ function normalizeManifestPath(value) {
 }
 
 function main() {
-  const result = assertDesktopPackage()
+  const packageRoot = resolveDesktopPackageRootArg(process.argv.slice(2), repoRoot)
+  const result = assertDesktopPackage({ packageRoot })
   if (!result.ok) {
     for (const error of result.errors) console.error(error)
     process.exit(1)
@@ -178,5 +179,10 @@ function main() {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main()
+  try {
+    main()
+  } catch (err) {
+    console.error(`[desktop-package] ${err instanceof Error ? err.message : String(err)}`)
+    process.exit(1)
+  }
 }

@@ -114,6 +114,13 @@ Add checks according to the touched surface:
 Do not run live-broker tests on real-money accounts. Do not call a change
 verified when the surface-specific path was skipped; state the remaining gap.
 
+For local package verification, prefer `pnpm electron:smoke:workspace`: it owns
+an isolated package output and removes that large expanded app after the smoke
+exits. Use `pnpm electron:pack` only when a persistent artifact is actually
+needed. A package passed through `--skip-pack` is externally owned and must
+never be deleted by the smoke runner; use `--keep-package` to preserve a
+temporary smoke package for investigation.
+
 ## Deferred Work and Issues
 
 Use GitHub issues for concrete deferred findings. Do not create repo TODO files
