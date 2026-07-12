@@ -568,7 +568,100 @@ export async function deleteWorkspace(id: string): Promise<boolean> {
   const res = await fetch(`/api/workspaces/${encodeURIComponent(id)}`, {
     method: 'DELETE',
   });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null) as { message?: string } | null
+    throw new Error(body?.message ?? `offboard failed: ${res.status}`)
+  }
   return res.ok;
+}
+
+export interface WorkspaceOffboardingAssessment {
+  readonly workspace: { readonly id: string; readonly tag: string; readonly dir: string }
+  readonly canOffboard: boolean
+  readonly blockers: readonly string[]
+  readonly runningHeadless: readonly { readonly taskId: string; readonly resumeId: string; readonly agent: string }[]
+  readonly untrackedHeadlessActive: boolean
+  readonly runningSessions: number
+  readonly sessionRecords: number
+  readonly resumeIds: readonly string[]
+  readonly openIssueIds: readonly string[]
+  readonly scheduledIssueIds: readonly string[]
+  readonly git: GitStatus | null
+}
+
+export async function getWorkspaceOffboardingAssessment(id: string): Promise<WorkspaceOffboardingAssessment> {
+  const res = await fetch(`/api/workspaces/${encodeURIComponent(id)}/offboarding`)
+  if (!res.ok) throw new Error(`offboarding assessment failed: ${res.status}`)
+  return ((await res.json()) as { assessment: WorkspaceOffboardingAssessment }).assessment
+}
+
+export async function offboardWorkspace(
+  id: string,
+  input: { reason: string; notes?: string },
+): Promise<void> {
+  const res = await fetch(`/api/workspaces/${encodeURIComponent(id)}/offboard`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null) as { message?: string } | null
+    throw new Error(body?.message ?? `offboard failed: ${res.status}`)
+  }
+}
+
+export type WorkspaceLifecycleState =
+  | 'active'
+  | 'offboarding'
+  | 'departed'
+  | 'restoring'
+  | 'purging'
+  | 'purged'
+
+export interface DepartedWorkspace {
+  readonly id: string
+  readonly tag: string
+  readonly activeDir: string
+  readonly departedDir?: string
+  readonly createdAt: string
+  readonly updatedAt: string
+  readonly departedAt?: string
+  readonly purgedAt?: string
+  readonly lifecycle: WorkspaceLifecycleState
+  readonly reason?: string
+  readonly legacyImported?: boolean
+  readonly handoff?: {
+    readonly preparedAt: string
+    readonly notes?: string
+    readonly dirtyFiles: readonly string[]
+    readonly openIssueIds: readonly string[]
+    readonly scheduledIssueIds: readonly string[]
+    readonly resumeIds: readonly string[]
+    readonly successors?: Readonly<Record<string, string>>
+    readonly sessionRecords: number
+  }
+}
+
+export async function listDepartedWorkspaces(): Promise<DepartedWorkspace[]> {
+  const res = await fetch('/api/workspaces/departed')
+  if (!res.ok) throw new Error(`list departed workspaces failed: ${res.status}`)
+  return ((await res.json()) as { workspaces: DepartedWorkspace[] }).workspaces
+}
+
+export async function restoreWorkspace(id: string): Promise<void> {
+  const res = await fetch(`/api/workspaces/departed/${encodeURIComponent(id)}/restore`, { method: 'POST' })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null) as { message?: string } | null
+    throw new Error(body?.message ?? `restore failed: ${res.status}`)
+  }
+}
+
+export async function purgeDepartedWorkspace(id: string): Promise<void> {
+  const res = await fetch(`/api/workspaces/departed/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null) as { message?: string } | null
+    throw new Error(body?.message ?? `purge failed: ${res.status}`)
+  }
 }
 
 export type WorkspaceMetadataPatch = { displayName?: string | null; description?: string | null };

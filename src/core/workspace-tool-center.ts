@@ -77,7 +77,14 @@ export type WorkspaceConversationResolution =
     }
   | {
       mode: 'unavailable'
-      reason: 'missing-session' | 'missing-native-session' | 'deleted-workspace' | 'missing-workspace'
+      reason:
+        | 'missing-session'
+        | 'missing-native-session'
+        | 'retired-session'
+        | 'departed-workspace'
+        | 'purged-workspace'
+        | 'deleted-workspace'
+        | 'missing-workspace'
       attributedOrigin?: SessionOrigin
       artifact?: ArtifactRef
     }

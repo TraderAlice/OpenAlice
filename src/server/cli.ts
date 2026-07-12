@@ -101,7 +101,11 @@ export function registerCliRoutes(app: Hono, deps: CliGatewayDeps): void {
           resolveSessionIdentity: (resumeId: string) => {
             const identity = svc.resumeRegistry.get(resumeId)
             return identity
-              ? { workspaceId: identity.wsId, agent: identity.agent, resumable: Boolean(identity.agentSessionId) }
+              ? {
+                  workspaceId: identity.wsId,
+                  agent: identity.agent,
+                  resumable: identity.lifecycle !== 'retired' && Boolean(identity.agentSessionId),
+                }
               : null
           },
         } : {}),

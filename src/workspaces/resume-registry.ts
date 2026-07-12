@@ -19,6 +19,11 @@ export interface ResumeIdentityRecord {
   latestTaskId?: string
   readonly createdAt: number
   updatedAt: number
+  /** Product employment state. Native transcript history is retained either way. */
+  lifecycle: 'active' | 'retired'
+  retiredAt?: number
+  retirementReason?: string
+  successorResumeId?: string
 }
 
 export class ResumeRegistry {
@@ -38,9 +43,12 @@ export class ResumeRegistry {
 
   private async read(): Promise<void> {
     try {
-      const parsed = JSON.parse(await readFile(this.path, 'utf8')) as { records?: unknown[] }
-      for (const value of Array.isArray(parsed.records) ? parsed.records : []) {
-        if (!value || typeof value !== 'object') continue
+      const parsed = JSON.parse(await readFile(this.path, 'utf8')) as { version?: unknown; records?: unknown }
+      if (parsed.version !== 1 || !Array.isArray(parsed.records)) {
+        throw new Error('resume-identities.json has an unsupported shape')
+      }
+      for (const value of parsed.records) {
+        if (!value || typeof value !== 'object') throw new Error('resume-identities.json contains an invalid record')
         const record = value as Record<string, unknown>
         if (
           typeof record['resumeId'] !== 'string' ||
@@ -48,24 +56,40 @@ export class ResumeRegistry {
           typeof record['agent'] !== 'string' ||
           typeof record['createdAt'] !== 'number' ||
           typeof record['updatedAt'] !== 'number'
-        ) continue
+        ) throw new Error('resume-identities.json contains an invalid record')
         this.records.set(record['resumeId'], {
           resumeId: record['resumeId'],
           wsId: record['wsId'],
           agent: record['agent'],
           createdAt: record['createdAt'],
           updatedAt: record['updatedAt'],
+          lifecycle: record['lifecycle'] === 'retired' ? 'retired' : 'active',
           ...(typeof record['agentSessionId'] === 'string'
             ? { agentSessionId: record['agentSessionId'] }
             : {}),
           ...(typeof record['latestTaskId'] === 'string'
             ? { latestTaskId: record['latestTaskId'] }
             : {}),
+          ...(typeof record['retiredAt'] === 'number'
+            ? { retiredAt: record['retiredAt'] }
+            : {}),
+          ...(typeof record['retirementReason'] === 'string'
+            ? { retirementReason: record['retirementReason'] }
+            : {}),
+          ...(typeof record['successorResumeId'] === 'string'
+            ? { successorResumeId: record['successorResumeId'] }
+            : {}),
         })
       }
-    } catch {
+    } catch (err) {
       // Migration creates the file for existing installs. A fresh install has
       // no identities until its first conversation is created.
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return
+      this.logger.error('resume_registry.read_failed', { path: this.path, err })
+      // Resume identities are the durable employment/signature ledger. A
+      // malformed file must stop startup instead of silently making every
+      // coworker appear new and severing provenance links.
+      throw err
     }
   }
 
@@ -98,6 +122,9 @@ export class ResumeRegistry {
       if (existing.wsId !== input.wsId || existing.agent !== input.agent) {
         throw new Error(`resume identity ${resumeId} belongs to ${existing.wsId}/${existing.agent}`)
       }
+      if (existing.lifecycle === 'retired') {
+        throw new Error(`resume identity ${resumeId} is retired`)
+      }
       if (input.agentSessionId) existing.agentSessionId = input.agentSessionId
       if (input.latestTaskId) existing.latestTaskId = input.latestTaskId
       existing.updatedAt = input.now ?? Date.now()
@@ -111,6 +138,7 @@ export class ResumeRegistry {
       agent: input.agent,
       createdAt: now,
       updatedAt: now,
+      lifecycle: 'active',
       ...(input.agentSessionId ? { agentSessionId: input.agentSessionId } : {}),
       ...(input.latestTaskId ? { latestTaskId: input.latestTaskId } : {}),
     }
@@ -127,6 +155,42 @@ export class ResumeRegistry {
     await this.flush()
   }
 
+  async retireWorkspace(
+    wsId: string,
+    input: { reason: string; successors?: Readonly<Record<string, string>>; now?: number },
+  ): Promise<ResumeIdentityRecord[]> {
+    const now = input.now ?? Date.now()
+    const changed: ResumeIdentityRecord[] = []
+    for (const record of this.records.values()) {
+      if (record.wsId !== wsId) continue
+      record.lifecycle = 'retired'
+      record.retiredAt = now
+      record.retirementReason = input.reason
+      const successor = input.successors?.[record.resumeId]
+      if (successor) record.successorResumeId = successor
+      record.updatedAt = now
+      changed.push(record)
+    }
+    if (changed.length > 0) await this.flush()
+    return changed
+  }
+
+  /** Restore the old coworkers with their old signatures and native mappings. */
+  async recallWorkspace(wsId: string, now = Date.now()): Promise<ResumeIdentityRecord[]> {
+    const changed: ResumeIdentityRecord[] = []
+    for (const record of this.records.values()) {
+      if (record.wsId !== wsId || record.lifecycle !== 'retired') continue
+      record.lifecycle = 'active'
+      delete record.retiredAt
+      delete record.retirementReason
+      delete record.successorResumeId
+      record.updatedAt = now
+      changed.push(record)
+    }
+    if (changed.length > 0) await this.flush()
+    return changed
+  }
+
   private async flush(): Promise<void> {
     const next = this.flushChain.then(() => this.flushNow())
     this.flushChain = next.catch(() => undefined)
@@ -141,6 +205,9 @@ export class ResumeRegistry {
       await rename(tmp, this.path)
     } catch (err) {
       this.logger.warn('resume_registry.flush_failed', { err })
+      // Callers such as Workspace offboarding depend on retirement being
+      // durable before the Catalog transition is committed.
+      throw err
     }
   }
 }

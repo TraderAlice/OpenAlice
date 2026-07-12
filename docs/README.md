@@ -12,6 +12,7 @@ GitHub navigation.
 | [[docs/project-structure.md]] | [Project structure](project-structure.md) | Process boundaries, source ownership, state roots, architectural entry points |
 | [[docs/development-workflow.md]] | [Development workflow](development-workflow.md) | Branches, delivery modes, PRs, promotions, external review, risk gates |
 | [[docs/managed-workspace-runtime.md]] | [Managed Workspace runtime](managed-workspace-runtime.md) | Electron packaging, managed Pi, PortableGit/Bash, runtime profile, Workspace PATH |
+| [[docs/workspace-lifecycle.md]] | [Workspace and Session lifecycle](workspace-lifecycle.md) | Offboarding, departed directories, handoff, restore/purge, Session retirement |
 | [[docs/workspace-issues-and-scheduling.md]] | [Workspace issues and scheduling](workspace-issues-and-scheduling.md) | Markdown issue contract, global board, schedule scanner, headless execution, Inbox delivery |
 | [[docs/conversation-provenance.md]] | [Workspace Session and artifact provenance](conversation-provenance.md) | `resumeId` identity, artifact trails, Issue execution responsibility, and provenance-before-collaboration sequencing |
 | [[docs/event-system.md]] | [Event-system retirement note](event-system.md) | Removed Alice event-bus scheduler and the remaining UTA journal boundary |

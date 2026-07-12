@@ -6,13 +6,13 @@ import { useTranslation } from 'react-i18next';
 
 import { headlessApi, type HeadlessTaskRecord } from '../../api/headless';
 import {
-  deleteWorkspace,
   type AgentInfo,
   type SessionRecord,
   type TemplateInfo,
   type Workspace,
 } from './api';
 import { CreateWorkspaceDialog } from './CreateWorkspaceDialog';
+import { WorkspaceOffboardingDialog } from './WorkspaceOffboardingDialog';
 import { Skeleton } from '../StateViews';
 import { workspaceDisplayName, workspaceDisplayTitle } from './display';
 import { orderSessionsForSidebar, orderWorkspacesForSidebar } from './sidebar-order';
@@ -82,6 +82,7 @@ export interface SidebarProps {
 export function Sidebar(props: SidebarProps): ReactElement {
   const { t } = useTranslation();
   const [showCreate, setShowCreate] = useState(false);
+  const [pendingOffboard, setPendingOffboard] = useState<Workspace | null>(null);
   const showListError = Boolean(props.listError && props.workspaces.length === 0);
   const orderedWorkspaces = useMemo(
     () => orderWorkspacesForSidebar(props.workspaces, props.selection),
@@ -122,12 +123,8 @@ export function Sidebar(props: SidebarProps): ReactElement {
   }, [headlessTasks]);
 
   const onDelete = async (id: string): Promise<void> => {
-    if (!window.confirm(t('workspace.deleteConfirm'))) return;
-    const ok = await deleteWorkspace(id);
-    if (ok) {
-      props.onChanged();
-      if (props.selection?.wsId === id) props.onSelectWorkspace('');
-    }
+    const workspace = props.workspaces.find((candidate) => candidate.id === id);
+    if (workspace) setPendingOffboard(workspace);
   };
 
   return (
@@ -154,6 +151,19 @@ export function Sidebar(props: SidebarProps): ReactElement {
             props.onSelectWorkspace(workspace.id);
           }}
           onClose={() => setShowCreate(false)}
+        />
+      )}
+
+      {pendingOffboard && (
+        <WorkspaceOffboardingDialog
+          workspace={pendingOffboard}
+          onOffboarded={() => {
+            const id = pendingOffboard.id;
+            setPendingOffboard(null);
+            props.onChanged();
+            if (props.selection?.wsId === id) props.onSelectWorkspace('');
+          }}
+          onClose={() => setPendingOffboard(null)}
         />
       )}
 

@@ -7,6 +7,8 @@ export interface WorkspaceSessionDirectoryEntry {
   agent: string
   createdAt: number
   updatedAt: number
+  lifecycle: ResumeIdentityRecord['lifecycle']
+  successorResumeId?: string
   resumable: boolean
   active: boolean
   latestExecution?: {
@@ -51,8 +53,10 @@ export function buildWorkspaceSessionDirectory(input: {
         agent: identity.agent,
         createdAt: identity.createdAt,
         updatedAt: identity.updatedAt,
-        resumable: Boolean(identity.agentSessionId),
-        active: input.isActive(identity.resumeId),
+        lifecycle: identity.lifecycle ?? 'active',
+        ...(identity.successorResumeId ? { successorResumeId: identity.successorResumeId } : {}),
+        resumable: identity.lifecycle !== 'retired' && Boolean(identity.agentSessionId),
+        active: identity.lifecycle !== 'retired' && input.isActive(identity.resumeId),
         ...(execution
           ? {
               latestExecution: {

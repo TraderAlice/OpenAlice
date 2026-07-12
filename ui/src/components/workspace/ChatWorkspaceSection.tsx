@@ -24,9 +24,9 @@ import { useWorkspaces } from '../../contexts/workspaces-context'
 import { Skeleton } from '../StateViews'
 import { useWorkspace } from '../../tabs/store'
 import { getFocusedTab } from '../../tabs/types'
-import { ConfirmDialog } from '../ConfirmDialog'
-import { deleteWorkspace, type Workspace } from './api'
+import { type Workspace } from './api'
 import { CreateWorkspaceDialog } from './CreateWorkspaceDialog'
+import { WorkspaceOffboardingDialog } from './WorkspaceOffboardingDialog'
 import { SessionRow } from './Sidebar'
 import { workspaceDisplayTitle } from './display'
 import { orderSessionsForSidebar, orderWorkspacesForSidebar } from './sidebar-order'
@@ -71,16 +71,6 @@ export function ChatWorkspaceSection(): ReactElement | null {
 
   const rememberChatWorkspace = (workspaceId: string): void => {
     void preferencesApi.rememberRecentChatWorkspace(workspaceId).catch(() => undefined)
-  }
-
-  const handleConfirmDelete = async (): Promise<void> => {
-    if (!pendingDelete) return
-    try {
-      const ok = await deleteWorkspace(pendingDelete.id)
-      if (ok) ctx.refresh()
-    } finally {
-      setPendingDelete(null)
-    }
   }
 
   // Don't collapse the whole section while templates are still loading — doing
@@ -205,11 +195,12 @@ export function ChatWorkspaceSection(): ReactElement | null {
       </ul>
 
       {pendingDelete && (
-        <ConfirmDialog
-          title={t('chat.deleteWorkspaceTitle')}
-          message={t('chat.deleteWorkspaceMessage', { tag: pendingDelete.tag })}
-          confirmLabel={t('common.delete')}
-          onConfirm={handleConfirmDelete}
+        <WorkspaceOffboardingDialog
+          workspace={pendingDelete}
+          onOffboarded={() => {
+            setPendingDelete(null)
+            ctx.refresh()
+          }}
           onClose={() => setPendingDelete(null)}
         />
       )}

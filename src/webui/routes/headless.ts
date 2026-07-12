@@ -63,9 +63,10 @@ export function createHeadlessRoutes(svc: WorkspaceService): Hono {
   const app = new Hono()
   const publicTask = (task: HeadlessTaskRecord) => {
     const { agentSessionId: _nativeSessionId, ...publicFields } = task
+    const identity = svc.resumeRegistry.get(task.resumeId)
     return {
       ...publicFields,
-      resumable: !!svc.resumeRegistry.get(task.resumeId)?.agentSessionId,
+      resumable: identity?.lifecycle !== 'retired' && Boolean(identity?.agentSessionId),
     }
   }
 

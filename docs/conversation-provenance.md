@@ -169,7 +169,9 @@ The resolver follows one policy across every product surface:
 1. **Known Session:** if the requested occurrence has a `resumeId`, the follow-up
    must continue that exact product Session.
 2. **Known but unavailable Session:** preserve the attribution and report that
-   it cannot be resumed. Do not silently replace the owner with a new worker.
+   it is retired, departed, purged, or missing its native mapping. Do not
+   silently replace the owner with a new worker. A declared successor is a
+   handoff target, never a rewrite of historical authorship.
 3. **Unknown Session, known Workspace:** ask the Workspace to create a fresh
    worker. That worker receives a new `resumeId` and reconstructs the answer
    from Workspace material.
@@ -184,7 +186,13 @@ type FollowUpResolution =
   | {
       mode: 'unavailable'
       attributedOrigin?: SessionOrigin
-      reason: 'missing-session' | 'missing-native-session' | 'deleted-workspace'
+      reason:
+        | 'missing-session'
+        | 'missing-native-session'
+        | 'retired-session'
+        | 'departed-workspace'
+        | 'purged-workspace'
+        | 'deleted-workspace'
     }
   | {
       mode: 'reconstructed'

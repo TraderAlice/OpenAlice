@@ -141,6 +141,8 @@ Read the relevant guide before editing its subsystem:
   delivery modes, promotions, external contributions, and risk gates.
 - [[docs/managed-workspace-runtime.md]] — [Managed Workspace runtime](docs/managed-workspace-runtime.md): Electron
   packaging, managed Pi, PortableGit/Bash, runtime profiles, and Workspace PATH.
+- [[docs/workspace-lifecycle.md]] — [Workspace and Session lifecycle](docs/workspace-lifecycle.md): offboarding,
+  departed desks, handoff, restore/purge, and resumeId retirement.
 - [[docs/uta-live-testing.md]] — [UTA live testing](docs/uta-live-testing.md): broker/trading acceptance loops.
 - [[docs/workspace-issues-and-scheduling.md]] — [Workspace issues and scheduling](docs/workspace-issues-and-scheduling.md): Issue board, schedules, headless runs, and Inbox delivery.
 - [[docs/conversation-provenance.md]] — [Workspace Session and artifact provenance](docs/conversation-provenance.md): `resumeId` identity, artifact trails, Issue responsibility, and the provenance-before-collaboration delivery order.

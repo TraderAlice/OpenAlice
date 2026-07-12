@@ -20,3 +20,4 @@ Each row corresponds to one migration in `src/migrations/`. The runner applies p
 | `0018_issue_assignee_ownership` | 0.75.0-beta | 2026-07-12 | workspaces/<id>/.alice/issues/*.md | Replace Issue execution ownership with one workspace, human, unassigned, or Session assignee. |
 | `0019_issue_session_signatures` | 0.75.0-beta | 2026-07-12 | workspaces/<id>/.alice/issues/*.md | Write Issue ownership as @workspace or an exact @resumeId Session signature. |
 | `0020_headless_issue_trigger` | 0.75.0-beta | 2026-07-12 | workspaces/state/headless-tasks.json | Store the composite Issue trigger separately from a run execution Workspace. |
+| `0021_workspace_departure_catalog` | 0.75.0-beta | 2026-07-12 | workspaces/workspaces.json, workspaces/workspaces/*, workspaces/departed-workspaces/*, workspaces/state/workspace-catalog.json | Move unregistered Workspace directories into a durable departed catalog without deleting them. |

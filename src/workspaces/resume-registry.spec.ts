@@ -28,6 +28,7 @@ describe('ResumeRegistry', () => {
     expect(reloaded.get(created.resumeId)).toMatchObject({
       wsId: 'ws-1',
       agent: 'claude',
+      lifecycle: 'active',
       agentSessionId: 'native-claude-session',
     })
   })
@@ -60,5 +61,38 @@ describe('ResumeRegistry', () => {
 
     expect(registry.list({ wsId: 'ws-1' }).map((record) => record.resumeId))
       .toEqual(['resume-new', 'resume-old'])
+  })
+
+  it('retires and recalls a Workspace without losing native identity history', async () => {
+    const registry = await ResumeRegistry.load(path, noopLogger)
+    await registry.ensure({
+      resumeId: 'resume-owner', wsId: 'ws-1', agent: 'pi', agentSessionId: 'native-1', now: 1,
+    })
+    await registry.ensure({
+      resumeId: 'resume-successor', wsId: 'ws-2', agent: 'codex', agentSessionId: 'native-2', now: 2,
+    })
+    await registry.retireWorkspace('ws-1', {
+      reason: 'Workspace departed',
+      successors: { 'resume-owner': 'resume-successor' },
+      now: 3,
+    })
+    expect(registry.get('resume-owner')).toMatchObject({
+      lifecycle: 'retired',
+      retiredAt: 3,
+      retirementReason: 'Workspace departed',
+      successorResumeId: 'resume-successor',
+      agentSessionId: 'native-1',
+    })
+    await expect(registry.ensure({ resumeId: 'resume-owner', wsId: 'ws-1', agent: 'pi' }))
+      .rejects.toThrow(/retired/)
+
+    await registry.recallWorkspace('ws-1', 4)
+    expect(registry.get('resume-owner')).toMatchObject({
+      lifecycle: 'active',
+      updatedAt: 4,
+      agentSessionId: 'native-1',
+    })
+    expect(registry.get('resume-owner')).not.toHaveProperty('retiredAt')
+    expect(registry.get('resume-owner')).not.toHaveProperty('successorResumeId')
   })
 })

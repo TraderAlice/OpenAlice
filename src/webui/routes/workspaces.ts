@@ -191,6 +191,9 @@ export function createWorkspaceRoutes(
     if (requestedIdentity && requestedIdentity.wsId !== id) {
       return { ok: false, status: 400, body: { error: 'resume_wrong_workspace' } };
     }
+    if (requestedIdentity?.lifecycle === 'retired') {
+      return { ok: false, status: 409, body: { error: 'resume_retired', message: 'this Session retired with its Workspace' } };
+    }
     if (requestedIdentity && !requestedIdentity.agentSessionId) {
       return { ok: false, status: 409, body: { error: 'resume_not_ready', message: 'runtime session id has not been captured yet' } };
     }
@@ -374,6 +377,9 @@ export function createWorkspaceRoutes(
     if (existing) return { ok: true, created: false, session: publicSession(existing) };
     const identity = svc.resumeRegistry.get(resumeId);
     if (!identity || identity.wsId !== meta.id) return { ok: false, status: 404, body: { error: 'resume_not_found' } };
+    if (identity.lifecycle === 'retired') {
+      return { ok: false, status: 409, body: { error: 'resume_retired', message: 'this Session retired with its Workspace' } };
+    }
     const task = identity.latestTaskId ? svc.headlessTasks.get(identity.latestTaskId) : null;
     if (task?.status === 'running') {
       return {
@@ -534,6 +540,38 @@ export function createWorkspaceRoutes(
     return c.json({ workspaces });
   });
 
+  app.get('/departed', (c) => {
+    return c.json({ workspaces: svc.lifecycle.listDeparted() });
+  });
+
+  app.post('/departed/:id/restore', async (c) => {
+    const id = c.req.param('id');
+    if (!validId(id)) return c.json({ error: 'not_found' }, 404);
+    try {
+      const result = await svc.lifecycle.restore(id);
+      if (result.ok) return c.json(result);
+      const status = result.code === 'not_found' ? 404 : 409;
+      return c.json({ error: result.code, message: result.message }, status);
+    } catch (err) {
+      launcherLogger.error('workspace.restore_failed', { id, err });
+      return c.json({ error: 'restore_failed', message: (err as Error).message }, 500);
+    }
+  });
+
+  app.delete('/departed/:id', async (c) => {
+    const id = c.req.param('id');
+    if (!validId(id)) return c.json({ error: 'not_found' }, 404);
+    try {
+      const result = await svc.lifecycle.purge(id);
+      if (result.ok) return c.json(result);
+      const status = result.code === 'not_found' ? 404 : 409;
+      return c.json({ error: result.code, message: result.message }, status);
+    } catch (err) {
+      launcherLogger.error('workspace.purge_failed', { id, err });
+      return c.json({ error: 'purge_failed', message: (err as Error).message }, 500);
+    }
+  });
+
   app.post('/', async (c) => {
     const body = await safeJson(c);
     const fields = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
@@ -618,39 +656,48 @@ export function createWorkspaceRoutes(
     }
   });
 
-  // ── single workspace (DELETE + git/files sub-resources) ──────────────────
+  // ── single workspace (offboarding + git/files sub-resources) ─────────────
 
+  app.get('/:id/offboarding', async (c) => {
+    const id = c.req.param('id');
+    if (!validId(id)) return c.json({ error: 'not_found' }, 404);
+    const assessment = await svc.lifecycle.assess(id);
+    return assessment ? c.json({ assessment }) : c.json({ error: 'not_found' }, 404);
+  });
+
+  app.post('/:id/offboard', async (c) => {
+    const id = c.req.param('id');
+    if (!validId(id)) return c.json({ error: 'not_found' }, 404);
+    const body = await safeJson(c);
+    const fields = body && typeof body === 'object' ? body as Record<string, unknown> : {};
+    const successors = fields['successors'] && typeof fields['successors'] === 'object' && !Array.isArray(fields['successors'])
+      ? Object.fromEntries(Object.entries(fields['successors'] as Record<string, unknown>)
+          .filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
+      : undefined;
+    try {
+      const result = await svc.lifecycle.offboard({
+        id,
+        ...(typeof fields['reason'] === 'string' ? { reason: fields['reason'] } : {}),
+        ...(typeof fields['notes'] === 'string' ? { notes: fields['notes'] } : {}),
+        ...(successors ? { successors } : {}),
+      });
+      if (result.ok) return c.json(result);
+      const status = result.code === 'not_found' ? 404 : 409;
+      return c.json({ error: result.code, message: result.message, assessment: result.assessment }, status);
+    } catch (err) {
+      launcherLogger.error('workspace.offboard_failed', { id, err });
+      return c.json({ error: 'offboard_failed', message: (err as Error).message }, 500);
+    }
+  });
+
+  /** Backwards-compatible surface: Delete now means offboard, never orphan. */
   app.delete('/:id', async (c) => {
     const id = c.req.param('id');
     if (!validId(id)) return c.json({ error: 'not_found' }, 404);
-    const purge = c.req.query('purge') === 'true';
-    svc.pool.dispose(id, 'workspace deleted');
-    const removed = await svc.registry.remove(id);
-    if (!removed) return c.json({ error: 'not_found' }, 404);
-    const droppedRecords = await svc.sessionRegistry
-      .removeAllFor(id)
-      .catch((err) => {
-        launcherLogger.warn('session_registry.remove_all_failed', { id, err });
-        return [] as readonly SessionRecord[];
-      });
-    await svc.scrollbackStore.removeAllFor(id);
-    let purged = false;
-    if (purge) {
-      try {
-        const { rm } = await import('node:fs/promises');
-        await rm(removed.dir, { recursive: true, force: true });
-        purged = true;
-      } catch (err) {
-        launcherLogger.error('workspace.purge_failed', { id, dir: removed.dir, err });
-      }
-    }
-    launcherLogger.info('workspace.removed', {
-      id,
-      dir: removed.dir,
-      purged,
-      droppedSessions: droppedRecords.length,
-    });
-    return c.json({ ok: true, purged });
+    const result = await svc.lifecycle.offboard({ id });
+    if (result.ok) return c.json(result);
+    const status = result.code === 'not_found' ? 404 : 409;
+    return c.json({ error: result.code, message: result.message, assessment: result.assessment }, status);
   });
 
   app.get('/:id/git/log', async (c) => {
@@ -720,7 +767,11 @@ export function createWorkspaceRoutes(
       resumeId: identity.resumeId,
       workspaceId: identity.wsId,
       agent: identity.agent,
-      resumable: Boolean(identity.agentSessionId),
+      ...(identity.lifecycle === 'retired' ? {
+        lifecycle: 'retired',
+        ...(identity.successorResumeId ? { successorResumeId: identity.successorResumeId } : {}),
+      } : {}),
+      resumable: identity.lifecycle !== 'retired' && Boolean(identity.agentSessionId),
     });
   });
 
@@ -1028,6 +1079,10 @@ export function createWorkspaceRoutes(
     async function doResume() {
       const record = svc.sessionRegistry.get(id, token);
       if (!record) return c.json({ error: 'not_found' }, 404);
+      const identity = svc.resumeRegistry.get(record.resumeId);
+      if (identity?.lifecycle === 'retired') {
+        return c.json({ error: 'resume_retired', message: 'this Session retired with its Workspace' }, 409);
+      }
       if (svc.isResumeActive?.(record.resumeId)) {
         return c.json({ error: 'resume_busy', message: 'this conversation already has a running headless turn' }, 409);
       }

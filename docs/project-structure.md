@@ -5,6 +5,7 @@ and persistent-state layout. Update it when a top-level subsystem moves or a
 new long-lived process, package, or state root is introduced.
 
 Related guides: [[docs/managed-workspace-runtime.md]],
+[[docs/workspace-lifecycle.md]],
 [[docs/workspace-issues-and-scheduling.md]],
 [[docs/conversation-provenance.md]], and [[docs/market-data-architecture.md]].
 
@@ -207,9 +208,11 @@ launcher and services agree.
 │   ├── news-collector/        RSS archive
 │   └── _backup/               migration snapshots
 ├── workspaces/                default launcher root
-│   ├── workspaces.json        Workspace registry
-│   ├── workspaces/            Workspace repositories
-│   ├── state/                 sessions, scrollback, tasks, compatibility lock
+│   ├── workspaces.json        active Workspace registry
+│   ├── workspaces/            active Workspace repositories only
+│   ├── departed-workspaces/   retained offboarded repositories
+│   ├── state/                 lifecycle catalog, Sessions, scrollback, tasks,
+│   │                          provenance, compatibility lock
 │   └── auto-quant-mirror/     shared Auto-Quant source mirror
 ├── state/
 │   ├── guardian.lock          launcher ownership
@@ -236,6 +239,7 @@ generated `src/migrations/INDEX.md`.
 | Change | Start with |
 |---|---|
 | Workspace lifecycle, agent launch, packaged Pi, shell/PATH | `src/workspaces/` + [Managed Workspace runtime](managed-workspace-runtime.md) |
+| Workspace offboarding, restore/purge, Session retirement | [Workspace and Session lifecycle](workspace-lifecycle.md) |
 | Broker/account/execution behavior | `services/uta/src/domain/trading/` + [UTA live testing](uta-live-testing.md) |
 | Shared Alice ↔ UTA shapes | `packages/uta-protocol/` and both callers |
 | Renderer/API surface | `ui/`, `src/webui/`, and matching demo handlers |

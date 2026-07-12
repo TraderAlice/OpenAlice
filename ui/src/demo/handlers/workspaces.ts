@@ -1,7 +1,27 @@
 import { http, HttpResponse } from 'msw'
 import { demoChatWorkspace, demoWorkspaces, demoTemplates } from '../fixtures/workspaces'
 import { demoWorkspaceFiles } from '../fixtures/inbox'
-import type { WorkspaceMetadataPatch } from '../../components/workspace/api'
+import type { DepartedWorkspace, WorkspaceMetadataPatch } from '../../components/workspace/api'
+
+const demoDepartedWorkspaces: DepartedWorkspace[] = [{
+  id: 'chat-quiet-slate-archive',
+  tag: 'macro-research-archive',
+  activeDir: '/demo/workspaces/chat-quiet-slate-archive',
+  departedDir: '/demo/departed-workspaces/chat-quiet-slate-archive',
+  createdAt: '2026-06-01T00:00:00.000Z',
+  updatedAt: '2026-07-11T08:30:00.000Z',
+  departedAt: '2026-07-11T08:30:00.000Z',
+  lifecycle: 'departed' as const,
+  reason: 'Research mandate moved to the durable macro desk.',
+  handoff: {
+    preparedAt: '2026-07-11T08:30:00.000Z',
+    dirtyFiles: [' M research/rates.md'],
+    openIssueIds: ['review-fed-regime'],
+    scheduledIssueIds: [],
+    resumeIds: ['resume-quiet-slate-owner'],
+    sessionRecords: 1,
+  },
+}]
 
 const demoAgentRuntimeReadiness = {
   agents: {
@@ -60,12 +80,74 @@ const demoAgentRuntimeReadiness = {
 
 export const workspacesHandlers = [
   http.get('/api/workspaces', () => HttpResponse.json({ workspaces: demoWorkspaces })),
+  http.get('/api/workspaces/departed', () => HttpResponse.json({ workspaces: demoDepartedWorkspaces })),
+  http.post('/api/workspaces/departed/:id/restore', ({ params }) => {
+    const index = demoDepartedWorkspaces.findIndex((workspace) => workspace.id === String(params.id))
+    if (index < 0) return HttpResponse.json({ error: 'not_found' }, { status: 404 })
+    demoDepartedWorkspaces.splice(index, 1)
+    return HttpResponse.json({ ok: true })
+  }),
+  http.delete('/api/workspaces/departed/:id', ({ params }) => {
+    const workspace = demoDepartedWorkspaces.find((candidate) => candidate.id === String(params.id))
+    if (!workspace) return HttpResponse.json({ error: 'not_found' }, { status: 404 })
+    Object.assign(workspace, { lifecycle: 'purged', purgedAt: new Date().toISOString() })
+    return HttpResponse.json({ ok: true })
+  }),
   http.post('/api/workspaces', () =>
     HttpResponse.json(
       { ok: false, status: 400, error: { error: 'bootstrap_failed', message: 'Demo mode — workspace creation is disabled.' } },
       { status: 400 },
     ),
   ),
+  http.get('/api/workspaces/:id/offboarding', ({ params }) => {
+    const workspace = demoWorkspaces.find((candidate) => candidate.id === String(params.id))
+    if (!workspace) return HttpResponse.json({ error: 'not_found' }, { status: 404 })
+    const resumeIds = workspace.sessions.map((session) => session.resumeId)
+    return HttpResponse.json({
+      assessment: {
+        workspace: { id: workspace.id, tag: workspace.tag, dir: `/demo/workspaces/${workspace.id}` },
+        canOffboard: true,
+        blockers: [],
+        runningHeadless: [],
+        untrackedHeadlessActive: false,
+        runningSessions: workspace.sessions.filter((session) => session.state === 'running').length,
+        sessionRecords: workspace.sessions.length,
+        resumeIds,
+        openIssueIds: ['review-current-thesis'],
+        scheduledIssueIds: [],
+        git: { branch: 'main', clean: false, files: [{ status: ' M', path: 'research/latest.md' }] },
+      },
+    })
+  }),
+  http.post('/api/workspaces/:id/offboard', async ({ params, request }) => {
+    const index = demoWorkspaces.findIndex((candidate) => candidate.id === String(params.id))
+    if (index < 0) return HttpResponse.json({ error: 'not_found' }, { status: 404 })
+    const workspace = demoWorkspaces[index]!
+    const body = await request.json().catch(() => ({})) as { reason?: string; notes?: string }
+    const now = new Date().toISOString()
+    demoWorkspaces.splice(index, 1)
+    demoDepartedWorkspaces.unshift({
+      id: workspace.id,
+      tag: workspace.tag,
+      activeDir: `/demo/workspaces/${workspace.id}`,
+      departedDir: `/demo/departed-workspaces/${workspace.id}`,
+      createdAt: workspace.createdAt,
+      updatedAt: now,
+      departedAt: now,
+      lifecycle: 'departed',
+      reason: body.reason ?? 'Offboarded in demo mode',
+      handoff: {
+        preparedAt: now,
+        ...(body.notes ? { notes: body.notes } : {}),
+        dirtyFiles: [' M research/latest.md'],
+        openIssueIds: ['review-current-thesis'],
+        scheduledIssueIds: [],
+        resumeIds: workspace.sessions.map((session) => session.resumeId),
+        sessionRecords: workspace.sessions.length,
+      },
+    })
+    return HttpResponse.json({ ok: true })
+  }),
   http.delete('/api/workspaces/:id', () => HttpResponse.json(true)),
   http.post('/api/workspaces/:id/stop', () => HttpResponse.json(true)),
   http.patch('/api/workspaces/:id/metadata', async ({ params, request }) => {
@@ -181,6 +263,7 @@ export const workspacesHandlers = [
       resumeId,
       workspaceId: workspace.id,
       agent: session?.agent ?? 'claude',
+      lifecycle: 'active',
       resumable: true,
     })
   }),
@@ -192,7 +275,7 @@ export const workspacesHandlers = [
         sessions: [{
           resumeId: 'resume-demo-thesis-owner', agent: 'claude',
           createdAt: Date.now() - 86_400_000, updatedAt: Date.now() - 60_000,
-          resumable: true, active: false,
+          lifecycle: 'active', resumable: true, active: false,
           latestExecution: {
             taskId: 'demo-thesis-owner-run', status: 'done',
             startedAt: Date.now() - 60_000,
@@ -209,6 +292,7 @@ export const workspacesHandlers = [
         agent: session.agent,
         createdAt: Date.parse(session.createdAt),
         updatedAt: Date.parse(session.lastActiveAt),
+        lifecycle: 'active',
         resumable: session.agent !== 'shell',
         active: session.state === 'running',
         interactive: {

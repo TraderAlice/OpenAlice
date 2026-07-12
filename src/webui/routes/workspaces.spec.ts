@@ -34,6 +34,7 @@ function build(
     runtimeReadiness?: any;
     resumeIdentity?: any;
     sessionDirectory?: any;
+    lifecycle?: any;
   } = {},
 ) {
   const claude = {
@@ -79,6 +80,13 @@ function build(
       },
     },
   }));
+  const lifecycle = opts.lifecycle ?? {
+    listDeparted: vi.fn(() => []),
+    assess: vi.fn(async () => null),
+    offboard: vi.fn(async () => ({ ok: true, workspace: { id: 'ws-1', lifecycle: 'departed' }, assessment: {} })),
+    restore: vi.fn(async () => ({ ok: true, workspace: { id: 'ws-1', lifecycle: 'active' }, assessment: {} })),
+    purge: vi.fn(async () => ({ ok: true, workspace: { id: 'ws-1', lifecycle: 'purged' }, assessment: {} })),
+  };
   const svc = {
     registry: { get: (id: string) => (id === 'ws-1' ? meta : undefined) },
     adapters: { get: (a: string) => adapters[a] },
@@ -92,6 +100,7 @@ function build(
     },
     getAgentRuntimeReadiness,
     probeAgentRuntimeReadiness,
+    lifecycle,
     sessionDirectory: vi.fn(async (id: string) => id === 'ws-1'
       ? (opts.sessionDirectory ?? {
           workspace: { id: 'ws-1', tag: 'demo' },
@@ -109,6 +118,7 @@ function build(
     dispatchHeadlessTask,
     getAgentRuntimeReadiness,
     probeAgentRuntimeReadiness,
+    lifecycle,
   };
 }
 
@@ -166,6 +176,54 @@ async function patch(app: any, path: string, body?: unknown) {
   const json = await res.json().catch(() => null);
   return { status: res.status, body: json as any };
 }
+
+async function del(app: any, path: string) {
+  const res = await app.request(path, { method: 'DELETE' });
+  return { status: res.status, body: await res.json().catch(() => null) as any };
+}
+
+describe('Workspace lifecycle routes', () => {
+  it('lists departed Workspaces and restores one through the lifecycle manager', async () => {
+    const lifecycle = {
+      listDeparted: vi.fn(() => [{ id: 'ws-old', lifecycle: 'departed' }]),
+      restore: vi.fn(async () => ({ ok: true, workspace: { id: 'ws-old', lifecycle: 'active' }, assessment: {} })),
+      assess: vi.fn(), offboard: vi.fn(), purge: vi.fn(),
+    };
+    const { app } = build({ lifecycle });
+    expect(await get(app, '/departed')).toMatchObject({
+      status: 200,
+      body: { workspaces: [{ id: 'ws-old', lifecycle: 'departed' }] },
+    });
+    expect((await post(app, '/departed/ws-old/restore')).status).toBe(200);
+    expect(lifecycle.restore).toHaveBeenCalledWith('ws-old');
+  });
+
+  it('maps a live-run offboarding blocker to 409 without deleting state', async () => {
+    const lifecycle = {
+      listDeparted: vi.fn(), restore: vi.fn(), assess: vi.fn(), purge: vi.fn(),
+      offboard: vi.fn(async () => ({
+        ok: false, code: 'blocked', message: '1 headless run is still active',
+        assessment: { canOffboard: false },
+      })),
+    };
+    const { app } = build({ lifecycle });
+    const result = await del(app, '/ws-1');
+    expect(result).toMatchObject({
+      status: 409,
+      body: { error: 'blocked', assessment: { canOffboard: false } },
+    });
+  });
+
+  it('purges only through the departed route', async () => {
+    const lifecycle = {
+      listDeparted: vi.fn(), restore: vi.fn(), assess: vi.fn(), offboard: vi.fn(),
+      purge: vi.fn(async () => ({ ok: true, workspace: { id: 'ws-old', lifecycle: 'purged' }, assessment: {} })),
+    };
+    const { app } = build({ lifecycle });
+    expect((await del(app, '/departed/ws-old')).status).toBe(200);
+    expect(lifecycle.purge).toHaveBeenCalledWith('ws-old');
+  });
+});
 
 describe('PATCH /:id/metadata', () => {
   it('writes workspace-owned display metadata without changing launcher identity', async () => {

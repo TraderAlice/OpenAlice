@@ -32,6 +32,7 @@ import { migration as migration_0017_issue_what_and_comment_sidecars } from './0
 import { migration as migration_0018_issue_assignee_ownership } from './0018_issue_assignee_ownership/index.js'
 import { migration as migration_0019_issue_session_signatures } from './0019_issue_session_signatures/index.js'
 import { migration as migration_0020_headless_issue_trigger } from './0020_headless_issue_trigger/index.js'
+import { migration as migration_0021_workspace_departure_catalog } from './0021_workspace_departure_catalog/index.js'
 
 export const REGISTRY: Migration[] = [
   migration_0008_disable_targetless_cron_jobs,
@@ -47,4 +48,5 @@ export const REGISTRY: Migration[] = [
   migration_0018_issue_assignee_ownership,
   migration_0019_issue_session_signatures,
   migration_0020_headless_issue_trigger,
+  migration_0021_workspace_departure_catalog,
 ]

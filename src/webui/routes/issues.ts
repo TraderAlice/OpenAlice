@@ -116,6 +116,12 @@ export function createIssuesRoutes(svc: WorkspaceService): Hono {
             message: 'Session assignee must identify a known product Session',
           }, 400)
         }
+        if (identity.lifecycle === 'retired') {
+          return c.json({
+            error: 'retired_assignee_session',
+            message: 'the selected Session is retired; assign its successor or another active Session',
+          }, 409)
+        }
         if (!identity.agentSessionId) {
           return c.json({
             error: 'unavailable_assignee_session',

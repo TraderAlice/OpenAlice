@@ -70,6 +70,16 @@ function sessionOrigin(identity: { resumeId: string; wsId: string; agent: string
   }
 }
 
+function unavailableWorkspaceReason(
+  svc: WorkspaceService,
+  workspaceId: string,
+): 'departed-workspace' | 'purged-workspace' | 'deleted-workspace' {
+  const lifecycle = svc.catalog.get(workspaceId)?.lifecycle
+  if (lifecycle === 'purged' || lifecycle === 'purging') return 'purged-workspace'
+  if (lifecycle && lifecycle !== 'active') return 'departed-workspace'
+  return 'deleted-workspace'
+}
+
 function exactResolution(
   svc: WorkspaceService,
   origin: SessionOrigin,
@@ -79,8 +89,16 @@ function exactResolution(
   if (!identity) {
     return { mode: 'unavailable', reason: 'missing-session', attributedOrigin: origin, ...(artifact ? { artifact } : {}) }
   }
+  if (identity.lifecycle === 'retired') {
+    return { mode: 'unavailable', reason: 'retired-session', attributedOrigin: origin, ...(artifact ? { artifact } : {}) }
+  }
   if (!svc.registry.get(identity.wsId)) {
-    return { mode: 'unavailable', reason: 'deleted-workspace', attributedOrigin: origin, ...(artifact ? { artifact } : {}) }
+    return {
+      mode: 'unavailable',
+      reason: unavailableWorkspaceReason(svc, identity.wsId),
+      attributedOrigin: origin,
+      ...(artifact ? { artifact } : {}),
+    }
   }
   if (!identity.agentSessionId) {
     return { mode: 'unavailable', reason: 'missing-native-session', attributedOrigin: origin, ...(artifact ? { artifact } : {}) }
@@ -108,7 +126,7 @@ export function resolveWorkspaceConversationTarget(
   if (target.kind === 'workspace') {
     return svc.registry.get(target.workspaceId)
       ? { mode: 'reconstructed', workspaceId: target.workspaceId, reason: 'explicit-workspace' }
-      : { mode: 'unavailable', reason: 'deleted-workspace' }
+      : { mode: 'unavailable', reason: unavailableWorkspaceReason(svc, target.workspaceId) }
   }
 
   const resolvedTarget = artifactTarget(target)
@@ -149,7 +167,7 @@ export function resolveWorkspaceConversationTarget(
   if (!svc.registry.get(fallbackWorkspaceId)) {
     return {
       mode: 'unavailable',
-      reason: 'deleted-workspace',
+      reason: unavailableWorkspaceReason(svc, fallbackWorkspaceId),
       artifact: resolvedTarget.artifact,
     }
   }
@@ -200,7 +218,7 @@ export function createWorkspaceConversationControl(
           status: 'unavailable',
           resolution: {
             mode: 'unavailable',
-            reason: 'deleted-workspace',
+            reason: unavailableWorkspaceReason(svc, wsId),
             ...(resolution.artifact ? { artifact: resolution.artifact } : {}),
             ...(resolution.mode === 'exact' ? { attributedOrigin: resolution.origin } : {}),
           },

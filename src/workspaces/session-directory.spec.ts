@@ -14,6 +14,7 @@ describe('buildWorkspaceSessionDirectory', () => {
         latestTaskId: 'task-1',
         createdAt: 1,
         updatedAt: 2,
+        lifecycle: 'active',
       }],
       interactiveFor: () => ({
         id: 'launcher-secret',

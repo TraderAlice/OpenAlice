@@ -12,7 +12,10 @@ describe('workspace_sessions', () => {
   it('returns the safe directory for a known workspace', async () => {
     const sessionDirectory = vi.fn(async () => ({
       workspace: { id: 'peer', tag: 'research' },
-      sessions: [{ resumeId: 'resume-kind-owl-abc123', agent: 'pi', createdAt: 1, updatedAt: 2, resumable: true, active: false }],
+      sessions: [{
+        resumeId: 'resume-kind-owl-abc123', agent: 'pi', createdAt: 1, updatedAt: 2,
+        lifecycle: 'active' as const, resumable: true, active: false,
+      }],
     }))
     const ctx = {
       workspaceId: 'self',

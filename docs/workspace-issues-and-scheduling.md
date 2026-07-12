@@ -128,6 +128,13 @@ checkout. Agents must tolerate concurrent edits. The launcher currently admits
 at most eight headless processes globally and serializes registry persistence,
 but there is no per-Workspace exclusive lock.
 
+Offboarding is the lifecycle exception: a Workspace with a live headless run
+cannot depart. Once its Catalog row enters `offboarding`, new dispatch is
+rejected and the active registry row disappears, so its local schedules stop.
+An active peer Issue assigned to a retired `@resumeId` remains visibly owned by
+that signature but cannot fire until a human assigns an active Session or
+restores the departed Workspace. See [[docs/workspace-lifecycle.md]].
+
 ## Structured Runtime Output
 
 Claude Code, Codex, opencode, and Pi all emit different JSON event streams.
