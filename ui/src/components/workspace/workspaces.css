@@ -260,8 +260,19 @@
   border-radius: 6px;
   font-size: 13px;
   font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
   transition: filter 0.12s;
+}
+.resume-cta-beta {
+  padding: 1px 4px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 8px;
+  line-height: 1.2;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0.58;
 }
 .resume-cta-btn:hover:not(:disabled) {
   filter: brightness(1.1);
@@ -949,6 +960,8 @@
 
 .resume-cta-actions .resume-cta-btn {
   flex: 1;
+  min-width: 0;
+  padding-inline: 14px;
 }
 
 .resume-cta-btn.is-webpi {

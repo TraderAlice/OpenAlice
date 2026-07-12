@@ -40,9 +40,9 @@ function workspace(
 }
 
 describe('sidebar attention order', () => {
-  it('lifts the selected workspace, then running workspaces, then recent activity', () => {
-    const selectedOld = workspace('selected-old', '2026-01-01T00:00:00Z', [
-      session('selected-session', 'paused', '2026-01-01T00:00:00Z'),
+  it('lifts running workspaces, then recent activity', () => {
+    const oldestPaused = workspace('oldest-paused', '2026-01-01T00:00:00Z', [
+      session('oldest-session', 'paused', '2026-01-01T00:00:00Z'),
     ])
     const runningOld = workspace('running-old', '2026-02-01T00:00:00Z', [
       session('running-session', 'running', '2026-02-01T00:00:00Z'),
@@ -55,13 +55,12 @@ describe('sidebar attention order', () => {
     ])
 
     expect(orderWorkspacesForSidebar(
-      [olderPaused, recentPaused, runningOld, selectedOld],
-      { wsId: selectedOld.id, sessionId: 'selected-session' },
+      [olderPaused, recentPaused, runningOld, oldestPaused],
     ).map((candidate) => candidate.id)).toEqual([
-      'selected-old',
       'running-old',
       'recent-paused',
       'older-paused',
+      'oldest-paused',
     ])
   })
 
@@ -69,24 +68,23 @@ describe('sidebar attention order', () => {
     const older = workspace('older', '2026-07-01T00:00:00Z', [])
     const newer = workspace('newer', '2026-07-10T00:00:00Z', [])
 
-    expect(orderWorkspacesForSidebar([older, newer], null).map((candidate) => candidate.id))
+    expect(orderWorkspacesForSidebar([older, newer]).map((candidate) => candidate.id))
       .toEqual(['newer', 'older'])
   })
 
-  it('lifts the selected session, then running sessions, then recent activity', () => {
-    const selectedOld = session('selected-old', 'paused', '2026-01-01T00:00:00Z')
+  it('lifts running sessions, then recent activity', () => {
+    const oldestPaused = session('oldest-paused', 'paused', '2026-01-01T00:00:00Z')
     const runningOld = session('running-old', 'running', '2026-02-01T00:00:00Z')
     const recentPaused = session('recent-paused', 'paused', '2026-07-10T00:00:00Z')
     const olderPaused = session('older-paused', 'paused', '2026-07-09T00:00:00Z')
 
     expect(orderSessionsForSidebar(
-      [olderPaused, recentPaused, runningOld, selectedOld],
-      selectedOld.id,
+      [olderPaused, recentPaused, runningOld, oldestPaused],
     ).map((candidate) => candidate.id)).toEqual([
-      'selected-old',
       'running-old',
       'recent-paused',
       'older-paused',
+      'oldest-paused',
     ])
   })
 })

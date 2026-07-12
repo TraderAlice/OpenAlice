@@ -85,8 +85,8 @@ export function Sidebar(props: SidebarProps): ReactElement {
   const [pendingOffboard, setPendingOffboard] = useState<Workspace | null>(null);
   const showListError = Boolean(props.listError && props.workspaces.length === 0);
   const orderedWorkspaces = useMemo(
-    () => orderWorkspacesForSidebar(props.workspaces, props.selection),
-    [props.workspaces, props.selection],
+    () => orderWorkspacesForSidebar(props.workspaces),
+    [props.workspaces],
   );
   const workspaceListRef = useReorderMotion<HTMLDivElement>(
     orderedWorkspaces.map((workspace) => workspace.id),
@@ -325,11 +325,8 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
   const hasRunning = w.sessions.some((s) => s.state === 'running');
   const runningCount = w.sessions.filter((s) => s.state === 'running').length;
   const orderedSessions = useMemo(
-    () => orderSessionsForSidebar(
-      w.sessions,
-      props.selection?.wsId === w.id ? props.selection.sessionId : null,
-    ),
-    [w.sessions, w.id, props.selection],
+    () => orderSessionsForSidebar(w.sessions),
+    [w.sessions],
   );
   const sessionListRef = useReorderMotion<HTMLDivElement>(
     orderedSessions.map((session) => session.id),

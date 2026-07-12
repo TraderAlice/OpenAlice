@@ -82,7 +82,8 @@ export function ResumeCta(props: ResumeCtaProps): ReactElement {
                 disabled={resuming !== null}
               >
                 <Bot size={14} strokeWidth={2.25} aria-hidden="true" />
-                <span>{resuming === 'webpi' ? 'Opening…' : 'Open WebPi · Beta'}</span>
+                <span>{resuming === 'webpi' ? 'Opening…' : 'Open WebPi'}</span>
+                {resuming !== 'webpi' && <span className="resume-cta-beta">Beta</span>}
               </button>
             )}
           </div>
