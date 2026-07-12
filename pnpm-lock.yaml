@@ -263,6 +263,9 @@ importers:
       '@hono/node-server':
         specifier: ^2.0.0
         version: 2.0.0(hono@4.12.25)
+      '@traderalice/guardian-runtime':
+        specifier: workspace:*
+        version: link:../../packages/guardian-runtime
       '@traderalice/ibkr':
         specifier: workspace:*
         version: link:../../packages/ibkr

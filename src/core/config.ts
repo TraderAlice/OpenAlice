@@ -5,6 +5,7 @@ import { homedir } from 'os'
 import { newsCollectorSchema } from '../domain/news/config.js'
 import { runMigrations } from '../migrations/runner.js'
 import { dataPath } from '@/core/paths.js'
+import { withConfigBootstrapLock } from './config-bootstrap-lock.js'
 import { isSealedEnvelope, seal, unseal } from './sealing.js'
 
 const CONFIG_DIR = dataPath('config')
@@ -518,6 +519,10 @@ async function parseAndSeed<T>(filename: string, schema: z.ZodType<T>, raw: unkn
 }
 
 export async function loadConfig(): Promise<Config> {
+  return withConfigBootstrapLock(loadConfigUnlocked)
+}
+
+async function loadConfigUnlocked(): Promise<Config> {
   // Run pending migrations before reading any section. Each migration is
   // recorded in data/config/_meta.json; the runner is a no-op when nothing
   // is pending. See src/migrations/INDEX.md for the full list.
