@@ -9,6 +9,8 @@
 
 import { z } from 'zod'
 
+import type { CredentialWireShape } from '../core/config.js'
+
 // ==================== Types ====================
 
 export interface ModelOption {
@@ -22,8 +24,12 @@ export interface ModelOption {
  * shapes (Anthropic Messages vs OpenAI Chat Completions vs OpenAI Responses),
  * each at a different endpoint URL. A credential captures every shape its region
  * offers (see `RegionOption.wires`) as its "wire capabilities".
+ *
+ * Aliased (type-only, erased at compile time) from the core credential schema
+ * so the union has a single source of truth. core/ must not depend on this
+ * layer; the reverse type-only dependency is fine.
  */
-export type WireShape = 'anthropic' | 'openai-chat' | 'openai-responses'
+export type WireShape = CredentialWireShape
 
 /**
  * A region (or "the official endpoint") a provider's key can authenticate

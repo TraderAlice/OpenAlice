@@ -8,6 +8,10 @@
     "open-alice-ui#build": {
       "dependsOn": [],
       "outputs": ["dist/**"]
+    },
+    "@traderalice/desktop#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["../../dist/electron/**"]
     }
   }
 }

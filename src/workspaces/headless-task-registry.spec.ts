@@ -25,7 +25,10 @@ beforeEach(async () => {
   path = join(dir, 'tasks.json')
 })
 afterEach(async () => {
-  await rm(dir, { recursive: true, force: true })
+  // The registry deletes pruned tasks' log files fire-and-forget (`void rm(…)`),
+  // which can race this recursive cleanup on Windows and throw ENOTEMPTY on the
+  // parent dir. `maxRetries` makes fs.rm retry exactly this class of error.
+  await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
 })
 
 describe('HeadlessTaskRegistry', () => {

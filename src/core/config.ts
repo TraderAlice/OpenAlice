@@ -70,24 +70,6 @@ const engineSchema = z.object({
   port: z.number().int().positive().default(3000),
 })
 
-// ==================== AI Provider: Legacy Schema (kept for migration) ====================
-
-const legacyLoginMethodSchema = z.enum(['api-key', 'claudeai', 'codex-oauth'])
-
-/** @deprecated Legacy flat schema — used only for migration detection. */
-export const aiProviderLegacySchema = z.object({
-  backend: z.enum(['claude-code', 'vercel-ai-sdk', 'agent-sdk', 'codex']).default('claude-code'),
-  provider: z.string().default('anthropic'),
-  model: z.string().default('claude-opus-4-7'),
-  baseUrl: z.string().min(1).optional(),
-  loginMethod: legacyLoginMethodSchema.default('api-key'),
-  apiKeys: z.object({
-    anthropic: z.string().optional(),
-    openai: z.string().optional(),
-    google: z.string().optional(),
-  }).default({}),
-})
-
 // ==================== AI Provider: Profile-based Schema ====================
 
 export type AIBackend = 'agent-sdk' | 'codex' | 'vercel-ai-sdk'
@@ -113,9 +95,10 @@ export type CredentialAuthType = z.infer<typeof credentialAuthTypeEnum>
  * The wire protocol the credential's endpoint speaks. Load-bearing, NOT
  * derivable from baseUrl alone — OpenAI Chat Completions and Responses share
  * one base URL (api.openai.com/v1), so only this field distinguishes them. Also
- * tells injection how to configure the consuming adapter. Mirrors the
- * `WireShape` union in ai-providers/preset-catalog.ts (kept in sync by hand —
- * 3 stable values; core must not depend on the ai-providers layer).
+ * tells injection how to configure the consuming adapter. This enum is the
+ * single source of truth: ai-providers/preset-catalog.ts aliases its
+ * `WireShape` from `CredentialWireShape` via a type-only import (erased at
+ * compile time — core still has no dependency on the ai-providers layer).
  */
 export const credentialWireShapeEnum = z.enum(['anthropic', 'openai-chat', 'openai-responses'])
 export type CredentialWireShape = z.infer<typeof credentialWireShapeEnum>
