@@ -93,7 +93,7 @@ There is no Postgres or Redis to provision. Config, sessions, issues, inbox entr
 Pick the run path that matches your machine:
 
 - **macOS** - use the signed Apple Silicon or Intel desktop build: [macOS install](https://openalice.ai/docs/getting-started/install-macos).
-- **Windows** - run from source today: [Windows install](https://openalice.ai/docs/getting-started/install-windows).
+- **Windows** - choose the self-contained unsigned desktop beta or the source path: [Windows install](https://openalice.ai/docs/getting-started/install-windows).
 - **Linux, contributors, debugging** - use the source path: [Source & Dev](https://openalice.ai/docs/getting-started/developer-setup).
 - **Server or always-on machine** - use Docker Compose: [Docker deployment](https://openalice.ai/docs/deployment/docker).
 
@@ -108,10 +108,11 @@ pnpm dev
 
 Open the UI URL printed by the terminal, usually `http://localhost:5173`.
 
-The packaged desktop includes a managed Pi runtime. Source and Docker installs
-need at least one agent CLI installed and logged in, such as `claude`, `codex`,
-`opencode`, or `pi`. OpenAlice runs the model loop inside that native CLI so you
-keep its prompt cache, terminal rendering, provider login, and tool behavior.
+The packaged desktop includes managed Pi; the Docker image pins Claude Code,
+Codex, opencode, and Pi. Both still need a model credential or supported CLI
+login. Source installs need at least one host agent CLI. OpenAlice runs the
+model loop inside that native runtime so you keep its conversation state,
+provider login, and tool behavior.
 
 ## Documentation
 
@@ -121,6 +122,8 @@ The README is intentionally short. The real docs live at [openalice.ai/docs](htt
 - [Quick Start](https://openalice.ai/docs/getting-started/quick-start) - your first research, tracking, issue, schedule, and Inbox loop.
 - [Installation Overview](https://openalice.ai/docs/getting-started/installation) - choose macOS, Windows, source, Docker, or remote access.
 - [Workspaces](https://openalice.ai/docs/workspaces/workspaces) - the directory, git, CLI, and file-backed substrate.
+- [Sessions & Collaboration](https://openalice.ai/docs/workspaces/sessions-and-collaboration) - durable Session identity, signatures, provenance, and attributable follow-up.
+- [Lifecycle & Offboarding](https://openalice.ai/docs/workspaces/lifecycle) - handoff, departed desks, restore, purge, and Session retirement.
 - [Workspace Automation](https://openalice.ai/docs/workspaces/automation) - scheduled runs through self-describing issues.
 - [Unified Trading Account](https://openalice.ai/docs/core-concepts/unified-trading-account) - the beta account layer and safety warnings.
 - [Trading as Git](https://openalice.ai/docs/core-concepts/trading-as-git) - staged, committed, approval-gated trading operations.

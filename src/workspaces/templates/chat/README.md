@@ -1,5 +1,5 @@
 ---
-version: 1.6.0
+version: 1.6.1
 ---
 
 # Chat
@@ -38,7 +38,10 @@ headless workspace run.
 
 ## What you'll see in Inbox
 
-(v1: Inbox is one-way — the agent posts; you don't reply through it.)
+Inbox keeps durable report delivery separate from the live terminal. A user or
+peer agent can ask the attributable sender about a report; when only the
+Workspace is known, OpenAlice creates a fresh reconstruction Session and labels
+it honestly instead of pretending it found the original author.
 
 Things Alice will route here:
 - Research notes, thesis updates, and market snapshots worth re-reading later.
