@@ -220,7 +220,10 @@ export function createWorkspaceRoutes(
         runtimeReadiness.source === 'global-login' ||
         runtimeReadiness.source === 'managed-runtime');
     try {
-      if (!runtimeIsGloballyReady) {
+      // Global login/config is a valid no-pick fallback, but it must never
+      // suppress an explicit Quick Chat credential choice. The selected vault
+      // credential belongs to this Workspace and must be written before spawn.
+      if (!runtimeIsGloballyReady || opts.credentialSlug !== undefined) {
         await ensureAgentCredentialReady({
           meta,
           agentId: adapter.id,

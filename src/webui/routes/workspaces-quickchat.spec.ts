@@ -36,6 +36,7 @@ function build(opts: {
   sessionsByWorkspace?: Record<string, any[]>;
   recentChatWorkspaceId?: string | null;
   opencodeConfig?: WorkspaceAiCred | null;
+  opencodeRuntimeSource?: 'global-config' | 'global-login' | 'managed-runtime';
 } = {}) {
   const META = {
     id: 'ws-1',
@@ -104,7 +105,25 @@ function build(opts: {
     pool: { spawn, get: vi.fn(() => undefined) },
     publicMeta: vi.fn(async () => META),
     config: { launcherRepoRoot: '/repo' },
-    getAgentRuntimeReadiness: vi.fn(() => ({ agents: {}, overallReady: false, checkedAt: null })),
+    getAgentRuntimeReadiness: vi.fn(() => ({
+      agents: opts.opencodeRuntimeSource
+        ? {
+            opencode: {
+              agent: 'opencode',
+              displayName: 'opencode',
+              installed: true,
+              binPath: '/usr/local/bin/opencode',
+              status: 'ready',
+              ready: true,
+              source: opts.opencodeRuntimeSource,
+              checkedAt: '2026-07-12T00:00:00.000Z',
+              durationMs: 1,
+            },
+          }
+        : {},
+      overallReady: opts.opencodeRuntimeSource !== undefined,
+      checkedAt: opts.opencodeRuntimeSource ? '2026-07-12T00:00:00.000Z' : null,
+    })),
   } as unknown as WorkspaceService;
   const rememberRecentChatWorkspace = vi.fn(async (workspaceId: string | null) => ({
     lastCredentialByAgent: {},
@@ -198,6 +217,27 @@ describe('POST /quick-chat — loginless credential injection', () => {
     const cred = (opencode.writeAiConfig.mock.calls[0] as any[])[1];
     expect(cred.apiKey).toBe('sk-second');
     expect(cred.model).toBe('gpt-5.5-mini'); // remembered lastModel wins over flagship
+  });
+
+  it('explicit credential pick overrides a globally-ready opencode config', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({
+      'openai-2': { ...openaiKey, apiKey: 'sk-second', lastModel: 'gpt-5.5-mini' },
+    });
+    const { app, opencode, spawn } = build({ opencodeRuntimeSource: 'global-config' });
+
+    const r = await quickChat(app, {
+      prompt: 'hi',
+      agent: 'opencode',
+      credentialSlug: 'openai-2',
+    });
+
+    expect(r.status).toBe(201);
+    expect(opencode.writeAiConfig).toHaveBeenCalledOnce();
+    expect((opencode.writeAiConfig.mock.calls[0] as any[])[1]).toMatchObject({
+      apiKey: 'sk-second',
+      model: 'gpt-5.5-mini',
+    });
+    expect(spawn).toHaveBeenCalledOnce();
   });
 
   it('claude is never injected (own CLI login) — vault is not even read', async () => {

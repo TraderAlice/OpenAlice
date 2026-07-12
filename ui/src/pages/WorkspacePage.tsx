@@ -16,8 +16,8 @@
  * keeps running on the server. Use the sidebar's × to actually delete.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Bot, Monitor, Plus } from 'lucide-react'
+import { useEffect } from 'react'
+import { Bot, Monitor } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import '@xterm/xterm/css/xterm.css'
 
@@ -47,37 +47,22 @@ export function WorkspacePage({ spec, visible }: Props) {
     ? sessions.find((s) => s.id === sessionId) ?? null
     : null
   const keyMap = keyMapForAgent(activeRecord?.agent)
-  const [spawnMenuOpen, setSpawnMenuOpen] = useState(false)
-  const spawnMenuRef = useRef<HTMLDivElement | null>(null)
-  const runtimeAgents = useMemo(() => {
-    if (!workspace) return []
-    return workspace.agents
-      .map((id) => ctx.agents.find((a) => a.id === id))
-      .filter((a): a is NonNullable<typeof a> => !!a && a.kind !== 'utility')
-  }, [ctx.agents, workspace])
-  const utilityAgents = useMemo(() => {
-    if (!workspace) return []
-    return workspace.agents
-      .map((id) => ctx.agents.find((a) => a.id === id))
-      .filter((a): a is NonNullable<typeof a> => !!a && a.kind === 'utility')
-  }, [ctx.agents, workspace])
   const defaultAgentEnabled =
     ctx.defaultAgent !== null &&
     workspace?.agents.includes(ctx.defaultAgent) === true &&
-    runtimeAgents.some((a) => a.id === ctx.defaultAgent)
-
-  const spawnWithAgent = async (agentId: string, saveDefault: boolean): Promise<void> => {
-    setSpawnMenuOpen(false)
-    if (saveDefault) await ctx.setDefaultAgent(agentId)
-    await ctx.spawn(wsId, { agent: agentId }, source)
-  }
+    ctx.agents.some((a) => a.id === ctx.defaultAgent && a.kind !== 'utility')
 
   const spawnDefault = (): void => {
     if (defaultAgentEnabled && ctx.defaultAgent) {
       void ctx.spawn(wsId, { agent: ctx.defaultAgent }, source)
       return
     }
-    setSpawnMenuOpen((v) => !v)
+    // The old header dropdown duplicated the global New chat flow and left a
+    // second, stale session-creation surface in every Workspace. When no
+    // default runtime is configured, take the remaining empty-state/shortcut
+    // entry points to the targeted composer, which owns runtime + credential
+    // selection.
+    openOrFocus({ kind: 'chat-landing', params: { targetWsId: wsId } })
   }
 
   // Cmd+T / Ctrl+T: spawn fresh session in this workspace; only when this
@@ -96,24 +81,6 @@ export function WorkspacePage({ spec, visible }: Props) {
     document.addEventListener('keydown', handler, { capture: true })
     return () => document.removeEventListener('keydown', handler, { capture: true })
   }, [visible, ctx, wsId, defaultAgentEnabled])
-
-  useEffect(() => {
-    if (!spawnMenuOpen) return
-    const onDocClick = (e: MouseEvent): void => {
-      if (spawnMenuRef.current?.contains(e.target as Node)) return
-      setSpawnMenuOpen(false)
-    }
-    const onEsc = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') setSpawnMenuOpen(false)
-    }
-    const tid = setTimeout(() => document.addEventListener('click', onDocClick), 0)
-    document.addEventListener('keydown', onEsc)
-    return () => {
-      clearTimeout(tid)
-      document.removeEventListener('click', onDocClick)
-      document.removeEventListener('keydown', onEsc)
-    }
-  }, [spawnMenuOpen])
 
   if (!workspace) {
     return (
@@ -155,44 +122,6 @@ export function WorkspacePage({ spec, visible }: Props) {
               {(activeRecord.surface ?? 'terminal') === 'webpi' ? 'Open TUI' : 'WebPi · Beta'}
             </button>
           )}
-          <div ref={spawnMenuRef} className="relative">
-            <button
-              type="button"
-              onClick={spawnDefault}
-              className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] text-text-muted hover:text-text hover:bg-bg-tertiary transition-colors"
-              title={t('workspace.newSessionTitle')}
-            >
-              <Plus size={13} strokeWidth={2.25} aria-hidden="true" />
-              {t('workspace.newSession')}
-            </button>
-            {spawnMenuOpen && (
-              <div className="absolute right-0 top-full mt-1 w-44 rounded-md border border-border bg-bg-secondary shadow-lg py-1 z-20">
-                {runtimeAgents.map((agent) => (
-                  <button
-                    key={agent.id}
-                    type="button"
-                    onClick={() => void spawnWithAgent(agent.id, true)}
-                    className="w-full px-3 py-1.5 text-left text-[12px] text-text-muted hover:text-text hover:bg-bg-tertiary"
-                  >
-                    {agent.displayName}
-                  </button>
-                ))}
-                {utilityAgents.length > 0 && runtimeAgents.length > 0 && (
-                  <div className="my-1 border-t border-border" />
-                )}
-                {utilityAgents.map((agent) => (
-                  <button
-                    key={agent.id}
-                    type="button"
-                    onClick={() => void spawnWithAgent(agent.id, false)}
-                    className="w-full px-3 py-1.5 text-left text-[12px] text-text-muted hover:text-text hover:bg-bg-tertiary"
-                  >
-                    {agent.displayName}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
           <WorkspaceFilesToggle />
           <button
             type="button"

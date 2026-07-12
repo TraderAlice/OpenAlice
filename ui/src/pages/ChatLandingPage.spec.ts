@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { resolveChatAgent, resolveChatCredential, resolveChatWorkspaceTarget } from './ChatLandingPage'
+import {
+  resolveChatAgent,
+  resolveChatCredential,
+  resolveChatWorkspaceTarget,
+  resolveQuickChatCredentialSlug,
+} from './ChatLandingPage'
 import type { AgentRuntimeReadinessSnapshot, Workspace } from '../components/workspace/api'
 
 const agents = [
@@ -178,5 +183,15 @@ describe('resolveChatCredential', () => {
   it('does not claim a deleted credential is available', () => {
     expect(resolveChatCredential(credentials, null, 'missing', true)).toBeNull()
     expect(resolveChatCredential(credentials, 'missing', null, false, null, 'saved-b')).toBe('saved-b')
+  })
+})
+
+describe('resolveQuickChatCredentialSlug', () => {
+  it('passes a resolved OpenCode/Pi credential even when runtime readiness came from global config', () => {
+    expect(resolveQuickChatCredentialSlug(true, 'meituan-longcat')).toBe('meituan-longcat')
+  })
+
+  it('does not send credentials to login-backed runtimes', () => {
+    expect(resolveQuickChatCredentialSlug(false, 'meituan-longcat')).toBeUndefined()
   })
 })

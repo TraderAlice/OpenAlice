@@ -319,6 +319,7 @@
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
+  position: relative;
 }
 
 /* Measure the space actually left for WorkspacePage after the global rail and
@@ -335,9 +336,16 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .workspace-page-shell .workspace-side,
-  .workspace-page-shell .workspace-files-toggle {
-    display: none;
+  /* Keep Files reachable in a narrow Workspace. A fixed second column would
+   * crush the terminal, so the same panel becomes a right-side overlay while
+   * its header toggle remains visible. */
+  .workspace-page-shell .workspace-side {
+    position: absolute;
+    inset: 0 0 0 auto;
+    width: min(360px, 100%);
+    z-index: 10;
+    background: var(--color-bg);
+    box-shadow: -18px 0 36px -28px rgba(0, 0, 0, 0.65);
   }
 }
 
