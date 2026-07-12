@@ -27,6 +27,8 @@ guides. [`docs/roadmap.md`](roadmap.md), [`docs/ai-os-design.md`](ai-os-design.m
 [`docs/implementation-plan.md`](implementation-plan.md) are forward-looking
 planning surfaces — direction, candidate work, and target-state design, not
 durable subsystem truth; current code always overrides them.
+[`docs/baseline-quality-gate.md`](baseline-quality-gate.md) is a point-in-time
+release-readiness record for the `v0.1-foundation` baseline.
 
 ## Maintenance Rule
 
