@@ -14,12 +14,19 @@
   "permissions": {
     "allow": [
       "Bash(pnpm install)",
+      "Bash(pnpm install:*)",
       "Bash(pnpm test)",
       "Bash(pnpm test:*)",
       "Bash(pnpm typecheck)",
       "Bash(pnpm build)",
       "Bash(pnpm build:*)",
-      "Bash(npx tsc:*)"
+      "Bash(pnpm -F:*)",
+      "Bash(pnpm vitest:*)",
+      "Bash(npx tsc:*)",
+      "Bash(git status:*)",
+      "Bash(git fetch:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)"
     ]
   }
 }
