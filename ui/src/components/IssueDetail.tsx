@@ -31,7 +31,7 @@ import { useInboxSelection } from '../live/inbox-selection'
 import { previewForEntry } from '../live/inbox-threads'
 import { useWikilinkHandler } from '../live/wikilink'
 import { useWorkspace } from '../tabs/store'
-import { CadencePill, PriorityIndicator } from './IssuesBoard'
+import { AutomationHealthPill, CadencePill, PriorityIndicator } from './IssuesBoard'
 import { STATUS_META } from './issue-status-meta'
 import { MarkdownContent } from './MarkdownContent'
 import { MarkdownWhatEditor } from './MarkdownWhatEditor'
@@ -338,6 +338,16 @@ function PropertiesRail({
           )}
           {agentNeedsCredential && (
             <p className="py-2 text-right text-[11px] leading-snug text-amber-400">AI credential missing.</p>
+          )}
+          {issue.automationHealth && (
+            <PropRow label="Health">
+              <div className="flex flex-col items-end gap-1">
+                <AutomationHealthPill health={issue.automationHealth} />
+                <span className="max-w-44 text-[11px] leading-snug text-muted">
+                  {issue.automationHealth.message}
+                </span>
+              </div>
+            </PropRow>
           )}
           <PropRow label="Last run">
             {issue.lastFiredAtMs ? formatRelativeTime(issue.lastFiredAtMs) : <span className="text-muted">never</span>}

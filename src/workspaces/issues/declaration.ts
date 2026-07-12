@@ -21,7 +21,8 @@
  *   status: backlog | todo | in_progress | done | canceled   (optional → 'todo')
  *   priority: urgent | high | medium | low | none             (optional → 'none')
  *   assignee: "@workspace" | "@human" | "@unassigned" | "@<resumeId>"  (optional → '@workspace')
- *   when: { kind: at, at } | { kind: every, every } | { kind: cron, cron }  (OPTIONAL — present iff scheduled)
+ *   when: { kind: at, at } | { kind: every, every } |
+ *         { kind: cron, cron, timezone?: local | IANA zone }  (OPTIONAL — present iff scheduled)
  *   what: <legacy fire prompt; migrated into the markdown What body>
  *   agent: <optional adapter id for the scheduled run>
  *   ---
@@ -37,7 +38,7 @@ import { join } from 'node:path'
 import { parse as parseYaml } from 'yaml'
 import { z } from 'zod'
 
-import type { Schedule } from '../../core/schedule-expr.js'
+import { isValidScheduleTimezone, type Schedule } from '../../core/schedule-expr.js'
 import {
   HUMAN_ASSIGNEE,
   UNASSIGNED_ASSIGNEE,
@@ -74,7 +75,13 @@ export function isTerminalStatus(status: IssueStatus): boolean {
 export const issueWhenSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('at'), at: z.string().min(1) }),
   z.object({ kind: z.literal('every'), every: z.string().min(1) }),
-  z.object({ kind: z.literal('cron'), cron: z.string().min(1) }),
+  z.object({
+    kind: z.literal('cron'),
+    cron: z.string().min(1),
+    /** Omitted is legacy machine-local time; explicit `local` is recommended
+     * for personal reminders, while market clocks should use an IANA zone. */
+    timezone: z.string().min(1).refine(isValidScheduleTimezone, 'timezone must be `local` or a valid IANA timezone').optional(),
+  }),
 ])
 
 /** Who owns the Issue. Workspace ownership recruits a fresh Session for each

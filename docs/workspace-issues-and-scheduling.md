@@ -34,7 +34,7 @@ title: Pre-market brief
 status: todo
 priority: high
 assignee: "@workspace"
-when: { kind: cron, cron: "30 8 * * 1-5" }
+when: { kind: cron, cron: "30 8 * * 1-5", timezone: America/New_York }
 agent: pi
 ---
 
@@ -55,7 +55,7 @@ The filename stem is the stable issue id. Frontmatter:
 - `when` — optional schedule:
   - `{ kind: at, at: <ISO timestamp> }`
   - `{ kind: every, every: <duration> }`
-  - `{ kind: cron, cron: <5-field expression> }`
+  - `{ kind: cron, cron: <5-field expression>, timezone: local | <IANA zone> }`
 - `agent` — optional CLI adapter id for `@workspace`-owned scheduled work;
   otherwise Workspace/default resolution is used. A Session assignee already
   owns its runtime and cannot be overridden here.
@@ -80,6 +80,26 @@ a heading surviving an arbitrary rewrite.
 `done` and `canceled` are terminal and stop scheduled firing. There is no
 separate `enabled` flag. A successful one-shot `at` issue is automatically
 marked `done`; repeating schedules retain their status.
+
+### Cron clock semantics
+
+Cron describes a wall clock, so the clock belongs in the file rather than in an
+operator's memory:
+
+```yaml
+# Personal/local intent: follow the machine running this OpenAlice installation.
+when: { kind: cron, cron: "0 9 * * *", timezone: local }
+
+# Market intent: 08:30 in New York, including EST/EDT transitions.
+when: { kind: cron, cron: "30 8 * * 1-5", timezone: America/New_York }
+```
+
+`timezone` accepts `local` or an IANA timezone. Omitting it preserves the former
+machine-local behavior for existing Issue files, but new files should state the
+clock explicitly. Cron is not an exchange calendar: holidays, early closes, and
+"only on a trading day" remain business conditions in What. A future market
+calendar primitive can add those semantics without making ordinary reminders
+depend on a trading subsystem.
 
 ## Agent and Human Surfaces
 
@@ -122,6 +142,20 @@ run checks X and exits silently when false.
 The scanner persists only last-fired markers under the launcher state root.
 Schedule semantics remain in the issue file. Markers are written after a
 successful dispatch; capacity/transient rejection stays due for retry.
+
+The Issue API also derives an `automationHealth` projection from these markers,
+the latest scheduled run, and the assignee's resume availability. It is not
+persisted in markdown and does not create another Issue workflow status:
+
+- `not_started`, `due`, `running`, and `healthy` describe normal progress;
+- `failed` retains the latest failed/interrupted run until a later success;
+- `blocked` means the schedule has no future fire, or an exact Session owner is
+  missing, retired, or not resumable;
+- `inactive` means Issue status `done`/`canceled` has stopped the schedule.
+
+Health measures scheduler fulfillment, not human attention. A successful run
+may correctly exit silently when its condition is false, so Inbox delivery is
+not a health prerequisite.
 
 Headless runs may overlap with interactive sessions or other runs in the same
 checkout. Agents must tolerate concurrent edits. The launcher currently admits
@@ -228,7 +262,9 @@ each concrete run as separate follow-up targets.
 
 Scheduling never bypasses trading approval. A headless agent may research or
 stage a trade, but execution remains behind UTA/Trading-as-Git permission and
-human approval boundaries.
+human approval boundaries. The Trading-as-Git commit log remains the durable
+trade decision trail; Issue automation does not duplicate it into a second
+provenance store.
 
 ## Load-Bearing Paths
 
@@ -239,6 +275,7 @@ human approval boundaries.
 | `src/workspaces/issues/mutate.ts` | Safe read-modify-write operations |
 | `src/workspaces/issues/board.ts` | Global board/detail projections |
 | `src/workspaces/issues/auto-complete.ts` | Successful one-shot → `done` transition |
+| `src/workspaces/issues/automation-health.ts` | Live schedule/run/owner health projection |
 | `src/workspaces/schedule/scanner.ts` | Workspace scan, due calculation, dispatch |
 | `src/workspaces/schedule/marker-store.ts` | Atomic last-fired persistence |
 | `src/workspaces/service.ts` | Scanner composition, agent resolution, headless registry |

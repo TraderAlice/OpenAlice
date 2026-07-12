@@ -27,6 +27,7 @@ import type {
 } from '../headless-task-registry.js'
 import type { IssuePriority, IssueRecord, IssueStatus } from './declaration.js'
 import type { IssueComment } from './comments.js'
+import type { IssueAutomationHealth } from './automation-health.js'
 
 /** One board row: the issue's display fields, plus — iff it self-schedules — its
  *  `when` and the scanner's firing markers. No markdown What (Phase 2 loads it). */
@@ -44,6 +45,8 @@ export interface IssuesSnapshotIssue {
   lastFiredAtMs?: number | null
   /** When it is next due (epoch ms); only for scheduled issues. */
   nextDueAtMs?: number | null
+  /** Live scheduler/worker health; present iff the Issue has a schedule. */
+  automationHealth?: IssueAutomationHealth
   /** True iff this issue's NAME (title, case-insensitive) is also used by an
    *  issue in a DIFFERENT workspace. A name is a global team object, so a clash
    *  across workspaces is ambiguous and the UI warns on it. DETECTION ONLY — we
@@ -135,6 +138,8 @@ export interface BoardRow {
   agent?: string
   /** True iff the issue self-schedules (snapshot `when` present). */
   scheduled: boolean
+  /** Live scheduler/worker health for scheduled rows. */
+  automationHealth?: IssueAutomationHealth
   workspace: { wsId: string; tag: string }
   /** Present (true) iff this title clashes across workspaces — carried from
    *  the snapshot's `annotateNameCollisions`. Absent ⇒ unique. */
@@ -172,6 +177,7 @@ export function flattenBoardRows(snapshot: IssuesSnapshot): {
         assignee: issue.assignee,
         ...(issue.agent ? { agent: issue.agent } : {}),
         scheduled: issue.when !== undefined,
+        ...(issue.automationHealth ? { automationHealth: issue.automationHealth } : {}),
         workspace: { wsId: ws.wsId, tag: ws.tag },
         ...(issue.nameCollision ? { nameCollision: true } : {}),
       })
@@ -196,6 +202,7 @@ export interface WikilinkIssueRef {
 export interface IssueFiringMarkers {
   lastFiredAtMs: number | null
   nextDueAtMs: number | null
+  automationHealth: IssueAutomationHealth
 }
 
 // ==================== Detail (Phase 2a) ====================
@@ -222,6 +229,8 @@ export interface IssueDetailIssue {
   lastFiredAtMs?: number | null
   /** When it is next due (epoch ms); only for scheduled issues. */
   nextDueAtMs?: number | null
+  /** Live scheduler/worker health; present iff the Issue has a schedule. */
+  automationHealth?: IssueAutomationHealth
 }
 
 /** GET /api/issues/:wsId/:id — one issue + its run history (Activity feed) +
@@ -367,7 +376,11 @@ export function detailIssue(
     assignee: issue.assignee,
     ...(issue.when ? { when: issue.when } : {}),
     ...(issue.agent ? { agent: issue.agent } : {}),
-    ...(markers ? { lastFiredAtMs: markers.lastFiredAtMs, nextDueAtMs: markers.nextDueAtMs } : {}),
+    ...(markers ? {
+      lastFiredAtMs: markers.lastFiredAtMs,
+      nextDueAtMs: markers.nextDueAtMs,
+      automationHealth: markers.automationHealth,
+    } : {}),
   }
 }
 
@@ -386,6 +399,10 @@ export function snapshotBoardIssue(
     assignee: issue.assignee,
     ...(issue.agent ? { agent: issue.agent } : {}),
     ...(issue.when ? { when: issue.when } : {}),
-    ...(markers ? { lastFiredAtMs: markers.lastFiredAtMs, nextDueAtMs: markers.nextDueAtMs } : {}),
+    ...(markers ? {
+      lastFiredAtMs: markers.lastFiredAtMs,
+      nextDueAtMs: markers.nextDueAtMs,
+      automationHealth: markers.automationHealth,
+    } : {}),
   }
 }

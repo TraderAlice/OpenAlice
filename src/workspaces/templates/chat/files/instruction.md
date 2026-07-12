@@ -155,10 +155,16 @@ For recurring work, create a scheduled issue instead of inventing a side channel
 
 ```bash
 alice-workspace issue create --title "Pre-market power brief" --priority high \
-  --when '{"kind":"cron","cron":"30 8 * * 1-5"}' \
+  --when '{"kind":"cron","cron":"30 8 * * 1-5","timezone":"America/New_York"}' \
   --assignee @me \
-  --what "Check AI power infrastructure names, write research/premarket-power.md, then push it to Inbox if there is a material update."
+  --what "Check AI power infrastructure names. If there is a material update, write research/premarket-power.md and run: alice-workspace inbox push --doc research/premarket-power.md --comments 'Pre-market power update'. Otherwise exit silently."
 ```
+
+Cron is wall-clock intent: write `timezone:"local"` for the user's own clock,
+and an IANA zone such as `America/New_York` for a market clock. Do not encode US
+daylight saving as a fixed UTC offset. A completed headless reply is visible to
+the scheduler, not automatically to the human; user-facing scheduled work must
+explicitly push Inbox from its What.
 
 Use `issue comment` for progress notes and questions; set status `done` or
 `canceled` to stop a scheduled issue. The full file model is in the

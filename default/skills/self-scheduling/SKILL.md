@@ -87,7 +87,7 @@ as `--when`:
 
 ```bash
 alice-workspace issue create --title "Pre-market brief" --priority high \
-  --when '{"kind":"cron","cron":"30 8 * * 1-5"}' \
+  --when '{"kind":"cron","cron":"30 8 * * 1-5","timezone":"America/New_York"}' \
   --assignee @me \
   --what "Pull pre-market movers and overnight news for my watchlist, write a short brief to research/premarket.md, then run: alice-workspace inbox push --doc research/premarket.md --comments 'Pre-market brief'." \
   --agent claude
@@ -110,7 +110,7 @@ title: Pre-market brief
 status: todo
 priority: high
 assignee: "@resume-calm-amber-river-a1b2c3"
-when: { kind: cron, cron: "30 8 * * 1-5" }
+when: { kind: cron, cron: "30 8 * * 1-5", timezone: America/New_York }
 ---
 
 Pull pre-market movers and overnight news for my watchlist. Every trading
@@ -165,9 +165,13 @@ plain tracked item; add a `when` and it starts firing.
 - **`when`** *(OPTIONAL — present iff the issue self-schedules)* — one of:
   - `{ kind: every, every: "30m" }` — repeat on an interval (`30m`, `2h`,
     `1h30m`). Runs on the next scan, then on the interval.
-  - `{ kind: cron, cron: "0 9 * * 1-5" }` — a 5-field cron expression
-    (`min hour day-of-month month day-of-week`; supports `*`, ranges `9-17`,
-    lists `1,15`, steps `*/15`). Wall-clock; waits for the next match.
+  - `{ kind: cron, cron: "0 9 * * 1-5", timezone: local }` — a 5-field cron
+    expression (`min hour day-of-month month day-of-week`; supports `*`, ranges
+    `9-17`, lists `1,15`, steps `*/15`). `timezone` is part of the intent:
+    use `local` for the user's own wall clock (morning reminders), or an IANA
+    zone such as `America/New_York` for a market clock (pre-open scans). The
+    zone handles daylight-saving changes. Omitted timezone remains machine-local
+    only for compatibility with old files; new Issues should write it explicitly.
   - `{ kind: at, at: "2026-03-01T13:30:00Z" }` — run ONCE at an ISO timestamp,
     then never again.
 - **`agent`** *(optional)* — runtime override for `workspace`-owned scheduled
@@ -220,6 +224,10 @@ work and surfaces nothing has vanished. So:
 - If the run is a **check that didn't trigger** (condition not met, nothing
   changed), **exit silently — that is the correct outcome**, not a failure.
   Don't manufacture noise.
+
+The Agent Runtime returning a reply only means the scheduler received the run's
+control-plane result. It does **not** mean the user saw it. Put the Inbox command
+inside What whenever human delivery is part of completion.
 
 Put **conditions inside `what`**, not in the schedule — there is no condition
 field. For "ping me only if X", write: "check X; if it holds, push an alert;

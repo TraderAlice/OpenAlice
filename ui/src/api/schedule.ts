@@ -3,7 +3,7 @@ import { fetchJson } from './client'
 export type ScheduleWhen =
   | { kind: 'at'; at: string }
   | { kind: 'every'; every: string }
-  | { kind: 'cron'; cron: string }
+  | { kind: 'cron'; cron: string; timezone?: string }
 
 export interface ScheduleTask {
   id: string

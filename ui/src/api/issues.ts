@@ -22,6 +22,20 @@ import type { ScheduleWhen } from './schedule'
 
 export type IssueStatus = 'backlog' | 'todo' | 'in_progress' | 'done' | 'canceled'
 export type IssuePriority = 'urgent' | 'high' | 'medium' | 'low' | 'none'
+export type IssueAutomationHealthState =
+  | 'inactive'
+  | 'not_started'
+  | 'due'
+  | 'running'
+  | 'healthy'
+  | 'failed'
+  | 'blocked'
+
+export interface IssueAutomationHealth {
+  state: IssueAutomationHealthState
+  message: string
+  latestTaskId?: string
+}
 export type IssueProvenanceAction = 'created' | 'updated' | 'commented' | 'sent' | 'decided' | 'reconstructed'
 export type IssueProvenanceOrigin =
   | {
@@ -73,6 +87,8 @@ export interface IssueListItem {
   lastFiredAtMs?: number | null
   /** Computed next fire (epoch ms) — scheduled issues only. */
   nextDueAtMs?: number | null
+  /** Live scheduler/worker health; present iff the Issue has a schedule. */
+  automationHealth?: IssueAutomationHealth
   /**
    * True iff this issue's NAME (title, case-insensitive) is also claimed by an
    * issue in a DIFFERENT workspace. A `[[name]]` is a global team object, so a
@@ -159,6 +175,8 @@ export interface IssueDetailIssue {
   lastFiredAtMs?: number | null
   /** Computed next fire (epoch ms) — scheduled issues only. */
   nextDueAtMs?: number | null
+  /** Live scheduler/worker health; present iff the Issue has a schedule. */
+  automationHealth?: IssueAutomationHealth
 }
 
 /** GET /api/issues/:wsId/:id — one issue + its run history (Activity feed). */

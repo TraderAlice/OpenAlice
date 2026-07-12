@@ -49,15 +49,15 @@ export function AutomationApiSection() {
 title: Pre-market movers scan
 status: todo
 priority: high
-assignee: ws:research
-when: { kind: cron, cron: "30 8 * * 1-5" }
-what: >
-  Pull pre-market movers, write research/premarket.md, then push it to the inbox.
+assignee: "@workspace"
+when: { kind: cron, cron: "30 8 * * 1-5", timezone: America/New_York }
 agent: claude
 ---
 
 Every trading morning before the open, assemble the pre-market picture for
-the watchlist — movers, gaps, and overnight headlines that move the thesis.`}</Block>
+the watchlist — movers, gaps, and overnight headlines that move the thesis.
+Write research/premarket.md, then run alice-workspace inbox push --doc
+research/premarket.md --comments "Pre-market brief".`}</Block>
         <ul className="ml-4 list-disc space-y-1 text-muted">
           <li>
             <code className={CODE}>title</code>: a short human title for the issue — required, surfaced
@@ -73,8 +73,13 @@ the watchlist — movers, gaps, and overnight headlines that move the thesis.`}<
           <li>
             <code className={CODE}>when</code> <em>(optional — present iff scheduled)</em>:{' '}
             <code className={CODE}>{`{kind: every, every: "30m"}`}</code>,{' '}
-            <code className={CODE}>{`{kind: cron, cron: "0 9 * * 1-5"}`}</code>, or{' '}
+            <code className={CODE}>{`{kind: cron, cron: "0 9 * * 1-5", timezone: "local"}`}</code>, or{' '}
             <code className={CODE}>{`{kind: at, at: "2026-03-01T13:30:00Z"}`}</code>.
+          </li>
+          <li>
+            Cron <code className={CODE}>timezone</code> is <code className={CODE}>local</code> for the
+            machine&apos;s wall clock or an IANA zone such as <code className={CODE}>America/New_York</code>{' '}
+            for market time. Omission is legacy-compatible machine-local time.
           </li>
           <li>
             <code className={CODE}>what</code>: a standalone prompt for the headless run — conditions

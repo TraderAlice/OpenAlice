@@ -59,6 +59,7 @@
     "@traderalice/uta-protocol": "workspace:*",
     "ai": "^6.0.86",
     "ccxt": "^4.5.38",
+    "cron-parser": "^5.6.1",
     "decimal.js": "^10.6.0",
     "dugite": "3.2.2",
     "electron-updater": "^6.8.9",

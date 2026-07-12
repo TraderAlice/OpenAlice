@@ -348,6 +348,8 @@ export const issueCreateFactory: WorkspaceToolFactory = {
         '`@workspace` recruits a new Session each fire. `@me` resolves to this',
         'calling Session, while an exact `@resumeId` keeps one accountable',
         'Session (including a deliberately signed Session from another Workspace).',
+        'A scheduled run is unattended: if its result is meant for the human,',
+        'What must explicitly tell it to use `alice-workspace inbox push`.',
       ].join('\n'),
       inputSchema: z.object({
         title: z.string().min(1).describe('Short human title (required).'),
@@ -363,7 +365,7 @@ export const issueCreateFactory: WorkspaceToolFactory = {
           .describe('Initial owner. Omit or use @me for the current Session; use @workspace to recruit a fresh Session each fire.'),
         when: issueWhenSchema
           .optional()
-          .describe('Schedule shape — { kind:"at", at } | { kind:"every", every } | { kind:"cron", cron }. Present iff the issue self-schedules.'),
+          .describe('Schedule shape — { kind:"at", at } | { kind:"every", every } | { kind:"cron", cron, timezone?:"local"|IANA }. Present iff the issue self-schedules.'),
         what: z.string().min(1).optional().describe('Markdown work definition; exact scheduled prompt. Defaults to title.'),
         agent: z.string().min(1).optional().describe('Adapter id when assignee is @workspace; Session assignees own their runtime.'),
       }),

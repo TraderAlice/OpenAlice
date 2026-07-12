@@ -75,6 +75,11 @@ import {
 } from './session-directory.js';
 import { completeOneShotIssueAfterRun } from './issues/auto-complete.js';
 import { readIssueComments } from './issues/comments.js';
+import {
+  issueAutomationHealth,
+  type IssueAutomationOwnerState,
+} from './issues/automation-health.js';
+import { issueAssigneeResumeId } from './issues/declaration.js';
 import type { IInboxStore } from '@/core/inbox-store.js';
 import { toSafeInboxOrigin } from '@/core/workspace-tool-center.js';
 import {
@@ -94,6 +99,17 @@ import {
   ChatWorkspaceResolver,
   type ChatWorkspaceResolution,
 } from './chat-workspace-resolver.js';
+
+/** Resolve only the operational facts automation health needs. Product APIs do
+ * not expose the runtime-native session id itself. */
+function automationOwnerState(assignee: string, resumes: ResumeRegistry): IssueAutomationOwnerState {
+  const resumeId = issueAssigneeResumeId(assignee);
+  if (!resumeId) return 'workspace';
+  const identity = resumes.get(resumeId);
+  if (!identity) return 'missing';
+  if (identity.lifecycle === 'retired') return 'retired';
+  return identity.agentSessionId ? 'ready' : 'unbound';
+}
 
 /** Max concurrent in-flight headless tasks — backstop against unbounded spawn. */
 const MAX_CONCURRENT_HEADLESS = 8;
@@ -1283,11 +1299,19 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
             nowMs,
             DEFAULT_INTERVAL_MS,
           );
+          const latestRun = headlessTasks.list({ issue: { workspaceId: ws.id, issueId: issue.id } })[0];
           return snapshotBoardIssue(
             issue,
             {
               lastFiredAtMs: fired.lastFiredAtMs,
               nextDueAtMs: fired.nextDueAtMs,
+              automationHealth: issueAutomationHealth({
+                status: issue.status,
+                nowMs,
+                nextDueAtMs: fired.nextDueAtMs,
+                ownerState: automationOwnerState(issue.assignee, resumeRegistry),
+                ...(latestRun ? { latestRun: { taskId: latestRun.taskId, status: latestRun.status } } : {}),
+              }),
             },
           );
         });
@@ -1318,7 +1342,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     if (!commentsResult.ok) {
       launcherLogger.warn('issue.comments_invalid', { wsId: ws.id, issueId: issue.id, error: commentsResult.error });
     }
-    let markers: IssueFiringMarkers | null = null;
+    let scheduledSnapshot: ScheduleSnapshotTask | null = null;
     if (issue.when) {
       const fired = snapshotScheduledIssue(
         issue,
@@ -1327,13 +1351,24 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         Date.now(),
         DEFAULT_INTERVAL_MS,
       );
-      markers = { lastFiredAtMs: fired.lastFiredAtMs, nextDueAtMs: fired.nextDueAtMs };
+      scheduledSnapshot = fired;
     }
     // Newest-first already (registry.list reverses); filter to this issue's runs.
     const runs = headlessTasks.list({ issue: { workspaceId: ws.id, issueId: issue.id } }).map((task) => {
       const identity = resumeRegistry.get(task.resumeId);
       return issueRunRecord(task, identity?.lifecycle !== 'retired' && Boolean(identity?.agentSessionId));
     });
+    const markers: IssueFiringMarkers | null = scheduledSnapshot ? {
+      lastFiredAtMs: scheduledSnapshot.lastFiredAtMs,
+      nextDueAtMs: scheduledSnapshot.nextDueAtMs,
+      automationHealth: issueAutomationHealth({
+        status: issue.status,
+        nowMs: Date.now(),
+        nextDueAtMs: scheduledSnapshot.nextDueAtMs,
+        ownerState: automationOwnerState(issue.assignee, resumeRegistry),
+        ...(runs[0] ? { latestRun: { taskId: runs[0].taskId, status: runs[0].status } } : {}),
+      }),
+    } : null;
     // The issue→inbox cross-link: the reports this issue produced (entries this
     // workspace pushed whose server-stamped origin.issueId is this issue).
     // Joined here in the domain so CLI / MCP get it too, not just the HTTP route.

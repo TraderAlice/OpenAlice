@@ -224,6 +224,18 @@ describe('assignee projection', () => {
     expect(snapshotBoardIssue(issue, null).assignee).toBe('@unassigned')
     expect(detailIssue(issue, null).assignee).toBe('@unassigned')
   })
+
+  it('carries live automation health only when scheduled markers are supplied', () => {
+    const scheduled = { ...baseIssue, when: { kind: 'every' as const, every: '1h' } }
+    const markers = {
+      lastFiredAtMs: 100,
+      nextDueAtMs: 200,
+      automationHealth: { state: 'healthy' as const, message: 'Latest scheduled run completed.', latestTaskId: 'run-1' },
+    }
+    expect(snapshotBoardIssue(scheduled, markers).automationHealth).toEqual(markers.automationHealth)
+    expect(detailIssue(scheduled, markers).automationHealth).toEqual(markers.automationHealth)
+    expect(snapshotBoardIssue(baseIssue, null)).not.toHaveProperty('automationHealth')
+  })
 })
 
 describe('inboxReportsForIssue', () => {

@@ -42,9 +42,10 @@ export const demoIssuesSnapshot: IssueSnapshot = {
           priority: 'high',
           assignee: '@workspace',
           agent: 'codex',
-          when: { kind: 'cron', cron: '30 8 * * 1-5' },
+          when: { kind: 'cron', cron: '30 8 * * 1-5', timezone: 'America/New_York' },
           lastFiredAtMs: now - HOUR,
           nextDueAtMs: now + 16 * HOUR,
+          automationHealth: { state: 'running', message: 'A scheduled run is in progress.', latestTaskId: 'demo-run-morning-1' },
         },
         // Scheduled (every) + urgent.
         {
@@ -56,6 +57,7 @@ export const demoIssuesSnapshot: IssueSnapshot = {
           when: { kind: 'every', every: '1h' },
           lastFiredAtMs: now - HOUR / 2,
           nextDueAtMs: now + HOUR / 2,
+          automationHealth: { state: 'failed', message: 'Latest scheduled run failed.', latestTaskId: 'demo-run-thesis-failed' },
         },
         // Pure work item — no `when`, scanner ignores it, board still shows it.
         {
@@ -99,9 +101,10 @@ export const demoIssuesSnapshot: IssueSnapshot = {
           priority: 'medium',
           assignee: '@workspace',
           agent: 'codex',
-          when: { kind: 'cron', cron: '0 16 * * 5' },
+          when: { kind: 'cron', cron: '0 16 * * 5', timezone: 'local' },
           lastFiredAtMs: now - 2 * DAY,
           nextDueAtMs: now + 5 * DAY,
+          automationHealth: { state: 'healthy', message: 'Latest scheduled run completed.', latestTaskId: 'demo-run-weekly-1' },
         },
         // Scheduled (at) one-shot — never fired yet.
         {
@@ -109,11 +112,11 @@ export const demoIssuesSnapshot: IssueSnapshot = {
           title: 'Write the CPI release reaction note',
           status: 'todo',
           priority: 'high',
-          assignee: '@human',
-          agent: 'claude',
+          assignee: '@resume-demo-cpi-owner',
           when: { kind: 'at', at: new Date(now + 3 * DAY).toISOString() },
           lastFiredAtMs: null,
           nextDueAtMs: now + 3 * DAY,
+          automationHealth: { state: 'blocked', message: 'Assigned Session does not exist. Choose an active Session or @workspace.' },
         },
         // Completed work item.
         {

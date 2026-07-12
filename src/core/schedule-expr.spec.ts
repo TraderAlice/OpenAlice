@@ -42,9 +42,19 @@ describe('schedule-expr', () => {
       expect(next).not.toBeNull()
       expect(new Date(next!).getMinutes() % 15).toBe(0)
     })
+    it('keeps omitted and explicit local timezones equivalent', () => {
+      expect(nextCronFire('0 9 * * *', base)).toBe(nextCronFire('0 9 * * *', base, 'local'))
+    })
+    it('evaluates market-clock schedules in an explicit IANA timezone', () => {
+      const winter = Date.UTC(2026, 0, 2, 12, 0, 0)
+      const summer = Date.UTC(2026, 6, 2, 12, 0, 0)
+      expect(nextCronFire('30 8 * * 1-5', winter, 'America/New_York')).toBe(Date.UTC(2026, 0, 2, 13, 30))
+      expect(nextCronFire('30 8 * * 1-5', summer, 'America/New_York')).toBe(Date.UTC(2026, 6, 2, 12, 30))
+    })
     it('rejects a malformed expression', () => {
       expect(nextCronFire('not a cron', base)).toBeNull()
       expect(nextCronFire('0 9 * *', base)).toBeNull() // only 4 fields
+      expect(nextCronFire('0 9 * * *', base, 'US/Definitely-Not-A-Zone')).toBeNull()
     })
   })
 })

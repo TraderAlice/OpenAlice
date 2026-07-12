@@ -150,15 +150,24 @@ describe('readWorkspaceIssues', () => {
   })
 
   it('parses block-style and cron/at `when` shapes', async () => {
-    await writeIssue('eod', fm('title: EOD summary\nwhen:\n  kind: cron\n  cron: "0 16 * * 1-5"'))
+    await writeIssue('eod', fm('title: EOD summary\nwhen:\n  kind: cron\n  cron: "0 16 * * 1-5"\n  timezone: America/New_York'))
     await writeIssue('oneshot', fm('title: One-shot\nwhen: { kind: at, at: "2030-01-01T09:00:00Z" }'))
     const r = await readWorkspaceIssues(dir)
     expect(r.ok).toBe(true)
     if (r.ok) {
       const byId = Object.fromEntries(r.issues.map((i) => [i.id, i]))
-      expect(byId['eod'].when).toEqual({ kind: 'cron', cron: '0 16 * * 1-5' })
+      expect(byId['eod'].when).toEqual({ kind: 'cron', cron: '0 16 * * 1-5', timezone: 'America/New_York' })
       expect(byId['oneshot'].when).toEqual({ kind: 'at', at: '2030-01-01T09:00:00Z' })
     }
+  })
+
+  it('rejects a cron timezone that is neither local nor an IANA zone', async () => {
+    await writeIssue('bad-zone', fm('title: Bad zone\nwhen: { kind: cron, cron: "0 9 * * *", timezone: "New York-ish" }'))
+    const result = await readWorkspaceIssues(dir)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.issues).toEqual([])
+    expect(result.invalid[0]?.error).toMatch(/timezone.*IANA/)
   })
 
   it('keys the id off the filename stem (not any frontmatter id)', async () => {
