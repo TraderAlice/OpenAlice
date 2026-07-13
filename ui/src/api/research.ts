@@ -4,6 +4,7 @@ export type EvidenceTone = 'muted' | 'red' | 'amber'
 export type QualityTone = EvidenceTone | 'green'
 export type BridgeState = 'awaiting_bridge' | 'stale' | 'unsafe_account' | 'disconnected' | 'ready'
 export type Mt5LearningState = 'no_data' | 'learning' | 'blocked' | 'stale'
+export type JmbDecisionState = 'no_decision' | 'shadow' | 'demo_blocked' | 'error'
 
 export interface Mt5TradeLedgerSummary {
   state: Mt5LearningState
@@ -21,6 +22,28 @@ export interface Mt5TradeLedgerSummary {
   otherDeals: number
   unknownDeals: number
   netProfit: number
+}
+
+export interface JmbDecisionSummary {
+  state: JmbDecisionState
+  label: string
+  detail: string
+  broker: string
+  symbol: string
+  lastUpdated: string | null
+  decision: null | {
+    decisionId: string
+    createdAt: string
+    strategyVersion: string
+    mode: string
+    direction: string
+    reasonCode: string
+    reasonDetail: string
+    spread: number | null
+    volume: number
+    stopLoss: number | null
+    gateResults: Array<{ gate: string; state: string; detail: string }>
+  }
 }
 
 export interface ResearchInstrument {
@@ -72,6 +95,7 @@ export interface ResearchInstrument {
     openOrders: number | null
   }
   learning: Mt5TradeLedgerSummary
+  decision: JmbDecisionSummary
   evidence: { label: string; tone: EvidenceTone; score: number }
 }
 
@@ -79,7 +103,7 @@ export interface ResearchDashboard {
   asOf: string
   mode: 'research_only'
   tradingEnabled: boolean
-  summary: { exportRoot: string; tradeLedgerRoot: string; instrumentsWithData: number; completedBaselines: number; completedWalkForwards: number; readyDemoBridges: number; learningInstruments: number; validatedInstruments: number; hfmReady: boolean; experimentRuns: number }
+  summary: { exportRoot: string; tradeLedgerRoot: string; decisionRoot: string; instrumentsWithData: number; completedBaselines: number; completedWalkForwards: number; readyDemoBridges: number; learningInstruments: number; shadowDecisions: number; validatedInstruments: number; hfmReady: boolean; experimentRuns: number }
   stages: Array<{ key: string; label: string; state: 'complete' | 'waiting' | 'next' | 'blocked'; detail: string }>
   instruments: ResearchInstrument[]
   experiments: Array<{

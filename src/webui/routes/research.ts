@@ -3,6 +3,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { Hono } from 'hono'
 import { dataPath } from '../../core/paths.js'
+import { summarizeLatestJmbDecision } from '../../domain/mt5/decision-record.js'
 import { readMt5ReadOnlyBridge } from '../../domain/mt5/read-only-bridge.js'
 import { summarizeMt5TradeLedger } from '../../domain/mt5/trade-ledger.js'
 import type { EngineContext } from '../../core/types.js'
@@ -80,6 +81,10 @@ const MT5_BRIDGE_ROOT = process.env['OPENALICE_MT5_BRIDGE_ROOT'] ?? join(
 const MT5_TRADE_LEDGER_ROOT = process.env['OPENALICE_MT5_TRADE_LEDGER_ROOT'] ?? join(
   process.env['APPDATA'] ?? join(homedir(), 'AppData', 'Roaming'),
   'MetaQuotes', 'Terminal', 'Common', 'Files', 'OpenAliceMt5TradeLedgerV1',
+)
+const MT5_DECISION_ROOT = process.env['OPENALICE_MT5_DECISION_ROOT'] ?? join(
+  process.env['APPDATA'] ?? join(homedir(), 'AppData', 'Roaming'),
+  'MetaQuotes', 'Terminal', 'Common', 'Files', 'OpenAliceMt5DecisionLogV1',
 )
 
 const INSTRUMENTS = [
@@ -180,12 +185,13 @@ export function createResearchRoutes(ctx: EngineContext) {
     ])
     const instruments = await Promise.all(INSTRUMENTS.map(async (instrument) => {
       const bridgeSymbol = instrument.bridgeSymbol ?? instrument.symbol
-      const [exportData, report, walkForward, bridge, learning] = await Promise.all([
+      const [exportData, report, walkForward, bridge, learning, decision] = await Promise.all([
         inspectExport(instrument.broker, instrument.symbol),
         readReport<TrendReport>(instrument.artifact),
         readReport<WalkForwardReport>(instrument.walkForwardArtifact),
         readMt5ReadOnlyBridge(MT5_BRIDGE_ROOT, instrument.broker, bridgeSymbol),
         summarizeMt5TradeLedger(MT5_TRADE_LEDGER_ROOT, instrument.broker, bridgeSymbol),
+        summarizeLatestJmbDecision(MT5_DECISION_ROOT, instrument.broker, bridgeSymbol),
       ])
       return {
         ...instrument,
@@ -194,6 +200,7 @@ export function createResearchRoutes(ctx: EngineContext) {
         walkForward,
         bridge,
         learning,
+        decision,
         quality: qualityFor(validationReport, instrument.broker, instrument.symbol, exportData.available),
         evidence: evidenceFor(report),
       }
@@ -213,6 +220,7 @@ export function createResearchRoutes(ctx: EngineContext) {
     const completedWalkForwards = instruments.filter((instrument) => instrument.walkForward != null).length
     const readyDemoBridges = instruments.filter((instrument) => instrument.bridge.state === 'ready').length
     const learningInstruments = instruments.filter((instrument) => instrument.learning.state === 'learning').length
+    const shadowDecisions = instruments.filter((instrument) => instrument.decision.state === 'shadow' || instrument.decision.state === 'demo_blocked').length
     const validatedInstruments = instruments.filter((instrument) => instrument.quality.tone === 'green' || instrument.quality.tone === 'amber').length
     return c.json({
       asOf: new Date().toISOString(),
@@ -221,11 +229,13 @@ export function createResearchRoutes(ctx: EngineContext) {
       summary: {
         exportRoot: MT5_EXPORT_ROOT,
         tradeLedgerRoot: MT5_TRADE_LEDGER_ROOT,
+        decisionRoot: MT5_DECISION_ROOT,
         instrumentsWithData: instruments.filter((instrument) => instrument.export.available).length,
         completedBaselines,
         completedWalkForwards,
         readyDemoBridges,
         learningInstruments,
+        shadowDecisions,
         validatedInstruments,
         hfmReady,
         experimentRuns: experimentLedger?.runs.length ?? 0,
@@ -237,6 +247,7 @@ export function createResearchRoutes(ctx: EngineContext) {
         { key: 'costs', label: 'Broker cost model', state: 'next', detail: 'Commission, financing, spread, and slippage still need verification.' },
         { key: 'bridge', label: 'MT5 demo bridge', state: readyDemoBridges === INSTRUMENTS.length ? 'complete' : readyDemoBridges > 0 ? 'next' : 'waiting', detail: readyDemoBridges > 0 ? `${readyDemoBridges}/${INSTRUMENTS.length} terminals report a fresh, demo-only read-only heartbeat.` : 'Attach the read-only MT5 bridge before any paper-execution work.' },
         { key: 'learning', label: 'Trade-history learning', state: learningInstruments === INSTRUMENTS.length ? 'complete' : learningInstruments > 0 ? 'next' : 'waiting', detail: learningInstruments > 0 ? `${learningInstruments}/${INSTRUMENTS.length} broker-symbol ledgers are fresh and demo-only.` : 'Run the MT5 trade ledger exporter so manual and demo trades can be reviewed.' },
+        { key: 'shadow', label: 'JMB shadow decisions', state: shadowDecisions === INSTRUMENTS.length ? 'complete' : shadowDecisions > 0 ? 'next' : 'waiting', detail: shadowDecisions > 0 ? `${shadowDecisions}/${INSTRUMENTS.length} broker-symbol pairs have logged JMB decisions.` : 'Run the shadow decision runner before enabling the demo risk shell.' },
         { key: 'demo', label: 'Demo forward test', state: 'blocked', detail: 'No execution EA exists or is enabled.' },
       ],
       instruments,

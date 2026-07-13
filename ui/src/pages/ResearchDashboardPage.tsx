@@ -46,6 +46,13 @@ function learningTone(state: string): ResearchInstrument['quality']['tone'] {
   return 'muted'
 }
 
+function decisionTone(state: string): ResearchInstrument['quality']['tone'] {
+  if (state === 'shadow') return 'green'
+  if (state === 'demo_blocked') return 'amber'
+  if (state === 'error') return 'red'
+  return 'muted'
+}
+
 function stageClass(state: ResearchDashboard['stages'][number]['state']): string {
   if (state === 'complete') return 'bg-green text-bg'
   if (state === 'next') return 'bg-accent text-bg'
@@ -147,6 +154,19 @@ function InstrumentStudy({ instrument }: { instrument: ResearchInstrument }) {
           <p className="mt-2 text-micro text-text-muted leading-relaxed">
             Deals: {instrument.learning.totalDeals} • Manual: {instrument.learning.manualDeals} • EA: {instrument.learning.eaDeals} • Net: {instrument.learning.netProfit.toFixed(2)}
           </p>
+        </div>
+
+        <div className="border border-border rounded-md px-3 py-3 bg-bg-secondary">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-micro uppercase tracking-[0.14em] text-text-muted">JMB decision learning</span>
+            <span className={`shrink-0 px-2 py-0.5 text-micro rounded border ${qualityToneClass(decisionTone(instrument.decision.state))}`}>{instrument.decision.label}</span>
+          </div>
+          <p className="mt-2 text-micro text-text-muted leading-relaxed">{instrument.decision.detail}</p>
+          {instrument.decision.decision ? (
+            <p className="mt-2 text-micro text-text-muted leading-relaxed">
+              {instrument.decision.decision.mode} / {instrument.decision.decision.direction} / {instrument.decision.decision.reasonCode}
+            </p>
+          ) : null}
         </div>
 
         <div className="flex items-center justify-between text-micro text-text-muted border-t border-border/70 pt-3">
@@ -306,6 +326,7 @@ export function ResearchDashboardPage() {
                 <div className="text-micro uppercase tracking-[0.14em] text-text-muted">Evidence meaning</div>
                 <p className="mt-2 text-body text-text">{dashboard.disclaimer}</p>
                 <p className="research-disclaimer mt-3 text-body text-text-muted">Trade-history learning imports manual and demo outcomes for review. It is not approval for live trading and it cannot submit orders.</p>
+                <p className="research-disclaimer mt-3 text-body text-text-muted">Shadow decisions are JMB learning records only. They are not live-trading approval and they do not submit orders.</p>
                 <div className="mt-4 border-t border-border pt-3 text-micro text-text-muted">Data source: local MT5 exports. Last analysed candles, not streaming broker quotes.</div>
               </div>
               <div className="border border-border bg-bg-secondary rounded-lg overflow-hidden">
