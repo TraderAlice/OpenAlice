@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -124,7 +124,7 @@ describe('OpenAlice local Runtime launcher', () => {
     expect(spawnProcess).toHaveBeenCalledWith('/test/node', ['scripts/guardian/prod.mjs'], expect.objectContaining({
       cwd: '/tmp/OpenAlice',
       env: expect.objectContaining({
-        OPENALICE_HOME: '/tmp/alice-home',
+        OPENALICE_HOME: resolve('/tmp/alice-home'),
         OPENALICE_APP_HOME: '/tmp/OpenAlice',
         OPENALICE_BIND_HOST: '127.0.0.1',
         OPENALICE_WEB_PORT: '41000',

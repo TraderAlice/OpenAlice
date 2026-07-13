@@ -57,6 +57,10 @@ For local installer development:
 ./install --source . --version dev --no-modify-path
 ```
 
+`OPENALICE_INSTALL_BASE_URL` may point the download branch at a local fixture
+server. It exists for installer development and the release smoke; normal user
+installs should leave it unset.
+
 Until release assets include a standalone headless Runtime, users keep an
 OpenAlice source checkout and run the CLI from inside it:
 
@@ -124,11 +128,16 @@ retryable, and Electron's managed-runtime policy continues to belong to
 When this surface changes:
 
 1. Run the CLI unit and installer tests.
-2. Install from `--source` into a temporary install root and execute the
+2. Run `pnpm test:install:docker` locally. It executes the real `curl | bash`
+   download path as a non-root user with an empty home and no global pnpm,
+   then verifies repeat installation, version switching, shell PATH changes,
+   and both launchers while the run container has no external network. This is
+   a manual pre-release gate and intentionally does not run in PR CI.
+3. Install from `--source` into a temporary install root and execute the
    installed symlink.
-3. Run `pnpm build:server` and start with an isolated `--home` and test port.
-4. Open the real localhost route and verify the auth contract and Workspace UI.
-5. Run Guardian recovery checks when launcher ownership changes.
-6. Run Docker smoke when `scripts/guardian/prod.mjs` changes.
-7. Run Electron PTY/package smoke when dependency topology or shared Runtime
+4. Run `pnpm build:server` and start with an isolated `--home` and test port.
+5. Open the real localhost route and verify the auth contract and Workspace UI.
+6. Run Guardian recovery checks when launcher ownership changes.
+7. Run Docker smoke when `scripts/guardian/prod.mjs` changes.
+8. Run Electron PTY/package smoke when dependency topology or shared Runtime
    behavior changes, even though the CLI itself does not package Electron.

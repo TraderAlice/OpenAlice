@@ -236,6 +236,8 @@ Before merging a promotion:
 
 - run the normal build/test gates against the full promotion delta;
 - add entry-path, trading, runtime, or package smokes required by included work;
+- run `pnpm test:install:docker` locally when the release publishes the CLI
+  bootstrap installer; this manual gate is intentionally not a PR CI job;
 - confirm release metadata/version intent;
 - confirm CI and release workflow triggers still match the branch policy.
 
@@ -323,6 +325,7 @@ to `master` or release, every applicable gate must be complete and green.
 | Persisted data | Idempotent migration + spec + regenerated migration index + backup behavior |
 | Desktop, Guardian, PTY, IPC, managed runtimes | Matching dev/Electron/package smoke on affected platforms |
 | UI/API contracts | Strict UI types, real browser route, and matching demo handler |
+| CLI bootstrap installer | Local `pnpm test:install:docker` against the real download path before release |
 | Public contributor/release workflow | Cross-check `AGENTS.md`, `CONTRIBUTING.md`, and GitHub Actions triggers |
 
 If a required gate cannot run, document the exact residual risk in the PR and

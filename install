@@ -103,7 +103,8 @@ if [[ -n "$SOURCE_DIR" ]]; then
     cp "$SOURCE_DIR/packages/cli/$file" "$STAGING/$file"
   done
 else
-  BASE_URL="https://raw.githubusercontent.com/$REPOSITORY/$VERSION/packages/cli"
+  BASE_URL="${OPENALICE_INSTALL_BASE_URL:-https://raw.githubusercontent.com/$REPOSITORY/$VERSION/packages/cli}"
+  BASE_URL="${BASE_URL%/}"
   for file in "${FILES[@]}"; do
     curl --fail --silent --show-error --location "$BASE_URL/$file" --output "$STAGING/$file"
   done
