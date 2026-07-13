@@ -24,6 +24,8 @@ const policy = {
 }
 
 const header = 'schema_version,policy_version,broker,server,symbol,strategy_version,rollout_stage,candidate_approved,completed_observation_max_age_hours,max_spread,max_deviation,max_risk_amount,max_daily_loss,max_daily_losing_trades,max_volume,magic_number'
+const policyRow = '1,hfm-canary-v1,hfmarkets,HFMarketsGlobal-Demo4,XAUUSD,daily-trend-v1,hfm_canary,1,72,0.75,0.5,10,40,4,0.01,880101'
+const policyCsv = `${header}\n${policyRow}`
 const directories: string[] = []
 
 afterEach(async () => {
@@ -78,10 +80,7 @@ describe('demo execution policy', () => {
     directories.push(root)
     const directory = join(root, 'hfmarkets', 'XAUUSD')
     await mkdir(directory, { recursive: true })
-    await writeFile(join(directory, 'policy.csv'), [
-      header,
-      '1,hfm-canary-v1,hfmarkets,HFMarketsGlobal-Demo4,XAUUSD,daily-trend-v1,hfm_canary,1,72,0.75,0.5,10,40,4,0.01,880101',
-    ].join('\n'))
+    await writeFile(join(directory, 'policy.csv'), policyCsv)
 
     await expect(readDemoExecutionPolicy(root, 'hfmarkets', 'XAUUSD')).resolves.toMatchObject({
       state: 'ready',
@@ -94,6 +93,60 @@ describe('demo execution policy', () => {
 
   it('returns missing for an unreadable policy file', async () => {
     await expect(readDemoExecutionPolicy('missing-root', 'hfmarkets', 'XAUUSD')).resolves.toMatchObject({ state: 'missing', policy: null })
+  })
+
+  it('accepts exactly two lines with only an optional LF or CRLF terminator', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-policy-boundary-'))
+    directories.push(root)
+    const directory = join(root, 'hfmarkets', 'XAUUSD')
+    const path = join(directory, 'policy.csv')
+    await mkdir(directory, { recursive: true })
+
+    const crlfPolicyCsv = `${header}\r\n${policyRow}`
+    for (const text of [policyCsv, `${policyCsv}\n`, crlfPolicyCsv, `${crlfPolicyCsv}\r\n`]) {
+      await writeFile(path, text)
+      await expect(readDemoExecutionPolicy(root, 'hfmarkets', 'XAUUSD')).resolves.toMatchObject({ state: 'ready' })
+    }
+  })
+
+  it('rejects whitespace and blank lines outside the exact two-line CSV contract', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-policy-boundary-'))
+    directories.push(root)
+    const directory = join(root, 'hfmarkets', 'XAUUSD')
+    const path = join(directory, 'policy.csv')
+    await mkdir(directory, { recursive: true })
+
+    for (const text of [
+      ` ${policyCsv}`,
+      `\n${policyCsv}`,
+      `${policyCsv}\n\n`,
+      `${policyCsv} `,
+      `${policyCsv}\n `,
+    ]) {
+      await writeFile(path, text)
+      await expect(readDemoExecutionPolicy(root, 'hfmarkets', 'XAUUSD'), JSON.stringify(text)).resolves.toMatchObject({ state: 'malformed', policy: null })
+    }
+  })
+
+  it('keeps the MQL policy-version writer grammar aligned with the reader', async () => {
+    const source = await readFile(join(process.cwd(), 'tools', 'mt5', 'ConfigureJmbGoldmineDemoPolicy.mq5'), 'utf8')
+    expect(source).toContain('string canonical = InpPolicyVersion;')
+    expect(source).toContain('StringTrimLeft(canonical);')
+    expect(source).toContain('StringTrimRight(canonical);')
+    expect(source).toContain('canonical == InpPolicyVersion')
+
+    const root = await mkdtemp(join(tmpdir(), 'openalice-policy-version-'))
+    directories.push(root)
+    const directory = join(root, 'hfmarkets', 'XAUUSD')
+    const path = join(directory, 'policy.csv')
+    await mkdir(directory, { recursive: true })
+
+    await writeFile(path, policyCsv)
+    await expect(readDemoExecutionPolicy(root, 'hfmarkets', 'XAUUSD')).resolves.toMatchObject({ state: 'ready' })
+    for (const version of [' hfm-canary-v1', 'hfm-canary-v1 ']) {
+      await writeFile(path, `${header}\n${policyRow.replace('hfm-canary-v1', version)}`)
+      await expect(readDemoExecutionPolicy(root, 'hfmarkets', 'XAUUSD')).resolves.toMatchObject({ state: 'malformed', policy: null })
+    }
   })
 
   it('keeps policy writes operator-only and demo-Gold allowlisted in MQL', async () => {

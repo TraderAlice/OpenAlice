@@ -122,7 +122,10 @@ function parseNumber(value: string | undefined, field: string): number {
 }
 
 function parseDemoExecutionPolicyCsv(text: string): DemoExecutionPolicy {
-  const lines = text.trim().split(/\r?\n/)
+  const contents = text.endsWith('\r\n')
+    ? text.slice(0, -2)
+    : text.endsWith('\n') ? text.slice(0, -1) : text
+  const lines = contents.split(/\r?\n/)
   if (lines.length !== 2 || lines[0] !== POLICY_HEADER) throw new Error('The policy CSV header or row count is invalid.')
   const values = lines[1]!.split(',')
   if (values.length !== 16) throw new Error('The policy CSV row must contain exactly 16 columns.')

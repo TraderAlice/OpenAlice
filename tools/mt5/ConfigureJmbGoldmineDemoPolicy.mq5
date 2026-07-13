@@ -51,11 +51,15 @@ bool ResolveBrokerBinding(BrokerPolicyBinding &binding)
 
 bool IsSafePolicyVersion()
 {
-   return InpPolicyVersion != ""
-      && StringFind(InpPolicyVersion, ",") < 0
-      && StringFind(InpPolicyVersion, "\"") < 0
-      && StringFind(InpPolicyVersion, "\r") < 0
-      && StringFind(InpPolicyVersion, "\n") < 0;
+   string canonical = InpPolicyVersion;
+   StringTrimLeft(canonical);
+   StringTrimRight(canonical);
+   return canonical != ""
+      && canonical == InpPolicyVersion
+      && StringFind(canonical, ",") < 0
+      && StringFind(canonical, "\"") < 0
+      && StringFind(canonical, "\r") < 0
+      && StringFind(canonical, "\n") < 0;
 }
 
 bool IsAllowedRolloutStage(const BrokerPolicyBinding &binding)
