@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -72,6 +72,22 @@ describe('JMB decision records', () => {
     expect(parsed.gateResults).toHaveLength(2)
   })
 
+  it('round-trips quoted CSV fields containing commas, quotes, and newlines', () => {
+    const decision = sampleDecision({
+      reasonDetail: 'Spread, "trend", and stop checked\nwith broker evidence',
+      gateResults: [
+        { gate: 'broker_note', state: 'warn', detail: 'Value had comma, "quote", and newline\nfrom MT5' },
+      ],
+    })
+
+    const parsed = parseLatestDecisionCsv(serializeLatestDecisionCsv(decision))
+
+    expect(parsed.reasonDetail).toBe('Spread, "trend", and stop checked\nwith broker evidence')
+    expect(parsed.gateResults).toEqual([
+      { gate: 'broker_note', state: 'warn', detail: 'Value had comma, "quote", and newline\nfrom MT5' },
+    ])
+  })
+
   it('writes append-only JSONL and latest CSV under broker symbol folders', async () => {
     const root = await mkdtemp(join(tmpdir(), 'jmb-decisions-'))
     directories.push(root)
@@ -93,6 +109,34 @@ describe('JMB decision records', () => {
     await import('node:fs/promises').then(({ writeFile }) =>
       writeFile(join(root, 'hfmarkets', 'XAUUSD', 'latest_decision.csv'), 'broken,csv\n1'),
     )
+
+    const summary = await summarizeLatestJmbDecision(root, 'hfmarkets', 'XAUUSD')
+
+    expect(summary.state).toBe('error')
+    expect(summary.label).toBe('Decision unreadable')
+  })
+
+  it('summarizes malformed required numeric fields as unreadable', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'jmb-decisions-'))
+    directories.push(root)
+    await writeLatestJmbDecision(root, sampleDecision())
+    await import('node:fs/promises').then(({ writeFile }) =>
+      writeFile(
+        join(root, 'hfmarkets', 'XAUUSD', 'latest_decision.csv'),
+        serializeLatestDecisionCsv(sampleDecision()).replace(',0.01,0.36,0.8,1,', ',not-a-number,0.36,0.8,also-bad,'),
+      ),
+    )
+
+    const summary = await summarizeLatestJmbDecision(root, 'hfmarkets', 'XAUUSD')
+
+    expect(summary.state).toBe('error')
+    expect(summary.label).toBe('Decision unreadable')
+  })
+
+  it('summarizes read errors as unreadable instead of missing decision', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'jmb-decisions-'))
+    directories.push(root)
+    await mkdir(join(root, 'hfmarkets', 'XAUUSD', 'latest_decision.csv'), { recursive: true })
 
     const summary = await summarizeLatestJmbDecision(root, 'hfmarkets', 'XAUUSD')
 

@@ -81,37 +81,56 @@ function csvEscape(value: string): string {
   return value
 }
 
-function parseCsvLine(line: string): string[] {
-  const cells: string[] = []
+function parseCsvRecords(text: string): string[][] {
+  const records: string[][] = []
+  let record: string[] = []
   let current = ''
   let quoted = false
 
-  for (let index = 0; index < line.length; index += 1) {
-    const character = line[index]
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index]
 
     if (character === '"') {
-      if (quoted && line[index + 1] === '"') {
+      if (quoted && text[index + 1] === '"') {
         current += '"'
         index += 1
       } else {
         quoted = !quoted
       }
     } else if (character === ',' && !quoted) {
-      cells.push(current)
+      record.push(current)
       current = ''
+    } else if ((character === '\n' || character === '\r') && !quoted) {
+      record.push(current)
+      records.push(record)
+      record = []
+      current = ''
+      if (character === '\r' && text[index + 1] === '\n') index += 1
     } else {
       current += character
     }
   }
 
-  cells.push(current)
-  return cells
+  if (quoted) throw new Error('Decision CSV has an unterminated quoted field')
+  if (current !== '' || record.length > 0) {
+    record.push(current)
+    records.push(record)
+  }
+
+  return records
 }
 
 function numberOrNull(value: string): number | null {
   if (value === '') return null
   const parsed = Number(value)
   if (!Number.isFinite(parsed)) throw new Error(`Invalid numeric decision field: ${value}`)
+  return parsed
+}
+
+function requiredNumber(value: string, field: string): number {
+  if (value === '') throw new Error(`Missing numeric decision field: ${field}`)
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) throw new Error(`Invalid numeric decision field: ${field}`)
   return parsed
 }
 
@@ -156,11 +175,10 @@ export function serializeLatestDecisionCsv(record: JmbDecisionRecord): string {
 }
 
 export function parseLatestDecisionCsv(text: string): JmbDecisionRecord {
-  const [headerLine, valueLine] = text.trim().split(/\r?\n/, 2)
-  if (!headerLine || !valueLine) throw new Error('Decision CSV is missing header or value row')
+  const records = parseCsvRecords(text)
+  if (records.length !== 2) throw new Error('Decision CSV is missing header or value row')
 
-  const headers = parseCsvLine(headerLine)
-  const values = parseCsvLine(valueLine)
+  const [headers, values] = records
   if (headers.join(',') !== HEADER.join(',') || values.length !== HEADER.length) throw new Error('Decision CSV schema mismatch')
 
   const row = Object.fromEntries(headers.map((header, index) => [header, values[index] ?? '']))
@@ -182,10 +200,10 @@ export function parseLatestDecisionCsv(text: string): JmbDecisionRecord {
     entryReferencePrice: numberOrNull(row['entry_reference_price']!),
     stopLoss: numberOrNull(row['stop_loss']!),
     takeProfit: numberOrNull(row['take_profit']!),
-    volume: Number(row['volume']),
+    volume: requiredNumber(row['volume']!, 'volume'),
     spread: numberOrNull(row['spread']!),
     riskAmount: numberOrNull(row['risk_amount']!),
-    maxAllowedRisk: Number(row['max_allowed_risk']),
+    maxAllowedRisk: requiredNumber(row['max_allowed_risk']!, 'max_allowed_risk'),
     gateResults: JSON.parse(row['gate_results_json']!) as JmbGateResult[],
     orderTicket: row['order_ticket'] || null,
     positionId: row['position_id'] || null,
@@ -209,6 +227,34 @@ export async function writeLatestJmbDecision(root: string, record: JmbDecisionRe
   await writeFile(join(directory, 'latest_decision.csv'), serializeLatestDecisionCsv(record), 'utf8')
 }
 
+function fileErrorCode(error: unknown): string | null {
+  return typeof error === 'object' && error !== null && 'code' in error ? String((error as { code: unknown }).code) : null
+}
+
+function noDecisionSummary(broker: string, symbol: string): JmbDecisionSummary {
+  return {
+    state: 'no_decision',
+    label: 'No JMB decision yet',
+    detail: 'Run the shadow decision runner before enabling any demo risk shell.',
+    broker,
+    symbol,
+    lastUpdated: null,
+    decision: null,
+  }
+}
+
+function unreadableSummary(broker: string, symbol: string, lastUpdated: string | null): JmbDecisionSummary {
+  return {
+    state: 'error',
+    label: 'Decision unreadable',
+    detail: 'The latest decision CSV is malformed. The risk shell must fail closed.',
+    broker,
+    symbol,
+    lastUpdated,
+    decision: null,
+  }
+}
+
 export async function summarizeLatestJmbDecision(
   root: string,
   broker: string,
@@ -220,19 +266,15 @@ export async function summarizeLatestJmbDecision(
   let modified: Date
 
   try {
-    const [fileText, modifiedAt] = await Promise.all([readFile(path, 'utf8'), stat(path).then((entry) => entry.mtime)])
-    text = fileText
-    modified = modifiedAt
-  } catch {
-    return {
-      state: 'no_decision',
-      label: 'No JMB decision yet',
-      detail: 'Run the shadow decision runner before enabling any demo risk shell.',
-      broker,
-      symbol,
-      lastUpdated: null,
-      decision: null,
-    }
+    modified = (await stat(path)).mtime
+  } catch (error) {
+    return fileErrorCode(error) === 'ENOENT' ? noDecisionSummary(broker, symbol) : unreadableSummary(broker, symbol, null)
+  }
+
+  try {
+    text = await readFile(path, 'utf8')
+  } catch (error) {
+    return fileErrorCode(error) === 'ENOENT' ? noDecisionSummary(broker, symbol) : unreadableSummary(broker, symbol, modified.toISOString())
   }
 
   try {
@@ -250,14 +292,6 @@ export async function summarizeLatestJmbDecision(
       decision,
     }
   } catch {
-    return {
-      state: 'error',
-      label: 'Decision unreadable',
-      detail: 'The latest decision CSV is malformed. The risk shell must fail closed.',
-      broker,
-      symbol,
-      lastUpdated: modified.toISOString(),
-      decision: null,
-    }
+    return unreadableSummary(broker, symbol, modified.toISOString())
   }
 }
