@@ -28,6 +28,13 @@ enum CanaryBrokerResultClass
    CANARY_RESULT_PARTIAL=3
 };
 
+enum CanaryClosedOwnershipClass
+{
+   CANARY_CLOSED_OWNERSHIP_FOREIGN=0,
+   CANARY_CLOSED_OWNERSHIP_EA=1,
+   CANARY_CLOSED_OWNERSHIP_UNSAFE=2
+};
+
 struct CanaryPositionSnapshot
 {
    bool present;
@@ -48,6 +55,7 @@ struct CanarySafetyLatch
    string pendingCloseDecisionId;
    string pendingCloseObservationId;
    bool emergencyCloseAttempted;
+   string emergencyPositionId;
 };
 
 struct CanaryReconciliationFacts
@@ -86,6 +94,8 @@ struct CanaryReconciliation
    double swap;
    double fee;
    double netResult;
+   bool authoritativeStopClosure;
+   bool authoritativeEmergencyClosure;
 };
 
 struct CanaryExecutionEvent
@@ -642,12 +652,13 @@ bool LoadCanarySafetyLatch(const string broker,const string symbol,
       return true;
    }
    string expected[]={"schema_version","unresolved","protection_error",
-      "pending_close_decision_id","pending_close_observation_id","emergency_close_attempted"};
+      "pending_close_decision_id","pending_close_observation_id","emergency_close_attempted",
+      "emergency_position_id"};
    string values[];
-   if(!ReadStrictCanaryCsv(path,expected,values,detail) || ArraySize(values)!=6
+   if(!ReadStrictCanaryCsv(path,expected,values,detail) || ArraySize(values)!=7
       || values[0]!="1" || (values[1]!="0" && values[1]!="1")
       || (values[2]!="0" && values[2]!="1") || (values[5]!="0" && values[5]!="1")
-      || ((values[3]=="")!=(values[4]=="")))
+      || ((values[3]=="")!=(values[4]=="")) || ((values[5]=="1")!=(values[6]!="")))
    {
       detail="The persistent reconciliation latch is malformed.";
       return false;
@@ -658,6 +669,7 @@ bool LoadCanarySafetyLatch(const string broker,const string symbol,
    latch.pendingCloseDecisionId=values[3];
    latch.pendingCloseObservationId=values[4];
    latch.emergencyCloseAttempted=values[5]=="1";
+   latch.emergencyPositionId=values[6];
    detail="The persistent reconciliation latch was loaded exactly.";
    return true;
 }
@@ -665,7 +677,8 @@ bool LoadCanarySafetyLatch(const string broker,const string symbol,
 bool PersistCanarySafetyLatch(const string broker,const string symbol,
                               const CanarySafetyLatch &latch,string &detail)
 {
-   if(!latch.valid || ((latch.pendingCloseDecisionId=="")!=(latch.pendingCloseObservationId=="")))
+   if(!latch.valid || ((latch.pendingCloseDecisionId=="")!=(latch.pendingCloseObservationId==""))
+      || (latch.emergencyCloseAttempted!=(latch.emergencyPositionId!="")))
    {
       detail="Refused to persist an invalid reconciliation latch.";
       return false;
@@ -680,10 +693,12 @@ bool PersistCanarySafetyLatch(const string broker,const string symbol,
       return false;
    }
    uint header_written=FileWrite(handle,"schema_version","unresolved","protection_error",
-      "pending_close_decision_id","pending_close_observation_id","emergency_close_attempted");
+      "pending_close_decision_id","pending_close_observation_id","emergency_close_attempted",
+      "emergency_position_id");
    uint row_written=FileWrite(handle,"1",latch.unresolved ? "1" : "0",
       latch.protectionError ? "1" : "0",latch.pendingCloseDecisionId,
-      latch.pendingCloseObservationId,latch.emergencyCloseAttempted ? "1" : "0");
+      latch.pendingCloseObservationId,latch.emergencyCloseAttempted ? "1" : "0",
+      latch.emergencyPositionId);
    if(header_written==0 || row_written==0)
    {
       FileClose(handle);
@@ -694,10 +709,11 @@ bool PersistCanarySafetyLatch(const string broker,const string symbol,
    FileFlush(handle);
    FileClose(handle);
    string expected[]={"schema_version","unresolved","protection_error",
-      "pending_close_decision_id","pending_close_observation_id","emergency_close_attempted"};
+      "pending_close_decision_id","pending_close_observation_id","emergency_close_attempted",
+      "emergency_position_id"};
    string intended[]={"1",latch.unresolved ? "1" : "0",latch.protectionError ? "1" : "0",
       latch.pendingCloseDecisionId,latch.pendingCloseObservationId,
-      latch.emergencyCloseAttempted ? "1" : "0"};
+      latch.emergencyCloseAttempted ? "1" : "0",latch.emergencyPositionId};
    string verified_values[];
    string verify_detail="";
    if(!ReadStrictCanaryCsv(temporary_path,expected,verified_values,verify_detail)
@@ -718,7 +734,8 @@ bool PersistCanarySafetyLatch(const string broker,const string symbol,
       || durable.unresolved!=latch.unresolved || durable.protectionError!=latch.protectionError
       || durable.pendingCloseDecisionId!=latch.pendingCloseDecisionId
       || durable.pendingCloseObservationId!=latch.pendingCloseObservationId
-      || durable.emergencyCloseAttempted!=latch.emergencyCloseAttempted)
+      || durable.emergencyCloseAttempted!=latch.emergencyCloseAttempted
+      || durable.emergencyPositionId!=latch.emergencyPositionId)
    {
       detail="The durable reconciliation latch failed exact reopen verification.";
       return false;

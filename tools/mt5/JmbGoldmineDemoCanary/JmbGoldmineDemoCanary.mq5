@@ -79,9 +79,12 @@ bool AppendCanaryOrderRequestingEvent(const CanaryDecision &decision,string &det
    CanaryReconciliation reconciliation;
    InitializeCanaryReconciliation(reconciliation);
    reconciliation.reconciliationState="pending";
+   CanaryExecutionEvent candidate;
    BuildCanaryLifecycleEvent(decision,reconciliation,CANARY_LIFECYCLE_ORDER_REQUESTING,"",
-      "Request persistence completed before submission.",g_latest_event);
-   return AppendCanaryExecutionEvent(g_latest_event,detail);
+      "Request persistence completed before submission.",candidate);
+   if(!AppendCanaryExecutionEvent(candidate,detail)) return false;
+   g_latest_event=candidate;
+   return true;
 }
 
 bool CanaryProcessedStateIsExactAppend(const CanaryProcessedState &prior,
@@ -279,18 +282,20 @@ void SubmitReadyCanaryDecision(const CanaryDecision &decision,
    pending.reconciliationState=g_last_result_class==CANARY_RESULT_REJECTED ? "terminal" : "required";
    CanaryLifecycleState result_state=g_last_result_class==CANARY_RESULT_REJECTED
       ? CANARY_LIFECYCLE_ORDER_REJECTED : CANARY_LIFECYCLE_RECONCILIATION_REQUIRED;
+   CanaryExecutionEvent candidate;
    BuildCanaryLifecycleEvent(decision,pending,result_state,IntegerToString((long)submission.retcode),
-      submission.detail,g_latest_event);
-   g_latest_event.hasAcceptedOrder=submission.accepted_volume>0.0;
-   g_latest_event.acceptedVolume=submission.accepted_volume;
-   g_latest_event.acceptedPrice=submission.accepted_price;
-   g_latest_event.orderTicket=submission.order_ticket;
-   g_latest_event.dealTicket=submission.deal_ticket;
-   if(!AppendCanaryExecutionEvent(g_latest_event,persistence_detail))
+      submission.detail,candidate);
+   candidate.hasAcceptedOrder=submission.accepted_volume>0.0;
+   candidate.acceptedVolume=submission.accepted_volume;
+   candidate.acceptedPrice=submission.accepted_price;
+   candidate.orderTicket=submission.order_ticket;
+   candidate.dealTicket=submission.deal_ticket;
+   if(!AppendCanaryExecutionEvent(candidate,persistence_detail))
    {
       latch.unresolved=true;
       g_last_result_class=CANARY_RESULT_UNKNOWN;
    }
+   else g_latest_event=candidate;
    if(!PersistCanarySafetyLatch(InpBrokerId,InpSymbol,latch,latch_detail))
       Print("JMB demo canary reconciliation latch persistence failed: ",latch_detail);
    g_reconciliation_dirty=true;
@@ -558,9 +563,14 @@ bool AppendManagedCanaryEvent(const CanaryDecision &decision,
                               const CanaryLifecycleState state,
                               const string result_code,const string result_detail)
 {
-   BuildCanaryLifecycleEvent(decision,reconciliation,state,result_code,result_detail,g_latest_event);
+   CanaryExecutionEvent candidate;
+   BuildCanaryLifecycleEvent(decision,reconciliation,state,result_code,result_detail,candidate);
    string detail="";
-   if(AppendCanaryExecutionEvent(g_latest_event,detail)) return true;
+   if(AppendCanaryExecutionEvent(candidate,detail))
+   {
+      g_latest_event=candidate;
+      return true;
+   }
    Print("JMB demo canary lifecycle event failed: ",detail);
    return false;
 }
@@ -576,6 +586,7 @@ bool HandleCanaryEmergencyClose(const CanaryDecision &decision,const CanaryPolic
    if(!AppendManagedCanaryEvent(decision,reconciliation,CANARY_LIFECYCLE_EMERGENCY_CLOSE,"",
       "Emergency protective close is durably requesting.")) return false;
    latch.emergencyCloseAttempted=true;
+   latch.emergencyPositionId=CanaryTicketString(reconciliation.position.identifier);
    string detail="";
    if(!PersistCanarySafetyLatch(InpBrokerId,InpSymbol,latch,detail))
    {
@@ -739,11 +750,46 @@ void Evaluate()
       }
    }
 
-   if(reconciliation.state==CANARY_LIFECYCLE_EMERGENCY_CLOSE)
+   if(reconciled && reconciliation.state==CANARY_LIFECYCLE_STOPPED
+      && reconciliation.authoritativeStopClosure && latch.unresolved)
+   {
+      latch.unresolved=false;
+      g_last_result_class=CANARY_RESULT_NONE;
+      string stopped_latch_detail="";
+      if(!PersistCanarySafetyLatch(InpBrokerId,InpSymbol,latch,stopped_latch_detail))
+         Print("JMB demo canary stopped-position latch failed: ",stopped_latch_detail);
+   }
+   bool authoritative_emergency_closure=reconciled
+      && reconciliation.authoritativeEmergencyClosure;
+   if(authoritative_emergency_closure && latch.unresolved)
+   {
+      latch.unresolved=false;
+      g_last_result_class=CANARY_RESULT_NONE;
+      string emergency_latch_detail="";
+      if(!PersistCanarySafetyLatch(InpBrokerId,InpSymbol,latch,emergency_latch_detail))
+         Print("JMB demo canary closed emergency latch failed: ",emergency_latch_detail);
+      if(latch.protectionError)
+         reconciliation.state=CANARY_LIFECYCLE_PAUSED;
+   }
+
+   CanaryEnvironment environment;
+   BuildCanaryEnvironment(decision,policy,processed_state,reconciliation,latch,environment);
+   CanaryEvaluation evaluation=EvaluateCanaryGates(decision,policy,environment);
+
+   if(reconciliation.state==CANARY_LIFECYCLE_EMERGENCY_CLOSE
+      && reconciliation.available && !reconciliation.hasForeignGoldExposure)
       HandleCanaryEmergencyClose(decision,policy,reconciliation,latch);
    else if(reconciliation.state==CANARY_LIFECYCLE_CLOSE_REQUESTING && decision.loaded
       && !observation_used && latch.pendingCloseDecisionId=="")
-      HandleCanaryOppositeClose(decision,policy,processed_state,processed_path,reconciliation,latch);
+   {
+      CanaryEnvironment reversal_environment;
+      reversal_environment=environment;
+      reversal_environment.hasEaPosition=false;
+      CanaryEvaluation reversal_evaluation=EvaluateCanaryGates(decision,policy,reversal_environment);
+      if(reconciliation.available && !reconciliation.hasForeignGoldExposure
+         && reversal_evaluation.ready)
+         HandleCanaryOppositeClose(decision,policy,processed_state,processed_path,reconciliation,latch);
+   }
    else if(reconciliation.state==CANARY_LIFECYCLE_CLOSED)
    {
       if(ConfirmCanaryOppositeClosure(decision,reconciliation,latch))
@@ -774,9 +820,8 @@ void Evaluate()
       AppendManagedCanaryEvent(decision,reconciliation,CANARY_LIFECYCLE_PAUSED,"",
          "The broker-day losing-trade or realized-loss ceiling pauses new entries.");
 
-   CanaryEnvironment environment;
    BuildCanaryEnvironment(decision,policy,processed_state,reconciliation,latch,environment);
-   CanaryEvaluation evaluation=EvaluateCanaryGates(decision,policy,environment);
+   evaluation=EvaluateCanaryGates(decision,policy,environment);
    bool effective_execution_enabled=CanaryEffectiveExecutionEnabled(InpDemoExecutionEnabled,policy);
 
    string write_detail="";

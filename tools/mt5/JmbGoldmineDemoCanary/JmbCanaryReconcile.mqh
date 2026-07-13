@@ -5,12 +5,16 @@
 
 CanaryLifecycleState ReduceCanaryLifecycle(const CanaryReconciliationFacts &facts)
 {
-   if(facts.hasEaPosition && !facts.eaPositionProtected)
-      return CANARY_LIFECYCLE_EMERGENCY_CLOSE;
    if(!facts.brokerStateAvailable)
       return CANARY_LIFECYCLE_RECONCILIATION_REQUIRED;
    if(facts.hasForeignGoldExposure)
       return CANARY_LIFECYCLE_BLOCKED;
+   if(facts.hasEaPosition && !facts.eaPositionProtected)
+      return CANARY_LIFECYCLE_EMERGENCY_CLOSE;
+   if(facts.stoppedObservation)
+      return CANARY_LIFECYCLE_STOPPED;
+   if(facts.persistentSafetyPause)
+      return CANARY_LIFECYCLE_PAUSED;
    if(facts.resultClass==CANARY_RESULT_UNKNOWN || facts.resultClass==CANARY_RESULT_PARTIAL
       || facts.hasEaPendingOrder)
       return CANARY_LIFECYCLE_RECONCILIATION_REQUIRED;
@@ -18,15 +22,27 @@ CanaryLifecycleState ReduceCanaryLifecycle(const CanaryReconciliationFacts &fact
       return CANARY_LIFECYCLE_CLOSE_REQUESTING;
    if(facts.hasEaPosition && facts.eaPositionProtected)
       return CANARY_LIFECYCLE_FILLED_PROTECTED;
-   if(facts.stoppedObservation)
-      return CANARY_LIFECYCLE_STOPPED;
    if(facts.closeConfirmed)
       return CANARY_LIFECYCLE_CLOSED;
-   if(facts.persistentSafetyPause || facts.dailyLimitReached)
+   if(facts.dailyLimitReached)
       return CANARY_LIFECYCLE_PAUSED;
    if(facts.resultClass==CANARY_RESULT_REJECTED)
       return CANARY_LIFECYCLE_ORDER_REJECTED;
    return CANARY_LIFECYCLE_READY;
+}
+
+bool IsCanaryActionableOpposite(const string decision_direction,const string position_direction)
+{
+   return (decision_direction=="buy" && position_direction=="sell")
+      || (decision_direction=="sell" && position_direction=="buy");
+}
+
+CanaryClosedOwnershipClass ClassifyCanaryClosedPositionOwnership(
+   const bool origin_is_ea,const bool has_foreign_entry,const bool has_nonmagic_close)
+{
+   if(!origin_is_ea) return CANARY_CLOSED_OWNERSHIP_FOREIGN;
+   if(has_foreign_entry) return CANARY_CLOSED_OWNERSHIP_UNSAFE;
+   return CANARY_CLOSED_OWNERSHIP_EA;
 }
 
 CanaryBrokerResultClass ClassifyCanaryBrokerResult(const bool sent,const uint retcode,
@@ -154,14 +170,13 @@ bool ScanCanaryGoldExposure(const string symbol,const long magic_number,
    return true;
 }
 
-bool CanaryPositionIdentifierOpen(const string symbol,const long magic_number,const ulong position_id)
+bool CanaryPositionIdentifierOpen(const string symbol,const ulong position_id)
 {
    for(int index=0;index<PositionsTotal();index++)
    {
       ulong ticket=PositionGetTicket(index);
       if(ticket==0) return true;
       if(PositionGetString(POSITION_SYMBOL)==symbol
-         && PositionGetInteger(POSITION_MAGIC)==magic_number
          && (ulong)PositionGetInteger(POSITION_IDENTIFIER)==position_id) return true;
    }
    return false;
@@ -198,8 +213,7 @@ bool ReadCanaryClosedPositionResults(const string symbol,const long magic_number
    {
       ulong deal_ticket=HistoryDealGetTicket(index);
       if(deal_ticket==0) return false;
-      if(HistoryDealGetString(deal_ticket,DEAL_SYMBOL)!=symbol
-         || HistoryDealGetInteger(deal_ticket,DEAL_MAGIC)!=magic_number) continue;
+      if(HistoryDealGetString(deal_ticket,DEAL_SYMBOL)!=symbol) continue;
       ENUM_DEAL_ENTRY entry=(ENUM_DEAL_ENTRY)HistoryDealGetInteger(deal_ticket,DEAL_ENTRY);
       if(entry!=DEAL_ENTRY_OUT && entry!=DEAL_ENTRY_OUT_BY) continue;
       ulong position_id=(ulong)HistoryDealGetInteger(deal_ticket,DEAL_POSITION_ID);
@@ -220,11 +234,15 @@ bool ReadCanaryClosedPositionResults(const string symbol,const long magic_number
    for(int position_index=0;position_index<ArraySize(position_ids);position_index++)
    {
       ulong position_id=position_ids[position_index];
-      if(CanaryPositionIdentifierOpen(symbol,magic_number,position_id)) continue;
+      if(CanaryPositionIdentifierOpen(symbol,position_id)) continue;
       if(!HistorySelectByPosition(position_id)) return false;
       int position_deals=HistoryDealsTotal();
-      bool has_ea_deal=false;
-      bool mixed_ownership=false;
+      bool has_origin=false;
+      long origin_magic=0;
+      datetime origin_time=0;
+      ulong origin_ticket=0;
+      bool has_foreign_entry=false;
+      bool has_nonmagic_close=false;
       datetime final_close_time=0;
       ulong final_deal_ticket=0;
       long final_reason=0;
@@ -233,18 +251,47 @@ bool ReadCanaryClosedPositionResults(const string symbol,const long magic_number
       double swap=0.0;
       double fee=0.0;
       double net_result=0.0;
+
       for(int deal_index=0;deal_index<position_deals;deal_index++)
       {
          ulong deal_ticket=HistoryDealGetTicket(deal_index);
          if(deal_ticket==0) return false;
          if(HistoryDealGetString(deal_ticket,DEAL_SYMBOL)!=symbol) continue;
-         long deal_magic=HistoryDealGetInteger(deal_ticket,DEAL_MAGIC);
-         if(deal_magic!=magic_number)
+         ENUM_DEAL_ENTRY entry=(ENUM_DEAL_ENTRY)HistoryDealGetInteger(deal_ticket,DEAL_ENTRY);
+         if(entry!=DEAL_ENTRY_IN && entry!=DEAL_ENTRY_INOUT) continue;
+         datetime deal_time=(datetime)HistoryDealGetInteger(deal_ticket,DEAL_TIME);
+         if(!has_origin || deal_time<origin_time || (deal_time==origin_time && deal_ticket<origin_ticket))
          {
-            mixed_ownership=true;
-            continue;
+            has_origin=true;
+            origin_time=deal_time;
+            origin_ticket=deal_ticket;
+            origin_magic=HistoryDealGetInteger(deal_ticket,DEAL_MAGIC);
          }
-         has_ea_deal=true;
+      }
+      if(!has_origin) return false;
+      for(int deal_index=0;deal_index<position_deals;deal_index++)
+      {
+         ulong deal_ticket=HistoryDealGetTicket(deal_index);
+         if(deal_ticket==0) return false;
+         if(HistoryDealGetString(deal_ticket,DEAL_SYMBOL)!=symbol || deal_ticket==origin_ticket) continue;
+         ENUM_DEAL_ENTRY entry=(ENUM_DEAL_ENTRY)HistoryDealGetInteger(deal_ticket,DEAL_ENTRY);
+         if((entry==DEAL_ENTRY_IN || entry==DEAL_ENTRY_INOUT)
+            && HistoryDealGetInteger(deal_ticket,DEAL_MAGIC)!=magic_number)
+            has_foreign_entry=true;
+         if((entry==DEAL_ENTRY_OUT || entry==DEAL_ENTRY_OUT_BY)
+            && HistoryDealGetInteger(deal_ticket,DEAL_MAGIC)!=magic_number)
+            has_nonmagic_close=true;
+      }
+      CanaryClosedOwnershipClass ownership=ClassifyCanaryClosedPositionOwnership(
+         origin_magic==magic_number,has_foreign_entry,has_nonmagic_close);
+      if(ownership==CANARY_CLOSED_OWNERSHIP_FOREIGN) continue;
+      if(ownership==CANARY_CLOSED_OWNERSHIP_UNSAFE) return false;
+
+      for(int deal_index=0;deal_index<position_deals;deal_index++)
+      {
+         ulong deal_ticket=HistoryDealGetTicket(deal_index);
+         if(deal_ticket==0) return false;
+         if(HistoryDealGetString(deal_ticket,DEAL_SYMBOL)!=symbol) continue;
          double deal_net=DealNet(deal_ticket);
          if(!MathIsValidNumber(deal_net)) return false;
          net_result+=deal_net;
@@ -261,8 +308,7 @@ bool ReadCanaryClosedPositionResults(const string symbol,const long magic_number
             accepted_price=HistoryDealGetDouble(deal_ticket,DEAL_PRICE);
          }
       }
-      if(mixed_ownership) return false;
-      if(!has_ea_deal || final_close_time<day_start || final_close_time>now) continue;
+      if(final_close_time<day_start || final_close_time>now) continue;
       if(net_result<0.0)
       {
          daily.lossCount++;
@@ -332,26 +378,37 @@ bool ReconcileCanaryBrokerState(const string symbol,const long magic_number,
       facts.resultClass=CANARY_RESULT_PARTIAL;
    facts.hasEaPendingOrder=reconciliation.hasEaPendingOrder;
    facts.hasForeignGoldExposure=reconciliation.hasForeignGoldExposure;
-   facts.sameDirection=decision.loaded && reconciliation.position.present
+   facts.sameDirection=decision.loaded && !observation_used && reconciliation.position.present
+      && (decision.direction=="buy" || decision.direction=="sell")
       && decision.direction==reconciliation.position.direction;
-   facts.oppositeDirection=decision.loaded && !observation_used && reconciliation.position.present
-      && decision.direction!=reconciliation.position.direction;
+   facts.oppositeDirection=!observation_used && decision.loaded && reconciliation.position.present
+      && IsCanaryActionableOpposite(decision.direction,reconciliation.position.direction);
    facts.closeConfirmed=latch.pendingCloseDecisionId!="" && !reconciliation.position.present
       && !reconciliation.hasEaPendingOrder;
    facts.stoppedObservation=observation_used && reconciliation.hasClosedPosition
       && reconciliation.lastCloseWasStop && !reconciliation.position.present;
+   bool authoritative_stop_closure=facts.stoppedObservation;
+   bool authoritative_emergency_closure=latch.protectionError && latch.emergencyCloseAttempted
+      && latch.emergencyPositionId!="" && !reconciliation.position.present
+      && reconciliation.hasClosedPosition
+      && CanaryTicketString(reconciliation.closedPositionId)==latch.emergencyPositionId;
+   reconciliation.authoritativeStopClosure=authoritative_stop_closure;
+   reconciliation.authoritativeEmergencyClosure=authoritative_emergency_closure;
    facts.persistentSafetyPause=latch.protectionError && !reconciliation.position.present;
    facts.dailyLimitReached=reconciliation.daily.lossCount>=CANARY_HARD_MAX_DAILY_LOSSES
       || reconciliation.daily.realizedLoss>=CANARY_HARD_MAX_DAILY_LOSS;
    if(latch.protectionError && reconciliation.position.present)
       facts.eaPositionProtected=false;
-   if(facts.resultClass==CANARY_RESULT_UNKNOWN
+   if(authoritative_stop_closure || authoritative_emergency_closure)
+      facts.resultClass=CANARY_RESULT_NONE;
+   else if(facts.resultClass==CANARY_RESULT_UNKNOWN
       && ((reconciliation.position.present && reconciliation.position.stopProtected
             && MathAbs(reconciliation.position.volume-CANARY_HARD_MAX_VOLUME)<=0.00000001)
          || facts.closeConfirmed))
       facts.resultClass=CANARY_RESULT_NONE;
    if(latch.unresolved && result_class==CANARY_RESULT_NONE
-      && !reconciliation.position.present && !facts.closeConfirmed)
+      && !reconciliation.position.present && !facts.closeConfirmed
+      && !authoritative_stop_closure && !authoritative_emergency_closure)
       facts.resultClass=CANARY_RESULT_UNKNOWN;
 
    reconciliation.state=ReduceCanaryLifecycle(facts);

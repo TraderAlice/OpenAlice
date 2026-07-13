@@ -54,7 +54,11 @@ enum HarnessReconciliationMutation
    HARNESS_RECONCILE_FOUR_LOSSES,
    HARNESS_RECONCILE_SERVER_DAY_RESET,
    HARNESS_RECONCILE_RESTART_PROTECTED,
-   HARNESS_RECONCILE_RESTART_FOREIGN
+   HARNESS_RECONCILE_RESTART_FOREIGN,
+   HARNESS_RECONCILE_MIXED_UNPROTECTED,
+   HARNESS_RECONCILE_MULTIPLE_POSITIONS,
+   HARNESS_RECONCILE_UNKNOWN_STOPPED,
+   HARNESS_RECONCILE_PROTECTION_PAUSE_AFTER_CLOSE
 };
 
 struct HarnessReconciliationCase
@@ -266,6 +270,26 @@ void ApplyHarnessReconciliationMutation(const HarnessReconciliationMutation muta
    }
    else if(mutation==HARNESS_RECONCILE_FOUR_LOSSES) facts.dailyLimitReached=true;
    else if(mutation==HARNESS_RECONCILE_RESTART_FOREIGN) facts.hasForeignGoldExposure=true;
+   else if(mutation==HARNESS_RECONCILE_MIXED_UNPROTECTED)
+   {
+      facts.hasEaPosition=true;
+      facts.hasForeignGoldExposure=true;
+   }
+   else if(mutation==HARNESS_RECONCILE_MULTIPLE_POSITIONS)
+   {
+      facts.brokerStateAvailable=false;
+      facts.hasEaPosition=true;
+   }
+   else if(mutation==HARNESS_RECONCILE_UNKNOWN_STOPPED)
+   {
+      facts.resultClass=CANARY_RESULT_UNKNOWN;
+      facts.stoppedObservation=true;
+   }
+   else if(mutation==HARNESS_RECONCILE_PROTECTION_PAUSE_AFTER_CLOSE)
+   {
+      facts.resultClass=CANARY_RESULT_NONE;
+      facts.persistentSafetyPause=true;
+   }
 }
 
 bool RunHarnessReconciliationCase(const HarnessReconciliationCase &test_case)
@@ -277,6 +301,26 @@ bool RunHarnessReconciliationCase(const HarnessReconciliationCase &test_case)
    bool passed=actual==test_case.expectedState;
    PrintFormat("%s %s state=%s",passed ? "PASS" : "FAIL",test_case.name,
       CanaryAuthoritativeLifecycleLabel(actual));
+   return passed;
+}
+
+bool RunActionableOppositeCase()
+{
+   bool passed=!IsCanaryActionableOpposite("flat","buy")
+      && !IsCanaryActionableOpposite("flat","sell")
+      && !IsCanaryActionableOpposite("buy","buy")
+      && IsCanaryActionableOpposite("buy","sell")
+      && IsCanaryActionableOpposite("sell","buy");
+   PrintFormat("%s flat decision cannot close",passed ? "PASS" : "FAIL");
+   return passed;
+}
+
+bool RunClosedOwnershipCase()
+{
+   bool passed=ClassifyCanaryClosedPositionOwnership(true,false,true)==CANARY_CLOSED_OWNERSHIP_EA
+      && ClassifyCanaryClosedPositionOwnership(false,false,true)==CANARY_CLOSED_OWNERSHIP_FOREIGN
+      && ClassifyCanaryClosedPositionOwnership(true,true,true)==CANARY_CLOSED_OWNERSHIP_UNSAFE;
+   PrintFormat("%s nonmagic final closure ownership",passed ? "PASS" : "FAIL");
    return passed;
 }
 
@@ -501,12 +545,18 @@ int OnInit()
    AddHarnessReconciliationCase(reconciliation_cases,"server day reset",HARNESS_RECONCILE_SERVER_DAY_RESET,CANARY_LIFECYCLE_READY);
    AddHarnessReconciliationCase(reconciliation_cases,"restart with protected position",HARNESS_RECONCILE_RESTART_PROTECTED,CANARY_LIFECYCLE_FILLED_PROTECTED);
    AddHarnessReconciliationCase(reconciliation_cases,"restart with foreign exposure",HARNESS_RECONCILE_RESTART_FOREIGN,CANARY_LIFECYCLE_BLOCKED);
+   AddHarnessReconciliationCase(reconciliation_cases,"mixed magic unprotected position blocks close",HARNESS_RECONCILE_MIXED_UNPROTECTED,CANARY_LIFECYCLE_BLOCKED);
+   AddHarnessReconciliationCase(reconciliation_cases,"multiple positions block close",HARNESS_RECONCILE_MULTIPLE_POSITIONS,CANARY_LIFECYCLE_RECONCILIATION_REQUIRED);
+   AddHarnessReconciliationCase(reconciliation_cases,"unknown entry immediately stopped",HARNESS_RECONCILE_UNKNOWN_STOPPED,CANARY_LIFECYCLE_STOPPED);
+   AddHarnessReconciliationCase(reconciliation_cases,"protection error pauses after emergency closure",HARNESS_RECONCILE_PROTECTION_PAUSE_AFTER_CLOSE,CANARY_LIFECYCLE_PAUSED);
 
    int failures=0;
    for(int index=0;index<ArraySize(cases);index++)
       if(!RunHarnessCase(cases[index])) failures++;
    for(int index=0;index<ArraySize(reconciliation_cases);index++)
       if(!RunHarnessReconciliationCase(reconciliation_cases[index])) failures++;
+   if(!RunActionableOppositeCase()) failures++;
+   if(!RunClosedOwnershipCase()) failures++;
    if(!RunDuplicateObservationStateCase()) failures++;
    if(!RunTask3IdentityCase()) failures++;
    if(!RunGateJsonContractCase()) failures++;

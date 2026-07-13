@@ -134,6 +134,84 @@ describe('MT5 demo canary source contract', () => {
     expect(harness).toContain('restart with foreign exposure')
   })
 
+  it('requires an exact actionable opposite and complete gate authorization before reversal close', async () => {
+    const [main, reconcile, harness] = await Promise.all([
+      readCanarySource('JmbGoldmineDemoCanary.mq5'),
+      readCanarySource('JmbCanaryReconcile.mqh'),
+      readFile(join('tools', 'mt5', 'tests', 'JmbGoldmineDemoCanaryHarness.mq5'), 'utf8'),
+    ])
+
+    expect(reconcile).toMatch(/bool IsCanaryActionableOpposite\([\s\S]*decision_direction=="buy"[\s\S]*position_direction=="sell"[\s\S]*decision_direction=="sell"[\s\S]*position_direction=="buy"/)
+    expect(reconcile).toContain('facts.oppositeDirection=!observation_used')
+    expect(reconcile).toContain('IsCanaryActionableOpposite(decision.direction,reconciliation.position.direction)')
+    expect(main).toMatch(/CanaryEnvironment reversal_environment;[\s\S]*reversal_environment=environment;[\s\S]*reversal_environment\.hasEaPosition=false;[\s\S]*CanaryEvaluation reversal_evaluation=EvaluateCanaryGates\(decision,policy,reversal_environment\)/)
+    expect(main).toMatch(/reversal_evaluation\.ready[\s\S]*HandleCanaryOppositeClose\(/)
+    expect(harness).toContain('flat decision cannot close')
+  })
+
+  it('blocks every close request when authoritative ownership is foreign or unavailable', async () => {
+    const [main, reconcile, harness] = await Promise.all([
+      readCanarySource('JmbGoldmineDemoCanary.mq5'),
+      readCanarySource('JmbCanaryReconcile.mqh'),
+      readFile(join('tools', 'mt5', 'tests', 'JmbGoldmineDemoCanaryHarness.mq5'), 'utf8'),
+    ])
+    const reducer = reconcile.match(/CanaryLifecycleState ReduceCanaryLifecycle\([\s\S]*?\n\}/)?.[0] ?? ''
+
+    expect(reducer.indexOf('!facts.brokerStateAvailable')).toBeGreaterThan(-1)
+    expect(reducer.indexOf('facts.hasForeignGoldExposure')).toBeGreaterThan(reducer.indexOf('!facts.brokerStateAvailable'))
+    expect(reducer.indexOf('facts.hasEaPosition && !facts.eaPositionProtected')).toBeGreaterThan(reducer.indexOf('facts.hasForeignGoldExposure'))
+    expect(main).toMatch(/reconciliation\.state==CANARY_LIFECYCLE_EMERGENCY_CLOSE[\s\S]*reconciliation\.available[\s\S]*!reconciliation\.hasForeignGoldExposure[\s\S]*HandleCanaryEmergencyClose/)
+    expect(harness).toContain('mixed magic unprotected position blocks close')
+    expect(harness).toContain('multiple positions block close')
+  })
+
+  it('counts EA-origin positions closed by a nonmagic final deal without claiming foreign-origin trades', async () => {
+    const [reconcile, harness] = await Promise.all([
+      readCanarySource('JmbCanaryReconcile.mqh'),
+      readFile(join('tools', 'mt5', 'tests', 'JmbGoldmineDemoCanaryHarness.mq5'), 'utf8'),
+    ])
+
+    expect(reconcile).toContain('CanaryClosedOwnershipClass ClassifyCanaryClosedPositionOwnership(')
+    expect(reconcile).toContain('HistoryDealGetString(deal_ticket,DEAL_SYMBOL)!=symbol) continue;')
+    expect(reconcile).toMatch(/if\(entry!=DEAL_ENTRY_OUT && entry!=DEAL_ENTRY_OUT_BY\) continue;[\s\S]*DEAL_POSITION_ID/)
+    expect(reconcile).toContain('origin_magic==magic_number')
+    expect(reconcile).toContain('CANARY_CLOSED_OWNERSHIP_EA')
+    expect(reconcile).toContain('CANARY_CLOSED_OWNERSHIP_FOREIGN')
+    expect(reconcile).toContain('CANARY_CLOSED_OWNERSHIP_UNSAFE')
+    expect(harness).toContain('nonmagic final closure ownership')
+  })
+
+  it('resolves authoritative immediate stops and emergency closures without allowing resend', async () => {
+    const [main, reconcile, state, harness] = await Promise.all([
+      readCanarySource('JmbGoldmineDemoCanary.mq5'),
+      readCanarySource('JmbCanaryReconcile.mqh'),
+      readCanarySource('JmbCanaryState.mqh'),
+      readFile(join('tools', 'mt5', 'tests', 'JmbGoldmineDemoCanaryHarness.mq5'), 'utf8'),
+    ])
+    const reducer = reconcile.match(/CanaryLifecycleState ReduceCanaryLifecycle\([\s\S]*?\n\}/)?.[0] ?? ''
+
+    expect(reducer.indexOf('facts.stoppedObservation')).toBeLessThan(reducer.indexOf('facts.resultClass==CANARY_RESULT_UNKNOWN'))
+    expect(reconcile).toContain('authoritative_stop_closure')
+    expect(reconcile).toContain('authoritative_emergency_closure')
+    expect(state).toContain('emergency_position_id')
+    expect(main).toContain('latch.emergencyPositionId=CanaryTicketString(reconciliation.position.identifier)')
+    expect(main).toMatch(/CANARY_LIFECYCLE_STOPPED[\s\S]*latch\.unresolved=false;[\s\S]*PersistCanarySafetyLatch/)
+    expect(main).toMatch(/authoritative_emergency_closure[\s\S]*latch\.unresolved=false;[\s\S]*latch\.protectionError/)
+    expect(harness).toContain('unknown entry immediately stopped')
+    expect(harness).toContain('protection error pauses after emergency closure')
+  })
+
+  it('publishes the in-memory latest event only after durable append verification succeeds', async () => {
+    const main = await readCanarySource('JmbGoldmineDemoCanary.mq5')
+    const managed = main.match(/bool AppendManagedCanaryEvent\([\s\S]*?\n\}/)?.[0] ?? ''
+
+    expect(managed).toContain('CanaryExecutionEvent candidate;')
+    expect(managed).toContain('AppendCanaryExecutionEvent(candidate,detail)')
+    expect(managed.indexOf('g_latest_event=candidate;')).toBeGreaterThan(managed.indexOf('AppendCanaryExecutionEvent(candidate,detail)'))
+    expect(main).not.toMatch(/BuildCanaryLifecycleEvent\([^;]*g_latest_event\)/s)
+    expect(main).not.toMatch(/AppendCanaryExecutionEvent\(g_latest_event,/)
+  })
+
   it('keeps execution disabled, demo-only, Gold-only, fixed-volume, and non-expanding', async () => {
     const [sources, gateway, types] = await Promise.all([
       readCanarySources(),
