@@ -3,9 +3,14 @@ import {
   loadConfig, writeConfigSection, validSections,
   readCredentials, addCredential, deleteCredential, writeCredential, resolveCredential,
   credentialWires,
+  readWorkspaceCredentialDefaults, writeWorkspaceCredentialDefaults,
+  readIssueDefaultAgent, writeIssueDefaultAgent,
+  readWorkspaceDefaultAgent, writeWorkspaceDefaultAgent,
   credentialVendorEnum, credentialWireShapeEnum,
   type ConfigSection, type Credential, type CredentialWireShape,
+  type WorkspaceCredentialDefault,
 } from '../../core/config.js'
+import { compatibleCredentials } from '../../workspaces/credential-injection.js'
 
 /** Validate a `{ [wireShape]: baseUrl }` body into a typed wires map. */
 function parseWires(raw: unknown): Partial<Record<CredentialWireShape, string>> {
@@ -26,6 +31,44 @@ import { probeByWireShape } from '../../workspaces/agent-probe.js'
 
 interface ConfigRouteOpts {
   ctx?: EngineContext
+}
+
+export const ONBOARDING_TEST_CREDENTIAL = {
+  apiKey: 'oa_test_ok',
+  model: 'openalice-onboarding-test',
+  baseUrl: 'http://127.0.0.1:0/v1',
+  wireShape: 'openai-chat' as const satisfies WireShape,
+}
+
+function onboardingTestCredential(env: NodeJS.ProcessEnv = process.env) {
+  return {
+    ...ONBOARDING_TEST_CREDENTIAL,
+    baseUrl: env['OPENALICE_ONBOARDING_AI_BASE_URL']?.trim()
+      || ONBOARDING_TEST_CREDENTIAL.baseUrl,
+  }
+}
+
+function onboardingMockCredentialTestEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env['OPENALICE_ONBOARDING_TEST'] === '1' && env['OPENALICE_CREDENTIAL_TEST_MODE'] === 'mock'
+}
+
+function maybeHandleOnboardingMockCredentialTest(body: {
+  wireShape: WireShape
+  baseUrl?: string
+  apiKey: string
+  model: string
+}): { ok: boolean; response?: string; error?: string } | null {
+  if (!onboardingMockCredentialTestEnabled()) return null
+  const credential = onboardingTestCredential()
+  const isMockEndpoint =
+    body.wireShape === credential.wireShape &&
+    body.baseUrl?.trim() === credential.baseUrl &&
+    body.model.trim() === credential.model
+  if (!isMockEndpoint) return null
+  if (body.apiKey.trim() !== credential.apiKey) {
+    return { ok: false, error: `Use the onboarding test key "${credential.apiKey}".` }
+  }
+  return { ok: true, response: 'OpenAlice onboarding mock credential is ready.' }
 }
 
 /** Config routes: GET /, PUT /:section, profile CRUD, presets, test */
@@ -66,6 +109,7 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
       const list = Object.entries(creds).map(([slug, cred]) => ({
         slug,
         vendor: cred.vendor,
+        ...(cred.label ? { label: cred.label } : {}),
         authType: cred.authType,
         wires: credentialWires(cred), // derives from legacy {baseUrl,wireShape} too
         apiKey: cred.apiKey ?? null,
@@ -80,16 +124,20 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
   /** POST /credentials — add an api-key credential (deduped by key). Returns slug. */
   app.post('/credentials', async (c) => {
     try {
-      const body = await c.req.json<{ vendor?: string; wires?: unknown; apiKey?: string }>()
+      const body = await c.req.json<{ vendor?: string; label?: string; wires?: unknown; apiKey?: string; lastModel?: string }>()
       const apiKey = body.apiKey?.trim()
       if (!apiKey) return c.json({ error: 'apiKey is required' }, 400)
       const vendorParse = credentialVendorEnum.safeParse(body.vendor)
+      const label = body.label?.trim()
+      const lastModel = body.lastModel?.trim()
       const wires = parseWires(body.wires)
       const cred: Credential = {
         vendor: vendorParse.success ? vendorParse.data : 'custom',
+        ...(label ? { label } : {}),
         authType: 'api-key',
         apiKey,
         ...(Object.keys(wires).length ? { wires } : {}),
+        ...(lastModel ? { lastModel } : {}),
       }
       const slug = await addCredential(cred)
       return c.json({ slug, vendor: cred.vendor }, 201)
@@ -102,16 +150,20 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
   app.put('/credentials/:slug', async (c) => {
     try {
       const slug = c.req.param('slug')
-      const body = await c.req.json<{ vendor?: string; wires?: unknown; apiKey?: string }>()
+      const body = await c.req.json<{ vendor?: string; label?: string; wires?: unknown; apiKey?: string; lastModel?: string }>()
       const existing = await resolveCredential(slug)
       const apiKey = body.apiKey?.trim() || existing.apiKey
       const vendorParse = credentialVendorEnum.safeParse(body.vendor)
+      const label = body.label?.trim()
+      const lastModel = body.lastModel?.trim() || existing.lastModel
       const wires = parseWires(body.wires)
       const cred: Credential = {
         vendor: vendorParse.success ? vendorParse.data : existing.vendor,
+        ...(label || existing.label ? { label: label || existing.label } : {}),
         authType: 'api-key',
         ...(apiKey ? { apiKey } : {}),
         ...(Object.keys(wires).length ? { wires } : { ...(existing.wires ? { wires: existing.wires } : {}) }),
+        ...(lastModel ? { lastModel } : {}),
       }
       await writeCredential(slug, cred)
       return c.json({ slug })
@@ -147,6 +199,8 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
       if (!body.apiKey || !body.model) {
         return c.json({ ok: false, error: 'apiKey and model are required' })
       }
+      const mockResult = maybeHandleOnboardingMockCredentialTest(body)
+      if (mockResult) return c.json(mockResult)
       const authMode = resolveAnthropicAuthMode({ authMode: body.authMode, baseUrl: body.baseUrl })
       const r = await probeByWireShape(body.wireShape, {
         baseUrl: body.baseUrl, apiKey: body.apiKey, model: body.model, authMode,
@@ -154,6 +208,104 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
       return c.json({ ok: true, response: r.text })
     } catch (err) {
       return c.json({ ok: false, error: err instanceof Error ? err.message : String(err) })
+    }
+  })
+
+  // ============ Default Workspace Credentials (per-agent) ============
+  //
+  // The user-level "inject my usual key on every new workspace" setting. A
+  // per-agent map of {credentialSlug, model?} that the workspace creator seeds
+  // into each new workspace's file-based AI config at create time — sparing the
+  // user the per-workspace AI-config modal. References the vault above.
+
+  const DEFAULTABLE_AGENTS = ['claude', 'codex', 'opencode', 'pi'] as const
+
+  /**
+   * GET /workspace-credential-defaults — the current per-agent defaults plus,
+   * for the picker, the vault slugs each agent can actually be driven by (the
+   * wire-shape funnel computed server-side, so the UI stays dumb).
+   */
+  app.get('/workspace-credential-defaults', async (c) => {
+    try {
+      const [defaults, creds] = await Promise.all([
+        readWorkspaceCredentialDefaults(),
+        readCredentials(),
+      ])
+      const compatibleByAgent: Record<string, string[]> = {}
+      for (const agent of DEFAULTABLE_AGENTS) {
+        compatibleByAgent[agent] = compatibleCredentials(creds, agent).map(([slug]) => slug)
+      }
+      return c.json({ defaults, compatibleByAgent })
+    } catch (err) {
+      return c.json({ error: String(err) }, 500)
+    }
+  })
+
+  /**
+   * PUT /workspace-credential-defaults — replace the whole per-agent map. Body:
+   * `{ defaults: { [agentId]: { credentialSlug, model? } } }`. An empty/absent
+   * `credentialSlug` for an agent clears its default (handled in the writer).
+   */
+  app.put('/workspace-credential-defaults', async (c) => {
+    try {
+      const body = await c.req.json<{ defaults?: Record<string, WorkspaceCredentialDefault> }>()
+      const incoming = body.defaults ?? {}
+      const next: Record<string, WorkspaceCredentialDefault> = {}
+      for (const agent of DEFAULTABLE_AGENTS) {
+        const def = incoming[agent]
+        if (def && typeof def.credentialSlug === 'string' && def.credentialSlug) {
+          next[agent] = {
+            credentialSlug: def.credentialSlug,
+            ...(typeof def.model === 'string' && def.model ? { model: def.model } : {}),
+          }
+        }
+      }
+      await writeWorkspaceCredentialDefaults(next)
+      return c.json({ defaults: next })
+    } catch (err) {
+      return c.json({ error: String(err) }, 400)
+    }
+  })
+
+  app.get('/workspace-default-agent', async (c) => {
+    try {
+      return c.json({ agent: await readWorkspaceDefaultAgent() })
+    } catch (err) {
+      return c.json({ error: String(err) }, 500)
+    }
+  })
+
+  app.put('/workspace-default-agent', async (c) => {
+    try {
+      const body = await c.req.json<{ agent?: string | null }>()
+      const agent = typeof body.agent === 'string' && DEFAULTABLE_AGENTS.includes(body.agent as typeof DEFAULTABLE_AGENTS[number])
+        ? body.agent
+        : null
+      await writeWorkspaceDefaultAgent(agent)
+      return c.json({ agent })
+    } catch (err) {
+      return c.json({ error: String(err) }, 400)
+    }
+  })
+
+  app.get('/issue-default-agent', async (c) => {
+    try {
+      return c.json({ agent: await readIssueDefaultAgent() })
+    } catch (err) {
+      return c.json({ error: String(err) }, 500)
+    }
+  })
+
+  app.put('/issue-default-agent', async (c) => {
+    try {
+      const body = await c.req.json<{ agent?: string | null }>()
+      const agent = typeof body.agent === 'string' && DEFAULTABLE_AGENTS.includes(body.agent as typeof DEFAULTABLE_AGENTS[number])
+        ? body.agent
+        : null
+      await writeIssueDefaultAgent(agent)
+      return c.json({ agent })
+    } catch (err) {
+      return c.json({ error: String(err) }, 400)
     }
   })
 
@@ -168,7 +320,7 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
       const body = await c.req.json()
       const validated = await writeConfigSection(section, body)
       // Keep the in-memory ctx.config in sync with disk so any code path
-      // reading it (opentypebb resolver, market-data helpers, …) picks up
+      // reading it (provider resolver, market-data helpers, …) picks up
       // edits without a restart. Object.assign preserves ctx.config's
       // object identity — we just swap its contents.
       if (opts?.ctx) {
@@ -182,7 +334,7 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
       if (section === 'trading') {
         triggerUTARestart().catch(() => { /* surfaced via health badges */ })
       }
-      // marketData edits are picked up lazily by the opentypebb resolver
+      // marketData edits are picked up lazily by the provider resolver
       // (it reads ctx.config per request), so no explicit hot-reload hook
       // is needed. The old connector hot-reload path was removed with the
       // legacy connector cluster.

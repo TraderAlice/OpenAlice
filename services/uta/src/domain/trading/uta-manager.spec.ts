@@ -10,8 +10,8 @@ import {
 } from './brokers/mock/index.js'
 import './contract-ext.js'
 
-function makeUta(broker: MockBroker): UnifiedTradingAccount {
-  return new UnifiedTradingAccount(broker)
+function makeUta(broker: MockBroker, options?: ConstructorParameters<typeof UnifiedTradingAccount>[1]): UnifiedTradingAccount {
+  return new UnifiedTradingAccount(broker, options)
 }
 
 describe('UTAManager', () => {
@@ -62,7 +62,14 @@ describe('UTAManager', () => {
       const list = manager.listUTAs()
       expect(list).toHaveLength(2)
       expect(list[0].id).toBe('a1')
+      expect(list[0].asVendor).toBe(true)
       expect(list[1].id).toBe('a2')
+    })
+
+    it('surfaces disabled vendor participation in summaries', () => {
+      manager.add(makeUta(new MockBroker({ id: 'a1', label: 'Paper' }), { asVendor: false }))
+
+      expect(manager.listUTAs()[0]).toMatchObject({ id: 'a1', asVendor: false })
     })
 
   })
@@ -153,6 +160,24 @@ describe('UTAManager', () => {
       expect(results).toHaveLength(2)
     })
 
+    it('skips non-vendor accounts in default search', async () => {
+      const a1 = new MockBroker({ id: 'a1' })
+      const desc1 = new ContractDescription()
+      desc1.contract = makeContract({ aliceId: 'a1|AAPL' })
+      vi.spyOn(a1, 'searchContracts').mockResolvedValue([desc1])
+
+      const a2 = new MockBroker({ id: 'a2' })
+      const search2 = vi.spyOn(a2, 'searchContracts').mockResolvedValue([desc1])
+
+      manager.add(makeUta(a1))
+      manager.add(makeUta(a2, { asVendor: false }))
+
+      const results = await manager.searchContracts('AAPL')
+      expect(results).toHaveLength(1)
+      expect(results[0].accountId).toBe('a1')
+      expect(search2).not.toHaveBeenCalled()
+    })
+
     it('scopes search to specific accountId', async () => {
       const a1 = new MockBroker({ id: 'a1' })
       const desc1 = new ContractDescription()
@@ -170,6 +195,20 @@ describe('UTAManager', () => {
       const results = await manager.searchContracts('AAPL', 'a1')
       expect(results).toHaveLength(1)
       expect(results[0].accountId).toBe('a1')
+    })
+
+    it('allows explicit accountId search even when asVendor is disabled', async () => {
+      const a1 = new MockBroker({ id: 'a1' })
+      const desc1 = new ContractDescription()
+      desc1.contract = makeContract({ aliceId: 'a1|AAPL' })
+      const search = vi.spyOn(a1, 'searchContracts').mockResolvedValue([desc1])
+
+      manager.add(makeUta(a1, { asVendor: false }))
+
+      const results = await manager.searchContracts('AAPL', 'a1')
+      expect(results).toHaveLength(1)
+      expect(results[0].accountId).toBe('a1')
+      expect(search).toHaveBeenCalledOnce()
     })
 
     it('excludes accounts with no matches', async () => {

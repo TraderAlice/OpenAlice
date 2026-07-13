@@ -33,6 +33,8 @@ export function CreateSimulatorSection({ onCreated }: {
         enabled: true,
         guards: [],
         presetConfig: { cash: cashNum },
+        readOnly: false,
+        asVendor: true,
       })
       await api.trading.reconnectUTA(created.id).catch(() => {})
       toast.success(`Created ${created.label} (${created.id})`)

@@ -19,6 +19,12 @@ export function HealthBadge({ health, size = 'sm' }: { health?: BrokerHealthInfo
 
   if (health.disabled) return pill('text-text-muted', 'bg-text-muted/40', 'Disabled', health.lastError)
 
+  // Initial broker connect still in flight. `status` is optimistically 'healthy'
+  // during this window, so this must be checked BEFORE the switch — otherwise a
+  // cold-starting account misleadingly reads "Connected" while its data is still
+  // loading. Pulses to signal work-in-progress, not a steady state.
+  if (health.connecting) return pill('text-accent', 'bg-accent', 'Connecting...', health.lastError, true)
+
   switch (health.status) {
     case 'healthy':
       // At target reach. The label tells the user the account's role.

@@ -6,20 +6,15 @@ import { TabStrip } from './TabStrip'
 import { EmptyEditor } from './EmptyEditor'
 
 /**
- * The main editor area — replaces the old `<Routes>` block.
+ * Main content host.
  *
- * Renders every open tab in the focused group concurrently, hiding all but
- * the active one via CSS `display: none`. Reasoning:
- *
- * - Tabs that hold long-lived state (ChatPage's SSE / message buffers,
- *   in-progress charts) survive switching without re-fetch or re-mount.
- * - Components don't need to be aware of "tab-hosted vs route-hosted" —
- *   they just render normally; the host controls visibility.
- *
- * The `visible` prop threaded into each tab's component lets surfaces that
- * care (ChatPage's catch-up scroll) react to becoming visible.
- *
- * Mobile (< md): single-tab mode. Only the active tab renders, no strip.
+ * Tabs are now lightweight navigation history, not VS-Code-style runtime
+ * containers. By default only the active tab is mounted; inactive tabs keep
+ * their ViewSpec in the tab store but release component state, timers, charts,
+ * terminals, and other DOM-owned resources. A view can opt into
+ * `lifecycle: 'keep-mounted'` in tabs/registry when it genuinely needs a live
+ * background DOM. Those keep-mounted hidden frames use `visibility: hidden`
+ * so size-sensitive children keep a real layout box.
  */
 export function TabHost() {
   const tabIds = useWorkspace((state) =>
@@ -42,9 +37,11 @@ export function TabHost() {
             const tab = tabsMap[id]
             if (!tab) return null
             const isActive = id === activeTabId
+            const view = getView(tab.spec.kind)
+            const keepMounted = view.lifecycle === 'keep-mounted'
             // Mobile: only render the active tab to avoid blowing memory and
             // because we don't even have a strip to switch tabs from.
-            if (!isDesktop && !isActive) return null
+            if (!isActive && (!isDesktop || !keepMounted)) return null
             return <TabFrame key={id} tab={tab} visible={isActive} />
           })
         )}
@@ -53,7 +50,7 @@ export function TabHost() {
   )
 }
 
-/** One mounted tab. Hidden frames are kept in the DOM but `display: none`. */
+/** One mounted view frame. Hidden frames exist only for keep-mounted views. */
 function TabFrame({ tab, visible }: { tab: Tab; visible: boolean }) {
   const view = getView(tab.spec.kind)
   // Cast: each ViewModule has a Component constrained to its spec kind. The
@@ -61,8 +58,14 @@ function TabFrame({ tab, visible }: { tab: Tab; visible: boolean }) {
   const Component = view.Component as React.ComponentType<{ spec: typeof tab.spec; visible: boolean }>
   return (
     <div
+      data-view-frame={tab.spec.kind}
+      data-view-visible={visible ? 'true' : 'false'}
       className="absolute inset-0 flex flex-col min-h-0"
-      style={{ display: visible ? 'flex' : 'none' }}
+      style={{
+        visibility: visible ? 'visible' : 'hidden',
+        pointerEvents: visible ? 'auto' : 'none',
+        zIndex: visible ? 1 : 0,
+      }}
       aria-hidden={!visible}
       // `inert` keeps focusable elements in hidden frames out of tab order.
       // React 19 supports it as a JSX attribute.

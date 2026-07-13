@@ -4,14 +4,84 @@ on:
   push:
     branches: [master, dev]
   pull_request:
-    branches: [master]
+    branches: [dev, master]
+  # Keep a full cross-platform safety net for lightweight PRs that intentionally
+  # skip the expensive host matrix. Scheduled workflows run from the default
+  # branch, while checkout below points the jobs at the current dev branch.
+  schedule:
+    - cron: "0 19 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+# Agent-driven iterations often supersede an earlier commit before its Windows
+# job finishes. Keep only the latest PR/dev run while never cancelling a master
+# or scheduled validation.
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.ref == 'refs/heads/dev' }}
 
 jobs:
+  # UI and prose changes are built and tested on Ubuntu, but do not need to
+  # repeat the host-sensitive runtime suite on macOS and Windows. This is a
+  # deliberately narrow allowlist: every other path keeps the full matrix.
+  change-scope:
+    if: github.event_name != 'push' || github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    outputs:
+      cross_platform: ${{ steps.changes.outputs.cross_platform }}
+
+    steps:
+      - name: Classify changed paths
+        id: changes
+        uses: actions/github-script@v8
+        with:
+          script: |
+            if (context.eventName !== "pull_request") {
+              core.info("Non-PR validation keeps the full platform matrix.");
+              core.setOutput("cross_platform", "true");
+              return;
+            }
+
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              per_page: 100,
+            });
+            const paths = files.flatMap((file) =>
+              file.previous_filename
+                ? [file.filename, file.previous_filename]
+                : [file.filename],
+            );
+            const isLightweight = (path) =>
+              path.startsWith("ui/") ||
+              path.startsWith("docs/") ||
+              /^[^/]+\.md$/i.test(path) ||
+              path === "LICENSE";
+            const platformSensitive = paths.filter((path) => !isLightweight(path));
+            const runCrossPlatform = paths.length === 0 || platformSensitive.length > 0;
+
+            core.info(`Changed paths: ${paths.join(", ") || "none reported"}`);
+            if (platformSensitive.length > 0) {
+              core.info(`Full matrix required by: ${platformSensitive.join(", ")}`);
+            } else {
+              core.info("Only UI/docs paths changed; Ubuntu remains the PR gate.");
+            }
+            core.setOutput("cross_platform", String(runCrossPlatform));
+
   build-and-test:
+    # A dev push is the already-tested result of merging a PR. It gets the
+    # focused post-merge smoke below instead of repeating the whole PR suite.
+    if: github.event_name != 'push' || github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'dev' || '' }}
 
       - uses: pnpm/action-setup@v4
 
@@ -26,6 +96,39 @@ jobs:
 
       - run: pnpm test
 
+  # The full Vitest suite includes path, port-binding, process-launch, and
+  # packaged-toolchain behavior whose semantics differ materially by host OS.
+  # Ubuntu remains the build gate above; this matrix prevents a Linux-only
+  # green check from shipping regressions to macOS or Windows users.
+  cross-platform-test:
+    needs: change-scope
+    if: needs.change-scope.outputs.cross_platform == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'dev' || '' }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm build
+        timeout-minutes: 15
+
+      - run: pnpm test
+        timeout-minutes: 15
+
   # Boots the real `pnpm dev` stack and asserts UTA/Alice/Vite all spawn.
   # Exists to catch cross-platform spawn regressions (e.g. `spawn tsx ENOENT`
   # on Windows) that `pnpm test` can't see — esbuild transpiles, it never
@@ -33,6 +136,8 @@ jobs:
   # control: if Windows goes red while Ubuntu stays green, it's a real platform
   # diff, not a harness bug. See scripts/guardian/smoke.ts.
   dev-smoke:
+    needs: change-scope
+    if: needs.change-scope.outputs.cross_platform == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -41,6 +146,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'dev' || '' }}
 
       - uses: pnpm/action-setup@v4
 
@@ -52,6 +159,37 @@ jobs:
       # Skip the Electron desktop shell — the smoke only needs UTA/Alice/UI,
       # and this avoids a large electron download on the Windows runner.
       - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
+
+      # Exercises duplicate-start rejection, graceful takeover, crash-stale
+      # reclamation, heartbeat renewal, and forced recovery with real child
+      # processes before the heavier full-stack boot smoke.
+      - run: pnpm test:guardian-recovery
+        timeout-minutes: 3
+
+      - run: pnpm test:smoke
+        timeout-minutes: 8
+
+  # Merging a green PR changes the commit SHA but normally not its tested tree.
+  # Keep a cheap real-process integration check on dev without paying for a
+  # second complete Linux/macOS/Windows pass.
+  post-merge-dev-smoke:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
+
+      - run: pnpm test:guardian-recovery
+        timeout-minutes: 3
 
       - run: pnpm test:smoke
         timeout-minutes: 8

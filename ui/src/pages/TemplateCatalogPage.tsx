@@ -16,7 +16,7 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { useWorkspaces } from '../contexts/WorkspacesContext'
+import { useWorkspaces } from '../contexts/workspaces-context'
 import { useWorkspace } from '../tabs/store'
 import { TemplateCard } from '../components/workspace/TemplateCard'
 import type { TemplateInfo } from '../components/workspace/api'

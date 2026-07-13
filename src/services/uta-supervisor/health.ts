@@ -1,7 +1,7 @@
 /**
- * Poll UTA `/__uta/health` until it returns 200 or timeout. Used by Alice's
- * boot path (`src/main.ts` in Step 5) to gate AgentCenter init on UTA
- * being live — Alice fails fast rather than running with a dead BFF.
+ * Poll UTA `/__uta/health` until it returns 200 or timeout. Used by Alice and
+ * Guardian for observability only: UTA is an optional carrier, so callers can
+ * continue in lite mode when this returns null.
  */
 
 export interface HealthBody {

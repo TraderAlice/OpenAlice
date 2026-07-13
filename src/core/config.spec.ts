@@ -133,7 +133,7 @@ describe('readAgentConfig', () => {
     fileNotFound()
     const cfg = await readAgentConfig()
     expect(cfg.maxSteps).toBe(20)
-    expect(cfg.evolutionMode).toBe(false)
+    expect(cfg.allowAiTrading).toBe(false)
   })
 
   it('parses maxSteps from file', async () => {
@@ -216,6 +216,7 @@ describe('readUTAsConfig', () => {
     const accounts = await readUTAsConfig()
     expect(accounts).toHaveLength(2)
     expect(accounts[0].presetId).toBe('okx')
+    expect(accounts[0].asVendor).toBe(true)
     expect(accounts[1].presetId).toBe('alpaca')
   })
 
@@ -262,7 +263,7 @@ describe('writeUTAsConfig', () => {
     await writeUTAsConfig([{
       id: 'acc-1', presetId: 'alpaca', enabled: true, guards: [],
       presetConfig: { mode: 'paper', apiKey: 'k', apiSecret: 's' },
-      keyless: false, readOnly: false, editable: true,
+      keyless: false, readOnly: false, asVendor: true, editable: true,
     }])
     const filePath = mockWriteFile.mock.calls[0][0] as string
     expect(filePath).toMatch(/accounts\.json$/)
@@ -273,6 +274,33 @@ describe('writeUTAsConfig', () => {
       writeUTAsConfig([{ presetId: 'alpaca' } as any])
     ).rejects.toThrow()
     expect(mockWriteFile).not.toHaveBeenCalled()
+  })
+})
+
+describe('writeConfigSection(trading)', () => {
+  it('defaults keylessDataSources to empty', async () => {
+    const trading = await writeConfigSection('trading', {}) as {
+      mode?: string
+      observeExternalOrdersEvery: string
+      keylessDataSources: string[]
+    }
+    expect(trading.mode).toBeUndefined()
+    expect(trading.observeExternalOrdersEvery).toBe('15m')
+    expect(trading.keylessDataSources).toEqual([])
+  })
+
+  it('persists explicit keyless data-source choices', async () => {
+    const trading = await writeConfigSection('trading', {
+      observeExternalOrdersEvery: 'off',
+      mode: 'readonly',
+      keylessDataSources: ['binance', 'okx'],
+    }) as {
+      mode?: string
+      observeExternalOrdersEvery: string
+      keylessDataSources: string[]
+    }
+    expect(trading.mode).toBe('readonly')
+    expect(trading.keylessDataSources).toEqual(['binance', 'okx'])
   })
 })
 
@@ -364,4 +392,3 @@ describe('deleteCredential', () => {
     expect(mockWriteFile).toHaveBeenCalled()
   })
 })
-

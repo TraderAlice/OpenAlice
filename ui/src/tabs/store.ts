@@ -9,6 +9,9 @@ import {
   specEquals,
   getFocusedGroup,
 } from './types'
+import { reloadOnHotUpdate } from '../lib/hmr'
+
+reloadOnHotUpdate('tabs/store')
 
 /**
  * Zustand store backing the workspace.
@@ -243,7 +246,9 @@ export const useWorkspace = create<WorkspaceStore>()(
       // session that had a news tab open — NewsPage's `[...articles]`
       // throws when res.items is undefined, and the rehydrate replays
       // that tab open on every reload. Bump clears the loop.
-      version: 5,
+      // v6: introduced the `chat-landing` ViewKind; clear stale persisted
+      // tab state so no rehydrate references an unknown kind.
+      version: 6,
       // Persist only the data shape — actions are recreated by the store factory.
       partialize: (state) => ({
         tabs: state.tabs,

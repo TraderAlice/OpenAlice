@@ -13,12 +13,14 @@
  */
 
 import { Hono } from 'hono'
+import { describeTradingMode, type TradingModePolicy } from '../../services/trading-mode.js'
 
 // Total request timeout. UTA is on the loopback interface so connect is
 // instant — this guards against handlers that legitimately take seconds
 // (broker queries, contract searches) hanging Alice forever. 30s is
 // well above the typical broker-API SLA without being a footgun.
 const PROXY_TIMEOUT_MS = 30_000
+const STATUS_TIMEOUT_MS = 1_000
 
 /** Methods Hono's `app.all` actually dispatches. Empty body methods get a
  *  null body forwarded. */
@@ -29,11 +31,115 @@ const PASSTHROUGH_HEADERS: readonly string[] = [
   'user-agent', 'cache-control', 'pragma', 'x-request-id',
 ]
 
-export function createTradingProxyRoutes(opts: { utaBaseUrl: string }): Hono {
+export function createTradingProxyRoutes(opts: {
+  utaBaseUrl?: string
+  disabledReason?: 'lite_mode'
+  getPolicy?: () => TradingModePolicy
+}): Hono {
   const app = new Hono()
-  const base = opts.utaBaseUrl.replace(/\/$/, '')
+  const base = opts.utaBaseUrl?.replace(/\/$/, '')
+  const disabledReason = opts.disabledReason
+  const getPolicy = opts.getPolicy ?? (() => ({
+    mode: disabledReason === 'lite_mode' ? 'lite' : 'pro',
+    source: disabledReason === 'lite_mode' ? 'env' : 'auto',
+    envLocked: disabledReason === 'lite_mode',
+    hasUTAConfig: false,
+  }))
+
+  app.get('/status', async (c) => {
+    const policy = getPolicy()
+    if (policy.mode === 'lite') {
+      return c.json({
+        available: false,
+        state: 'unavailable',
+        reason: 'lite_mode',
+        mode: policy.mode,
+        modeSource: policy.source,
+        envLocked: policy.envLocked,
+        hasUTAConfig: policy.hasUTAConfig,
+        hint: describeTradingMode('lite'),
+      })
+    }
+    if (!base) {
+      return c.json({
+        available: false,
+        state: 'unavailable',
+        reason: 'not_configured',
+        mode: policy.mode,
+        modeSource: policy.source,
+        envLocked: policy.envLocked,
+        hasUTAConfig: policy.hasUTAConfig,
+        hint: 'Trading service is not configured.',
+      })
+    }
+
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), STATUS_TIMEOUT_MS)
+    try {
+      const res = await fetch(`${base}/__uta/health`, { signal: controller.signal })
+      if (!res.ok) {
+        return c.json({
+          available: false,
+          state: 'unavailable',
+          reason: `health_${res.status}`,
+          mode: policy.mode,
+          modeSource: policy.source,
+          envLocked: policy.envLocked,
+          hasUTAConfig: policy.hasUTAConfig,
+          hint: 'Trading service is not healthy.',
+        })
+      }
+      const health = await res.json() as { startedAt?: string; utas?: number }
+      return c.json({
+        available: true,
+        state: 'available',
+        mode: policy.mode,
+        modeSource: policy.source,
+        envLocked: policy.envLocked,
+        hasUTAConfig: policy.hasUTAConfig,
+        hint: describeTradingMode(policy.mode),
+        startedAt: health.startedAt,
+        utas: health.utas ?? 0,
+      })
+    } catch (err) {
+      return c.json({
+        available: false,
+        state: 'unavailable',
+        reason: err instanceof Error ? err.message : String(err),
+        mode: policy.mode,
+        modeSource: policy.source,
+        envLocked: policy.envLocked,
+        hasUTAConfig: policy.hasUTAConfig,
+        hint: 'Trading service is not reachable.',
+      })
+    } finally {
+      clearTimeout(timer)
+    }
+  })
 
   app.all('*', async (c) => {
+    const policy = getPolicy()
+    if (policy.mode === 'lite') {
+      return c.json({
+        error: 'UTA disabled',
+        detail: 'Trading mode is lite',
+        hint: describeTradingMode('lite'),
+      }, 503)
+    }
+    if (policy.mode === 'readonly' && isVenueMutation(c.req.method, c.req.path)) {
+      return c.json({
+        error: 'Trading mode is readonly',
+        detail: 'Venue-mutating broker writes are disabled in readonly mode',
+        hint: describeTradingMode('readonly'),
+      }, 403)
+    }
+    if (!base) {
+      return c.json({
+        error: 'UTA unavailable',
+        detail: 'UTA URL is not configured',
+        hint: 'Trading service is not reachable. Alice is running in lite mode.',
+      }, 503)
+    }
     const incoming = c.req.raw
     // Reconstruct target URL: Hono's `c.req.path` is the *full* path
     // including the mount prefix (`/api/trading/uta`, not `/uta`), so
@@ -67,7 +173,7 @@ export function createTradingProxyRoutes(opts: { utaBaseUrl: string }): Hono {
       return c.json({
         error: 'UTA unavailable',
         detail: msg,
-        hint: 'Trading service is not reachable. Check Guardian / UTA process.',
+        hint: 'Trading service is not reachable. Alice is running in lite mode.',
       }, 502)
     } finally {
       clearTimeout(connectTimer)
@@ -87,6 +193,21 @@ export function createTradingProxyRoutes(opts: { utaBaseUrl: string }): Hono {
   })
 
   return app
+}
+
+function isVenueMutation(method: string, path: string): boolean {
+  const m = method.toUpperCase()
+  if (m === 'GET' || m === 'HEAD') return false
+  const normalized = path.toLowerCase()
+  return (
+    normalized.includes('/wallet/push') ||
+    normalized.includes('/wallet/place-order') ||
+    normalized.includes('/wallet/close-position') ||
+    normalized.includes('/wallet/cancel-order') ||
+    normalized.includes('/simulate-price') ||
+    normalized.startsWith('/api/simulator') ||
+    normalized.startsWith('/simulator')
+  )
 }
 
 function url(req: Request): URL {

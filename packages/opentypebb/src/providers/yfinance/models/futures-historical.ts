@@ -6,8 +6,7 @@
 import { z } from 'zod'
 import { Fetcher } from '../../../core/provider/abstract/fetcher.js'
 import { FuturesHistoricalQueryParamsSchema, FuturesHistoricalDataSchema } from '../../../standard-models/futures-historical.js'
-import { EmptyDataError } from '../../../core/provider/utils/errors.js'
-import { getHistoricalData } from '../utils/helpers.js'
+import { getHistoricalData, emptyHistoricalError } from '../utils/helpers.js'
 import { INTERVALS_DICT, MONTHS } from '../utils/references.js'
 
 export const YFinanceFuturesHistoricalQueryParamsSchema = FuturesHistoricalQueryParamsSchema.extend({
@@ -102,7 +101,7 @@ export class YFinanceFuturesHistoricalFetcher extends Fetcher {
       if (r.status === 'fulfilled') allData.push(...r.value)
     }
 
-    if (!allData.length) throw new EmptyDataError('No futures historical data returned')
+    if (!allData.length) throw emptyHistoricalError(results, 'No futures historical data returned')
     return allData
   }
 

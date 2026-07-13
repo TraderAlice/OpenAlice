@@ -41,6 +41,16 @@ export interface CodexProbeInput {
   wireApi: 'chat' | 'responses';
 }
 
+/** Does this error mean the model MANDATES extended thinking? Some reasoning
+ *  models (e.g. Kimi k2.7) 400 with "invalid thinking: only type=enabled is
+ *  allowed for this model" when the request omits thinking — they can't run it
+ *  disabled. We detect that to retry with thinking on, rather than enabling it
+ *  for every model (Claude/GLM/etc. don't need it and some reject the param). */
+function isThinkingRequiredError(err: unknown): boolean {
+  const e = err as { status?: number; message?: string } | undefined;
+  return e?.status === 400 && typeof e?.message === 'string' && /thinking/i.test(e.message);
+}
+
 export async function probeAnthropic(input: ClaudeProbeInput): Promise<ProbeResult> {
   // `authToken` makes the SDK send `Authorization: Bearer`; `apiKey` makes it
   // send `x-api-key`. Pick exactly one — sending both can trip gateways that
@@ -48,19 +58,34 @@ export async function probeAnthropic(input: ClaudeProbeInput): Promise<ProbeResu
   const client = input.authMode === 'bearer'
     ? new Anthropic({ authToken: input.apiKey, baseURL: input.baseUrl })
     : new Anthropic({ apiKey: input.apiKey, baseURL: input.baseUrl });
-  const msg = await client.messages.create({
-    model: input.model,
-    // Enough room for a reasoning model to finish thinking AND emit a visible
-    // reply on a trivial prompt — a tiny budget gets spent entirely on reasoning,
-    // leaving empty content (the "(empty reply)" the user saw). One-off per Test.
-    max_tokens: 512,
-    messages: [{ role: 'user', content: 'Hi' }],
-  });
-  const text = msg.content
+
+  const extract = (msg: Anthropic.Message): string => msg.content
     .filter((b): b is Anthropic.TextBlock => b.type === 'text')
     .map((b) => b.text)
     .join('');
-  return { text };
+
+  try {
+    const msg = await client.messages.create({
+      model: input.model,
+      // Enough room for a reasoning model to finish thinking AND emit a visible
+      // reply on a trivial prompt — a tiny budget gets spent entirely on reasoning,
+      // leaving empty content (the "(empty reply)" the user saw). One-off per Test.
+      max_tokens: 512,
+      messages: [{ role: 'user', content: 'Hi' }],
+    });
+    return { text: extract(msg) };
+  } catch (err) {
+    if (!isThinkingRequiredError(err)) throw err;
+    // Thinking-mandatory model: retry with it enabled. budget_tokens must be
+    // < max_tokens and Anthropic's floor is 1024, so bump max_tokens to match.
+    const msg = await client.messages.create({
+      model: input.model,
+      max_tokens: 2048,
+      thinking: { type: 'enabled', budget_tokens: 1024 },
+      messages: [{ role: 'user', content: 'Hi' }],
+    });
+    return { text: extract(msg) };
+  }
 }
 
 export async function probeOpenAI(input: CodexProbeInput): Promise<ProbeResult> {

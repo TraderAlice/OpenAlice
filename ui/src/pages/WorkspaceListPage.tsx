@@ -12,13 +12,19 @@
  * ⚙ override row opens the AI-provider modal.
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { ArchiveRestore, Trash2 } from 'lucide-react'
 
-import { useWorkspaces } from '../contexts/WorkspacesContext'
+import { useWorkspaces } from '../contexts/workspaces-context'
 import { useWorkspace } from '../tabs/store'
 import { OverviewCard } from '../components/workspace/OverviewCard'
 import {
   getGitLog,
+  listDepartedWorkspaces,
+  purgeDepartedWorkspace,
+  restoreWorkspace,
+  type DepartedWorkspace,
   type GitLogEntry,
   type TemplateInfo,
   type Workspace,
@@ -54,6 +60,7 @@ const UNKNOWN_KEY = '__unknown__'
 function buildSections(
   workspaces: readonly Workspace[],
   templates: readonly TemplateInfo[],
+  otherTitle: string,
 ): Section[] {
   // Bucket workspaces by template name; unknown / missing → "Other".
   const knownTemplateNames = new Set(templates.map((t) => t.name))
@@ -89,21 +96,39 @@ function buildSections(
   const others = buckets.get(UNKNOWN_KEY)
   if (others && others.length > 0) {
     const sorted = [...others].sort((a, b) => lastActivityMs(b) - lastActivityMs(a))
-    sections.push({ key: UNKNOWN_KEY, title: 'Other', workspaces: sorted })
+    sections.push({ key: UNKNOWN_KEY, title: otherTitle, workspaces: sorted })
   }
   return sections
 }
 
 export function WorkspaceListPage() {
-  const { workspaces, templates, openAgentConfig } = useWorkspaces()
+  const { t } = useTranslation()
+  const { workspaces, templates, openAgentConfig, refresh } = useWorkspaces()
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
+  const [departed, setDeparted] = useState<DepartedWorkspace[]>([])
+  const [departedError, setDepartedError] = useState<string | null>(null)
+  const [lifecycleBusy, setLifecycleBusy] = useState<string | null>(null)
+  const idsKey = useMemo(() => workspaces.map((w) => w.id).join(','), [workspaces])
+
+  const refreshDeparted = useCallback(async () => {
+    try {
+      setDeparted(await listDepartedWorkspaces())
+      setDepartedError(null)
+    } catch (err) {
+      setDepartedError((err as Error).message)
+    }
+  }, [])
+
+  // Active and departed inventories are two views of one lifecycle. Refresh
+  // the archive whenever the active ID set changes so an offboarding action
+  // taken from either sidebar appears here without a page reload.
+  useEffect(() => { void refreshDeparted() }, [refreshDeparted, idsKey])
 
   // Latest commit per workspace. Fetched in parallel on mount + whenever
   // the set of workspace IDs changes. Polled separately from the regular
   // workspaces refresh because git log is expensive — we don't want it
   // running every 3s on the list poll.
   const [commits, setCommits] = useState<Record<string, GitLogEntry | null>>({})
-  const idsKey = useMemo(() => workspaces.map((w) => w.id).join(','), [workspaces])
   useEffect(() => {
     if (workspaces.length === 0) return
     let cancelled = false
@@ -126,18 +151,16 @@ export function WorkspaceListPage() {
   }, [idsKey, workspaces])
 
   const sections = useMemo(
-    () => buildSections(workspaces, templates),
-    [workspaces, templates],
+    () => buildSections(workspaces, templates, t('workspace.other')),
+    [workspaces, templates, t],
   )
 
-  if (workspaces.length === 0) {
+  if (workspaces.length === 0 && departed.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-text-muted px-6">
-        <h2 className="text-lg font-medium text-text mb-2">Workspaces</h2>
+        <h2 className="text-lg font-medium text-text mb-2">{t('workspace.emptyTitle')}</h2>
         <p className="text-sm max-w-md text-center">
-          No workspaces yet. Create one from the sidebar — each is an isolated git
-          directory with a persistent terminal session attached, wired to OpenAlice
-          over MCP.
+          {t('workspace.emptyBody')}
         </p>
       </div>
     )
@@ -147,9 +170,11 @@ export function WorkspaceListPage() {
     <div className="h-full overflow-y-auto">
       <div className="max-w-5xl mx-auto px-6 py-6">
         <div className="mb-6 flex items-baseline justify-between gap-4">
-          <h2 className="text-[18px] font-semibold text-text">Workspaces Overview</h2>
+          <h2 className="text-[18px] font-semibold text-text">{t('workspace.overviewTitle')}</h2>
           <span className="text-[12px] text-text-muted">
-            {workspaces.length} workspace{workspaces.length === 1 ? '' : 's'}
+            {t(workspaces.length === 1 ? 'workspace.workspaceSingular' : 'workspace.workspacePlural', {
+              count: workspaces.length,
+            })}
           </span>
         </div>
 
@@ -186,6 +211,86 @@ export function WorkspaceListPage() {
               </div>
             </section>
           ))}
+
+          {(departed.length > 0 || departedError) && (
+            <section className="border-t border-border pt-6">
+              <div className="mb-3 flex items-baseline gap-2">
+                <h3 className="text-[12px] font-semibold uppercase tracking-wider text-text/85">
+                  Departed Workspaces
+                </h3>
+                <span className="text-[11px] text-text-muted">· {departed.length}</span>
+              </div>
+              <p className="mb-3 max-w-2xl text-[12px] leading-relaxed text-text-muted">
+                Offboarded desks are outside the active Workspace directory. Restore returns the exact checkout and Session signatures; purge removes files but keeps the historical tombstone.
+              </p>
+              {departedError && (
+                <div className="mb-3 rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-[12px] text-danger">
+                  {departedError}
+                </div>
+              )}
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                {departed.map((workspace) => {
+                  const purged = workspace.lifecycle === 'purged' || workspace.lifecycle === 'purging'
+                  return (
+                    <article key={workspace.id} className="rounded-lg border border-border bg-bg-secondary/35 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="truncate text-[14px] font-medium text-text">{workspace.tag}</div>
+                          <div className="mt-0.5 font-mono text-[10px] text-text-muted">{workspace.id}</div>
+                        </div>
+                        <span className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wide text-text-muted">
+                          {workspace.lifecycle}
+                        </span>
+                      </div>
+                      <p className="mt-3 line-clamp-2 text-[12px] leading-relaxed text-text-muted">
+                        {workspace.reason ?? 'No departure reason recorded.'}
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-text-muted">
+                        <span>{workspace.handoff?.resumeIds.length ?? 0} Sessions</span>
+                        <span>{workspace.handoff?.openIssueIds.length ?? 0} open Issues</span>
+                        {workspace.legacyImported && <span>legacy import</span>}
+                      </div>
+                      <div className="mt-4 flex justify-end gap-2">
+                        {!purged && workspace.lifecycle === 'departed' && (
+                          <button
+                            type="button"
+                            className="btn-secondary inline-flex items-center gap-1.5"
+                            disabled={lifecycleBusy !== null}
+                            onClick={() => {
+                              setLifecycleBusy(workspace.id)
+                              void restoreWorkspace(workspace.id)
+                                .then(async () => { refresh(); await refreshDeparted() })
+                                .catch((err) => setDepartedError((err as Error).message))
+                                .finally(() => setLifecycleBusy(null))
+                            }}
+                          >
+                            <ArchiveRestore size={13} /> Restore
+                          </button>
+                        )}
+                        {!purged && workspace.lifecycle === 'departed' && (
+                          <button
+                            type="button"
+                            className="btn-danger inline-flex items-center gap-1.5"
+                            disabled={lifecycleBusy !== null}
+                            onClick={() => {
+                              if (!window.confirm(`Permanently purge files for ${workspace.tag}? The catalog tombstone remains, but the desk cannot be restored.`)) return
+                              setLifecycleBusy(workspace.id)
+                              void purgeDepartedWorkspace(workspace.id)
+                                .then(refreshDeparted)
+                                .catch((err) => setDepartedError((err as Error).message))
+                                .finally(() => setLifecycleBusy(null))
+                            }}
+                          >
+                            <Trash2 size={13} /> Purge files
+                          </button>
+                        )}
+                      </div>
+                    </article>
+                  )
+                })}
+              </div>
+            </section>
+          )}
         </div>
       </div>
     </div>

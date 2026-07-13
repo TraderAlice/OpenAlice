@@ -44,6 +44,43 @@ function handleBrokerError(err: unknown): { error: string; code: string; transie
   }
 }
 
+/** A per-account degradation marker: which account failed, and why. */
+type AccountFailure = { source: string } & ReturnType<typeof handleBrokerError>
+
+/**
+ * Run `fn` against every target account, tolerating per-account failure.
+ *
+ * Without this, one offline / region-blocked account (e.g. a `bybit-readonly`
+ * data source whose proxy exit node is geo-blocked) rejects the whole
+ * `Promise.all` and blanks EVERY healthy account's data — the user sees
+ * nothing instead of their real Binance/Bitget holdings (issue #390). Here a
+ * failed account degrades to a `{ source, ...error }` marker while the healthy
+ * ones still return.
+ *
+ * `connecting` is split out from `failed`: a CONNECTING marker means the
+ * account's broker connect is still in flight (or it's reconnecting) — data is
+ * PENDING, not failed. Keeping it out of `failed`/`degraded` is what stops the
+ * UI (and the agent) from reporting a cold-starting account as a broken one.
+ * The per-account read returns this fast instead of blocking on the slow
+ * connect, so the aggregate resolves immediately with whatever is ready.
+ */
+async function settlePerAccount<U extends { id: string }, T>(
+  targets: readonly U[],
+  fn: (uta: U) => Promise<T>,
+): Promise<{ ok: T[]; failed: AccountFailure[]; connecting: AccountFailure[] }> {
+  const settled = await Promise.allSettled(targets.map((u) => fn(u)))
+  const ok: T[] = []
+  const failed: AccountFailure[] = []
+  const connecting: AccountFailure[] = []
+  settled.forEach((r, i) => {
+    if (r.status === 'fulfilled') { ok.push(r.value); return }
+    const marker = { source: targets[i].id, ...handleBrokerError(r.reason) }
+    if (marker.code === 'CONNECTING') connecting.push(marker)
+    else failed.push(marker)
+  })
+  return { ok, failed, connecting }
+}
+
 /**
  * Summarize an OpenOrder for AI consumption. Uses the value-tolerant
  * compactors (NOT order.field.equals(...)) because over HTTP the Order's
@@ -128,6 +165,21 @@ async function noAccountsError(manager: UTAManagerSDK, source?: string): Promise
   }
 }
 
+async function filterVendorSearchTargets<T extends { id: string }>(
+  manager: UTAManagerSDK,
+  targets: T[],
+): Promise<T[]> {
+  try {
+    const vendorIds = new Set(
+      (await manager.listUTAs())
+        .filter((u) => u.asVendor !== false)
+        .map((u) => u.id),
+    )
+    return targets.filter((t) => vendorIds.has(t.id))
+  } catch {
+    return targets
+  }
+}
 
 /** Stage + (optionally) commit in one call. The stage→commit split is pure
  *  ceremony when one decision = one operation — which is the dominant agent
@@ -146,7 +198,17 @@ async function stageAndMaybeCommit(
   }
 }
 
-export function createTradingTools(manager: UTAManagerSDK): Record<string, Tool> {
+/**
+ * @param manager        UTA SDK manager (account resolution + FX).
+ * @param allowAiTrading  Live getter for the `agent.allowAiTrading` master
+ *   switch. Read at call time (not captured) so toggling it in Settings takes
+ *   effect without a restart. Gates `tradingPush`: false ⇒ stage + ask the user
+ *   to approve in the Web UI; true ⇒ the AI pushes to the broker directly.
+ */
+export function createTradingTools(
+  manager: UTAManagerSDK,
+  allowAiTrading: () => boolean = () => false,
+): Record<string, Tool> {
   return {
     listUTAs: tool({
       description: 'List all registered trading accounts with their id, provider, label, and capabilities.',
@@ -157,6 +219,8 @@ export function createTradingTools(manager: UTAManagerSDK): Record<string, Tool>
     searchContracts: tool({
       description: `Search broker accounts for tradeable contracts matching a pattern.
 This is a BROKER-LEVEL search — it queries your connected trading accounts.
+By default it uses accounts with data-source participation enabled; pass
+\`source\` to query a specific account explicitly.
 
 Results are either LEAVES (tradeable, use aliceId with getQuote/placeOrder) or
 DIRECTORIES (expandable: true — e.g. a bond issuer): call expandContract on
@@ -181,8 +245,17 @@ hitting the broker, which otherwise expects the bare base ticker.`,
         if (!brokerPattern) return { results: [], message: 'Empty pattern.' }
         // Source-scoped: when the caller pinned an account, only that one is
         // hit; otherwise fan out to all configured accounts.
-        const targets = await manager.resolve(source)
-        if (targets.length === 0) return await noAccountsError(manager, source)
+        const resolvedTargets = await manager.resolve(source)
+        const targets = source ? resolvedTargets : await filterVendorSearchTargets(manager, resolvedTargets)
+        if (targets.length === 0) {
+          if (!source && resolvedTargets.length > 0) {
+            return {
+              results: [],
+              message: 'No UTA data sources are enabled. Pass source to search a specific account, or enable data-source participation on a UTA.',
+            }
+          }
+          return await noAccountsError(manager, source)
+        }
         const all: Array<Record<string, unknown>> = []
         const settled = await Promise.allSettled(
           targets.map(async (uta) => ({ id: uta.id, results: await uta.searchContracts(brokerPattern) })),
@@ -236,31 +309,37 @@ hitting the broker, which otherwise expects the bare base ticker.`,
 
     getAccount: tool({
       description: `Query trading account info (netLiquidation, totalCashValue, buyingPower, unrealizedPnL, realizedPnL).
-If this tool returns an error with transient=true, wait a few seconds and retry once before reporting to the user.`,
+If this tool returns an error with transient=true, wait a few seconds and retry once before reporting to the user.
+When multiple accounts are queried, a healthy account appears with its balances and a failed one appears as an entry with an \`error\` field (and \`source\`). ALWAYS surface failed accounts to the user — an entry with transient=false is a permanent (credentials/config) failure they must fix, not retry. An entry with code="CONNECTING" is NOT a failure: that account is still establishing its broker connection and its data will populate on a later read — don't report it as broken.`,
       inputSchema: z.object({
         source: z.string().optional().describe(sourceDesc(false)),
+        subAccountId: z.string().optional().describe('For multi-wallet venues (e.g. Binance: "spot" / "derivatives"), scope to one wallet. Omit for the aggregate across all wallets. Most brokers have a single wallet and ignore this.'),
       }).meta({ examples: [{ source: 'alpaca-paper' }] }),
-      execute: async ({ source }) => {
-        const targets = await manager.resolve(source)
+      execute: async ({ source, subAccountId }) => {
+        const targets = await manager.resolve(source, { tradingOnly: true })
         if (targets.length === 0) return await noAccountsError(manager, source)
-        try {
-          const results = await Promise.all(targets.map(async (uta) => ({ source: uta.id, ...compactAccountInfo(await uta.getAccount()) })))
-          return results.length === 1 ? results[0] : results
-        } catch (err) {
-          return handleBrokerError(err)
-        }
+        const { ok, failed, connecting } = await settlePerAccount(targets, async (uta) => ({ source: uta.id, ...compactAccountInfo(await uta.getAccount(subAccountId)) }))
+        // Single explicit account: keep the original shape (the account
+        // object, or the error / connecting marker directly).
+        if (targets.length === 1) return ok[0] ?? failed[0] ?? connecting[0]
+        // Multi-account: healthy accounts + per-account error / connecting
+        // markers, so one offline (or cold-starting) broker can't blank the
+        // rest (issue #390 + the cold-start non-blocking fix).
+        return [...ok, ...failed, ...connecting]
       },
     }),
 
     getPortfolio: tool({
       description: `Query current portfolio holdings. IMPORTANT: If result is an empty array [], you have no holdings.
-If this tool returns an error with transient=true, wait a few seconds and retry once before reporting to the user.`,
+If this tool returns an error with transient=true, wait a few seconds and retry once before reporting to the user.
+If the result is an object with a \`degraded\` array, one or more accounts could not be read — the \`positions\` are only from the healthy accounts. ALWAYS tell the user which \`source\`(s) are degraded; an entry with transient=false is a permanent (credentials/config) failure they must fix, not retry. A \`connecting\` array (separate from \`degraded\`) lists accounts still establishing their broker connection — their positions are pending, not missing; mention them as "connecting" and re-query shortly rather than reporting a problem.`,
       inputSchema: z.object({
         source: z.string().optional().describe(sourceDesc(false)),
         symbol: z.string().optional().describe('Filter by ticker, or omit for all'),
+        subAccountId: z.string().optional().describe('For multi-wallet venues (e.g. Binance: "spot" / "derivatives"), scope to one wallet. Omit for holdings across all wallets.'),
       }).meta({ examples: [{ source: 'alpaca-paper' }] }),
-      execute: async ({ source, symbol }) => {
-        const targets = await manager.resolve(source)
+      execute: async ({ source, symbol, subAccountId }) => {
+        const targets = await manager.resolve(source, { tradingOnly: true })
         if (targets.length === 0) return { positions: [], ...(await noAccountsError(manager, source)) }
         // FX rates table — UTA's /fx-rates collects every currency in
         // use server-side and returns a flat lookup. Locally we treat
@@ -282,92 +361,112 @@ If this tool returns an error with transient=true, wait a few seconds and retry 
           const rate = fxLookup.get(currency) ?? 1
           return new Decimal(amount).mul(rate).toString()
         }
-        try {
-          const allPositions: Array<Record<string, unknown>> = []
-          const fxWarnings: string[] = []
-          for (const uta of targets) {
-            const positions = await uta.getPositions()
-            const accountInfo = await uta.getAccount()
+        // Per-account so one offline/region-blocked account degrades to a
+        // marker instead of zeroing every healthy account's holdings (#390).
+        const { ok, failed, connecting } = await settlePerAccount(targets, async (uta) => {
+          const positions = await uta.getPositions(subAccountId)
+          const accountInfo = await uta.getAccount(subAccountId)
 
-            // Convert position market values to USD for cross-currency percentage calculations
-            let totalMarketValueUsd = new Decimal(0)
-            const posUsdValues: Decimal[] = []
-            for (const pos of positions) {
-              posUsdValues.push(new Decimal(fxToUsd(pos.marketValue, pos.currency)))
-              totalMarketValueUsd = totalMarketValueUsd.plus(posUsdValues[posUsdValues.length - 1])
-            }
-
-            // Account netLiq in USD for equity percentage
-            const netLiqUsd = new Decimal(fxToUsd(accountInfo.netLiquidation, accountInfo.baseCurrency))
-
-            let idx = 0
-            for (const pos of positions) {
-              if (symbol && symbol !== 'all' && pos.contract.symbol !== symbol) { idx++; continue }
-              const mvUsd = posUsdValues[idx]
-              const percentOfEquity = netLiqUsd.gt(0) ? mvUsd.div(netLiqUsd).mul(100) : new Decimal(0)
-              const percentOfPortfolio = totalMarketValueUsd.gt(0) ? mvUsd.div(totalMarketValueUsd).mul(100) : new Decimal(0)
-              allPositions.push({
-                source: uta.id, symbol: pos.contract.symbol,
-                // secType + aliceId disambiguate same-symbol positions (ETH
-                // spot vs ETH perp render identically without them) and give
-                // the agent the exact id closePosition needs.
-                secType: pos.contract.secType,
-                aliceId: pos.contract.aliceId,
-                currency: pos.currency, side: pos.side,
-                quantity: pos.quantity.toString(), avgCost: price(pos.avgCost), marketPrice: price(pos.marketPrice),
-                marketValue: money(pos.marketValue), unrealizedPnL: money(pos.unrealizedPnL), realizedPnL: money(pos.realizedPnL),
-                percentageOfEquity: `${percentOfEquity.toFixed(1)}%`,
-                percentageOfPortfolio: `${percentOfPortfolio.toFixed(1)}%`,
-              })
-              idx++
-            }
+          // Convert position market values to USD for cross-currency percentage calculations
+          let totalMarketValueUsd = new Decimal(0)
+          const posUsdValues: Decimal[] = []
+          for (const pos of positions) {
+            posUsdValues.push(new Decimal(fxToUsd(pos.marketValue, pos.currency)))
+            totalMarketValueUsd = totalMarketValueUsd.plus(posUsdValues[posUsdValues.length - 1])
           }
-          if (allPositions.length === 0) return { positions: [], message: 'No open positions.' }
-          const allWarnings = [...new Set([...fxWarnings, ...fxWarningsFromRates])]
-          if (allWarnings.length > 0) return { positions: allPositions, fxWarnings: allWarnings }
-          return allPositions
-        } catch (err) {
-          return handleBrokerError(err)
+
+          // Account netLiq in USD for equity percentage
+          const netLiqUsd = new Decimal(fxToUsd(accountInfo.netLiquidation, accountInfo.baseCurrency))
+
+          const rows: Array<Record<string, unknown>> = []
+          let idx = 0
+          for (const pos of positions) {
+            if (symbol && symbol !== 'all' && pos.contract.symbol !== symbol) { idx++; continue }
+            const mvUsd = posUsdValues[idx]
+            const percentOfEquity = netLiqUsd.gt(0) ? mvUsd.div(netLiqUsd).mul(100) : new Decimal(0)
+            const percentOfPortfolio = totalMarketValueUsd.gt(0) ? mvUsd.div(totalMarketValueUsd).mul(100) : new Decimal(0)
+            rows.push({
+              source: uta.id, symbol: pos.contract.symbol,
+              // secType + aliceId disambiguate same-symbol positions (ETH
+              // spot vs ETH perp render identically without them) and give
+              // the agent the exact id closePosition needs.
+              secType: pos.contract.secType,
+              aliceId: pos.contract.aliceId,
+              currency: pos.currency, side: pos.side,
+              quantity: pos.quantity.toString(), avgCost: price(pos.avgCost), marketPrice: price(pos.marketPrice),
+              marketValue: money(pos.marketValue), unrealizedPnL: money(pos.unrealizedPnL), realizedPnL: money(pos.realizedPnL),
+              percentageOfEquity: `${percentOfEquity.toFixed(1)}%`,
+              percentageOfPortfolio: `${percentOfPortfolio.toFixed(1)}%`,
+              // Leveraged-derivative risk (crypto perps): leverage,
+              // liquidation price, margin mode. Present ⇒ this is NOT a 1×
+              // spot position — size the downside accordingly.
+              ...(pos.risk && { risk: pos.risk }),
+            })
+            idx++
+          }
+          return rows
+        })
+
+        const allPositions = ok.flat()
+        const allWarnings = [...new Set(fxWarningsFromRates)]
+        // Clean empty result only when nothing failed AND nothing is still
+        // connecting — don't report "no positions" when an account was actually
+        // unreachable or just hasn't finished its initial connect.
+        if (allPositions.length === 0 && failed.length === 0 && connecting.length === 0 && allWarnings.length === 0) {
+          return { positions: [], message: 'No open positions.' }
         }
+        if (failed.length > 0 || connecting.length > 0 || allWarnings.length > 0) {
+          return {
+            positions: allPositions,
+            ...(allWarnings.length > 0 && { fxWarnings: allWarnings }),
+            ...(failed.length > 0 && { degraded: failed }),
+            ...(connecting.length > 0 && { connecting }),
+          }
+        }
+        return allPositions
       },
     }),
 
     getOrders: tool({
       description: `Query orders by ID. If no orderIds provided, queries all pending (submitted) orders.
 Use groupBy: "contract" to group orders by contract/aliceId (useful with many positions + TPSL).
-If this tool returns an error with transient=true, wait a few seconds and retry once before reporting to the user.`,
+If this tool returns an error with transient=true, wait a few seconds and retry once before reporting to the user.
+If the result is an object with a \`degraded\` array, one or more accounts could not be read — the orders are only from the healthy accounts. ALWAYS tell the user which \`source\`(s) are degraded; an entry with transient=false is a permanent (credentials/config) failure they must fix, not retry. A \`connecting\` array lists accounts still establishing their broker connection — their orders are pending, not missing; re-query shortly rather than reporting a problem.`,
       inputSchema: z.object({
         source: z.string().optional().describe(sourceDesc(false)),
         orderIds: z.array(z.string()).optional().describe('Order IDs to query. If omitted, queries all pending orders.'),
         groupBy: z.enum(['contract']).optional().describe('Group orders by contract (aliceId)'),
       }).meta({ examples: [{ source: 'alpaca-paper' }] }),
       execute: async ({ source, orderIds, groupBy }) => {
-        const targets = await manager.resolve(source)
+        const targets = await manager.resolve(source, { tradingOnly: true })
         if (targets.length === 0) return []
-        try {
-          const summaries = (await Promise.all(targets.map(async (uta) => {
-            // SDK's getPendingOrderIds is a no-op returning []; the real
-            // UnifiedTradingAccount returns the actual pending list. Both
-            // satisfy the same call site so this works for Phase A's
-            // dual-impl world.
-            const ids = orderIds ?? uta.getPendingOrderIds().map(p => p.orderId)
-            const orders = await uta.getOrders(ids)
-            return orders.map((o, i) => summarizeOrder(o, uta.id, ids[i]))
-          }))).flat()
-
-          if (groupBy === 'contract') {
-            const grouped: Record<string, { symbol: string; orders: ReturnType<typeof summarizeOrder>[] }> = {}
-            for (const s of summaries) {
-              const key = s.aliceId || s.symbol
-              if (!grouped[key]) grouped[key] = { symbol: s.symbol, orders: [] }
-              grouped[key].orders.push(s)
-            }
-            return grouped
-          }
-          return summaries
-        } catch (err) {
-          return handleBrokerError(err)
+        // Per-account so one offline account doesn't blank everyone's orders (#390).
+        const { ok, failed, connecting } = await settlePerAccount(targets, async (uta) => {
+          // SDK's getPendingOrderIds is a no-op returning []; the real
+          // UnifiedTradingAccount returns the actual pending list. Both
+          // satisfy the same call site so this works for Phase A's
+          // dual-impl world.
+          const ids = orderIds ?? uta.getPendingOrderIds().map(p => p.orderId)
+          const orders = await uta.getOrders(ids)
+          return orders.map((o, i) => summarizeOrder(o, uta.id, ids[i]))
+        })
+        const summaries = ok.flat()
+        const markers = {
+          ...(failed.length > 0 && { degraded: failed }),
+          ...(connecting.length > 0 && { connecting }),
         }
+        const hasMarkers = failed.length > 0 || connecting.length > 0
+
+        if (groupBy === 'contract') {
+          const grouped: Record<string, { symbol: string; orders: ReturnType<typeof summarizeOrder>[] }> = {}
+          for (const s of summaries) {
+            const key = s.aliceId || s.symbol
+            if (!grouped[key]) grouped[key] = { symbol: s.symbol, orders: [] }
+            grouped[key].orders.push(s)
+          }
+          return hasMarkers ? { grouped, ...markers } : grouped
+        }
+        return hasMarkers ? { orders: summaries, ...markers } : summaries
       },
     }),
 
@@ -568,11 +667,15 @@ Optional: attach takeProfit and/or stopLoss for automatic exit orders.`,
           price: z.string().describe('Stop loss trigger price'),
           limitPrice: z.string().optional().describe('Limit price for stop-limit SL (omit for stop-market)'),
         }).optional().describe('Stop loss order (single-level, full quantity)'),
+        subAccountId: z.string().optional().describe('Target wallet on multi-wallet venues (e.g. Binance: "spot" / "derivatives"). REQUIRED when the account spans multiple wallets — staging loud-refuses without it and lists the valid ids. Single-wallet brokers ignore it.'),
         commitMessage: z.string().optional().describe('Stage AND commit in one step with this message (your trading thesis). Push/approval still required.'),
       }).meta({ examples: [{ aliceId: 'alpaca-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '1', commitMessage: 'Entry: momentum breakout' }] }),
       execute: async ({ source, commitMessage, ...params }) => {
         const uta = await manager.resolveOne(source ?? parseAliceId(params.aliceId)?.utaId ?? '')
-        return stageAndMaybeCommit({ stage: () => uta.stagePlaceOrder(params), commit: (m) => uta.commit(m) }, commitMessage)
+        return {
+          source: uta.id,
+          ...await stageAndMaybeCommit({ stage: () => uta.stagePlaceOrder(params), commit: (m) => uta.commit(m) }, commitMessage),
+        }
       },
     }),
 
@@ -593,7 +696,10 @@ Optional: attach takeProfit and/or stopLoss for automatic exit orders.`,
       }).meta({ examples: [{ source: 'alpaca-paper', orderId: '1', lmtPrice: '150' }] }),
       execute: async ({ source, commitMessage, ...params }) => {
         const uta = await manager.resolveOne(source)
-        return stageAndMaybeCommit({ stage: () => uta.stageModifyOrder(params), commit: (m) => uta.commit(m) }, commitMessage)
+        return {
+          source: uta.id,
+          ...await stageAndMaybeCommit({ stage: () => uta.stageModifyOrder(params), commit: (m) => uta.commit(m) }, commitMessage),
+        }
       },
     }),
 
@@ -604,11 +710,15 @@ Optional: attach takeProfit and/or stopLoss for automatic exit orders.`,
         aliceId: z.string().describe('Contract ID (format: accountId|nativeKey, from searchContracts)'),
         symbol: z.string().optional().describe('Human-readable symbol. Optional.'),
         qty: positiveNumeric.optional().describe('Number of shares to sell. Decimal string. Default: sell all.'),
+        subAccountId: z.string().optional().describe('Target wallet on multi-wallet venues (e.g. Binance: "spot" / "derivatives"). REQUIRED when the account spans multiple wallets. Single-wallet brokers ignore it.'),
         commitMessage: z.string().optional().describe('Stage AND commit in one step with this message. Push/approval still required.'),
       }).meta({ examples: [{ aliceId: 'alpaca-paper|AAPL', commitMessage: 'Exit: thesis invalidated' }] }),
       execute: async ({ source, commitMessage, ...params }) => {
         const uta = await manager.resolveOne(source ?? parseAliceId(params.aliceId)?.utaId ?? '')
-        return stageAndMaybeCommit({ stage: () => uta.stageClosePosition(params), commit: (m) => uta.commit(m) }, commitMessage)
+        return {
+          source: uta.id,
+          ...await stageAndMaybeCommit({ stage: () => uta.stageClosePosition(params), commit: (m) => uta.commit(m) }, commitMessage),
+        }
       },
     }),
 
@@ -621,7 +731,10 @@ Optional: attach takeProfit and/or stopLoss for automatic exit orders.`,
       }).meta({ examples: [{ source: 'alpaca-paper', orderId: '1', commitMessage: 'Cancel: stale level' }] }),
       execute: async ({ source, orderId, commitMessage }) => {
         const uta = await manager.resolveOne(source)
-        return stageAndMaybeCommit({ stage: () => uta.stageCancelOrder({ orderId }), commit: (m) => uta.commit(m) }, commitMessage)
+        return {
+          source: uta.id,
+          ...await stageAndMaybeCommit({ stage: () => uta.stageCancelOrder({ orderId }), commit: (m) => uta.commit(m) }, commitMessage),
+        }
       },
     }),
 
@@ -645,7 +758,11 @@ Optional: attach takeProfit and/or stopLoss for automatic exit orders.`,
     }),
 
     tradingPush: tool({
-      description: 'Trading push requires manual approval — call tradingStatus to show the user what is pending, then ask them to approve it on the Web UI (Trading as Git page, or the account detail page).',
+      description: `Push committed operations to the broker — the final, real execution step.
+
+By DEFAULT this does NOT execute: it returns the pending operations and you must ask the user to approve them in the Web UI (Trading as Git page, or the account detail page).
+
+ONLY if the operator has enabled "Allow AI to push trades" in Settings → Agent Permissions does this execute directly — committed operations are sent to the broker as live orders. Use deliberately.`,
       inputSchema: z.object({
         source: z.string().optional().describe(sourceDesc(false, 'If omitted, checks all accounts.')),
       }).meta({ examples: [{ source: 'alpaca-paper' }] }),
@@ -663,13 +780,28 @@ Optional: attach takeProfit and/or stopLoss for automatic exit orders.`,
           }
           return { message: 'No committed operations to push.' }
         }
-        return {
-          message: 'Push requires manual approval. Tell the user to review and approve the pending operations in the Web UI (Trading as Git page, or the account detail page).',
-          pending: pending.map(({ uta, status }) => ({
-            source: uta.id,
-            ...compactStatus(status),
-          })),
+        // Gate: AI-initiated execution is OFF by default. Without the operator's
+        // explicit opt-in, surface the pending ops for manual Web-UI approval
+        // rather than sending live orders to the broker.
+        if (!allowAiTrading()) {
+          return {
+            message: 'Push requires manual approval (AI trading is disabled). Tell the user to review and approve the pending operations in the Web UI (Trading as Git page, or the account detail page).',
+            pending: pending.map(({ uta, status }) => ({
+              source: uta.id,
+              ...compactStatus(status),
+            })),
+          }
         }
+        // AI trading enabled — execute for real. Each push() sends the committed
+        // operations to the broker. Per-account failures degrade individually.
+        const results = await Promise.all(pending.map(async ({ uta }) => {
+          try {
+            return { source: uta.id, ...compactPushResult(await uta.push()) }
+          } catch (err) {
+            return { source: uta.id, ...handleBrokerError(err) }
+          }
+        }))
+        return { message: 'AI trading is enabled — pushed committed operations to the broker.', results }
       },
     }),
 

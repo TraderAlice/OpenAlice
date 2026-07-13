@@ -37,7 +37,7 @@ export interface Profile {
 
 export type CredentialVendor =
   | 'anthropic' | 'openai' | 'google'
-  | 'minimax' | 'glm' | 'kimi' | 'deepseek'
+  | 'minimax' | 'glm' | 'kimi' | 'deepseek' | 'longcat'
   | 'custom'
 
 export type CredentialAuthType = 'api-key' | 'subscription'
@@ -153,6 +153,9 @@ export type ChatHistoryItem =
 
 // ==================== Config ====================
 
+export type TradingMode = 'lite' | 'readonly' | 'pro'
+export type TradingModeSource = 'env' | 'config' | 'auto'
+
 export interface AIProviderConfig {
   apiKeys: { anthropic?: string; openai?: string; google?: string }
   profiles: Record<string, Profile>
@@ -162,8 +165,13 @@ export interface AIProviderConfig {
 export interface AppConfig {
   aiProvider: AIProviderConfig
   engine: Record<string, unknown>
-  agent: { evolutionMode: boolean; claudeCode: Record<string, unknown> }
+  agent: { allowAiTrading: boolean; claudeCode: Record<string, unknown> }
   compaction: { maxContextTokens: number; maxOutputTokens: number }
+  trading: {
+    mode?: TradingMode
+    observeExternalOrdersEvery: string
+    keylessDataSources: Array<'binance' | 'okx' | 'bybit'>
+  }
   snapshot: {
     enabled: boolean
     every: string
@@ -181,6 +189,7 @@ export interface AppConfig {
  * stays under connectors.
  */
 export interface McpConfig {
+  enabled: boolean
   port: number
 }
 
@@ -193,36 +202,6 @@ export interface ConnectorsConfig {
     botUsername?: string
     chatIds: number[]
   }
-}
-
-// ==================== Topology ====================
-
-export interface TopologyEventType {
-  name: string
-  external: boolean
-  description?: string
-}
-
-export interface TopologyListener {
-  name: string
-  subscribes: string[]
-  emits: string[]
-  /** True if declared as wildcard '*' — UI renders an aura instead of N edges. */
-  subscribesWildcard: boolean
-  /** Same for emits. */
-  emitsWildcard: boolean
-}
-
-export interface TopologyProducer {
-  name: string
-  emits: string[]
-  emitsWildcard: boolean
-}
-
-export interface TopologyResponse {
-  eventTypes: TopologyEventType[]
-  producers: TopologyProducer[]
-  listeners: TopologyListener[]
 }
 
 // ==================== News Collector ====================
@@ -261,43 +240,6 @@ export interface NewsListResponse {
   lookback: string
 }
 
-// ==================== Events ====================
-
-export interface EventLogEntry {
-  seq: number
-  ts: number
-  type: string
-  payload: unknown
-}
-
-// ==================== Cron ====================
-
-export type CronSchedule =
-  | { kind: 'at'; at: string }
-  | { kind: 'every'; every: string }
-  | { kind: 'cron'; cron: string }
-
-export interface CronJobState {
-  nextRunAtMs: number | null
-  lastRunAtMs: number | null
-  lastStatus: 'ok' | 'error' | null
-  consecutiveErrors: number
-}
-
-export interface CronJob {
-  id: string
-  name: string
-  enabled: boolean
-  schedule: CronSchedule
-  payload: string
-  /** Target workspace the job's prompt runs in, headless. */
-  workspaceId?: string
-  /** Which enabled CLI agent runs it — claude / codex / pi / opencode. */
-  agent?: string
-  state: CronJobState
-  createdAt: number
-}
-
 // ==================== Trading ====================
 
 export type BrokerHealth = 'healthy' | 'degraded' | 'offline'
@@ -317,12 +259,17 @@ export interface BrokerHealthInfo {
   lastSuccessAt?: string
   lastFailureAt?: string
   recovering: boolean
+  /** True while the account's initial broker connect is still in flight; the UI
+   *  renders a "connecting…" state off this (status is optimistically 'healthy'
+   *  during the window, so it can't be inferred from status/reach). */
+  connecting: boolean
   disabled: boolean
 }
 
 export interface UTASummary {
   id: string
   label: string
+  asVendor: boolean
   capabilities: { supportedSecTypes: string[]; supportedOrderTypes: string[] }
   health: BrokerHealthInfo
 }
@@ -351,12 +298,27 @@ export interface AccountInfo {
   dayTradesRemaining?: number
 }
 
+/** A sub-account (wallet) within one broker connection. One for ordinary
+ *  brokers; >1 for separate-wallet venues (Binance: spot / derivatives). */
+export interface SubAccountRef {
+  id: string
+  label: string
+  kind: 'spot' | 'derivatives' | 'unified'
+}
+
 export interface Position {
   contract: {
     aliceId?: string
     symbol?: string
     secType?: string
     exchange?: string
+    /** Primary listing exchange (e.g. NASDAQ, SEHK) — distinct from the
+     *  routing `exchange` (often SMART). Populated for equities; empty for
+     *  crypto. */
+    primaryExchange?: string
+    /** Instrument long-name (e.g. "Apple Inc"). Populated where the broker
+     *  exposes it (IBKR, Alpaca catalog); empty otherwise. */
+    description?: string
     currency?: string
     lastTradeDateOrContractMonth?: string
     strike?: number
@@ -374,6 +336,14 @@ export interface Position {
   marketValue: string
   unrealizedPnL: string
   realizedPnL: string
+  /** Leveraged-derivative risk metadata (crypto perps/futures). Absent for
+   *  spot and brokers without per-position leverage. Mirrors uta-protocol's
+   *  PositionRisk. */
+  risk?: {
+    leverage?: string
+    liquidationPrice?: string
+    marginMode?: 'cross' | 'isolated'
+  }
 }
 
 export interface WalletCommitLog {
@@ -520,6 +490,10 @@ export interface UTAConfig {
   guards: GuardEntry[]
   /** User-filled form values for the preset's schema. */
   presetConfig: Record<string, unknown>
+  /** Whether broker-side account mutations are refused. */
+  readOnly: boolean
+  /** Whether this UTA participates in broker-backed market-data discovery. */
+  asVendor: boolean
 }
 
 // ==================== Broker Preset Metadata (from /broker-presets endpoint) ====================
@@ -588,6 +562,8 @@ export interface PlaceOrderRequest {
   ocaGroup?: string
   takeProfit?: { price: string }
   stopLoss?: { price: string; limitPrice?: string }
+  /** Target wallet on multi-wallet venues — required when the account spans >1. */
+  subAccountId?: string
   message: string
 }
 
@@ -595,6 +571,8 @@ export interface ClosePositionRequest {
   aliceId: string
   symbol?: string
   qty?: string
+  /** Target wallet on multi-wallet venues — required when the account spans >1. */
+  subAccountId?: string
   message: string
 }
 

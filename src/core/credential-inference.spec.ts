@@ -11,6 +11,7 @@ describe('inferCredentialVendor', () => {
     expect(inferCredentialVendor({ baseUrl: 'https://api.minimax.io/anthropic' })).toBe('minimax')
     expect(inferCredentialVendor({ baseUrl: 'https://api.moonshot.cn/v1' })).toBe('kimi')
     expect(inferCredentialVendor({ baseUrl: 'https://api.deepseek.com' })).toBe('deepseek')
+    expect(inferCredentialVendor({ baseUrl: 'https://api.longcat.chat/openai' })).toBe('longcat')
   })
 
   it('falls back to the agent when the baseUrl is unrecognized', () => {
@@ -36,6 +37,10 @@ describe('resolveAnthropicAuthMode', () => {
 
   it('infers bearer for MiniMax international (api.minimax.io)', () => {
     expect(resolveAnthropicAuthMode({ baseUrl: 'https://api.minimax.io/anthropic' })).toBe('bearer')
+  })
+
+  it('infers bearer for LongCat anthropic compatibility', () => {
+    expect(resolveAnthropicAuthMode({ baseUrl: 'https://api.longcat.chat/anthropic' })).toBe('bearer')
   })
 
   it('does NOT infer bearer for MiniMax China (minimaxi.com tolerates x-api-key)', () => {

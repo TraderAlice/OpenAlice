@@ -92,5 +92,6 @@ alice-uta sim price-change --help      # MockBroker only — move a mock price f
 
 ## Not here
 
-- **Scheduling (cron) is not on any CLI** and is unavailable in-workspace — if
-  the user wants a recurring run, say so rather than improvising.
+- **Scheduling is not in `alice-uta`.** Recurring/headless workspace work is
+  issue-backed: use `alice-workspace issue create` or write
+  `.alice/issues/<id>.md` with a `when` field (see the `self-scheduling` skill).

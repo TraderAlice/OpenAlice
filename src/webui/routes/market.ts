@@ -2,9 +2,9 @@
  * Market data aggregation routes.
  *
  * `/api/market/*` is Alice's own namespace for cross-asset-class behaviour
- * that doesn't map 1:1 to an opentypebb fetcher — currently just the
+ * that doesn't map 1:1 to an embedded provider fetcher — currently just the
  * heuristic symbol search. Quote / historical / fundamentals remain on the
- * raw opentypebb passthrough at `/api/market-data-v1/*`.
+ * compatibility passthrough at `/api/market-data-v1/*`.
  */
 
 import { Hono } from 'hono'

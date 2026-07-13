@@ -9,7 +9,6 @@ const workspaceAliases = {
   '@': resolve(__dirname, './src'),
   '@traderalice/ibkr': resolve(__dirname, './packages/ibkr/src/index.ts'),
   '@traderalice/uta-protocol': resolve(__dirname, './packages/uta-protocol/src/index.ts'),
-  '@traderalice/opentypebb/server': resolve(__dirname, './packages/opentypebb/src/server.ts'),
   '@traderalice/opentypebb': resolve(__dirname, './packages/opentypebb/src/index.ts'),
 }
 

@@ -108,6 +108,24 @@ export function EditUTADialog({ uta, preset, health, onSave, onDelete, onViewInP
             <span className="text-[12px] text-text-muted">Type</span>
             <span className="ml-2 text-[12px] font-medium text-text">{preset?.label ?? uta.presetId}</span>
           </div>
+          <div className="mb-3 flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2.5">
+            <div className="min-w-0">
+              <div className="text-[12px] font-medium text-text">Read-only account</div>
+              <div className="text-[11px] text-text-muted leading-relaxed">
+                Allow analysis reads; block broker-side order changes.
+              </div>
+            </div>
+            <Toggle size="sm" checked={draft.readOnly === true} onChange={(v) => setDraft(d => ({ ...d, readOnly: v }))} />
+          </div>
+          <div className="mb-3 flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2.5">
+            <div className="min-w-0">
+              <div className="text-[12px] font-medium text-text">Use as data source</div>
+              <div className="text-[11px] text-text-muted leading-relaxed">
+                Include this UTA in K-line and contract discovery.
+              </div>
+            </div>
+            <Toggle size="sm" checked={draft.asVendor !== false} onChange={(v) => setDraft(d => ({ ...d, asVendor: v }))} />
+          </div>
           <SchemaFormFields
             fields={fields}
             formData={formData}

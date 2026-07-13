@@ -10,7 +10,7 @@ export function EmptyEditor() {
       <img
         src="/alice.ico"
         alt="OpenAlice"
-        className="w-16 h-16 rounded-2xl ring-1 ring-accent/25 shadow-[0_0_18px_rgba(88,166,255,0.18)]"
+        className="w-16 h-16 rounded-2xl ring-1 ring-accent/25 shadow-[0_0_18px_var(--color-accent-dim)]"
         draggable={false}
       />
       <div className="space-y-2 max-w-md">

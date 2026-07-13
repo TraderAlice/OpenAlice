@@ -28,6 +28,14 @@ export interface CalcOutput {
   value: CalcValue
   /** Sources actually fetched, keyed by barId. */
   dataRange: Record<string, DataSourceMeta>
+  /** Per-source date axis (ascending), keyed by barId — only when withDates. Lets
+   *  the caller map a dumped series back to dates without a second snapshot call. */
+  dates?: Record<string, string[]>
+}
+
+export interface EvalOpts {
+  /** Attach each source's date axis to the output (opt-in; off by default). */
+  withDates?: boolean
 }
 
 // ---- runtime values ----
@@ -44,17 +52,23 @@ type V =
 
 const SERIES_COLUMNS = ['open', 'high', 'low', 'close', 'volume'] as const
 /** A panel (list/dict result) batches many computations in one call — but each
- *  entry is still a single value, so the output stays small. Cap the count. */
-const MAX_PANEL = 50
+ *  entry is still a single value, so the output stays small. Cap the count.
+ *  Raised from 50: dumping a multi-bar axis (one entry per bar) shouldn't have to
+ *  split into two calls for a few months of dailies. */
+const MAX_PANEL = 200
 
-export async function evaluate(program: Program, deps: CalcDeps): Promise<CalcOutput> {
+export async function evaluate(program: Program, deps: CalcDeps, opts: EvalOpts = {}): Promise<CalcOutput> {
   const env = new Map<string, V>()
   const dataRange: Record<string, DataSourceMeta> = {}
+  const dates: Record<string, string[]> = {}
 
-  const fetchBars = async (barId: string, opts: GetBarsOpts, assetClass: AssetClass | undefined): Promise<BarsResult> => {
+  const fetchBars = async (barId: string, fetchOpts: GetBarsOpts, assetClass: AssetClass | undefined): Promise<BarsResult> => {
     const ref = assetClass ? { barId, assetClass } : { barId }
-    const r = await deps.barService.getBars(ref, opts)
-    if (r.meta.barId) dataRange[r.meta.barId] = r.meta
+    const r = await deps.barService.getBars(ref, fetchOpts)
+    if (r.meta.barId) {
+      dataRange[r.meta.barId] = r.meta
+      if (opts.withDates) dates[r.meta.barId] = r.bars.map((b) => b.date)
+    }
     return r
   }
 
@@ -143,7 +157,12 @@ export async function evaluate(program: Program, deps: CalcDeps): Promise<CalcOu
     try {
       r = await fetchBars(barId, opts, assetClass)
     } catch (err) {
-      throw new CalcError({ kind: 'type', message: `bars("${barId}") failed: ${err instanceof Error ? err.message : String(err)}`, line: e.pos.line, col: e.pos.col })
+      // A bars(...) fetch failure is NOT a script bug — the expression is fine,
+      // the data pipe failed (vendor rate-limit / network / bad barId). Tag it
+      // 'data-source' (not 'type') and attach an operational next step so the
+      // agent retries / switches source instead of rewriting a correct script.
+      const detail = err instanceof Error ? err.message : String(err)
+      throw new CalcError({ kind: 'data-source', message: `bars("${barId}") failed: ${detail}`, line: e.pos.line, col: e.pos.col, suggestion: barFetchSuggestion(detail) })
     }
     if (r.bars.length === 0) throw new CalcError({ kind: 'insufficient-bars', message: `bars("${barId}", "${interval}") returned no data`, line: e.pos.line, col: e.pos.col })
     return { k: 'series', barId, r }
@@ -164,12 +183,13 @@ export async function evaluate(program: Program, deps: CalcDeps): Promise<CalcOu
     env.set(b.name, await evalExpr(b.value))
   }
   const out = await evalExpr(program.result)
+  const tail = opts.withDates ? { dataRange, dates } : { dataRange }
   switch (out.k) {
-    case 'num': return { value: out.v, dataRange }
-    case 'str': return { value: out.v, dataRange }
-    case 'rec': return { value: out.v, dataRange }
-    case 'list': return { value: out.items, dataRange }
-    case 'dict': return { value: out.map, dataRange }
+    case 'num': return { value: out.v, ...tail }
+    case 'str': return { value: out.v, ...tail }
+    case 'rec': return { value: out.v, ...tail }
+    case 'list': return { value: out.items, ...tail }
+    case 'dict': return { value: out.map, ...tail }
     default: {
       const what = out.k === 'series' ? 'a series' : 'a series column'
       throw new CalcError({ kind: 'type', message: `The result is ${what}, not a value — reduce it with [-1] or an indicator (e.g. sma(s.close, 50)), or return a panel like { "1h": rsi(s.close, 14) }`, line: program.result.pos.line })
@@ -201,6 +221,22 @@ function asNum(v: V, ctx: string, line: number): number {
 function asStr(v: V, fn: string, argIdx: number, line: number): string {
   if (v.k === 'str') return v.v
   throw new CalcError({ kind: 'type', message: `${fn} arg ${argIdx} must be a string`, line })
+}
+
+/**
+ * Map a bars(...) fetch failure to an operational next step for the agent.
+ * Matches the typed prefixes the data layer emits (RATE_LIMITED: /
+ * NETWORK_UNREACHABLE:) — no coupling to the provider's error classes — so the
+ * suggestion stays accurate whichever vendor/broker the barId resolved to.
+ */
+function barFetchSuggestion(detail: string): string {
+  if (/^RATE_LIMITED:|rate.?limit|too many requests|\b429\b/i.test(detail)) {
+    return 'Not a script error — the data source throttled/blocked this client. Wait a few minutes and retry, or switch source (an "fmp|<symbol>" barId if an FMP key is set, or a connected broker barId).'
+  }
+  if (/^NETWORK_UNREACHABLE:|cannot reach|unreachable|\bDNS\b|proxy/i.test(detail)) {
+    return 'Not a script error — the data source was unreachable from this network. Do not retry blindly; try a different source, or surface the network/VPN issue to the user.'
+  }
+  return 'Not a script error in the math — check the barId is one returned by searchBars/searchContracts (vendor barIds also need asset=). If the source genuinely has no data for this symbol/interval, try another source.'
 }
 
 // ---- function registry (reuses indicator math) ----

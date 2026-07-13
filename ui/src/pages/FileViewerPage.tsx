@@ -10,11 +10,13 @@
  */
 
 import { useEffect, useState } from 'react'
-import { FileText } from 'lucide-react'
+import { ArrowLeft, FileText } from 'lucide-react'
 
 import { FileContentView } from '../components/FileContentView'
-import { useWorkspaces } from '../contexts/WorkspacesContext'
+import { CenteredLoading } from '../components/StateViews'
+import { useWorkspaces } from '../contexts/workspaces-context'
 import { readWorkspaceFile, type ReadFileResult } from '../components/workspace/api'
+import { useWorkspace } from '../tabs/store'
 import type { ViewSpec } from '../tabs/types'
 
 interface Props {
@@ -24,6 +26,8 @@ interface Props {
 export function FileViewerPage({ spec }: Props) {
   const { wsId, path } = spec.params
   const { workspaces } = useWorkspaces()
+  const openOrFocus = useWorkspace((s) => s.openOrFocus)
+  const setSidebar = useWorkspace((s) => s.setSidebar)
   const tag = workspaces.find((w) => w.id === wsId)?.tag ?? wsId.slice(0, 8)
 
   const [result, setResult] = useState<ReadFileResult | null>(null)
@@ -38,9 +42,23 @@ export function FileViewerPage({ spec }: Props) {
     }
   }, [wsId, path])
 
+  const openWorkspace = () => {
+    setSidebar('workspaces')
+    openOrFocus({ kind: 'workspace', params: { wsId } })
+  }
+
   return (
     <div className="h-full flex flex-col min-h-0">
       <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-bg-secondary/30 shrink-0">
+        <button
+          type="button"
+          onClick={openWorkspace}
+          className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-border bg-bg px-2 text-[12px] font-medium text-text-muted transition-colors hover:bg-bg-tertiary hover:text-text"
+          title={`Back to ${tag}`}
+        >
+          <ArrowLeft size={14} strokeWidth={1.8} aria-hidden />
+          <span className="hidden sm:inline">Back</span>
+        </button>
         <FileText size={13} strokeWidth={1.75} className="shrink-0 text-text-muted/70" aria-hidden />
         <span className="font-mono text-[12px] text-text truncate" title={path}>
           {path}
@@ -50,7 +68,7 @@ export function FileViewerPage({ spec }: Props) {
       <div className="flex-1 overflow-y-auto min-h-0">
         <div className="max-w-[820px] mx-auto px-6 py-6">
           {result === null ? (
-            <div className="text-[12px] text-text-muted">Loading…</div>
+            <CenteredLoading />
           ) : (
             <FileContentView path={path} result={result} />
           )}

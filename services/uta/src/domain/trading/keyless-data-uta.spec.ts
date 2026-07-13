@@ -1,10 +1,11 @@
 /**
- * Built-in keyless read-only data UTAs (binance/okx/bybit-readonly) — verify the
- * code-injection path constructs them correctly (no API key) so they auto-register
- * for OOTB crypto K-lines. Pure construction; no network.
+ * Optional keyless read-only data UTAs (binance/okx/bybit-readonly) — verify the
+ * opt-in config path constructs them correctly (no API key). Pure construction;
+ * no network.
  */
 import { describe, it, expect } from 'vitest'
 import { createBroker } from './brokers/factory.js'
+import { buildKeylessDataUTAs } from './keyless-data-sources.js'
 import type { UTAConfig } from '@/core/config.js'
 
 function cfgFor(ex: string): UTAConfig {
@@ -15,7 +16,21 @@ function cfgFor(ex: string): UTAConfig {
   } as unknown as UTAConfig
 }
 
-describe('keyless data UTA injection (createBroker)', () => {
+describe('keyless data UTA injection', () => {
+  it('defaults to no keyless data accounts', () => {
+    expect(buildKeylessDataUTAs([], new Set())).toEqual([])
+  })
+
+  it('builds only the exchanges selected by the user', () => {
+    const utas = buildKeylessDataUTAs(['binance', 'okx'], new Set())
+    expect(utas.map((u) => u.id)).toEqual(['binance-readonly', 'okx-readonly'])
+  })
+
+  it('does not shadow a user-defined account id', () => {
+    const utas = buildKeylessDataUTAs(['binance', 'okx'], new Set(['binance-readonly']))
+    expect(utas.map((u) => u.id)).toEqual(['okx-readonly'])
+  })
+
   for (const ex of ['binance', 'okx', 'bybit']) {
     it(`${ex}-readonly: constructs a keyless broker (no throw, keyless flag flows)`, () => {
       let broker: unknown

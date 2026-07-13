@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { marketApi, type KeyMetrics, type FinancialRatios } from '../../api/market'
+import { Skeleton } from '../StateViews'
 import { Card } from './Card'
 import { fmtNumber, fmtPercent, fmtMoneyShort } from './format'
 
@@ -92,7 +93,16 @@ export function KeyMetricsPanel({ symbol }: Props) {
 
   return (
     <Card title="Key Metrics" info={info}>
-      {loading && <div className="text-[12px] text-text-muted">Loading…</div>}
+      {loading && (
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-[12px]" aria-hidden="true">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="flex items-baseline justify-between border-b border-border/30 py-1 last:border-b-0">
+              <Skeleton className="h-3 w-16 rounded" />
+              <Skeleton className="h-3 w-12 rounded" />
+            </div>
+          ))}
+        </dl>
+      )}
       {error && !loading && <div className="text-[12px] text-red">{error}</div>}
       {!loading && !error && data && (
         <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-[12px]">

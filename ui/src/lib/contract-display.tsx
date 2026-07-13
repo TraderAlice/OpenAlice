@@ -25,6 +25,10 @@ export interface ContractLike {
   secType?: string
   currency?: string
   exchange?: string
+  /** Primary listing exchange (NASDAQ / SEHK), distinct from routing `exchange`. */
+  primaryExchange?: string
+  /** Instrument long-name ("Apple Inc"), where the broker exposes it. */
+  description?: string
   /** History rows. */
   expiry?: string
   /** Position rows (IBKR field name). */
@@ -41,6 +45,8 @@ interface NormalizedContract {
   secType?: string
   currency?: string
   exchange?: string
+  primaryExchange?: string
+  description?: string
   expiry?: string
   strike?: string
   right?: string
@@ -55,6 +61,9 @@ function normalizeContract(c: ContractLike): NormalizedContract {
     secType: c.secType,
     currency: c.currency,
     exchange: c.exchange,
+    // Empty strings come over the wire for unpopulated fields — coerce to undefined.
+    primaryExchange: c.primaryExchange || undefined,
+    description: c.description || undefined,
     expiry: c.expiry ?? c.lastTradeDateOrContractMonth,
     strike: c.strike != null ? String(c.strike) : undefined,
     right: c.right,
@@ -128,26 +137,55 @@ export function contractPrimary(input: ContractLike): string {
 }
 
 /**
- * Secondary muted line: `OPT · SMART · USD · ×100`.
- * Multiplier is shown only when present and ≠ '1'.
+ * Secondary line, split into two visual tiers so the symbol stays dominant:
+ *
+ * - `name` — the human instrument long-name ("Apple Inc. Common Stock"),
+ *   present for equities / IBKR. The crypto `description` is just the pair
+ *   (redundant with the primary line), so it's suppressed.
+ * - `meta` — the coded metadata `STK · NASDAQ · USD` (`primaryExchange`, the
+ *   real listing venue, replaces the routing `exchange` — often a meaningless
+ *   "SMART"). Multiplier shown only when present and ≠ '1'.
+ *
+ * `ContractCell` renders `name` muted and `meta` fainter still.
  */
-export function contractSecondary(input: ContractLike): string {
+export function contractSecondaryParts(input: ContractLike): { name?: string; meta: string } {
   const c = normalizeContract(input)
-  const parts: string[] = []
-  if (c.secType) parts.push(c.secType)
-  if (c.exchange) parts.push(c.exchange)
-  if (c.currency) parts.push(c.currency)
-  if (c.multiplier && trimDecimal(c.multiplier) !== '1') parts.push(`×${trimDecimal(c.multiplier)}`)
-  return parts.join(' · ')
+  const t = (c.secType ?? '').toUpperCase()
+  const isCrypto = t === 'CRYPTO' || t === 'CRYPTO_PERP'
+  const name = !isCrypto ? c.description : undefined
+  const venue = c.primaryExchange ?? c.exchange
+
+  const meta: string[] = []
+  if (c.secType) meta.push(c.secType)
+  if (venue) meta.push(venue)
+  if (c.currency) meta.push(c.currency)
+  if (c.multiplier && trimDecimal(c.multiplier) !== '1') meta.push(`×${trimDecimal(c.multiplier)}`)
+  return { name, meta: meta.join(' · ') }
 }
 
-/** Two-line contract cell for tables: primary identity + muted detail line. */
+/** Flat secondary string (`name · meta`) — kept for non-cell callers/tests. */
+export function contractSecondary(input: ContractLike): string {
+  const { name, meta } = contractSecondaryParts(input)
+  return [name, meta].filter(Boolean).join(' · ')
+}
+
+/**
+ * Two-line contract cell for tables. Three deliberate emphasis tiers so the
+ * full detail line never competes with the symbol:
+ *   symbol (strong) → long-name (muted) → coded metadata (faintest).
+ */
 export function ContractCell({ contract }: { contract: ContractLike }) {
-  const secondary = contractSecondary(contract)
+  const { name, meta } = contractSecondaryParts(contract)
   return (
     <div className="min-w-0">
-      <div className="text-[13px] text-text font-medium">{contractPrimary(contract)}</div>
-      {secondary && <div className="text-[11px] text-text-muted">{secondary}</div>}
+      <div className="text-[13px] text-text font-medium leading-tight">{contractPrimary(contract)}</div>
+      {(name || meta) && (
+        <div className="text-[11px] leading-tight mt-0.5">
+          {name && <span className="text-text-muted">{name}</span>}
+          {name && meta && <span className="text-text-muted opacity-40"> · </span>}
+          {meta && <span className="text-text-muted opacity-60">{meta}</span>}
+        </div>
+      )}
     </div>
   )
 }

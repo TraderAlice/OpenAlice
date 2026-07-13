@@ -1,7 +1,9 @@
 import { useMemo } from 'react'
 import { formatRelativeTime } from '../../lib/intl'
 import { ArrowUpCircle, Bot, ChevronRight, Code, Cpu, GitBranch, ScrollText, Settings, Sparkles, Terminal, type LucideIcon } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { GitLogEntry, Workspace } from './api'
+import { workspaceDisplayName, workspaceDisplayTitle } from './display'
 
 /**
  * Single-workspace card for the Workspaces Overview dashboard. Variant B
@@ -53,7 +55,9 @@ export function OverviewCard({
   onConfigure,
   onOpenTemplate,
 }: Props) {
+  const { t } = useTranslation()
   const w = workspace
+  const label = workspaceDisplayName(w)
   const hasRunning = w.sessions.some((s) => s.state === 'running')
 
   const lastActivityMs = useMemo(() => {
@@ -88,11 +92,11 @@ export function OverviewCard({
           aria-hidden="true"
         />
         <div className="flex-1 min-w-0">
-          <h3 className="text-[14px] font-semibold text-text truncate" title={w.tag}>
-            {w.tag}
+          <h3 className="text-[14px] font-semibold text-text truncate" title={workspaceDisplayTitle(w)}>
+            {label}
           </h3>
-          <p className="text-[11px] text-text-muted">
-            Active {formatRelativeTime(lastActivityMs)}
+          <p className="text-[11px] text-text-muted truncate" title={w.description}>
+            {w.description?.trim() || t('workspace.activeAgo', { time: formatRelativeTime(lastActivityMs) })}
           </p>
         </div>
         {w.upgradeAvailable && w.template && (
@@ -103,7 +107,10 @@ export function OverviewCard({
               onOpenTemplate?.(w.template!)
             }}
             disabled={!onOpenTemplate}
-            title={`Template moved from v${w.upgradeAvailable.from} → v${w.upgradeAvailable.to}. The agent can self-upgrade by reading the new README and updating this workspace.`}
+            title={t('workspace.templateUpgrade', {
+              from: w.upgradeAvailable.from,
+              to: w.upgradeAvailable.to,
+            })}
             className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-accent border border-accent/40 hover:border-accent/80 hover:bg-accent/10 transition-colors disabled:cursor-default disabled:hover:border-accent/40 disabled:hover:bg-transparent"
           >
             <ArrowUpCircle size={10} strokeWidth={2.25} />
@@ -115,10 +122,10 @@ export function OverviewCard({
       {/* Sessions */}
       <div className="border-t border-border pt-3">
         <div className="text-[10px] uppercase tracking-wider text-text-muted/70 mb-1.5">
-          Sessions
+          {t('workspace.sessions')}
         </div>
         {w.sessions.length === 0 ? (
-          <p className="text-[12px] text-text-muted/80 italic">no sessions yet</p>
+          <p className="text-[12px] text-text-muted/80 italic">{t('workspace.noSessions')}</p>
         ) : (
           <ul className="space-y-0.5 -mx-2">
             {w.sessions.map((s) => (
@@ -139,7 +146,7 @@ export function OverviewCard({
                     s.state === 'running' ? 'text-green' : 'text-text-muted'
                   }`}
                 >
-                  {s.state}
+                  {t(s.state === 'running' ? 'workspace.running' : 'workspace.paused')}
                 </span>
                 <ChevronRight
                   size={10}
@@ -158,7 +165,10 @@ export function OverviewCard({
             <div className="flex items-center gap-2 text-[11px] text-text-muted">
               <GitBranch size={11} strokeWidth={2.25} className="shrink-0" />
               <span className="truncate">
-                from {w.template} v{w.spawnedFromVersion}
+                {t('workspace.fromTemplate', {
+                  template: w.template,
+                  version: w.spawnedFromVersion,
+                })}
               </span>
             </div>
           )}
@@ -172,13 +182,13 @@ export function OverviewCard({
               className="flex items-center gap-2 text-[11px] text-text-muted hover:text-text transition-colors w-full text-left"
             >
               <Settings size={11} strokeWidth={2.25} className="shrink-0" />
-              <span>Workspace override · {overrideAgents.join(', ')}</span>
+              <span>{t('workspace.override', { agents: overrideAgents.join(', ') })}</span>
             </button>
           )}
           {overrideAgents.length > 0 && !onConfigure && (
             <div className="flex items-center gap-2 text-[11px] text-text-muted">
               <Settings size={11} strokeWidth={2.25} className="shrink-0" />
-              <span>Workspace override · {overrideAgents.join(', ')}</span>
+              <span>{t('workspace.override', { agents: overrideAgents.join(', ') })}</span>
             </div>
           )}
           {lastCommit && (

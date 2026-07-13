@@ -98,6 +98,30 @@ export interface CcxtExchangeOverrides {
     exchange: Exchange,
     defaultImpl: DefaultImpl<[Exchange], CcxtOrder[]>,
   ): Promise<CcxtOrder[]>
+
+  /** Sub-account (wallet / compartment) decomposition for SEPARATE-WALLET venues.
+   *  Binance keeps spot / USDⓈ-M / COIN-M in distinct wallets behind distinct
+   *  endpoints; each logical sub-account aggregates one or more CCXT balance
+   *  `type`s. Drives `listSubAccounts()`, scoped reads, and write disambiguation
+   *  (ANG-111). Leave undefined for UNIFIED-account venues (okx / bybit UTA),
+   *  where a single fetchBalance() returns the whole account — those expose one
+   *  implicit 'default' sub-account and never require a selector. A per-type
+   *  fetch failure (e.g. an un-activated COIN-M wallet → -2015) is skipped, not
+   *  fatal. */
+  subAccounts?: CcxtSubAccountDef[]
+}
+
+/** One CCXT sub-account: a logical wallet aggregating CCXT balance `type`s. */
+export interface CcxtSubAccountDef {
+  /** Selector id, e.g. 'spot' / 'derivatives'. */
+  id: string
+  /** User-facing label, e.g. 'Spot' / 'Futures'. */
+  label: string
+  /** Editorial taxonomy. 'unified' is reserved for the implicit single-wallet default. */
+  kind: 'spot' | 'derivatives' | 'unified'
+  /** CCXT balance `type`s this sub-account fetches and merges. Empty ⇒ a plain
+   *  unscoped fetchBalance() (the unified-default case). */
+  walletTypes: string[]
 }
 
 // ==================== Default implementations ====================
@@ -161,7 +185,20 @@ export async function defaultFetchAllOpenOrders(exchange: Exchange): Promise<Ccx
 
 // ==================== Registry ====================
 
+/** Binance keeps spot / USDⓈ-M / COIN-M in separate wallets behind separate
+ *  endpoints, so it splits into two trading sub-accounts: 'spot' (the spot
+ *  wallet) and 'derivatives' (USDⓈ-M `future` + COIN-M `delivery`, merged).
+ *  'delivery' is tolerated-on-failure — many accounts never activate COIN-M
+ *  (ANG-111). Reads aggregate across both unless scoped; writes must name one. */
+const binanceOverrides: CcxtExchangeOverrides = {
+  subAccounts: [
+    { id: 'spot', label: 'Spot', kind: 'spot', walletTypes: ['spot'] },
+    { id: 'derivatives', label: 'Futures', kind: 'derivatives', walletTypes: ['future', 'delivery'] },
+  ],
+}
+
 export const exchangeOverrides: Record<string, CcxtExchangeOverrides> = {
+  binance: binanceOverrides,
   bybit: bybitOverrides,
   hyperliquid: hyperliquidOverrides,
 }

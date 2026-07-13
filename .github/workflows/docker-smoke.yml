@@ -1,0 +1,93 @@
+name: Docker Smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [dev, master]
+    paths:
+      - ".github/workflows/docker-smoke.yml"
+      - "Dockerfile"
+      - ".dockerignore"
+      - "docker-compose.yml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "turbo.json"
+      - "scripts/docker-runtime-smoke*.mjs"
+      - "scripts/guardian/**"
+      - "src/core/paths.ts"
+      - "src/core/runtime-profile.ts"
+      - "src/main.ts"
+      - "src/server/**"
+      - "src/webui/**"
+      - "src/workspaces/**"
+      - "services/uta/**"
+      - "packages/**"
+      - "default/**"
+  push:
+    # Dev-targeted PRs provide integration coverage. Keep direct push smoke on
+    # master so routine serial merges do not duplicate the expensive image job.
+    branches: [master]
+    paths:
+      - ".github/workflows/docker-smoke.yml"
+      - "Dockerfile"
+      - ".dockerignore"
+      - "docker-compose.yml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "turbo.json"
+      - "scripts/docker-runtime-smoke*.mjs"
+      - "scripts/guardian/**"
+      - "src/core/paths.ts"
+      - "src/core/runtime-profile.ts"
+      - "src/main.ts"
+      - "src/server/**"
+      - "src/webui/**"
+      - "src/workspaces/**"
+      - "services/uta/**"
+      - "packages/**"
+      - "default/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-smoke-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build server image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: openalice:ci
+          cache-from: type=gha,scope=openalice-docker
+          cache-to: type=gha,mode=max,scope=openalice-docker
+
+      - name: Exercise Guardian, Workspace PTY, and CLI gateway
+        env:
+          OPENALICE_DOCKER_SMOKE_LOG_FILE: artifacts/docker-smoke.log
+        run: node scripts/docker-runtime-smoke.mjs --skip-build --image openalice:ci
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-smoke-logs
+          path: artifacts/docker-smoke.log
+          if-no-files-found: ignore
+          retention-days: 7

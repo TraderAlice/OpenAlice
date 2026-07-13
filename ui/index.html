@@ -1,11 +1,26 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="auto">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <link rel="icon" href="/alice.ico" />
     <title>OpenAlice</title>
-    <meta name="color-scheme" content="dark" />
+    <meta name="color-scheme" content="light dark" />
+    <script>
+      // No-flash theme: mirror the persisted preference onto <html data-theme>
+      // before first paint. Source of truth is the zustand theme store
+      // (openalice.theme.v1); ui/src/theme re-applies + self-heals on boot.
+      (function () {
+        try {
+          var raw = localStorage.getItem('openalice.theme.v1');
+          var t = raw ? (JSON.parse(raw).state || {}).theme : 'auto';
+          document.documentElement.dataset.theme =
+            t === 'light' || t === 'dark' ? t : 'auto';
+        } catch (e) {
+          document.documentElement.dataset.theme = 'auto';
+        }
+      })();
+    </script>
   </head>
   <body class="h-full bg-bg text-text">
     <div id="root"></div>

@@ -1,19 +1,33 @@
 import { readFile, writeFile, mkdir } from 'fs/promises'
 import { dirname, join } from 'path'
+import {
+  acquireOpenAliceRuntimeLocks,
+  takeoverRequested,
+  type OpenAliceRuntimeLock,
+} from '@traderalice/guardian-runtime'
 // The in-process AI loop (AgentCenter, then GenerateRouter + AgentWork) is gone
 // as of 0.40 — the model loop runs inside the native workspace CLIs; autonomous
 // runs go through headless workspace dispatch (cron → workspace).
-import { loadConfig } from './core/config.js'
+import { loadConfig, readMarketDataConfig } from './core/config.js'
 import { printLegacyDataNotice } from './core/legacy-data-notice.js'
-import { dataPath, defaultPath } from '@/core/paths.js'
+import { dataPath, defaultPath, userDataHome } from '@/core/paths.js'
+import { resolveLauncherRoot } from '@/workspaces/config.js'
 import type { Plugin, EngineContext } from './core/types.js'
 import { McpPlugin } from './server/mcp.js'
+import { LocalToolGatewayPlugin } from './server/local-tool-gateway.js'
 import { WebPlugin } from './webui/index.js'
 import { createWorkspaceServiceRef } from './webui/plugin.js'
 import { createThinkingTools } from './tool/thinking.js'
 import { createUTAClient } from '@traderalice/uta-protocol'
 import { UTAManagerSDK } from './services/uta-client/index.js'
 import { waitForUTAReady } from './services/uta-supervisor/health.js'
+import { resolveUTAUrl } from './services/uta-supervisor/url.js'
+import {
+  liteUnavailableReason,
+  readonlyMutationReason,
+  resolveTradingModePolicy,
+  type TradingModePolicy,
+} from './services/trading-mode.js'
 import { createTradingTools } from './tool/trading.js'
 import { SymbolIndex } from './domain/market-data/equity/index.js'
 import { CommodityCatalog } from './domain/market-data/commodity/index.js'
@@ -24,7 +38,10 @@ import { getSDKExecutor, buildRouteMap, SDKEquityClient, SDKCryptoClient, SDKCur
 import type { EquityClientLike, CryptoClientLike, CurrencyClientLike, EtfClientLike, IndexClientLike, DerivativesClientLike, CommodityClientLike, EconomyClientLike } from './domain/market-data/client/types.js'
 import { buildSDKCredentials } from './domain/market-data/credential-map.js'
 import { createMarketSearchTools } from './tool/market.js'
+import { createVendorTools } from './tool/market-vendors.js'
 import { createQuantTools } from './tool/quant.js'
+import { createSnapshotTools } from './tool/snapshot.js'
+import { createSimulateTools } from './tool/simulate.js'
 import { createBarService } from './domain/market-data/bars/index.js'
 import { createReferenceData } from './domain/market-data/reference/service.js'
 import { createSectorRotationTools } from './tool/sector-rotation.js'
@@ -37,15 +54,18 @@ import { createInboxStore } from './core/inbox-store.js'
 import { ToolCenter } from './core/tool-center.js'
 import { WorkspaceToolCenter } from './core/workspace-tool-center.js'
 import { inboxPushFactory } from './tool/inbox-push.js'
+import { inboxReadFactory } from './tool/inbox-read.js'
+import { workspacePathFactory } from './tool/workspace-path.js'
+import { workspaceSessionsFactory } from './tool/workspace-sessions.js'
 import { createEntityStore } from './core/entity-store.js'
 import { entityUpsertFactory } from './tool/entity-upsert.js'
 import { entitySearchFactory } from './tool/entity-search.js'
-import { createEventLog } from './core/event-log.js'
+import { issueToolFactories } from './tool/issue-tools.js'
+import { sessionSignatureFactory } from './tool/session-signature.js'
+import { provenanceShowFactory } from './tool/provenance-show.js'
+import { conversationToolFactories } from './tool/conversation.js'
+import { artifactConversationToolFactories } from './tool/conversation-artifacts.js'
 import { createToolCallLog } from './core/tool-call-log.js'
-import { createListenerRegistry } from './core/listener-registry.js'
-import { createEventBus } from './core/event-bus.js'
-import { createCronEngine, createCronListener, createCronTools } from './task/cron/index.js'
-import { createMetricsListener } from './task/metrics/index.js'
 import { createJmbMt5DecisionScheduler } from './task/mt5-decision-scheduler.js'
 import { createJmbMt5OutcomeImporter, importReconciledExecutionOutcomes } from './task/mt5-outcome-importer.js'
 import { DEFAULT_JMB_DEMO_INSTRUMENTS, runDemoDecisionCycle } from './domain/mt5/demo-decision-service.js'
@@ -59,6 +79,13 @@ const PERSONA_FILE = dataPath('brain', 'persona.md')
 const PERSONA_DEFAULT = defaultPath('persona.default.md')
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+let runtimeLock: OpenAliceRuntimeLock | null = null
+
+async function releaseRuntimeLock(): Promise<void> {
+  const current = runtimeLock
+  runtimeLock = null
+  await current?.release()
+}
 
 /** Read a file, copying from default if it doesn't exist yet. */
 async function readWithDefault(target: string, defaultFile: string): Promise<string> {
@@ -79,15 +106,7 @@ async function main() {
 
   const config = await loadConfig()
 
-  // ==================== Event Log ====================
-
-  const eventLog = await createEventLog()
   const toolCallLog = await createToolCallLog()
-
-  // ==================== Listener Registry ====================
-  // Created early so CronEngine and other producers can declare against it.
-
-  const listenerRegistry = createListenerRegistry(eventLog)
 
   // ==================== Tool Center (created early — UTAManager needs it) ====================
 
@@ -97,37 +116,59 @@ async function main() {
 
   const workspaceToolCenter = new WorkspaceToolCenter()
   workspaceToolCenter.register(inboxPushFactory)
+  workspaceToolCenter.register(inboxReadFactory)
+  workspaceToolCenter.register(workspacePathFactory)
+  workspaceToolCenter.register(workspaceSessionsFactory)
   workspaceToolCenter.register(entityUpsertFactory)
   workspaceToolCenter.register(entitySearchFactory)
+  for (const f of issueToolFactories) workspaceToolCenter.register(f)
+  workspaceToolCenter.register(sessionSignatureFactory)
+  workspaceToolCenter.register(provenanceShowFactory)
+  for (const f of conversationToolFactories) workspaceToolCenter.register(f)
+  for (const f of artifactConversationToolFactories) workspaceToolCenter.register(f)
 
   // ==================== UTA SDK (HTTP boundary) ====================
   //
-  // Trading domain lives in the co-located UTA service spawned by
-  // Guardian (`scripts/guardian/dev.ts` in dev / Docker `tini` supervisor
-  // in prod). Alice talks to it through the SDK — broker init, snapshot
-  // scheduling, FX, and ephemeral-UTA purges all live in UTA's
-  // `services/uta/src/main.ts`.
+  // Trading domain lives in the UTA carrier. Guardian normally spawns it
+  // beside Alice, but UTA is optional: Alice can boot in lite mode while the
+  // proxy reports trading unavailable. Explicit OPENALICE_LITE_MODE disables
+  // SDK carrier calls locally; ordinary offline mode can recover when the
+  // carrier appears at the resolved URL.
 
-  const utaUrl = process.env['OPENALICE_UTA_URL']
-  if (!utaUrl) {
-    throw new Error('OPENALICE_UTA_URL not set — Guardian must spawn the UTA service before Alice boots')
+  const initialTradingMode = await resolveTradingModePolicy(config)
+  const currentTradingModePolicy = (): TradingModePolicy => {
+    const envLockedMode = initialTradingMode.source === 'env' ? initialTradingMode.mode : null
+    if (envLockedMode) return { ...initialTradingMode, mode: envLockedMode, source: 'env', envLocked: true }
+    return {
+      ...initialTradingMode,
+      mode: config.trading.mode ?? initialTradingMode.mode,
+      source: config.trading.mode ? 'config' : initialTradingMode.source,
+      envLocked: false,
+    }
   }
+  const utaDisabled = currentTradingModePolicy().mode === 'lite'
+  const utaUrl = resolveUTAUrl()
   const utaClient = createUTAClient({ baseUrl: utaUrl })
-  const utaHealth = await waitForUTAReady({ baseUrl: utaUrl, timeoutMs: 15_000 })
-  if (!utaHealth) {
-    throw new Error(`UTA service at ${utaUrl} did not become ready within 15s`)
+  if (utaDisabled) {
+    console.warn('uta: disabled by trading mode lite — continuing without trading carrier')
+  } else {
+    const utaHealth = await waitForUTAReady({ baseUrl: utaUrl, timeoutMs: 750 })
+    if (utaHealth) {
+      console.log(`uta: ready (${utaHealth.utas} accounts, startedAt=${utaHealth.startedAt})`)
+    } else {
+      console.warn(`uta: unavailable at ${utaUrl} — continuing in lite mode`)
+    }
   }
-  console.log(`uta: ready (${utaHealth.utas} accounts, startedAt=${utaHealth.startedAt})`)
-  const utaManager = new UTAManagerSDK({ client: utaClient })
+  const utaManager = new UTAManagerSDK({
+    client: utaClient,
+    unavailableReason: () => liteUnavailableReason(currentTradingModePolicy()),
+    readonlyMutationReason: () => readonlyMutationReason(currentTradingModePolicy()),
+  })
 
   // ==================== Persona ====================
   // The persona file is seeded on first run so the user has an editable
   // override (consumed by the workspace context-injector).
   await readWithDefault(PERSONA_FILE, PERSONA_DEFAULT)
-
-  // ==================== Cron ====================
-
-  const cronEngine = createCronEngine({ registry: listenerRegistry })
 
   // ==================== News Collector Store ====================
 
@@ -137,7 +178,7 @@ async function main() {
   })
   await newsStore.init()
 
-  // ==================== OpenBB Clients ====================
+  // ==================== Embedded Provider Clients ====================
 
   const { providers } = config.marketData
 
@@ -172,9 +213,19 @@ async function main() {
   const commodityCatalog = new CommodityCatalog()
   commodityCatalog.load()
 
-  const marketSearch = { symbolIndex, cryptoClient, currencyClient, commodityCatalog }
+  // Default equity vendor + user-opted incremental vendors (eastmoney, …),
+  // de-duped, fanned out in searchBars; yfinance stays the always-on default.
+  // Resolved PER search (not a boot snapshot) so a vendor the agent enables at
+  // runtime via setMarketVendor — written to market-data.json, which the
+  // resolver re-reads per request — is live on the next search, no restart.
+  const getEquityVendors = async () => {
+    const md = await readMarketDataConfig()
+    return [...new Set([md.providers.equity, ...md.extraVendors])]
+  }
 
-  // Federated bar layer — vendor (OpenTypeBB) + broker (UTA) OHLCV behind one
+  const marketSearch = { symbolIndex, equityVendors: getEquityVendors, equityClient, cryptoClient, currencyClient, commodityCatalog }
+
+  // Federated bar layer — embedded vendor adapters + broker (UTA) OHLCV behind one
   // barId-keyed interface. Vendor branch live now; UTA branch lands with Phase 1.
   const barService = createBarService({
     marketSearch,
@@ -205,14 +256,17 @@ async function main() {
 
   toolCenter.register(createThinkingTools(), 'thinking')
 
-  // One unified set of trading tools — routes via `source` parameter at runtime
+  // One unified set of trading tools — routes via `source` parameter at runtime.
+  // The getter reads `config.agent.allowAiTrading` live (config is mutated in
+  // place on Settings writes), so toggling AI trading takes effect without a
+  // restart.
   toolCenter.register(
-    createTradingTools(utaManager),
+    createTradingTools(utaManager, () => config.agent.allowAiTrading),
     'trading',
   )
 
-  toolCenter.register(createCronTools(cronEngine), 'cron')
   toolCenter.register(createMarketSearchTools(marketSearch), 'market-search')
+  toolCenter.register(createVendorTools(getSDKExecutor()), 'market-vendors')
   toolCenter.register(createReferenceBoardTools(reference), 'market-board')
   toolCenter.register(createEquityTools(equityClient), 'equity')
   if (etfClient) {
@@ -225,6 +279,8 @@ async function main() {
   // — calculateQuant (v2, barId-keyed) supersedes it and the two descriptions
   // confused the model / bloated context. The code remains for now.
   toolCenter.register(createQuantTools({ barService }), 'quant')
+  toolCenter.register(createSnapshotTools(barService), 'snapshot')
+  toolCenter.register(createSimulateTools(barService), 'simulate')
   toolCenter.register(createSectorRotationTools(equityClient, config.marketData.hub), 'sector-rotation')
   if (derivativesClient) {
     toolCenter.register(createDerivativesTools(derivativesClient), 'derivatives')
@@ -252,26 +308,9 @@ async function main() {
   // skip (see cron listener). Created here so cron dispatch can hold it.
   const workspaceServiceRef = createWorkspaceServiceRef()
 
-  // Cron fires now dispatch a headless Workspace run (job → workspace+agent),
-  // not the legacy in-process AgentWork path.
-  const cronListener = createCronListener({ registry: listenerRegistry, workspaceServiceRef })
-  await cronListener.start()
-
   // Snapshot scheduler lives in UTA after Step 6 — Alice no longer
   // drives the periodic equity-curve writes. The UTA service starts
   // its own scheduler at boot.
-
-  // ==================== Event Metrics (wildcard observer) ====================
-
-  const metricsListener = createMetricsListener({ registry: listenerRegistry })
-  await metricsListener.start()
-
-  // ==================== Activate Listeners + Start Cron Engine ====================
-
-  await listenerRegistry.start()
-  await cronEngine.start()
-  console.log(`listener-registry: started (${listenerRegistry.list().length} listeners)`)
-  console.log('cron: engine started')
 
   // ==================== News Collector ====================
 
@@ -295,10 +334,21 @@ async function main() {
   // workspaceServiceRef is created earlier (Cron Listener section) so cron
   // dispatch shares the same box the WebPlugin fills on start.
 
-  // MCP Server is always active when a port is set — Claude Code provider depends on it for tools.
-  // Lives at top-level config (not under connectors:) because it exports
-  // ToolCenter outward rather than consuming chat input.
-  if (config.mcp.port) {
+  const envMcpEnabled = process.env['OPENALICE_MCP_ENABLED']
+  const mcpEnabled = envMcpEnabled === '1'
+    || ((envMcpEnabled === undefined || envMcpEnabled === '') && config.mcp.enabled === true)
+  const localCliOnWeb = process.env['OPENALICE_LOCAL_CLI_ON_WEB'] === '1'
+  const webTransport = process.env['OPENALICE_WEB_TRANSPORT'] === 'ipc' ? 'ipc' : 'http'
+  const toolBaseUrl = process.env['OPENALICE_TOOL_BASE_URL']
+    ?? (localCliOnWeb
+      ? `http://127.0.0.1:${config.connectors.web.port}/cli`
+      : `http://127.0.0.1:${config.mcp.port}/cli`)
+  const mcpBaseUrl = mcpEnabled ? `http://127.0.0.1:${config.mcp.port}/mcp` : undefined
+
+  // MCP is optional. The workspace CLI gateway is the default local tool path;
+  // when it cannot safely ride the loopback web listener, keep it on a
+  // loopback-only side listener.
+  if (mcpEnabled && config.mcp.port) {
     corePlugins.push(new McpPlugin(
       toolCenter,
       config.mcp.port,
@@ -307,12 +357,28 @@ async function main() {
       entityStore,
       () => workspaceServiceRef.current,
     ))
+  } else if (!localCliOnWeb && config.mcp.port) {
+    corePlugins.push(new LocalToolGatewayPlugin(config.mcp.port, {
+      toolCenter,
+      workspaceToolCenter,
+      inboxStore,
+      entityStore,
+      getWorkspaceService: () => workspaceServiceRef.current,
+    }))
   }
 
   // Web UI is always active (no enabled flag)
   if (config.connectors.web.port) {
     corePlugins.push(new WebPlugin(
-      { port: config.connectors.web.port, mcpPort: config.mcp.port },
+      {
+        port: config.connectors.web.port,
+        mcpPort: config.mcp.port,
+        toolBaseUrl,
+        ...(mcpBaseUrl ? { mcpBaseUrl } : {}),
+        localCliOnWeb,
+        listen: webTransport !== 'ipc',
+        ...(process.env['OPENALICE_TOOL_SOCKET'] ? { cliSocketPath: process.env['OPENALICE_TOOL_SOCKET'] } : {}),
+      },
       workspaceServiceRef,
     ))
   }
@@ -326,15 +392,15 @@ async function main() {
   // ==================== Engine Context ====================
 
   const ctx: EngineContext = {
-    config, inboxStore, entityStore, eventLog, toolCallLog, cronEngine, toolCenter,
-    listenerRegistry,
-    fire: createEventBus(eventLog),
+    config, inboxStore, entityStore, toolCallLog, toolCenter,
+    workspaceToolCenter,
     bbEngine: getSDKExecutor(),
     marketSearch,
     equityClient,
     barService,
     reference,
     utaManager,
+    tradingModePolicy: currentTradingModePolicy,
     newsProvider: newsStore,
   }
 
@@ -373,16 +439,12 @@ async function main() {
     mt5OutcomeImporter.stop()
     mt5DecisionScheduler.stop()
     newsCollector?.stop()
-    metricsListener.stop()
-    cronListener.stop()
-    cronEngine.stop()
-    await listenerRegistry.stop()
     for (const plugin of [...corePlugins, ...optionalPlugins.values()]) {
       await plugin.stop()
     }
     await newsStore.close()
     await toolCallLog.close()
-    await eventLog.close()
+    await releaseRuntimeLock()
     process.exit(0)
   }
   process.on('SIGINT', shutdown)
@@ -395,7 +457,38 @@ async function main() {
   }
 }
 
-main().catch((err) => {
+async function start(): Promise<void> {
+  const guardianPid = positiveInteger(process.env['OPENALICE_GUARDIAN_PID'])
+  const guardianStartedAt = positiveInteger(process.env['OPENALICE_GUARDIAN_STARTED_AT'])
+  runtimeLock = await acquireOpenAliceRuntimeLocks({
+    userDataHome,
+    launcherRoot: resolveLauncherRoot(),
+    launcher: process.env['OPENALICE_LAUNCHER'] ?? 'standalone',
+    takeover: takeoverRequested(),
+    ...(guardianPid ? { guardianPid } : {}),
+    ...(guardianStartedAt ? { guardianStartedAt } : {}),
+    onOwnershipLost: (err) => {
+      console.error('fatal: OpenAlice runtime ownership lost:', err)
+      try { process.kill(process.pid, 'SIGTERM') } catch { process.exit(1) }
+    },
+  })
+  try {
+    await main()
+  } catch (err) {
+    await releaseRuntimeLock().catch((releaseErr) => {
+      console.error('runtime lock release failed after startup error:', releaseErr)
+    })
+    throw err
+  }
+}
+
+function positiveInteger(raw: string | undefined): number | undefined {
+  if (!raw) return undefined
+  const value = Number(raw)
+  return Number.isInteger(value) && value > 0 ? value : undefined
+}
+
+start().catch((err) => {
   console.error('fatal:', err)
   process.exit(1)
 })

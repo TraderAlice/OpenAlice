@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="auto">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>OpenAlice — Theme Study · Daybreak / Midnight</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+/* ============================================================
+   OpenAlice — Theme Study
+   A "character-sheet" styled color card. Two palettes drawn from
+   Alice's reference card: alice-blue (the dress) is the shared
+   brand accent across both modes; cream paper + engraved navy for
+   day, midnight ink + lifted cornflower for night.
+   The page chrome + the mini-shell preview adopt the ACTIVE theme
+   (Light / Dark / Auto). The two palette cards are specimens — each
+   always sits on its native ground.
+   ============================================================ */
+
+/* ---- Active-theme tokens (page chrome + live preview) ---- */
+:root,
+:root[data-theme="light"] {
+  --bg:        #f7f4ec;
+  --bg-2:      #f0ebdd;
+  --bg-3:      #e5decb;
+  --border:    #d8d0bc;
+  --border-soft:#e3dcc9;
+  --text:      #1c2a41;
+  --muted:     #5e6573;
+  --accent:    #2f62b0;
+  --accent-2:  #c99a2e;   /* gold (hair) */
+  --accent-dim:rgba(47,98,176,0.13);
+  --green:     #2e8b6f;
+  --red:       #be4138;
+  --purple:    #6b5bc2;
+  --paper: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  --vignette: transparent;
+  --shadow: 0 1px 2px rgba(28,42,65,0.05), 0 8px 30px rgba(28,42,65,0.06);
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg:        #0b0c0e;   /* neutral charcoal-black canvas (#353 palette) */
+  --bg-2:      #0e0f12;   /* chrome panels — rail / sidebar / tabs */
+  --bg-3:      #1a1b21;   /* active / hover well */
+  --border:    #24262c;   /* neutral hairline */
+  --border-soft:#1a1b21;
+  --text:      #dfe1e6;
+  --muted:     #8f929b;
+  --accent:    #3b82f6;   /* alice-blue — small brand highlights only */
+  --accent-2:  #c9a23a;   /* gold (hair) */
+  --accent-dim:rgba(59,130,246,0.16);
+  --green:     #23b99a;   /* success / up */
+  --red:       #e5484d;   /* danger / down */
+  --purple:    #8f72ff;
+  --paper: none;
+  --vignette: radial-gradient(circle at 50% 24%, rgba(255,255,255,0.03), transparent 38rem);
+  --shadow: 0 1px 2px rgba(0,0,0,0.45), 0 16px 44px rgba(0,0,0,0.5);
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="auto"] {
+    --bg:#0b0c0e; --bg-2:#0e0f12; --bg-3:#1a1b21; --border:#24262c; --border-soft:#1a1b21;
+    --text:#dfe1e6; --muted:#8f929b; --accent:#3b82f6; --accent-2:#c9a23a;
+    --accent-dim:rgba(59,130,246,0.16); --green:#23b99a; --red:#e5484d; --purple:#8f72ff;
+    --paper:none;
+    --vignette: radial-gradient(circle at 50% 24%, rgba(255,255,255,0.03), transparent 38rem);
+    --shadow: 0 1px 2px rgba(0,0,0,0.45), 0 16px 44px rgba(0,0,0,0.5);
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: "Hanken Grotesk", sans-serif;
+  background: var(--vignette), var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  transition: background-color .45s ease, color .45s ease;
+  position: relative;
+}
+body::before {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background-image: var(--paper); background-size: 160px 160px; opacity: .9;
+  mix-blend-mode: multiply;
+}
+.wrap { position: relative; z-index: 1; max-width: 1180px; margin: 0 auto; padding: 56px 32px 80px; }
+
+/* serif display */
+.serif { font-family: "Cormorant Garamond", serif; font-weight: 600; letter-spacing: .01em; }
+.mono  { font-family: "JetBrains Mono", monospace; }
+
+/* ---- Masthead ---- */
+.mast { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px;
+  padding-bottom: 22px; border-bottom: 1px solid var(--border);
+  position: relative; }
+.mast::after { content:""; position:absolute; left:0; right:0; bottom:-4px; height:1px; background:var(--border-soft); }
+.brandrow { display: flex; align-items: center; gap: 14px; }
+.keyhole { width: 30px; height: 38px; color: var(--accent); flex: none; filter: drop-shadow(0 0 10px var(--accent-dim)); }
+.title { font-size: 40px; line-height: 1; color: var(--text); }
+.title .amp { color: var(--accent); font-style: italic; padding: 0 .12em; }
+.sub { margin-top: 8px; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.spark { color: var(--accent-2); }
+
+/* ---- Segmented Light/Dark/Auto ---- */
+.seg { display: inline-flex; padding: 4px; gap: 2px; border: 1px solid var(--border);
+  border-radius: 999px; background: var(--bg-2); box-shadow: var(--shadow); }
+.seg button { font-family: inherit; font-size: 12.5px; font-weight: 600; letter-spacing: .02em;
+  color: var(--muted); background: transparent; border: 0; cursor: pointer;
+  padding: 7px 16px; border-radius: 999px; display: inline-flex; align-items: center; gap: 7px;
+  transition: color .2s ease, background-color .2s ease; }
+.seg button:hover { color: var(--text); }
+.seg button[aria-pressed="true"] { color: #fff; background: var(--accent);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.14); }
+.seg svg { width: 14px; height: 14px; }
+.autohint { margin-top: 9px; font-size: 11.5px; color: var(--muted); text-align: right; min-height: 14px; }
+
+/* ---- Section scaffold ---- */
+.sec { margin-top: 56px; }
+.sechead { display: flex; align-items: baseline; gap: 14px; margin-bottom: 22px; }
+.num { font-family: "JetBrains Mono", monospace; font-size: 12px; font-weight: 500;
+  color: var(--accent); border: 1px solid var(--accent); border-radius: 5px;
+  padding: 2px 7px; flex: none; }
+.sectitle { font-size: 27px; color: var(--text); }
+.secnote { margin-left: auto; font-size: 12.5px; color: var(--muted); max-width: 340px; text-align: right; }
+
+/* ============ Palette specimen cards ============ */
+.cards { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+@media (max-width: 820px){ .cards { grid-template-columns: 1fr; } }
+
+/* each card sits on its NATIVE ground regardless of page theme */
+.card { border-radius: 16px; padding: 26px 24px 22px; position: relative; overflow: hidden;
+  border: 1px solid; box-shadow: var(--shadow); }
+.card.day  { background: #f7f4ec; border-color: #ddd5c2; color: #1c2a41; }
+.card.night{ background: #0b0c0e; border-color: #24262c; color: #dfe1e6;
+  background-image: radial-gradient(circle at 50% 0%, rgba(59,130,246,0.06), transparent 22rem); }
+.card .label { font-size: 12px; letter-spacing: .16em; text-transform: uppercase; opacity: .7; }
+.card .cardname { font-family:"Cormorant Garamond",serif; font-weight:600; font-size: 30px; margin-top: 2px; }
+.card .cardname em { font-style: italic; }
+.card.day .cardname em { color: #2f62b0; }
+.card.night .cardname em { color: #5b9bf0; }
+.card .ribbon { font-size: 11.5px; opacity: .65; margin: 4px 0 20px; }
+
+.swatch { display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 13px;
+  padding: 8px 0; opacity: 0; transform: translateY(8px);
+  animation: rise .55s cubic-bezier(.2,.7,.2,1) forwards; }
+@keyframes rise { to { opacity: 1; transform: none; } }
+.chip { width: 34px; height: 34px; border-radius: 9px; flex: none;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.18), 0 1px 2px rgba(0,0,0,.18); }
+.card.night .chip { box-shadow: inset 0 0 0 1px rgba(255,255,255,.12), 0 1px 3px rgba(0,0,0,.5); }
+.srole { font-size: 13.5px; font-weight: 600; }
+.ssource { font-size: 11.5px; opacity: .62; margin-top: 1px; }
+.shex { font-family:"JetBrains Mono",monospace; font-size: 12px; opacity: .8; }
+.rule { height: 1px; margin: 14px 0 4px; }
+.card.day .rule { background: #e3dcc9; }
+.card.night .rule { background: #1a1b21; }
+
+/* ============ Live mini-shell preview (adopts active theme) ============ */
+.previewframe { border: 1px solid var(--border); border-radius: 16px; overflow: hidden;
+  box-shadow: var(--shadow); background: var(--bg); }
+.shell { display: grid; grid-template-columns: 188px 230px 1fr; height: 430px;
+  transition: background-color .45s ease; }
+@media (max-width: 720px){ .shell { grid-template-columns: 64px 1fr; } .shell .side { display:none; } }
+
+/* activity rail — blends toward the canvas (TradingView left-toolbar feel);
+   the secondary sidebar then reads as a lifted panel one layer up. */
+.rail { background: var(--bg); border-right: 1px solid var(--border); padding: 14px 12px;
+  display: flex; flex-direction: column; gap: 3px; transition: background-color .45s ease; }
+.railbrand { display: flex; align-items: center; gap: 9px; padding: 4px 6px 14px; }
+.railbrand .kh { width: 16px; height: 20px; color: var(--accent); }
+.railbrand b { font-size: 14px; font-weight: 700; color: var(--text); }
+.railsec { font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+  color: color-mix(in srgb, var(--muted) 80%, transparent); padding: 14px 8px 6px; }
+.navitem { position: relative; display: flex; align-items: center; gap: 10px;
+  font-size: 12.5px; color: var(--muted); padding: 7px 9px; border-radius: 7px; cursor: default;
+  transition: background-color .2s, color .2s; }
+.navitem:hover { color: var(--text); background: color-mix(in srgb, var(--text) 4%, transparent); }
+.navitem.active { color: var(--text); background: var(--bg-3);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 5%, transparent); }
+.navitem.active::before { content:""; position:absolute; left:-12px; top:50%; transform:translateY(-50%);
+  width: 3px; height: 16px; border-radius: 0 3px 3px 0; background: var(--accent); }
+.navitem svg { width: 15px; height: 15px; flex: none; }
+
+/* secondary sidebar */
+.side { background: var(--bg-2); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; transition: background-color .45s ease; }
+.sidehead { display: flex; align-items: center; justify-content: space-between;
+  padding: 0 14px; height: 42px; border-bottom: 1px solid var(--border-soft); }
+.sidehead b { font-size: 13px; font-weight: 700; }
+.newbtn { display:inline-flex; align-items:center; gap:6px; font-family: inherit; font-weight: 600;
+  font-size: 11.5px; color:#fff; background: var(--accent); border:0; border-radius:7px;
+  padding: 5px 10px; cursor: default; box-shadow: inset 0 0 0 1px rgba(255,255,255,.14); }
+.sesslist { padding: 8px; display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
+.daylbl { font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--muted); opacity: .8; padding: 10px 8px 4px; }
+.sess { display: flex; align-items: center; gap: 9px; padding: 8px; border-radius: 8px; cursor: default; }
+.sess:hover { background: color-mix(in srgb, var(--text) 4%, transparent); }
+.sess.on { background: var(--bg-3); }
+.badge { width: 21px; height: 21px; border-radius: 6px; flex: none; display: grid; place-items: center;
+  font-size: 10px; font-weight: 700; color: #fff; }
+.sess .nm { font-size: 12.5px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sess .nm.muted { color: var(--muted); }
+
+/* main + tabstrip + composer */
+.main { display: flex; flex-direction: column; min-width: 0; background: var(--bg);
+  transition: background-color .45s ease; }
+.tabs { display: flex; height: 40px; border-bottom: 1px solid var(--border); background: var(--bg-2); }
+.tab { display: flex; align-items: center; gap: 8px; padding: 0 14px; font-size: 12.5px;
+  color: var(--muted); border-right: 1px solid var(--border-soft); }
+.tab.active { color: var(--text); background: var(--bg-3); }
+.tab .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.stage { flex: 1; display: grid; place-items: center; padding: 24px; position: relative; overflow: hidden; }
+.stage::before { content:""; position:absolute; inset:0;
+  background-image: linear-gradient(to right, color-mix(in srgb,var(--text) 100%,transparent) 1px, transparent 1px),
+                    linear-gradient(to bottom, color-mix(in srgb,var(--text) 100%,transparent) 1px, transparent 1px);
+  background-size: 72px 72px; opacity: .035; }
+.ask { position: relative; width: 100%; max-width: 440px; text-align: center; }
+.ask h3 { font-family:"Cormorant Garamond",serif; font-weight: 600; font-size: 26px; color: var(--text); }
+.ask p  { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+.composer { margin-top: 18px; text-align: left; background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: 13px; padding: 13px 13px 11px; box-shadow: var(--shadow); }
+.composer .ph { font-size: 13px; color: var(--muted); }
+.crow { display: flex; align-items: center; gap: 7px; margin-top: 12px; }
+.pillchip { display:inline-flex; align-items:center; gap:6px; font-size: 11px; font-weight: 600;
+  color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 4px 9px; background: var(--bg); }
+.pillchip .sw { width: 8px; height: 8px; border-radius: 50%; }
+.send { margin-left: auto; width: 28px; height: 28px; border-radius: 8px; background: var(--accent);
+  display: grid; place-items: center; }
+.send svg { width: 14px; height: 14px; color: #fff; }
+
+/* ============ Variable map table ============ */
+.maptbl { width: 100%; border-collapse: collapse; font-size: 12.5px;
+  border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
+.maptbl th, .maptbl td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--border-soft); }
+.maptbl thead th { background: var(--bg-2); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+.maptbl tbody tr:last-child td { border-bottom: 0; }
+.maptbl tbody tr:hover { background: color-mix(in srgb, var(--text) 3%, transparent); }
+.maptbl .var { font-family:"JetBrains Mono",monospace; color: var(--text); }
+.maptbl .hx { font-family:"JetBrains Mono",monospace; color: var(--muted); display: inline-flex; align-items: center; gap: 8px; }
+.maptbl .hx i { width: 13px; height: 13px; border-radius: 3px; display: inline-block; box-shadow: inset 0 0 0 1px rgba(128,128,128,.35); }
+
+footer { margin-top: 60px; padding-top: 22px; border-top: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  font-family:"Cormorant Garamond",serif; font-style: italic; font-size: 17px; color: var(--muted); }
+footer .dot { color: var(--accent-2); font-style: normal; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ============ MASTHEAD ============ -->
+  <header class="mast">
+    <div>
+      <div class="brandrow">
+        <svg class="keyhole" viewBox="0 0 30 38" fill="none" aria-hidden="true">
+          <path d="M15 1.5a13 13 0 0 1 13 13c0 5.2-3 9.7-7.4 11.9L23 36H7l2.4-9.6A13 13 0 0 1 15 1.5Z" stroke="currentColor" stroke-width="1.6"/>
+          <circle cx="15" cy="14" r="4.2" fill="currentColor"/>
+          <path d="M15 17.5 12.8 27h4.4L15 17.5Z" fill="currentColor"/>
+        </svg>
+        <h1 class="title serif">Open<span class="amp">A</span>lice <span class="spark">✦</span> Theme Study</h1>
+      </div>
+      <p class="sub">One Alice · Two Lights — Daybreak &amp; Midnight</p>
+    </div>
+    <div>
+      <div class="seg" role="group" aria-label="Theme">
+        <button data-set="light" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></svg>
+          Day
+        </button>
+        <button data-set="dark" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A8.5 8.5 0 1 1 11.2 3a6.6 6.6 0 0 0 9.8 9.8Z"/></svg>
+          Night
+        </button>
+        <button data-set="auto" aria-pressed="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v18" /><path d="M12 3a9 9 0 0 0 0 18Z" fill="currentColor" stroke="none"/></svg>
+          Auto
+        </button>
+      </div>
+      <div class="autohint" id="autohint"></div>
+    </div>
+  </header>
+
+  <!-- ============ 1 · TWO PALETTES ============ -->
+  <section class="sec">
+    <div class="sechead">
+      <span class="num">01</span>
+      <h2 class="sectitle serif">Two Palettes, One Identity</h2>
+      <p class="secnote">Alice-blue — the dress — is the brand accent in <em>both</em> modes. Day borrows the reference card's cream &amp; ink; night stays a calm neutral charcoal-black (the #353 palette) so the full shell doesn't read as blue — alice-blue survives only as small highlights.</p>
+    </div>
+
+    <div class="cards">
+      <!-- DAY -->
+      <div class="card day">
+        <div class="label">Light</div>
+        <div class="cardname">Day<em>break</em></div>
+        <div class="ribbon">Cream paper · engraved navy · alice-blue · a touch of gold</div>
+        <div data-swatches="day"></div>
+      </div>
+
+      <!-- NIGHT -->
+      <div class="card night">
+        <div class="label">Dark</div>
+        <div class="cardname">Mid<em>night</em></div>
+        <div class="ribbon">Neutral charcoal-black (#353) · calm shell · alice-blue only as small brand highlights</div>
+        <div data-swatches="night"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 2 · IN CONTEXT ============ -->
+  <section class="sec">
+    <div class="sechead">
+      <span class="num">02</span>
+      <h2 class="sectitle serif">In Context</h2>
+      <p class="secnote">The shell below adopts the <em>active</em> theme — flip the toggle up top and watch it re-skin live.</p>
+    </div>
+
+    <div class="previewframe">
+      <div class="shell">
+        <!-- activity rail -->
+        <div class="rail">
+          <div class="railbrand">
+            <svg class="kh" viewBox="0 0 30 38" fill="none"><path d="M15 1.5a13 13 0 0 1 13 13c0 5.2-3 9.7-7.4 11.9L23 36H7l2.4-9.6A13 13 0 0 1 15 1.5Z" stroke="currentColor" stroke-width="1.8"/><circle cx="15" cy="14" r="4.2" fill="currentColor"/></svg>
+            <b>OpenAlice</b>
+          </div>
+          <div class="navitem active">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/></svg>
+            Ask Alice
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.5 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.5A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.5Z"/></svg>
+            Inbox
+          </div>
+          <div class="railsec">Build</div>
+          <div class="navitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            Workspaces
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17 9 11l4 4 8-8"/><path d="M14 7h7v7"/></svg>
+            Markets
+          </div>
+          <div style="margin-top:auto"></div>
+          <div class="navitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 7 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.1-2.7H1a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 2.6 7a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H7a1.6 1.6 0 0 0 1-1.5V1a2 2 0 1 1 4 0v.1A1.6 1.6 0 0 0 17 2.6a1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V7a1.6 1.6 0 0 0 1.5 1H23a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1Z"/></svg>
+            Settings
+          </div>
+        </div>
+
+        <!-- secondary sidebar: chat history -->
+        <div class="side">
+          <div class="sidehead">
+            <b>Ask Alice</b>
+            <button class="newbtn">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+              New chat
+            </button>
+          </div>
+          <div class="sesslist">
+            <div class="daylbl">Today</div>
+            <div class="sess on"><span class="badge" style="background:var(--accent)">C</span><span class="nm">What's moving in semis today?</span></div>
+            <div class="sess"><span class="badge" style="background:var(--accent-2)">X</span><span class="nm">解释美债收益率曲线倒挂</span></div>
+            <div class="sess"><span class="badge" style="background:var(--green)">O</span><span class="nm muted">Backtest a momentum sweep</span></div>
+            <div class="daylbl">Yesterday</div>
+            <div class="sess"><span class="badge" style="background:var(--purple)">π</span><span class="nm muted">Thesis on NVDA earnings</span></div>
+          </div>
+        </div>
+
+        <!-- main -->
+        <div class="main">
+          <div class="tabs">
+            <div class="tab active"><span class="dot"></span>Ask Alice</div>
+            <div class="tab">chat-jun16</div>
+          </div>
+          <div class="stage">
+            <div class="ask">
+              <h3>What are we trading today?</h3>
+              <p>Type a message — Alice opens a fresh session already on it.</p>
+              <div class="composer">
+                <div class="ph">Ask anything, or describe a task…</div>
+                <div class="crow">
+                  <span class="pillchip"><span class="sw" style="background:var(--accent)"></span>Chat</span>
+                  <span class="pillchip"><span class="sw" style="background:var(--accent)"></span>Claude ▾</span>
+                  <span class="send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 3 · VARIABLE MAP ============ -->
+  <section class="sec">
+    <div class="sechead">
+      <span class="num">03</span>
+      <h2 class="sectitle serif">Variable Map</h2>
+      <p class="secnote">Drops straight into <span class="mono" style="font-size:11.5px">ui/src/index.css</span> — one set for <span class="mono" style="font-size:11.5px">:root</span> (day), one for the dark override.</p>
+    </div>
+    <table class="maptbl">
+      <thead><tr><th>Token</th><th>Daybreak (light)</th><th>Midnight (dark)</th><th>Drawn from</th></tr></thead>
+      <tbody id="maprows"></tbody>
+    </table>
+  </section>
+
+  <footer>
+    <span>Observant Mind. <span class="dot">✦</span> Dry Wit. <span class="dot">✦</span> Elegant Efficiency.</span>
+    <span class="mono" style="font-style:normal;font-size:11px;opacity:.7">theme-study · scratch</span>
+  </footer>
+
+</div>
+
+<script>
+/* ---------- palette data (the actual proposal) ---------- */
+const DAY = {
+  bg:'#f7f4ec', 'bg-secondary':'#f0ebdd', 'bg-tertiary':'#e5decb', border:'#d8d0bc',
+  text:'#1c2a41', 'text-muted':'#5e6573', accent:'#2f62b0', 'accent-dim':'rgba(47,98,176,0.13)',
+  'user-bubble':'#2f62b0', 'assistant-bubble':'#fbf8f0', 'notification-bg':'#fbf1d6',
+  'notification-border':'#c99a2e', green:'#2e8b6f', red:'#be4138', purple:'#6b5bc2',
+  'purple-dim':'rgba(107,91,194,0.14)'
+};
+const NIGHT = {
+  bg:'#0b0c0e', 'bg-secondary':'#0e0f12', 'bg-tertiary':'#1a1b21', border:'#24262c',
+  text:'#dfe1e6', 'text-muted':'#8f929b', accent:'#3b82f6', 'accent-dim':'rgba(59,130,246,0.16)',
+  'user-bubble':'#2f62b0', 'assistant-bubble':'#141519', 'notification-bg':'#1d1610',
+  'notification-border':'#8a5b2f', green:'#23b99a', red:'#e5484d', purple:'#8f72ff',
+  'purple-dim':'rgba(143,114,255,0.16)'
+};
+/* swatch rows shown on the two specimen cards (curated subset + source notes) */
+const SPEC = [
+  ['bg','Background','Cream paper — her reference card','Neutral charcoal-black (#353 palette)'],
+  ['bg-secondary','Chrome panels','Warmer paper for the rails','Rail / sidebar / tabs — calm neutral'],
+  ['bg-tertiary','Hover / active well','Toned paper','Active well'],
+  ['border','Borders','Soft tan rule','Neutral hairline'],
+  ['text','Ink','Engraved navy — the card titling','Soft off-white'],
+  ['text-muted','Muted','Desaturated navy','Cool grey'],
+  ['accent','Accent · alice-blue','The dress','The dress — small brand highlights only'],
+  ['notification-border','Gold','Her golden-blonde hair','Muted gold'],
+  ['green','Success','Botanical teal-green','Teal-green'],
+  ['red','Danger','Warm brick','Clean red'],
+  ['purple','Purple','Muted iris','Iris violet'],
+];
+
+/* render specimen swatches */
+function renderSwatches(host, pal, isDay){
+  const wrap = document.querySelector(`[data-swatches="${host}"]`);
+  SPEC.forEach((row, i) => {
+    const [key,, dayNote, nightNote] = row;
+    const hex = pal[key];
+    const el = document.createElement('div');
+    el.className = 'swatch';
+    el.style.animationDelay = (0.05 + i*0.035) + 's';
+    el.innerHTML = `
+      <span class="chip" style="background:${hex}"></span>
+      <span><span class="srole">${row[1]}</span><span class="ssource">${isDay?dayNote:nightNote}</span></span>
+      <span class="shex">${hex}</span>`;
+    wrap.appendChild(el);
+    if (key==='border' || key==='text-muted'){ const r=document.createElement('div'); r.className='rule'; wrap.appendChild(r); }
+  });
+}
+renderSwatches('day', DAY, true);
+renderSwatches('night', NIGHT, false);
+
+/* render the variable-map table (full 16) */
+const VARS = ['bg','bg-secondary','bg-tertiary','border','text','text-muted','accent','accent-dim',
+  'user-bubble','assistant-bubble','notification-bg','notification-border','green','red','purple','purple-dim'];
+const SRC = {accent:'Alice-blue · the dress','notification-border':'Golden blonde · her hair',
+  text:'Engraved navy · the card', bg:'Cream paper / midnight ink', 'user-bubble':'The dress'};
+const rows = document.getElementById('maprows');
+VARS.forEach(k => {
+  const d = DAY[k], n = NIGHT[k];
+  const sw = v => v.startsWith('rgba') ? `<i style="background:${v}"></i>` : `<i style="background:${v}"></i>`;
+  rows.insertAdjacentHTML('beforeend',
+    `<tr><td class="var">--color-${k}</td>
+       <td><span class="hx">${sw(d)}${d}</span></td>
+       <td><span class="hx">${sw(n)}${n}</span></td>
+       <td style="color:var(--muted)">${SRC[k]||'—'}</td></tr>`);
+});
+
+/* ---------- theme toggle (Light / Dark / Auto) ---------- */
+const root = document.documentElement;
+const hint = document.getElementById('autohint');
+const mq = window.matchMedia('(prefers-color-scheme: dark)');
+function paintHint(){
+  const t = root.getAttribute('data-theme');
+  hint.textContent = t === 'auto' ? `Following your system — currently ${mq.matches ? 'dark' : 'light'}` : '';
+}
+function setTheme(t){
+  root.setAttribute('data-theme', t);
+  document.querySelectorAll('.seg button').forEach(b =>
+    b.setAttribute('aria-pressed', String(b.dataset.set === t)));
+  try { localStorage.setItem('alice-theme-study', t); } catch(e){}
+  paintHint();
+}
+document.querySelectorAll('.seg button').forEach(b =>
+  b.addEventListener('click', () => setTheme(b.dataset.set)));
+mq.addEventListener('change', paintHint);
+setTheme((()=>{ try { return localStorage.getItem('alice-theme-study') || 'auto'; } catch(e){ return 'auto'; } })());
+</script>
+</body>
+</html>

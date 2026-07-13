@@ -83,6 +83,10 @@ export class WorkspaceRegistry {
     return this.byId.get(id);
   }
 
+  hasId(id: string): boolean {
+    return this.byId.has(id);
+  }
+
   hasTag(tag: string): boolean {
     return this.tagsInUse.has(tag);
   }

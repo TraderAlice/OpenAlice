@@ -5,6 +5,7 @@ import { getIntlLocale } from '../lib/intl'
 import { useToast } from '../components/Toast'
 import { LogsPage } from './LogsPage'
 import { SimulatorPage } from './SimulatorPage'
+import { OnboardingDesignPage } from './OnboardingDesignPage'
 import {
   toolsApi,
   type ToolInfo,
@@ -13,6 +14,7 @@ import {
 } from '../api/tools'
 import { api, type UTASnapshotSummary } from '../api'
 import type { ViewSpec } from '../tabs/types'
+import { filterAccountTierUTAs } from '../lib/uta-account-filter'
 
 // ==================== Tab Types ====================
 
@@ -20,6 +22,7 @@ type Tab = Extract<ViewSpec, { kind: 'dev' }>['params']['tab']
 
 const TAB_TITLES: Record<Tab, string> = {
   tools: 'Tools',
+  onboarding: 'Onboarding',
   snapshots: 'Snapshots',
   logs: 'Logs',
   simulator: 'Simulator',
@@ -42,6 +45,7 @@ export function DevPage({ spec }: DevPageProps) {
       <PageHeader title={TAB_TITLES[tab]} />
       <div className={`flex-1 min-h-0 ${SELF_SCROLLING_TABS.has(tab) ? 'flex flex-col' : 'overflow-y-auto'}`}>
         {tab === 'tools' && <ToolsTab />}
+        {tab === 'onboarding' && <OnboardingDesignPage />}
         {tab === 'snapshots' && <SnapshotsTab />}
         {tab === 'logs' && <LogsPage />}
         {tab === 'simulator' && <SimulatorPage />}
@@ -62,8 +66,8 @@ function SnapshotsTab() {
 
   // Load accounts list
   useEffect(() => {
-    api.trading.listUTAs().then(r => {
-      const list = r.utas.map(a => ({ id: a.id, label: a.label }))
+    api.trading.listUTASummaries().then(r => {
+      const list = filterAccountTierUTAs(r.utas).map(a => ({ id: a.id, label: a.label }))
       setAccounts(list)
       if (list.length > 0 && !selectedAccount) setSelectedAccount(list[0].id)
     }).catch(() => {})

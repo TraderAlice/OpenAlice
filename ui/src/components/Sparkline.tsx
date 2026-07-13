@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
-import { AreaChart, Area, ResponsiveContainer, YAxis } from 'recharts'
+import { AreaChart, Area, YAxis } from 'recharts'
+import { MeasuredChartFrame } from './MeasuredChartFrame'
 
 type SparklineColor = 'green' | 'red' | 'accent' | 'auto'
 
@@ -57,26 +58,28 @@ export function Sparkline({
 
   return (
     <div style={containerStyle} className={className}>
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 1, right: 0, bottom: 1, left: 0 }}>
-          <defs>
-            <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={stroke} stopOpacity={0.35} />
-              <stop offset="100%" stopColor={stroke} stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <YAxis hide domain={['dataMin', 'dataMax']} />
-          <Area
-            type="monotone"
-            dataKey="v"
-            stroke={stroke}
-            strokeWidth={1.25}
-            fill={`url(#${gradId})`}
-            dot={false}
-            isAnimationActive={false}
-          />
-        </AreaChart>
-      </ResponsiveContainer>
+      <MeasuredChartFrame className="h-full w-full">
+        {({ width: measuredWidth, height: measuredHeight }) => (
+          <AreaChart width={measuredWidth} height={measuredHeight} data={data} margin={{ top: 1, right: 0, bottom: 1, left: 0 }}>
+            <defs>
+              <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={stroke} stopOpacity={0.35} />
+                <stop offset="100%" stopColor={stroke} stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <YAxis hide domain={['dataMin', 'dataMax']} />
+            <Area
+              type="monotone"
+              dataKey="v"
+              stroke={stroke}
+              strokeWidth={1.25}
+              fill={`url(#${gradId})`}
+              dot={false}
+              isAnimationActive={false}
+            />
+          </AreaChart>
+        )}
+      </MeasuredChartFrame>
     </div>
   )
 }

@@ -6,8 +6,7 @@
 import { z } from 'zod'
 import { Fetcher } from '../../../core/provider/abstract/fetcher.js'
 import { CurrencyHistoricalQueryParamsSchema, CurrencyHistoricalDataSchema } from '../../../standard-models/currency-historical.js'
-import { EmptyDataError } from '../../../core/provider/utils/errors.js'
-import { getHistoricalData } from '../utils/helpers.js'
+import { getHistoricalData, emptyHistoricalError } from '../utils/helpers.js'
 import { INTERVALS_DICT } from '../utils/references.js'
 
 export const YFinanceCurrencyHistoricalQueryParamsSchema = CurrencyHistoricalQueryParamsSchema.extend({
@@ -62,7 +61,7 @@ export class YFinanceCurrencyHistoricalFetcher extends Fetcher {
       if (r.status === 'fulfilled') allData.push(...r.value)
     }
 
-    if (!allData.length) throw new EmptyDataError('No currency historical data returned')
+    if (!allData.length) throw emptyHistoricalError(results, 'No currency historical data returned')
     return allData
   }
 

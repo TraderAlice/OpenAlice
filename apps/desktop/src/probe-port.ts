@@ -20,8 +20,8 @@ export async function probeFreePort(start: number, end: number = start + 100): P
 }
 
 /**
- * A port only counts as free when BOTH the v4 wildcard (0.0.0.0) and the
- * loopback (127.0.0.1) bind succeed. One bind is not enough on macOS/BSD:
+ * A port only counts as free when the IPv4 AND IPv6 wildcard/loopback binds
+ * all succeed. One bind is not enough on macOS/BSD or Windows:
  * SO_REUSEADDR (node's default) lets a specific-address bind succeed while
  * a wildcard listener holds the port — and vice versa — so probing only
  * 127.0.0.1 reported ports held by wildcard listeners (e.g. a default
@@ -30,7 +30,10 @@ export async function probeFreePort(start: number, end: number = start + 100): P
  * 0.0.0.0 each miss one mode; the conjunction catches all four.
  */
 async function isPortFree(port: number): Promise<boolean> {
-  return (await bindable(port, '0.0.0.0')) && (await bindable(port, '127.0.0.1'))
+  return (await bindable(port, '0.0.0.0'))
+    && (await bindable(port, '127.0.0.1'))
+    && (await bindable(port, '::'))
+    && (await bindable(port, '::1'))
 }
 
 function bindable(port: number, host: string): Promise<boolean> {
@@ -43,7 +46,12 @@ function bindable(port: number, host: string): Promise<boolean> {
       try { srv.close() } catch { /* noop */ }
       res(free)
     }
-    srv.once('error', () => done(false))
+    srv.once('error', (err: NodeJS.ErrnoException) => {
+      // A host with IPv6 disabled should still be able to use IPv4 ports.
+      // EADDRINUSE remains a real collision; unsupported-family/address
+      // errors make this particular probe neutral.
+      done(err.code === 'EAFNOSUPPORT' || err.code === 'EADDRNOTAVAIL')
+    })
     srv.once('listening', () => done(true))
     srv.listen(port, host)
   })

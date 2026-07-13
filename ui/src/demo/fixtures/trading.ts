@@ -2,6 +2,7 @@ import type {
   TradingAccount,
   UTASummary,
   AccountInfo,
+  SubAccountRef,
   Position,
   UTAConfig,
   EquityCurvePoint,
@@ -21,7 +22,7 @@ export const DEMO_UTA_CRYPTO = 'demo-crypto'
 export const demoTradingAccounts: TradingAccount[] = [
   { id: DEMO_UTA_PAPER, provider: 'alpaca', label: 'Alpaca Paper' },
   { id: DEMO_UTA_IBKR, provider: 'ibkr', label: 'IBKR Demo' },
-  { id: DEMO_UTA_CRYPTO, provider: 'ccxt', label: 'Binance Spot' },
+  { id: DEMO_UTA_CRYPTO, provider: 'ccxt', label: 'Binance' },
 ]
 
 const healthOk = {
@@ -31,6 +32,7 @@ const healthOk = {
   consecutiveFailures: 0,
   lastSuccessAt: new Date().toISOString(),
   recovering: false,
+  connecting: false,
   disabled: false,
 }
 
@@ -38,18 +40,21 @@ export const demoUTASummaries: UTASummary[] = [
   {
     id: DEMO_UTA_PAPER,
     label: 'Alpaca Paper',
+    asVendor: true,
     capabilities: { supportedSecTypes: ['STK'], supportedOrderTypes: ['MKT', 'LMT'] },
     health: healthOk,
   },
   {
     id: DEMO_UTA_IBKR,
     label: 'IBKR Demo',
+    asVendor: true,
     capabilities: { supportedSecTypes: ['STK', 'OPT'], supportedOrderTypes: ['MKT', 'LMT', 'STP'] },
     health: healthOk,
   },
   {
     id: DEMO_UTA_CRYPTO,
-    label: 'Binance Spot',
+    label: 'Binance',
+    asVendor: true,
     capabilities: { supportedSecTypes: ['CRYPTO'], supportedOrderTypes: ['MKT', 'LMT'] },
     health: healthOk,
   },
@@ -147,7 +152,40 @@ export const demoPositionsByUTA: Record<string, Position[]> = {
   [DEMO_UTA_CRYPTO]: [
     pos({ symbol: 'BTC/USDT', secType: 'CRYPTO', currency: 'USDT', qty: '0.18', avgCost: '64200.00', marketPrice: '66480.00' }),
     pos({ symbol: 'ETH/USDT', secType: 'CRYPTO', currency: 'USDT', qty: '1.5', avgCost: '3340.00', marketPrice: '3402.00' }),
+    pos({ symbol: 'BTC/USDT:USDT', secType: 'CRYPTO_PERP', currency: 'USDT', side: 'short', qty: '0.05', avgCost: '67100.00', marketPrice: '66480.00' }),
   ],
+}
+
+// ==================== Sub-accounts (wallets) ====================
+//
+// The crypto demo account is Binance-shaped: a separate-wallet venue with a
+// 'spot' and a 'derivatives' wallet. Every other demo UTA is single-wallet, so
+// the selector never renders for them. Reads scope by `?subAccountId=`; with no
+// selector the handler returns the aggregate (matches the live CCXT broker).
+
+const SINGLE_WALLET: SubAccountRef[] = [{ id: 'default', label: 'Account', kind: 'unified' }]
+
+export const demoSubAccountsByUTA: Record<string, SubAccountRef[]> = {
+  [DEMO_UTA_PAPER]: SINGLE_WALLET,
+  [DEMO_UTA_IBKR]: SINGLE_WALLET,
+  [DEMO_UTA_CRYPTO]: [
+    { id: 'spot', label: 'Spot', kind: 'spot' },
+    { id: 'derivatives', label: 'Futures', kind: 'derivatives' },
+  ],
+}
+
+/** Per-wallet account info for the crypto demo (spot + derivatives sum to the
+ *  aggregate in `demoAccountByUTA[DEMO_UTA_CRYPTO]`). */
+export const demoCryptoAccountBySub: Record<string, AccountInfo> = {
+  spot: { baseCurrency: 'USDT', netLiquidation: '11002.18', totalCashValue: '1104.20', unrealizedPnL: '503.40', realizedPnL: '-128.40' },
+  derivatives: { baseCurrency: 'USDT', netLiquidation: '4030.00', totalCashValue: '2000.00', unrealizedPnL: '-20.74', realizedPnL: '0.00', initMarginReq: '332.40' },
+}
+
+/** Per-wallet positions for the crypto demo: spot wallet holds the spot lines,
+ *  derivatives wallet holds the perp. */
+export const demoCryptoPositionsBySub: Record<string, Position[]> = {
+  spot: demoPositionsByUTA[DEMO_UTA_CRYPTO].filter(p => p.contract.secType === 'CRYPTO'),
+  derivatives: demoPositionsByUTA[DEMO_UTA_CRYPTO].filter(p => p.contract.secType === 'CRYPTO_PERP'),
 }
 
 // ==================== Equity curves ====================
@@ -381,8 +419,8 @@ export const demoTradeHistoryByUTA: Record<string, TradeHistoryEntry[]> = {
 // ==================== UTA configs ====================
 
 export const demoUTAConfigs: UTAConfig[] = [
-  { id: DEMO_UTA_PAPER, label: 'Alpaca Paper', presetId: 'alpaca-paper', enabled: true, guards: [], presetConfig: {} },
-  { id: DEMO_UTA_IBKR, label: 'IBKR Demo', presetId: 'ibkr', enabled: true, guards: [], presetConfig: {} },
-  { id: DEMO_UTA_CRYPTO, label: 'Binance Spot', presetId: 'ccxt', enabled: true, guards: [], presetConfig: {} },
+  { id: DEMO_UTA_PAPER, label: 'Alpaca Paper', presetId: 'alpaca-paper', enabled: true, guards: [], presetConfig: {}, readOnly: false, asVendor: true },
+  { id: DEMO_UTA_IBKR, label: 'IBKR Demo', presetId: 'ibkr', enabled: true, guards: [], presetConfig: {}, readOnly: false, asVendor: true },
+  { id: DEMO_UTA_CRYPTO, label: 'Binance', presetId: 'ccxt', enabled: true, guards: [], presetConfig: {}, readOnly: false, asVendor: true },
 ]
 export const demoUTAConfig: UTAConfig = demoUTAConfigs[0]

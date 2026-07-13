@@ -1,28 +1,105 @@
 @import "tailwindcss";
 
-/* GitHub Dark theme palette */
+/* ============================================================
+   Theme tokens — two palettes, one identity. Alice-blue (her dress)
+   is the brand accent in BOTH modes. @theme below is Daybreak (light)
+   and the DEFAULT; the [data-theme="dark"] block + the prefers-color-
+   scheme block flip the same token names, so every `bg-bg`/`text-accent`/
+   `border-border` utility follows the active theme with zero component
+   changes. Living color card: ui/design/theme-study.html. The toggle lives in the
+   ActivityBar footer (light / dark / auto), persisted by the theme store
+   (ui/src/theme) and mirrored pre-paint by the inline script in index.html.
+   ============================================================ */
 @theme {
-  --color-bg: #0d1117;
-  --color-bg-secondary: #161b22;
-  --color-bg-tertiary: #21262d;
-  --color-border: #30363d;
-  --color-text: #e6edf3;
-  --color-text-muted: #8b949e;
-  --color-accent: #58a6ff;
-  --color-accent-dim: rgba(31, 111, 235, 0.2);
-  --color-user-bubble: #1f6feb;
-  --color-assistant-bubble: #161b22;
-  --color-notification-bg: #2d1f00;
-  --color-notification-border: #d29922;
-  --color-green: #3fb950;
-  --color-red: #f85149;
-  --color-purple: #a78bfa;
-  --color-purple-dim: rgba(139, 92, 246, 0.2);
+  /* Daybreak — light (default). Warm paper · engraved navy · alice-blue. */
+  --color-bg: #fbfaf6;
+  --color-bg-secondary: #f1ede4;
+  --color-bg-tertiary: #e4dccb;
+  --color-border: #d8d2c4;
+  --color-text: #1c2a41;
+  --color-text-muted: #5e6573;
+  --color-accent: #2f62b0;
+  --color-accent-dim: rgba(47, 98, 176, 0.14);
+  --color-user-bubble: #2f62b0;
+  --color-assistant-bubble: #fffdf8;
+  --color-notification-bg: #fbf1d6;
+  --color-notification-border: #c99a2e;
+  --color-green: #2e8b6f;
+  --color-red: #be4138;
+  --color-purple: #6b5bc2;
+  --color-purple-dim: rgba(107, 91, 194, 0.14);
+
+  /* Elevation overlays — theme-aware "subtle wash on hover / active".
+     Light darkens with navy ink; dark lightens with white. Components use
+     `bg-overlay` / `bg-overlay-strong`; raw CSS uses `var(--color-overlay)`. */
+  --color-overlay: rgba(28, 42, 65, 0.045);
+  --color-overlay-strong: rgba(28, 42, 65, 0.075);
 
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Microsoft YaHei", "Hiragino Sans GB", "Noto Sans CJK SC", sans-serif;
   --font-mono: "SF Mono", "Fira Code", "Cascadia Code", Menlo, Consolas,
     monospace;
+}
+
+/* Base resolution (no attribute / explicit light). */
+:root {
+  color-scheme: light;
+  --app-bg-wash: radial-gradient(circle at 50% 24%, rgba(47, 98, 176, 0.045), transparent 38rem);
+}
+
+/* ---- Midnight — dark (neutral charcoal-black) ----
+   Reverted to the #353 neutral-black palette: a navy-tinted dark read as
+   "too blue" once the full shell (rail + sidebar + tabs) was on screen — a
+   large neutral surface is calmer. Alice-blue survives ONLY as small brand
+   highlights (accent + the user's own bubble), so the large-area blue tint
+   is gone while the brand stays consistent with Daybreak.
+   Forced via data-theme="dark", AND the resolution for data-theme="auto"
+   when the OS is in dark mode (media block below). KEEP THE TWO IN SYNC. */
+:root[data-theme="dark"] {
+  --color-bg: #0b0c0e;
+  --color-bg-secondary: #0e0f12;
+  --color-bg-tertiary: #1a1b21;
+  --color-border: #24262c;
+  --color-text: #dfe1e6;
+  --color-text-muted: #8f929b;
+  --color-accent: #3b82f6;
+  --color-accent-dim: rgba(59, 130, 246, 0.16);
+  --color-user-bubble: #2f62b0;
+  --color-assistant-bubble: #141519;
+  --color-notification-bg: #1d1610;
+  --color-notification-border: #8a5b2f;
+  --color-green: #23b99a;
+  --color-red: #e5484d;
+  --color-purple: #8f72ff;
+  --color-purple-dim: rgba(143, 114, 255, 0.16);
+  --color-overlay: rgba(255, 255, 255, 0.04);
+  --color-overlay-strong: rgba(255, 255, 255, 0.07);
+  color-scheme: dark;
+  --app-bg-wash: radial-gradient(circle at 50% 28%, rgba(255, 255, 255, 0.02), transparent 34rem);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="auto"] {
+    --color-bg: #0b0c0e;
+    --color-bg-secondary: #0e0f12;
+    --color-bg-tertiary: #1a1b21;
+    --color-border: #24262c;
+    --color-text: #dfe1e6;
+    --color-text-muted: #8f929b;
+    --color-accent: #3b82f6;
+    --color-accent-dim: rgba(59, 130, 246, 0.16);
+    --color-user-bubble: #2f62b0;
+    --color-assistant-bubble: #141519;
+    --color-notification-bg: #1d1610;
+    --color-notification-border: #8a5b2f;
+    --color-green: #23b99a;
+    --color-red: #e5484d;
+    --color-purple: #8f72ff;
+    --color-purple-dim: rgba(143, 114, 255, 0.16);
+    --color-overlay: rgba(255, 255, 255, 0.04);
+    --color-overlay-strong: rgba(255, 255, 255, 0.07);
+    color-scheme: dark;
+    --app-bg-wash: radial-gradient(circle at 50% 28%, rgba(255, 255, 255, 0.02), transparent 34rem);
+  }
 }
 
 /* Japanese gets a JP-first sans stack so shared Han characters render in
@@ -49,6 +126,18 @@ html,
 body,
 #root {
   height: 100%;
+}
+
+body {
+  background: var(--app-bg-wash), var(--color-bg);
+  color: var(--color-text);
+  overflow: hidden;
+  transition: background-color 0.4s ease, color 0.4s ease;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-accent) 28%, transparent);
+  color: var(--color-text);
 }
 
 /* ==================== Typography scale ====================
@@ -105,6 +194,221 @@ body,
   opacity: 0.3;
   animation: live-pulse 2.4s ease-in-out infinite;
   animation-delay: 0.3s;
+}
+
+@keyframes onboarding-slide-forward {
+  from {
+    opacity: 0;
+    transform: translateX(22px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes onboarding-slide-back {
+  from {
+    opacity: 0;
+    transform: translateX(-22px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes onboarding-completion-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.76);
+  }
+  62% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes onboarding-completion-ring {
+  0% {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+  45% {
+    opacity: 0.55;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.42);
+  }
+}
+
+@keyframes onboarding-completion-line {
+  0% {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+  35% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scaleX(1);
+  }
+}
+
+.oa-onboarding-slide-forward {
+  animation: onboarding-slide-forward 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.oa-onboarding-slide-back {
+  animation: onboarding-slide-back 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.oa-onboarding-step-layout {
+  display: grid;
+  min-height: 0;
+  flex: 1 1 0%;
+  gap: 1rem;
+  align-content: start;
+  overflow-y: auto;
+  padding-bottom: 0.75rem;
+  padding-top: 0.75rem;
+}
+
+.oa-onboarding-title {
+  overflow-wrap: normal;
+  text-wrap: balance;
+  word-break: keep-all;
+}
+
+html[lang="ja"] .oa-onboarding-title {
+  line-break: strict;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.oa-onboarding-completion {
+  position: relative;
+  width: 5rem;
+  height: 5rem;
+  margin-bottom: 1.25rem;
+}
+
+.oa-onboarding-completion-ring {
+  position: relative;
+  display: grid;
+  width: 4.5rem;
+  height: 4.5rem;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--color-green) 38%, var(--color-border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-green) 12%, var(--color-bg));
+  box-shadow: inset 0 0 0 0.5rem color-mix(in srgb, var(--color-green) 7%, transparent);
+  animation: onboarding-completion-pop 0.58s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.oa-onboarding-completion-ring::after {
+  position: absolute;
+  inset: -0.5rem;
+  content: "";
+  border: 1px solid var(--color-green);
+  border-radius: inherit;
+  animation: onboarding-completion-ring 0.72s 0.12s ease-out both;
+}
+
+.oa-onboarding-completion-line {
+  position: absolute;
+  width: 1.25rem;
+  height: 1px;
+  border-radius: 999px;
+  background: var(--color-green);
+  opacity: 0;
+  transform-origin: center;
+  animation: onboarding-completion-line 0.62s ease-out both;
+}
+
+.oa-onboarding-completion-line-a {
+  top: 0.55rem;
+  left: 3.85rem;
+  transform: rotate(-22deg) scaleX(0);
+  animation-delay: 0.16s;
+}
+
+.oa-onboarding-completion-line-b {
+  top: 3.55rem;
+  left: 4.2rem;
+  transform: rotate(16deg) scaleX(0);
+  animation-delay: 0.23s;
+}
+
+.oa-onboarding-completion-line-c {
+  top: 1.15rem;
+  left: -0.25rem;
+  transform: rotate(18deg) scaleX(0);
+  animation-delay: 0.2s;
+}
+
+@media (min-width: 768px) {
+  .oa-onboarding-step-layout {
+    grid-template-columns: minmax(0, 360px) minmax(300px, 340px);
+    gap: 1.5rem;
+    align-items: start;
+    justify-content: center;
+    padding-top: clamp(3rem, 10vh, 5rem);
+  }
+}
+
+@media (min-width: 900px) {
+  .oa-onboarding-step-layout {
+    grid-template-columns: minmax(0, 420px) minmax(320px, 350px);
+  }
+}
+
+@media (min-width: 1024px) {
+  .oa-onboarding-step-layout {
+    grid-template-columns: minmax(0, 540px) minmax(340px, 360px);
+  }
+}
+
+/* Skeleton placeholder — theme-aware shimmer for first-load states. The block
+   is the tertiary surface (reads on both the page bg and bg-secondary cards); a
+   soft overlay band sweeps across at an ambient cadence (sibling to live-pulse's
+   2.4s, a touch quicker so it reads as "loading" without feeling anxious). Size
+   + radius come from the element's own utility classes. Honors reduced motion. */
+@keyframes skeleton-sweep {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.skeleton {
+  background-color: var(--color-bg-tertiary);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--color-overlay-strong) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: skeleton-sweep 1.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .oa-onboarding-slide-forward,
+  .oa-onboarding-slide-back,
+  .oa-onboarding-completion-ring,
+  .oa-onboarding-completion-ring::after,
+  .oa-onboarding-completion-line {
+    animation: none;
+  }
+  .skeleton {
+    animation: none;
+    background-image: none;
+    opacity: 0.7;
+  }
 }
 
 /* ==================== Button utility classes ==================== */
@@ -170,8 +474,18 @@ body,
 }
 
 /* Markdown content inside assistant messages */
+/* Prose base size — the single knob for all markdown surfaces (chat,
+   inbox comment, doc preview, file viewer). Headings/lists use `em` so
+   they scale off this. Without it, markdown inherits the browser default
+   16px, which reads oversized next to the 12–13px UI chrome. Being
+   tuned empirically; candidate prose tier for the semantic scale. */
+.markdown-content {
+  font-size: 15px;
+  overflow-wrap: break-word;
+}
 .markdown-content p {
   margin: 0.5em 0;
+  text-wrap: pretty;
 }
 .markdown-content p:first-child {
   margin-top: 0;
@@ -196,6 +510,9 @@ body,
   background: var(--color-bg-tertiary);
   padding: 2px 6px;
   border-radius: 4px;
+  overflow-wrap: anywhere;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }
 .markdown-content ul,
 .markdown-content ol {
@@ -211,19 +528,38 @@ body,
 }
 .markdown-content li {
   margin: 0.25em 0;
+  text-wrap: pretty;
 }
 .markdown-content li::marker {
   color: var(--color-text-muted);
 }
 /* Obsidian-style [[name]] wikilinks → clickable entity references. */
 .markdown-content a.wikilink {
+  display: inline-block;
+  max-width: 100%;
   color: var(--color-accent);
   cursor: pointer;
   text-decoration: none;
+  vertical-align: baseline;
+  overflow-wrap: anywhere;
   border-bottom: 1px dashed color-mix(in srgb, var(--color-accent) 45%, transparent);
 }
 .markdown-content a.wikilink:hover {
   border-bottom-style: solid;
+}
+
+.markdown-content a.session-signature {
+  color: var(--color-accent, #3b82f6);
+  cursor: pointer;
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: 4px;
+  padding: 0 2px;
+}
+
+.markdown-content a.session-signature:hover {
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  text-decoration: underline;
 }
 .markdown-content blockquote {
   border-left: 3px solid var(--color-accent);
@@ -253,6 +589,7 @@ body,
 .markdown-content a {
   color: var(--color-accent);
   text-decoration: none;
+  overflow-wrap: anywhere;
 }
 .markdown-content a:hover {
   text-decoration: underline;
@@ -276,6 +613,36 @@ body,
 .markdown-content h2:first-child,
 .markdown-content h3:first-child {
   margin-top: 0;
+}
+
+/* Issue What visual editor. Tiptap owns the editable DOM, while these rules
+   deliberately reuse read-mode typography so the always-editable body still
+   feels like part of the Issue rather than a separate source application. */
+.what-editor-content .ProseMirror {
+  min-height: 12rem;
+  padding: 0.75rem 1rem;
+  outline: none;
+  cursor: text;
+}
+.what-editor-content .ProseMirror > *:first-child {
+  margin-top: 0;
+}
+.what-editor-content .ProseMirror > *:last-child {
+  margin-bottom: 0;
+}
+.what-editor-content .ProseMirror-focused {
+  background: transparent;
+}
+.what-editor-content .ProseMirror-selectednode {
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 45%, transparent);
+  border-radius: 4px;
+}
+.what-editor-content .ProseMirror p.is-editor-empty:first-child::before {
+  color: var(--color-text-muted);
+  content: 'Describe what this Issue should accomplish…';
+  float: left;
+  height: 0;
+  pointer-events: none;
 }
 
 /* Thinking animation */
@@ -365,7 +732,9 @@ body,
 }
 .code-block-wrapper .code-copy-btn:hover {
   color: var(--color-text);
-  background: rgba(255, 255, 255, 0.06);
+  /* Theme-aware wash — navy in Daybreak, white in Midnight. The old
+     hardcoded rgba(255,255,255,…) was invisible in light mode. */
+  background: var(--color-overlay-strong);
 }
 .code-block-wrapper .code-copy-btn.copied {
   color: var(--color-green);
@@ -374,167 +743,4 @@ body,
   margin-top: 0 !important;
   border-top-left-radius: 0 !important;
   border-top-right-radius: 0 !important;
-}
-
-/* ==================== Automation Flow (React Flow) ==================== */
-
-/* Producer nodes (leftmost column — pure event sources) */
-.react-flow__node.flow-producer-node {
-  background: var(--color-bg-tertiary);
-  color: var(--color-text);
-  border: 1px solid #a371f7;
-  border-radius: 6px;
-  padding: 10px 14px;
-  font-size: 13px;
-  font-weight: 500;
-  min-width: 180px;
-  text-align: center;
-  box-shadow: 0 0 0 1px rgba(163, 113, 247, 0.12);
-}
-
-/* Wildcard producer — directional halo on the right (toward events) */
-.react-flow__node.flow-producer-emit-wildcard {
-  position: relative;
-}
-.react-flow__node.flow-producer-emit-wildcard::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 100%;
-  width: 80px;
-  height: 120%;
-  transform: translateY(-50%);
-  pointer-events: none;
-  background: radial-gradient(
-    ellipse at left center,
-    rgba(163, 113, 247, 0.45) 0%,
-    rgba(163, 113, 247, 0.15) 40%,
-    rgba(163, 113, 247, 0) 75%
-  );
-  animation: flow-wildcard-breath 2.4s ease-in-out infinite;
-}
-
-/* Event-type nodes (inputs + outputs) */
-.react-flow__node.flow-event-node {
-  background: var(--color-bg-secondary);
-  color: var(--color-text);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  padding: 8px 14px;
-  font-size: 12px;
-  font-family: var(--font-mono);
-  min-width: 140px;
-  text-align: center;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-}
-
-/* Listener nodes (middle column) */
-.react-flow__node.flow-listener-node {
-  background: var(--color-bg-tertiary);
-  color: var(--color-text);
-  border: 1px solid var(--color-accent);
-  border-radius: 6px;
-  padding: 10px 14px;
-  font-size: 13px;
-  font-weight: 500;
-  min-width: 200px;
-  text-align: center;
-  box-shadow: 0 0 0 1px rgba(88, 166, 255, 0.1);
-}
-
-/* Pulse animation when an event of this type fires */
-.react-flow__node.flow-pulse {
-  animation: flow-pulse 800ms ease-out;
-  border-color: var(--color-accent);
-}
-@keyframes flow-pulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(88, 166, 255, 0.6);
-    border-color: var(--color-accent);
-  }
-  100% {
-    box-shadow: 0 0 0 14px rgba(88, 166, 255, 0);
-    border-color: var(--color-border);
-  }
-}
-
-/* React Flow background + controls theming */
-.react-flow__controls {
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  overflow: hidden;
-}
-.react-flow__controls-button {
-  background: var(--color-bg-secondary);
-  border-bottom: 1px solid var(--color-border);
-  color: var(--color-text-muted);
-}
-.react-flow__controls-button:hover {
-  background: var(--color-bg-tertiary);
-  color: var(--color-text);
-}
-.react-flow__controls-button svg {
-  fill: currentColor;
-}
-
-/* External events (webhook-reachable) get a dashed teal outline */
-.react-flow__node.flow-event-external {
-  border-color: var(--color-accent);
-  border-style: dashed;
-}
-
-/* ==================== Wildcard listener auras ====================
-   A listener declared with `subscribes: '*'` or `emits: '*'` gets a
-   soft directional halo instead of N individual edges. Emit-side is
-   green (matches emit edge color), subscribe-side is blue (matches
-   subscribe edge color). Breathing animation is slower and softer
-   than the event-pulse animation to stay ambient. */
-
-.react-flow__node.flow-listener-emit-wildcard {
-  /* ensure absolutely-positioned pseudo-elements are anchored here */
-  position: relative;
-}
-.react-flow__node.flow-listener-emit-wildcard::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 100%;
-  width: 80px;
-  height: 120%;
-  transform: translateY(-50%);
-  pointer-events: none;
-  background: radial-gradient(
-    ellipse at left center,
-    rgba(63, 185, 80, 0.45) 0%,
-    rgba(63, 185, 80, 0.15) 40%,
-    rgba(63, 185, 80, 0) 75%
-  );
-  animation: flow-wildcard-breath 2.4s ease-in-out infinite;
-}
-
-.react-flow__node.flow-listener-sub-wildcard {
-  position: relative;
-}
-.react-flow__node.flow-listener-sub-wildcard::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  right: 100%;
-  width: 80px;
-  height: 120%;
-  transform: translateY(-50%);
-  pointer-events: none;
-  background: radial-gradient(
-    ellipse at right center,
-    rgba(88, 166, 255, 0.45) 0%,
-    rgba(88, 166, 255, 0.15) 40%,
-    rgba(88, 166, 255, 0) 75%
-  );
-  animation: flow-wildcard-breath 2.4s ease-in-out infinite;
-}
-
-@keyframes flow-wildcard-breath {
-  0%, 100% { opacity: 0.55; transform: translateY(-50%) scale(1); }
-  50%      { opacity: 1;    transform: translateY(-50%) scale(1.08); }
 }

@@ -1,12 +1,13 @@
-import { type LucideIcon, MessageSquare, Inbox, Telescope, LineChart, GitBranch, BarChart3, Newspaper, Zap, Settings, Code2, TerminalSquare, ChevronDown, Info } from 'lucide-react'
-import { useState } from 'react'
+import { type LucideIcon, MessageSquare, Inbox, Telescope, LineChart, GitBranch, BarChart3, Newspaper, Zap, Settings, Code2, TerminalSquare, ChevronDown, Info, ListChecks, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { type Page } from '../App'
-import { findSectionForActivity } from '../sections'
 import { useWorkspace } from '../tabs/store'
 import type { ActivitySection, ViewSpec } from '../tabs/types'
 import { useUnreadInboxCount } from '../live/inbox-read'
+import { usePendingPushCount } from '../live/trading-push'
 import { useActivityBarCollapse } from '../live/activity-bar-collapse'
 import { useTranslation } from 'react-i18next'
+import { ThemeToggle } from './ThemeToggle'
 
 /**
  * Map ActivityBar page enum (visual layout grouping) to the ActivitySection
@@ -23,6 +24,7 @@ function activitySectionFor(page: Page): ActivitySection {
     case 'dev':                  return 'dev'
     case 'market':               return 'market'
     case 'portfolio':            return 'portfolio'
+    case 'issue':                return 'issue'
     case 'automation':           return 'automation'
     case 'news':                 return 'news'
   }
@@ -31,20 +33,19 @@ function activitySectionFor(page: Page): ActivitySection {
 interface ActivityBarProps {
   open: boolean
   onClose: () => void
-  /**
-   * Called after the user activates an item. Receives the activity the user
-   * landed on (or null if they collapsed the current one by re-clicking it).
-   * The parent uses this on mobile to drill into the secondary sidebar drawer
-   * instead of dismissing entirely. Desktop layouts can ignore it.
-   */
-  onItemActivated?: (section: ActivitySection | null) => void
+  /** True once the rail is static (>= md). The compact rail is desktop-only. */
+  desktopStatic?: boolean
+  /** Static desktop rail width chosen by App's shell breakpoints. */
+  railMode?: 'compact' | 'narrow' | 'full'
+  /** Force the static rail into icon-only mode at narrow desktop widths. */
+  compactRailForced?: boolean
 }
 
 // ==================== Nav item definitions ====================
 
 type NavItemKey =
   | 'nav.item.inbox' | 'nav.item.tracked' | 'nav.item.chat' | 'nav.item.workspaces'
-  | 'nav.item.market' | 'nav.item.news' | 'nav.item.tradingAsGit'
+  | 'nav.item.market' | 'nav.item.news' | 'nav.item.tradingAsGit' | 'nav.item.issue'
   | 'nav.item.portfolio' | 'nav.item.automation' | 'nav.item.settings' | 'nav.item.dev'
 
 interface NavLeaf {
@@ -52,19 +53,10 @@ interface NavLeaf {
   labelKey: NavItemKey
   icon: LucideIcon
   /**
-   * What tab opens when this ActivityBar item is clicked.
-   *
-   * - **Set**: clicking the icon both reveals the sidebar AND opens (or
-   *   focuses) this tab. Used for activities with a meaningful default
-   *   landing page — e.g. Portfolio's Overview, News, Automation.
-   * - **Omitted**: sidebar-only activity. Click reveals the sidebar; tabs
-   *   are created from sidebar interactions. Used when there's no canonical
-   *   "all of X" view (Chat, Settings, Dev) or no tab at all (Trading-as-Git).
-   *
-   * Same-section re-click always collapses the sidebar regardless of this
-   * field; the focused tab isn't touched on collapse.
+   * What page opens when this ActivityBar item is clicked. Local navigators
+   * are page-owned now, so every rail item has a concrete landing surface.
    */
-  defaultTab?: ViewSpec
+  defaultTab: ViewSpec
 }
 
 interface NavSection {
@@ -89,12 +81,14 @@ interface NavSection {
 
 const NAV_SECTIONS: NavSection[] = [
   // Top — primary nav, always visible (no header, not collapsible).
-  // Mental model: Workspace is the atom for all work units. Chat is
-  // the high-frequency subset's shortcut — chat-template workspaces
-  // got their own top-level entry because that flow is common enough
-  // to warrant direct access. Workspaces (the all-templates index)
-  // sits alongside; the two aren't redundant: Workspaces = whole set,
-  // Chat = chat-shape subset shortcut.
+  // Mental model: Chat (Ask Alice) is THE entry — for an AI product the
+  // chat surface is the front door (how you use the thing), so it sits at
+  // the very top, above Inbox (which is task sync, not the core loop).
+  // Workspaces (the all-templates index) is the power-user surface for
+  // hands-on session management; the two aren't redundant (Workspaces =
+  // whole set, Chat = chat-shape subset shortcut), but because day-to-day
+  // work rarely leaves Ask Alice, Workspaces sits at the bottom of this
+  // group rather than alongside Chat.
   //
   // Market / News are operational tools that work but aren't load-
   // bearing — they live here because they don't need lifecycle
@@ -102,69 +96,96 @@ const NAV_SECTIONS: NavSection[] = [
   {
     sectionLabel: '',
     items: [
+      { page: 'chat',       labelKey: 'nav.item.chat',       icon: MessageSquare, defaultTab: { kind: 'chat-landing', params: {} } },
       { page: 'inbox',      labelKey: 'nav.item.inbox',      icon: Inbox, defaultTab: { kind: 'inbox', params: {} } },
+      { page: 'issue',      labelKey: 'nav.item.issue',      icon: ListChecks, defaultTab: { kind: 'issue', params: {} } },
       { page: 'tracked',    labelKey: 'nav.item.tracked',    icon: Telescope, defaultTab: { kind: 'tracked', params: {} } },
-      { page: 'chat',       labelKey: 'nav.item.chat',       icon: MessageSquare },
-      { page: 'workspaces', labelKey: 'nav.item.workspaces', icon: TerminalSquare },
-      { page: 'market',     labelKey: 'nav.item.market',     icon: BarChart3 },
+      { page: 'market',     labelKey: 'nav.item.market',     icon: BarChart3, defaultTab: { kind: 'market-list', params: {} } },
       { page: 'news',       labelKey: 'nav.item.news',       icon: Newspaper, defaultTab: { kind: 'news', params: {} } },
+      { page: 'workspaces', labelKey: 'nav.item.workspaces', icon: TerminalSquare, defaultTab: { kind: 'workspace-list', params: {} } },
     ],
   },
-  // Beta — functional but not yet dependable. Two distinct reasons
-  // land an entry here:
-  //  - Cross-broker unification (UTA abstraction, FX/options/futures)
-  //    is in active rearchitecture. Portfolio surfaces that state;
-  //    Trading-as-Git is the operations side (pending broker writes).
-  //    The data runs; the schema/UX underneath isn't settled.
-  //  - Automation runs fine in isolation, but its trigger chain isn't
-  //    closed in the current Harness architecture — nothing fires it
-  //    end-to-end yet, so it's effectively unusable today. Once
-  //    Harness scheduling lands it gets wired back up.
-  // Broker connection CRUD lives under Settings → Trading, not here —
-  // it's a config surface, not a state/ops one.
+  // Beta — useful trading surfaces whose cross-broker state model and UX are
+  // still settling. Broker connection CRUD lives under Settings → Trading.
   {
     sectionLabel: 'Beta',
     labelKey: 'nav.section.beta',
     descriptionKey: 'nav.betaDescription',
     items: [
-      { page: 'trading-as-git', labelKey: 'nav.item.tradingAsGit', icon: GitBranch },
+      { page: 'trading-as-git', labelKey: 'nav.item.tradingAsGit', icon: GitBranch, defaultTab: { kind: 'trading-as-git', params: {} } },
       { page: 'portfolio',      labelKey: 'nav.item.portfolio',    icon: LineChart, defaultTab: { kind: 'portfolio', params: {} } },
-      { page: 'automation',     labelKey: 'nav.item.automation',   icon: Zap, defaultTab: { kind: 'automation', params: { section: 'flow' } } },
     ],
   },
   {
     sectionLabel: 'System',
     labelKey: 'nav.section.system',
     items: [
-      { page: 'settings', labelKey: 'nav.item.settings', icon: Settings },
-      { page: 'dev',      labelKey: 'nav.item.dev',      icon: Code2 },
+      // Automation lives here now: Issues (the board) is the primary
+      // management surface, and scheduled issues fire from there. Automation
+      // is the operations/plumbing side (headless runs, API, event bus) —
+      // System chrome, not a daily-driver nav target.
+      { page: 'automation', labelKey: 'nav.item.automation', icon: Zap, defaultTab: { kind: 'automation', params: { section: 'runs' } } },
+      { page: 'settings', labelKey: 'nav.item.settings', icon: Settings, defaultTab: { kind: 'settings', params: { category: 'general' } } },
+      { page: 'dev',      labelKey: 'nav.item.dev',      icon: Code2, defaultTab: { kind: 'dev', params: { tab: 'tools' } } },
     ],
   },
 ]
 
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia(query).matches : false,
+  )
+  useEffect(() => {
+    const mq = window.matchMedia(query)
+    const handler = () => setMatches(mq.matches)
+    setMatches(mq.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [query])
+  return matches
+}
+
 // ==================== ActivityBar ====================
 
 /**
- * Linear-style left nav. 200px wide on all viewports; on mobile (<md)
- * it slides in over the page from the left, on desktop it's a static
- * column. Top section (no header) is the pinned-nav block — Chat,
- * Inbox, Workspaces, etc. — always visible. Labeled sections (Agent,
- * System) get collapsible chevron headers; collapse state persists
- * to localStorage.
+ * Linear-style left nav. Mobile uses a drawer; desktop keeps a compact
+ * text rail. The recessed-rail look comes from bg-tertiary
+ * (one elevation step up from the secondary Sidebar and the base main
+ * pane) — rail → sidebar → main read as three distinct tiers. Top
+ * section (no header) is the pinned-nav block — Chat, Inbox,
+ * Workspaces, etc. — always visible. Labeled sections (Agent, System)
+ * get collapsible chevron headers; collapse state persists to
+ * localStorage.
  *
- * The wider layout (vs VS Code's 56px icon-only column) is deliberate
- * for OpenAlice's current phase: items in the bar live in different
- * lifecycle stages and the section labels are how we'll later
- * communicate that. Mostly-icon view would hide the differentiation.
+ * The ActivityBar owns only top-level area selection. Business navigation
+ * lives inside each page so surfaces can have their own layout and responsive
+ * behavior.
  */
-export function ActivityBar({ open, onClose, onItemActivated }: ActivityBarProps) {
+export function ActivityBar({
+  open,
+  onClose,
+  desktopStatic = true,
+  railMode = 'full',
+  compactRailForced = false,
+}: ActivityBarProps) {
   const { t } = useTranslation()
   const selectedSidebar = useWorkspace((state) => state.selectedSidebar)
   const setSidebar = useWorkspace((state) => state.setSidebar)
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
   const unreadInbox = useUnreadInboxCount()
+  const pendingPush = usePendingPushCount()
   const collapsedSections = useActivityBarCollapse((s) => s.collapsedSections)
   const setCollapsed = useActivityBarCollapse((s) => s.setCollapsed)
+  const railCollapsed = useActivityBarCollapse((s) => s.railCollapsed)
+  const setRailCollapsed = useActivityBarCollapse((s) => s.setRailCollapsed)
+  const shortRailHeight = useMediaQuery('(max-height: 700px)')
+  const veryShortRailHeight = useMediaQuery('(max-height: 520px)')
+  const forcedCompactRail = desktopStatic && (
+    compactRailForced || railMode === 'compact' || veryShortRailHeight
+  )
+  const compactRail = desktopStatic && (forcedCompactRail || railCollapsed)
+  const narrowRail = desktopStatic && railMode === 'narrow' && !compactRail
+  const denseRail = desktopStatic && shortRailHeight
 
   return (
     <>
@@ -176,31 +197,32 @@ export function ActivityBar({ open, onClose, onItemActivated }: ActivityBarProps
         onClick={onClose}
       />
 
-      {/* ActivityBar — 200px on all viewports. Mobile: slide-in over
+      {/* ActivityBar — Linear-style workspace rail. Mobile: slide-in over
        *  page with backdrop. Desktop: static column flush left. */}
       <aside
         className={`
-          w-[200px] h-full flex flex-col shrink-0
-          bg-bg-secondary
-          border-r border-border
-          fixed z-50 top-0 left-0 transition-transform duration-200
+          w-[280px] ${compactRail ? 'md:w-[60px]' : narrowRail ? 'md:w-[152px]' : 'md:w-[188px]'} h-full flex flex-col shrink-0
+          bg-bg-tertiary
+          border-r border-border/80
+          fixed z-50 top-0 left-0 transition-[transform,width] duration-200
           ${open ? 'translate-x-0' : '-translate-x-full'}
-          md:static md:translate-x-0 md:z-auto md:transition-none
+          md:static md:translate-x-0 md:z-auto
         `}
       >
-        {/* Branding */}
-        <div className="px-5 py-4 flex items-center gap-2.5">
+        {/* Branding — h-10 to line up with the Sidebar header + TabStrip
+            (all three top surfaces share the 40px header rhythm). */}
+        <div className={`${denseRail ? 'h-10 mb-2 md:h-7 md:mb-0.5' : 'h-10 mb-2'} flex items-center shrink-0 ${compactRail ? 'justify-center px-0' : narrowRail ? 'pl-[18px] pr-3 gap-2' : 'pl-[22px] pr-4 gap-2.5'}`}>
           <img
             src="/alice.ico"
             alt="Alice"
-            className="w-7 h-7 rounded-lg ring-1 ring-accent/25 shadow-[0_0_8px_rgba(88,166,255,0.15)]"
+            className={`${denseRail ? 'h-6 w-6 md:h-5 md:w-5' : 'h-6 w-6'} shrink-0 rounded-full ring-1 ring-border shadow-[0_0_14px_var(--color-accent-dim)]`}
             draggable={false}
           />
-          <h1 className="text-[15px] font-semibold text-text">OpenAlice</h1>
+          <h1 className={`min-w-0 flex-1 truncate text-[15px] font-semibold text-text ${compactRail ? 'md:hidden' : ''}`}>OpenAlice</h1>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 flex flex-col px-2 overflow-y-auto pb-3">
+        <nav className={`flex-1 flex flex-col overflow-x-hidden overflow-y-auto ${denseRail ? 'pb-3 md:pb-0.5' : 'pb-3'} ${compactRail ? 'px-2 md:items-center' : narrowRail ? 'px-2.5' : 'px-3'}`}>
           {NAV_SECTIONS.map((section, si) => {
             const labeled = section.sectionLabel.length > 0
             // User toggle wins over default. The collapse store stores
@@ -211,10 +233,21 @@ export function ActivityBar({ open, onClose, onItemActivated }: ActivityBarProps
             const isCollapsed = labeled && (
               stored !== undefined ? stored : Boolean(section.defaultCollapsed)
             )
-            const showItems = !isCollapsed
+            const showItems = compactRail ? true : !isCollapsed
             return (
-              <div key={si} className={si > 0 ? 'mt-4' : ''}>
-                {labeled && (
+              <div
+                key={si}
+                className={
+                  compactRail && si > 0
+                    ? `${denseRail ? 'mt-3 pt-3 md:mt-0.5 md:pt-0.5 md:w-8' : 'mt-3 pt-3 md:w-11'} border-t border-border/70`
+                    : si > 0
+                      ? denseRail ? 'mt-2' : 'mt-4'
+                      : compactRail
+                        ? denseRail ? 'md:w-8' : 'md:w-11'
+                        : ''
+                }
+              >
+                {labeled && !compactRail && (
                   <SectionHeader
                     label={section.labelKey ? t(section.labelKey) : section.sectionLabel}
                     description={section.descriptionKey ? t(section.descriptionKey) : undefined}
@@ -229,38 +262,15 @@ export function ActivityBar({ open, onClose, onItemActivated }: ActivityBarProps
                   />
                 )}
                 {showItems && (
-                  <div className="flex flex-col gap-0.5" id={`activity-section-${si}`}>
+                  <div className={`flex flex-col ${denseRail ? 'gap-1 md:gap-px' : 'gap-1'}`} id={`activity-section-${si}`}>
                     {section.items.map((item) => {
                       const sec = activitySectionFor(item.page)
                       const isActive = selectedSidebar === sec
                       const Icon = item.icon
-                      // Sidebar-less activity (no entry in SECTION_BY_KEY):
-                      // pure navigation — clicking opens the default tab
-                      // full-width; no collapse toggle, no secondary drawer.
-                      const hasSidebar = findSectionForActivity(sec) != null
                       const handleClick = () => {
-                        let landedOn: ActivitySection | null
-                        if (selectedSidebar === sec && hasSidebar) {
-                          // Same section re-clicked: toggle sidebar off. Don't
-                          // touch the focused tab — collapsing the sidebar
-                          // shouldn't change what's in the editor.
-                          setSidebar(null)
-                          landedOn = null
-                        } else {
-                          setSidebar(sec)
-                          // Activities with a meaningful default landing (e.g.
-                          // Portfolio overview) jump straight to it. Sidebar-only
-                          // activities (Chat, Settings, Trading-as-Git, …) leave
-                          // tab focus alone — user picks from the sidebar.
-                          if (item.defaultTab) openOrFocus(item.defaultTab)
-                          // Sidebar-less activities report null so mobile
-                          // dismisses instead of opening the secondary drawer.
-                          landedOn = hasSidebar ? sec : null
-                        }
-                        // Let parent decide the mobile transition (drill into
-                        // secondary drawer vs dismiss). Default: just close.
-                        if (onItemActivated) onItemActivated(landedOn)
-                        else onClose()
+                        setSidebar(sec)
+                        openOrFocus(item.defaultTab)
+                        onClose()
                       }
                       return (
                         <button
@@ -268,29 +278,49 @@ export function ActivityBar({ open, onClose, onItemActivated }: ActivityBarProps
                           type="button"
                           onClick={handleClick}
                           title={t(item.labelKey)}
-                          className={`relative flex items-center gap-3 px-3 py-1.5 rounded-md text-[13px] transition-colors text-left ${
+                          className={`relative flex items-center rounded-md transition-colors text-left ${
+                            compactRail
+                              ? denseRail
+                                ? 'md:h-[26px] md:w-8 md:min-h-[26px] md:justify-center md:gap-0 md:px-0 md:py-0'
+                                : 'md:h-9 md:w-11 md:min-h-9 md:justify-center md:gap-0 md:px-0 md:py-0'
+                              : denseRail
+                                ? `min-h-[28px] ${narrowRail ? 'gap-2 px-2' : 'gap-2.5 px-2.5'} py-1 text-[12px]`
+                                : `min-h-[34px] ${narrowRail ? 'gap-2 px-2.5' : 'gap-3 px-3'} py-1.5 text-[13px]`
+                          } ${
                             isActive
-                              ? 'bg-bg-tertiary text-text'
-                              : 'text-text-muted hover:text-text hover:bg-bg-tertiary/50'
+                              ? 'bg-accent-dim text-text'
+                              : 'text-text-muted hover:text-text hover:bg-overlay'
                           }`}
                         >
                           {/* Active indicator — left vertical bar */}
                           <span
-                            className={`absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r-full bg-accent transition-opacity duration-150 ${
+                            className={`absolute left-0 ${denseRail ? 'top-1.5 bottom-1.5 md:top-0.5 md:bottom-0.5' : 'top-1.5 bottom-1.5'} w-[2px] rounded-r-full bg-accent transition-opacity duration-150 ${
                               isActive ? 'opacity-100' : 'opacity-0'
                             }`}
                             aria-hidden
                           />
-                          <span className="relative flex items-center justify-center w-5 h-5 shrink-0">
-                            <Icon size={16} strokeWidth={1.75} />
+                          <span className={`relative flex items-center justify-center w-5 h-5 shrink-0 ${denseRail ? 'md:w-3.5 md:h-3.5' : ''}`}>
+                            <Icon size={denseRail ? 14 : 16} strokeWidth={1.75} />
                           </span>
-                          <span className="flex-1 truncate">{t(item.labelKey)}</span>
+                          <span className={`flex-1 truncate ${compactRail ? 'md:hidden' : ''}`}>{t(item.labelKey)}</span>
                           {item.page === 'inbox' && unreadInbox > 0 && (
                             <span
                               aria-label={t('nav.unread', { count: unreadInbox })}
-                              className="shrink-0 min-w-[18px] h-[18px] px-1.5 rounded-full bg-red text-[10px] font-semibold text-white tabular-nums flex items-center justify-center"
+                              className={`shrink-0 min-w-[18px] h-[18px] px-1.5 rounded-full bg-red text-[10px] font-semibold text-white tabular-nums flex items-center justify-center ${
+                                compactRail ? 'md:absolute md:-right-1 md:-top-1 md:h-4 md:min-w-4 md:px-1 md:text-[9px]' : ''
+                              }`}
                             >
                               {unreadInbox > 99 ? '99+' : unreadInbox}
+                            </span>
+                          )}
+                          {item.page === 'trading-as-git' && pendingPush > 0 && (
+                            <span
+                              aria-label={t('nav.pendingPush', { count: pendingPush })}
+                              className={`shrink-0 min-w-[18px] h-[18px] px-1.5 rounded-full bg-red text-[10px] font-semibold text-white tabular-nums flex items-center justify-center ${
+                                compactRail ? 'md:absolute md:-right-1 md:-top-1 md:h-4 md:min-w-4 md:px-1 md:text-[9px]' : ''
+                              }`}
+                            >
+                              {pendingPush > 99 ? '99+' : pendingPush}
                             </span>
                           )}
                         </button>
@@ -303,6 +333,23 @@ export function ActivityBar({ open, onClose, onItemActivated }: ActivityBarProps
           })}
         </nav>
 
+        {/* Footer — global icon controls pinned to the bottom of the rail. */}
+        <div className={`shrink-0 flex items-center ${compactRail ? `${denseRail ? 'py-2 md:py-0.5 md:gap-px' : 'py-2 md:gap-1'} px-4 md:flex-col md:items-center md:px-2` : `${narrowRail ? 'px-3' : 'px-4'} border-t border-border py-1.5 justify-between gap-2`}`}>
+          <ThemeToggle compact={denseRail} />
+          {!forcedCompactRail && (
+            <button
+              type="button"
+              onClick={() => setRailCollapsed(!railCollapsed)}
+              title={t(railCollapsed ? 'nav.expandRail' : 'nav.collapseRail')}
+              aria-label={t(railCollapsed ? 'nav.expandRail' : 'nav.collapseRail')}
+              className={`hidden ${denseRail ? 'h-9 w-9 md:h-[26px] md:w-[26px]' : 'h-9 w-9'} shrink-0 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-overlay hover:text-text md:flex`}
+            >
+              {railCollapsed
+                ? <PanelLeftOpen size={denseRail ? 14 : 17} strokeWidth={1.75} aria-hidden />
+                : <PanelLeftClose size={denseRail ? 14 : 17} strokeWidth={1.75} aria-hidden />}
+            </button>
+          )}
+        </div>
       </aside>
     </>
   )
@@ -347,9 +394,10 @@ function SectionHeader({
         <button
           type="button"
           onClick={onToggleCollapse}
-          className="flex-1 flex items-center gap-1.5 py-1 text-[11px] font-medium text-text-muted/60 hover:text-text-muted uppercase tracking-wider transition-colors text-left"
+          className="flex min-h-7 flex-1 items-center gap-1.5 py-1 text-left text-[12px] font-semibold text-text-muted transition-colors hover:text-text"
           aria-expanded={!isCollapsed}
           aria-controls={controlsId}
+          title={label}
         >
           <ChevronDown
             size={12}
@@ -365,7 +413,7 @@ function SectionHeader({
           <button
             type="button"
             onClick={() => setHintOpen((o) => !o)}
-            className={`flex items-center justify-center p-0.5 transition-colors ${
+            className={`flex min-h-7 min-w-7 items-center justify-center p-0.5 transition-colors ${
               hintOpen ? 'text-text-muted' : 'text-text-muted/50 hover:text-text-muted'
             }`}
             aria-label={t('nav.about', { label })}
@@ -376,7 +424,7 @@ function SectionHeader({
         )}
       </div>
       {showItems && description && hintOpen && (
-        <p className="px-3 mb-2 text-[11px] text-text-muted/60 leading-relaxed">
+        <p className="mb-2 px-3 text-[11px] leading-relaxed text-text-muted">
           {description}
         </p>
       )}

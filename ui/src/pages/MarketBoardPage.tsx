@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { LineChart, Line, ResponsiveContainer, YAxis, XAxis, Tooltip } from 'recharts'
+import { LineChart, Line, YAxis, XAxis, Tooltip } from 'recharts'
 import { useReferenceBoard } from '../components/market/useReferenceBoard'
 import { BoardMeta } from '../components/market/BoardMeta'
 import { PageHeader } from '../components/PageHeader'
+import { CenteredLoading } from '../components/StateViews'
 import { SeriesCard } from '../components/market/SeriesCard'
+import { MeasuredChartFrame } from '../components/MeasuredChartFrame'
 import {
   referenceApi,
   type MoversBoard, type MoverRow, type ReferenceMeta, type CalendarBoard,
@@ -14,19 +16,6 @@ import {
 } from '../api/reference'
 import { useWorkspace } from '../tabs/store'
 import type { ViewSpec } from '../tabs/types'
-
-type BoardKind = Extract<ViewSpec, { kind: 'market-board' }>['params']['board']
-
-/** Tab titles (plain English, matching the registry's other title strings). */
-export const MARKET_BOARD_TITLES: Record<BoardKind, string> = {
-  movers: 'Movers',
-  calendar: 'Calendar',
-  macro: 'Macro',
-  'term-structure': 'Term Structure',
-  'global-macro': 'Global Macro',
-  shipping: 'Shipping',
-  fed: 'Fed',
-}
 
 const REFRESH_MS = 5 * 60 * 1000
 
@@ -95,7 +84,7 @@ function MoversBoardView() {
           ))}
         </div>
 
-        {loading && !data && <div className="text-[13px] text-text-muted">{t('common.loading')}</div>}
+        {loading && !data && <CenteredLoading label={t('common.loading')} />}
         {error && (
           <div className="text-[13px] text-red border border-red/30 rounded-md px-3 py-2 bg-red/5">{error}</div>
         )}
@@ -166,7 +155,7 @@ type CalendarList = 'earnings' | 'ipos' | 'dividends'
 
 function CalendarBoardView() {
   const { t } = useTranslation()
-  const { data, updatedAt, loading, error } = useReferenceBoard<CalendarBoard>(referenceApi.calendar, 30 * 60 * 1000)
+  const { data, updatedAt, loading, slow, error, retry } = useReferenceBoard<CalendarBoard>(referenceApi.calendar, 30 * 60 * 1000)
   const [list, setList] = useState<CalendarList>('earnings')
 
   return (
@@ -199,9 +188,20 @@ function CalendarBoardView() {
           ))}
         </div>
 
-        {loading && !data && <div className="text-[13px] text-text-muted">{t('common.loading')}</div>}
+        {loading && !data && (
+          <CenteredLoading label={slow ? t('market.calendarSlowLoading') : t('common.loading')} />
+        )}
         {error && (
-          <div className="text-[13px] text-red border border-red/30 rounded-md px-3 py-2 bg-red/5">{error}</div>
+          <div className="flex items-center justify-between gap-3 text-[13px] text-red border border-red/30 rounded-md px-3 py-2 bg-red/5">
+            <span className="min-w-0 break-words">{error}</span>
+            <button
+              type="button"
+              onClick={retry}
+              className="shrink-0 text-[12px] font-medium text-red hover:text-red/80"
+            >
+              {t('common.retry')}
+            </button>
+          </div>
         )}
         {/* Per-list upstream failure — loud, with the provider's own message. */}
         {data?.errors?.[list] && (
@@ -333,7 +333,7 @@ function MacroBoardView() {
         live={{ lastUpdated: updatedAt }}
       />
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 min-h-0">
-        {loading && !data && <div className="text-[13px] text-text-muted">{t('common.loading')}</div>}
+        {loading && !data && <CenteredLoading label={t('common.loading')} />}
         {error && (
           <div className="text-[13px] text-red border border-red/30 rounded-md px-3 py-2 bg-red/5">{error}</div>
         )}
@@ -390,7 +390,7 @@ function TermStructureBoardView() {
         live={{ lastUpdated: updatedAt }}
       />
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 flex flex-col gap-6 min-h-0">
-        {loading && !data && <div className="text-[13px] text-text-muted">{t('common.loading')}</div>}
+        {loading && !data && <CenteredLoading label={t('common.loading')} />}
         {error && (
           <div className="text-[13px] text-red border border-red/30 rounded-md px-3 py-2 bg-red/5">{error}</div>
         )}
@@ -422,9 +422,9 @@ function TermCurveCard({ curve }: { curve: TermCurve }) {
         )}
         {regime && <span className="text-[11px] uppercase tracking-wide text-text-muted/70">{regime}</span>}
       </div>
-      <div className="h-40">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartData} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
+      <MeasuredChartFrame className="h-40">
+        {({ width, height }) => (
+          <LineChart width={width} height={height} data={chartData} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
             <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#7d8590' }} stroke="#7d8590" />
             <YAxis domain={['dataMin', 'dataMax']} tick={{ fontSize: 10, fill: '#7d8590' }} stroke="#7d8590" width={70}
               tickFormatter={(v: number) => v.toLocaleString('en-US')} />
@@ -435,8 +435,8 @@ function TermCurveCard({ curve }: { curve: TermCurve }) {
             />
             <Line type="monotone" dataKey="price" stroke="var(--color-accent)" strokeWidth={1.5} dot={{ r: 2.5 }} isAnimationActive={false} />
           </LineChart>
-        </ResponsiveContainer>
-      </div>
+        )}
+      </MeasuredChartFrame>
       <div className="flex flex-wrap gap-1.5">
         {curve.points.map((p) => (
           <span key={p.expiration} className="text-[11px] px-1.5 py-0.5 rounded bg-bg-tertiary/60 font-mono" title={`${p.daysToExpiry ?? '—'}d`}>
@@ -473,7 +473,7 @@ function GlobalMacroBoardView() {
         live={{ lastUpdated: updatedAt }}
       />
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 min-h-0">
-        {loading && !data && <div className="text-[13px] text-text-muted">{t('common.loading')}</div>}
+        {loading && !data && <CenteredLoading label={t('common.loading')} />}
         {error && (
           <div className="text-[13px] text-red border border-red/30 rounded-md px-3 py-2 bg-red/5">{error}</div>
         )}
@@ -542,7 +542,7 @@ function ShippingBoardView() {
         live={{ lastUpdated: updatedAt }}
       />
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 min-h-0">
-        {loading && !data && <div className="text-[13px] text-text-muted">{t('common.loading')}</div>}
+        {loading && !data && <CenteredLoading label={t('common.loading')} />}
         {error && (
           <div className="text-[13px] text-red border border-red/30 rounded-md px-3 py-2 bg-red/5">{error}</div>
         )}
@@ -574,9 +574,9 @@ function ChokepointCard({ curve }: { curve: ShippingCurve }) {
           </span>
         )}
       </div>
-      <div className="h-28">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+      <MeasuredChartFrame className="h-28">
+        {({ width, height }) => (
+          <LineChart width={width} height={height} data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
             <XAxis dataKey="label" tick={{ fontSize: 9, fill: '#7d8590' }} stroke="#7d8590" minTickGap={28} />
             <YAxis tick={{ fontSize: 9, fill: '#7d8590' }} stroke="#7d8590" width={36}
               tickFormatter={(v: number) => v.toFixed(1)} domain={['auto', 'auto']} />
@@ -586,8 +586,8 @@ function ChokepointCard({ curve }: { curve: ShippingCurve }) {
             />
             <Line type="monotone" dataKey="mt" stroke="var(--color-accent)" strokeWidth={1.25} dot={false} isAnimationActive={false} />
           </LineChart>
-        </ResponsiveContainer>
-      </div>
+        )}
+      </MeasuredChartFrame>
     </div>
   )
 }
@@ -611,7 +611,7 @@ function FedBoardView() {
         live={{ lastUpdated: updatedAt }}
       />
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 flex flex-col gap-5 min-h-0">
-        {loading && !data && <div className="text-[13px] text-text-muted">{t('common.loading')}</div>}
+        {loading && !data && <CenteredLoading label={t('common.loading')} />}
         {error && (
           <div className="text-[13px] text-red border border-red/30 rounded-md px-3 py-2 bg-red/5">{error}</div>
         )}

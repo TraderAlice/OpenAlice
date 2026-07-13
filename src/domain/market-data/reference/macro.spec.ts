@@ -43,6 +43,23 @@ describe('macro board', () => {
     expect(cpi.unit).toBe('percent')
   })
 
+  it('derives CPI YoY by matching the same date one year earlier, not by row offset', async () => {
+    const rows = mkRows().filter((r) => r.date !== '2025-10-01')
+    const board = await fetchMacroBoard(mkEconomyClient(rows))
+    const cpi = board.cards.find((c) => c.id === 'CPI_YOY')!
+    const nov = cpi.points.find((p) => p.date === '2025-11-01')
+
+    expect(nov?.value).toBeCloseTo(3, 5)
+  })
+
+  it('skips CPI YoY points when the matching prior-year date is absent', async () => {
+    const rows = mkRows().filter((r) => r.date !== '2024-11-01')
+    const board = await fetchMacroBoard(mkEconomyClient(rows))
+    const cpi = board.cards.find((c) => c.id === 'CPI_YOY')!
+
+    expect(cpi.points.some((p) => p.date === '2025-11-01')).toBe(false)
+  })
+
   it('propagates the upstream failure (missing FRED key) loudly', async () => {
     const client = { fredSeries: async () => { throw new Error('FRED api_key required') } } as unknown as EconomyClientLike
     await expect(fetchMacroBoard(client)).rejects.toThrow(/FRED/)

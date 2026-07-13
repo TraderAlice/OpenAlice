@@ -1,24 +1,20 @@
 import { useTranslation } from 'react-i18next'
+import { SlidersHorizontal, Bot, ShieldCheck, CandlestickChart, ListChecks, Plug, LineChart, Newspaper } from 'lucide-react'
 import { useWorkspace } from '../tabs/store'
-import { getFocusedTab, type ViewSpec } from '../tabs/types'
+import { getFocusedTab } from '../tabs/types'
 import { SidebarRow } from './SidebarRow'
 
-type SettingsCategory = Extract<ViewSpec, { kind: 'settings' }>['params']['category']
-
-interface CategoryItem {
-  labelKey: string
-  category: SettingsCategory
-}
-
 const CATEGORIES = [
-  { labelKey: 'settings.category.general',     category: 'general' },
-  { labelKey: 'settings.category.aiProvider',  category: 'ai-provider' },
-  { labelKey: 'settings.category.trading',     category: 'trading' },
+  { labelKey: 'settings.category.general',     category: 'general',        Icon: SlidersHorizontal },
+  { labelKey: 'settings.category.aiProvider',  category: 'ai-provider',    Icon: Bot },
+  { labelKey: 'settings.category.agentPermissions', category: 'agent-permissions', Icon: ShieldCheck },
+  { labelKey: 'settings.category.trading',     category: 'trading',        Icon: CandlestickChart },
+  { labelKey: 'settings.category.issues',      category: 'issues',         Icon: ListChecks },
   // Connectors moved to its own ActivityBar Legacy entry — see
   // ConnectorsLegacySidebar.
-  { labelKey: 'settings.category.mcpServer',   category: 'mcp' },
-  { labelKey: 'settings.category.marketData',  category: 'market-data' },
-  { labelKey: 'settings.category.newsSources', category: 'news-collector' },
+  { labelKey: 'settings.category.mcpServer',   category: 'mcp',            Icon: Plug },
+  { labelKey: 'settings.category.marketData',  category: 'market-data',    Icon: LineChart },
+  { labelKey: 'settings.category.newsSources', category: 'news-collector', Icon: Newspaper },
 ] as const
 
 /**
@@ -32,7 +28,7 @@ export function SettingsCategoryList() {
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
 
   return (
-    <div className="py-0.5">
+    <div className="py-1">
       {CATEGORIES.map((item) => {
         const active =
           focused?.kind === 'settings' && focused.params.category === item.category
@@ -41,6 +37,7 @@ export function SettingsCategoryList() {
             key={item.category}
             label={t(item.labelKey)}
             active={active}
+            icon={<item.Icon size={14} strokeWidth={1.75} className="text-text-muted/70" aria-hidden />}
             onClick={() => openOrFocus({ kind: 'settings', params: { category: item.category } })}
           />
         )

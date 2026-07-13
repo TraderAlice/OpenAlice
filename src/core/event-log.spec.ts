@@ -413,26 +413,16 @@ describe('event-log', () => {
     })
   })
 
-  // ==================== typed append validation ====================
+  // ==================== domain-neutral payloads ====================
 
-  describe('typed append validation', () => {
-    it('should accept valid payload for registered event type', async () => {
-      const entry = await log.append('cron.fire', {
-        jobId: 'j1', jobName: 'test', payload: 'hello',
+  describe('domain-neutral payloads', () => {
+    it('stores payloads without imposing the retired Alice event registry', async () => {
+      const entry = await log.append('snapshot.taken', {
+        accountId: 'paper-1',
+        trigger: 'schedule',
       })
-      expect(entry.type).toBe('cron.fire')
-      expect(entry.payload.jobId).toBe('j1')
-    })
-
-    it('should reject invalid payload for registered event type', async () => {
-      await expect(
-        log.append('cron.fire', { wrong: 'shape' } as never),
-      ).rejects.toThrow(/Invalid payload/)
-    })
-
-    it('should allow unregistered event types without validation', async () => {
-      const entry = await log.append('custom.unregistered', { anything: true })
-      expect(entry.type).toBe('custom.unregistered')
+      expect(entry.type).toBe('snapshot.taken')
+      expect(entry.payload.accountId).toBe('paper-1')
     })
   })
 

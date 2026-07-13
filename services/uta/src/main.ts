@@ -30,6 +30,7 @@ import {
 import type { CurrencyClientLike } from '@/domain/market-data/client/types.js'
 import { buildSDKCredentials } from '@/domain/market-data/credential-map.js'
 import { startOrderSyncPoller } from './domain/trading/order-sync-poller.js'
+import { buildKeylessDataUTAs } from './domain/trading/keyless-data-sources.js'
 import { createTradingRoutes } from './http/routes-trading.js'
 import { createSimulatorRoutes } from './http/routes-simulator.js'
 import type { UTAEngineContext } from './types.js'
@@ -40,6 +41,17 @@ const CATALOG_REFRESH_MS = 6 * 60 * 60 * 1000  // 6h
 async function main(): Promise<void> {
   const startedAt = new Date().toISOString()
   console.log(`[uta] bootstrap @ ${startedAt}`)
+
+  // Surface outbound-proxy config at startup so a user behind a proxy can
+  // confirm UTA saw it — CCXT exchange instances are bridged onto it per
+  // broker (see CcxtBroker.applyEnvProxy / issue #384). Credentials in the
+  // URL (user:pass@) are redacted.
+  const outboundProxy = process.env.HTTPS_PROXY || process.env.https_proxy
+    || process.env.HTTP_PROXY || process.env.http_proxy
+    || process.env.ALL_PROXY || process.env.all_proxy
+  if (outboundProxy) {
+    console.log(`[uta] outbound proxy detected (${outboundProxy.replace(/\/\/[^@/]*@/, '//***@')}) — bridging into CCXT exchanges`)
+  }
 
   const config = await loadConfig()
 
@@ -55,24 +67,11 @@ async function main(): Promise<void> {
   // ==================== Account init (with ephemeral purge) ====================
 
   const survivors = await purgeEphemeralUTAs(await readUTAsConfig())
-  // Built-in keyless read-only data UTAs (binance/okx/bybit) — code-defined, not
-  // persisted to accounts.json, so they can't be edited/clobbered. They serve
-  // public crypto K-lines out-of-box (no API key) and are redundant sources for
-  // the federated bar layer. A user's own exchange UTA uses a different id.
   const userIds = new Set(survivors.map((u) => u.id))
-  const dataUTAs: UTAConfig[] = ['binance', 'okx', 'bybit']
-    .filter((ex) => !userIds.has(`${ex}-readonly`))
-    .map((ex) => ({
-      id: `${ex}-readonly`,
-      label: `${ex[0].toUpperCase()}${ex.slice(1)} (read-only data)`,
-      presetId: 'ccxt-custom',
-      enabled: true,
-      guards: [],
-      presetConfig: { exchange: ex },
-      keyless: true,
-      readOnly: true,
-      editable: false,
-    }))
+  const dataUTAs: UTAConfig[] = buildKeylessDataUTAs(config.trading.keylessDataSources, userIds)
+  if (dataUTAs.length > 0) {
+    console.log(`[uta] keyless data sources enabled: ${dataUTAs.map((u) => u.id).join(', ')}`)
+  }
 
   for (const accCfg of [...dataUTAs, ...survivors]) {
     if (accCfg.enabled === false) continue

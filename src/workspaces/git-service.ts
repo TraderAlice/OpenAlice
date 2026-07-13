@@ -1,7 +1,4 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-
-const exec = promisify(execFile);
+import { exec, type IGitStringExecutionOptions } from 'dugite';
 
 export interface GitLogEntry {
   readonly hash: string;
@@ -24,6 +21,16 @@ export interface GitStatus {
 
 const LOG_FORMAT = '%h%x09%ar%x09%aI%x09%s';
 const GIT_TIMEOUT_MS = 5_000;
+const MAX_BUFFER = 4 * 1024 * 1024;
+
+// Read-only panel git, routed through the bundled git (dugite) so the panel
+// renders without a system git. dugite resolves with an exitCode rather than
+// throwing (it rejects only when git fails to launch, or when the abort signal
+// fires), so callers check exitCode. The old execFile `timeout` option becomes
+// an AbortSignal — a slow git is killed and surfaces as a rejection/non-zero.
+function gitOpts(): IGitStringExecutionOptions {
+  return { maxBuffer: MAX_BUFFER, signal: AbortSignal.timeout(GIT_TIMEOUT_MS) };
+}
 
 /**
  * Wrap `git log --pretty=...` so the panel can render hash + subject + time.
@@ -31,11 +38,14 @@ const GIT_TIMEOUT_MS = 5_000;
  */
 export async function gitLog(cwd: string, limit: number): Promise<GitLogEntry[]> {
   const n = Math.max(1, Math.min(limit, 500));
-  const { stdout } = await exec(
-    'git',
+  const { stdout, exitCode, stderr } = await exec(
     ['log', `--pretty=format:${LOG_FORMAT}`, `-n`, String(n)],
-    { cwd, timeout: GIT_TIMEOUT_MS, maxBuffer: 4 * 1024 * 1024 },
+    cwd,
+    gitOpts(),
   );
+  if (exitCode !== 0) {
+    throw new Error(`git log exited ${exitCode}: ${stderr.slice(0, 200)}`);
+  }
   const lines = stdout.split('\n').filter((l) => l.length > 0);
   return lines.map((line) => {
     const parts = line.split('\t');
@@ -54,16 +64,13 @@ export async function gitLog(cwd: string, limit: number): Promise<GitLogEntry[]>
  */
 export async function gitStatus(cwd: string): Promise<GitStatus> {
   const [branchRes, statusRes] = await Promise.all([
-    exec('git', ['branch', '--show-current'], { cwd, timeout: GIT_TIMEOUT_MS }).catch(
-      () => ({ stdout: '' }),
-    ),
-    exec('git', ['status', '--porcelain=v1'], {
-      cwd,
-      timeout: GIT_TIMEOUT_MS,
-      maxBuffer: 4 * 1024 * 1024,
-    }),
+    exec(['branch', '--show-current'], cwd, gitOpts()).catch(() => null),
+    exec(['status', '--porcelain=v1'], cwd, gitOpts()),
   ]);
-  const branchRaw = branchRes.stdout.trim();
+  if (statusRes.exitCode !== 0) {
+    throw new Error(`git status exited ${statusRes.exitCode}: ${statusRes.stderr.slice(0, 200)}`);
+  }
+  const branchRaw = branchRes && branchRes.exitCode === 0 ? branchRes.stdout.trim() : '';
   const branch = branchRaw.length > 0 ? branchRaw : null;
   const files: GitStatusFile[] = statusRes.stdout
     .split('\n')

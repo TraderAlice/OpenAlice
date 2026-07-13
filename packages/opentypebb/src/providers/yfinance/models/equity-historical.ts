@@ -6,8 +6,7 @@
 import { z } from 'zod'
 import { Fetcher } from '../../../core/provider/abstract/fetcher.js'
 import { EquityHistoricalQueryParamsSchema, EquityHistoricalDataSchema } from '../../../standard-models/equity-historical.js'
-import { EmptyDataError } from '../../../core/provider/utils/errors.js'
-import { getHistoricalData } from '../utils/helpers.js'
+import { getHistoricalData, emptyHistoricalError } from '../utils/helpers.js'
 import { INTERVALS_DICT } from '../utils/references.js'
 
 export const YFinanceEquityHistoricalQueryParamsSchema = EquityHistoricalQueryParamsSchema.extend({
@@ -61,7 +60,7 @@ export class YFinanceEquityHistoricalFetcher extends Fetcher {
       if (r.status === 'fulfilled') allData.push(...r.value)
     }
 
-    if (!allData.length) throw new EmptyDataError('No historical data returned')
+    if (!allData.length) throw emptyHistoricalError(results, 'No historical data returned')
     return allData
   }
 

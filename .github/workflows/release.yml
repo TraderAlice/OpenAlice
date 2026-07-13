@@ -2,15 +2,29 @@ name: Release
 
 on:
   push:
+    # Releases are cut only from the stable user-facing lane. Routine work
+    # lands on dev first and reaches release eligibility through promotion.
     branches: [master]
   workflow_dispatch:
+    inputs:
+      mirror_tag:
+        description: Existing release tag to mirror to the download CDN without cutting a new release.
+        required: false
+        type: string
 
 jobs:
   release:
+    name: Plan release candidate
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      packages: write
+    outputs:
+      # Whether this push introduces a version that does not have a tag yet.
+      # The tag and GitHub Release are deliberately created only after every
+      # platform builds and passes Workspace acceptance.
+      created: ${{ !github.event.inputs.mirror_tag && steps.check.outputs.exists == 'false' }}
+      tag: ${{ github.event.inputs.mirror_tag || steps.version.outputs.tag }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
 
     steps:
       - uses: actions/checkout@v4
@@ -41,38 +55,56 @@ jobs:
           fi
 
       - name: Install git-cliff
-        if: steps.check.outputs.exists == 'false'
+        if: steps.check.outputs.exists == 'false' && !github.event.inputs.mirror_tag
         uses: kenji-miyake/setup-git-cliff@v2
 
       - name: Generate release notes
-        if: steps.check.outputs.exists == 'false'
+        if: steps.check.outputs.exists == 'false' && !github.event.inputs.mirror_tag
         id: notes
         run: |
-          # Generate notes for this version only (since last tag)
+          # Generate notes for this version only (since last tag).
+          # --tag labels the about-to-be-created version: git-cliff runs
+          # BEFORE the tag exists (it's created only after candidate acceptance), so without
+          # this the section header falls back to "[Unreleased]" instead of
+          # the version. See cliff.toml's `{% if version %}` template.
+          TAG="${{ steps.version.outputs.tag }}"
           LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           if [ -z "$LAST_TAG" ]; then
-            git-cliff --output notes.md
+            git-cliff --tag "$TAG" --output notes.md
           else
-            git-cliff "$LAST_TAG"..HEAD --output notes.md
+            git-cliff "$LAST_TAG"..HEAD --tag "$TAG" --output notes.md
           fi
 
-      - name: Create tag and GitHub Release
-        if: steps.check.outputs.exists == 'false'
-        uses: softprops/action-gh-release@v2
+      - name: Preserve release notes for gated publication
+        if: steps.check.outputs.exists == 'false' && !github.event.inputs.mirror_tag
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: ${{ steps.version.outputs.tag }}
-          body_path: notes.md
-          prerelease: ${{ steps.version.outputs.prerelease == 'true' }}
-          generate_release_notes: false
+          name: release-notes
+          path: notes.md
+          if-no-files-found: error
 
-  publish-opentypebb:
-    runs-on: ubuntu-latest
+  # Per-platform desktop installers are built and acceptance-tested before any
+  # tag or GitHub Release exists. Each runner builds only its own platform/arch, so each
+  # artifact carries just its matching native binary (longbridge, node-pty) —
+  # pnpm installs only the os/cpu-matching prebuilt. macOS builds are signed and
+  # notarized through Developer ID secrets; Windows remains unsigned until a
+  # Windows code-signing certificate exists.
+  build-desktop:
     needs: release
-    if: needs.release.result == 'success'
+    if: needs.release.outputs.created == 'true' && !github.event.inputs.mirror_tag
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            arch: arm64
+          - os: macos-15-intel
+            arch: x64
+          - os: windows-latest
+            arch: x64
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: read
-      packages: write
 
     steps:
       - uses: actions/checkout@v4
@@ -82,48 +114,297 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          registry-url: https://npm.pkg.github.com
 
-      - name: Check published versions
-        id: check
-        working-directory: packages/opentypebb
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Fail loud if dugite's postinstall was skipped (e.g. dropped from
+      # pnpm.onlyBuiltDependencies) — otherwise node_modules/dugite/git/ is
+      # silently empty and workspace creation breaks at runtime, not build.
+      - name: Verify bundled git (dugite) was fetched
+        run: |
+          node -e "const{existsSync}=require('fs');const{dirname,join}=require('path');const g=join(dirname(require.resolve('dugite/package.json')),'git');if(!existsSync(g)){console.error('dugite embedded git MISSING at '+g);process.exit(1)}console.log('dugite embedded git OK '+g)"
+
+      - name: Build Alice + UTA + desktop shell
+        run: pnpm electron:build
+
+      - name: Vendor managed workspace runtime
+        run: pnpm vendor:runtime
+
+      - name: Write Apple notarization API key
+        if: runner.os == 'macOS'
+        run: |
+          KEY_PATH="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8"
+          printf '%s' "$APPLE_API_KEY_P8" > "$KEY_PATH"
+          chmod 600 "$KEY_PATH"
+          echo "APPLE_API_KEY=$KEY_PATH" >> "$GITHUB_ENV"
+        env:
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+
+      - name: Package macOS installer
+        if: runner.os == 'macOS'
+        # Build on the matching native host so pnpm and electron-builder both
+        # select the correct native dependencies for arm64 or Intel.
+        run: |
+          ulimit -n 65536 || ulimit -n 32768 || ulimit -n 16384 || ulimit -n 10240
+          echo "open files limit: $(ulimit -n)"
+          pnpm -F @traderalice/desktop exec electron-builder --projectDir ../.. --publish never --${{ matrix.arch }}
+        env:
+          CSC_LINK: ${{ secrets.MACOS_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+
+      - name: Package Windows installer
+        if: runner.os == 'Windows'
+        # Windows remains unsigned until a Windows code-signing certificate is
+        # available.
+        run: pnpm -F @traderalice/desktop exec electron-builder --projectDir ../.. --publish never --${{ matrix.arch }}
+
+      - name: Prove release candidate Workspace CLI acceptance
+        run: pnpm electron:smoke:workspace --skip-build --skip-pack
+        timeout-minutes: 5
+        env:
+          OPENALICE_SMOKE_RECEIPT_PATH: ${{ runner.temp }}/openalice-workspace-acceptance.json
+
+      - name: Preserve release acceptance receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-acceptance-${{ runner.os }}-${{ matrix.arch }}
+          path: ${{ runner.temp }}/openalice-workspace-acceptance.json
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Prepare update channel aliases
+        shell: bash
+        env:
+          RELEASE_PLATFORM: ${{ runner.os }}
+          RELEASE_ARCH: ${{ matrix.arch }}
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          node scripts/prepare-desktop-release-assets.mjs build \
+            --out-dir dist/electron-app \
+            --platform "$RELEASE_PLATFORM" \
+            --arch "$RELEASE_ARCH" \
+            --version "$VERSION"
+          rm -f dist/electron-app/builder-debug.yml
 
-          if npm view "@traderalice/opentypebb@$VERSION" version --registry=https://npm.pkg.github.com 2>/dev/null; then
-            echo "ghpkg=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "ghpkg=false" >> "$GITHUB_OUTPUT"
+      - name: Preserve accepted release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets-${{ runner.os }}-${{ matrix.arch }}
+          path: |
+            dist/electron-app/*.dmg
+            dist/electron-app/*.zip
+            dist/electron-app/*.yml
+            dist/electron-app/*.blockmap
+            dist/electron-app/*.exe
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
+
+  publish-release:
+    name: Publish accepted release
+    needs: [release, build-desktop]
+    if: needs.release.outputs.created == 'true' && needs.build-desktop.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+          path: dist/release-notes
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-assets-*
+          path: dist/release-assets
+          merge-multiple: true
+
+      - name: Create tag and GitHub Release from accepted candidates
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.release.outputs.tag }}
+          name: ${{ needs.release.outputs.tag }}
+          body_path: dist/release-notes/notes.md
+          prerelease: ${{ needs.release.outputs.prerelease == 'true' }}
+          generate_release_notes: false
+          target_commitish: ${{ github.sha }}
+          fail_on_unmatched_files: true
+          files: |
+            dist/release-assets/*.dmg
+            dist/release-assets/*.zip
+            dist/release-assets/*.yml
+            dist/release-assets/*.blockmap
+            dist/release-assets/*.exe
+
+  mirror-release-assets:
+    needs: [release, publish-release]
+    if: always() && ((needs.release.outputs.created == 'true' && needs.publish-release.result == 'success') || github.event.inputs.mirror_tag)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.inputs.mirror_tag || needs.release.outputs.tag }}
+        run: |
+          mkdir -p dist/r2-upload
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir dist/r2-upload --clobber
+
+      - name: Prepare CDN download aliases
+        env:
+          TAG: ${{ github.event.inputs.mirror_tag || needs.release.outputs.tag }}
+          DOWNLOAD_BASE_URL: ${{ secrets.DOWNLOAD_BASE_URL }}
+        run: |
+          node scripts/prepare-desktop-release-assets.mjs mirror \
+            --out-dir dist/r2-upload \
+            --tag "$TAG" \
+            --base-url "${DOWNLOAD_BASE_URL:-https://download.openalice.ai}" \
+            --repository "$GITHUB_REPOSITORY"
+
+      - name: Publish architecture-specific macOS update metadata
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.inputs.mirror_tag || needs.release.outputs.tag }}
+        run: |
+          shopt -s nullglob
+          files=(dist/r2-upload/*-mac-intel.yml dist/r2-upload/*-intel-mac.yml dist/r2-upload/latest-mac-arm64.yml)
+          if ((${#files[@]})); then
+            gh release upload "$TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" --clobber
           fi
 
-          if npm view "@traderalice/opentypebb@$VERSION" version --registry=https://registry.npmjs.org 2>/dev/null; then
-            echo "npmjs=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "npmjs=false" >> "$GITHUB_OUTPUT"
+      - name: Install AWS CLI
+        run: |
+          python3 -m pip install --user awscli
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Mirror release assets to Cloudflare R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_EC2_METADATA_DISABLED: true
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+
+          aws s3 cp dist/r2-upload "s3://${R2_BUCKET}/" \
+            --recursive \
+            --exclude "*.yml" \
+            --exclude "manifest.json" \
+            --exclude "mac-arm64.dmg" \
+            --exclude "mac-arm64.zip" \
+            --exclude "mac-x64.dmg" \
+            --exclude "mac-x64.zip" \
+            --exclude "windows-x64.exe" \
+            --cache-control "public, max-age=31536000, immutable" \
+            --endpoint-url "$ENDPOINT"
+
+          aws s3 cp dist/r2-upload "s3://${R2_BUCKET}/" \
+            --recursive \
+            --exclude "*" \
+            --include "*.yml" \
+            --cache-control "no-cache" \
+            --content-type "text/yaml" \
+            --endpoint-url "$ENDPOINT"
+
+          aws s3 cp dist/r2-upload/manifest.json "s3://${R2_BUCKET}/manifest.json" \
+            --cache-control "no-cache" \
+            --content-type "application/json" \
+            --endpoint-url "$ENDPOINT"
+
+          if [ -f dist/r2-upload/mac-arm64.dmg ]; then
+            aws s3 cp dist/r2-upload/mac-arm64.dmg "s3://${R2_BUCKET}/mac-arm64.dmg" \
+              --cache-control "no-cache" \
+              --content-type "application/x-apple-diskimage" \
+              --endpoint-url "$ENDPOINT"
           fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build
-        if: steps.check.outputs.ghpkg == 'false' || steps.check.outputs.npmjs == 'false'
-        working-directory: packages/opentypebb
+          if [ -f dist/r2-upload/mac-arm64.zip ]; then
+            aws s3 cp dist/r2-upload/mac-arm64.zip "s3://${R2_BUCKET}/mac-arm64.zip" \
+              --cache-control "no-cache" \
+              --content-type "application/zip" \
+              --endpoint-url "$ENDPOINT"
+          fi
+
+          if [ -f dist/r2-upload/mac-x64.dmg ]; then
+            aws s3 cp dist/r2-upload/mac-x64.dmg "s3://${R2_BUCKET}/mac-x64.dmg" \
+              --cache-control "no-cache" \
+              --content-type "application/x-apple-diskimage" \
+              --endpoint-url "$ENDPOINT"
+          fi
+
+          if [ -f dist/r2-upload/mac-x64.zip ]; then
+            aws s3 cp dist/r2-upload/mac-x64.zip "s3://${R2_BUCKET}/mac-x64.zip" \
+              --cache-control "no-cache" \
+              --content-type "application/zip" \
+              --endpoint-url "$ENDPOINT"
+          fi
+
+          if [ -f dist/r2-upload/windows-x64.exe ]; then
+            aws s3 cp dist/r2-upload/windows-x64.exe "s3://${R2_BUCKET}/windows-x64.exe" \
+              --cache-control "no-cache" \
+              --content-type "application/vnd.microsoft.portable-executable" \
+              --endpoint-url "$ENDPOINT"
+          fi
+
+      - name: Verify CDN metadata
+        env:
+          DOWNLOAD_BASE_URL: ${{ secrets.DOWNLOAD_BASE_URL }}
+          TAG: ${{ github.event.inputs.mirror_tag || needs.release.outputs.tag }}
         run: |
-          pnpm install --frozen-lockfile
-          pnpm build
+          BASE_URL="${DOWNLOAD_BASE_URL%/}"
+          VERSION="${TAG#v}"
+          CHANNEL="latest"
 
-      - name: Publish to GitHub Packages
-        if: steps.check.outputs.ghpkg == 'false'
-        working-directory: packages/opentypebb
-        run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          if [[ "$VERSION" == *-* ]]; then
+            CHANNEL="${VERSION#*-}"
+            CHANNEL="${CHANNEL%%.*}"
+          fi
 
-      - name: Publish to npmjs
-        if: steps.check.outputs.npmjs == 'false'
-        working-directory: packages/opentypebb
-        run: |
-          echo "//registry.npmjs.org/:_authToken=\${NODE_AUTH_TOKEN}" > "$NPM_CONFIG_USERCONFIG"
-          npm publish --registry=https://registry.npmjs.org
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          if [ "$CHANNEL" = "latest" ]; then
+            MAC_METADATA="latest-mac.yml"
+            WINDOWS_METADATA="latest.yml"
+          else
+            MAC_METADATA="${CHANNEL}-mac.yml"
+            WINDOWS_METADATA="${CHANNEL}.yml"
+          fi
+
+          curl -fsSI "${BASE_URL}/${MAC_METADATA}"
+          curl -fsSI "${BASE_URL}/${WINDOWS_METADATA}"
+          curl -fsSI "${BASE_URL}/OpenAlice-${VERSION}-arm64.dmg"
+          curl -fsSI "${BASE_URL}/mac-arm64.dmg"
+          if [ -f dist/r2-upload/mac-x64.dmg ]; then
+            curl -fsSI "${BASE_URL}/mac-x64.dmg"
+          fi
+          if [ -f dist/r2-upload/mac-x64.zip ]; then
+            curl -fsSI "${BASE_URL}/mac-x64.zip"
+          fi
+          if [ -f "dist/r2-upload/${CHANNEL}-mac-intel.yml" ]; then
+            curl -fsSI "${BASE_URL}/${CHANNEL}-mac-intel.yml"
+          fi
+          curl -fsSI "${BASE_URL}/windows-x64.exe"
+          curl -fsSI "${BASE_URL}/manifest.json"
+
+          WINDOWS_FEED_EXE=$(
+            WINDOWS_METADATA="$WINDOWS_METADATA" node -e "const fs=require('fs');const content=fs.readFileSync('dist/r2-upload/'+process.env.WINDOWS_METADATA,'utf8');const match=content.match(/(?:^|\\n)path:\\s*['\"]?([^'\"\\n]+)['\"]?/);process.stdout.write(match?.[1]?.trim()||'')"
+          )
+
+          if [ -n "$WINDOWS_FEED_EXE" ]; then
+            WINDOWS_FEED_URL=$(
+              WINDOWS_FEED_EXE="$WINDOWS_FEED_EXE" node -e "process.stdout.write(encodeURI(process.env.WINDOWS_FEED_EXE))"
+            )
+            curl -fsSI "${BASE_URL}/${WINDOWS_FEED_URL}"
+            curl -fsSI "${BASE_URL}/${WINDOWS_FEED_URL}.blockmap"
+          fi

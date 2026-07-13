@@ -25,7 +25,7 @@ export function MCPPage() {
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
         title="MCP Server"
-        description="Streamable-HTTP endpoint that exposes OpenAlice's ToolCenter to external MCP clients. Changes require a restart."
+        description="Optional Streamable-HTTP endpoint for external MCP clients. Workspace tools use the built-in CLI gateway by default."
         right={<SaveIndicator status={status} onRetry={retry} />}
       />
 
@@ -34,12 +34,23 @@ export function MCPPage() {
           <div className="max-w-[880px] mx-auto">
             <ConfigSection
               title="HTTP Server"
-              description="Listening port for the streamable-HTTP MCP endpoint (path: /mcp)."
+              description="Disabled by default. Enable only when you intentionally want another local MCP client to call OpenAlice."
             >
+              <Field label="Enabled">
+                <label className="inline-flex items-center gap-2 text-[13px] text-text">
+                  <input
+                    type="checkbox"
+                    checked={config.enabled}
+                    onChange={(e) => updateConfig({ enabled: e.target.checked })}
+                  />
+                  Run the MCP endpoint
+                </label>
+              </Field>
               <Field label="Port">
                 <input
                   className={inputClass}
                   type="number"
+                  disabled={!config.enabled}
                   value={config.port}
                   onChange={(e) => updateConfig({ port: Number(e.target.value) })}
                 />

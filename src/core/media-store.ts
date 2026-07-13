@@ -9,7 +9,7 @@
 import { createHash } from 'node:crypto'
 import { readFile, copyFile, mkdir } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
-import { extname, join } from 'node:path'
+import { extname, join, posix } from 'node:path'
 import { dataPath } from '@/core/paths.js'
 
 /** 256 short, common English words — one per byte value. */
@@ -77,7 +77,9 @@ export async function persistMedia(filePath: string): Promise<string> {
     await copyFile(filePath, dest)
   }
 
-  return join(dateDir, name)
+  // This value is a URL/storage key, not an OS filesystem path. Keep it
+  // portable so Windows callers never emit backslashes into `/api/media/...`.
+  return posix.join(dateDir, name)
 }
 
 /** Resolve a media relative path to its absolute path on disk. */

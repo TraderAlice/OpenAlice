@@ -1,12 +1,14 @@
 /**
  * Inbox HTTP route — read history + dev-only seed.
  *
- *   GET  /history?limit=&before=&workspaceId=   paginated, newest-first
- *   POST /seed                                  dev-only: append an entry
+ *   GET    /history?limit=&before=&workspaceId= paginated, newest-first
+ *   PUT    /:id/read                            mark one entry read
+ *   DELETE /:id/read                            mark one entry unread
+ *   POST   /seed                                dev-only: append an entry
  *
- * UI polls /history every 20s. Production write path is still deliberately
- * deferred — only /seed exists until the workspace integration pathway
- * (MCP tool + workspace identity) is decided.
+ * UI polls /history every 20s. Production writes still come from workspace
+ * tools (`inbox_push` via MCP/CLI gateway); `/seed` is only for manual/dev
+ * appends. Read/unread writes are user actions and stay in this HTTP surface.
  */
 import { Hono } from 'hono'
 import type { IInboxStore, InboxDoc } from '../../core/inbox-store.js'
@@ -24,6 +26,21 @@ export function createInboxRoutes(deps: InboxRoutesDeps) {
     const workspaceId = c.req.query('workspaceId') || undefined
     const result = await deps.inboxStore.read({ limit, before, workspaceId })
     return c.json(result)
+  })
+
+  app.put('/:id/read', async (c) => {
+    const id = c.req.param('id')
+    const readAt = Date.now()
+    const ok = await deps.inboxStore.markRead(id, readAt)
+    if (!ok) return c.json({ error: 'not_found' }, 404)
+    return c.json({ ok: true, id, readAt })
+  })
+
+  app.delete('/:id/read', async (c) => {
+    const id = c.req.param('id')
+    const ok = await deps.inboxStore.markUnread(id)
+    if (!ok) return c.json({ error: 'not_found' }, 404)
+    return c.json({ ok: true, id })
   })
 
   app.post('/seed', async (c) => {

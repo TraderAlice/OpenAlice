@@ -1,9 +1,9 @@
 /**
- * End-to-end check of the create flow for the `chat` template, exercising the
- * real moving parts in order: the (shrunk) bootstrap.sh → launcher context
- * injection → launcher initial commit. Proves the load-bearing Phase-B change
- * — commit authority moved from bootstrap.sh into the launcher — yields a
- * fresh-git workspace with exactly one clean commit (the "Harness rule").
+ * End-to-end check of the create flow, exercising the real moving parts in
+ * order: bootstrap.mjs (run on the bundled Node + dugite's bundled git) →
+ * launcher context injection → launcher initial commit. Proves the workspace
+ * is a fresh-git repo with exactly one clean commit (the "Harness rule"), and
+ * — via the PATH-stripped case — that creation needs NO system git or bash.
  */
 
 import { spawn } from 'node:child_process';
@@ -22,9 +22,26 @@ import { commitInitial } from './workspace-creator.js';
 const HERE = fileURLToPath(new URL('.', import.meta.url)); // src/workspaces/
 const CHAT_DIR = join(HERE, 'templates', 'chat');
 const CHAT_FILES = join(CHAT_DIR, 'files');
-const CHAT_BOOTSTRAP = join(CHAT_DIR, 'bootstrap.sh');
+const CHAT_BOOTSTRAP = join(CHAT_DIR, 'bootstrap.mjs');
 const AQ_DIR = join(HERE, 'templates', 'auto-quant');
-const AQ_BOOTSTRAP = join(AQ_DIR, 'bootstrap.sh');
+const AQ_BOOTSTRAP = join(AQ_DIR, 'bootstrap.mjs');
+
+/**
+ * Run a bootstrap.mjs exactly as the launcher's runScript does: on the bundled
+ * Node (`process.execPath`) with ELECTRON_RUN_AS_NODE. `strip` removes git/bash
+ * from PATH to prove the bare-machine path uses only dugite's embedded git.
+ */
+function runBootstrap(
+  script: string,
+  args: readonly string[],
+  extraEnv: NodeJS.ProcessEnv,
+  strip = false,
+): Promise<string> {
+  const env = strip
+    ? { HOME: process.env.HOME, ELECTRON_RUN_AS_NODE: '1', PATH: '', ...extraEnv }
+    : { ...process.env, ELECTRON_RUN_AS_NODE: '1', ...extraEnv };
+  return run(process.execPath, [script, ...args], env);
+}
 
 function autoQuantMeta(): TemplateMeta {
   return {
@@ -78,8 +95,10 @@ afterEach(async () => {
 
 describe('chat workspace create: bootstrap → inject → commit', () => {
   it('yields a fresh-git workspace with one clean launcher commit', async () => {
-    // 1. real bootstrap.sh — git init + README + excludes, NO commit
-    await run('bash', [CHAT_BOOTSTRAP, 'testtag', dir], { ...process.env, AQ_TEMPLATE_ROOT: CHAT_DIR });
+    // 1. real bootstrap.mjs — git init + README + excludes, NO commit. PATH
+    //    stripped: proves a bare machine (no system git, no bash) still works
+    //    via dugite's bundled git.
+    await runBootstrap(CHAT_BOOTSTRAP, ['testtag', dir], { AQ_TEMPLATE_ROOT: CHAT_DIR }, true);
     // 2. launcher-owned injection
     await injectWorkspaceContext({ template: chatMeta(), wsId: 'ws-e2e-1', dir });
     // 3. launcher-owned initial commit
@@ -90,7 +109,6 @@ describe('chat workspace create: bootstrap → inject → commit', () => {
       'CLAUDE.md', 'AGENTS.md', 'README.md',
       '.claude/skills/scan-value-chain/SKILL.md',
       '.agents/skills/scan-value-chain/SKILL.md',
-      '.pi/skills/scan-value-chain/SKILL.md',
       // per-CLI playbooks injected for every tool-bearing template
       '.claude/skills/alice/SKILL.md',
       '.claude/skills/alice-analysis/SKILL.md',
@@ -126,7 +144,7 @@ describe('auto-quant workspace create: clone → scrub → commit', () => {
     await run('git', ['-C', src, 'remote', 'add', 'origin', 'https://github.com/TraderAlice/Auto-Quant.git']);
 
     const aqDir = join(parent, 'aq-workspace');
-    await run('bash', [AQ_BOOTSTRAP, 'aqtag', aqDir], { ...process.env, AQ_TEMPLATE_DIR: src });
+    await runBootstrap(AQ_BOOTSTRAP, ['aqtag', aqDir], { AQ_TEMPLATE_DIR: src });
     // auto-quant injects nothing (all flags false); launcher still commits.
     await injectWorkspaceContext({ template: autoQuantMeta(), wsId: 'ws-aq-1', dir: aqDir });
     await commitInitial(aqDir, 'auto-quant: aqtag');
@@ -144,7 +162,7 @@ describe('auto-quant workspace create: clone → scrub → commit', () => {
 
 describe('chat workspace create — CLI-only injection (no MCP)', () => {
   it('injects the per-CLI alice*/traderhub skills and writes no MCP files', async () => {
-    await run('bash', [CHAT_BOOTSTRAP, 'clitag', dir], { ...process.env, AQ_TEMPLATE_ROOT: CHAT_DIR });
+    await runBootstrap(CHAT_BOOTSTRAP, ['clitag', dir], { AQ_TEMPLATE_ROOT: CHAT_DIR });
     await injectWorkspaceContext({ template: chatMeta(), wsId: 'ws-cli-1', dir });
     await commitInitial(dir, 'chat: clitag');
 
@@ -153,7 +171,8 @@ describe('chat workspace create — CLI-only injection (no MCP)', () => {
     expect(existsSync(join(dir, '.claude/skills/alice-uta/SKILL.md'))).toBe(true);   // trading skill discoverable
     expect(existsSync(join(dir, '.claude/skills/traderhub/SKILL.md'))).toBe(true);
     expect(existsSync(join(dir, '.claude/skills/scan-value-chain/SKILL.md'))).toBe(true);
-    expect(existsSync(join(dir, '.pi/skills/alice-uta/SKILL.md'))).toBe(true);  // Pi discovers .pi/skills
+    expect(existsSync(join(dir, '.agents/skills/alice-uta/SKILL.md'))).toBe(true); // Pi shares .agents/skills
+    expect(existsSync(join(dir, '.pi/skills'))).toBe(false);                       // avoid duplicate discovery
     expect((await run('git', ['-C', dir, 'status', '--porcelain'])).trim()).toBe('');
   });
 });

@@ -9,9 +9,8 @@
  * (same shapes over HTTP, shared cache) — clients must not be able to tell
  * the difference except through `meta`.
  *
- * Row shapes reuse the opentypebb standard models (they are ours — the TS
- * port owns them); what this contract adds is the board grouping and the
- * explicit `meta` envelope.
+ * Row shapes reuse the private compatibility package's standard models; this
+ * contract adds the board grouping and explicit `meta` envelope.
  */
 
 import type {

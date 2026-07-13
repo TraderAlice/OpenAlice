@@ -873,3 +873,45 @@ describe('AlpacaBroker — getCapabilities()', () => {
     expect(caps.supportedOrderTypes).toEqual(['MKT', 'LMT', 'STP', 'STP LMT', 'TRAIL'])
   })
 })
+
+describe('AlpacaBroker — getHistorical() feed handling', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  async function* barGen(rows: any[]) { for (const r of rows) yield r }
+  const ROW = { Timestamp: '2026-06-25T05:00:00Z', OpenPrice: 1, HighPrice: 2, LowPrice: 0.5, ClosePrice: 1.5, Volume: 100 }
+  const recentSip403 = Object.assign(new Error('Request failed with status code 403'), {
+    response: { status: 403, data: { message: 'subscription does not permit querying recent SIP data' } },
+  })
+
+  it('requests the full SIP tape by default', async () => {
+    const acc = new AlpacaBroker({ apiKey: 'k', secretKey: 's', paper: true })
+    const getBarsV2 = vi.fn(() => barGen([ROW]))
+    ;(acc as any).client = { getBarsV2 }
+    const bars = await acc.getHistorical(Object.assign(new Contract(), { symbol: 'SPY' }), { interval: '1d' } as any)
+    expect(getBarsV2).toHaveBeenCalledTimes(1)
+    expect(getBarsV2).toHaveBeenCalledWith('SPY', expect.objectContaining({ feed: 'sip' }))
+    expect(bars).toHaveLength(1)
+  })
+
+  it('falls back to IEX when SIP denies the recent window (403)', async () => {
+    const acc = new AlpacaBroker({ apiKey: 'k', secretKey: 's', paper: true })
+    const getBarsV2 = vi.fn((_sym: string, opts: any) => {
+      if (opts.feed === 'sip') throw recentSip403
+      return barGen([ROW])
+    })
+    ;(acc as any).client = { getBarsV2 }
+    const bars = await acc.getHistorical(Object.assign(new Contract(), { symbol: 'SPY' }), { interval: '1m' } as any)
+    expect(getBarsV2).toHaveBeenCalledTimes(2)
+    expect(getBarsV2).toHaveBeenNthCalledWith(2, 'SPY', expect.objectContaining({ feed: 'iex' }))
+    expect(bars).toHaveLength(1)
+  })
+
+  it('does NOT fall back on a non-SIP error (propagates)', async () => {
+    const acc = new AlpacaBroker({ apiKey: 'k', secretKey: 's', paper: true })
+    const err500 = Object.assign(new Error('boom'), { response: { status: 500 } })
+    const getBarsV2 = vi.fn(() => { throw err500 })
+    ;(acc as any).client = { getBarsV2 }
+    await expect(acc.getHistorical(Object.assign(new Contract(), { symbol: 'SPY' }), { interval: '1d' } as any)).rejects.toThrow()
+    expect(getBarsV2).toHaveBeenCalledTimes(1)
+  })
+})

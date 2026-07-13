@@ -1,12 +1,14 @@
 import { useMemo } from 'react';
 import type { ReactElement } from 'react';
 import { MessageSquare } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import type { SessionRecord } from './api';
 import { FilesPanel } from './FilesPanel';
 import { ResumeCta, prefixOf } from './ResumeCta';
 import { formatRelativeTime } from '../../lib/intl';
 import { TerminalView, type KeyMap } from './Terminal';
+import { WebPiView } from './WebPiView';
 import { useIsDesktop } from '../../live/use-is-desktop';
 import { useWorkspaceSidePanels } from '../../live/workspace-side-panels';
 
@@ -28,6 +30,7 @@ export interface WorkspaceViewProps {
   readonly keyMap?: KeyMap;
   readonly onSpawnFresh: () => void;
   readonly onResume: (sessionId: string) => void;
+  readonly onOpenWebPi: (sessionId: string) => void;
   /** Navigate to an already-running session without re-spawning it. The
    *  empty-state cards call this for running entries; resume-spawn for
    *  paused entries goes through `onResume`. */
@@ -36,33 +39,25 @@ export interface WorkspaceViewProps {
 }
 
 export function WorkspaceView(props: WorkspaceViewProps): ReactElement {
-  // Only running records get a mounted terminal slot. Same persist-across-
-  // tab-switch trick from V2.S3 (commit 0f21914): keep them in the DOM,
-  // toggle visibility via CSS so switching sessions is a CSS toggle, not a
-  // WS reconnect + replay.
+  // Mount ONLY this tab's own pinned session. Each session is its own tab with
+  // its own WorkspaceView, and TabHost keeps every tab mounted (display:none
+  // when inactive) — so a session's terminal already persists across tab
+  // switches without a WS reconnect. Mounting *every* running session here (the
+  // old single-shared-view design) duplicates each session's <TerminalView>
+  // into every open tab: a session open in N tabs then gets N WebSockets
+  // fighting over its single-attach PTY → kick/reconnect war that wedges the
+  // session (ANG-120 — e.g. claude froze whenever an opencode tab was also open).
   //
-  // When no session is pinned (empty state landing — e.g. coming from an
-  // Inbox jump), short-circuit to []: the empty state renders inline
-  // cards for the user to pick a session, and we shouldn't mount
-  // terminals for every running session in the workspace just to keep
-  // them warm (defeats the one-session-per-tab WS optimisation).
-  const runningSlots = useMemo<readonly SessionRecord[]>(() => {
-    if (props.sessionId === null) return [];
-    const running = props.sessions.filter((s) => s.state === 'running');
-    // Brief race after a fresh spawn: selection.sessionId is set but the
-    // optimistic update may have completed *after* render, or the user pinned
-    // a session that the next poll hasn't surfaced yet. If the pinned record
-    // is running but not in our list, virtually-append so its slot mounts
-    // immediately. React reconciles by `key` when the real entry lands.
-    if (
-      props.activeRecord !== null &&
-      props.activeRecord.state === 'running' &&
-      !running.some((s) => s.id === props.sessionId)
-    ) {
-      return [...running, props.activeRecord];
-    }
-    return running;
-  }, [props.sessions, props.sessionId, props.activeRecord]);
+  // activeRecord is null when sessionId is null (empty-state landing) or during
+  // the brief post-spawn race before the record lands in the list — both
+  // correctly render no slot (the CTA / paused-CTA path covers them).
+  const runningSlots = useMemo<readonly SessionRecord[]>(
+    () =>
+      props.activeRecord !== null && props.activeRecord.state === 'running'
+        ? [props.activeRecord]
+        : [],
+    [props.activeRecord],
+  );
 
   // Right-pane state machine:
   //  - no selection.sessionId → CTA ("start a new session")
@@ -100,6 +95,7 @@ export function WorkspaceView(props: WorkspaceViewProps): ReactElement {
           <ResumeCta
             record={props.activeRecord}
             onResume={() => props.onResume(props.activeRecord!.id)}
+            onOpenWebPi={() => props.onOpenWebPi(props.activeRecord!.id)}
           />
         )}
         {!showPausedCta &&
@@ -110,13 +106,22 @@ export function WorkspaceView(props: WorkspaceViewProps): ReactElement {
                 key={s.id}
                 className={`workspace-terminal-slot ${isActive ? 'is-active' : 'is-hidden'}`}
               >
-                <TerminalView
-                  wsId={props.wsId}
-                  sessionId={s.id}
-                  {...(props.label !== undefined ? { label: `${props.label} · ${s.name}` } : {})}
-                  {...(props.keyMap !== undefined ? { keyMap: props.keyMap } : {})}
-                  onSessionLost={props.onSessionLost}
-                />
+                {(s.surface ?? 'terminal') === 'webpi' && s.agent === 'pi' ? (
+                  <WebPiView
+                    wsId={props.wsId}
+                    sessionId={s.id}
+                    {...(props.label !== undefined ? { label: `${props.label} · ${s.name}` } : {})}
+                    onSessionLost={props.onSessionLost}
+                  />
+                ) : (
+                  <TerminalView
+                    wsId={props.wsId}
+                    sessionId={s.id}
+                    {...(props.label !== undefined ? { label: `${props.label} · ${s.name}` } : {})}
+                    {...(props.keyMap !== undefined ? { keyMap: props.keyMap } : {})}
+                    onSessionLost={props.onSessionLost}
+                  />
+                )}
               </div>
             );
           })}
@@ -159,17 +164,18 @@ function EmptyState(props: {
   onSelectSession: (sessionId: string) => void;
   onSpawn: () => void;
 }): ReactElement {
+  const { t } = useTranslation();
   if (props.sessions.length === 0) {
     return (
       <div className="workspace-cta">
         <p className="workspace-cta-text">
-          No session yet — start one to begin a conversation in this workspace.
+          {t('workspace.emptyNoSession')}
         </p>
         <button type="button" className="workspace-cta-btn" onClick={props.onSpawn}>
-          Start a new session
+          {t('workspace.startNewSession')}
         </button>
         <p className="workspace-cta-hint">
-          <kbd>⌘T</kbd> works too.
+          {t('workspace.shortcutHint')}
         </p>
       </div>
     );
@@ -184,7 +190,7 @@ function EmptyState(props: {
 
   return (
     <div className="workspace-empty-state">
-      <h2 className="workspace-empty-heading">Pick up where you left off</h2>
+      <h2 className="workspace-empty-heading">{t('workspace.pickUp')}</h2>
       <ul className="workspace-empty-list">
         {ordered.map((s) => (
           <SessionCard
@@ -198,17 +204,17 @@ function EmptyState(props: {
         ))}
       </ul>
       <div className="workspace-empty-divider">
-        <span>or</span>
+        <span>{t('workspace.or')}</span>
       </div>
       <button
         type="button"
         className="workspace-empty-secondary-btn"
         onClick={props.onSpawn}
       >
-        + Start a new session
+        + {t('workspace.startNewSession')}
       </button>
       <p className="workspace-cta-hint">
-        <kbd>⌘T</kbd> works too.
+        {t('workspace.shortcutHint')}
       </p>
     </div>
   );
@@ -218,17 +224,18 @@ function SessionCard(props: {
   record: SessionRecord;
   onClick: () => void;
 }): ReactElement {
+  const { t } = useTranslation();
   const r = props.record;
   const isPaused = r.state === 'paused';
   return (
     <li className="workspace-empty-card">
-      <span className={`sidebar-agent-badge is-${r.agent}`}>
+      <span className="inline-flex items-center justify-center shrink-0 min-w-[18px] h-4 px-1 rounded text-[10px] font-mono text-text-muted bg-bg-tertiary">
         {prefixOf(r.agent)}
       </span>
       <div className="workspace-empty-card-meta">
         <span className="workspace-empty-card-name">{r.name}</span>
         <span className="workspace-empty-card-state">
-          {isPaused ? 'paused · ' : 'active · '}
+          {isPaused ? `${t('workspace.paused')} · ` : `${t('workspace.active')} · `}
           {formatRelativeTime(r.lastActiveAt)}
         </span>
       </div>
@@ -236,10 +243,10 @@ function SessionCard(props: {
         type="button"
         className="workspace-empty-card-btn"
         onClick={props.onClick}
-        aria-label={isPaused ? `Resume ${r.name}` : `Open ${r.name}`}
+        aria-label={isPaused ? t('workspace.resumeNamed', { name: r.name }) : t('workspace.openNamed', { name: r.name })}
       >
         <MessageSquare size={13} strokeWidth={2.25} aria-hidden="true" />
-        <span>Continue</span>
+        <span>{t('workspace.continue')}</span>
       </button>
     </li>
   );

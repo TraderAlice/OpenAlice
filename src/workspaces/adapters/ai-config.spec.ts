@@ -15,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { claudeAdapter } from './claude.js';
 import { codexAdapter } from './codex.js';
 import { opencodeAdapter } from './opencode.js';
-import { piAdapter } from './pi.js';
+import { piAdapter, syncPiWindowsShellPath } from './pi.js';
 
 let dir: string;
 
@@ -198,23 +198,12 @@ describe('codexAdapter AI-config', () => {
 describe('opencodeAdapter AI-config', () => {
   const mcpEnv = { OPENALICE_MCP_URL: 'http://127.0.0.1:47332/mcp', AQ_WS_ID: 'ws-abc' };
 
-  it('injects both MCP servers + hermetic flags via composeEnv inline config', () => {
+  it('keeps OpenAlice MCP out of opencode env even when an MCP URL is present', () => {
     const env = opencodeAdapter.composeEnv!({ cwd: dir, env: mcpEnv });
     expect(env['OPENCODE_DISABLE_MODELS_FETCH']).toBe('1');
     expect(env['OPENCODE_DISABLE_AUTOUPDATE']).toBe('1');
     expect(env['OPENCODE_DISABLE_LSP_DOWNLOAD']).toBe('1');
-    expect(JSON.parse(env['OPENCODE_CONFIG_CONTENT']!)).toEqual({
-      mcp: {
-        openalice: { type: 'remote', url: 'http://127.0.0.1:47332/mcp', enabled: true },
-        'openalice-workspace': {
-          type: 'remote', url: 'http://127.0.0.1:47332/mcp/ws-abc', enabled: true,
-        },
-      },
-    });
-  });
-
-  it('composeEnv throws loud when MCP url is missing from spawn env', () => {
-    expect(() => opencodeAdapter.composeEnv!({ cwd: dir, env: {} })).toThrow(/OPENALICE_MCP_URL/);
+    expect(env['OPENCODE_CONFIG_CONTENT']).toBeUndefined();
   });
 
   it('composeCommand: fresh is the bare binary; resume uses top-level flags', () => {
@@ -243,6 +232,16 @@ describe('opencodeAdapter AI-config', () => {
     });
   });
 
+  it('writes an explicit custom-model context window for opencode when provided', async () => {
+    await opencodeAdapter.writeAiConfig!(dir, {
+      baseUrl: 'https://cn.test/v1', apiKey: 'sk-o', model: 'deepseek-chat', contextWindow: 1_000_000,
+    });
+    expect(JSON.parse(await read('opencode.json')).provider.workspace.models['deepseek-chat']).toEqual({
+      name: 'deepseek-chat',
+      limit: { context: 1_000_000, output: 16_384 },
+    });
+  });
+
   it('honors wireShape — anthropic → @ai-sdk/anthropic, responses → @ai-sdk/openai', async () => {
     await opencodeAdapter.writeAiConfig!(dir, { baseUrl: 'https://x/anthropic', apiKey: 'k', model: 'glm-5.1', wireShape: 'anthropic' });
     expect(JSON.parse(await read('opencode.json')).provider.workspace.npm).toBe('@ai-sdk/anthropic');
@@ -258,10 +257,10 @@ describe('opencodeAdapter AI-config', () => {
 
   it('round-trips through readAiConfig (strips the provider/ prefix off model)', async () => {
     await opencodeAdapter.writeAiConfig!(dir, {
-      baseUrl: 'https://cn.test/v1', apiKey: 'sk-o', model: 'deepseek-chat',
+      baseUrl: 'https://cn.test/v1', apiKey: 'sk-o', model: 'deepseek-chat', contextWindow: 512_000,
     });
     expect(await opencodeAdapter.readAiConfig!(dir)).toEqual({
-      baseUrl: 'https://cn.test/v1', apiKey: 'sk-o', model: 'deepseek-chat', wireShape: 'openai-chat',
+      baseUrl: 'https://cn.test/v1', apiKey: 'sk-o', model: 'deepseek-chat', wireShape: 'openai-chat', contextWindow: 512_000,
     });
   });
 
@@ -301,6 +300,8 @@ describe('composeHeadlessCommand (one-shot headless argv, prompt placed per-CLI)
       'claude',
       '--settings',
       '{"enableAllProjectMcpServers":true}',
+      '--allowedTools',
+      'Bash(alice:*),Bash(alice-workspace:*),Bash(alice-uta:*),Bash(traderhub:*)',
       '-p',
       '--output-format',
       'stream-json',
@@ -326,7 +327,7 @@ describe('composeHeadlessCommand (one-shot headless argv, prompt placed per-CLI)
     ]);
   });
 
-  it('opencode: run --format json -- <prompt> (MCP via env, not flags)', () => {
+  it('opencode: run --format json -- <prompt> (tools via CLI shims)', () => {
     expect(opencodeAdapter.composeHeadlessCommand!(['opencode'], ctx(), 'do x')).toEqual([
       'opencode',
       'run',
@@ -344,6 +345,26 @@ describe('composeHeadlessCommand (one-shot headless argv, prompt placed per-CLI)
       '--mode',
       'json',
       'do x',
+    ]);
+  });
+
+  it('pi: Docker headless explicitly approves the image-pinned runtime', () => {
+    expect(piAdapter.composeHeadlessCommand!(['pi'], ctx({ OPENALICE_LAUNCHER: 'docker' }), 'do x')).toEqual([
+      'pi', '--approve', '-p', '--mode', 'json', 'do x',
+    ]);
+  });
+
+  it('resumes headless conversations by backend-resolved native id for all runtimes', () => {
+    const resume = { sessionId: 'native-session-1' } as const;
+    expect(claudeAdapter.composeHeadlessCommand!(['claude'], { ...ctx(), resume }, 'next')).toContain('native-session-1');
+    expect(codexAdapter.composeHeadlessCommand!(['codex'], { ...ctx(), resume }, 'next')).toEqual(expect.arrayContaining([
+      'exec', 'resume', '--json', 'native-session-1', 'next',
+    ]));
+    expect(opencodeAdapter.composeHeadlessCommand!(['opencode'], { ...ctx(), resume }, 'next')).toEqual([
+      'opencode', 'run', '--format', 'json', '--session', 'native-session-1', '--', 'next',
+    ]);
+    expect(piAdapter.composeHeadlessCommand!(['pi'], { ...ctx(), resume }, 'next')).toEqual([
+      'pi', '--session-id', 'native-session-1', '-p', '--mode', 'json', 'next',
     ]);
   });
 
@@ -366,7 +387,7 @@ describe('composeHeadlessCommand (one-shot headless argv, prompt placed per-CLI)
 describe('piAdapter AI-config', () => {
   const mcpEnv = { OPENALICE_MCP_URL: 'http://127.0.0.1:47332/mcp', AQ_WS_ID: 'ws-abc' };
 
-  it('composeCommand: fresh is bare; resume uses top-level --continue / --session-id', () => {
+  it('composeCommand leaves project trust to Pi and the user', () => {
     expect(piAdapter.composeCommand(['ignored'], { cwd: dir, env: mcpEnv })).toEqual(['pi']);
     expect(piAdapter.composeCommand([], { cwd: dir, env: mcpEnv, resume: 'last' }))
       .toEqual(['pi', '--continue']);
@@ -374,10 +395,58 @@ describe('piAdapter AI-config', () => {
       .toEqual(['pi', '--session-id', 'sess-1']);
   });
 
-  it('composeEnv sets PI_OFFLINE always; PI_CODING_AGENT_DIR only in override mode', async () => {
+  it('composeWebCommand is opt-in RPC and does not alter the TUI command', () => {
+    const spawn = { cwd: dir, env: mcpEnv, resume: { sessionId: 'sess-web' } } as const;
+    expect(piAdapter.composeCommand([], spawn)).toEqual(['pi', '--session-id', 'sess-web']);
+    expect(piAdapter.composeWebCommand?.([], spawn)).toEqual([
+      'pi', '--session-id', 'sess-web', '--mode', 'rpc',
+    ]);
+  });
+
+  it('composeWebCommand uses the packaged managed Pi trust flag only on the RPC surface', () => {
+    const env = { ...mcpEnv, OPENALICE_MANAGED_PI_PATH: '/app/vendor/pi/pi' };
+    const spawn = { cwd: dir, env, resume: { sessionId: 'sess-web' } } as const;
+    expect(piAdapter.composeCommand([], spawn)).toEqual([
+      '/app/vendor/pi/pi', '--session-id', 'sess-web',
+    ]);
+    expect(piAdapter.composeWebCommand?.([], spawn)).toEqual([
+      '/app/vendor/pi/pi', '--approve', '--session-id', 'sess-web', '--mode', 'rpc',
+    ]);
+  });
+
+  it('composeCommand uses managed Pi binary path when the spawn env provides one', () => {
+    const env = { ...mcpEnv, OPENALICE_MANAGED_PI_PATH: '/app/vendor/pi/pi' };
+    expect(piAdapter.composeCommand(['ignored'], { cwd: dir, env })).toEqual(['/app/vendor/pi/pi']);
+    expect(piAdapter.composeHeadlessCommand!([], { cwd: dir, env }, 'hello')).toEqual([
+      '/app/vendor/pi/pi', '--approve', '-p', '--mode', 'json', 'hello',
+    ]);
+  });
+
+  it('composeCommand runs managed Pi npm runtime through the injected Node path', () => {
+    const env = {
+      ...mcpEnv,
+      OPENALICE_MANAGED_PI_PATH: '/app/vendor/pi/node_modules/@earendil-works/pi-coding-agent/dist/cli.js',
+      OPENALICE_MANAGED_PI_NODE_PATH: '/Applications/OpenAlice.app/Contents/MacOS/OpenAlice',
+    };
+    expect(piAdapter.composeCommand(['ignored'], { cwd: dir, env })).toEqual([
+      '/Applications/OpenAlice.app/Contents/MacOS/OpenAlice',
+      '/app/vendor/pi/node_modules/@earendil-works/pi-coding-agent/dist/cli.js',
+    ]);
+    expect(piAdapter.composeHeadlessCommand!([], { cwd: dir, env }, 'hello')).toEqual([
+      '/Applications/OpenAlice.app/Contents/MacOS/OpenAlice',
+      '/app/vendor/pi/node_modules/@earendil-works/pi-coding-agent/dist/cli.js',
+      '--approve',
+      '-p',
+      '--mode',
+      'json',
+      'hello',
+    ]);
+  });
+
+  it('composeEnv leaves Pi startup networking to the base env and redirects only in override mode', async () => {
     // No .pi-agent yet → no redirect.
     const before = piAdapter.composeEnv!({ cwd: dir, env: mcpEnv });
-    expect(before['PI_OFFLINE']).toBe('1');
+    expect(before['PI_OFFLINE']).toBeUndefined();
     expect(before['PI_CODING_AGENT_DIR']).toBeUndefined();
     // After writing a provider override, the agent dir is redirected.
     await piAdapter.writeAiConfig!(dir, { baseUrl: 'https://cn.test/v1', apiKey: 'sk-p', model: 'deepseek-chat' });
@@ -400,10 +469,62 @@ describe('piAdapter AI-config', () => {
         },
       },
     });
-    expect(JSON.parse(await read('.pi-agent/settings.json'))).toEqual({
+    const settings = JSON.parse(await read('.pi-agent/settings.json'));
+    expect(settings.defaultProvider).toBe('workspace');
+    expect(settings.defaultModel).toBe('deepseek-chat');
+    if (process.platform === 'win32') expect(settings.shellPath).toMatch(/bash\.exe$/i);
+    else expect(settings.shellPath).toBeUndefined();
+  });
+
+  it('writes managed shellPath into Pi settings when the runtime profile provides one', async () => {
+    const shellPath = join(dir, 'managed-bash');
+    await writeFile(shellPath, '');
+    const before = process.env['OPENALICE_MANAGED_SHELL_PATH'];
+    process.env['OPENALICE_MANAGED_SHELL_PATH'] = shellPath;
+    try {
+      await piAdapter.writeAiConfig!(dir, {
+        baseUrl: 'https://cn.test/v1', apiKey: 'sk-p', model: 'deepseek-chat',
+      });
+      expect(JSON.parse(await read('.pi-agent/settings.json'))).toEqual({
+        defaultProvider: 'workspace',
+        defaultModel: 'deepseek-chat',
+        shellPath,
+      });
+    } finally {
+      if (before === undefined) delete process.env['OPENALICE_MANAGED_SHELL_PATH'];
+      else process.env['OPENALICE_MANAGED_SHELL_PATH'] = before;
+    }
+  });
+
+  it('backfills the Windows shell path without overwriting Pi-owned settings', async () => {
+    await mkdir(join(dir, '.pi-agent'), { recursive: true });
+    await writeFile(join(dir, '.pi-agent', 'settings.json'), JSON.stringify({
       defaultProvider: 'workspace',
-      defaultModel: 'deepseek-chat',
+      theme: 'light',
+    }));
+    const customPath = 'D:\\PortableGit\\bin\\bash.exe';
+    const before = process.env['OPENALICE_WORKSPACE_SHELL_PATH'];
+    process.env['OPENALICE_WORKSPACE_SHELL_PATH'] = customPath;
+    try {
+      await syncPiWindowsShellPath(dir, 'win32');
+      expect(JSON.parse(await read('.pi-agent/settings.json'))).toEqual({
+        defaultProvider: 'workspace',
+        theme: 'light',
+        shellPath: customPath,
+      });
+    } finally {
+      if (before === undefined) delete process.env['OPENALICE_WORKSPACE_SHELL_PATH'];
+      else process.env['OPENALICE_WORKSPACE_SHELL_PATH'] = before;
+    }
+  });
+
+  it('writes an explicit custom-model context window for Pi when provided', async () => {
+    await piAdapter.writeAiConfig!(dir, {
+      baseUrl: 'https://cn.test/v1', apiKey: 'sk-p', model: 'deepseek-chat', contextWindow: 1_000_000,
     });
+    expect(JSON.parse(await read('.pi-agent/models.json')).providers.workspace.models).toEqual([
+      { id: 'deepseek-chat', contextWindow: 1_000_000 },
+    ]);
   });
 
   it('honors wireShape — anthropic → anthropic-messages, responses → openai-responses', async () => {
@@ -421,10 +542,10 @@ describe('piAdapter AI-config', () => {
 
   it('round-trips through readAiConfig', async () => {
     await piAdapter.writeAiConfig!(dir, {
-      baseUrl: 'https://cn.test/v1', apiKey: 'sk-p', model: 'deepseek-chat',
+      baseUrl: 'https://cn.test/v1', apiKey: 'sk-p', model: 'deepseek-chat', contextWindow: 256_000,
     });
     expect(await piAdapter.readAiConfig!(dir)).toEqual({
-      baseUrl: 'https://cn.test/v1', apiKey: 'sk-p', model: 'deepseek-chat', wireShape: 'openai-chat',
+      baseUrl: 'https://cn.test/v1', apiKey: 'sk-p', model: 'deepseek-chat', wireShape: 'openai-chat', contextWindow: 256_000,
     });
   });
 

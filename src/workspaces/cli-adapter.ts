@@ -12,6 +12,7 @@
  */
 
 import type { WireShape } from '../ai-providers/preset-catalog.js';
+import type { HeadlessOutputEvent } from './headless-output.js';
 
 export interface OnDiskSession {
   readonly sessionId: string;
@@ -30,6 +31,20 @@ export interface SpawnContext {
    * cross-CLI MCP definition into their own native command flags.
    */
   readonly env: Readonly<Record<string, string>>;
+  /**
+   * Seed a freshly-spawned INTERACTIVE TUI with a first user message — the
+   * "quick chat" launch ("type a message → you're in, agent already working").
+   * Unlike `composeHeadlessCommand`'s prompt (one-shot, exits at the turn
+   * boundary), this rides the interactive `composeCommand`: each agent CLI
+   * accepts a first prompt that opens the TUI and auto-submits it (claude/codex
+   * positional after `--`; opencode `--prompt`; pi trailing positional).
+   *
+   * ONLY honored on a FRESH spawn (`resume` undefined) — seeding a prompt while
+   * also resuming is ambiguous on codex's `resume <id>` subcommand and pi's
+   * `--session-id`, so adapters MUST ignore it when resuming. `shell` ignores
+   * it entirely (no agent to receive a prompt).
+   */
+  readonly initialPrompt?: string;
 }
 
 export interface BootstrapContext {
@@ -62,6 +77,12 @@ export interface WorkspaceAiCred {
    * actually uses the shape the credential was created + tested with.
    */
   wireShape?: WireShape | null;
+  /**
+   * Model context window for runtimes that need an explicit custom-model limit
+   * (currently opencode/Pi). Optional so old workspace configs keep loading;
+   * injectors may choose a modern default for newly-written configs.
+   */
+  contextWindow?: number | null;
   /** Codex only — legacy/explicit wire_api; superseded by wireShape when set. */
   wireApi?: 'chat' | 'responses' | null;
   /** Claude only. */
@@ -82,6 +103,20 @@ export interface EnvOverrides {
 export interface CliAdapter {
   readonly id: string;                          // 'claude' | 'codex' | 'shell'
   readonly displayName: string;
+  /**
+   * Launch surface category. Agent runtimes run a coding-agent TUI and can be
+   * used as the default workload. Utility adapters are explicit tools such as a
+   * bare shell and must never be selected by an omitted `agent`.
+   */
+  readonly kind?: 'agent' | 'utility';
+  /**
+   * Canonical PATH binary name this adapter spawns (`claude`, `codex`,
+   * `opencode`, `pi`). Consumed by `agent-detect.ts` to tell the frontend
+   * whether the runtime is actually installed on the host. Omit for adapters
+   * that always resolve (e.g. `shell` runs `$SHELL`, present on any box) —
+   * those are reported as installed unconditionally.
+   */
+  readonly binary?: string;
   /**
    * Short prefix used to name sessions (e.g. `c1`, `x1`, `sh1`). Helps scan a
    * mixed sidebar tree. Defaults to `id[0]` if omitted, but adapters whose
@@ -122,18 +157,36 @@ export interface CliAdapter {
    * For codex (M2):
    *   base + 'last'    → [...base, 'resume', '--last']
    *   base + { id }    → [...base, 'resume', id]
+   *
+   * On a FRESH spawn (`resume` undefined) with `ctx.initialPrompt` set, the
+   * adapter ALSO appends the prompt at the CLI's interactive-seed position so
+   * the TUI opens already working on it (claude/codex positional after `--`;
+   * opencode `--prompt`; pi trailing positional). Ignored when resuming; `shell`
+   * ignores it always.
    */
   composeCommand(base: readonly string[], ctx: SpawnContext): readonly string[];
+
+  /**
+   * Optional long-lived structured interactive surface. Unlike headless mode,
+   * this process remains alive and accepts multiple prompts over stdin/stdout.
+   * WebPi is the first consumer: it opens the SAME native Pi session through
+   * Pi's documented RPC mode while the ordinary terminal keeps using
+   * `composeCommand`. Keeping this opt-in prevents any other runtime's launch
+   * path from changing merely because WebPi exists.
+   */
+  composeWebCommand?(base: readonly string[], ctx: SpawnContext): readonly string[];
 
   /**
    * One-shot HEADLESS argv for an automation task — like `composeCommand`, but
    * the process consumes `prompt` and EXITS at the turn boundary (vs the
    * interactive TUI that waits for input). The adapter places `prompt` at the
    * CLI-correct position (claude right after `-p`; codex/opencode/pi trailing).
-   * MUST keep the SAME MCP injection as `composeCommand` so the agent can reach
-   * `inbox_push`. Present iff `capabilities.headless` is true.
+   * MUST keep the same tool-access strategy as `composeCommand`: modern
+   * OpenAlice workspaces prefer the injected `alice*` / `traderhub` CLI shims,
+   * while adapter-native MCP is optional and adapter-specific. Present iff
+   * `capabilities.headless` is true.
    *   claude:   [...base, -p, <prompt>, --output-format, json]   // never --bare
-   *   codex:    [codex, -c mcp…, exec, --json, <prompt>]
+   *   codex:    [codex, exec, --json, <prompt>]                  // MCP optional
    *   opencode: [opencode, run, --format, json, <prompt>]
    *   pi:       [pi, -p, --mode, json, <prompt>]
    */
@@ -154,6 +207,31 @@ export interface CliAdapter {
    * `capabilities.headless` (shell excluded).
    */
   extractHeadlessSessionId?(line: string): string | null;
+
+  /**
+   * Extract a completed assistant reply from one structured headless stdout
+   * line. This is intentionally adapter-owned: all four CLIs emit different
+   * JSONL event shapes, and raw stdout being non-empty only proves that the CLI
+   * logged something (startup/error events also produce output).
+   *
+   * Return a non-empty string only for an assistant-authored response. The
+   * runner keeps the latest extracted reply and exposes it on
+   * `HeadlessTaskResult`, allowing readiness checks to prove a real model turn
+   * without coupling the generic runner to vendor event schemas.
+   */
+  extractHeadlessAssistantText?(line: string): string | null;
+
+  /** Translate one native JSONL line into vendor-neutral response/tool events. */
+  extractHeadlessOutputEvents?(line: string): readonly HeadlessOutputEvent[];
+
+  /**
+   * Decide whether one complete stdout line belongs in the bounded diagnostic
+   * log/tail. Structured parsers still see every line. Use this for documented
+   * high-frequency transient events (Pi's cumulative `message_update` and
+   * `tool_execution_update`) that are useful to a live TUI but pathological in
+   * a persisted one-shot run log. Omit to preserve stdout byte-for-byte.
+   */
+  keepHeadlessDiagnosticLine?(line: string): boolean;
 
   /** Optional per-CLI env adjustments on top of `spawn-env.ts`'s baseline. */
   envOverrides?(parent: NodeJS.ProcessEnv): EnvOverrides;
@@ -198,6 +276,10 @@ export interface CliAdapter {
 
   /** Subprocess discovery (capabilities.transcriptDiscovery === 'subprocess'). */
   listOnDisk?(cwd: string): Promise<readonly OnDiskSession[]>;
+}
+
+export function isAgentRuntime(adapter: CliAdapter): boolean {
+  return adapter.kind !== 'utility' && adapter.id !== 'shell';
 }
 
 export class AdapterRegistry {

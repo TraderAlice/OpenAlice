@@ -11,10 +11,11 @@
 
 import { createServer, type Server } from 'node:http';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { probeAnthropic } from './agent-probe.js';
+import { probeAnthropic, probeOpenAI } from './agent-probe.js';
 
 interface Captured {
   headers: Record<string, string | string[] | undefined>;
+  url: string | undefined;
 }
 
 let server: Server;
@@ -24,22 +25,21 @@ let captured: Captured | null;
 beforeEach(async () => {
   captured = null;
   server = createServer((req, res) => {
-    captured = { headers: req.headers };
+    captured = { headers: req.headers, url: req.url };
     let body = '';
     req.on('data', (c) => (body += c));
     req.on('end', () => {
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(
-        JSON.stringify({
-          id: 'msg_1',
-          type: 'message',
-          role: 'assistant',
-          model: 'x',
-          content: [{ type: 'text', text: 'pong' }],
-          stop_reason: 'end_turn',
+      res.end(req.url?.endsWith('/chat/completions')
+        ? JSON.stringify({
+          id: 'chatcmpl_1', object: 'chat.completion', created: 0, model: 'x',
+          choices: [{ index: 0, message: { role: 'assistant', content: 'pong' }, finish_reason: 'stop' }],
+        })
+        : JSON.stringify({
+          id: 'msg_1', type: 'message', role: 'assistant', model: 'x',
+          content: [{ type: 'text', text: 'pong' }], stop_reason: 'end_turn',
           usage: { input_tokens: 1, output_tokens: 1 },
-        }),
-      );
+        }));
     });
   });
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
@@ -79,5 +79,19 @@ describe('probeAnthropic auth header', () => {
     await probeAnthropic({ baseUrl, apiKey: 'sk-path', model: 'm' });
     // request landed on /anthropic/v1/messages, proving the path wasn't dropped
     expect(captured).not.toBeNull();
+  });
+});
+
+describe('probeOpenAI auth header', () => {
+  it('uses Bearer auth and preserves a versioned base path', async () => {
+    const out = await probeOpenAI({
+      baseUrl: baseUrl.replace('/anthropic', '/openai/v1'),
+      apiKey: 'sk-openai',
+      model: 'm',
+      wireApi: 'chat',
+    });
+    expect(out.text).toBe('pong');
+    expect(captured?.headers['authorization']).toBe('Bearer sk-openai');
+    expect(captured?.url).toBe('/openai/v1/chat/completions');
   });
 });

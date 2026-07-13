@@ -39,7 +39,7 @@ function applyMapping(
 }
 
 /**
- * Build credentials object for the in-process OpenTypeBB SDK executor.
+ * Build credentials for the embedded provider executor.
  * Field names follow the SDK's auto-prefixed credential convention
  * (provider name + cred name) — see file header for why this differs
  * from the HTTP header path.

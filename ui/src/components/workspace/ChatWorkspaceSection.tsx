@@ -1,30 +1,47 @@
 /**
- * "Workspace chat" section embedded inside the Chat activity sidebar.
+ * "Ask Alice" secondary sidebar — your chat history.
  *
- * Visual rhythm matches the Traditional channels list below — single
- * row per workspace, with a collapsible session sub-tree. Status dot
- * prefix conveys running/idle without needing a "4h" trailing meta.
+ * Makes the two lifecycle actions explicit: "New chat" creates a Session inside
+ * the recent Chat Workspace; "New workspace" creates a new durable context
+ * container. Workspaces keep their actual names and Sessions hang underneath.
  *
- * The create form is hidden behind a `+` toggle in the section header;
- * when opened, the tag input pre-fills with a date-based default
- * (`chat-may13`, `chat-may13-2`, …) so users can hit enter without
- * typing. Power-user spawn-by-agent stays in the Workspaces activity
- * — this sidebar is for "pick a conversation and continue".
+ * Named-workspace creation (a custom tag) lives in the Workspaces activity —
+ * this surface is for chatting, not workspace management.
  */
 
 import { useMemo, useState, type ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronDown, ChevronRight, Plus, Settings as SettingsIcon, X } from 'lucide-react'
+import {
+  ChevronDown,
+  ChevronRight,
+  MessageSquarePlus,
+  PanelsTopLeft,
+  Settings as SettingsIcon,
+  X,
+} from 'lucide-react'
 
-import { useWorkspaces } from '../../contexts/WorkspacesContext'
+import { useWorkspaces } from '../../contexts/workspaces-context'
+import { Skeleton } from '../StateViews'
 import { useWorkspace } from '../../tabs/store'
 import { getFocusedTab } from '../../tabs/types'
-import { ConfirmDialog } from '../ConfirmDialog'
-import { deleteWorkspace, type SessionRecord, type Workspace } from './api'
-import { SessionRow } from './Sidebar'
+import { type Workspace } from './api'
 import { CreateWorkspaceDialog } from './CreateWorkspaceDialog'
+import { WorkspaceOffboardingDialog } from './WorkspaceOffboardingDialog'
+import { SessionRow } from './Sidebar'
+import { workspaceDisplayTitle } from './display'
+import { orderSessionsForSidebar, orderWorkspacesForSidebar } from './sidebar-order'
+import { useReorderMotion } from './useReorderMotion'
+import { preferencesApi } from '../../api/preferences'
 
 const CHAT_TEMPLATE = 'chat'
+
+function nextChatWorkspaceTag(workspaces: readonly Workspace[]): string {
+  const tags = new Set(workspaces.map((workspace) => workspace.tag))
+  if (!tags.has(CHAT_TEMPLATE)) return CHAT_TEMPLATE
+  let suffix = 2
+  while (tags.has(`${CHAT_TEMPLATE}-${suffix}`)) suffix += 1
+  return `${CHAT_TEMPLATE}-${suffix}`
+}
 
 export function ChatWorkspaceSection(): ReactElement | null {
   const { t } = useTranslation()
@@ -32,105 +49,151 @@ export function ChatWorkspaceSection(): ReactElement | null {
   const focused = useWorkspace((s) => getFocusedTab(s)?.spec)
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
 
-  const chatWorkspaces = useMemo(
-    () => ctx.workspaces.filter((w) => w.template === CHAT_TEMPLATE),
-    [ctx.workspaces],
-  )
-
-  const isWsFocus = focused?.kind === 'workspace'
+  const isWsFocus = focused?.kind === 'workspace' && focused.params.source === 'chat'
   const selection = isWsFocus
     ? { wsId: focused.params.wsId, sessionId: focused.params.sessionId ?? null }
     : null
+  const chatWorkspaces = useMemo(
+    () => orderWorkspacesForSidebar(
+      ctx.workspaces.filter((workspace) => workspace.template === CHAT_TEMPLATE),
+    ),
+    [ctx.workspaces],
+  )
+  const workspaceListRef = useReorderMotion<HTMLUListElement>(
+    chatWorkspaces.map((workspace) => workspace.id),
+  )
+  const showListError = Boolean(ctx.listError && ctx.workspaces.length === 0)
 
   const chatTemplate = ctx.templates.find((tpl) => tpl.name === CHAT_TEMPLATE)
-
-  const [showCreate, setShowCreate] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<Workspace | null>(null)
+  const [showCreate, setShowCreate] = useState(false)
 
-  const handleConfirmDelete = async (): Promise<void> => {
-    if (!pendingDelete) return
-    try {
-      const ok = await deleteWorkspace(pendingDelete.id)
-      if (ok) ctx.refresh()
-    } finally {
-      setPendingDelete(null)
-    }
+  const rememberChatWorkspace = (workspaceId: string): void => {
+    void preferencesApi.rememberRecentChatWorkspace(workspaceId).catch(() => undefined)
   }
 
-  if (!chatTemplate) return null
+  // Don't collapse the whole section while templates are still loading — doing
+  // so hid the cold-load skeleton (and the New-chat CTA) during the exact 30s
+  // window we want to fill, leaving a blank pane. Only bail once templates are
+  // known-loaded AND there genuinely is no chat template (broken deployment).
+  if (ctx.templatesLoaded && !chatTemplate) return null
 
   return (
     <>
-      <div className="px-3 mt-2 flex items-baseline gap-2">
-        <h3 className="text-[10px] font-medium text-text-muted/60 uppercase tracking-wider">
-          {t('chat.workspaceChatHeader')}
-        </h3>
-        <span className="text-[10px] text-text-muted/50">{t('chat.recommended')}</span>
+      {/* Starting a conversation is the primary action. Creating a Workspace is
+          a lower-frequency context-boundary action attached to the list it
+          affects, rather than a competing half-width CTA. */}
+      <div className="px-2 pt-2 pb-1">
+        <button
+          type="button"
+          onClick={() => openOrFocus({ kind: 'chat-landing', params: {} })}
+          className="flex w-full items-center gap-2 rounded-lg border border-accent/25 bg-accent/10 px-3 py-2.5 text-left text-[13px] font-medium text-text transition-colors hover:border-accent/45 hover:bg-accent/15"
+        >
+          <MessageSquarePlus size={15} strokeWidth={2.15} className="shrink-0 text-accent" />
+          <span>{t('chat.newChat')}</span>
+        </button>
+      </div>
+
+      <div className="px-3 pb-1 pt-1.5">
+        <span className="min-w-0 truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-text-muted/60">
+          {t('nav.item.workspaces')}
+        </span>
+      </div>
+      <div className="px-2 pb-1">
         <button
           type="button"
           onClick={() => setShowCreate(true)}
-          className="ml-auto w-5 h-5 rounded flex items-center justify-center text-text-muted hover:text-text hover:bg-bg-secondary"
-          title={t('chat.newChatWorkspace')}
-          aria-label={t('chat.newChatWorkspace')}
+          className="flex w-full items-center gap-2 rounded-lg border border-border/70 bg-bg-secondary/45 px-3 py-2 text-left text-[12px] font-medium text-text-muted transition-colors hover:border-border hover:bg-bg-tertiary hover:text-text"
+          title={t('chat.newWorkspace')}
+          aria-label={t('chat.newWorkspace')}
         >
-          <Plus size={13} strokeWidth={2.25} />
+          <PanelsTopLeft size={14} strokeWidth={2} className="shrink-0" />
+          <span>{t('chat.newWorkspace')}</span>
         </button>
       </div>
 
       {showCreate && (
         <CreateWorkspaceDialog
           templates={ctx.templates}
-          agents={ctx.agents}
           presetTemplate={CHAT_TEMPLATE}
+          initialTag={nextChatWorkspaceTag(ctx.workspaces)}
           onCreated={(workspace) => {
             ctx.refresh()
-            openOrFocus({ kind: 'workspace', params: { wsId: workspace.id } })
+            rememberChatWorkspace(workspace.id)
+            openOrFocus({ kind: 'chat-landing', params: { targetWsId: workspace.id } })
           }}
           onClose={() => setShowCreate(false)}
         />
       )}
 
-      <ul className="py-0.5">
-        {chatWorkspaces.length === 0 && !ctx.listError && (
-          <li className="px-3 py-2 text-[12px] text-text-muted/60">{t('chat.noChatWorkspacesYet')}</li>
+      <ul ref={workspaceListRef} className="py-0.5">
+        {/* Cold load: the list is empty because it hasn't fetched yet, NOT
+            because there are no chats — show a skeleton instead of flashing the
+            "no chats yet" empty text (or a blank pane) until the first list
+            lands. */}
+        {!ctx.hasLoaded && !showListError && (
+          <li aria-hidden="true">
+            {Array.from({ length: 3 }).map((_, g) => (
+              <div key={g} className="mb-1.5">
+                <div className="px-3 py-1.5"><Skeleton className="h-2.5 w-14" /></div>
+                {Array.from({ length: 2 }).map((_, r) => (
+                  <div key={r} className="flex items-center gap-2 px-3 py-1.5">
+                    <Skeleton className="h-3 w-3 rounded" />
+                    <Skeleton className={`h-3 ${r === 0 ? 'w-32' : 'w-24'}`} />
+                  </div>
+                ))}
+              </div>
+            ))}
+          </li>
         )}
-        {ctx.listError && (
-          <li className="px-3 py-1 text-[11px] text-red">{ctx.listError}</li>
+        {ctx.hasLoaded && chatWorkspaces.length === 0 && !showListError && (
+          <li className="px-3 py-2.5">
+            <p className="text-[12px] text-text-muted/60">{t('chat.noChatWorkspacesYet')}</p>
+            <button
+              type="button"
+              onClick={() => setShowCreate(true)}
+              className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-medium text-text-muted transition-colors hover:text-text"
+            >
+              <PanelsTopLeft size={13} strokeWidth={2} />
+              <span>{t('chat.newWorkspace')}</span>
+            </button>
+          </li>
         )}
+        {showListError && <li className="px-3 py-1 text-[11px] text-red">{ctx.listError}</li>}
         {chatWorkspaces.map((w) => (
           <ChatWorkspaceRow
             key={w.id}
             workspace={w}
+            label={workspaceDisplayTitle(w)}
             selection={selection}
             onOpen={() => {
-              const recent = mostRecentSession(w.sessions)
-              if (recent) {
-                openOrFocus({
-                  kind: 'workspace',
-                  params: { wsId: w.id, sessionId: recent.id },
-                })
-              } else {
-                openOrFocus({ kind: 'workspace', params: { wsId: w.id } })
-              }
+              rememberChatWorkspace(w.id)
+              openOrFocus({ kind: 'chat-landing', params: { targetWsId: w.id } })
             }}
-            onOpenSession={(sid) =>
-              openOrFocus({ kind: 'workspace', params: { wsId: w.id, sessionId: sid } })
-            }
+            onOpenSession={(sid) => {
+              rememberChatWorkspace(w.id)
+              openOrFocus({ kind: 'workspace', params: { wsId: w.id, sessionId: sid, source: 'chat' } })
+            }}
             onPauseSession={(sid) => void ctx.pauseSession(w.id, sid)}
-            onResumeSession={(sid) => void ctx.resumeSession(w.id, sid)}
-            onDeleteSession={(sid) => void ctx.deleteSession(w.id, sid)}
+            onResumeSession={(sid) => {
+              rememberChatWorkspace(w.id)
+              void ctx.resumeSession(w.id, sid, 'chat')
+            }}
+            onDeleteSession={(sid) => ctx.requestDeleteSession(w.id, sid)}
             onConfigure={() => ctx.openAgentConfig(w.id)}
             onDelete={() => setPendingDelete(w)}
+            onSpawn={() => openOrFocus({ kind: 'chat-landing', params: { targetWsId: w.id } })}
           />
         ))}
       </ul>
 
       {pendingDelete && (
-        <ConfirmDialog
-          title={t('chat.deleteWorkspaceTitle')}
-          message={t('chat.deleteWorkspaceMessage', { tag: pendingDelete.tag })}
-          confirmLabel={t('common.delete')}
-          onConfirm={handleConfirmDelete}
+        <WorkspaceOffboardingDialog
+          workspace={pendingDelete}
+          onOffboarded={() => {
+            setPendingDelete(null)
+            ctx.refresh()
+          }}
           onClose={() => setPendingDelete(null)}
         />
       )}
@@ -138,17 +201,9 @@ export function ChatWorkspaceSection(): ReactElement | null {
   )
 }
 
-function mostRecentSession(
-  sessions: readonly SessionRecord[],
-): SessionRecord | undefined {
-  if (sessions.length === 0) return undefined
-  return [...sessions].sort(
-    (a, b) => new Date(b.lastActiveAt).getTime() - new Date(a.lastActiveAt).getTime(),
-  )[0]
-}
-
 interface ChatWorkspaceRowProps {
   workspace: Workspace
+  label: string
   selection: { wsId: string; sessionId: string | null } | null
   onOpen: () => void
   onOpenSession: (sid: string) => void
@@ -157,6 +212,8 @@ interface ChatWorkspaceRowProps {
   onDeleteSession: (sid: string) => void
   onConfigure: () => void
   onDelete: () => void
+  /** Spawn a fresh agent session in THIS workspace (and open it). */
+  onSpawn: () => void
 }
 
 function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
@@ -164,8 +221,16 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
   const w = props.workspace
   const hasRunning = w.sessions.some((s) => s.state === 'running')
   const [expanded, setExpanded] = useState(true)
-  const isSelected =
-    props.selection?.wsId === w.id && props.selection.sessionId === null
+  const isSelected = props.selection?.wsId === w.id && props.selection.sessionId === null
+  const displayName = w.displayName?.trim()
+  const subtitle = displayName && displayName !== props.label ? displayName : null
+  const orderedSessions = useMemo(
+    () => orderSessionsForSidebar(w.sessions),
+    [w.sessions],
+  )
+  const sessionListRef = useReorderMotion<HTMLDivElement>(
+    orderedSessions.map((session) => session.id),
+  )
 
   const statusClass = hasRunning
     ? 'bg-green'
@@ -174,17 +239,14 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
       : 'border border-border'
 
   return (
-    <li className="group relative">
+    <li className="group relative" data-reorder-id={w.id}>
       <div
-        className={`flex items-center gap-1 px-3 py-1 text-[13px] cursor-pointer transition-colors ${
+        className={`flex items-center gap-1 pl-2 pr-2 py-1 text-[13px] cursor-pointer transition-colors ${
           isSelected ? 'bg-bg-tertiary text-text' : 'text-text hover:bg-bg-tertiary/50'
         }`}
       >
         {isSelected && (
-          <span
-            aria-hidden="true"
-            className="absolute left-0 top-0 bottom-0 w-[2px] bg-accent"
-          />
+          <span aria-hidden="true" className="absolute left-0 top-0 bottom-0 w-[2px] bg-accent" />
         )}
         <button
           type="button"
@@ -192,28 +254,52 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
             e.stopPropagation()
             setExpanded((v) => !v)
           }}
-          className="w-3 h-4 flex items-center justify-center text-text-muted/60 hover:text-text"
+          className="w-4 h-5 flex items-center justify-center text-text-muted/50 hover:text-text shrink-0"
           aria-label={expanded ? t('chat.collapseSessions') : t('chat.expandSessions')}
           title={expanded ? t('chat.collapseSessions') : t('chat.expandSessions')}
         >
           {expanded ? (
-            <ChevronDown size={11} strokeWidth={2.25} />
+            <ChevronDown size={12} strokeWidth={2.25} />
           ) : (
-            <ChevronRight size={11} strokeWidth={2.25} />
+            <ChevronRight size={12} strokeWidth={2.25} />
           )}
         </button>
         <button
           type="button"
           onClick={props.onOpen}
-          className="flex-1 min-w-0 flex items-center gap-1.5 text-left"
+          className="flex-1 min-w-0 flex items-center gap-2 text-left"
         >
-          <span
-            className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusClass}`}
-            aria-hidden="true"
-          />
-          <span className="truncate" title={w.tag}>
-            {w.tag}
+          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusClass}`} aria-hidden="true" />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-medium" title={workspaceDisplayTitle(w)}>
+              {props.label}
+            </span>
+            {subtitle && (
+              <span className="block truncate text-[11px] leading-3 text-text-muted/65" title={subtitle}>
+                {subtitle}
+              </span>
+            )}
           </span>
+          {w.sessions.length > 0 && (
+            <span className="text-[11px] text-text-muted/45 tabular-nums shrink-0">
+              {w.sessions.length}
+            </span>
+          )}
+        </button>
+        {/* Always-visible conversation action for THIS workspace. The icon is
+            intentionally distinct from the global New chat and New workspace
+            actions so three different meanings do not collapse into bare +s. */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            props.onSpawn()
+          }}
+          className="shrink-0 w-5 h-5 rounded flex items-center justify-center text-text-muted/50 hover:text-text hover:bg-bg-secondary transition-colors"
+          title={t('chat.newSession')}
+          aria-label={t('chat.newSession')}
+        >
+          <MessageSquarePlus size={13} strokeWidth={2.1} />
         </button>
         <span className="shrink-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
@@ -223,8 +309,8 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
               props.onConfigure()
             }}
             className="w-5 h-5 rounded flex items-center justify-center text-text-muted hover:text-text hover:bg-bg-secondary"
-            title={t('settings.category.aiProvider')}
-            aria-label={t('settings.category.aiProvider')}
+            title={t('workspace.configure')}
+            aria-label={t('workspace.configure')}
           >
             <SettingsIcon size={12} strokeWidth={2} />
           </button>
@@ -242,11 +328,12 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
           </button>
         </span>
       </div>
-      {expanded && w.sessions.length > 0 && (
-        <ul className="sidebar-children chat-ws-children-list">
-          {w.sessions.map((s) => (
+      {expanded && orderedSessions.length > 0 && (
+        <div ref={sessionListRef} className="ml-[18px] border-l border-border/50">
+          {orderedSessions.map((s) => (
             <SessionRow
               key={s.id}
+              reorderId={s.id}
               session={s}
               isActive={props.selection?.sessionId === s.id}
               onSelect={() => props.onOpenSession(s.id)}
@@ -255,7 +342,7 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
               onDelete={() => props.onDeleteSession(s.id)}
             />
           ))}
-        </ul>
+        </div>
       )}
     </li>
   )

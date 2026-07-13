@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 // ==================== Shared class constants ====================
 
 export const inputClass =
-  'w-full px-3 py-2 bg-bg text-text border border-border rounded-lg font-sans text-sm outline-none transition-all duration-200 focus:border-accent/60 focus:shadow-[0_0_0_1px_rgba(88,166,255,0.1)]'
+  'w-full px-3 py-2 bg-bg text-text border border-border rounded-lg font-sans text-sm outline-none transition-all duration-200 focus:border-accent/60 focus:shadow-[0_0_0_1px_var(--color-accent-dim)]'
 
 // ==================== Card ====================
 

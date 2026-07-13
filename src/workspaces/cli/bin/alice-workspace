@@ -1,223 +1,65 @@
-#!/usr/bin/env node
-/*
- * alice* — OpenAlice workspace CLIs.
- *
- * A thin argv -> JSON -> HTTP forwarder over the /cli gateway (see
- * src/server/cli.ts). It owns no schema and no business logic: the gateway
- * validates + executes, the manifest drives --help, so new capabilities appear
- * here with zero changes to this file.
- *
- * ONE file, shipped under each export name as a byte-identical copy (`alice`,
- * `alice-workspace`, …). It self-detects which export it is from argv[0]
- * (`alice` -> data, `alice-<x>` -> <x>) and talks to `/cli/<wsId>/<export>/*`.
- *
- * Runs from a workspace PTY shell, reading env the launcher already injects per
- * spawn (OPENALICE_MCP_URL + AQ_WS_ID). Deliberately written with NO import /
- * export and NO top-level await, so node runs it identically whether it treats
- * the file as ESM or CommonJS — and with zero Alice imports, so there is nothing
- * to build (dev and prod behave the same). Uses only global fetch / process.
- *
- *   alice                              list command groups (data export)
- *   alice-workspace inbox push ...     collaboration export
- *   <bin> <group> <verb> --help        show a verb's flags
- *   <bin> <group> <verb> [--flags]     run it; JSON to stdout
- */
+#!/bin/sh
+set -eu
 
-// The binary name this was invoked as — set in main() from argv; drives the
-// export selection and all help/error text.
-let BIN = 'alice'
+# Resolve the payload beside this launcher without dirname/readlink so the
+# packaged path still works with an intentionally empty host PATH.
+launcher=$0
+case "$launcher" in
+  *\\*)
+    # A managed Git Bash receives Windows-native PATH entries from Electron.
+    # Normalize a `D:\...\alice` argv[0] before deriving the sibling payload.
+    if command -v cygpath >/dev/null 2>&1; then
+      converted=$(cygpath -u "$launcher" 2>/dev/null || true)
+      if [ -n "$converted" ]; then launcher=$converted; fi
+    fi
+    ;;
+esac
+case "$launcher" in
+  */*) ;;
+  *)
+    resolved=$(command -v "$launcher" 2>/dev/null || true)
+    if [ -n "$resolved" ]; then launcher=$resolved; fi
+    ;;
+esac
 
-async function main() {
-  const argv = process.argv.slice(2)
+# Public command name drives the gateway export in the shared JS payload.
+OPENALICE_CLI_BIN=${launcher##*/}
+export OPENALICE_CLI_BIN
+case "$launcher" in
+  */*) launcher_dir=${launcher%/*} ;;
+  *) launcher_dir=. ;;
+esac
 
-  // Self-detect the export: `alice` -> data, `alice-<x>` -> <x>.
-  BIN = (process.argv[1] || 'alice').split(/[\\/]/).pop() || 'alice'
-  const exportKey = BIN === 'alice' ? 'data' : BIN.replace(/^alice-/, '')
+# Packaged Electron exposes its Node-capable executable through the managed Pi
+# runtime. Source/dev keeps the ordinary host-node fallback.
+if [ -n "${OPENALICE_MANAGED_PI_NODE_PATH:-}" ]; then
+  managed_node=$OPENALICE_MANAGED_PI_NODE_PATH
+  case "$managed_node" in
+    *\\*|[A-Za-z]:*)
+      if command -v cygpath >/dev/null 2>&1; then
+        converted=$(cygpath -u "$managed_node" 2>/dev/null || true)
+        if [ -n "$converted" ]; then managed_node=$converted; fi
+      fi
+      ;;
+  esac
+  ELECTRON_RUN_AS_NODE=1
+  export ELECTRON_RUN_AS_NODE
+  payload=$launcher_dir/openalice-cli.cjs
+  if command -v cygpath >/dev/null 2>&1; then
+    # Electron is a native Windows process. Give it a native payload path
+    # explicitly instead of relying on MSYS' executable-name heuristics to
+    # translate the first argument for a renamed OpenAlice.exe.
+    converted=$(cygpath -w "$payload" 2>/dev/null || true)
+    if [ -n "$converted" ]; then payload=$converted; fi
+    # `/cli` is an application route, not a POSIX filesystem path. Preserve
+    # both transport values when MSYS prepares the native Electron child env.
+    case "${MSYS2_ENV_CONV_EXCL:-}" in
+      '') MSYS2_ENV_CONV_EXCL='OPENALICE_TOOL_URL;OPENALICE_TOOL_SOCKET' ;;
+      *) MSYS2_ENV_CONV_EXCL="$MSYS2_ENV_CONV_EXCL;OPENALICE_TOOL_URL;OPENALICE_TOOL_SOCKET" ;;
+    esac
+    export MSYS2_ENV_CONV_EXCL
+  fi
+  exec "$managed_node" "$payload" "$@"
+fi
 
-  const mcpUrl = process.env.OPENALICE_MCP_URL || 'http://127.0.0.1:47332/mcp'
-  const wsId = process.env.AQ_WS_ID
-  if (!wsId) {
-    fail('AQ_WS_ID is not set — run from inside an OpenAlice workspace.')
-  }
-  // Derive the CLI base from the MCP URL: .../mcp -> .../cli/<wsId>/<export>
-  const base = mcpUrl.replace(/\/+$/, '').replace(/\/mcp$/, '/cli') + '/' + wsId + '/' + exportKey
-
-  const wantsHelp = argv.includes('--help') || argv.includes('-h')
-  const positionals = argv.filter((a) => !a.startsWith('-'))
-  const group = positionals[0]
-  const verb = positionals[1]
-
-  // `<bin>` / `<bin> --help` -> group listing
-  if (!group) return printGroups(await manifest(base))
-
-  const m = await manifest(base)
-  const groupCmds = m.groups[group]
-  if (!groupCmds) fail(`unknown group "${group}". Run \`${BIN}\` to list groups.`)
-
-  // `<bin> <group>` / `<bin> <group> --help` -> verb listing
-  if (!verb || (wantsHelp && !m.groups[group][verb])) return printVerbs(group, groupCmds)
-
-  const cmd = groupCmds[verb]
-  if (!cmd) fail(`unknown command "${group} ${verb}". Run \`${BIN} ${group}\` to list verbs.`)
-
-  // `alice <group> <verb> --help` -> flag listing
-  if (wantsHelp) return printVerbHelp(group, verb, cmd)
-
-  // Run it.
-  const args = parseFlags(argv.slice(argv.indexOf(verb) + 1))
-  const res = await invoke(base, cmd.tool, args)
-  process.stdout.write(res.endsWith('\n') ? res : res + '\n')
-}
-
-// ---- HTTP -----------------------------------------------------------------
-
-async function manifest(base) {
-  const r = await fetchJson(base + '/manifest', { method: 'GET' })
-  if (!r.ok) {
-    const msg = r.body && r.body.error ? r.body.error : `HTTP ${r.status}`
-    fail(typeof msg === 'string' ? msg : JSON.stringify(msg))
-  }
-  return r.body
-}
-
-async function invoke(base, tool, args) {
-  const r = await fetchJson(base + '/invoke', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tool, args }),
-  })
-  if (!r.ok) {
-    let msg = r.body && r.body.error ? r.body.error : `HTTP ${r.status}`
-    if (typeof msg !== 'string') msg = JSON.stringify(msg)
-    const details = r.body && r.body.details
-    if (details) msg += '\n' + (typeof details === 'string' ? details : JSON.stringify(details, null, 2))
-    fail(msg)
-  }
-  const blocks = (r.body && r.body.content) || []
-  return blocks
-    .map((b) => (b && b.type === 'text' ? b.text : b ? `[${b.type}]` : ''))
-    .join('\n')
-}
-
-async function fetchJson(url, opts) {
-  let resp
-  try {
-    resp = await fetch(url, opts)
-  } catch (e) {
-    fail(`cannot reach OpenAlice at ${url} — is the backend running? (${e && e.message})`)
-  }
-  let body = null
-  const text = await resp.text()
-  try {
-    body = text ? JSON.parse(text) : null
-  } catch {
-    body = text
-  }
-  return { ok: resp.ok, status: resp.status, body }
-}
-
-// ---- flag parsing ---------------------------------------------------------
-
-function parseFlags(tokens) {
-  const args = {}
-  const meta = {}
-  const docs = []
-  for (let i = 0; i < tokens.length; i++) {
-    let tok = tokens[i]
-    if (!tok.startsWith('--')) continue
-    tok = tok.slice(2)
-    let key, val
-    const eq = tok.indexOf('=')
-    if (eq >= 0) {
-      key = tok.slice(0, eq)
-      val = tok.slice(eq + 1)
-    } else {
-      key = tok
-      const next = tokens[i + 1]
-      if (next === undefined || next.startsWith('--')) {
-        val = 'true' // bare flag -> boolean-ish; gateway coerces as needed
-      } else {
-        val = next
-        i++
-      }
-    }
-    // JSON-looking values parse into objects/arrays so object flags work:
-    //   --takeProfit '{"price":"1725"}'
-    // Parse failures fall through as plain strings (gateway validates).
-    if (typeof val === 'string' && (val.startsWith('{') || val.startsWith('['))) {
-      try { val = JSON.parse(val) } catch { /* keep the raw string */ }
-    }
-    if (key === 'meta') {
-      // repeatable: --meta key=value -> metadataFilter
-      const e = val.indexOf('=')
-      if (e >= 0) meta[val.slice(0, e)] = val.slice(e + 1)
-    } else if (key === 'doc') {
-      // repeatable: --doc <path> -> docs: [{ path }] (inbox_push attachments).
-      // A JSON object value (--doc '{"path":"x"}') is kept as-is so future
-      // per-doc fields keep working; a bare path is wrapped into { path }.
-      docs.push(val && typeof val === 'object' ? val : { path: String(val) })
-    } else {
-      args[key] = val
-    }
-  }
-  if (Object.keys(meta).length) args.metadataFilter = meta
-  if (docs.length) args.docs = docs
-  return args
-}
-
-// ---- help rendering -------------------------------------------------------
-
-function printGroups(m) {
-  const groups = Object.keys(m.groups)
-  const width = Math.max(...groups.map((g) => g.length), 1)
-  out(`OpenAlice CLI — ${BIN} <group> <verb> [--flags]`)
-  if (m.description) out(m.description)
-  out('')
-  for (const g of groups) {
-    out(`  ${g.padEnd(width)}  ${Object.keys(m.groups[g]).join(', ')}`)
-  }
-  out(`\nRun \`${BIN} <group>\` or \`${BIN} <group> <verb> --help\` for details.`)
-  if (m.unmapped && m.unmapped.length) {
-    out(`\n(${m.unmapped.length} tool(s) reachable via MCP but not this CLI)`)
-  }
-}
-
-function printVerbs(group, cmds) {
-  const verbs = Object.keys(cmds)
-  const width = Math.max(...verbs.map((v) => v.length), 1)
-  out(`${BIN} ${group} <verb> [--flags]\n`)
-  for (const v of verbs) {
-    out(`  ${v.padEnd(width)}  ${firstLine(cmds[v].description)}`)
-  }
-}
-
-function printVerbHelp(group, verb, cmd) {
-  out(`${BIN} ${group} ${verb} [--flags]\n`)
-  if (cmd.description) out(cmd.description + '\n')
-  const props = (cmd.schema && cmd.schema.properties) || {}
-  const required = new Set((cmd.schema && cmd.schema.required) || [])
-  const names = Object.keys(props)
-  if (!names.length) return out('(no flags)')
-  out('Flags:')
-  for (const n of names) {
-    const p = props[n] || {}
-    const type = p.type || (p.enum ? 'enum' : '')
-    const req = required.has(n) ? ' (required)' : ''
-    out(`  --${n}${type ? ' <' + type + '>' : ''}${req}   ${firstLine(p.description || '')}`)
-  }
-}
-
-// ---- util -----------------------------------------------------------------
-
-function firstLine(s) {
-  return (s || '').split('\n')[0]
-}
-function out(s) {
-  process.stdout.write(s + '\n')
-}
-function fail(msg) {
-  process.stderr.write(BIN + ': ' + msg + '\n')
-  process.exit(1)
-}
-
-main().catch((e) => fail(e && e.stack ? e.stack : String(e)))
+exec node "$launcher_dir/openalice-cli.cjs" "$@"

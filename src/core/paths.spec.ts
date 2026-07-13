@@ -43,8 +43,8 @@ afterEach(() => {
 describe('dataPath', () => {
   it('joins parts under <USER_DATA_HOME>/data/', async () => {
     const { dataPath } = await loadPaths({ OPENALICE_HOME: '/tmp/oa-test' })
-    expect(dataPath('config')).toBe('/tmp/oa-test/data/config')
-    expect(dataPath('brain', 'persona.md')).toBe('/tmp/oa-test/data/brain/persona.md')
+    expect(dataPath('config')).toBe(resolve('/tmp/oa-test', 'data', 'config'))
+    expect(dataPath('brain', 'persona.md')).toBe(resolve('/tmp/oa-test', 'data', 'brain', 'persona.md'))
   })
 
   it('falls back to ~/.openalice when OPENALICE_HOME is unset', async () => {
@@ -54,14 +54,14 @@ describe('dataPath', () => {
 
   it('returns the base data dir when called with no parts', async () => {
     const { dataPath } = await loadPaths({ OPENALICE_HOME: '/tmp/oa-test' })
-    expect(dataPath()).toBe('/tmp/oa-test/data')
+    expect(dataPath()).toBe(resolve('/tmp/oa-test', 'data'))
   })
 })
 
 describe('defaultPath', () => {
   it('joins parts under <APP_RESOURCES_HOME>/default/', async () => {
     const { defaultPath } = await loadPaths({ OPENALICE_APP_HOME: '/Apps/OpenAlice.app/Contents/Resources' })
-    expect(defaultPath('persona.default.md')).toBe('/Apps/OpenAlice.app/Contents/Resources/default/persona.default.md')
+    expect(defaultPath('persona.default.md')).toBe(resolve('/Apps/OpenAlice.app/Contents/Resources', 'default', 'persona.default.md'))
   })
 
   it('falls back to process.cwd() when OPENALICE_APP_HOME is unset', async () => {
@@ -73,7 +73,7 @@ describe('defaultPath', () => {
 describe('uiBundlePath', () => {
   it('resolves to <APP_RESOURCES_HOME>/ui/dist (no parts)', async () => {
     const { uiBundlePath } = await loadPaths({ OPENALICE_APP_HOME: '/foo' })
-    expect(uiBundlePath()).toBe('/foo/ui/dist')
+    expect(uiBundlePath()).toBe(resolve('/foo', 'ui', 'dist'))
   })
 
   it('falls back to cwd-relative ui/dist when unset', async () => {
@@ -85,7 +85,7 @@ describe('uiBundlePath', () => {
 describe('templatesPath', () => {
   it('resolves to <APP_RESOURCES_HOME>/src/workspaces/templates', async () => {
     const { templatesPath } = await loadPaths({ OPENALICE_APP_HOME: '/foo' })
-    expect(templatesPath()).toBe('/foo/src/workspaces/templates')
+    expect(templatesPath()).toBe(resolve('/foo', 'src', 'workspaces', 'templates'))
   })
 
   it('falls back to cwd-relative path when unset', async () => {
@@ -100,13 +100,13 @@ describe('two homes are independent', () => {
     // by different lifecycle actors. Tying them together would conflate
     // upgrade-survives vs upgrade-replaces semantics.
     const { dataPath, defaultPath } = await loadPaths({ OPENALICE_HOME: '/tmp/user' })
-    expect(dataPath('config')).toBe('/tmp/user/data/config')
+    expect(dataPath('config')).toBe(resolve('/tmp/user', 'data', 'config'))
     expect(defaultPath('persona.default.md')).toBe(resolve(process.cwd(), 'default/persona.default.md'))
   })
 
   it('setting OPENALICE_APP_HOME does not move USER_DATA_HOME', async () => {
     const { dataPath, defaultPath } = await loadPaths({ OPENALICE_APP_HOME: '/tmp/resources' })
-    expect(defaultPath('x')).toBe('/tmp/resources/default/x')
+    expect(defaultPath('x')).toBe(resolve('/tmp/resources', 'default', 'x'))
     expect(dataPath('config')).toBe(resolve(homedir(), '.openalice', 'data/config'))
   })
 
@@ -115,10 +115,10 @@ describe('two homes are independent', () => {
       OPENALICE_HOME: '/Users/x/Library/Application Support/OpenAlice',
       OPENALICE_APP_HOME: '/Applications/OpenAlice.app/Contents/Resources',
     })
-    expect(dataPath('config')).toBe('/Users/x/Library/Application Support/OpenAlice/data/config')
-    expect(defaultPath('persona.default.md')).toBe('/Applications/OpenAlice.app/Contents/Resources/default/persona.default.md')
-    expect(uiBundlePath()).toBe('/Applications/OpenAlice.app/Contents/Resources/ui/dist')
-    expect(templatesPath()).toBe('/Applications/OpenAlice.app/Contents/Resources/src/workspaces/templates')
+    expect(dataPath('config')).toBe(resolve('/Users/x/Library/Application Support/OpenAlice', 'data', 'config'))
+    expect(defaultPath('persona.default.md')).toBe(resolve('/Applications/OpenAlice.app/Contents/Resources', 'default', 'persona.default.md'))
+    expect(uiBundlePath()).toBe(resolve('/Applications/OpenAlice.app/Contents/Resources', 'ui', 'dist'))
+    expect(templatesPath()).toBe(resolve('/Applications/OpenAlice.app/Contents/Resources', 'src', 'workspaces', 'templates'))
   })
 })
 

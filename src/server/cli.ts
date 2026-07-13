@@ -27,12 +27,21 @@ import type { Hono } from 'hono'
 import { z } from 'zod'
 import type { Tool } from 'ai'
 import type { ToolCenter } from '../core/tool-center.js'
-import type { WorkspaceToolCenter } from '../core/workspace-tool-center.js'
-import type { IInboxStore } from '../core/inbox-store.js'
+import {
+  type WorkspaceToolCenter,
+  makeInboxEntryOriginResolver,
+  makeWorkspaceResolver,
+} from '../core/workspace-tool-center.js'
+import type { IInboxStore, InboxOrigin } from '../core/inbox-store.js'
 import type { IEntityStore } from '../core/entity-store.js'
+import { sessionOriginFromInboxOrigin } from '../core/provenance-store.js'
 import type { WorkspaceService } from '../workspaces/service.js'
+import { logger as launcherLogger } from '../workspaces/logger.js'
 import { extractMcpShape, wrapToolExecute } from '../core/mcp-export.js'
 import { type CliExport, getExport, mappedToolNames } from './cli-commands.js'
+import { resolveInboxOrigin } from './inbox-origin.js'
+import { extractTradeDecisionRefs } from './trade-provenance.js'
+import { createWorkspaceConversationControl } from '../workspaces/conversation-control.js'
 
 export interface CliGatewayDeps {
   toolCenter: ToolCenter
@@ -67,13 +76,52 @@ export function registerCliRoutes(app: Hono, deps: CliGatewayDeps): void {
   const exportCatalog = (
     exp: CliExport,
     ws: WsMeta,
+    origin?: InboxOrigin,
   ): { resolve: (name: string) => Tool | null; inventoryNames: () => string[] } => {
     if (exp.scope === 'scoped') {
+      // GLOBAL issue-board reader, backed by the live WorkspaceService.
+      // Built here so issue_list / issue_show on `alice-workspace` read EVERY
+      // workspace's issues (reads global), while create/update/comment stay
+      // caller-local. Absent when the service isn't up yet → tools self-read.
+      const svc = getWorkspaceService()
       const wsTools = workspaceToolCenter.build({
         workspaceId: ws.id,
         workspaceLabel: ws.tag,
         inboxStore,
         entityStore,
+        ...(svc ? { provenanceStore: svc.provenanceStore } : {}),
+        ...(svc ? { conversation: createWorkspaceConversationControl(svc) } : {}),
+        // Lets workspace_path resolve ANY peer's dir (not just the caller) —
+        // the in-workspace cross-workspace addressing path. Shared with the
+        // mcp.ts build site so the two never drift.
+        resolveWorkspace: makeWorkspaceResolver(getWorkspaceService),
+        resolveInboxOrigin: makeInboxEntryOriginResolver(getWorkspaceService),
+        ...(svc ? { sessionDirectory: (id: string, limit?: number) => svc.sessionDirectory(id, limit) } : {}),
+        ...(svc ? {
+          resolveSessionIdentity: (resumeId: string) => {
+            const identity = svc.resumeRegistry.get(resumeId)
+            return identity
+              ? {
+                  workspaceId: identity.wsId,
+                  agent: identity.agent,
+                  resumable: identity.lifecycle !== 'retired' && Boolean(identity.agentSessionId),
+                }
+              : null
+          },
+        } : {}),
+        ...(svc
+          ? {
+              board: {
+                snapshot: () => svc.issuesSnapshot(),
+                detail: (w: string, i: string) => svc.issueDetail(w, i),
+                resolveByName: (n: string) => svc.resolveIssuesByName(n),
+              },
+            }
+          : {}),
+        // Agent-invisible run provenance from the `x-openalice-run` header
+        // (resolved server-side). Only the invoke path passes it; manifest omits
+        // it (no execution, no push). Absent → undefined.
+        ...(origin ? { origin } : {}),
       })
       return {
         resolve: (name) => wsTools[name] ?? null,
@@ -154,7 +202,20 @@ export function registerCliRoutes(app: Hono, deps: CliGatewayDeps): void {
     if (!mappedToolNames(c.req.param('export')).has(toolName)) {
       return c.json({ error: `Unknown CLI command tool: ${toolName || '(none)'}` }, 404)
     }
-    const tool = exportCatalog(r.exp, r.ws).resolve(toolName)
+    // Out-of-band identity (agent never sees it): the `alice` shim forwards the
+    // spawn-injected AQ_RUN_ID (headless) / AQ_SESSION_ID (interactive) here as
+    // mutually-exclusive headers, resolved server-side to an authoritative origin
+    // and baked into the scoped tools (e.g. inbox_push auto-link). The session
+    // header is validated against THIS workspace's session registry.
+    const origin = resolveInboxOrigin(
+      {
+        run: c.req.header('x-openalice-run'),
+        session: c.req.header('x-openalice-session'),
+        wsId: r.ws.id,
+      },
+      getWorkspaceService,
+    )
+    const tool = exportCatalog(r.exp, r.ws, origin).resolve(toolName)
     if (!tool) return c.json({ error: `Tool not available: ${toolName}` }, 404)
 
     const rawArgs =
@@ -181,6 +242,37 @@ export function registerCliRoutes(app: Hono, deps: CliGatewayDeps): void {
     if (result.isError) {
       const text = result.content.map((b) => (b.type === 'text' ? b.text : '')).join('\n')
       return c.json({ error: text || 'tool error' }, 500)
+    }
+    // A UTA Git commit is the durable business decision. Attribute only commits
+    // created through an authoritative Workspace Session header; a bare local
+    // API/CLI call remains unattributed rather than being guessed as an agent.
+    const provenanceOrigin = sessionOriginFromInboxOrigin(r.ws.id, origin)
+    const decisionRefs = provenanceOrigin
+      ? extractTradeDecisionRefs(toolName, result.content)
+      : []
+    if (provenanceOrigin && decisionRefs.length > 0) {
+      const svc = getWorkspaceService()
+      if (svc) {
+        try {
+          for (const ref of decisionRefs) {
+            await svc.provenanceStore.append({
+              artifact: {
+                kind: 'trade-decision',
+                accountId: ref.accountId,
+                decisionId: ref.decisionId,
+              },
+              action: 'decided',
+              origin: provenanceOrigin,
+              at: Date.now(),
+              fingerprint: `trade-decision:${ref.accountId}:${ref.decisionId}:decided`,
+            })
+          }
+        } catch (err) {
+          // Trading already committed successfully. A diagnostics write must
+          // never turn that success into a reported command failure.
+          launcherLogger.warn('trade_decision_provenance.append_failed', { err })
+        }
+      }
     }
     // Hand back the MCP content blocks; the client prints text blocks verbatim
     // (data tools return one text block that already holds the JSON payload).

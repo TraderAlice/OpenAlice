@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { formatRelativeTime } from '../lib/intl'
 import { api, type NewsArticle } from '../api'
 import { PageHeader } from '../components/PageHeader'
-import { EmptyState } from '../components/StateViews'
+import { EmptyState, Skeleton } from '../components/StateViews'
 
 // ==================== Helpers ====================
 
@@ -158,7 +158,14 @@ export function NewsPage() {
           {/* Article list */}
           <div className="flex-1 min-h-0 overflow-y-auto rounded-lg border border-border bg-bg">
             {loading && articles.length === 0 ? (
-              <div className="px-4 py-8 text-center text-text-muted">{t('common.loading')}</div>
+              <div className="divide-y divide-border/50">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="px-4 py-3">
+                    <Skeleton className="h-3.5 w-3/4" />
+                    <Skeleton className="h-2.5 w-1/3 mt-2" />
+                  </div>
+                ))}
+              </div>
             ) : articles.length === 0 ? (
               <EmptyState title={t('news.noArticles')} description={t('news.noArticlesDescription')} />
             ) : (

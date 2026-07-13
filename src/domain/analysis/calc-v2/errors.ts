@@ -14,6 +14,8 @@ export type CalcErrorKind =
   | 'type'              // sma("x", 50) — arg 1 must be a series
   | 'insufficient-bars' // rsi(length=300) but the series has 120 bars
   | 'reflex'            // .rolling().mean() / np.mean() / .iloc — Python habit, redirect
+  | 'data-source'       // bars(...) fetch failed upstream (vendor rate-limit / network /
+                        // bad barId) — NOT a script bug; the fix is operational, not an edit
 
 export interface CalcDiagnostic {
   kind: CalcErrorKind

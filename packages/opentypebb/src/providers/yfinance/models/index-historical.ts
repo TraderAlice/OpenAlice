@@ -6,8 +6,7 @@
 import { z } from 'zod'
 import { Fetcher } from '../../../core/provider/abstract/fetcher.js'
 import { IndexHistoricalQueryParamsSchema, IndexHistoricalDataSchema } from '../../../standard-models/index-historical.js'
-import { EmptyDataError } from '../../../core/provider/utils/errors.js'
-import { getHistoricalData } from '../utils/helpers.js'
+import { getHistoricalData, emptyHistoricalError } from '../utils/helpers.js'
 import { INTERVALS_DICT, INDICES } from '../utils/references.js'
 
 export const YFinanceIndexHistoricalQueryParamsSchema = IndexHistoricalQueryParamsSchema.extend({
@@ -113,7 +112,7 @@ export class YFinanceIndexHistoricalFetcher extends Fetcher {
       if (r.status === 'fulfilled') allData.push(...r.value)
     }
 
-    if (!allData.length) throw new EmptyDataError('No index historical data returned')
+    if (!allData.length) throw emptyHistoricalError(results, 'No index historical data returned')
     return allData
   }
 

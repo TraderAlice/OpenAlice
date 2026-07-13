@@ -15,9 +15,17 @@
  * they can't sensibly use.
  */
 
+import { createHash } from 'node:crypto'
+
 import { tool } from 'ai'
 import { z } from 'zod'
 import type { WorkspaceToolFactory, WorkspaceToolContext } from '../core/workspace-tool-center.js'
+import { sessionOriginFromInboxOrigin } from '../core/provenance-store.js'
+import { readWorkspaceFile } from '../workspaces/file-service.js'
+
+export function reportContentRevision(content: string): string {
+  return `sha256:${createHash('sha256').update(content, 'utf8').digest('hex')}`
+}
 
 export const inboxPushFactory: WorkspaceToolFactory = {
   name: 'inbox_push',
@@ -32,14 +40,18 @@ export const inboxPushFactory: WorkspaceToolFactory = {
         '',
         '`docs` are paths relative to this workspace root. Each one',
         'is rendered live in the inbox UI when the user opens the',
-        'entry — no snapshot is taken, so later edits to the file',
-        'will be reflected on subsequent reads.',
+        'entry — later edits remain visible. OpenAlice also records a content',
+        'hash for the exact revision published, so later readers can distinguish',
+        '“what was sent then” from the current live file.',
         '',
         '`comments` is markdown — your voice to the user about what',
         'you did or want to ask. Keep it short and direct; if more',
         'detail is needed put it in a doc and reference it.',
         '',
         'At least one of `docs` or `comments` must be present.',
+        '',
+        'Entries are automatically linked back to the run that produced',
+        'them — you do not pass any run, session, or issue identity.',
       ].join(' '),
       inputSchema: z.object({
         docs: z
@@ -66,12 +78,49 @@ export const inboxPushFactory: WorkspaceToolFactory = {
       }),
       execute: async ({ docs, comments }) => {
         try {
+          const workspace = ctx.resolveWorkspace?.(ctx.workspaceId)
+          const publishedDocs = await Promise.all((docs ?? []).map(async (doc) => {
+            if (!workspace) return doc
+            const content = await readWorkspaceFile(workspace.dir, doc.path)
+            return content === null
+              ? doc
+              : { ...doc, revision: reportContentRevision(content) }
+          }))
           const entry = await ctx.inboxStore.append({
             workspaceId: ctx.workspaceId,
             workspaceLabel: ctx.workspaceLabel,
-            docs,
+            ...(docs ? { docs: publishedDocs } : {}),
             comments,
+            // Agent-invisible: stamped from the server-resolved run origin, NOT
+            // from anything in the tool's input schema. Omit the key entirely
+            // when absent (interactive / no run header) so the JSONL stays clean.
+            ...(ctx.origin ? { origin: ctx.origin } : {}),
           })
+          if (ctx.provenanceStore) {
+            const sessionOrigin = sessionOriginFromInboxOrigin(ctx.workspaceId, ctx.origin)
+            const origin = sessionOrigin ?? { kind: 'unknown' as const, reason: 'missing-session-origin' }
+            await ctx.provenanceStore.append({
+              artifact: { kind: 'inbox', inboxEntryId: entry.id },
+              action: 'sent',
+              origin,
+              at: entry.ts,
+              fingerprint: `inbox:${entry.id}:sent`,
+            })
+            for (const doc of entry.docs ?? []) {
+              await ctx.provenanceStore.append({
+                artifact: {
+                  kind: 'report',
+                  workspaceId: ctx.workspaceId,
+                  path: doc.path,
+                  ...(doc.revision ? { revision: doc.revision } : {}),
+                },
+                action: 'sent',
+                origin,
+                at: entry.ts,
+                fingerprint: `report:${ctx.workspaceId}:${doc.path}:${doc.revision ?? 'unversioned'}:sent:${entry.id}`,
+              })
+            }
+          }
           return {
             ok: true as const,
             entryId: entry.id,

@@ -10,7 +10,7 @@ import { resolveMediaPath, persistMedia } from './media-store.js'
 describe('resolveMediaPath', () => {
   it('should join MEDIA_DIR with the given name', () => {
     const result = resolveMediaPath('2026-01-01/ace-aim-air.png')
-    expect(result).toContain('data/media/2026-01-01/ace-aim-air.png')
+    expect(result).toContain(join('data', 'media', '2026-01-01', 'ace-aim-air.png'))
   })
 })
 

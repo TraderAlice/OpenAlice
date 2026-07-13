@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { readPortsFile, resolvePortConfig } from './shared.js'
+import { isLiteModeEnv, readPortsFile, resolveGuardianTradingMode, resolvePortConfig, resolveWindowsBin, startFlagWatcher } from './shared.js'
 
 let home: string
 
@@ -18,6 +18,11 @@ afterEach(async () => {
 async function writePortsFile(content: string): Promise<void> {
   await mkdir(join(home, 'data', 'config'), { recursive: true })
   await writeFile(join(home, 'data', 'config', 'ports.json'), content)
+}
+
+async function writeConfigFile(name: string, content: string): Promise<void> {
+  await mkdir(join(home, 'data', 'config'), { recursive: true })
+  await writeFile(join(home, 'data', 'config', name), content)
 }
 
 describe('readPortsFile', () => {
@@ -88,5 +93,103 @@ describe('resolvePortConfig', () => {
 
   it('fails loud on a malformed env value', () => {
     expect(() => resolvePortConfig({ OPENALICE_MCP_PORT: 'banana' }, {})).toThrow(/invalid port/)
+  })
+})
+
+describe('isLiteModeEnv', () => {
+  it('accepts explicit truthy lite-mode values', () => {
+    expect(isLiteModeEnv({ OPENALICE_LITE_MODE: '1' })).toBe(true)
+    expect(isLiteModeEnv({ OPENALICE_LITE_MODE: 'true' })).toBe(true)
+    expect(isLiteModeEnv({ OPENALICE_LITE_MODE: 'yes' })).toBe(true)
+    expect(isLiteModeEnv({ OPENALICE_LITE_MODE: 'on' })).toBe(true)
+  })
+
+  it('accepts OPENALICE_UTA_DISABLED as a direct alias', () => {
+    expect(isLiteModeEnv({ OPENALICE_UTA_DISABLED: '1' })).toBe(true)
+  })
+
+  it('treats unset and falsey values as normal mode', () => {
+    expect(isLiteModeEnv({})).toBe(false)
+    expect(isLiteModeEnv({ OPENALICE_LITE_MODE: '' })).toBe(false)
+    expect(isLiteModeEnv({ OPENALICE_LITE_MODE: '0', OPENALICE_UTA_DISABLED: 'false' })).toBe(false)
+  })
+})
+
+describe('resolveGuardianTradingMode', () => {
+  it('env OPENALICE_TRADING_MODE wins and locks the mode', async () => {
+    await writeConfigFile('trading.json', '{ "mode": "pro" }')
+    await writeConfigFile('accounts.json', '[{ "id": "alpaca" }]')
+    await expect(resolveGuardianTradingMode({ OPENALICE_TRADING_MODE: 'readonly' }, home)).resolves.toMatchObject({
+      mode: 'readonly',
+      source: 'env',
+      envLocked: true,
+      hasUTAConfig: true,
+    })
+  })
+
+  it('uses persisted mode before auto inference', async () => {
+    await writeConfigFile('trading.json', '{ "mode": "lite" }')
+    await writeConfigFile('accounts.json', '[{ "id": "alpaca" }]')
+    await expect(resolveGuardianTradingMode({}, home)).resolves.toMatchObject({
+      mode: 'lite',
+      source: 'config',
+      hasUTAConfig: true,
+    })
+  })
+
+  it('auto defaults to pro only when accounts exist', async () => {
+    await writeConfigFile('accounts.json', '[{ "id": "alpaca" }]')
+    await expect(resolveGuardianTradingMode({}, home)).resolves.toMatchObject({ mode: 'pro', source: 'auto', hasUTAConfig: true })
+
+    await rm(home, { recursive: true, force: true })
+    home = await mkdtemp(join(tmpdir(), 'guardian-ports-'))
+    await expect(resolveGuardianTradingMode({}, home)).resolves.toMatchObject({ mode: 'lite', source: 'auto', hasUTAConfig: false })
+  })
+})
+
+describe('resolveWindowsBin — Windows .CMD shim resolution (#378)', () => {
+  const BIN = 'C:\\proj\\node_modules\\.bin'
+
+  it('is a no-op off Windows (POSIX resolves .bin directly with shell off)', () => {
+    expect(resolveWindowsBin('tsx', 'linux', BIN, () => true)).toBe('tsx')
+    expect(resolveWindowsBin('tsx', 'darwin', BIN, () => true)).toBe('tsx')
+  })
+
+  it('rewrites a local shim to its absolute .CMD path on Windows', () => {
+    expect(resolveWindowsBin('tsx', 'win32', BIN, (p) => p === `${BIN}\\tsx.CMD`))
+      .toBe('C:\\proj\\node_modules\\.bin\\tsx.CMD')
+  })
+
+  it('falls through to the bare command when no local shim exists (e.g. global pnpm)', () => {
+    expect(resolveWindowsBin('pnpm', 'win32', BIN, () => false)).toBe('pnpm')
+  })
+
+  it('quotes the path when it contains a space, for cmd.exe parsing under shell:true', () => {
+    const spaced = 'C:\\Program Files\\proj\\node_modules\\.bin'
+    expect(resolveWindowsBin('tsx', 'win32', spaced, () => true))
+      .toBe('"C:\\Program Files\\proj\\node_modules\\.bin\\tsx.CMD"')
+  })
+})
+
+describe('startFlagWatcher', () => {
+  it('detects a newly-created flag once across fs.watch and the poll fallback', async () => {
+    const flagPath = join(home, 'data', 'control', 'restart-uta.flag')
+    let calls = 0
+    const stop = await startFlagWatcher({ flagPath, onTrigger: () => { calls++ }, debounceMs: 20 })
+    try {
+      await writeFile(flagPath, 'restart')
+      const deadline = Date.now() + 3_000
+      while (calls === 0 && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      }
+      expect(calls).toBe(1)
+      await new Promise((resolve) => setTimeout(resolve, 1_100))
+      expect(calls).toBe(1)
+    } finally {
+      stop()
+      // Let the POSIX fs.watch AbortSignal settle before afterEach removes the
+      // watched temp directory; Windows uses the poll-only path.
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    }
   })
 })

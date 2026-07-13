@@ -244,6 +244,14 @@ export interface SimulatePriceChangeResult {
 export interface StagePlaceOrderParams {
   aliceId: string
   symbol?: string
+  /**
+   * Target sub-account (wallet) for multi-sub-account brokers (CCXT Binance:
+   * 'spot' / 'derivatives'). REQUIRED when the broker exposes >1 sub-account —
+   * the UTA layer loud-refuses a write without it rather than guessing. Ignored
+   * by single-sub-account brokers. Not persisted in the Operation schema; it is
+   * validated against the instrument and stamped into the commit message.
+   */
+  subAccountId?: string
   action: 'BUY' | 'SELL'
   orderType: string
   totalQuantity?: string
@@ -278,6 +286,11 @@ export interface StageClosePositionParams {
   symbol?: string
   /** Empty / undefined closes the full position. */
   qty?: string
+  /**
+   * Target sub-account — same semantics as `StagePlaceOrderParams.subAccountId`.
+   * REQUIRED for multi-sub-account brokers, ignored otherwise.
+   */
+  subAccountId?: string
 }
 
 // ==================== Operation Helpers ====================

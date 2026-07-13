@@ -7,17 +7,17 @@ import type { Logger } from './logger.js';
 /**
  * Persistent session-identity record. Lives across server restart so the user
  * can pause a session today and resume it tomorrow. The `id` is the stable
- * uuid used in every cross-system reference (URL hash, WebSocket query, REST
- * route) — what we previously called `sessionToken` (transient, in-memory).
+ * launcher-owned record id used in every cross-system reference (URL hash,
+ * WebSocket query, REST route) — what we previously called `sessionToken`
+ * (transient, in-memory).
  *
  * `state` is the launcher's view: 'running' means we have a live PTY in the
  * pool keyed by this id; 'paused' means the record exists but no PTY. On a
  * crash recovery we flip any 'running' to 'paused' (see `bootFixup`).
  *
- * `resumeHint` is adapter-specific guidance written when the adapter has
- * enough information to recover the agent's own session id (claude's JSONL
- * UUID, discovered by the transcript watcher). Codex doesn't have this — its
- * `resume --last` is cwd-filtered so we don't need to track the id ourselves.
+ * `resumeId` is the product-level conversation identity. `resumeHint` remains
+ * an internal compatibility cache of the adapter-native id; ResumeRegistry is
+ * the authoritative translation layer for new product/API flows.
  *
  * `scrollbackFile` is a path **relative to** the launcher's scrollback dir
  * (see `scrollback-store.ts`), populated when a shell session is paused so
@@ -25,22 +25,42 @@ import type { Logger } from './logger.js';
  */
 export interface SessionRecord {
   readonly id: string;
+  /** Stable product conversation identity; frontend resume contracts use this. */
+  readonly resumeId: string;
   readonly wsId: string;
   readonly agent: string;
   readonly name: string;
   readonly createdAt: string;
   lastActiveAt: string;
   state: 'running' | 'paused';
+  /** Preferred/live presentation for this Session. The runtime remains Pi. */
+  surface?: 'terminal' | 'webpi';
   resumeHint?: { kind: 'agent-session-id'; value: string };
   scrollbackFile?: string;
+  /**
+   * The user's first message, captured when the session is seeded (quick-chat).
+   * Surfaced as a human-readable title in the chat sidebar instead of the sticky
+   * `c1` name. Only present for seeded sessions; absent ones fall back to `name`.
+   * Stored capped — we don't need the whole prompt for a one-line title.
+   */
+  readonly title?: string;
+  /**
+   * The headless run this launcher-owned Session was materialized from.
+   * Optional in the v2 registry because ordinary interactive Sessions have no
+   * source run. The loader still accepts v1 files during migration. This is the
+   * durable run -> Session index used by Inbox and automation surfaces to make
+   * repeated "continue this run" actions return to one conversation instead
+   * of spawning duplicate wrappers around the same agent transcript.
+   */
+  readonly sourceRunId?: string;
 }
 
 interface FileShape {
-  readonly version: 1;
+  readonly version: 2;
   readonly records: SessionRecord[];
 }
 
-const SESSION_FILE_RE = /^[0-9a-f-]+\.json$/;
+const SESSION_FILE_RE = /^[A-Za-z0-9_-]+\.json$/;
 
 /**
  * Per-workspace persistent registry of SessionRecords. Each workspace gets
@@ -153,11 +173,31 @@ export class SessionRegistry {
     return this.byWs.get(wsId)?.get(id);
   }
 
-  /** Find a record by id without knowing its wsId (uniqueness assumed at uuid level). */
+  /** Find a record by id without knowing its wsId (record ids are global). */
   findById(id: string): SessionRecord | undefined {
     for (const records of this.byWs.values()) {
       const r = records.get(id);
       if (r) return r;
+    }
+    return undefined;
+  }
+
+  /** Find the stable interactive Session materialized from a headless run. */
+  findBySourceRunId(wsId: string, sourceRunId: string): SessionRecord | undefined {
+    const records = this.byWs.get(wsId);
+    if (!records) return undefined;
+    for (const record of records.values()) {
+      if (record.sourceRunId === sourceRunId) return record;
+    }
+    return undefined;
+  }
+
+  /** Find the interactive wrapper for one product-owned conversation. */
+  findByResumeId(wsId: string, resumeId: string): SessionRecord | undefined {
+    const records = this.byWs.get(wsId);
+    if (!records) return undefined;
+    for (const record of records.values()) {
+      if (record.resumeId === resumeId) return record;
     }
     return undefined;
   }
@@ -233,7 +273,7 @@ export class SessionRegistry {
     const records = this.byWs.get(wsId);
     if (!records) return;
     const payload: FileShape = {
-      version: 1,
+      version: 2,
       records: Array.from(records.values()),
     };
     const path = join(this.dir, `${wsId}.json`);
@@ -253,7 +293,7 @@ function validateFile(value: unknown): SessionRecord[] {
     throw new Error('sessions.json: root must be an object');
   }
   const v = value as Record<string, unknown>;
-  if (v['version'] !== 1) {
+  if (v['version'] !== 1 && v['version'] !== 2) {
     throw new Error(`sessions.json: unsupported version ${String(v['version'])}`);
   }
   if (!Array.isArray(v['records'])) {
@@ -279,12 +319,21 @@ function validateFile(value: unknown): SessionRecord[] {
     }
     const base: SessionRecord = {
       id: r['id'],
+      resumeId: typeof r['resumeId'] === 'string' ? r['resumeId'] : r['id'],
       wsId: r['wsId'],
       agent: r['agent'],
       name: r['name'],
       createdAt: r['createdAt'],
       lastActiveAt: r['lastActiveAt'],
       state: r['state'],
+      ...(r['surface'] === 'terminal' || r['surface'] === 'webpi'
+        ? { surface: r['surface'] }
+        : {}),
+      // Carry the session title (the captured first message) across reloads —
+      // it's written to disk by `flush`, so it must be read back here too, or
+      // every server restart / registry reload reverts the row to the `c1` name.
+      ...(typeof r['title'] === 'string' ? { title: r['title'] } : {}),
+      ...(typeof r['sourceRunId'] === 'string' ? { sourceRunId: r['sourceRunId'] } : {}),
     };
     const hint = r['resumeHint'];
     if (

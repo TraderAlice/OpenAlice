@@ -1,45 +1,47 @@
 import { api } from '../api'
 import type { BrokerHealthInfo } from '../api/types'
 import { createLiveStore } from './createLiveStore'
-import { connectSSE } from './connectSSE'
+import { reloadOnHotUpdate } from '../lib/hmr'
+
+reloadOnHotUpdate('live/account-health')
 
 /**
  * Live broker-health map: accountId → BrokerHealthInfo.
  *
- * First LiveStore consumer. Replaces the previous per-page `useSSE` that
- * opened a fresh EventSource for each of TradingPage / PortfolioPage /
- * UTADetailPage — three components mounted concurrently used to mean
- * three connections to the same `/api/events/stream`. Now there's one,
- * shared across all subscribers, and it tears down when nothing's
- * watching.
+ * Shared by TradingPage, PortfolioPage, and UTADetailPage. Health lives in the
+ * separate UTA process, so Alice refreshes the authoritative UTA summaries
+ * instead of pretending its retired event stream carries UTA-local records.
  */
 
 type State = Record<string, BrokerHealthInfo>
-
-interface HealthEvent {
-  type?: string
-  payload?: { accountId?: string } & Partial<BrokerHealthInfo>
-}
 
 export const accountHealthLive = createLiveStore<State>({
   name: 'account-health',
   initialState: {},
   subscribe: ({ apply }) => {
-    // Initial snapshot — the SSE stream only emits diffs going forward,
-    // so we still need a one-shot fetch to populate steady state.
-    api.trading.listUTASummaries().then(({ utas }) => {
-      const map: State = {}
-      for (const u of utas) map[u.id] = u.health
-      apply(() => map)
-    }).catch(() => {
-      /* surface via ignored network errors — not worth a notification */
-    })
+    let disposed = false
+    let refreshing = false
+    const refresh = () => {
+      if (refreshing) return
+      refreshing = true
+      api.trading.listUTASummaries().then(({ utas }) => {
+        if (disposed) return
+        const map: State = {}
+        for (const u of utas) map[u.id] = u.health
+        apply(map)
+      }).catch(() => {
+        /* A transient UTA outage should preserve the last known snapshot. */
+      }).finally(() => {
+        refreshing = false
+      })
+    }
 
-    // Live diffs.
-    return connectSSE<HealthEvent>('/api/events/stream', (entry) => {
-      if (entry.type !== 'account.health' || !entry.payload?.accountId) return
-      const { accountId, ...health } = entry.payload
-      apply((prev) => ({ ...prev, [accountId]: health as BrokerHealthInfo }))
-    })
+    refresh()
+    const timer = setInterval(refresh, 5_000)
+    return () => {
+      disposed = true
+      clearInterval(timer)
+    }
   },
+  staleAfterMs: 15_000,
 })

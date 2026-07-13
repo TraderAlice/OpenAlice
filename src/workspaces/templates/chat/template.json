@@ -5,5 +5,5 @@
   "defaultAgents": ["claude", "codex"],
   "injectTools": true,
   "injectPersona": true,
-  "bundledSkills": ["scan-value-chain", "build-thesis", "sector-rotation", "opencli-reader"]
+  "bundledSkills": ["scan-value-chain", "build-thesis", "sector-rotation", "retrospective", "opencli-reader"]
 }

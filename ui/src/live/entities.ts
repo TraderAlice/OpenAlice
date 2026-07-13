@@ -1,6 +1,9 @@
 import { api } from '../api'
 import type { EntityListItem } from '../api/entities'
 import { createLiveStore } from './createLiveStore'
+import { reloadOnHotUpdate } from '../lib/hmr'
+
+reloadOnHotUpdate('live/entities')
 
 /**
  * Live tracked-entity feed. 20s polling against `/api/entities`. Same

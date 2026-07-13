@@ -31,13 +31,22 @@ import { UTAAccountSDK, NotImplementedInSDK } from './UTAAccountSDK.js'
 
 export interface UTAManagerSDKDeps {
   client: UTAClient
+  /** Offline/lite mode reason. Getter form lets product-mode changes take
+   *  effect without reconstructing the SDK. */
+  unavailableReason?: string | (() => string | undefined)
+  /** Dynamic guard for venue-mutating broker writes in readonly mode. */
+  readonlyMutationReason?: () => string | undefined
 }
 
 export class UTAManagerSDK {
   private readonly client: UTAClient
+  private readonly unavailableReason?: string | (() => string | undefined)
+  private readonly readonlyMutationReason?: () => string | undefined
 
   constructor(deps: UTAManagerSDKDeps) {
     this.client = deps.client
+    this.unavailableReason = deps.unavailableReason
+    this.readonlyMutationReason = deps.readonlyMutationReason
   }
 
   // ==================== Setup hooks — UTA owns these now ====================
@@ -72,18 +81,30 @@ export class UTAManagerSDK {
   // ==================== Reads (HTTP-backed) ====================
 
   async listUTAs(): Promise<UTASummary[]> {
+    if (this.getUnavailableReason()) return []
     const res = await this.client.get<{ utas: UTASummary[] }>(`/api/trading/uta`)
     return res.utas
   }
 
   /** Async equivalent of `UTAManager.resolve(source?)`. Filters by id or
-   *  provider prefix when `source` is given. */
-  async resolve(source?: string): Promise<UTAAccountSDK[]> {
+   *  provider prefix when `source` is given.
+   *
+   *  `tradingOnly` (used by the user-portfolio aggregations — account /
+   *  portfolio / orders) drops keyless **'data'-tier** sources
+   *  (binance-readonly, okx-readonly, bybit-readonly) from the no-source
+   *  aggregate: they hold no user positions or orders, so including them only
+   *  adds failure surface — a region-blocked public-data source must not blank
+   *  the whole portfolio (issue #390). An explicit `source` still resolves a
+   *  data-tier account (you can query it directly). */
+  async resolve(source?: string, opts?: { tradingOnly?: boolean }): Promise<UTAAccountSDK[]> {
     const all = await this.listUTAs()
-    const matches = source
+    let matches = source
       ? all.filter((u) => u.id === source || u.id.startsWith(`${source}-`))
       : all
-    return matches.map((u) => new UTAAccountSDK({ client: this.client, id: u.id, label: u.label }))
+    if (!source && opts?.tradingOnly) {
+      matches = matches.filter((u) => u.health.tier !== 'data')
+    }
+    return matches.map((u) => this.accountFromSummary(u))
   }
 
   /** Like `UTAManager.resolveOne(source)` but async and throws when
@@ -100,12 +121,27 @@ export class UTAManagerSDK {
   async get(id: string): Promise<UTAAccountSDK | undefined> {
     const all = await this.listUTAs()
     const match = all.find((u) => u.id === id)
-    return match ? new UTAAccountSDK({ client: this.client, id: match.id, label: match.label }) : undefined
+    return match ? this.accountFromSummary(match) : undefined
   }
 
   async has(id: string): Promise<boolean> {
     const all = await this.listUTAs()
     return all.some((u) => u.id === id)
+  }
+
+  /** sourceId → declared historical-bar quality, for the federated bar layer to
+   *  report each broker's honest entitlement (Alpaca free = 'iex', CCXT =
+   *  'realtime') rather than blanket-labeling broker sources 'realtime'. */
+  async getBarCapabilities(): Promise<Record<string, 'realtime' | 'iex' | 'delayed' | 'subscription'>> {
+    if (this.getUnavailableReason()) return {}
+    const all = await this.listUTAs()
+    const out: Record<string, 'realtime' | 'iex' | 'delayed' | 'subscription'> = {}
+    for (const u of all) {
+      if (u.asVendor === false) continue
+      const q = u.capabilities.historicalBars?.quality
+      if (q) out[u.id] = q
+    }
+    return out
   }
 
   /** UTAManager exposed `size` as a sync getter — SDK can't avoid the
@@ -116,6 +152,7 @@ export class UTAManagerSDK {
   }
 
   async getAggregatedEquity(): Promise<AggregatedEquity> {
+    this.assertAvailable()
     return this.client.get<AggregatedEquity>(`/api/trading/equity`)
   }
 
@@ -123,6 +160,7 @@ export class UTAManagerSDK {
    *  UTAs (collected server-side from positions + account base currency).
    *  Used by the AI portfolio tool for cross-currency percentage math. */
   async getFxRates(): Promise<Array<{ currency: string; rate: number; source: string; updatedAt: string }>> {
+    if (this.getUnavailableReason()) return []
     const res = await this.client.get<{ rates: Array<{ currency: string; rate: number; source: string; updatedAt: string }> }>(`/api/trading/fx-rates`)
     return res.rates
   }
@@ -138,6 +176,8 @@ export class UTAManagerSDK {
    *  for v1; finer-grained reconnect can land alongside per-UTA hot
    *  reload in a future step. */
   async reconnectUTA(_id: string): Promise<ReconnectResult> {
+    const unavailable = this.getUnavailableReason()
+    if (unavailable) return { success: false, error: unavailable }
     const r = await triggerUTARestart()
     if (r.triggered && r.ready) return { success: true, message: 'UTA restarted' }
     return { success: false, error: r.error ?? 'UTA restart did not complete' }
@@ -146,6 +186,7 @@ export class UTAManagerSDK {
   /** Same shape: triggers UTA restart so the new process picks up the
    *  caller-side write to `accounts.json`. */
   async removeUTA(_id: string): Promise<void> {
+    if (this.getUnavailableReason()) return
     await triggerUTARestart().catch((err) => {
       // Best-effort — config-route caller has already deleted from disk;
       // not blocking the response on UTA respawn completion.
@@ -159,6 +200,7 @@ export class UTAManagerSDK {
     pattern: string,
     _assetClass?: unknown,
   ): Promise<ContractSearchHit[]> {
+    if (this.getUnavailableReason()) return []
     // The route returns flat per-account hits ({ source, contract,
     // derivativeSecTypes }), NOT the grouped ContractSearchResult shape.
     const res = await this.client.get<{ results: ContractSearchHit[] }>(
@@ -172,10 +214,31 @@ export class UTAManagerSDK {
     _aliceId: string,
     _query: Contract,
   ): Promise<ContractDetails | null> {
+    this.assertAvailable()
     throw new NotImplementedInSDK(
       'getContractDetails',
       'GET /api/trading/uta/:id/contracts/details',
     )
+  }
+
+  private assertAvailable(): void {
+    const unavailable = this.getUnavailableReason()
+    if (unavailable) throw new Error(unavailable)
+  }
+
+  private getUnavailableReason(): string | undefined {
+    return typeof this.unavailableReason === 'function'
+      ? this.unavailableReason()
+      : this.unavailableReason
+  }
+
+  private accountFromSummary(summary: UTASummary): UTAAccountSDK {
+    return new UTAAccountSDK({
+      client: this.client,
+      id: summary.id,
+      label: summary.label,
+      readonlyMutationReason: this.readonlyMutationReason,
+    })
   }
 }
 

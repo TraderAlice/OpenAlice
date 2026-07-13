@@ -1,0 +1,9 @@
+# Executable/importable scripts must keep Unix newlines. In particular,
+# esbuild/Vitest rejects a CRLF-converted shebang in imported `.mjs` files on
+# Windows, and Git Bash scripts must not acquire CRLF line endings.
+*.mjs text eol=lf
+*.sh text eol=lf
+src/workspaces/cli/bin/* text eol=lf
+
+# Native Windows launchers are consumed by cmd.exe.
+*.cmd text eol=crlf

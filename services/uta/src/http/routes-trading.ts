@@ -37,6 +37,7 @@ const placeOrderSchema = z.object({
   ocaGroup: z.string().optional(),
   takeProfit: z.object({ price: numericString }).optional(),
   stopLoss: z.object({ price: numericString, limitPrice: numericString.optional() }).optional(),
+  subAccountId: z.string().optional(),
   message,
 }).refine(
   (d) => d.totalQuantity != null || d.cashQty != null,
@@ -47,6 +48,7 @@ const closePositionSchema = z.object({
   aliceId: z.string().min(1),
   symbol: z.string().optional(),
   qty: numericString.optional(),
+  subAccountId: z.string().optional(),
   message,
 })
 
@@ -150,7 +152,8 @@ export function createTradingRoutes(ctx: UTAEngineContext) {
     // 'unknown' — identity passthrough — when omitted or invalid.
     const rawAc = c.req.query('assetClass') as AssetClassHint | undefined
     const assetClass: AssetClassHint = rawAc && ALLOWED_ASSET_CLASSES.has(rawAc) ? rawAc : 'unknown'
-    const hits = await searchTradeableContracts(ctx.utaManager, pattern, assetClass)
+    const source = c.req.query('source') ?? c.req.query('accountId')
+    const hits = await searchTradeableContracts(ctx.utaManager, pattern, assetClass, source)
     return c.json({ results: hits, count: hits.length, utasConfigured: utas.length })
   })
 
@@ -248,18 +251,26 @@ export function createTradingRoutes(ctx: UTAEngineContext) {
     }
   })
 
-  // Account info
+  // Sub-accounts (wallets) — one element for ordinary brokers, >1 for
+  // separate-wallet venues (CCXT Binance: spot / derivatives).
+  app.get('/uta/:id/subaccounts', async (c) => {
+    const account = resolveAccount(ctx, c)
+    if (!account) return c.json({ error: 'Account not found' }, 404)
+    return queryAccount(c, account, async () => ({ subAccounts: await account.listSubAccounts() }))
+  })
+
+  // Account info. `?subAccountId=` scopes to one wallet (omitted ⇒ aggregate).
   app.get('/uta/:id/account', async (c) => {
     const account = resolveAccount(ctx, c)
     if (!account) return c.json({ error: 'Account not found' }, 404)
-    return queryAccount(c, account, () => account.getAccount())
+    return queryAccount(c, account, () => account.getAccount(c.req.query('subAccountId')))
   })
 
-  // Positions
+  // Positions. `?subAccountId=` scopes to one wallet (omitted ⇒ all).
   app.get('/uta/:id/positions', async (c) => {
     const account = resolveAccount(ctx, c)
     if (!account) return c.json({ error: 'Account not found' }, 404)
-    return queryAccount(c, account, async () => ({ positions: await account.getPositions() }))
+    return queryAccount(c, account, async () => ({ positions: await account.getPositions(c.req.query('subAccountId')) }))
   })
 
   // Orders

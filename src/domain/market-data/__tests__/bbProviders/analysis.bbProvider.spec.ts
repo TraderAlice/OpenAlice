@@ -27,7 +27,7 @@ function makeBarService(
   commodity = 'yfinance',
 ) {
   return createBarService({
-    marketSearch: { symbolIndex: {} as never, cryptoClient, currencyClient, commodityCatalog: {} as never },
+    marketSearch: { symbolIndex: {} as never, equityVendors: [], equityClient: {} as never, cryptoClient, currencyClient, commodityCatalog: {} as never },
     equityClient, cryptoClient, currencyClient, commodityClient,
     utaManager: { has: async () => false, get: async () => undefined, searchContracts: async () => [] },
     vendorProviders: { equity: 'yfinance', crypto: 'yfinance', currency: 'yfinance', commodity },

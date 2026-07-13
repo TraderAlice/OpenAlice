@@ -1,4 +1,7 @@
 import { create } from 'zustand'
+import { reloadOnHotUpdate } from '../lib/hmr'
+
+reloadOnHotUpdate('live/tracked-selection')
 
 /**
  * Client-side selection state for the Tracked tab. Lives outside `ViewSpec`

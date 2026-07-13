@@ -12,11 +12,10 @@ import { useTranslation } from 'react-i18next'
 
 import { Dialog } from '../uta/Dialog'
 import { CreateWorkspaceForm } from './CreateWorkspaceForm'
-import type { AgentInfo, TemplateInfo, Workspace } from './api'
+import type { TemplateInfo, Workspace } from './api'
 
 export interface CreateWorkspaceDialogProps {
   readonly templates: readonly TemplateInfo[]
-  readonly agents: readonly AgentInfo[]
   /** Pin the template (Chat section). Omit for the general sidebar create. */
   readonly presetTemplate?: string
   /** Seed the tag input (e.g. the Chat section's date-based default). */
@@ -38,7 +37,6 @@ export function CreateWorkspaceDialog(props: CreateWorkspaceDialogProps): ReactE
       <div className="px-5 py-4">
         <CreateWorkspaceForm
           templates={props.templates}
-          agents={props.agents}
           presetTemplate={props.presetTemplate}
           initialTag={props.initialTag}
           autoFocusTag

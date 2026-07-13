@@ -120,8 +120,18 @@ export class TemplateRegistry {
       if (!entry.isDirectory()) continue;
       const name = entry.name;
       const templateDir = join(absDir, name);
-      const bootstrapScript = join(templateDir, 'bootstrap.sh');
-      if (!existsSync(bootstrapScript)) {
+      // Prefer the cross-platform Node bootstrap (`bootstrap.mjs`, run on the
+      // bundled Node + bundled git — works on bare Windows/Mac). Fall back to
+      // `bootstrap.sh` for third-party templates that still ship bash (only
+      // runnable where bash is on PATH).
+      const mjsScript = join(templateDir, 'bootstrap.mjs');
+      const shScript = join(templateDir, 'bootstrap.sh');
+      const bootstrapScript = existsSync(mjsScript)
+        ? mjsScript
+        : existsSync(shScript)
+          ? shScript
+          : undefined;
+      if (bootstrapScript === undefined) {
         logger.warn('templates.no_bootstrap', { name, templateDir });
         continue;
       }

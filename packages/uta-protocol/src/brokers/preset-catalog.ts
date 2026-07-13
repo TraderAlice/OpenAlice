@@ -107,6 +107,52 @@ function defaultIsPaper(data: Record<string, unknown>): boolean {
 
 // ==================== CCXT-engine presets ====================
 
+export const BINANCE_PRESET: BrokerPresetDef = {
+  id: 'binance',
+  label: 'Binance',
+  description: 'Binance — spot, USDⓈ-M & COIN-M futures. The world\'s largest crypto exchange.',
+  category: 'crypto',
+  // Paper trading uses Binance Demo Trading (mode 'demo' → demoTrading →
+  // enableDemoTrading): the unified simulator at demo-*.binance.com covering
+  // spot + futures with virtual funds. We deliberately do NOT expose Binance's
+  // legacy Testnet (setSandboxMode):
+  //   - Futures testnet (testnet.binancefuture.com) is DEAD — CCXT 4.5.38 hard
+  //     -throws NotSupported on any private futures call there ("not supported
+  //     for futures anymore … use demo trading instead").
+  //   - Spot testnet (testnet.binance.vision) is alive but spot-only, and the
+  //     engine's getAccount/getPositions unconditionally call fetchPositions()
+  //     (futures) — which would hit the dead futures testnet. Supporting a
+  //     spot-only account means breaking the full-spectrum-load invariant;
+  //     tracked as a separate engine change (Linear), not worth it for a
+  //     dev-oriented sandbox inside a trading product. Demo covers the need.
+  hint: '**Demo Trading** is Binance\'s risk-free simulator — virtual funds, spot + futures in one place. It runs on isolated demo servers, so prices and fills are simulated and can differ from live. Generate a dedicated Demo API key at demo.binance.com → API Management; your live keys are rejected here (and demo keys are rejected on live).\n\n**Live** places real orders on real money — grant trade-only permissions and never enable withdrawals.',
+  defaultName: 'binance-main',
+  badge: 'BN',
+  badgeColor: 'text-yellow-400',
+  engine: 'ccxt',
+  guardCategory: 'crypto',
+  modes: [
+    { id: 'live', label: 'Live' },
+    { id: 'demo', label: 'Demo Trading' },
+  ],
+  zodSchema: z.object({
+    mode: z.enum(['live', 'demo']).default('live').describe('Mode'),
+    apiKey: z.string().min(1).describe('API Key'),
+    secret: z.string().min(1).describe('API Secret'),
+  }),
+  subtitleFields: [
+    { field: 'mode', prefix: 'Binance · ' },
+  ],
+  writeOnlyFields: ['apiKey', 'secret'],
+  fingerprintFields: ['mode', 'apiKey'],
+  toEngineConfig: (d) => ({
+    exchange: 'binance',
+    demoTrading: d.mode === 'demo',
+    apiKey: d.apiKey,
+    secret: d.secret,
+  }),
+}
+
 export const OKX_PRESET: BrokerPresetDef = {
   id: 'okx',
   label: 'OKX',
@@ -464,6 +510,7 @@ export const BROKER_PRESET_CATALOG: BrokerPresetDef[] = [
   LONGBRIDGE_PRESET,
   HYPERLIQUID_PRESET,
   // ---- Crypto ----
+  BINANCE_PRESET,
   OKX_PRESET,
   BYBIT_PRESET,
   BITGET_PRESET,

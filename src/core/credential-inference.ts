@@ -17,13 +17,14 @@ const VENDORS_BY_BASEURL: Array<[RegExp, CredentialVendor]> = [
   [/minimaxi\.com|minimax\.io/i, 'minimax'],
   [/moonshot\.cn|moonshot\.ai/i, 'kimi'],
   [/deepseek\.com/i, 'deepseek'],
+  [/longcat\.chat/i, 'longcat'],
 ]
 
 /**
  * Infer a credential vendor from the workspace AI-config modal's context — a
  * CLI agent tab + the entered baseUrl.
  *
- * A recognized baseUrl wins (GLM/MiniMax/Kimi/DeepSeek gateways); otherwise the
+ * A recognized baseUrl wins (GLM/MiniMax/Kimi/DeepSeek/LongCat gateways); otherwise the
  * agent decides: claude → anthropic, codex → openai. opencode/pi are
  * OpenAI-compatible against arbitrary endpoints, so an unrecognized baseUrl
  * falls back to 'custom' rather than guessing a first-party vendor.
@@ -44,8 +45,8 @@ export function inferCredentialVendor(opts: { agent?: string; baseUrl?: string }
  * `x-api-key` is Anthropic's first-party standard and the safe default;
  * `bearer` sends `Authorization: Bearer`, which anthropic-compatible *gateways*
  * require. An explicit `authMode` always wins. Fallback inference is deliberately
- * narrow: only `api.minimax.io` (MiniMax's international endpoint) is
- * auto-promoted to bearer, because it's the one endpoint confirmed to *reject*
+ * narrow: confirmed bearer-only gateways (MiniMax international and LongCat's
+ * Anthropic compatibility endpoint) are auto-promoted because they *reject*
  * x-api-key with a 401. Other gateways stay at the default until confirmed —
  * over-promoting would silently break a working x-api-key setup.
  */
@@ -53,6 +54,6 @@ export function resolveAnthropicAuthMode(
   opts: { authMode?: 'x-api-key' | 'bearer'; baseUrl?: string },
 ): 'x-api-key' | 'bearer' {
   if (opts.authMode) return opts.authMode
-  if (/api\.minimax\.io/i.test(opts.baseUrl ?? '')) return 'bearer'
+  if (/api\.minimax\.io|api\.longcat\.chat/i.test(opts.baseUrl ?? '')) return 'bearer'
   return 'x-api-key'
 }

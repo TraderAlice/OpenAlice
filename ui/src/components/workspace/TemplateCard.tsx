@@ -79,12 +79,21 @@ export function TemplateCard({ template: t, agents, onOpen }: Props) {
           {tr('templates.agentsLabel')}
         </div>
         <div className="flex items-center gap-2 text-text-muted flex-wrap">
-          {agents.map((a) => (
-            <span key={a.id} className="flex items-center gap-1 text-[11px]">
-              <AgentGlyph agent={a.id} />
-              <span>{a.id}</span>
-            </span>
-          ))}
+          {agents.map((a) => {
+            // Backend PATH-probes each runtime; dim the ones not installed on
+            // this host so the catalog hints at what needs setting up.
+            const missing = a.installed === false
+            return (
+              <span
+                key={a.id}
+                className={`flex items-center gap-1 text-[11px] ${missing ? 'opacity-40' : ''}`}
+                title={missing ? `${a.id} — ${tr('templates.agentNotInstalled')}` : a.id}
+              >
+                <AgentGlyph agent={a.id} />
+                <span className={missing ? 'line-through' : ''}>{a.id}</span>
+              </span>
+            )
+          })}
         </div>
       </div>
     </button>

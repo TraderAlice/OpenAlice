@@ -36,6 +36,22 @@ export interface PersistentSessionOptions {
   readonly initialReplayBytes?: Buffer;
 }
 
+export interface SessionControllerClaim {
+  readonly controllerId: string;
+  readonly controllerKind: string;
+  /** Explicit user/operator action: replace the current controller. */
+  readonly takeover?: boolean;
+}
+
+export interface SessionControllerOwner {
+  readonly id: string;
+  readonly kind: string;
+}
+
+export type SessionAttachResult =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly reason: 'locked'; readonly owner: SessionControllerOwner };
+
 const MAX_DIM = 1000;
 const CURSOR_TICK_MS = 2000;
 const CURSOR_BYTES_INTERVAL = 64 * 1024;
@@ -71,6 +87,7 @@ export class PersistentSession {
   private messageHandler: ((raw: unknown, isBinary: boolean) => void) | null = null;
   private closeHandler: (() => void) | null = null;
   private errorHandler: (() => void) | null = null;
+  private controller: SessionControllerOwner | null = null;
   private currentCols: number;
   private currentRows: number;
   private respawnTimes: number[] = [];
@@ -123,8 +140,8 @@ export class PersistentSession {
     // win32: resolve the bare CLI name to its real `.exe`, or wrap a `.cmd`/
     // `.ps1` npm shim through cmd.exe — ConPTY's CreateProcess only appends
     // `.exe`, so npm-shim CLIs (opencode, pi) otherwise never launch. No-op off
-    // Windows. The interactive command is flags + a uuid, so the shell wrap is
-    // injection-safe here. See win-command.ts.
+    // Windows. The interactive command is flags + launcher/adapter-generated
+    // ids, so the shell wrap is injection-safe here. See win-command.ts.
     const [argv0, ...args] = resolveLaunchCommand(this.opts.command, {
       env: this.opts.env,
     }).argv;
@@ -281,15 +298,40 @@ export class PersistentSession {
     this.log.info('session.agent_id_detected', { agentSessionId: id });
   }
 
-  /** Swap in `ws` as the attached client; kick the previous one if any. */
-  attach(ws: WebSocket, cols: number, rows: number, since: number | undefined): void {
+  /** Swap in `ws` as the attached client. A controller claim makes ownership
+   *  explicit: a second controller is rejected unless it deliberately takes
+   *  over. This is the shared rule for browser, Electron IPC, future IM bridges,
+   *  and any debug client that can write to the PTY. */
+  attach(
+    ws: WebSocket,
+    cols: number,
+    rows: number,
+    since: number | undefined,
+    claim?: SessionControllerClaim,
+  ): SessionAttachResult {
     if (this.disposed) {
       try {
         ws.close(1011, 'session disposed');
       } catch {
         // ignore
       }
-      return;
+      return { ok: false, reason: 'locked', owner: this.controller ?? { id: 'disposed', kind: 'session' } };
+    }
+
+    const owner = normalizeClaim(claim);
+    if (
+      owner &&
+      this.ws !== null &&
+      this.controller !== null &&
+      this.controller.id !== owner.id &&
+      !claim?.takeover
+    ) {
+      try {
+        ws.close(4409, 'session locked by another controller');
+      } catch {
+        // ignore
+      }
+      return { ok: false, reason: 'locked', owner: this.controller };
     }
 
     // Kick previous client.
@@ -305,7 +347,11 @@ export class PersistentSession {
     }
 
     this.ws = ws;
-    this.paused = false;
+    this.controller = owner;
+    // A previous client may have dropped mid-backpressure, leaving the PTY
+    // paused at the OS level. Clearing only the flag (not resuming the term)
+    // would strand it paused forever; resumePty() un-sticks both.
+    this.resumePty();
     this.resize(cols, rows);
 
     // Compute replay window. Cold attach (since=undefined) replays the full
@@ -324,7 +370,6 @@ export class PersistentSession {
       wsId: this.opts.wsId,
       sessionId: this.opts.recordId,
       name: this.opts.name,
-      agentSessionId: this._agentSessionId,
       pid: this.term.pid,
       command: this.opts.command,
       replayFromSeq: slice.effectiveSeq,
@@ -342,7 +387,9 @@ export class PersistentSession {
       replayFromSeq: slice.effectiveSeq,
       replayBytes: slice.bytes.length,
       scrollbackTruncated,
+      controller: this.controller,
     });
+    return { ok: true };
   }
 
   /** Drop the current client without killing the PTY. */
@@ -350,7 +397,14 @@ export class PersistentSession {
     if (this.ws === null) return;
     const ws = this.ws;
     this.ws = null;
+    this.controller = null;
     this.unwireWs(ws);
+    // No consumer left — let the PTY run free into the in-memory ring buffer
+    // (onPtyData appends regardless of socket). If the socket dropped while
+    // we were backpressure-paused, NOT resuming here strands the PTY paused
+    // forever and the agent blocks on its next stdout write — the "running
+    // along and then freezes" symptom.
+    this.resumePty();
     if (this.cursorTimer) {
       clearInterval(this.cursorTimer);
       this.cursorTimer = null;
@@ -378,6 +432,7 @@ export class PersistentSession {
     if (ws !== null) {
       this.unwireWs(ws);
       this.ws = null;
+      this.controller = null;
       try {
         ws.close(1000, `disposed: ${reason}`);
       } catch {
@@ -425,6 +480,19 @@ export class PersistentSession {
     }
   }
 
+  /** Un-pause the PTY read stream if backpressure paused it. Safe to call when
+   *  already running. Keeping the `paused` flag and the term stream in lockstep
+   *  is the whole point — clearing one without the other deadlocks the PTY. */
+  private resumePty(): void {
+    if (!this.paused) return;
+    this.paused = false;
+    try {
+      this.term.resume();
+    } catch {
+      // PTY may be dying; ignore.
+    }
+  }
+
   private onWsMessage(ws: WebSocket, raw: unknown, isBinary: boolean): void {
     if (this.disposed) return;
     if (this.ws !== ws) return; // stale (this ws was kicked)
@@ -433,7 +501,10 @@ export class PersistentSession {
       const buf = toBuffer(raw);
       if (!buf) return;
       try {
-        this.term.write(buf.toString('utf8'));
+        // Browser stdin arrives as UTF-8 bytes. Keep this edge byte-faithful:
+        // converting through string corrupts arbitrary terminal sequences and
+        // makes CJK/IME behavior depend on JS decoding instead of the PTY.
+        this.term.write(buf as unknown as string);
       } catch (err) {
         this.log.warn('session.write_error', { err });
       }
@@ -516,6 +587,11 @@ export class PersistentSession {
     this.lastCursorSeq = seq;
     this.sendControl({ type: 'cursor', seq });
   }
+}
+
+function normalizeClaim(claim: SessionControllerClaim | undefined): SessionControllerOwner | null {
+  if (!claim?.controllerId) return null;
+  return { id: claim.controllerId, kind: claim.controllerKind || 'unknown' };
 }
 
 function toBuffer(raw: unknown): Buffer | null {

@@ -1,7 +1,9 @@
 import type { CliAdapter, SpawnContext } from '../cli-adapter.js';
+import { resolveBashPath } from '@/core/shell-resolver.js';
 
 /**
- * The bare-metal terminal — `zsh --login` (or whatever's on `$SHELL`),
+ * The bare-metal terminal — the inherited login shell, or a platform-native
+ * default (`zsh` on macOS, `bash` on Linux),
  * dropped into the workspace's cwd. No transcript discovery, no resume.
  * This is the "I just want a terminal, leave me alone" path the user
  * articulated: "反正 terminal 都开了，用户自己开个 vim 我也管不着".
@@ -13,6 +15,7 @@ import type { CliAdapter, SpawnContext } from '../cli-adapter.js';
 export const shellAdapter: CliAdapter = {
   id: 'shell',
   displayName: 'Shell',
+  kind: 'utility',
   namePrefix: 'sh',
   capabilities: {
     parallelPerCwd: true,
@@ -21,8 +24,20 @@ export const shellAdapter: CliAdapter = {
     transcriptDiscovery: 'none',
   },
 
-  composeCommand(_base: readonly string[], _ctx: SpawnContext): readonly string[] {
-    const shell = process.env['SHELL'] ?? '/bin/zsh';
-    return [shell, '--login'];
+  composeCommand(_base: readonly string[], ctx: SpawnContext): readonly string[] {
+    return composeShellCommand(ctx.env);
   },
 };
+
+export function composeShellCommand(
+  env: Readonly<Record<string, string | undefined>>,
+  platform: NodeJS.Platform = process.platform,
+): readonly string[] {
+  const bash = resolveBashPath(env, platform);
+  if (bash) return [bash, '--login'];
+  if (platform === 'win32') {
+    return [env['SHELL'] ?? env['ComSpec'] ?? env['COMSPEC'] ?? 'cmd.exe'];
+  }
+  const defaultShell = platform === 'darwin' ? '/bin/zsh' : '/bin/bash';
+  return [env['SHELL'] ?? defaultShell, '--login'];
+}

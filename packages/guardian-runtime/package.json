@@ -1,0 +1,30 @@
+{
+  "name": "@traderalice/guardian-runtime",
+  "version": "0.1.0",
+  "description": "Cross-platform OpenAlice runtime ownership and recovery primitives",
+  "type": "module",
+  "exports": {
+    ".": {
+      "openalice-source": "./src/index.ts",
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc",
+    "test": "vitest run --config vitest.config.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.3",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.5"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "license": "AGPL-3.0-only"
+}

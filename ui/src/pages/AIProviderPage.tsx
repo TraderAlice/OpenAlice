@@ -16,24 +16,17 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { api, type Preset, type WireShape } from '../api'
-import type { CredentialSummary } from '../api/config'
+import type { CredentialSummary, WorkspaceCredentialDefaultsResponse } from '../api/config'
 import { PageHeader } from '../components/PageHeader'
-import { PageLoading } from '../components/StateViews'
-import { Field, inputClass } from '../components/form'
-import { ModelCombobox } from '../components/credentials/PresetFields'
-import {
-  VENDOR_BY_PRESET, isApiKeyPreset, presetModels, vendorPreset, WIRE_SHAPE_SHORT,
-  presetRegions, regionById, regionShapes,
-} from '../lib/presetHelpers'
-import { useTestGate } from '../lib/useTestGate'
+import { PageLoading, Skeleton } from '../components/StateViews'
+import { inputClass } from '../components/form'
+import { CredentialModal } from '../components/credentials/CredentialModal'
+import { WIRE_SHAPE_SHORT, isApiKeyPreset } from '../lib/presetHelpers'
 
 const SHAPE_ORDER: WireShape[] = ['anthropic', 'openai-chat', 'openai-responses']
 
-/** Find the region whose wires match a stored credential (for edit mode). */
-function matchRegionId(preset: Preset | null, wires: Partial<Record<WireShape, string>>): string | undefined {
-  const shapes = Object.keys(wires) as WireShape[]
-  if (shapes.length === 0) return undefined
-  return presetRegions(preset).find((r) => shapes.every((s) => r.wires[s] === wires[s]))?.id
+function credentialLabel(cred: Pick<CredentialSummary, 'slug' | 'vendor' | 'label'>): string {
+  return cred.label?.trim() || cred.slug
 }
 
 // ==================== Agent runtimes ====================
@@ -154,7 +147,10 @@ export function AIProviderPage() {
                 <div key={cred.slug} className="flex items-center gap-3 rounded-lg border border-border bg-bg px-4 py-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[13px] font-medium text-text">{cred.vendor}</span>
+                      <span className="text-[13px] font-medium text-text">{credentialLabel(cred)}</span>
+                      {cred.label && (
+                        <span className="text-[11px] text-text-muted">{cred.vendor}</span>
+                      )}
                       <span className="text-[11px] text-text-muted font-mono">{cred.slug}</span>
                       {(SHAPE_ORDER.filter((s) => s in cred.wires)).map((s) => (
                         <span key={s} className="text-[10px] text-text-muted border border-border rounded px-1">{WIRE_SHAPE_SHORT[s]}</span>
@@ -228,6 +224,9 @@ export function AIProviderPage() {
             </div>
           </section>
         </div>
+
+        {/* ============== Default workspace credentials ============== */}
+        <WorkspaceDefaultsSection credentials={credentials} />
       </div>
 
       {modal && (
@@ -243,240 +242,143 @@ export function AIProviderPage() {
   )
 }
 
-// ==================== Add / Edit modal ====================
+// ==================== Default workspace credentials ====================
+//
+// A user-level "inject my usual key on every new workspace" setting. Per agent,
+// pick a vault credential to seed into each new workspace's file-based AI config
+// at create time. opencode/pi are the primary case (loginless — they need a key
+// to run); Claude Code / Codex run on their own CLI login by default, so they're
+// behind an "advanced" reveal — present (some users drive them via an unofficial
+// API key) but never pushed.
 
-function CredentialModal({ mode, cred, presets, onClose, onSaved }: {
-  mode: 'add' | 'edit'
-  cred?: CredentialSummary
-  presets: Preset[]
-  onClose: () => void
-  onSaved: () => Promise<void>
-}) {
-  // In edit mode the vendor is fixed → resolve its preset + the region whose
-  // wires match the stored credential; in add mode the user picks a provider.
-  const initialPreset = mode === 'edit' && cred ? vendorPreset(cred.vendor, presets) ?? null : null
-  const [preset, setPreset] = useState<Preset | null>(initialPreset)
-  const [regionId, setRegionId] = useState<string>(
-    () => matchRegionId(initialPreset, cred?.wires ?? {}) ?? presetRegions(initialPreset)[0]?.id ?? '',
-  )
-  // Custom (free-form) provider — one shape + a hand-typed endpoint.
-  const customInit = cred ? (SHAPE_ORDER.find((s) => s in (cred.wires ?? {})) ?? 'openai-chat') : 'openai-chat'
-  const [customShape, setCustomShape] = useState<WireShape>(customInit)
-  const [customUrl, setCustomUrl] = useState<string>(cred?.wires?.[customInit] ?? '')
-  const [apiKey, setApiKey] = useState(cred?.apiKey ?? '')
-  const [showKey, setShowKey] = useState(false)
-  const [model, setModel] = useState('')
+const PRIMARY_DEFAULT_AGENTS = [
+  { id: 'opencode', name: 'opencode' },
+  { id: 'pi', name: 'Pi' },
+] as const
+
+const ADVANCED_DEFAULT_AGENTS = [
+  { id: 'claude', name: 'Claude Code' },
+  { id: 'codex', name: 'Codex' },
+] as const
+
+function WorkspaceDefaultsSection({ credentials }: { credentials: CredentialSummary[] }) {
+  const [data, setData] = useState<WorkspaceCredentialDefaultsResponse | null>(null)
+  const [showAdvanced, setShowAdvanced] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const gate = useTestGate()
 
-  useEffect(() => {
-    if (initialPreset && !model) setModel(presetModels(initialPreset)[0]?.id ?? '')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  const reload = () =>
+    api.config.getWorkspaceCredentialDefaults()
+      .then(setData)
+      .catch(() => setData({ defaults: {}, compatibleByAgent: {} }))
 
-  const regions = presetRegions(preset)
-  const isCustom = !!preset && regions.length === 0
-  const region = regionById(preset, regionId)
-  const models = preset ? presetModels(preset) : []
+  // Re-derive when the vault changes (a deleted cred drops from compatible lists,
+  // and the backend also clears any default that pointed at it).
+  useEffect(() => { void reload() }, [credentials])
 
-  // The wire capabilities this credential will declare: a whole region's map,
-  // or — for custom — the single hand-entered shape→url.
-  const wires: Partial<Record<WireShape, string>> = isCustom
-    ? (customUrl.trim() ? { [customShape]: customUrl.trim() } : {})
-    : (region?.wires ?? {})
-  const shapes = isCustom ? [customShape] : regionShapes(region)
-  // The shape the Test probes (the key is shared, so one probe validates it).
-  const primaryShape = shapes[0]
-  const primaryUrl = primaryShape ? (wires[primaryShape] ?? '') : ''
-
-  const pickPreset = (p: Preset) => {
-    setPreset(p)
-    setRegionId(presetRegions(p)[0]?.id ?? '')
-    setModel(presetModels(p)[0]?.id ?? '')
-    setError('')
-    gate.reset()
+  const credLabel = (slug: string) => {
+    const c = credentials.find((x) => x.slug === slug)
+    return c ? `${credentialLabel(c)} · ${slug}` : slug
   }
 
-  // The fields the test covers — editing any of them re-locks Save.
-  const testKey = `${JSON.stringify(wires)}|${apiKey.trim()}|${model.trim()}`
-  const canTest = !!apiKey.trim() && !!model.trim() && !!primaryShape
-  // ADD must pass a test. EDIT keeping the stored key (key blank) can't be probed
-  // — it was verified at creation, so allow it; if a key is entered, re-test.
-  const needsTest = mode === 'add' || !!apiKey.trim()
-  const canSave = !saving && (!needsTest || gate.passedFor(testKey))
-
-  const handleTest = () => {
-    if (!canTest || !primaryShape) { setError('Fill the API key + model first'); return }
-    setError('')
-    void gate.run(testKey, () =>
-      api.config.testCredential({ wireShape: primaryShape, baseUrl: primaryUrl || undefined, apiKey: apiKey.trim(), model: model.trim() }),
-    )
-  }
-
-  const handleSave = async () => {
-    if (!preset) return
-    if (Object.keys(wires).length === 0) { setError('Pick a region / endpoint first'); return }
-    const vendor = VENDOR_BY_PRESET[preset.id] ?? 'custom'
+  const setAgentDefault = async (agentId: string, slug: string) => {
+    if (!data) return
+    const nextDefaults = { ...data.defaults }
+    if (slug) nextDefaults[agentId] = { credentialSlug: slug }
+    else delete nextDefaults[agentId]
     setSaving(true); setError('')
+    setData({ ...data, defaults: nextDefaults }) // optimistic
     try {
-      if (mode === 'edit' && cred) {
-        await api.config.updateCredential(cred.slug, {
-          vendor, wires,
-          ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
-        })
-      } else {
-        if (!apiKey.trim()) { setError('API key is required'); setSaving(false); return }
-        await api.config.addCredential({ vendor, wires, apiKey: apiKey.trim() })
-      }
-      await onSaved()
+      const res = await api.config.setWorkspaceCredentialDefaults(nextDefaults)
+      setData((d) => (d ? { ...d, defaults: res.defaults } : d))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed')
+      await reload()
+    } finally {
       setSaving(false)
     }
   }
 
-  const title = mode === 'edit' && cred ? `Edit credential · ${cred.slug}` : 'Add credential'
-  const tested = gate.passedFor(testKey)
-  const staleResult = gate.result && !gate.matchesCurrent(testKey)
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-bg border border-border rounded-xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <h2 className="text-[15px] font-semibold text-text">{title}</h2>
-          <button onClick={onClose} className="text-text-muted hover:text-text transition-colors">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-          {!preset ? (
-            <div className="grid grid-cols-2 gap-2">
-              {presets.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => pickPreset(p)}
-                  className="flex flex-col items-start gap-0.5 p-3 rounded-lg border border-border bg-bg hover:bg-bg-tertiary hover:border-accent/40 transition-all text-left"
-                >
-                  <span className="text-[12px] font-medium text-text">{p.label}</span>
-                  <span className="text-[10px] text-text-muted leading-snug">{p.description}</span>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <>
-              {/* Provider header with a change link (add mode) */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-[13px] font-semibold text-text">{preset.label}</span>
-                  <span className="text-[11px] text-text-muted">{preset.description}</span>
-                </div>
-                {mode === 'add' && (
-                  <button onClick={() => { setPreset(null); gate.reset() }} className="text-[11px] text-accent hover:underline">change</button>
-                )}
-              </div>
-
-              {preset.hint && (
-                <p className="text-[11px] text-text-muted bg-bg-tertiary rounded-lg px-3 py-2.5 leading-relaxed">{preset.hint}</p>
-              )}
-
-              {isCustom ? (
-                <>
-                  <Field label="API mode" description="Which wire protocol your endpoint speaks.">
-                    <select className={inputClass} value={customShape} onChange={(e) => { setCustomShape(e.target.value as WireShape); gate.reset() }}>
-                      {SHAPE_ORDER.map((s) => <option key={s} value={s}>{WIRE_SHAPE_SHORT[s]}</option>)}
-                    </select>
-                  </Field>
-                  <Field label="Base URL">
-                    <input className={inputClass + ' font-mono text-[12px]'} value={customUrl}
-                      onChange={(e) => { setCustomUrl(e.target.value); gate.reset() }}
-                      placeholder="https://… (leave empty for the official endpoint)"
-                      spellCheck={false} autoCapitalize="off" autoCorrect="off" />
-                  </Field>
-                </>
-              ) : (
-                <>
-                  {/* Region — only when the provider offers more than one */}
-                  {regions.length > 1 && (
-                    <Field label="Endpoint / region" description="Region picks the endpoints; this key authenticates against one region.">
-                      <select className={inputClass} value={regionId} onChange={(e) => { setRegionId(e.target.value); gate.reset() }}>
-                        {regions.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
-                      </select>
-                    </Field>
-                  )}
-
-                  {/* Wire capabilities this credential will declare (read-only) */}
-                  <Field label="Wire capabilities" description="One key, every shape this region speaks — injected per agent (claude→Anthropic, opencode/pi→either, codex→Responses).">
-                    <div className="space-y-1.5 rounded-lg border border-border bg-bg-secondary/30 px-3 py-2.5">
-                      {shapes.length === 0 && <p className="text-[11px] text-text-muted">No endpoints for this provider.</p>}
-                      {shapes.map((s) => (
-                        <div key={s} className="flex items-baseline gap-2 text-[11px]">
-                          <span className="text-text-muted w-28 shrink-0">{WIRE_SHAPE_SHORT[s]}</span>
-                          <span className="font-mono text-text-muted/80 break-all">{wires[s] || 'official endpoint'}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </Field>
-                </>
-              )}
-
-              <Field label="API key">
-                <div className="flex gap-2">
-                  <input className={inputClass + ' flex-1'} type={showKey ? 'text' : 'password'} value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)} placeholder="Enter API key"
-                    spellCheck={false} autoCapitalize="off" autoCorrect="off" />
-                  <button type="button" onClick={() => setShowKey(!showKey)}
-                    className="px-3 rounded-md border border-border text-text-muted hover:text-text text-[12px]">
-                    {showKey ? 'Hide' : 'Show'}
-                  </button>
-                </div>
-              </Field>
-
-              <Field label="Test model" description="Used only to verify the key — not stored on the credential (the model is chosen per workspace).">
-                <ModelCombobox value={model} suggestions={models} onChange={setModel} />
-              </Field>
-
-              {error && <p className="text-[12px] text-red">{error}</p>}
-              {gate.testing && <p className="text-[12px] text-text-muted">Testing connection…</p>}
-              {gate.result && !staleResult && (
-                <div className={`text-[12px] rounded-lg px-3 py-2.5 ${gate.result.ok ? 'bg-green/10 text-green' : 'bg-red/10 text-red'}`}>
-                  {gate.result.ok
-                    ? (gate.result.response?.trim() ? `Connected — “${gate.result.response.trim().slice(0, 120)}”` : 'Connected — provider reachable (returned no text).')
-                    : `Failed: ${gate.result.error}`}
-                </div>
-              )}
-              {staleResult && (
-                <p className="text-[11px] text-yellow-400/90">Form changed since the last test — re-test before saving.</p>
-              )}
-            </>
+  const renderAgent = (agent: { id: string; name: string }, note?: string) => {
+    const options = data?.compatibleByAgent[agent.id] ?? []
+    const current = data?.defaults[agent.id]?.credentialSlug ?? ''
+    return (
+      <div key={agent.id} className="flex items-center gap-3 rounded-lg border border-border bg-bg px-4 py-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline gap-2">
+            <span className="text-[13px] font-medium text-text">{agent.name}</span>
+            <span className="text-[11px] text-text-muted font-mono">{agent.id}</span>
+          </div>
+          {note && <p className="text-[11px] text-text-muted mt-0.5 leading-snug">{note}</p>}
+          {options.length === 0 && (
+            <p className="text-[11px] text-text-muted/70 mt-0.5 leading-snug">No compatible credential in the vault yet.</p>
           )}
         </div>
-
-        {preset && (
-          <div className="flex items-center justify-between gap-2 px-5 py-3 border-t border-border bg-bg-secondary/30">
-            <button
-              onClick={handleTest}
-              disabled={gate.testing || !canTest}
-              title={!canTest ? 'Fill the API key + model first' : undefined}
-              className="text-[12px] px-3 py-1.5 rounded-md border border-border text-text-muted hover:text-text hover:bg-bg-tertiary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {gate.testing ? 'Testing…' : tested ? '✓ Tested' : 'Test'}
-            </button>
-            <div className="flex items-center gap-2">
-              <button onClick={onClose} className="text-[12px] px-3 py-1.5 rounded-md text-text-muted hover:text-text">Cancel</button>
-              <button
-                onClick={handleSave}
-                disabled={!canSave}
-                title={needsTest && !tested ? 'Test the connection first' : undefined}
-                className="btn-primary disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {saving ? 'Saving…' : 'Save'}
-              </button>
-            </div>
-          </div>
-        )}
+        <select
+          className={inputClass + ' max-w-[240px]'}
+          value={current}
+          disabled={saving || options.length === 0}
+          onChange={(e) => void setAgentDefault(agent.id, e.target.value)}
+        >
+          <option value="">Don’t seed</option>
+          {options.map((slug) => <option key={slug} value={slug}>{credLabel(slug)}</option>)}
+        </select>
       </div>
-    </div>
+    )
+  }
+
+  return (
+    <section className="max-w-[1100px] mx-auto mt-6">
+      <div className="rounded-lg border border-border/50 bg-bg-secondary/50 px-4 py-3 mb-4">
+        <p className="text-[13px] text-text-muted leading-relaxed">
+          Seed a default credential into every <em>new</em> workspace, so you don’t open the
+          per-workspace AI config each time. It’s written into the workspace’s own agent config
+          files at create — existing workspaces are untouched, and you can still override any
+          workspace afterwards. opencode and Pi need a key to run; Claude Code and Codex normally
+          run on their own CLI login (<code className="font-mono text-[11.5px]">claude login</code> /{' '}
+          <code className="font-mono text-[11.5px]">codex login</code>) and don’t need this.
+        </p>
+      </div>
+
+      <h2 className="text-[13px] font-semibold text-text uppercase tracking-wide mb-3">Default workspace credentials</h2>
+
+      {!data ? (
+        <div className="space-y-2.5" aria-hidden="true">
+          {PRIMARY_DEFAULT_AGENTS.map((a) => (
+            <div key={a.id} className="flex items-center gap-3 rounded-lg border border-border bg-bg px-4 py-3">
+              <div className="flex-1 min-w-0 space-y-1.5">
+                <Skeleton className="h-3.5 w-28 rounded" />
+                <Skeleton className="h-2.5 w-44 rounded" />
+              </div>
+              <Skeleton className="h-8 w-[240px] max-w-[240px] rounded" />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-2.5">
+          {PRIMARY_DEFAULT_AGENTS.map((a) => renderAgent(a))}
+
+          <button
+            onClick={() => setShowAdvanced((v) => !v)}
+            className="text-[11px] text-text-muted hover:text-text transition-colors pt-1"
+          >
+            {showAdvanced ? '▾' : '▸'} Advanced — Claude Code / Codex (unofficial API)
+          </button>
+
+          {showAdvanced && (
+            <>
+              <p className="text-[11px] text-text-muted/80 leading-snug px-1">
+                Only set these if you drive Claude Code / Codex through an unofficial API key
+                instead of their built-in login. A default here overwrites the CLI login in each
+                new workspace.
+              </p>
+              {ADVANCED_DEFAULT_AGENTS.map((a) => renderAgent(a))}
+            </>
+          )}
+
+          {error && <p className="text-[12px] text-red">{error}</p>}
+        </div>
+      )}
+    </section>
   )
 }

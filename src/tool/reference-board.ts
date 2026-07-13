@@ -25,7 +25,7 @@ Available boards:
 - macro: 14 US macro series cards — rates, labor, CPI YoY, oil, dollar, M2, sentiment (FRED)
 - valuation: S&P 500 PE / Shiller CAPE / earnings yield / dividend yield (multpl)
 - term-structure: BTC/ETH futures curve with annualized basis vs perpetual (Deribit)
-- global-macro: 7 countries × CPI/short-rate/CLI/house/equity indices (OECD)
+- global-macro: 7 countries × CPI/short-rate/CLI/house/equity indices (OECD + BIS + World Bank, via FRED; CPI annual, rest monthly — check each cell's date)
 - shipping: daily transit volume at 6 maritime chokepoints (IMF PortWatch)
 - fed: balance sheet, primary dealer positioning, FOMC documents
 

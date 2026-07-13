@@ -1,11 +1,14 @@
 {
   "name": "open-alice",
-  "version": "0.50.0-beta.1",
+  "version": "0.80.0-beta",
   "description": "File-based trading agent engine",
   "type": "module",
   "main": "dist/electron/main.js",
   "scripts": {
     "dev": "tsx scripts/guardian/dev.ts",
+    "dev:onboarding": "tsx scripts/onboarding-test-dev.ts",
+    "docker:build": "docker build --tag openalice:local .",
+    "docker:smoke": "node scripts/docker-runtime-smoke.mjs",
     "prebuild": "tsx scripts/build-migration-index.ts",
     "build": "turbo run build && tsup src/main.ts --format esm --dts",
     "build:migration-index": "tsx scripts/build-migration-index.ts",
@@ -13,12 +16,22 @@
     "electron:tsc": "pnpm -F @traderalice/desktop build",
     "electron:build": "pnpm build && pnpm electron:tsc",
     "electron:dev": "pnpm electron:build && pnpm -F @traderalice/desktop dev",
-    "electron:pack": "pnpm electron:build && pnpm -F @traderalice/desktop pack",
+    "electron:pack": "pnpm electron:build && pnpm vendor:runtime && pnpm -F @traderalice/desktop run pack",
+    "electron:assert-package": "node scripts/assert-desktop-package.mjs",
+    "electron:smoke-toolchain": "node scripts/smoke-packaged-toolchain.mjs",
+    "electron:smoke:packaged": "node scripts/desktop-packaged-smoke.mjs",
+    "electron:smoke:onboarding": "node scripts/desktop-packaged-smoke.mjs --onboarding",
+    "electron:smoke:trading-mode": "node scripts/desktop-packaged-smoke.mjs --trading-mode",
+    "electron:smoke:workspace": "node scripts/desktop-packaged-smoke.mjs --workspace-acceptance",
+    "electron:smoke:pty": "node scripts/desktop-pty-smoke.mjs",
+    "electron:smoke:guardian-recovery": "node scripts/desktop-pty-smoke.mjs --guardian-recovery",
+    "vendor:runtime": "node scripts/vendor-managed-runtime.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "test:bbProvider": "vitest run --config vitest.bbProvider.config.ts",
     "test:smoke": "tsx scripts/guardian/smoke.ts",
+    "test:guardian-recovery": "tsx scripts/guardian/runtime-recovery-smoke.ts",
     "postinstall": "node scripts/fix-pty-perms.mjs"
   },
   "keywords": [
@@ -35,22 +48,23 @@
     "url": "git+https://github.com/TraderAlice/OpenAlice.git"
   },
   "homepage": "https://traderalice.com",
-  "packageManager": "pnpm@10.29.2",
+  "packageManager": "pnpm@11.7.0",
   "dependencies": {
     "@alpacahq/alpaca-trade-api": "^3.1.3",
-    "@anthropic-ai/claude-agent-sdk": "^0.2.72",
     "@anthropic-ai/sdk": "^0.96.0",
     "@grammyjs/auto-retry": "^2.0.2",
     "@hono/node-server": "^2.0.0",
     "@modelcontextprotocol/sdk": "^1.27.1",
-    "@sinclair/typebox": "0.34.48",
+    "@traderalice/guardian-runtime": "workspace:*",
     "@traderalice/ibkr": "workspace:*",
     "@traderalice/opentypebb": "workspace:*",
     "@traderalice/uta-protocol": "workspace:*",
     "ai": "^6.0.86",
-    "ajv": "^8.18.0",
     "ccxt": "^4.5.38",
+    "cron-parser": "^5.6.1",
     "decimal.js": "^10.6.0",
+    "dugite": "3.2.2",
+    "electron-updater": "^6.8.9",
     "grammy": "^1.40.0",
     "hono": "^4.12.21",
     "longbridge": "^4.0.5",
@@ -59,6 +73,7 @@
     "pino": "^10.3.1",
     "viem": "^2.48.7",
     "ws": "^8.19.0",
+    "yaml": "^2.9.0",
     "zod": "^4.3.6"
   },
   "build": {
@@ -67,42 +82,53 @@
     "directories": {
       "output": "dist/electron-app"
     },
+    "electronVersion": "39.8.10",
+    "asar": false,
     "files": [
-      "dist/main.js",
+      "dist/*.js",
       "dist/electron/**",
       "ui/dist/**",
       "default/**",
       "src/workspaces/cli/**",
-      "package.json"
+      "src/workspaces/templates/**",
+      "services/uta/dist/**",
+      "services/uta/package.json",
+      "vendor/**",
+      "package.json",
+      "!node_modules/**/*.d.ts",
+      "!node_modules/**/*.d.ts.map",
+      "!node_modules/**/*.map",
+      "!node_modules/**/_types/**"
     ],
     "mac": {
-      "target": "dir"
-    }
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "node-pty",
-      "electron"
-    ],
-    "overrides": {
-      "@alpacahq/alpaca-trade-api>axios": "^0.32.0",
-      "@alpacahq/alpaca-trade-api>eslint": "-",
-      "protobufjs": "^7.5.8",
-      "fast-uri": "^3.1.2",
-      "qs": "^6.15.2",
-      "ip-address": "^10.1.1",
-      "tmp": "^0.2.6",
-      "ws@^8.0.0": "^8.20.1",
-      "lodash": "^4.18.0",
-      "path-to-regexp": "^8.4.0",
-      "msw>path-to-regexp": "^6.3.0",
-      "follow-redirects": "^1.16.0",
-      "express-rate-limit": "^8.2.2",
-      "picomatch": "^4.0.4",
-      "rollup": "^4.59.0",
-      "vitest>vite": "^7.3.2",
-      "@vitest/mocker>vite": "^7.3.2"
-    }
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.finance",
+      "icon": "apps/desktop/build/icon.icns",
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.inherit.plist",
+      "notarize": true,
+      "gatekeeperAssess": false
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "apps/desktop/build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://download.openalice.ai/"
+      }
+    ]
   },
   "devDependencies": {
     "@ai-sdk/provider": "^3.0.8",

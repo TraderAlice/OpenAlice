@@ -1,5 +1,5 @@
 /**
- * Event Log — append-only persistent event log with in-memory ring buffer.
+ * Event Log — append-only persistent journal with in-memory ring buffer.
  *
  * Dual-write: every append goes to disk (JSONL) AND an in-memory buffer.
  * The memory buffer holds the most recent N entries (default 500) for fast
@@ -13,8 +13,6 @@
 import { appendFile, readFile, mkdir, unlink } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { dataPath } from './paths.js'
-import type { AgentEventMap } from './agent-event.js'
-import { validateEventPayload } from './agent-event.js'
 
 // ==================== Types ====================
 
@@ -27,13 +25,13 @@ export interface EventLogEntry<T = unknown> {
   type: string
   /** Arbitrary JSON-serializable payload. */
   payload: T
-  /** Parent event's seq — present if this event was emitted in response to another. */
+  /** Optional parent record sequence for callers that maintain causal links. */
   causedBy?: number
 }
 
 /** Options accepted by EventLog.append(). */
 export interface AppendOpts {
-  /** Parent event's seq. Set by listeners to link a child event back to what triggered it. */
+  /** Parent record sequence, when the caller maintains causal links. */
   causedBy?: number
 }
 
@@ -48,9 +46,7 @@ export interface EventLogQueryResult {
 }
 
 export interface EventLog {
-  /** Append a typed event (registered in AgentEventMap). Validates payload at runtime. */
-  append<K extends keyof AgentEventMap>(type: K, payload: AgentEventMap[K], opts?: AppendOpts): Promise<EventLogEntry<AgentEventMap[K]>>
-  /** Append an unregistered event (no runtime validation). */
+  /** Append an arbitrary journal record. Domain validation belongs to the caller. */
   append<T>(type: string, payload: T, opts?: AppendOpts): Promise<EventLogEntry<T>>
 
   /**
@@ -85,9 +81,7 @@ export interface EventLog {
   /** Subscribe to new events (real-time, on append). Returns unsubscribe fn. */
   subscribe(listener: EventLogListener): () => void
 
-  /** Subscribe to events of a registered type (typed listener). Returns unsubscribe fn. */
-  subscribeType<K extends keyof AgentEventMap>(type: K, listener: (entry: EventLogEntry<AgentEventMap[K]>) => void): () => void
-  /** Subscribe to events of any type (untyped listener). Returns unsubscribe fn. */
+  /** Subscribe to records of one type. Returns unsubscribe fn. */
   subscribeType(type: string, listener: EventLogListener): () => void
 
   /** Close the log (clear listeners and buffer). */
@@ -133,7 +127,6 @@ export async function createEventLog(opts?: {
   // ---------- append ----------
 
   async function append<T>(type: string, payload: T, opts?: AppendOpts): Promise<EventLogEntry<T>> {
-    validateEventPayload(type, payload)
     seq += 1
     const entry: EventLogEntry<T> = {
       seq,

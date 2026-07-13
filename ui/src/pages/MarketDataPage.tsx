@@ -5,25 +5,49 @@ import { ConfigSection, Field, inputClass } from '../components/form'
 import { Toggle } from '../components/Toggle'
 import { useConfigPage } from '../hooks/useConfigPage'
 import { PageHeader } from '../components/PageHeader'
+import { CenteredLoading } from '../components/StateViews'
 
 type MarketDataConfig = Record<string, unknown>
 
 // ==================== Constants ====================
 
-const PROVIDER_OPTIONS: Record<string, string[]> = {
-  equity: ['yfinance', 'fmp', 'intrinio'],
-  crypto: ['yfinance', 'fmp'],
-  currency: ['yfinance', 'fmp'],
-  commodity: ['yfinance', 'fmp'],
+// Chart vendors — live K-line / quote sources. These are the high-frequency,
+// can't-be-mediated data the Data Hub deliberately doesn't carry, so each is a
+// direct vendor you switch on. There is NO per-asset-class configuration: a
+// vendor that's on joins the searchBars candidate pool, and what it can serve
+// is discovered by searching (heuristic), never declared here. yfinance is the
+// always-on global default; the rest are user-opted regional vendors
+// (marketData.extraVendors). TWSE / Vietnam slot in here as new rows.
+interface ChartVendor {
+  id: string
+  name: string
+  desc: string
+  alwaysOn?: boolean
 }
 
-const ASSET_LABELS: Record<string, string> = {
-  equity: 'Equity',
-  crypto: 'Crypto',
-  currency: 'Currency',
-  commodity: 'Commodity',
-}
+const CHART_VENDORS: ChartVendor[] = [
+  {
+    id: 'yfinance',
+    name: 'yfinance',
+    desc: 'Global default — charts & quotes for every market Yahoo lists (US, CN, HK, TW, VN, EU, JP, KR…). Free, no key.',
+    alwaysOn: true,
+  },
+  {
+    id: 'eastmoney',
+    name: 'Eastmoney 东方财富',
+    desc: 'CN A-shares — 中文搜索 (茅台 → 600519) and 前复权 K-lines yfinance can’t give. Public endpoints, no key. Served from China, so slower than yfinance for users abroad.',
+  },
+  {
+    id: 'twse',
+    name: 'TWSE + TPEx 臺灣證交所',
+    desc: 'Taiwan listed + OTC (上市/上櫃) — 中文/英文 search over the official company roster, plus official P/E·殖利率·股價淨值比 and company profiles yfinance lacks. No key. K-lines come from Yahoo (2330.TW / 6488.TWO).',
+  },
+]
 
+// Data-provider keys — LOW-frequency data (boards, economy, fundamentals). The
+// Data Hub already mediates all of this, so a key here is just a compatibility
+// shim: go direct, or unlock the slice the hub doesn't serve (FMP fundamentals).
+// Advanced, edge — not the main event.
 interface ProviderEntry {
   key: string
   name: string
@@ -31,9 +55,6 @@ interface ProviderEntry {
   hint: string
 }
 
-/** Key groups tell the real story: FMP unlocks things the hub doesn't
- *  serve; FRED/EIA/BLS are hub-covered (a key here just means direct
- *  access); the rest is long tail. */
 const KEY_GROUPS: { label: string | null; providers: ProviderEntry[] }[] = [
   {
     label: null,
@@ -78,12 +99,12 @@ interface SourceRow {
 function deriveSourceRows(
   hubOn: boolean,
   ping: HubPing,
-  providers: Record<string, string>,
   keys: Record<string, string>,
+  extraVendors: string[],
 ): SourceRow[] {
   const hubLive = hubOn && ping !== 'down' // optimistic while checking
   const hub = { source: 'Hub', state: 'ok' as const }
-  const chartVendors = [...new Set(Object.keys(PROVIDER_OPTIONS).map((a) => providers[a] || 'yfinance'))].join(' · ')
+  const chartVendors = ['yfinance', ...extraVendors].join(' · ')
 
   return [
     {
@@ -115,7 +136,7 @@ function deriveSourceRows(
     },
     {
       name: 'FX rates',
-      ...(hubLive ? hub : { source: providers.currency || 'yfinance', state: 'ok' as const }),
+      ...(hubLive ? hub : { source: 'yfinance', state: 'ok' as const }),
     },
     {
       name: 'Charts & quotes',
@@ -178,18 +199,19 @@ export function MarketDataPage() {
       <div className="flex flex-col flex-1 min-h-0">
         <PageHeader title="Market Data" description="Structured financial data — prices, fundamentals, macro indicators." />
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-[13px] text-text-muted">Loading...</p>
+          <CenteredLoading />
         </div>
       </div>
     )
   }
 
-  const providers = (config.providers ?? { equity: 'yfinance', crypto: 'yfinance', currency: 'yfinance', commodity: 'yfinance' }) as Record<string, string>
   const providerKeys = (config.providerKeys ?? {}) as Record<string, string>
-  const sourceRows = deriveSourceRows(hub.enabled, ping, providers, providerKeys)
+  const extraVendors = (config.extraVendors ?? []) as string[]
+  const sourceRows = deriveSourceRows(hub.enabled, ping, providerKeys, extraVendors)
 
-  const handleProviderChange = (asset: string, provider: string) => {
-    updateConfigImmediate({ providers: { ...providers, [asset]: provider } })
+  const handleExtraVendorToggle = (id: string, on: boolean) => {
+    const next = on ? [...new Set([...extraVendors, id])] : extraVendors.filter((v) => v !== id)
+    updateConfigImmediate({ extraVendors: next })
   }
 
   const handleKeyChange = (keyName: string, value: string) => {
@@ -236,11 +258,11 @@ export function MarketDataPage() {
 
           <SourcesCard rows={sourceRows} onAddFmp={jumpToFmp} />
 
+          <ChartVendorsSection extraVendors={extraVendors} onToggle={handleExtraVendorToggle} />
+
           <AdvancedSection
             open={advancedOpen}
             onToggle={() => setAdvancedOpen((o) => !o)}
-            providers={providers}
-            onProviderChange={handleProviderChange}
             providerKeys={providerKeys}
             onKeyChange={handleKeyChange}
             hub={hub}
@@ -333,13 +355,53 @@ function SourcesCard({ rows, onAddFmp }: { rows: SourceRow[]; onAddFmp: () => vo
   )
 }
 
+// ==================== Chart Vendors (live K-line sources) ====================
+
+function ChartVendorsSection({
+  extraVendors,
+  onToggle,
+}: {
+  extraVendors: string[]
+  onToggle: (id: string, on: boolean) => void
+}) {
+  return (
+    <section className="mb-6">
+      <h2 className="text-[13px] font-semibold text-text-muted uppercase tracking-wider mb-2">Chart Vendors</h2>
+      <p className="text-[12px] text-text-muted/70 mb-2.5 max-w-[640px]">
+        Live K-line &amp; quote sources — queried per symbol, never via the hub. Switch one on and it
+        joins the search pool; what it covers is found by searching, not configured here. yfinance is
+        the always-on global default.
+      </p>
+      <div className="space-y-2.5">
+        {CHART_VENDORS.map((v) => {
+          const on = v.alwaysOn || extraVendors.includes(v.id)
+          return (
+            <div key={v.id} className="border border-border/60 rounded-xl bg-bg-secondary/50 px-4 py-3.5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${on ? 'bg-green' : 'border border-text-muted/50'}`} />
+                  <span className="text-[13px] font-semibold text-text truncate">{v.name}</span>
+                </div>
+                {v.alwaysOn ? (
+                  <span className="text-[11px] text-text-muted/60 uppercase tracking-wider shrink-0">always on</span>
+                ) : (
+                  <Toggle size="sm" checked={on} onChange={(val) => onToggle(v.id, val)} />
+                )}
+              </div>
+              <p className="text-[12px] text-text-muted/70 mt-1.5 leading-relaxed">{v.desc}</p>
+            </div>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
 // ==================== Advanced ====================
 
 function AdvancedSection({
   open,
   onToggle,
-  providers,
-  onProviderChange,
   providerKeys,
   onKeyChange,
   hub,
@@ -349,8 +411,6 @@ function AdvancedSection({
 }: {
   open: boolean
   onToggle: () => void
-  providers: Record<string, string>
-  onProviderChange: (asset: string, provider: string) => void
   providerKeys: Record<string, string>
   onKeyChange: (keyName: string, value: string) => void
   hub: { enabled: boolean; baseUrl: string }
@@ -370,38 +430,12 @@ function AdvancedSection({
 
       {open && (
         <div className="mt-2 border border-border/60 rounded-xl bg-bg-secondary/30 px-5">
-          <ApiKeysSection
+          <KeyProvidersSection
             providerKeys={providerKeys}
             onKeyChange={onKeyChange}
             fmpRef={fmpRef}
             highlightFmp={highlightFmp}
           />
-
-          <ConfigSection
-            title="Chart Vendor Routing"
-            description="Per-asset-class vendor for charts (K-lines) and as fallback when the Data Hub is off or doesn't cover an endpoint. Broker chart sources arrive with the bar layer."
-          >
-            <div className="space-y-3">
-              {Object.entries(PROVIDER_OPTIONS).map(([asset, options]) => {
-                const selectedProvider = providers[asset] || options[0]
-                return (
-                  <div key={asset} className="flex items-center gap-3">
-                    <span className="text-[13px] text-text w-24 shrink-0 font-medium">{ASSET_LABELS[asset]}</span>
-                    <select
-                      className={`${inputClass} max-w-[180px]`}
-                      value={selectedProvider}
-                      onChange={(e) => onProviderChange(asset, e.target.value)}
-                    >
-                      {options.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
-                    </select>
-                    {selectedProvider === 'yfinance' && (
-                      <span className="text-[13px] text-text-muted/50 px-1">Free</span>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </ConfigSection>
 
           <ConfigSection
             title="Data Hub Endpoint"
@@ -449,9 +483,9 @@ function TestButton({
   )
 }
 
-// ==================== API Keys Section ====================
+// ==================== Data Provider Keys (low-frequency) ====================
 
-function ApiKeysSection({
+function KeyProvidersSection({
   providerKeys,
   onKeyChange,
   fmpRef,
@@ -489,8 +523,8 @@ function ApiKeysSection({
 
   return (
     <ConfigSection
-      title="Provider Keys"
-      description="Your own credentials. Keys always take precedence over the hub for the providers they cover."
+      title="Data Provider Keys"
+      description="Low-frequency data — boards, economy, fundamentals — is served by the Data Hub. Add a key only to go direct, or to unlock the slice the hub doesn't serve (FMP fundamentals)."
     >
       <div className="space-y-4">
         {KEY_GROUPS.map((group, gi) => (

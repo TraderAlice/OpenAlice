@@ -16,9 +16,10 @@
 import { writeFile, rename, mkdir } from 'fs/promises'
 import { dirname } from 'path'
 import { dataPath } from '@/core/paths.js'
+import { isUTADisabled, resolveUTAUrl } from './url.js'
 
 export interface TriggerOpts {
-  /** UTA service base URL. Default: process.env.OPENALICE_UTA_URL. */
+  /** UTA service base URL. Default: resolved local UTA carrier URL. */
   utaUrl?: string
   /** Flag path. Default: `dataPath('control', 'restart-uta.flag')`. */
   flagPath?: string
@@ -53,10 +54,10 @@ async function fetchHealth(url: string): Promise<HealthBody | null> {
 }
 
 export async function triggerUTARestart(opts: TriggerOpts = {}): Promise<TriggerResult> {
-  const utaUrl = opts.utaUrl ?? process.env['OPENALICE_UTA_URL']
-  if (!utaUrl) {
-    return { triggered: false, ready: false, error: 'OPENALICE_UTA_URL not set' }
+  if (isUTADisabled()) {
+    return { triggered: false, ready: false, error: 'UTA disabled by OPENALICE_LITE_MODE' }
   }
+  const utaUrl = opts.utaUrl ?? resolveUTAUrl()
   const flagPath = opts.flagPath ?? dataPath('control', 'restart-uta.flag')
   const healthUrl = `${utaUrl.replace(/\/$/, '')}/__uta/health`
   const timeoutMs = opts.timeoutMs ?? 20_000

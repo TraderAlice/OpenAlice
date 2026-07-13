@@ -63,6 +63,17 @@ const { port: uiPort, strictPort } = readUiPort()
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // Inject the backend port as a compile-time constant so the dev client can
+  // open the PTY WebSocket *directly* against the backend, bypassing the Vite
+  // dev proxy. node-http-proxy's WS upgrade forwarding chokes under the
+  // terminal's high-throughput byte stream (read ECONNRESET), and adds a
+  // buffer+copy hop per frame. API traffic still goes through the proxy (low
+  // frequency, convenient). Dev-only: in production the UI is same-origin with
+  // the backend, so `location.host` is already correct and this is unused.
+  // `0` sentinel means "no override" — the client falls back to location.host.
+  define: {
+    __OPENALICE_DEV_BACKEND_PORT__: JSON.stringify(backendPort),
+  },
   // Dev server with API proxy to the backend.
   // Backend port is read from `data/config/connectors.json` (web.port) so
   // changing the backend port in one place propagates to Vite automatically.

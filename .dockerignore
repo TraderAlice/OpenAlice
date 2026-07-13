@@ -15,6 +15,10 @@ node_modules
 **/node_modules
 ui/.vite
 electron/dist
+# The server image never builds or ships the Electron desktop workspace. Keep
+# it out of the post-install COPY so pnpm does not discover a new eighth
+# workspace and auto-install Electron after the cacheable dependency layer.
+apps/desktop
 
 # Editor / IDE
 .vscode

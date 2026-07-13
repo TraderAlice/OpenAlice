@@ -9,7 +9,7 @@
 
 import Decimal from 'decimal.js'
 import { Contract, Order, ContractDescription, ContractDetails, UNSET_DECIMAL, UNSET_INTEGER, UNSET_DOUBLE } from '@traderalice/ibkr'
-import { BrokerError, type IBroker, type AccountInfo, type Position, type OpenOrder, type PlaceOrderResult, type Quote, type MarketClock, type AccountCapabilities, type BrokerHealth, type BrokerHealthInfo, type UTAReach, type UTATier, type TpSlParams, type Bar, type BarParams, type ExpandContractFilters, type ContractExpansion } from './brokers/types.js'
+import { BrokerError, type IBroker, type AccountInfo, type Position, type OpenOrder, type PlaceOrderResult, type Quote, type MarketClock, type AccountCapabilities, type BrokerHealth, type BrokerHealthInfo, type UTAReach, type UTATier, type TpSlParams, type Bar, type BarParams, type ExpandContractFilters, type ContractExpansion, type SubAccountRef } from './brokers/types.js'
 
 const REACH_RANK: Record<UTAReach, number> = { down: 0, connected: 1, readable: 2 }
 import { TradingGit } from './git/TradingGit.js'
@@ -45,11 +45,13 @@ export interface UnifiedTradingAccountOptions {
   onHealthChange?: (accountId: string, health: BrokerHealthInfo) => void
   onPostPush?: (accountId: string) => void | Promise<void>
   onPostReject?: (accountId: string) => void | Promise<void>
-  /** Refuse write operations (stage/commit/push). Implied by keyless. */
+  /** Refuse external account mutations. Proposal staging stays local; push is blocked. Implied by keyless. */
   readOnly?: boolean
   /** Public-data-only account (no key) — no account/positions; excluded from
    *  equity aggregation. Implies readOnly. */
   keyless?: boolean
+  /** Whether this UTA participates in broker-backed market-data discovery. */
+  asVendor?: boolean
 }
 
 // ==================== Stage param types ====================
@@ -84,8 +86,10 @@ export class UnifiedTradingAccount {
   readonly git: TradingGit
   /** Public-data-only (no key, no account/positions, excluded from equity agg). */
   readonly keyless: boolean
-  /** Write operations refused (implied by keyless). */
+  /** External account mutations refused (implied by keyless). */
   readonly readOnly: boolean
+  /** Broker-backed market-data discovery participation. */
+  readonly asVendor: boolean
 
   private readonly _getState: () => Promise<GitState>
   private readonly _onHealthChange?: (accountId: string, health: BrokerHealthInfo) => void
@@ -97,6 +101,12 @@ export class UnifiedTradingAccount {
   private static readonly OFFLINE_THRESHOLD = 6
   private static readonly RECOVERY_BASE_MS = 5_000
   private static readonly RECOVERY_MAX_MS = 60_000
+  /** Grace a read gives the INITIAL connect before it fast-fails with CONNECTING.
+   *  An instantly-connecting broker (mock, warm cache) settles within this and
+   *  serves real data; a slow one (CCXT loadMarkets, tens of seconds) blows past
+   *  it and the read returns "connecting" instead of blocking on the whole init.
+   *  Bounds the cold-start first-read to this, not the full connect time. */
+  private static readonly CONNECT_GRACE_MS = 1_500
 
   private _consecutiveFailures = 0
   private _lastError?: string
@@ -105,10 +115,28 @@ export class UnifiedTradingAccount {
   private _recoveryTimer?: ReturnType<typeof setTimeout>
   private _recovering = false
   private _disabled = false
+  /** True while the INITIAL broker connect is in flight (e.g. CCXT loadMarkets,
+   *  which can take tens of seconds). Reads during this window return fast with
+   *  a transient CONNECTING error instead of blocking on the slow connect — the
+   *  bug that made the whole UI hang ~30s on cold start while the optimistic
+   *  reach (below) reported "healthy". Flips false when `_connectPromise`
+   *  settles; never set true again (re-connects go through the recovery loop,
+   *  which has its own gate). Orthogonal to `_recovering`. */
+  private _connecting = true
   /** Current rung on the capability ladder. Updated by every connect/recovery
    *  probe and by live broker-call success/failure. */
   private _currentReach: UTAReach = 'down'
   private _connectPromise: Promise<void>
+  /** Sub-account (wallet) list, cached from the broker once it connects. Null
+   *  until first probed. Static per connection (CCXT derives it from venue
+   *  overrides — network-independent), so caching can't go stale. Drives the
+   *  write-disambiguation guard. */
+  private _subAccounts: SubAccountRef[] | null = null
+  /** Sub-account ids declared by writes staged-but-not-yet-committed, parallel
+   *  to the git staging area. Stamped into the commit message at commit time
+   *  (the ledger records the wallet without touching the Operation schema),
+   *  then cleared. */
+  private _stagedSubAccountIds: string[] = []
 
   constructor(broker: IBroker, options: UnifiedTradingAccountOptions = {}) {
     this.broker = broker
@@ -116,6 +144,7 @@ export class UnifiedTradingAccount {
     this.label = broker.label
     this.keyless = options.keyless ?? false
     this.readOnly = options.readOnly ?? options.keyless ?? false
+    this.asVendor = options.asVendor ?? true
     // Optimistically assume we'll reach this account's target until the first
     // probe says otherwise — preserves "usable immediately after construction"
     // (the probe corrects/demotes within ms).
@@ -148,6 +177,7 @@ export class UnifiedTradingAccount {
     }
 
     const dispatcher = async (op: Operation): Promise<unknown> => {
+      this._assertCanMutateAccount(op.action)
       switch (op.action) {
         case 'placeOrder':
           return broker.placeOrder(op.contract, op.order, op.tpsl)
@@ -174,8 +204,13 @@ export class UnifiedTradingAccount {
       ? TradingGit.restore(options.savedState, gitConfig)
       : new TradingGit(gitConfig)
 
-    // Kick off broker connection asynchronously — UTA is usable immediately,
-    // broker queries will fail (tracked by health) until init succeeds.
+    // Kick off broker connection asynchronously — UTA is usable immediately;
+    // reads during the connect window return a fast transient CONNECTING marker
+    // (see `_connecting` / `_callBroker`) rather than blocking on init.
+    // `_connecting` is cleared INSIDE _connect() (right after the connect probe
+    // settles, before the health-change emit) so the first emitted health diff
+    // already carries connecting:false — clearing it here in a .finally would
+    // run after that emit and leave the UI stuck on "connecting".
     const p = this._connect()
     // Silence unhandled rejection in fire-and-forget path.
     // waitForConnect() returns the raw promise so callers can observe failures.
@@ -238,6 +273,7 @@ export class UnifiedTradingAccount {
       lastSuccessAt: this._lastSuccessAt,
       lastFailureAt: this._lastFailureAt,
       recovering: this._recovering,
+      connecting: this._connecting,
       disabled: this._disabled,
     }
   }
@@ -280,7 +316,23 @@ export class UnifiedTradingAccount {
 
   /** Initial broker connection — fire-and-forget from constructor. */
   private async _connect(): Promise<void> {
+    // Timed + logged: the connect duration is the cold-start cost this whole
+    // non-blocking path exists to absorb, so surface it on the console (a slow
+    // CCXT loadMarkets is otherwise an invisible ~30s stall).
+    const startedAt = Date.now()
+    console.log(`UTA[${this.id}]: connecting (target ${this.targetReach})…`)
     this._currentReach = await this._attemptReach()
+    // Initial connect has settled (reached, down, or disabled — _attemptReach
+    // never throws). Clear the connecting gate now, BEFORE any _emitHealthChange
+    // below, so the first health diff the UI receives reflects the real state.
+    // Re-connections go through the recovery loop, which has its own gating.
+    this._connecting = false
+    // Warm the sub-account cache once the transport is up, so the (sync)
+    // write-disambiguation guard has the list before any staging. Best-effort:
+    // a failure here must not break connection.
+    if (!this._disabled && this._currentReach !== 'down') {
+      try { await this._ensureSubAccounts() } catch { /* guard falls back to single-default */ }
+    }
     if (this._disabled) {
       console.warn(`UTA[${this.id}]: disabled — ${this._lastError}`)
       this._emitHealthChange()
@@ -289,7 +341,7 @@ export class UnifiedTradingAccount {
     if (this._reachedTarget()) {
       this._onSuccess()
       this._emitHealthChange()
-      console.log(`UTA[${this.id}]: ${this._currentReach} (${this.tier})`)
+      console.log(`UTA[${this.id}]: ${this._currentReach} (${this.tier}) in ${((Date.now() - startedAt) / 1000).toFixed(1)}s`)
       return
     }
     // Below target → recover toward it.
@@ -297,17 +349,45 @@ export class UnifiedTradingAccount {
     this._startRecovery()
     this._emitHealthChange()
     if (this._currentReach === 'down') {
+      console.warn(`UTA[${this.id}]: unreachable after ${((Date.now() - startedAt) / 1000).toFixed(1)}s — ${this._lastError ?? 'no detail'} (recovering)`)
       throw new BrokerError('NETWORK', this._lastError ?? `Account "${this.label}" unreachable`)
     }
     // 'connected' but funded wants 'readable' — partial; recovery pursues it.
+  }
+
+  /** Race the initial connect against a short grace window. Resolves as soon as
+   *  the connect settles (an instant broker wins via microtask, well before the
+   *  timer) or the grace elapses (a slow broker). The caller re-checks
+   *  `_connecting` afterwards to decide whether to proceed or fast-fail. */
+  private _awaitConnectOrGrace(): Promise<void> {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const grace = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, UnifiedTradingAccount.CONNECT_GRACE_MS)
+      timer.unref?.()
+    })
+    return Promise.race([this._connectPromise.catch(() => {}), grace])
+      .finally(() => { if (timer) clearTimeout(timer) })
   }
 
   private async _callBroker<T>(fn: () => Promise<T>): Promise<T> {
     if (this._disabled) {
       throw new BrokerError('CONFIG', `Account "${this.label}" is disabled due to configuration error: ${this._lastError}`)
     }
+    // Initial connect still in flight (e.g. CCXT loadMarkets). Give it a short
+    // grace: an instant broker settles within it and the read proceeds with real
+    // data; a slow one is still connecting afterwards and we return FAST instead
+    // of blocking on the whole init. Thrown BEFORE the try block, so it never
+    // reaches _onFailure: no failure counter, no health degrade, no premature
+    // recovery. The background connect keeps going; a later read gets real data.
+    // This is the fix for the ~30s cold-start hang.
+    if (this._connecting) {
+      await this._awaitConnectOrGrace()
+      if (this._connecting) {
+        throw new BrokerError('CONNECTING', `Account "${this.label}" is still connecting to the broker. Data will be available shortly.`)
+      }
+    }
     if (this.health === 'offline' && this._recovering) {
-      throw new BrokerError('NETWORK', `Account "${this.label}" is offline and reconnecting. Try again shortly.`)
+      throw new BrokerError('CONNECTING', `Account "${this.label}" is offline and reconnecting. Try again shortly.`)
     }
     try {
       const result = await fn()
@@ -428,11 +508,19 @@ export class UnifiedTradingAccount {
 
   // ==================== Stage operations ====================
 
-  /** Loud-refuse writes on a read-only / keyless (data-only) account. */
-  private _assertWritable(): void {
+  /** Loud-refuse proposal staging on a keyless public-data source. */
+  private _assertCanCreateProposal(): void {
+    if (this.keyless) {
+      throw new BrokerError('CONFIG',
+        `Account "${this.label}" is a keyless public-data account — trading proposals require a funded account.`)
+    }
+  }
+
+  /** Loud-refuse broker-side account mutations on read-only / keyless accounts. */
+  private _assertCanMutateAccount(action: string): void {
     if (this.readOnly) {
       throw new BrokerError('CONFIG',
-        `Account "${this.label}" is read-only${this.keyless ? ' (keyless public-data account)' : ''} — trading operations are not allowed.`)
+        `Account "${this.label}" is read-only${this.keyless ? ' (keyless public-data account)' : ''} — ${action} would mutate the external account, which is not allowed.`)
     }
   }
 
@@ -479,12 +567,68 @@ export class UnifiedTradingAccount {
     }
   }
 
+  // ==================== Sub-accounts ====================
+
+  /** Fetch (and memoize) the broker's sub-account list. Brokers that don't
+   *  implement `listSubAccounts` collapse to a single implicit 'default'. */
+  private async _ensureSubAccounts(): Promise<SubAccountRef[]> {
+    if (this._subAccounts) return this._subAccounts
+    const list = this.broker.listSubAccounts ? await this.broker.listSubAccounts() : null
+    this._subAccounts = list && list.length ? list : [{ id: 'default', label: this.label, kind: 'unified' }]
+    return this._subAccounts
+  }
+
+  /** The sub-accounts (wallets) this connection spans. One element for ordinary
+   *  brokers; >1 only for separate-wallet venues (CCXT Binance: spot / futures). */
+  async listSubAccounts(): Promise<SubAccountRef[]> {
+    return this._ensureSubAccounts()
+  }
+
+  /**
+   * Resolve + validate the target sub-account for a proposed account mutation. When the connection
+   * spans >1 sub-account, an explicit selector is REQUIRED (placing an order is
+   * irreversible — we never guess a wallet). The selector is also checked
+   * against the instrument: "place this on spot" with a perp contract
+   * loud-refuses. Returns the resolved id to stamp into the commit message, or
+   * undefined for single-sub-account brokers (nothing to disambiguate or stamp).
+   */
+  private _resolveWriteSubAccount(contract: Contract, requested?: string): string | undefined {
+    const subs = this._subAccounts ?? []
+    if (subs.length <= 1) return undefined  // single (or not-yet-probed) → nothing to disambiguate
+
+    const valid = subs.map(s => s.id).join(', ')
+    const expected = this.broker.subAccountForContract?.(contract)
+    const instr = contract.secType || 'this instrument'
+
+    if (!requested) {
+      throw new BrokerError('CONFIG',
+        `Account "${this.label}" has multiple sub-accounts (${subs.map(s => `${s.id} [${s.kind}]`).join(', ')}). ` +
+        `Re-issue this write with subAccountId` +
+        (expected ? `="${expected}" (where ${instr} trades).` : ` set to one of: ${valid}.`))
+    }
+    if (!subs.some(s => s.id === requested)) {
+      throw new BrokerError('CONFIG',
+        `Account "${this.label}": unknown sub-account "${requested}". Valid sub-accounts: ${valid}.`)
+    }
+    if (expected && expected !== requested) {
+      throw new BrokerError('CONFIG',
+        `Account "${this.label}": ${instr} trades in sub-account "${expected}", not "${requested}". ` +
+        `Re-issue with subAccountId="${expected}".`)
+    }
+    return requested
+  }
+
+  // ==================== Staging ====================
+
   stagePlaceOrder(params: StagePlaceOrderParams): AddResult {
-    this._assertWritable()
+    this._assertCanCreateProposal()
     this._validatePlaceOrderParams(params)
     // Resolve aliceId → full contract via broker (fills secType, exchange, currency, conId, etc.)
     const contract = this.contractFromAliceId(params.aliceId)
     if (params.symbol) contract.symbol = params.symbol
+
+    const subAccountId = this._resolveWriteSubAccount(contract, params.subAccountId)
+    if (subAccountId) this._stagedSubAccountIds.push(subAccountId)
 
     const order = new Order()
     order.action = params.action
@@ -511,7 +655,7 @@ export class UnifiedTradingAccount {
   }
 
   stageModifyOrder(params: StageModifyOrderParams): AddResult {
-    this._assertWritable()
+    this._assertCanCreateProposal()
     const changes: Partial<Order> = {}
     if (params.totalQuantity != null) changes.totalQuantity = new Decimal(String(params.totalQuantity))
     if (params.lmtPrice != null) changes.lmtPrice = new Decimal(String(params.lmtPrice))
@@ -526,9 +670,12 @@ export class UnifiedTradingAccount {
   }
 
   stageClosePosition(params: StageClosePositionParams): AddResult {
-    this._assertWritable()
+    this._assertCanCreateProposal()
     const contract = this.contractFromAliceId(params.aliceId)
     if (params.symbol) contract.symbol = params.symbol
+
+    const subAccountId = this._resolveWriteSubAccount(contract, params.subAccountId)
+    if (subAccountId) this._stagedSubAccountIds.push(subAccountId)
 
     return this.git.add({
       action: 'closePosition',
@@ -538,17 +685,31 @@ export class UnifiedTradingAccount {
   }
 
   stageCancelOrder(params: { orderId: string }): AddResult {
-    this._assertWritable()
+    this._assertCanCreateProposal()
     return this.git.add({ action: 'cancelOrder', orderId: params.orderId })
   }
 
   // ==================== Git flow ====================
 
   commit(message: string): CommitPrepareResult {
-    return this.git.commit(message)
+    const result = this.git.commit(this._stampSubAccount(message))
+    // Sub-account intent is now baked into the persisted message — clear the
+    // transient tracker so the next staging batch starts clean.
+    this._stagedSubAccountIds = []
+    return result
+  }
+
+  /** Append a `[sub:…]` tag to the commit message recording which wallet(s) the
+   *  staged writes targeted. The ONLY place the sub-account is persisted — the
+   *  Operation / GitCommit schema is deliberately left untouched. No-op when no
+   *  multi-sub-account write was staged. */
+  private _stampSubAccount(message: string): string {
+    const ids = [...new Set(this._stagedSubAccountIds)]
+    return ids.length ? `${message} [sub:${ids.join(',')}]` : message
   }
 
   async push(): Promise<PushResult> {
+    this._assertCanMutateAccount('push')
     if (this._disabled) {
       throw new BrokerError('CONFIG', `Account "${this.label}" is disabled due to configuration error.`)
     }
@@ -562,6 +723,7 @@ export class UnifiedTradingAccount {
 
   async reject(reason?: string): Promise<RejectResult> {
     const result = await this.git.reject(reason)
+    this._stagedSubAccountIds = []
     Promise.resolve(this._onPostReject?.(this.id)).catch(() => {})
     return result
   }
@@ -758,9 +920,9 @@ export class UnifiedTradingAccount {
    * two surfaces agree by construction, at the cost of one extra broker
    * round-trip per account read (a 60s-poll path, not a hot path).
    */
-  async getAccount(): Promise<AccountInfo> {
-    const account = await this._callBroker(() => this.broker.getAccount())
-    const positions = await this.getPositions()
+  async getAccount(subAccountId?: string): Promise<AccountInfo> {
+    const account = await this._callBroker(() => this.broker.getAccount(subAccountId))
+    const positions = await this.getPositions(subAccountId)
     // Currency guard: position PnLs can only be summed when they all share
     // the account's base currency. Mixed-currency books (IBKR holding HKD +
     // USD lines) would otherwise blind-sum different units — the exact bug
@@ -779,8 +941,8 @@ export class UnifiedTradingAccount {
     return account
   }
 
-  async getPositions(): Promise<Position[]> {
-    const positions = await this._callBroker(() => this.broker.getPositions())
+  async getPositions(subAccountId?: string): Promise<Position[]> {
+    const positions = await this._callBroker(() => this.broker.getPositions(subAccountId))
     for (const p of positions) this.stampAliceId(p.contract)
     await this._reconcileWalletPositions(positions)
     return positions

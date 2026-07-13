@@ -6,6 +6,7 @@ import { createInterface } from 'node:readline';
 
 import type { BootstrapContext, CliAdapter, OnDiskSession, SpawnContext, WorkspaceAiCred } from '../cli-adapter.js';
 import { readWorkspaceFile, writeWorkspaceFile } from '../file-service.js';
+import type { HeadlessOutputEvent } from '../headless-output.js';
 
 const CODEX_CONFIG_PATH = '.codex/config.toml';
 const CODEX_ENV_PATH = '.codex/env.json';
@@ -55,6 +56,7 @@ const CODEX_PROVIDER_NAME = 'workspace';
 export const codexAdapter: CliAdapter = {
   id: 'codex',
   displayName: 'Codex',
+  binary: 'codex',
   namePrefix: 'x',
   capabilities: {
     parallelPerCwd: true,
@@ -70,16 +72,21 @@ export const codexAdapter: CliAdapter = {
   },
 
   /**
-   * Always prepends `-c mcp_servers.openalice.url="..."` and the workspace
-   * scoped `openalice-workspace` server so OpenAlice MCP is visible
-   * per-spawn without writing to `~/.codex/config.toml`. The
-   * flag overrides any same-key entry in the read config.toml (verified
-   * empirically), and adds a new key when none exists — safe in both
-   * default and override modes.
+   * Prepends MCP server flags only when OpenAlice's optional MCP server is
+   * enabled. The default tool path is CLI-mode (`alice*` shell commands), so a
+   * workspace must still spawn even when no MCP URL is present.
    */
   composeCommand(_base: readonly string[], ctx: SpawnContext): readonly string[] {
     const head = codexMcpHead(ctx);
-    if (ctx.resume === undefined) return head;
+    if (ctx.resume === undefined) {
+      // Quick-chat seed: `codex [-c …] -- <prompt>` opens the interactive TUI on
+      // that prompt ("Optional user prompt to start the session" per `codex
+      // --help`). `--` terminates options so a `-`-leading prompt is safe (codex
+      // accepts `--` at the top level; verified). Seeding only on fresh spawns —
+      // codex's `resume <id>` subcommand has no positional-prompt slot.
+      if (ctx.initialPrompt) return [...head, '--', ctx.initialPrompt];
+      return head;
+    }
     if (ctx.resume === 'last') return [...head, 'resume', '--last'];
     return [...head, 'resume', ctx.resume.sessionId];
   },
@@ -96,8 +103,8 @@ export const codexAdapter: CliAdapter = {
   //                       loopback CLI gateway (else: "...fetch failed").
   // No mcp_servers head (interactive composeCommand keeps it — MCP works there
   // with a human approver). `--` terminates options before the trailing prompt.
-  composeHeadlessCommand(_base: readonly string[], _ctx: SpawnContext, prompt: string): readonly string[] {
-    return [
+  composeHeadlessCommand(_base: readonly string[], ctx: SpawnContext, prompt: string): readonly string[] {
+    const head = [
       'codex',
       '-c',
       'approval_policy="never"',
@@ -106,6 +113,11 @@ export const codexAdapter: CliAdapter = {
       '-c',
       'sandbox_workspace_write.network_access=true',
       'exec',
+    ];
+    if (ctx.resume === 'last') return [...head, 'resume', '--json', '--last', prompt];
+    if (ctx.resume) return [...head, 'resume', '--json', ctx.resume.sessionId, prompt];
+    return [
+      ...head,
       '--json',
       '--',
       prompt,
@@ -123,6 +135,117 @@ export const codexAdapter: CliAdapter = {
       return typeof evt['thread_id'] === 'string' ? evt['thread_id'] : null;
     } catch {
       return null;
+    }
+  },
+
+  extractHeadlessAssistantText(line: string): string | null {
+    try {
+      const evt = JSON.parse(line) as Record<string, unknown>;
+      if (evt['type'] !== 'item.completed') return null;
+      const item = evt['item'];
+      if (!item || typeof item !== 'object') return null;
+      const record = item as Record<string, unknown>;
+      return record['type'] === 'agent_message' && typeof record['text'] === 'string'
+        ? record['text']
+        : null;
+    } catch {
+      return null;
+    }
+  },
+
+  extractHeadlessOutputEvents(line: string): readonly HeadlessOutputEvent[] {
+    try {
+      const evt = JSON.parse(line) as Record<string, unknown>;
+      if (evt['type'] === 'error' && typeof evt['message'] === 'string') {
+        return [{ type: 'error', message: evt['message'] }];
+      }
+      if (evt['type'] === 'turn.failed') {
+        const error = evt['error'];
+        const message = error && typeof error === 'object' && typeof (error as Record<string, unknown>)['message'] === 'string'
+          ? (error as Record<string, unknown>)['message'] as string
+          : typeof error === 'string'
+            ? error
+            : 'Codex turn failed';
+        return [{ type: 'error', message }];
+      }
+      if (evt['type'] !== 'item.started' && evt['type'] !== 'item.completed') return [];
+      const item = evt['item'];
+      if (!item || typeof item !== 'object') return [];
+      const record = item as Record<string, unknown>;
+      const id = typeof record['id'] === 'string' ? record['id'] : `codex-${record['type'] ?? 'item'}`;
+      if (evt['type'] === 'item.completed' && record['type'] === 'error' && typeof record['message'] === 'string') {
+        return [{ type: 'error', message: record['message'] }];
+      }
+      if (evt['type'] === 'item.completed' && record['type'] === 'agent_message' && typeof record['text'] === 'string') {
+        return [{ type: 'text', text: record['text'] }];
+      }
+      if (record['type'] === 'command_execution') {
+        const input = typeof record['command'] === 'string' ? { command: record['command'] } : record['command'];
+        if (evt['type'] === 'item.started') return [{ type: 'tool-start', id, name: 'Shell', input }];
+        const failed = record['status'] === 'failed' ||
+          record['status'] === 'declined' ||
+          (typeof record['exit_code'] === 'number' && record['exit_code'] !== 0);
+        return [{
+          type: 'tool-finish',
+          id,
+          name: 'Shell',
+          ...(record['aggregated_output'] !== undefined ? { output: record['aggregated_output'] } : {}),
+          ...(failed ? { isError: true } : {}),
+        }];
+      }
+      if (record['type'] === 'file_change') {
+        if (evt['type'] === 'item.started') {
+          return [{ type: 'tool-start', id, name: 'File changes', input: record['changes'] }];
+        }
+        return [{
+          type: 'tool-finish',
+          id,
+          name: 'File changes',
+          output: record['changes'],
+          ...(record['status'] === 'failed' ? { isError: true } : {}),
+        }];
+      }
+      if (record['type'] === 'mcp_tool_call' || record['type'] === 'tool_call') {
+        const name = typeof record['tool'] === 'string'
+          ? record['tool']
+          : typeof record['name'] === 'string'
+            ? record['name']
+            : 'Tool';
+        if (evt['type'] === 'item.started') {
+          return [{ type: 'tool-start', id, name, input: record['arguments'] ?? record['input'] }];
+        }
+        return [{
+          type: 'tool-finish',
+          id,
+          name,
+          output: record['result'] ?? record['output'] ?? record['error'],
+          ...(record['status'] === 'failed' ? { isError: true } : {}),
+        }];
+      }
+      if (record['type'] === 'web_search') {
+        const input = { query: record['query'], action: record['action'] };
+        if (evt['type'] === 'item.started') return [{ type: 'tool-start', id, name: 'Web search', input }];
+        return [{ type: 'tool-finish', id, name: 'Web search', output: input }];
+      }
+      if (record['type'] === 'collab_tool_call') {
+        const rawTool = typeof record['tool'] === 'string' ? record['tool'] : 'collaboration';
+        const name = `Collaboration · ${rawTool.replaceAll('_', ' ')}`;
+        const input = {
+          ...(record['receiver_thread_ids'] !== undefined ? { receiverThreadIds: record['receiver_thread_ids'] } : {}),
+          ...(record['prompt'] !== undefined ? { prompt: record['prompt'] } : {}),
+        };
+        if (evt['type'] === 'item.started') return [{ type: 'tool-start', id, name, input }];
+        return [{
+          type: 'tool-finish',
+          id,
+          name,
+          output: record['agents_states'],
+          ...(record['status'] === 'failed' ? { isError: true } : {}),
+        }];
+      }
+      return [];
+    } catch {
+      return [];
     }
   },
 
@@ -298,19 +421,17 @@ export const codexAdapter: CliAdapter = {
 };
 
 /**
- * The `codex -c mcp_servers.*` head shared by interactive `composeCommand` and
- * headless `composeHeadlessCommand` — so the two never drift on MCP wiring.
+ * Optional `codex -c mcp_servers.*` head. When MCP is disabled, return the
+ * bare codex command and let the workspace use the injected `alice*` CLIs.
  *
- * Reads OPENALICE_MCP_URL / AQ_WS_ID from the spawn-bound env (which service.ts
- * populates with the backend's actual MCP port), NOT process.env — the backend
- * env only carries OPENALICE_MCP_PORT; the URL is composed per-spawn and
- * injected via buildSpawnEnv. Reading process.env here used to fall back to the
- * historical 3001 hardcode and route codex at a dead port.
+ * Reads OPENALICE_MCP_URL / AQ_WS_ID from the spawn-bound env. The URL exists
+ * only when the optional MCP server is enabled; otherwise the workspace uses
+ * the injected `alice*` CLI tools.
  */
 function codexMcpHead(ctx: SpawnContext): string[] {
   const mcpUrl = ctx.env['OPENALICE_MCP_URL'];
   if (!mcpUrl) {
-    throw new Error('codex adapter: OPENALICE_MCP_URL missing from spawn env');
+    return ['codex'];
   }
   const workspaceId = ctx.env['AQ_WS_ID'];
   if (!workspaceId) {

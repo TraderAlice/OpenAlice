@@ -1,14 +1,16 @@
 /**
- * Per-workspace AI provider config modal.
+ * Per-workspace settings modal.
  *
  * Workspaces are VS-Code-style "open folders" — each owns its CLI config
  * files (.claude/settings.local.json, .codex/config.toml + env.json). This
- * modal is the visual editor for those files. Files are the source of
- * truth; the modal reads + writes via the workspace API. Restart any open
- * sessions for changes to take effect (env is read at CLI startup).
+ * modal is the visual editor for those files plus the workspace's
+ * self-describing metadata. Files are the source of truth; the modal reads +
+ * writes via the workspace API. Restart any open sessions for AI-provider
+ * changes to take effect (env is read at CLI startup).
  */
 
 import { useEffect, useMemo, useState } from 'react'
+import { Bot, Info, Settings, X } from 'lucide-react'
 import {
   getAgentConfig,
   listCredentials,
@@ -24,6 +26,7 @@ import { api, type Preset, type WireShape } from '../../api'
 import { baseUrlToVendor, vendorPreset, presetModels, pickAgentWire } from '../../lib/presetHelpers'
 import { ModelCombobox } from '../credentials/PresetFields'
 import { useTestGate } from '../../lib/useTestGate'
+import { useWorkspaces } from '../../contexts/workspaces-context'
 
 // The agent tab implies a default vendor when the baseUrl alone can't say:
 // claude → Anthropic, codex → OpenAI; opencode/pi run anything so they have no
@@ -35,22 +38,33 @@ const TAB_FALLBACK_VENDOR: Record<Tab, string | null> = {
   pi: null,
 }
 
+type Tab = 'claude' | 'codex' | 'opencode' | 'pi'
+type Section = 'general' | 'ai'
+
 interface Props {
   wsId: string
   onClose: () => void
+  initialAgent?: Tab
+  initialSection?: Section
 }
 
 const inputClass =
   'w-full bg-bg-secondary border border-border rounded-md px-3 py-2 text-[13px] text-text placeholder:text-text-muted/60 focus:outline-none focus:border-accent'
 
-type Tab = 'claude' | 'codex' | 'opencode' | 'pi'
-
 const TAB_LABEL: Record<Tab, string> = { claude: 'Claude Code', codex: 'Codex', opencode: 'opencode', pi: 'Pi' }
+const DEFAULT_CONTEXT_WINDOW = 1_000_000
+const CONTEXT_WINDOW_OPTIONS = [
+  { value: 128_000, label: '128K' },
+  { value: 256_000, label: '256K' },
+  { value: 512_000, label: '512K' },
+  { value: 1_000_000, label: '1M' },
+] as const
 
 interface FormState {
   baseUrl: string
   apiKey: string
   model: string
+  contextWindow: number
   /** The wire protocol — drives the test + how the adapter is configured. */
   wireShape: WireShape
   wireApi: 'chat' | 'responses'
@@ -69,7 +83,20 @@ const DEFAULT_WIRE_BY_TAB: Record<Tab, WireShape> = {
   pi: 'openai-chat',
 }
 
-const EMPTY_FORM: FormState = { baseUrl: '', apiKey: '', model: '', wireShape: 'anthropic', wireApi: 'responses', authMode: 'x-api-key' }
+const EMPTY_FORM: FormState = {
+  baseUrl: '',
+  apiKey: '',
+  model: '',
+  contextWindow: DEFAULT_CONTEXT_WINDOW,
+  wireShape: 'anthropic',
+  wireApi: 'responses',
+  authMode: 'x-api-key',
+}
+
+function normalizeContextWindow(value: number | null | undefined): number {
+  if (typeof value !== 'number') return DEFAULT_CONTEXT_WINDOW
+  return CONTEXT_WINDOW_OPTIONS.some((o) => o.value === value) ? value : DEFAULT_CONTEXT_WINDOW
+}
 
 function configToForm(cfg: AgentConfig | null, tab: Tab): FormState {
   if (!cfg) return { ...EMPTY_FORM, wireShape: DEFAULT_WIRE_BY_TAB[tab] }
@@ -77,6 +104,7 @@ function configToForm(cfg: AgentConfig | null, tab: Tab): FormState {
     baseUrl: cfg.baseUrl ?? '',
     apiKey: cfg.apiKey ?? '',
     model: cfg.model ?? '',
+    contextWindow: normalizeContextWindow(cfg.contextWindow),
     wireShape: cfg.wireShape ?? DEFAULT_WIRE_BY_TAB[tab],
     wireApi: 'responses',
     authMode: cfg.authMode === 'bearer' ? 'bearer' : 'x-api-key',
@@ -89,6 +117,9 @@ function formToConfig(form: FormState, agent: AgentId): AgentConfig {
     apiKey: form.apiKey.trim() || null,
     model: form.model.trim() || null,
     wireShape: form.wireShape,
+  }
+  if (agent === 'opencode' || agent === 'pi') {
+    return { ...cfg, contextWindow: form.contextWindow }
   }
   if (agent === 'codex') {
     return { ...cfg, wireApi: form.wireApi }
@@ -116,8 +147,17 @@ function testKey(form: FormState, agent: AgentId): string {
   ].join('|')
 }
 
-export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
-  const [tab, setTab] = useState<Tab>('claude')
+export function WorkspaceAIConfigModal({ wsId, onClose, initialAgent = 'claude', initialSection = 'general' }: Props) {
+  const { workspaces, saveWorkspaceMetadata } = useWorkspaces()
+  const workspace = workspaces.find((w) => w.id === wsId) ?? null
+  const workspaceLabel = workspace?.displayName?.trim() || workspace?.tag || wsId
+  const [section, setSection] = useState<Section>(initialSection)
+  const [tab, setTab] = useState<Tab>(initialAgent)
+  const [metadataFormWsId, setMetadataFormWsId] = useState<string | null>(null)
+  const [displayName, setDisplayName] = useState('')
+  const [description, setDescription] = useState('')
+  const [metadataSaving, setMetadataSaving] = useState(false)
+  const [metadataSavedFlash, setMetadataSavedFlash] = useState(false)
   const [credentials, setCredentials] = useState<SavedCredential[]>([])
   const [bundle, setBundle] = useState<AgentConfigBundle | null>(null)
   const [claudeForm, setClaudeForm] = useState<FormState>(EMPTY_FORM)
@@ -140,6 +180,19 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
   const opencodeGate = useTestGate()
   const piGate = useTestGate()
   const [presets, setPresets] = useState<Preset[]>([])
+
+  useEffect(() => {
+    setSection(initialSection)
+    setTab(initialAgent)
+  }, [initialAgent, initialSection, wsId])
+
+  useEffect(() => {
+    if (metadataFormWsId === wsId) return
+    if (!workspace) return
+    setDisplayName(workspace.displayName ?? '')
+    setDescription(workspace.description ?? '')
+    setMetadataFormWsId(wsId)
+  }, [metadataFormWsId, workspace, wsId])
 
   useEffect(() => {
     void Promise.all([listCredentials(), getAgentConfig(wsId)])
@@ -184,6 +237,7 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
       savedForm.apiKey !== form.apiKey ||
       savedForm.model !== form.model ||
       savedForm.wireShape !== form.wireShape ||
+      ((tab === 'opencode' || tab === 'pi') && savedForm.contextWindow !== form.contextWindow) ||
       (tab === 'claude' && savedForm.authMode !== form.authMode)
     )
   }, [bundle, form, tab])
@@ -280,6 +334,34 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
   const canTest =
     !!form.baseUrl.trim() && !!form.apiKey.trim() && !!form.model.trim()
 
+  const stableTag = workspace?.tag || wsId
+  const savedDisplayName = workspace?.displayName ?? ''
+  const savedDescription = workspace?.description ?? ''
+  const normalizedDisplayName = displayName.trim()
+  const normalizedDescription = description.trim()
+  const metadataDirty =
+    normalizedDisplayName !== savedDisplayName ||
+    normalizedDescription !== savedDescription
+
+  const handleSaveMetadata = async () => {
+    setError(null)
+    setMetadataSaving(true)
+    try {
+      await saveWorkspaceMetadata(wsId, {
+        displayName: normalizedDisplayName || null,
+        description: normalizedDescription || null,
+      })
+      setDisplayName(normalizedDisplayName)
+      setDescription(normalizedDescription)
+      setMetadataSavedFlash(true)
+      setTimeout(() => setMetadataSavedFlash(false), 1800)
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setMetadataSaving(false)
+    }
+  }
+
   const handleTest = () => {
     if (!canTest) return
     // The result is bound to `key` (the current form's tested fields). If the
@@ -305,23 +387,147 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm"
       onMouseDown={handleBackdropMouseDown}
     >
       <div
-        className="bg-bg border border-border rounded-xl shadow-2xl w-full max-w-xl max-h-[85vh] flex flex-col"
+        className="bg-bg border border-border rounded-xl shadow-2xl w-[calc(100vw-24px)] max-w-3xl max-h-[85vh] flex flex-col"
         onMouseDown={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border">
-          <h2 className="text-[15px] font-semibold text-text">Workspace AI Provider</h2>
-          <button onClick={onClose} className="text-text-muted hover:text-text transition-colors">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
+          <div className="min-w-0">
+            <h2 className="text-[15px] font-semibold text-text">Workspace Settings</h2>
+            <p className="mt-0.5 truncate text-[11px] text-text-muted">{workspaceLabel}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md p-1 text-text-muted hover:bg-bg-tertiary hover:text-text transition-colors"
+            aria-label="Close workspace settings"
+            title="Close"
+          >
+            <X size={18} />
           </button>
         </div>
 
+        <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
+          <aside className="flex w-full shrink-0 gap-1 border-b border-border bg-bg-secondary/25 p-2 sm:block sm:w-40 sm:border-b-0 sm:border-r">
+            <button
+              type="button"
+              onClick={() => setSection('general')}
+              className={`flex min-w-0 flex-1 items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:w-full ${
+                section === 'general'
+                  ? 'bg-accent/10 text-accent'
+                  : 'text-text-muted hover:bg-bg-tertiary hover:text-text'
+              }`}
+            >
+              <Settings size={15} />
+              <span>General</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSection('ai')}
+              className={`flex min-w-0 flex-1 items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:w-full ${
+                section === 'ai'
+                  ? 'bg-accent/10 text-accent'
+                  : 'text-text-muted hover:bg-bg-tertiary hover:text-text'
+              }`}
+            >
+              <Bot size={15} />
+              <span>AI Provider</span>
+            </button>
+          </aside>
+
+          <div className="min-w-0 flex flex-1 flex-col">
+            {section === 'general' && (
+              <div className="flex min-h-0 flex-1 flex-col">
+                <div className="flex-1 overflow-y-auto p-4">
+                  <div className="max-w-xl space-y-4">
+                  <div>
+                    <label className="block text-xs font-medium text-text-muted mb-1">Display name</label>
+                    <input
+                      value={displayName}
+                      onChange={(e) => setDisplayName(e.target.value)}
+                      maxLength={80}
+                      placeholder={stableTag}
+                      className={inputClass}
+                    />
+                    <div className="mt-1 flex items-center justify-between gap-3 text-[11px] text-text-muted/70">
+                      <span>Shown in the workspace list and tab titles.</span>
+                      <span>{displayName.length}/80</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-text-muted mb-1">Description</label>
+                    <textarea
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      maxLength={240}
+                      rows={5}
+                      placeholder="Short note for recognizing this workspace."
+                      className={`${inputClass} min-h-28 resize-y leading-relaxed`}
+                    />
+                    <div className="mt-1 flex items-center justify-between gap-3 text-[11px] text-text-muted/70">
+                      <span>Shown on workspace overview cards.</span>
+                      <span>{description.length}/240</span>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-border bg-bg-secondary/30 p-3">
+                    <div className="flex items-start gap-2">
+                      <Info size={14} className="mt-0.5 shrink-0 text-text-muted" />
+                      <div className="min-w-0">
+                        <div className="text-[11px] font-medium uppercase tracking-wide text-text-muted">Stable tag</div>
+                        <div className="mt-1 truncate font-mono text-[12px] text-text">{stableTag}</div>
+                        <p className="mt-1 text-[11px] leading-snug text-text-muted/75">
+                          The tag stays stable for paths and launcher bookkeeping; the display name is the human-facing label.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {error && (
+                    <div className="rounded-md border border-red/40 bg-red/10 text-red text-[12px] px-3 py-2">
+                      {error}
+                    </div>
+                  )}
+                  {metadataSavedFlash && (
+                    <div className="rounded-md border border-green/40 bg-green/10 text-green text-[12px] px-3 py-2">
+                      Saved to <code className="font-mono text-[11.5px]">.alice/workspace.json</code>.
+                    </div>
+                  )}
+                  </div>
+                </div>
+                <div className="flex flex-col gap-2 border-t border-border bg-bg-secondary/30 p-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-[11px] text-text-muted/75">
+                    Stored in <code className="font-mono text-[11.5px]">.alice/workspace.json</code>.
+                  </p>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      disabled={metadataSaving}
+                      className="px-3 py-2 rounded-md text-text-muted hover:text-text text-[13px] disabled:opacity-40"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveMetadata}
+                      disabled={metadataSaving || !metadataDirty}
+                      className="px-4 py-2 rounded-md bg-accent text-bg text-[13px] font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent/90 transition-colors"
+                    >
+                      {metadataSaving ? 'Saving…' : 'Save'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {section === 'ai' && (
+              <>
         {/* Tabs */}
         <div className="flex border-b border-border bg-bg-secondary/50">
           {(['claude', 'codex', 'opencode', 'pi'] as const).map((id) => (
@@ -367,7 +573,7 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
                         const picked = pickAgentWire(cred.wires, tab)
                         return (
                           <option key={cred.slug} value={cred.slug}>
-                            {cred.slug}{picked?.baseUrl ? ` · ${picked.baseUrl}` : ''}
+                            {(cred.label?.trim() || cred.slug)}{picked?.baseUrl ? ` · ${picked.baseUrl}` : ''}
                           </option>
                         )
                       })}
@@ -463,12 +669,27 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
               value={form.model}
               suggestions={modelSuggestions}
               onChange={(v) => setForm({ ...form, model: v })}
-              placeholder={tab === 'claude' ? 'claude-sonnet-4-6' : tab === 'opencode' || tab === 'pi' ? 'deepseek-chat' : 'gpt-4o'}
+              placeholder={tab === 'claude' ? 'claude-opus-4-8' : tab === 'opencode' || tab === 'pi' ? 'deepseek-chat' : 'gpt-5.5'}
             />
             {modelSuggestions.length > 0 && (
               <p className="text-[11px] text-text-muted/70 mt-1">Suggestions from the matched provider — or type any model id.</p>
             )}
           </div>
+
+          {(tab === 'opencode' || tab === 'pi') && (
+            <div>
+              <label className="block text-xs font-medium text-text-muted mb-1">Context window</label>
+              <select
+                value={form.contextWindow}
+                onChange={(e) => setForm({ ...form, contextWindow: Number(e.target.value) })}
+                className={inputClass}
+              >
+                {CONTEXT_WINDOW_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {tab === 'codex' && (
             <div className="rounded-md border border-border bg-bg-secondary/50 px-3 py-2.5 space-y-2">
@@ -597,7 +818,7 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between gap-2 p-3 border-t border-border bg-bg-secondary/30">
+        <div className="flex flex-col gap-2 p-3 border-t border-border bg-bg-secondary/30 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex gap-2">
             <button
               onClick={handleReset}
@@ -607,7 +828,7 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
               Reset to global default
             </button>
           </div>
-          <div className="flex gap-2">
+          <div className="flex justify-end gap-2">
             <button
               onClick={onClose}
               disabled={saving}
@@ -636,6 +857,10 @@ export function WorkspaceAIConfigModal({ wsId, onClose }: Props) {
               >
                 {saving ? 'Saving…' : 'Save'}
               </button>
+            )}
+          </div>
+        </div>
+              </>
             )}
           </div>
         </div>

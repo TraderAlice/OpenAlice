@@ -73,7 +73,6 @@ export const CLAUDE_OAUTH: PresetDef = {
   }),
   models: [
     { id: 'claude-opus-4-8', label: 'Claude Opus 4.8' },
-    { id: 'claude-opus-4-7', label: 'Claude Opus 4.7' },
     { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
   ],
 }
@@ -84,7 +83,7 @@ export const CLAUDE_API: PresetDef = {
   description: 'Pay per token via Anthropic API',
   category: 'official',
   defaultName: 'Claude (API Key)',
-  hint: 'Model is switchable here or from the profile list anytime. Opus is ~5× the cost of Sonnet; Haiku is cheapest for high-volume work.',
+  hint: 'Model is switchable here or from the profile list anytime. Opus is ~5× the cost of Sonnet.',
   zodSchema: z.object({
     backend: z.literal('agent-sdk'),
     loginMethod: z.literal('api-key'),
@@ -93,9 +92,7 @@ export const CLAUDE_API: PresetDef = {
   }),
   models: [
     { id: 'claude-opus-4-8', label: 'Claude Opus 4.8' },
-    { id: 'claude-opus-4-7', label: 'Claude Opus 4.7' },
     { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
-    { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' },
   ],
   regions: [{ id: 'official', label: 'Official (api.anthropic.com)', wires: { anthropic: '' } }],
   writeOnlyFields: ['apiKey'],
@@ -118,7 +115,6 @@ export const CODEX_OAUTH: PresetDef = {
   models: [
     { id: 'gpt-5.5', label: 'GPT 5.5' },
     { id: 'gpt-5.4', label: 'GPT 5.4' },
-    { id: 'gpt-5.4-mini', label: 'GPT 5.4 Mini' },
   ],
 }
 
@@ -137,7 +133,6 @@ export const CODEX_API: PresetDef = {
   models: [
     { id: 'gpt-5.5', label: 'GPT 5.5' },
     { id: 'gpt-5.4', label: 'GPT 5.4' },
-    { id: 'gpt-5.4-mini', label: 'GPT 5.4 Mini' },
   ],
   // Same key + base; the shape is how you call it. Responses is OpenAI's
   // current API (what codex speaks); Chat Completions is the legacy shape
@@ -146,13 +141,13 @@ export const CODEX_API: PresetDef = {
   writeOnlyFields: ['apiKey'],
 }
 
-// ==================== Official: Gemini ====================
+// ==================== Third-party: Gemini ====================
 
 export const GEMINI: PresetDef = {
   id: 'gemini',
   label: 'Google Gemini',
   description: 'Google AI via API key',
-  category: 'official',
+  category: 'third-party',
   defaultName: 'Google Gemini',
   zodSchema: z.object({
     backend: z.literal('vercel-ai-sdk'),
@@ -215,12 +210,12 @@ export const GLM: PresetDef = {
   description: 'Zhipu GLM models via Claude Agent SDK (Anthropic-compatible)',
   category: 'third-party',
   defaultName: 'GLM',
-  hint: 'China console: bigmodel.cn — International console: z.ai. API keys are region-locked. GLM 5.1 is the current flagship, served on both regions.',
+  hint: 'China console: bigmodel.cn — International console: z.ai. API keys are region-locked. GLM 5.2 is the current flagship, served on both regions.',
   zodSchema: z.object({
     backend: z.literal('agent-sdk'),
     loginMethod: z.literal('api-key'),
     baseUrl: z.string().default('https://open.bigmodel.cn/api/anthropic').describe('API endpoint'),
-    model: z.string().default('glm-5.1').describe('Model'),
+    model: z.string().default('glm-5.2').describe('Model'),
     apiKey: z.string().min(1).describe('GLM API key'),
   }),
   regions: [
@@ -232,9 +227,7 @@ export const GLM: PresetDef = {
     } },
   ],
   models: [
-    { id: 'glm-5.1', label: 'GLM 5.1' },
-    { id: 'glm-4.7', label: 'GLM 4.7' },
-    { id: 'glm-4.5-air', label: 'GLM 4.5 Air' },
+    { id: 'glm-5.2', label: 'GLM 5.2' },
   ],
   writeOnlyFields: ['apiKey'],
 }
@@ -257,7 +250,7 @@ export const KIMI: PresetDef = {
     backend: z.literal('agent-sdk'),
     loginMethod: z.literal('api-key'),
     baseUrl: z.string().default('https://api.moonshot.cn/anthropic').describe('API endpoint'),
-    model: z.string().default('kimi-k2.6').describe('Model'),
+    model: z.string().default('kimi-k2.7-code').describe('Model'),
     apiKey: z.string().min(1).describe('Moonshot API key'),
   }),
   regions: [
@@ -269,8 +262,8 @@ export const KIMI: PresetDef = {
     } },
   ],
   models: [
+    { id: 'kimi-k2.7-code', label: 'Kimi K2.7 Code' },
     { id: 'kimi-k2.6', label: 'Kimi K2.6' },
-    { id: 'kimi-k2.5', label: 'Kimi K2.5' },
   ],
   writeOnlyFields: ['apiKey'],
 }
@@ -298,7 +291,36 @@ export const DEEPSEEK: PresetDef = {
   ],
   models: [
     { id: 'deepseek-v4-pro', label: 'DeepSeek V4 Pro (flagship)' },
-    { id: 'deepseek-v4-flash', label: 'DeepSeek V4 Flash (cheap/fast)' },
+  ],
+  writeOnlyFields: ['apiKey'],
+}
+
+// ==================== Third-party: LongCat (Meituan) ====================
+
+export const LONGCAT: PresetDef = {
+  id: 'longcat',
+  label: 'LongCat (Meituan)',
+  description: 'Meituan LongCat via OpenAI-compatible and Anthropic APIs',
+  category: 'third-party',
+  defaultName: 'LongCat',
+  hint: 'Declares LongCat\'s OpenAI-compatible and Anthropic endpoints. Use Claude/OpenCode/Pi for this credential unless LongCat adds a Responses-compatible endpoint later.',
+  zodSchema: z.object({
+    backend: z.literal('vercel-ai-sdk'),
+    provider: z.literal('openai-compatible'),
+    baseUrl: z.string().default('https://api.longcat.chat/openai/v1').describe('API endpoint'),
+    model: z.string().default('LongCat-2.0').describe('Model'),
+    apiKey: z.string().min(1).describe('LongCat API key'),
+  }),
+  regions: [
+    { id: 'default', label: 'LongCat (api.longcat.chat)', wires: {
+      // The OpenAI SDK appends `/chat/completions` itself, so its base must
+      // include LongCat's required `/v1` segment.
+      'openai-chat': 'https://api.longcat.chat/openai/v1',
+      anthropic: 'https://api.longcat.chat/anthropic',
+    } },
+  ],
+  models: [
+    { id: 'LongCat-2.0', label: 'LongCat 2.0' },
   ],
   writeOnlyFields: ['apiKey'],
 }
@@ -331,10 +353,31 @@ export const PRESET_CATALOG: PresetDef[] = [
   CLAUDE_API,
   CODEX_OAUTH,
   CODEX_API,
-  GEMINI,
   MINIMAX,
   GLM,
   KIMI,
   DEEPSEEK,
+  LONGCAT,
+  GEMINI,
   CUSTOM,
 ]
+
+/**
+ * The capable-flagship model to seed a fresh injection with when a credential
+ * has no remembered `lastModel` yet (keyed by `CredentialVendor`). This is only
+ * the very-first-run default — once a model is run it's remembered on the cred —
+ * so it favors the most capable tier (a trading agent wants the flagship, not a
+ * fast/cheap variant), mirroring the preset model lists. `custom` has no
+ * canonical model (free-form), so it's absent and the caller falls back to
+ * "let the runtime decide".
+ */
+export const DEFAULT_MODEL_BY_VENDOR: Record<string, string> = {
+  anthropic: 'claude-opus-4-8',
+  openai: 'gpt-5.5',
+  google: 'gemini-2.5-pro',
+  minimax: 'MiniMax-M3',
+  glm: 'glm-5.2',
+  kimi: 'kimi-k2.7-code',
+  deepseek: 'deepseek-v4-pro',
+  longcat: 'LongCat-2.0',
+}

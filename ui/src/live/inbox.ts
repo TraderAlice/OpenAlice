@@ -1,6 +1,9 @@
 import { api } from '../api'
 import type { InboxEntry } from '../api/inbox'
 import { createLiveStore } from './createLiveStore'
+import { reloadOnHotUpdate } from '../lib/hmr'
+
+reloadOnHotUpdate('live/inbox')
 
 /**
  * Live inbox feed. 20s polling against `/api/inbox/history`. Mirrors the
@@ -77,5 +80,22 @@ export function removeInboxOptimistically(id: string): void {
   applyState?.((prev) => ({
     ...prev,
     entries: prev.entries.filter((e) => e.id !== id),
+  }))
+}
+
+/** Optimistically mirror server-side read-state writes in the loaded feed.
+ *  The next /history poll remains authoritative and will reconcile drift. */
+export function setInboxReadAtOptimistically(id: string, readAt: number | null): void {
+  applyState?.((prev) => ({
+    ...prev,
+    entries: prev.entries.map((entry) => {
+      if (entry.id !== id) return entry
+      if (readAt == null) {
+        const next = { ...entry }
+        delete next.readAt
+        return next
+      }
+      return { ...entry, readAt }
+    }),
   }))
 }

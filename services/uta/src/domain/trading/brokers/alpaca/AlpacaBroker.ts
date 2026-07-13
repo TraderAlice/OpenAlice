@@ -91,6 +91,13 @@ function alpacaErrorMessage(err: unknown): string {
   return base
 }
 
+/** The free-tier "you can't query the last ~15 min of SIP data" gate — a 403
+ *  whose body says exactly that. The signal to retry the same window on IEX. */
+function isRecentSipDenied(err: unknown): boolean {
+  const status = (err as { response?: { status?: number } })?.response?.status
+  return status === 403 && /recent SIP data/i.test(alpacaErrorMessage(err))
+}
+
 export class AlpacaBroker implements IBroker {
   // ---- Self-registration ----
 
@@ -130,6 +137,9 @@ export class AlpacaBroker implements IBroker {
    * null) means "we tried and got nothing" — null means "haven't tried yet".
    */
   private catalog: AlpacaAssetRaw[] | null = null
+  /** symbol → asset, derived from `catalog` for O(1) name/exchange joins on
+   *  position & order rows (issue #340). Rebuilt whenever the catalog loads. */
+  private catalogBySymbol: Map<string, AlpacaAssetRaw> | null = null
 
   constructor(config: AlpacaBrokerConfig) {
     this.config = config
@@ -212,6 +222,7 @@ export class AlpacaBroker implements IBroker {
       // contract the broker won't accept orders for.
       const next = (raw ?? []).filter((a) => a.tradable !== false)
       this.catalog = next
+      this.catalogBySymbol = new Map(next.map((a) => [a.symbol, a]))
       console.log(`AlpacaBroker[${this.id}]: catalog loaded (${next.length} active tradable assets)`)
     } catch (err) {
       // Re-throw so the caller (init / cron) can decide whether to log or
@@ -428,12 +439,26 @@ export class AlpacaBroker implements IBroker {
     }
   }
 
+  /**
+   * Build a contract for `symbol`, enriched from the cached asset catalog with
+   * the instrument long-name (`description`) + primary listing exchange so
+   * position / order / trade rows can render them (issue #340). Falls back to a
+   * bare contract before the catalog has loaded.
+   */
+  private contractFor(symbol: string): Contract {
+    const contract = makeContract(symbol)
+    const asset = this.catalogBySymbol?.get(symbol)
+    if (asset?.name) contract.description = asset.name
+    if (asset?.exchange) contract.primaryExchange = asset.exchange
+    return contract
+  }
+
   async getPositions(): Promise<Position[]> {
     try {
       const raw = await this.client.getPositions() as AlpacaPositionRaw[]
 
       return raw.map(p => buildPosition({
-        contract: makeContract(p.symbol),
+        contract: this.contractFor(p.symbol),
         currency: 'USD',
         side: p.side === 'long' ? 'long' as const : 'short' as const,
         quantity: new Decimal(p.qty),
@@ -511,13 +536,14 @@ export class AlpacaBroker implements IBroker {
     const symbol = resolveSymbol(contract)
     if (!symbol) throw new BrokerError('EXCHANGE', 'Cannot resolve contract to Alpaca symbol')
     const timeframe = ALPACA_TIMEFRAME[params.interval]
-    try {
-      const opts: Record<string, unknown> = { timeframe, adjustment: 'all' }
-      if (params.start) opts.start = params.start.toISOString()
-      if (params.end) opts.end = params.end.toISOString()
-      if (params.limit) opts.limit = params.limit
+    const baseOpts: Record<string, unknown> = { timeframe, adjustment: 'all' }
+    if (params.start) baseOpts.start = params.start.toISOString()
+    if (params.end) baseOpts.end = params.end.toISOString()
+    if (params.limit) baseOpts.limit = params.limit
+
+    const drain = async (feed: 'sip' | 'iex'): Promise<Bar[]> => {
       const bars: Bar[] = []
-      const gen = this.client.getBarsV2(symbol, opts) as AsyncGenerator<AlpacaBarRaw>
+      const gen = this.client.getBarsV2(symbol, { ...baseOpts, feed }) as AsyncGenerator<AlpacaBarRaw>
       for await (const b of gen) {
         bars.push({
           timestamp: new Date(b.Timestamp),
@@ -529,6 +555,26 @@ export class AlpacaBroker implements IBroker {
         })
       }
       return bars
+    }
+
+    try {
+      // SIP = the full consolidated tape (the right feed for history/backtest —
+      // real volume, real closes). The free tier can't query the last ~15 min of
+      // SIP, so a window that reaches "now" 403s; fall back to IEX (free
+      // real-time, but only IEX's ~2-3% of the tape) for that case so a recent
+      // request degrades to thinner data instead of dying. (Alpaca's OWN data
+      // endpoint serves both feeds; this never touches a third-party vendor.)
+      try {
+        return await drain('sip')
+      } catch (err) {
+        if (isRecentSipDenied(err)) {
+          console.warn(
+            `AlpacaBroker[${this.id}]: SIP denied recent data for ${symbol} (${timeframe}) — falling back to IEX (thinner tape). Free tier can't query the last ~15min of SIP.`,
+          )
+          return await drain('iex')
+        }
+        throw err
+      }
     } catch (err) {
       throw BrokerError.from(err)
     }
@@ -572,7 +618,7 @@ export class AlpacaBroker implements IBroker {
   // ---- Internal ----
 
   private mapOpenOrder(o: AlpacaOrderRaw): OpenOrder {
-    const contract = makeContract(o.symbol)
+    const contract = this.contractFor(o.symbol)
 
     const order = new Order()
     order.action = o.side.toUpperCase() // buy → BUY

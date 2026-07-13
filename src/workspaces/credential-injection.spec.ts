@@ -1,5 +1,11 @@
 import { describe, it, expect, vi } from 'vitest'
-import { credentialToWorkspaceAiCred, injectWorkspaceCredentials } from './credential-injection.js'
+import {
+  credentialToWorkspaceAiCred,
+  injectWorkspaceCredentials,
+  compatibleCredentials,
+  matchCredentialByApiKey,
+  resolveInjectionModel,
+} from './credential-injection.js'
 import { AdapterRegistry, type CliAdapter, type WorkspaceAiCred } from './cli-adapter.js'
 import type { Credential } from '@/core/config.js'
 import type { Logger } from './logger.js'
@@ -72,10 +78,16 @@ describe('credentialToWorkspaceAiCred', () => {
         expect(cred.wireShape).toBe('openai-chat')
         expect(cred.authMode).toBeUndefined()
         expect(cred.wireApi).toBeUndefined()
+        expect(cred.contextWindow).toBe(1_000_000)
         expect(cred.apiKey).toBe('k')
         expect(cred.baseUrl).toBe('https://gw.example.com/v1')
       })
     }
+  })
+
+  it('lets opencode/pi override the default context window', () => {
+    const cred = credentialToWorkspaceAiCred(chatOnlyGateway, 'pi', { model: 'some-model', contextWindow: 256_000 })!
+    expect(cred.contextWindow).toBe(256_000)
   })
 })
 
@@ -196,5 +208,65 @@ describe('injectWorkspaceCredentials', () => {
 
     expect(calls).toHaveLength(0)
     expect(warns).toContain('workspace.cred_inject_missing_credential')
+  })
+})
+
+describe('compatibleCredentials', () => {
+  const vault: Record<string, Credential> = {
+    'anthropic-1': anthropicKey,
+    'openai-1': openaiKey,
+    'custom-1': chatOnlyGateway,
+  }
+
+  it('opencode/pi accept any wire — all three creds are compatible', () => {
+    expect(compatibleCredentials(vault, 'opencode').map(([s]) => s)).toEqual(['anthropic-1', 'openai-1', 'custom-1'])
+    expect(compatibleCredentials(vault, 'pi').map(([s]) => s)).toEqual(['anthropic-1', 'openai-1', 'custom-1'])
+  })
+
+  it('claude needs an anthropic wire — only the anthropic key qualifies', () => {
+    expect(compatibleCredentials(vault, 'claude').map(([s]) => s)).toEqual(['anthropic-1'])
+  })
+
+  it('codex needs openai-responses — chat-only / anthropic keys are excluded', () => {
+    expect(compatibleCredentials(vault, 'codex').map(([s]) => s)).toEqual(['openai-1'])
+  })
+
+  it('preserves input order', () => {
+    const ordered: Record<string, Credential> = { z: openaiKey, a: anthropicKey }
+    expect(compatibleCredentials(ordered, 'opencode').map(([s]) => s)).toEqual(['z', 'a'])
+  })
+})
+
+describe('matchCredentialByApiKey', () => {
+  const vault: Record<string, Credential> = { 'anthropic-1': anthropicKey, 'openai-1': openaiKey }
+
+  it('maps an on-disk apiKey back to its vault slug', () => {
+    expect(matchCredentialByApiKey(vault, 'sk-oa')).toBe('openai-1')
+  })
+
+  it('returns null for an unknown / hand-edited key', () => {
+    expect(matchCredentialByApiKey(vault, 'sk-unknown')).toBeNull()
+  })
+
+  it('returns null for empty / missing input', () => {
+    expect(matchCredentialByApiKey(vault, null)).toBeNull()
+    expect(matchCredentialByApiKey(vault, undefined)).toBeNull()
+    expect(matchCredentialByApiKey(vault, '')).toBeNull()
+  })
+})
+
+describe('resolveInjectionModel', () => {
+  it('prefers the credential\'s remembered lastModel', () => {
+    expect(resolveInjectionModel({ vendor: 'openai', lastModel: 'gpt-5.5-custom' })).toBe('gpt-5.5-custom')
+  })
+
+  it('falls back to the vendor flagship when no lastModel', () => {
+    expect(resolveInjectionModel({ vendor: 'anthropic' })).toBe('claude-opus-4-8')
+    expect(resolveInjectionModel({ vendor: 'glm' })).toBe('glm-5.2')
+    expect(resolveInjectionModel({ vendor: 'longcat' })).toBe('LongCat-2.0')
+  })
+
+  it('returns null for a vendor with no catalog default (custom)', () => {
+    expect(resolveInjectionModel({ vendor: 'custom' })).toBeNull()
   })
 })

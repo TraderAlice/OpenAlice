@@ -26,6 +26,8 @@ function makeDeps(over: Partial<BarServiceDeps> = {}): BarServiceDeps {
   return {
     marketSearch: {
       symbolIndex: { search: () => [{ symbol: 'AAPL', name: 'Apple Inc.' }] },
+      equityVendors: ['yfinance'],
+      equityClient: { search: async () => [] },
       cryptoClient: { search: async () => [] },
       currencyClient: { search: async () => [] },
       commodityCatalog: { search: () => [] },
@@ -81,6 +83,16 @@ describe('getBars — vendor branch', () => {
     const svc = createBarService(makeDeps())
     const { bars } = await svc.getBars({ symbol: 'AAPL', assetClass: 'equity' }, { interval: '1d', count: 2 })
     expect(bars.map((b) => b.date)).toEqual(['2024-01-02', '2024-01-03'])
+  })
+
+  it('freshness contract: marks data stale when it does not reach the asOf anchor', async () => {
+    const svc = createBarService(makeDeps())
+    // RAW ends 2024-01-03. Anchor AT the last bar → current.
+    const cur = await svc.getBars({ symbol: 'AAPL', assetClass: 'equity' }, { interval: '1d', end: '2024-01-03' })
+    expect(cur.meta).toMatchObject({ asOf: '2024-01-03', isLatestActual: true, staleTradingDays: 0 })
+    // Anchor a week later (3 trading days past the last bar) → stale + LOUD.
+    const stale = await svc.getBars({ symbol: 'AAPL', assetClass: 'equity' }, { interval: '1d', end: '2024-01-08' })
+    expect(stale.meta).toMatchObject({ asOf: '2024-01-08', isLatestActual: false, staleTradingDays: 3 })
   })
 
   it('caps at MAX_BARS', async () => {
@@ -139,6 +151,69 @@ describe('getBars — UTA branch', () => {
     expect(meta).toMatchObject({ source: 'uta', sourceId: 'alpaca-paper', barId: 'alpaca-paper|AAPL', barCapability: 'realtime' })
     expect(getHistorical).toHaveBeenCalledWith({ aliceId: 'alpaca-paper|AAPL' }, expect.objectContaining({ interval: '1d' }))
   })
+
+  it('reports the broker\'s HONEST bar quality (alpaca free = iex), not a blanket realtime', async () => {
+    const utaManager: UtaBarGateway = {
+      has: async (id) => id === 'alpaca-paper',
+      get: async () => ({ getHistorical: async () => WIRE }),
+      searchContracts: async () => [],
+      getBarCapabilities: async () => ({ 'alpaca-paper': 'iex' }),
+    }
+    const svc = createBarService(makeDeps({ utaManager }))
+    const { meta } = await svc.getBars({ barId: 'alpaca-paper|AAPL' }, { interval: '1d' })
+    expect(meta.barCapability).toBe('iex')
+  })
+
+  it('falls back to realtime when the gateway cannot surface a quality', async () => {
+    const utaManager: UtaBarGateway = {
+      has: async (id) => id === 'alpaca-paper',
+      get: async () => ({ getHistorical: async () => WIRE }),
+      searchContracts: async () => [],
+      // no getBarCapabilities
+    }
+    const svc = createBarService(makeDeps({ utaManager }))
+    const { meta } = await svc.getBars({ barId: 'alpaca-paper|AAPL' }, { interval: '1d' })
+    expect(meta.barCapability).toBe('realtime')
+  })
+
+  it('renders a daily broker bar date-only even when stamped at the session open (no 05:00 / DST noise)', async () => {
+    // Alpaca stamps a daily bar at the premarket open (04:00/05:00 ET in UTC),
+    // which also flips an hour across DST — render the calendar day, not an instant.
+    const dailyWire = [
+      { timestamp: '2026-02-17T05:00:00.000Z', open: '1', high: '2', low: '0.5', close: '1.5', volume: '100' },
+      { timestamp: '2026-06-25T04:00:00.000Z', open: '2', high: '3', low: '1', close: '2.5', volume: '200' },
+    ] as unknown as Bar[]
+    const utaManager: UtaBarGateway = {
+      has: async (id) => id === 'alpaca-paper',
+      get: async () => ({ getHistorical: async () => dailyWire }),
+      searchContracts: async () => [],
+    }
+    const svc = createBarService(makeDeps({ utaManager }))
+    const { bars } = await svc.getBars({ barId: 'alpaca-paper|AAPL' }, { interval: '1d' })
+    expect(bars.map((b) => b.date)).toEqual(['2026-02-17', '2026-06-25']) // date-only, no time, no DST flip
+  })
+
+  it('count-only request becomes a START WINDOW, not a broker `limit` (alpaca count-anchoring bug)', async () => {
+    // A count-only request must reach the broker as a start-bounded window — NOT
+    // as `limit: count` with no start. Alpaca's getBarsV2 anchors `limit` to a
+    // default start and returns the FIRST N bars ascending, so `1d count=60`
+    // collapsed to a single in-progress daily bar. We over-fetch a window and
+    // tail-slice instead. Regression guard for the 2026-06-25 repro.
+    const getHistorical = vi.fn(async (_ref: unknown, params: { start?: Date; limit?: number }) => {
+      void params
+      return WIRE
+    })
+    const utaManager: UtaBarGateway = {
+      has: async (id) => id === 'alpaca-paper',
+      get: async () => ({ getHistorical }),
+      searchContracts: async () => [],
+    }
+    const svc = createBarService(makeDeps({ utaManager }))
+    await svc.getBars({ barId: 'alpaca-paper|AAPL' }, { interval: '1d', count: 60 })
+    const params = getHistorical.mock.calls[0][1]
+    expect(params.start).toBeInstanceOf(Date)       // count → synthesized start window
+    expect(params.limit).toBeUndefined()            // count is NOT forwarded as limit
+  })
 })
 
 describe('searchBarSources — federated candidates', () => {
@@ -149,6 +224,7 @@ describe('searchBarSources — federated candidates', () => {
       barId: 'yfinance|AAPL', source: 'vendor', sourceId: 'yfinance', symbol: 'AAPL', assetClass: 'equity',
     })
     expect(out[0].label).toContain('AAPL')
+    expect(out[0].label).toContain('delayed') // freshness surfaced in the label, not just the structured field
   })
 
   it('unions UTA broker hits (barId = aliceId, secType → assetClass)', async () => {
@@ -167,6 +243,7 @@ describe('searchBarSources — federated candidates', () => {
       expect.objectContaining({ barId: 'alpaca-paper|AAPL', sourceId: 'alpaca-paper', symbol: 'AAPL', assetClass: 'equity', barCapability: 'realtime' }),
       expect.objectContaining({ barId: 'bybit-main|BTC/USDT:USDT', sourceId: 'bybit-main', symbol: 'BTC', assetClass: 'crypto', barCapability: 'realtime' }),
     ])
+    expect(uta[0].label).toContain('realtime') // broker freshness shown in the label too
     // vendor side still present (redundancy)
     expect(out.some((c) => c.source === 'vendor')).toBe(true)
   })

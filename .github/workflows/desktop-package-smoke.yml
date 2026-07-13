@@ -1,0 +1,147 @@
+name: Desktop Package Smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [dev, master]
+    paths:
+      - ".github/workflows/desktop-package-smoke.yml"
+      - ".github/workflows/release.yml"
+      - "apps/desktop/**"
+      - "packages/guardian-runtime/**"
+      - "build/entitlements*.plist"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "scripts/assert-desktop-package.mjs"
+      - "scripts/desktop-package-artifact.mjs"
+      - "scripts/desktop-packaged-smoke.mjs"
+      - "scripts/desktop-packaged-smoke-plan.mjs"
+      - "scripts/guardian/**"
+      - "scripts/prepare-desktop-release-assets.mjs"
+      - "scripts/smoke-packaged-toolchain.mjs"
+      - "scripts/workspace-acceptance-ai-mock.mjs"
+      - "scripts/vendor-managed-runtime.mjs"
+      - "default/**"
+      - "src/ai-providers/**"
+      - "src/core/**"
+      - "src/server/cli.ts"
+      - "src/server/cli-commands.ts"
+      - "src/tool/**"
+      - "src/webui/plugin.ts"
+      - "src/webui/routes/issues.ts"
+      - "src/webui/routes/workspaces.ts"
+      - "src/workspaces/**"
+      - "services/uta/**"
+  push:
+    # Keep push package smoke master-only: PRs into dev get coverage, while
+    # routine dev integration pushes do not burn the expensive desktop matrix.
+    branches: [master]
+    paths:
+      - ".github/workflows/desktop-package-smoke.yml"
+      - ".github/workflows/release.yml"
+      - "apps/desktop/**"
+      - "packages/guardian-runtime/**"
+      - "build/entitlements*.plist"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "scripts/assert-desktop-package.mjs"
+      - "scripts/desktop-package-artifact.mjs"
+      - "scripts/desktop-packaged-smoke.mjs"
+      - "scripts/desktop-packaged-smoke-plan.mjs"
+      - "scripts/guardian/**"
+      - "scripts/prepare-desktop-release-assets.mjs"
+      - "scripts/smoke-packaged-toolchain.mjs"
+      - "scripts/workspace-acceptance-ai-mock.mjs"
+      - "scripts/vendor-managed-runtime.mjs"
+      - "default/**"
+      - "src/ai-providers/**"
+      - "src/core/**"
+      - "src/server/cli.ts"
+      - "src/server/cli-commands.ts"
+      - "src/tool/**"
+      - "src/webui/plugin.ts"
+      - "src/webui/routes/issues.ts"
+      - "src/webui/routes/workspaces.ts"
+      - "src/workspaces/**"
+      - "services/uta/**"
+
+jobs:
+  package:
+    name: package ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            arch: arm64
+          - os: macos-15-intel
+            arch: x64
+          - os: windows-latest
+            arch: x64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Keep this until the Windows managed Git runtime fully replaces dugite's
+      # embedded payload. It catches a skipped dugite postinstall before a
+      # package artifact reaches a tester.
+      - name: Verify bundled git (dugite) was fetched
+        shell: bash
+        run: |
+          node -e "const{existsSync}=require('fs');const{dirname,join}=require('path');const g=join(dirname(require.resolve('dugite/package.json')),'git');if(!existsSync(g)){console.error('dugite embedded git MISSING at '+g);process.exit(1)}console.log('dugite embedded git OK '+g)"
+
+      - name: Build Alice + UTA + desktop shell
+        run: pnpm electron:build
+
+      - name: Smoke Guardian takeover through Electron
+        run: pnpm electron:smoke:guardian-recovery --skip-build
+        timeout-minutes: 5
+
+      - name: Vendor managed workspace runtime
+        run: pnpm vendor:runtime
+
+      - name: Verify managed Pi runtime
+        run: node vendor/pi/node_modules/@earendil-works/pi-coding-agent/dist/cli.js --version
+
+      - name: Package unpacked desktop app
+        shell: bash
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: |
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            ulimit -n 65536 || ulimit -n 32768 || ulimit -n 16384 || ulimit -n 10240
+            echo "open files limit: $(ulimit -n)"
+          fi
+          pnpm -F @traderalice/desktop exec electron-builder --dir --projectDir ../.. --publish never --${{ matrix.arch }}
+
+      - name: Assert packaged resource layout
+        run: pnpm electron:assert-package
+
+      - name: Smoke packaged managed toolchain
+        run: pnpm electron:smoke-toolchain
+
+      - name: Prove packaged Workspace CLI acceptance
+        run: pnpm electron:smoke:workspace --skip-build --skip-pack
+        timeout-minutes: 5
+        env:
+          OPENALICE_SMOKE_RECEIPT_PATH: ${{ runner.temp }}/openalice-workspace-acceptance.json
+
+      - name: Upload Workspace acceptance receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workspace-acceptance-${{ matrix.os }}
+          path: ${{ runner.temp }}/openalice-workspace-acceptance.json
+          if-no-files-found: warn

@@ -1,5 +1,8 @@
 # UTA Live Testing — the self-bootstrapped scenario catalog
 
+This guide owns live broker/demo acceptance. Architecture and delivery context:
+[[docs/project-structure.md]] and [[docs/development-workflow.md]].
+
 This guide exists because five dogfood rounds (2026-06-12) surfaced ~20 real
 bugs that **no unit test and no human UI session would ever catch** — they
 only appear on the real usage path, through the agent surface, against real
@@ -41,19 +44,25 @@ integrations.
   bybit 170193/170194). For marketable orders use quote ±0.3%; for hangers
   use deep prices the band allows (~15-30% away worked on okx/bybit demo).
   Re-quote right before pushing — the band moves with the market.
-- Every bug found: fix in place if in scope, else Linear (`TODO from AI
-  Code`). Every fix gets a regression spec before the round continues.
+- Every bug found: fix in place if in scope, otherwise file a GitHub issue with
+  the scenario, venue, evidence, and suspected path. Every fix gets a
+  regression spec before the round continues.
 
 ## Setup
 
 ```bash
-export OPENALICE_MCP_URL=http://127.0.0.1:47332/mcp
+export OPENALICE_TOOL_URL=http://127.0.0.1:47331/cli
 export AQ_WS_ID=<any live workspace id>     # from ~/.openalice/workspaces/workspaces.json
 BIN=src/workspaces/cli/bin/alice-uta
 node $BIN                                    # discover groups/verbs
 node $BIN order place --help                 # flags come from the manifest
 # "user approves": curl -s -X POST http://127.0.0.1:47333/api/trading/uta/<id>/wallet/push
 ```
+
+Running inside a real OpenAlice Workspace is preferred: the launcher injects
+`OPENALICE_TOOL_URL` or `OPENALICE_TOOL_SOCKET` plus `AQ_WS_ID` automatically.
+For a manual repo-root run, use Guardian's printed Alice web port rather than
+assuming 47331 if `data/config/ports.json` overrides it.
 
 Probe scripts (external orders, raw venue checks) live as throwaway `.mts`
 files under `data/` (gitignored), run with
@@ -63,8 +72,10 @@ Delete after use.
 
 ## Scenario catalog
 
-Run S1–S12 for a trading-path change; run ALL of them per venue for a new
-broker integration. Each scenario names the bug class it guards against.
+Run the relevant S1–S14 scenarios for a trading-path change; run the full
+applicable catalog per venue for a new broker integration. S13/S14 apply only
+to venues with the corresponding directory/derivatives surfaces. Each scenario
+names the bug class it guards against.
 
 **S1 — Read-state agreement.** `account info`, `account portfolio`,
 `/equity`: account-level unrealizedPnL must equal the positions sum;
@@ -137,7 +148,7 @@ history shows `user-rejected` with the reason; a `--commitMessage` one-step
 ends in `awaitingApproval` and rejects cleanly too. *Guards: approval-flow
 dead ends.*
 
-## New-broker acceptance checklist (beyond S1–S12)
+## New-broker acceptance checklist (beyond the core lifecycle scenarios)
 
 - `getOpenOrders` must SEE a real open order you placed — empty-without-
   error is the silent failure mode (bybit returned [] for spot under
@@ -212,7 +223,7 @@ Round 7 (2026-06-12, IBKR paper first acceptance run): 5 findings, 2
 pre-located by reading the adapter BEFORE connecting (do this for every
 new broker). (1) `placeOrder(_tpsl)` silently ignored TP/SL — the okx
 naked-entry species, gated with a loud refusal pre-test (native bracket =
-parent/child + `legs`, ANG-103 batch). (2) `getOpenOrders` unwired despite
+parent/child + `legs`). (2) `getOpenOrders` unwired despite
 the bridge primitive existing — 5-line wire-up; NOTE reqOpenOrders only
 sees THIS clientId's orders, manual TWS-UI orders need reqAllOpenOrders +
 permId identity (deferred). (3) By-conId quote → TWS error 321: reqMktData
@@ -231,6 +242,6 @@ Alpaca); stops sit `PreSubmitted` (not terminal); paper quotes need
 delayed data — full-protobuf REQ_MARKET_DATA_TYPE(3) + REQ_MKT_DATA still
 got 10089 (entitlement question parked, price oracle = Alpaca AAPL quote
 meanwhile); multi-currency books (HKD+USD) blind-sum at the BROKER layer
-(getAccount + aggregateAccountFromPositions) — the live numbers for
-ANG-101. S2/S4/S6/S8/S9/S11/S12 green; restart survival incl. TWS
+(`getAccount` + `aggregateAccountFromPositions`) remained a deferred
+follow-up. S2/S4/S6/S8/S9/S11/S12 green; restart survival incl. TWS
 reconnect verified.

@@ -29,9 +29,11 @@
 
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import { connect } from 'node:net'
-import { mkdir, writeFile } from 'node:fs/promises'
-import { resolve, dirname } from 'node:path'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { resolve, dirname, join } from 'node:path'
 import { appendFileSync } from 'node:fs'
+import { resolveLaunchCommand } from '../../src/workspaces/win-command.js'
 
 const IS_WIN = process.platform === 'win32'
 const BOOT_TIMEOUT_MS = 120_000
@@ -96,24 +98,42 @@ async function fetchHealth(utaPort: number): Promise<UtaHealth | null> {
 
 async function main(): Promise<void> {
   const root = process.cwd()
-  // Pin the user-data home to the checkout so the smoke harness and the
-  // Guardian under test agree on where data/control/ lives, independent of
-  // the production default (~/.openalice). The SOFT restart check below
-  // watches this flag path — if the two sides ever derived different roots,
-  // that check would silently stop testing anything.
-  const flagPath = resolve(root, 'data/control/restart-uta.flag')
+  // Every Guardian smoke gets a disposable data root. Startup and recovery
+  // tests must never mutate the contributor's real ~/.openalice store or
+  // leave runtime locks in the checkout under test.
+  const dataHome = await mkdtemp(join(tmpdir(), 'openalice-guardian-smoke-'))
+  const launcherRoot = resolve(dataHome, 'workspaces')
+  const flagPath = resolve(dataHome, 'data/control/restart-uta.flag')
 
   // ── Spawn the full stack ──────────────────────────────────
   // POSIX: detached so the whole process group can be force-killed on cleanup.
   // Windows: shell so the `pnpm` .cmd shim resolves (this outer spawn is the
   // harness, not the code under test — the code under test is what Guardian
   // does internally).
-  const child: ChildProcess = spawn('pnpm', ['dev'], {
+  const childEnv = {
+    ...process.env,
+    OPENALICE_HOME: dataHome,
+    AQ_LAUNCHER_ROOT: launcherRoot,
+  }
+  // The product auto-defaults a fresh data home to Lite mode, but this smoke
+  // harness is intentionally the full-stack Guardian spawn test. Keep UTA in
+  // the hard path unless a caller explicitly asks to exercise Lite.
+  if (
+    !childEnv['OPENALICE_TRADING_MODE'] &&
+    !childEnv['OPENALICE_LITE_MODE'] &&
+    !childEnv['OPENALICE_UTA_DISABLED']
+  ) {
+    childEnv['OPENALICE_TRADING_MODE'] = 'pro'
+  }
+  const resolvedDev = resolveLaunchCommand(['pnpm', 'dev'], { env: childEnv, nodeExecPath: process.execPath })
+  const [devCommand, ...devArgs] = resolvedDev.argv
+  if (!devCommand) throw new Error('guardian smoke: empty dev command')
+  const child: ChildProcess = spawn(devCommand, devArgs, {
     cwd: root,
-    env: { ...process.env, OPENALICE_HOME: root },
+    env: childEnv,
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: !IS_WIN,
-    shell: IS_WIN,
+    shell: IS_WIN && resolvedDev.viaShell,
   })
 
   // `out` holds ANSI-stripped text for matching; raw output is mirrored to the
@@ -232,6 +252,7 @@ async function main(): Promise<void> {
   // Ensure the CI runner is left clean regardless of the above.
   forceCleanup()
   await waitForPortFree(utaPort, 10_000)
+  await rm(dataHome, { recursive: true, force: true })
   console.log('\n✅ Smoke complete (HARD checks passed).')
   process.exit(0)
 }

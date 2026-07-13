@@ -13,12 +13,18 @@ import './contract-ext.js'
 
 // ==================== Errors ====================
 
-export type BrokerErrorCode = 'CONFIG' | 'AUTH' | 'NETWORK' | 'EXCHANGE' | 'MARKET_CLOSED' | 'UNKNOWN'
+export type BrokerErrorCode = 'CONFIG' | 'AUTH' | 'NETWORK' | 'EXCHANGE' | 'MARKET_CLOSED' | 'CONNECTING' | 'UNKNOWN'
 
 /**
  * Structured broker error.
  * - `permanent` errors (CONFIG, AUTH) disable the account — will not be retried.
  * - Transient errors (NETWORK, EXCHANGE, MARKET_CLOSED) trigger auto-recovery.
+ * - `CONNECTING` is a special transient marker: the account is not yet (or no
+ *   longer) ready — its initial broker connect is still in flight, or it's
+ *   offline and the recovery loop is actively reconnecting. It means "data
+ *   pending, retry shortly", NOT a failure: a read returns it WITHOUT blocking
+ *   on the slow connect and WITHOUT counting as a failure (so it never degrades
+ *   health or disables the account). Recovery keeps running underneath.
  */
 export class BrokerError extends Error {
   readonly code: BrokerErrorCode
@@ -62,6 +68,31 @@ export class BrokerError extends Error {
 // ==================== Position ====================
 
 /**
+ * Venue risk metadata for a leveraged-derivative position (crypto perps /
+ * futures). Grouped into its own struct — rather than added as loose
+ * top-level fields — so the base Position stays aligned with IBKR's
+ * updatePortfolio() shape. IBKR itself keeps margin/leverage OFF the
+ * position: init/maint margin live on `OrderState`, and account-wide margin
+ * lives in the account-summary tags (ExcessLiquidity, MaintMarginReq, …),
+ * because there leverage is a cross-margin *account* concept, not a
+ * per-position one. On CCXT isolated/cross perps it genuinely IS
+ * per-position, so we surface it here.
+ *
+ * Absent (`Position.risk === undefined`) for spot holdings and for
+ * equity/cash brokers that don't expose per-position leverage. Numeric
+ * fields are strings for the same float-safety reason as the monetary
+ * fields on Position.
+ */
+export interface PositionRisk {
+  /** Effective leverage on the position, e.g. `'50'` for 50×. */
+  leverage?: string
+  /** Estimated liquidation price, denominated in the position's `currency`. */
+  liquidationPrice?: string
+  /** Margin mode the position runs under. */
+  marginMode?: 'cross' | 'isolated'
+}
+
+/**
  * Unified position/holding.
  * Field names aligned with IBKR EWrapper.updatePortfolio() parameters.
  */
@@ -101,6 +132,13 @@ export interface Position {
    * Undefined defaults to `'broker'` (current behavior, back-compat).
    */
   avgCostSource?: 'broker' | 'wallet'
+  /**
+   * Venue risk metadata for leveraged derivatives (see {@link PositionRisk}).
+   * Undefined for spot and for brokers without per-position leverage — so
+   * a consumer reading `position.risk?.leverage` gets `undefined` rather
+   * than a misleading implicit 1×.
+   */
+  risk?: PositionRisk
 }
 
 // ==================== Order result ====================
@@ -208,6 +246,37 @@ export interface AccountInfo {
   initMarginReq?: string
   maintMarginReq?: string
   dayTradesRemaining?: number
+}
+
+// ==================== Sub-accounts ====================
+
+/**
+ * A sub-account (a.k.a. wallet / compartment) WITHIN a single broker
+ * connection. Most brokers have exactly one and never implement
+ * `listSubAccounts` — they are treated as having a single implicit 'default'
+ * sub-account, and the `subAccountId` selector on reads/writes is ignored for
+ * them end-to-end (every broker today except CCXT).
+ *
+ * The asymmetric case is CCXT separate-wallet venues (Binance: spot /
+ * USDⓈ-M / COIN-M live behind distinct endpoints) and, in future, IBKR
+ * linked / FA accounts under one login. There the SAME connection spans
+ * several trading compartments, so a READ can scope to one (or aggregate
+ * across all) and a WRITE must name its target — placing an order is
+ * irreversible, so the ambiguity is resolved up front, never defaulted.
+ *
+ * `kind` is editorial taxonomy for the UI, not a routing key:
+ *   - 'spot'        a cash / spot wallet
+ *   - 'derivatives' a futures / swap / margin wallet
+ *   - 'unified'     a single cross-margin account that IS the whole thing
+ * Funding / earn / staking wallets are deliberately NOT enumerated — Alice
+ * trades; it does not custody-manage them.
+ */
+export interface SubAccountRef {
+  /** Stable id used as the `subAccountId` selector, e.g. 'spot', 'derivatives'. */
+  id: string
+  /** User-facing label, e.g. 'Spot', 'USDⓈ-M Futures'. */
+  label: string
+  kind: 'spot' | 'derivatives' | 'unified'
 }
 
 // ==================== Market data ====================
@@ -319,6 +388,13 @@ export interface BrokerHealthInfo {
   lastSuccessAt?: Date
   lastFailureAt?: Date
   recovering: boolean
+  /** True while the account's INITIAL broker connect is still in flight (e.g.
+   *  CCXT loadMarkets, which can take tens of seconds). During this window
+   *  `status` is optimistically 'healthy' (reach defaults to target) but the
+   *  broker isn't actually ready, so reads return a transient CONNECTING marker
+   *  instead of blocking. The UI shows a "connecting…" state off this flag —
+   *  `status`/`reach` alone can't distinguish it from a genuinely-ready account. */
+  connecting: boolean
   disabled: boolean
 }
 
@@ -417,10 +493,42 @@ export interface IBroker<TMeta = unknown> {
   cancelOrder(orderId: string, orderCancel?: OrderCancel): Promise<PlaceOrderResult>
   closePosition(contract: Contract, quantity?: Decimal): Promise<PlaceOrderResult>
 
+  // ---- Sub-accounts (wallets / compartments within one connection) ----
+
+  /**
+   * Enumerate the sub-accounts this connection spans. OPTIONAL — a broker that
+   * omits it is treated as having a single implicit 'default' sub-account, and
+   * the `subAccountId` selector is ignored for it (every broker today except
+   * CCXT separate-wallet venues). Implementations return >1 ONLY for genuinely
+   * separate-wallet venues (CCXT Binance: spot / USDⓈ-M / COIN-M). Trading
+   * compartments only — funding / earn wallets are never enumerated.
+   */
+  listSubAccounts?(): Promise<SubAccountRef[]>
+
+  /**
+   * Which sub-account id a given contract trades in — derived from the
+   * INSTRUMENT (CCXT: a spot symbol vs a perp symbol route to different
+   * wallets). OPTIONAL — the UTA layer uses it to validate that a write's
+   * declared `subAccountId` is consistent with the instrument, so "place this
+   * on spot" with a perp contract loud-refuses instead of silently landing in
+   * the wrong wallet. Brokers with a single sub-account omit it.
+   */
+  subAccountForContract?(contract: Contract): string | undefined
+
   // ---- Queries ----
 
-  getAccount(): Promise<AccountInfo>
-  getPositions(): Promise<Position[]>
+  /**
+   * Account equity. `subAccountId` OPTIONAL: omitted ⇒ AGGREGATE across every
+   * sub-account (the rolled-up netLiquidation); a specific id ⇒ just that
+   * wallet. Single-sub-account brokers ignore the arg.
+   */
+  getAccount(subAccountId?: string): Promise<AccountInfo>
+  /**
+   * Positions / holdings. `subAccountId` OPTIONAL: omitted ⇒ ALL sub-accounts;
+   * a specific id ⇒ just that wallet's positions. Single-sub-account brokers
+   * ignore the arg.
+   */
+  getPositions(subAccountId?: string): Promise<Position[]>
   getOrders(orderIds: string[]): Promise<OpenOrder[]>
   /**
    * Look up a single order. `symbolHint` is the broker-native localSymbol
