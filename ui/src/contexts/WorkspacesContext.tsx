@@ -78,7 +78,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
   const [configuringAgentTarget, setConfiguringAgentTarget] = useState<{
     wsId: string
     agent?: AgentId
-    section?: 'general' | 'ai' | 'template'
+    section?: 'general' | 'ai' | 'template' | 'absorb'
   } | null>(null)
   const [pendingSessionDelete, setPendingSessionDelete] = useState<{ wsId: string; sessionId: string } | null>(null)
   const { t } = useTranslation()
@@ -418,7 +418,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         resumeSession,
         openWebPiSession,
         requestDeleteSession,
-        openAgentConfig: (wsId: string, agent?: AgentId, section?: 'general' | 'ai' | 'template') =>
+        openAgentConfig: (wsId: string, agent?: AgentId, section?: 'general' | 'ai' | 'template' | 'absorb') =>
           setConfiguringAgentTarget({
             wsId,
             ...(agent ? { agent } : {}),

@@ -252,7 +252,20 @@ function manager(busy = false): TemplateUpgradeManager {
   return new TemplateUpgradeManager({
     registry,
     templates,
-    isWorkspaceBusy: () => busy,
+    workspaceRuntimeActivity: () => busy
+      ? {
+          busy: true,
+          sessions: [{
+            sessionId: 'pi-live',
+            resumeId: 'resume-live',
+            name: 'p1',
+            agent: 'pi',
+            surface: 'webpi',
+            startedAt: Date.now(),
+          }],
+          headless: [],
+        }
+      : { busy: false, sessions: [], headless: [] },
     logger,
     materializeTemplate: async () => incoming,
   });

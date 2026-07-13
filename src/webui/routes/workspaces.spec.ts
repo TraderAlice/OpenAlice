@@ -11,6 +11,7 @@ import { join } from 'node:path';
 import { createWorkspaceRoutes } from './workspaces.js';
 import { HeadlessCapacityError, type WorkspaceService } from '../../workspaces/service.js';
 import { TemplateUpgradeError } from '../../workspaces/template-upgrade.js';
+import { WorkspaceAbsorbError } from '../../workspaces/workspace-absorb.js';
 import { readWorkspaceMetadata } from '../../workspaces/workspace-metadata.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -37,6 +38,7 @@ function build(
     sessionDirectory?: any;
     lifecycle?: any;
     templateUpgrades?: any;
+    workspaceAbsorbs?: any;
   } = {},
 ) {
   const claude = {
@@ -96,6 +98,17 @@ function build(
       commit: 'abc123', changedPaths: ['README.md'], keptPaths: [],
     })),
   };
+  const workspaceAbsorbs = opts.workspaceAbsorbs ?? {
+    plan: vi.fn(async () => ({
+      source: { id: 'ws-2', tag: 'source' },
+      target: { id: 'ws-1', tag: 'target' },
+      planDigest: 'absorb-digest-1',
+    })),
+    apply: vi.fn(async () => ({
+      sourceWorkspaceId: 'ws-2', targetWorkspaceId: 'ws-1', commit: 'absorb123',
+      changedPaths: ['research/new.md'], skippedPaths: [], departedDir: '/departed/ws-2',
+    })),
+  };
   const svc = {
     registry: { get: (id: string) => (id === 'ws-1' ? meta : undefined) },
     adapters: { get: (a: string) => adapters[a] },
@@ -111,6 +124,7 @@ function build(
     probeAgentRuntimeReadiness,
     lifecycle,
     templateUpgrades,
+    workspaceAbsorbs,
     sessionDirectory: vi.fn(async (id: string) => id === 'ws-1'
       ? (opts.sessionDirectory ?? {
           workspace: { id: 'ws-1', tag: 'demo' },
@@ -130,6 +144,7 @@ function build(
     probeAgentRuntimeReadiness,
     lifecycle,
     templateUpgrades,
+    workspaceAbsorbs,
   };
 }
 
@@ -284,6 +299,67 @@ describe('Workspace template upgrade routes', () => {
     const result = await post(app, '/ws-1/template-upgrade', {});
     expect(result).toMatchObject({ status: 400, body: { error: 'bad_request' } });
     expect(templateUpgrades.apply).not.toHaveBeenCalled();
+  });
+});
+
+describe('Workspace absorb routes', () => {
+  it('previews a direction and passes only supported conflict resolutions', async () => {
+    const workspaceAbsorbs = {
+      plan: vi.fn(async () => ({
+        source: { id: 'ws-2', tag: 'source' }, target: { id: 'ws-1', tag: 'target' },
+        planDigest: 'absorb-digest-1',
+      })),
+      apply: vi.fn(async () => ({
+        sourceWorkspaceId: 'ws-2', targetWorkspaceId: 'ws-1', commit: 'abc123',
+        changedPaths: ['research/new.md'], skippedPaths: [], departedDir: '/departed/ws-2',
+      })),
+    };
+    const { app } = build({ workspaceAbsorbs });
+
+    expect(await get(app, '/ws-1/absorb/ws-2')).toMatchObject({
+      status: 200,
+      body: { plan: { planDigest: 'absorb-digest-1' } },
+    });
+    const applied = await post(app, '/ws-1/absorb/ws-2', {
+      planDigest: 'absorb-digest-1',
+      resolutions: {
+        'research/a.md': 'both',
+        'research/b.md': 'source',
+        'research/c.md': 'target',
+        'research/d.md': 'delete',
+      },
+    });
+    expect(applied.status).toBe(200);
+    expect(workspaceAbsorbs.apply).toHaveBeenCalledWith({
+      targetWorkspaceId: 'ws-1',
+      sourceWorkspaceId: 'ws-2',
+      planDigest: 'absorb-digest-1',
+      resolutions: {
+        'research/a.md': 'both',
+        'research/b.md': 'source',
+        'research/c.md': 'target',
+      },
+    });
+  });
+
+  it('returns a refreshed plan when the reviewed digest is stale', async () => {
+    const refreshed = { source: { id: 'ws-2' }, target: { id: 'ws-1' }, planDigest: 'new' } as any;
+    const workspaceAbsorbs = {
+      plan: vi.fn(),
+      apply: vi.fn(async () => {
+        throw new WorkspaceAbsorbError(
+          'stale_plan',
+          'One Workspace changed after preview.',
+          refreshed,
+        );
+      }),
+    };
+    const { app } = build({ workspaceAbsorbs });
+    const result = await post(app, '/ws-1/absorb/ws-2', { planDigest: 'old' });
+    expect(result).toMatchObject({
+      status: 409,
+      body: { error: 'stale_plan', plan: { planDigest: 'new' } },
+    });
   });
 });
 

@@ -25,6 +25,7 @@ const plan: TemplateUpgradePlan = {
   source: 'legacy-root-commit',
   blocked: false,
   blockers: [],
+  activity: { busy: false, sessions: [], headless: [] },
   files: [
     {
       path: 'README.md',
@@ -126,10 +127,22 @@ describe('WorkspaceTemplateUpgradePanel', () => {
       ...plan,
       blocked: true,
       blockers: ['active_sessions'],
+      activity: {
+        busy: true,
+        sessions: [{
+          sessionId: 'pi-live',
+          resumeId: 'resume-live',
+          name: 'p1',
+          agent: 'pi',
+          surface: 'webpi',
+          startedAt: Date.now(),
+        }],
+        headless: [],
+      },
     })
     render(<WorkspaceTemplateUpgradePanel wsId="chat-old" onWorkspaceChanged={vi.fn()} onClose={vi.fn()} />)
 
     expect(await screen.findByText('Prepare this Workspace before applying')).toBeTruthy()
-    expect(screen.getByText(/Pause its open sessions/)).toBeTruthy()
+    expect(screen.getByText(/p1.*pi.*WebPi/i)).toBeTruthy()
   })
 })

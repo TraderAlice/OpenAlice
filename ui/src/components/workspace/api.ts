@@ -96,6 +96,22 @@ export interface TemplateUpgradePlan {
   readonly source: 'recorded-baseline' | 'legacy-root-commit'
   readonly blocked: boolean
   readonly blockers: readonly string[]
+  readonly activity: {
+    readonly busy: boolean
+    readonly sessions: readonly {
+      readonly sessionId: string
+      readonly resumeId: string
+      readonly name: string
+      readonly agent: string
+      readonly surface: 'terminal' | 'webpi'
+      readonly startedAt: number | null
+    }[]
+    readonly headless: readonly {
+      readonly taskId: string | null
+      readonly agent: string
+      readonly startedAt: number
+    }[]
+  }
   readonly files: readonly TemplateUpgradeFilePlan[]
   readonly summary: {
     readonly ready: number
@@ -164,6 +180,126 @@ export async function applyTemplateUpgrade(
     throw new TemplateUpgradeApiError(
       body.error ?? 'upgrade_apply_failed',
       body.message ?? `Template upgrade failed: HTTP ${res.status}`,
+      res.status,
+      body.plan,
+    )
+  }
+  return body.result
+}
+
+export type WorkspaceAbsorbFileStatus = 'ready' | 'duplicate' | 'conflict'
+export type WorkspaceAbsorbResolution = 'target' | 'source' | 'both'
+
+export interface WorkspaceAbsorbFilePlan {
+  readonly path: string
+  readonly status: WorkspaceAbsorbFileStatus
+  readonly operation: 'add' | 'skip' | 'choose'
+  readonly sourcePreview: string | null
+  readonly targetPreview: string | null
+  readonly sourceTruncated: boolean
+  readonly targetTruncated: boolean
+  readonly sourceSize: number
+  readonly targetSize: number | null
+  readonly canUseSource: boolean
+  readonly keepBothPath: string
+}
+
+export interface WorkspaceAbsorbPlan {
+  readonly source: { readonly id: string; readonly tag: string; readonly displayName?: string }
+  readonly target: { readonly id: string; readonly tag: string; readonly displayName?: string }
+  readonly importRoot: string
+  readonly planDigest: string
+  readonly blocked: boolean
+  readonly blockers: readonly string[]
+  readonly activity: {
+    readonly source: TemplateUpgradePlan['activity']
+    readonly target: TemplateUpgradePlan['activity']
+  }
+  readonly sourceInventory: {
+    readonly sessions: number
+    readonly resumeIds: number
+    readonly openIssues: readonly string[]
+    readonly scheduledIssues: readonly string[]
+    readonly dirtyFiles: number
+  }
+  readonly files: readonly WorkspaceAbsorbFilePlan[]
+  readonly summary: {
+    readonly ready: number
+    readonly duplicates: number
+    readonly conflicts: number
+    readonly excluded: number
+    readonly bytes: number
+  }
+}
+
+export interface WorkspaceAbsorbResult {
+  readonly sourceWorkspaceId: string
+  readonly targetWorkspaceId: string
+  readonly commit: string
+  readonly changedPaths: readonly string[]
+  readonly skippedPaths: readonly string[]
+  readonly departedDir: string
+}
+
+export class WorkspaceAbsorbApiError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+    readonly status: number,
+    readonly plan?: WorkspaceAbsorbPlan,
+  ) {
+    super(message)
+    this.name = 'WorkspaceAbsorbApiError'
+  }
+}
+
+export async function getWorkspaceAbsorbPlan(
+  targetWorkspaceId: string,
+  sourceWorkspaceId: string,
+): Promise<WorkspaceAbsorbPlan> {
+  const res = await fetch(
+    `/api/workspaces/${encodeURIComponent(targetWorkspaceId)}/absorb/${encodeURIComponent(sourceWorkspaceId)}`,
+  )
+  const body = await res.json().catch(() => ({})) as {
+    plan?: WorkspaceAbsorbPlan
+    error?: string
+    message?: string
+  }
+  if (!res.ok || !body.plan) {
+    throw new WorkspaceAbsorbApiError(
+      body.error ?? 'absorb_plan_failed',
+      body.message ?? `Workspace preview failed: HTTP ${res.status}`,
+      res.status,
+      body.plan,
+    )
+  }
+  return body.plan
+}
+
+export async function applyWorkspaceAbsorb(
+  targetWorkspaceId: string,
+  sourceWorkspaceId: string,
+  planDigest: string,
+  resolutions: Readonly<Record<string, WorkspaceAbsorbResolution>>,
+): Promise<WorkspaceAbsorbResult> {
+  const res = await fetch(
+    `/api/workspaces/${encodeURIComponent(targetWorkspaceId)}/absorb/${encodeURIComponent(sourceWorkspaceId)}`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ planDigest, resolutions }),
+    },
+  )
+  const body = await res.json().catch(() => ({})) as {
+    result?: WorkspaceAbsorbResult
+    plan?: WorkspaceAbsorbPlan
+    error?: string
+    message?: string
+  }
+  if (!res.ok || !body.result) {
+    throw new WorkspaceAbsorbApiError(
+      body.error ?? 'absorb_apply_failed',
+      body.message ?? `Workspace absorb failed: HTTP ${res.status}`,
       res.status,
       body.plan,
     )
@@ -797,6 +933,9 @@ export interface DepartedWorkspace {
   readonly purgedAt?: string
   readonly lifecycle: WorkspaceLifecycleState
   readonly reason?: string
+  readonly absorbedIntoWorkspaceId?: string
+  readonly absorbedAt?: string
+  readonly absorbCommit?: string
   readonly legacyImported?: boolean
   readonly handoff?: {
     readonly preparedAt: string

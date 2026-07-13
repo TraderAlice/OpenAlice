@@ -133,6 +133,20 @@ export class WorkspaceLifecycleManager {
     }
   }
 
+  /**
+   * Compose offboarding inside a caller-owned multi-Workspace lease. Absorb is
+   * the only production caller: reacquiring the source lease there would make
+   * an atomic source+target transaction deadlock against itself.
+   */
+  async offboardWithinOperation(input: {
+    id: string
+    reason?: string
+    notes?: string
+    successors?: Readonly<Record<string, string>>
+  }): Promise<WorkspaceOffboardingResult> {
+    return this.offboardLocked(input)
+  }
+
   private async offboardLocked(input: {
     id: string
     reason?: string

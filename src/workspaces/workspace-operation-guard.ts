@@ -4,6 +4,12 @@ export interface WorkspaceOperationLease {
   release(): void;
 }
 
+export interface WorkspaceOperationGroupLease {
+  readonly workspaceIds: readonly string[];
+  readonly operation: string;
+  release(): void;
+}
+
 /**
  * Serializes directory-wide Workspace mutations inside the Alice process.
  *
@@ -36,6 +42,51 @@ export class WorkspaceOperationGuard {
   }
 
   /**
+   * Atomically claim several Workspaces in stable id order. No partial lease
+   * escapes: a collision releases every claim already made. This is the
+   * deadlock-free primitive for directional source -> target operations.
+   */
+  acquireMany(workspaceIds: readonly string[], operation: string): WorkspaceOperationGroupLease | null {
+    const ids = [...new Set(workspaceIds)].sort();
+    const leases: WorkspaceOperationLease[] = [];
+    for (const id of ids) {
+      const lease = this.acquire(id, operation);
+      if (!lease) {
+        for (const acquired of leases.reverse()) acquired.release();
+        return null;
+      }
+      leases.push(lease);
+    }
+    let released = false;
+    return {
+      workspaceIds: ids,
+      operation,
+      release: () => {
+        if (released) return;
+        released = true;
+        for (const lease of leases.reverse()) lease.release();
+      },
+    };
+  }
+
+  async acquireManyWhenAvailable(
+    workspaceIds: readonly string[],
+    operation: string,
+  ): Promise<WorkspaceOperationGroupLease> {
+    const ids = [...new Set(workspaceIds)].sort();
+    for (;;) {
+      const lease = this.acquireMany(ids, operation);
+      if (lease) return lease;
+      const busyIds = ids.filter((id) => this.active.has(id));
+      // A lease can be released between acquireMany() observing the collision
+      // and this snapshot. Promise.race([]) never settles, so retry instead of
+      // turning that harmless release race into a permanent preview hang.
+      if (busyIds.length === 0) continue;
+      await Promise.race(busyIds.map((id) => this.waitForRelease(id)));
+    }
+  }
+
+  /**
    * Read/review operations may queue behind a directory mutation instead of
    * flashing a transient busy error. Mutating callers still use `acquire()`
    * so a duplicate apply/offboard request fails explicitly.
@@ -54,5 +105,14 @@ export class WorkspaceOperationGuard {
 
   current(workspaceId: string): string | null {
     return this.active.get(workspaceId) ?? null;
+  }
+
+  private waitForRelease(workspaceId: string): Promise<void> {
+    if (!this.active.has(workspaceId)) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      const queue = this.waiters.get(workspaceId) ?? [];
+      queue.push(resolve);
+      this.waiters.set(workspaceId, queue);
+    });
   }
 }

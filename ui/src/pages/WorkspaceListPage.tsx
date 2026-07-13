@@ -14,7 +14,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArchiveRestore, Trash2 } from 'lucide-react'
+import { ArchiveRestore, GitMerge, Trash2 } from 'lucide-react'
 
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { useWorkspace } from '../tabs/store'
@@ -243,6 +243,20 @@ export function WorkspaceListPage() {
                       <p className="mt-3 line-clamp-2 text-[12px] leading-relaxed text-text-muted">
                         {workspace.reason ?? 'No departure reason recorded.'}
                       </p>
+                      {workspace.absorbedIntoWorkspaceId && (
+                        <div className="mt-3 flex items-center gap-2 rounded-md border border-accent/20 bg-accent/6 px-2.5 py-2 text-[11px] text-text-muted">
+                          <GitMerge size={13} className="shrink-0 text-accent" />
+                          <span>
+                            Working files reviewed into{' '}
+                            <strong className="font-medium text-text">
+                              {workspaces.find((candidate) => candidate.id === workspace.absorbedIntoWorkspaceId)?.displayName
+                                ?? workspaces.find((candidate) => candidate.id === workspace.absorbedIntoWorkspaceId)?.tag
+                                ?? workspace.absorbedIntoWorkspaceId}
+                            </strong>
+                            {workspace.absorbCommit ? ` · ${workspace.absorbCommit.slice(0, 8)}` : ''}
+                          </span>
+                        </div>
+                      )}
                       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-text-muted">
                         <span>{workspace.handoff?.resumeIds.length ?? 0} Sessions</span>
                         <span>{workspace.handoff?.openIssueIds.length ?? 0} open Issues</span>

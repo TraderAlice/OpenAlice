@@ -189,6 +189,8 @@ Read the relevant guide before editing its subsystem:
   departed desks, handoff, restore/purge, and resumeId retirement.
 - [[docs/workspace-template-upgrade.md]] — [Workspace Template Upgrade](docs/workspace-template-upgrade.md):
   managed-asset baselines, three-way review, safe apply, recovery, and the future Merge/Absorb boundary.
+- [[docs/workspace-absorb.md]] — [Workspace Absorb](docs/workspace-absorb.md): directional
+  Workspace consolidation, file collisions, archived source identity, and recovery.
 - [[docs/uta-live-testing.md]] — [UTA live testing](docs/uta-live-testing.md): broker/trading acceptance loops.
 - [[docs/workspace-issues-and-scheduling.md]] — [Workspace issues and scheduling](docs/workspace-issues-and-scheduling.md): Issue board, schedules, headless runs, and Inbox delivery.
 - [[docs/conversation-provenance.md]] — [Workspace Session and artifact provenance](docs/conversation-provenance.md): `resumeId` identity, artifact trails, Issue responsibility, and the provenance-before-collaboration delivery order.

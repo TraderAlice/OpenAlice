@@ -38,6 +38,8 @@ export interface HeadlessProbeArgs {
   readonly prompt: string;
   readonly timeoutMs: number;
   readonly logger: Logger;
+  /** Closes directory-operation start races once the PTY actually exists. */
+  readonly onSpawned?: () => void;
 }
 
 export interface JsonlFileDelta {
@@ -94,6 +96,7 @@ export async function runHeadlessProbe(args: HeadlessProbeArgs): Promise<Headles
     rows: 24,
     encoding: null,
   } as never);
+  args.onSpawned?.();
 
   child.onData((data) => {
     const s = typeof data === 'string' ? data : (data as Buffer).toString('utf8');

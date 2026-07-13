@@ -170,7 +170,26 @@ export function WorkspaceTemplateUpgradePanel({
                   {t('workspace.upgradeBlockedTitle')}
                 </div>
                 <ul className="mt-2 space-y-1.5 pl-5 text-text-muted">
-                  {plan.blockers.includes('active_sessions') && <li>{t('workspace.upgradeBlockedSessions')}</li>}
+                  {plan.blockers.includes('active_sessions') && plan.activity.sessions.length === 0 && plan.activity.headless.length === 0 && (
+                    <li>{t('workspace.upgradeBlockedSessions')}</li>
+                  )}
+                  {plan.activity.sessions.map((session) => (
+                    <li key={session.sessionId}>
+                      {t('workspace.upgradeBlockedSessionItem', {
+                        name: session.name,
+                        agent: session.agent,
+                        surface: session.surface === 'webpi' ? 'WebPi' : 'TUI',
+                      })}
+                    </li>
+                  ))}
+                  {plan.activity.headless.map((run, index) => (
+                    <li key={run.taskId ?? `${run.agent}-${run.startedAt}-${index}`}>
+                      {t('workspace.upgradeBlockedHeadlessItem', {
+                        agent: run.agent,
+                        run: run.taskId ?? t('workspace.upgradeSynchronousRun'),
+                      })}
+                    </li>
+                  ))}
                   {plan.blockers.includes('staged_changes') && <li>{t('workspace.upgradeBlockedStaged')}</li>}
                 </ul>
               </div>

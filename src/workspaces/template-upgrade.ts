@@ -23,6 +23,7 @@ import type { Logger } from './logger.js';
 import type { TemplateMeta, TemplateRegistry } from './template-registry.js';
 import { WorkspaceOperationGuard } from './workspace-operation-guard.js';
 import type { WorkspaceMeta, WorkspaceRegistry } from './workspace-registry.js';
+import type { WorkspaceRuntimeActivity } from './workspace-runtime-activity.js';
 
 const gzipAsync = promisify(gzip);
 const gunzipAsync = promisify(gunzip);
@@ -102,6 +103,8 @@ export interface TemplateUpgradePlan {
   readonly source: 'recorded-baseline' | 'legacy-root-commit';
   readonly blocked: boolean;
   readonly blockers: readonly string[];
+  /** Concrete process evidence behind `active_sessions`. */
+  readonly activity: WorkspaceRuntimeActivity;
   readonly files: readonly TemplateUpgradeFilePlan[];
   readonly summary: {
     readonly ready: number;
@@ -147,7 +150,7 @@ export class TemplateUpgradeError extends Error {
 export interface TemplateUpgradeManagerOptions {
   readonly registry: WorkspaceRegistry;
   readonly templates: TemplateRegistry;
-  readonly isWorkspaceBusy?: (workspaceId: string) => boolean;
+  readonly workspaceRuntimeActivity?: (workspaceId: string) => WorkspaceRuntimeActivity;
   readonly logger: Logger;
   readonly operationGuard?: WorkspaceOperationGuard;
   /** Test seam: production materializes the actual current template. */
@@ -389,8 +392,13 @@ export class TemplateUpgradeManager {
       localEntries[index] ?? missingFile(),
       incoming[path] ?? missingFile(),
     ));
+    const activity = this.opts.workspaceRuntimeActivity?.(workspace.id) ?? {
+      busy: false,
+      sessions: [],
+      headless: [],
+    };
     const blockers: string[] = [];
-    if (this.opts.isWorkspaceBusy?.(workspace.id)) blockers.push('active_sessions');
+    if (activity.busy) blockers.push('active_sessions');
     if ((await stagedPaths(workspace.dir)).length > 0) blockers.push('staged_changes');
     const fromVersion = state?.template === template.name
       ? state.appliedVersion
@@ -414,6 +422,7 @@ export class TemplateUpgradeManager {
       source,
       blocked: blockers.length > 0,
       blockers,
+      activity,
       files,
       summary: {
         ready: files.filter((file) => file.status === 'ready').length,

@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react'
-import { Bot, GitMerge, Info, Settings, X } from 'lucide-react'
+import { Bot, GitMerge, Info, Layers3, Settings, X } from 'lucide-react'
 import {
   getAgentConfig,
   listCredentials,
@@ -28,6 +28,7 @@ import { ModelCombobox } from '../credentials/PresetFields'
 import { useTestGate } from '../../lib/useTestGate'
 import { useWorkspaces } from '../../contexts/workspaces-context'
 import { WorkspaceTemplateUpgradePanel } from './WorkspaceTemplateUpgradePanel'
+import { WorkspaceAbsorbPanel } from './WorkspaceAbsorbPanel'
 
 // The agent tab implies a default vendor when the baseUrl alone can't say:
 // claude → Anthropic, codex → OpenAI; opencode/pi run anything so they have no
@@ -40,7 +41,7 @@ const TAB_FALLBACK_VENDOR: Record<Tab, string | null> = {
 }
 
 type Tab = 'claude' | 'codex' | 'opencode' | 'pi'
-type Section = 'general' | 'ai' | 'template'
+type Section = 'general' | 'ai' | 'template' | 'absorb'
 
 interface Props {
   wsId: string
@@ -447,11 +448,23 @@ export function WorkspaceAIConfigModal({ wsId, onClose, initialAgent = 'claude',
                   : 'text-text-muted hover:bg-bg-tertiary hover:text-text'
               }`}
             >
-              <GitMerge size={15} />
+              <Layers3 size={15} />
               <span>Template</span>
               {workspace?.upgradeAvailable && (
                 <span className="ml-auto h-1.5 w-1.5 rounded-full bg-accent" aria-label="Update available" />
               )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setSection('absorb')}
+              className={`flex min-w-0 flex-1 items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:w-full ${
+                section === 'absorb'
+                  ? 'bg-accent/10 text-accent'
+                  : 'text-text-muted hover:bg-bg-tertiary hover:text-text'
+              }`}
+            >
+              <GitMerge size={15} />
+              <span>Consolidate</span>
             </button>
           </aside>
 
@@ -883,6 +896,15 @@ export function WorkspaceAIConfigModal({ wsId, onClose, initialAgent = 'claude',
             {section === 'template' && (
               <WorkspaceTemplateUpgradePanel
                 wsId={wsId}
+                onWorkspaceChanged={refresh}
+                onClose={onClose}
+              />
+            )}
+
+            {section === 'absorb' && workspace && (
+              <WorkspaceAbsorbPanel
+                target={workspace}
+                workspaces={workspaces}
                 onWorkspaceChanged={refresh}
                 onClose={onClose}
               />
