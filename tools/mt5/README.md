@@ -144,3 +144,23 @@ Use it on demo accounts first:
    - IC Markets demo EURUSD: `InpBrokerId=icmarkets`, `InpSymbol=EURUSD`
 
 The exporter is read-only. It does not submit, modify, or close orders. If the exported account mode is not `demo`, JMB Goldmine must show the ledger as blocked for demo-autopilot progression.
+
+## Demo risk shell, no order submission
+
+`JmbGoldmineDemoRiskShell.mq5` is an EA that reads the latest JMB shadow decision and writes gate status to:
+
+```text
+OpenAliceMt5RiskShellV1/<broker>/<symbol>/gate_status.csv
+```
+
+This shell does not submit, modify, or close orders. It validates demo account mode, chart symbol, decision freshness, shadow mode, lot size, stop loss, spread, kill switch, and existing manual or foreign exposure before reporting `shadow_ready`.
+
+Recommended first run:
+
+- Keep `InpKillSwitch=true`.
+- Attach to HFM demo `XAUUSD` and `EURUSD`.
+- Attach to IC Markets demo `XAUUSD` and `EURUSD`.
+- Use `InpBrokerId=hfmarkets` or `icmarkets`.
+- Use the exact chart symbol in `InpSymbol`.
+
+Only after the gate status is stable should a separate plan add demo order submission.
