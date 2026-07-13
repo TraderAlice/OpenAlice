@@ -84,12 +84,16 @@ struct CanaryEnvironment
    bool policyFresh;
    bool costModelFresh;
    bool observationFresh;
+   bool processedStateAvailable;
    bool observationUnused;
 
    bool volumeEvidenceAvailable;
    bool volumeCompatible;
 
    bool stopEvidenceAvailable;
+   bool stopModeSupportsSl;
+   bool stopTickSizeAvailable;
+   bool stopTickAligned;
    bool stopBrokerValid;
    bool riskCalculationAvailable;
    double calculatedStopRisk;
@@ -146,9 +150,13 @@ struct CanaryDailyState
    double realizedLoss;
 };
 
-struct CanaryObservationState
+struct CanaryProcessedState
 {
-   string lastObservationId;
+   bool valid;
+   bool filePresent;
+   string decisionIds[];
+   string observationIds[];
+   datetime attemptedAt[];
 };
 
 #endif

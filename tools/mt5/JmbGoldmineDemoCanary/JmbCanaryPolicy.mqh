@@ -40,11 +40,21 @@ bool CanaryRolloutAuthorized(const string broker,const string rollout_stage)
    return false;
 }
 
+bool IsCanonicalCanaryPolicyVersion(const string value)
+{
+   if(value=="" || StringFind(value,",")>=0 || StringFind(value,"\"")>=0
+      || StringFind(value,"\r")>=0 || StringFind(value,"\n")>=0) return false;
+   string trimmed=value;
+   StringTrimLeft(trimmed);
+   StringTrimRight(trimmed);
+   return trimmed==value;
+}
+
 bool ValidateCanaryPolicy(const CanaryPolicy &policy,string &detail)
 {
    string allowed_server=CanaryAllowedServer(policy.broker);
    long allowed_magic=CanaryAllowedMagic(policy.broker);
-   if(policy.schemaVersion!=1 || !IsCanonicalCanaryText(policy.policyVersion)
+   if(policy.schemaVersion!=1 || !IsCanonicalCanaryPolicyVersion(policy.policyVersion)
       || allowed_server=="" || policy.server!=allowed_server || policy.symbol!="XAUUSD"
       || policy.strategyVersion!="daily-trend-v1" || policy.magicNumber!=allowed_magic)
    {

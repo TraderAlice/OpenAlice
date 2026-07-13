@@ -18,6 +18,10 @@ async function readCanaryBundle(): Promise<string> {
   return sources.join('\n')
 }
 
+async function readCanarySource(file: string): Promise<string> {
+  return readFile(join(CANARY_DIRECTORY, file), 'utf8')
+}
+
 describe('MT5 demo canary source contract', () => {
   it('keeps the dry-run bundle order-free and safe by default', async () => {
     const source = await readCanaryBundle()
@@ -51,5 +55,73 @@ describe('MT5 demo canary source contract', () => {
     expect(source).toContain('schema_version,captured_at,broker,server,account_mode,symbol,state,detail,rollout_stage,execution_enabled,kill_switch,decision_id,observation_id,event_id,event_type,event_time,result_code,result_detail,stop_protection_confirmed,position_direction,position_volume,position_open_price,position_stop_loss,position_id,reconciliation_state,daily_loss_count,daily_realized_loss,blocking_gate,next_safe_action')
     expect(source).not.toMatch(/FileWrite\([^;]*InpExpectedAccountLogin/s)
     expect(source).not.toMatch(/(?:Print|Comment)\([^;]*InpExpectedAccountLogin/s)
+  })
+
+  it('strictly validates policy grammar, gate JSON, and Task 3 hash identities', async () => {
+    const [csv, policy, harness] = await Promise.all([
+      readCanarySource('JmbCanaryCsv.mqh'),
+      readCanarySource('JmbCanaryPolicy.mqh'),
+      readFile(join('tools', 'mt5', 'tests', 'JmbGoldmineDemoCanaryHarness.mq5'), 'utf8'),
+    ])
+
+    expect(policy).toContain('bool IsCanonicalCanaryPolicyVersion(')
+    expect(policy).toContain('StringFind(value,",")')
+    expect(policy).toContain('StringFind(value,"\\\"")')
+    expect(csv).toContain('bool ParseCanaryGateResultsJson(')
+    expect(csv).toContain('CRYPT_HASH_SHA256')
+    expect(csv).toContain('CreateCanaryObservationId(')
+    expect(csv).toContain('CreateCanaryDecisionId(')
+    expect(csv).toContain('decision.observationId!=CreateCanaryObservationId(decision)')
+    expect(csv).toContain('decision.decisionId!=CreateCanaryDecisionId(decision)')
+    expect(harness).toContain('arbitrary decision ids')
+    expect(harness).toContain('malformed gate JSON')
+    expect(harness).toContain('unknown gate name')
+    expect(harness).toContain('unknown gate state')
+    expect(harness).toContain('unknown gate field')
+    expect(harness).toContain('duplicate gate field')
+    expect(harness).toContain('missing gate field')
+    expect(harness).toContain('noncanonical gate evidence')
+    expect(harness).toContain('policy version grammar')
+  })
+
+  it('exports Task 5-compatible effective enablement and loads durable attempt state', async () => {
+    const [main, state, harness] = await Promise.all([
+      readCanarySource('JmbGoldmineDemoCanary.mq5'),
+      readCanarySource('JmbCanaryState.mqh'),
+      readFile(join('tools', 'mt5', 'tests', 'JmbGoldmineDemoCanaryHarness.mq5'), 'utf8'),
+    ])
+
+    expect(state).toContain('schema_version,decision_id,observation_id,attempted_at')
+    expect(state).toContain('processed_observations.csv')
+    expect(state).toContain('bool LoadCanaryProcessedState(')
+    expect(state).toContain('CanarySha256Identity("daily-trend-v1|"+values[2])')
+    expect(main).toContain('LoadCanaryProcessedState(')
+    expect(main).toContain('bool effective_execution_enabled=')
+    expect(state).toContain('policy.rolloutStage!="status_only"')
+    expect(state).toContain('if(policy.rolloutStage=="status_only" && execution_enabled) return false;')
+    expect(main).not.toMatch(/WriteCanaryLatestStatus\([^;]*InpDemoExecutionEnabled/s)
+    expect(harness).toContain('loaded duplicate state')
+    expect(harness).toContain('malformed processed state')
+  })
+
+  it('requires broker-valid stop metadata, checked writes, and a working timer', async () => {
+    const [main, state, harness] = await Promise.all([
+      readCanarySource('JmbGoldmineDemoCanary.mq5'),
+      readCanarySource('JmbCanaryState.mqh'),
+      readFile(join('tools', 'mt5', 'tests', 'JmbGoldmineDemoCanaryHarness.mq5'), 'utf8'),
+    ])
+
+    expect(main).toContain('SYMBOL_ORDER_MODE')
+    expect(main).toContain('SYMBOL_ORDER_SL')
+    expect(main).toContain('SYMBOL_TRADE_TICK_SIZE')
+    expect(main).toContain('if(!EventSetTimer(10))')
+    expect(state).toContain('uint preflight_written=FileWriteString(handle,"preflight\\n")')
+    expect(state).toContain('if(preflight_written!=StringLen("preflight\\n"))')
+    expect(state).toContain('uint header_written=FileWrite(')
+    expect(state).toContain('uint row_written=FileWrite(')
+    expect(state).toContain('ReadStrictCanaryCsv(temporary_path')
+    expect(harness).toContain('stop mode unsupported')
+    expect(harness).toContain('stop tick unavailable')
+    expect(harness).toContain('stop tick misaligned')
   })
 })

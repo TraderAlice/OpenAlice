@@ -20,7 +20,6 @@ const string CANARY_POLICY_ROOT="OpenAliceMt5DemoPolicyV1";
 const string CANARY_DECISION_ROOT="OpenAliceMt5ExecutionDecisionV1";
 
 bool g_evaluating=false;
-CanaryObservationState g_observation_state;
 
 void InitializeCanaryPolicy(CanaryPolicy &policy)
 {
@@ -105,21 +104,43 @@ bool CanaryVolumeEvidence(const CanaryDecision &decision,bool &compatible)
 
 bool CalculateCanaryStopRisk(const CanaryDecision &decision,
                              const MqlTick &tick,
+                             bool &evidence_available,
+                             bool &mode_supports_sl,
+                             bool &tick_size_available,
+                             bool &tick_aligned,
                              bool &stop_valid,
                              double &calculated_risk)
 {
+   evidence_available=false;
+   mode_supports_sl=false;
+   tick_size_available=false;
+   tick_aligned=false;
    stop_valid=false;
    calculated_risk=0.0;
    if(decision.direction!="buy" && decision.direction!="sell") return false;
-   double point=SymbolInfoDouble(InpSymbol,SYMBOL_POINT);
-   long stops_level=SymbolInfoInteger(InpSymbol,SYMBOL_TRADE_STOPS_LEVEL);
-   if(point<=0.0 || stops_level<0) return false;
+   long order_mode=0;
+   long stops_level=0;
+   double point=0.0;
+   double tick_size=0.0;
+   if(!SymbolInfoInteger(InpSymbol,SYMBOL_ORDER_MODE,order_mode)
+      || !SymbolInfoInteger(InpSymbol,SYMBOL_TRADE_STOPS_LEVEL,stops_level)
+      || !SymbolInfoDouble(InpSymbol,SYMBOL_POINT,point)
+      || !SymbolInfoDouble(InpSymbol,SYMBOL_TRADE_TICK_SIZE,tick_size)) return false;
+   evidence_available=true;
+   mode_supports_sl=(order_mode&SYMBOL_ORDER_SL)==SYMBOL_ORDER_SL;
+   tick_size_available=MathIsValidNumber(tick_size) && tick_size>0.0;
+   if(!mode_supports_sl || !tick_size_available || !MathIsValidNumber(point) || point<=0.0 || stops_level<0)
+      return false;
+   double aligned_stop=MathRound(decision.stopLoss/tick_size)*tick_size;
+   double alignment_tolerance=MathMax(0.00000001,tick_size*0.0000001);
+   tick_aligned=MathAbs(decision.stopLoss-aligned_stop)<=alignment_tolerance;
+   if(!tick_aligned) return false;
    double entry=decision.direction=="buy" ? tick.ask : tick.bid;
    double minimum_distance=(double)stops_level*point;
    stop_valid=decision.direction=="buy"
-      ? decision.stopLoss<entry && entry-decision.stopLoss>=minimum_distance
-      : decision.stopLoss>entry && decision.stopLoss-entry>=minimum_distance;
-   if(!stop_valid) return true;
+      ? decision.stopLoss<entry && entry-decision.stopLoss+alignment_tolerance>=minimum_distance
+      : decision.stopLoss>entry && decision.stopLoss-entry+alignment_tolerance>=minimum_distance;
+   if(!stop_valid) return false;
 
    ENUM_ORDER_TYPE calculation_type=decision.direction=="buy" ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
    double projected_result=0.0;
@@ -238,6 +259,7 @@ bool ReadCanaryNewsBlackout(const datetime now,bool &blackout)
 
 void BuildCanaryEnvironment(const CanaryDecision &decision,
                             const CanaryPolicy &policy,
+                            const CanaryProcessedState &processed_state,
                             CanaryEnvironment &environment)
 {
    InitializeCanaryEnvironment(environment);
@@ -270,8 +292,9 @@ void BuildCanaryEnvironment(const CanaryDecision &decision,
    environment.costModelFresh=decision.loaded && decision.preDecisionGatesPassed
       && IsCanonicalCanaryText(decision.costModelVersion);
    environment.observationFresh=CanaryObservationIsFresh(decision,policy,now);
-   environment.observationUnused=decision.loaded
-      && !CanaryIsDuplicateObservation(g_observation_state,decision.observationId);
+   environment.processedStateAvailable=processed_state.valid;
+   environment.observationUnused=decision.loaded && processed_state.valid
+      && !CanaryProcessedStateContains(processed_state,decision.decisionId,decision.observationId);
 
    environment.volumeEvidenceAvailable=decision.loaded && CanaryVolumeEvidence(decision,environment.volumeCompatible);
 
@@ -279,8 +302,9 @@ void BuildCanaryEnvironment(const CanaryDecision &decision,
    bool has_tick=decision.loaded && SymbolSelect(InpSymbol,true) && SymbolInfoTick(InpSymbol,tick);
    if(has_tick)
    {
-      environment.stopEvidenceAvailable=true;
       environment.riskCalculationAvailable=CalculateCanaryStopRisk(decision,tick,
+         environment.stopEvidenceAvailable,environment.stopModeSupportsSl,
+         environment.stopTickSizeAvailable,environment.stopTickAligned,
          environment.stopBrokerValid,environment.calculatedStopRisk);
       environment.marginCalculationAvailable=CalculateCanaryMargin(decision,tick,environment.estimatedMargin);
       environment.freeMargin=AccountInfoDouble(ACCOUNT_MARGIN_FREE);
@@ -326,24 +350,54 @@ void Evaluate()
    string decision_path=CANARY_DECISION_ROOT+"\\"+InpBrokerId+"\\"+InpSymbol+"\\latest_decision.csv";
    ReadCanaryDecision(decision_path,TimeGMT(),decision,read_detail);
 
+   CanaryProcessedState processed_state;
+   InitializeCanaryProcessedState(processed_state);
+   string processed_path=CanaryProcessedStatePath(InpBrokerId,InpSymbol);
+   LoadCanaryProcessedState(processed_path,processed_state,read_detail);
+
    CanaryEnvironment environment;
-   BuildCanaryEnvironment(decision,policy,environment);
+   BuildCanaryEnvironment(decision,policy,processed_state,environment);
    CanaryEvaluation evaluation=EvaluateCanaryGates(decision,policy,environment);
+   bool effective_execution_enabled=CanaryEffectiveExecutionEnabled(InpDemoExecutionEnabled,policy);
 
    string write_detail="";
    if(!WriteCanaryLatestStatus(InpBrokerId,AccountInfoString(ACCOUNT_SERVER),InpSymbol,policy,decision,evaluation,
-                              InpDemoExecutionEnabled,InpKillSwitch,
+                               effective_execution_enabled,InpKillSwitch,
                               environment.dailyLossCount,environment.dailyRealizedLoss,write_detail))
       Print("JMB demo canary status publication failed: ",write_detail);
 
    g_evaluating=false;
 }
 
+void PublishCanarySchedulerFailure()
+{
+   CanaryPolicy policy;
+   InitializeCanaryPolicy(policy);
+   CanaryDecision decision;
+   InitializeCanaryDecision(decision);
+   CanaryEvaluation evaluation;
+   evaluation.state=CANARY_LIFECYCLE_BLOCKED;
+   evaluation.ready=false;
+   evaluation.detail="The ten-second evaluation timer could not be started.";
+   evaluation.blockingGate="scheduler";
+   evaluation.nextSafeAction="Keep the canary disabled and resolve the terminal timer failure.";
+   ArrayResize(evaluation.gates,0);
+   string write_detail="";
+   if(!WriteCanaryLatestStatus(InpBrokerId,AccountInfoString(ACCOUNT_SERVER),InpSymbol,
+      policy,decision,evaluation,false,InpKillSwitch,0,0.0,write_detail))
+      Print("JMB demo canary scheduler failure status could not be published: ",write_detail);
+}
+
 int OnInit()
 {
    if(InpExpectedAccountLogin<=0 || InpSymbol!="XAUUSD") return INIT_PARAMETERS_INCORRECT;
    if(!ValidateCanaryInputs()) return INIT_PARAMETERS_INCORRECT;
-   EventSetTimer(10);
+   if(!EventSetTimer(10))
+   {
+      PublishCanarySchedulerFailure();
+      Print("JMB demo canary initialization failed because its evaluation timer is unavailable.");
+      return INIT_FAILED;
+   }
    Evaluate();
    return INIT_SUCCEEDED;
 }

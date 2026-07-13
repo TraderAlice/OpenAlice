@@ -306,40 +306,109 @@ bool IsCanaryIsoDate(const string value)
    return StringFormat("%04d-%02d-%02d",parts.year,parts.mon,parts.day)==value;
 }
 
-bool ValidateCanaryGateResultsJson(const string json)
+bool ConsumeCanaryJsonToken(const string json,int &cursor,const string token)
 {
-   int length=StringLen(json);
-   if(length<2 || StringSubstr(json,0,1)!="[" || StringSubstr(json,length-1,1)!="]") return false;
-   if(StringFind(json,"\r")>=0 || StringFind(json,"\n")>=0) return false;
-   int cursor=0;
-   int states=0;
-   while(true)
-   {
-      int marker=StringFind(json,"\"state\":\"",cursor);
-      if(marker<0) break;
-      int value_start=marker+9;
-      int value_end=StringFind(json,"\"",value_start);
-      if(value_end<0) return false;
-      string state=StringSubstr(json,value_start,value_end-value_start);
-      if(state!="pass" && state!="block") return false;
-      states++;
-      cursor=value_end+1;
-   }
-   return states>0 && StringFind(json,"\"name\":")>=0 && StringFind(json,"\"detail\":")>=0;
-}
-
-bool HasPassingCanaryDecisionGate(const string json,const string gate_name)
-{
-   return StringFind(json,"\"name\":\""+gate_name+"\",\"state\":\"pass\"")>=0;
-}
-
-bool HasCompleteCanaryDecisionEvidence(const string json)
-{
-   string required[]={"bridge","completed_observation","candidate_policy","cost_model",
-                      "learning","quote","spread","direction","stop_loss"};
-   for(int index=0;index<ArraySize(required);index++)
-      if(!HasPassingCanaryDecisionGate(json,required[index])) return false;
+   if(StringSubstr(json,cursor,StringLen(token))!=token) return false;
+   cursor+=StringLen(token);
    return true;
+}
+
+bool ParseCanonicalCanaryJsonString(const string json,int &cursor,string &value)
+{
+   value="";
+   if(!ConsumeCanaryJsonToken(json,cursor,"\"")) return false;
+   while(cursor<StringLen(json))
+   {
+      string character=StringSubstr(json,cursor,1);
+      cursor++;
+      if(character=="\"") return true;
+      if(character=="\\")
+      {
+         if(cursor>=StringLen(json)) return false;
+         string escaped=StringSubstr(json,cursor,1);
+         cursor++;
+         if(escaped!="\"" && escaped!="\\") return false;
+         value+=escaped;
+         continue;
+      }
+      int code=(int)StringGetCharacter(character,0);
+      if(code<32) return false;
+      value+=character;
+   }
+   return false;
+}
+
+bool ParseCanaryGateResultsJson(const string json,bool &all_passed,string &detail)
+{
+   all_passed=true;
+   if(StringFind(json,"\r")>=0 || StringFind(json,"\n")>=0)
+   {
+      detail="Execution decision gate JSON contains physical multiline evidence.";
+      return false;
+   }
+   string expected_names[]={"bridge","completed_observation","candidate_policy","cost_model",
+                             "learning","quote","spread","direction","stop_loss"};
+   int cursor=0;
+   if(!ConsumeCanaryJsonToken(json,cursor,"[")) return false;
+   for(int index=0;index<ArraySize(expected_names);index++)
+   {
+      if(index>0 && !ConsumeCanaryJsonToken(json,cursor,",")) return false;
+      if(!ConsumeCanaryJsonToken(json,cursor,"{")) return false;
+      string key="";
+      string name="";
+      string state="";
+      string evidence_detail="";
+      if(!ParseCanonicalCanaryJsonString(json,cursor,key) || key!="name"
+         || !ConsumeCanaryJsonToken(json,cursor,":")
+         || !ParseCanonicalCanaryJsonString(json,cursor,name) || name!=expected_names[index]
+         || !ConsumeCanaryJsonToken(json,cursor,",")
+         || !ParseCanonicalCanaryJsonString(json,cursor,key) || key!="state"
+         || !ConsumeCanaryJsonToken(json,cursor,":")
+         || !ParseCanonicalCanaryJsonString(json,cursor,state)
+         || (state!="pass" && state!="block")
+         || !ConsumeCanaryJsonToken(json,cursor,",")
+         || !ParseCanonicalCanaryJsonString(json,cursor,key) || key!="detail"
+         || !ConsumeCanaryJsonToken(json,cursor,":")
+         || !ParseCanonicalCanaryJsonString(json,cursor,evidence_detail)
+         || !IsCanonicalCanaryText(evidence_detail)
+         || !ConsumeCanaryJsonToken(json,cursor,"}"))
+      {
+         detail="Execution decision gate JSON violates the exact object contract.";
+         return false;
+      }
+      if(state=="block") all_passed=false;
+   }
+   if(!ConsumeCanaryJsonToken(json,cursor,"]") || cursor!=StringLen(json))
+   {
+      detail="Execution decision gate JSON contains unknown, duplicate, missing, or trailing evidence.";
+      return false;
+   }
+   return true;
+}
+
+string CanarySha256Identity(const string input)
+{
+   uchar source[];
+   uchar key[];
+   uchar digest[];
+   int copied=StringToCharArray(input,source,0,StringLen(input),CP_UTF8);
+   if(copied!=StringLen(input)) return "";
+   ArrayResize(key,0);
+   if(CryptEncode(CRYPT_HASH_SHA256,source,key,digest)!=32) return "";
+   string hex="";
+   for(int index=0;index<12;index++) hex+=StringFormat("%02x",(int)digest[index]);
+   return hex;
+}
+
+string CreateCanaryObservationId(const CanaryDecision &decision)
+{
+   return CanarySha256Identity(decision.broker+"|"+decision.symbol+"|"
+      +decision.strategyVersion+"|"+decision.observationAsOf);
+}
+
+string CreateCanaryDecisionId(const CanaryDecision &decision)
+{
+   return CanarySha256Identity("daily-trend-v1|"+decision.observationId);
 }
 
 bool ReadCanaryDecision(const string path,const datetime now,CanaryDecision &decision,string &detail)
@@ -359,6 +428,7 @@ bool ReadCanaryDecision(const string path,const datetime now,CanaryDecision &dec
    double volume=0.0;
    double stop=0.0;
    double max_risk=0.0;
+   bool all_application_gates_passed=false;
    datetime created=0;
    datetime issued=0;
    datetime expires=0;
@@ -395,7 +465,7 @@ bool ReadCanaryDecision(const string path,const datetime now,CanaryDecision &dec
       || (!actionable && (has_entry || has_stop))
       || volume<=0.0 || max_risk<=0.0 || max_risk>CANARY_HARD_MAX_RISK
       || !IsCanonicalCanaryText(values[17]) || !IsCanonicalCanaryText(values[18])
-      || !ValidateCanaryGateResultsJson(values[19]))
+      || !ParseCanaryGateResultsJson(values[19],all_application_gates_passed,detail))
    {
       detail="Execution decision contains invalid entry, risk, version, or gate evidence.";
       return false;
@@ -422,8 +492,14 @@ bool ReadCanaryDecision(const string path,const datetime now,CanaryDecision &dec
    decision.candidatePolicyVersion=values[17];
    decision.costModelVersion=values[18];
    decision.gateResultsJson=values[19];
-   decision.preDecisionGatesPassed=StringFind(values[19],"\"state\":\"block\"")<0
-      && HasCompleteCanaryDecisionEvidence(values[19]);
+   decision.preDecisionGatesPassed=all_application_gates_passed;
+   if(decision.observationId!=CreateCanaryObservationId(decision)
+      || decision.decisionId!=CreateCanaryDecisionId(decision))
+   {
+      decision.loaded=false;
+      detail="Execution decision IDs do not match the immutable Task 3 hash identity.";
+      return false;
+   }
    detail="Execution decision lease matches the strict schema and current UTC lease window.";
    return true;
 }

@@ -18,12 +18,16 @@ enum HarnessMutation
    HARNESS_ROLLOUT_BLOCKED,
    HARNESS_VOLUME_INVALID,
    HARNESS_STOP_INVALID,
+   HARNESS_STOP_MODE_UNSUPPORTED,
+   HARNESS_STOP_TICK_UNAVAILABLE,
+   HARNESS_STOP_TICK_MISALIGNED,
    HARNESS_RISK_EXCESSIVE,
    HARNESS_SPREAD_EXCESSIVE,
    HARNESS_SESSION_CLOSED,
    HARNESS_NEWS_BLOCKED,
    HARNESS_EXPOSURE_PRESENT,
    HARNESS_DUPLICATE_OBSERVATION,
+   HARNESS_MALFORMED_PROCESSED_STATE,
    HARNESS_LOG_FAILURE,
    HARNESS_RECONCILIATION_MISSING
 };
@@ -113,10 +117,14 @@ void BuildHarnessEnvironment(CanaryEnvironment &environment)
    environment.policyFresh=true;
    environment.costModelFresh=true;
    environment.observationFresh=true;
+   environment.processedStateAvailable=true;
    environment.observationUnused=true;
    environment.volumeEvidenceAvailable=true;
    environment.volumeCompatible=true;
    environment.stopEvidenceAvailable=true;
+   environment.stopModeSupportsSl=true;
+   environment.stopTickSizeAvailable=true;
+   environment.stopTickAligned=true;
    environment.stopBrokerValid=true;
    environment.riskCalculationAvailable=true;
    environment.calculatedStopRisk=5.0;
@@ -153,12 +161,20 @@ void ApplyHarnessMutation(const HarnessMutation mutation,CanaryDecision &decisio
    else if(mutation==HARNESS_ROLLOUT_BLOCKED) environment.rolloutAuthorized=false;
    else if(mutation==HARNESS_VOLUME_INVALID) decision.volume=0.02;
    else if(mutation==HARNESS_STOP_INVALID) environment.stopBrokerValid=false;
+   else if(mutation==HARNESS_STOP_MODE_UNSUPPORTED) environment.stopModeSupportsSl=false;
+   else if(mutation==HARNESS_STOP_TICK_UNAVAILABLE) environment.stopTickSizeAvailable=false;
+   else if(mutation==HARNESS_STOP_TICK_MISALIGNED) environment.stopTickAligned=false;
    else if(mutation==HARNESS_RISK_EXCESSIVE) environment.calculatedStopRisk=10.01;
    else if(mutation==HARNESS_SPREAD_EXCESSIVE) environment.currentSpread=0.76;
    else if(mutation==HARNESS_SESSION_CLOSED) environment.sessionOpen=false;
    else if(mutation==HARNESS_NEWS_BLOCKED) environment.newsBlackout=true;
    else if(mutation==HARNESS_EXPOSURE_PRESENT) environment.hasForeignGoldExposure=true;
    else if(mutation==HARNESS_DUPLICATE_OBSERVATION) environment.observationUnused=false;
+   else if(mutation==HARNESS_MALFORMED_PROCESSED_STATE)
+   {
+      environment.processedStateAvailable=false;
+      environment.observationUnused=false;
+   }
    else if(mutation==HARNESS_LOG_FAILURE) environment.logPreflightReady=false;
    else if(mutation==HARNESS_RECONCILIATION_MISSING) environment.reconciliationComplete=false;
 }
@@ -181,11 +197,95 @@ bool RunHarnessCase(const HarnessCase &test_case)
 
 bool RunDuplicateObservationStateCase()
 {
-   CanaryObservationState state;
-   state.lastObservationId="observation-harness";
-   bool passed=CanaryIsDuplicateObservation(state,"observation-harness")
-      && !CanaryIsDuplicateObservation(state,"new-observation");
-   PrintFormat("%s duplicate observation state",passed ? "PASS" : "FAIL");
+   CanaryProcessedState state;
+   InitializeCanaryProcessedState(state);
+   state.valid=true;
+   ArrayResize(state.decisionIds,1);
+   ArrayResize(state.observationIds,1);
+   ArrayResize(state.attemptedAt,1);
+   state.decisionIds[0]="bc0bc128a9155065dda0b5bc";
+   state.observationIds[0]="53f2bd057c1ee3608a02d1f2";
+   state.attemptedAt[0]=1;
+   bool passed=CanaryProcessedStateContains(state,"bc0bc128a9155065dda0b5bc","new-observation")
+      && CanaryProcessedStateContains(state,"new-decision","53f2bd057c1ee3608a02d1f2")
+      && !CanaryProcessedStateContains(state,"new-decision","new-observation");
+   PrintFormat("%s loaded duplicate state",passed ? "PASS" : "FAIL");
+   return passed;
+}
+
+bool RunTask3IdentityCase()
+{
+   CanaryDecision decision;
+   BuildHarnessDecision(decision);
+   string observation_id=CreateCanaryObservationId(decision);
+   decision.observationId=observation_id;
+   string decision_id=CreateCanaryDecisionId(decision);
+   bool passed=observation_id=="53f2bd057c1ee3608a02d1f2"
+      && decision_id=="bc0bc128a9155065dda0b5bc"
+      && "arbitrary-observation"!=observation_id
+      && "arbitrary-decision"!=decision_id;
+   PrintFormat("%s arbitrary decision ids",passed ? "PASS" : "FAIL");
+   return passed;
+}
+
+bool RunGateJsonContractCase()
+{
+   string valid="[{\"name\":\"bridge\",\"state\":\"pass\",\"detail\":\"ok\"},"
+      +"{\"name\":\"completed_observation\",\"state\":\"pass\",\"detail\":\"ok\"},"
+      +"{\"name\":\"candidate_policy\",\"state\":\"pass\",\"detail\":\"ok\"},"
+      +"{\"name\":\"cost_model\",\"state\":\"pass\",\"detail\":\"ok\"},"
+      +"{\"name\":\"learning\",\"state\":\"pass\",\"detail\":\"ok\"},"
+      +"{\"name\":\"quote\",\"state\":\"pass\",\"detail\":\"ok\"},"
+      +"{\"name\":\"spread\",\"state\":\"pass\",\"detail\":\"ok\"},"
+      +"{\"name\":\"direction\",\"state\":\"pass\",\"detail\":\"ok\"},"
+      +"{\"name\":\"stop_loss\",\"state\":\"pass\",\"detail\":\"ok\"}]";
+   string malformed=valid+" trailing";
+   string unknown_name=valid;
+   StringReplace(unknown_name,"\"name\":\"bridge\"","\"name\":\"unknown\"");
+   string unknown_state=valid;
+   StringReplace(unknown_state,"\"state\":\"pass\"","\"state\":\"warn\"");
+   string unknown_field=valid;
+   StringReplace(unknown_field,"\"detail\":\"ok\"","\"extra\":\"x\",\"detail\":\"ok\"");
+   string duplicate_field=valid;
+   StringReplace(duplicate_field,"\"state\":\"pass\"","\"name\":\"bridge\",\"state\":\"pass\"");
+   string missing_field=valid;
+   StringReplace(missing_field,",\"detail\":\"ok\"","");
+   string noncanonical=valid;
+   StringReplace(noncanonical,"[{","[ {");
+   bool all_passed=false;
+   string detail="";
+   bool passed=ParseCanaryGateResultsJson(valid,all_passed,detail) && all_passed
+      && !ParseCanaryGateResultsJson(malformed,all_passed,detail)
+      && !ParseCanaryGateResultsJson(unknown_name,all_passed,detail)
+      && !ParseCanaryGateResultsJson(unknown_state,all_passed,detail)
+      && !ParseCanaryGateResultsJson(unknown_field,all_passed,detail)
+      && !ParseCanaryGateResultsJson(duplicate_field,all_passed,detail)
+      && !ParseCanaryGateResultsJson(missing_field,all_passed,detail)
+      && !ParseCanaryGateResultsJson(noncanonical,all_passed,detail);
+   PrintFormat("%s malformed gate JSON: unknown gate name, unknown gate state, unknown gate field, duplicate gate field, missing gate field, noncanonical gate evidence",
+      passed ? "PASS" : "FAIL");
+   return passed;
+}
+
+bool RunPolicyVersionGrammarCase()
+{
+   bool passed=IsCanonicalCanaryPolicyVersion("operator-policy-v1")
+      && !IsCanonicalCanaryPolicyVersion("")
+      && !IsCanonicalCanaryPolicyVersion(" policy")
+      && !IsCanonicalCanaryPolicyVersion("policy ")
+      && !IsCanonicalCanaryPolicyVersion("policy,version")
+      && !IsCanonicalCanaryPolicyVersion("policy\"version")
+      && !IsCanonicalCanaryPolicyVersion("policy\nversion");
+   PrintFormat("%s policy version grammar",passed ? "PASS" : "FAIL");
+   return passed;
+}
+
+bool RunMalformedProcessedStateCase()
+{
+   CanaryProcessedState state;
+   InitializeCanaryProcessedState(state);
+   bool passed=!state.valid && CanaryProcessedStateContains(state,"new-decision","new-observation");
+   PrintFormat("%s malformed processed state",passed ? "PASS" : "FAIL");
    return passed;
 }
 
@@ -218,12 +318,16 @@ int OnInit()
    AddHarnessCase(cases,"rollout",HARNESS_ROLLOUT_BLOCKED,CANARY_LIFECYCLE_BLOCKED,"rollout");
    AddHarnessCase(cases,"volume",HARNESS_VOLUME_INVALID,CANARY_LIFECYCLE_BLOCKED,"volume");
    AddHarnessCase(cases,"stop",HARNESS_STOP_INVALID,CANARY_LIFECYCLE_BLOCKED,"stop_risk");
+   AddHarnessCase(cases,"stop mode unsupported",HARNESS_STOP_MODE_UNSUPPORTED,CANARY_LIFECYCLE_BLOCKED,"stop_risk");
+   AddHarnessCase(cases,"stop tick unavailable",HARNESS_STOP_TICK_UNAVAILABLE,CANARY_LIFECYCLE_BLOCKED,"stop_risk");
+   AddHarnessCase(cases,"stop tick misaligned",HARNESS_STOP_TICK_MISALIGNED,CANARY_LIFECYCLE_BLOCKED,"stop_risk");
    AddHarnessCase(cases,"risk",HARNESS_RISK_EXCESSIVE,CANARY_LIFECYCLE_BLOCKED,"stop_risk");
    AddHarnessCase(cases,"spread",HARNESS_SPREAD_EXCESSIVE,CANARY_LIFECYCLE_BLOCKED,"spread_deviation");
    AddHarnessCase(cases,"session",HARNESS_SESSION_CLOSED,CANARY_LIFECYCLE_BLOCKED,"session");
    AddHarnessCase(cases,"news",HARNESS_NEWS_BLOCKED,CANARY_LIFECYCLE_BLOCKED,"news");
    AddHarnessCase(cases,"exposure",HARNESS_EXPOSURE_PRESENT,CANARY_LIFECYCLE_BLOCKED,"exposure");
-   AddHarnessCase(cases,"duplicate observation",HARNESS_DUPLICATE_OBSERVATION,CANARY_LIFECYCLE_BLOCKED,"freshness");
+   AddHarnessCase(cases,"loaded duplicate state",HARNESS_DUPLICATE_OBSERVATION,CANARY_LIFECYCLE_BLOCKED,"freshness");
+   AddHarnessCase(cases,"malformed processed state",HARNESS_MALFORMED_PROCESSED_STATE,CANARY_LIFECYCLE_BLOCKED,"freshness");
    AddHarnessCase(cases,"log failure",HARNESS_LOG_FAILURE,CANARY_LIFECYCLE_BLOCKED,"log_preflight");
    AddHarnessCase(cases,"reconciliation",HARNESS_RECONCILIATION_MISSING,CANARY_LIFECYCLE_BLOCKED,"reconciliation");
 
@@ -231,6 +335,10 @@ int OnInit()
    for(int index=0;index<ArraySize(cases);index++)
       if(!RunHarnessCase(cases[index])) failures++;
    if(!RunDuplicateObservationStateCase()) failures++;
+   if(!RunTask3IdentityCase()) failures++;
+   if(!RunGateJsonContractCase()) failures++;
+   if(!RunPolicyVersionGrammarCase()) failures++;
+   if(!RunMalformedProcessedStateCase()) failures++;
    if(!RunFourLossResetCase()) failures++;
 
    PrintFormat("JMB demo canary harness completed with %d failure(s).",failures);

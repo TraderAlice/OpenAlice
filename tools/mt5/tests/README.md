@@ -13,3 +13,7 @@ Manual operator gate:
 Codex does not launch MetaEditor or automate its compiler. Compilation and execution are a later operator-controlled gate. The Task 6 EA remains status-only even when `InpDemoExecutionEnabled` is true: it can publish `ready`, but it cannot submit, amend, or close anything.
 
 The EA inputs must bind exactly to `hfmarkets` / `HFMarketsGlobal-Demo4` / magic `880101` or `icmarkets` / `ICMarketsSC-Demo` / magic `880201`, always on `XAUUSD`. The expected account login must be a positive in-memory binding. It must never appear in status, events, terminal comments, or exported artifacts.
+
+The authoritative attempt input is `OpenAliceMt5ExecutionV1/<broker>/XAUUSD/processed_observations.csv` in Common Files, with exact header `schema_version,decision_id,observation_id,attempted_at`. A missing file is an empty pre-attempt state. Any present unreadable, malformed, duplicated, noncanonical, or identity-inconsistent record blocks readiness. Task 6 only reads this file; the later gateway/reconciliation tasks own durable attempt writes.
+
+If the ten-second terminal timer cannot start, initialization returns `INIT_FAILED` after attempting a safe blocked status projection. The EA never silently falls back to tick-only scheduling.

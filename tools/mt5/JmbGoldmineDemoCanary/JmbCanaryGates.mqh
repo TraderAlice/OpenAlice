@@ -80,6 +80,7 @@ CanaryEvaluation EvaluateCanaryGates(const CanaryDecision &decision,
       && environment.policyFresh
       && environment.costModelFresh
       && environment.observationFresh
+      && environment.processedStateAvailable
       && environment.observationUnused;
    CanaryGateResult freshness=Gate("freshness",freshness_passed,
       freshness_passed ? "Decision, bridge, policy, cost, and observation evidence is current and unused."
@@ -98,6 +99,9 @@ CanaryEvaluation EvaluateCanaryGates(const CanaryDecision &decision,
 
    double risk_ceiling=MathMin(CANARY_HARD_MAX_RISK,MathMin(policy.maxRiskAmount,decision.maxRiskAmount));
    bool stop_risk_passed=environment.stopEvidenceAvailable
+      && environment.stopModeSupportsSl
+      && environment.stopTickSizeAvailable
+      && environment.stopTickAligned
       && environment.stopBrokerValid
       && environment.riskCalculationAvailable
       && decision.stopLoss>0.0
