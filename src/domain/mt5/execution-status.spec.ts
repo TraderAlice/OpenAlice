@@ -94,6 +94,40 @@ describe('parseExecutionStatusCsv', () => {
       position: null,
     })
   })
+
+  it.each([
+    ['stop confirmation off', VALID_CSV.replace(',Request completed,1,buy,', ',Request completed,0,buy,')],
+    ['no position', VALID_CSV.replace(',1,buy,0.01,3334.25,3324.25,position-opaque,reconciled,', ',1,,,,,,reconciled,')],
+    ['zero volume', VALID_CSV.replace(',buy,0.01,', ',buy,0,')],
+    ['negative volume', VALID_CSV.replace(',buy,0.01,', ',buy,-0.01,')],
+    ['zero open price', VALID_CSV.replace(',0.01,3334.25,', ',0.01,0,')],
+    ['zero stop', VALID_CSV.replace(',3334.25,3324.25,', ',3334.25,0,')],
+    ['a nonprotective buy stop', VALID_CSV.replace(',3334.25,3324.25,', ',3334.25,3344.25,')],
+    ['a nonprotective sell stop', VALID_CSV.replace(',buy,0.01,3334.25,3324.25,', ',sell,0.01,3334.25,3324.25,')],
+    ['an empty position id', VALID_CSV.replace(',position-opaque,reconciled,', ',,reconciled,')],
+  ])('rejects filled_protected with %s', (_case, csv) => {
+    expect(() => parseExecutionStatusCsv(csv)).toThrow(/position/i)
+  })
+
+  it('rejects stop confirmation without a complete valid protective position', () => {
+    const csv = VALID_CSV
+      .replace(',filled_protected,', ',ready,')
+      .replace(',1,buy,0.01,3334.25,3324.25,position-opaque,reconciled,', ',1,,,,,,reconciled,')
+
+    expect(() => parseExecutionStatusCsv(csv)).toThrow(/stop protection/i)
+  })
+
+  it('rejects execution enabled in the status-only rollout stage', () => {
+    expect(() => parseExecutionStatusCsv(VALID_CSV.replace(',hfm_canary,1,', ',status_only,1,'))).toThrow(/status.only/i)
+  })
+
+  it('accepts a protected fill while the kill switch blocks new entries', () => {
+    expect(parseExecutionStatusCsv(VALID_CSV.replace(',hfm_canary,1,0,', ',hfm_canary,1,1,'))).toMatchObject({
+      state: 'filled_protected',
+      killSwitch: true,
+      stopProtectionConfirmed: true,
+    })
+  })
 })
 
 describe('summarizeLatestJmbExecutionStatus', () => {

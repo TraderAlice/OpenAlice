@@ -44,8 +44,11 @@ describe('Mt5ExecutionStatusCard', () => {
     ['paused', 'PAUSED'],
     ['reconciliation_required', 'RECONCILIATION REQUIRED'],
     ['demo_blocked', 'DEMO BLOCKED'],
+    ['missing', 'STATUS MISSING'],
+    ['malformed', 'STATUS MALFORMED'],
+    ['stale', 'STATUS STALE'],
   ] as const)('maps %s to the approved operational label', (state, label) => {
-    render(<Mt5ExecutionStatusCard execution={execution({ state })} />)
+    render(<Mt5ExecutionStatusCard execution={execution({ state, label })} />)
 
     expect(screen.getByRole('region', { name: 'MT5 demo execution status' }).textContent).toContain(label)
     expect(screen.queryByText('untrusted upstream label')).toBeNull()

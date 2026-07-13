@@ -20,7 +20,7 @@ function statusCsv(capturedAt: string): string {
 type ResearchResponse = {
   mode: string
   tradingEnabled: boolean
-  stages: Array<{ key: string; detail: string }>
+  stages: Array<{ key: string; state: string; detail: string }>
   instruments: Array<{ broker: string; symbol: string; execution: JmbExecutionStatusSummary }>
 }
 
@@ -70,5 +70,22 @@ describe('GET /', () => {
     expect(serialized).toContain('malformed')
     expect(serialized).not.toContain('SENTINEL-LOGIN-884422')
     expect(serialized).not.toMatch(/accountLogin|account_login/i)
+  })
+
+  it('does not count a contradictory protected fill as protected or complete', async () => {
+    const directory = join(executionRoot, 'hfmarkets', 'XAUUSD')
+    await mkdir(directory, { recursive: true })
+    const contradictory = statusCsv(new Date().toISOString()).replace(',Request completed,1,buy,', ',Request completed,0,buy,')
+    await writeFile(join(directory, 'latest_status.csv'), contradictory, 'utf8')
+    const app = createResearchRoutes({} as EngineContext, { executionRoot })
+
+    const response = await app.request('/')
+    const body = await response.json() as ResearchResponse
+    const hfmGold = body.instruments.find((instrument) => instrument.broker === 'hfmarkets' && instrument.symbol === 'XAUUSDb')
+    const demoStage = body.stages.find((stage) => stage.key === 'demo')
+
+    expect(hfmGold?.execution).toMatchObject({ state: 'malformed', stopProtectionConfirmed: false, position: null })
+    expect(demoStage?.state).not.toBe('complete')
+    expect(demoStage?.detail).toContain('0/2')
   })
 })

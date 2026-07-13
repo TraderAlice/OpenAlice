@@ -206,20 +206,47 @@ export function parseExecutionStatusCsv(text: string): JmbExecutionStatusSummary
 
   const dailyLossCount = requiredFinite(row['daily_loss_count']!, 'daily_loss_count')
   if (!Number.isInteger(dailyLossCount) || dailyLossCount < 0) throw new Error('Execution status daily_loss_count must be a non-negative integer.')
+  const state = row['state'] as JmbExecutionLifecycleState
+  const rolloutStage = row['rollout_stage'] as JmbExecutionRolloutStage
   const executionEnabled = binary(row['execution_enabled']!, 'execution_enabled')
+  const killSwitch = binary(row['kill_switch']!, 'kill_switch')
+  const stopProtectionConfirmed = binary(row['stop_protection_confirmed']!, 'stop_protection_confirmed')
+  const position = hasPosition ? {
+    direction: row['position_direction'] as 'buy' | 'sell',
+    volume: requiredFinite(row['position_volume']!, 'position_volume'),
+    openPrice: requiredFinite(row['position_open_price']!, 'position_open_price'),
+    stopLoss: requiredFinite(row['position_stop_loss']!, 'position_stop_loss'),
+    id: row['position_id']!,
+  } : null
+
+  if (position && (position.volume <= 0 || position.openPrice <= 0 || position.id.trim() === '')) {
+    throw new Error('Execution status position must have a positive volume and open price with a nonempty opaque id.')
+  }
+  const hasProtectiveStop = position !== null
+    && position.stopLoss > 0
+    && (position.direction === 'buy' ? position.stopLoss < position.openPrice : position.stopLoss > position.openPrice)
+  if (stopProtectionConfirmed && !hasProtectiveStop) {
+    throw new Error('Execution status stop protection requires a complete position with a valid protective stop.')
+  }
+  if (state === 'filled_protected' && (!stopProtectionConfirmed || !hasProtectiveStop)) {
+    throw new Error('Execution status filled_protected requires a confirmed protected position.')
+  }
+  if (rolloutStage === 'status_only' && executionEnabled) {
+    throw new Error('Execution status status_only rollout cannot enable execution.')
+  }
 
   return {
-    state: row['state'] as JmbExecutionLifecycleState,
-    label: labelFor(row['state'] as JmbExecutionLifecycleState, executionEnabled),
+    state,
+    label: labelFor(state, executionEnabled),
     detail: row['detail']!,
     capturedAt: row['captured_at']!,
     broker: row['broker'] as JmbExecutionBroker,
     server: row['server']!,
     accountMode: 'demo',
     symbol: row['symbol'] as JmbExecutionSymbol,
-    rolloutStage: row['rollout_stage'] as JmbExecutionRolloutStage,
+    rolloutStage,
     executionEnabled,
-    killSwitch: binary(row['kill_switch']!, 'kill_switch'),
+    killSwitch,
     decisionId: nullable(row['decision_id']!),
     observationId: nullable(row['observation_id']!),
     latestEvent: hasEvent ? {
@@ -229,14 +256,8 @@ export function parseExecutionStatusCsv(text: string): JmbExecutionStatusSummary
       resultCode: row['result_code']!,
       detail: row['result_detail']!,
     } : null,
-    stopProtectionConfirmed: binary(row['stop_protection_confirmed']!, 'stop_protection_confirmed'),
-    position: hasPosition ? {
-      direction: row['position_direction'] as 'buy' | 'sell',
-      volume: requiredFinite(row['position_volume']!, 'position_volume'),
-      openPrice: requiredFinite(row['position_open_price']!, 'position_open_price'),
-      stopLoss: requiredFinite(row['position_stop_loss']!, 'position_stop_loss'),
-      id: row['position_id']!,
-    } : null,
+    stopProtectionConfirmed,
+    position,
     reconciliationState: row['reconciliation_state']!,
     dailyLossCount,
     dailyRealizedLoss: requiredFinite(row['daily_realized_loss']!, 'daily_realized_loss'),

@@ -1,26 +1,6 @@
 import { Radio, ShieldCheck, ShieldX, TriangleAlert } from 'lucide-react'
 import type { JmbExecutionStatusSummary, JmbResearchExecutionState } from '../../api/research'
 
-const APPROVED_LABELS: Record<JmbResearchExecutionState, string> = {
-  disabled: 'EXECUTION DISABLED',
-  paused: 'PAUSED',
-  blocked: 'BLOCKED',
-  ready: 'CANARY READY',
-  order_requesting: 'DEMO ENABLED',
-  order_rejected: 'BLOCKED',
-  reconciliation_required: 'RECONCILIATION REQUIRED',
-  filled_protected: 'DEMO ENABLED',
-  close_requesting: 'DEMO ENABLED',
-  closed: 'DEMO ENABLED',
-  stopped: 'PAUSED',
-  emergency_close: 'BLOCKED',
-  error: 'BLOCKED',
-  demo_blocked: 'DEMO BLOCKED',
-  missing: 'BLOCKED',
-  malformed: 'BLOCKED',
-  stale: 'BLOCKED',
-}
-
 function readable(value: string): string {
   return value.replaceAll('_', ' ')
 }
@@ -49,7 +29,7 @@ export function Mt5ExecutionStatusCard({ execution }: { execution: JmbExecutionS
           <span className="shrink-0 border border-yellow-500/35 bg-yellow-500/10 px-1.5 py-0.5 font-mono text-[9px] font-semibold tracking-[0.12em] text-yellow-300">DEMO ONLY</span>
         </div>
         <strong className={`shrink-0 rounded-sm border px-2 py-1 font-mono text-[10px] tracking-[0.08em] ${stateTone(execution.state)}`}>
-          {APPROVED_LABELS[execution.state]}
+          {execution.label}
         </strong>
       </div>
 
