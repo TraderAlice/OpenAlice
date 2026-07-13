@@ -72,6 +72,29 @@ bool AppendCanaryOrderRequestingEvent(const CanaryDecision &decision,string &det
    return true;
 }
 
+bool CanaryProcessedStateIsExactAppend(const CanaryProcessedState &prior,
+                                       const CanaryProcessedState &candidate,
+                                       const CanaryDecision &decision,
+                                       const datetime attempted_at)
+{
+   if(!prior.valid || !candidate.valid) return false;
+   int prior_count=ArraySize(prior.observationIds);
+   int candidate_count=ArraySize(candidate.observationIds);
+   if(ArraySize(prior.decisionIds)!=prior_count || ArraySize(prior.attemptedAt)!=prior_count
+      || candidate_count!=prior_count+1
+      || ArraySize(candidate.decisionIds)!=candidate_count
+      || ArraySize(candidate.attemptedAt)!=candidate_count) return false;
+   for(int index=0;index<prior_count;index++)
+   {
+      if(candidate.decisionIds[index]!=prior.decisionIds[index]
+         || candidate.observationIds[index]!=prior.observationIds[index]
+         || candidate.attemptedAt[index]!=prior.attemptedAt[index]) return false;
+   }
+   return candidate.decisionIds[prior_count]==decision.decisionId
+      && candidate.observationIds[prior_count]==decision.observationId
+      && candidate.attemptedAt[prior_count]==attempted_at;
+}
+
 bool PersistCanaryAttempt(const string path,
                           const CanaryDecision &decision,
                           const CanaryProcessedState &processed_state,
@@ -160,8 +183,7 @@ bool PersistCanaryAttempt(const string path,
    CanaryProcessedState temporary_state;
    InitializeCanaryProcessedState(temporary_state);
    if(!LoadCanaryProcessedState(temporary_path,temporary_state,verification_detail)
-      || ArraySize(temporary_state.observationIds)!=ArraySize(locked_state.observationIds)+1
-      || !CanaryProcessedStateContains(temporary_state,decision.decisionId,decision.observationId))
+      || !CanaryProcessedStateIsExactAppend(locked_state,temporary_state,decision,attempted_at))
    {
       FileDelete(temporary_path,FILE_COMMON);
       FileClose(lock_handle);
@@ -181,7 +203,7 @@ bool PersistCanaryAttempt(const string path,
    CanaryProcessedState durable_state;
    InitializeCanaryProcessedState(durable_state);
    if(!LoadCanaryProcessedState(path,durable_state,verification_detail)
-      || !CanaryProcessedStateContains(durable_state,decision.decisionId,decision.observationId))
+      || !CanaryProcessedStateIsExactAppend(locked_state,durable_state,decision,attempted_at))
    {
       FileClose(lock_handle);
       FileDelete(lock_path,FILE_COMMON);
