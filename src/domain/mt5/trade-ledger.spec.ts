@@ -123,4 +123,30 @@ describe('summarizeMt5TradeLedger', () => {
     expect(summary.detail).toContain('non-demo')
     expect(summary.totalDeals).toBe(2)
   })
+
+  it('blocks unreadable trade history instead of rejecting malformed ledger rows', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-ledger-'))
+    directories.push(root)
+    const directory = join(root, 'hfmarkets', 'XAUUSD')
+    await mkdir(directory, { recursive: true })
+    await writeFile(join(directory, 'deals.csv'), [
+      'account_mode,server,login,broker,symbol,deal_ticket,order_ticket,position_id,time,entry,type,reason,volume,price,commission,fee,swap,profit,magic,comment',
+      'demo,HFM-Demo,123456,hfmarkets,XAUUSD,1',
+    ].join('\n'))
+
+    const summary = await summarizeMt5TradeLedger(root, 'hfmarkets', 'XAUUSD', new Date('2026-07-13T02:01:00.000Z'))
+
+    expect(summary.state).toBe('blocked')
+    expect(summary.label).toBe('Trade history unreadable')
+    expect(summary.detail).toContain('Malformed MT5 trade ledger row 2')
+    expect(summary.broker).toBe('hfmarkets')
+    expect(summary.symbol).toBe('XAUUSD')
+    expect(summary.lastUpdated).toEqual(expect.any(String))
+    expect(summary.totalDeals).toBe(0)
+    expect(summary.manualDeals).toBe(0)
+    expect(summary.eaDeals).toBe(0)
+    expect(summary.otherDeals).toBe(0)
+    expect(summary.unknownDeals).toBe(0)
+    expect(summary.netProfit).toBe(0)
+  })
 })

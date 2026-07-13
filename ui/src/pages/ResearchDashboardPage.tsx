@@ -145,7 +145,7 @@ function InstrumentStudy({ instrument }: { instrument: ResearchInstrument }) {
           </div>
           <p className="mt-2 text-micro text-text-muted leading-relaxed">{instrument.learning.detail}</p>
           <p className="mt-2 text-micro text-text-muted leading-relaxed">
-            Deals: {instrument.learning.totalDeals} Â· Manual: {instrument.learning.manualDeals} Â· EA: {instrument.learning.eaDeals} Â· Net: {instrument.learning.netProfit.toFixed(2)}
+            Deals: {instrument.learning.totalDeals} • Manual: {instrument.learning.manualDeals} • EA: {instrument.learning.eaDeals} • Net: {instrument.learning.netProfit.toFixed(2)}
           </p>
         </div>
 

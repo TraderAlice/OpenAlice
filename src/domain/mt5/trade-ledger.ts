@@ -156,7 +156,29 @@ export async function summarizeMt5TradeLedger(
     }
   }
 
-  const rows = parseMt5TradeLedgerCsv(text).filter((row) => row.broker === broker && row.symbol === symbol)
+  let rows: Mt5TradeLedgerRow[]
+  try {
+    rows = parseMt5TradeLedgerCsv(text).filter((row) => row.broker === broker && row.symbol === symbol)
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : 'Unknown MT5 trade ledger parse error'
+    return {
+      state: 'blocked',
+      label: 'Trade history unreadable',
+      detail: `The MT5 trade ledger exists but could not be read safely: ${detail}. Refresh the read-only export before learning can continue.`,
+      broker,
+      symbol,
+      accountMode: null,
+      server: null,
+      lastDealTime: null,
+      lastUpdated: modified.toISOString(),
+      totalDeals: 0,
+      manualDeals: 0,
+      eaDeals: 0,
+      otherDeals: 0,
+      unknownDeals: 0,
+      netProfit: 0,
+    }
+  }
   const first = rows[0]
   const lastDealTime = rows.map((row) => row.time).sort().at(-1) ?? null
   const totalMoney = rows.reduce((total, row) => total + row.profit + row.commission + row.fee + row.swap, 0)
