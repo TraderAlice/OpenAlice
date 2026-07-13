@@ -218,7 +218,9 @@ describe('MT5 demo canary source contract', () => {
     expect(state).toContain('emergency_position_id')
     expect(main).toContain('latch.emergencyPositionId=CanaryTicketString(reconciliation.position.identifier)')
     expect(main).toMatch(/CANARY_LIFECYCLE_STOPPED[\s\S]*latch\.unresolved=false;[\s\S]*PersistCanarySafetyLatch/)
-    expect(main).toMatch(/authoritative_emergency_closure[\s\S]*latch\.unresolved=false;[\s\S]*latch\.protectionError/)
+    expect(main).toMatch(/authoritative_emergency_closure[\s\S]*ConfirmCanaryEmergencyClosure/)
+    expect(state).toMatch(/FinalizeCanaryEmergencyTerminalCorrelation[\s\S]*latch\.unresolved=false;/)
+    expect(main).toContain('latch.protectionError=true;')
     expect(harness).toContain('correlated stopped observation')
     expect(harness).toContain('unrelated stop remains unresolved')
     expect(harness).toContain('protection error pauses after emergency closure')
@@ -274,6 +276,36 @@ describe('MT5 demo canary source contract', () => {
     expect(main).toMatch(/CANARY_LIFECYCLE_STOPPED[\s\S]*AppendManagedCanaryPositionEvent[\s\S]*ClearCanaryActivePositionCorrelation/)
     expect(harness).toContain('protected fill then later stop after restart')
     expect(harness).toContain('opening decision differs from reversal decision')
+  })
+
+  it('durably publishes one opening-correlated emergency terminal before clearing its restart latch', async () => {
+    const [main, state, harness] = await Promise.all([
+      readCanarySource('JmbGoldmineDemoCanary.mq5'),
+      readCanarySource('JmbCanaryState.mqh'),
+      readFile(join('tools', 'mt5', 'tests', 'JmbGoldmineDemoCanaryHarness.mq5'), 'utf8'),
+    ])
+    const emergencyConfirmation = main.match(/bool ConfirmCanaryEmergencyClosure\([\s\S]*?\n\}/)?.[0] ?? ''
+    const terminalRecorded = emergencyConfirmation.indexOf('CanaryCorrelatedTerminalEventRecorded(')
+    const terminalAppend = emergencyConfirmation.indexOf('AppendManagedCanaryPositionEvent(')
+    const terminalFinalize = emergencyConfirmation.indexOf('FinalizeCanaryEmergencyTerminalCorrelation(')
+
+    expect(emergencyConfirmation).toContain('terminal_reconciliation.reconciliationState="reconciled"')
+    expect(emergencyConfirmation).toContain('CANARY_LIFECYCLE_CLOSED')
+    expect(terminalRecorded).toBeGreaterThan(-1)
+    expect(terminalAppend).toBeGreaterThan(terminalRecorded)
+    expect(terminalFinalize).toBeGreaterThan(terminalAppend)
+    expect(emergencyConfirmation).toContain('if(any_terminal_event_durable && !terminal_event_durable) return false;')
+    expect(state).toMatch(/FinalizeCanaryEmergencyTerminalCorrelation[\s\S]*if\(!terminal_event_durable\) return false;[\s\S]*ClearCanaryActivePositionCorrelation/)
+    for (const field of [
+      'decision_id', 'observation_id', 'position_id', 'calculated_risk',
+      'requested_volume', 'requested_price', 'requested_stop_loss',
+      'commission', 'swap', 'fee', 'net_result',
+    ]) expect(state).toMatch(new RegExp(`CanaryCorrelatedTerminalEventRecorded[\\s\\S]*${field}`))
+    expect(main).toMatch(/authoritative_emergency_closure && \(latch\.unresolved[\s\S]*latch\.activePositionDecisionId!=""[\s\S]*ConfirmCanaryEmergencyClosure/)
+    expect(main).toMatch(/CANARY_LIFECYCLE_PAUSED[\s\S]*!authoritative_emergency_closure/)
+    expect(harness).toContain('emergency terminal waits for durable event')
+    expect(harness).toContain('emergency terminal clears active correlation after restart')
+    expect(harness).toContain('emergency protection pause remains')
   })
 
   it('recovers a correlated stop or emergency closure independently of broker-day loss selection', async () => {

@@ -136,6 +136,65 @@ describe('MT5 outcome importer', () => {
     })
   })
 
+  it('imports a restart-recovered emergency terminal once under its opening identity', async () => {
+    const openingDecisionId = 'bc0bc128a9155065dda0b5bc'
+    const openingObservationId = '53f2bd057c1ee3608a02d1f2'
+    const emergencyRequest = executionEvent({
+      event_id: 'event-emergency-request-1',
+      event_type: 'emergency_close',
+      event_time: '2026-07-13T09:02:00.000Z',
+      decision_id: openingDecisionId,
+      observation_id: openingObservationId,
+      calculated_risk: 7.5,
+      position_id: 'position-4321',
+      reconciliation_state: 'protection_error',
+    })
+    const pausedAfterRestart = executionEvent({
+      event_id: 'event-emergency-pause-1',
+      event_type: 'paused',
+      event_time: '2026-07-13T09:03:00.000Z',
+      decision_id: 'unrelated-current-decision',
+      observation_id: 'unrelated-current-observation',
+      position_id: 'position-4321',
+      reconciliation_state: 'protection_error',
+    })
+    const emergencyTerminal = executionEvent({
+      ...closedEvent,
+      event_id: 'event-emergency-closed-1',
+      event_time: '2026-07-13T09:04:00.000Z',
+      decision_id: openingDecisionId,
+      observation_id: openingObservationId,
+      calculated_risk: 7.5,
+      requested_price: 2400,
+      accepted_price: 2400.5,
+      requested_stop_loss: 2392,
+      position_id: 'position-4321',
+      commission: -0.5,
+      swap: -0.25,
+      fee: -0.1,
+      net_result: -6.25,
+    })
+    await writeExecutionEvents(executionRoot, [emergencyRequest, pausedAfterRestart, emergencyTerminal])
+
+    const first = await importReconciledExecutionOutcomes({ executionRoot, learningRoot, instruments: [hfmGold] })
+    const second = await importReconciledExecutionOutcomes({ executionRoot, learningRoot, instruments: [hfmGold] })
+
+    expect(first[0]).toMatchObject({ state: 'imported', imported: 1 })
+    expect(second[0]).toMatchObject({ state: 'no_new_outcome', imported: 0 })
+    await expect(readExecutionLearningRecords(learningRoot, 'hfmarkets', 'XAUUSD')).resolves.toEqual([
+      expect.objectContaining({
+        outcomeEventId: 'event-emergency-closed-1',
+        decisionId: openingDecisionId,
+        observationId: openingObservationId,
+        positionId: 'position-4321',
+        netResult: -6.25,
+        commission: -0.5,
+        swap: -0.25,
+        fee: -0.1,
+      }),
+    ])
+  })
+
   it('imports a fully reconciled stopped outcome', async () => {
     const stoppedEvent = {
       ...closedEvent,

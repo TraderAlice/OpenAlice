@@ -749,6 +749,52 @@ bool ConfirmCanaryOppositeClosure(const CanaryDecision &decision,
    return true;
 }
 
+bool ConfirmCanaryEmergencyClosure(const CanaryDecision &decision,
+                                   const CanaryReconciliation &reconciliation,
+                                   CanarySafetyLatch &latch)
+{
+   if(!reconciliation.authoritativeEmergencyClosure || reconciliation.closedPositionId==0)
+      return false;
+   string closed_position_id=CanaryTicketString(reconciliation.closedPositionId);
+   if(latch.activePositionDecisionId!="" && latch.activePositionId!=closed_position_id)
+      return false;
+
+   if(latch.activePositionDecisionId==""
+      && !ActivateCanaryPositionCorrelation(latch,reconciliation.closedPositionId)) return false;
+   CanaryReconciliation terminal_reconciliation;
+   terminal_reconciliation=reconciliation;
+   terminal_reconciliation.state=CANARY_LIFECYCLE_CLOSED;
+   terminal_reconciliation.reconciliationState="reconciled";
+   CanaryExecutionEvent expected_terminal;
+   BuildCanaryLifecycleEvent(decision,terminal_reconciliation,CANARY_LIFECYCLE_CLOSED,"",
+      "Emergency protection closure is broker-confirmed with its opening evidence.",0.0,
+      expected_terminal);
+   if(!ApplyCanaryPositionCorrelation(expected_terminal,latch)) return false;
+   bool any_terminal_event_durable=CanaryLifecycleEventRecorded(InpBrokerId,
+      CANARY_LIFECYCLE_CLOSED,reconciliation.closedPositionId);
+   bool terminal_event_durable=CanaryCorrelatedTerminalEventRecorded(InpBrokerId,
+      expected_terminal);
+   if(any_terminal_event_durable && !terminal_event_durable) return false;
+   if(!terminal_event_durable)
+   {
+      terminal_event_durable=AppendManagedCanaryPositionEvent(decision,terminal_reconciliation,
+         CANARY_LIFECYCLE_CLOSED,"",
+         "Emergency protection closure is broker-confirmed with its opening evidence.",latch);
+   }
+
+   CanarySafetyLatch finalized_latch;
+   finalized_latch=latch;
+   if(!FinalizeCanaryEmergencyTerminalCorrelation(finalized_latch,terminal_event_durable)) return false;
+   string detail="";
+   if(!PersistCanarySafetyLatch(InpBrokerId,InpSymbol,finalized_latch,detail))
+   {
+      Print("JMB demo canary emergency-terminal latch failed: ",detail);
+      return false;
+   }
+   latch=finalized_latch;
+   return true;
+}
+
 void Evaluate()
 {
    if(g_evaluating) return;
@@ -828,18 +874,12 @@ void Evaluate()
    }
    bool authoritative_emergency_closure=reconciled
       && reconciliation.authoritativeEmergencyClosure;
-   if(authoritative_emergency_closure && latch.unresolved)
+   if(authoritative_emergency_closure && (latch.unresolved
+      || latch.activePositionDecisionId!="" || latch.pendingEntryDecisionId!=""))
    {
-      if(latch.activePositionDecisionId=="")
-         ActivateCanaryPositionCorrelation(latch,reconciliation.closedPositionId);
-      latch.unresolved=false;
-      ClearCanaryPendingEntryLatch(latch);
-      g_last_result_class=CANARY_RESULT_NONE;
-      string emergency_latch_detail="";
-      if(!PersistCanarySafetyLatch(InpBrokerId,InpSymbol,latch,emergency_latch_detail))
-         Print("JMB demo canary closed emergency latch failed: ",emergency_latch_detail);
-      if(latch.protectionError)
-         reconciliation.state=CANARY_LIFECYCLE_PAUSED;
+      if(ConfirmCanaryEmergencyClosure(decision,reconciliation,latch))
+         g_last_result_class=CANARY_RESULT_NONE;
+      else g_reconciliation_dirty=true;
    }
 
    CanaryEnvironment environment;
@@ -920,7 +960,8 @@ void Evaluate()
       string recovered_terminal_detail="";
       PersistCanarySafetyLatch(InpBrokerId,InpSymbol,latch,recovered_terminal_detail);
    }
-   if(reconciliation.state==CANARY_LIFECYCLE_PAUSED && reconciliation.hasClosedPosition
+   if(reconciliation.state==CANARY_LIFECYCLE_PAUSED && !authoritative_emergency_closure
+      && reconciliation.hasClosedPosition
       && !CanaryLifecycleEventRecorded(InpBrokerId,CANARY_LIFECYCLE_PAUSED,
          reconciliation.closedPositionId))
       AppendManagedCanaryEvent(decision,reconciliation,CANARY_LIFECYCLE_PAUSED,"",

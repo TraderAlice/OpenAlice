@@ -250,6 +250,16 @@ void ClearCanaryActivePositionCorrelation(CanarySafetyLatch &latch)
    latch.activeEntryComment="";
 }
 
+bool FinalizeCanaryEmergencyTerminalCorrelation(CanarySafetyLatch &latch,
+                                                const bool terminal_event_durable)
+{
+   if(!terminal_event_durable) return false;
+   latch.unresolved=false;
+   ClearCanaryPendingEntryLatch(latch);
+   ClearCanaryActivePositionCorrelation(latch);
+   return true;
+}
+
 bool CanaryRequestedEvidenceValid(const string decision_id,const string observation_id,
                                   const double volume,const double price,const double stop_loss,
                                   const double calculated_risk,const string entry_comment)
@@ -740,6 +750,49 @@ bool CanaryLifecycleEventRecorded(const string broker,const CanaryLifecycleState
    string position_token="\"position_id\":"+CanaryJsonString(CanaryTicketString(position_id));
    for(int index=0;index<count;index++)
       if(StringFind(lines[index],type_token)>=0 && StringFind(lines[index],position_token)>=0) return true;
+   return false;
+}
+
+bool CanaryCorrelatedTerminalEventRecorded(const string broker,
+                                           const CanaryExecutionEvent &event)
+{
+   if((event.eventType!=CANARY_LIFECYCLE_CLOSED && event.eventType!=CANARY_LIFECYCLE_STOPPED)
+      || event.positionId==0 || event.reconciliationState!="reconciled"
+      || event.decisionId=="" || event.observationId==""
+      || !event.hasCalculatedRisk || !event.hasRequestedOrder || !event.hasOutcome) return false;
+   string path=CanaryStatusDirectory(broker,"XAUUSD")+"\\events.jsonl";
+   string text="";
+   string detail="";
+   if(!ReadCanaryCommonText(path,text,detail)) return false;
+   string tokens[]={
+      "\"event_type\":"+CanaryJsonString(CanaryAuthoritativeLifecycleLabel(event.eventType)),
+      "\"decision_id\":"+CanaryJsonString(event.decisionId),
+      "\"observation_id\":"+CanaryJsonString(event.observationId),
+      "\"calculated_risk\":"+CanaryJsonNumberOrNull(true,event.calculatedRisk,8),
+      "\"requested_volume\":"+CanaryJsonNumberOrNull(true,event.requestedVolume,8),
+      "\"requested_price\":"+CanaryJsonNumberOrNull(true,event.requestedPrice,8),
+      "\"requested_stop_loss\":"+CanaryJsonNumberOrNull(true,event.requestedStopLoss,8),
+      "\"deal_ticket\":"+CanaryJsonString(CanaryTicketString(event.dealTicket)),
+      "\"position_id\":"+CanaryJsonString(CanaryTicketString(event.positionId)),
+      "\"reconciliation_state\":\"reconciled\"",
+      "\"commission\":"+CanaryJsonNumberOrNull(true,event.commission,8),
+      "\"swap\":"+CanaryJsonNumberOrNull(true,event.swap,8),
+      "\"fee\":"+CanaryJsonNumberOrNull(true,event.fee,8),
+      "\"net_result\":"+CanaryJsonNumberOrNull(true,event.netResult,8)
+   };
+   string lines[];
+   int count=StringSplit(text,(ushort)StringGetCharacter("\n",0),lines);
+   for(int line_index=0;line_index<count;line_index++)
+   {
+      bool matches=true;
+      for(int token_index=0;token_index<ArraySize(tokens);token_index++)
+         if(StringFind(lines[line_index],tokens[token_index])<0)
+         {
+            matches=false;
+            break;
+         }
+      if(matches) return true;
+   }
    return false;
 }
 

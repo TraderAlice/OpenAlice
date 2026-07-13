@@ -580,6 +580,38 @@ bool RunActivePositionCorrelationCase()
    return restart_stop_correlated && decisions_separate;
 }
 
+bool RunEmergencyTerminalCorrelationCase()
+{
+   CanarySafetyLatch latch;
+   InitializeCanarySafetyLatch(latch);
+   latch.valid=true;
+   latch.unresolved=false;
+   latch.protectionError=true;
+   latch.emergencyCloseAttempted=true;
+   latch.emergencyPositionId="4321";
+   latch.activePositionDecisionId="bc0bc128a9155065dda0b5bc";
+   latch.activePositionObservationId="53f2bd057c1ee3608a02d1f2";
+   latch.activePositionId="4321";
+   latch.activeRequestedVolume=0.01;
+   latch.activeRequestedPrice=2400.0;
+   latch.activeRequestedStopLoss=2392.0;
+   latch.activeCalculatedRisk=7.5;
+   latch.activeEntryComment=CanaryEntryCorrelationComment(latch.activePositionDecisionId);
+
+   bool rejected=FinalizeCanaryEmergencyTerminalCorrelation(latch,false);
+   bool waited=!rejected && !latch.unresolved && latch.activePositionDecisionId!=""
+      && CanaryNearlyEqual(latch.activeCalculatedRisk,7.5);
+   bool finalized=FinalizeCanaryEmergencyTerminalCorrelation(latch,true);
+   bool cleared=finalized && !latch.unresolved && latch.activePositionDecisionId==""
+      && latch.activePositionObservationId=="" && latch.activePositionId=="";
+   bool pause_retained=latch.protectionError && latch.emergencyCloseAttempted
+      && latch.emergencyPositionId=="4321";
+   PrintFormat("%s emergency terminal waits for durable event",waited ? "PASS" : "FAIL");
+   PrintFormat("%s emergency terminal clears active correlation after restart",cleared ? "PASS" : "FAIL");
+   PrintFormat("%s emergency protection pause remains",pause_retained ? "PASS" : "FAIL");
+   return waited && cleared && pause_retained;
+}
+
 int OnInit()
 {
    HarnessCase cases[];
@@ -645,6 +677,7 @@ int OnInit()
    if(!RunFourLossResetCase()) failures++;
    if(!RunGatewayBindingCase()) failures++;
    if(!RunActivePositionCorrelationCase()) failures++;
+   if(!RunEmergencyTerminalCorrelationCase()) failures++;
 
    PrintFormat("JMB demo canary harness completed with %d failure(s).",failures);
    if(failures==0) Print("JMB_CANARY_HARNESS PASS");
