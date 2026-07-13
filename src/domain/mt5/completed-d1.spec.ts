@@ -1,13 +1,31 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtemp, mkdir, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { deriveCompletedTrendObservation, parseCompletedD1Csv, readMt5CompletedD1 } from './completed-d1.js'
 
+const fsMocks = vi.hoisted(() => ({
+  open: vi.fn(),
+  readFile: vi.fn(),
+  stat: vi.fn(),
+}))
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>()
+  fsMocks.open.mockImplementation(actual.open)
+  fsMocks.readFile.mockImplementation(actual.readFile)
+  fsMocks.stat.mockImplementation(actual.stat)
+  return { ...actual, ...fsMocks }
+})
+
 const directories: string[] = []
 
 afterEach(async () => {
   await Promise.all(directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })))
+  const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
+  fsMocks.open.mockReset().mockImplementation(actual.open)
+  fsMocks.readFile.mockReset().mockImplementation(actual.readFile)
+  fsMocks.stat.mockReset().mockImplementation(actual.stat)
 })
 
 function csv(closes: number[]): string {
@@ -83,5 +101,26 @@ describe('completed D1 broker bars', () => {
 
     await writeFile(path, 'not,a,completed,d1,file')
     await expect(readMt5CompletedD1(root, 'hfmarkets', 'XAUUSD', { maxAgeHours: 2 })).resolves.toMatchObject({ state: 'malformed', parsed: null })
+  })
+
+  it('reads contents and modification time from the same file identity', async () => {
+    const staleModifiedAt = new Date('2026-07-13T06:00:00.000Z')
+    const freshModifiedAt = new Date('2026-07-13T09:00:00.000Z')
+    const staleText = csv([100, 101])
+    const close = vi.fn().mockResolvedValue(undefined)
+
+    fsMocks.readFile.mockResolvedValueOnce(staleText)
+    fsMocks.stat.mockResolvedValueOnce({ mtime: freshModifiedAt })
+    fsMocks.open.mockResolvedValueOnce({
+      readFile: vi.fn().mockResolvedValue(staleText),
+      stat: vi.fn().mockResolvedValue({ mtime: staleModifiedAt }),
+      close,
+    })
+
+    await expect(readMt5CompletedD1('root', 'hfmarkets', 'XAUUSD', {
+      now: freshModifiedAt,
+      maxAgeHours: 2,
+    })).resolves.toMatchObject({ state: 'stale', ageHours: 3 })
+    expect(close).toHaveBeenCalledOnce()
   })
 })

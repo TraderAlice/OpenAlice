@@ -4,7 +4,7 @@
 #property version "0.1.0"
 
 input string InpBrokerId = "hfmarkets";
-input string InpSymbol = "XAUUSDb";
+input string InpSymbol = "XAUUSD";
 input int InpHeartbeatSeconds = 30;
 
 const string OUTPUT_ROOT = "OpenAliceMt5BridgeV1";

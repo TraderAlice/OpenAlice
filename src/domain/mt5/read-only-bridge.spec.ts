@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { readMt5ReadOnlyBridge } from './read-only-bridge.js'
@@ -11,6 +11,14 @@ afterEach(async () => {
 })
 
 describe('readMt5ReadOnlyBridge', () => {
+  it('defaults bridge exports to the exact Gold demo symbol', async () => {
+    const source = await readFile(join(process.cwd(), 'tools', 'mt5', 'OpenAliceMt5ReadOnlyBridge.mq5'), 'utf8')
+
+    expect(source).toContain('input string InpSymbol = "XAUUSD";')
+    expect(source).not.toContain('input string InpSymbol = "XAUUSDb";')
+    expect(source).toContain('OUTPUT_ROOT+"\\\\"+InpBrokerId+"\\\\"+InpSymbol+"\\\\completed_d1.csv"')
+  })
+
   it('accepts a fresh demo-only read-only heartbeat', async () => {
     const root = await mkdtemp(join(tmpdir(), 'openalice-mt5-'))
     directories.push(root)

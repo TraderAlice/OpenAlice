@@ -1,3 +1,6 @@
+import { open } from 'node:fs/promises'
+import { join } from 'node:path'
+
 export type CompletedD1State = 'ready' | 'missing' | 'stale' | 'unsafe' | 'malformed'
 export type TrendDirection = 'uptrend' | 'downtrend' | 'flat'
 
@@ -126,10 +129,17 @@ export async function readMt5CompletedD1(
   let text: string
   let modifiedAt: Date
   try {
-    [text, modifiedAt] = await Promise.all([
-      readFile(path, 'utf8'),
-      stat(path).then((entry) => entry.mtime),
-    ])
+    const handle = await open(path, 'r')
+    try {
+      const [contents, metadata] = await Promise.all([
+        handle.readFile('utf8'),
+        handle.stat(),
+      ])
+      text = contents
+      modifiedAt = metadata.mtime
+    } finally {
+      await handle.close()
+    }
   } catch {
     return {
       state: 'missing',
@@ -196,5 +206,3 @@ export function deriveCompletedTrendObservation(input: ParsedCompletedD1, lookba
     referenceClose: reference.close,
   }
 }
-import { readFile, stat } from 'node:fs/promises'
-import { join } from 'node:path'
