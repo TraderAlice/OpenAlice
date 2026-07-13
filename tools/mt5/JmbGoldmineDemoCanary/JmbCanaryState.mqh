@@ -10,6 +10,135 @@ const string CANARY_EXECUTION_ROOT="OpenAliceMt5ExecutionV1";
 const string CANARY_STATUS_HEADER="schema_version,captured_at,broker,server,account_mode,symbol,state,detail,rollout_stage,execution_enabled,kill_switch,decision_id,observation_id,event_id,event_type,event_time,result_code,result_detail,stop_protection_confirmed,position_direction,position_volume,position_open_price,position_stop_loss,position_id,reconciliation_state,daily_loss_count,daily_realized_loss,blocking_gate,next_safe_action";
 const string CANARY_PROCESSED_HEADER="schema_version,decision_id,observation_id,attempted_at";
 
+const CanaryLifecycleState CANARY_LIFECYCLE_ORDER_REQUESTING=(CanaryLifecycleState)4;
+const CanaryLifecycleState CANARY_LIFECYCLE_ORDER_REJECTED=(CanaryLifecycleState)5;
+const CanaryLifecycleState CANARY_LIFECYCLE_RECONCILIATION_REQUIRED=(CanaryLifecycleState)6;
+const CanaryLifecycleState CANARY_LIFECYCLE_FILLED_PROTECTED=(CanaryLifecycleState)7;
+const CanaryLifecycleState CANARY_LIFECYCLE_CLOSE_REQUESTING=(CanaryLifecycleState)8;
+const CanaryLifecycleState CANARY_LIFECYCLE_CLOSED=(CanaryLifecycleState)9;
+const CanaryLifecycleState CANARY_LIFECYCLE_STOPPED=(CanaryLifecycleState)10;
+const CanaryLifecycleState CANARY_LIFECYCLE_EMERGENCY_CLOSE=(CanaryLifecycleState)11;
+const CanaryLifecycleState CANARY_LIFECYCLE_ERROR=(CanaryLifecycleState)12;
+
+enum CanaryBrokerResultClass
+{
+   CANARY_RESULT_NONE=0,
+   CANARY_RESULT_REJECTED=1,
+   CANARY_RESULT_UNKNOWN=2,
+   CANARY_RESULT_PARTIAL=3
+};
+
+struct CanaryPositionSnapshot
+{
+   bool present;
+   ulong ticket;
+   ulong identifier;
+   string direction;
+   double volume;
+   double openPrice;
+   double stopLoss;
+   bool stopProtected;
+};
+
+struct CanarySafetyLatch
+{
+   bool valid;
+   bool unresolved;
+   bool protectionError;
+   string pendingCloseDecisionId;
+   string pendingCloseObservationId;
+   bool emergencyCloseAttempted;
+};
+
+struct CanaryReconciliationFacts
+{
+   bool brokerStateAvailable;
+   CanaryBrokerResultClass resultClass;
+   bool hasEaPosition;
+   bool eaPositionProtected;
+   bool hasEaPendingOrder;
+   bool hasForeignGoldExposure;
+   bool sameDirection;
+   bool oppositeDirection;
+   bool closeConfirmed;
+   bool stoppedObservation;
+   bool persistentSafetyPause;
+   bool dailyLimitReached;
+};
+
+struct CanaryReconciliation
+{
+   bool available;
+   CanaryLifecycleState state;
+   string detail;
+   string reconciliationState;
+   CanaryPositionSnapshot position;
+   bool hasEaPendingOrder;
+   bool hasForeignGoldExposure;
+   CanaryDailyState daily;
+   bool hasClosedPosition;
+   bool lastCloseWasStop;
+   datetime finalCloseTime;
+   ulong dealTicket;
+   ulong closedPositionId;
+   double acceptedPrice;
+   double commission;
+   double swap;
+   double fee;
+   double netResult;
+};
+
+struct CanaryExecutionEvent
+{
+   CanaryLifecycleState eventType;
+   string eventId;
+   datetime eventTime;
+   string broker;
+   string server;
+   long accountLogin;
+   string decisionId;
+   string observationId;
+   string gateResultsJson;
+   bool hasCalculatedRisk;
+   double calculatedRisk;
+   bool hasRequestedOrder;
+   double requestedVolume;
+   double requestedPrice;
+   double requestedStopLoss;
+   bool hasAcceptedOrder;
+   bool hasAcceptedStopLoss;
+   double acceptedVolume;
+   double acceptedPrice;
+   double acceptedStopLoss;
+   string resultCode;
+   string resultDetail;
+   ulong orderTicket;
+   ulong dealTicket;
+   ulong positionId;
+   string reconciliationState;
+   int dailyLossCount;
+   double dailyRealizedLoss;
+   bool hasOutcome;
+   double commission;
+   double swap;
+   double fee;
+   double netResult;
+};
+
+string CanaryAuthoritativeLifecycleLabel(const CanaryLifecycleState state)
+{
+   if(state==CANARY_LIFECYCLE_ORDER_REQUESTING) return "order_requesting";
+   if(state==CANARY_LIFECYCLE_ORDER_REJECTED) return "order_rejected";
+   if(state==CANARY_LIFECYCLE_RECONCILIATION_REQUIRED) return "reconciliation_required";
+   if(state==CANARY_LIFECYCLE_FILLED_PROTECTED) return "filled_protected";
+   if(state==CANARY_LIFECYCLE_CLOSE_REQUESTING) return "close_requesting";
+   if(state==CANARY_LIFECYCLE_CLOSED) return "closed";
+   if(state==CANARY_LIFECYCLE_STOPPED) return "stopped";
+   if(state==CANARY_LIFECYCLE_EMERGENCY_CLOSE) return "emergency_close";
+   if(state==CANARY_LIFECYCLE_ERROR) return "error";
+   return CanaryLifecycleLabel(state);
+}
+
 string CanaryStatusDirectory(const string broker,const string symbol)
 {
    return CANARY_EXECUTION_ROOT+"\\"+broker+"\\"+symbol;
@@ -334,6 +463,374 @@ bool WriteCanaryLatestStatus(const string broker,
    FileDelete(temporary_path,FILE_COMMON);
    detail="The temporary status file could not replace latest_status.csv.";
    return false;
+}
+
+string CanaryJsonEscape(const string value)
+{
+   string escaped="";
+   for(int index=0;index<StringLen(value);index++)
+   {
+      int character=(int)StringGetCharacter(value,index);
+      if(character==34) escaped+="\\\"";
+      else if(character==92) escaped+="\\\\";
+      else if(character==8) escaped+="\\b";
+      else if(character==9) escaped+="\\t";
+      else if(character==10) escaped+="\\n";
+      else if(character==12) escaped+="\\f";
+      else if(character==13) escaped+="\\r";
+      else if(character<32) escaped+=StringFormat("\\u%04x",character);
+      else escaped+=ShortToString((ushort)character);
+   }
+   return escaped;
+}
+
+string CanaryJsonString(const string value)
+{
+   return "\""+CanaryJsonEscape(value)+"\"";
+}
+
+string CanaryJsonNumberOrNull(const bool present,const double value,const int digits=8)
+{
+   if(!present || !MathIsValidNumber(value)) return "null";
+   return DoubleToString(value,digits);
+}
+
+string CanaryTicketString(const ulong ticket)
+{
+   return ticket==0 ? "" : StringFormat("%I64u",ticket);
+}
+
+string CanaryMaskedAccountIdentity(const string server,const long account_login)
+{
+   return "masked-"+CanarySha256Identity(server+"|"+IntegerToString(account_login));
+}
+
+void InitializeCanaryExecutionEvent(CanaryExecutionEvent &event)
+{
+   ZeroMemory(event);
+   event.eventType=CANARY_LIFECYCLE_ERROR;
+   event.gateResultsJson="[]";
+   event.reconciliationState="required";
+}
+
+bool AppendCanaryExecutionEvent(CanaryExecutionEvent &event,string &detail)
+{
+   if(event.broker!="hfmarkets" && event.broker!="icmarkets")
+   {
+      detail="The execution event broker is not allowlisted.";
+      return false;
+   }
+   if(event.server!="HFMarketsGlobal-Demo4" && event.server!="ICMarketsSC-Demo")
+   {
+      detail="The execution event server is not allowlisted.";
+      return false;
+   }
+   if(event.eventTime<=0) event.eventTime=TimeGMT();
+   if(event.eventId=="")
+      event.eventId=CanarySha256Identity(event.broker+"|"+event.decisionId+"|"
+         +CanaryAuthoritativeLifecycleLabel(event.eventType)+"|"+CanaryIsoTime(event.eventTime)+"|"
+         +event.resultCode+"|"+event.resultDetail+"|"+CanaryTicketString(event.orderTicket)+"|"
+         +CanaryTicketString(event.dealTicket)+"|"+IntegerToString((long)GetTickCount()));
+   string gate_results=event.gateResultsJson;
+   if(StringLen(gate_results)<2 || StringSubstr(gate_results,0,1)!="["
+      || StringSubstr(gate_results,StringLen(gate_results)-1,1)!="]") gate_results="[]";
+
+   string line="{"
+      +"\"schema_version\":1"
+      +",\"event_id\":"+CanaryJsonString(event.eventId)
+      +",\"event_type\":"+CanaryJsonString(CanaryAuthoritativeLifecycleLabel(event.eventType))
+      +",\"event_time\":"+CanaryJsonString(CanaryIsoTime(event.eventTime))
+      +",\"broker\":"+CanaryJsonString(event.broker)
+      +",\"server\":"+CanaryJsonString(event.server)
+      +",\"account_mode\":\"demo\""
+      +",\"account_identity_masked\":"+CanaryJsonString(CanaryMaskedAccountIdentity(event.server,event.accountLogin))
+      +",\"symbol\":\"XAUUSD\""
+      +",\"strategy_version\":\"daily-trend-v1\""
+      +",\"magic_number\":"+IntegerToString(event.broker=="hfmarkets" ? 880101 : 880201)
+      +",\"decision_id\":"+CanaryJsonString(event.decisionId)
+      +",\"observation_id\":"+CanaryJsonString(event.observationId)
+      +",\"gate_results\":"+gate_results
+      +",\"calculated_risk\":"+CanaryJsonNumberOrNull(event.hasCalculatedRisk,event.calculatedRisk,8)
+      +",\"requested_volume\":"+CanaryJsonNumberOrNull(event.hasRequestedOrder,event.requestedVolume,8)
+      +",\"requested_price\":"+CanaryJsonNumberOrNull(event.hasRequestedOrder,event.requestedPrice,8)
+      +",\"requested_stop_loss\":"+CanaryJsonNumberOrNull(event.hasRequestedOrder,event.requestedStopLoss,8)
+      +",\"accepted_volume\":"+CanaryJsonNumberOrNull(event.hasAcceptedOrder,event.acceptedVolume,8)
+      +",\"accepted_price\":"+CanaryJsonNumberOrNull(event.hasAcceptedOrder,event.acceptedPrice,8)
+      +",\"accepted_stop_loss\":"+CanaryJsonNumberOrNull(event.hasAcceptedStopLoss,event.acceptedStopLoss,8)
+      +",\"result_code\":"+CanaryJsonString(event.resultCode)
+      +",\"result_detail\":"+CanaryJsonString(event.resultDetail)
+      +",\"order_ticket\":"+CanaryJsonString(CanaryTicketString(event.orderTicket))
+      +",\"deal_ticket\":"+CanaryJsonString(CanaryTicketString(event.dealTicket))
+      +",\"position_id\":"+CanaryJsonString(CanaryTicketString(event.positionId))
+      +",\"reconciliation_state\":"+CanaryJsonString(event.reconciliationState)
+      +",\"daily_loss_count\":"+IntegerToString(event.dailyLossCount)
+      +",\"daily_realized_loss\":"+DoubleToString(event.dailyRealizedLoss,8)
+      +",\"commission\":"+CanaryJsonNumberOrNull(event.hasOutcome,event.commission,8)
+      +",\"swap\":"+CanaryJsonNumberOrNull(event.hasOutcome,event.swap,8)
+      +",\"fee\":"+CanaryJsonNumberOrNull(event.hasOutcome,event.fee,8)
+      +",\"net_result\":"+CanaryJsonNumberOrNull(event.hasOutcome,event.netResult,8)
+      +",\"max_adverse_excursion\":null"
+      +",\"max_favorable_excursion\":null}\r\n";
+
+   EnsureCanaryDirectory(event.broker,"XAUUSD");
+   string path=CanaryStatusDirectory(event.broker,"XAUUSD")+"\\events.jsonl";
+   int handle=FileOpen(path,FILE_READ|FILE_WRITE|FILE_BIN|FILE_ANSI|FILE_COMMON);
+   if(handle==INVALID_HANDLE || !FileSeek(handle,0,SEEK_END))
+   {
+      if(handle!=INVALID_HANDLE) FileClose(handle);
+      detail="The append-only execution journal could not be opened at its boundary.";
+      return false;
+   }
+   uint written=FileWriteString(handle,line);
+   if(written!=StringLen(line))
+   {
+      FileClose(handle);
+      detail="The complete execution event could not be appended.";
+      return false;
+   }
+   FileFlush(handle);
+   FileClose(handle);
+   string reopened="";
+   string read_detail="";
+   if(!ReadCanaryCommonText(path,reopened,read_detail) || StringLen(reopened)<StringLen(line)
+      || StringSubstr(reopened,StringLen(reopened)-StringLen(line))!=line)
+   {
+      detail="The flushed execution event could not be verified exactly.";
+      return false;
+   }
+   detail="The stable execution event was appended, flushed, and verified.";
+   return true;
+}
+
+bool CanaryLifecycleEventRecorded(const string broker,const CanaryLifecycleState state,
+                                  const ulong position_id)
+{
+   if(position_id==0) return false;
+   string path=CanaryStatusDirectory(broker,"XAUUSD")+"\\events.jsonl";
+   string text="";
+   string detail="";
+   if(!ReadCanaryCommonText(path,text,detail)) return false;
+   string lines[];
+   int count=StringSplit(text,(ushort)StringGetCharacter("\n",0),lines);
+   string type_token="\"event_type\":"+CanaryJsonString(CanaryAuthoritativeLifecycleLabel(state));
+   string position_token="\"position_id\":"+CanaryJsonString(CanaryTicketString(position_id));
+   for(int index=0;index<count;index++)
+      if(StringFind(lines[index],type_token)>=0 && StringFind(lines[index],position_token)>=0) return true;
+   return false;
+}
+
+string CanarySafetyLatchPath(const string broker,const string symbol)
+{
+   return CanaryStatusDirectory(broker,symbol)+"\\reconciliation_latch.csv";
+}
+
+void InitializeCanarySafetyLatch(CanarySafetyLatch &latch)
+{
+   ZeroMemory(latch);
+   latch.valid=false;
+}
+
+bool LoadCanarySafetyLatch(const string broker,const string symbol,
+                           CanarySafetyLatch &latch,string &detail)
+{
+   InitializeCanarySafetyLatch(latch);
+   string path=CanarySafetyLatchPath(broker,symbol);
+   if(!FileIsExist(path,FILE_COMMON))
+   {
+      latch.valid=true;
+      detail="No persistent reconciliation or protection error is latched.";
+      return true;
+   }
+   string expected[]={"schema_version","unresolved","protection_error",
+      "pending_close_decision_id","pending_close_observation_id","emergency_close_attempted"};
+   string values[];
+   if(!ReadStrictCanaryCsv(path,expected,values,detail) || ArraySize(values)!=6
+      || values[0]!="1" || (values[1]!="0" && values[1]!="1")
+      || (values[2]!="0" && values[2]!="1") || (values[5]!="0" && values[5]!="1")
+      || ((values[3]=="")!=(values[4]=="")))
+   {
+      detail="The persistent reconciliation latch is malformed.";
+      return false;
+   }
+   latch.valid=true;
+   latch.unresolved=values[1]=="1";
+   latch.protectionError=values[2]=="1";
+   latch.pendingCloseDecisionId=values[3];
+   latch.pendingCloseObservationId=values[4];
+   latch.emergencyCloseAttempted=values[5]=="1";
+   detail="The persistent reconciliation latch was loaded exactly.";
+   return true;
+}
+
+bool PersistCanarySafetyLatch(const string broker,const string symbol,
+                              const CanarySafetyLatch &latch,string &detail)
+{
+   if(!latch.valid || ((latch.pendingCloseDecisionId=="")!=(latch.pendingCloseObservationId=="")))
+   {
+      detail="Refused to persist an invalid reconciliation latch.";
+      return false;
+   }
+   EnsureCanaryDirectory(broker,symbol);
+   string path=CanarySafetyLatchPath(broker,symbol);
+   string temporary_path=path+"."+IntegerToString((long)GetTickCount())+".tmp";
+   int handle=FileOpen(temporary_path,FILE_WRITE|FILE_CSV|FILE_ANSI|FILE_COMMON,',');
+   if(handle==INVALID_HANDLE)
+   {
+      detail="The temporary reconciliation latch could not be opened.";
+      return false;
+   }
+   uint header_written=FileWrite(handle,"schema_version","unresolved","protection_error",
+      "pending_close_decision_id","pending_close_observation_id","emergency_close_attempted");
+   uint row_written=FileWrite(handle,"1",latch.unresolved ? "1" : "0",
+      latch.protectionError ? "1" : "0",latch.pendingCloseDecisionId,
+      latch.pendingCloseObservationId,latch.emergencyCloseAttempted ? "1" : "0");
+   if(header_written==0 || row_written==0)
+   {
+      FileClose(handle);
+      FileDelete(temporary_path,FILE_COMMON);
+      detail="The complete reconciliation latch could not be written.";
+      return false;
+   }
+   FileFlush(handle);
+   FileClose(handle);
+   string expected[]={"schema_version","unresolved","protection_error",
+      "pending_close_decision_id","pending_close_observation_id","emergency_close_attempted"};
+   string intended[]={"1",latch.unresolved ? "1" : "0",latch.protectionError ? "1" : "0",
+      latch.pendingCloseDecisionId,latch.pendingCloseObservationId,
+      latch.emergencyCloseAttempted ? "1" : "0"};
+   string verified_values[];
+   string verify_detail="";
+   if(!ReadStrictCanaryCsv(temporary_path,expected,verified_values,verify_detail)
+      || !CanaryExactValuesMatch(intended,verified_values))
+   {
+      FileDelete(temporary_path,FILE_COMMON);
+      detail="The flushed reconciliation latch failed exact verification.";
+      return false;
+   }
+   if(!FileMove(temporary_path,FILE_COMMON,path,FILE_COMMON|FILE_REWRITE))
+   {
+      FileDelete(temporary_path,FILE_COMMON);
+      detail="The reconciliation latch could not be replaced atomically.";
+      return false;
+   }
+   CanarySafetyLatch durable;
+   if(!LoadCanarySafetyLatch(broker,symbol,durable,verify_detail)
+      || durable.unresolved!=latch.unresolved || durable.protectionError!=latch.protectionError
+      || durable.pendingCloseDecisionId!=latch.pendingCloseDecisionId
+      || durable.pendingCloseObservationId!=latch.pendingCloseObservationId
+      || durable.emergencyCloseAttempted!=latch.emergencyCloseAttempted)
+   {
+      detail="The durable reconciliation latch failed exact reopen verification.";
+      return false;
+   }
+   detail="The reconciliation and protection latch was persisted atomically.";
+   return true;
+}
+
+bool PersistCanaryStatusValues(const string broker,const string symbol,
+                               const string &intended_values[],string &detail)
+{
+   if(ArraySize(intended_values)!=29) return false;
+   EnsureCanaryDirectory(broker,symbol);
+   string destination_path=CanaryStatusDirectory(broker,symbol)+"\\latest_status.csv";
+   string temporary_path=destination_path+"."+IntegerToString((long)GetTickCount())+".tmp";
+   int handle=FileOpen(temporary_path,FILE_WRITE|FILE_CSV|FILE_ANSI|FILE_COMMON,',');
+   if(handle==INVALID_HANDLE) return false;
+   uint header_written=FileWrite(handle,
+      "schema_version","captured_at","broker","server","account_mode","symbol","state","detail",
+      "rollout_stage","execution_enabled","kill_switch","decision_id","observation_id","event_id",
+      "event_type","event_time","result_code","result_detail","stop_protection_confirmed","position_direction",
+      "position_volume","position_open_price","position_stop_loss","position_id","reconciliation_state",
+      "daily_loss_count","daily_realized_loss","blocking_gate","next_safe_action");
+   uint row_written=FileWrite(handle,
+      intended_values[0],intended_values[1],intended_values[2],intended_values[3],intended_values[4],
+      intended_values[5],intended_values[6],intended_values[7],intended_values[8],intended_values[9],
+      intended_values[10],intended_values[11],intended_values[12],intended_values[13],intended_values[14],
+      intended_values[15],intended_values[16],intended_values[17],intended_values[18],intended_values[19],
+      intended_values[20],intended_values[21],intended_values[22],intended_values[23],intended_values[24],
+      intended_values[25],intended_values[26],intended_values[27],intended_values[28]);
+   if(header_written==0 || row_written==0)
+   {
+      FileClose(handle);
+      FileDelete(temporary_path,FILE_COMMON);
+      return false;
+   }
+   FileFlush(handle);
+   FileClose(handle);
+   string expected_fields[];
+   string header_copy=CANARY_STATUS_HEADER;
+   StringSplit(header_copy,(ushort)StringGetCharacter(",",0),expected_fields);
+   string verified_values[];
+   string verify_detail="";
+   if(!ReadStrictCanaryCsv(temporary_path,expected_fields,verified_values,verify_detail)
+      || !CanaryExactValuesMatch(intended_values,verified_values)
+      || !FileMove(temporary_path,FILE_COMMON,destination_path,FILE_COMMON|FILE_REWRITE))
+   {
+      FileDelete(temporary_path,FILE_COMMON);
+      detail="The authoritative status failed exact atomic verification.";
+      return false;
+   }
+   detail="The authoritative Task 5-compatible latest status was replaced atomically.";
+   return true;
+}
+
+bool WriteCanaryReconciledStatus(const string broker,const string server,const string symbol,
+                                 const CanaryPolicy &policy,const CanaryDecision &decision,
+                                 const CanaryReconciliation &reconciliation,
+                                 const CanaryExecutionEvent &latest_event,
+                                 const bool execution_enabled,const bool kill_switch,
+                                 string &detail)
+{
+   if(reconciliation.state==CANARY_LIFECYCLE_FILLED_PROTECTED
+      && (!reconciliation.position.present || !reconciliation.position.stopProtected
+         || reconciliation.position.stopLoss<=0.0))
+   {
+      detail="Refused to publish filled_protected without broker-confirmed stop protection.";
+      return false;
+   }
+   string values[];
+   ArrayResize(values,29);
+   values[0]="1";
+   values[1]=CanaryIsoTime(TimeGMT());
+   values[2]=broker;
+   values[3]=server;
+   values[4]="demo";
+   values[5]=symbol;
+   values[6]=CanaryAuthoritativeLifecycleLabel(reconciliation.state);
+   values[7]=reconciliation.detail;
+   values[8]=policy.rolloutStage;
+   values[9]=execution_enabled ? "1" : "0";
+   values[10]=kill_switch ? "1" : "0";
+   values[11]=decision.loaded ? decision.decisionId : "";
+   values[12]=decision.loaded ? decision.observationId : "";
+   values[13]=latest_event.eventId;
+   values[14]=latest_event.eventId=="" ? "" : CanaryAuthoritativeLifecycleLabel(latest_event.eventType);
+   values[15]=latest_event.eventId=="" ? "" : CanaryIsoTime(latest_event.eventTime);
+   values[16]=latest_event.resultCode;
+   values[17]=latest_event.resultDetail;
+   values[18]=reconciliation.position.present && reconciliation.position.stopProtected ? "1" : "0";
+   values[19]=reconciliation.position.present ? reconciliation.position.direction : "";
+   values[20]=reconciliation.position.present ? DoubleToString(reconciliation.position.volume,8) : "";
+   values[21]=reconciliation.position.present ? DoubleToString(reconciliation.position.openPrice,8) : "";
+   values[22]=reconciliation.position.present ? DoubleToString(reconciliation.position.stopLoss,8) : "";
+   values[23]=reconciliation.position.present ? CanaryTicketString(reconciliation.position.identifier) : "";
+   values[24]=reconciliation.reconciliationState;
+   values[25]=IntegerToString(reconciliation.daily.lossCount);
+   values[26]=DoubleToString(reconciliation.daily.realizedLoss,2);
+   values[27]=reconciliation.state==CANARY_LIFECYCLE_RECONCILIATION_REQUIRED ? "reconciliation"
+      : reconciliation.state==CANARY_LIFECYCLE_EMERGENCY_CLOSE ? "protection"
+      : reconciliation.state==CANARY_LIFECYCLE_BLOCKED ? "exposure"
+      : reconciliation.state==CANARY_LIFECYCLE_PAUSED ? "daily_loss_count" : "";
+   values[28]=reconciliation.state==CANARY_LIFECYCLE_FILLED_PROTECTED
+      ? "Monitor broker-side protection and reconciliation."
+      : reconciliation.state==CANARY_LIFECYCLE_EMERGENCY_CLOSE
+         ? "Keep the broker paused and confirm the protective close before operator review."
+      : reconciliation.state==CANARY_LIFECYCLE_RECONCILIATION_REQUIRED
+         ? "Do not submit again; inspect authoritative broker orders, deals, and positions."
+      : reconciliation.state==CANARY_LIFECYCLE_PAUSED
+         ? "Wait for the next broker server day; unresolved safety latches remain active."
+      : "Re-evaluate every entry gate before any new protected demo request.";
+   return PersistCanaryStatusValues(broker,symbol,values,detail);
 }
 
 #endif

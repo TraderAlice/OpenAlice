@@ -1,7 +1,7 @@
 #ifndef OPENALICE_JMB_CANARY_TRADE_GATEWAY_MQH
 #define OPENALICE_JMB_CANARY_TRADE_GATEWAY_MQH
 
-#include "JmbCanaryTypes.mqh"
+#include "JmbCanaryState.mqh"
 
 struct TradeSubmitResult
 {
@@ -9,6 +9,8 @@ struct TradeSubmitResult
    uint retcode;
    ulong order_ticket;
    ulong deal_ticket;
+   double accepted_volume;
+   double accepted_price;
    string detail;
 };
 
@@ -34,6 +36,28 @@ bool ResolveMarketFilling(const string symbol,ENUM_ORDER_TYPE_FILLING &resolved)
       return true;
    }
    return false;
+}
+
+TradeSubmitResult CheckedSendCanaryRequest(MqlTradeRequest &request)
+{
+   TradeSubmitResult result;
+   ZeroMemory(result);
+   MqlTradeCheckResult check={};
+   MqlTradeResult broker={};
+   if(!OrderCheck(request,check) || check.retcode!=0)
+   {
+      result.retcode=check.retcode;
+      result.detail=check.comment;
+      return result;
+   }
+   result.sent=OrderSend(request,broker);
+   result.retcode=broker.retcode;
+   result.order_ticket=broker.order;
+   result.deal_ticket=broker.deal;
+   result.accepted_volume=broker.volume;
+   result.accepted_price=broker.price;
+   result.detail=broker.comment;
+   return result;
 }
 
 bool IsGatewayStopProtective(const CanaryDecision &decision,const MqlTick &tick)
@@ -62,13 +86,57 @@ bool IsGatewayStopProtective(const CanaryDecision &decision,const MqlTick &tick)
       : decision.stopLoss>entry && decision.stopLoss-entry+tolerance>=minimum_distance;
 }
 
+bool CanaryGatewayIdentityValid(const long magic_number)
+{
+   return (ENUM_ACCOUNT_TRADE_MODE)AccountInfoInteger(ACCOUNT_TRADE_MODE)==ACCOUNT_TRADE_MODE_DEMO
+      && (magic_number==880101 || magic_number==880201);
+}
+
+bool SetCanaryCloseVolume(MqlTradeRequest &close,const double close_volume)
+{
+   if(!MathIsValidNumber(close_volume) || close_volume<=0.0
+      || close_volume>CANARY_HARD_MAX_VOLUME) return false;
+   close.volume=close_volume;
+   return true;
+}
+
+bool BuildCanaryCloseRequest(const CanaryPositionSnapshot &position,
+                             const long magic_number,
+                             const double max_deviation,
+                             const string comment,
+                             MqlTradeRequest &close)
+{
+   if(!CanaryGatewayIdentityValid(magic_number) || !position.present || position.ticket==0
+      || (position.direction!="buy" && position.direction!="sell")) return false;
+   MqlTick tick;
+   double point=0.0;
+   if(!SymbolInfoTick("XAUUSD",tick) || !SymbolInfoDouble("XAUUSD",SYMBOL_POINT,point)
+      || !MathIsValidNumber(point) || point<=0.0 || !MathIsValidNumber(max_deviation)
+      || max_deviation<0.0) return false;
+   double deviation_points=MathFloor(max_deviation/point);
+   if(!MathIsValidNumber(deviation_points) || deviation_points<0.0
+      || deviation_points>(double)ULONG_MAX) return false;
+
+   ZeroMemory(close);
+   close.action=TRADE_ACTION_DEAL;
+   close.magic=(ulong)magic_number;
+   close.symbol="XAUUSD";
+   if(!SetCanaryCloseVolume(close,position.volume)) return false;
+   close.type=position.direction=="buy" ? ORDER_TYPE_SELL : ORDER_TYPE_BUY;
+   close.price=position.direction=="buy" ? tick.bid : tick.ask;
+   close.position=position.ticket;
+   close.deviation=(ulong)deviation_points;
+   close.comment=comment;
+   return ResolveMarketFilling("XAUUSD",close.type_filling);
+}
+
 TradeSubmitResult SubmitProtectedMarketOrder(const CanaryDecision &decision,const CanaryPolicy &policy)
 {
    TradeSubmitResult result;
    ZeroMemory(result);
-   if((ENUM_ACCOUNT_TRADE_MODE)AccountInfoInteger(ACCOUNT_TRADE_MODE)!=ACCOUNT_TRADE_MODE_DEMO)
+   if(!CanaryGatewayIdentityValid(policy.magicNumber))
    {
-      result.detail="Account is not demo.";
+      result.detail="Account is not demo or broker magic is not allowlisted.";
       return result;
    }
    if(!decision.loaded || !policy.loaded || decision.accountMode!="demo"
@@ -93,28 +161,23 @@ TradeSubmitResult SubmitProtectedMarketOrder(const CanaryDecision &decision,cons
    }
 
    MqlTick tick;
-   if(!SymbolInfoTick("XAUUSD",tick) || !IsGatewayStopProtective(decision,tick))
+   double point=0.0;
+   if(!SymbolInfoTick("XAUUSD",tick) || !IsGatewayStopProtective(decision,tick)
+      || !SymbolInfoDouble("XAUUSD",SYMBOL_POINT,point) || !MathIsValidNumber(point) || point<=0.0
+      || !MathIsValidNumber(policy.maxDeviation) || policy.maxDeviation<0.0)
    {
       result.detail="The original request cannot carry a broker-valid protective stop.";
       return result;
    }
-   double point=0.0;
-   if(!SymbolInfoDouble("XAUUSD",SYMBOL_POINT,point) || !MathIsValidNumber(point) || point<=0.0
-      || !MathIsValidNumber(policy.maxDeviation) || policy.maxDeviation<0.0)
-   {
-      result.detail="The deviation conversion inputs are invalid.";
-      return result;
-   }
    double deviation_points=MathFloor(policy.maxDeviation/point);
-   if(!MathIsValidNumber(deviation_points) || deviation_points<0.0 || deviation_points>(double)ULONG_MAX)
+   if(!MathIsValidNumber(deviation_points) || deviation_points<0.0
+      || deviation_points>(double)ULONG_MAX)
    {
       result.detail="The deviation cannot be represented safely in points.";
       return result;
    }
 
    MqlTradeRequest request={};
-   MqlTradeCheckResult check={};
-   MqlTradeResult broker={};
    request.action=TRADE_ACTION_DEAL;
    request.magic=(ulong)policy.magicNumber;
    request.symbol="XAUUSD";
@@ -129,18 +192,40 @@ TradeSubmitResult SubmitProtectedMarketOrder(const CanaryDecision &decision,cons
       result.detail="No supported market filling mode is available.";
       return result;
    }
-   if(!OrderCheck(request,check) || check.retcode!=0)
+   return CheckedSendCanaryRequest(request);
+}
+
+TradeSubmitResult SubmitCanaryReversalClose(const CanaryPositionSnapshot &position,
+                                            const CanaryDecision &decision,
+                                            const CanaryPolicy &policy)
+{
+   MqlTradeRequest request={};
+   TradeSubmitResult result;
+   ZeroMemory(result);
+   if(!decision.loaded || !policy.loaded || decision.symbol!="XAUUSD"
+      || policy.symbol!="XAUUSD" || !BuildCanaryCloseRequest(position,policy.magicNumber,
+         policy.maxDeviation,"JMB-REV:"+StringSubstr(decision.decisionId,0,16),request))
    {
-      result.retcode=check.retcode;
-      result.detail=check.comment;
+      result.detail="The reversal close request failed immutable validation.";
       return result;
    }
-   result.sent=OrderSend(request,broker);
-   result.retcode=broker.retcode;
-   result.order_ticket=broker.order;
-   result.deal_ticket=broker.deal;
-   result.detail=broker.comment;
-   return result;
+   return CheckedSendCanaryRequest(request);
+}
+
+TradeSubmitResult SubmitCanaryEmergencyClose(const CanaryPositionSnapshot &position,
+                                             const CanaryPolicy &policy)
+{
+   MqlTradeRequest request={};
+   TradeSubmitResult result;
+   ZeroMemory(result);
+   if(!policy.loaded || policy.symbol!="XAUUSD"
+      || !BuildCanaryCloseRequest(position,policy.magicNumber,policy.maxDeviation,
+         "JMB-EMERGENCY-CLOSE",request))
+   {
+      result.detail="The emergency close request failed immutable validation.";
+      return result;
+   }
+   return CheckedSendCanaryRequest(request);
 }
 
 #endif

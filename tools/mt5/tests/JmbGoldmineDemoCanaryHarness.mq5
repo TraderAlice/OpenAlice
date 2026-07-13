@@ -5,6 +5,7 @@
 #include "..\JmbGoldmineDemoCanary\JmbCanaryTypes.mqh"
 #include "..\JmbGoldmineDemoCanary\JmbCanaryGates.mqh"
 #include "..\JmbGoldmineDemoCanary\JmbCanaryState.mqh"
+#include "..\JmbGoldmineDemoCanary\JmbCanaryReconcile.mqh"
 
 enum HarnessMutation
 {
@@ -38,6 +39,29 @@ struct HarnessCase
    HarnessMutation mutation;
    CanaryLifecycleState expectedState;
    string expectedGate;
+};
+
+enum HarnessReconciliationMutation
+{
+   HARNESS_RECONCILE_REJECTED=0,
+   HARNESS_RECONCILE_UNKNOWN,
+   HARNESS_RECONCILE_PARTIAL,
+   HARNESS_RECONCILE_FILLED_WITH_STOP,
+   HARNESS_RECONCILE_FILLED_WITHOUT_STOP,
+   HARNESS_RECONCILE_STOPPED,
+   HARNESS_RECONCILE_SAME_DIRECTION,
+   HARNESS_RECONCILE_OPPOSITE_DIRECTION,
+   HARNESS_RECONCILE_FOUR_LOSSES,
+   HARNESS_RECONCILE_SERVER_DAY_RESET,
+   HARNESS_RECONCILE_RESTART_PROTECTED,
+   HARNESS_RECONCILE_RESTART_FOREIGN
+};
+
+struct HarnessReconciliationCase
+{
+   string name;
+   HarnessReconciliationMutation mutation;
+   CanaryLifecycleState expectedState;
 };
 
 void AddHarnessCase(HarnessCase &cases[],const string name,const HarnessMutation mutation,
@@ -192,6 +216,67 @@ bool RunHarnessCase(const HarnessCase &test_case)
    bool passed=evaluation.state==test_case.expectedState && evaluation.blockingGate==test_case.expectedGate;
    PrintFormat("%s %s state=%s gate=%s",passed ? "PASS" : "FAIL",test_case.name,
       CanaryLifecycleLabel(evaluation.state),evaluation.blockingGate);
+   return passed;
+}
+
+void AddHarnessReconciliationCase(HarnessReconciliationCase &cases[],const string name,
+                                  const HarnessReconciliationMutation mutation,
+                                  const CanaryLifecycleState expected_state)
+{
+   int index=ArraySize(cases);
+   ArrayResize(cases,index+1);
+   cases[index].name=name;
+   cases[index].mutation=mutation;
+   cases[index].expectedState=expected_state;
+}
+
+void BuildHarnessReconciliationFacts(CanaryReconciliationFacts &facts)
+{
+   ZeroMemory(facts);
+   facts.brokerStateAvailable=true;
+   facts.resultClass=CANARY_RESULT_NONE;
+}
+
+void ApplyHarnessReconciliationMutation(const HarnessReconciliationMutation mutation,
+                                        CanaryReconciliationFacts &facts)
+{
+   if(mutation==HARNESS_RECONCILE_REJECTED) facts.resultClass=CANARY_RESULT_REJECTED;
+   else if(mutation==HARNESS_RECONCILE_UNKNOWN) facts.resultClass=CANARY_RESULT_UNKNOWN;
+   else if(mutation==HARNESS_RECONCILE_PARTIAL) facts.resultClass=CANARY_RESULT_PARTIAL;
+   else if(mutation==HARNESS_RECONCILE_FILLED_WITH_STOP
+      || mutation==HARNESS_RECONCILE_RESTART_PROTECTED)
+   {
+      facts.hasEaPosition=true;
+      facts.eaPositionProtected=true;
+   }
+   else if(mutation==HARNESS_RECONCILE_FILLED_WITHOUT_STOP)
+      facts.hasEaPosition=true;
+   else if(mutation==HARNESS_RECONCILE_STOPPED) facts.stoppedObservation=true;
+   else if(mutation==HARNESS_RECONCILE_SAME_DIRECTION)
+   {
+      facts.hasEaPosition=true;
+      facts.eaPositionProtected=true;
+      facts.sameDirection=true;
+   }
+   else if(mutation==HARNESS_RECONCILE_OPPOSITE_DIRECTION)
+   {
+      facts.hasEaPosition=true;
+      facts.eaPositionProtected=true;
+      facts.oppositeDirection=true;
+   }
+   else if(mutation==HARNESS_RECONCILE_FOUR_LOSSES) facts.dailyLimitReached=true;
+   else if(mutation==HARNESS_RECONCILE_RESTART_FOREIGN) facts.hasForeignGoldExposure=true;
+}
+
+bool RunHarnessReconciliationCase(const HarnessReconciliationCase &test_case)
+{
+   CanaryReconciliationFacts facts;
+   BuildHarnessReconciliationFacts(facts);
+   ApplyHarnessReconciliationMutation(test_case.mutation,facts);
+   CanaryLifecycleState actual=ReduceCanaryLifecycle(facts);
+   bool passed=actual==test_case.expectedState;
+   PrintFormat("%s %s state=%s",passed ? "PASS" : "FAIL",test_case.name,
+      CanaryAuthoritativeLifecycleLabel(actual));
    return passed;
 }
 
@@ -373,7 +458,7 @@ bool RunFourLossResetCase()
    bool reset=state.brokerDay=="2026-07-13" && state.lossCount==0
       && CanaryNearlyEqual(state.realizedLoss,0.0);
    bool passed=retained && reset;
-   PrintFormat("%s four-loss broker-day reset",passed ? "PASS" : "FAIL");
+   PrintFormat("%s server day reset",passed ? "PASS" : "FAIL");
    return passed;
 }
 
@@ -403,9 +488,25 @@ int OnInit()
    AddHarnessCase(cases,"log failure",HARNESS_LOG_FAILURE,CANARY_LIFECYCLE_BLOCKED,"log_preflight");
    AddHarnessCase(cases,"reconciliation",HARNESS_RECONCILIATION_MISSING,CANARY_LIFECYCLE_BLOCKED,"reconciliation");
 
+   HarnessReconciliationCase reconciliation_cases[];
+   AddHarnessReconciliationCase(reconciliation_cases,"rejected request",HARNESS_RECONCILE_REJECTED,CANARY_LIFECYCLE_ORDER_REJECTED);
+   AddHarnessReconciliationCase(reconciliation_cases,"unknown result",HARNESS_RECONCILE_UNKNOWN,CANARY_LIFECYCLE_RECONCILIATION_REQUIRED);
+   AddHarnessReconciliationCase(reconciliation_cases,"partial fill",HARNESS_RECONCILE_PARTIAL,CANARY_LIFECYCLE_RECONCILIATION_REQUIRED);
+   AddHarnessReconciliationCase(reconciliation_cases,"filled with stop",HARNESS_RECONCILE_FILLED_WITH_STOP,CANARY_LIFECYCLE_FILLED_PROTECTED);
+   AddHarnessReconciliationCase(reconciliation_cases,"filled without stop",HARNESS_RECONCILE_FILLED_WITHOUT_STOP,CANARY_LIFECYCLE_EMERGENCY_CLOSE);
+   AddHarnessReconciliationCase(reconciliation_cases,"stopped observation",HARNESS_RECONCILE_STOPPED,CANARY_LIFECYCLE_STOPPED);
+   AddHarnessReconciliationCase(reconciliation_cases,"same direction durable no-op",HARNESS_RECONCILE_SAME_DIRECTION,CANARY_LIFECYCLE_FILLED_PROTECTED);
+   AddHarnessReconciliationCase(reconciliation_cases,"opposite signal close",HARNESS_RECONCILE_OPPOSITE_DIRECTION,CANARY_LIFECYCLE_CLOSE_REQUESTING);
+   AddHarnessReconciliationCase(reconciliation_cases,"four losing positions",HARNESS_RECONCILE_FOUR_LOSSES,CANARY_LIFECYCLE_PAUSED);
+   AddHarnessReconciliationCase(reconciliation_cases,"server day reset",HARNESS_RECONCILE_SERVER_DAY_RESET,CANARY_LIFECYCLE_READY);
+   AddHarnessReconciliationCase(reconciliation_cases,"restart with protected position",HARNESS_RECONCILE_RESTART_PROTECTED,CANARY_LIFECYCLE_FILLED_PROTECTED);
+   AddHarnessReconciliationCase(reconciliation_cases,"restart with foreign exposure",HARNESS_RECONCILE_RESTART_FOREIGN,CANARY_LIFECYCLE_BLOCKED);
+
    int failures=0;
    for(int index=0;index<ArraySize(cases);index++)
       if(!RunHarnessCase(cases[index])) failures++;
+   for(int index=0;index<ArraySize(reconciliation_cases);index++)
+      if(!RunHarnessReconciliationCase(reconciliation_cases[index])) failures++;
    if(!RunDuplicateObservationStateCase()) failures++;
    if(!RunTask3IdentityCase()) failures++;
    if(!RunGateJsonContractCase()) failures++;
@@ -417,6 +518,7 @@ int OnInit()
    if(!RunFourLossResetCase()) failures++;
 
    PrintFormat("JMB demo canary harness completed with %d failure(s).",failures);
+   if(failures==0) Print("JMB_CANARY_HARNESS PASS");
    return failures==0 ? INIT_SUCCEEDED : INIT_FAILED;
 }
 

@@ -128,6 +128,36 @@ describe('parseExecutionStatusCsv', () => {
       stopProtectionConfirmed: true,
     })
   })
+
+  it.each([
+    [
+      'reconciliation_required',
+      VALID_CSV
+        .replace(',filled_protected,', ',reconciliation_required,')
+        .replace(',Request completed,1,buy,0.01,3334.25,3324.25,position-opaque,reconciled,', ',Request completed,0,,,,,,required,'),
+    ],
+    ['filled_protected', VALID_CSV],
+    [
+      'stopped',
+      VALID_CSV
+        .replace(',filled_protected,', ',stopped,')
+        .replace(',Request completed,1,buy,0.01,3334.25,3324.25,position-opaque,reconciled,', ',Request completed,0,,,,,,reconciled,'),
+    ],
+    [
+      'emergency_close',
+      VALID_CSV
+        .replace(',filled_protected,', ',emergency_close,')
+        .replace(',Request completed,1,buy,0.01,3334.25,3324.25,position-opaque,reconciled,', ',Request completed,0,buy,0.01,3334.25,0,position-opaque,protection_error,'),
+    ],
+  ])('parses the Task 8 %s reconciliation lifecycle', (state, csv) => {
+    expect(parseExecutionStatusCsv(csv)).toMatchObject({ state })
+  })
+
+  it('rejects filled_protected when broker stop confirmation is absent', () => {
+    const csv = VALID_CSV.replace(',Request completed,1,buy,', ',Request completed,0,buy,')
+
+    expect(() => parseExecutionStatusCsv(csv)).toThrow(/filled_protected|position/i)
+  })
 })
 
 describe('summarizeLatestJmbExecutionStatus', () => {

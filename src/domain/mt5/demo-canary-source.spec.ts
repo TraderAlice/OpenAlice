@@ -36,11 +36,102 @@ describe('MT5 demo canary source contract', () => {
     expect(gateway, 'the protected-order gateway must exist').toBeDefined()
     expect(gateway?.source.match(/\bOrderCheck\s*\(/g)).toHaveLength(1)
     expect(gateway?.source.match(/\bOrderSend\s*\(/g)).toHaveLength(1)
+    expect(gateway?.source).toContain('TradeSubmitResult CheckedSendCanaryRequest(')
+    expect(gateway?.source).toMatch(/SubmitProtectedMarketOrder[\s\S]*CheckedSendCanaryRequest\(request\)/)
+    expect(gateway?.source).toMatch(/SubmitCanaryReversalClose[\s\S]*CheckedSendCanaryRequest\(request\)/)
+    expect(gateway?.source).toMatch(/SubmitCanaryEmergencyClose[\s\S]*CheckedSendCanaryRequest\(request\)/)
     expect(gateway?.source).not.toMatch(/\bCTrade\b/)
     for (const file of sources.filter(({ path }) => path !== gatewayPath)) {
       expect(file.source, `${file.path} must not call an order API`).not.toMatch(/\bOrder(?:Check|Send)\s*\(/)
       expect(file.source, `${file.path} must not use CTrade`).not.toMatch(/\bCTrade\b/)
     }
+  })
+
+  it('reconciles authoritative Gold state by exact magic before any decision or resend', async () => {
+    const [main, reconcile] = await Promise.all([
+      readCanarySource('JmbGoldmineDemoCanary.mq5'),
+      readCanarySource('JmbCanaryReconcile.mqh'),
+    ])
+
+    expect(main).toContain('#include "JmbCanaryReconcile.mqh"')
+    expect(main).toContain('g_reconciliation_dirty=true;')
+    expect(main).toMatch(/void OnTradeTransaction\([\s\S]*g_reconciliation_dirty=true;\s*return;\s*\}/)
+    expect(main).toMatch(/void Evaluate\([\s\S]*ReconcileCanaryBrokerState\([\s\S]*EvaluateCanaryGates\(/)
+    expect(reconcile).toContain('PositionGetString(POSITION_SYMBOL)!=symbol')
+    expect(reconcile).toContain('PositionGetInteger(POSITION_MAGIC)==magic_number')
+    expect(reconcile).toContain('OrderGetString(ORDER_SYMBOL)!=symbol')
+    expect(reconcile).toContain('OrderGetInteger(ORDER_MAGIC)==magic_number')
+    expect(reconcile).not.toMatch(/if\s*\(\s*PositionsTotal\(\)\s*>\s*0\s*\)/)
+    expect(main).not.toMatch(/\b(?:PositionsTotal|OrdersTotal|HistorySelect|HistoryDealGet)\s*\(/)
+    expect(main).not.toMatch(/\b(?:retry|resend)\b/i)
+  })
+
+  it('groups fully closed positions by broker day and complete net result', async () => {
+    const reconcile = await readCanarySource('JmbCanaryReconcile.mqh')
+
+    expect(reconcile).toContain('DEAL_POSITION_ID')
+    expect(reconcile).toContain('HistorySelect(day_start,now)')
+    expect(reconcile).toContain('HistorySelectByPosition(position_id)')
+    expect(reconcile).toMatch(/double DealNet\(const ulong deal_ticket\)[\s\S]*DEAL_PROFIT[\s\S]*DEAL_COMMISSION[\s\S]*DEAL_SWAP[\s\S]*DEAL_FEE/)
+    expect(reconcile).toContain('DEAL_ENTRY_OUT_BY')
+    expect(reconcile).toContain('final_close_time')
+    expect(reconcile).toContain('daily.lossCount++')
+    expect(reconcile).toContain('daily.realizedLoss+=MathAbs(net_result)')
+  })
+
+  it('publishes the stable flushed event schema without exposing the raw login', async () => {
+    const [state, main] = await Promise.all([
+      readCanarySource('JmbCanaryState.mqh'),
+      readCanarySource('JmbGoldmineDemoCanary.mq5'),
+    ])
+    const stableFields = [
+      'schema_version', 'event_id', 'event_type', 'event_time', 'broker', 'server', 'account_mode',
+      'account_identity_masked', 'symbol', 'strategy_version', 'magic_number', 'decision_id',
+      'observation_id', 'gate_results', 'calculated_risk', 'requested_volume', 'requested_price',
+      'requested_stop_loss', 'accepted_volume', 'accepted_price', 'accepted_stop_loss', 'result_code',
+      'result_detail', 'order_ticket', 'deal_ticket', 'position_id', 'reconciliation_state',
+      'daily_loss_count', 'daily_realized_loss', 'commission', 'swap', 'fee', 'net_result',
+      'max_adverse_excursion', 'max_favorable_excursion',
+    ]
+
+    for (const field of stableFields) expect(state).toContain(`\\"${field}\\"`)
+    expect(state).toContain('events.jsonl')
+    expect(state).toContain('FileFlush(handle)')
+    expect(state).toContain('CanaryMaskedAccountIdentity(')
+    expect(state).not.toMatch(/FileWrite(?:String)?\([^;]*ACCOUNT_LOGIN/s)
+    expect(main).not.toMatch(/(?:Print|Comment)\([^;]*ACCOUNT_LOGIN/s)
+  })
+
+  it('models protection, closures, durable no-ops, and persistent broker safety latches', async () => {
+    const [main, reconcile, state, harness] = await Promise.all([
+      readCanarySource('JmbGoldmineDemoCanary.mq5'),
+      readCanarySource('JmbCanaryReconcile.mqh'),
+      readCanarySource('JmbCanaryState.mqh'),
+      readFile(join('tools', 'mt5', 'tests', 'JmbGoldmineDemoCanaryHarness.mq5'), 'utf8'),
+    ])
+
+    expect(reconcile).toContain('CANARY_LIFECYCLE_RECONCILIATION_REQUIRED')
+    expect(reconcile).toContain('CANARY_LIFECYCLE_FILLED_PROTECTED')
+    expect(reconcile).toContain('CANARY_LIFECYCLE_EMERGENCY_CLOSE')
+    expect(reconcile).toContain('CANARY_LIFECYCLE_STOPPED')
+    expect(main).toContain('SubmitCanaryReversalClose(')
+    expect(main).toContain('SubmitCanaryEmergencyClose(')
+    expect(main).toContain('PersistCanarySafetyLatch(')
+    expect(main).toContain('PersistCanaryAttempt(')
+    expect(state).toContain('reconciliation_latch.csv')
+    expect(state).toContain('protection_error')
+    expect(state).toContain('pending_close_decision_id')
+    expect(harness).toContain('rejected request')
+    expect(harness).toContain('unknown result')
+    expect(harness).toContain('partial fill')
+    expect(harness).toContain('filled with stop')
+    expect(harness).toContain('filled without stop')
+    expect(harness).toContain('stopped observation')
+    expect(harness).toContain('opposite signal close')
+    expect(harness).toContain('four losing positions')
+    expect(harness).toContain('server day reset')
+    expect(harness).toContain('restart with protected position')
+    expect(harness).toContain('restart with foreign exposure')
   })
 
   it('keeps execution disabled, demo-only, Gold-only, fixed-volume, and non-expanding', async () => {
@@ -77,7 +168,10 @@ describe('MT5 demo canary source contract', () => {
   })
 
   it('persists requesting and attempt barriers before one submit then defers every result to reconciliation', async () => {
-    const main = await readCanarySource('JmbGoldmineDemoCanary.mq5')
+    const [main, state] = await Promise.all([
+      readCanarySource('JmbGoldmineDemoCanary.mq5'),
+      readCanarySource('JmbCanaryState.mqh'),
+    ])
     const submissionFlow = main.match(/void SubmitReadyCanaryDecision\([\s\S]*?\n\}/)?.[0] ?? ''
     const eventBarrier = submissionFlow.indexOf('AppendCanaryOrderRequestingEvent(')
     const attemptBarrier = submissionFlow.indexOf('PersistCanaryAttempt(')
@@ -91,7 +185,8 @@ describe('MT5 demo canary source contract', () => {
     expect(eventBarrier).toBeGreaterThan(-1)
     expect(attemptBarrier).toBeGreaterThan(eventBarrier)
     expect(submit).toBeGreaterThan(attemptBarrier)
-    expect(main).toMatch(/AppendCanaryOrderRequestingEvent\([\s\S]*FileFlush\(handle\)[\s\S]*ReadCanaryCommonText/)
+    expect(main).toContain('AppendCanaryOrderRequestingEvent(')
+    expect(state).toMatch(/AppendCanaryExecutionEvent\([\s\S]*FileFlush\(handle\)[\s\S]*ReadCanaryCommonText/)
     expect(main).toMatch(/PersistCanaryAttempt\([\s\S]*FileFlush\(handle\)[\s\S]*LoadCanaryProcessedState/)
     expect(main).toContain('processed_observations.lock')
     expect(main).toMatch(/PersistCanaryAttempt\([\s\S]*FileOpen\(lock_path[\s\S]*LoadCanaryProcessedState\(path,locked_state/)
