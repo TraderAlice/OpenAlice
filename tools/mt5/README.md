@@ -7,7 +7,7 @@ These tools collect and validate broker-native M1 data for research and paper-tr
 | Broker terminal | Gold research/live | Gold demo | EUR/USD | Export `InpBrokerId` |
 | --- | --- | --- | --- | --- |
 | HFM MT5 | `XAUUSDb` | `XAUUSD` | research/live `EURUSDb`; demo `EURUSD` | `hfmarkets` |
-| IC Markets MT5 | `XAUUSD` | `EURUSD` | `icmarkets` |
+| IC Markets MT5 | `XAUUSD` | `XAUUSD` | `EURUSD` | `icmarkets` |
 
 ## Export
 
