@@ -5,7 +5,37 @@ REPOSITORY="TraderAlice/OpenAlice"
 VERSION="${OPENALICE_VERSION:-dev}"
 SOURCE_DIR=""
 MODIFY_PATH=1
+ASSUME_YES=0
 INSTALL_ROOT="${OPENALICE_INSTALL_DIR:-${HOME}/.openalice}"
+
+BOLD=""
+DIM=""
+CYAN=""
+GREEN=""
+RED=""
+RESET=""
+
+if [[ -t 1 && -z "${NO_COLOR:-}" && "${TERM:-}" != "dumb" ]]; then
+  BOLD=$'\033[1m'
+  DIM=$'\033[2m'
+  CYAN=$'\033[36m'
+  GREEN=$'\033[32m'
+  RED=$'\033[31m'
+  RESET=$'\033[0m'
+fi
+
+die() {
+  printf '\n%bError:%b %s\n' "${RED}${BOLD}" "$RESET" "$*" >&2
+  exit 1
+}
+
+step() {
+  printf '\n%b[%s/4]%b %s\n' "$CYAN" "$1" "$RESET" "$2"
+}
+
+ok() {
+  printf '      %b✓%b %s\n' "$GREEN" "$RESET" "$1"
+}
 
 usage() {
   cat <<'EOF'
@@ -13,13 +43,14 @@ OpenAlice CLI installer
 
 Usage:
   curl -fsSL https://raw.githubusercontent.com/TraderAlice/OpenAlice/dev/install | bash
-  ./install [--version <git-ref>] [--install-dir <path>] [--no-modify-path]
+  ./install [--version <git-ref>] [--install-dir <path>] [--no-modify-path] [--yes]
 
 Options:
   --version <git-ref>   Git tag, branch, or commit to install (default: dev)
   --install-dir <path>  OpenAlice user root (default: ~/.openalice)
   --source <path>       Install CLI files from a local checkout (development)
   --no-modify-path      Do not update the shell profile
+  -y, --yes             Accept the install plan without an interactive prompt
   -h, --help            Show this help
 EOF
 }
@@ -45,6 +76,10 @@ while [[ $# -gt 0 ]]; do
       MODIFY_PATH=0
       shift
       ;;
+    -y|--yes)
+      ASSUME_YES=1
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
@@ -58,25 +93,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ "$VERSION" == *".."* || ! "$VERSION" =~ ^[A-Za-z0-9._/-]+$ ]]; then
-  echo "openalice install: unsupported version/ref: $VERSION" >&2
-  exit 1
-fi
-
-if ! command -v node >/dev/null 2>&1; then
-  echo "openalice install: Node.js 20 or newer is required for the preview CLI." >&2
-  echo "Install Node.js, then run this installer again." >&2
-  exit 1
-fi
-
-NODE_MAJOR="$(node -p 'Number(process.versions.node.split(".")[0])')"
-if [[ "$NODE_MAJOR" -lt 20 ]]; then
-  echo "openalice install: Node.js 20 or newer is required (found $(node --version))." >&2
-  exit 1
-fi
-
-if [[ -z "$SOURCE_DIR" ]] && ! command -v curl >/dev/null 2>&1; then
-  echo "openalice install: curl is required." >&2
-  exit 1
+  die "Unsupported version/ref: $VERSION"
 fi
 
 INSTALL_ROOT="${INSTALL_ROOT/#\~/$HOME}"
@@ -84,10 +101,122 @@ BIN_DIR="$INSTALL_ROOT/bin"
 VERSIONS_DIR="$INSTALL_ROOT/cli-versions"
 SAFE_VERSION="${VERSION//\//_}"
 DESTINATION="$VERSIONS_DIR/$SAFE_VERSION"
-STAGING="$(mktemp -d "${TMPDIR:-/tmp}/openalice-cli.XXXXXX")"
-trap 'rm -rf "$STAGING"' EXIT
 
-mkdir -p "$STAGING/bin" "$STAGING/src" "$BIN_DIR" "$VERSIONS_DIR"
+if [[ -n "$SOURCE_DIR" ]]; then
+  source_argument="$SOURCE_DIR"
+  if ! SOURCE_DIR="$(cd "$SOURCE_DIR" 2>/dev/null && pwd)"; then
+    die "Local source checkout not found: $source_argument"
+  fi
+fi
+
+path_present=0
+case ":$PATH:" in
+  *":$BIN_DIR:"*) path_present=1 ;;
+esac
+
+profile=""
+path_line=""
+printf -v quoted_bin '%q' "$BIN_DIR"
+current_path_command="export PATH=$quoted_bin:\$PATH"
+if [[ "$MODIFY_PATH" -eq 0 ]]; then
+  shell_setup="Skip (--no-modify-path)"
+elif [[ "$path_present" -eq 1 ]]; then
+  shell_setup="Already available on PATH"
+else
+  case "${SHELL:-}" in
+    */zsh)
+      profile="$HOME/.zshrc"
+      path_line="export PATH=$quoted_bin:\$PATH"
+      ;;
+    */bash)
+      if [[ "$(uname -s)" == "Darwin" ]]; then profile="$HOME/.bash_profile"; else profile="$HOME/.bashrc"; fi
+      path_line="export PATH=$quoted_bin:\$PATH"
+      ;;
+    */fish)
+      profile="$HOME/.config/fish/config.fish"
+      path_line="fish_add_path $quoted_bin"
+      current_path_command="fish_add_path $quoted_bin"
+      ;;
+  esac
+  if [[ -n "$profile" ]]; then
+    shell_setup="Add OpenAlice to $profile"
+  else
+    shell_setup="Manual PATH setup (shell profile not detected)"
+  fi
+fi
+
+printf '\n%bOpenAlice%b\n' "${BOLD}${CYAN}" "$RESET"
+printf '%bLocal Runtime CLI installer%b\n\n' "$BOLD" "$RESET"
+printf 'This installs the small %bopenalice%b command used to launch a local\n' "$BOLD" "$RESET"
+printf 'OpenAlice checkout in your browser. Nothing will start yet.\n'
+printf '%bIt will not clone a repository, install Electron, start services, or configure credentials.%b\n' "$DIM" "$RESET"
+
+step 1 "Checking your system"
+if ! command -v node >/dev/null 2>&1; then
+  die "Node.js 20 or newer is required. Install Node.js, then run this installer again."
+fi
+
+NODE_MAJOR="$(node -p 'Number(process.versions.node.split(".")[0])')"
+if [[ "$NODE_MAJOR" -lt 20 ]]; then
+  die "Node.js 20 or newer is required (found $(node --version))."
+fi
+ok "Node.js $(node --version)"
+
+if [[ -z "$SOURCE_DIR" ]] && ! command -v curl >/dev/null 2>&1; then
+  die "curl is required to download the CLI files."
+fi
+if [[ -n "$SOURCE_DIR" ]]; then
+  [[ -f "$SOURCE_DIR/packages/cli/package.json" ]] || die "OpenAlice CLI sources are missing under $SOURCE_DIR"
+  ok "Local checkout is readable"
+  install_source="Local checkout: $SOURCE_DIR"
+else
+  ok "curl is available"
+  BASE_URL="${OPENALICE_INSTALL_BASE_URL:-https://raw.githubusercontent.com/$REPOSITORY/$VERSION/packages/cli}"
+  BASE_URL="${BASE_URL%/}"
+  if [[ -n "${OPENALICE_INSTALL_BASE_URL:-}" ]]; then
+    install_source="Download URL: $BASE_URL"
+  else
+    install_source="GitHub ref: $REPOSITORY@$VERSION"
+  fi
+fi
+
+printf '\n%bInstall plan%b\n' "$BOLD" "$RESET"
+printf '  %-14s %s\n' "Source" "$install_source"
+printf '  %-14s %s\n' "Version" "$VERSION"
+printf '  %-14s %s\n' "Install root" "$INSTALL_ROOT"
+printf '  %-14s %s\n' "Command" "$BIN_DIR/openalice"
+printf '  %-14s %s\n' "Shell setup" "$shell_setup"
+if [[ -d "$DESTINATION" ]]; then
+  printf '  %-14s %s\n' "Existing CLI" "Replace the installed $VERSION CLI files"
+fi
+
+if [[ "$ASSUME_YES" -eq 0 ]]; then
+  if ! { exec 3<>/dev/tty; } 2>/dev/null; then
+    printf '\n%bNo interactive terminal is available.%b\n' "${RED}${BOLD}" "$RESET" >&2
+    printf 'Review the install plan above, then re-run with %b--yes%b to approve it.\n' "$BOLD" "$RESET" >&2
+    exit 2
+  fi
+  while true; do
+    printf '\n%bContinue with this install?%b [Y/n] ' "$BOLD" "$RESET" >&3
+    if ! IFS= read -r reply <&3; then
+      reply="n"
+    fi
+    case "$reply" in
+      ""|y|Y|yes|YES|Yes)
+        break
+        ;;
+      n|N|no|NO|No)
+        exec 3>&-
+        printf '\nNo changes made. You can run the installer again whenever you are ready.\n'
+        exit 0
+        ;;
+      *)
+        printf 'Please answer y or n.\n' >&3
+        ;;
+    esac
+  done
+  exec 3>&-
+fi
 
 FILES=(
   "package.json"
@@ -97,25 +226,32 @@ FILES=(
   "src/ssh-connect.mjs"
 )
 
+step 2 "Preparing CLI files"
+STAGING="$(mktemp -d "${TMPDIR:-/tmp}/openalice-cli.XXXXXX")"
+trap 'rm -rf "$STAGING"' EXIT
+mkdir -p "$STAGING/bin" "$STAGING/src"
+
 if [[ -n "$SOURCE_DIR" ]]; then
-  SOURCE_DIR="$(cd "$SOURCE_DIR" && pwd)"
   for file in "${FILES[@]}"; do
     cp "$SOURCE_DIR/packages/cli/$file" "$STAGING/$file"
   done
 else
-  BASE_URL="${OPENALICE_INSTALL_BASE_URL:-https://raw.githubusercontent.com/$REPOSITORY/$VERSION/packages/cli}"
-  BASE_URL="${BASE_URL%/}"
   for file in "${FILES[@]}"; do
     curl --fail --silent --show-error --location "$BASE_URL/$file" --output "$STAGING/$file"
   done
 fi
+ok "CLI files are ready"
 
+step 3 "Verifying the download"
 chmod +x "$STAGING/bin/openalice.mjs"
 node --check "$STAGING/bin/openalice.mjs"
 node --check "$STAGING/src/local-start.mjs"
 node --check "$STAGING/src/runtime-client.mjs"
 node --check "$STAGING/src/ssh-connect.mjs"
+ok "JavaScript entry points passed validation"
 
+step 4 "Installing the command"
+mkdir -p "$BIN_DIR" "$VERSIONS_DIR"
 rm -rf "$DESTINATION"
 mv "$STAGING" "$DESTINATION"
 trap - EXIT
@@ -132,29 +268,7 @@ fi
 WINDOWS_CLI_ENTRY="${WINDOWS_CLI_ENTRY//%/%%}"
 printf '@echo off\r\nnode "%s" %%*\r\n' "$WINDOWS_CLI_ENTRY" > "$BIN_DIR/openalice.cmd"
 
-path_present=0
-case ":$PATH:" in
-  *":$BIN_DIR:"*) path_present=1 ;;
-esac
-
-profile=""
-path_line=""
 if [[ "$MODIFY_PATH" -eq 1 && "$path_present" -eq 0 ]]; then
-  printf -v quoted_bin '%q' "$BIN_DIR"
-  case "${SHELL:-}" in
-    */zsh)
-      profile="$HOME/.zshrc"
-      path_line="export PATH=$quoted_bin:\$PATH"
-      ;;
-    */bash)
-      if [[ "$(uname -s)" == "Darwin" ]]; then profile="$HOME/.bash_profile"; else profile="$HOME/.bashrc"; fi
-      path_line="export PATH=$quoted_bin:\$PATH"
-      ;;
-    */fish)
-      profile="$HOME/.config/fish/config.fish"
-      path_line="fish_add_path $quoted_bin"
-      ;;
-  esac
   if [[ -n "$profile" ]]; then
     mkdir -p "$(dirname "$profile")"
     touch "$profile"
@@ -163,12 +277,17 @@ if [[ "$MODIFY_PATH" -eq 1 && "$path_present" -eq 0 ]]; then
     fi
   fi
 fi
+ok "Installed $BIN_DIR/openalice"
 
-echo "OpenAlice CLI installed: $BIN_DIR/openalice"
-echo "Version: $VERSION"
-if [[ "$path_present" -eq 0 ]]; then
-  echo "For this shell, run:"
-  printf '  export PATH=%q:$PATH\n' "$BIN_DIR"
-  [[ -z "$profile" ]] || echo "Future shells will load it from $profile."
+printf '\n%bOpenAlice CLI is ready.%b\n' "${GREEN}${BOLD}" "$RESET"
+printf '  %-12s %s\n' "Command" "$BIN_DIR/openalice"
+printf '  %-12s %s\n' "Version" "$VERSION"
+if [[ -n "$profile" && "$path_present" -eq 0 ]]; then
+  printf '  %-12s %s\n' "Shell" "Future terminals will load $profile"
 fi
-echo "Then enter an OpenAlice checkout and run: openalice"
+if [[ "$path_present" -eq 0 ]]; then
+  printf '\nFor this terminal, run:\n  %s\n' "$current_path_command"
+fi
+printf '\nThen launch from an OpenAlice checkout:\n'
+printf '  cd /path/to/OpenAlice\n'
+printf '  openalice\n\n'

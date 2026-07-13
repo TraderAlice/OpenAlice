@@ -7,25 +7,32 @@ const suffix = `${process.pid}-${Date.now().toString(36)}`
 const image = `openalice-install-smoke:${suffix}`
 const args = process.argv.slice(2)
 const keepImage = args.includes('--keep-image')
+const interactive = args.includes('--interactive')
 let imageBuilt = false
 
 if (args.includes('--help') || args.includes('-h')) {
-  console.log(`Usage: pnpm test:install:docker [--keep-image]
+  console.log(`Usage: pnpm test:install:docker [--interactive] [--keep-image]
 
 Build a clean local container and execute the OpenAlice curl installer through
 its real HTTP download path. The smoke is a manual pre-release gate and is not
 wired into PR CI.
 
 Options:
+  --interactive Keep a TTY open to experience and inspect the installer manually
   --keep-image  Preserve the temporary image for investigation
   -h, --help    Show this help
 `)
   process.exit(0)
 }
 
-const unknownArgs = args.filter((arg) => arg !== '--keep-image')
+const unknownArgs = args.filter((arg) => !['--interactive', '--keep-image'].includes(arg))
 if (unknownArgs.length > 0) {
   console.error(`install docker smoke: unknown option: ${unknownArgs[0]}`)
+  process.exit(1)
+}
+
+if (interactive && (!process.stdin.isTTY || !process.stdout.isTTY)) {
+  console.error('install docker smoke: --interactive requires an interactive terminal')
   process.exit(1)
 }
 
@@ -51,8 +58,16 @@ try {
     '.',
   ])
   imageBuilt = true
-  console.log('[install-docker-smoke] running clean installer acceptance')
-  docker(['run', '--rm', '--network', 'none', image])
+  if (interactive) {
+    console.log('[install-docker-smoke] opening manual installer playground')
+    docker([
+      'run', '--rm', '--interactive', '--tty', '--network', 'none',
+      '--entrypoint', 'bash', image, '/fixture/interactive.sh',
+    ])
+  } else {
+    console.log('[install-docker-smoke] running clean installer acceptance')
+    docker(['run', '--rm', '--network', 'none', image])
+  }
 } catch (error) {
   console.error(`[install-docker-smoke] failed: ${error instanceof Error ? error.message : String(error)}`)
   process.exitCode = 1

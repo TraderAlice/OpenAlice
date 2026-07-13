@@ -40,9 +40,19 @@ curl -fsSL https://raw.githubusercontent.com/TraderAlice/OpenAlice/dev/install |
 The preview requires Node.js 20 or newer. It installs versioned CLI files under
 `~/.openalice/cli-versions/`, writes stable `openalice` and `openalice.cmd`
 launchers under `~/.openalice/bin/`, and offers to add that bin directory to the
-current shell profile. It does not clone OpenAlice, write application state, or
+current shell profile. Before changing files, the interactive installer shows
+its source, version, paths, and shell changes, explains what it will not do, and
+asks for confirmation. It does not clone OpenAlice, write application state, or
 install Electron. The curl entry targets macOS, Linux, WSL, and Git Bash;
 native Windows desktop distribution remains the signed Electron installer.
+
+Unattended environments have no implicit consent. After reviewing the same
+install plan, pass `--yes` explicitly:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/TraderAlice/OpenAlice/dev/install \
+  | bash -s -- --yes
+```
 
 For a pinned tag or commit:
 
@@ -55,6 +65,13 @@ For local installer development:
 
 ```bash
 ./install --source . --version dev --no-modify-path
+```
+
+To experience the real prompt in a clean, offline container and remain in its
+shell afterward for inspection:
+
+```bash
+pnpm test:install:docker --interactive
 ```
 
 `OPENALICE_INSTALL_BASE_URL` may point the download branch at a local fixture

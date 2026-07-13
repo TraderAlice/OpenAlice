@@ -13,12 +13,13 @@ if command -v pnpm >/dev/null 2>&1; then
 fi
 
 server_log="$(mktemp)"
+refusal_log="$(mktemp)"
 node /fixture/static-server.mjs >"$server_log" 2>&1 &
 server_pid=$!
 cleanup() {
   kill "$server_pid" >/dev/null 2>&1 || true
   wait "$server_pid" >/dev/null 2>&1 || true
-  rm -f "$server_log"
+  rm -f "$server_log" "$refusal_log"
 }
 trap cleanup EXIT
 
@@ -40,9 +41,15 @@ curl --fail --silent --output /dev/null "$installer_url" || {
 
 export OPENALICE_INSTALL_BASE_URL="http://127.0.0.1:18080/packages/cli/"
 
+if curl -fsSL "$installer_url" | bash -s -- --version smoke-unattended >"$refusal_log" 2>&1; then
+  fail "installer proceeded without interactive or explicit approval"
+fi
+grep -Fq -- "--yes" "$refusal_log" || fail "unattended refusal did not explain --yes"
+[[ ! -e "$HOME/.openalice" ]] || fail "unattended refusal changed the install root"
+
 install_version() {
   local version="$1"
-  curl -fsSL "$installer_url" | bash -s -- --version "$version"
+  curl -fsSL "$installer_url" | bash -s -- --yes --version "$version"
 }
 
 install_version smoke-v1
