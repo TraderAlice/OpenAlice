@@ -150,6 +150,46 @@ must still produce Windows and macOS evidence. In serial `dev` work that
 evidence may arrive after merge, but a known failure stops the next increment;
 it must be green before promotion to `master` or release.
 
+### Package signing boundary
+
+Packaging evidence and release-signing evidence are different gates:
+
+- Routine local work and PR package smoke build unpacked/unsigned artifacts
+  with `CSC_IDENTITY_AUTO_DISCOVERY=false`. They verify resource layout,
+  Guardian startup, managed runtimes, Workspace CLI acceptance, and
+  platform-specific behavior without touching signing identities or
+  notarization services.
+- Signed/notarized builds run only for a versioned release candidate, an
+  explicit release rehearsal, or a change directly concerning signing,
+  notarization, auto-update metadata, or release publication.
+- A development agent must not run a signed package merely because Electron or
+  packaging code changed. Report signing as release-only residual risk and use
+  the unsigned package smoke that matches the affected surface.
+- Temporary expanded apps are disposable test artifacts. Prefer the smoke
+  runner's isolated auto-clean path; preserve one only when investigation or a
+  human tester actually needs it.
+
+This boundary keeps expensive, credentialed, externally rate-limited release
+work out of the interactive development loop while retaining the same runtime
+and resource-layout coverage.
+
+### CI/CD optimization order
+
+Optimize measured waiting time without collapsing the confidence lanes:
+
+1. cancel superseded work and avoid repeating the PR matrix on `dev` push;
+2. use narrow path classification to skip irrelevant host/package jobs;
+3. cache dependency, build, and safe unsigned-package inputs across jobs;
+4. split fast contract/type gates from slower host/runtime acceptance so the
+   first actionable failure arrives early;
+5. measure queue time versus install/build/test time before buying larger
+   runners;
+6. keep complete promotion/release acceptance, signing, and publication gated
+   even when routine `dev` feedback is deliberately asynchronous.
+
+Any CI optimization PR should include before/after timing evidence and name the
+confidence gate it preserves, moves, or removes.
+
 ## Merge and Cleanup
 
 The normal merge method is a merge commit:

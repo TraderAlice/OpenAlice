@@ -122,6 +122,21 @@ needed. A package passed through `--skip-pack` is externally owned and must
 never be deleted by the smoke runner; use `--keep-package` to preserve a
 temporary smoke package for investigation.
 
+Code signing and notarization are release gates, not routine development
+checks. Serial/parallel `dev` work, ordinary PR package smokes, and local
+packaged-runtime debugging must build unsigned (`CSC_IDENTITY_AUTO_DISCOVERY=false`)
+and must not read release signing secrets. Run a real signed/notarized build
+only for a versioned release candidate, an explicit release rehearsal, or a
+change whose subject is the signing/notarization/update chain. State that
+release-only residual risk instead of making every development iteration pay
+the signing cost.
+
+When optimizing CI/CD, preserve the lane boundaries above. First remove
+duplicate jobs, cancel superseded runs, narrow path triggers, reuse caches and
+unsigned build artifacts, and measure the slow step before considering larger
+runners. Do not trade away the full `master` promotion/release gates merely to
+make routine `dev` feedback look faster.
+
 ## Deferred Work and Issues
 
 Use GitHub issues for concrete deferred findings. Do not create repo TODO files
