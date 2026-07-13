@@ -155,11 +155,8 @@ int FindCanaryHeader(const string &headers[],const string name)
    return found;
 }
 
-bool ReadStrictCanaryCsv(const string path,const string &expected_fields[],string &ordered_values[],string &detail)
+bool ReadStrictCanaryCsvText(const string text,const string &expected_fields[],string &ordered_values[],string &detail)
 {
-   string text="";
-   if(!ReadCanaryCommonText(path,text,detail)) return false;
-
    string header_line="";
    string value_line="";
    if(!SplitCanaryCsvDocument(text,header_line,value_line,detail)) return false;
@@ -207,6 +204,13 @@ bool ReadStrictCanaryCsv(const string path,const string &expected_fields[],strin
       ordered_values[expected]=values[source_index];
    }
    return true;
+}
+
+bool ReadStrictCanaryCsv(const string path,const string &expected_fields[],string &ordered_values[],string &detail)
+{
+   string text="";
+   if(!ReadCanaryCommonText(path,text,detail)) return false;
+   return ReadStrictCanaryCsvText(text,expected_fields,ordered_values,detail);
 }
 
 bool IsCanonicalCanaryText(const string value)
@@ -313,6 +317,46 @@ bool ConsumeCanaryJsonToken(const string json,int &cursor,const string token)
    return true;
 }
 
+int CanaryHexDigit(const int character)
+{
+   if(character>=48 && character<=57) return character-48;
+   if(character>=65 && character<=70) return character-65+10;
+   if(character>=97 && character<=102) return character-97+10;
+   return -1;
+}
+
+bool ParseCanaryJsonCodeUnit(const string json,int &cursor,int &code_unit)
+{
+   if(cursor+4>StringLen(json)) return false;
+   code_unit=0;
+   for(int index=0;index<4;index++)
+   {
+      int digit=CanaryHexDigit((int)StringGetCharacter(json,cursor+index));
+      if(digit<0) return false;
+      code_unit=code_unit*16+digit;
+   }
+   cursor+=4;
+   return true;
+}
+
+bool ParseCanaryUnicodeEscape(const string json,int &cursor,string &decoded)
+{
+   decoded="";
+   int first=0;
+   if(!ParseCanaryJsonCodeUnit(json,cursor,first)) return false;
+   if(first>=0xDC00 && first<=0xDFFF) return false;
+   if(first>=0xD800 && first<=0xDBFF)
+   {
+      if(!ConsumeCanaryJsonToken(json,cursor,"\\u")) return false;
+      int second=0;
+      if(!ParseCanaryJsonCodeUnit(json,cursor,second) || second<0xDC00 || second>0xDFFF) return false;
+      decoded=ShortToString((ushort)first)+ShortToString((ushort)second);
+      return true;
+   }
+   decoded=ShortToString((ushort)first);
+   return true;
+}
+
 bool ParseCanonicalCanaryJsonString(const string json,int &cursor,string &value)
 {
    value="";
@@ -327,8 +371,19 @@ bool ParseCanonicalCanaryJsonString(const string json,int &cursor,string &value)
          if(cursor>=StringLen(json)) return false;
          string escaped=StringSubstr(json,cursor,1);
          cursor++;
-         if(escaped!="\"" && escaped!="\\") return false;
-         value+=escaped;
+         if(escaped=="\"" || escaped=="\\" || escaped=="/") value+=escaped;
+         else if(escaped=="b") value+=ShortToString((ushort)8);
+         else if(escaped=="f") value+=ShortToString((ushort)12);
+         else if(escaped=="n") value+=ShortToString((ushort)10);
+         else if(escaped=="r") value+=ShortToString((ushort)13);
+         else if(escaped=="t") value+=ShortToString((ushort)9);
+         else if(escaped=="u")
+         {
+            string decoded="";
+            if(!ParseCanaryUnicodeEscape(json,cursor,decoded)) return false;
+            value+=decoded;
+         }
+         else return false;
          continue;
       }
       int code=(int)StringGetCharacter(character,0);

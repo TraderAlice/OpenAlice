@@ -267,6 +267,78 @@ bool RunGateJsonContractCase()
    return passed;
 }
 
+bool RunJsonEscapeCase()
+{
+   string canonical="\"quote\\\" reverse\\\\ solidus\\/ backspace\\b formfeed\\f newline\\n return\\r tab\\t bmp\\u263A pair\\uD83D\\uDE00\"";
+   string invalid_escape="\"bad\\x\"";
+   string invalid_hex="\"bad\\uZZZZ\"";
+   string lone_high="\"bad\\uD83D\"";
+   string lone_low="\"bad\\uDE00\"";
+   string invalid_pair="\"bad\\uD83D\\u263A\"";
+   int cursor=0;
+   string decoded="";
+   string expected="quote\" reverse\\ solidus/ backspace"+ShortToString((ushort)8)
+      +" formfeed"+ShortToString((ushort)12)+" newline"+ShortToString((ushort)10)
+      +" return"+ShortToString((ushort)13)+" tab"+ShortToString((ushort)9)+" bmp"+ShortToString((ushort)0x263A)
+      +" pair"+ShortToString((ushort)0xD83D)+ShortToString((ushort)0xDE00);
+   bool canonical_passed=ParseCanonicalCanaryJsonString(canonical,cursor,decoded)
+      && cursor==StringLen(canonical) && decoded==expected;
+   PrintFormat("%s canonical JSON escapes",canonical_passed ? "PASS" : "FAIL");
+
+   cursor=0;
+   bool invalid_escape_blocked=!ParseCanonicalCanaryJsonString(invalid_escape,cursor,decoded);
+   cursor=0;
+   invalid_escape_blocked=invalid_escape_blocked
+      && !ParseCanonicalCanaryJsonString(invalid_hex,cursor,decoded);
+   PrintFormat("%s invalid JSON escapes",invalid_escape_blocked ? "PASS" : "FAIL");
+
+   cursor=0;
+   bool invalid_surrogates_blocked=!ParseCanonicalCanaryJsonString(lone_high,cursor,decoded);
+   cursor=0;
+   invalid_surrogates_blocked=invalid_surrogates_blocked
+      && !ParseCanonicalCanaryJsonString(lone_low,cursor,decoded);
+   cursor=0;
+   invalid_surrogates_blocked=invalid_surrogates_blocked
+      && !ParseCanonicalCanaryJsonString(invalid_pair,cursor,decoded);
+   PrintFormat("%s invalid surrogate pairs",invalid_surrogates_blocked ? "PASS" : "FAIL");
+   return canonical_passed && invalid_escape_blocked && invalid_surrogates_blocked;
+}
+
+bool RunQuotedPolicyCsvCase()
+{
+   string row="1,harness-policy-v1,hfmarkets,HFMarketsGlobal-Demo4,XAUUSD,daily-trend-v1,hfm_canary,1,72,0.75,0.50,10,40,4,0.01,880101";
+   string valid=CANARY_POLICY_HEADER+"\n"+row+"\n";
+   string fully_quoted=CANARY_POLICY_HEADER+"\n"
+      +"\"1\",\"harness-policy-v1\",\"hfmarkets\",\"HFMarketsGlobal-Demo4\",\"XAUUSD\",\"daily-trend-v1\",\"hfm_canary\",\"1\",\"72\",\"0.75\",\"0.50\",\"10\",\"40\",\"4\",\"0.01\",\"880101\"\n";
+   string partially_quoted=CANARY_POLICY_HEADER+"\n1,\"harness-policy-v1\",hfmarkets,HFMarketsGlobal-Demo4,XAUUSD,daily-trend-v1,hfm_canary,1,72,0.75,0.50,10,40,4,0.01,880101\n";
+   CanaryPolicy policy;
+   string detail="";
+   bool valid_passed=ParseCanaryPolicyCsvText(valid,policy,detail);
+   bool fully_blocked=!ParseCanaryPolicyCsvText(fully_quoted,policy,detail);
+   bool partially_blocked=!ParseCanaryPolicyCsvText(partially_quoted,policy,detail);
+   PrintFormat("%s fully quoted policy row",fully_blocked ? "PASS" : "FAIL");
+   PrintFormat("%s partially quoted policy row",partially_blocked ? "PASS" : "FAIL");
+   return valid_passed && fully_blocked && partially_blocked;
+}
+
+bool RunStatusExactComparisonCase()
+{
+   string intended_values[];
+   string verified_values[];
+   ArrayResize(intended_values,29);
+   ArrayResize(verified_values,29);
+   for(int index=0;index<29;index++)
+   {
+      intended_values[index]="value-"+IntegerToString(index);
+      verified_values[index]=intended_values[index];
+   }
+   bool exact_passed=CanaryExactValuesMatch(intended_values,verified_values);
+   verified_values[28]="truncated";
+   bool truncation_blocked=!CanaryExactValuesMatch(intended_values,verified_values);
+   PrintFormat("%s truncated next safe action",truncation_blocked ? "PASS" : "FAIL");
+   return exact_passed && truncation_blocked;
+}
+
 bool RunPolicyVersionGrammarCase()
 {
    bool passed=IsCanonicalCanaryPolicyVersion("operator-policy-v1")
@@ -337,6 +409,9 @@ int OnInit()
    if(!RunDuplicateObservationStateCase()) failures++;
    if(!RunTask3IdentityCase()) failures++;
    if(!RunGateJsonContractCase()) failures++;
+   if(!RunJsonEscapeCase()) failures++;
+   if(!RunQuotedPolicyCsvCase()) failures++;
+   if(!RunStatusExactComparisonCase()) failures++;
    if(!RunPolicyVersionGrammarCase()) failures++;
    if(!RunMalformedProcessedStateCase()) failures++;
    if(!RunFourLossResetCase()) failures++;

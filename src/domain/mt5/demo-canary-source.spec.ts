@@ -115,13 +115,61 @@ describe('MT5 demo canary source contract', () => {
     expect(main).toContain('SYMBOL_ORDER_SL')
     expect(main).toContain('SYMBOL_TRADE_TICK_SIZE')
     expect(main).toContain('if(!EventSetTimer(10))')
-    expect(state).toContain('uint preflight_written=FileWriteString(handle,"preflight\\n")')
-    expect(state).toContain('if(preflight_written!=StringLen("preflight\\n"))')
+    expect(state).toContain('uint preflight_written=FileWriteString(handle,payload)')
+    expect(state).toContain('if(preflight_written!=StringLen(payload))')
     expect(state).toContain('uint header_written=FileWrite(')
     expect(state).toContain('uint row_written=FileWrite(')
     expect(state).toContain('ReadStrictCanaryCsv(temporary_path')
     expect(harness).toContain('stop mode unsupported')
     expect(harness).toContain('stop tick unavailable')
     expect(harness).toContain('stop tick misaligned')
+  })
+
+  it('rejects physical policy quotes without weakening quoted decision CSV', async () => {
+    const [csv, policy, harness] = await Promise.all([
+      readCanarySource('JmbCanaryCsv.mqh'),
+      readCanarySource('JmbCanaryPolicy.mqh'),
+      readFile(join('tools', 'mt5', 'tests', 'JmbGoldmineDemoCanaryHarness.mq5'), 'utf8'),
+    ])
+
+    expect(csv).toContain('bool ReadStrictCanaryCsvText(')
+    expect(csv).toMatch(/bool ReadCanaryDecision\([\s\S]*ReadStrictCanaryCsv\(path,expected,values,detail\)/)
+    expect(policy).toContain('bool ParseCanaryPolicyCsvText(')
+    expect(policy).toContain('StringFind(policy_text,"\\\"")>=0')
+    expect(policy).toContain('ReadStrictCanaryCsvText(policy_text')
+    expect(harness).toContain('fully quoted policy row')
+    expect(harness).toContain('partially quoted policy row')
+  })
+
+  it('verifies exact reopened preflight and all intended status fields', async () => {
+    const [state, harness] = await Promise.all([
+      readCanarySource('JmbCanaryState.mqh'),
+      readFile(join('tools', 'mt5', 'tests', 'JmbGoldmineDemoCanaryHarness.mq5'), 'utf8'),
+    ])
+
+    expect(state).toContain('const string payload="openalice-canary-preflight\\r\\n";')
+    expect(state).toContain('ReadCanaryCommonText(path,reopened,read_detail)')
+    expect(state).toContain('reopened!=payload')
+    expect(state).toContain('bool CanaryExactValuesMatch(')
+    expect(state).toContain('CanaryExactValuesMatch(intended_values,verified_values)')
+    expect(harness).toContain('truncated next safe action')
+  })
+
+  it('decodes canonical JSON escapes and rejects malformed Unicode sequences', async () => {
+    const [csv, harness] = await Promise.all([
+      readCanarySource('JmbCanaryCsv.mqh'),
+      readFile(join('tools', 'mt5', 'tests', 'JmbGoldmineDemoCanaryHarness.mq5'), 'utf8'),
+    ])
+
+    expect(csv).toContain('bool ParseCanaryUnicodeEscape(')
+    expect(csv).toContain('escaped=="b"')
+    expect(csv).toContain('escaped=="f"')
+    expect(csv).toContain('escaped=="n"')
+    expect(csv).toContain('escaped=="r"')
+    expect(csv).toContain('escaped=="t"')
+    expect(csv).toContain('escaped=="/"')
+    expect(harness).toContain('canonical JSON escapes')
+    expect(harness).toContain('invalid JSON escapes')
+    expect(harness).toContain('invalid surrogate pairs')
   })
 })

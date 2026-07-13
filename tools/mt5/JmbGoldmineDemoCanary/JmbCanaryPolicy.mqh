@@ -82,8 +82,13 @@ bool ValidateCanaryPolicy(const CanaryPolicy &policy,string &detail)
    return true;
 }
 
-bool ReadCanaryPolicy(const string path,CanaryPolicy &policy,string &detail)
+bool ParseCanaryPolicyCsvText(const string policy_text,CanaryPolicy &policy,string &detail)
 {
+   if(StringFind(policy_text,"\"")>=0)
+   {
+      detail="Policy CSV physical quotes are forbidden.";
+      return false;
+   }
    string expected[];
    string header_copy=CANARY_POLICY_HEADER;
    if(StringSplit(header_copy,(ushort)StringGetCharacter(",",0),expected)!=16)
@@ -92,7 +97,7 @@ bool ReadCanaryPolicy(const string path,CanaryPolicy &policy,string &detail)
       return false;
    }
    string values[];
-   if(!ReadStrictCanaryCsv(path,expected,values,detail)) return false;
+   if(!ReadStrictCanaryCsvText(policy_text,expected,values,detail)) return false;
 
    long schema=0;
    long loss_count=0;
@@ -142,6 +147,13 @@ bool ReadCanaryPolicy(const string path,CanaryPolicy &policy,string &detail)
       return false;
    }
    return true;
+}
+
+bool ReadCanaryPolicy(const string path,CanaryPolicy &policy,string &detail)
+{
+   string policy_text="";
+   if(!ReadCanaryCommonText(path,policy_text,detail)) return false;
+   return ParseCanaryPolicyCsvText(policy_text,policy,detail);
 }
 
 #endif

@@ -163,8 +163,9 @@ bool PreflightCanaryLog(const string broker,const string symbol)
       +IntegerToString((int)GetTickCount())+".tmp";
    int handle=FileOpen(path,FILE_WRITE|FILE_TXT|FILE_ANSI|FILE_COMMON);
    if(handle==INVALID_HANDLE) return false;
-   uint preflight_written=FileWriteString(handle,"preflight\n");
-   if(preflight_written!=StringLen("preflight\n"))
+   const string payload="openalice-canary-preflight\r\n";
+   uint preflight_written=FileWriteString(handle,payload);
+   if(preflight_written!=StringLen(payload))
    {
       FileClose(handle);
       FileDelete(path,FILE_COMMON);
@@ -172,8 +173,23 @@ bool PreflightCanaryLog(const string broker,const string symbol)
    }
    FileFlush(handle);
    FileClose(handle);
+   string reopened="";
+   string read_detail="";
+   if(!ReadCanaryCommonText(path,reopened,read_detail) || reopened!=payload)
+   {
+      FileDelete(path,FILE_COMMON);
+      return false;
+   }
    bool removed=FileDelete(path,FILE_COMMON);
    return removed;
+}
+
+bool CanaryExactValuesMatch(const string &intended_values[],const string &verified_values[])
+{
+   if(ArraySize(intended_values)!=ArraySize(verified_values)) return false;
+   for(int index=0;index<ArraySize(intended_values);index++)
+      if(intended_values[index]!=verified_values[index]) return false;
+   return true;
 }
 
 bool CanaryStatusProjectionIsPossible(const CanaryEvaluation &evaluation,
@@ -225,6 +241,38 @@ bool WriteCanaryLatestStatus(const string broker,
       return false;
    }
 
+   string intended_values[];
+   ArrayResize(intended_values,29);
+   intended_values[0]="1";
+   intended_values[1]=CanaryIsoTime(TimeGMT());
+   intended_values[2]=broker;
+   intended_values[3]=server;
+   intended_values[4]="demo";
+   intended_values[5]=symbol;
+   intended_values[6]=CanaryLifecycleLabel(evaluation.state);
+   intended_values[7]=evaluation.detail;
+   intended_values[8]=policy.rolloutStage;
+   intended_values[9]=execution_enabled ? "1" : "0";
+   intended_values[10]=kill_switch ? "1" : "0";
+   intended_values[11]=decision.loaded ? decision.decisionId : "";
+   intended_values[12]=decision.loaded ? decision.observationId : "";
+   intended_values[13]="";
+   intended_values[14]="";
+   intended_values[15]="";
+   intended_values[16]="";
+   intended_values[17]="";
+   intended_values[18]="0";
+   intended_values[19]="";
+   intended_values[20]="";
+   intended_values[21]="";
+   intended_values[22]="";
+   intended_values[23]="";
+   intended_values[24]=evaluation.state==CANARY_LIFECYCLE_READY ? "complete" : "required";
+   intended_values[25]=IntegerToString(daily_loss_count);
+   intended_values[26]=DoubleToString(daily_realized_loss,2);
+   intended_values[27]=evaluation.blockingGate;
+   intended_values[28]=evaluation.nextSafeAction;
+
    uint header_written=FileWrite(handle,
       "schema_version","captured_at","broker","server","account_mode","symbol","state","detail",
       "rollout_stage","execution_enabled","kill_switch","decision_id","observation_id","event_id",
@@ -239,12 +287,12 @@ bool WriteCanaryLatestStatus(const string broker,
       return false;
    }
    uint row_written=FileWrite(handle,
-      1,CanaryIsoTime(TimeGMT()),broker,server,"demo",symbol,CanaryLifecycleLabel(evaluation.state),evaluation.detail,
-      policy.rolloutStage,execution_enabled ? 1 : 0,kill_switch ? 1 : 0,
-      decision.loaded ? decision.decisionId : "",decision.loaded ? decision.observationId : "",
-      "","","","","",0,"","","","","",
-      evaluation.state==CANARY_LIFECYCLE_READY ? "complete" : "required",
-      daily_loss_count,daily_realized_loss,evaluation.blockingGate,evaluation.nextSafeAction);
+      intended_values[0],intended_values[1],intended_values[2],intended_values[3],intended_values[4],
+      intended_values[5],intended_values[6],intended_values[7],intended_values[8],intended_values[9],
+      intended_values[10],intended_values[11],intended_values[12],intended_values[13],intended_values[14],
+      intended_values[15],intended_values[16],intended_values[17],intended_values[18],intended_values[19],
+      intended_values[20],intended_values[21],intended_values[22],intended_values[23],intended_values[24],
+      intended_values[25],intended_values[26],intended_values[27],intended_values[28]);
    if(row_written==0)
    {
       FileClose(handle);
@@ -269,6 +317,12 @@ bool WriteCanaryLatestStatus(const string broker,
    {
       FileDelete(temporary_path,FILE_COMMON);
       detail="The temporary status file failed strict completeness verification.";
+      return false;
+   }
+   if(!CanaryExactValuesMatch(intended_values,verified_values))
+   {
+      FileDelete(temporary_path,FILE_COMMON);
+      detail="The temporary status file did not preserve every intended field exactly.";
       return false;
    }
 
