@@ -136,6 +136,23 @@ describe('MT5 outcome importer', () => {
     })
   })
 
+  it('imports a fully reconciled stopped outcome', async () => {
+    const stoppedEvent = {
+      ...closedEvent,
+      event_id: 'event-stopped-1',
+      event_type: 'stopped',
+      event_time: '2026-07-13T09:30:00.000Z',
+    }
+    await writeExecutionEvents(executionRoot, [requestEvent, fillEvent, stoppedEvent])
+
+    const result = await importReconciledExecutionOutcomes({ executionRoot, learningRoot, instruments: [hfmGold] })
+
+    expect(result[0]).toMatchObject({ state: 'imported', imported: 1 })
+    await expect(readExecutionLearningRecords(learningRoot, 'hfmarkets', 'XAUUSD')).resolves.toEqual([
+      expect.objectContaining({ outcomeEventId: 'event-stopped-1', result: 'loss' }),
+    ])
+  })
+
   it('does not import an unresolved or unprotected exposure', async () => {
     await writeExecutionEvents(executionRoot, [requestEvent, reconciliationRequiredEvent])
 

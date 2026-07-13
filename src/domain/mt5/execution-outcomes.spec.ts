@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -115,6 +115,21 @@ describe('MT5 execution outcomes', () => {
     }))).toThrow(/decision_id|identifier/i)
   })
 
+  it.each([
+    ['null', null],
+    ['a scalar', 'pass'],
+    ['a missing key', { name: 'identity', state: 'pass' }],
+    ['an unknown key', { name: 'identity', state: 'pass', detail: 'Matched.', approval: true }],
+    ['an unknown state', { name: 'identity', state: 'warn', detail: 'Matched.' }],
+    ['an empty name', { name: '', state: 'pass', detail: 'Matched.' }],
+    ['an empty detail', { name: 'identity', state: 'pass', detail: '' }],
+  ])('rejects gate_results containing %s', (_case, gate) => {
+    expect(() => parseExecutionEventJsonLine(JSON.stringify({
+      ...terminalEvent,
+      gate_results: [gate],
+    }))).toThrow(/gate/i)
+  })
+
   it('does not convert nonterminal or unreconciled events', () => {
     const unresolved = parseExecutionEventJsonLine(JSON.stringify({
       ...terminalEvent,
@@ -156,5 +171,39 @@ describe('MT5 execution outcomes', () => {
       latestOutcomeAt: outcome.outcomeAt,
     })
     expect(JSON.stringify(summary)).not.toMatch(/approval|risk.?limit|strategy.?parameter|profit.?prediction/i)
+  })
+
+  it.each(['unexpected', 'approval', 'riskLimit', 'strategyParameter', 'profitPrediction'])(
+    'rejects the extra or prohibited outcome key %s',
+    async (key) => {
+      const contaminated = { ...outcome, [key]: true }
+
+      await expect(appendOutcomeOnce(root, contaminated)).rejects.toThrow(/contract|field|key/i)
+      await expect(readExecutionLearningRecords(root, 'hfmarkets', 'XAUUSD')).resolves.toEqual([])
+    },
+  )
+
+  it('rejects a mismatched outcome broker and server pair', async () => {
+    const mismatched = { ...outcome, server: 'ICMarketsSC-Demo' } as JmbExecutionOutcomeRecord
+
+    await expect(appendOutcomeOnce(root, mismatched)).rejects.toThrow(/server|broker/i)
+  })
+
+  it('rejects a result that is inconsistent with netResult', async () => {
+    const inconsistent = { ...outcome, result: 'win' } as JmbExecutionOutcomeRecord
+
+    await expect(appendOutcomeOnce(root, inconsistent)).rejects.toThrow(/result/i)
+  })
+
+  it.each(['missing', 'stale'])('repairs a %s summary when the outcome is already journaled', async (state) => {
+    await appendOutcomeOnce(root, outcome)
+    const summaryPath = join(root, 'hfmarkets', 'XAUUSD', 'summary.json')
+    if (state === 'missing') await rm(summaryPath)
+    else await writeFile(summaryPath, '{"schemaVersion":1,"count":999}\n', 'utf8')
+
+    await expect(appendOutcomeOnce(root, outcome)).resolves.toBe(false)
+
+    const summary = JSON.parse(await readFile(summaryPath, 'utf8')) as Record<string, unknown>
+    expect(summary).toMatchObject({ count: 1, totalNetResult: -6.25, lossCount: 1 })
   })
 })

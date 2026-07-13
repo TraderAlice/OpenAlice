@@ -52,6 +52,13 @@ const EXECUTION_EVENT_FIELDS = [
   'commission', 'swap', 'fee', 'net_result', 'max_adverse_excursion', 'max_favorable_excursion',
 ] as const
 
+const OUTCOME_RECORD_FIELDS = [
+  'schemaVersion', 'outcomeEventId', 'outcomeAt', 'broker', 'server', 'accountMode', 'symbol',
+  'strategyVersion', 'decisionId', 'observationId', 'positionId', 'result', 'netResult', 'commission',
+  'swap', 'fee', 'requestedPrice', 'acceptedPrice', 'slippage', 'maxAdverseExcursion',
+  'maxFavorableExcursion', 'source',
+] as const
+
 const LIFECYCLE_STATES = new Set([
   'disabled', 'paused', 'blocked', 'ready', 'order_requesting', 'order_rejected',
   'reconciliation_required', 'filled_protected', 'close_requesting', 'closed', 'stopped',
@@ -130,6 +137,25 @@ function assertExactFields(value: Record<string, unknown>): void {
   }
 }
 
+function validateGateResults(value: unknown): void {
+  if (!Array.isArray(value)) validationError('Execution event gate_results must be an array.')
+  for (const gate of value) {
+    if (typeof gate !== 'object' || gate === null || Array.isArray(gate)) {
+      validationError('Execution event gate result must be an object.')
+    }
+    const candidate = gate as Record<string, unknown>
+    if (Object.keys(candidate).sort().join(',') !== 'detail,name,state') {
+      validationError('Execution event gate result fields do not match the Task 8 contract.')
+    }
+    const name = stringValue(candidate['name'], 'gate name')
+    const detail = stringValue(candidate['detail'], 'gate detail')
+    if (name.trim() !== name || detail.trim() !== detail
+      || (candidate['state'] !== 'pass' && candidate['state'] !== 'block')) {
+      validationError('Execution event gate result has an invalid semantic value.')
+    }
+  }
+}
+
 export function parseExecutionEventJsonLine(line: string): JmbExecutionEvent {
   let decoded: unknown
   try {
@@ -161,7 +187,7 @@ export function parseExecutionEventJsonLine(line: string): JmbExecutionEvent {
 
   const decisionId = stringValue(value['decision_id'], 'decision_id')
   const observationId = stringValue(value['observation_id'], 'observation_id')
-  if (!Array.isArray(value['gate_results'])) validationError('Execution event gate_results must be an array.')
+  validateGateResults(value['gate_results'])
   nullableFiniteValue(value['calculated_risk'], 'calculated_risk')
   nullableFiniteValue(value['requested_volume'], 'requested_volume')
   const requestedPrice = nullableFiniteValue(value['requested_price'], 'requested_price')
@@ -290,30 +316,83 @@ export function outcomeSummaryPath(root: string, broker: Broker, symbol: 'XAUUSD
 }
 
 function validateOutcomeRecord(value: unknown): JmbExecutionOutcomeRecord {
-  const record = objectValue(value) as unknown as JmbExecutionOutcomeRecord
-  if (record.schemaVersion !== 1
-    || (record.broker !== 'hfmarkets' && record.broker !== 'icmarkets')
-    || (record.server !== 'HFMarketsGlobal-Demo4' && record.server !== 'ICMarketsSC-Demo')
-    || record.accountMode !== 'demo'
-    || record.symbol !== 'XAUUSD'
-    || record.strategyVersion !== 'daily-trend-v1'
-    || record.source !== 'ea_demo'
-    || (record.result !== 'win' && record.result !== 'loss' && record.result !== 'breakeven')) {
+  const candidate = objectValue(value)
+  const actualFields = Reflect.ownKeys(candidate)
+  if (actualFields.some((field) => typeof field !== 'string')
+    || actualFields.map(String).sort().join(',') !== [...OUTCOME_RECORD_FIELDS].sort().join(',')) {
+    validationError('Execution learning record fields do not match the exact outcome contract.')
+  }
+
+  const broker = candidate['broker']
+  const server = candidate['server']
+  const result = candidate['result']
+  if (candidate['schemaVersion'] !== 1
+    || (broker !== 'hfmarkets' && broker !== 'icmarkets')
+    || (server !== 'HFMarketsGlobal-Demo4' && server !== 'ICMarketsSC-Demo')
+    || candidate['accountMode'] !== 'demo'
+    || candidate['symbol'] !== 'XAUUSD'
+    || candidate['strategyVersion'] !== 'daily-trend-v1'
+    || candidate['source'] !== 'ea_demo'
+    || (result !== 'win' && result !== 'loss' && result !== 'breakeven')) {
     validationError('Execution learning record contract is invalid.')
   }
+  if (server !== (broker === 'hfmarkets' ? 'HFMarketsGlobal-Demo4' : 'ICMarketsSC-Demo')) {
+    validationError('Execution learning broker and server pair is inconsistent.')
+  }
+  const outcomeEventId = stringValue(candidate['outcomeEventId'], 'outcomeEventId')
+  const outcomeAt = stringValue(candidate['outcomeAt'], 'outcomeAt')
+  const decisionId = stringValue(candidate['decisionId'], 'decisionId')
+  const observationId = stringValue(candidate['observationId'], 'observationId')
+  const positionId = stringValue(candidate['positionId'], 'positionId')
   for (const [field, item] of [
-    ['outcomeEventId', record.outcomeEventId], ['outcomeAt', record.outcomeAt], ['decisionId', record.decisionId],
-    ['observationId', record.observationId], ['positionId', record.positionId],
-  ] as const) stringValue(item, field)
-  if (!Number.isFinite(Date.parse(record.outcomeAt))) validationError('Execution learning outcomeAt is invalid.')
-  for (const [field, item] of [
-    ['netResult', record.netResult], ['commission', record.commission], ['swap', record.swap], ['fee', record.fee],
-  ] as const) finiteValue(item, field)
-  for (const [field, item] of [
-    ['requestedPrice', record.requestedPrice], ['acceptedPrice', record.acceptedPrice], ['slippage', record.slippage],
-    ['maxAdverseExcursion', record.maxAdverseExcursion], ['maxFavorableExcursion', record.maxFavorableExcursion],
-  ] as const) nullableFiniteValue(item, field)
-  return record
+    ['outcomeEventId', outcomeEventId], ['outcomeAt', outcomeAt], ['decisionId', decisionId],
+    ['observationId', observationId], ['positionId', positionId],
+  ] as const) {
+    if (item.trim() !== item) validationError(`Execution learning ${field} must be canonical text.`)
+  }
+  if (!Number.isFinite(Date.parse(outcomeAt))) validationError('Execution learning outcomeAt is invalid.')
+  const netResult = finiteValue(candidate['netResult'], 'netResult')
+  const commission = finiteValue(candidate['commission'], 'commission')
+  const swap = finiteValue(candidate['swap'], 'swap')
+  const fee = finiteValue(candidate['fee'], 'fee')
+  const requestedPrice = nullableFiniteValue(candidate['requestedPrice'], 'requestedPrice')
+  const acceptedPrice = nullableFiniteValue(candidate['acceptedPrice'], 'acceptedPrice')
+  const slippage = nullableFiniteValue(candidate['slippage'], 'slippage')
+  const maxAdverseExcursion = nullableFiniteValue(candidate['maxAdverseExcursion'], 'maxAdverseExcursion')
+  const maxFavorableExcursion = nullableFiniteValue(candidate['maxFavorableExcursion'], 'maxFavorableExcursion')
+  const expectedResult = netResult > 0 ? 'win' : netResult < 0 ? 'loss' : 'breakeven'
+  if (result !== expectedResult) validationError('Execution learning result is inconsistent with netResult.')
+  const expectedSlippage = requestedPrice === null || acceptedPrice === null
+    ? null
+    : acceptedPrice - requestedPrice
+  if (slippage !== expectedSlippage) {
+    validationError('Execution learning slippage is inconsistent with requested and accepted prices.')
+  }
+
+  return {
+    schemaVersion: 1,
+    outcomeEventId,
+    outcomeAt,
+    broker,
+    server,
+    accountMode: 'demo',
+    symbol: 'XAUUSD',
+    strategyVersion: 'daily-trend-v1',
+    decisionId,
+    observationId,
+    positionId,
+    result,
+    netResult,
+    commission,
+    swap,
+    fee,
+    requestedPrice,
+    acceptedPrice,
+    slippage,
+    maxAdverseExcursion,
+    maxFavorableExcursion,
+    source: 'ea_demo',
+  }
 }
 
 export async function readExecutionLearningRecords(
@@ -399,16 +478,17 @@ async function withAppendLock<T>(key: string, operation: () => Promise<T>): Prom
 }
 
 export async function appendOutcomeOnce(root: string, record: JmbExecutionOutcomeRecord): Promise<boolean> {
-  validateOutcomeRecord(record)
-  const journalPath = outcomeJournalPath(root, record.broker, record.symbol)
+  const normalizedRecord = validateOutcomeRecord(record)
+  const journalPath = outcomeJournalPath(root, normalizedRecord.broker, normalizedRecord.symbol)
   return withAppendLock(journalPath, async () => {
-    const records = await readExecutionLearningRecords(root, record.broker, record.symbol)
-    if (records.some((item) => item.outcomeEventId === record.outcomeEventId)) return false
-    await appendDurableJsonLine(journalPath, record)
+    const records = await readExecutionLearningRecords(root, normalizedRecord.broker, normalizedRecord.symbol)
+    const alreadyJournaled = records.some((item) => item.outcomeEventId === normalizedRecord.outcomeEventId)
+    const authoritativeRecords = alreadyJournaled ? records : [...records, normalizedRecord]
+    if (!alreadyJournaled) await appendDurableJsonLine(journalPath, normalizedRecord)
     await writeJsonAtomically(
-      outcomeSummaryPath(root, record.broker, record.symbol),
-      summarizeOutcomes([...records, record]),
+      outcomeSummaryPath(root, normalizedRecord.broker, normalizedRecord.symbol),
+      summarizeOutcomes(authoritativeRecords),
     )
-    return true
+    return !alreadyJournaled
   })
 }
