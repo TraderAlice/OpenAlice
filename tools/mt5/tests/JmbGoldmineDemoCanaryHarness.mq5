@@ -6,6 +6,7 @@
 #include "..\JmbGoldmineDemoCanary\JmbCanaryGates.mqh"
 #include "..\JmbGoldmineDemoCanary\JmbCanaryState.mqh"
 #include "..\JmbGoldmineDemoCanary\JmbCanaryReconcile.mqh"
+#include "..\JmbGoldmineDemoCanary\JmbCanaryTradeGateway.mqh"
 
 enum HarnessMutation
 {
@@ -23,6 +24,8 @@ enum HarnessMutation
    HARNESS_STOP_TICK_UNAVAILABLE,
    HARNESS_STOP_TICK_MISALIGNED,
    HARNESS_RISK_EXCESSIVE,
+   HARNESS_TIGHT_DAILY_LOSS_EQUALITY,
+   HARNESS_HARD_DAILY_LOSS_EQUALITY,
    HARNESS_SPREAD_EXCESSIVE,
    HARNESS_SESSION_CLOSED,
    HARNESS_NEWS_BLOCKED,
@@ -177,7 +180,8 @@ void BuildHarnessEnvironment(CanaryEnvironment &environment)
    environment.reconciliationComplete=true;
 }
 
-void ApplyHarnessMutation(const HarnessMutation mutation,CanaryDecision &decision,CanaryEnvironment &environment)
+void ApplyHarnessMutation(const HarnessMutation mutation,CanaryPolicy &policy,
+                          CanaryDecision &decision,CanaryEnvironment &environment)
 {
    if(mutation==HARNESS_NON_DEMO) environment.accountIsDemo=false;
    else if(mutation==HARNESS_SERVER_MISMATCH) environment.serverMatches=false;
@@ -192,6 +196,12 @@ void ApplyHarnessMutation(const HarnessMutation mutation,CanaryDecision &decisio
    else if(mutation==HARNESS_STOP_TICK_UNAVAILABLE) environment.stopTickSizeAvailable=false;
    else if(mutation==HARNESS_STOP_TICK_MISALIGNED) environment.stopTickAligned=false;
    else if(mutation==HARNESS_RISK_EXCESSIVE) environment.calculatedStopRisk=10.01;
+   else if(mutation==HARNESS_TIGHT_DAILY_LOSS_EQUALITY)
+   {
+      policy.maxDailyLoss=5.0;
+      environment.dailyRealizedLoss=5.0;
+   }
+   else if(mutation==HARNESS_HARD_DAILY_LOSS_EQUALITY) environment.dailyRealizedLoss=40.0;
    else if(mutation==HARNESS_SPREAD_EXCESSIVE) environment.currentSpread=0.76;
    else if(mutation==HARNESS_SESSION_CLOSED) environment.sessionOpen=false;
    else if(mutation==HARNESS_NEWS_BLOCKED) environment.newsBlackout=true;
@@ -214,7 +224,7 @@ bool RunHarnessCase(const HarnessCase &test_case)
    BuildHarnessPolicy(policy);
    BuildHarnessDecision(decision);
    BuildHarnessEnvironment(environment);
-   ApplyHarnessMutation(test_case.mutation,decision,environment);
+   ApplyHarnessMutation(test_case.mutation,policy,decision,environment);
    CanaryEvaluation evaluation=EvaluateCanaryGates(decision,policy,environment);
    bool passed=evaluation.state==test_case.expectedState && evaluation.blockingGate==test_case.expectedGate;
    PrintFormat("%s %s state=%s gate=%s",passed ? "PASS" : "FAIL",test_case.name,
@@ -531,6 +541,45 @@ bool RunFourLossResetCase()
    return passed;
 }
 
+bool RunGatewayBindingCase()
+{
+   bool wrong_account_blocked=!CanaryGatewayBindingMatches("hfmarkets","HFMarketsGlobal-Demo4",
+      123456,"XAUUSD",880101,ACCOUNT_TRADE_MODE_DEMO,"HFMarketsGlobal-Demo4",654321,"XAUUSD");
+   bool account_switch_blocked=!CanaryGatewayBindingMatches("hfmarkets","HFMarketsGlobal-Demo4",
+      123456,"XAUUSD",880101,ACCOUNT_TRADE_MODE_DEMO,"ICMarketsSC-Demo",123456,"XAUUSD");
+   PrintFormat("%s wrong demo account blocks emergency close",wrong_account_blocked ? "PASS" : "FAIL");
+   PrintFormat("%s account switch blocks reversal close",account_switch_blocked ? "PASS" : "FAIL");
+   return wrong_account_blocked && account_switch_blocked;
+}
+
+bool RunActivePositionCorrelationCase()
+{
+   CanarySafetyLatch latch;
+   InitializeCanarySafetyLatch(latch);
+   latch.valid=true;
+   latch.pendingEntryDecisionId="bc0bc128a9155065dda0b5bc";
+   latch.pendingEntryObservationId="53f2bd057c1ee3608a02d1f2";
+   latch.pendingEntryAttemptedAt=1;
+   latch.pendingRequestedVolume=0.01;
+   latch.pendingRequestedPrice=2400.0;
+   latch.pendingRequestedStopLoss=2392.0;
+   latch.pendingCalculatedRisk=7.5;
+   latch.pendingEntryComment=CanaryEntryCorrelationComment(latch.pendingEntryDecisionId);
+   bool activated=ActivateCanaryPositionCorrelation(latch,4321);
+   ClearCanaryPendingEntryLatch(latch);
+   CanaryExecutionEvent stopped;
+   InitializeCanaryExecutionEvent(stopped);
+   bool restart_stop_correlated=activated && ApplyCanaryPositionCorrelation(stopped,latch)
+      && stopped.decisionId=="bc0bc128a9155065dda0b5bc"
+      && stopped.observationId=="53f2bd057c1ee3608a02d1f2"
+      && CanaryNearlyEqual(stopped.calculatedRisk,7.5);
+   string reversal_decision="0123456789abcdef01234567";
+   bool decisions_separate=restart_stop_correlated && stopped.decisionId!=reversal_decision;
+   PrintFormat("%s protected fill then later stop after restart",restart_stop_correlated ? "PASS" : "FAIL");
+   PrintFormat("%s opening decision differs from reversal decision",decisions_separate ? "PASS" : "FAIL");
+   return restart_stop_correlated && decisions_separate;
+}
+
 int OnInit()
 {
    HarnessCase cases[];
@@ -548,6 +597,8 @@ int OnInit()
    AddHarnessCase(cases,"stop tick unavailable",HARNESS_STOP_TICK_UNAVAILABLE,CANARY_LIFECYCLE_BLOCKED,"stop_risk");
    AddHarnessCase(cases,"stop tick misaligned",HARNESS_STOP_TICK_MISALIGNED,CANARY_LIFECYCLE_BLOCKED,"stop_risk");
    AddHarnessCase(cases,"risk",HARNESS_RISK_EXCESSIVE,CANARY_LIFECYCLE_BLOCKED,"stop_risk");
+   AddHarnessCase(cases,"tighter daily loss equality",HARNESS_TIGHT_DAILY_LOSS_EQUALITY,CANARY_LIFECYCLE_BLOCKED,"daily_loss_count");
+   AddHarnessCase(cases,"hard daily loss equality",HARNESS_HARD_DAILY_LOSS_EQUALITY,CANARY_LIFECYCLE_BLOCKED,"daily_loss_count");
    AddHarnessCase(cases,"spread",HARNESS_SPREAD_EXCESSIVE,CANARY_LIFECYCLE_BLOCKED,"spread_deviation");
    AddHarnessCase(cases,"session",HARNESS_SESSION_CLOSED,CANARY_LIFECYCLE_BLOCKED,"session");
    AddHarnessCase(cases,"news",HARNESS_NEWS_BLOCKED,CANARY_LIFECYCLE_BLOCKED,"news");
@@ -592,6 +643,8 @@ int OnInit()
    if(!RunPolicyVersionGrammarCase()) failures++;
    if(!RunMalformedProcessedStateCase()) failures++;
    if(!RunFourLossResetCase()) failures++;
+   if(!RunGatewayBindingCase()) failures++;
+   if(!RunActivePositionCorrelationCase()) failures++;
 
    PrintFormat("JMB demo canary harness completed with %d failure(s).",failures);
    if(failures==0) Print("JMB_CANARY_HARNESS PASS");

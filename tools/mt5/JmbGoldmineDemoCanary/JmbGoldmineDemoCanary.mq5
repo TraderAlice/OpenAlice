@@ -37,6 +37,7 @@ void BuildCanaryLifecycleEvent(const CanaryDecision &decision,
                                const CanaryReconciliation &reconciliation,
                                const CanaryLifecycleState state,
                                const string result_code,const string result_detail,
+                               const double calculated_risk,
                                CanaryExecutionEvent &event)
 {
    InitializeCanaryExecutionEvent(event);
@@ -48,8 +49,8 @@ void BuildCanaryLifecycleEvent(const CanaryDecision &decision,
    event.decisionId=decision.loaded ? decision.decisionId : "";
    event.observationId=decision.loaded ? decision.observationId : "";
    event.gateResultsJson=decision.loaded ? decision.gateResultsJson : "[]";
-   event.hasCalculatedRisk=decision.loaded && decision.maxRiskAmount>0.0;
-   event.calculatedRisk=decision.maxRiskAmount;
+   event.hasCalculatedRisk=decision.loaded && calculated_risk>0.0;
+   event.calculatedRisk=calculated_risk;
    event.hasRequestedOrder=decision.loaded;
    event.requestedVolume=decision.volume;
    event.requestedPrice=decision.entryReferencePrice;
@@ -74,14 +75,15 @@ void BuildCanaryLifecycleEvent(const CanaryDecision &decision,
    event.netResult=reconciliation.netResult;
 }
 
-bool AppendCanaryOrderRequestingEvent(const CanaryDecision &decision,string &detail)
+bool AppendCanaryOrderRequestingEvent(const CanaryDecision &decision,
+                                      const double calculated_risk,string &detail)
 {
    CanaryReconciliation reconciliation;
    InitializeCanaryReconciliation(reconciliation);
    reconciliation.reconciliationState="pending";
    CanaryExecutionEvent candidate;
    BuildCanaryLifecycleEvent(decision,reconciliation,CANARY_LIFECYCLE_ORDER_REQUESTING,"",
-      "Request persistence completed before submission.",candidate);
+      "Request persistence completed before submission.",calculated_risk,candidate);
    if(!AppendCanaryExecutionEvent(candidate,detail)) return false;
    g_latest_event=candidate;
    return true;
@@ -237,7 +239,8 @@ void SubmitReadyCanaryDecision(const CanaryDecision &decision,
                                const CanaryProcessedState &processed_state,
                                const string processed_path,
                                const bool effective_execution_enabled,
-                               const bool status_persisted)
+                               const bool status_persisted,
+                               const double calculated_risk)
 {
    if(!status_persisted) return;
    if(!InpDemoExecutionEnabled || InpKillSwitch || !effective_execution_enabled
@@ -246,7 +249,7 @@ void SubmitReadyCanaryDecision(const CanaryDecision &decision,
       || CanaryProcessedStateContains(processed_state,decision.decisionId,decision.observationId)) return;
 
    string persistence_detail="";
-   if(!AppendCanaryOrderRequestingEvent(decision,persistence_detail))
+   if(!AppendCanaryOrderRequestingEvent(decision,calculated_risk,persistence_detail))
    {
       Print("JMB demo canary order-requesting event failed: ",persistence_detail);
       return;
@@ -274,13 +277,19 @@ void SubmitReadyCanaryDecision(const CanaryDecision &decision,
    latch.pendingEntryAttemptedAt=pending_entry_attempted_at;
    latch.pendingEntryOrderId="";
    latch.pendingEntryDealId="";
+   latch.pendingRequestedVolume=decision.volume;
+   latch.pendingRequestedPrice=decision.entryReferencePrice;
+   latch.pendingRequestedStopLoss=decision.stopLoss;
+   latch.pendingCalculatedRisk=calculated_risk;
+   latch.pendingEntryComment=CanaryEntryCorrelationComment(decision.decisionId);
    if(!PersistCanarySafetyLatch(InpBrokerId,InpSymbol,latch,latch_detail))
    {
       Print("JMB demo canary pre-submit correlation latch failed: ",latch_detail);
       return;
    }
 
-   TradeSubmitResult submission=SubmitProtectedMarketOrder(decision,policy);
+   TradeSubmitResult submission=SubmitProtectedMarketOrder(decision,policy,InpBrokerId,
+      InpExpectedServer,InpExpectedAccountLogin,InpSymbol,InpMagicNumber);
    g_last_submit_sent=submission.sent;
    g_last_submit_retcode=submission.retcode;
    g_last_submit_order_ticket=submission.order_ticket;
@@ -305,7 +314,7 @@ void SubmitReadyCanaryDecision(const CanaryDecision &decision,
       ? CANARY_LIFECYCLE_ORDER_REJECTED : CANARY_LIFECYCLE_RECONCILIATION_REQUIRED;
    CanaryExecutionEvent candidate;
    BuildCanaryLifecycleEvent(decision,pending,result_state,IntegerToString((long)submission.retcode),
-      submission.detail,candidate);
+      submission.detail,calculated_risk,candidate);
    candidate.hasAcceptedOrder=submission.accepted_volume>0.0;
    candidate.acceptedVolume=submission.accepted_volume;
    candidate.acceptedPrice=submission.accepted_price;
@@ -585,7 +594,7 @@ bool AppendManagedCanaryEvent(const CanaryDecision &decision,
                               const string result_code,const string result_detail)
 {
    CanaryExecutionEvent candidate;
-   BuildCanaryLifecycleEvent(decision,reconciliation,state,result_code,result_detail,candidate);
+   BuildCanaryLifecycleEvent(decision,reconciliation,state,result_code,result_detail,0.0,candidate);
    string detail="";
    if(AppendCanaryExecutionEvent(candidate,detail))
    {
@@ -593,6 +602,25 @@ bool AppendManagedCanaryEvent(const CanaryDecision &decision,
       return true;
    }
    Print("JMB demo canary lifecycle event failed: ",detail);
+   return false;
+}
+
+bool AppendManagedCanaryPositionEvent(const CanaryDecision &decision,
+                                      const CanaryReconciliation &reconciliation,
+                                      const CanaryLifecycleState state,
+                                      const string result_code,const string result_detail,
+                                      const CanarySafetyLatch &latch)
+{
+   CanaryExecutionEvent candidate;
+   BuildCanaryLifecycleEvent(decision,reconciliation,state,result_code,result_detail,0.0,candidate);
+   if(!ApplyCanaryPositionCorrelation(candidate,latch)) return false;
+   string detail="";
+   if(AppendCanaryExecutionEvent(candidate,detail))
+   {
+      g_latest_event=candidate;
+      return true;
+   }
+   Print("JMB demo canary correlated lifecycle event failed: ",detail);
    return false;
 }
 
@@ -604,8 +632,8 @@ bool HandleCanaryEmergencyClose(const CanaryDecision &decision,const CanaryPolic
    latch.protectionError=true;
    latch.unresolved=true;
    if(latch.emergencyCloseAttempted) return false;
-   if(!AppendManagedCanaryEvent(decision,reconciliation,CANARY_LIFECYCLE_EMERGENCY_CLOSE,"",
-      "Emergency protective close is durably requesting.")) return false;
+   if(!AppendManagedCanaryPositionEvent(decision,reconciliation,CANARY_LIFECYCLE_EMERGENCY_CLOSE,"",
+      "Emergency protective close is durably requesting.",latch)) return false;
    latch.emergencyCloseAttempted=true;
    latch.emergencyPositionId=CanaryTicketString(reconciliation.position.identifier);
    string detail="";
@@ -615,7 +643,8 @@ bool HandleCanaryEmergencyClose(const CanaryDecision &decision,const CanaryPolic
       return false;
    }
 
-   TradeSubmitResult submission=SubmitCanaryEmergencyClose(reconciliation.position,policy);
+   TradeSubmitResult submission=SubmitCanaryEmergencyClose(reconciliation.position,policy,
+      InpBrokerId,InpExpectedServer,InpExpectedAccountLogin,InpSymbol,InpMagicNumber);
    g_last_submit_sent=submission.sent;
    g_last_submit_retcode=submission.retcode;
    g_last_submit_order_ticket=submission.order_ticket;
@@ -625,8 +654,8 @@ bool HandleCanaryEmergencyClose(const CanaryDecision &decision,const CanaryPolic
    g_last_submit_detail=submission.detail;
    g_last_result_class=ClassifyCanaryBrokerResult(submission.sent,submission.retcode,
       reconciliation.position.volume,submission.accepted_volume);
-   AppendManagedCanaryEvent(decision,reconciliation,CANARY_LIFECYCLE_EMERGENCY_CLOSE,
-      IntegerToString((long)submission.retcode),submission.detail);
+   AppendManagedCanaryPositionEvent(decision,reconciliation,CANARY_LIFECYCLE_EMERGENCY_CLOSE,
+      IntegerToString((long)submission.retcode),submission.detail,latch);
    PersistCanarySafetyLatch(InpBrokerId,InpSymbol,latch,detail);
    g_reconciliation_dirty=true;
    return true;
@@ -652,7 +681,8 @@ bool HandleCanaryOppositeClose(const CanaryDecision &decision,const CanaryPolicy
       return false;
    }
 
-   TradeSubmitResult submission=SubmitCanaryReversalClose(reconciliation.position,decision,policy);
+   TradeSubmitResult submission=SubmitCanaryReversalClose(reconciliation.position,decision,policy,
+      InpBrokerId,InpExpectedServer,InpExpectedAccountLogin,InpSymbol,InpMagicNumber);
    g_last_submit_sent=submission.sent;
    g_last_submit_retcode=submission.retcode;
    g_last_submit_order_ticket=submission.order_ticket;
@@ -701,11 +731,15 @@ bool ConfirmCanaryOppositeClosure(const CanaryDecision &decision,
                                   const CanaryReconciliation &reconciliation,
                                   CanarySafetyLatch &latch)
 {
-   if(!AppendManagedCanaryEvent(decision,reconciliation,CANARY_LIFECYCLE_CLOSED,"",
-      "Opposite-signal closure is broker-confirmed and durable before gate re-evaluation.")) return false;
+   bool closed_event_recorded=CanaryLifecycleEventRecorded(InpBrokerId,CANARY_LIFECYCLE_CLOSED,
+      reconciliation.closedPositionId);
+   if(!closed_event_recorded
+      && !AppendManagedCanaryPositionEvent(decision,reconciliation,CANARY_LIFECYCLE_CLOSED,"",
+         "Opposite-signal closure is broker-confirmed and durable before gate re-evaluation.",latch)) return false;
    latch.unresolved=false;
    latch.pendingCloseDecisionId="";
    latch.pendingCloseObservationId="";
+   ClearCanaryActivePositionCorrelation(latch);
    string detail="";
    if(!PersistCanarySafetyLatch(InpBrokerId,InpSymbol,latch,detail))
    {
@@ -760,32 +794,44 @@ void Evaluate()
    if(reconciled && reconciliation.state==CANARY_LIFECYCLE_FILLED_PROTECTED
       && latch.unresolved && !latch.protectionError)
    {
-      latch.unresolved=false;
-      ClearCanaryPendingEntryLatch(latch);
       string latch_detail="";
-      if(PersistCanarySafetyLatch(InpBrokerId,InpSymbol,latch,latch_detail))
+      bool correlation_activated=ActivateCanaryPositionCorrelation(latch,
+         reconciliation.position.identifier);
+      if(correlation_activated)
       {
-         g_last_result_class=CANARY_RESULT_NONE;
-         reconciled=ReconcileCanaryBrokerState(InpSymbol,InpMagicNumber,decision,observation_used,
-            CANARY_RESULT_NONE,latch,reconciliation);
-         g_reconciliation_dirty=!reconciled;
+         latch.unresolved=false;
+         ClearCanaryPendingEntryLatch(latch);
+         if(PersistCanarySafetyLatch(InpBrokerId,InpSymbol,latch,latch_detail))
+         {
+            g_last_result_class=CANARY_RESULT_NONE;
+            reconciled=ReconcileCanaryBrokerState(InpSymbol,InpMagicNumber,decision,observation_used,
+               CANARY_RESULT_NONE,latch,reconciliation);
+            g_reconciliation_dirty=!reconciled;
+         }
       }
+      else g_reconciliation_dirty=true;
    }
 
    if(reconciled && reconciliation.state==CANARY_LIFECYCLE_STOPPED
       && reconciliation.authoritativeStopClosure && latch.unresolved)
    {
-      latch.unresolved=false;
-      ClearCanaryPendingEntryLatch(latch);
-      g_last_result_class=CANARY_RESULT_NONE;
       string stopped_latch_detail="";
-      if(!PersistCanarySafetyLatch(InpBrokerId,InpSymbol,latch,stopped_latch_detail))
-         Print("JMB demo canary stopped-position latch failed: ",stopped_latch_detail);
+      if((latch.activePositionDecisionId!="" || ActivateCanaryPositionCorrelation(latch,
+            reconciliation.closedPositionId)))
+      {
+         latch.unresolved=false;
+         ClearCanaryPendingEntryLatch(latch);
+         g_last_result_class=CANARY_RESULT_NONE;
+         if(!PersistCanarySafetyLatch(InpBrokerId,InpSymbol,latch,stopped_latch_detail))
+            Print("JMB demo canary stopped-position latch failed: ",stopped_latch_detail);
+      }
    }
    bool authoritative_emergency_closure=reconciled
       && reconciliation.authoritativeEmergencyClosure;
    if(authoritative_emergency_closure && latch.unresolved)
    {
+      if(latch.activePositionDecisionId=="")
+         ActivateCanaryPositionCorrelation(latch,reconciliation.closedPositionId);
       latch.unresolved=false;
       ClearCanaryPendingEntryLatch(latch);
       g_last_result_class=CANARY_RESULT_NONE;
@@ -799,9 +845,24 @@ void Evaluate()
    CanaryEnvironment environment;
    BuildCanaryEnvironment(decision,policy,processed_state,reconciliation,latch,environment);
    CanaryEvaluation evaluation=EvaluateCanaryGates(decision,policy,environment);
+   bool mutation_identity_valid=CanaryGatewayIdentityValid(InpBrokerId,InpExpectedServer,
+      InpExpectedAccountLogin,InpSymbol,InpMagicNumber);
+   bool mutation_requested=reconciliation.state==CANARY_LIFECYCLE_EMERGENCY_CLOSE
+      || reconciliation.state==CANARY_LIFECYCLE_CLOSE_REQUESTING;
+   if(mutation_requested && !mutation_identity_valid)
+   {
+      reconciliation.state=CANARY_LIFECYCLE_BLOCKED;
+      reconciliation.available=false;
+      reconciliation.reconciliationState="identity_mismatch";
+      reconciliation.detail="The actual terminal identity changed; every broker mutation is refused.";
+      latch.valid=true;
+      latch.unresolved=true;
+      string identity_latch_detail="";
+      PersistCanarySafetyLatch(InpBrokerId,InpSymbol,latch,identity_latch_detail);
+   }
 
    if(reconciliation.state==CANARY_LIFECYCLE_EMERGENCY_CLOSE
-      && reconciliation.available && !reconciliation.hasForeignGoldExposure)
+      && mutation_identity_valid && reconciliation.available && !reconciliation.hasForeignGoldExposure)
       HandleCanaryEmergencyClose(decision,policy,reconciliation,latch);
    else if(reconciliation.state==CANARY_LIFECYCLE_CLOSE_REQUESTING && decision.loaded
       && !observation_used && latch.pendingCloseDecisionId=="")
@@ -810,7 +871,7 @@ void Evaluate()
       reversal_environment=environment;
       reversal_environment.hasEaPosition=false;
       CanaryEvaluation reversal_evaluation=EvaluateCanaryGates(decision,policy,reversal_environment);
-      if(reconciliation.available && !reconciliation.hasForeignGoldExposure
+      if(mutation_identity_valid && reconciliation.available && !reconciliation.hasForeignGoldExposure
          && reversal_evaluation.ready)
          HandleCanaryOppositeClose(decision,policy,processed_state,processed_path,reconciliation,latch);
    }
@@ -831,13 +892,34 @@ void Evaluate()
    if(reconciliation.state==CANARY_LIFECYCLE_FILLED_PROTECTED
       && !CanaryLifecycleEventRecorded(InpBrokerId,CANARY_LIFECYCLE_FILLED_PROTECTED,
          reconciliation.position.identifier))
-      AppendManagedCanaryEvent(decision,reconciliation,CANARY_LIFECYCLE_FILLED_PROTECTED,"",
-         "Broker-confirmed EA-owned exposure has a valid protective stop.");
+      AppendManagedCanaryPositionEvent(decision,reconciliation,CANARY_LIFECYCLE_FILLED_PROTECTED,"",
+         "Broker-confirmed EA-owned exposure has a valid protective stop.",latch);
    if(reconciliation.state==CANARY_LIFECYCLE_STOPPED
       && !CanaryLifecycleEventRecorded(InpBrokerId,CANARY_LIFECYCLE_STOPPED,
          reconciliation.closedPositionId))
-      AppendManagedCanaryEvent(decision,reconciliation,CANARY_LIFECYCLE_STOPPED,"",
-         "The fully reconciled stop-loss closure consumes its observation.");
+   {
+      if(AppendManagedCanaryPositionEvent(decision,reconciliation,CANARY_LIFECYCLE_STOPPED,"",
+         "The fully reconciled stop-loss closure consumes its observation.",latch))
+      {
+         latch.unresolved=false;
+         latch.pendingCloseDecisionId="";
+         latch.pendingCloseObservationId="";
+         ClearCanaryActivePositionCorrelation(latch);
+         string terminal_latch_detail="";
+         PersistCanarySafetyLatch(InpBrokerId,InpSymbol,latch,terminal_latch_detail);
+      }
+   }
+   else if(reconciliation.state==CANARY_LIFECYCLE_STOPPED
+      && CanaryLifecycleEventRecorded(InpBrokerId,CANARY_LIFECYCLE_STOPPED,
+         reconciliation.closedPositionId) && latch.activePositionDecisionId!="")
+   {
+      latch.unresolved=false;
+      latch.pendingCloseDecisionId="";
+      latch.pendingCloseObservationId="";
+      ClearCanaryActivePositionCorrelation(latch);
+      string recovered_terminal_detail="";
+      PersistCanarySafetyLatch(InpBrokerId,InpSymbol,latch,recovered_terminal_detail);
+   }
    if(reconciliation.state==CANARY_LIFECYCLE_PAUSED && reconciliation.hasClosedPosition
       && !CanaryLifecycleEventRecorded(InpBrokerId,CANARY_LIFECYCLE_PAUSED,
          reconciliation.closedPositionId))
@@ -862,7 +944,7 @@ void Evaluate()
       Print("JMB demo canary status publication failed: ",write_detail);
    if(reconciliation.state==CANARY_LIFECYCLE_READY)
       SubmitReadyCanaryDecision(decision,policy,evaluation,processed_state,processed_path,
-         effective_execution_enabled,status_persisted);
+         effective_execution_enabled,status_persisted,environment.calculatedStopRisk);
 
    g_evaluating=false;
 }

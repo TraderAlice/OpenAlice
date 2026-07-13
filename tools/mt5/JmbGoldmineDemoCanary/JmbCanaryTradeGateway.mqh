@@ -86,10 +86,27 @@ bool IsGatewayStopProtective(const CanaryDecision &decision,const MqlTick &tick)
       : decision.stopLoss>entry && decision.stopLoss-entry+tolerance>=minimum_distance;
 }
 
-bool CanaryGatewayIdentityValid(const long magic_number)
+bool CanaryGatewayBindingMatches(const string broker,const string expected_server,
+                                 const long expected_login,const string symbol,
+                                 const long magic_number,const ENUM_ACCOUNT_TRADE_MODE actual_mode,
+                                 const string actual_server,const long actual_login,
+                                 const string actual_symbol)
 {
-   return (ENUM_ACCOUNT_TRADE_MODE)AccountInfoInteger(ACCOUNT_TRADE_MODE)==ACCOUNT_TRADE_MODE_DEMO
-      && (magic_number==880101 || magic_number==880201);
+   return actual_mode==ACCOUNT_TRADE_MODE_DEMO
+      && expected_login>0 && actual_login==expected_login
+      && actual_server==expected_server
+      && expected_server==CanaryAllowedServer(broker)
+      && symbol=="XAUUSD" && actual_symbol==symbol
+      && magic_number==CanaryAllowedMagic(broker);
+}
+
+bool CanaryGatewayIdentityValid(const string broker,const string expected_server,
+                                const long expected_login,const string symbol,
+                                const long magic_number)
+{
+   return CanaryGatewayBindingMatches(broker,expected_server,expected_login,symbol,magic_number,
+      (ENUM_ACCOUNT_TRADE_MODE)AccountInfoInteger(ACCOUNT_TRADE_MODE),
+      AccountInfoString(ACCOUNT_SERVER),AccountInfoInteger(ACCOUNT_LOGIN),_Symbol);
 }
 
 bool SetCanaryCloseVolume(MqlTradeRequest &close,const double close_volume)
@@ -106,7 +123,7 @@ bool BuildCanaryCloseRequest(const CanaryPositionSnapshot &position,
                              const string comment,
                              MqlTradeRequest &close)
 {
-   if(!CanaryGatewayIdentityValid(magic_number) || !position.present || position.ticket==0
+   if(!position.present || position.ticket==0
       || (position.direction!="buy" && position.direction!="sell")) return false;
    MqlTick tick;
    double point=0.0;
@@ -130,17 +147,23 @@ bool BuildCanaryCloseRequest(const CanaryPositionSnapshot &position,
    return ResolveMarketFilling("XAUUSD",close.type_filling);
 }
 
-TradeSubmitResult SubmitProtectedMarketOrder(const CanaryDecision &decision,const CanaryPolicy &policy)
+TradeSubmitResult SubmitProtectedMarketOrder(const CanaryDecision &decision,const CanaryPolicy &policy,
+                                             const string broker,const string expected_server,
+                                             const long expected_login,const string symbol,
+                                             const long magic_number)
 {
    TradeSubmitResult result;
    ZeroMemory(result);
-   if(!CanaryGatewayIdentityValid(policy.magicNumber))
+   if(!CanaryGatewayIdentityValid(broker,expected_server,expected_login,symbol,magic_number))
    {
       result.detail="Account is not demo or broker magic is not allowlisted.";
       return result;
    }
    if(!decision.loaded || !policy.loaded || decision.accountMode!="demo"
       || decision.symbol!="XAUUSD" || policy.symbol!="XAUUSD"
+      || decision.broker!=broker || policy.broker!=broker
+      || decision.server!=expected_server || policy.server!=expected_server
+      || policy.magicNumber!=magic_number
       || decision.volume!=CANARY_HARD_MAX_VOLUME || policy.maxVolume!=CANARY_HARD_MAX_VOLUME)
    {
       result.detail="The immutable Gold or 0.01-volume binding failed.";
@@ -197,12 +220,19 @@ TradeSubmitResult SubmitProtectedMarketOrder(const CanaryDecision &decision,cons
 
 TradeSubmitResult SubmitCanaryReversalClose(const CanaryPositionSnapshot &position,
                                             const CanaryDecision &decision,
-                                            const CanaryPolicy &policy)
+                                            const CanaryPolicy &policy,
+                                            const string broker,const string expected_server,
+                                            const long expected_login,const string symbol,
+                                            const long magic_number)
 {
    MqlTradeRequest request={};
    TradeSubmitResult result;
    ZeroMemory(result);
-   if(!decision.loaded || !policy.loaded || decision.symbol!="XAUUSD"
+   if(!CanaryGatewayIdentityValid(broker,expected_server,expected_login,symbol,magic_number)
+      || !decision.loaded || !policy.loaded || decision.symbol!="XAUUSD"
+      || decision.broker!=broker || policy.broker!=broker
+      || decision.server!=expected_server || policy.server!=expected_server
+      || policy.magicNumber!=magic_number
       || policy.symbol!="XAUUSD" || !BuildCanaryCloseRequest(position,policy.magicNumber,
          policy.maxDeviation,"JMB-REV:"+StringSubstr(decision.decisionId,0,16),request))
    {
@@ -213,12 +243,17 @@ TradeSubmitResult SubmitCanaryReversalClose(const CanaryPositionSnapshot &positi
 }
 
 TradeSubmitResult SubmitCanaryEmergencyClose(const CanaryPositionSnapshot &position,
-                                             const CanaryPolicy &policy)
+                                             const CanaryPolicy &policy,
+                                             const string broker,const string expected_server,
+                                             const long expected_login,const string symbol,
+                                             const long magic_number)
 {
    MqlTradeRequest request={};
    TradeSubmitResult result;
    ZeroMemory(result);
-   if(!policy.loaded || policy.symbol!="XAUUSD"
+   if(!CanaryGatewayIdentityValid(broker,expected_server,expected_login,symbol,magic_number)
+      || !policy.loaded || policy.symbol!="XAUUSD" || policy.broker!=broker
+      || policy.server!=expected_server || policy.magicNumber!=magic_number
       || !BuildCanaryCloseRequest(position,policy.magicNumber,policy.maxDeviation,
          "JMB-EMERGENCY-CLOSE",request))
    {

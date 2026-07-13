@@ -13,7 +13,7 @@ string IsoTime(datetime value)
 {
    MqlDateTime parts;
    TimeToStruct(value, parts);
-   return StringFormat("%04d-%02d-%02dT%02d:%02d:%02d", parts.year, parts.mon, parts.day, parts.hour, parts.min, parts.sec);
+   return StringFormat("%04d-%02d-%02dT%02d:%02d:%02d.000Z", parts.year, parts.mon, parts.day, parts.hour, parts.min, parts.sec);
 }
 
 string AccountModeLabel()
@@ -122,10 +122,10 @@ void WriteHeartbeat()
       "trade_allowed", "trade_expert", "symbol_trade_mode", "bid", "ask", "spread_price", "tick_time",
       "contract_size", "volume_min", "volume_max", "volume_step", "stops_level", "open_positions", "open_orders");
    FileWrite(handle,
-      IsoTime(TimeCurrent()), InpBrokerId, InpSymbol, "read_only", AccountModeLabel(), AccountInfoString(ACCOUNT_SERVER),
+      IsoTime(TimeGMT()), InpBrokerId, InpSymbol, "read_only", AccountModeLabel(), AccountInfoString(ACCOUNT_SERVER),
       (int)TerminalInfoInteger(TERMINAL_CONNECTED), (int)AccountInfoInteger(ACCOUNT_TRADE_ALLOWED),
       (int)AccountInfoInteger(ACCOUNT_TRADE_EXPERT), (int)SymbolInfoInteger(InpSymbol, SYMBOL_TRADE_MODE),
-      tick.bid, tick.ask, tick.ask - tick.bid, IsoTime(tick.time), SymbolInfoDouble(InpSymbol, SYMBOL_TRADE_CONTRACT_SIZE),
+      tick.bid, tick.ask, tick.ask - tick.bid, IsoTime(TimeGMT()), SymbolInfoDouble(InpSymbol, SYMBOL_TRADE_CONTRACT_SIZE),
       SymbolInfoDouble(InpSymbol, SYMBOL_VOLUME_MIN), SymbolInfoDouble(InpSymbol, SYMBOL_VOLUME_MAX),
       SymbolInfoDouble(InpSymbol, SYMBOL_VOLUME_STEP), (int)SymbolInfoInteger(InpSymbol, SYMBOL_TRADE_STOPS_LEVEL),
       PositionsTotal(), OrdersTotal());

@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises'
+import { open } from 'node:fs/promises'
 import { join } from 'node:path'
 
 export type JmbExecutionLifecycleState =
@@ -95,6 +95,15 @@ const LIFECYCLE_STATES = new Set<JmbExecutionLifecycleState>([
 const ROLLOUT_STAGES = new Set<JmbExecutionRolloutStage>(['status_only', 'hfm_canary', 'ic_canary', 'both_demo'])
 const MAX_STATUS_AGE_MS = 2 * 60_000
 const MAX_CLOCK_SKEW_MS = 60_000
+const RFC3339_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/
+const EXPECTED_SERVERS: Record<JmbExecutionBroker, string> = {
+  hfmarkets: 'HFMarketsGlobal-Demo4',
+  icmarkets: 'ICMarketsSC-Demo',
+}
+
+function isCanonicalUtcTimestamp(value: string): boolean {
+  return RFC3339_UTC.test(value) && Number.isFinite(Date.parse(value))
+}
 
 function parseCsvRecords(text: string): string[][] {
   const records: string[][] = []
@@ -181,8 +190,9 @@ export function parseExecutionStatusCsv(text: string): JmbExecutionStatusSummary
 
   const row = Object.fromEntries(STATUS_HEADER.map((field, index) => [field, values[index] ?? '']))
   if (row['schema_version'] !== '1') throw new Error('Execution status schema_version must be 1.')
-  if (!Number.isFinite(Date.parse(row['captured_at']!))) throw new Error('Execution status captured_at is invalid.')
+  if (!isCanonicalUtcTimestamp(row['captured_at']!)) throw new Error('Execution status captured_at must be canonical RFC 3339 UTC.')
   if (row['broker'] !== 'hfmarkets' && row['broker'] !== 'icmarkets') throw new Error('Execution status broker is not allowlisted.')
+  if (row['server'] !== EXPECTED_SERVERS[row['broker']]) throw new Error('Execution status broker and server pairing is invalid.')
   if (row['account_mode'] !== 'demo') throw new Error('Execution status must describe a demo account.')
   if (row['symbol'] !== 'XAUUSD' && row['symbol'] !== 'EURUSD') throw new Error('Execution status symbol is not allowlisted.')
   if (!LIFECYCLE_STATES.has(row['state'] as JmbExecutionLifecycleState)) throw new Error('Execution status lifecycle state is invalid.')
@@ -195,7 +205,7 @@ export function parseExecutionStatusCsv(text: string): JmbExecutionStatusSummary
   if (!hasEvent && (row['result_code'] !== '' || row['result_detail'] !== '')) {
     throw new Error('Execution status event result has no event identity.')
   }
-  if (hasEvent && !Number.isFinite(Date.parse(row['event_time']!))) throw new Error('Execution status event_time is invalid.')
+  if (hasEvent && !isCanonicalUtcTimestamp(row['event_time']!)) throw new Error('Execution status event_time must be canonical RFC 3339 UTC.')
 
   const hasPosition = assertExactGroup([
     row['position_direction']!, row['position_volume']!, row['position_open_price']!, row['position_stop_loss']!, row['position_id']!,
@@ -327,8 +337,16 @@ export async function summarizeLatestJmbExecutionStatus(
   now = new Date(),
 ): Promise<JmbExecutionStatusSummary> {
   let text: string
+  let modifiedAt: Date
   try {
-    text = await readFile(join(root, broker, symbol, 'latest_status.csv'), 'utf8')
+    const handle = await open(join(root, broker, symbol, 'latest_status.csv'), 'r')
+    try {
+      const [contents, metadata] = await Promise.all([handle.readFile('utf8'), handle.stat()])
+      text = contents
+      modifiedAt = metadata.mtime
+    } finally {
+      await handle.close()
+    }
   } catch (error) {
     return safeSummary(fileErrorCode(error) === 'ENOENT' ? 'missing' : 'malformed', broker, symbol)
   }
@@ -341,7 +359,7 @@ export async function summarizeLatestJmbExecutionStatus(
   }
   if (summary.broker !== broker || summary.symbol !== symbol) return safeSummary('malformed', broker, symbol)
 
-  const ageMs = now.getTime() - Date.parse(summary.capturedAt!)
+  const ageMs = now.getTime() - modifiedAt.getTime()
   if (ageMs > MAX_STATUS_AGE_MS || ageMs < -MAX_CLOCK_SKEW_MS) {
     return safeSummary('stale', broker, symbol, summary.capturedAt)
   }

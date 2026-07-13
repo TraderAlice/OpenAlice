@@ -138,7 +138,7 @@ Promotion evidence requires one HFM decision with a durable pre-request event, b
 
 Only after the HFM evidence is accepted may the operator build an IC-only `canary_ready` cost model, write an `ic_canary` policy, and locally enable the IC Markets demo EA. The same evidence chain is required, including IC-specific spread, deviation, volume, server, costs, identifiers, protective stop, and restart behavior. HFM must remain protected and reconciled or be paused.
 
-Only after both named ceremonies pass may the operator write `both_demo` policies. Each broker remains independently bound and paused. EURUSD remains shadow-only, and live execution remains absent.
+Only after both named ceremonies pass may the operator write `both_demo` policies. Each broker remains independently bound and pausable under its own gates. EURUSD remains shadow-only, and live execution remains absent.
 
 ### Pause, rollback, and recovery evidence
 

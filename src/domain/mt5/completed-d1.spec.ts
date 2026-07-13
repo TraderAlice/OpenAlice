@@ -73,6 +73,7 @@ describe('completed D1 broker bars', () => {
     await expect(readMt5CompletedD1(root, 'hfmarkets', 'XAUUSD', {
       now: new Date('2026-07-13T09:30:00.000Z'),
       maxAgeHours: 2,
+      expectedServer: 'HFMarketsGlobal-Demo4',
     })).resolves.toMatchObject({
       state: 'ready',
       ageHours: 1.5,
@@ -86,7 +87,7 @@ describe('completed D1 broker bars', () => {
     const directory = join(root, 'hfmarkets', 'XAUUSD')
     const path = join(directory, 'completed_d1.csv')
 
-    await expect(readMt5CompletedD1(root, 'hfmarkets', 'XAUUSD', { maxAgeHours: 2 })).resolves.toMatchObject({ state: 'missing', parsed: null })
+    await expect(readMt5CompletedD1(root, 'hfmarkets', 'XAUUSD', { maxAgeHours: 2, expectedServer: 'HFMarketsGlobal-Demo4' })).resolves.toMatchObject({ state: 'missing', parsed: null })
 
     await mkdir(directory, { recursive: true })
     await writeFile(path, csv([100, 101]))
@@ -94,13 +95,30 @@ describe('completed D1 broker bars', () => {
     await expect(readMt5CompletedD1(root, 'hfmarkets', 'XAUUSD', {
       now: new Date('2026-07-13T09:00:00.000Z'),
       maxAgeHours: 2,
+      expectedServer: 'HFMarketsGlobal-Demo4',
     })).resolves.toMatchObject({ state: 'stale', ageHours: 3, parsed: expect.any(Object) })
 
     await writeFile(path, csv([100, 101]).replace(',demo,', ',real,'))
-    await expect(readMt5CompletedD1(root, 'hfmarkets', 'XAUUSD', { maxAgeHours: 2 })).resolves.toMatchObject({ state: 'unsafe', parsed: null })
+    await expect(readMt5CompletedD1(root, 'hfmarkets', 'XAUUSD', { maxAgeHours: 2, expectedServer: 'HFMarketsGlobal-Demo4' })).resolves.toMatchObject({ state: 'unsafe', parsed: null })
 
     await writeFile(path, 'not,a,completed,d1,file')
-    await expect(readMt5CompletedD1(root, 'hfmarkets', 'XAUUSD', { maxAgeHours: 2 })).resolves.toMatchObject({ state: 'malformed', parsed: null })
+    await expect(readMt5CompletedD1(root, 'hfmarkets', 'XAUUSD', { maxAgeHours: 2, expectedServer: 'HFMarketsGlobal-Demo4' })).resolves.toMatchObject({ state: 'malformed', parsed: null })
+  })
+
+  it('fails closed when fresh completed D1 evidence comes from the wrong server', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-mt5-d1-'))
+    directories.push(root)
+    const directory = join(root, 'hfmarkets', 'XAUUSD')
+    const path = join(directory, 'completed_d1.csv')
+    await mkdir(directory, { recursive: true })
+    await writeFile(path, csv([100, 101, 103]).replaceAll('HFMarketsGlobal-Demo4', 'Other-Demo'))
+    await utimes(path, new Date('2026-07-13T09:00:00.000Z'), new Date('2026-07-13T09:00:00.000Z'))
+
+    await expect(readMt5CompletedD1(root, 'hfmarkets', 'XAUUSD', {
+      now: new Date('2026-07-13T09:30:00.000Z'),
+      maxAgeHours: 2,
+      expectedServer: 'HFMarketsGlobal-Demo4',
+    })).resolves.toMatchObject({ state: 'unsafe', parsed: null })
   })
 
   it('reads contents and modification time from the same file identity', async () => {
@@ -120,6 +138,7 @@ describe('completed D1 broker bars', () => {
     await expect(readMt5CompletedD1('root', 'hfmarkets', 'XAUUSD', {
       now: freshModifiedAt,
       maxAgeHours: 2,
+      expectedServer: 'HFMarketsGlobal-Demo4',
     })).resolves.toMatchObject({ state: 'stale', ageHours: 3 })
     expect(close).toHaveBeenCalledOnce()
   })

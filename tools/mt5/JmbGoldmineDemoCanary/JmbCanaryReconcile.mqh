@@ -537,8 +537,25 @@ bool ReconcileCanaryBrokerState(const string symbol,const long magic_number,
    bool correlated_entry_position=false;
    bool correlated_entry_closed=false;
    ulong correlated_entry_position_id=0;
-   if(latch.pendingEntryDecisionId!="")
+   string correlated_entry_decision_id="";
+   if(latch.activePositionDecisionId!="")
    {
+      correlated_entry_position=true;
+      correlated_entry_decision_id=latch.activePositionDecisionId;
+      correlated_entry_position_id=(ulong)StringToInteger(latch.activePositionId);
+      if(correlated_entry_position_id==0
+         || !ReadCanaryLifecyclePositionById(symbol,magic_number,correlated_entry_position_id,
+            correlated_entry_decision_id,reconciliation,correlated_entry_closed)
+         || (!correlated_entry_closed && (!reconciliation.position.present
+            || reconciliation.position.identifier!=correlated_entry_position_id)))
+      {
+         reconciliation.detail="The active opening correlation could not recover its exact position lifecycle.";
+         return false;
+      }
+   }
+   else if(latch.pendingEntryDecisionId!="")
+   {
+      correlated_entry_decision_id=latch.pendingEntryDecisionId;
       if(!FindCanaryPendingEntryPosition(latch,symbol,magic_number,now,
          correlated_entry_position,correlated_entry_position_id))
       {
@@ -547,7 +564,7 @@ bool ReconcileCanaryBrokerState(const string symbol,const long magic_number,
       }
       if(correlated_entry_position
          && !ReadCanaryLifecyclePositionById(symbol,magic_number,correlated_entry_position_id,
-            latch.pendingEntryDecisionId,reconciliation,correlated_entry_closed))
+            correlated_entry_decision_id,reconciliation,correlated_entry_closed))
       {
          reconciliation.detail="The correlated entry position lifecycle could not be recovered.";
          return false;
@@ -581,9 +598,11 @@ bool ReconcileCanaryBrokerState(const string symbol,const long magic_number,
       && decision.direction==reconciliation.position.direction;
    facts.oppositeDirection=!observation_used && decision.loaded && reconciliation.position.present
       && IsCanaryActionableOpposite(decision.direction,reconciliation.position.direction);
-   facts.closeConfirmed=latch.pendingCloseDecisionId!="" && !reconciliation.position.present
-      && !reconciliation.hasEaPendingOrder;
-   facts.stoppedObservation=latch.unresolved && correlated_entry_position && correlated_entry_closed
+   facts.closeConfirmed=latch.pendingCloseDecisionId!="" && correlated_entry_position
+      && correlated_entry_closed && !reconciliation.position.present && !reconciliation.hasEaPendingOrder;
+   facts.stoppedObservation=!latch.protectionError
+      && (latch.unresolved || latch.activePositionDecisionId!="")
+      && correlated_entry_position && correlated_entry_closed
       && reconciliation.lastCloseWasStop && !reconciliation.position.present
       && !reconciliation.hasEaPendingOrder;
    bool authoritative_stop_closure=facts.stoppedObservation;

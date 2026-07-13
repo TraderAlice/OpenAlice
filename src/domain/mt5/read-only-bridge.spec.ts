@@ -17,6 +17,10 @@ describe('readMt5ReadOnlyBridge', () => {
     expect(source).toContain('input string InpSymbol = "XAUUSD";')
     expect(source).not.toContain('input string InpSymbol = "XAUUSDb";')
     expect(source).toContain('OUTPUT_ROOT+"\\\\"+InpBrokerId+"\\\\"+InpSymbol+"\\\\completed_d1.csv"')
+    expect(source).toContain('%02d:%02d:%02d.000Z')
+    expect(source).toContain('IsoTime(TimeGMT())')
+    expect(source).not.toContain('IsoTime(TimeCurrent())')
+    expect(source).not.toContain('IsoTime(tick.time)')
   })
 
   it('accepts a fresh demo-only read-only heartbeat', async () => {

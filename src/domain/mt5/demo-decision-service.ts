@@ -52,6 +52,7 @@ export const DEFAULT_JMB_DEMO_INSTRUMENTS = [
 ] as const satisfies readonly JmbDemoInstrumentConfig[]
 
 const SPREAD_HEADER = 'schema_version,captured_at,broker,server,account_mode,symbol,bid,ask,spread,point,digits,contract_size,volume_min,volume_step,stops_level,freeze_level'
+const RFC3339_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/
 
 interface ResearchTrendReport {
   symbol: string
@@ -92,7 +93,9 @@ function parseSpreadEvidenceCsv(
       || values[5] !== 'XAUUSD') {
       throw new Error('Spread evidence identity does not match the demo Gold instrument.')
     }
-    if (!Number.isFinite(Date.parse(values[1]!))) throw new Error('Spread evidence captured_at is invalid.')
+    if (!RFC3339_UTC.test(values[1]!) || !Number.isFinite(Date.parse(values[1]!))) {
+      throw new Error('Spread evidence captured_at must be canonical RFC 3339 UTC.')
+    }
     finite(values[6], 'bid')
     finite(values[7], 'ask')
     const spread = finite(values[8], 'spread')
@@ -217,6 +220,7 @@ async function runInstrumentCycle(
     readMt5CompletedD1(roots.bridgeRoot, instrument.broker, instrument.symbol, {
       now,
       maxAgeHours: policy.policy?.completedObservationMaxAgeHours ?? 72,
+      expectedServer: instrument.server,
     }),
     summarizeMt5TradeLedger(roots.ledgerRoot, instrument.broker, instrument.symbol, now),
     readLedgerRows(roots.ledgerRoot, instrument),
@@ -233,7 +237,7 @@ async function runInstrumentCycle(
     now: nowIso,
     bridge: {
       state: bridge.state,
-      capturedAt: bridge.capturedAt ?? '',
+      capturedAt: bridge.lastUpdated ?? '',
       contractFingerprint: spreadEvidence.expectedContractFingerprint,
     },
     spreadSamples: spreadEvidence.samples,

@@ -119,7 +119,7 @@ export async function readMt5CompletedD1(
   root: string,
   broker: string,
   symbol: string,
-  options: { now?: Date; maxAgeHours: number },
+  options: { now?: Date; maxAgeHours: number; expectedServer: string },
 ): Promise<Mt5CompletedD1Summary> {
   if (!Number.isFinite(options.maxAgeHours) || options.maxAgeHours <= 0) {
     throw new Error('Completed D1 maximum age must be a positive finite number of hours')
@@ -162,10 +162,13 @@ export async function readMt5CompletedD1(
     }
   }
 
-  if (parsed.broker !== broker || parsed.symbol !== symbol || parsed.accountMode !== 'demo') {
+  if (parsed.broker !== broker
+    || parsed.server !== options.expectedServer
+    || parsed.symbol !== symbol
+    || parsed.accountMode !== 'demo') {
     return {
       state: 'unsafe',
-      detail: 'The completed D1 export identity does not match the requested demo broker and symbol.',
+      detail: 'The completed D1 export identity does not match the requested demo broker, server, and symbol.',
       ageHours: null,
       parsed: null,
     }

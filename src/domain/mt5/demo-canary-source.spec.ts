@@ -47,6 +47,28 @@ describe('MT5 demo canary source contract', () => {
     }
   })
 
+  it('revalidates the exact local account binding inside every mutating gateway', async () => {
+    const [gateway, main, harness] = await Promise.all([
+      readCanarySource('JmbCanaryTradeGateway.mqh'),
+      readCanarySource('JmbGoldmineDemoCanary.mq5'),
+      readFile(join('tools', 'mt5', 'tests', 'JmbGoldmineDemoCanaryHarness.mq5'), 'utf8'),
+    ])
+    const identity = gateway.match(/bool CanaryGatewayIdentityValid\([\s\S]*?\n\}/)?.[0] ?? ''
+    const binding = gateway.match(/bool CanaryGatewayBindingMatches\([\s\S]*?\n\}/)?.[0] ?? ''
+
+    expect(identity).toContain('ACCOUNT_LOGIN')
+    expect(identity).toContain('ACCOUNT_SERVER')
+    expect(identity).toContain('_Symbol')
+    expect(binding).toContain('actual_mode==ACCOUNT_TRADE_MODE_DEMO')
+    expect(binding).toContain('CanaryAllowedServer(broker)')
+    expect(binding).toContain('CanaryAllowedMagic(broker)')
+    expect(gateway.match(/CanaryGatewayIdentityValid\(/g)).toHaveLength(4)
+    expect(main).toContain('mutation_identity_valid')
+    expect(main).toContain('identity_mismatch')
+    expect(harness).toContain('wrong demo account blocks emergency close')
+    expect(harness).toContain('account switch blocks reversal close')
+  })
+
   it('reconciles authoritative Gold state by exact magic before any decision or resend', async () => {
     const [main, reconcile] = await Promise.all([
       readCanarySource('JmbGoldmineDemoCanary.mq5'),
@@ -232,6 +254,28 @@ describe('MT5 demo canary source contract', () => {
     expect(harness).toContain('unrelated stop remains unresolved')
   })
 
+  it('persists opening correlation through protected fill, restart, stop, and reversal closure', async () => {
+    const [main, reconcile, state, harness] = await Promise.all([
+      readCanarySource('JmbGoldmineDemoCanary.mq5'),
+      readCanarySource('JmbCanaryReconcile.mqh'),
+      readCanarySource('JmbCanaryState.mqh'),
+      readFile(join('tools', 'mt5', 'tests', 'JmbGoldmineDemoCanaryHarness.mq5'), 'utf8'),
+    ])
+
+    for (const field of [
+      'active_position_decision_id', 'active_position_observation_id', 'active_position_id',
+      'active_requested_volume', 'active_requested_price', 'active_requested_stop_loss',
+      'active_calculated_risk', 'active_entry_comment',
+    ]) expect(state).toContain(field)
+    expect(main).toContain('ActivateCanaryPositionCorrelation(')
+    expect(reconcile).toContain('latch.activePositionDecisionId')
+    expect(main).toContain('AppendManagedCanaryPositionEvent(')
+    expect(main).toMatch(/ConfirmCanaryOppositeClosure[\s\S]*AppendManagedCanaryPositionEvent[\s\S]*ClearCanaryActivePositionCorrelation/)
+    expect(main).toMatch(/CANARY_LIFECYCLE_STOPPED[\s\S]*AppendManagedCanaryPositionEvent[\s\S]*ClearCanaryActivePositionCorrelation/)
+    expect(harness).toContain('protected fill then later stop after restart')
+    expect(harness).toContain('opening decision differs from reversal decision')
+  })
+
   it('recovers a correlated stop or emergency closure independently of broker-day loss selection', async () => {
     const [reconcile, harness] = await Promise.all([
       readCanarySource('JmbCanaryReconcile.mqh'),
@@ -343,6 +387,10 @@ describe('MT5 demo canary source contract', () => {
 
     expect(source).toContain('CanaryEvaluation EvaluateCanaryGates(')
     expect(source).toContain('OrderCalcProfit(')
+    expect(source).toContain('environment.calculatedStopRisk')
+    expect(source).toContain('environment.dailyRealizedLoss<daily_ceiling')
+    expect(source).toMatch(/event\.calculatedRisk=calculated_risk/)
+    expect(source).not.toContain('event.calculatedRisk=decision.maxRiskAmount')
     expect(source).toContain('OrderCalcMargin(')
     expect(source).toContain('CalendarValueHistory(')
     expect(source).toContain('FileMove(temporary_path, FILE_COMMON, destination_path, FILE_COMMON | FILE_REWRITE)')

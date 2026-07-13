@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -121,6 +121,14 @@ describe('parseExecutionStatusCsv', () => {
     expect(() => parseExecutionStatusCsv(VALID_CSV.replace(',hfm_canary,1,', ',status_only,1,'))).toThrow(/status.only/i)
   })
 
+  it('rejects a broker paired with the other allowlisted demo server', () => {
+    expect(() => parseExecutionStatusCsv(VALID_CSV.replace('HFMarketsGlobal-Demo4', 'ICMarketsSC-Demo'))).toThrow(/broker.*server|server.*broker/i)
+  })
+
+  it('rejects workstation-local timestamps without a canonical UTC suffix', () => {
+    expect(() => parseExecutionStatusCsv(VALID_CSV.replaceAll('.000Z', ''))).toThrow(/timestamp|captured_at/i)
+  })
+
   it('accepts a protected fill while the kill switch blocks new entries', () => {
     expect(parseExecutionStatusCsv(VALID_CSV.replace(',hfm_canary,1,0,', ',hfm_canary,1,1,'))).toMatchObject({
       state: 'filled_protected',
@@ -174,7 +182,9 @@ describe('summarizeLatestJmbExecutionStatus', () => {
   it('summarizes a protected demo fill without exposing account login', async () => {
     const directory = join(root, 'hfmarkets', 'XAUUSD')
     await mkdir(directory, { recursive: true })
-    await writeFile(join(directory, 'latest_status.csv'), VALID_CSV, 'utf8')
+    const path = join(directory, 'latest_status.csv')
+    await writeFile(path, VALID_CSV, 'utf8')
+    await utimes(path, new Date('2026-07-13T09:10:00.000Z'), new Date('2026-07-13T09:10:00.000Z'))
 
     const summary = await summarizeLatestJmbExecutionStatus(root, 'hfmarkets', 'XAUUSD', new Date('2026-07-13T09:10:30.000Z'))
 
@@ -200,6 +210,7 @@ describe('summarizeLatestJmbExecutionStatus', () => {
     })
 
     await writeFile(join(directory, 'latest_status.csv'), VALID_CSV, 'utf8')
+    await utimes(join(directory, 'latest_status.csv'), new Date('2026-07-13T09:10:00.000Z'), new Date('2026-07-13T09:10:00.000Z'))
     await expect(summarizeLatestJmbExecutionStatus(root, 'hfmarkets', 'XAUUSD', new Date('2026-07-13T09:15:01.000Z'))).resolves.toMatchObject({
       state: 'stale',
       executionEnabled: false,
@@ -217,5 +228,16 @@ describe('summarizeLatestJmbExecutionStatus', () => {
       executionEnabled: false,
       killSwitch: true,
     })
+  })
+
+  it('uses the trusted file modification time for freshness on non-UTC workstations', async () => {
+    const directory = join(root, 'hfmarkets', 'XAUUSD')
+    const path = join(directory, 'latest_status.csv')
+    await mkdir(directory, { recursive: true })
+    await writeFile(path, VALID_CSV.replaceAll('2026-07-13T09:10:00.000Z', '2026-01-01T00:00:00.000Z'), 'utf8')
+    await utimes(path, new Date('2026-07-13T09:10:00.000Z'), new Date('2026-07-13T09:10:00.000Z'))
+
+    await expect(summarizeLatestJmbExecutionStatus(root, 'hfmarkets', 'XAUUSD', new Date('2026-07-13T09:10:30.000Z')))
+      .resolves.toMatchObject({ state: 'filled_protected' })
   })
 })

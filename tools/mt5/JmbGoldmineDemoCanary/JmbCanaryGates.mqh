@@ -116,7 +116,7 @@ CanaryEvaluation EvaluateCanaryGates(const CanaryDecision &decision,
    int count_ceiling=MathMin(CANARY_HARD_MAX_DAILY_LOSSES,policy.maxDailyLosingTrades);
    bool daily_passed=environment.dailyStateAvailable
       && environment.dailyRealizedLoss>=0.0
-      && environment.dailyRealizedLoss<=daily_ceiling
+      && environment.dailyRealizedLoss<daily_ceiling
       && environment.dailyLossCount>=0
       && environment.dailyLossCount<count_ceiling;
    CanaryGateResult daily=Gate("daily_loss_count",daily_passed,

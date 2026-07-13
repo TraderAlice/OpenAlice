@@ -61,6 +61,19 @@ struct CanarySafetyLatch
    datetime pendingEntryAttemptedAt;
    string pendingEntryOrderId;
    string pendingEntryDealId;
+   double pendingRequestedVolume;
+   double pendingRequestedPrice;
+   double pendingRequestedStopLoss;
+   double pendingCalculatedRisk;
+   string pendingEntryComment;
+   string activePositionDecisionId;
+   string activePositionObservationId;
+   string activePositionId;
+   double activeRequestedVolume;
+   double activeRequestedPrice;
+   double activeRequestedStopLoss;
+   double activeCalculatedRisk;
+   string activeEntryComment;
 };
 
 struct CanaryReconciliationFacts
@@ -218,6 +231,81 @@ void ClearCanaryPendingEntryLatch(CanarySafetyLatch &latch)
    latch.pendingEntryAttemptedAt=0;
    latch.pendingEntryOrderId="";
    latch.pendingEntryDealId="";
+   latch.pendingRequestedVolume=0.0;
+   latch.pendingRequestedPrice=0.0;
+   latch.pendingRequestedStopLoss=0.0;
+   latch.pendingCalculatedRisk=0.0;
+   latch.pendingEntryComment="";
+}
+
+void ClearCanaryActivePositionCorrelation(CanarySafetyLatch &latch)
+{
+   latch.activePositionDecisionId="";
+   latch.activePositionObservationId="";
+   latch.activePositionId="";
+   latch.activeRequestedVolume=0.0;
+   latch.activeRequestedPrice=0.0;
+   latch.activeRequestedStopLoss=0.0;
+   latch.activeCalculatedRisk=0.0;
+   latch.activeEntryComment="";
+}
+
+bool CanaryRequestedEvidenceValid(const string decision_id,const string observation_id,
+                                  const double volume,const double price,const double stop_loss,
+                                  const double calculated_risk,const string entry_comment)
+{
+   return IsCanaryHashIdentity(decision_id) && IsCanaryHashIdentity(observation_id)
+      && MathIsValidNumber(volume) && CanaryNearlyEqual(volume,CANARY_HARD_MAX_VOLUME)
+      && MathIsValidNumber(price) && price>0.0
+      && MathIsValidNumber(stop_loss) && stop_loss>0.0
+      && MathIsValidNumber(calculated_risk) && calculated_risk>0.0
+      && entry_comment==CanaryEntryCorrelationComment(decision_id);
+}
+
+bool ActivateCanaryPositionCorrelation(CanarySafetyLatch &latch,const ulong position_id)
+{
+   if(position_id==0 || !CanaryRequestedEvidenceValid(latch.pendingEntryDecisionId,
+      latch.pendingEntryObservationId,latch.pendingRequestedVolume,latch.pendingRequestedPrice,
+      latch.pendingRequestedStopLoss,latch.pendingCalculatedRisk,latch.pendingEntryComment)) return false;
+   latch.activePositionDecisionId=latch.pendingEntryDecisionId;
+   latch.activePositionObservationId=latch.pendingEntryObservationId;
+   latch.activePositionId=CanaryTicketString(position_id);
+   latch.activeRequestedVolume=latch.pendingRequestedVolume;
+   latch.activeRequestedPrice=latch.pendingRequestedPrice;
+   latch.activeRequestedStopLoss=latch.pendingRequestedStopLoss;
+   latch.activeCalculatedRisk=latch.pendingCalculatedRisk;
+   latch.activeEntryComment=latch.pendingEntryComment;
+   return true;
+}
+
+bool ApplyCanaryPositionCorrelation(CanaryExecutionEvent &event,const CanarySafetyLatch &latch)
+{
+   string decision_id=latch.activePositionDecisionId!=""
+      ? latch.activePositionDecisionId : latch.pendingEntryDecisionId;
+   string observation_id=latch.activePositionDecisionId!=""
+      ? latch.activePositionObservationId : latch.pendingEntryObservationId;
+   double volume=latch.activePositionDecisionId!=""
+      ? latch.activeRequestedVolume : latch.pendingRequestedVolume;
+   double price=latch.activePositionDecisionId!=""
+      ? latch.activeRequestedPrice : latch.pendingRequestedPrice;
+   double stop_loss=latch.activePositionDecisionId!=""
+      ? latch.activeRequestedStopLoss : latch.pendingRequestedStopLoss;
+   double calculated_risk=latch.activePositionDecisionId!=""
+      ? latch.activeCalculatedRisk : latch.pendingCalculatedRisk;
+   string entry_comment=latch.activePositionDecisionId!=""
+      ? latch.activeEntryComment : latch.pendingEntryComment;
+   if(!CanaryRequestedEvidenceValid(decision_id,observation_id,volume,price,stop_loss,
+      calculated_risk,entry_comment)) return false;
+   event.decisionId=decision_id;
+   event.observationId=observation_id;
+   event.gateResultsJson="[]";
+   event.hasCalculatedRisk=true;
+   event.calculatedRisk=calculated_risk;
+   event.hasRequestedOrder=true;
+   event.requestedVolume=volume;
+   event.requestedPrice=price;
+   event.requestedStopLoss=stop_loss;
+   return true;
 }
 
 bool CanaryProcessedStateContains(const CanaryProcessedState &state,
@@ -680,16 +768,25 @@ bool LoadCanarySafetyLatch(const string broker,const string symbol,
    string expected[]={"schema_version","unresolved","protection_error",
       "pending_close_decision_id","pending_close_observation_id","emergency_close_attempted",
       "emergency_position_id","pending_entry_decision_id","pending_entry_observation_id",
-      "pending_entry_attempted_at","pending_entry_order_id","pending_entry_deal_id"};
+      "pending_entry_attempted_at","pending_entry_order_id","pending_entry_deal_id",
+      "pending_requested_volume","pending_requested_price","pending_requested_stop_loss",
+      "pending_calculated_risk","pending_entry_comment","active_position_decision_id",
+      "active_position_observation_id","active_position_id","active_requested_volume",
+      "active_requested_price","active_requested_stop_loss","active_calculated_risk",
+      "active_entry_comment"};
    string values[];
-   if(!ReadStrictCanaryCsv(path,expected,values,detail) || ArraySize(values)!=12
+   if(!ReadStrictCanaryCsv(path,expected,values,detail) || ArraySize(values)!=25
       || values[0]!="1" || (values[1]!="0" && values[1]!="1")
       || (values[2]!="0" && values[2]!="1") || (values[5]!="0" && values[5]!="1")
       || ((values[3]=="")!=(values[4]=="")) || ((values[5]=="1")!=(values[6]!=""))
       || ((values[7]=="")!=(values[8]=="")) || ((values[7]=="")!=(values[9]==""))
-      || (values[7]!="" && (!IsCanaryHashIdentity(values[7]) || !IsCanaryHashIdentity(values[8])))
-      || (values[7]=="" && (values[10]!="" || values[11]!=""))
-      || !IsCanaryTicketText(values[10]) || !IsCanaryTicketText(values[11]))
+      || (values[7]=="" && (values[10]!="" || values[11]!="" || values[12]!=""
+         || values[13]!="" || values[14]!="" || values[15]!="" || values[16]!=""))
+      || ((values[17]=="")!=(values[18]=="")) || ((values[17]=="")!=(values[19]==""))
+      || (values[17]=="" && (values[20]!="" || values[21]!="" || values[22]!=""
+         || values[23]!="" || values[24]!=""))
+      || !IsCanaryTicketText(values[10]) || !IsCanaryTicketText(values[11])
+      || (values[19]!="" && !IsCanaryTicketText(values[19])))
    {
       detail="The persistent reconciliation latch is malformed.";
       return false;
@@ -710,6 +807,31 @@ bool LoadCanarySafetyLatch(const string broker,const string symbol,
    }
    latch.pendingEntryOrderId=values[10];
    latch.pendingEntryDealId=values[11];
+   latch.pendingRequestedVolume=StringToDouble(values[12]);
+   latch.pendingRequestedPrice=StringToDouble(values[13]);
+   latch.pendingRequestedStopLoss=StringToDouble(values[14]);
+   latch.pendingCalculatedRisk=StringToDouble(values[15]);
+   latch.pendingEntryComment=values[16];
+   latch.activePositionDecisionId=values[17];
+   latch.activePositionObservationId=values[18];
+   latch.activePositionId=values[19];
+   latch.activeRequestedVolume=StringToDouble(values[20]);
+   latch.activeRequestedPrice=StringToDouble(values[21]);
+   latch.activeRequestedStopLoss=StringToDouble(values[22]);
+   latch.activeCalculatedRisk=StringToDouble(values[23]);
+   latch.activeEntryComment=values[24];
+   if((latch.pendingEntryDecisionId!="" && !CanaryRequestedEvidenceValid(
+         latch.pendingEntryDecisionId,latch.pendingEntryObservationId,latch.pendingRequestedVolume,
+         latch.pendingRequestedPrice,latch.pendingRequestedStopLoss,latch.pendingCalculatedRisk,
+         latch.pendingEntryComment))
+      || (latch.activePositionDecisionId!="" && !CanaryRequestedEvidenceValid(
+         latch.activePositionDecisionId,latch.activePositionObservationId,latch.activeRequestedVolume,
+         latch.activeRequestedPrice,latch.activeRequestedStopLoss,latch.activeCalculatedRisk,
+         latch.activeEntryComment)))
+   {
+      detail="The persistent position correlation evidence is malformed.";
+      return false;
+   }
    detail="The persistent reconciliation latch was loaded exactly.";
    return true;
 }
@@ -724,7 +846,23 @@ bool PersistCanarySafetyLatch(const string broker,const string symbol,
       || (latch.pendingEntryDecisionId!="" && (!IsCanaryHashIdentity(latch.pendingEntryDecisionId)
          || !IsCanaryHashIdentity(latch.pendingEntryObservationId)))
       || (latch.pendingEntryDecisionId==""
-         && (latch.pendingEntryOrderId!="" || latch.pendingEntryDealId!=""))
+         && (latch.pendingEntryOrderId!="" || latch.pendingEntryDealId!=""
+            || latch.pendingRequestedVolume!=0.0 || latch.pendingRequestedPrice!=0.0
+            || latch.pendingRequestedStopLoss!=0.0 || latch.pendingCalculatedRisk!=0.0
+            || latch.pendingEntryComment!=""))
+      || (latch.pendingEntryDecisionId!="" && !CanaryRequestedEvidenceValid(
+         latch.pendingEntryDecisionId,latch.pendingEntryObservationId,latch.pendingRequestedVolume,
+         latch.pendingRequestedPrice,latch.pendingRequestedStopLoss,latch.pendingCalculatedRisk,
+         latch.pendingEntryComment))
+      || (latch.activePositionDecisionId=="" && (latch.activePositionObservationId!=""
+         || latch.activePositionId!="" || latch.activeRequestedVolume!=0.0
+         || latch.activeRequestedPrice!=0.0 || latch.activeRequestedStopLoss!=0.0
+         || latch.activeCalculatedRisk!=0.0 || latch.activeEntryComment!=""))
+      || (latch.activePositionDecisionId!="" && (!IsCanaryTicketText(latch.activePositionId)
+         || latch.activePositionId=="" || !CanaryRequestedEvidenceValid(
+            latch.activePositionDecisionId,latch.activePositionObservationId,
+            latch.activeRequestedVolume,latch.activeRequestedPrice,latch.activeRequestedStopLoss,
+            latch.activeCalculatedRisk,latch.activeEntryComment)))
       || !IsCanaryTicketText(latch.pendingEntryOrderId) || !IsCanaryTicketText(latch.pendingEntryDealId))
    {
       detail="Refused to persist an invalid reconciliation latch.";
@@ -742,13 +880,28 @@ bool PersistCanarySafetyLatch(const string broker,const string symbol,
    uint header_written=FileWrite(handle,"schema_version","unresolved","protection_error",
       "pending_close_decision_id","pending_close_observation_id","emergency_close_attempted",
       "emergency_position_id","pending_entry_decision_id","pending_entry_observation_id",
-      "pending_entry_attempted_at","pending_entry_order_id","pending_entry_deal_id");
+      "pending_entry_attempted_at","pending_entry_order_id","pending_entry_deal_id",
+      "pending_requested_volume","pending_requested_price","pending_requested_stop_loss",
+      "pending_calculated_risk","pending_entry_comment","active_position_decision_id",
+      "active_position_observation_id","active_position_id","active_requested_volume",
+      "active_requested_price","active_requested_stop_loss","active_calculated_risk",
+      "active_entry_comment");
    uint row_written=FileWrite(handle,"1",latch.unresolved ? "1" : "0",
       latch.protectionError ? "1" : "0",latch.pendingCloseDecisionId,
       latch.pendingCloseObservationId,latch.emergencyCloseAttempted ? "1" : "0",
       latch.emergencyPositionId,latch.pendingEntryDecisionId,latch.pendingEntryObservationId,
       latch.pendingEntryAttemptedAt>0 ? CanaryIsoTime(latch.pendingEntryAttemptedAt) : "",
-      latch.pendingEntryOrderId,latch.pendingEntryDealId);
+      latch.pendingEntryOrderId,latch.pendingEntryDealId,
+      latch.pendingEntryDecisionId!="" ? DoubleToString(latch.pendingRequestedVolume,8) : "",
+      latch.pendingEntryDecisionId!="" ? DoubleToString(latch.pendingRequestedPrice,8) : "",
+      latch.pendingEntryDecisionId!="" ? DoubleToString(latch.pendingRequestedStopLoss,8) : "",
+      latch.pendingEntryDecisionId!="" ? DoubleToString(latch.pendingCalculatedRisk,8) : "",
+      latch.pendingEntryComment,latch.activePositionDecisionId,latch.activePositionObservationId,
+      latch.activePositionId,latch.activePositionDecisionId!="" ? DoubleToString(latch.activeRequestedVolume,8) : "",
+      latch.activePositionDecisionId!="" ? DoubleToString(latch.activeRequestedPrice,8) : "",
+      latch.activePositionDecisionId!="" ? DoubleToString(latch.activeRequestedStopLoss,8) : "",
+      latch.activePositionDecisionId!="" ? DoubleToString(latch.activeCalculatedRisk,8) : "",
+      latch.activeEntryComment);
    if(header_written==0 || row_written==0)
    {
       FileClose(handle);
@@ -761,13 +914,28 @@ bool PersistCanarySafetyLatch(const string broker,const string symbol,
    string expected[]={"schema_version","unresolved","protection_error",
       "pending_close_decision_id","pending_close_observation_id","emergency_close_attempted",
       "emergency_position_id","pending_entry_decision_id","pending_entry_observation_id",
-      "pending_entry_attempted_at","pending_entry_order_id","pending_entry_deal_id"};
+      "pending_entry_attempted_at","pending_entry_order_id","pending_entry_deal_id",
+      "pending_requested_volume","pending_requested_price","pending_requested_stop_loss",
+      "pending_calculated_risk","pending_entry_comment","active_position_decision_id",
+      "active_position_observation_id","active_position_id","active_requested_volume",
+      "active_requested_price","active_requested_stop_loss","active_calculated_risk",
+      "active_entry_comment"};
    string intended[]={"1",latch.unresolved ? "1" : "0",latch.protectionError ? "1" : "0",
       latch.pendingCloseDecisionId,latch.pendingCloseObservationId,
       latch.emergencyCloseAttempted ? "1" : "0",latch.emergencyPositionId,
       latch.pendingEntryDecisionId,latch.pendingEntryObservationId,
       latch.pendingEntryAttemptedAt>0 ? CanaryIsoTime(latch.pendingEntryAttemptedAt) : "",
-      latch.pendingEntryOrderId,latch.pendingEntryDealId};
+      latch.pendingEntryOrderId,latch.pendingEntryDealId,
+      latch.pendingEntryDecisionId!="" ? DoubleToString(latch.pendingRequestedVolume,8) : "",
+      latch.pendingEntryDecisionId!="" ? DoubleToString(latch.pendingRequestedPrice,8) : "",
+      latch.pendingEntryDecisionId!="" ? DoubleToString(latch.pendingRequestedStopLoss,8) : "",
+      latch.pendingEntryDecisionId!="" ? DoubleToString(latch.pendingCalculatedRisk,8) : "",
+      latch.pendingEntryComment,latch.activePositionDecisionId,latch.activePositionObservationId,
+      latch.activePositionId,latch.activePositionDecisionId!="" ? DoubleToString(latch.activeRequestedVolume,8) : "",
+      latch.activePositionDecisionId!="" ? DoubleToString(latch.activeRequestedPrice,8) : "",
+      latch.activePositionDecisionId!="" ? DoubleToString(latch.activeRequestedStopLoss,8) : "",
+      latch.activePositionDecisionId!="" ? DoubleToString(latch.activeCalculatedRisk,8) : "",
+      latch.activeEntryComment};
    string verified_values[];
    string verify_detail="";
    if(!ReadStrictCanaryCsv(temporary_path,expected,verified_values,verify_detail)
@@ -794,7 +962,20 @@ bool PersistCanarySafetyLatch(const string broker,const string symbol,
       || durable.pendingEntryObservationId!=latch.pendingEntryObservationId
       || durable.pendingEntryAttemptedAt!=latch.pendingEntryAttemptedAt
       || durable.pendingEntryOrderId!=latch.pendingEntryOrderId
-      || durable.pendingEntryDealId!=latch.pendingEntryDealId)
+      || durable.pendingEntryDealId!=latch.pendingEntryDealId
+      || !CanaryNearlyEqual(durable.pendingRequestedVolume,latch.pendingRequestedVolume)
+      || !CanaryNearlyEqual(durable.pendingRequestedPrice,latch.pendingRequestedPrice)
+      || !CanaryNearlyEqual(durable.pendingRequestedStopLoss,latch.pendingRequestedStopLoss)
+      || !CanaryNearlyEqual(durable.pendingCalculatedRisk,latch.pendingCalculatedRisk)
+      || durable.pendingEntryComment!=latch.pendingEntryComment
+      || durable.activePositionDecisionId!=latch.activePositionDecisionId
+      || durable.activePositionObservationId!=latch.activePositionObservationId
+      || durable.activePositionId!=latch.activePositionId
+      || !CanaryNearlyEqual(durable.activeRequestedVolume,latch.activeRequestedVolume)
+      || !CanaryNearlyEqual(durable.activeRequestedPrice,latch.activeRequestedPrice)
+      || !CanaryNearlyEqual(durable.activeRequestedStopLoss,latch.activeRequestedStopLoss)
+      || !CanaryNearlyEqual(durable.activeCalculatedRisk,latch.activeCalculatedRisk)
+      || durable.activeEntryComment!=latch.activeEntryComment)
    {
       detail="The durable reconciliation latch failed exact reopen verification.";
       return false;
@@ -893,7 +1074,8 @@ bool WriteCanaryReconciledStatus(const string broker,const string server,const s
    values[24]=reconciliation.reconciliationState;
    values[25]=IntegerToString(reconciliation.daily.lossCount);
    values[26]=DoubleToString(reconciliation.daily.realizedLoss,2);
-   values[27]=reconciliation.reconciliationState=="protection_error" ? "protection"
+   values[27]=reconciliation.reconciliationState=="identity_mismatch" ? "demo_identity"
+      : reconciliation.reconciliationState=="protection_error" ? "protection"
       : reconciliation.state==CANARY_LIFECYCLE_RECONCILIATION_REQUIRED ? "reconciliation"
       : reconciliation.state==CANARY_LIFECYCLE_EMERGENCY_CLOSE ? "protection"
       : reconciliation.state==CANARY_LIFECYCLE_BLOCKED ? "exposure"
@@ -902,6 +1084,8 @@ bool WriteCanaryReconciledStatus(const string broker,const string server,const s
       ? "Monitor broker-side protection and reconciliation."
       : reconciliation.state==CANARY_LIFECYCLE_EMERGENCY_CLOSE
          ? "Keep the broker paused and confirm the protective close before operator review."
+      : reconciliation.reconciliationState=="identity_mismatch"
+         ? "Restore the exact configured demo account, server, broker, symbol, and magic binding."
       : reconciliation.state==CANARY_LIFECYCLE_RECONCILIATION_REQUIRED
          ? "Do not submit again; inspect authoritative broker orders, deals, and positions."
       : reconciliation.reconciliationState=="protection_error"

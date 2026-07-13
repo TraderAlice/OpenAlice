@@ -191,7 +191,7 @@ OpenAlice and the terminals exchange local artifacts only through MetaTrader Com
 ```text
 OpenAliceMt5BridgeV1\<broker>\XAUUSD\status.csv
 OpenAliceMt5BridgeV1\<broker>\XAUUSD\completed_d1.csv
-OpenAliceMt5BridgeV1\<broker>\XAUUSD\spread_samples_YYYYMM.csv
+OpenAliceMt5BridgeV1\<broker>\XAUUSD\spread_samples_YYYYMMDD.csv
 OpenAliceMt5DemoPolicyV1\<broker>\XAUUSD\policy.csv
 OpenAliceMt5CostModelV1\<broker>\XAUUSD\cost_model.csv
 OpenAliceMt5ExecutionDecisionV1\<broker>\XAUUSD\latest_decision.csv

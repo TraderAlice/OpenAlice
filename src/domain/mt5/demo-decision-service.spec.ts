@@ -145,6 +145,33 @@ describe('demo decision cycle', () => {
     expect(decision).toMatchObject({ direction: 'sell', entryReferencePrice: 2399.9, stopLoss: 2407.9 })
   })
 
+  it('does not derive an executable observation from fresh D1 evidence on the wrong server', async () => {
+    const rootsValue = await roots()
+    const hfm = DEFAULT_JMB_DEMO_INSTRUMENTS.find((item) => item.broker === 'hfmarkets' && item.symbol === 'XAUUSD')!
+    await writeReadyGoldFiles(rootsValue, hfm)
+    const completedPath = join(rootsValue.bridgeRoot, 'hfmarkets', 'XAUUSD', 'completed_d1.csv')
+    await writeFile(completedPath, completedD1Csv('hfmarkets', 'ICMarketsSC-Demo'))
+    await utimes(completedPath, now, now)
+
+    const [result] = await runDemoDecisionCycle({ roots: rootsValue, now: () => now, instruments: [hfm] })
+
+    expect(result).toMatchObject({ state: 'blocked', observationId: null, decisionId: null })
+    expect(result.detail).toMatch(/server|identity/i)
+  })
+
+  it('rejects spread samples that would be parsed in the workstation local timezone', async () => {
+    const rootsValue = await roots()
+    const hfm = DEFAULT_JMB_DEMO_INSTRUMENTS.find((item) => item.broker === 'hfmarkets' && item.symbol === 'XAUUSD')!
+    await writeReadyGoldFiles(rootsValue, hfm)
+    const spreadPath = join(rootsValue.bridgeRoot, 'hfmarkets', 'XAUUSD', 'spread_samples_20260713.csv')
+    await writeFile(spreadPath, spreadCsv('hfmarkets', 'HFMarketsGlobal-Demo4').replaceAll('.000Z', ''))
+
+    const [result] = await runDemoDecisionCycle({ roots: rootsValue, now: () => now, instruments: [hfm] })
+
+    expect(result).toMatchObject({ state: 'error', observationId: null, decisionId: null })
+    expect(result.detail).toMatch(/captured_at.*UTC|timestamp.*UTC/i)
+  })
+
   it('rejects an injected Gold stop distance other than the immutable eight units', async () => {
     const rootsValue = await roots()
     const defaultHfm = DEFAULT_JMB_DEMO_INSTRUMENTS.find((item) => item.broker === 'hfmarkets' && item.symbol === 'XAUUSD')!
