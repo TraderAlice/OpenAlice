@@ -100,7 +100,8 @@ RUN chmod +x /app/src/workspaces/cli/bin/alice \
  && ln -sf /app/src/workspaces/cli/bin/alice          /usr/local/bin/alice \
  && ln -sf /app/src/workspaces/cli/bin/alice-uta      /usr/local/bin/alice-uta \
  && ln -sf /app/src/workspaces/cli/bin/alice-workspace /usr/local/bin/alice-workspace \
- && ln -sf /app/src/workspaces/cli/bin/traderhub      /usr/local/bin/traderhub
+ && ln -sf /app/src/workspaces/cli/bin/traderhub      /usr/local/bin/traderhub \
+ && cp /app/src/workspaces/cli/bin/openalice-cli.cjs  /usr/local/bin/openalice-cli.cjs
 # tsup bundles backend deps into the entry files where possible, but
 # native modules (node-pty, longbridge, etc.) stay as runtime requires.
 COPY --from=build /src/node_modules               ./node_modules
