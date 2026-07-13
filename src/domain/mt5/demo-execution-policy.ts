@@ -29,6 +29,7 @@ export interface DemoExecutionPolicySummary {
 }
 
 const POLICY_HEADER = 'schema_version,policy_version,broker,server,symbol,strategy_version,rollout_stage,candidate_approved,completed_observation_max_age_hours,max_spread,max_deviation,max_risk_amount,max_daily_loss,max_daily_losing_trades,max_volume,magic_number'
+const POLICY_VERSION_FORBIDDEN = /[,"\r\n]/
 
 const BROKER_RULES = {
   hfmarkets: {
@@ -63,6 +64,13 @@ function isPositiveFinite(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0
 }
 
+function isCanonicalPolicyVersion(value: unknown): value is string {
+  return typeof value === 'string'
+    && value !== ''
+    && value.trim() === value
+    && !POLICY_VERSION_FORBIDDEN.test(value)
+}
+
 export function validateDemoExecutionPolicy(input: unknown): DemoExecutionPolicySummary {
   if (typeof input !== 'object' || input === null) return blocked('The demo execution policy is not an object.')
   const candidate = input as Record<string, unknown>
@@ -71,8 +79,7 @@ export function validateDemoExecutionPolicy(input: unknown): DemoExecutionPolicy
   const rules = BROKER_RULES[broker]
 
   const exactIdentity = candidate['schemaVersion'] === 1
-    && candidate['policyVersion'] !== ''
-    && typeof candidate['policyVersion'] === 'string'
+    && isCanonicalPolicyVersion(candidate['policyVersion'])
     && candidate['server'] === rules.server
     && candidate['symbol'] === 'XAUUSD'
     && candidate['strategyVersion'] === 'daily-trend-v1'
@@ -130,6 +137,7 @@ function parseDemoExecutionPolicyCsv(text: string): DemoExecutionPolicy {
   const values = lines[1]!.split(',')
   if (values.length !== 16) throw new Error('The policy CSV row must contain exactly 16 columns.')
   if (values.some((value) => value.trim() !== value)) throw new Error('The policy CSV contains unexpected whitespace.')
+  if (!isCanonicalPolicyVersion(values[1])) throw new Error('Policy policy_version contains a forbidden character.')
   if (values[7] !== '0' && values[7] !== '1') throw new Error('Policy candidate_approved must be 0 or 1.')
 
   return {

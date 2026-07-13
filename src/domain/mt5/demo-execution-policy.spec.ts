@@ -134,6 +134,22 @@ describe('demo execution policy', () => {
     expect(source).toContain('StringTrimLeft(canonical);')
     expect(source).toContain('StringTrimRight(canonical);')
     expect(source).toContain('canonical == InpPolicyVersion')
+    expect(source).toContain('StringFind(canonical, ",") < 0')
+    expect(source).toContain('StringFind(canonical, "\\\"") < 0')
+    expect(source).toContain('StringFind(canonical, "\\r") < 0')
+    expect(source).toContain('StringFind(canonical, "\\n") < 0')
+
+    const invalidVersions = [
+      ' hfm-canary-v1',
+      'hfm-canary-v1 ',
+      'hfm,canary-v1',
+      'hfm"canary-v1',
+      'hfm\rcanary-v1',
+      'hfm\ncanary-v1',
+    ]
+    for (const version of invalidVersions) {
+      expect(validateDemoExecutionPolicy({ ...policy, policyVersion: version }).state, JSON.stringify(version)).toBe('blocked')
+    }
 
     const root = await mkdtemp(join(tmpdir(), 'openalice-policy-version-'))
     directories.push(root)
@@ -143,7 +159,7 @@ describe('demo execution policy', () => {
 
     await writeFile(path, policyCsv)
     await expect(readDemoExecutionPolicy(root, 'hfmarkets', 'XAUUSD')).resolves.toMatchObject({ state: 'ready' })
-    for (const version of [' hfm-canary-v1', 'hfm-canary-v1 ']) {
+    for (const version of invalidVersions) {
       await writeFile(path, `${header}\n${policyRow.replace('hfm-canary-v1', version)}`)
       await expect(readDemoExecutionPolicy(root, 'hfmarkets', 'XAUUSD')).resolves.toMatchObject({ state: 'malformed', policy: null })
     }
