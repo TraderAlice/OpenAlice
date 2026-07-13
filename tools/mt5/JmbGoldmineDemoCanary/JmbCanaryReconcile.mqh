@@ -45,6 +45,15 @@ CanaryClosedOwnershipClass ClassifyCanaryClosedPositionOwnership(
    return CANARY_CLOSED_OWNERSHIP_EA;
 }
 
+bool IsCanaryCorrelatedLifecyclePosition(const string decision_id,
+                                         const ulong expected_position_id,
+                                         const string origin_comment,
+                                         const ulong candidate_position_id)
+{
+   return expected_position_id>0 && candidate_position_id==expected_position_id
+      && origin_comment==CanaryEntryCorrelationComment(decision_id);
+}
+
 CanaryBrokerResultClass ClassifyCanaryBrokerResult(const bool sent,const uint retcode,
                                                     const double requested_volume,
                                                     const double accepted_volume)
@@ -195,6 +204,164 @@ int FindCanaryPositionId(const ulong &position_ids[],const ulong position_id)
    for(int index=0;index<ArraySize(position_ids);index++)
       if(position_ids[index]==position_id) return index;
    return -1;
+}
+
+bool FindCanaryPendingEntryPosition(const CanarySafetyLatch &latch,
+                                    const string symbol,const long magic_number,
+                                    const datetime now,bool &found,ulong &position_id)
+{
+   found=false;
+   position_id=0;
+   if(latch.pendingEntryDecisionId=="") return true;
+   string expected_comment=CanaryEntryCorrelationComment(latch.pendingEntryDecisionId);
+   if(expected_comment=="" || latch.pendingEntryAttemptedAt<=0 || now<latch.pendingEntryAttemptedAt)
+      return false;
+
+   if(latch.pendingEntryDealId!="")
+   {
+      ulong deal_ticket=(ulong)StringToInteger(latch.pendingEntryDealId);
+      if(HistoryDealSelect(deal_ticket))
+      {
+         ENUM_DEAL_ENTRY entry=(ENUM_DEAL_ENTRY)HistoryDealGetInteger(deal_ticket,DEAL_ENTRY);
+         ulong candidate=(ulong)HistoryDealGetInteger(deal_ticket,DEAL_POSITION_ID);
+         if(HistoryDealGetString(deal_ticket,DEAL_SYMBOL)!=symbol
+            || HistoryDealGetInteger(deal_ticket,DEAL_MAGIC)!=magic_number
+            || (entry!=DEAL_ENTRY_IN && entry!=DEAL_ENTRY_INOUT)
+            || !IsCanaryCorrelatedLifecyclePosition(latch.pendingEntryDecisionId,candidate,
+               HistoryDealGetString(deal_ticket,DEAL_COMMENT),candidate)) return false;
+         found=true;
+         position_id=candidate;
+         return true;
+      }
+   }
+
+   if(latch.pendingEntryOrderId!="")
+   {
+      ulong order_ticket=(ulong)StringToInteger(latch.pendingEntryOrderId);
+      if(HistoryOrderSelect(order_ticket))
+      {
+         ulong candidate=(ulong)HistoryOrderGetInteger(order_ticket,ORDER_POSITION_ID);
+         if(HistoryOrderGetString(order_ticket,ORDER_SYMBOL)!=symbol
+            || HistoryOrderGetInteger(order_ticket,ORDER_MAGIC)!=magic_number
+            || HistoryOrderGetString(order_ticket,ORDER_COMMENT)!=expected_comment) return false;
+         if(candidate>0)
+         {
+            found=true;
+            position_id=candidate;
+            return true;
+         }
+      }
+   }
+
+   datetime search_start=latch.pendingEntryAttemptedAt>300
+      ? latch.pendingEntryAttemptedAt-300 : latch.pendingEntryAttemptedAt;
+   if(!HistorySelect(search_start,now)) return false;
+   int total=HistoryDealsTotal();
+   for(int index=0;index<total;index++)
+   {
+      ulong deal_ticket=HistoryDealGetTicket(index);
+      if(deal_ticket==0) return false;
+      ENUM_DEAL_ENTRY entry=(ENUM_DEAL_ENTRY)HistoryDealGetInteger(deal_ticket,DEAL_ENTRY);
+      if(HistoryDealGetString(deal_ticket,DEAL_SYMBOL)!=symbol
+         || HistoryDealGetInteger(deal_ticket,DEAL_MAGIC)!=magic_number
+         || (entry!=DEAL_ENTRY_IN && entry!=DEAL_ENTRY_INOUT)
+         || HistoryDealGetString(deal_ticket,DEAL_COMMENT)!=expected_comment) continue;
+      ulong candidate=(ulong)HistoryDealGetInteger(deal_ticket,DEAL_POSITION_ID);
+      if(candidate==0 || (found && candidate!=position_id)) return false;
+      found=true;
+      position_id=candidate;
+   }
+   return true;
+}
+
+bool ReadCanaryLifecyclePositionById(const string symbol,const long magic_number,
+                                     const ulong position_id,const string expected_decision_id,
+                                     CanaryReconciliation &reconciliation,bool &closed)
+{
+   closed=false;
+   if(position_id==0 || !HistorySelectByPosition(position_id)) return false;
+   int total=HistoryDealsTotal();
+   bool has_origin=false;
+   datetime origin_time=0;
+   ulong origin_ticket=0;
+   string origin_comment="";
+   bool has_foreign_entry=false;
+   datetime final_close_time=0;
+   ulong final_deal_ticket=0;
+   long final_reason=0;
+   double accepted_price=0.0;
+   double commission=0.0;
+   double swap=0.0;
+   double fee=0.0;
+   double net_result=0.0;
+   for(int index=0;index<total;index++)
+   {
+      ulong deal_ticket=HistoryDealGetTicket(index);
+      if(deal_ticket==0) return false;
+      if(HistoryDealGetString(deal_ticket,DEAL_SYMBOL)!=symbol) continue;
+      ENUM_DEAL_ENTRY entry=(ENUM_DEAL_ENTRY)HistoryDealGetInteger(deal_ticket,DEAL_ENTRY);
+      datetime deal_time=(datetime)HistoryDealGetInteger(deal_ticket,DEAL_TIME);
+      if(entry==DEAL_ENTRY_IN || entry==DEAL_ENTRY_INOUT)
+      {
+         if(!has_origin || deal_time<origin_time || (deal_time==origin_time && deal_ticket<origin_ticket))
+         {
+            has_origin=true;
+            origin_time=deal_time;
+            origin_ticket=deal_ticket;
+            origin_comment=HistoryDealGetString(deal_ticket,DEAL_COMMENT);
+         }
+      }
+   }
+   if(!has_origin || HistoryDealGetInteger(origin_ticket,DEAL_MAGIC)!=magic_number) return false;
+   for(int index=0;index<total;index++)
+   {
+      ulong deal_ticket=HistoryDealGetTicket(index);
+      if(deal_ticket==0) return false;
+      if(deal_ticket==origin_ticket || HistoryDealGetString(deal_ticket,DEAL_SYMBOL)!=symbol) continue;
+      ENUM_DEAL_ENTRY entry=(ENUM_DEAL_ENTRY)HistoryDealGetInteger(deal_ticket,DEAL_ENTRY);
+      if((entry==DEAL_ENTRY_IN || entry==DEAL_ENTRY_INOUT)
+         && HistoryDealGetInteger(deal_ticket,DEAL_MAGIC)!=magic_number)
+         has_foreign_entry=true;
+   }
+   if(has_foreign_entry) return false;
+   if(expected_decision_id!="" && !IsCanaryCorrelatedLifecyclePosition(expected_decision_id,
+      position_id,origin_comment,position_id)) return false;
+   if(CanaryPositionIdentifierOpen(symbol,position_id)) return true;
+
+   for(int index=0;index<total;index++)
+   {
+      ulong deal_ticket=HistoryDealGetTicket(index);
+      if(deal_ticket==0) return false;
+      if(HistoryDealGetString(deal_ticket,DEAL_SYMBOL)!=symbol) continue;
+      double deal_net=DealNet(deal_ticket);
+      if(!MathIsValidNumber(deal_net)) return false;
+      net_result+=deal_net;
+      commission+=HistoryDealGetDouble(deal_ticket,DEAL_COMMISSION);
+      swap+=HistoryDealGetDouble(deal_ticket,DEAL_SWAP);
+      fee+=HistoryDealGetDouble(deal_ticket,DEAL_FEE);
+      ENUM_DEAL_ENTRY entry=(ENUM_DEAL_ENTRY)HistoryDealGetInteger(deal_ticket,DEAL_ENTRY);
+      datetime deal_time=(datetime)HistoryDealGetInteger(deal_ticket,DEAL_TIME);
+      if((entry==DEAL_ENTRY_OUT || entry==DEAL_ENTRY_OUT_BY) && deal_time>=final_close_time)
+      {
+         final_close_time=deal_time;
+         final_deal_ticket=deal_ticket;
+         final_reason=HistoryDealGetInteger(deal_ticket,DEAL_REASON);
+         accepted_price=HistoryDealGetDouble(deal_ticket,DEAL_PRICE);
+      }
+   }
+   if(final_close_time<=0) return false;
+   closed=true;
+   reconciliation.hasClosedPosition=true;
+   reconciliation.finalCloseTime=final_close_time;
+   reconciliation.dealTicket=final_deal_ticket;
+   reconciliation.closedPositionId=position_id;
+   reconciliation.lastCloseWasStop=final_reason==DEAL_REASON_SL;
+   reconciliation.acceptedPrice=accepted_price;
+   reconciliation.commission=commission;
+   reconciliation.swap=swap;
+   reconciliation.fee=fee;
+   reconciliation.netResult=net_result;
+   return true;
 }
 
 bool ReadCanaryClosedPositionResults(const string symbol,const long magic_number,
@@ -367,6 +534,37 @@ bool ReconcileCanaryBrokerState(const string symbol,const long magic_number,
       return false;
    }
 
+   bool correlated_entry_position=false;
+   bool correlated_entry_closed=false;
+   ulong correlated_entry_position_id=0;
+   if(latch.pendingEntryDecisionId!="")
+   {
+      if(!FindCanaryPendingEntryPosition(latch,symbol,magic_number,now,
+         correlated_entry_position,correlated_entry_position_id))
+      {
+         reconciliation.detail="The pending entry identity could not be authoritatively correlated.";
+         return false;
+      }
+      if(correlated_entry_position
+         && !ReadCanaryLifecyclePositionById(symbol,magic_number,correlated_entry_position_id,
+            latch.pendingEntryDecisionId,reconciliation,correlated_entry_closed))
+      {
+         reconciliation.detail="The correlated entry position lifecycle could not be recovered.";
+         return false;
+      }
+   }
+   bool emergency_position_closed=false;
+   if(latch.emergencyPositionId!="")
+   {
+      ulong emergency_position_id=(ulong)StringToInteger(latch.emergencyPositionId);
+      if(!ReadCanaryLifecyclePositionById(symbol,magic_number,emergency_position_id,"",
+         reconciliation,emergency_position_closed))
+      {
+         reconciliation.detail="The emergency position lifecycle could not be recovered.";
+         return false;
+      }
+   }
+
    CanaryReconciliationFacts facts;
    ZeroMemory(facts);
    facts.brokerStateAvailable=ea_position_count<=1;
@@ -385,12 +583,13 @@ bool ReconcileCanaryBrokerState(const string symbol,const long magic_number,
       && IsCanaryActionableOpposite(decision.direction,reconciliation.position.direction);
    facts.closeConfirmed=latch.pendingCloseDecisionId!="" && !reconciliation.position.present
       && !reconciliation.hasEaPendingOrder;
-   facts.stoppedObservation=observation_used && reconciliation.hasClosedPosition
-      && reconciliation.lastCloseWasStop && !reconciliation.position.present;
+   facts.stoppedObservation=latch.unresolved && correlated_entry_position && correlated_entry_closed
+      && reconciliation.lastCloseWasStop && !reconciliation.position.present
+      && !reconciliation.hasEaPendingOrder;
    bool authoritative_stop_closure=facts.stoppedObservation;
    bool authoritative_emergency_closure=latch.protectionError && latch.emergencyCloseAttempted
       && latch.emergencyPositionId!="" && !reconciliation.position.present
-      && reconciliation.hasClosedPosition
+      && emergency_position_closed
       && CanaryTicketString(reconciliation.closedPositionId)==latch.emergencyPositionId;
    reconciliation.authoritativeStopClosure=authoritative_stop_closure;
    reconciliation.authoritativeEmergencyClosure=authoritative_emergency_closure;
@@ -402,7 +601,9 @@ bool ReconcileCanaryBrokerState(const string symbol,const long magic_number,
    if(authoritative_stop_closure || authoritative_emergency_closure)
       facts.resultClass=CANARY_RESULT_NONE;
    else if(facts.resultClass==CANARY_RESULT_UNKNOWN
-      && ((reconciliation.position.present && reconciliation.position.stopProtected
+      && ((correlated_entry_position && reconciliation.position.present
+            && reconciliation.position.identifier==correlated_entry_position_id
+            && reconciliation.position.stopProtected
             && MathAbs(reconciliation.position.volume-CANARY_HARD_MAX_VOLUME)<=0.00000001)
          || facts.closeConfirmed))
       facts.resultClass=CANARY_RESULT_NONE;
@@ -452,8 +653,16 @@ bool ReconcileCanaryBrokerState(const string symbol,const long magic_number,
    }
    else if(reconciliation.state==CANARY_LIFECYCLE_PAUSED)
    {
-      reconciliation.reconciliationState="reconciled";
-      reconciliation.detail="The broker-day realized-loss ceiling pauses new entries until the next server day.";
+      if(facts.persistentSafetyPause)
+      {
+         reconciliation.reconciliationState="protection_error";
+         reconciliation.detail="A persistent broker protection error pauses new entries until operator clearance.";
+      }
+      else
+      {
+         reconciliation.reconciliationState="reconciled";
+         reconciliation.detail="The broker-day realized-loss ceiling pauses new entries until the next server day.";
+      }
    }
    else
    {

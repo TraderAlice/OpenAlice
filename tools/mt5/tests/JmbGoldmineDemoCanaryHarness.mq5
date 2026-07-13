@@ -57,7 +57,6 @@ enum HarnessReconciliationMutation
    HARNESS_RECONCILE_RESTART_FOREIGN,
    HARNESS_RECONCILE_MIXED_UNPROTECTED,
    HARNESS_RECONCILE_MULTIPLE_POSITIONS,
-   HARNESS_RECONCILE_UNKNOWN_STOPPED,
    HARNESS_RECONCILE_PROTECTION_PAUSE_AFTER_CLOSE
 };
 
@@ -280,11 +279,6 @@ void ApplyHarnessReconciliationMutation(const HarnessReconciliationMutation muta
       facts.brokerStateAvailable=false;
       facts.hasEaPosition=true;
    }
-   else if(mutation==HARNESS_RECONCILE_UNKNOWN_STOPPED)
-   {
-      facts.resultClass=CANARY_RESULT_UNKNOWN;
-      facts.stoppedObservation=true;
-   }
    else if(mutation==HARNESS_RECONCILE_PROTECTION_PAUSE_AFTER_CLOSE)
    {
       facts.resultClass=CANARY_RESULT_NONE;
@@ -321,6 +315,37 @@ bool RunClosedOwnershipCase()
       && ClassifyCanaryClosedPositionOwnership(false,false,true)==CANARY_CLOSED_OWNERSHIP_FOREIGN
       && ClassifyCanaryClosedPositionOwnership(true,true,true)==CANARY_CLOSED_OWNERSHIP_UNSAFE;
    PrintFormat("%s nonmagic final closure ownership",passed ? "PASS" : "FAIL");
+   return passed;
+}
+
+bool RunLifecycleCorrelationCase()
+{
+   string decision_id="0123456789abcdef01234567";
+   string correlation=CanaryEntryCorrelationComment(decision_id);
+   bool correlated=IsCanaryCorrelatedLifecyclePosition(decision_id,4321,correlation,4321);
+   bool unrelated=!IsCanaryCorrelatedLifecyclePosition(decision_id,4321,
+      CanaryEntryCorrelationComment("89abcdef0123456701234567"),9876);
+   CanaryReconciliationFacts facts;
+   BuildHarnessReconciliationFacts(facts);
+   facts.resultClass=CANARY_RESULT_UNKNOWN;
+   facts.stoppedObservation=correlated;
+   bool stopped=ReduceCanaryLifecycle(facts)==CANARY_LIFECYCLE_STOPPED;
+   facts.stoppedObservation=!unrelated;
+   bool blocked=ReduceCanaryLifecycle(facts)==CANARY_LIFECYCLE_RECONCILIATION_REQUIRED;
+   PrintFormat("%s correlated stopped observation",stopped ? "PASS" : "FAIL");
+   PrintFormat("%s unrelated stop remains unresolved",blocked ? "PASS" : "FAIL");
+   PrintFormat("%s position-specific rollover recovery",correlated ? "PASS" : "FAIL");
+   return correlated && unrelated && stopped && blocked;
+}
+
+bool RunProtectionPauseSemanticsCase()
+{
+   CanaryReconciliation reconciliation;
+   InitializeCanaryReconciliation(reconciliation);
+   reconciliation.state=CANARY_LIFECYCLE_PAUSED;
+   reconciliation.reconciliationState="protection_error";
+   bool passed=IsCanaryPersistentProtectionPause(reconciliation);
+   PrintFormat("%s persistent protection status semantics",passed ? "PASS" : "FAIL");
    return passed;
 }
 
@@ -547,7 +572,6 @@ int OnInit()
    AddHarnessReconciliationCase(reconciliation_cases,"restart with foreign exposure",HARNESS_RECONCILE_RESTART_FOREIGN,CANARY_LIFECYCLE_BLOCKED);
    AddHarnessReconciliationCase(reconciliation_cases,"mixed magic unprotected position blocks close",HARNESS_RECONCILE_MIXED_UNPROTECTED,CANARY_LIFECYCLE_BLOCKED);
    AddHarnessReconciliationCase(reconciliation_cases,"multiple positions block close",HARNESS_RECONCILE_MULTIPLE_POSITIONS,CANARY_LIFECYCLE_RECONCILIATION_REQUIRED);
-   AddHarnessReconciliationCase(reconciliation_cases,"unknown entry immediately stopped",HARNESS_RECONCILE_UNKNOWN_STOPPED,CANARY_LIFECYCLE_STOPPED);
    AddHarnessReconciliationCase(reconciliation_cases,"protection error pauses after emergency closure",HARNESS_RECONCILE_PROTECTION_PAUSE_AFTER_CLOSE,CANARY_LIFECYCLE_PAUSED);
 
    int failures=0;
@@ -557,6 +581,8 @@ int OnInit()
       if(!RunHarnessReconciliationCase(reconciliation_cases[index])) failures++;
    if(!RunActionableOppositeCase()) failures++;
    if(!RunClosedOwnershipCase()) failures++;
+   if(!RunLifecycleCorrelationCase()) failures++;
+   if(!RunProtectionPauseSemanticsCase()) failures++;
    if(!RunDuplicateObservationStateCase()) failures++;
    if(!RunTask3IdentityCase()) failures++;
    if(!RunGateJsonContractCase()) failures++;

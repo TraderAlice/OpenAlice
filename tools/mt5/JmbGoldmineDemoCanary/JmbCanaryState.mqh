@@ -56,6 +56,11 @@ struct CanarySafetyLatch
    string pendingCloseObservationId;
    bool emergencyCloseAttempted;
    string emergencyPositionId;
+   string pendingEntryDecisionId;
+   string pendingEntryObservationId;
+   datetime pendingEntryAttemptedAt;
+   string pendingEntryOrderId;
+   string pendingEntryDealId;
 };
 
 struct CanaryReconciliationFacts
@@ -192,6 +197,27 @@ bool IsCanaryHashIdentity(const string value)
       if(!((character>=48 && character<=57) || (character>=97 && character<=102))) return false;
    }
    return true;
+}
+
+string CanaryEntryCorrelationComment(const string decision_id)
+{
+   return IsCanaryHashIdentity(decision_id) ? "JMB:"+StringSubstr(decision_id,0,20) : "";
+}
+
+bool IsCanaryTicketText(const string value)
+{
+   if(value=="") return true;
+   long parsed=StringToInteger(value);
+   return parsed>0 && StringFormat("%I64u",(ulong)parsed)==value;
+}
+
+void ClearCanaryPendingEntryLatch(CanarySafetyLatch &latch)
+{
+   latch.pendingEntryDecisionId="";
+   latch.pendingEntryObservationId="";
+   latch.pendingEntryAttemptedAt=0;
+   latch.pendingEntryOrderId="";
+   latch.pendingEntryDealId="";
 }
 
 bool CanaryProcessedStateContains(const CanaryProcessedState &state,
@@ -653,12 +679,17 @@ bool LoadCanarySafetyLatch(const string broker,const string symbol,
    }
    string expected[]={"schema_version","unresolved","protection_error",
       "pending_close_decision_id","pending_close_observation_id","emergency_close_attempted",
-      "emergency_position_id"};
+      "emergency_position_id","pending_entry_decision_id","pending_entry_observation_id",
+      "pending_entry_attempted_at","pending_entry_order_id","pending_entry_deal_id"};
    string values[];
-   if(!ReadStrictCanaryCsv(path,expected,values,detail) || ArraySize(values)!=7
+   if(!ReadStrictCanaryCsv(path,expected,values,detail) || ArraySize(values)!=12
       || values[0]!="1" || (values[1]!="0" && values[1]!="1")
       || (values[2]!="0" && values[2]!="1") || (values[5]!="0" && values[5]!="1")
-      || ((values[3]=="")!=(values[4]=="")) || ((values[5]=="1")!=(values[6]!="")))
+      || ((values[3]=="")!=(values[4]=="")) || ((values[5]=="1")!=(values[6]!=""))
+      || ((values[7]=="")!=(values[8]=="")) || ((values[7]=="")!=(values[9]==""))
+      || (values[7]!="" && (!IsCanaryHashIdentity(values[7]) || !IsCanaryHashIdentity(values[8])))
+      || (values[7]=="" && (values[10]!="" || values[11]!=""))
+      || !IsCanaryTicketText(values[10]) || !IsCanaryTicketText(values[11]))
    {
       detail="The persistent reconciliation latch is malformed.";
       return false;
@@ -670,6 +701,15 @@ bool LoadCanarySafetyLatch(const string broker,const string symbol,
    latch.pendingCloseObservationId=values[4];
    latch.emergencyCloseAttempted=values[5]=="1";
    latch.emergencyPositionId=values[6];
+   latch.pendingEntryDecisionId=values[7];
+   latch.pendingEntryObservationId=values[8];
+   if(values[9]!="" && !TryCanaryIsoUtc(values[9],latch.pendingEntryAttemptedAt))
+   {
+      detail="The persistent entry correlation timestamp is invalid.";
+      return false;
+   }
+   latch.pendingEntryOrderId=values[10];
+   latch.pendingEntryDealId=values[11];
    detail="The persistent reconciliation latch was loaded exactly.";
    return true;
 }
@@ -678,7 +718,14 @@ bool PersistCanarySafetyLatch(const string broker,const string symbol,
                               const CanarySafetyLatch &latch,string &detail)
 {
    if(!latch.valid || ((latch.pendingCloseDecisionId=="")!=(latch.pendingCloseObservationId==""))
-      || (latch.emergencyCloseAttempted!=(latch.emergencyPositionId!="")))
+      || (latch.emergencyCloseAttempted!=(latch.emergencyPositionId!=""))
+      || ((latch.pendingEntryDecisionId=="")!=(latch.pendingEntryObservationId==""))
+      || ((latch.pendingEntryDecisionId=="")!=(latch.pendingEntryAttemptedAt==0))
+      || (latch.pendingEntryDecisionId!="" && (!IsCanaryHashIdentity(latch.pendingEntryDecisionId)
+         || !IsCanaryHashIdentity(latch.pendingEntryObservationId)))
+      || (latch.pendingEntryDecisionId==""
+         && (latch.pendingEntryOrderId!="" || latch.pendingEntryDealId!=""))
+      || !IsCanaryTicketText(latch.pendingEntryOrderId) || !IsCanaryTicketText(latch.pendingEntryDealId))
    {
       detail="Refused to persist an invalid reconciliation latch.";
       return false;
@@ -694,11 +741,14 @@ bool PersistCanarySafetyLatch(const string broker,const string symbol,
    }
    uint header_written=FileWrite(handle,"schema_version","unresolved","protection_error",
       "pending_close_decision_id","pending_close_observation_id","emergency_close_attempted",
-      "emergency_position_id");
+      "emergency_position_id","pending_entry_decision_id","pending_entry_observation_id",
+      "pending_entry_attempted_at","pending_entry_order_id","pending_entry_deal_id");
    uint row_written=FileWrite(handle,"1",latch.unresolved ? "1" : "0",
       latch.protectionError ? "1" : "0",latch.pendingCloseDecisionId,
       latch.pendingCloseObservationId,latch.emergencyCloseAttempted ? "1" : "0",
-      latch.emergencyPositionId);
+      latch.emergencyPositionId,latch.pendingEntryDecisionId,latch.pendingEntryObservationId,
+      latch.pendingEntryAttemptedAt>0 ? CanaryIsoTime(latch.pendingEntryAttemptedAt) : "",
+      latch.pendingEntryOrderId,latch.pendingEntryDealId);
    if(header_written==0 || row_written==0)
    {
       FileClose(handle);
@@ -710,10 +760,14 @@ bool PersistCanarySafetyLatch(const string broker,const string symbol,
    FileClose(handle);
    string expected[]={"schema_version","unresolved","protection_error",
       "pending_close_decision_id","pending_close_observation_id","emergency_close_attempted",
-      "emergency_position_id"};
+      "emergency_position_id","pending_entry_decision_id","pending_entry_observation_id",
+      "pending_entry_attempted_at","pending_entry_order_id","pending_entry_deal_id"};
    string intended[]={"1",latch.unresolved ? "1" : "0",latch.protectionError ? "1" : "0",
       latch.pendingCloseDecisionId,latch.pendingCloseObservationId,
-      latch.emergencyCloseAttempted ? "1" : "0",latch.emergencyPositionId};
+      latch.emergencyCloseAttempted ? "1" : "0",latch.emergencyPositionId,
+      latch.pendingEntryDecisionId,latch.pendingEntryObservationId,
+      latch.pendingEntryAttemptedAt>0 ? CanaryIsoTime(latch.pendingEntryAttemptedAt) : "",
+      latch.pendingEntryOrderId,latch.pendingEntryDealId};
    string verified_values[];
    string verify_detail="";
    if(!ReadStrictCanaryCsv(temporary_path,expected,verified_values,verify_detail)
@@ -735,7 +789,12 @@ bool PersistCanarySafetyLatch(const string broker,const string symbol,
       || durable.pendingCloseDecisionId!=latch.pendingCloseDecisionId
       || durable.pendingCloseObservationId!=latch.pendingCloseObservationId
       || durable.emergencyCloseAttempted!=latch.emergencyCloseAttempted
-      || durable.emergencyPositionId!=latch.emergencyPositionId)
+      || durable.emergencyPositionId!=latch.emergencyPositionId
+      || durable.pendingEntryDecisionId!=latch.pendingEntryDecisionId
+      || durable.pendingEntryObservationId!=latch.pendingEntryObservationId
+      || durable.pendingEntryAttemptedAt!=latch.pendingEntryAttemptedAt
+      || durable.pendingEntryOrderId!=latch.pendingEntryOrderId
+      || durable.pendingEntryDealId!=latch.pendingEntryDealId)
    {
       detail="The durable reconciliation latch failed exact reopen verification.";
       return false;
@@ -834,7 +893,8 @@ bool WriteCanaryReconciledStatus(const string broker,const string server,const s
    values[24]=reconciliation.reconciliationState;
    values[25]=IntegerToString(reconciliation.daily.lossCount);
    values[26]=DoubleToString(reconciliation.daily.realizedLoss,2);
-   values[27]=reconciliation.state==CANARY_LIFECYCLE_RECONCILIATION_REQUIRED ? "reconciliation"
+   values[27]=reconciliation.reconciliationState=="protection_error" ? "protection"
+      : reconciliation.state==CANARY_LIFECYCLE_RECONCILIATION_REQUIRED ? "reconciliation"
       : reconciliation.state==CANARY_LIFECYCLE_EMERGENCY_CLOSE ? "protection"
       : reconciliation.state==CANARY_LIFECYCLE_BLOCKED ? "exposure"
       : reconciliation.state==CANARY_LIFECYCLE_PAUSED ? "daily_loss_count" : "";
@@ -844,10 +904,18 @@ bool WriteCanaryReconciledStatus(const string broker,const string server,const s
          ? "Keep the broker paused and confirm the protective close before operator review."
       : reconciliation.state==CANARY_LIFECYCLE_RECONCILIATION_REQUIRED
          ? "Do not submit again; inspect authoritative broker orders, deals, and positions."
+      : reconciliation.reconciliationState=="protection_error"
+         ? "Resolve the persistent broker protection error before operator clearance."
       : reconciliation.state==CANARY_LIFECYCLE_PAUSED
          ? "Wait for the next broker server day; unresolved safety latches remain active."
       : "Re-evaluate every entry gate before any new protected demo request.";
    return PersistCanaryStatusValues(broker,symbol,values,detail);
+}
+
+bool IsCanaryPersistentProtectionPause(const CanaryReconciliation &reconciliation)
+{
+   return reconciliation.state==CANARY_LIFECYCLE_PAUSED
+      && reconciliation.reconciliationState=="protection_error";
 }
 
 #endif

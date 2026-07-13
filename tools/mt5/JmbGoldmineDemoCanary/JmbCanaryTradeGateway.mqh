@@ -186,7 +186,7 @@ TradeSubmitResult SubmitProtectedMarketOrder(const CanaryDecision &decision,cons
    request.price=decision.direction=="buy" ? tick.ask : tick.bid;
    request.sl=decision.stopLoss;
    request.deviation=(ulong)deviation_points;
-   request.comment="JMB:"+StringSubstr(decision.decisionId,0,20);
+   request.comment=CanaryEntryCorrelationComment(decision.decisionId);
    if(!ResolveMarketFilling("XAUUSD",request.type_filling))
    {
       result.detail="No supported market filling mode is available.";

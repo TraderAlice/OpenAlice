@@ -257,6 +257,29 @@ void SubmitReadyCanaryDecision(const CanaryDecision &decision,
       return;
    }
 
+   CanarySafetyLatch latch;
+   string latch_detail="";
+   if(!LoadCanarySafetyLatch(InpBrokerId,InpSymbol,latch,latch_detail))
+   {
+      InitializeCanarySafetyLatch(latch);
+      latch.valid=true;
+   }
+   if(latch.pendingEntryDecisionId!="") return;
+   datetime pending_entry_attempted_at=TimeTradeServer();
+   if(pending_entry_attempted_at<=0) return;
+   latch.valid=true;
+   latch.unresolved=true;
+   latch.pendingEntryDecisionId=decision.decisionId;
+   latch.pendingEntryObservationId=decision.observationId;
+   latch.pendingEntryAttemptedAt=pending_entry_attempted_at;
+   latch.pendingEntryOrderId="";
+   latch.pendingEntryDealId="";
+   if(!PersistCanarySafetyLatch(InpBrokerId,InpSymbol,latch,latch_detail))
+   {
+      Print("JMB demo canary pre-submit correlation latch failed: ",latch_detail);
+      return;
+   }
+
    TradeSubmitResult submission=SubmitProtectedMarketOrder(decision,policy);
    g_last_submit_sent=submission.sent;
    g_last_submit_retcode=submission.retcode;
@@ -267,15 +290,13 @@ void SubmitReadyCanaryDecision(const CanaryDecision &decision,
    g_last_submit_detail=submission.detail;
    g_last_result_class=ClassifyCanaryBrokerResult(submission.sent,submission.retcode,
       decision.volume,submission.accepted_volume);
-   CanarySafetyLatch latch;
-   string latch_detail="";
-   if(!LoadCanarySafetyLatch(InpBrokerId,InpSymbol,latch,latch_detail))
+   latch.pendingEntryOrderId=CanaryTicketString(submission.order_ticket);
+   latch.pendingEntryDealId=CanaryTicketString(submission.deal_ticket);
+   if(g_last_result_class==CANARY_RESULT_REJECTED)
    {
-      InitializeCanarySafetyLatch(latch);
-      latch.valid=true;
+      latch.unresolved=false;
+      ClearCanaryPendingEntryLatch(latch);
    }
-   if(g_last_result_class==CANARY_RESULT_UNKNOWN || g_last_result_class==CANARY_RESULT_PARTIAL)
-      latch.unresolved=true;
 
    CanaryReconciliation pending;
    InitializeCanaryReconciliation(pending);
@@ -740,6 +761,7 @@ void Evaluate()
       && latch.unresolved && !latch.protectionError)
    {
       latch.unresolved=false;
+      ClearCanaryPendingEntryLatch(latch);
       string latch_detail="";
       if(PersistCanarySafetyLatch(InpBrokerId,InpSymbol,latch,latch_detail))
       {
@@ -754,6 +776,7 @@ void Evaluate()
       && reconciliation.authoritativeStopClosure && latch.unresolved)
    {
       latch.unresolved=false;
+      ClearCanaryPendingEntryLatch(latch);
       g_last_result_class=CANARY_RESULT_NONE;
       string stopped_latch_detail="";
       if(!PersistCanarySafetyLatch(InpBrokerId,InpSymbol,latch,stopped_latch_detail))
@@ -764,6 +787,7 @@ void Evaluate()
    if(authoritative_emergency_closure && latch.unresolved)
    {
       latch.unresolved=false;
+      ClearCanaryPendingEntryLatch(latch);
       g_last_result_class=CANARY_RESULT_NONE;
       string emergency_latch_detail="";
       if(!PersistCanarySafetyLatch(InpBrokerId,InpSymbol,latch,emergency_latch_detail))
@@ -818,7 +842,9 @@ void Evaluate()
       && !CanaryLifecycleEventRecorded(InpBrokerId,CANARY_LIFECYCLE_PAUSED,
          reconciliation.closedPositionId))
       AppendManagedCanaryEvent(decision,reconciliation,CANARY_LIFECYCLE_PAUSED,"",
-         "The broker-day losing-trade or realized-loss ceiling pauses new entries.");
+         IsCanaryPersistentProtectionPause(reconciliation)
+            ? "Persistent broker protection error keeps this canary paused pending operator clearance."
+            : "The broker-day losing-trade or realized-loss ceiling pauses new entries.");
 
    BuildCanaryEnvironment(decision,policy,processed_state,reconciliation,latch,environment);
    evaluation=EvaluateCanaryGates(decision,policy,environment);

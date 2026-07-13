@@ -197,7 +197,8 @@ describe('MT5 demo canary source contract', () => {
     expect(main).toContain('latch.emergencyPositionId=CanaryTicketString(reconciliation.position.identifier)')
     expect(main).toMatch(/CANARY_LIFECYCLE_STOPPED[\s\S]*latch\.unresolved=false;[\s\S]*PersistCanarySafetyLatch/)
     expect(main).toMatch(/authoritative_emergency_closure[\s\S]*latch\.unresolved=false;[\s\S]*latch\.protectionError/)
-    expect(harness).toContain('unknown entry immediately stopped')
+    expect(harness).toContain('correlated stopped observation')
+    expect(harness).toContain('unrelated stop remains unresolved')
     expect(harness).toContain('protection error pauses after emergency closure')
   })
 
@@ -210,6 +211,54 @@ describe('MT5 demo canary source contract', () => {
     expect(managed.indexOf('g_latest_event=candidate;')).toBeGreaterThan(managed.indexOf('AppendCanaryExecutionEvent(candidate,detail)'))
     expect(main).not.toMatch(/BuildCanaryLifecycleEvent\([^;]*g_latest_event\)/s)
     expect(main).not.toMatch(/AppendCanaryExecutionEvent\(g_latest_event,/)
+  })
+
+  it('correlates an unresolved entry decision to its authoritative position before accepting a stop', async () => {
+    const [main, reconcile, state, harness] = await Promise.all([
+      readCanarySource('JmbGoldmineDemoCanary.mq5'),
+      readCanarySource('JmbCanaryReconcile.mqh'),
+      readCanarySource('JmbCanaryState.mqh'),
+      readFile(join('tools', 'mt5', 'tests', 'JmbGoldmineDemoCanaryHarness.mq5'), 'utf8'),
+    ])
+
+    expect(state).toContain('pending_entry_decision_id')
+    expect(state).toContain('pending_entry_observation_id')
+    expect(state).toContain('pending_entry_attempted_at')
+    expect(main).toMatch(/latch\.pendingEntryDecisionId=decision\.decisionId[\s\S]*PersistCanarySafetyLatch\([\s\S]*SubmitProtectedMarketOrder/)
+    expect(reconcile).toContain('CanaryEntryCorrelationComment(latch.pendingEntryDecisionId)')
+    expect(reconcile).toContain('IsCanaryCorrelatedLifecyclePosition(')
+    expect(reconcile).toMatch(/facts\.stoppedObservation=[^;]*correlated_entry_position[^;]*lastCloseWasStop/s)
+    expect(harness).toContain('correlated stopped observation')
+    expect(harness).toContain('unrelated stop remains unresolved')
+  })
+
+  it('recovers a correlated stop or emergency closure independently of broker-day loss selection', async () => {
+    const [reconcile, harness] = await Promise.all([
+      readCanarySource('JmbCanaryReconcile.mqh'),
+      readFile(join('tools', 'mt5', 'tests', 'JmbGoldmineDemoCanaryHarness.mq5'), 'utf8'),
+    ])
+    const lifecycleRecovery = reconcile.match(/bool ReadCanaryLifecyclePositionById\([\s\S]*?\n\}/)?.[0] ?? ''
+
+    expect(lifecycleRecovery).toContain('HistorySelectByPosition(position_id)')
+    expect(lifecycleRecovery).not.toContain('day_start')
+    expect(reconcile).toContain('latch.emergencyPositionId')
+    expect(reconcile).toContain('latch.pendingEntryAttemptedAt')
+    expect(harness).toContain('position-specific rollover recovery')
+  })
+
+  it('projects persistent protection pauses distinctly from broker-day loss pauses', async () => {
+    const [main, reconcile, state, harness] = await Promise.all([
+      readCanarySource('JmbGoldmineDemoCanary.mq5'),
+      readCanarySource('JmbCanaryReconcile.mqh'),
+      readCanarySource('JmbCanaryState.mqh'),
+      readFile(join('tools', 'mt5', 'tests', 'JmbGoldmineDemoCanaryHarness.mq5'), 'utf8'),
+    ])
+
+    expect(reconcile).toMatch(/CANARY_LIFECYCLE_PAUSED[\s\S]*facts\.persistentSafetyPause[\s\S]*reconciliationState="protection_error"/)
+    expect(state).toMatch(/reconciliation\.reconciliationState=="protection_error"[\s\S]*"protection"/)
+    expect(state).toContain('Resolve the persistent broker protection error before operator clearance.')
+    expect(main).toContain('Persistent broker protection error keeps this canary paused pending operator clearance.')
+    expect(harness).toContain('persistent protection status semantics')
   })
 
   it('keeps execution disabled, demo-only, Gold-only, fixed-volume, and non-expanding', async () => {
