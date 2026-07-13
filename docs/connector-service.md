@@ -24,7 +24,7 @@ categories.
   slash-command control plane; ordinary DM text is not ingested.
 - Each adapter serves one owner account/private chat. Group and channel
   broadcasting are out of scope.
-- Inbox `docs` that are Markdown are sent as file attachments, not flattened
+- Inbox `docs` that are Markdown or static HTML reports are sent as file attachments, not flattened
   into the message body. Alice reads the live Workspace file before crossing
   the process boundary; Connector Service never reaches into a Workspace
   itself. The Workspace artifact is never rewritten or given an agent-facing
@@ -32,12 +32,20 @@ categories.
   source encoding and creates a UTF-8-with-BOM delivery copy so locale-sensitive
   mobile viewers do not guess GBK, Big5, Shift-JIS, or a Western legacy charset.
   Source and delivery byte evidence remain separate. One notification carries
-  at most five files of at most 1 MiB each. Missing, oversized, non-Markdown,
+  at most five files of at most 1 MiB each. Missing, oversized, unsupported,
   or path-escaping files remain visible as Inbox/report paths and never block
   the text notification. When an encoding cannot be identified safely, Alice
   sends the original bytes instead of guessing. A skipped or ambiguous
   eligible attachment is logged and leaves bridge health degraded so partial
   or unnormalized delivery is visible to operators.
+- HTML is a presentation asset, not a Connector message format. Adapters send
+  the `.html`/`.htm` file with a `text/html` media type and never inline,
+  translate, or render its contents into the external chat message. OpenAlice
+  previews static HTML in an origin-less sandbox with scripts, forms,
+  navigation, and network disabled; inline CSS, SVG, and data images remain
+  available for self-contained human-facing reports. Markdown remains the
+  default agent-readable work product, while Inbox comments carry the concise
+  summary for both the user and other agents.
 - Session provenance is rendered as a visible `@resumeId` signature. The
   runtime label may accompany it (`pi · @resume-…`) but must never replace it.
 

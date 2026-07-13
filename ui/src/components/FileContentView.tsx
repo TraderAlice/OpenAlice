@@ -6,15 +6,14 @@
  * same tombstone copy for the `readWorkspaceFile` error variants
  * (missing workspace / missing file / too large / …).
  *
- * `.html` deliberately routes through MarkdownContent for now: marked
- * passes raw HTML through, then DOMPurify sanitises before insertion.
- * Good enough for HTML fragments; a faithful full-document HTML report
- * would want a sandboxed iframe renderer instead — deferred until agents
- * actually emit those.
+ * HTML is a human-facing presentation asset. It uses an isolated static-report
+ * iframe so page-level CSS and SVG render faithfully without joining the
+ * OpenAlice document or gaining script/network privileges.
  */
 
 import type { ReactElement } from 'react'
 
+import { HtmlReportView } from './HtmlReportView'
 import { MarkdownContent } from './MarkdownContent'
 import type { ReadFileResult } from './workspace/api'
 
@@ -35,10 +34,7 @@ function DocBody({ path, content }: { path: string; content: string }): ReactEle
     return <MarkdownContent text={content} />
   }
   if (lower.endsWith('.html') || lower.endsWith('.htm')) {
-    // DOMPurify sanitisation is inside MarkdownContent; for raw HTML we
-    // run it through the markdown renderer too — marked passes HTML
-    // through, then DOMPurify sanitises before insertion.
-    return <MarkdownContent text={content} />
+    return <HtmlReportView path={path} content={content} />
   }
   // Plain-text fallback (.txt, .log, no extension, code files…)
   return (

@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import iconv from 'iconv-lite'
-import { normalizeConnectorMarkdownAttachment } from './text-attachment.js'
+import { normalizeConnectorTextAttachment } from './text-attachment.js'
 
 const UTF8_BOM = Buffer.from([0xef, 0xbb, 0xbf])
 
-describe('normalizeConnectorMarkdownAttachment', () => {
+describe('normalizeConnectorTextAttachment', () => {
   it('adds one language-neutral UTF-8 marker without changing Unicode text', () => {
     const markdown = '# 市场 / 市場 / 市場\n\n日本語 · 한국어 · العربية · Русский · Français\n'
-    const result = normalizeConnectorMarkdownAttachment(Buffer.from(markdown, 'utf8'))
+    const result = normalizeConnectorTextAttachment(Buffer.from(markdown, 'utf8'), 'text/markdown')
 
     expect(result).toMatchObject({
       mediaType: 'text/markdown; charset=utf-8',
@@ -20,13 +20,13 @@ describe('normalizeConnectorMarkdownAttachment', () => {
 
   it('keeps an existing UTF-8 BOM singular', () => {
     const source = Buffer.concat([UTF8_BOM, Buffer.from('# Report\n')])
-    const result = normalizeConnectorMarkdownAttachment(source)
+    const result = normalizeConnectorTextAttachment(source, 'text/markdown')
     expect(result.content).toEqual(source)
   })
 
   it('does not trust a UTF-8 BOM when the following bytes are invalid UTF-8', () => {
     const source = Buffer.concat([UTF8_BOM, Buffer.from([0xc3, 0x28])])
-    const result = normalizeConnectorMarkdownAttachment(source)
+    const result = normalizeConnectorTextAttachment(source, 'text/markdown')
 
     expect(result.content).toEqual(source)
     expect(result.warning).toContain('could not be decoded safely')
@@ -40,7 +40,7 @@ describe('normalizeConnectorMarkdownAttachment', () => {
   ] as const)('normalizes BOM-marked %s', (detectedEncoding, sourceEncoding) => {
     const markdown = '# Encoding report\n\nZażółć · 測試 · テスト\n'
     const source = iconv.encode(markdown, sourceEncoding, { addBOM: true })
-    const result = normalizeConnectorMarkdownAttachment(source)
+    const result = normalizeConnectorTextAttachment(source, 'text/markdown')
 
     expect(result.detectedEncoding).toBe(detectedEncoding)
     expect(result.content.subarray(3).toString('utf8')).toBe(markdown)
@@ -54,7 +54,7 @@ describe('normalizeConnectorMarkdownAttachment', () => {
     ['KOI8-R', '# Отчёт рынка\n\nСегодня рынок спокоен, кодировка определяется корректно.\n'],
   ] as const)('normalizes detected legacy %s without locale assumptions', (encoding, markdown) => {
     const source = iconv.encode(markdown, encoding)
-    const result = normalizeConnectorMarkdownAttachment(source)
+    const result = normalizeConnectorTextAttachment(source, 'text/markdown')
 
     expect(result.warning).toBeUndefined()
     expect(result.detectedEncoding).toBe(encoding)
@@ -64,10 +64,19 @@ describe('normalizeConnectorMarkdownAttachment', () => {
 
   it('keeps unrecognizable binary-like bytes intact and reports the ambiguity', () => {
     const source = Buffer.from([0x00, 0x01, 0x02, 0x03, 0x80, 0x81, 0x82, 0x83])
-    const result = normalizeConnectorMarkdownAttachment(source)
+    const result = normalizeConnectorTextAttachment(source, 'text/markdown')
 
     expect(result.content).toEqual(source)
     expect(result.mediaType).toBe('text/markdown')
     expect(result.warning).toContain('could not be determined safely')
+  })
+
+  it('uses the HTML media type without changing the report body', () => {
+    const html = '<!doctype html><html><body><h1>市場</h1></body></html>\n'
+    const result = normalizeConnectorTextAttachment(Buffer.from(html, 'utf8'), 'text/html')
+
+    expect(result.mediaType).toBe('text/html; charset=utf-8')
+    expect(result.content.subarray(0, 3)).toEqual(UTF8_BOM)
+    expect(result.content.subarray(3).toString('utf8')).toBe(html)
   })
 })

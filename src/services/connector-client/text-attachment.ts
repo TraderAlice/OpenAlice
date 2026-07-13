@@ -17,6 +17,8 @@ export interface NormalizedTextAttachment {
   warning?: string
 }
 
+export type ConnectorTextMediaType = 'text/markdown' | 'text/html'
+
 /**
  * Normalize an external text attachment without changing the Workspace file.
  *
@@ -27,7 +29,10 @@ export interface NormalizedTextAttachment {
  * are deterministic; legacy encodings use bounded statistical detection and
  * round-trip/text sanity checks before conversion.
  */
-export function normalizeConnectorMarkdownAttachment(source: Buffer): NormalizedTextAttachment {
+export function normalizeConnectorTextAttachment(
+  source: Buffer,
+  mediaType: ConnectorTextMediaType,
+): NormalizedTextAttachment {
   const bomEncoding = detectBomEncoding(source)
   if (bomEncoding) {
     const decoded = decodeWithEncoding(source, bomEncoding)
@@ -35,15 +40,15 @@ export function normalizeConnectorMarkdownAttachment(source: Buffer): Normalized
       ? iconv.encode(decoded, bomEncoding, { addBOM: true })
       : null
     if (decoded !== null && isTextLike(decoded) && roundTrip?.equals(source)) {
-      return normalized(decoded, canonicalEncodingName(bomEncoding), 100)
+      return normalized(decoded, mediaType, canonicalEncodingName(bomEncoding), 100)
     }
-    return unchanged(source, `BOM declared ${bomEncoding}, but the Markdown bytes could not be decoded safely`)
+    return unchanged(source, mediaType, `BOM declared ${bomEncoding}, but the report bytes could not be decoded safely`)
   }
 
   // A UTF-16/32 or binary file can contain only byte values that are legal
   // UTF-8. NUL bytes are therefore routed through the detector first.
   if (!source.includes(0) && isStrictUtf8(source)) {
-    return normalized(source.toString('utf8'), 'UTF-8', 100)
+    return normalized(source.toString('utf8'), mediaType, 'UTF-8', 100)
   }
 
   const candidates = chardet.analyse(source)
@@ -56,26 +61,35 @@ export function normalizeConnectorMarkdownAttachment(source: Buffer): Normalized
       const roundTrip = iconv.encode(decoded, candidate.name)
       if (!roundTrip.equals(source)) continue
     }
-    return normalized(decoded, candidate.name, candidate.confidence)
+    return normalized(decoded, mediaType, candidate.name, candidate.confidence)
   }
 
-  return unchanged(source, 'Markdown attachment encoding could not be determined safely')
+  return unchanged(source, mediaType, 'Report attachment encoding could not be determined safely')
 }
 
-function normalized(text: string, detectedEncoding: string, detectionConfidence: number): NormalizedTextAttachment {
+function normalized(
+  text: string,
+  mediaType: ConnectorTextMediaType,
+  detectedEncoding: string,
+  detectionConfidence: number,
+): NormalizedTextAttachment {
   const withoutBom = text.startsWith('\uFEFF') ? text.slice(1) : text
   return {
     content: Buffer.concat([UTF8_BOM, Buffer.from(withoutBom, 'utf8')]),
-    mediaType: 'text/markdown; charset=utf-8',
+    mediaType: `${mediaType}; charset=utf-8`,
     detectedEncoding,
     detectionConfidence,
   }
 }
 
-function unchanged(source: Buffer, warning: string): NormalizedTextAttachment {
+function unchanged(
+  source: Buffer,
+  mediaType: ConnectorTextMediaType,
+  warning: string,
+): NormalizedTextAttachment {
   return {
     content: source,
-    mediaType: 'text/markdown',
+    mediaType,
     warning,
   }
 }

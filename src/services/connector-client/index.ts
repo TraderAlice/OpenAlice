@@ -10,10 +10,13 @@ import {
   type ConnectorServiceHealth,
   type InboxNotification,
 } from '@traderalice/connector-protocol'
-import type { InboxEntry, IInboxStore } from '../../core/inbox-store.js'
+import type { InboxDoc, InboxEntry, IInboxStore } from '../../core/inbox-store.js'
 import { readConnectorServiceEnabled } from '../../core/connector-config.js'
 import { probeOptionalCarrier } from '../optional-carrier/health.js'
-import { normalizeConnectorMarkdownAttachment } from './text-attachment.js'
+import {
+  normalizeConnectorTextAttachment,
+  type ConnectorTextMediaType,
+} from './text-attachment.js'
 
 export interface ConnectorBridgeHealth {
   enabled: boolean
@@ -182,7 +185,7 @@ export function toNotification(
   }
 }
 
-/** Project Inbox's live Markdown document pointers into bounded, verified file
+/** Project Inbox's live text-report pointers into bounded, verified file
  * bytes before crossing the process boundary. Unsupported or unavailable files
  * remain listed in the text notification and never block the durable Inbox
  * append or the remaining external message. */
@@ -191,11 +194,16 @@ export async function projectInboxAttachments(
   resolveWorkspace: InboxConnectorBridgeDeps['resolveWorkspace'],
   warn: (message: string) => void = () => undefined,
 ): Promise<InboxAttachmentProjection[]> {
-  const markdownDocs = (entry.docs ?? []).filter((doc) => {
+  const reportDocs: Array<{ doc: InboxDoc; mediaType: ConnectorTextMediaType }> = []
+  for (const doc of entry.docs ?? []) {
     const extension = extname(doc.path).toLowerCase()
-    return extension === '.md' || extension === '.markdown'
-  })
-  if (markdownDocs.length === 0 || !resolveWorkspace) return []
+    if (extension === '.md' || extension === '.markdown') {
+      reportDocs.push({ doc, mediaType: 'text/markdown' })
+    } else if (extension === '.html' || extension === '.htm') {
+      reportDocs.push({ doc, mediaType: 'text/html' })
+    }
+  }
+  if (reportDocs.length === 0 || !resolveWorkspace) return []
 
   const workspace = resolveWorkspace(entry.workspaceId)
   if (!workspace) {
@@ -213,7 +221,7 @@ export async function projectInboxAttachments(
 
   const projections: InboxAttachmentProjection[] = []
   const usedNames = new Set<string>()
-  for (const doc of markdownDocs.slice(0, MAX_CONNECTOR_ATTACHMENTS)) {
+  for (const { doc, mediaType } of reportDocs.slice(0, MAX_CONNECTOR_ATTACHMENTS)) {
     try {
       const target = await resolveSafeWorkspaceFile(workspaceRoot, doc.path)
       const info = await stat(target)
@@ -223,7 +231,7 @@ export async function projectInboxAttachments(
       }
       const content = await readFile(target)
       const sourceDigest = createHash('sha256').update(content).digest('hex')
-      const delivery = normalizeConnectorMarkdownAttachment(content)
+      const delivery = normalizeConnectorTextAttachment(content, mediaType)
       if (delivery.warning) warn(`Inbox attachment encoding unchanged (${doc.path}): ${delivery.warning}`)
       if (delivery.content.byteLength > MAX_CONNECTOR_ATTACHMENT_BYTES) {
         throw new Error(`encoding-normalized file exceeds ${MAX_CONNECTOR_ATTACHMENT_BYTES} bytes`)
@@ -251,8 +259,8 @@ export async function projectInboxAttachments(
       warn(`Inbox attachment skipped (${doc.path}): ${message(error)}`)
     }
   }
-  if (markdownDocs.length > MAX_CONNECTOR_ATTACHMENTS) {
-    warn(`Inbox attachment limit reached; skipped ${markdownDocs.length - MAX_CONNECTOR_ATTACHMENTS} file(s)`)
+  if (reportDocs.length > MAX_CONNECTOR_ATTACHMENTS) {
+    warn(`Inbox attachment limit reached; skipped ${reportDocs.length - MAX_CONNECTOR_ATTACHMENTS} file(s)`)
   }
   return projections
 }

@@ -51,21 +51,24 @@ describe('recorded Inbox payload formatting', () => {
     })).toContain('From: pi · @resume-calm-river-12ab')
   })
 
-  it('decodes and verifies Markdown attachments', () => {
-    const content = Buffer.from('# Close scan\n')
+  it.each([
+    ['Markdown', 'close.md', 'text/markdown; charset=utf-8', '# Close scan\n'],
+    ['HTML', 'close.html', 'text/html; charset=utf-8', '<!doctype html><h1>Close scan</h1>\n'],
+  ])('decodes and verifies %s attachments', (_label, filename, mediaType, body) => {
+    const content = Buffer.from(body)
     const decoded = decodeInboxAttachments({
       ...notification,
       attachments: [{
-        filename: 'close.md',
-        mediaType: 'text/markdown; charset=utf-8',
+        filename,
+        mediaType,
         sizeBytes: content.byteLength,
         contentSha256: createHash('sha256').update(content).digest('hex'),
         contentBase64: content.toString('base64'),
       }],
     })
     expect(decoded).toEqual([{
-      filename: 'close.md',
-      mediaType: 'text/markdown; charset=utf-8',
+      filename,
+      mediaType,
       content,
     }])
   })

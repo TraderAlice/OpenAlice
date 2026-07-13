@@ -93,6 +93,44 @@ describe('Inbox Connector bridge', () => {
       .toBe('# Close scan\n')
   })
 
+  it('delivers HTML reports as files without flattening their contents into the message', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-connector-html-attachment-'))
+    tempDirs.push(root)
+    await mkdir(join(root, 'research'))
+    const html = '<!doctype html><html><body><h1>Close dashboard</h1></body></html>\n'
+    await writeFile(join(root, 'research', 'close.html'), html)
+    const push = vi.fn(async (_notification: InboxNotification) => undefined)
+    const store = createMemoryInboxStore()
+    attachInboxConnectorBridge(store, {
+      isEnabled: async () => true,
+      push,
+      warn: vi.fn(),
+      resolveWorkspace: () => ({ dir: root }),
+    })
+
+    await store.append({
+      workspaceId: 'ws-1',
+      docs: [{ path: 'research/close.html' }],
+      comments: 'Dashboard attached.',
+    })
+
+    await vi.waitFor(() => expect(push).toHaveBeenCalledOnce())
+    const notification = push.mock.calls[0]?.[0]
+    expect(notification?.body).toBe('Dashboard attached.\n\nReports:\n- research/close.html')
+    expect(notification?.body).not.toContain('Close dashboard')
+    expect(notification?.attachments?.[0]).toMatchObject({
+      filename: 'close.html',
+      mediaType: 'text/html; charset=utf-8',
+      source: {
+        sizeBytes: Buffer.byteLength(html),
+        detectedEncoding: 'UTF-8',
+        detectionConfidence: 100,
+      },
+    })
+    expect(Buffer.from(notification!.attachments![0]!.contentBase64, 'base64').subarray(3).toString('utf8'))
+      .toBe(html)
+  })
+
   it('warns and preserves source bytes when encoding cannot be normalized safely', async () => {
     const root = await mkdtemp(join(tmpdir(), 'openalice-connector-ambiguous-'))
     tempDirs.push(root)
