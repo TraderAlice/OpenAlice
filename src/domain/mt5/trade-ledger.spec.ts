@@ -87,4 +87,40 @@ describe('summarizeMt5TradeLedger', () => {
     expect(summary.state).toBe('blocked')
     expect(summary.detail).toContain('non-demo')
   })
+
+  it('does not learn from a ledger that has no rows for the requested broker symbol', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-ledger-'))
+    directories.push(root)
+    const directory = join(root, 'hfmarkets', 'XAUUSD')
+    await mkdir(directory, { recursive: true })
+    await writeFile(join(directory, 'deals.csv'), [
+      'account_mode,server,login,broker,symbol,deal_ticket,order_ticket,position_id,time,entry,type,reason,volume,price,commission,fee,swap,profit,magic,comment',
+      'demo,HFM-Demo,123456,hfmarkets,EURUSD,1,11,101,2026-07-13T01:00:00.000Z,out,buy,client,0.01,1.17000,-0.07,0,0,1.25,0,manual close',
+      'demo,IC-Demo,123456,icmarkets,XAUUSD,2,12,102,2026-07-13T01:05:00.000Z,out,sell,client,0.01,2410.25,-0.07,0,-0.01,4.25,0,manual close',
+    ].join('\n'))
+
+    const summary = await summarizeMt5TradeLedger(root, 'hfmarkets', 'XAUUSD', new Date('2026-07-13T02:01:00.000Z'))
+
+    expect(summary.state).toBe('no_data')
+    expect(summary.totalDeals).toBe(0)
+    expect(summary.accountMode).toBeNull()
+  })
+
+  it('blocks mixed demo and real rows for the requested broker symbol', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-ledger-'))
+    directories.push(root)
+    const directory = join(root, 'icmarkets', 'EURUSD')
+    await mkdir(directory, { recursive: true })
+    await writeFile(join(directory, 'deals.csv'), [
+      'account_mode,server,login,broker,symbol,deal_ticket,order_ticket,position_id,time,entry,type,reason,volume,price,commission,fee,swap,profit,magic,comment',
+      'demo,IC-Demo,123456,icmarkets,EURUSD,1,11,101,2026-07-13T01:00:00.000Z,out,buy,client,0.01,1.17000,-0.07,0,0,1.25,0,manual close',
+      'real,IC-Live,123456,icmarkets,EURUSD,2,12,102,2026-07-13T01:05:00.000Z,out,sell,client,0.01,1.17100,-0.07,0,0,-0.75,0,manual close',
+    ].join('\n'))
+
+    const summary = await summarizeMt5TradeLedger(root, 'icmarkets', 'EURUSD', new Date('2026-07-13T02:01:00.000Z'))
+
+    expect(summary.state).toBe('blocked')
+    expect(summary.detail).toContain('non-demo')
+    expect(summary.totalDeals).toBe(2)
+  })
 })

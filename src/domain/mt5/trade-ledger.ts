@@ -174,7 +174,10 @@ export async function summarizeMt5TradeLedger(
     unknownDeals: rows.filter((row) => row.origin === 'unknown').length,
     netProfit: Number(totalMoney.toFixed(2)),
   }
-  if (first && first.accountMode !== 'demo') {
+  if (rows.length === 0) {
+    return { ...base, state: 'no_data', label: 'Awaiting trade history', detail: 'No matching demo trade history was found for this broker and symbol.' }
+  }
+  if (rows.some((row) => row.accountMode !== 'demo')) {
     return { ...base, state: 'blocked', label: 'Trade history blocked', detail: 'The ledger contains non-demo account history, so it cannot unlock demo automation.' }
   }
   if (now.getTime() - modified.getTime() > STALE_AFTER_MS) {
