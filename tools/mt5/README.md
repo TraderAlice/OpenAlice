@@ -1,6 +1,6 @@
 # MT5 Broker History Tools
 
-These tools collect and validate broker-native M1 data for research and paper-trading development. They do not submit orders and do not read account credentials.
+Most tools in this directory collect and validate broker-native data without submitting orders. The separately installed Plan 3 demo-canary EA described below is the only exception: after explicit local operator enablement, it may submit protected Gold orders on the exact allowlisted demo accounts. It has no live-account mode, EURUSD execution path, or remote order command.
 
 ## Broker mappings
 
@@ -124,7 +124,7 @@ The bridge writes to:
 %APPDATA%\\MetaQuotes\\Terminal\\Common\\Files\\OpenAliceMt5BridgeV1\\<broker>\\<symbol>\\status.csv
 ```
 
-After both heartbeats appear as **Demo bridge connected**, the next implementation phase is a paper-only command protocol with a separate human approval gate. It will not be enabled by this phase.
+The bridge remains read-only. Plan 3 adds a separate broker-local demo-canary EA; the bridge itself never gains order authority.
 
 ## Read-only trade ledger exporter
 
@@ -163,4 +163,107 @@ Recommended first run:
 - Use `InpBrokerId=hfmarkets` or `icmarkets`.
 - Use the exact chart symbol in `InpSymbol`.
 
-Only after the gate status is stable should a separate plan add demo order submission.
+Keep this EA available as the rollback and diagnostic shell for the Plan 3 ceremony below.
+
+## Plan 3 broker-local Gold demo canary
+
+The [approved Plan 3 design](../../docs/superpowers/specs/2026-07-13-jmb-goldmine-demo-canary-execution-design.md) governs this separately installed EA. UTA remains mandatory for app-, API-, UI-, workspace-, or AI-managed broker orders. `JmbGoldmineDemoCanary` is a narrower broker-local exception governed by the PRD's R6: it reads local artifacts, exposes no remote order command, and independently enforces its demo-account and Gold-only bindings inside MT5.
+
+Codex does not launch MetaEditor, compile MQL, attach an EA, enable Algo Trading, change terminal inputs, or submit a broker request. Every MetaEditor and terminal action below is an operator-only human gate. Keep terminal Algo Trading disabled throughout Stage 0.
+
+### Install and compile manually
+
+Perform these steps separately in the HFM demo terminal and the IC Markets demo terminal. Use each terminal's **File -> Open Data Folder** so files are copied into the correct installation.
+
+1. Re-copy `OpenAliceMt5ReadOnlyBridge.mq5` to `MQL5\Experts\OpenAliceMt5ReadOnlyBridge.mq5`. This version exports the latest 300 completed D1 bars and bounded spread samples in addition to its read-only heartbeat; recompile it even if an older bridge is already attached.
+2. Copy `ConfigureJmbGoldmineDemoPolicy.mq5` to `MQL5\Scripts\ConfigureJmbGoldmineDemoPolicy.mq5`.
+3. Copy the complete repository folder `JmbGoldmineDemoCanary\` to `MQL5\Experts\JmbGoldmineDemoCanary\`. Preserve `JmbGoldmineDemoCanary.mq5` and every sibling `.mqh` file in that layout.
+4. Copy `tests\JmbGoldmineDemoCanaryHarness.mq5` to `MQL5\Experts\tests\JmbGoldmineDemoCanaryHarness.mq5`, preserving its relative path to `..\JmbGoldmineDemoCanary\`.
+5. In MetaEditor opened from that terminal, compile the bridge, policy script, canary EA, and harness. Accept only `0 errors, 0 warnings` for every file.
+6. With Algo Trading still disabled, attach the harness to an unused demo chart. Its Experts log must end with `JMB_CANARY_HARNESS PASS`, every case must print `PASS`, and the failure count must be zero. Remove the harness after the run. The harness includes no trade gateway.
+
+Compilation and harness results are pending until a human records them for both terminals. A source-code build or TypeScript test cannot substitute for this gate.
+
+### Shared Common Files layout
+
+OpenAlice and the terminals exchange local artifacts only through MetaTrader Common Files under `%APPDATA%\MetaQuotes\Terminal\Common\Files`. The operator should expect these broker-specific artifacts:
+
+```text
+OpenAliceMt5BridgeV1\<broker>\XAUUSD\status.csv
+OpenAliceMt5BridgeV1\<broker>\XAUUSD\completed_d1.csv
+OpenAliceMt5BridgeV1\<broker>\XAUUSD\spread_samples_YYYYMM.csv
+OpenAliceMt5DemoPolicyV1\<broker>\XAUUSD\policy.csv
+OpenAliceMt5CostModelV1\<broker>\XAUUSD\cost_model.csv
+OpenAliceMt5ExecutionDecisionV1\<broker>\XAUUSD\latest_decision.csv
+OpenAliceMt5ExecutionDecisionV1\<broker>\XAUUSD\decisions.jsonl
+OpenAliceMt5ExecutionV1\<broker>\XAUUSD\latest_status.csv
+OpenAliceMt5ExecutionV1\<broker>\XAUUSD\events.jsonl
+OpenAliceMt5ExecutionV1\<broker>\XAUUSD\processed_observations.csv
+OpenAliceMt5ExecutionV1\<broker>\XAUUSD\reconciliation_latch.csv
+```
+
+The bridge owns its first three read-only files, the operator-only script owns `policy.csv`, OpenAlice's deterministic decision cycle owns the cost-model and decision files, and the EA owns the execution files. Do not hand-edit, truncate, copy between brokers, or delete the append-only event, decision, processed-observation, or reconciliation files during rollback or recovery. The local expected account login is an EA input only and must never be put in a policy, status file, screenshot, commit, or Research API response.
+
+### Stage 0: status-only dry run
+
+Stage 0 is a two-terminal human ceremony. It does not authorize any order.
+
+1. In each demo terminal, keep two `XAUUSD` charts: the recompiled read-only bridge stays on its existing duplicate Gold chart; the status/execution chart is reserved for the risk shell or canary. Do not attach the canary to EURUSD.
+2. Reattach the bridge with `InpBrokerId=hfmarkets`, `InpSymbol=XAUUSD` in HFM and `InpBrokerId=icmarkets`, `InpSymbol=XAUUSD` in IC Markets. Confirm `status.csv`, `completed_d1.csv`, and the current monthly spread-sample file update.
+3. Save the stable `JmbGoldmineDemoRiskShell` gate result for comparison. Remove that shell from the Gold status chart, then attach `JmbGoldmineDemoCanary` to the same chart with the exact status-only inputs below.
+4. Run `ConfigureJmbGoldmineDemoPolicy` on each terminal's `XAUUSD` chart with `InpRolloutStage=status_only` and `InpCandidateApproved=false`. Use a unique immutable version such as `hfm-status-only-v1` or `ic-status-only-v1`. HFM may use the script's `0.75` spread and `0.50` deviation defaults. IC Markets must set both to `0.30`; the HFM defaults are deliberately refused on IC. Keep the remaining limits at or below 72 hours, `10.00` risk, `40.00` daily loss, 4 losses, and `0.01` lot.
+5. Leave terminal Algo Trading disabled. Confirm the EA's `latest_status.csv` advances for at least two ten-second timer cycles on both terminals. Also observe at least two 30-second bridge cycles so its heartbeat and completed-D1 export remain current.
+6. Compare every reported canary gate with the saved risk-shell result. Confirm the MT5 **Trade** and **History** tabs show zero new canary orders and zero new positions across the observation window. `execution_enabled` must be `0`, `kill_switch` must be `1`, and the rollout stage must be `status_only`.
+7. Inspect the newest row in each `completed_d1.csv`. Its `bar_as_of` must be later than the stale `2026-06-23` artifact. A merely recent file modification time is insufficient. If either broker lacks fresh completed-D1 evidence, both canary promotions remain blocked.
+8. Record terminal/server, compile and harness results, before/after order and position counts, two-cycle timestamps, risk-shell comparison, and completed-D1 `bar_as_of` values without recording account logins.
+
+Use these exact EA inputs; replace `<local demo login>` only in the terminal input dialog:
+
+| Input | HFM | IC Markets |
+| --- | --- | --- |
+| `InpBrokerId` | `hfmarkets` | `icmarkets` |
+| `InpExpectedServer` | `HFMarketsGlobal-Demo4` | `ICMarketsSC-Demo` |
+| `InpExpectedAccountLogin` | `<local HFM demo login>` | `<local IC demo login>` |
+| `InpSymbol` | `XAUUSD` | `XAUUSD` |
+| `InpMagicNumber` | `880101` | `880201` |
+| `InpDemoExecutionEnabled` | `false` | `false` |
+| `InpKillSwitch` | `true` | `true` |
+
+Any non-demo account, login/server mismatch, missing cost or policy evidence, stale decision or completed observation, foreign Gold exposure, reconciliation error, or unwritable log remains blocked. Do not weaken an input to make Stage 0 appear ready.
+
+### HFM canary
+
+This is the Stage 1 ceremony and remains pending until the human Stage 0 evidence above is reviewed.
+
+1. Leave IC Markets at `status_only`, `InpDemoExecutionEnabled=false`, and `InpKillSwitch=true`.
+2. Build and review an HFM `canary_ready` broker-cost model from fresh HFM bridge spread evidence. Confirm HFM has a fresh completed-D1 observation and an eligible `daily-trend-v1` Gold decision.
+3. On the HFM demo `XAUUSD` chart only, run the operator policy script with a new policy version, `InpRolloutStage=hfm_canary`, `InpCandidateApproved=true`, and limits no looser than HFM's immutable ceilings.
+4. Reconfirm the locally entered HFM demo login, server, symbol, and magic. Only the operator then sets `InpDemoExecutionEnabled=true`, sets `InpKillSwitch=false`, and enables terminal Algo Trading for the HFM canary.
+5. Observe one eligible decision from its durable `order_requesting` event through broker result, accepted volume/price, broker-confirmed stop protection, append-only evidence, and restart reconciliation. The broker's Trade/History tabs are authoritative.
+6. An unprotected fill, unknown result, partial result, reconciliation mismatch, non-demo identity, missing cost evidence, or duplicate/uncertain observation immediately returns HFM to `status_only` using the pause procedure below. Do not resend an unknown request.
+
+HFM evidence must be reviewed and accepted before any IC execution setting changes.
+
+### IC Markets canary
+
+This is the Stage 2 ceremony and remains pending until the HFM canary has broker-confirmed stop protection, durable request/result evidence, and successful restart reconciliation.
+
+1. Keep the HFM position, if any, protected and reconciled; otherwise pause HFM before proceeding.
+2. Build and review an IC `canary_ready` cost model from IC-only evidence. Never reuse the HFM model.
+3. On the IC Markets demo `XAUUSD` chart only, run the operator policy script with a new policy version, `InpRolloutStage=ic_canary`, `InpCandidateApproved=true`, `InpMaxSpread<=0.30`, `InpMaxDeviation<=0.30`, and the remaining immutable ceilings unchanged or tighter.
+4. Reconfirm the locally entered IC demo login, `ICMarketsSC-Demo`, `XAUUSD`, and magic `880201`. Only the operator then sets `InpDemoExecutionEnabled=true`, sets `InpKillSwitch=false`, and enables Algo Trading for the IC Markets canary.
+5. Repeat the HFM evidence chain and specifically verify IC spread, deviation, volume, server, cost, order/deal/position identifiers, broker-side stop, and restart behavior.
+
+Only after both ceremonies pass may the operator write `both_demo` policies. Each broker keeps independent gates, magic numbers, loss days, pauses, and evidence. EURUSD remains shadow-only and live execution remains absent at every stage.
+
+### Kill switch, pause, rollback, and recovery
+
+To pause a broker, set `InpKillSwitch=true` first, set `InpDemoExecutionEnabled=false`, write a new `status_only` policy with the operator script, and disable terminal Algo Trading if no other approved EA needs it. Confirm two `latest_status.csv` cycles with execution disabled. The kill switch blocks new entries; it does not close a correctly protected existing position.
+
+To roll back, keep the broker paused, capture `latest_status.csv`, `events.jsonl`, `processed_observations.csv`, `reconciliation_latch.csv`, and the broker Trade/History state, then detach `JmbGoldmineDemoCanary` from the Gold status chart and reattach `JmbGoldmineDemoRiskShell` with its kill switch on. Leave the read-only bridge on its duplicate Gold chart. The rollback shell submits no orders. Do not delete canary evidence or treat rollback as clearance of an unresolved broker result.
+
+For an unknown result, restart, or reconciliation failure, keep execution disabled and use the broker terminal to correlate symbol, magic, decision comment, order, deal, position, and stop with the durable event record. The EA never blindly resends. Restart the canary only with execution disabled and the kill switch on, then require two stable status cycles before review.
+
+If a fill lacks broker-confirmed stop protection, the EA's sole emergency path attempts to close only that EA-owned unprotected position and persists a protection-error pause. The operator must immediately verify the actual position and stop in the broker terminal, correlate the close result with `events.jsonl` and `reconciliation_latch.csv`, and leave the broker at `status_only`. A local `filled_protected` label is not evidence unless the broker confirms both exposure and stop. Never clear or delete the persistent latch merely to resume; promotion requires an explicit human incident review and approved recovery decision.
+
+There is no live-mode input, live-account bypass, EURUSD demo allowlist, AI risk override, or remote close/order command. App/API/AI-managed orders continue to require UTA approval and guards.
