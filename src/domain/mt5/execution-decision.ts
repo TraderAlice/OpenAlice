@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { appendFile, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { appendFile, mkdir, readFile, rename, rm, rmdir, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 
 export interface JmbGateResult {
@@ -61,6 +61,9 @@ const HEADER = [
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 const FORBIDDEN_TEXT = /[\r\n]/
+const PUBLICATION_LOCK_DIRECTORY = '.publication.lock'
+const PUBLICATION_LOCK_TIMEOUT_MS = 1_000
+const PUBLICATION_LOCK_RETRY_MS = 20
 
 function hash(parts: readonly string[]): string {
   return createHash('sha256').update(parts.join('|')).digest('hex').slice(0, 24)
@@ -280,20 +283,48 @@ async function replaceAtomically(destination: string, contents: string): Promise
   }
 }
 
+function wait(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds))
+}
+
+async function acquirePublicationLock(directory: string): Promise<() => Promise<void>> {
+  const lockPath = join(directory, PUBLICATION_LOCK_DIRECTORY)
+  const deadline = Date.now() + PUBLICATION_LOCK_TIMEOUT_MS
+  while (true) {
+    try {
+      await mkdir(lockPath)
+      return async () => rmdir(lockPath)
+    } catch (error) {
+      if (fileCode(error) !== 'EEXIST') {
+        throw new Error(`Execution decision publication lock could not be acquired at ${lockPath}: ${error instanceof Error ? error.message : 'unknown filesystem error'}`)
+      }
+      if (Date.now() >= deadline) {
+        throw new Error(`Execution decision publication lock timed out at ${lockPath}. Another process may still own it; stop the owner and remove the lock directory manually before retrying.`)
+      }
+      await wait(PUBLICATION_LOCK_RETRY_MS)
+    }
+  }
+}
+
 export async function writeExecutionDecision(root: string, decision: JmbExecutionDecision): Promise<WriteExecutionDecisionResult> {
   const destination = join(root, decision.broker, decision.symbol, 'latest_decision.csv')
   await mkdir(dirname(destination), { recursive: true })
   const serialized = serializeExecutionDecisionCsv(decision)
-  const latest = await readLatest(destination)
-  if (latest !== null && (decision.observationAsOf < latest.observationAsOf
-    || (decision.observationAsOf === latest.observationAsOf && Date.parse(decision.leaseIssuedAt) < Date.parse(latest.leaseIssuedAt)))) {
-    return { state: 'regressed', journalAppended: false }
-  }
+  const releaseLock = await acquirePublicationLock(dirname(destination))
+  try {
+    const latest = await readLatest(destination)
+    if (latest !== null && (decision.observationAsOf < latest.observationAsOf
+      || (decision.observationAsOf === latest.observationAsOf && Date.parse(decision.leaseIssuedAt) < Date.parse(latest.leaseIssuedAt)))) {
+      return { state: 'regressed', journalAppended: false }
+    }
 
-  const journalAppended = latest === null || materialEvidence(latest) !== materialEvidence(decision)
-  if (journalAppended) {
-    await appendFile(join(dirname(destination), 'decisions.jsonl'), `${JSON.stringify(decision)}\n`, 'utf8')
+    const journalAppended = latest === null || materialEvidence(latest) !== materialEvidence(decision)
+    if (journalAppended) {
+      await appendFile(join(dirname(destination), 'decisions.jsonl'), `${JSON.stringify(decision)}\n`, 'utf8')
+    }
+    await replaceAtomically(destination, serialized)
+    return { state: 'published', journalAppended }
+  } finally {
+    await releaseLock()
   }
-  await replaceAtomically(destination, serialized)
-  return { state: 'published', journalAppended }
 }

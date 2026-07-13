@@ -145,6 +145,19 @@ describe('demo decision cycle', () => {
     expect(decision).toMatchObject({ direction: 'sell', entryReferencePrice: 2399.9, stopLoss: 2407.9 })
   })
 
+  it('rejects an injected Gold stop distance other than the immutable eight units', async () => {
+    const rootsValue = await roots()
+    const defaultHfm = DEFAULT_JMB_DEMO_INSTRUMENTS.find((item) => item.broker === 'hfmarkets' && item.symbol === 'XAUUSD')!
+    const injected = { ...defaultHfm, stopDistance: 80 }
+    await writeReadyGoldFiles(rootsValue, injected)
+
+    const [result] = await runDemoDecisionCycle({ roots: rootsValue, now: () => now, instruments: [injected] })
+
+    expect(result).toMatchObject({ state: 'error', observationId: null, decisionId: null })
+    expect(result.detail).toMatch(/stop distance.*exactly 8/i)
+    await expect(stat(join(rootsValue.executionDecisionRoot, 'hfmarkets', 'XAUUSD'))).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
   it('returns EURUSD blocked and never creates an execution lease directory', async () => {
     const rootsValue = await roots()
     const eurusd = DEFAULT_JMB_DEMO_INSTRUMENTS.find((item) => item.broker === 'hfmarkets' && item.symbol === 'EURUSD')!

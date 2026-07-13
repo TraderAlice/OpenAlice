@@ -42,10 +42,12 @@ export interface DemoDecisionCycleResult {
   detail: string
 }
 
+export const JMB_GOLD_STOP_DISTANCE = 8 as const
+
 export const DEFAULT_JMB_DEMO_INSTRUMENTS = [
-  { broker: 'hfmarkets', server: 'HFMarketsGlobal-Demo4', symbol: 'XAUUSD', researchArtifactSymbol: 'XAUUSDb', maxSpread: 0.75, maxDeviation: 0.5, stopDistance: 8 },
+  { broker: 'hfmarkets', server: 'HFMarketsGlobal-Demo4', symbol: 'XAUUSD', researchArtifactSymbol: 'XAUUSDb', maxSpread: 0.75, maxDeviation: 0.5, stopDistance: JMB_GOLD_STOP_DISTANCE },
   { broker: 'hfmarkets', server: 'HFMarketsGlobal-Demo4', symbol: 'EURUSD', researchArtifactSymbol: 'EURUSDb', maxSpread: 0.00025, maxDeviation: 0.0002, stopDistance: null },
-  { broker: 'icmarkets', server: 'ICMarketsSC-Demo', symbol: 'XAUUSD', researchArtifactSymbol: 'XAUUSD', maxSpread: 0.3, maxDeviation: 0.3, stopDistance: 8 },
+  { broker: 'icmarkets', server: 'ICMarketsSC-Demo', symbol: 'XAUUSD', researchArtifactSymbol: 'XAUUSD', maxSpread: 0.3, maxDeviation: 0.3, stopDistance: JMB_GOLD_STOP_DISTANCE },
   { broker: 'icmarkets', server: 'ICMarketsSC-Demo', symbol: 'EURUSD', researchArtifactSymbol: 'EURUSD', maxSpread: 0.00015, maxDeviation: 0.0001, stopDistance: null },
 ] as const satisfies readonly JmbDemoInstrumentConfig[]
 
@@ -205,6 +207,9 @@ async function runInstrumentCycle(
   now: Date,
 ): Promise<DemoDecisionCycleResult> {
   if (instrument.symbol === 'EURUSD') return blockedEurUsd(instrument)
+  if (instrument.stopDistance !== JMB_GOLD_STOP_DISTANCE) {
+    throw new Error(`Gold execution stop distance must be exactly ${JMB_GOLD_STOP_DISTANCE}; caller overrides are not permitted.`)
+  }
 
   const policy = await readDemoExecutionPolicy(roots.policyRoot, instrument.broker, instrument.symbol)
   const [bridge, completed, learning, rows, spreadEvidence, lookback] = await Promise.all([
@@ -258,7 +263,7 @@ async function runInstrumentCycle(
     costModel: model,
     learning: { state: learning.state, accountMode: learning.accountMode, server: learning.server },
     quote: { bid: bridge.bid, ask: bridge.ask, spread: bridge.spread },
-    stopLoss: observation === null ? null : protectiveStop(observation.direction, bridge.bid, bridge.ask, instrument.stopDistance),
+    stopLoss: observation === null ? null : protectiveStop(observation.direction, bridge.bid, bridge.ask, JMB_GOLD_STOP_DISTANCE),
   })
 
   if (result.decision === null) {
