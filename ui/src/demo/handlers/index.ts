@@ -13,6 +13,7 @@ import { agentStatusHandlers } from './agentStatus'
 import { newsListHandlers } from './newsList'
 import { devMiscHandlers } from './devMisc'
 import { headlessHandlers } from './headless'
+import { researchHandlers } from './research'
 import { catchAllHandlers } from './catchAll'
 
 // Order matters: catchAll must be LAST. MSW resolves handlers in registration
@@ -34,5 +35,6 @@ export const handlers = [
   ...newsListHandlers,
   ...devMiscHandlers,
   ...headlessHandlers,
+  ...researchHandlers,
   ...catchAllHandlers,
 ]

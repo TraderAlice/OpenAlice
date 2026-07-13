@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Activity, ArrowDownRight, ArrowUpRight, BarChart3, Database, FlaskConical, Radio, RefreshCw, ShieldCheck } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
+import { Mt5ExecutionStatusCard } from '../components/research/Mt5ExecutionStatusCard'
 import { researchApi, type ResearchDashboard, type ResearchInstrument } from '../api/research'
 
 function percentage(value: number | null | undefined): string {
@@ -169,6 +170,8 @@ function InstrumentStudy({ instrument }: { instrument: ResearchInstrument }) {
           ) : null}
         </div>
 
+        <Mt5ExecutionStatusCard execution={instrument.execution} />
+
         <div className="flex items-center justify-between text-micro text-text-muted border-t border-border/70 pt-3">
           <span>{instrument.export.available ? `${instrument.export.files} monthly files · ${compactBytes(instrument.export.totalBytes)}` : 'No export found'}</span>
           <span>{dateTime(instrument.export.lastUpdated)}</span>
@@ -273,7 +276,7 @@ export function ResearchDashboardPage() {
     <div className="flex flex-col flex-1 min-h-0 bg-bg">
       <PageHeader
         title="Research Desk"
-        description="Local evidence ledger · no broker orders enabled"
+        description="Read-only evidence and broker-local MT5 demo execution monitor"
         live={{ lastUpdated: dashboard ? new Date(dashboard.asOf) : null }}
         right={<button onClick={() => void load()} className="btn-secondary-sm inline-flex items-center gap-1.5" title="Refresh research data"><RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh</button>}
       />
@@ -287,7 +290,7 @@ export function ResearchDashboardPage() {
               <div className="p-5 border-b lg:border-b-0 lg:border-r border-border">
                 <div className="flex items-center gap-2 text-micro uppercase tracking-[0.16em] text-accent"><FlaskConical size={14} /> Research-only mode</div>
                 <h3 className="mt-3 text-[22px] font-semibold text-text leading-tight">Evidence before automation.</h3>
-                <p className="mt-2 text-body text-text-muted max-w-2xl">The dashboard tracks what has actually been exported, tested, rejected, or still needs proof. It does not calculate a promise of profit and it cannot send orders.</p>
+                <p className="mt-2 text-body text-text-muted max-w-2xl">This read-only desk monitors what has been exported, tested, rejected, or broker-confirmed. Any demo execution authority remains inside the locally configured MT5 EA; this page cannot send or manage orders.</p>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 bg-bg">
                 <SummaryStat label="Data feeds" value={String(dashboard.summary.instrumentsWithData)} />
@@ -327,6 +330,7 @@ export function ResearchDashboardPage() {
                 <p className="mt-2 text-body text-text">{dashboard.disclaimer}</p>
                 <p className="research-disclaimer mt-3 text-body text-text-muted">Trade-history learning imports manual and demo outcomes for review. It is not approval for live trading and it cannot submit orders.</p>
                 <p className="research-disclaimer mt-3 text-body text-text-muted">Shadow decisions are JMB learning records only. They are not live-trading approval and they do not submit orders.</p>
+                <p className="research-disclaimer mt-3 text-body text-text-muted">Demo execution status is operational evidence only. Demo performance is not live approval and does not imply future profit.</p>
                 <div className="mt-4 border-t border-border pt-3 text-micro text-text-muted">Data source: local MT5 exports. Last analysed candles, not streaming broker quotes.</div>
               </div>
               <div className="border border-border bg-bg-secondary rounded-lg overflow-hidden">

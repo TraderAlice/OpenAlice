@@ -5,6 +5,36 @@ export type QualityTone = EvidenceTone | 'green'
 export type BridgeState = 'awaiting_bridge' | 'stale' | 'unsafe_account' | 'disconnected' | 'ready'
 export type Mt5LearningState = 'no_data' | 'learning' | 'blocked' | 'stale'
 export type JmbDecisionState = 'no_decision' | 'shadow' | 'demo_blocked' | 'error'
+export type JmbExecutionLifecycleState =
+  | 'disabled' | 'paused' | 'blocked' | 'ready' | 'order_requesting'
+  | 'order_rejected' | 'reconciliation_required' | 'filled_protected'
+  | 'close_requesting' | 'closed' | 'stopped' | 'emergency_close' | 'error'
+export type JmbResearchExecutionState = JmbExecutionLifecycleState | 'demo_blocked' | 'missing' | 'malformed' | 'stale'
+export type JmbExecutionRolloutStage = 'status_only' | 'hfm_canary' | 'ic_canary' | 'both_demo'
+
+export interface JmbExecutionStatusSummary {
+  state: JmbResearchExecutionState
+  label: string
+  detail: string
+  capturedAt: string | null
+  broker: 'hfmarkets' | 'icmarkets'
+  server: string | null
+  accountMode: 'demo' | null
+  symbol: 'XAUUSD' | 'EURUSD'
+  rolloutStage: JmbExecutionRolloutStage
+  executionEnabled: boolean
+  killSwitch: boolean
+  decisionId: string | null
+  observationId: string | null
+  latestEvent: { id: string; type: string; at: string; resultCode: string; detail: string } | null
+  stopProtectionConfirmed: boolean
+  position: { direction: 'buy' | 'sell'; volume: number; openPrice: number; stopLoss: number; id: string } | null
+  reconciliationState: string
+  dailyLossCount: number
+  dailyRealizedLoss: number
+  blockingGate: string | null
+  nextSafeAction: string
+}
 
 export interface Mt5TradeLedgerSummary {
   state: Mt5LearningState
@@ -96,6 +126,7 @@ export interface ResearchInstrument {
   }
   learning: Mt5TradeLedgerSummary
   decision: JmbDecisionSummary
+  execution: JmbExecutionStatusSummary
   evidence: { label: string; tone: EvidenceTone; score: number }
 }
 
@@ -103,7 +134,7 @@ export interface ResearchDashboard {
   asOf: string
   mode: 'research_only'
   tradingEnabled: boolean
-  summary: { exportRoot: string; tradeLedgerRoot: string; decisionRoot: string; instrumentsWithData: number; completedBaselines: number; completedWalkForwards: number; readyDemoBridges: number; learningInstruments: number; shadowDecisions: number; validatedInstruments: number; hfmReady: boolean; experimentRuns: number }
+  summary: { exportRoot: string; tradeLedgerRoot: string; decisionRoot: string; executionRoot: string; instrumentsWithData: number; completedBaselines: number; completedWalkForwards: number; readyDemoBridges: number; learningInstruments: number; shadowDecisions: number; validatedInstruments: number; hfmReady: boolean; experimentRuns: number }
   stages: Array<{ key: string; label: string; state: 'complete' | 'waiting' | 'next' | 'blocked'; detail: string }>
   instruments: ResearchInstrument[]
   experiments: Array<{
