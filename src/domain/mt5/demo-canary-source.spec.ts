@@ -1,10 +1,11 @@
-import { readFile } from 'node:fs/promises'
+import { readFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const CANARY_DIRECTORY = join('tools', 'mt5', 'JmbGoldmineDemoCanary')
 const CANARY_FILES = [
   join(CANARY_DIRECTORY, 'JmbGoldmineDemoCanary.mq5'),
+  join(CANARY_DIRECTORY, 'JmbCanaryTradeGateway.mqh'),
   join(CANARY_DIRECTORY, 'JmbCanaryTypes.mqh'),
   join(CANARY_DIRECTORY, 'JmbCanaryCsv.mqh'),
   join(CANARY_DIRECTORY, 'JmbCanaryPolicy.mqh'),
@@ -22,14 +23,78 @@ async function readCanarySource(file: string): Promise<string> {
   return readFile(join(CANARY_DIRECTORY, file), 'utf8')
 }
 
-describe('MT5 demo canary source contract', () => {
-  it('keeps the dry-run bundle order-free and safe by default', async () => {
-    const source = await readCanaryBundle()
+async function readMqlSources(directory = join('tools', 'mt5')): Promise<Array<{ path: string; source: string }>> {
+  const entries = await readdir(directory, { withFileTypes: true })
+  const nested = await Promise.all(entries.map(async (entry) => {
+    const path = join(directory, entry.name)
+    if (entry.isDirectory()) return readMqlSources(path)
+    if (!/\.mq[5h]$/i.test(entry.name)) return []
+    return [{ path, source: await readFile(path, 'utf8') }]
+  }))
+  return nested.flat()
+}
 
-    expect(source).not.toMatch(/OrderSend|OrderCheck|CTrade|PositionClose/)
+describe('MT5 demo canary source contract', () => {
+  it('has one protected gateway and keeps every other MQL source order-API-free', async () => {
+    const sources = await readMqlSources()
+    const gatewayPath = join(CANARY_DIRECTORY, 'JmbCanaryTradeGateway.mqh')
+    const gateway = sources.find(({ path }) => path === gatewayPath)
+
+    expect(gateway, 'the protected-order gateway must exist').toBeDefined()
+    expect(gateway?.source.match(/\bOrderCheck\s*\(/g)).toHaveLength(1)
+    expect(gateway?.source.match(/\bOrderSend\s*\(/g)).toHaveLength(1)
+    expect(gateway?.source).not.toMatch(/\bCTrade\b/)
+    for (const file of sources.filter(({ path }) => path !== gatewayPath)) {
+      expect(file.source, `${file.path} must not call an order API`).not.toMatch(/\bOrder(?:Check|Send)\s*\(/)
+      expect(file.source, `${file.path} must not use CTrade`).not.toMatch(/\bCTrade\b/)
+    }
+  })
+
+  it('keeps execution disabled, demo-only, Gold-only, fixed-volume, and non-expanding', async () => {
+    const [source, gateway] = await Promise.all([
+      readCanaryBundle(),
+      readCanarySource('JmbCanaryTradeGateway.mqh'),
+    ])
+
     expect(source).toContain('input bool InpDemoExecutionEnabled = false;')
     expect(source).toContain('input bool InpKillSwitch = true;')
-    expect(source).not.toMatch(/live.?mode/i)
+    expect(source).not.toMatch(/input[^;]*(?:live|real)/i)
+    expect(source).not.toMatch(/(?:EURUSD|martingale|grid|recovery)/i)
+    expect(source).not.toMatch(/(?:take_profit|\btp\s*=)/i)
+    expect(gateway).toContain('ACCOUNT_TRADE_MODE_DEMO')
+    expect(gateway).toContain('decision.symbol!="XAUUSD"')
+    expect(gateway).toContain('decision.volume!=CANARY_HARD_MAX_VOLUME')
+    expect(gateway).toContain('request.volume=CANARY_HARD_MAX_VOLUME;')
+    expect(gateway).toContain('request.sl=decision.stopLoss;')
+    expect(gateway).toMatch(/policy\.magicNumber!=880101\s*&&\s*policy\.magicNumber!=880201/)
+    expect(gateway).not.toMatch(/request\.volume\s*=\s*(?!CANARY_HARD_MAX_VOLUME)/)
+  })
+
+  it('persists requesting and attempt barriers before one submit then defers every result to reconciliation', async () => {
+    const main = await readCanarySource('JmbGoldmineDemoCanary.mq5')
+    const submissionFlow = main.match(/void SubmitReadyCanaryDecision\([\s\S]*?\n\}/)?.[0] ?? ''
+    const eventBarrier = submissionFlow.indexOf('AppendCanaryOrderRequestingEvent(')
+    const attemptBarrier = submissionFlow.indexOf('PersistCanaryAttempt(')
+    const submit = submissionFlow.indexOf('SubmitProtectedMarketOrder(')
+
+    expect(main).toContain('#include "JmbCanaryTradeGateway.mqh"')
+    expect(main).toContain('evaluation.state!=CANARY_LIFECYCLE_READY')
+    expect(main).toContain('!InpDemoExecutionEnabled || InpKillSwitch')
+    expect(main).toContain('if(!status_persisted)')
+    expect(main).toContain('CanaryProcessedStateContains(processed_state,decision.decisionId,decision.observationId)')
+    expect(eventBarrier).toBeGreaterThan(-1)
+    expect(attemptBarrier).toBeGreaterThan(eventBarrier)
+    expect(submit).toBeGreaterThan(attemptBarrier)
+    expect(main).toMatch(/AppendCanaryOrderRequestingEvent\([\s\S]*FileFlush\(handle\)[\s\S]*ReadCanaryCommonText/)
+    expect(main).toMatch(/PersistCanaryAttempt\([\s\S]*FileFlush\(handle\)[\s\S]*LoadCanaryProcessedState/)
+    expect(main).toContain('processed_observations.lock')
+    expect(main).toMatch(/PersistCanaryAttempt\([\s\S]*FileOpen\(lock_path[\s\S]*LoadCanaryProcessedState\(path,locked_state/)
+    expect(main.match(/SubmitProtectedMarketOrder\s*\(/g)).toHaveLength(1)
+    expect(main).toContain('g_reconciliation_dirty=true;')
+    expect(main).toContain('environment.reconciliationComplete=!g_reconciliation_dirty')
+    expect(main).toContain('void OnTradeTransaction(')
+    expect(main).not.toMatch(/filled_protected/)
+    expect(main).not.toMatch(/\b(?:retry|resend)\b/i)
   })
 
   it('keeps risk evaluation pure while retaining broker-side calculation evidence', async () => {

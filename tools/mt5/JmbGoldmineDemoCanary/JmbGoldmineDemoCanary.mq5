@@ -1,12 +1,13 @@
-// JMB Goldmine broker-local demo canary. Task 6 evaluates and publishes readiness only.
+// JMB Goldmine broker-local demo canary with one protected demo-order gateway.
 #property strict
-#property version "0.200"
+#property version "0.300"
 
 #include "JmbCanaryTypes.mqh"
 #include "JmbCanaryCsv.mqh"
 #include "JmbCanaryPolicy.mqh"
 #include "JmbCanaryGates.mqh"
 #include "JmbCanaryState.mqh"
+#include "JmbCanaryTradeGateway.mqh"
 
 input string InpBrokerId = "";
 input string InpExpectedServer = "";
@@ -20,6 +21,213 @@ const string CANARY_POLICY_ROOT="OpenAliceMt5DemoPolicyV1";
 const string CANARY_DECISION_ROOT="OpenAliceMt5ExecutionDecisionV1";
 
 bool g_evaluating=false;
+bool g_reconciliation_dirty=false;
+bool g_last_submit_sent=false;
+uint g_last_submit_retcode=0;
+ulong g_last_submit_order_ticket=0;
+ulong g_last_submit_deal_ticket=0;
+string g_last_submit_detail="";
+
+bool AppendCanaryOrderRequestingEvent(const CanaryDecision &decision,string &detail)
+{
+   EnsureCanaryDirectory(InpBrokerId,InpSymbol);
+   string path=CanaryStatusDirectory(InpBrokerId,InpSymbol)+"\\events.jsonl";
+   string line="{\"schema_version\":1,\"event_type\":\"order_requesting\",\"event_time\":\""
+      +CanaryIsoTime(TimeGMT())+"\",\"broker\":\""+InpBrokerId+"\",\"server\":\""
+      +InpExpectedServer+"\",\"account_mode\":\"demo\",\"symbol\":\"XAUUSD\",\"decision_id\":\""
+      +decision.decisionId+"\",\"observation_id\":\""+decision.observationId
+      +"\",\"result_code\":\"\",\"result_detail\":\"Request persistence completed before submission.\"}\r\n";
+   int handle=FileOpen(path,FILE_READ|FILE_WRITE|FILE_BIN|FILE_ANSI|FILE_COMMON);
+   if(handle==INVALID_HANDLE)
+   {
+      detail="The order-requesting journal could not be opened.";
+      return false;
+   }
+   if(!FileSeek(handle,0,SEEK_END))
+   {
+      FileClose(handle);
+      detail="The order-requesting journal could not seek to its append boundary.";
+      return false;
+   }
+   uint written=FileWriteString(handle,line);
+   if(written!=StringLen(line))
+   {
+      FileClose(handle);
+      detail="The complete order-requesting event could not be appended.";
+      return false;
+   }
+   FileFlush(handle);
+   FileClose(handle);
+
+   string reopened="";
+   string read_detail="";
+   if(!ReadCanaryCommonText(path,reopened,read_detail)
+      || StringLen(reopened)<StringLen(line)
+      || StringSubstr(reopened,StringLen(reopened)-StringLen(line))!=line)
+   {
+      detail="The flushed order-requesting event could not be verified exactly.";
+      return false;
+   }
+   detail="The order-requesting event was appended, flushed, and verified.";
+   return true;
+}
+
+bool PersistCanaryAttempt(const string path,
+                          const CanaryDecision &decision,
+                          const CanaryProcessedState &processed_state,
+                          string &detail)
+{
+   if(!processed_state.valid
+      || CanaryProcessedStateContains(processed_state,decision.decisionId,decision.observationId))
+   {
+      detail="The observation is unavailable or already attempted.";
+      return false;
+   }
+   datetime attempted_at=TimeGMT();
+   if(attempted_at<=0)
+   {
+      detail="A durable attempt cannot be recorded without terminal UTC time.";
+      return false;
+   }
+
+   EnsureCanaryDirectory(InpBrokerId,InpSymbol);
+   string lock_path=CanaryStatusDirectory(InpBrokerId,InpSymbol)+"\\processed_observations.lock";
+   int lock_handle=FileOpen(lock_path,FILE_WRITE|FILE_BIN|FILE_ANSI|FILE_COMMON);
+   if(lock_handle==INVALID_HANDLE)
+   {
+      detail="Another canary instance owns the attempt-state lock.";
+      return false;
+   }
+   CanaryProcessedState locked_state;
+   InitializeCanaryProcessedState(locked_state);
+   string verification_detail="";
+   if(!LoadCanaryProcessedState(path,locked_state,verification_detail)
+      || CanaryProcessedStateContains(locked_state,decision.decisionId,decision.observationId))
+   {
+      FileClose(lock_handle);
+      FileDelete(lock_path,FILE_COMMON);
+      detail="The locked attempt state is invalid or already contains this observation.";
+      return false;
+   }
+
+   string temporary_path=path+"."+IntegerToString((int)GetTickCount())+".tmp";
+   int handle=FileOpen(temporary_path,FILE_WRITE|FILE_CSV|FILE_ANSI|FILE_COMMON,',');
+   if(handle==INVALID_HANDLE)
+   {
+      FileClose(lock_handle);
+      FileDelete(lock_path,FILE_COMMON);
+      detail="The temporary attempt store could not be opened.";
+      return false;
+   }
+   uint header_written=FileWrite(handle,"schema_version","decision_id","observation_id","attempted_at");
+   if(header_written==0)
+   {
+      FileClose(handle);
+      FileDelete(temporary_path,FILE_COMMON);
+      FileClose(lock_handle);
+      FileDelete(lock_path,FILE_COMMON);
+      detail="The attempt-store header could not be written.";
+      return false;
+   }
+   for(int index=0;index<ArraySize(locked_state.observationIds);index++)
+   {
+      uint existing_written=FileWrite(handle,"1",locked_state.decisionIds[index],
+         locked_state.observationIds[index],CanaryIsoTime(locked_state.attemptedAt[index]));
+      if(existing_written==0)
+      {
+         FileClose(handle);
+         FileDelete(temporary_path,FILE_COMMON);
+         FileClose(lock_handle);
+         FileDelete(lock_path,FILE_COMMON);
+         detail="An existing durable attempt could not be preserved.";
+         return false;
+      }
+   }
+   uint attempt_written=FileWrite(handle,"1",decision.decisionId,decision.observationId,
+      CanaryIsoTime(attempted_at));
+   if(attempt_written==0)
+   {
+      FileClose(handle);
+      FileDelete(temporary_path,FILE_COMMON);
+      FileClose(lock_handle);
+      FileDelete(lock_path,FILE_COMMON);
+      detail="The new attempt could not be written.";
+      return false;
+   }
+   FileFlush(handle);
+   FileClose(handle);
+
+   CanaryProcessedState temporary_state;
+   InitializeCanaryProcessedState(temporary_state);
+   if(!LoadCanaryProcessedState(temporary_path,temporary_state,verification_detail)
+      || ArraySize(temporary_state.observationIds)!=ArraySize(locked_state.observationIds)+1
+      || !CanaryProcessedStateContains(temporary_state,decision.decisionId,decision.observationId))
+   {
+      FileDelete(temporary_path,FILE_COMMON);
+      FileClose(lock_handle);
+      FileDelete(lock_path,FILE_COMMON);
+      detail="The flushed attempt store failed strict verification.";
+      return false;
+   }
+   if(!FileMove(temporary_path,FILE_COMMON,path,FILE_COMMON|FILE_REWRITE))
+   {
+      FileDelete(temporary_path,FILE_COMMON);
+      FileClose(lock_handle);
+      FileDelete(lock_path,FILE_COMMON);
+      detail="The verified attempt store could not replace the durable state.";
+      return false;
+   }
+
+   CanaryProcessedState durable_state;
+   InitializeCanaryProcessedState(durable_state);
+   if(!LoadCanaryProcessedState(path,durable_state,verification_detail)
+      || !CanaryProcessedStateContains(durable_state,decision.decisionId,decision.observationId))
+   {
+      FileClose(lock_handle);
+      FileDelete(lock_path,FILE_COMMON);
+      detail="The replaced attempt store could not be reopened and verified.";
+      return false;
+   }
+   FileClose(lock_handle);
+   FileDelete(lock_path,FILE_COMMON);
+   detail="The decision and observation attempt were durably recorded.";
+   return true;
+}
+
+void SubmitReadyCanaryDecision(const CanaryDecision &decision,
+                               const CanaryPolicy &policy,
+                               const CanaryEvaluation &evaluation,
+                               const CanaryProcessedState &processed_state,
+                               const string processed_path,
+                               const bool effective_execution_enabled,
+                               const bool status_persisted)
+{
+   if(!status_persisted) return;
+   if(!InpDemoExecutionEnabled || InpKillSwitch || !effective_execution_enabled
+      || !evaluation.ready || evaluation.state!=CANARY_LIFECYCLE_READY) return;
+   if(!processed_state.valid
+      || CanaryProcessedStateContains(processed_state,decision.decisionId,decision.observationId)) return;
+
+   string persistence_detail="";
+   if(!AppendCanaryOrderRequestingEvent(decision,persistence_detail))
+   {
+      Print("JMB demo canary order-requesting event failed: ",persistence_detail);
+      return;
+   }
+   if(!PersistCanaryAttempt(processed_path,decision,processed_state,persistence_detail))
+   {
+      Print("JMB demo canary attempt persistence failed: ",persistence_detail);
+      return;
+   }
+
+   TradeSubmitResult submission=SubmitProtectedMarketOrder(decision,policy);
+   g_last_submit_sent=submission.sent;
+   g_last_submit_retcode=submission.retcode;
+   g_last_submit_order_ticket=submission.order_ticket;
+   g_last_submit_deal_ticket=submission.deal_ticket;
+   g_last_submit_detail=submission.detail;
+   g_reconciliation_dirty=true;
+}
 
 void InitializeCanaryPolicy(CanaryPolicy &policy)
 {
@@ -323,7 +531,8 @@ void BuildCanaryEnvironment(const CanaryDecision &decision,
    environment.newsEvidenceAvailable=calendar_now>0
       && ReadCanaryNewsBlackout(calendar_now,environment.newsBlackout);
    environment.logPreflightReady=PreflightCanaryLog(InpBrokerId,InpSymbol);
-   environment.reconciliationComplete=environment.dailyStateAvailable && environment.exposureStateAvailable;
+   environment.reconciliationComplete=!g_reconciliation_dirty
+      && environment.dailyStateAvailable && environment.exposureStateAvailable;
 }
 
 bool ValidateCanaryInputs()
@@ -361,10 +570,13 @@ void Evaluate()
    bool effective_execution_enabled=CanaryEffectiveExecutionEnabled(InpDemoExecutionEnabled,policy);
 
    string write_detail="";
-   if(!WriteCanaryLatestStatus(InpBrokerId,AccountInfoString(ACCOUNT_SERVER),InpSymbol,policy,decision,evaluation,
-                               effective_execution_enabled,InpKillSwitch,
-                              environment.dailyLossCount,environment.dailyRealizedLoss,write_detail))
+   bool status_persisted=WriteCanaryLatestStatus(InpBrokerId,AccountInfoString(ACCOUNT_SERVER),InpSymbol,
+      policy,decision,evaluation,effective_execution_enabled,InpKillSwitch,
+      environment.dailyLossCount,environment.dailyRealizedLoss,write_detail);
+   if(!status_persisted)
       Print("JMB demo canary status publication failed: ",write_detail);
+   SubmitReadyCanaryDecision(decision,policy,evaluation,processed_state,processed_path,
+      effective_execution_enabled,status_persisted);
 
    g_evaluating=false;
 }
@@ -404,4 +616,11 @@ int OnInit()
 
 void OnTimer() { Evaluate(); }
 void OnTick()  { Evaluate(); }
+void OnTradeTransaction(const MqlTradeTransaction &transaction,
+                        const MqlTradeRequest &request,
+                        const MqlTradeResult &result)
+{
+   g_reconciliation_dirty=true;
+   return;
+}
 void OnDeinit(const int reason) { EventKillTimer(); }
