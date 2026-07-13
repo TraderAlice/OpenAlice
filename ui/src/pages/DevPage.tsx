@@ -6,6 +6,7 @@ import { useToast } from '../components/Toast'
 import { LogsPage } from './LogsPage'
 import { SimulatorPage } from './SimulatorPage'
 import { OnboardingDesignPage } from './OnboardingDesignPage'
+import { ConnectorsPage } from './ConnectorsPage'
 import {
   toolsApi,
   type ToolInfo,
@@ -22,6 +23,7 @@ type Tab = Extract<ViewSpec, { kind: 'dev' }>['params']['tab']
 
 const TAB_TITLES: Record<Tab, string> = {
   tools: 'Tools',
+  connectors: 'Connectors',
   onboarding: 'Onboarding',
   snapshots: 'Snapshots',
   logs: 'Logs',
@@ -39,6 +41,12 @@ interface DevPageProps {
 
 export function DevPage({ spec }: DevPageProps) {
   const tab = spec.params.tab
+
+  // Settings and Dev are two navigation contexts over one Connector surface.
+  // Reuse the page wholesale so credentials, health, and probe behavior cannot
+  // drift into separate implementations. ConnectorsPage owns its own header
+  // and scrolling layout, unlike the older inline Dev tabs below.
+  if (tab === 'connectors') return <ConnectorsPage />
 
   return (
     <div className="flex flex-col flex-1 min-h-0">

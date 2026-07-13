@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useWorkspace } from '../store'
-import { specEquals, getFocusedGroup, getFocusedTab, type ViewSpec } from '../types'
+import { specEquals, getFocusedGroup, getFocusedTab, isDevTab, type ViewSpec } from '../types'
 
 // Reset zustand state + localStorage before each test so cases stay isolated.
 function resetStore() {
@@ -16,6 +16,13 @@ function resetStore() {
 }
 
 beforeEach(resetStore)
+
+describe('Dev URL tabs', () => {
+  it('accepts the Connector beta surface and rejects unknown tabs', () => {
+    expect(isDevTab('connectors')).toBe(true)
+    expect(isDevTab('connector')).toBe(false)
+  })
+})
 
 // A sample ViewSpec whose params vary by a single string, used to drive
 // tab-store mechanics (open/focus/close/dedup). market-detail fits: its

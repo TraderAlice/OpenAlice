@@ -15,6 +15,14 @@
 
 export type WorkspaceSource = 'chat'
 
+/** One source of truth for the Dev sidebar and `/dev/:tab` URL contract. */
+export const DEV_TABS = ['tools', 'connectors', 'onboarding', 'snapshots', 'logs', 'simulator'] as const
+export type DevTab = typeof DEV_TABS[number]
+
+export function isDevTab(value: string): value is DevTab {
+  return (DEV_TABS as readonly string[]).includes(value)
+}
+
 export type ViewSpec =
   | { kind: 'workspace-list'; params: Record<string, never> }
   | { kind: 'workspace';      params: { wsId: string; sessionId?: string; source?: WorkspaceSource } }
@@ -35,7 +43,7 @@ export type ViewSpec =
   | { kind: 'uta-detail';     params: { id: string } }
   | { kind: 'onboarding';     params: Record<string, never> }
   | { kind: 'design-project'; params: { project: string } }
-  | { kind: 'dev';            params: { tab: 'tools' | 'onboarding' | 'snapshots' | 'logs' | 'simulator' } }
+  | { kind: 'dev';            params: { tab: DevTab } }
   | { kind: 'inbox';               params: Record<string, never> }
   | { kind: 'tracked';             params: Record<string, never> }
   | { kind: 'chat-landing';        params: { targetWsId?: string } }
