@@ -44,3 +44,7 @@ export type { CcxtBrokerConfig } from './ccxt/index.js'
 // IBKR
 export { IbkrBroker } from './ibkr/index.js'
 export type { IbkrBrokerConfig } from './ibkr/index.js'
+
+// INDstocks (INDmoney — Indian equities)
+export { IndstocksBroker } from './indstocks/index.js'
+export type { IndstocksBrokerConfig } from './indstocks/index.js'

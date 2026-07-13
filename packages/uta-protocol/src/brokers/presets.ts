@@ -11,7 +11,7 @@
  */
 
 import { z } from 'zod'
-import { BROKER_PRESET_CATALOG, type BrokerPresetDef, type ModeOption, type SubtitleSegment } from './preset-catalog.js'
+import { BROKER_PRESET_CATALOG, type BrokerEngine, type BrokerPresetDef, type ModeOption, type SubtitleSegment } from './preset-catalog.js'
 
 // ==================== Serialized shape (sent to frontend) ====================
 
@@ -24,7 +24,7 @@ export interface SerializedBrokerPreset {
   defaultName: string
   badge: string
   badgeColor: string
-  engine: 'ccxt' | 'alpaca' | 'ibkr' | 'leverup' | 'longbridge' | 'mock'
+  engine: BrokerEngine
   guardCategory: 'crypto' | 'securities'
   modes?: ModeOption[]
   subtitleFields: SubtitleSegment[]
