@@ -1,5 +1,5 @@
 import { readFile, writeFile, mkdir } from 'fs/promises'
-import { dirname } from 'path'
+import { dirname, join } from 'path'
 // The in-process AI loop (AgentCenter, then GenerateRouter + AgentWork) is gone
 // as of 0.40 — the model loop runs inside the native workspace CLIs; autonomous
 // runs go through headless workspace dispatch (cron → workspace).
@@ -47,7 +47,8 @@ import { createEventBus } from './core/event-bus.js'
 import { createCronEngine, createCronListener, createCronTools } from './task/cron/index.js'
 import { createMetricsListener } from './task/metrics/index.js'
 import { createJmbMt5DecisionScheduler } from './task/mt5-decision-scheduler.js'
-import { runDemoDecisionCycle } from './domain/mt5/demo-decision-service.js'
+import { createJmbMt5OutcomeImporter, importReconciledExecutionOutcomes } from './task/mt5-outcome-importer.js'
+import { DEFAULT_JMB_DEMO_INSTRUMENTS, runDemoDecisionCycle } from './domain/mt5/demo-decision-service.js'
 import { resolveJmbMt5Roots } from './domain/mt5/local-paths.js'
 import { NewsCollectorStore, NewsCollector } from './domain/news/index.js'
 import { createNewsArchiveTools } from './tool/news.js'
@@ -347,6 +348,18 @@ async function main() {
   })
   await mt5DecisionScheduler.start()
 
+  const mt5Roots = resolveJmbMt5Roots()
+  const mt5OutcomeImporter = createJmbMt5OutcomeImporter({
+    runCycle: async () => importReconciledExecutionOutcomes({
+      executionRoot: mt5Roots.executionRoot,
+      learningRoot: join(mt5Roots.researchRoot, 'mt5-execution-learning'),
+      instruments: DEFAULT_JMB_DEMO_INSTRUMENTS
+        .filter((instrument) => instrument.symbol === 'XAUUSD')
+        .map(({ broker, server, symbol }) => ({ broker, server, symbol })),
+    }),
+  })
+  await mt5OutcomeImporter.start()
+
   console.log('engine: started')
 
   // Broker catalog refresh, snapshot scheduling, and broker close-on-
@@ -357,6 +370,7 @@ async function main() {
   let stopped = false
   const shutdown = async () => {
     stopped = true
+    mt5OutcomeImporter.stop()
     mt5DecisionScheduler.stop()
     newsCollector?.stop()
     metricsListener.stop()
