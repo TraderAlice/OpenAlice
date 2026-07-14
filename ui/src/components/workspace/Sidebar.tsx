@@ -136,7 +136,7 @@ export function Sidebar(props: SidebarProps): ReactElement {
         <button
           type="button"
           onClick={() => setShowCreate(true)}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-border/60 bg-bg-tertiary/30 text-[13px] font-medium text-text-muted transition-colors hover:text-text hover:border-accent/50 hover:bg-bg-tertiary/60"
+          className="oa-pressable w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-border/60 bg-bg-tertiary/30 text-[13px] font-medium text-text-muted hover:text-text hover:border-accent/50 hover:bg-bg-tertiary/60"
         >
           <Plus size={15} strokeWidth={2.25} className="shrink-0" />
           <span className="truncate">{t('workspace.newWorkspace')}</span>
@@ -245,7 +245,7 @@ function NavRow({
       type="button"
       onClick={onClick}
       title={title}
-      className={`relative flex items-center gap-2.5 w-full px-3 py-1.5 text-[13px] text-left transition-colors ${
+      className={`oa-nav-row relative flex items-center gap-2.5 w-full px-3 py-1.5 text-[13px] text-left ${
         active ? 'bg-bg-tertiary text-text' : 'text-text hover:bg-bg-tertiary/50'
       }`}
     >
@@ -312,7 +312,7 @@ function AgentBadgeGlyph({ agentId }: { agentId: string }): ReactElement {
 
 /** Hover-revealed square action button used for the per-row controls. */
 function rowAction(danger = false): string {
-  return `shrink-0 w-5 h-5 rounded flex items-center justify-center text-text-muted/70 transition-colors ${
+  return `oa-icon-action shrink-0 w-5 h-5 rounded flex items-center justify-center text-text-muted/70 transition-colors ${
     danger ? 'hover:text-red hover:bg-red/10' : 'hover:text-text hover:bg-bg-secondary'
   }`;
 }
@@ -444,7 +444,7 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
               <ul
                 ref={menuRef}
                 role="menu"
-                className="absolute right-0 top-full mt-1 min-w-[170px] py-1 bg-bg-secondary border border-border/70 rounded-lg shadow-lg z-10"
+                className="oa-popover-enter absolute right-0 top-full mt-1 min-w-[170px] py-1 bg-bg-secondary border border-border/70 rounded-lg shadow-lg z-10"
               >
                 {runtimeAgents.map((agent) => (
                   <li key={agent.id}>
@@ -577,7 +577,7 @@ function HeadlessGroup(props: {
         {runningCount > 0 && <span className="ml-0.5 w-1.5 h-1.5 rounded-full bg-accent" />}
       </button>
       {open && (
-        <div className="ml-[7px] border-l border-border/50">
+        <div className="oa-disclosure-enter ml-[7px] border-l border-border/50">
           {props.tasks.map((t) => (
             <HeadlessTaskRow key={t.taskId} task={t} onOpenAsSession={props.onOpenAsSession} />
           ))}

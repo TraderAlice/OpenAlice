@@ -15,6 +15,14 @@
 
 export type WorkspaceSource = 'chat'
 
+/** One source of truth for the Dev sidebar and `/dev/:tab` URL contract. */
+export const DEV_TABS = ['tools', 'onboarding', 'snapshots', 'logs', 'simulator'] as const
+export type DevTab = typeof DEV_TABS[number]
+
+export function isDevTab(value: string): value is DevTab {
+  return (DEV_TABS as readonly string[]).includes(value)
+}
+
 export type ViewSpec =
   | { kind: 'workspace-list'; params: Record<string, never> }
   | { kind: 'workspace';      params: { wsId: string; sessionId?: string; source?: WorkspaceSource } }
@@ -22,6 +30,7 @@ export type ViewSpec =
   | { kind: 'template-detail';  params: { name: string } }
   | { kind: 'portfolio';      params: Record<string, never> }
   | { kind: 'trading-as-git'; params: Record<string, never> }
+  | { kind: 'connectors';     params: Record<string, never> }
   | { kind: 'issue';          params: Record<string, never> }
   | { kind: 'issue-detail';   params: { wsId: string; id: string } }
   | { kind: 'tracked-issue-detail'; params: { wsId: string; id: string } }
@@ -31,11 +40,11 @@ export type ViewSpec =
   | { kind: 'market-rotation'; params: Record<string, never> }
   | { kind: 'market-board';   params: { board: 'movers' | 'calendar' | 'macro' | 'term-structure' | 'global-macro' | 'shipping' | 'fed' } }
   | { kind: 'market-detail';  params: { assetClass: 'equity' | 'crypto' | 'currency' | 'commodity'; symbol: string; source?: string } }
-  | { kind: 'settings';       params: { category: 'general' | 'ai-provider' | 'agent-permissions' | 'trading' | 'issues' | 'mcp' | 'market-data' | 'news-collector' } }
+  | { kind: 'settings';       params: { category: 'general' | 'ai-provider' | 'agent-permissions' | 'trading' | 'issues' | 'connectors' | 'mcp' | 'market-data' | 'news-collector' } }
   | { kind: 'uta-detail';     params: { id: string } }
   | { kind: 'onboarding';     params: Record<string, never> }
   | { kind: 'design-project'; params: { project: string } }
-  | { kind: 'dev';            params: { tab: 'tools' | 'onboarding' | 'snapshots' | 'logs' | 'simulator' } }
+  | { kind: 'dev';            params: { tab: DevTab } }
   | { kind: 'inbox';               params: Record<string, never> }
   | { kind: 'tracked';             params: Record<string, never> }
   | { kind: 'chat-landing';        params: { targetWsId?: string } }
@@ -54,6 +63,7 @@ export type ActivitySection =
   | 'tracked'
   | 'workspaces'
   | 'trading-as-git'
+  | 'connectors'
   | 'settings'
   | 'dev'
   | 'market'

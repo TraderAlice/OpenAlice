@@ -78,7 +78,8 @@ export function createAuthMiddleware(opts: AuthMiddlewareOptions): MiddlewareHan
     // public request through. See safe/playbooks/03-localhost-spoofing.md.
     if (trustedProxies.size === 0) {
       const clientIp = getSocketRemoteAddress(c)
-      if (clientIp && isLoopbackIp(clientIp)) {
+      const origin = c.req.header('origin')
+      if (clientIp && isLoopbackIp(clientIp) && (!origin || isTrustedLocalOrigin(origin))) {
         return next()
       }
     }
@@ -145,6 +146,24 @@ export function isLoopbackIp(ip: string): boolean {
   // IPv4 — accept the entire 127.0.0.0/8 range, not just 127.0.0.1
   if (/^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(norm)) return true
   return false
+}
+
+/** Browser origins that are owned by a local OpenAlice surface. This keeps
+ * localhost, Vite, and the packaged Electron app frictionless without letting
+ * an arbitrary public page inherit the socket-level loopback bypass (including
+ * while an SSH tunnel is open). */
+export function isTrustedLocalOrigin(origin: string): boolean {
+  try {
+    const url = new URL(origin)
+    if (url.protocol === 'app:' && url.hostname === 'openalice') return true
+    return (url.protocol === 'http:' || url.protocol === 'https:') && (
+      url.hostname === 'localhost' ||
+      url.hostname === '127.0.0.1' ||
+      url.hostname === '[::1]'
+    )
+  } catch {
+    return false
+  }
 }
 
 function readSessionCookie(cookieHeader: string): string | null {

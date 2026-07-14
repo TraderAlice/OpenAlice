@@ -21,9 +21,7 @@ export interface Plugin {
   stop(): Promise<void>
 }
 
-/** Generic result of an out-of-band reconnect attempt. Still used by the
- *  UTA client SDK (`reconnectUTA`); the connector-reconnect path that
- *  used to share it was removed with the legacy connector cluster. */
+/** Generic result of a UTA reconnect attempt. */
 export interface ReconnectResult {
   success: boolean
   error?: string

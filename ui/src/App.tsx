@@ -18,6 +18,7 @@ export type Page =
   | 'chat' | 'inbox' | 'tracked' | 'workspaces' | 'portfolio' | 'news' | 'automation' | 'market'
   | 'issue'
   | 'trading-as-git'
+  | 'connectors'
   | 'settings' | 'dev'
 
 /** Subscribe to a CSS media query, SSR-safe (defaults to matched). */

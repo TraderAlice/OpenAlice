@@ -46,6 +46,10 @@ export interface WorkspaceCatalogRecord {
   purgedAt?: string
   reason?: string
   handoff?: WorkspaceHandoffSnapshot
+  /** Directional consolidation trail; historical identity remains this row. */
+  absorbedIntoWorkspaceId?: string
+  absorbedAt?: string
+  absorbCommit?: string
   /** Imported from an unregistered pre-Catalog directory. Metadata is best effort. */
   legacyImported?: boolean
 }
@@ -189,13 +193,37 @@ export class WorkspaceCatalog {
     return this.patch(id, { lifecycle: 'departed', departedAt: at, updatedAt: at })
   }
 
+  async markAbsorbed(input: {
+    id: string
+    targetWorkspaceId: string
+    commit: string
+    at?: string
+  }): Promise<WorkspaceCatalogRecord> {
+    const at = input.at ?? new Date().toISOString()
+    return this.patch(input.id, {
+      lifecycle: 'departed',
+      absorbedIntoWorkspaceId: input.targetWorkspaceId,
+      absorbedAt: at,
+      absorbCommit: input.commit,
+      updatedAt: at,
+    })
+  }
+
   async beginRestoring(id: string): Promise<WorkspaceCatalogRecord> {
     const now = new Date().toISOString()
     return this.patch(id, { lifecycle: 'restoring', updatedAt: now })
   }
 
   async markActive(id: string, at = new Date().toISOString()): Promise<WorkspaceCatalogRecord> {
-    return this.patch(id, { lifecycle: 'active', restoredAt: at, updatedAt: at })
+    return this.patch(id, {
+      lifecycle: 'active',
+      restoredAt: at,
+      updatedAt: at,
+      // Explicit restoration reopens the old desk as its own identity.
+      absorbedIntoWorkspaceId: undefined,
+      absorbedAt: undefined,
+      absorbCommit: undefined,
+    })
   }
 
   async beginPurging(id: string): Promise<WorkspaceCatalogRecord> {
@@ -251,6 +279,9 @@ function validateRecord(value: unknown): WorkspaceCatalogRecord | null {
     !Array.isArray(record['agents']) ||
     !record['agents'].every((agent) => typeof agent === 'string') ||
     typeof record['updatedAt'] !== 'string' ||
+    (record['absorbedIntoWorkspaceId'] !== undefined && typeof record['absorbedIntoWorkspaceId'] !== 'string') ||
+    (record['absorbedAt'] !== undefined && typeof record['absorbedAt'] !== 'string') ||
+    (record['absorbCommit'] !== undefined && typeof record['absorbCommit'] !== 'string') ||
     !['active', 'offboarding', 'departed', 'restoring', 'purging', 'purged'].includes(String(lifecycle))
   ) return null
   return value as WorkspaceCatalogRecord

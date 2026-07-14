@@ -10,6 +10,8 @@ import { join } from 'node:path';
 
 import { createWorkspaceRoutes } from './workspaces.js';
 import { HeadlessCapacityError, type WorkspaceService } from '../../workspaces/service.js';
+import { TemplateUpgradeError } from '../../workspaces/template-upgrade.js';
+import { WorkspaceAbsorbError } from '../../workspaces/workspace-absorb.js';
 import { readWorkspaceMetadata } from '../../workspaces/workspace-metadata.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -35,6 +37,8 @@ function build(
     resumeIdentity?: any;
     sessionDirectory?: any;
     lifecycle?: any;
+    templateUpgrades?: any;
+    workspaceAbsorbs?: any;
   } = {},
 ) {
   const claude = {
@@ -87,6 +91,24 @@ function build(
     restore: vi.fn(async () => ({ ok: true, workspace: { id: 'ws-1', lifecycle: 'active' }, assessment: {} })),
     purge: vi.fn(async () => ({ ok: true, workspace: { id: 'ws-1', lifecycle: 'purged' }, assessment: {} })),
   };
+  const templateUpgrades = opts.templateUpgrades ?? {
+    plan: vi.fn(async () => ({ workspaceId: 'ws-1', planDigest: 'digest-1' })),
+    apply: vi.fn(async () => ({
+      workspaceId: 'ws-1', fromVersion: '1.0.0', toVersion: '2.0.0',
+      commit: 'abc123', changedPaths: ['README.md'], keptPaths: [],
+    })),
+  };
+  const workspaceAbsorbs = opts.workspaceAbsorbs ?? {
+    plan: vi.fn(async () => ({
+      source: { id: 'ws-2', tag: 'source' },
+      target: { id: 'ws-1', tag: 'target' },
+      planDigest: 'absorb-digest-1',
+    })),
+    apply: vi.fn(async () => ({
+      sourceWorkspaceId: 'ws-2', targetWorkspaceId: 'ws-1', commit: 'absorb123',
+      changedPaths: ['research/new.md'], skippedPaths: [], departedDir: '/departed/ws-2',
+    })),
+  };
   const svc = {
     registry: { get: (id: string) => (id === 'ws-1' ? meta : undefined) },
     adapters: { get: (a: string) => adapters[a] },
@@ -101,6 +123,8 @@ function build(
     getAgentRuntimeReadiness,
     probeAgentRuntimeReadiness,
     lifecycle,
+    templateUpgrades,
+    workspaceAbsorbs,
     sessionDirectory: vi.fn(async (id: string) => id === 'ws-1'
       ? (opts.sessionDirectory ?? {
           workspace: { id: 'ws-1', tag: 'demo' },
@@ -119,6 +143,8 @@ function build(
     getAgentRuntimeReadiness,
     probeAgentRuntimeReadiness,
     lifecycle,
+    templateUpgrades,
+    workspaceAbsorbs,
   };
 }
 
@@ -222,6 +248,118 @@ describe('Workspace lifecycle routes', () => {
     const { app } = build({ lifecycle });
     expect((await del(app, '/departed/ws-old')).status).toBe(200);
     expect(lifecycle.purge).toHaveBeenCalledWith('ws-old');
+  });
+});
+
+describe('Workspace template upgrade routes', () => {
+  it('returns a review plan and applies only the accepted resolution values', async () => {
+    const templateUpgrades = {
+      plan: vi.fn(async () => ({ workspaceId: 'ws-1', planDigest: 'digest-1' })),
+      apply: vi.fn(async () => ({
+        workspaceId: 'ws-1', fromVersion: '1.0.0', toVersion: '2.0.0',
+        commit: 'abc123', changedPaths: ['README.md'], keptPaths: ['AGENTS.md'],
+      })),
+    };
+    const { app } = build({ templateUpgrades });
+
+    expect(await get(app, '/ws-1/template-upgrade')).toMatchObject({
+      status: 200,
+      body: { plan: { planDigest: 'digest-1' } },
+    });
+    const applied = await post(app, '/ws-1/template-upgrade', {
+      planDigest: 'digest-1',
+      resolutions: { 'AGENTS.md': 'workspace', 'README.md': 'anything-else' },
+    });
+    expect(applied.status).toBe(200);
+    expect(templateUpgrades.apply).toHaveBeenCalledWith('ws-1', {
+      planDigest: 'digest-1',
+      resolutions: { 'AGENTS.md': 'workspace' },
+    });
+  });
+
+  it('maps a changed preview to a recoverable 409 with the refreshed plan', async () => {
+    const refreshed = { workspaceId: 'ws-1', planDigest: 'digest-2' } as any;
+    const templateUpgrades = {
+      plan: vi.fn(),
+      apply: vi.fn(async () => {
+        throw new TemplateUpgradeError('stale_plan', 'Review the refreshed plan.', refreshed);
+      }),
+    };
+    const { app } = build({ templateUpgrades });
+    const result = await post(app, '/ws-1/template-upgrade', { planDigest: 'digest-1' });
+
+    expect(result).toMatchObject({
+      status: 409,
+      body: { error: 'stale_plan', plan: { planDigest: 'digest-2' } },
+    });
+  });
+
+  it('rejects apply requests without a reviewed plan digest', async () => {
+    const { app, templateUpgrades } = build();
+    const result = await post(app, '/ws-1/template-upgrade', {});
+    expect(result).toMatchObject({ status: 400, body: { error: 'bad_request' } });
+    expect(templateUpgrades.apply).not.toHaveBeenCalled();
+  });
+});
+
+describe('Workspace absorb routes', () => {
+  it('previews a direction and passes only supported conflict resolutions', async () => {
+    const workspaceAbsorbs = {
+      plan: vi.fn(async () => ({
+        source: { id: 'ws-2', tag: 'source' }, target: { id: 'ws-1', tag: 'target' },
+        planDigest: 'absorb-digest-1',
+      })),
+      apply: vi.fn(async () => ({
+        sourceWorkspaceId: 'ws-2', targetWorkspaceId: 'ws-1', commit: 'abc123',
+        changedPaths: ['research/new.md'], skippedPaths: [], departedDir: '/departed/ws-2',
+      })),
+    };
+    const { app } = build({ workspaceAbsorbs });
+
+    expect(await get(app, '/ws-1/absorb/ws-2')).toMatchObject({
+      status: 200,
+      body: { plan: { planDigest: 'absorb-digest-1' } },
+    });
+    const applied = await post(app, '/ws-1/absorb/ws-2', {
+      planDigest: 'absorb-digest-1',
+      resolutions: {
+        'research/a.md': 'both',
+        'research/b.md': 'source',
+        'research/c.md': 'target',
+        'research/d.md': 'delete',
+      },
+    });
+    expect(applied.status).toBe(200);
+    expect(workspaceAbsorbs.apply).toHaveBeenCalledWith({
+      targetWorkspaceId: 'ws-1',
+      sourceWorkspaceId: 'ws-2',
+      planDigest: 'absorb-digest-1',
+      resolutions: {
+        'research/a.md': 'both',
+        'research/b.md': 'source',
+        'research/c.md': 'target',
+      },
+    });
+  });
+
+  it('returns a refreshed plan when the reviewed digest is stale', async () => {
+    const refreshed = { source: { id: 'ws-2' }, target: { id: 'ws-1' }, planDigest: 'new' } as any;
+    const workspaceAbsorbs = {
+      plan: vi.fn(),
+      apply: vi.fn(async () => {
+        throw new WorkspaceAbsorbError(
+          'stale_plan',
+          'One Workspace changed after preview.',
+          refreshed,
+        );
+      }),
+    };
+    const { app } = build({ workspaceAbsorbs });
+    const result = await post(app, '/ws-1/absorb/ws-2', { planDigest: 'old' });
+    expect(result).toMatchObject({
+      status: 409,
+      body: { error: 'stale_plan', plan: { planDigest: 'new' } },
+    });
   });
 });
 

@@ -15,6 +15,7 @@ import { Hono } from 'hono'
 import {
   createAuthMiddleware,
   isLoopbackIp,
+  isTrustedLocalOrigin,
   SESSION_COOKIE_NAME,
 } from './auth.js'
 import {
@@ -85,6 +86,20 @@ describe('isLoopbackIp', () => {
   })
 })
 
+describe('isTrustedLocalOrigin', () => {
+  it('accepts local browser origins on any port', () => {
+    expect(isTrustedLocalOrigin('http://127.0.0.1:47331')).toBe(true)
+    expect(isTrustedLocalOrigin('http://localhost:5173')).toBe(true)
+    expect(isTrustedLocalOrigin('https://[::1]:47331')).toBe(true)
+    expect(isTrustedLocalOrigin('app://openalice')).toBe(true)
+  })
+
+  it('rejects public and malformed origins', () => {
+    expect(isTrustedLocalOrigin('https://example.com')).toBe(false)
+    expect(isTrustedLocalOrigin('null')).toBe(false)
+  })
+})
+
 describe('auth middleware — playbook 01 (auth bypass)', () => {
   it('01.1: GET /api/trading/uta without cookie from non-localhost → 401', async () => {
     const app = makeApp({ trustedProxies: [], csrfTrustedOrigins: [] })
@@ -129,6 +144,22 @@ describe('auth middleware — playbook 01 (auth bypass)', () => {
     const app = makeApp({ trustedProxies: [], csrfTrustedOrigins: [] })
     const res = await app.request('/api/trading/uta', undefined, envWithIp('::1'))
     expect(res.status).toBe(200)
+  })
+
+  it('loopback browser origin keeps the localhost bypass', async () => {
+    const app = makeApp({ trustedProxies: [], csrfTrustedOrigins: [] })
+    const res = await app.request('/api/trading/uta', {
+      headers: { origin: 'http://127.0.0.1:40123' },
+    }, envWithIp('127.0.0.1'))
+    expect(res.status).toBe(200)
+  })
+
+  it('public browser origin cannot inherit the localhost bypass', async () => {
+    const app = makeApp({ trustedProxies: [], csrfTrustedOrigins: [] })
+    const res = await app.request('/api/trading/uta', {
+      headers: { origin: 'https://evil.example' },
+    }, envWithIp('127.0.0.1'))
+    expect(res.status).toBe(401)
   })
 
   it('public route /api/version is accessible without cookie or localhost', async () => {

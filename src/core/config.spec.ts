@@ -188,10 +188,10 @@ describe('writeConfigSection', () => {
     expect(mockWriteFile).not.toHaveBeenCalled()
   })
 
-  it('writes connectors section to connectors.json', async () => {
-    await writeConfigSection('connectors', { web: { port: 3005 } })
+  it('writes local listener ports separately from external connectors', async () => {
+    await writeConfigSection('ports', { web: 3005 })
     const filePath = mockWriteFile.mock.calls[0][0] as string
-    expect(filePath).toMatch(/connectors\.json$/)
+    expect(filePath).toMatch(/ports\.json$/)
   })
 })
 

@@ -25,18 +25,11 @@ export interface Workspace {
    * Overview card ("from {template} v{spawnedFromVersion}").
    */
   readonly spawnedFromVersion?: string;
-  /**
-   * The instance's currently self-reported version, read from
-   * `<workspace>/README.md` frontmatter on every list call. The agent can
-   * mutate this when self-upgrading. Falls back to `spawnedFromVersion`
-   * if the instance README is missing or has no version frontmatter.
-   */
+  /** Last successfully applied template baseline; README text cannot forge it. */
   readonly currentVersion?: string;
   /**
-   * Set when the template (in source tree) is at a higher version than the
-   * instance currently self-claims. Informational only — clicking the
-   * badge jumps the user to the template's detail page; nothing in the
-   * launcher applies migrations. Agent self-upgrade is the resolution path.
+   * Set when the source template is newer than the recorded applied baseline.
+   * Opens the reviewed three-way Template Upgrade flow.
    */
   readonly upgradeAvailable?: { from: string; to: string } | null;
   /** Adapter ids enabled for this workspace. Default runtime lives in user config. */
@@ -77,6 +70,242 @@ export interface CreateError {
 export type CreateResult =
   | { readonly ok: true; readonly workspace: Workspace }
   | { readonly ok: false; readonly status: number; readonly error: CreateError };
+
+export type TemplateUpgradeFileStatus = 'ready' | 'preserved' | 'conflict' | 'unchanged'
+export type TemplateUpgradeResolution = 'workspace' | 'template'
+
+export interface TemplateUpgradeFilePlan {
+  readonly path: string
+  readonly status: TemplateUpgradeFileStatus
+  readonly operation: 'add' | 'update' | 'remove' | 'keep' | 'none'
+  readonly currentPreview: string | null
+  readonly templatePreview: string | null
+  readonly currentTruncated: boolean
+  readonly templateTruncated: boolean
+  readonly canUseTemplate: boolean
+  readonly note?: string
+}
+
+export interface TemplateUpgradePlan {
+  readonly workspaceId: string
+  readonly template: string
+  readonly fromVersion: string
+  readonly toVersion: string
+  readonly strategy: 'managed-context'
+  readonly planDigest: string
+  readonly source: 'recorded-baseline' | 'legacy-root-commit'
+  readonly blocked: boolean
+  readonly blockers: readonly string[]
+  readonly activity: {
+    readonly busy: boolean
+    readonly sessions: readonly {
+      readonly sessionId: string
+      readonly resumeId: string
+      readonly name: string
+      readonly agent: string
+      readonly surface: 'terminal' | 'webpi'
+      readonly startedAt: number | null
+    }[]
+    readonly headless: readonly {
+      readonly taskId: string | null
+      readonly agent: string
+      readonly startedAt: number
+    }[]
+  }
+  readonly files: readonly TemplateUpgradeFilePlan[]
+  readonly summary: {
+    readonly ready: number
+    readonly preserved: number
+    readonly conflicts: number
+    readonly unchanged: number
+  }
+}
+
+export interface TemplateUpgradeResult {
+  readonly workspaceId: string
+  readonly fromVersion: string
+  readonly toVersion: string
+  readonly commit: string
+  readonly changedPaths: readonly string[]
+  readonly keptPaths: readonly string[]
+}
+
+export class TemplateUpgradeApiError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+    readonly status: number,
+    readonly plan?: TemplateUpgradePlan,
+  ) {
+    super(message)
+    this.name = 'TemplateUpgradeApiError'
+  }
+}
+
+export async function getTemplateUpgradePlan(wsId: string): Promise<TemplateUpgradePlan> {
+  const res = await fetch(`/api/workspaces/${encodeURIComponent(wsId)}/template-upgrade`)
+  const body = await res.json().catch(() => ({})) as {
+    plan?: TemplateUpgradePlan
+    error?: string
+    message?: string
+  }
+  if (!res.ok || !body.plan) {
+    throw new TemplateUpgradeApiError(
+      body.error ?? 'upgrade_plan_failed',
+      body.message ?? `Template upgrade preview failed: HTTP ${res.status}`,
+      res.status,
+      body.plan,
+    )
+  }
+  return body.plan
+}
+
+export async function applyTemplateUpgrade(
+  wsId: string,
+  planDigest: string,
+  resolutions: Readonly<Record<string, TemplateUpgradeResolution>>,
+): Promise<TemplateUpgradeResult> {
+  const res = await fetch(`/api/workspaces/${encodeURIComponent(wsId)}/template-upgrade`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ planDigest, resolutions }),
+  })
+  const body = await res.json().catch(() => ({})) as {
+    result?: TemplateUpgradeResult
+    plan?: TemplateUpgradePlan
+    error?: string
+    message?: string
+  }
+  if (!res.ok || !body.result) {
+    throw new TemplateUpgradeApiError(
+      body.error ?? 'upgrade_apply_failed',
+      body.message ?? `Template upgrade failed: HTTP ${res.status}`,
+      res.status,
+      body.plan,
+    )
+  }
+  return body.result
+}
+
+export type WorkspaceAbsorbFileStatus = 'ready' | 'duplicate' | 'conflict'
+export type WorkspaceAbsorbResolution = 'target' | 'source' | 'both'
+
+export interface WorkspaceAbsorbFilePlan {
+  readonly path: string
+  readonly status: WorkspaceAbsorbFileStatus
+  readonly operation: 'add' | 'skip' | 'choose'
+  readonly sourcePreview: string | null
+  readonly targetPreview: string | null
+  readonly sourceTruncated: boolean
+  readonly targetTruncated: boolean
+  readonly sourceSize: number
+  readonly targetSize: number | null
+  readonly canUseSource: boolean
+  readonly keepBothPath: string
+}
+
+export interface WorkspaceAbsorbPlan {
+  readonly source: { readonly id: string; readonly tag: string; readonly displayName?: string }
+  readonly target: { readonly id: string; readonly tag: string; readonly displayName?: string }
+  readonly importRoot: string
+  readonly planDigest: string
+  readonly blocked: boolean
+  readonly blockers: readonly string[]
+  readonly activity: {
+    readonly source: TemplateUpgradePlan['activity']
+    readonly target: TemplateUpgradePlan['activity']
+  }
+  readonly sourceInventory: {
+    readonly sessions: number
+    readonly resumeIds: number
+    readonly openIssues: readonly string[]
+    readonly scheduledIssues: readonly string[]
+    readonly dirtyFiles: number
+  }
+  readonly files: readonly WorkspaceAbsorbFilePlan[]
+  readonly summary: {
+    readonly ready: number
+    readonly duplicates: number
+    readonly conflicts: number
+    readonly excluded: number
+    readonly bytes: number
+  }
+}
+
+export interface WorkspaceAbsorbResult {
+  readonly sourceWorkspaceId: string
+  readonly targetWorkspaceId: string
+  readonly commit: string
+  readonly changedPaths: readonly string[]
+  readonly skippedPaths: readonly string[]
+  readonly departedDir: string
+}
+
+export class WorkspaceAbsorbApiError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+    readonly status: number,
+    readonly plan?: WorkspaceAbsorbPlan,
+  ) {
+    super(message)
+    this.name = 'WorkspaceAbsorbApiError'
+  }
+}
+
+export async function getWorkspaceAbsorbPlan(
+  targetWorkspaceId: string,
+  sourceWorkspaceId: string,
+): Promise<WorkspaceAbsorbPlan> {
+  const res = await fetch(
+    `/api/workspaces/${encodeURIComponent(targetWorkspaceId)}/absorb/${encodeURIComponent(sourceWorkspaceId)}`,
+  )
+  const body = await res.json().catch(() => ({})) as {
+    plan?: WorkspaceAbsorbPlan
+    error?: string
+    message?: string
+  }
+  if (!res.ok || !body.plan) {
+    throw new WorkspaceAbsorbApiError(
+      body.error ?? 'absorb_plan_failed',
+      body.message ?? `Workspace preview failed: HTTP ${res.status}`,
+      res.status,
+      body.plan,
+    )
+  }
+  return body.plan
+}
+
+export async function applyWorkspaceAbsorb(
+  targetWorkspaceId: string,
+  sourceWorkspaceId: string,
+  planDigest: string,
+  resolutions: Readonly<Record<string, WorkspaceAbsorbResolution>>,
+): Promise<WorkspaceAbsorbResult> {
+  const res = await fetch(
+    `/api/workspaces/${encodeURIComponent(targetWorkspaceId)}/absorb/${encodeURIComponent(sourceWorkspaceId)}`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ planDigest, resolutions }),
+    },
+  )
+  const body = await res.json().catch(() => ({})) as {
+    result?: WorkspaceAbsorbResult
+    plan?: WorkspaceAbsorbPlan
+    error?: string
+    message?: string
+  }
+  if (!res.ok || !body.result) {
+    throw new WorkspaceAbsorbApiError(
+      body.error ?? 'absorb_apply_failed',
+      body.message ?? `Workspace absorb failed: HTTP ${res.status}`,
+      res.status,
+      body.plan,
+    )
+  }
+  return body.result
+}
 
 export async function listWorkspaces(): Promise<Workspace[]> {
   const res = await fetch('/api/workspaces');
@@ -704,6 +933,9 @@ export interface DepartedWorkspace {
   readonly purgedAt?: string
   readonly lifecycle: WorkspaceLifecycleState
   readonly reason?: string
+  readonly absorbedIntoWorkspaceId?: string
+  readonly absorbedAt?: string
+  readonly absorbCommit?: string
   readonly legacyImported?: boolean
   readonly handoff?: {
     readonly preparedAt: string

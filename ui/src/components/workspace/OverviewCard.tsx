@@ -38,13 +38,8 @@ interface Props {
   onOpen: () => void
   onOpenSession: (sessionId: string) => void
   onConfigure?: () => void
-  /**
-   * Open the template's detail page — used by the upgrade badge so the
-   * user (or the agent reading the page) can see what's new before
-   * deciding to self-upgrade. Optional; when absent the badge still
-   * displays but isn't clickable.
-   */
-  onOpenTemplate?: (templateName: string) => void
+  /** Open the reviewed Template Upgrade preview. */
+  onUpgrade?: () => void
 }
 
 export function OverviewCard({
@@ -53,7 +48,7 @@ export function OverviewCard({
   onOpen,
   onOpenSession,
   onConfigure,
-  onOpenTemplate,
+  onUpgrade,
 }: Props) {
   const { t } = useTranslation()
   const w = workspace
@@ -104,14 +99,14 @@ export function OverviewCard({
             type="button"
             onClick={(e) => {
               e.stopPropagation()
-              onOpenTemplate?.(w.template!)
+              onUpgrade?.()
             }}
-            disabled={!onOpenTemplate}
+            disabled={!onUpgrade}
             title={t('workspace.templateUpgrade', {
               from: w.upgradeAvailable.from,
               to: w.upgradeAvailable.to,
             })}
-            className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-accent border border-accent/40 hover:border-accent/80 hover:bg-accent/10 transition-colors disabled:cursor-default disabled:hover:border-accent/40 disabled:hover:bg-transparent"
+            className="oa-pressable shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-accent border border-accent/40 hover:border-accent/80 hover:bg-accent/10 transition-colors disabled:cursor-default disabled:hover:border-accent/40 disabled:hover:bg-transparent"
           >
             <ArrowUpCircle size={10} strokeWidth={2.25} />
             <span>v{w.upgradeAvailable.to}</span>

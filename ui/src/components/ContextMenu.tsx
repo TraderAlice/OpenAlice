@@ -78,7 +78,7 @@ export function ContextMenu({ anchor, items, onClose }: ContextMenuProps) {
         top: pos.y,
         zIndex: 60,
       }}
-      className="min-w-[180px] py-1 bg-bg-secondary border border-border rounded-md shadow-xl"
+      className="oa-popover-enter min-w-[180px] py-1 bg-bg-secondary border border-border rounded-md shadow-xl"
     >
       {items.map((item, i) => {
         if (item.kind === 'separator') {

@@ -1,3 +1,5 @@
+import { waitForOptionalCarrier } from '../optional-carrier/health.js'
+
 /**
  * Poll UTA `/__uta/health` until it returns 200 or timeout. Used by Alice and
  * Guardian for observability only: UTA is an optional carrier, so callers can
@@ -19,18 +21,23 @@ export interface WaitOpts {
   intervalMs?: number
 }
 
-export async function waitForUTAReady(opts: WaitOpts): Promise<HealthBody | null> {
-  const url = `${opts.baseUrl.replace(/\/$/, '')}/__uta/health`
-  const timeoutMs = opts.timeoutMs ?? 15_000
-  const intervalMs = opts.intervalMs ?? 200
-  const deadline = Date.now() + timeoutMs
-
-  while (Date.now() < deadline) {
-    try {
-      const res = await fetch(url)
-      if (res.ok) return (await res.json()) as HealthBody
-    } catch { /* not ready yet */ }
-    await new Promise((r) => setTimeout(r, intervalMs))
+export function decodeUTAHealth(value: unknown): HealthBody {
+  const body = value as Partial<HealthBody>
+  if (body.ok !== true || typeof body.startedAt !== 'string' || typeof body.utas !== 'number') {
+    throw new Error('Invalid UTA health response.')
   }
-  return null
+  return body as HealthBody
+}
+
+export async function waitForUTAReady(opts: WaitOpts): Promise<HealthBody | null> {
+  const result = await waitForOptionalCarrier({
+    id: 'uta',
+    enabled: true,
+    baseUrl: opts.baseUrl,
+    healthPath: '/__uta/health',
+    waitTimeoutMs: opts.timeoutMs ?? 15_000,
+    intervalMs: opts.intervalMs ?? 200,
+    decode: decodeUTAHealth,
+  })
+  return result.phase === 'healthy' ? result.body! : null
 }

@@ -18,6 +18,7 @@ import {
   type WorkspaceHandoffSnapshot,
 } from './workspace-catalog.js'
 import type { WorkspaceMeta, WorkspaceRegistry } from './workspace-registry.js'
+import type { WorkspaceOperationGuard } from './workspace-operation-guard.js'
 
 export interface WorkspaceOffboardingAssessment {
   workspace: { id: string; tag: string; dir: string }
@@ -49,6 +50,8 @@ export interface WorkspaceLifecycleManagerDeps {
   webPi?: WebPiSessionHost
   /** Includes synchronous wait:true/probe-style runs not yet in HeadlessTaskRegistry. */
   isWorkspaceHeadlessActive?: (workspaceId: string) => boolean
+  /** Serializes checkout-wide mutations with Template Upgrade and Merge. */
+  operationGuard?: WorkspaceOperationGuard
   logger: Logger
 }
 
@@ -110,6 +113,41 @@ export class WorkspaceLifecycleManager {
   }
 
   async offboard(input: {
+    id: string
+    reason?: string
+    notes?: string
+    successors?: Readonly<Record<string, string>>
+  }): Promise<WorkspaceOffboardingResult> {
+    const lease = this.deps.operationGuard?.acquire(input.id, 'offboarding') ?? null
+    if (this.deps.operationGuard && !lease) {
+      return {
+        ok: false,
+        code: 'blocked',
+        message: `workspace is busy with ${this.deps.operationGuard.current(input.id) ?? 'another directory operation'}`,
+      }
+    }
+    try {
+      return await this.offboardLocked(input)
+    } finally {
+      lease?.release()
+    }
+  }
+
+  /**
+   * Compose offboarding inside a caller-owned multi-Workspace lease. Absorb is
+   * the only production caller: reacquiring the source lease there would make
+   * an atomic source+target transaction deadlock against itself.
+   */
+  async offboardWithinOperation(input: {
+    id: string
+    reason?: string
+    notes?: string
+    successors?: Readonly<Record<string, string>>
+  }): Promise<WorkspaceOffboardingResult> {
+    return this.offboardLocked(input)
+  }
+
+  private async offboardLocked(input: {
     id: string
     reason?: string
     notes?: string

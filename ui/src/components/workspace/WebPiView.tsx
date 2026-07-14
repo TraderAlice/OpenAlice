@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
-import { LoaderCircle, Send, Square } from 'lucide-react'
+import { Check, ChevronRight, CircleAlert, CircleDashed, LoaderCircle, Send, Square } from 'lucide-react'
 
 import { MarkdownContent } from '../MarkdownContent'
 import {
@@ -8,6 +8,15 @@ import {
   promptWebPiSession,
   type WebPiSnapshot,
 } from './api'
+import {
+  activityToolLabel,
+  contentText,
+  groupWebPiTranscript,
+  summarizeToolInput,
+  type WebPiActivity,
+  type WebPiToolStep,
+  type WebPiTranscriptItem,
+} from './webpi-transcript'
 
 interface Props {
   readonly wsId: string
@@ -66,10 +75,11 @@ export function WebPiView({ wsId, sessionId, label, onSessionLost }: Props): Rea
       ? [...snapshot.messages, snapshot.streamingMessage]
       : [...snapshot.messages]
   }, [snapshot])
+  const transcript = useMemo(() => groupWebPiTranscript(messages), [messages])
 
   useEffect(() => {
     scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight, behavior: 'smooth' })
-  }, [messages.length, snapshot?.revision])
+  }, [snapshot?.revision, transcript.length])
 
   const working = snapshot?.phase === 'working' || snapshot?.phase === 'compacting' || snapshot?.phase === 'retrying'
 
@@ -111,8 +121,12 @@ export function WebPiView({ wsId, sessionId, label, onSessionLost }: Props): Rea
         {messages.length === 0 && !error && (
           <div className="webpi-empty">This Pi conversation is ready in the browser.</div>
         )}
-        {messages.map((message, index) => (
-          <PiMessage key={messageKey(message, index)} value={message} />
+        {transcript.map((item, index) => (
+          <PiTranscriptItem
+            key={item.key}
+            item={item}
+            working={working && index === transcript.length - 1}
+          />
         ))}
         {error && (
           <div className="webpi-error">
@@ -155,39 +169,146 @@ export function WebPiView({ wsId, sessionId, label, onSessionLost }: Props): Rea
   )
 }
 
-function PiMessage({ value }: { readonly value: unknown }): ReactElement {
-  const record = asRecord(value)
-  const role = typeof record?.['role'] === 'string' ? record['role'] : 'assistant'
-  const user = role === 'user'
-  const tool = role === 'toolResult' || role === 'tool'
-  const content = record?.['content']
+function PiTranscriptItem({
+  item,
+  working,
+}: {
+  readonly item: WebPiTranscriptItem
+  readonly working: boolean
+}): ReactElement {
+  if (item.kind === 'user') {
+    return (
+      <article className="webpi-message is-user">
+        <div className="webpi-message-body"><PiContent value={item.content} /></div>
+      </article>
+    )
+  }
+  if (item.kind === 'unknown') {
+    return (
+      <article className="webpi-message is-assistant">
+        <div className="webpi-message-body"><PiContent value={item.value} /></div>
+      </article>
+    )
+  }
   return (
-    <article className={`webpi-message is-${user ? 'user' : tool ? 'tool' : 'assistant'}`}>
+    <article className="webpi-message is-assistant is-turn">
       <div className="webpi-message-body">
-        {tool && record
-          ? <PiToolResult record={record} />
-          : <PiContent value={content ?? value} />}
+        {item.progress.map((text, index) => (
+          <div key={index} className="webpi-progress-text"><MarkdownContent text={text} /></div>
+        ))}
+        {item.activity && <PiActivityGroup activity={item.activity} working={working} />}
+        {item.final && <div className="webpi-final-text"><MarkdownContent text={item.final} /></div>}
       </div>
     </article>
   )
 }
 
-function PiToolResult({ record }: { readonly record: Record<string, unknown> }): ReactElement {
-  const failed = record['isError'] === true
-  const [open, setOpen] = useState(failed)
-  const content = record['content']
-  const chars = contentText(content).length
+function PiActivityGroup({ activity, working }: { readonly activity: WebPiActivity; readonly working: boolean }): ReactElement {
+  const failedCount = activity.steps.filter((step) => step.status === 'failed').length
+  const running = activity.steps.some((step) => step.status === 'running')
+  const thinkingCount = activity.thinking.length
+    + activity.steps.reduce((count, step) => count + step.thinking.length, 0)
+  const [open, setOpen] = useState(failedCount > 0)
+
+  useEffect(() => {
+    if (failedCount > 0) setOpen(true)
+  }, [failedCount])
+
+  const title = failedCount > 0
+    ? `${failedCount} failed`
+    : running ? (working ? 'Working' : 'Incomplete')
+      : activity.steps.length > 0 ? `${activity.steps.length} action${activity.steps.length === 1 ? '' : 's'}`
+        : 'Reasoning'
+  const tools = activityToolLabel(activity.steps)
+  const detail = tools || (thinkingCount > 0 ? `${thinkingCount} note${thinkingCount === 1 ? '' : 's'}` : 'Details')
+
   return (
     <details
-      className={`webpi-tool-result${failed ? ' is-error' : ''}`}
+      className={`webpi-activity${failedCount > 0 ? ' is-error' : ''}${running ? ' is-running' : ''}`}
       open={open}
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
       <summary>
-        <span>{failed ? 'Failed' : 'Result'} from {String(record['toolName'] ?? 'tool')}</span>
-        <span>{formatChars(chars)}</span>
+        <span className="webpi-activity-status" aria-hidden="true">
+          {failedCount > 0
+            ? <CircleAlert size={14} />
+            : running
+              ? working ? <LoaderCircle size={14} className="animate-spin" /> : <CircleDashed size={14} />
+              : <Check size={14} />}
+        </span>
+        <span className="webpi-activity-title">{title}</span>
+        <span className="webpi-activity-meta">{detail}</span>
+        <ChevronRight size={14} className="webpi-disclosure" aria-hidden="true" />
       </summary>
-      {open && <PiContent value={content} />}
+      <div className="webpi-activity-body">
+        {activity.steps.map((step) => <PiToolStepView key={step.id} step={step} working={working} />)}
+        {activity.thinking.length > 0 && (
+          <PiReasoning notes={activity.thinking} label="Final reasoning" />
+        )}
+        {activity.unknownParts.length > 0 && (
+          <details className="webpi-reasoning">
+            <summary>Raw events · {activity.unknownParts.length}</summary>
+            <pre>{JSON.stringify(activity.unknownParts, null, 2)}</pre>
+          </details>
+        )}
+      </div>
+    </details>
+  )
+}
+
+function PiToolStepView({ step, working }: { readonly step: WebPiToolStep; readonly working: boolean }): ReactElement {
+  const failed = step.status === 'failed'
+  const [open, setOpen] = useState(failed)
+  const summary = summarizeToolInput(step.name, step.input)
+  const resultChars = step.result === undefined ? null : contentText(step.result).length
+
+  useEffect(() => {
+    if (failed) setOpen(true)
+  }, [failed])
+
+  return (
+    <details
+      className={`webpi-tool-step is-${step.status}`}
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
+      <summary>
+        <span className="webpi-step-status" aria-hidden="true">
+          {failed
+            ? <CircleAlert size={13} />
+            : step.status === 'running'
+              ? working ? <LoaderCircle size={13} className="animate-spin" /> : <CircleDashed size={13} />
+              : <Check size={13} />}
+        </span>
+        <code>{step.name}</code>
+        <span className="webpi-step-summary">{summary ?? (step.status === 'running' ? 'Running…' : 'Completed')}</span>
+        {resultChars !== null && <span className="webpi-step-size">{formatChars(resultChars)}</span>}
+        <ChevronRight size={13} className="webpi-disclosure" aria-hidden="true" />
+      </summary>
+      <div className="webpi-step-detail">
+        {step.thinking.length > 0 && <PiReasoning notes={step.thinking} label="Reasoning" />}
+        <section>
+          <h4>Input</h4>
+          <pre>{JSON.stringify(step.input, null, 2)}</pre>
+        </section>
+        {step.result !== undefined && (
+          <section>
+            <h4>{failed ? 'Error' : 'Result'}</h4>
+            <div className="webpi-step-result"><PiContent value={step.result} /></div>
+          </section>
+        )}
+      </div>
+    </details>
+  )
+}
+
+function PiReasoning({ notes, label }: { readonly notes: readonly string[]; readonly label: string }): ReactElement {
+  return (
+    <details className="webpi-reasoning">
+      <summary>{label} · {notes.length}</summary>
+      <div className="webpi-reasoning-notes">
+        {notes.map((note, index) => <MarkdownContent key={index} text={note} />)}
+      </div>
     </details>
   )
 }
@@ -231,22 +352,7 @@ function asRecord(value: unknown): Record<string, unknown> | null {
     : null
 }
 
-function contentText(value: unknown): string {
-  if (typeof value === 'string') return value
-  if (!Array.isArray(value)) return ''
-  return value.flatMap((part) => {
-    const item = asRecord(part)
-    return typeof item?.['text'] === 'string' ? [item['text']] : []
-  }).join('\n')
-}
-
 function formatChars(chars: number): string {
   if (chars < 1_000) return `${chars} chars`
   return `${(chars / 1_000).toFixed(chars < 10_000 ? 1 : 0)}k chars`
-}
-
-function messageKey(value: unknown, index: number): string {
-  const record = asRecord(value)
-  const stable = record?.['id'] ?? record?.['toolCallId'] ?? record?.['timestamp'] ?? record?.['role'] ?? 'message'
-  return `${index}-${String(stable)}`
 }

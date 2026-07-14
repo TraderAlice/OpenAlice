@@ -6,7 +6,7 @@ import { resolveInboxOrigin } from './inbox-origin.js'
 /** Build a structural fake service with both authorities. */
 function svc(opts: {
   headless?: Record<string, { taskId: string; resumeId: string; trigger?: { kind: 'issue'; workspaceId: string; issueId: string }; agent: string }>
-  sessions?: Record<string, Record<string, { id: string; wsId: string; agent: string }>>
+  sessions?: Record<string, Record<string, { id: string; resumeId: string; wsId: string; agent: string }>>
 } = {}) {
   return {
     headlessTasks: { get: (id: string) => opts.headless?.[id] ?? null },
@@ -60,15 +60,15 @@ describe('resolveInboxOrigin — headless (Phase 1)', () => {
 describe('resolveInboxOrigin — interactive (Phase 2)', () => {
   it('builds an interactive origin from a valid session header (validated against the registry)', () => {
     const origin = resolveInboxOrigin({ session: 'sess-1', wsId: 'ws1' }, () =>
-      svc({ sessions: { ws1: { 'sess-1': { id: 'sess-1', wsId: 'ws1', agent: 'codex' } } } }) as any,
+      svc({ sessions: { ws1: { 'sess-1': { id: 'sess-1', resumeId: 'resume-1', wsId: 'ws1', agent: 'codex' } } } }) as any,
     )
-    expect(origin).toEqual({ kind: 'interactive', sessionId: 'sess-1', agent: 'codex' })
+    expect(origin).toEqual({ kind: 'interactive', sessionId: 'sess-1', resumeId: 'resume-1', agent: 'codex' })
   })
 
   it('undefined for an unknown/forged session id (no fabricated link)', () => {
     expect(
       resolveInboxOrigin({ session: 'forged', wsId: 'ws1' }, () =>
-        svc({ sessions: { ws1: { 'sess-1': { id: 'sess-1', wsId: 'ws1', agent: 'codex' } } } }) as any,
+        svc({ sessions: { ws1: { 'sess-1': { id: 'sess-1', resumeId: 'resume-1', wsId: 'ws1', agent: 'codex' } } } }) as any,
       ),
     ).toBeUndefined()
   })
@@ -77,7 +77,7 @@ describe('resolveInboxOrigin — interactive (Phase 2)', () => {
     // The id exists, but not under the route's wsId — the authority is scoped.
     expect(
       resolveInboxOrigin({ session: 'sess-1', wsId: 'ws2' }, () =>
-        svc({ sessions: { ws1: { 'sess-1': { id: 'sess-1', wsId: 'ws1', agent: 'codex' } } } }) as any,
+        svc({ sessions: { ws1: { 'sess-1': { id: 'sess-1', resumeId: 'resume-1', wsId: 'ws1', agent: 'codex' } } } }) as any,
       ),
     ).toBeUndefined()
   })
@@ -85,7 +85,7 @@ describe('resolveInboxOrigin — interactive (Phase 2)', () => {
   it('undefined when the session header is present but wsId is missing', () => {
     expect(
       resolveInboxOrigin({ session: 'sess-1' }, () =>
-        svc({ sessions: { ws1: { 'sess-1': { id: 'sess-1', wsId: 'ws1', agent: 'codex' } } } }) as any,
+        svc({ sessions: { ws1: { 'sess-1': { id: 'sess-1', resumeId: 'resume-1', wsId: 'ws1', agent: 'codex' } } } }) as any,
       ),
     ).toBeUndefined()
   })
@@ -107,7 +107,7 @@ describe('resolveInboxOrigin — precedence + both-absent', () => {
             agent: 'claude',
           },
         },
-        sessions: { ws1: { 'sess-1': { id: 'sess-1', wsId: 'ws1', agent: 'codex' } } },
+        sessions: { ws1: { 'sess-1': { id: 'sess-1', resumeId: 'resume-1', wsId: 'ws1', agent: 'codex' } } },
       }) as any,
     )
     expect(origin).toEqual({
@@ -122,9 +122,9 @@ describe('resolveInboxOrigin — precedence + both-absent', () => {
 
   it('falls through to the session header when the run id is unknown', () => {
     const origin = resolveInboxOrigin({ run: 'ghost', session: 'sess-1', wsId: 'ws1' }, () =>
-      svc({ sessions: { ws1: { 'sess-1': { id: 'sess-1', wsId: 'ws1', agent: 'codex' } } } }) as any,
+      svc({ sessions: { ws1: { 'sess-1': { id: 'sess-1', resumeId: 'resume-1', wsId: 'ws1', agent: 'codex' } } } }) as any,
     )
-    expect(origin).toEqual({ kind: 'interactive', sessionId: 'sess-1', agent: 'codex' })
+    expect(origin).toEqual({ kind: 'interactive', sessionId: 'sess-1', resumeId: 'resume-1', agent: 'codex' })
   })
 
   it('undefined when both headers are absent (manual case)', () => {

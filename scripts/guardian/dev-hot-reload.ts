@@ -1,5 +1,6 @@
 export const ALICE_BACKEND_WATCH_INCLUDES = ['src', 'packages'] as const
 export const UTA_BACKEND_WATCH_INCLUDES = ['services/uta/src', 'packages'] as const
+export const CONNECTOR_BACKEND_WATCH_INCLUDES = ['services/connector/src', 'packages/connector-protocol/src', 'src/core'] as const
 export const BACKEND_WATCH_EXCLUDES = [
   'src/**/*.spec.ts',
   'src/**/__test__/**',

@@ -20,6 +20,8 @@ import { AgentPermissionsPage } from '../pages/AgentPermissionsPage'
 import { AIProviderPage } from '../pages/AIProviderPage'
 import { TradingPage } from '../pages/TradingPage'
 import { MCPPage } from '../pages/MCPPage'
+import { ConnectorsPage } from '../pages/ConnectorsPage'
+import { ConnectorStatusPage } from '../pages/ConnectorStatusPage'
 import { MarketDataPage } from '../pages/MarketDataPage'
 import { NewsCollectorPage } from '../pages/NewsCollectorPage'
 import { UTADetailPage } from '../pages/UTADetailPage'
@@ -110,6 +112,13 @@ const tradingAsGitModule: ViewModule<'trading-as-git'> = {
   title: () => 'Trading as Git',
   toUrl: () => '/trading-as-git',
   Component: () => <TradingAsGitPage />,
+}
+
+const connectorsModule: ViewModule<'connectors'> = {
+  kind: 'connectors',
+  title: () => 'Connectors',
+  toUrl: () => '/connectors',
+  Component: () => <ConnectorStatusPage />,
 }
 
 const issueModule: ViewModule<'issue'> = {
@@ -250,6 +259,7 @@ const settingsCategoryTitle: Record<
   'agent-permissions': 'Agent Permissions',
   trading: 'Trading',
   issues: 'Issues',
+  connectors: 'Connectors',
   mcp: 'MCP Server',
   'market-data': 'Market Data',
   'news-collector': 'News Sources',
@@ -262,6 +272,7 @@ function SettingsRouter({ spec }: ViewProps<'settings'>) {
     case 'agent-permissions': return <AgentPermissionsPage />
     case 'trading': return <TradingPage />
     case 'issues': return <IssueSettingsPage />
+    case 'connectors': return <ConnectorsPage />
     case 'mcp': return <MCPPage />
     case 'market-data': return <MarketDataPage />
     case 'news-collector': return <NewsCollectorPage />
@@ -492,6 +503,7 @@ const fileViewerModule: ViewModule<'file-viewer'> = {
 const VIEWS = {
   portfolio: portfolioModule,
   'trading-as-git': tradingAsGitModule,
+  connectors: connectorsModule,
   issue: issueModule,
   'issue-detail': issueDetailModule,
   'tracked-issue-detail': trackedIssueDetailModule,

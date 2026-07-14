@@ -10,8 +10,7 @@ const CATEGORIES = [
   { labelKey: 'settings.category.agentPermissions', category: 'agent-permissions', Icon: ShieldCheck },
   { labelKey: 'settings.category.trading',     category: 'trading',        Icon: CandlestickChart },
   { labelKey: 'settings.category.issues',      category: 'issues',         Icon: ListChecks },
-  // Connectors moved to its own ActivityBar Legacy entry — see
-  // ConnectorsLegacySidebar.
+  { labelKey: 'settings.category.connectors',  category: 'connectors',     Icon: Plug },
   { labelKey: 'settings.category.mcpServer',   category: 'mcp',            Icon: Plug },
   { labelKey: 'settings.category.marketData',  category: 'market-data',    Icon: LineChart },
   { labelKey: 'settings.category.newsSources', category: 'news-collector', Icon: Newspaper },

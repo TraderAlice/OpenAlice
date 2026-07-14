@@ -32,6 +32,8 @@ on:
       - "src/webui/routes/workspaces.ts"
       - "src/workspaces/**"
       - "services/uta/**"
+      - "services/connector/**"
+      - "packages/connector-protocol/**"
   push:
     # Keep push package smoke master-only: PRs into dev get coverage, while
     # routine dev integration pushes do not burn the expensive desktop matrix.
@@ -64,6 +66,8 @@ on:
       - "src/webui/routes/workspaces.ts"
       - "src/workspaces/**"
       - "services/uta/**"
+      - "services/connector/**"
+      - "packages/connector-protocol/**"
 
 jobs:
   package:

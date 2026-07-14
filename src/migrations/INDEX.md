@@ -21,3 +21,4 @@ Each row corresponds to one migration in `src/migrations/`. The runner applies p
 | `0019_issue_session_signatures` | 0.80.0-beta | 2026-07-12 | workspaces/<id>/.alice/issues/*.md | Write Issue ownership as @workspace or an exact @resumeId Session signature. |
 | `0020_headless_issue_trigger` | 0.80.0-beta | 2026-07-12 | workspaces/state/headless-tasks.json | Store the composite Issue trigger separately from a run execution Workspace. |
 | `0021_workspace_departure_catalog` | 0.80.0-beta | 2026-07-12 | workspaces/workspaces.json, workspaces/workspaces/*, workspaces/departed-workspaces/*, workspaces/state/workspace-catalog.json | Move unregistered Workspace directories into a durable departed catalog without deleting them. |
+| `0022_connector_service_config` | 0.81.0-beta | 2026-07-13 | connectors.json, connector-service.json, ports.json | Move external notifications into sealed Connector Service config and retire legacy Web/MCP-Ask connector meanings. |

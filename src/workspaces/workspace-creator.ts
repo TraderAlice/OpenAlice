@@ -14,6 +14,7 @@ import { injectWorkspaceCredentials } from './credential-injection.js';
 import type { Logger } from './logger.js';
 import { generatePetnameId } from './petname-id.js';
 import type { AgentCredentialDecl, TemplateRegistry } from './template-registry.js';
+import { initializeWorkspaceTemplateState } from './template-upgrade.js';
 import type { WorkspaceMeta, WorkspaceRegistry } from './workspace-registry.js';
 
 export interface BootstrapEnv {
@@ -277,6 +278,20 @@ export class WorkspaceCreator {
       spawnedFromVersion: template.version,
       agents,
     };
+    try {
+      // The first commit is the exact Base for every future Template Upgrade.
+      // Store it outside Git now; legacy Workspaces reconstruct the same Base
+      // from their root commit on first upgrade.
+      await initializeWorkspaceTemplateState(workspace, template);
+    } catch (err) {
+      log.warn('template_state.initialize_failed', { err });
+      await rm(dir, { recursive: true, force: true });
+      return {
+        ok: false,
+        code: 'injection_failed',
+        message: `template baseline initialization failed: ${(err as Error).message}`,
+      };
+    }
     await this.opts.registry.add(workspace);
     try {
       await this.opts.onWorkspaceCreated?.(workspace);

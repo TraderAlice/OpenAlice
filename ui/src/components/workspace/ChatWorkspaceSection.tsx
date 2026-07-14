@@ -87,7 +87,7 @@ export function ChatWorkspaceSection(): ReactElement | null {
         <button
           type="button"
           onClick={() => openOrFocus({ kind: 'chat-landing', params: {} })}
-          className="flex w-full items-center gap-2 rounded-lg border border-accent/25 bg-accent/10 px-3 py-2.5 text-left text-[13px] font-medium text-text transition-colors hover:border-accent/45 hover:bg-accent/15"
+          className="oa-pressable flex w-full items-center gap-2 rounded-lg border border-accent/25 bg-accent/10 px-3 py-2.5 text-left text-[13px] font-medium text-text hover:border-accent/45 hover:bg-accent/15"
         >
           <MessageSquarePlus size={15} strokeWidth={2.15} className="shrink-0 text-accent" />
           <span>{t('chat.newChat')}</span>
@@ -103,7 +103,7 @@ export function ChatWorkspaceSection(): ReactElement | null {
         <button
           type="button"
           onClick={() => setShowCreate(true)}
-          className="flex w-full items-center gap-2 rounded-lg border border-border/70 bg-bg-secondary/45 px-3 py-2 text-left text-[12px] font-medium text-text-muted transition-colors hover:border-border hover:bg-bg-tertiary hover:text-text"
+          className="oa-pressable flex w-full items-center gap-2 rounded-lg border border-border/70 bg-bg-secondary/45 px-3 py-2 text-left text-[12px] font-medium text-text-muted hover:border-border hover:bg-bg-tertiary hover:text-text"
           title={t('chat.newWorkspace')}
           aria-label={t('chat.newWorkspace')}
         >
@@ -295,7 +295,7 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
             e.stopPropagation()
             props.onSpawn()
           }}
-          className="shrink-0 w-5 h-5 rounded flex items-center justify-center text-text-muted/50 hover:text-text hover:bg-bg-secondary transition-colors"
+          className="oa-icon-action shrink-0 w-5 h-5 rounded flex items-center justify-center text-text-muted/50 hover:text-text hover:bg-bg-secondary transition-colors"
           title={t('chat.newSession')}
           aria-label={t('chat.newSession')}
         >
@@ -308,7 +308,7 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
               e.stopPropagation()
               props.onConfigure()
             }}
-            className="w-5 h-5 rounded flex items-center justify-center text-text-muted hover:text-text hover:bg-bg-secondary"
+            className="oa-icon-action w-5 h-5 rounded flex items-center justify-center text-text-muted hover:text-text hover:bg-bg-secondary"
             title={t('workspace.configure')}
             aria-label={t('workspace.configure')}
           >
@@ -320,7 +320,7 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
               e.stopPropagation()
               props.onDelete()
             }}
-            className="w-5 h-5 rounded flex items-center justify-center text-text-muted hover:text-red hover:bg-red/10"
+            className="oa-icon-action w-5 h-5 rounded flex items-center justify-center text-text-muted hover:text-red hover:bg-red/10"
             title={t('chat.deleteWorkspace')}
             aria-label={t('chat.deleteWorkspace')}
           >
@@ -329,7 +329,7 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
         </span>
       </div>
       {expanded && orderedSessions.length > 0 && (
-        <div ref={sessionListRef} className="ml-[18px] border-l border-border/50">
+        <div ref={sessionListRef} className="oa-disclosure-enter ml-[18px] border-l border-border/50">
           {orderedSessions.map((s) => (
             <SessionRow
               key={s.id}

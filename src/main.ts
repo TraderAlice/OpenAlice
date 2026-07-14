@@ -53,6 +53,7 @@ import { createIndexTools } from './tool/indices.js'
 import { createEconomyTools } from './tool/economy.js'
 import { SessionStore } from './core/session.js'
 import { createInboxStore } from './core/inbox-store.js'
+import { startInboxConnectorBridge } from './services/connector-client/index.js'
 import { ToolCenter } from './core/tool-center.js'
 import { WorkspaceToolCenter } from './core/workspace-tool-center.js'
 import { inboxPushFactory } from './tool/inbox-push.js'
@@ -316,6 +317,7 @@ async function main() {
   // `ref.current` is null until the plugin boots; an early cron fire is a loud
   // skip (see cron listener). Created here so cron dispatch can hold it.
   const workspaceServiceRef = createWorkspaceServiceRef()
+  startInboxConnectorBridge(inboxStore, () => workspaceServiceRef.current)
 
   // Snapshot scheduler lives in UTA after Step 6 — Alice no longer
   // drives the periodic equity-curve writes. The UTA service starts
@@ -350,7 +352,7 @@ async function main() {
   const webTransport = process.env['OPENALICE_WEB_TRANSPORT'] === 'ipc' ? 'ipc' : 'http'
   const toolBaseUrl = process.env['OPENALICE_TOOL_BASE_URL']
     ?? (localCliOnWeb
-      ? `http://127.0.0.1:${config.connectors.web.port}/cli`
+      ? `http://127.0.0.1:${config.ports.web}/cli`
       : `http://127.0.0.1:${config.mcp.port}/cli`)
   const mcpBaseUrl = mcpEnabled ? `http://127.0.0.1:${config.mcp.port}/mcp` : undefined
 
@@ -377,10 +379,10 @@ async function main() {
   }
 
   // Web UI is always active (no enabled flag)
-  if (config.connectors.web.port) {
+  if (config.ports.web) {
     corePlugins.push(new WebPlugin(
       {
-        port: config.connectors.web.port,
+        port: config.ports.web,
         mcpPort: config.mcp.port,
         toolBaseUrl,
         ...(mcpBaseUrl ? { mcpBaseUrl } : {}),
@@ -392,10 +394,8 @@ async function main() {
     ))
   }
 
-  // Optional plugins — none today. The legacy connector cluster
-  // (Telegram / MCP-Ask) was removed; the map is kept (empty) so the
-  // start/stop iteration below stays uniform and future optional
-  // plugins have a home.
+  // Optional in-process plugins — none today. External IM connections live in
+  // the independently supervised Connector Service, never in Alice.
   const optionalPlugins = new Map<string, Plugin>()
 
   // ==================== Engine Context ====================

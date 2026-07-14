@@ -22,6 +22,7 @@ import {
 import {
   SESSION_COOKIE_NAME,
   isLoopbackIp,
+  isTrustedLocalOrigin,
   normalizeIp,
   getSocketRemoteAddress,
 } from '../middleware/auth.js'
@@ -63,7 +64,8 @@ export function createAuthRoutes(opts: AuthRouteOptions = {}) {
     // login page in single-user local mode.
     if (trustedProxies.size === 0) {
       const remote = getSocketRemoteAddress(c) ?? ''
-      if (isLoopbackIp(remote)) {
+      const origin = c.req.header('origin')
+      if (isLoopbackIp(remote) && (!origin || isTrustedLocalOrigin(origin))) {
         return c.json({ authed: true, tokenConfigured: tokenInfo.exists, passthrough: 'localhost' })
       }
     }

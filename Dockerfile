@@ -22,17 +22,20 @@ RUN corepack enable && corepack prepare pnpm@11.7.0 --activate
 # of `pnpm install` and must already exist on disk.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
 COPY scripts/fix-pty-perms.mjs ./scripts/fix-pty-perms.mjs
+COPY packages/cli/package.json packages/cli/
 COPY packages/guardian-runtime/package.json packages/guardian-runtime/
+COPY packages/connector-protocol/package.json packages/connector-protocol/
 COPY packages/ibkr/package.json packages/ibkr/
 COPY packages/opentypebb/package.json packages/opentypebb/
 COPY packages/uta-protocol/package.json packages/uta-protocol/
 COPY services/uta/package.json services/uta/
+COPY services/connector/package.json services/connector/
 COPY ui/package.json ui/
 
 RUN pnpm install --frozen-lockfile
 
 # Source + build. Mirrors root `pnpm build` (turbo: workspace packages + UI
-# Vite build + services/uta, then `tsup` bundles Alice into `dist/main.js`).
+# Vite build + optional services, then `tsup` bundles Alice into `dist/main.js`).
 # `.dockerignore` removes `apps/desktop`, so Electron is not a discovered
 # workspace and cannot trigger a late dependency install in this server build.
 COPY . .
@@ -85,10 +88,10 @@ RUN npm install -g \
     && npm cache clean --force
 
 # Production artifacts. The Guardian script (`scripts/guardian/prod.mjs`)
-# expects `dist/main.js` (Alice) and `services/uta/dist/uta.js` (UTA)
-# next to each other at /app.
+# expects Alice, UTA and Connector Service artifacts next to each other at /app.
 COPY --from=build /src/dist                       ./dist
 COPY --from=build /src/services/uta/dist          ./services/uta/dist
+COPY --from=build /src/services/connector/dist    ./services/connector/dist
 COPY --from=build /src/ui/dist                    ./ui/dist
 COPY --from=build /src/default                    ./default
 COPY --from=build /src/src/workspaces/templates   ./src/workspaces/templates
@@ -114,6 +117,7 @@ COPY --from=build /src/package.json               ./package.json
 # with ERR_MODULE_NOT_FOUND at startup.
 COPY --from=build /src/packages                   ./packages
 COPY --from=build /src/services/uta/package.json  ./services/uta/package.json
+COPY --from=build /src/services/connector/package.json ./services/connector/package.json
 # UTA's broker SDK deps (ccxt / longbridge / alpaca-trade-api) live in
 # services/uta/package.json after Step 8 cleanup, so Node resolution
 # from the bundled `services/uta/dist/uta.js` needs the local
@@ -137,6 +141,7 @@ ENV OPENALICE_APP_HOME=/app \
     OPENALICE_WEB_PORT=47331 \
     OPENALICE_MCP_PORT=47332 \
     OPENALICE_UTA_PORT=47333 \
+    OPENALICE_CONNECTOR_PORT=47334 \
     OPENALICE_BIND_HOST=0.0.0.0
 
 VOLUME ["/data"]

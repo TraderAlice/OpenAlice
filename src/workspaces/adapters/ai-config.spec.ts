@@ -103,6 +103,10 @@ describe('codexAdapter AI-config', () => {
       },
     })).toEqual([
       'codex',
+      '--sandbox',
+      'danger-full-access',
+      '--ask-for-approval',
+      'never',
       '-c',
       'mcp_servers.openalice.url="http://127.0.0.1:47332/mcp"',
       '-c',
@@ -117,6 +121,10 @@ describe('codexAdapter AI-config', () => {
     };
     expect(codexAdapter.composeCommand([], { cwd: dir, env, resume: 'last' })).toEqual([
       'codex',
+      '--sandbox',
+      'danger-full-access',
+      '--ask-for-approval',
+      'never',
       '-c',
       'mcp_servers.openalice.url="http://127.0.0.1:47332/mcp"',
       '-c',
@@ -126,12 +134,26 @@ describe('codexAdapter AI-config', () => {
     ]);
     expect(codexAdapter.composeCommand([], { cwd: dir, env, resume: { sessionId: 'rollout-id' } })).toEqual([
       'codex',
+      '--sandbox',
+      'danger-full-access',
+      '--ask-for-approval',
+      'never',
       '-c',
       'mcp_servers.openalice.url="http://127.0.0.1:47332/mcp"',
       '-c',
       'mcp_servers.openalice-workspace.url="http://127.0.0.1:47332/mcp/ws-abc"',
       'resume',
       'rollout-id',
+    ]);
+  });
+
+  it('keeps explicit full access when interactive Codex runs without MCP', () => {
+    expect(codexAdapter.composeCommand([], { cwd: dir, env: {} })).toEqual([
+      'codex',
+      '--sandbox',
+      'danger-full-access',
+      '--ask-for-approval',
+      'never',
     ]);
   });
 

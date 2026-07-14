@@ -31,7 +31,7 @@ export const demoWorkspace: Workspace = {
   template: 'chat',
   spawnedFromVersion: '0.1.0',
   currentVersion: '0.1.0',
-  upgradeAvailable: null,
+  upgradeAvailable: { from: '0.1.0', to: '0.2.0' },
   agents: ['claude'],
   sessions: [demoSession],
   agentOverride: { claude: false, codex: false, opencode: false, pi: false },
@@ -129,7 +129,7 @@ export const chatTemplate: TemplateInfo = {
     "General-purpose Alice workspace — Alice's full tool surface (market/research data + trading) via the alice*/traderhub CLIs on PATH.",
   groupOrder: 10,
   defaultAgents: ['claude', 'codex'],
-  version: '0.1.0',
+  version: '0.2.0',
   hasReadme: false,
 }
 

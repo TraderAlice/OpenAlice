@@ -3,6 +3,8 @@
 This guide owns the OpenAlice server-image contract, Docker Compose lifecycle,
 remote-host safety boundary, and container smoke requirements. It complements
 [[docs/project-structure.md]] and [[docs/managed-workspace-runtime.md]].
+External notification setup is owned by [[docs/connector-service.md]].
+Private browser access over SSH is owned by [[docs/remote-access.md]].
 
 ## Topology
 
@@ -12,13 +14,15 @@ The image is the non-Electron production topology:
 tini (PID 1)
 └── scripts/guardian/prod.mjs
     ├── Alice HTTP + Workspace process
-    └── optional UTA process
+    ├── optional UTA process
+    └── optional Connector Service process
 
 /app   immutable image resources
 /data  persistent operator state and Workspaces
 ```
 
-Only Alice's web port `47331` is published. The CLI/MCP gateway and UTA stay on
+Only Alice's web port `47331` is published. The CLI/MCP gateway, UTA, and
+Connector Service stay on
 container loopback. Workspace agents reach Alice through the injected
 `alice`, `alice-workspace`, `alice-uta`, and `traderhub` CLI launchers; remote
 clients must not expose the internal tool gateway as a replacement API.
@@ -57,11 +61,15 @@ unencrypted public endpoint. Configure `OPENALICE_TRUSTED_PROXIES` only with
 the actual proxy peer addresses; an overly broad trusted-proxy range weakens
 the localhost/auth boundary.
 
+For the Stage 1 SSH path, keep `47331` private on the host and use
+`openalice ssh <host>` as described in [[docs/remote-access.md]]. The tunnel
+targets host loopback; it does not expose the internal CLI/MCP or UTA ports.
+
 ## Health and Lifecycle
 
 The image healthcheck calls the public `/api/version` route from container
 loopback. `docker compose ps` should report `healthy` after Alice is ready.
-`stop_grace_period: 30s` gives Guardian time to stop PTYs and UTA before Docker
+`stop_grace_period: 30s` gives Guardian time to stop PTYs and optional services before Docker
 forces termination. Compose also rotates stdout/stderr logs (`10m`, three
 files) so an always-on host does not grow an unbounded Docker json log.
 

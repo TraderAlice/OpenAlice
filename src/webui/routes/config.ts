@@ -337,8 +337,7 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
       }
       // marketData edits are picked up lazily by the provider resolver
       // (it reads ctx.config per request), so no explicit hot-reload hook
-      // is needed. The old connector hot-reload path was removed with the
-      // legacy connector cluster.
+      // is needed. Connector Service owns its own restart flag and API.
       return c.json(validated)
     } catch (err) {
       if (err instanceof Error && err.name === 'ZodError') {

@@ -35,7 +35,7 @@ export interface WorkspacesContextValue {
   resumeSession(wsId: string, sessionId: string, source?: WorkspaceSource): Promise<void>
   openWebPiSession(wsId: string, sessionId: string, source?: WorkspaceSource): Promise<void>
   requestDeleteSession(wsId: string, sessionId: string): void
-  openAgentConfig(wsId: string, agent?: AgentId): void
+  openAgentConfig(wsId: string, agent?: AgentId, section?: 'general' | 'ai' | 'template' | 'absorb'): void
   saveWorkspaceMetadata(
     wsId: string,
     metadata: { displayName?: string | null; description?: string | null },

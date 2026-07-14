@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useWorkspace } from '../store'
-import { specEquals, getFocusedGroup, getFocusedTab, type ViewSpec } from '../types'
+import { specEquals, getFocusedGroup, getFocusedTab, isDevTab, type ViewSpec } from '../types'
 
 // Reset zustand state + localStorage before each test so cases stay isolated.
 function resetStore() {
@@ -16,6 +16,14 @@ function resetStore() {
 }
 
 beforeEach(resetStore)
+
+describe('Dev URL tabs', () => {
+  it('keeps product surfaces out of the internal Dev Panel', () => {
+    expect(isDevTab('connectors')).toBe(false)
+    expect(isDevTab('connector')).toBe(false)
+    expect(isDevTab('tools')).toBe(true)
+  })
+})
 
 // A sample ViewSpec whose params vary by a single string, used to drive
 // tab-store mechanics (open/focus/close/dedup). market-detail fits: its

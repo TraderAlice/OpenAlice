@@ -45,6 +45,11 @@
 :root {
   color-scheme: light;
   --app-bg-wash: radial-gradient(circle at 50% 24%, rgba(47, 98, 176, 0.045), transparent 38rem);
+  --motion-fast: 120ms;
+  --motion-standard: 180ms;
+  --motion-slow: 260ms;
+  --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
 }
 
 /* ---- Midnight — dark (neutral charcoal-black) ----
@@ -138,6 +143,157 @@ body {
 ::selection {
   background: color-mix(in srgb, var(--color-accent) 28%, transparent);
   color: var(--color-text);
+}
+
+/* ==================== Interaction + motion foundation ====================
+   Motion explains hierarchy and confirms intent; it should not turn the shell
+   into a moving background. Keep transforms on explicitly marked controls and
+   reserve ambient loops for real live/loading state. Pointer cursors are global
+   because a clickable control should never make the user guess. */
+
+:where(button, [role="button"], summary, a[href], select):not(:disabled):not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
+:where(button:disabled, [role="button"][aria-disabled="true"]) {
+  cursor: default;
+}
+
+.oa-pressable {
+  transition:
+    transform var(--motion-fast) var(--motion-ease-standard),
+    border-color var(--motion-standard) var(--motion-ease-standard),
+    background-color var(--motion-standard) var(--motion-ease-standard),
+    color var(--motion-standard) var(--motion-ease-standard),
+    box-shadow var(--motion-standard) var(--motion-ease-standard);
+}
+
+.oa-icon-action,
+.oa-icon-action > svg,
+.oa-nav-icon {
+  transition:
+    transform var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-standard) var(--motion-ease-standard),
+    background-color var(--motion-standard) var(--motion-ease-standard),
+    opacity var(--motion-standard) var(--motion-ease-standard);
+}
+
+.oa-nav-item,
+.oa-nav-row {
+  transition:
+    transform var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-standard) var(--motion-ease-standard),
+    background-color var(--motion-standard) var(--motion-ease-standard);
+}
+
+.oa-status-surface {
+  transition:
+    border-color var(--motion-slow) var(--motion-ease-standard),
+    background-color var(--motion-slow) var(--motion-ease-standard),
+    box-shadow var(--motion-slow) var(--motion-ease-standard);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .oa-pressable:hover:not(:disabled):not([aria-disabled="true"]) {
+    transform: translateY(-1px);
+    box-shadow: 0 5px 14px color-mix(in srgb, var(--color-text) 9%, transparent);
+  }
+
+  .oa-pressable:active:not(:disabled):not([aria-disabled="true"]) {
+    transform: translateY(0) scale(0.98);
+    box-shadow: none;
+  }
+
+  .oa-icon-action:hover:not(:disabled):not([aria-disabled="true"]) {
+    transform: translateY(-1px);
+  }
+
+  .oa-icon-action:hover:not(:disabled):not([aria-disabled="true"]) > svg {
+    transform: scale(1.1);
+  }
+
+  .oa-icon-action:active:not(:disabled):not([aria-disabled="true"]) {
+    transform: translateY(0) scale(0.92);
+  }
+
+  .oa-nav-item:hover .oa-nav-icon {
+    transform: translateX(1px) scale(1.04);
+  }
+
+  .oa-nav-row:hover {
+    transform: translateX(1px);
+  }
+}
+
+@keyframes oa-view-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes oa-dialog-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes oa-backdrop-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes oa-disclosure-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes oa-popover-enter {
+  from {
+    opacity: 0;
+    transform: translateY(3px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.oa-view-enter {
+  animation: oa-view-enter var(--motion-standard) var(--motion-ease-out) both;
+}
+
+.oa-dialog-surface {
+  animation: oa-dialog-enter var(--motion-slow) var(--motion-ease-out) both;
+}
+
+.oa-dialog-backdrop {
+  animation: oa-backdrop-enter var(--motion-standard) ease-out both;
+}
+
+.oa-disclosure-enter {
+  transform-origin: top;
+  animation: oa-disclosure-enter var(--motion-standard) var(--motion-ease-out) both;
+}
+
+.oa-popover-enter {
+  transform-origin: top;
+  animation: oa-popover-enter var(--motion-standard) var(--motion-ease-out) both;
 }
 
 /* ==================== Typography scale ====================
@@ -408,6 +564,35 @@ html[lang="ja"] .oa-onboarding-title {
     animation: none;
     background-image: none;
     opacity: 0.7;
+  }
+  .live-pulse,
+  .live-pulse::after,
+  .thinking-dot,
+  .message-enter,
+  .page-fade-in,
+  .oa-view-enter,
+  .oa-dialog-surface,
+  .oa-dialog-backdrop,
+  .oa-disclosure-enter,
+  .oa-popover-enter {
+    animation: none;
+  }
+  .oa-pressable,
+  .oa-icon-action,
+  .oa-icon-action > svg,
+  .oa-nav-item,
+  .oa-nav-row,
+  .oa-nav-icon,
+  .oa-status-surface {
+    transition-duration: 0.01ms;
+  }
+  .oa-pressable:hover,
+  .oa-pressable:active,
+  .oa-icon-action:hover,
+  .oa-icon-action:active,
+  .oa-nav-row:hover,
+  .oa-nav-item:hover .oa-nav-icon {
+    transform: none;
   }
 }
 
@@ -743,4 +928,17 @@ html[lang="ja"] .oa-onboarding-title {
   margin-top: 0 !important;
   border-top-left-radius: 0 !important;
   border-top-right-radius: 0 !important;
+}
+
+/* Final cascade-level safety net. Several domain animations are declared
+   below the first reduced-motion block, so this lives at EOF on purpose. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

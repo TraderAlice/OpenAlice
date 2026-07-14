@@ -1,9 +1,10 @@
 /**
  * Electron main process — OpenAlice's desktop guardian.
  *
- * Supervises the same two-process topology as scripts/guardian/prod.mjs:
+ * Supervises the same optional-service topology as scripts/guardian/prod.mjs:
  *   1. UTA service  (services/uta/dist/uta.js, bind 127.0.0.1)
- *   2. Alice main   (dist/main.js)
+ *   2. Connector Service (services/connector/dist/connector.js, optional)
+ *   3. Alice main   (dist/main.js)
  * plus the desktop-only concerns: data relocation, BrowserWindow, quit UX.
  *
  * Lifecycle:
@@ -49,9 +50,11 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
 let uta: ChildProcess | null = null
+let connector: ChildProcess | null = null
 let alice: ChildProcess | null = null
 let appQuitting = false
 let restartingUTA = false
+let restartingConnector = false
 let pendingUTAMode: GuardianTradingModePlan | null = null
 let rendererOnboardingSmokeStarted = false
 let rendererTradingModeSmokeStarted = false
@@ -108,7 +111,9 @@ function parsePort(raw: unknown, origin: string): number {
   return n
 }
 
-async function readPortsFile(userDataHome: string): Promise<Partial<Record<'web' | 'mcp' | 'uta', number>>> {
+type DesktopPortName = 'web' | 'mcp' | 'uta' | 'connector'
+
+async function readPortsFile(userDataHome: string): Promise<Partial<Record<DesktopPortName, number>>> {
   const filePath = resolve(userDataHome, 'data', 'config', 'ports.json')
   let raw: string
   try {
@@ -123,14 +128,23 @@ async function readPortsFile(userDataHome: string): Promise<Partial<Record<'web'
     throw new Error(`[guardian] ${filePath} is not valid JSON: ${err instanceof Error ? err.message : String(err)}`)
   }
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    throw new Error(`[guardian] ${filePath} must be a JSON object like {"web":47331,"mcp":47332,"uta":47333}`)
+    throw new Error(`[guardian] ${filePath} must be a JSON object like {"web":47331,"mcp":47332,"uta":47333,"connector":47334}`)
   }
-  const out: Partial<Record<'web' | 'mcp' | 'uta', number>> = {}
-  for (const name of ['web', 'mcp', 'uta'] as const) {
+  const out: Partial<Record<DesktopPortName, number>> = {}
+  for (const name of ['web', 'mcp', 'uta', 'connector'] as const) {
     const v = (parsed as Record<string, unknown>)[name]
     if (v !== undefined) out[name] = parsePort(v, `${filePath} ("${name}")`)
   }
   return out
+}
+
+async function readConnectorServiceEnabled(userDataHome: string): Promise<boolean> {
+  try {
+    const value = JSON.parse(await readFile(resolve(userDataHome, 'data', 'config', 'connector-service.json'), 'utf8')) as { enabled?: unknown }
+    return value.enabled === true
+  } catch {
+    return false
+  }
 }
 
 async function readMcpConfigFile(userDataHome: string): Promise<{ enabled: boolean; port?: number }> {
@@ -450,12 +464,14 @@ async function runRendererOnboardingSmoke(win: BrowserWindow): Promise<void> {
 
 app.whenReady().then(async () => {
   // Build output lives at <repo>/dist/electron/main.js, <repo>/dist/main.js
-  // (Alice), and <repo>/services/uta/dist/uta.js (UTA). The desktop package
+  // (Alice), <repo>/services/uta/dist/uta.js (UTA), and the optional
+  // <repo>/services/connector/dist/connector.js. The desktop package
   // source is at apps/desktop/src/ but tsconfig.outDir is ../../dist/electron,
   // so these repo-relative resolves are unchanged from the pre-split layout.
   const repoRoot = resolve(__dirname, '..', '..')
   const aliceEntry = resolve(__dirname, '..', 'main.js')
   const utaEntry = resolve(repoRoot, 'services', 'uta', 'dist', 'uta.js')
+  const connectorEntry = resolve(repoRoot, 'services', 'connector', 'dist', 'connector.cjs')
 
   // Two homes — user data vs app resources. See src/core/paths.ts for why
   // they're split. User data lives at ~/.openalice by default in BOTH branches
@@ -569,6 +585,9 @@ app.whenReady().then(async () => {
     ? selectPort('OPENALICE_UTA_PORT', portsFile.uta, utaPortFallback).value
     : await claimPort('uta', 'OPENALICE_UTA_PORT', portsFile.uta, utaPortFallback)
   const utaUrl = `http://127.0.0.1:${utaPort}`
+  const connectorPortFallback = Math.max(47334, utaPort + 1)
+  const connectorPort = await claimPort('connector', 'OPENALICE_CONNECTOR_PORT', portsFile.connector, connectorPortFallback)
+  const connectorUrl = `http://127.0.0.1:${connectorPort}`
   const launcherMode = app.isPackaged ? 'electron-packaged' : 'electron-dev'
   const runtimeEnv = resolveManagedRuntimeEnv({
     appHome: homeEnv.OPENALICE_APP_HOME,
@@ -614,6 +633,30 @@ app.whenReady().then(async () => {
     return child
   }
 
+  const spawnConnector = (): ChildProcess => {
+    const child = spawn(process.execPath, [connectorEntry], {
+      env: {
+        ...process.env,
+        ELECTRON_RUN_AS_NODE: '1',
+        OPENALICE_CONNECTOR_PORT: String(connectorPort),
+        OPENALICE_LAUNCHER: 'electron',
+        OPENALICE_GUARDIAN_PID: String(process.pid),
+        OPENALICE_GUARDIAN_STARTED_AT: String(guardianStartedAt),
+        AQ_LAUNCHER_ROOT: launcherRoot,
+        ...(takeover ? { OPENALICE_TAKEOVER: '1' } : {}),
+        ...homeEnv,
+        ...runtimeEnv,
+        ...proxyEnv,
+      },
+      stdio: 'inherit',
+    })
+    child.once('exit', (code, signal) => {
+      if (appQuitting || restartingConnector) return
+      console.error(`[guardian] Connector exited unexpectedly code=${code} signal=${signal} — external notifications offline, app stays up`)
+    })
+    return child
+  }
+
   const spawnAlice = (): ChildProcess => {
     const child = spawn(process.execPath, [aliceEntry], {
       env: {
@@ -626,6 +669,7 @@ app.whenReady().then(async () => {
         OPENALICE_TOOL_BASE_URL: toolBaseUrl,
         OPENALICE_TOOL_SOCKET: toolSocketPath,
         OPENALICE_UTA_URL: utaUrl,
+        OPENALICE_CONNECTOR_URL: connectorUrl,
         OPENALICE_LAUNCHER: 'electron',
         OPENALICE_GUARDIAN_PID: String(process.pid),
         OPENALICE_GUARDIAN_STARTED_AT: String(guardianStartedAt),
@@ -665,6 +709,7 @@ app.whenReady().then(async () => {
   console.log(`[guardian] app      →  ${homeEnv.OPENALICE_APP_HOME}`)
   console.log(`[guardian] runtime  →  ${piRuntime}`)
   console.log(`[guardian] UTA      →  ${tradingMode.mode === 'lite' ? 'disabled (trading mode lite)' : utaUrl}`)
+  console.log(`[guardian] Connector→  ${connectorUrl} (optional)`)
   console.log(`[guardian] Alice    →  app://openalice (Electron IPC)`)
   console.log(`[guardian] Tools    →  ${toolSocketPath}`)
   console.log(`[guardian] MCP      →  ${mcpPort !== null ? `http://127.0.0.1:${mcpPort}/mcp` : 'disabled'}`)
@@ -692,18 +737,39 @@ app.whenReady().then(async () => {
       else console.warn(`[guardian] UTA did not become ready within ${UTA_READY_TIMEOUT_MS / 1000}s — continuing with trading offline`)
     })
   }
+  if (await readConnectorServiceEnabled(homeEnv.OPENALICE_HOME)) {
+    connector = spawnConnector()
+    void waitForConnector(connectorUrl).then((ready) => {
+      if (ready) console.log(`[guardian] Connector ready pid=${connector?.pid ?? ''}`)
+      else console.warn('[guardian] Connector did not become ready within 15s — external notifications offline')
+    })
+  }
 
   alice = spawnAlice()
   console.log(`[guardian] Alice pid=${alice.pid} web=ipc mcpPort=${mcpPort ?? 'disabled'}`)
   await waitForAliceReady()
 
+  // Alice migrations can create connector-service.json from the retired
+  // Telegram config. Reconcile after readiness so this upgrade starts the
+  // independent service without requiring a second app launch.
+  if (!connector && await readConnectorServiceEnabled(homeEnv.OPENALICE_HOME)) {
+    await reconcileConnector(true, connectorUrl, spawnConnector)
+  }
+
   // ── Restart-flag watcher: broker config changes touch the flag; SIGTERM
   // + respawn UTA without restarting Alice (mirrors prod.mjs). ────────────
-  void startFlagWatcher(homeEnv.OPENALICE_HOME, () => {
-    void (async () => {
+  void startFlagWatcher(homeEnv.OPENALICE_HOME, {
+    uta: () => { void (async () => {
       tradingMode = await resolveGuardianTradingMode(process.env, homeEnv.OPENALICE_HOME)
       await reconcileUTA(tradingMode, utaUrl, spawnUTA)
-    })().catch((err) => console.error('[guardian] UTA mode reconcile failed:', err))
+    })().catch((err) => console.error('[guardian] UTA mode reconcile failed:', err)) },
+    connector: () => { void (async () => {
+      await reconcileConnector(
+        await readConnectorServiceEnabled(homeEnv.OPENALICE_HOME),
+        connectorUrl,
+        spawnConnector,
+      )
+    })().catch((err) => console.error('[guardian] Connector reconcile failed:', err)) },
   })
 
   // No in-window menu bar on Windows/Linux — Electron's default
@@ -835,7 +901,7 @@ app.whenReady().then(async () => {
   configureAutoUpdate(win, { beforeInstall: stopChildren })
 })
 
-async function stopUTAProcess(child: ChildProcess): Promise<void> {
+async function stopManagedProcess(child: ChildProcess): Promise<void> {
   if (child.exitCode !== null) return
   const exited = new Promise<void>((resolveExit) => child.once('exit', () => resolveExit()))
   killTree(child, 'SIGTERM')
@@ -872,7 +938,7 @@ async function reconcileUTA(
           ? '[guardian] trading mode lite — stopping UTA'
           : `[guardian] trading mode ${targetMode.mode} — restarting UTA`)
         const old = uta
-        if (old) await stopUTAProcess(old)
+        if (old) await stopManagedProcess(old)
         if (uta === old) uta = null
       }
 
@@ -888,36 +954,87 @@ async function reconcileUTA(
   }
 }
 
+async function waitForConnector(connectorUrl: string): Promise<boolean> {
+  const deadline = Date.now() + UTA_READY_TIMEOUT_MS
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(`${connectorUrl}/__connector/health`)
+      if (response.ok) return true
+    } catch { /* not ready */ }
+    await new Promise((resolveWait) => setTimeout(resolveWait, 150))
+  }
+  return false
+}
+
+async function reconcileConnector(
+  enabled: boolean,
+  connectorUrl: string,
+  spawnConnector: () => ChildProcess,
+): Promise<void> {
+  if (appQuitting || restartingConnector) return
+  restartingConnector = true
+  try {
+    const running = connector !== null && connector.exitCode === null
+    if (!enabled) {
+      if (running && connector) {
+        console.log('[guardian] Connector disabled — stopping service')
+        const old = connector
+        await stopManagedProcess(old)
+        if (connector === old) connector = null
+      }
+      return
+    }
+    if (running && connector) {
+      console.log('[guardian] Connector configuration changed — restarting service')
+      const old = connector
+      await stopManagedProcess(old)
+      if (connector === old) connector = null
+    } else if (connector?.exitCode !== null) {
+      connector = null
+    }
+    connector = spawnConnector()
+    const ready = await waitForConnector(connectorUrl)
+    console.log(ready ? '[guardian] Connector online' : '[guardian] Connector did not become ready')
+  } finally {
+    restartingConnector = false
+  }
+}
+
 async function startFlagWatcher(
   dataHome: string,
-  onTrigger: () => void,
+  onTrigger: { uta: () => void; connector: () => void },
 ): Promise<void> {
-  const flagPath = resolve(dataHome, 'data', 'control', 'restart-uta.flag')
-  const flagDir = dirname(flagPath)
-  const flagName = 'restart-uta.flag'
+  const flagDir = resolve(dataHome, 'data', 'control')
+  const handlers = new Map([
+    ['restart-uta.flag', onTrigger.uta],
+    ['restart-connector.flag', onTrigger.connector],
+  ])
   await mkdir(flagDir, { recursive: true })
-  let pending: ReturnType<typeof setTimeout> | undefined
-  const fire = (): void => {
-    if (pending) clearTimeout(pending)
-    pending = setTimeout(() => {
-      pending = undefined
-      onTrigger()
-    }, 100)
+  const pending = new Map<string, ReturnType<typeof setTimeout>>()
+  const fire = (name: string, handler: () => void): void => {
+    const prior = pending.get(name)
+    if (prior) clearTimeout(prior)
+    pending.set(name, setTimeout(() => {
+      pending.delete(name)
+      handler()
+    }, 100))
   }
   try {
     const watcher = watch(flagDir)
     for await (const evt of watcher) {
-      if (evt.filename === flagName) fire()
+      if (!evt.filename) continue
+      const handler = handlers.get(evt.filename)
+      if (handler) fire(evt.filename, handler)
     }
   } catch (err) {
     console.error('[guardian] flag watcher errored:', err)
   }
 }
 
-/** Cascade tree-kill both children. */
+/** Cascade tree-kill every managed child. */
 async function stopChildren(): Promise<void> {
   appQuitting = true
-  const children = [uta, alice].filter((c): c is ChildProcess => c != null && c.exitCode === null && !c.killed)
+  const children = [uta, connector, alice].filter((c): c is ChildProcess => c != null && c.exitCode === null && !c.killed)
   if (children.length === 0) return
   console.log(`[guardian] shutting down — SIGTERM → ${children.length} child(ren)`)
   await Promise.all(

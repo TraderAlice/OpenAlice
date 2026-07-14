@@ -1,0 +1,33 @@
+{
+  "name": "@traderalice/connector-protocol",
+  "version": "0.1.0",
+  "description": "OpenAlice Connector Service wire protocol, adapter catalog and client SDK",
+  "type": "module",
+  "exports": {
+    ".": {
+      "openalice-source": "./src/index.ts",
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc",
+    "test": "vitest run --root ../.. --config vitest.config.ts --project node packages/connector-protocol/src",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "typescript": "^5.7.3",
+    "vitest": "^3.2.6"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "license": "AGPL-3.0-only"
+}

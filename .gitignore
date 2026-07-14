@@ -42,6 +42,10 @@ packages/ibkr/ref/samples/Java/
 packages/ibkr/ref/samples/Cpp/
 packages/ibkr/ref/CMakeLists.txt
 
+# Local third-party installer research; keep only the context note tracked.
+/docs/reference/install-script/*
+!/docs/reference/install-script/README.md
+
 # Turborepo
 .turbo/
 

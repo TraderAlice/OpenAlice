@@ -6,7 +6,9 @@ interrupted lifecycle transition.
 
 Related guides: [[docs/project-structure.md]],
 [[docs/conversation-provenance.md]], and
-[[docs/workspace-issues-and-scheduling.md]].
+[[docs/workspace-issues-and-scheduling.md]]. For in-place managed-asset
+reconciliation, see [[docs/workspace-template-upgrade.md]].
+For directional desk consolidation, see [[docs/workspace-absorb.md]].
 
 ## The Active Directory Is an Office Floor
 
@@ -100,6 +102,11 @@ Restore is “rehire with the old desk”:
 Returning to the exact cwd is load-bearing. Claude, Codex, opencode, Pi, trust
 stores, and transcript discovery may key native state by project path.
 
+An absorbed Workspace is still a departed Workspace, with an additional
+Catalog link to the active target and its import commit. Restoring it is an
+explicit decision to recreate two active copies; it never removes files already
+copied into the target.
+
 Purge is deliberately separate and irreversible. It is allowed only after
 offboarding. Purge removes the departed checkout, interactive Session records,
 and Shell scrollback. It retains the Catalog tombstone, retired resumeIds,
@@ -126,6 +133,8 @@ not guess which copy is the real coworker and never overwrites either directory.
 - `src/workspaces/workspace-catalog.ts` — immutable ids and durable states.
 - `src/workspaces/workspace-lifecycle.ts` — assess/offboard/restore/purge and
   interrupted-transition recovery.
+- `src/workspaces/workspace-absorb.ts` — directional copy plan, two-desk
+  transaction, rollback, and Catalog link.
 - `src/workspaces/resume-registry.ts` — active/retired Session signatures and
   successor links.
 - `src/webui/routes/workspaces.ts` — lifecycle API surface.

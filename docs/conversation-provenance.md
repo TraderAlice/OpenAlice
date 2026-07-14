@@ -252,7 +252,10 @@ Inbox entry -> sender resumeId -> exact product Session
 
 This answers “who sent this message?” independently from who last edited any
 live document linked by the notification. Legacy/manual entries may have only a
-Workspace; those resolve through the explicit reconstruction path.
+Workspace; those resolve through the explicit reconstruction path. Product and
+external-notification surfaces display the sender as `@resumeId` (optionally
+preceded by its runtime label); a generic label such as `pi` must not hide the
+unique Session signature already present in the origin envelope.
 
 ### Issues: creation provenance versus execution responsibility
 

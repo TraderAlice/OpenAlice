@@ -101,4 +101,32 @@ describe('createTradingProxyRoutes — UTA optional carrier', () => {
       utas: 2,
     })
   })
+
+  it.each([
+    [503, 'http_error'],
+    [404, 'http_error'],
+  ] as const)('classifies UTA HTTP %s health failures as %s', async (status, reason) => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status })))
+    const app = createTradingProxyRoutes({ utaBaseUrl: 'http://127.0.0.1:47333' })
+    const res = await app.request('/status')
+    await expect(res.json()).resolves.toMatchObject({ available: false, reason })
+  })
+
+  it('rejects malformed UTA health JSON instead of reporting a false healthy state', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 })))
+    const app = createTradingProxyRoutes({ utaBaseUrl: 'http://127.0.0.1:47333' })
+    const res = await app.request('/status')
+    await expect(res.json()).resolves.toMatchObject({ available: false, reason: 'invalid_response' })
+  })
+
+  it('classifies connection errors without leaking them as availability', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('ECONNREFUSED') }))
+    const app = createTradingProxyRoutes({ utaBaseUrl: 'http://127.0.0.1:47333' })
+    const res = await app.request('/status')
+    await expect(res.json()).resolves.toMatchObject({
+      available: false,
+      reason: 'unreachable',
+      detail: 'ECONNREFUSED',
+    })
+  })
 })

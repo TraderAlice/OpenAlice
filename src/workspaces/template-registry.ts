@@ -87,6 +87,14 @@ export interface TemplateMeta {
   readonly injectPersona: boolean;
   readonly bundledSkills: readonly string[];
   /**
+   * Opt-in lifecycle policy for merging launcher-managed assets into older
+   * Workspaces. `managed-context` means README/persona/skill files can use the
+   * three-way Template Upgrade flow. Absence deliberately means recreate or
+   * migrate with template-specific tooling; bootstrap output is never guessed
+   * to be safely mergeable.
+   */
+  readonly upgradeStrategy?: 'managed-context';
+  /**
    * Optional per-agent credential seeding. When present, the launcher writes
    * each declared agent's workspace AI config at create time from the named
    * central credential — so a workspace boots ready-to-run without a manual
@@ -155,6 +163,9 @@ export class TemplateRegistry {
         injectTools: tplMeta.injectTools,
         injectPersona: tplMeta.injectPersona,
         bundledSkills: tplMeta.bundledSkills,
+        ...(tplMeta.upgradeStrategy !== undefined
+          ? { upgradeStrategy: tplMeta.upgradeStrategy }
+          : {}),
         ...(tplMeta.agentCredentials !== undefined ? { agentCredentials: tplMeta.agentCredentials } : {}),
       };
       reg.byName.set(name, meta);
@@ -203,6 +214,7 @@ interface ParsedTemplateMeta {
   readonly injectTools: boolean;
   readonly injectPersona: boolean;
   readonly bundledSkills: readonly string[];
+  readonly upgradeStrategy?: 'managed-context';
   readonly agentCredentials?: Readonly<Record<string, AgentCredentialDecl>>;
 }
 
@@ -287,6 +299,9 @@ async function readTemplateMeta(path: string): Promise<ParsedTemplateMeta> {
           (s): s is string => typeof s === 'string' && !s.includes('/') && !s.includes('..'),
         )
       : [];
+    const upgradeStrategy = obj['upgradeStrategy'] === 'managed-context'
+      ? 'managed-context' as const
+      : undefined;
     const agentCredentials = parseAgentCredentials(obj['agentCredentials']);
     return {
       ...(description !== undefined ? { description } : {}),
@@ -297,6 +312,7 @@ async function readTemplateMeta(path: string): Promise<ParsedTemplateMeta> {
       injectTools,
       injectPersona,
       bundledSkills,
+      ...(upgradeStrategy !== undefined ? { upgradeStrategy } : {}),
       ...(agentCredentials !== undefined ? { agentCredentials } : {}),
     };
   } catch {
@@ -330,4 +346,3 @@ function parseAgentCredentials(raw: unknown): Record<string, AgentCredentialDecl
   }
   return Object.keys(out).length > 0 ? out : undefined;
 }
-

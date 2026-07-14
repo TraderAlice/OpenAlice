@@ -509,7 +509,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
                     onClick={() => openOrFocus({ kind: 'chat-landing', params: {} })}
                     aria-label={t('chatLanding.clearTarget')}
                     title={t('chatLanding.clearTarget')}
-                    className="ml-0.5 rounded-full p-0.5 text-accent/70 hover:text-accent hover:bg-accent/20 transition-colors"
+                    className="oa-icon-action ml-0.5 rounded-full p-0.5 text-accent/70 hover:text-accent hover:bg-accent/20 transition-colors"
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -554,7 +554,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
                   aria-haspopup="menu"
                   aria-expanded={workspaceMenuOpen}
                   aria-label={t('chatLanding.selectWorkspace')}
-                  className="inline-flex min-h-8 max-w-[220px] items-center gap-1.5 rounded-md bg-bg-tertiary px-2.5 py-1 text-[11px] text-text-muted transition-colors hover:text-text disabled:cursor-default"
+                  className="oa-pressable inline-flex min-h-8 max-w-[220px] items-center gap-1.5 rounded-md bg-bg-tertiary px-2.5 py-1 text-[11px] text-text-muted hover:text-text disabled:cursor-default"
                 >
                   <MessageSquare className="w-3 h-3 shrink-0" />
                   <span className="truncate">
@@ -569,7 +569,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
                 {workspaceMenuOpen && targetWs === undefined && chatWorkspaceOptions.length > 0 && (
                   <div
                     role="menu"
-                    className="absolute bottom-full left-0 z-10 mb-1 max-h-[min(24rem,calc(100vh-8rem))] min-w-[220px] max-w-[320px] overflow-y-auto overscroll-contain rounded-lg border border-border/70 bg-bg-secondary py-1 shadow-lg [scrollbar-gutter:stable]"
+                    className="oa-popover-enter absolute bottom-full left-0 z-10 mb-1 max-h-[min(24rem,calc(100vh-8rem))] min-w-[220px] max-w-[320px] overflow-y-auto overscroll-contain rounded-lg border border-border/70 bg-bg-secondary py-1 shadow-lg [scrollbar-gutter:stable]"
                   >
                     {chatWorkspaceOptions.map((workspace) => {
                       const active = workspace.id === workspaceTarget?.id
@@ -605,7 +605,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
                   aria-haspopup="menu"
                   aria-expanded={agentMenuOpen}
                   aria-label={t('chatLanding.selectAgent')}
-                  className="inline-flex min-h-8 max-w-[190px] items-center gap-1.5 text-[11px] text-text-muted bg-bg-tertiary px-2.5 py-1 rounded-md transition-colors hover:text-text disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="oa-pressable inline-flex min-h-8 max-w-[190px] items-center gap-1.5 text-[11px] text-text-muted bg-bg-tertiary px-2.5 py-1 rounded-md hover:text-text disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {SelectedIcon ? <SelectedIcon className="w-3 h-3" /> : null}
                   <span className="truncate">{selectedInfo?.displayName ?? t('chatLanding.selectAgent')}</span>
@@ -614,7 +614,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
                 {agentMenuOpen && targetCliAgents.length > 0 && (
                   <div
                     role="menu"
-                    className="absolute bottom-full left-0 mb-1 min-w-[170px] py-1 bg-bg-secondary border border-border/70 rounded-lg shadow-lg z-10"
+                    className="oa-popover-enter absolute bottom-full left-0 mb-1 min-w-[170px] py-1 bg-bg-secondary border border-border/70 rounded-lg shadow-lg z-10"
                   >
                     {targetCliAgents.map((a) => {
                       const Icon = AGENT_ICONS[a.id]
@@ -655,7 +655,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
                 <button
                   type="button"
                   onClick={goConfigureProvider}
-                  className="inline-flex min-h-8 items-center gap-1.5 text-[11px] text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-md transition-colors hover:bg-amber-500/20"
+                  className="oa-pressable inline-flex min-h-8 items-center gap-1.5 text-[11px] text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-md hover:bg-amber-500/20"
                 >
                   <KeyRound className="w-3 h-3" />
                   {t('chatLanding.configureProvider')}
@@ -669,7 +669,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
                     aria-haspopup="menu"
                     aria-expanded={credMenuOpen}
                     aria-label={t('chatLanding.selectCredential')}
-                    className="inline-flex min-h-8 max-w-[190px] items-center gap-1.5 text-[11px] text-text-muted bg-bg-tertiary px-2.5 py-1 rounded-md transition-colors hover:text-text"
+                    className="oa-pressable inline-flex min-h-8 max-w-[190px] items-center gap-1.5 text-[11px] text-text-muted bg-bg-tertiary px-2.5 py-1 rounded-md hover:text-text"
                   >
                     <KeyRound className="w-3 h-3" />
                     <span className="truncate">{credInfo?.label?.trim() || credInfo?.slug || t('chatLanding.selectCredential')}</span>
@@ -678,7 +678,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
                   {credMenuOpen && (
                     <div
                       role="menu"
-                      className="absolute bottom-full left-0 mb-1 min-w-[180px] py-1 bg-bg-secondary border border-border/70 rounded-lg shadow-lg z-10"
+                      className="oa-popover-enter absolute bottom-full left-0 mb-1 min-w-[180px] py-1 bg-bg-secondary border border-border/70 rounded-lg shadow-lg z-10"
                     >
                       {creds.map((cr) => {
                         const active = cr.slug === effectiveCred
@@ -729,7 +729,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
                 disabled={!canSend}
                 title={t('chatLanding.send')}
                 aria-label={t('chatLanding.send')}
-                className="w-10 h-10 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center bg-accent text-white transition-colors hover:bg-accent/90 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="oa-icon-action w-10 h-10 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center bg-accent text-white transition-colors hover:bg-accent/90 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {launching ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowUp className="w-4 h-4" />}
               </button>

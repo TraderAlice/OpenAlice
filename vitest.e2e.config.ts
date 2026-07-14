@@ -12,19 +12,24 @@ const workspaceAliases = {
   '@traderalice/opentypebb': resolve(__dirname, './packages/opentypebb/src/index.ts'),
 }
 
-// Single process, sequential execution. E2E tests share stateful broker
-// connections (IBKR TCP + clientId, REST API sessions). Module-level
-// singletons in setup.ts require same-process to actually share state.
+// Safe product/integration E2E only. Tests that submit orders to configured
+// demo/paper accounts live in vitest.uta-live.config.ts and require an explicit
+// OPENALICE_UTA_LIVE_PAPER=1 acknowledgement.
 export default {
   resolve: {
     alias: workspaceAliases,
   },
   test: {
-    include: ['src/**/*.e2e.spec.*', 'services/**/*.e2e.spec.*'],
+    include: [
+      'src/**/*.e2e.spec.*',
+      'services/uta/src/domain/trading/brokers/ccxt/CcxtBroker.e2e.spec.ts',
+      'services/uta/src/domain/trading/__test__/e2e/uta-lifecycle.e2e.spec.ts',
+      'services/uta/src/domain/trading/__test__/e2e/ccxt-hyperliquid-markets.e2e.spec.ts',
+    ],
     testTimeout: 60_000,
     fileParallelism: false,
     pool: 'forks',
-    poolOptions: { forks: { singleFork: true } },
+    singleFork: true,
     // Cap CCXT init retries during e2e — production defaults (8 retries with
     // exponential backoff) burn ~140s per market type when a testnet is
     // unreachable, blocking the entire serial setup. 2 retries × 250ms base

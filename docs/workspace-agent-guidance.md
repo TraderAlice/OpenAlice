@@ -59,9 +59,11 @@ edited those files, and an automatic overwrite would mutate a durable work log.
 
 The template README version records guidance changes. Bump it when the injected
 contract or bundled skill set changes materially. Existing Workspaces then show
-an upgrade-available signal; applying that upgrade must remain an explicit,
-diff-visible operation. Until an upgrade workflow exists, live CLI help and
-self-correcting errors are the compatibility layer for older desks.
+an upgrade-available signal. Templates that opt into `managed-context` use the
+explicit three-way review in [[docs/workspace-template-upgrade.md]]: launcher
+changes apply, Workspace-only changes stay, and dual edits require a choice.
+Live CLI help and self-correcting errors remain the compatibility layer for old
+skills that a user deliberately preserves.
 
 ## Review checklist
 
@@ -75,4 +77,3 @@ self-correcting errors are the compatibility layer for older desks.
 - Was the template version bumped for a material injected-guidance change?
 - Were context injection, the affected tool, the CLI gateway, and the real shim
   tested together?
-

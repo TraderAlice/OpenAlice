@@ -12,6 +12,12 @@ const CODEX_CONFIG_PATH = '.codex/config.toml';
 const CODEX_ENV_PATH = '.codex/env.json';
 const CODEX_KEY_ENV_NAME = 'OPENALICE_WORKSPACE_KEY';
 const CODEX_PROVIDER_NAME = 'workspace';
+const CODEX_INTERACTIVE_PERMISSION_ARGS = [
+  '--sandbox',
+  'danger-full-access',
+  '--ask-for-approval',
+  'never',
+] as const;
 
 /**
  * OpenAI Codex CLI (Rust rewrite, `codex-cli`).
@@ -72,9 +78,14 @@ export const codexAdapter: CliAdapter = {
   },
 
   /**
-   * Prepends MCP server flags only when OpenAlice's optional MCP server is
-   * enabled. The default tool path is CLI-mode (`alice*` shell commands), so a
-   * workspace must still spawn even when no MCP URL is present.
+   * Every OpenAlice-owned interactive Codex launch explicitly selects full
+   * host access and disables command approvals. Without launch-time flags,
+   * Codex inherits its global/project defaults and can silently start in a
+   * sandbox that blocks the injected `alice*` CLIs from reaching Alice.
+   *
+   * MCP server flags remain optional. The default tool path is CLI-mode
+   * (`alice*` shell commands), so a workspace must still spawn when no MCP URL
+   * is present.
    */
   composeCommand(_base: readonly string[], ctx: SpawnContext): readonly string[] {
     const head = codexMcpHead(ctx);
@@ -431,7 +442,7 @@ export const codexAdapter: CliAdapter = {
 function codexMcpHead(ctx: SpawnContext): string[] {
   const mcpUrl = ctx.env['OPENALICE_MCP_URL'];
   if (!mcpUrl) {
-    return ['codex'];
+    return ['codex', ...CODEX_INTERACTIVE_PERMISSION_ARGS];
   }
   const workspaceId = ctx.env['AQ_WS_ID'];
   if (!workspaceId) {
@@ -439,6 +450,7 @@ function codexMcpHead(ctx: SpawnContext): string[] {
   }
   return [
     'codex',
+    ...CODEX_INTERACTIVE_PERMISSION_ARGS,
     '-c',
     `mcp_servers.openalice.url="${mcpUrl}"`,
     '-c',

@@ -4,18 +4,18 @@
  * Guardian is OpenAlice's L2 authority (see memory:port-architecture-3-layers).
  * Three carriers, one set of L2 responsibilities:
  *   - dev:    `scripts/guardian/dev.ts`, spawned by `pnpm dev`
- *   - prod:   `scripts/guardian/prod.mjs`, container CMD (Step 7)
+ *   - built:  `scripts/guardian/prod.mjs`, Docker CMD or local CLI child
  *   - desktop: Electron `main` process (future)
  *
  * Responsibilities (this module):
  *   - port probing
- *   - child-process spawning (UTA / Alice / Vite) with env injection
+ *   - child-process spawning (optional services / Alice / Vite) with env injection
  *   - HTTP readiness gates (`waitForHttp`)
  *   - signal forwarding + cascade shutdown
  *   - log line prefixing (dev only)
  *
- * Step 4 will add: watching `data/control/restart-uta.flag` so Guardian
- * SIGTERMs + respawns UTA without restarting Alice.
+ * Optional services use restart flags so Guardian can reconcile them without
+ * restarting Alice.
  */
 
 import { spawn, spawnSync, type ChildProcess, type SpawnOptions } from 'node:child_process'
@@ -38,6 +38,7 @@ export interface GuardianPorts {
   webPort: number
   mcpPort: number
   utaPort: number
+  connectorPort: number
   /** Vite dev-server port — resolved by Guardian (dev only; prod has no Vite). */
   uiPort: number
 }
@@ -48,7 +49,7 @@ export interface GuardianPorts {
 // them into the children via env (see memory:port-architecture-3-layers).
 // User-facing configuration lives in L1 — `data/config/ports.json`:
 //
-//   { "web": 47331, "mcp": 47332, "uta": 47333, "ui": 5173 }   (all keys optional)
+//   { "web": 47331, "mcp": 47332, "uta": 47333, "connector": 47334, "ui": 5173 }
 //
 // Deliberately a data/config file and NOT a dotenv file: the data dir is the
 // one location every topology agrees on (dev repo, docker volume, Electron
@@ -60,7 +61,7 @@ export interface GuardianPorts {
 // drifting off a value the user pinned would be worse than aborting. Only
 // unconfigured ports keep the probe-upward-from-default behavior.
 
-const PORT_DEFAULTS = { web: 47331, mcp: 47332, uta: 47333, ui: 5173 } as const
+const PORT_DEFAULTS = { web: 47331, mcp: 47332, uta: 47333, connector: 47334, ui: 5173 } as const
 
 export type PortName = keyof typeof PORT_DEFAULTS
 
@@ -76,6 +77,7 @@ const ENV_KEYS: Record<PortName, string> = {
   web: 'OPENALICE_WEB_PORT',
   mcp: 'OPENALICE_MCP_PORT',
   uta: 'OPENALICE_UTA_PORT',
+  connector: 'OPENALICE_CONNECTOR_PORT',
   ui: 'OPENALICE_UI_PORT',
 }
 
@@ -107,7 +109,7 @@ export async function readPortsFile(userDataHome: string): Promise<Partial<Recor
     throw new Error(`[guardian] ${filePath} is not valid JSON: ${err instanceof Error ? err.message : String(err)}`)
   }
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    throw new Error(`[guardian] ${filePath} must be a JSON object like {"web":47331,"mcp":47332,"uta":47333,"ui":5173}`)
+    throw new Error(`[guardian] ${filePath} must be a JSON object like {"web":47331,"mcp":47332,"uta":47333,"connector":47334,"ui":5173}`)
   }
   const out: Partial<Record<PortName, number>> = {}
   for (const name of Object.keys(PORT_DEFAULTS) as PortName[]) {
@@ -131,7 +133,13 @@ export function resolvePortConfig(
     if (fromFile !== undefined) return { value: fromFile, source: 'file' }
     return { value: PORT_DEFAULTS[name], source: 'default' }
   }
-  return { web: pick('web'), mcp: pick('mcp'), uta: pick('uta'), ui: pick('ui') }
+  return {
+    web: pick('web'),
+    mcp: pick('mcp'),
+    uta: pick('uta'),
+    connector: pick('connector'),
+    ui: pick('ui'),
+  }
 }
 
 /**
@@ -142,7 +150,7 @@ export function resolvePortConfig(
  * (not left to Vite's own auto-increment) so Guardian can print the real
  * URL and inject the value into Alice for the WS-origin allowlist.
  */
-export async function planPorts(cfg: PortConfig, opts?: { skipUta?: boolean }): Promise<GuardianPorts> {
+export async function planPorts(cfg: PortConfig, opts?: { skipUta?: boolean; skipConnector?: boolean }): Promise<GuardianPorts> {
   const claim = async (name: PortName, choice: PortChoice, probeStart: number): Promise<number> => {
     if (choice.source === 'default') return probeFreePort(probeStart)
     try {
@@ -158,12 +166,15 @@ export async function planPorts(cfg: PortConfig, opts?: { skipUta?: boolean }): 
   const utaPort = opts?.skipUta === true
     ? cfg.uta.value
     : await claim('uta', cfg.uta, Math.max(PORT_DEFAULTS.uta, mcpPort + 1))
+  const connectorPort = opts?.skipConnector === true
+    ? cfg.connector.value
+    : await claim('connector', cfg.connector, Math.max(PORT_DEFAULTS.connector, utaPort + 1))
   const uiPort = await claim('ui', cfg.ui, PORT_DEFAULTS.ui)
-  return { webPort, mcpPort, utaPort, uiPort }
+  return { webPort, mcpPort, utaPort, connectorPort, uiPort }
 }
 
 export interface SpawnSpec {
-  name: 'uta' | 'alice' | 'vite'
+  name: string
   command: string
   args: string[]
   env: NodeJS.ProcessEnv
@@ -311,7 +322,7 @@ export async function waitForHttp(url: string, opts: {
  *  twice on rapid SIGINT or child crash + signal race).
  *
  *  `children` is the initial set; `trackReplacement(old, next)` rewires
- *  exit-listeners when UTAController respawns its child. */
+ *  exit-listeners when an OptionalServiceController respawns its child. */
 export interface CascadeOpts {
   children: ChildProcess[]
   /** Grace period before SIGKILL fallback. */
@@ -423,7 +434,7 @@ function childTag(c: ChildProcess, _all: ChildProcess[]): string {
  * Restart path = startup path: SIGTERM the old, wait exit, re-spawn with
  * same spec, gate Alice's BFF on the new health endpoint.
  */
-export class UTAController {
+export class OptionalServiceController {
   private child: ChildProcess
   private restarting = false
   /** Optional cascade hooks. UTA respawn must inform cascade so SIGINT
@@ -445,12 +456,12 @@ export class UTAController {
 
   async restart(): Promise<void> {
     if (this.restarting) {
-      console.log(`[guardian] UTA restart already in progress, skipping`)
+      console.log(`[guardian] ${this.spec.name} restart already in progress, skipping`)
       return
     }
     this.restarting = true
     try {
-      console.log(`[guardian] restarting UTA`)
+      console.log(`[guardian] restarting ${this.spec.name}`)
       const old = this.child
       this.cascade?.expectExit(old)
       const exited = new Promise<void>((resolve) => old.once('exit', () => resolve()))
@@ -467,13 +478,23 @@ export class UTAController {
 
       const ready = await waitForHttp(this.healthUrl, { timeoutMs: 15_000 })
       if (!ready) {
-        console.error(`[guardian] UTA failed to come back up after restart`)
+        console.error(`[guardian] ${this.spec.name} failed to come back up after restart`)
         return
       }
-      console.log(`[guardian] UTA back online`)
+      console.log(`[guardian] ${this.spec.name} back online`)
     } finally {
       this.restarting = false
     }
+  }
+}
+
+export async function readConnectorServiceEnabled(userDataHome: string): Promise<boolean> {
+  const filePath = resolve(userDataHome, 'data', 'config', 'connector-service.json')
+  try {
+    const value = JSON.parse(await readFile(filePath, 'utf8')) as { enabled?: unknown }
+    return value.enabled === true
+  } catch {
+    return false
   }
 }
 

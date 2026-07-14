@@ -1,4 +1,4 @@
-import { type LucideIcon, MessageSquare, Inbox, Telescope, LineChart, GitBranch, BarChart3, Newspaper, Zap, Settings, Code2, TerminalSquare, ChevronDown, Info, ListChecks, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { type LucideIcon, MessageSquare, Inbox, Telescope, LineChart, GitBranch, BarChart3, Newspaper, Zap, Settings, Code2, TerminalSquare, ChevronDown, Info, ListChecks, PanelLeftClose, PanelLeftOpen, Plug } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { type Page } from '../App'
 import { useWorkspace } from '../tabs/store'
@@ -20,6 +20,7 @@ function activitySectionFor(page: Page): ActivitySection {
     case 'tracked':              return 'tracked'
     case 'workspaces':           return 'workspaces'
     case 'trading-as-git':       return 'trading-as-git'
+    case 'connectors':           return 'connectors'
     case 'settings':             return 'settings'
     case 'dev':                  return 'dev'
     case 'market':               return 'market'
@@ -46,7 +47,7 @@ interface ActivityBarProps {
 type NavItemKey =
   | 'nav.item.inbox' | 'nav.item.tracked' | 'nav.item.chat' | 'nav.item.workspaces'
   | 'nav.item.market' | 'nav.item.news' | 'nav.item.tradingAsGit' | 'nav.item.issue'
-  | 'nav.item.portfolio' | 'nav.item.automation' | 'nav.item.settings' | 'nav.item.dev'
+  | 'nav.item.portfolio' | 'nav.item.connectors' | 'nav.item.automation' | 'nav.item.settings' | 'nav.item.dev'
 
 interface NavLeaf {
   page: Page
@@ -105,8 +106,9 @@ const NAV_SECTIONS: NavSection[] = [
       { page: 'workspaces', labelKey: 'nav.item.workspaces', icon: TerminalSquare, defaultTab: { kind: 'workspace-list', params: {} } },
     ],
   },
-  // Beta — useful trading surfaces whose cross-broker state model and UX are
-  // still settling. Broker connection CRUD lives under Settings → Trading.
+  // Beta — useful product surfaces whose state model and UX are still
+  // settling. Configuration remains in Settings; these entries show the
+  // operational product state rather than editing credentials.
   {
     sectionLabel: 'Beta',
     labelKey: 'nav.section.beta',
@@ -114,6 +116,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { page: 'trading-as-git', labelKey: 'nav.item.tradingAsGit', icon: GitBranch, defaultTab: { kind: 'trading-as-git', params: {} } },
       { page: 'portfolio',      labelKey: 'nav.item.portfolio',    icon: LineChart, defaultTab: { kind: 'portfolio', params: {} } },
+      { page: 'connectors',     labelKey: 'nav.item.connectors',   icon: Plug, defaultTab: { kind: 'connectors', params: {} } },
     ],
   },
   {
@@ -262,7 +265,7 @@ export function ActivityBar({
                   />
                 )}
                 {showItems && (
-                  <div className={`flex flex-col ${denseRail ? 'gap-1 md:gap-px' : 'gap-1'}`} id={`activity-section-${si}`}>
+                  <div className={`oa-disclosure-enter flex flex-col ${denseRail ? 'gap-1 md:gap-px' : 'gap-1'}`} id={`activity-section-${si}`}>
                     {section.items.map((item) => {
                       const sec = activitySectionFor(item.page)
                       const isActive = selectedSidebar === sec
@@ -278,7 +281,7 @@ export function ActivityBar({
                           type="button"
                           onClick={handleClick}
                           title={t(item.labelKey)}
-                          className={`relative flex items-center rounded-md transition-colors text-left ${
+                          className={`oa-nav-item relative flex items-center rounded-md text-left ${
                             compactRail
                               ? denseRail
                                 ? 'md:h-[26px] md:w-8 md:min-h-[26px] md:justify-center md:gap-0 md:px-0 md:py-0'
@@ -299,7 +302,7 @@ export function ActivityBar({
                             }`}
                             aria-hidden
                           />
-                          <span className={`relative flex items-center justify-center w-5 h-5 shrink-0 ${denseRail ? 'md:w-3.5 md:h-3.5' : ''}`}>
+                          <span className={`oa-nav-icon relative flex items-center justify-center w-5 h-5 shrink-0 ${denseRail ? 'md:w-3.5 md:h-3.5' : ''}`}>
                             <Icon size={denseRail ? 14 : 16} strokeWidth={1.75} />
                           </span>
                           <span className={`flex-1 truncate ${compactRail ? 'md:hidden' : ''}`}>{t(item.labelKey)}</span>
@@ -342,7 +345,7 @@ export function ActivityBar({
               onClick={() => setRailCollapsed(!railCollapsed)}
               title={t(railCollapsed ? 'nav.expandRail' : 'nav.collapseRail')}
               aria-label={t(railCollapsed ? 'nav.expandRail' : 'nav.collapseRail')}
-              className={`hidden ${denseRail ? 'h-9 w-9 md:h-[26px] md:w-[26px]' : 'h-9 w-9'} shrink-0 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-overlay hover:text-text md:flex`}
+              className={`oa-icon-action hidden ${denseRail ? 'h-9 w-9 md:h-[26px] md:w-[26px]' : 'h-9 w-9'} shrink-0 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-overlay hover:text-text md:flex`}
             >
               {railCollapsed
                 ? <PanelLeftOpen size={denseRail ? 14 : 17} strokeWidth={1.75} aria-hidden />
@@ -424,7 +427,7 @@ function SectionHeader({
         )}
       </div>
       {showItems && description && hintOpen && (
-        <p className="mb-2 px-3 text-[11px] leading-relaxed text-text-muted">
+        <p className="oa-disclosure-enter mb-2 px-3 text-[11px] leading-relaxed text-text-muted">
           {description}
         </p>
       )}

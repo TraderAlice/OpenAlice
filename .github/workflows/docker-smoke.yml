@@ -22,6 +22,8 @@ on:
       - "src/webui/**"
       - "src/workspaces/**"
       - "services/uta/**"
+      - "services/connector/**"
+      - "packages/connector-protocol/**"
       - "packages/**"
       - "default/**"
   push:
@@ -46,6 +48,8 @@ on:
       - "src/webui/**"
       - "src/workspaces/**"
       - "services/uta/**"
+      - "services/connector/**"
+      - "packages/connector-protocol/**"
       - "packages/**"
       - "default/**"
 

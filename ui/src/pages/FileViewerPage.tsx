@@ -3,9 +3,9 @@
  * VS Code's editor. Opened from the Tracked backlink list and the
  * workspace Files panel; renders one workspace file read-only.
  *
- * Markdown (`[[name]]` wikilinks included) and HTML route through
- * MarkdownContent; everything else falls back to monospace plain text.
- * Rendering + tombstones are shared with the Inbox doc pane via
+ * Markdown (`[[name]]` wikilinks included) uses MarkdownContent; static HTML
+ * uses the isolated report renderer; everything else falls back to monospace
+ * plain text. Rendering + tombstones are shared with the Inbox doc pane via
  * FileContentView.
  */
 

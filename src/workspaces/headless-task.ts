@@ -24,7 +24,7 @@
 import { createWriteStream } from 'node:fs';
 import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
 
 import type { Logger } from './logger.js';
@@ -80,6 +80,8 @@ export interface HeadlessTaskArgs {
    * launcher-owned fixed prompt and may opt in so opencode/Pi can be checked.
    */
   readonly allowShellShim?: boolean;
+  /** Internal liveness hook used by Workspace mutation guards. */
+  readonly onChildSpawned?: (child: ChildProcess) => void;
 }
 
 export interface HeadlessTaskResult {
@@ -394,6 +396,7 @@ export async function runHeadlessTask(args: HeadlessTaskArgs): Promise<HeadlessT
     env: env as NodeJS.ProcessEnv,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
+  args.onChildSpawned?.(child);
   child.stdout?.on('data', (d: Buffer) => {
     if (!args.keepDiagnosticLine) {
       outSink.push(d);

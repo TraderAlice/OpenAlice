@@ -4,7 +4,7 @@
  * Full Trading-as-Git flow: stage → commit → push → sync → verify
  * against Bybit demo trading (crypto perps, 24/7).
  *
- * Run: pnpm test:e2e
+ * Run: OPENALICE_UTA_LIVE_PAPER=1 pnpm test:uta:live-paper
  */
 
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest'

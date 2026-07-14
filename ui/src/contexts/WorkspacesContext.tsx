@@ -75,7 +75,11 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
   // gear button (no workspace tab needed) and the WorkspacePage header
   // button share one modal instance — and the modal survives activity
   // switches (rendered here, not inside an activity-scoped component).
-  const [configuringAgentTarget, setConfiguringAgentTarget] = useState<{ wsId: string; agent?: AgentId } | null>(null)
+  const [configuringAgentTarget, setConfiguringAgentTarget] = useState<{
+    wsId: string
+    agent?: AgentId
+    section?: 'general' | 'ai' | 'template' | 'absorb'
+  } | null>(null)
   const [pendingSessionDelete, setPendingSessionDelete] = useState<{ wsId: string; sessionId: string } | null>(null)
   const { t } = useTranslation()
   const terminalTheme = useResolvedTerminalThemeVariant()
@@ -414,8 +418,12 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         resumeSession,
         openWebPiSession,
         requestDeleteSession,
-        openAgentConfig: (wsId: string, agent?: AgentId) =>
-          setConfiguringAgentTarget({ wsId, ...(agent ? { agent } : {}) }),
+        openAgentConfig: (wsId: string, agent?: AgentId, section?: 'general' | 'ai' | 'template' | 'absorb') =>
+          setConfiguringAgentTarget({
+            wsId,
+            ...(agent ? { agent } : {}),
+            ...(section ? { section } : {}),
+          }),
         saveWorkspaceMetadata,
         renameWorkspace,
       }}
@@ -425,7 +433,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         <WorkspaceAIConfigModal
           wsId={configuringAgentTarget.wsId}
           initialAgent={configuringAgentTarget.agent}
-          initialSection={configuringAgentTarget.agent ? 'ai' : 'general'}
+          initialSection={configuringAgentTarget.section ?? (configuringAgentTarget.agent ? 'ai' : 'general')}
           onClose={() => setConfiguringAgentTarget(null)}
         />
       )}

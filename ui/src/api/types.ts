@@ -177,31 +177,14 @@ export interface AppConfig {
     every: string
   }
   mcp: McpConfig
-  connectors: ConnectorsConfig
+  ports: { web: number }
   [key: string]: unknown
 }
 
-/**
- * MCP server config — lives at top-level of AppConfig (NOT under
- * connectors:) because the MCP server exports OpenAlice's ToolCenter
- * to external clients, not because it's a chat-input surface.
- * `connectors.mcpAsk` is the chat-shaped MCP-as-input flavour and
- * stays under connectors.
- */
+/** MCP server config exports OpenAlice's ToolCenter to external clients. */
 export interface McpConfig {
   enabled: boolean
   port: number
-}
-
-export interface ConnectorsConfig {
-  web: { port: number }
-  mcpAsk: { enabled: boolean; port?: number }
-  telegram: {
-    enabled: boolean
-    botToken?: string
-    botUsername?: string
-    chatIds: number[]
-  }
 }
 
 // ==================== News Collector ====================

@@ -18,6 +18,71 @@ fixing what it hits and adding a regression spec per fix. Run it after any
 change to trading paths, and as the acceptance gate for new broker
 integrations.
 
+The automated account-trading suite is deliberately separate from ordinary
+product E2E. It will not start unless both its explicit script and acknowledgement
+are present:
+
+```bash
+OPENALICE_UTA_LIVE_PAPER=1 pnpm test:uta:live-paper
+```
+
+`pnpm test:e2e` never submits broker orders. It contains only local product
+integration tests and read-only network/provider checks.
+
+## Choose the verification layer
+
+Do not jump from a unit change straight to an account-trading sweep. Start at
+the lowest layer that can disprove the change, then move outward only when the
+touched contract requires it.
+
+| Change surface | Minimum verification | When live-paper is required |
+|---|---|---|
+| UTA staging, commit, ledger, reconciliation, or state transitions | Targeted unit specs, then `pnpm test:e2e` (`uta-lifecycle` uses `MockBroker`) | Only when venue behavior or a real execution response is part of the claim |
+| Public market loading or read-only provider integration | Targeted read-only E2E; failures from DNS/TLS/provider downtime must be reported separately from product failures | Not required when no configured account or private endpoint is used |
+| Broker account parsing, order ids, status mapping, modify/cancel, permissions, TP/SL, or venue-specific parameters | Targeted broker spec against one verified demo/paper account | Required: these semantics cannot be proven by `MockBroker` |
+| Alice-to-UTA protocol or `alice-uta` CLI changes | Protocol/unit specs, then the relevant scenario through a real Workspace CLI | Required if the changed command reaches an order write or approval boundary |
+| New broker or new traded market type | Full applicable S1-S14 catalog for that venue | Always required before claiming support |
+| UTA health/restart/supervision without trading changes | Health and restart smoke with a broker disabled or read-only | Only if recovery of pending/open orders is part of the change |
+
+The commands are intentionally asymmetric:
+
+```bash
+# Ordinary product E2E: safe for routine local development and CI.
+pnpm test:e2e
+
+# One explicitly selected account-trading spec.
+OPENALICE_UTA_LIVE_PAPER=1 pnpm test:uta:live-paper -- \
+  services/uta/src/domain/trading/__test__/e2e/uta-bybit.e2e.spec.ts
+
+# Full configured demo/paper account suite. Use only for a deliberate sweep.
+OPENALICE_UTA_LIVE_PAPER=1 pnpm test:uta:live-paper
+```
+
+The environment variable is an acknowledgement, not proof that an account is
+safe. Before setting it, inspect the selected account configuration and confirm
+its resolved preset is paper/demo/sandbox. Never print credentials while doing
+that inspection.
+
+## Live-paper run record and cleanup
+
+For every live-paper run, record enough evidence to distinguish a product bug
+from venue or network behavior:
+
+1. Account id, provider/venue, resolved paper/demo mode, scenario/spec, and
+   current Git commit.
+2. Pre-run positions and open orders. These are the cleanup baseline, not an
+   assumption that the account starts empty.
+3. Submitted order ids as strings, relevant Alice/UTA logs, and raw venue
+   status for any disputed transition.
+4. Post-run positions and open orders compared with the baseline.
+
+Automated cancellation is helpful but not a safety boundary: a process can be
+interrupted between submit and cleanup. After success **and after failure**,
+query the venue again, cancel new open orders, close only positions created by
+the test, reject leftover Alice staging, and confirm the account returned to
+its baseline. If that cannot be proven, stop the development lane and report
+the account as requiring manual cleanup.
+
 ## Ground rules
 
 - **Demo/paper accounts only.** Verify `mode` in the account config before

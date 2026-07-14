@@ -165,7 +165,7 @@ export function PageSidebarLayout({
       <button
         type="button"
         onClick={() => updateCollapsed(true)}
-        className="flex h-7 w-7 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-overlay hover:text-text"
+        className="oa-icon-action flex h-7 w-7 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-overlay hover:text-text"
         aria-label={t('common.collapsePanel', { title })}
         title={t('common.focusContent')}
       >
@@ -191,7 +191,7 @@ export function PageSidebarLayout({
             <button
               type="button"
               onClick={() => updateCollapsed(false)}
-              className="flex h-8 w-8 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-overlay hover:text-text"
+              className="oa-icon-action flex h-8 w-8 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-overlay hover:text-text"
               aria-label={t('common.openPanel', { title })}
               title={t('common.openPanel', { title })}
             >
@@ -228,7 +228,7 @@ export function PageSidebarLayout({
         <button
           type="button"
           onClick={() => setDrawerOpen(true)}
-          className="flex h-8 w-8 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-overlay hover:text-text"
+          className="oa-icon-action flex h-8 w-8 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-overlay hover:text-text"
           aria-label={t('common.openPanel', { title })}
           title={title}
         >

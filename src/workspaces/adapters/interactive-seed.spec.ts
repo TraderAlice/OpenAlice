@@ -53,6 +53,9 @@ describe('interactive seed — composeCommand initialPrompt', () => {
       const argv = codexAdapter.composeCommand([], ctx({ initialPrompt: PROMPT }));
       expect(argv.slice(-2)).toEqual(['--', PROMPT]);
       expect(argv[0]).toBe('codex');
+      expect(argv).toEqual(expect.arrayContaining([
+        '--sandbox', 'danger-full-access', '--ask-for-approval', 'never',
+      ]));
       expect(argv).not.toContain('exec'); // interactive, NOT headless
     });
 
@@ -94,6 +97,9 @@ describe('interactive seed — composeCommand initialPrompt', () => {
     it('codex resume ignores the prompt', () => {
       const argv = codexAdapter.composeCommand([], ctx({ resume: RESUME, initialPrompt: PROMPT }));
       expect(argv).toContain('resume');
+      expect(argv).toEqual(expect.arrayContaining([
+        '--sandbox', 'danger-full-access', '--ask-for-approval', 'never',
+      ]));
       expect(argv).not.toContain(PROMPT);
     });
     it('opencode resume ignores the prompt', () => {

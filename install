@@ -1,0 +1,531 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPOSITORY="TraderAlice/OpenAlice"
+VERSION="${OPENALICE_VERSION:-dev}"
+SOURCE_DIR=""
+MODIFY_PATH=1
+ASSUME_YES=0
+PLAN_ONLY=0
+INSTALL_ROOT="${OPENALICE_INSTALL_DIR:-${HOME}/.openalice}"
+
+BOLD=""
+DIM=""
+CYAN=""
+GREEN=""
+YELLOW=""
+RED=""
+RESET=""
+
+STAGING=""
+LOCK_DIR=""
+LOCK_HELD=0
+TTY_OPEN=0
+SHELL_LAUNCHER_TEMP=""
+CMD_LAUNCHER_TEMP=""
+
+if [[ -t 1 && -z "${NO_COLOR:-}" && "${TERM:-}" != "dumb" ]]; then
+  BOLD=$'\033[1m'
+  DIM=$'\033[2m'
+  CYAN=$'\033[36m'
+  GREEN=$'\033[32m'
+  YELLOW=$'\033[33m'
+  RED=$'\033[31m'
+  RESET=$'\033[0m'
+fi
+
+cleanup() {
+  local status=$?
+  [[ -z "$STAGING" ]] || rm -rf "$STAGING"
+  [[ -z "$SHELL_LAUNCHER_TEMP" ]] || rm -f "$SHELL_LAUNCHER_TEMP"
+  [[ -z "$CMD_LAUNCHER_TEMP" ]] || rm -f "$CMD_LAUNCHER_TEMP"
+  if [[ "$LOCK_HELD" -eq 1 && -n "$LOCK_DIR" ]]; then
+    rm -rf "$LOCK_DIR"
+  fi
+  if [[ "$TTY_OPEN" -eq 1 ]]; then
+    exec 3>&- 3<&-
+  fi
+  return "$status"
+}
+
+trap cleanup EXIT
+trap 'exit 130' HUP INT TERM
+
+die() {
+  printf '\n%bError:%b %s\n' "${RED}${BOLD}" "$RESET" "$*" >&2
+  exit 1
+}
+
+step() {
+  printf '\n%b[%s/4]%b %s\n' "$CYAN" "$1" "$RESET" "$2"
+}
+
+ok() {
+  printf '      %b✓%b %s\n' "$GREEN" "$RESET" "$1"
+}
+
+warn() {
+  printf '      %b!%b %s\n' "$YELLOW" "$RESET" "$1"
+}
+
+usage() {
+  cat <<'EOF'
+OpenAlice CLI installer
+
+Usage:
+  curl -fsSL https://raw.githubusercontent.com/TraderAlice/OpenAlice/dev/install | bash
+  ./install [--version <git-ref>] [--install-dir <path>] [--no-modify-path] [--yes]
+
+Options:
+  --version <git-ref>   Git tag, branch, or commit to install (default: dev)
+  --install-dir <path>  OpenAlice user root (default: ~/.openalice)
+  --source <path>       Install CLI files from a local checkout (development)
+  --no-modify-path      Do not update the shell profile
+  --plan                Show the install plan and exit without changing files
+  -y, --yes             Accept the install plan without an interactive prompt
+  -h, --help            Show this help
+EOF
+}
+
+open_tty() {
+  if { exec 3<>/dev/tty; } 2>/dev/null; then
+    TTY_OPEN=1
+    return 0
+  fi
+  return 1
+}
+
+prompt_yes_no() {
+  local message="$1"
+  local reply=""
+
+  while true; do
+    printf '\n%b%s%b [y/N] ' "$BOLD" "$message" "$RESET" >&3
+    if ! IFS= read -r reply <&3; then
+      return 2
+    fi
+    case "$reply" in
+      y|Y|yes|YES|Yes)
+        return 0
+        ;;
+      ""|n|N|no|NO|No)
+        return 1
+        ;;
+      *)
+        printf 'Please answer y or n. Press Enter to choose no.\n' >&3
+        ;;
+    esac
+  done
+}
+
+acquire_install_lock() {
+  local owner=""
+
+  mkdir -p "$INSTALL_ROOT"
+  LOCK_DIR="$INSTALL_ROOT/.cli-install.lock"
+  if mkdir "$LOCK_DIR" 2>/dev/null; then
+    printf '%s\n' "$$" > "$LOCK_DIR/pid"
+    LOCK_HELD=1
+    return
+  fi
+
+  if [[ -r "$LOCK_DIR/pid" ]]; then
+    IFS= read -r owner < "$LOCK_DIR/pid" || owner=""
+  fi
+  if [[ "$owner" =~ ^[0-9]+$ ]] && kill -0 "$owner" 2>/dev/null; then
+    die "Another OpenAlice CLI installer is running (pid $owner)."
+  fi
+
+  warn "Removing a stale CLI installer lock"
+  rm -rf "$LOCK_DIR"
+  mkdir "$LOCK_DIR" || die "Could not acquire the CLI installer lock at $LOCK_DIR"
+  printf '%s\n' "$$" > "$LOCK_DIR/pid"
+  LOCK_HELD=1
+}
+
+release_install_lock() {
+  if [[ "$LOCK_HELD" -eq 1 ]]; then
+    rm -rf "$LOCK_DIR"
+    LOCK_HELD=0
+  fi
+}
+
+content_id() {
+  local root="$1"
+  shift
+  node - "$root" "$@" <<'NODE'
+const { createHash } = require('node:crypto')
+const { readFileSync } = require('node:fs')
+const { join } = require('node:path')
+
+const [, , root, ...files] = process.argv
+const hash = createHash('sha256')
+for (const file of files) {
+  hash.update(file)
+  hash.update('\0')
+  hash.update(readFileSync(join(root, file)))
+  hash.update('\0')
+}
+process.stdout.write(hash.digest('hex').slice(0, 16))
+NODE
+}
+
+update_path_profile() {
+  local begin_marker="# >>> OpenAlice CLI >>>"
+  local end_marker="# <<< OpenAlice CLI <<<"
+  local temporary="${profile}.openalice.$$"
+
+  mkdir -p "$(dirname "$profile")" || return 1
+  touch "$profile" || return 1
+  awk -v begin="$begin_marker" -v end="$end_marker" -v legacy="$path_line" '
+    $0 == begin { skipping = 1; next }
+    $0 == end { skipping = 0; next }
+    !skipping && $0 != legacy { print }
+  ' "$profile" > "$temporary" || return 1
+  if [[ -s "$temporary" ]]; then
+    printf '\n' >> "$temporary" || return 1
+  fi
+  printf '%s\n%s\n%s\n' "$begin_marker" "$path_line" "$end_marker" >> "$temporary" || return 1
+
+  if [[ -L "$profile" ]]; then
+    command cat "$temporary" > "$profile" || return 1
+    rm -f "$temporary" || return 1
+  else
+    mv -f "$temporary" "$profile" || return 1
+  fi
+}
+
+find_openalice_checkout() {
+  node - "$PWD" <<'NODE'
+const { readFileSync } = require('node:fs')
+const { dirname, join, resolve } = require('node:path')
+
+let current = resolve(process.argv[2])
+while (true) {
+  try {
+    const manifest = JSON.parse(readFileSync(join(current, 'package.json'), 'utf8'))
+    if (manifest?.name === 'open-alice' && manifest?.scripts?.['build:server']) {
+      process.stdout.write(current)
+      process.exit(0)
+    }
+  } catch {
+    // Walking up from an arbitrary install directory normally encounters no manifest.
+  }
+  const parent = dirname(current)
+  if (parent === current) process.exit(1)
+  current = parent
+}
+NODE
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --version)
+      [[ $# -ge 2 ]] || { echo "openalice install: --version requires a value" >&2; exit 1; }
+      VERSION="$2"
+      shift 2
+      ;;
+    --install-dir)
+      [[ $# -ge 2 ]] || { echo "openalice install: --install-dir requires a value" >&2; exit 1; }
+      INSTALL_ROOT="$2"
+      shift 2
+      ;;
+    --source)
+      [[ $# -ge 2 ]] || { echo "openalice install: --source requires a value" >&2; exit 1; }
+      SOURCE_DIR="$2"
+      shift 2
+      ;;
+    --no-modify-path)
+      MODIFY_PATH=0
+      shift
+      ;;
+    --plan)
+      PLAN_ONLY=1
+      shift
+      ;;
+    -y|--yes)
+      ASSUME_YES=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "openalice install: unknown option: $1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [[ ${#VERSION} -gt 128 || "$VERSION" == *".."* || ! "$VERSION" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+  die "Unsupported version/ref: $VERSION"
+fi
+
+INSTALL_ROOT="${INSTALL_ROOT/#\~/$HOME}"
+BIN_DIR="$INSTALL_ROOT/bin"
+VERSIONS_DIR="$INSTALL_ROOT/cli-versions"
+SAFE_VERSION="${VERSION//\//_}"
+
+if [[ -n "$SOURCE_DIR" ]]; then
+  source_argument="$SOURCE_DIR"
+  if ! SOURCE_DIR="$(cd "$SOURCE_DIR" 2>/dev/null && pwd)"; then
+    die "Local source checkout not found: $source_argument"
+  fi
+fi
+
+path_present=0
+case ":$PATH:" in
+  *":$BIN_DIR:"*) path_present=1 ;;
+esac
+
+profile=""
+path_line=""
+printf -v quoted_bin '%q' "$BIN_DIR"
+current_path_command="export PATH=$quoted_bin:\$PATH"
+if [[ "$MODIFY_PATH" -eq 0 ]]; then
+  shell_setup="Skip (--no-modify-path)"
+elif [[ "$path_present" -eq 1 ]]; then
+  shell_setup="Already available on PATH"
+else
+  case "${SHELL:-}" in
+    */zsh)
+      if [[ "$(uname -s)" == "Darwin" ]]; then profile="$HOME/.zprofile"; else profile="$HOME/.zshrc"; fi
+      path_line="export PATH=$quoted_bin:\$PATH"
+      ;;
+    */bash)
+      if [[ "$(uname -s)" == "Darwin" ]]; then profile="$HOME/.bash_profile"; else profile="$HOME/.bashrc"; fi
+      path_line="export PATH=$quoted_bin:\$PATH"
+      ;;
+    */fish)
+      profile="$HOME/.config/fish/config.fish"
+      path_line="fish_add_path $quoted_bin"
+      current_path_command="fish_add_path $quoted_bin"
+      ;;
+  esac
+  if [[ -n "$profile" ]]; then
+    shell_setup="Manage OpenAlice PATH in $profile"
+  else
+    shell_setup="Manual PATH setup (shell profile not detected)"
+  fi
+fi
+
+existing_command="$(command -v openalice 2>/dev/null || true)"
+install_action="Install a new command"
+if [[ -e "$BIN_DIR/openalice" || -e "$BIN_DIR/openalice.cmd" ]]; then
+  install_action="Update the installed command"
+fi
+
+printf '\n%bOpenAlice%b\n' "${BOLD}${CYAN}" "$RESET"
+printf '%bLocal Runtime CLI installer%b\n\n' "$BOLD" "$RESET"
+printf 'Install one small command, then run OpenAlice locally in your browser.\n'
+printf '%bYour checkout, Electron app, credentials, and services stay untouched until you start them yourself.%b\n' "$DIM" "$RESET"
+
+step 1 "Checking your system"
+if ! command -v node >/dev/null 2>&1; then
+  die "Node.js 20 or newer is required. Install Node.js, then run this installer again."
+fi
+
+NODE_MAJOR="$(node -p 'Number(process.versions.node.split(".")[0])')"
+if [[ "$NODE_MAJOR" -lt 20 ]]; then
+  die "Node.js 20 or newer is required (found $(node --version))."
+fi
+ok "Node.js $(node --version)"
+
+if [[ -z "$SOURCE_DIR" ]] && ! command -v curl >/dev/null 2>&1; then
+  die "curl is required to download the CLI files."
+fi
+if [[ -n "$SOURCE_DIR" ]]; then
+  [[ -f "$SOURCE_DIR/packages/cli/package.json" ]] || die "OpenAlice CLI sources are missing under $SOURCE_DIR"
+  ok "Local checkout is readable"
+  install_source="Local checkout: $SOURCE_DIR"
+else
+  ok "curl is available"
+  BASE_URL="${OPENALICE_INSTALL_BASE_URL:-https://raw.githubusercontent.com/$REPOSITORY/$VERSION/packages/cli}"
+  BASE_URL="${BASE_URL%/}"
+  if [[ -n "${OPENALICE_INSTALL_BASE_URL:-}" ]]; then
+    install_source="Download URL: $BASE_URL"
+  else
+    install_source="GitHub ref: $REPOSITORY@$VERSION"
+  fi
+fi
+
+printf '\n%bInstall plan%b\n' "$BOLD" "$RESET"
+printf '  %-14s %s\n' "Action" "$install_action"
+printf '  %-14s %s\n' "Source" "$install_source"
+printf '  %-14s %s\n' "Version" "$VERSION"
+printf '  %-14s %s\n' "Install root" "$INSTALL_ROOT"
+printf '  %-14s %s\n' "Command" "$BIN_DIR/openalice"
+printf '  %-14s %s\n' "Shell setup" "$shell_setup"
+if [[ -n "$existing_command" && "$existing_command" != "$BIN_DIR/openalice" ]]; then
+  printf '  %-14s %s\n' "PATH warning" "$existing_command currently resolves first"
+fi
+
+if [[ "$PLAN_ONLY" -eq 1 ]]; then
+  printf '\n%bPlan complete.%b No files were changed.\n\n' "$BOLD" "$RESET"
+  exit 0
+fi
+
+if [[ "$ASSUME_YES" -eq 0 ]]; then
+  if ! open_tty; then
+    printf '\n%bNo interactive terminal is available.%b\n' "${RED}${BOLD}" "$RESET" >&2
+    printf 'Review the install plan above, then re-run with %b--yes%b to approve it.\n' "$BOLD" "$RESET" >&2
+    exit 2
+  fi
+  confirmation_status=0
+  prompt_yes_no "Continue with this install?" || confirmation_status=$?
+  case "$confirmation_status" in
+    0) ;;
+    1)
+      printf '\nNo changes made. You can run the installer again whenever you are ready.\n'
+      exit 0
+      ;;
+    *)
+      printf '\nNo confirmation received. No changes made.\n' >&2
+      exit 2
+      ;;
+  esac
+fi
+
+FILES=(
+  "package.json"
+  "bin/openalice.mjs"
+  "src/local-start.mjs"
+  "src/runtime-client.mjs"
+  "src/ssh-connect.mjs"
+)
+
+step 2 "Downloading the CLI"
+acquire_install_lock
+STAGING="$(mktemp -d "${TMPDIR:-/tmp}/openalice-cli.XXXXXX")"
+mkdir -p "$STAGING/bin" "$STAGING/src"
+
+if [[ -n "$SOURCE_DIR" ]]; then
+  for file in "${FILES[@]}"; do
+    cp "$SOURCE_DIR/packages/cli/$file" "$STAGING/$file"
+  done
+else
+  for file in "${FILES[@]}"; do
+    curl --fail --silent --show-error --location --retry 3 --connect-timeout 15 \
+      "$BASE_URL/$file" --output "$STAGING/$file"
+  done
+fi
+ok "CLI files are ready"
+
+step 3 "Verifying the CLI"
+chmod +x "$STAGING/bin/openalice.mjs"
+node --check "$STAGING/bin/openalice.mjs"
+node --check "$STAGING/src/local-start.mjs"
+node --check "$STAGING/src/runtime-client.mjs"
+node --check "$STAGING/src/ssh-connect.mjs"
+
+CLI_VERSION="$(node -e '
+  const manifest = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
+  if (manifest.name !== "@traderalice/openalice-cli" || typeof manifest.version !== "string") process.exit(1);
+  process.stdout.write(manifest.version);
+' "$STAGING/package.json")" || die "The downloaded package manifest is not an OpenAlice CLI package"
+STAGED_VERSION="$(node "$STAGING/bin/openalice.mjs" --version)"
+[[ "$STAGED_VERSION" == "$CLI_VERSION" ]] || die "The downloaded CLI did not report its package version"
+CONTENT_ID="$(content_id "$STAGING" "${FILES[@]}")"
+ok "OpenAlice CLI $CLI_VERSION passed validation ($CONTENT_ID)"
+
+step 4 "Installing the command"
+mkdir -p "$BIN_DIR" "$VERSIONS_DIR"
+DESTINATION="$VERSIONS_DIR/${SAFE_VERSION}-${CONTENT_ID}"
+if [[ -e "$DESTINATION" ]]; then
+  if [[ -d "$DESTINATION" && "$(content_id "$DESTINATION" "${FILES[@]}" 2>/dev/null || true)" == "$CONTENT_ID" ]]; then
+    rm -rf "$STAGING"
+    STAGING=""
+    ok "Reusing the already-verified CLI release"
+  else
+    damaged_destination="${DESTINATION}.damaged.$$"
+    warn "Preserving a damaged prior release at $damaged_destination"
+    mv "$DESTINATION" "$damaged_destination"
+    mv "$STAGING" "$DESTINATION"
+    STAGING=""
+  fi
+else
+  mv "$STAGING" "$DESTINATION"
+  STAGING=""
+fi
+
+CLI_ENTRY="$DESTINATION/bin/openalice.mjs"
+printf -v quoted_cli_entry '%q' "$CLI_ENTRY"
+SHELL_LAUNCHER_TEMP="$BIN_DIR/.openalice.$$.tmp"
+CMD_LAUNCHER_TEMP="$BIN_DIR/.openalice.$$.cmd.tmp"
+printf '#!/usr/bin/env bash\n# OpenAlice CLI launcher\nexec node %s "$@"\n' "$quoted_cli_entry" > "$SHELL_LAUNCHER_TEMP"
+chmod +x "$SHELL_LAUNCHER_TEMP"
+
+WINDOWS_CLI_ENTRY="$CLI_ENTRY"
+if command -v cygpath >/dev/null 2>&1; then
+  WINDOWS_CLI_ENTRY="$(cygpath -w "$CLI_ENTRY")"
+fi
+WINDOWS_CLI_ENTRY="${WINDOWS_CLI_ENTRY//%/%%}"
+printf '@echo off\r\nrem OpenAlice CLI launcher\r\nnode "%s" %%*\r\n' "$WINDOWS_CLI_ENTRY" > "$CMD_LAUNCHER_TEMP"
+
+LAUNCHER_VERSION="$("$SHELL_LAUNCHER_TEMP" --version)"
+[[ "$LAUNCHER_VERSION" == "$CLI_VERSION" ]] || die "The staged OpenAlice launcher is not runnable"
+
+# Both launchers point to an immutable, validated release before either visible
+# command is replaced. A failed update therefore leaves every visible launcher
+# pointing to a complete old or new release rather than a half-written tree.
+mv -f "$CMD_LAUNCHER_TEMP" "$BIN_DIR/openalice.cmd"
+CMD_LAUNCHER_TEMP=""
+mv -f "$SHELL_LAUNCHER_TEMP" "$BIN_DIR/openalice"
+SHELL_LAUNCHER_TEMP=""
+
+path_updated=0
+if [[ "$MODIFY_PATH" -eq 1 && "$path_present" -eq 0 && -n "$profile" ]]; then
+  if update_path_profile; then
+    path_updated=1
+  else
+    rm -f "${profile}.openalice.$$"
+    warn "Could not update $profile; the command is installed and can be added to PATH manually"
+  fi
+fi
+
+INSTALLED_VERSION="$("$BIN_DIR/openalice" --version)"
+[[ "$INSTALLED_VERSION" == "$CLI_VERSION" ]] || die "The installed OpenAlice command failed its version check"
+ok "Installed and verified $BIN_DIR/openalice"
+release_install_lock
+
+printf '\n%bOpenAlice CLI is ready.%b\n' "${GREEN}${BOLD}" "$RESET"
+printf '  %-12s %s\n' "Command" "$BIN_DIR/openalice"
+printf '  %-12s %s\n' "CLI version" "$CLI_VERSION"
+printf '  %-12s %s\n' "Source ref" "$VERSION"
+if [[ "$path_updated" -eq 1 ]]; then
+  printf '  %-12s %s\n' "Shell" "Future terminals will load the managed block in $profile"
+fi
+if [[ "$path_present" -eq 0 ]]; then
+  printf '\nFor this terminal, run:\n  %s\n' "$current_path_command"
+fi
+if [[ -n "$existing_command" && "$existing_command" != "$BIN_DIR/openalice" ]]; then
+  printf '\n%bPATH note:%b this terminal still resolves %s first.\n' "$YELLOW" "$RESET" "$existing_command"
+  printf 'Use %s now, or apply the PATH command above.\n' "$BIN_DIR/openalice"
+fi
+
+checkout=""
+checkout="$(find_openalice_checkout 2>/dev/null || true)"
+if [[ -n "$checkout" ]]; then
+  printf '\n%bReady to launch%b\n' "$BOLD" "$RESET"
+  printf '  Checkout     %s\n' "$checkout"
+  printf '  Local UI     http://127.0.0.1:47331\n'
+  printf '  Runtime      Stays attached to this terminal; Ctrl+C stops it\n'
+  if [[ "$TTY_OPEN" -eq 1 ]]; then
+    start_status=0
+    prompt_yes_no "Start OpenAlice now? Dependency preparation may take a few minutes." || start_status=$?
+    if [[ "$start_status" -eq 0 ]]; then
+      exec 3>&- 3<&-
+      TTY_OPEN=0
+      printf '\nStarting OpenAlice...\n\n'
+      exec "$BIN_DIR/openalice" start "$checkout"
+    fi
+  fi
+  printf '\nStart it when you are ready:\n  cd %q\n  %s\n\n' "$checkout" "$BIN_DIR/openalice"
+else
+  printf '\n%bNext: launch from an OpenAlice checkout%b\n' "$BOLD" "$RESET"
+  printf '  git clone https://github.com/TraderAlice/OpenAlice.git\n'
+  printf '  cd OpenAlice\n'
+  printf '  %s\n\n' "$BIN_DIR/openalice"
+fi

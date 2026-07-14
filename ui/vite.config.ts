@@ -11,7 +11,7 @@ import { resolve } from 'node:path'
  *      when invoked via `pnpm dev`. Guaranteed to match the port the
  *      backend was spawned on; drift-free.
  *
- *   2. `data/config/connectors.json` web.port — used when Vite is run
+ *   2. `data/config/ports.json` web.port — used when Vite is run
  *      standalone (`pnpm dev:ui`), without orchestrator. Stale only if
  *      the user manually started backend on a different port than
  *      configured, in which case the standalone workflow is on them.
@@ -24,11 +24,11 @@ function readBackendPort(): number {
   if (Number.isFinite(envPort) && envPort > 0 && envPort <= 65535) return envPort
 
   // Fallback: read the same file backend reads.
-  const configPath = resolve(__dirname, '..', 'data', 'config', 'connectors.json')
+  const configPath = resolve(__dirname, '..', 'data', 'config', 'ports.json')
   try {
     const raw = readFileSync(configPath, 'utf-8')
-    const parsed = JSON.parse(raw) as { web?: { port?: number } }
-    const port = parsed.web?.port
+    const parsed = JSON.parse(raw) as { web?: number }
+    const port = parsed.web
     if (typeof port === 'number' && port > 0 && port <= 65535) return port
     console.warn(`[vite] ${configPath}: web.port missing or invalid, falling back to 3002`)
   } catch (err: unknown) {
@@ -75,7 +75,7 @@ export default defineConfig({
     __OPENALICE_DEV_BACKEND_PORT__: JSON.stringify(backendPort),
   },
   // Dev server with API proxy to the backend.
-  // Backend port is read from `data/config/connectors.json` (web.port) so
+  // Backend port is read from `data/config/ports.json` (web.port) so
   // changing the backend port in one place propagates to Vite automatically.
   server: {
     port: uiPort,

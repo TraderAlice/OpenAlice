@@ -44,6 +44,8 @@ import {
   type QuickChatPreferences,
 } from '../../core/preferences.js';
 import { CHAT_WORKSPACE_TEMPLATE } from '../../workspaces/chat-workspace-resolver.js';
+import { TemplateUpgradeError } from '../../workspaces/template-upgrade.js';
+import { WorkspaceAbsorbError } from '../../workspaces/workspace-absorb.js';
 
 // The spawn body's `resume` value is an AGENT-side session id, whose shape is
 // adapter-native: uuid for claude/codex/pi, `ses_<base62>` for opencode. This
@@ -183,6 +185,18 @@ export function createWorkspaceRoutes(
     },
   ): Promise<SpawnSessionResult> {
     const id = meta.id;
+    const operationLease = svc.operationGuard?.acquire(id, 'interactive-session-start') ?? null;
+    if (svc.operationGuard && !operationLease) {
+      return {
+        ok: false,
+        status: 409,
+        body: {
+          error: 'workspace_busy',
+          message: `workspace is busy with ${svc.operationGuard.current(id) ?? 'another operation'}`,
+        },
+      };
+    }
+    try {
     const initialPrompt = opts.initialPrompt;
     let resume = opts.resume;
     const requestedIdentity = opts.resumeId ? svc.resumeRegistry.get(opts.resumeId) : null;
@@ -341,6 +355,9 @@ export function createWorkspaceRoutes(
       await svc.sessionRegistry.remove(id, recordId).catch(() => undefined);
       launcherLogger.error('workspace.session_spawn_failed', { id, err });
       return { ok: false, status: 500, body: { error: 'spawn_failed', message: (err as Error).message } };
+    }
+    } finally {
+      operationLease?.release();
     }
   }
 
@@ -694,6 +711,118 @@ export function createWorkspaceRoutes(
     } catch (err) {
       launcherLogger.error('workspace.offboard_failed', { id, err });
       return c.json({ error: 'offboard_failed', message: (err as Error).message }, 500);
+    }
+  });
+
+  app.get('/:id/template-upgrade', async (c) => {
+    const id = c.req.param('id');
+    if (!validId(id)) return c.json({ error: 'not_found' }, 404);
+    try {
+      return c.json({ plan: await svc.templateUpgrades.plan(id) });
+    } catch (err) {
+      if (err instanceof TemplateUpgradeError) {
+        const status = err.code === 'not_found' ? 404
+          : err.code === 'unsupported' || err.code === 'busy' ? 409
+            : 400;
+        return c.json({ error: err.code, message: err.message, plan: err.plan }, status);
+      }
+      launcherLogger.error('workspace.template_upgrade_plan_failed', { id, err });
+      return c.json({ error: 'upgrade_plan_failed', message: (err as Error).message }, 500);
+    }
+  });
+
+  app.post('/:id/template-upgrade', async (c) => {
+    const id = c.req.param('id');
+    if (!validId(id)) return c.json({ error: 'not_found' }, 404);
+    const body = await safeJson(c);
+    const fields = body && typeof body === 'object' ? body as Record<string, unknown> : {};
+    if (typeof fields['planDigest'] !== 'string') {
+      return c.json({ error: 'bad_request', message: 'planDigest is required' }, 400);
+    }
+    const rawResolutions = fields['resolutions'];
+    const resolutions = rawResolutions && typeof rawResolutions === 'object' && !Array.isArray(rawResolutions)
+      ? Object.fromEntries(Object.entries(rawResolutions as Record<string, unknown>)
+          .filter((entry): entry is [string, 'workspace' | 'template'] =>
+            entry[1] === 'workspace' || entry[1] === 'template'))
+      : undefined;
+    try {
+      const result = await svc.templateUpgrades.apply(id, {
+        planDigest: fields['planDigest'],
+        ...(resolutions ? { resolutions } : {}),
+      });
+      return c.json({ result, workspace: await svc.publicMeta(svc.registry.get(id)!) });
+    } catch (err) {
+      if (err instanceof TemplateUpgradeError) {
+        const status = err.code === 'not_found' ? 404
+          : err.code === 'busy' || err.code === 'staged_changes' || err.code === 'stale_plan'
+            ? 409
+            : 400;
+        return c.json({ error: err.code, message: err.message, plan: err.plan }, status);
+      }
+      launcherLogger.error('workspace.template_upgrade_apply_failed', { id, err });
+      return c.json({ error: 'upgrade_apply_failed', message: (err as Error).message }, 500);
+    }
+  });
+
+  app.get('/:id/absorb/:sourceId', async (c) => {
+    const targetWorkspaceId = c.req.param('id');
+    const sourceWorkspaceId = c.req.param('sourceId');
+    if (!validId(targetWorkspaceId) || !validId(sourceWorkspaceId)) {
+      return c.json({ error: 'not_found' }, 404);
+    }
+    try {
+      return c.json({ plan: await svc.workspaceAbsorbs.plan(targetWorkspaceId, sourceWorkspaceId) });
+    } catch (err) {
+      if (err instanceof WorkspaceAbsorbError) {
+        const status = err.code === 'not_found' ? 404
+          : err.code === 'busy' || err.code === 'staged_changes' ? 409
+            : 400;
+        return c.json({ error: err.code, message: err.message, plan: err.plan }, status);
+      }
+      launcherLogger.error('workspace.absorb_plan_failed', { targetWorkspaceId, sourceWorkspaceId, err });
+      return c.json({ error: 'absorb_plan_failed', message: (err as Error).message }, 500);
+    }
+  });
+
+  app.post('/:id/absorb/:sourceId', async (c) => {
+    const targetWorkspaceId = c.req.param('id');
+    const sourceWorkspaceId = c.req.param('sourceId');
+    if (!validId(targetWorkspaceId) || !validId(sourceWorkspaceId)) {
+      return c.json({ error: 'not_found' }, 404);
+    }
+    const body = await safeJson(c);
+    const fields = body && typeof body === 'object' ? body as Record<string, unknown> : {};
+    if (typeof fields['planDigest'] !== 'string') {
+      return c.json({ error: 'bad_request', message: 'planDigest is required' }, 400);
+    }
+    const rawResolutions = fields['resolutions'];
+    const resolutions = rawResolutions && typeof rawResolutions === 'object' && !Array.isArray(rawResolutions)
+      ? Object.fromEntries(Object.entries(rawResolutions as Record<string, unknown>)
+          .filter((entry): entry is [string, 'target' | 'source' | 'both'] =>
+            entry[1] === 'target' || entry[1] === 'source' || entry[1] === 'both'))
+      : undefined;
+    try {
+      const result = await svc.workspaceAbsorbs.apply({
+        targetWorkspaceId,
+        sourceWorkspaceId,
+        planDigest: fields['planDigest'],
+        ...(resolutions ? { resolutions } : {}),
+      });
+      const target = svc.registry.get(targetWorkspaceId);
+      return c.json({
+        result,
+        ...(target ? { workspace: await svc.publicMeta(target) } : {}),
+      });
+    } catch (err) {
+      if (err instanceof WorkspaceAbsorbError) {
+        const status = err.code === 'not_found' ? 404
+          : err.code === 'busy' || err.code === 'staged_changes' || err.code === 'stale_plan' || err.code === 'offboard_failed'
+            ? 409
+            : 400;
+        return c.json({ error: err.code, message: err.message, plan: err.plan }, status);
+      }
+      launcherLogger.error('workspace.absorb_apply_failed', { targetWorkspaceId, sourceWorkspaceId, err });
+      return c.json({ error: 'absorb_apply_failed', message: (err as Error).message }, 500);
     }
   });
 

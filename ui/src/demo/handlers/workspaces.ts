@@ -78,6 +78,46 @@ const demoAgentRuntimeReadiness = {
   checkedAt: '2026-07-08T00:00:00.000Z',
 }
 
+const demoTemplateUpgradePlan = (workspaceId: string) => ({
+  workspaceId,
+  template: 'chat',
+  fromVersion: '0.1.0',
+  toVersion: '0.2.0',
+  strategy: 'managed-context' as const,
+  planDigest: 'demo-template-upgrade-plan',
+  source: 'legacy-root-commit' as const,
+  blocked: false,
+  blockers: [],
+  activity: { busy: false, sessions: [], headless: [] },
+  files: [
+    {
+      path: 'README.md', status: 'ready', operation: 'update', canUseTemplate: true,
+      currentPreview: '# Chat workspace\n\nUse the OpenAlice CLI.',
+      templatePreview: '# Chat workspace\n\nUse the OpenAlice CLI and sign durable work.',
+      currentTruncated: false, templateTruncated: false,
+    },
+    {
+      path: '.agents/skills/alice-workspace/SKILL.md', status: 'ready', operation: 'update', canUseTemplate: true,
+      currentPreview: 'Old collaboration guidance.', templatePreview: 'Current collaboration guidance.',
+      currentTruncated: false, templateTruncated: false,
+    },
+    {
+      path: 'AGENTS.md', status: 'preserved', operation: 'keep', canUseTemplate: true,
+      currentPreview: 'Workspace-specific desk instructions.', templatePreview: 'Template desk instructions.',
+      currentTruncated: false, templateTruncated: false,
+      note: 'Changed only in this Workspace; it will stay as-is.',
+    },
+    {
+      path: '.claude/skills/self-scheduling/SKILL.md', status: 'conflict', operation: 'update', canUseTemplate: true,
+      currentPreview: 'Report scheduled work to the owner with the local checklist.',
+      templatePreview: 'Report scheduled work to Inbox with a signed artifact.',
+      currentTruncated: false, templateTruncated: false,
+      note: 'Both the Workspace and template changed this file.',
+    },
+  ],
+  summary: { ready: 2, preserved: 1, conflicts: 1, unchanged: 0 },
+})
+
 export const workspacesHandlers = [
   http.get('/api/workspaces', () => HttpResponse.json({ workspaces: demoWorkspaces })),
   http.get('/api/workspaces/departed', () => HttpResponse.json({ workspaces: demoDepartedWorkspaces })),
@@ -147,6 +187,150 @@ export const workspacesHandlers = [
       },
     })
     return HttpResponse.json({ ok: true })
+  }),
+  http.get('/api/workspaces/:id/template-upgrade', ({ params }) => {
+    const workspace = demoWorkspaces.find((candidate) => candidate.id === String(params.id))
+    if (!workspace) return HttpResponse.json({ error: 'not_found' }, { status: 404 })
+    if (!workspace.upgradeAvailable) {
+      return HttpResponse.json({
+        plan: {
+          ...demoTemplateUpgradePlan(workspace.id),
+          fromVersion: workspace.currentVersion ?? '0.2.0',
+          toVersion: workspace.currentVersion ?? '0.2.0',
+          source: 'recorded-baseline',
+          files: [],
+          summary: { ready: 0, preserved: 0, conflicts: 0, unchanged: 0 },
+        },
+      })
+    }
+    return HttpResponse.json({ plan: demoTemplateUpgradePlan(workspace.id) })
+  }),
+  http.post('/api/workspaces/:id/template-upgrade', async ({ params, request }) => {
+    const workspace = demoWorkspaces.find((candidate) => candidate.id === String(params.id))
+    if (!workspace) return HttpResponse.json({ error: 'not_found' }, { status: 404 })
+    const body = await request.json().catch(() => ({})) as {
+      planDigest?: string
+      resolutions?: Record<string, string>
+    }
+    if (body.planDigest !== 'demo-template-upgrade-plan') {
+      return HttpResponse.json({ error: 'stale_plan', message: 'Refresh the preview.' }, { status: 409 })
+    }
+    if (!body.resolutions?.['.claude/skills/self-scheduling/SKILL.md']) {
+      return HttpResponse.json({ error: 'unresolved_conflict', message: 'Choose a copy first.' }, { status: 400 })
+    }
+    ;(workspace as { currentVersion?: string; upgradeAvailable?: { from: string; to: string } | null }).currentVersion = '0.2.0'
+    ;(workspace as { currentVersion?: string; upgradeAvailable?: { from: string; to: string } | null }).upgradeAvailable = null
+    return HttpResponse.json({
+      result: {
+        workspaceId: workspace.id,
+        fromVersion: '0.1.0',
+        toVersion: '0.2.0',
+        commit: 'd3m0c0de12345678',
+        changedPaths: ['README.md', '.agents/skills/alice-workspace/SKILL.md'],
+        keptPaths: ['AGENTS.md'],
+      },
+      workspace,
+    })
+  }),
+  http.get('/api/workspaces/:id/absorb/:sourceId', ({ params }) => {
+    const target = demoWorkspaces.find((candidate) => candidate.id === String(params.id))
+    const source = demoWorkspaces.find((candidate) => candidate.id === String(params.sourceId))
+    if (!target || !source || target.id === source.id) {
+      return HttpResponse.json({ error: 'not_found' }, { status: 404 })
+    }
+    return HttpResponse.json({
+      plan: {
+        source: { id: source.id, tag: source.tag, displayName: source.displayName },
+        target: { id: target.id, tag: target.tag, displayName: target.displayName },
+        importRoot: `imports/${source.tag}-${source.id.slice(-6)}`,
+        planDigest: `demo-absorb-${target.id}-${source.id}`,
+        blocked: false,
+        blockers: [],
+        activity: {
+          source: { busy: false, sessions: [], headless: [] },
+          target: { busy: false, sessions: [], headless: [] },
+        },
+        sourceInventory: {
+          sessions: source.sessions.length,
+          resumeIds: source.sessions.length,
+          openIssues: ['review-source-thesis'],
+          scheduledIssues: ['daily-source-scan'],
+          dirtyFiles: 2,
+        },
+        files: [
+          {
+            path: 'research/source-thesis.md', status: 'ready', operation: 'add',
+            sourcePreview: '# Source thesis\n\nReviewed research from the source desk.', targetPreview: null,
+            sourceTruncated: false, targetTruncated: false, sourceSize: 82, targetSize: null,
+            canUseSource: true, keepBothPath: `imports/${source.tag}-${source.id.slice(-6)}/research/source-thesis.md`,
+          },
+          {
+            path: 'research/watchlist.md', status: 'conflict', operation: 'choose',
+            sourcePreview: '# Watchlist\n\nNVDA, TSM, MU', targetPreview: '# Watchlist\n\nSPY, QQQ, IWM',
+            sourceTruncated: false, targetTruncated: false, sourceSize: 28, targetSize: 29,
+            canUseSource: true, keepBothPath: `imports/${source.tag}-${source.id.slice(-6)}/research/watchlist.md`,
+          },
+          {
+            path: 'research/market-conventions.md', status: 'duplicate', operation: 'skip',
+            sourcePreview: '# Market conventions', targetPreview: '# Market conventions',
+            sourceTruncated: false, targetTruncated: false, sourceSize: 20, targetSize: 20,
+            canUseSource: true, keepBothPath: `imports/${source.tag}-${source.id.slice(-6)}/research/market-conventions.md`,
+          },
+        ],
+        summary: { ready: 1, duplicates: 1, conflicts: 1, excluded: 12, bytes: 130 },
+      },
+    })
+  }),
+  http.post('/api/workspaces/:id/absorb/:sourceId', async ({ params, request }) => {
+    const target = demoWorkspaces.find((candidate) => candidate.id === String(params.id))
+    const sourceIndex = demoWorkspaces.findIndex((candidate) => candidate.id === String(params.sourceId))
+    if (!target || sourceIndex < 0) return HttpResponse.json({ error: 'not_found' }, { status: 404 })
+    const source = demoWorkspaces[sourceIndex]!
+    const body = await request.json().catch(() => ({})) as {
+      planDigest?: string
+      resolutions?: Record<string, string>
+    }
+    if (body.planDigest !== `demo-absorb-${target.id}-${source.id}`) {
+      return HttpResponse.json({ error: 'stale_plan', message: 'Review the refreshed plan.' }, { status: 409 })
+    }
+    if (!body.resolutions?.['research/watchlist.md']) {
+      return HttpResponse.json({ error: 'unresolved_conflict', message: 'Choose how to keep research/watchlist.md.' }, { status: 400 })
+    }
+    const now = new Date().toISOString()
+    demoWorkspaces.splice(sourceIndex, 1)
+    demoDepartedWorkspaces.unshift({
+      id: source.id,
+      tag: source.tag,
+      activeDir: `/demo/workspaces/${source.id}`,
+      departedDir: `/demo/departed-workspaces/${source.id}`,
+      createdAt: source.createdAt,
+      updatedAt: now,
+      departedAt: now,
+      absorbedAt: now,
+      absorbedIntoWorkspaceId: target.id,
+      absorbCommit: 'ab50bed123456789',
+      lifecycle: 'departed',
+      reason: `Absorbed into ${target.tag}`,
+      handoff: {
+        preparedAt: now,
+        dirtyFiles: [' M research/source-thesis.md'],
+        openIssueIds: ['review-source-thesis'],
+        scheduledIssueIds: ['daily-source-scan'],
+        resumeIds: source.sessions.map((session) => session.resumeId),
+        sessionRecords: source.sessions.length,
+      },
+    })
+    return HttpResponse.json({
+      result: {
+        sourceWorkspaceId: source.id,
+        targetWorkspaceId: target.id,
+        commit: 'ab50bed123456789',
+        changedPaths: ['research/source-thesis.md', 'imports/source/research/watchlist.md'],
+        skippedPaths: ['research/market-conventions.md'],
+        departedDir: `/demo/departed-workspaces/${source.id}`,
+      },
+      workspace: target,
+    })
   }),
   http.delete('/api/workspaces/:id', () => HttpResponse.json(true)),
   http.post('/api/workspaces/:id/stop', () => HttpResponse.json(true)),

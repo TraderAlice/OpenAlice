@@ -22,6 +22,7 @@ export const BASE_REQUIRED_FILES = [
   'dist/electron/main.js',
   'ui/dist/index.html',
   'services/uta/dist/uta.js',
+  'services/connector/dist/connector.cjs',
   'src/workspaces/cli/bin/openalice-cli.cjs',
   'src/workspaces/cli/bin/alice',
   'src/workspaces/cli/bin/alice.cmd',

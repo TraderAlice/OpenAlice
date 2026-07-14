@@ -17,7 +17,7 @@ pnpm dev                  # Guardian -> UTA + Alice + Vite
 pnpm dev --takeover       # replace the recorded local Guardian owner tree
 pnpm build                # packages + UI + UTA + Alice
 pnpm test                 # monorepo Vitest suite
-pnpm test:e2e             # separate end-to-end suite
+pnpm test:e2e             # non-trading product/integration E2E
 ```
 
 Before changing files:
@@ -104,16 +104,23 @@ Add checks according to the touched surface:
 | `ui/` | `cd ui && npx tsc -b`; verify the real route in browser/dev |
 | UI `/api/*` contract or demo surface | Update `ui/src/demo/` handlers and walk `pnpm -F open-alice-ui dev:demo` |
 | `packages/<name>/` | `pnpm -F @traderalice/<name> typecheck` |
-| Trading, broker writes, UTA permissions | Relevant scenarios from [UTA live testing](docs/uta-live-testing.md), using demo/paper accounts and leaving them flat |
+| UTA state machine, ledger, staging, or sync logic | `pnpm test:e2e` for the MockBroker lifecycle, plus the targeted unit specs listed in [UTA live testing](docs/uta-live-testing.md) |
+| Broker adapter, order writes, or UTA permissions | Choose the smallest live-paper scenario from [UTA live testing](docs/uta-live-testing.md); verify the configured account is demo/paper first and leave it flat |
 | Workspace issues, schedules, headless dispatch | Follow [Workspace issues and scheduling](docs/workspace-issues-and-scheduling.md) |
 | Guardian locks, process ownership, takeover | `pnpm test:guardian-recovery`; exercise the real launcher path |
 | Desktop, IPC, PTY, managed Pi, shell, packaging | Follow [Managed Workspace runtime](docs/managed-workspace-runtime.md) and run the matching Electron/package smoke |
+| Root installer or distributed CLI payload | Follow [CLI installer](docs/cli-installer.md) and run `pnpm test:install:docker`; manually walk the interactive playground before release |
 | Docker/server image, Compose, remote deployment | Follow [Docker deployment](docs/docker-deployment.md) and run `pnpm docker:smoke`; before release, opt into the credentialed agent/CLI check documented there |
 | Persisted data shape | Add an idempotent migration + spec, register it, then run `pnpm build:migration-index` |
 | Onboarding/first run/auth | Use isolated data; exercise dev and packaged onboarding paths where relevant |
 
-Do not run live-broker tests on real-money accounts. Do not call a change
-verified when the surface-specific path was skipped; state the remaining gap.
+`pnpm test:e2e` is non-trading: it must never load configured broker accounts
+or submit orders. Live-paper acceptance is a separate, explicit lane:
+`OPENALICE_UTA_LIVE_PAPER=1 pnpm test:uta:live-paper`. Never run that lane as
+routine CI or against real-money accounts. Inspect the account mode and the
+pre-test positions/orders before acknowledging it, then verify the account is
+flat after the run even when a test fails. Do not call a change verified when
+the surface-specific path was skipped; state the remaining gap.
 
 For local package verification, prefer `pnpm electron:smoke:workspace`: it owns
 an isolated package output and removes that large expanded app after the smoke
@@ -121,6 +128,21 @@ exits. Use `pnpm electron:pack` only when a persistent artifact is actually
 needed. A package passed through `--skip-pack` is externally owned and must
 never be deleted by the smoke runner; use `--keep-package` to preserve a
 temporary smoke package for investigation.
+
+Code signing and notarization are release gates, not routine development
+checks. Serial/parallel `dev` work, ordinary PR package smokes, and local
+packaged-runtime debugging must build unsigned (`CSC_IDENTITY_AUTO_DISCOVERY=false`)
+and must not read release signing secrets. Run a real signed/notarized build
+only for a versioned release candidate, an explicit release rehearsal, or a
+change whose subject is the signing/notarization/update chain. State that
+release-only residual risk instead of making every development iteration pay
+the signing cost.
+
+When optimizing CI/CD, preserve the lane boundaries above. First remove
+duplicate jobs, cancel superseded runs, narrow path triggers, reuse caches and
+unsigned build artifacts, and measure the slow step before considering larger
+runners. Do not trade away the full `master` promotion/release gates merely to
+make routine `dev` feedback look faster.
 
 ## Deferred Work and Issues
 
@@ -149,12 +171,26 @@ Read the relevant guide before editing its subsystem:
   delivery modes, promotions, external contributions, and risk gates.
 - [[docs/managed-workspace-runtime.md]] — [Managed Workspace runtime](docs/managed-workspace-runtime.md): Electron
   packaging, managed Pi, PortableGit/Bash, runtime profiles, and Workspace PATH.
+- [[docs/cli-installer.md]] — [CLI installer](docs/cli-installer.md): consent, installed layout,
+  atomic updates, PATH integration, installer tests, and release checks.
+- [[docs/local-runtime.md]] — [Local Runtime and CLI bootstrap](docs/local-runtime.md): source-backed
+  localhost startup, dependency bootstrap, Runtime ownership, and the headless bundle boundary.
 - [[docs/docker-deployment.md]] — [Docker deployment](docs/docker-deployment.md): server image topology,
   remote-host safety, persistence, health, and container acceptance.
+- [[docs/remote-access.md]] — [Remote access](docs/remote-access.md): SSH tunnel experiment,
+  local/remote ownership, and staged remote-control boundaries.
+- [[docs/connector-service.md]] — [Connector Service](docs/connector-service.md): optional external Inbox
+  notification adapters, sealed credentials, health, and Guardian lifecycle.
+- [[docs/ui-interaction-and-motion.md]] — [UI interaction and motion](docs/ui-interaction-and-motion.md):
+  clickable affordances, shared motion primitives, and reduced-motion policy.
 - [[docs/workspace-agent-guidance.md]] — [Workspace agent guidance](docs/workspace-agent-guidance.md): prompt
   layers, skill ownership, live CLI authority, and guidance versioning.
 - [[docs/workspace-lifecycle.md]] — [Workspace and Session lifecycle](docs/workspace-lifecycle.md): offboarding,
   departed desks, handoff, restore/purge, and resumeId retirement.
+- [[docs/workspace-template-upgrade.md]] — [Workspace Template Upgrade](docs/workspace-template-upgrade.md):
+  managed-asset baselines, three-way review, safe apply, recovery, and the future Merge/Absorb boundary.
+- [[docs/workspace-absorb.md]] — [Workspace Absorb](docs/workspace-absorb.md): directional
+  Workspace consolidation, file collisions, archived source identity, and recovery.
 - [[docs/uta-live-testing.md]] — [UTA live testing](docs/uta-live-testing.md): broker/trading acceptance loops.
 - [[docs/workspace-issues-and-scheduling.md]] — [Workspace issues and scheduling](docs/workspace-issues-and-scheduling.md): Issue board, schedules, headless runs, and Inbox delivery.
 - [[docs/conversation-provenance.md]] — [Workspace Session and artifact provenance](docs/conversation-provenance.md): `resumeId` identity, artifact trails, Issue responsibility, and the provenance-before-collaboration delivery order.

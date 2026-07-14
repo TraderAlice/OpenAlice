@@ -25,11 +25,7 @@ export const configKeysHandlers = [
         providerKeys: {},
         hub: { enabled: true, baseUrl: 'https://traderhub.openalice.ai' },
       },
-      connectors: {
-        web: { port: 47331 },
-        mcpAsk: { enabled: false },
-        telegram: { enabled: false, chatIds: [] },
-      },
+      ports: { web: 47331 },
     }),
   ),
 

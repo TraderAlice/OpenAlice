@@ -5,5 +5,6 @@
   "defaultAgents": ["claude", "codex"],
   "injectTools": true,
   "injectPersona": true,
+  "upgradeStrategy": "managed-context",
   "bundledSkills": ["scan-value-chain", "build-thesis", "sector-rotation", "retrospective", "opencli-reader"]
 }

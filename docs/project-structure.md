@@ -5,8 +5,10 @@ and persistent-state layout. Update it when a top-level subsystem moves or a
 new long-lived process, package, or state root is introduced.
 
 Related guides: [[docs/managed-workspace-runtime.md]],
+[[docs/cli-installer.md]], [[docs/local-runtime.md]],
 [[docs/docker-deployment.md]],
 [[docs/workspace-lifecycle.md]],
+[[docs/workspace-template-upgrade.md]],
 [[docs/workspace-issues-and-scheduling.md]],
 [[docs/conversation-provenance.md]], and [[docs/market-data-architecture.md]].
 
@@ -33,7 +35,9 @@ Launchers share the same ownership model:
 - `scripts/guardian/dev.ts` runs UTA, Alice, and Vite for `pnpm dev`.
 - `apps/desktop/src/main.ts` is the packaged Electron Guardian and renderer
   host. It starts Alice/UTA through Electron's Node mode.
-- `scripts/guardian/prod.mjs` supervises the Docker/production process pair.
+- `scripts/guardian/prod.mjs` supervises built Runtime services for Docker and
+  the source-backed local CLI. Docker defaults to the `docker` launcher;
+  `openalice` supplies the distinct `cli` launcher and a loopback bind.
 - `packages/guardian-runtime/` owns cross-launcher single-writer locks,
   heartbeat metadata, process identity, and controlled takeover.
 
@@ -73,6 +77,7 @@ services/uta/                  UTA process
 └── src/domain/trading/        all broker and trading-domain implementation
 
 packages/
+├── cli/                       installable local Runtime/connection CLI
 ├── guardian-runtime/          process ownership and recovery primitives
 ├── uta-protocol/              schemas and wire types shared by Alice + UTA
 ├── ibkr/                      IBKR TWS protocol package, owned by UTA
@@ -117,6 +122,10 @@ Load-bearing paths:
 - `src/workspaces/session-registry.ts` — durable session metadata.
 - `src/workspaces/scrollback-store.ts` — terminal replay.
 - `src/workspaces/template-registry.ts` — template declarations.
+- `src/workspaces/template-upgrade.ts` — reviewed managed-asset reconciliation
+  and interrupted-upgrade recovery.
+- `src/workspaces/workspace-operation-guard.ts` — shared checkout-mutation
+  lease for upgrade, offboarding, and future merge operations.
 - `src/workspaces/workspace-creator.ts` — bootstrap and initial git state.
 - `src/workspaces/context-injector.ts` — persona and shared skill injection.
 - `src/workspaces/adapters/` — CLI-specific command/config behavior.
@@ -241,13 +250,15 @@ generated `src/migrations/INDEX.md`.
 |---|---|
 | Workspace lifecycle, agent launch, packaged Pi, shell/PATH | `src/workspaces/` + [Managed Workspace runtime](managed-workspace-runtime.md) |
 | Workspace offboarding, restore/purge, Session retirement | [Workspace and Session lifecycle](workspace-lifecycle.md) |
+| Template versions, managed-asset reconciliation, upgrade recovery | [Workspace Template Upgrade](workspace-template-upgrade.md) |
 | Broker/account/execution behavior | `services/uta/src/domain/trading/` + [UTA live testing](uta-live-testing.md) |
 | Shared Alice ↔ UTA shapes | `packages/uta-protocol/` and both callers |
+| External Inbox notifications and IM adapters | [Connector Service](connector-service.md) |
 | Renderer/API surface | `ui/`, `src/webui/`, and matching demo handlers |
 | Issues, schedules, headless runs, Inbox delivery | [Workspace issues and scheduling](workspace-issues-and-scheduling.md) |
 | Retired event-bus scheduler and UTA journal boundary | [Event-system retirement note](event-system.md) |
 | User-state schema | `src/migrations/` + generated migration index |
-| Process lock/recovery | `packages/guardian-runtime/` and all three launchers |
+| Process lock/recovery and optional-service supervision | `packages/guardian-runtime/` and all three launchers |
 
 When current code disagrees with this guide, verify the runtime behavior and
 update the guide in the same change rather than leaving a second source of

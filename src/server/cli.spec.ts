@@ -266,7 +266,7 @@ describe('CLI gateway — agent-invisible origin (x-openalice-run → registry)'
       sessionRegistry: {
         get: (wsId: string, id: string) =>
           wsId === 'ws1' && id === 'sess-1'
-            ? { id: 'sess-1', wsId: 'ws1', agent: 'claude' }
+            ? { id: 'sess-1', resumeId: 'resume-1', wsId: 'ws1', agent: 'claude' }
             : undefined,
       },
     }
@@ -324,7 +324,12 @@ describe('CLI gateway — agent-invisible origin (x-openalice-run → registry)'
     const res = await pushWith(app, { 'x-openalice-session': 'sess-1' })
     expect(res.status).toBe(200)
     const { entries } = await inboxStore.read({ workspaceId: 'ws1' })
-    expect(entries[0].origin).toEqual({ kind: 'interactive', sessionId: 'sess-1', agent: 'claude' })
+    expect(entries[0].origin).toEqual({
+      kind: 'interactive',
+      sessionId: 'sess-1',
+      resumeId: 'resume-1',
+      agent: 'claude',
+    })
   })
 
   it('a forged session id resolves to no origin (registry is the authority)', async () => {

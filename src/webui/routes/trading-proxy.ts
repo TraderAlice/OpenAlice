@@ -13,7 +13,9 @@
  */
 
 import { Hono } from 'hono'
+import { probeOptionalCarrier } from '../../services/optional-carrier/health.js'
 import { describeTradingMode, type TradingModePolicy } from '../../services/trading-mode.js'
+import { decodeUTAHealth } from '../../services/uta-supervisor/health.js'
 
 // Total request timeout. UTA is on the loopback interface so connect is
 // instant — this guards against handlers that legitimately take seconds
@@ -73,23 +75,16 @@ export function createTradingProxyRoutes(opts: {
       })
     }
 
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), STATUS_TIMEOUT_MS)
-    try {
-      const res = await fetch(`${base}/__uta/health`, { signal: controller.signal })
-      if (!res.ok) {
-        return c.json({
-          available: false,
-          state: 'unavailable',
-          reason: `health_${res.status}`,
-          mode: policy.mode,
-          modeSource: policy.source,
-          envLocked: policy.envLocked,
-          hasUTAConfig: policy.hasUTAConfig,
-          hint: 'Trading service is not healthy.',
-        })
-      }
-      const health = await res.json() as { startedAt?: string; utas?: number }
+    const probe = await probeOptionalCarrier({
+      id: 'uta',
+      enabled: true,
+      baseUrl: base,
+      healthPath: '/__uta/health',
+      timeoutMs: STATUS_TIMEOUT_MS,
+      decode: decodeUTAHealth,
+    })
+    if (probe.phase === 'healthy') {
+      const health = probe.body!
       return c.json({
         available: true,
         state: 'available',
@@ -99,22 +94,22 @@ export function createTradingProxyRoutes(opts: {
         hasUTAConfig: policy.hasUTAConfig,
         hint: describeTradingMode(policy.mode),
         startedAt: health.startedAt,
-        utas: health.utas ?? 0,
+        utas: health.utas,
       })
-    } catch (err) {
-      return c.json({
-        available: false,
-        state: 'unavailable',
-        reason: err instanceof Error ? err.message : String(err),
-        mode: policy.mode,
-        modeSource: policy.source,
-        envLocked: policy.envLocked,
-        hasUTAConfig: policy.hasUTAConfig,
-        hint: 'Trading service is not reachable.',
-      })
-    } finally {
-      clearTimeout(timer)
     }
+    return c.json({
+      available: false,
+      state: 'unavailable',
+      reason: probe.reason,
+      detail: probe.detail,
+      mode: policy.mode,
+      modeSource: policy.source,
+      envLocked: policy.envLocked,
+      hasUTAConfig: policy.hasUTAConfig,
+      hint: probe.reason === 'http_error' || probe.reason === 'invalid_response'
+        ? 'Trading service is not healthy.'
+        : 'Trading service is not reachable.',
+    })
   })
 
   app.all('*', async (c) => {

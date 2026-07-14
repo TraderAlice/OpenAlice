@@ -1,0 +1,34 @@
+{
+  "name": "@traderalice/connector-service",
+  "version": "0.1.0",
+  "description": "Optional OpenAlice external notification connector service",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/connector.cjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --root ../.. --config vitest.config.ts --project node services/connector/src"
+  },
+  "dependencies": {
+    "@grammyjs/auto-retry": "^2.0.2",
+    "@hono/node-server": "^2.0.0",
+    "@traderalice/connector-protocol": "workspace:*",
+    "discord.js": "14.26.5",
+    "grammy": "^1.40.0",
+    "hono": "^4.12.21",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "tsup": "^8.4.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3",
+    "vitest": "^3.2.6"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "license": "AGPL-3.0-only"
+}

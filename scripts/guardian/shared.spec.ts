@@ -64,6 +64,7 @@ describe('resolvePortConfig', () => {
       web: { value: 47331, source: 'default' },
       mcp: { value: 47332, source: 'default' },
       uta: { value: 47333, source: 'default' },
+      connector: { value: 47334, source: 'default' },
       ui: { value: 5173, source: 'default' },
     })
   })
@@ -76,6 +77,7 @@ describe('resolvePortConfig', () => {
     expect(cfg.web).toEqual({ value: 15000, source: 'env' })
     expect(cfg.mcp).toEqual({ value: 12346, source: 'file' })
     expect(cfg.uta).toEqual({ value: 47333, source: 'default' })
+    expect(cfg.connector).toEqual({ value: 47334, source: 'default' })
     expect(cfg.ui).toEqual({ value: 5173, source: 'default' })
   })
 

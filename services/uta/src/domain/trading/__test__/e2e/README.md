@@ -1,14 +1,27 @@
-# Trading E2E Tests
+# UTA Acceptance Tests
 
-End-to-end tests that run against real broker APIs (Alpaca paper, Bybit demo, IBKR paper) and MockBroker.
+This directory contains two deliberately separate acceptance layers:
+
+- `uta-lifecycle.e2e.spec.ts` uses `MockBroker` and is part of the ordinary,
+  non-trading product E2E suite.
+- The broker and `uta-*` paper/demo specs talk to configured external accounts.
+  Several of them submit and cancel orders, so they only run through the
+  explicit live-paper command.
 
 ## Running
 
 ```bash
+# Safe product/integration E2E. Never submits broker orders.
 pnpm test:e2e
+
+# Explicit UTA acceptance against configured demo/paper accounts.
+# Verify the accounts first and leave them flat when the suite finishes.
+OPENALICE_UTA_LIVE_PAPER=1 pnpm test:uta:live-paper
 ```
 
-Tests run sequentially (`fileParallelism: false`) because broker APIs are shared resources.
+The live-paper tests run sequentially (`fileParallelism: false`) because broker
+APIs and accounts are shared resources. Without the acknowledgement variable,
+the live-paper config exits before collecting tests or initializing a broker.
 
 ## File Naming
 
@@ -16,7 +29,7 @@ Tests run sequentially (`fileParallelism: false`) because broker APIs are shared
 |---------|-------|---------|
 | `{broker}.e2e.spec.ts` | Broker API | `alpaca-paper`, `ibkr-paper` — calls `broker.placeOrder()` directly |
 | `uta-{broker}.e2e.spec.ts` | UTA (Trading-as-Git) | `uta-alpaca`, `uta-ibkr` — uses `stagePlaceOrder → commit → push` |
-| `uta-lifecycle.e2e.spec.ts` | UTA + MockBroker | Pure in-memory, no external deps |
+| `uta-lifecycle.e2e.spec.ts` | UTA + MockBroker | Pure in-memory; ordinary `test:e2e` |
 
 ## Precondition Pattern
 

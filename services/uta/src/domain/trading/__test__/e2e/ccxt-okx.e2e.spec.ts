@@ -28,7 +28,7 @@
  * OKX demo seeds the account with ~100k USDT — plenty of headroom for
  * the small test trades below.
  *
- * Run: pnpm test:e2e
+ * Run: OPENALICE_UTA_LIVE_PAPER=1 pnpm test:uta:live-paper
  */
 
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest'

@@ -13,6 +13,7 @@ import type { SessionPool } from './session-pool.js'
 import { SessionRegistry } from './session-registry.js'
 import { WorkspaceCatalog } from './workspace-catalog.js'
 import { WorkspaceLifecycleManager } from './workspace-lifecycle.js'
+import { WorkspaceOperationGuard } from './workspace-operation-guard.js'
 import { WorkspaceRegistry, type WorkspaceMeta } from './workspace-registry.js'
 
 const noopLogger = {
@@ -27,6 +28,7 @@ let resumes: ResumeRegistry
 let sessions: SessionRegistry
 let tasks: HeadlessTaskRegistry
 let lifecycle: WorkspaceLifecycleManager
+let operationGuard: WorkspaceOperationGuard
 
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'workspace-lifecycle-'))
@@ -77,6 +79,7 @@ beforeEach(async () => {
     get: () => undefined,
     disposeToken: () => false,
   } as unknown as SessionPool
+  operationGuard = new WorkspaceOperationGuard()
   lifecycle = new WorkspaceLifecycleManager({
     launcherRoot: root,
     registry,
@@ -86,6 +89,7 @@ beforeEach(async () => {
     scrollbackStore: new ScrollbackStore(join(root, 'state'), noopLogger),
     headlessTasks: tasks,
     pool,
+    operationGuard,
     logger: noopLogger,
   })
 })
@@ -127,6 +131,20 @@ describe('WorkspaceLifecycleManager', () => {
     expect(result).toMatchObject({ ok: false, code: 'blocked' })
     expect(registry.get(workspace.id)).toBeTruthy()
     expect(existsSync(workspace.dir)).toBe(true)
+  })
+
+  it('does not offboard a checkout while another directory operation owns it', async () => {
+    const upgrade = operationGuard.acquire(workspace.id, 'template-upgrade')
+    expect(upgrade).toBeTruthy()
+    const blocked = await lifecycle.offboard({ id: workspace.id })
+    expect(blocked).toMatchObject({
+      ok: false,
+      code: 'blocked',
+      message: 'workspace is busy with template-upgrade',
+    })
+    expect(existsSync(workspace.dir)).toBe(true)
+    upgrade?.release()
+    expect((await lifecycle.offboard({ id: workspace.id })).ok).toBe(true)
   })
 
   it('purges only the departed checkout while retaining the Catalog tombstone', async () => {

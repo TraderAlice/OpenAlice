@@ -334,31 +334,15 @@ const compactionSchema = z.object({
   microcompactKeepRecent: z.number().default(3),
 })
 
-/**
- * MCP server config — exposes OpenAlice's ToolCenter to external MCP
- * clients (Claude Desktop, codex inside workspaces, etc.). Lives at the
- * top level of Config rather than under `connectors:` because it's an
- * export direction (ToolCenter → outside), not a chat-input connector.
- * `connectors.mcpAsk` is the actual chat-shaped MCP-as-input flavour
- * and stays in connectors.
- */
+/** MCP server config — exports OpenAlice's ToolCenter to MCP clients. */
 const mcpSchema = z.object({
   enabled: z.boolean().default(false),
   port: z.number().int().positive().default(3001),
 }).default({ enabled: false, port: 3001 })
 
-const connectorsSchema = z.object({
-  web: z.object({ port: z.number().int().positive().default(3002) }).default({ port: 3002 }),
-  mcpAsk: z.object({
-    enabled: z.boolean().default(false),
-    port: z.number().int().positive().optional(),
-  }).default({ enabled: false }),
-  telegram: z.object({
-    enabled: z.boolean().default(false),
-    botToken: z.string().optional(),
-    botUsername: z.string().optional(),
-    chatIds: z.array(z.number()).default([]),
-  }).default({ enabled: false, chatIds: [] }),
+/** Local listeners are transport configuration, not external connectors. */
+const portsSchema = z.object({
+  web: z.number().int().positive().default(3002),
 })
 
 const snapshotSchema = z.object({
@@ -484,7 +468,7 @@ export type Config = {
   snapshot: z.infer<typeof snapshotSchema>
   trading: z.infer<typeof tradingSchema>
   mcp: z.infer<typeof mcpSchema>
-  connectors: z.infer<typeof connectorsSchema>
+  ports: z.infer<typeof portsSchema>
   news: z.infer<typeof newsCollectorSchema>
   tools: z.infer<typeof toolsSchema>
 }
@@ -528,7 +512,7 @@ async function loadConfigUnlocked(): Promise<Config> {
   // is pending. See src/migrations/INDEX.md for the full list.
   await runMigrations()
 
-  const files = ['engine.json', 'agent.json', 'crypto.json', 'securities.json', 'market-data.json', 'compaction.json', 'ai-provider-manager.json', 'snapshot.json', 'mcp.json', 'connectors.json', 'news.json', 'tools.json', 'trading.json'] as const
+  const files = ['engine.json', 'agent.json', 'crypto.json', 'securities.json', 'market-data.json', 'compaction.json', 'ai-provider-manager.json', 'snapshot.json', 'mcp.json', 'ports.json', 'news.json', 'tools.json', 'trading.json'] as const
   const raws = await Promise.all(files.map((f) => loadJsonFile(f)))
 
   const config: Config = {
@@ -541,7 +525,7 @@ async function loadConfigUnlocked(): Promise<Config> {
     aiProvider:    await parseAndSeed(files[6], aiProviderSchema, raws[6]),
     snapshot:      await parseAndSeed(files[7], snapshotSchema, raws[7]),
     mcp:           await parseAndSeed(files[8], mcpSchema, raws[8]),
-    connectors:    await parseAndSeed(files[9], connectorsSchema, raws[9]),
+    ports:         await parseAndSeed(files[9], portsSchema, raws[9]),
     news:          await parseAndSeed(files[10], newsCollectorSchema, raws[10]),
     tools:         await parseAndSeed(files[11], toolsSchema, raws[11]),
     trading:       await parseAndSeed(files[12], tradingSchema, raws[12]),
@@ -554,7 +538,7 @@ async function loadConfigUnlocked(): Promise<Config> {
   // taken). In dev mode (no guardian) both env vars are unset and the
   // file value flows through unchanged.
   const envWebPort = parseEnvPort(process.env['OPENALICE_WEB_PORT'])
-  if (envWebPort !== null) config.connectors.web.port = envWebPort
+  if (envWebPort !== null) config.ports.web = envWebPort
   const envMcpPort = parseEnvPort(process.env['OPENALICE_MCP_PORT'])
   if (envMcpPort !== null) config.mcp.port = envMcpPort
 
@@ -866,16 +850,6 @@ export async function readToolsConfig() {
   }
 }
 
-/** Read connectors config from disk (called per-request for hot-reload). */
-export async function readConnectorsConfig() {
-  try {
-    const raw = JSON.parse(await readFile(resolve(CONFIG_DIR, 'connectors.json'), 'utf-8'))
-    return connectorsSchema.parse(raw)
-  } catch {
-    return connectorsSchema.parse({})
-  }
-}
-
 // ==================== Credential Helpers ====================
 
 /** Read a credential by slug. Throws if missing. */
@@ -1037,7 +1011,7 @@ const sectionSchemas: Record<ConfigSection, z.ZodTypeAny> = {
   snapshot: snapshotSchema,
   trading: tradingSchema,
   mcp: mcpSchema,
-  connectors: connectorsSchema,
+  ports: portsSchema,
   news: newsCollectorSchema,
   tools: toolsSchema,
 }
@@ -1053,7 +1027,7 @@ const sectionFiles: Record<ConfigSection, string> = {
   snapshot: 'snapshot.json',
   trading: 'trading.json',
   mcp: 'mcp.json',
-  connectors: 'connectors.json',
+  ports: 'ports.json',
   news: 'news.json',
   tools: 'tools.json',
 }

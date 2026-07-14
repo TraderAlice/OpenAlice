@@ -1,7 +1,21 @@
 import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { formatRelativeTime, getIntlLocale } from '../lib/intl'
-import { ArrowRight, Bot, Check, ChevronRight, Copy, Download, ListChecks, MessageSquare, Terminal, Trash2 } from 'lucide-react'
+import {
+  Bot,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  Download,
+  FileCode2,
+  FileText,
+  ListChecks,
+  MessageSquare,
+  Paperclip,
+  Terminal,
+  Trash2,
+} from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
 import { Skeleton } from '../components/StateViews'
 import { MarkdownContent } from '../components/MarkdownContent'
@@ -29,9 +43,9 @@ interface InboxPageProps {
  * own entry, because a workspace's pushes are usually unrelated topics
  * (we have no Issue layer to make them one thread) — merging them into a
  * combined timeline read badly. So selection is a single entry, and this
- * pane shows just that one: its docs (collapsed attachment cards) above
- * its comment (markdown body), with a reply bar that returns to the exact
- * source Session when provenance is available and falls back to the Workspace.
+ * pane shows just that one: its message first, compact attachments second,
+ * then one conversation surface that can either ask the sender in the
+ * background or open the same Session interactively.
  *
  * Selection (an entryId) is owned by `useInboxSelection`; the sidebar
  * drives it and marks the entry read on select. Delete (header trash +
@@ -171,6 +185,8 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
   // (there's no per-run detail surface to open).
   const origin = entry.origin
   const issueId = origin?.issueId
+  const senderSignature = origin?.resumeId ? `@${origin.resumeId}` : null
+  const senderLabel = [origin?.agent, senderSignature].filter(Boolean).join(' · ') || null
   // Interactive provenance — the human-attended session this push came from
   // (server-stamped from AQ_SESSION_ID, validated against the session registry).
   // Navigable: opens/focuses that exact session tab.
@@ -178,6 +194,8 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
   const sessionRecord = sessionId
     ? aliveWorkspace?.sessions.find((session) => session.id === sessionId) ?? null
     : null
+  const hasHeadlessOrigin = origin?.kind === 'headless' && !!(origin.resumeId || origin.runId)
+  const hasSenderIdentity = !!(origin?.resumeId || origin?.runId || origin?.sessionId)
   const [continuing, setContinuing] = useState(false)
   const [continueError, setContinueError] = useState<string | null>(null)
   // Resolve the issue id (a filename stem) to its display title via the warm,
@@ -203,22 +221,6 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
     if (!issueId) return
     setSidebar('issue')
     openOrFocus({ kind: 'issue-detail', params: { wsId: entry.workspaceId, id: issueId } })
-  }
-
-  // Jump to the originating interactive session — reuses the same
-  // workspace-tab open/focus wiring as the reply bar, pinned to the session id
-  // (WorkspaceView focuses the matching session record). Switch the sidebar to
-  // Workspaces so the sessions list shows alongside the tab.
-  const openSession = () => {
-    if (!wsAlive || !sessionId || !sessionRecord) return
-    setSidebar('workspaces')
-    if (sessionRecord.state === 'paused') {
-      void workspacesCtx.resumeSession(entry.workspaceId, sessionId).catch((err) =>
-        setContinueError(err instanceof Error ? err.message : String(err)),
-      )
-      return
-    }
-    openOrFocus({ kind: 'workspace', params: { wsId: entry.workspaceId, sessionId } })
   }
 
   const continueOrigin = async () => {
@@ -251,7 +253,6 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
     }
   }
 
-  const hasHeadlessOrigin = origin?.kind === 'headless' && !!origin.runId
   const canContinueOrigin = hasHeadlessOrigin || !!sessionRecord
   const loadInquiries = useCallback(
     () => api.inquiries.forInbox(entry.id),
@@ -263,93 +264,65 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
   )
 
   return (
-    <div className="max-w-[1040px] mx-auto py-6 px-4 md:px-8">
-      {/* Header: workspace label · timestamp · delete. */}
-      <div className="flex items-center gap-2 mb-4 flex-wrap">
-        <span
-          className={`text-[14px] font-medium ${
-            wsAlive ? 'text-text' : 'text-text-muted/70 line-through'
-          }`}
-          title={wsAlive ? undefined : t('inbox.workspaceNotExists')}
-        >
-          {displayLabel}
-        </span>
-
-        {/* Origin — the run/issue this push came from. Navigable for a
-         *  scheduled issue; a lighter marker for a bare headless run. */}
-        {issueId && (
-          <button
-            type="button"
-            onClick={openIssue}
-            title={`From issue ${issueId}`}
-            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-text-muted/80 hover:text-accent hover:bg-accent/10 transition-colors"
-          >
-            <ListChecks size={12} strokeWidth={1.75} className="shrink-0" />
-            <span className="truncate max-w-[220px]">from {issueTitle ?? issueId}</span>
-          </button>
-        )}
-        {sessionId ? (
-          <button
-            type="button"
-            onClick={openSession}
-            disabled={!wsAlive || !sessionRecord}
-            title={`From session ${sessionId}`}
-            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-text-muted/80 hover:text-accent hover:bg-accent/10 transition-colors disabled:opacity-50 disabled:hover:text-text-muted/80 disabled:hover:bg-transparent disabled:cursor-default"
-          >
-            <Terminal size={12} strokeWidth={1.75} className="shrink-0" />
-            <span className="truncate max-w-[220px]">from session{origin?.agent ? ` · ${origin.agent}` : ''}</span>
-          </button>
-        ) : hasHeadlessOrigin ? (
-          <button
-            type="button"
-            onClick={() => void continueOrigin()}
-            disabled={!wsAlive || continuing}
-            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-text-muted/80 hover:text-accent hover:bg-accent/10 transition-colors disabled:opacity-50 disabled:hover:text-text-muted/80 disabled:hover:bg-transparent disabled:cursor-default"
-            title={`From headless run ${origin.runId}`}
-          >
-            <Bot size={12} strokeWidth={1.75} className="shrink-0" />
-            <span>from run{origin.agent ? ` · ${origin.agent}` : ''}</span>
-          </button>
-        ) : null}
-
-        <span className="text-[11px] text-text-muted/70 tabular-nums ml-auto">
-          {formatAbsolute(entry.ts)}
-          <span className="mx-1.5 text-text-muted/40">·</span>
-          {formatRelativeTime(entry.ts)}
-        </span>
-        <button
-          type="button"
-          onClick={onDelete}
-          className="p-1 rounded text-text-muted/50 hover:text-red hover:bg-red/10 transition-colors"
-          title={t('inbox.deleteEntryTitle')}
-          aria-label={t('inbox.deleteEntryAriaLabel')}
-        >
-          <Trash2 size={14} strokeWidth={1.75} />
-        </button>
-      </div>
-
-      {/* Docs — collapsed attachment cards above the comment. */}
-      {hasDocs && (
-        <div>
-          <div className="text-[11px] font-medium text-text-muted/60 uppercase tracking-wider mb-3">
-            {t('inbox.documentsSection')}
+    <div className="mx-auto max-w-[920px] px-4 py-6 md:px-8 md:py-8">
+      {/* Provenance is identity, not a third way to open the same Session. */}
+      <header className="mb-6 border-b border-border/70 pb-4">
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <span
+                className={`text-[14px] font-semibold ${
+                  wsAlive ? 'text-text' : 'text-text-muted/70 line-through'
+                }`}
+                title={wsAlive ? undefined : t('inbox.workspaceNotExists')}
+              >
+                {displayLabel}
+              </span>
+              {senderLabel && (
+                <span
+                  className="inline-flex min-w-0 items-center gap-1.5 text-[11px] text-text-muted/75"
+                  title={t('inbox.senderIdentityTitle', { sender: senderLabel })}
+                >
+                  <ChevronRight size={11} className="shrink-0 text-text-muted/35" aria-hidden />
+                  {origin?.kind === 'interactive'
+                    ? <Terminal size={12} strokeWidth={1.75} className="shrink-0" aria-hidden />
+                    : <Bot size={12} strokeWidth={1.75} className="shrink-0" aria-hidden />}
+                  <span className="max-w-[380px] truncate">{t('inbox.fromSender', { sender: senderLabel })}</span>
+                </span>
+              )}
+              {issueId && (
+                <button
+                  type="button"
+                  onClick={openIssue}
+                  title={t('inbox.fromIssueTitle', { issue: issueId })}
+                  className="oa-pressable inline-flex min-w-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-text-muted/75 hover:bg-accent/10 hover:text-accent"
+                >
+                  <ListChecks size={12} strokeWidth={1.75} className="shrink-0" />
+                  <span className="max-w-[220px] truncate">{t('inbox.fromIssue', { issue: issueTitle ?? issueId })}</span>
+                </button>
+              )}
+            </div>
+            <div className="mt-1.5 text-[11px] tabular-nums text-text-muted/55">
+              {formatAbsolute(entry.ts)}
+              <span className="mx-1.5 text-text-muted/30">·</span>
+              {formatRelativeTime(entry.ts)}
+            </div>
           </div>
-          <div className="space-y-3">
-            {entry.docs!.map((doc) => (
-              <DocBlock
-                key={doc.path}
-                workspaceId={entry.workspaceId}
-                doc={doc}
-                defaultExpanded={!hasComments}
-              />
-            ))}
-          </div>
+          <button
+            type="button"
+            onClick={onDelete}
+            className="oa-pressable -mr-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-muted/45 hover:bg-red/10 hover:text-red"
+            title={t('inbox.deleteEntryTitle')}
+            aria-label={t('inbox.deleteEntryAriaLabel')}
+          >
+            <Trash2 size={14} strokeWidth={1.75} />
+          </button>
         </div>
-      )}
+      </header>
 
-      {/* Comment — the agent's voice; divider from the docs above. */}
+      {/* The sender's message is the Inbox asset's primary content. */}
       {hasComments && (
-        <div className={`${hasDocs ? 'mt-6 pt-6 border-t border-border' : ''}`}>
+        <div className="text-[15px] leading-relaxed text-text/90">
           <MarkdownContent
             text={entry.comments!}
             strikethrough={false}
@@ -359,63 +332,69 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
         </div>
       )}
 
-      {wsAlive && (
-        <InquiryPanel
-          title={origin?.resumeId || origin?.runId || origin?.sessionId ? 'Ask the sender' : 'Ask this Workspace'}
-          description={origin?.resumeId || origin?.runId || origin?.sessionId
-            ? 'Send a background follow-up to the Session that produced this Inbox entry. You can leave while it works.'
-            : 'No sender Session was recorded. OpenAlice will recruit a fresh agent in the source Workspace and label the answer reconstructed.'}
-          actionLabel={origin?.resumeId || origin?.runId || origin?.sessionId ? 'Ask sender' : 'Ask workspace'}
-          placeholder="What do you want to ask about this message?"
-          load={loadInquiries}
-          ask={askInbox}
-        />
+      {hasDocs && (
+        <section className={hasComments ? 'mt-7' : ''}>
+          <div className="mb-2.5 flex items-center gap-2 text-[11px] font-medium uppercase tracking-wider text-text-muted/55">
+            <Paperclip size={12} aria-hidden />
+            {t('inbox.documentsSection')}
+            <span className="font-normal tabular-nums text-text-muted/40">{entry.docs!.length}</span>
+          </div>
+          <div className="space-y-2">
+            {entry.docs!.map((doc) => (
+              <InboxAttachment
+                key={doc.path}
+                workspaceId={entry.workspaceId}
+                doc={doc}
+                defaultExpanded={!hasComments}
+              />
+            ))}
+          </div>
+        </section>
       )}
 
-      {/* Follow-up bar — exact originating Session when available; Workspace
-       * fallback for legacy/manual entries without Session provenance. */}
-      <div className="mt-6">
-        {wsAlive ? (
-          <button
-            type="button"
-            onClick={() => void continueOrigin()}
-            disabled={continuing}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-border bg-bg-tertiary/40 hover:bg-bg-tertiary hover:border-accent/40 transition-colors text-left group"
-          >
-            {canContinueOrigin
-              ? <Terminal size={15} strokeWidth={1.75} className="shrink-0 text-text-muted/70 group-hover:text-accent transition-colors" />
-              : <MessageSquare size={15} strokeWidth={1.75} className="shrink-0 text-text-muted/70 group-hover:text-accent transition-colors" />}
-            <span className="flex-1 text-[13px] text-text-muted/80 group-hover:text-text transition-colors">
-              {continuing
-                ? t('inbox.continuingSession')
-                : hasHeadlessOrigin
-                  ? t('inbox.continueRun')
-                  : sessionRecord
-                    ? t('inbox.continueSession')
-                    : t('inbox.replyInWorkspace', { label: displayLabel })}
-            </span>
-            <ArrowRight size={15} strokeWidth={1.75} className="shrink-0 text-text-muted/60 group-hover:text-accent group-hover:translate-x-0.5 transition-all" />
-          </button>
-        ) : (
-          <div className="px-4 py-3 text-[12px] text-text-muted/60 italic border-t border-border/40 pt-4">
-            {t('inbox.cannotReplyWorkspaceGone')}
-          </div>
-        )}
-        {continueError && (
-          <div className="mt-2 text-[12px] text-red">{continueError}</div>
-        )}
-      </div>
-
-      <div className="mt-4 text-[11px] text-text-muted/40 font-mono">
-        workspace: {entry.workspaceId}
-      </div>
+      {wsAlive ? (
+        <>
+          <InquiryPanel
+            title={hasSenderIdentity ? t('inbox.followUpSender') : t('inbox.followUpWorkspace')}
+            description={hasSenderIdentity
+              ? t('inbox.followUpSenderDescription')
+              : t('inbox.followUpWorkspaceDescription', { workspace: displayLabel })}
+            actionLabel={hasSenderIdentity ? t('inbox.askInBackground') : t('inbox.askWorkspace')}
+            placeholder={t('inbox.followUpPlaceholder')}
+            load={loadInquiries}
+            ask={askInbox}
+            controls={(
+              <button
+                type="button"
+                onClick={() => void continueOrigin()}
+                disabled={continuing}
+                className="oa-pressable inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-bg px-2.5 text-[11px] font-medium text-text-muted hover:border-accent/35 hover:text-accent disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                {canContinueOrigin
+                  ? <Terminal size={13} strokeWidth={1.75} aria-hidden />
+                  : <MessageSquare size={13} strokeWidth={1.75} aria-hidden />}
+                {continuing
+                  ? t('inbox.continuingSession')
+                  : canContinueOrigin
+                    ? t('inbox.openConversation')
+                    : t('inbox.openWorkspace')}
+              </button>
+            )}
+          />
+          {continueError && <div className="mt-2 text-[12px] text-red">{continueError}</div>}
+        </>
+      ) : (
+        <div className="mt-8 border-t border-border/50 pt-4 text-[12px] italic text-text-muted/60">
+          {t('inbox.cannotReplyWorkspaceGone')}
+        </div>
+      )}
     </div>
   )
 }
 
-// ==================== Doc block (live fetch from workspace) ====================
+// ==================== Attachment (live fetch from workspace) ====================
 
-function DocBlock({
+export function InboxAttachment({
   workspaceId, doc, defaultExpanded,
 }: {
   workspaceId: string
@@ -427,9 +406,8 @@ function DocBlock({
   const [result, setResult] = useState<ReadFileResult | null>(null)
   const [copied, setCopied] = useState(false)
 
-  // Fetch on mount: the collapsed card shows a text preview, so we need the
-  // content up front. The same `result` then renders in full on expand —
-  // one fetch serves both states.
+  // Fetch on mount so the compact row can show type/size immediately. The
+  // actual content stays hidden until the user asks to preview the asset.
   useEffect(() => {
     let cancelled = false
     setResult(null)
@@ -439,8 +417,20 @@ function DocBlock({
     return () => { cancelled = true }
   }, [workspaceId, doc.path])
 
-  const preview = useMemo(() => buildDocPreview(result), [result])
   const markdownActionsAvailable = isMarkdownPath(doc.path) && result?.kind === 'ok'
+  const name = fileNameFromPath(doc.path) || doc.path
+  const directory = fileDirectoryFromPath(doc.path)
+  const isHtml = /\.html$/i.test(doc.path)
+  const fileKind = isHtml
+    ? t('inbox.docTypeHtml')
+    : isMarkdownPath(doc.path)
+      ? t('inbox.docTypeMarkdown')
+      : fileExtension(doc.path)
+  const size = result?.kind === 'ok'
+    ? formatBytes(new TextEncoder().encode(result.content).byteLength)
+    : result?.kind === 'too_large'
+      ? formatBytes(result.sizeBytes)
+      : null
 
   const copyMarkdown = async (e: MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation()
@@ -468,84 +458,70 @@ function DocBlock({
     URL.revokeObjectURL(url)
   }
 
-  const header = (
-    <div className="flex items-center gap-1 bg-bg-tertiary/25 hover:bg-bg-tertiary/50 transition-colors">
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        aria-expanded={expanded}
-        className="min-w-0 flex-1 px-4 py-3 flex items-center gap-2.5 text-left"
-      >
-        <ChevronRight
-          size={15}
-          strokeWidth={2}
-          aria-hidden
-          className={`shrink-0 text-text-muted/70 transition-transform ${expanded ? 'rotate-90' : ''}`}
-        />
-        <span className="text-[12px]">📄</span>
-        <span className="flex-1 truncate text-[12px] font-mono text-text-muted">{doc.path}</span>
-        {doc.revision && (
-          <span
-            className="shrink-0 rounded bg-bg-tertiary px-1.5 py-0.5 font-mono text-[9px] text-text-muted/60"
-            title={`Published revision ${doc.revision}`}
-          >
-            sent {doc.revision.replace(/^sha256:/, '').slice(0, 8)}
-          </span>
-        )}
-        <span className="shrink-0 text-[10px] uppercase tracking-wider text-text-muted/45">
-          {expanded ? t('inbox.docCollapse') : t('inbox.docExpand')}
-        </span>
-      </button>
-      {isMarkdownPath(doc.path) && (
-        <div className="shrink-0 flex items-center gap-1 pr-3">
-          <button
-            type="button"
-            onClick={copyMarkdown}
-            disabled={!markdownActionsAvailable}
-            title={copied ? t('inbox.docCopiedMarkdown') : t('inbox.docCopyMarkdown')}
-            aria-label={copied ? t('inbox.docCopiedMarkdown') : t('inbox.docCopyMarkdown')}
-            className="inline-flex h-7 w-7 items-center justify-center rounded text-text-muted/65 transition-colors hover:bg-bg-tertiary hover:text-accent disabled:cursor-default disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-text-muted/65"
-          >
-            {copied ? <Check size={14} strokeWidth={2} /> : <Copy size={14} strokeWidth={1.75} />}
-          </button>
-          <button
-            type="button"
-            onClick={downloadMarkdown}
-            disabled={!markdownActionsAvailable}
-            title={t('inbox.docDownloadMarkdown')}
-            aria-label={t('inbox.docDownloadMarkdown')}
-            className="inline-flex h-7 w-7 items-center justify-center rounded text-text-muted/65 transition-colors hover:bg-bg-tertiary hover:text-accent disabled:cursor-default disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-text-muted/65"
-          >
-            <Download size={14} strokeWidth={1.75} />
-          </button>
-        </div>
-      )}
-    </div>
-  )
-
   return (
-    <div className="rounded-lg border border-border bg-bg/50 overflow-hidden">
-      <div>
-        {header}
-        {/* Collapsed: a short text preview so the card reads as openable
-         *  content rather than a bare filename. Hidden once expanded (the
-         *  full render takes over below). */}
-        {!expanded && (
-          <button
-            type="button"
-            onClick={() => setExpanded(true)}
-            className="block w-full text-left bg-bg-tertiary/25 hover:bg-bg-tertiary/50 transition-colors pl-11 pr-4 pb-3 -mt-1.5 text-[12px] leading-relaxed text-text-muted/70"
-          >
-            <span className="line-clamp-2">
-            {result === null ? t('common.loading') : preview || t('inbox.docNoPreview')}
+    <div
+      className={`group overflow-hidden rounded-xl border bg-bg/55 transition-colors ${expanded ? 'border-accent/25' : 'border-border hover:border-text-muted/35'}`}
+      title={doc.revision ? t('inbox.docRevisionTitle', { revision: doc.revision }) : undefined}
+    >
+      <div className="flex min-w-0 items-center gap-1">
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          aria-label={t(expanded ? 'inbox.docCollapseAria' : 'inbox.docExpandAria', { name })}
+          className="oa-pressable flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left"
+        >
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-bg-tertiary/70 text-text-muted/70">
+            {isHtml
+              ? <FileCode2 size={15} strokeWidth={1.75} aria-hidden />
+              : <FileText size={15} strokeWidth={1.75} aria-hidden />}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[12px] font-medium text-text/90">{name}</span>
+            <span className="mt-0.5 block truncate font-mono text-[10px] text-text-muted/50">
+              {directory || t('inbox.workspaceRoot')}
             </span>
-          </button>
+          </span>
+          <span className="hidden shrink-0 items-center gap-1.5 text-[10px] text-text-muted/50 sm:flex">
+            <span>{fileKind}</span>
+            {size && <><span className="text-text-muted/25">·</span><span>{size}</span></>}
+          </span>
+          <ChevronDown
+            size={14}
+            strokeWidth={1.75}
+            aria-hidden
+            className={`shrink-0 text-text-muted/50 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+          />
+        </button>
+        {isMarkdownPath(doc.path) && (
+          <div className="flex shrink-0 items-center gap-0.5 border-l border-border/60 px-2">
+            <button
+              type="button"
+              onClick={copyMarkdown}
+              disabled={!markdownActionsAvailable}
+              title={copied ? t('inbox.docCopiedMarkdown') : t('inbox.docCopyMarkdown')}
+              aria-label={copied ? t('inbox.docCopiedMarkdown') : t('inbox.docCopyMarkdown')}
+              className="oa-pressable inline-flex h-7 w-7 items-center justify-center rounded-md text-text-muted/55 hover:bg-bg-tertiary hover:text-accent disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-text-muted/55"
+            >
+              {copied ? <Check size={14} strokeWidth={2} /> : <Copy size={14} strokeWidth={1.75} />}
+            </button>
+            <button
+              type="button"
+              onClick={downloadMarkdown}
+              disabled={!markdownActionsAvailable}
+              title={t('inbox.docDownloadMarkdown')}
+              aria-label={t('inbox.docDownloadMarkdown')}
+              className="oa-pressable inline-flex h-7 w-7 items-center justify-center rounded-md text-text-muted/55 hover:bg-bg-tertiary hover:text-accent disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-text-muted/55"
+            >
+              <Download size={14} strokeWidth={1.75} />
+            </button>
+          </div>
         )}
       </div>
       {expanded && (
-        <div className="px-4 py-3 border-t border-border/50">
+        <div className="oa-disclosure-enter border-t border-border/60 bg-bg px-3 py-3 sm:px-4">
           {result === null ? (
-            <div className="text-[12px] text-text-muted">{t('common.loading')}</div>
+            <div className="py-3 text-center text-[12px] text-text-muted">{t('common.loading')}</div>
           ) : (
             <FileContentView path={doc.path} result={result} />
           )}
@@ -561,6 +537,24 @@ function isMarkdownPath(path: string): boolean {
 
 function fileNameFromPath(path: string): string {
   return path.replace(/\\/g, '/').split('/').filter(Boolean).pop() ?? ''
+}
+
+function fileDirectoryFromPath(path: string): string {
+  const normalized = path.replace(/\\/g, '/')
+  const index = normalized.lastIndexOf('/')
+  return index > 0 ? normalized.slice(0, index) : ''
+}
+
+function fileExtension(path: string): string {
+  const name = fileNameFromPath(path)
+  const index = name.lastIndexOf('.')
+  return index > 0 ? name.slice(index + 1).toUpperCase() : 'FILE'
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(bytes < 10 * 1024 ? 1 : 0)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
 async function copyText(text: string): Promise<void> {
@@ -589,35 +583,6 @@ async function copyText(text: string): Promise<void> {
   const ok = document.execCommand('copy')
   ta.remove()
   if (!ok) throw new Error('copy failed')
-}
-
-/** Build a short plain-text preview from a fetched doc, for the collapsed
- *  card. Takes the first couple of non-empty lines and strips the most
- *  common markdown leaders / inline markers so the snippet reads as prose.
- *  Returns '' for non-ok results (loading / missing / too-large) — the
- *  caller shows its own fallback. */
-function buildDocPreview(result: ReadFileResult | null): string {
-  if (!result || result.kind !== 'ok') return ''
-  const strip = (s: string): string =>
-    s
-      .replace(/^#{1,6}\s+/, '')        // heading markers
-      .replace(/^[>*\-+]\s+/, '')       // quote / list leaders
-      .replace(/[*_`]/g, '')            // emphasis / code ticks
-      .replace(/\[\[([^[\]]+)\]\]/g, '$1') // wikilinks → text
-      .trim()
-  const lines = result.content
-    .split('\n')
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .slice(0, 2)
-    .map(strip)
-  // Single flowing snippet (title — first paragraph), clamped to 2 visual
-  // lines by the caller. A separator beats a newline here: `-webkit-line-
-  // clamp` leaves a faint sliver of a third line when fed hard breaks.
-  const joined = lines.join(' — ')
-  // ~100 chars keeps CJK-dense snippets within 2 lines, so the caller's
-  // `line-clamp-2` rarely has to bite (its cut leaves a faint sliver).
-  return joined.length > 100 ? joined.slice(0, 100).trimEnd() + '…' : joined
 }
 
 // ==================== Date formatting ====================

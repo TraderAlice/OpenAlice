@@ -8,6 +8,10 @@
     "open-alice-ui#build": {
       "dependsOn": [],
       "outputs": ["dist/**"]
+    },
+    "@traderalice/openalice-cli#build": {
+      "dependsOn": [],
+      "outputs": []
     }
   }
 }

@@ -1,12 +1,10 @@
 /**
- * MCP Server settings — dedicated page lifted out of Connectors.
+ * MCP Server settings — separate from external notification connectors.
  *
  * The MCP server exports OpenAlice's ToolCenter to external MCP clients
  * (Claude Desktop, codex inside workspaces, anything that speaks MCP
- * over streamable-http). It's semantically distinct from connectors
- * (which is the chat-input direction: web UI's chat, telegram, mcpAsk),
- * so it lives under its own Settings entry rather than nested inside
- * Connectors.
+ * over streamable-http). It is an exported tool protocol, while Connector
+ * Service owns optional outbound notifications to external IM platforms.
  */
 
 import { useConfigPage } from '../hooks/useConfigPage'

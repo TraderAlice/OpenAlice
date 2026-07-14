@@ -227,7 +227,7 @@ async function main(): Promise<void> {
     console.log('✓ UTA restarted cleanly (startedAt changed)')
     summary(`✅ UTA restart on ${process.platform}: clean re-spawn.`)
   } else {
-    console.warn('⚠️  UTA did NOT re-spawn within timeout after the restart flag. Either the flag watcher never fired or the old UTA was not reaped (port still held). This is the broker-config restart path — see scripts/guardian/shared.ts startFlagWatcher + UTAController.restart.')
+    console.warn('⚠️  UTA did NOT re-spawn within timeout after the restart flag. Either the flag watcher never fired or the old UTA was not reaped (port still held). This is the broker-config restart path — see scripts/guardian/shared.ts startFlagWatcher + OptionalServiceController.restart().')
     summary(`⚠️ UTA restart on ${process.platform}: did not re-spawn — broker-config restart path is broken.`)
   }
 

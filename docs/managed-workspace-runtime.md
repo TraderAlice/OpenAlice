@@ -188,6 +188,22 @@ Do not add external-Pi version probing or upgrade UX to preserve flags used by
 the packaged runtime. Compatibility for the packaged app is maintained by
 pinning and upgrading the bundled Pi with the OpenAlice release.
 
+### Codex interactive permissions
+
+OpenAlice launches interactive Codex TUI sessions with explicit
+`--sandbox danger-full-access --ask-for-approval never` arguments. This applies
+to fresh sessions, Quick Chat prompts, and resumed sessions. Launch-time flags
+are intentional: otherwise Codex may inherit a restrictive global or project
+default, silently sandbox the session, and prevent the injected `alice`,
+`alice-workspace`, `alice-uta`, and `traderhub` CLIs from reaching their local
+OpenAlice transport.
+
+Headless Codex remains narrower: it uses `approval_policy=never`, a
+workspace-write sandbox, and explicit loopback network access. That is enough
+for unattended Workspace CLI work without granting an automation run unrelated
+host access. Neither policy bypasses OpenAlice's trading boundary; broker writes
+and their approval rules remain enforced by UTA.
+
 ## Workspace Bootstrap and Skills
 
 Built-in templates run `bootstrap.mjs` on Electron's Node using

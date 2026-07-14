@@ -229,28 +229,3 @@ export const DATASOURCE_OPTIONS: SDKOption[] = [
     badgeColor: 'text-purple',
   },
 ]
-
-export const CONNECTOR_OPTIONS: SDKOption[] = [
-  {
-    id: 'web',
-    name: 'Web UI',
-    description: 'Browser-based chat and configuration interface.',
-    badge: 'WB',
-    badgeColor: 'text-accent',
-    locked: true,
-  },
-  {
-    id: 'mcpAsk',
-    name: 'MCP Ask',
-    description: 'Multi-turn conversation endpoint for external agents.',
-    badge: 'MA',
-    badgeColor: 'text-blue',
-  },
-  {
-    id: 'telegram',
-    name: 'Telegram',
-    description: 'Mobile notifications and two-way chat via Telegram bot.',
-    badge: 'TG',
-    badgeColor: 'text-cyan',
-  },
-]

@@ -6,7 +6,7 @@
  * - Order lifecycle: any time (limit order place → query → cancel)
  * - Fill + position: market hours only (market order → fill → close)
  *
- * Run: pnpm test:e2e
+ * Run: OPENALICE_UTA_LIVE_PAPER=1 pnpm test:uta:live-paper
  */
 
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest'

@@ -18,6 +18,7 @@ import { versionApi } from './version'
 import { headlessApi } from './headless'
 import { preferencesApi } from './preferences'
 import { inquiriesApi } from './inquiries'
+import { connectorsApi } from './connectors'
 export const api = {
   config: configApi,
   schedule: scheduleApi,
@@ -35,6 +36,7 @@ export const api = {
   headless: headlessApi,
   preferences: preferencesApi,
   inquiries: inquiriesApi,
+  connectors: connectorsApi,
 }
 
 // Re-export all types for convenience
@@ -59,7 +61,6 @@ export type {
   Position,
   WalletCommitLog,
   ReconnectResult,
-  ConnectorsConfig,
   McpConfig,
   NewsCollectorConfig,
   NewsCollectorFeed,
@@ -78,4 +79,10 @@ export type {
   NewsArticle,
   NewsListResponse,
 } from './types'
+export type {
+  ConnectorDefinition,
+  PublicConnectorConfig,
+  ConnectorHealth,
+  ConnectorSettingsSnapshot,
+} from './connectors'
 export type { ToolCallQueryResult } from './agentStatus'
