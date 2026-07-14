@@ -28,6 +28,7 @@ import { BUILTIN_PRESETS } from '../../ai-providers/presets.js'
 import type { WireShape } from '../../ai-providers/preset-catalog.js'
 import { resolveAnthropicAuthMode } from '../../core/credential-inference.js'
 import { probeByWireShape } from '../../workspaces/agent-probe.js'
+import { listMarketVendors } from '../../domain/market-data/vendors.js'
 
 interface ConfigRouteOpts {
   ctx?: EngineContext
@@ -362,6 +363,14 @@ export function createMarketDataRoutes(ctx: EngineContext) {
   }
 
   const app = new Hono()
+
+  app.get('/vendors', async (c) => {
+    try {
+      return c.json({ vendors: await listMarketVendors(ctx.bbEngine) })
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 500)
+    }
+  })
 
   // Liveness ping for the settings page's hub status dot. Hits the hub's
   // cheapest parameterless endpoint (fx-rates, Redis-cached hourly) and

@@ -15,7 +15,6 @@ export interface IntrabarWindowResult {
 export async function loadIntrabarWindow(params: {
   barService: BarService
   ref: BarSourceRef
-  barId: string
   targetInterval: string
   requestedCount: number
   start?: string
@@ -23,7 +22,14 @@ export async function loadIntrabarWindow(params: {
   targetBars?: OhlcvBar[]
   targetMeta?: BarMeta
 }): Promise<IntrabarWindowResult> {
-  const plan = chooseIntrabarPlan(params.targetInterval, params.requestedCount, params.barId)
+  const sourceCapabilities = params.targetMeta?.supportedIntervals
+    ? params.targetMeta
+    : await params.barService.getSourceCapabilities?.(params.ref)
+  const plan = chooseIntrabarPlan(
+    params.targetInterval,
+    params.requestedCount,
+    sourceCapabilities?.supportedIntervals,
+  )
   const loaded = await loadTargetBars(params, plan)
 
   if (loaded.bars.length === 0) {
@@ -60,6 +66,7 @@ async function loadTargetBars(
     barService: BarService
     ref: BarSourceRef
     targetInterval: string
+    requestedCount: number
     start?: string
     end?: string
     targetBars?: OhlcvBar[]

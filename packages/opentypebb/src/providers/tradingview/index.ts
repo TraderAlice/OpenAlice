@@ -16,9 +16,14 @@ import { TradingViewCurrencyHistoricalFetcher } from './models/currency-historic
 import { TradingViewCurrencySearchFetcher } from './models/currency-search.js'
 import { TradingViewEquityHistoricalFetcher } from './models/equity-historical.js'
 import { TradingViewEquitySearchFetcher } from './models/equity-search.js'
+import {
+  TRADINGVIEW_BAR_CAPABILITY,
+  TRADINGVIEW_HISTORICAL_INTERVALS,
+  TRADINGVIEW_PROVIDER_ID,
+} from './domain.js'
 
 export const tradingviewProvider = new Provider({
-  name: 'tradingview',
+  name: TRADINGVIEW_PROVIDER_ID,
   reprName: 'TradingView Free',
   description: 'TradingView anonymous chart feed — free global OHLCV for equities, crypto, and FX with exchange-dependent freshness.',
   website: 'https://www.tradingview.com/',
@@ -29,6 +34,11 @@ export const tradingviewProvider = new Provider({
       'Symbols may be bare (AAPL, SPY) or TradingView-qualified (NASDAQ:AAPL, SZSE:300820, HKEX:0700, BINANCE:BTCUSDT, FX:EURUSD). ' +
       'For US equities that resolve to Cboe, volume is partial-market Cboe One/BATS volume, not SIP consolidated. ' +
       'All timestamps are in UTC for consistency across providers.',
+  },
+  barMeta: {
+    capability: TRADINGVIEW_BAR_CAPABILITY,
+    supportedIntervals: TRADINGVIEW_HISTORICAL_INTERVALS,
+    supportsCount: true,
   },
   fetcherDict: {
     EquitySearch: TradingViewEquitySearchFetcher,

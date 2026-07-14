@@ -158,8 +158,8 @@ It detects:
   confirmation when available.
 - **OB (Order Block):** volumetric order block: after a
   BOS/CHoCH, locate the extreme candle between the broken swing and breakout,
-  derive a zone, and mark it mitigated when price closes through the configured
-  boundary. By default the tool also tries to attach lower-timeframe intrabar
+  derive a zone, and mark it mitigated when the configured zone trigger source
+  reaches the mitigation boundary. By default the tool also tries to attach lower-timeframe intrabar
   delta confirmation for the OB anchor candle and breakout candle, including
   delta ratio, coverage, confidence, and whether the delta direction agrees
   with the OB direction. When anchor intrabars are available, it also estimates

@@ -60,6 +60,12 @@ export interface OhlcvBar {
 export type BarSourceKind = 'vendor' | 'uta'
 export type BarCapability = 'free' | 'delayed' | 'subscription' | 'iex' | 'realtime'
 
+export interface VendorBarMetadata {
+  capability: BarCapability
+  supportedIntervals: readonly string[]
+  supportsCount?: boolean
+}
+
 /** Data-source metadata — structurally a superset of `DataSourceMeta`. */
 export interface BarMeta {
   symbol: string
@@ -71,6 +77,7 @@ export interface BarMeta {
   barId?: string
   provider?: string
   barCapability?: BarCapability
+  supportedIntervals?: string[]
   // ---- freshness contract ----
   // The point-in-time the request was anchored to (opts.end ?? asOf ?? today),
   // and whether the data actually REACHES it. A delayed vendor silently
@@ -94,12 +101,15 @@ export interface BarSourceCandidate {
   assetClass: AssetClass | 'unknown'
   label: string
   barCapability?: BarCapability
+  supportedIntervals?: string[]
 }
 
 export interface BarsResult {
   bars: OhlcvBar[]
   meta: BarMeta
 }
+
+export type BarSourceCapabilities = Pick<BarMeta, 'barCapability' | 'supportedIntervals'>
 
 // ==================== service contract ====================
 
@@ -127,6 +137,7 @@ export type BarSourceRef =
 
 export interface BarService {
   searchBarSources(query: string, opts?: { limit?: number }): Promise<BarSourceCandidate[]>
+  getSourceCapabilities?(ref: BarSourceRef): Promise<BarSourceCapabilities>
   getBars(ref: BarSourceRef, opts: GetBarsOpts): Promise<BarsResult>
 }
 
@@ -159,4 +170,6 @@ export interface BarServiceDeps {
   utaManager: UtaBarGateway
   /** Configured default provider per asset class — the `provider` we report. */
   vendorProviders: Record<AssetClass, string>
+  /** Provider-owned K-line behavior, keyed by provider id. */
+  vendorBarMetadata?: Record<string, VendorBarMetadata>
 }

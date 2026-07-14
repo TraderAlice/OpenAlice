@@ -36,8 +36,8 @@ Modes:
   - delta: delta/CVD only
   - profile: volume profile only
 
-Intrabar selection is automatic and caps requests at MAX_BARS=5000. TradingView
-sources may use internal 3m intrabars; other sources avoid 3m.`,
+Intrabar selection is automatic, respects source-declared interval support, and
+caps requests at MAX_BARS=5000.`,
 
       inputSchema: z.object({
         barId: z.string().describe('Bar source ID from searchBars'),

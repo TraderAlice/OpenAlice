@@ -179,6 +179,7 @@ async function main() {
   // ==================== Embedded Provider Clients ====================
 
   const { providers } = config.marketData
+  const executor = getSDKExecutor()
 
   let equityClient: EquityClientLike
   let cryptoClient: CryptoClientLike
@@ -190,7 +191,6 @@ async function main() {
   let economyClient: EconomyClientLike
 
   {
-    const executor = getSDKExecutor()
     const routeMap = buildRouteMap()
     const credentials = buildSDKCredentials(config.marketData.providerKeys, config.marketData.hub)
     equityClient = new SDKEquityClient(executor, 'equity', providers.equity, credentials, routeMap)
@@ -237,6 +237,11 @@ async function main() {
     commodityClient,
     utaManager,
     vendorProviders: config.marketData.providers,
+    vendorBarMetadata: Object.fromEntries(
+      executor.listProviders()
+        .filter((provider) => provider.barMeta)
+        .map((provider) => [provider.name, provider.barMeta!]),
+    ),
   })
 
   // Hub-first calendars: tools, CLI and boards all inherit through the

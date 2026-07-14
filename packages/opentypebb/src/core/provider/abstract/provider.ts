@@ -30,6 +30,15 @@ export interface VendorMeta {
   howToUse: string
 }
 
+export type ProviderBarCapability = 'free' | 'delayed' | 'subscription' | 'iex' | 'realtime'
+
+/** Operational K-line behavior declared by the provider adapter itself. */
+export interface ProviderBarMeta {
+  capability: ProviderBarCapability
+  supportedIntervals: readonly string[]
+  supportsCount?: boolean
+}
+
 export interface ProviderConfig {
   /** Short name of the provider (e.g., "fmp", "yfinance"). */
   name: string
@@ -43,6 +52,8 @@ export interface ProviderConfig {
    * internal/back-end providers. See {@link VendorMeta}.
    */
   vendorMeta?: VendorMeta
+  /** K-line capabilities consumed by Alice's BarService boundary. */
+  barMeta?: ProviderBarMeta
   /**
    * List of required credential names (without provider prefix).
    * Will be auto-prefixed with the provider name.
@@ -69,6 +80,7 @@ export class Provider {
   readonly reprName?: string
   readonly instructions?: string
   readonly vendorMeta?: VendorMeta
+  readonly barMeta?: ProviderBarMeta
 
   constructor(config: ProviderConfig) {
     this.name = config.name
@@ -78,6 +90,7 @@ export class Provider {
     this.reprName = config.reprName
     this.instructions = config.instructions
     this.vendorMeta = config.vendorMeta
+    this.barMeta = config.barMeta
 
     // Auto-prefix credentials with provider name (matches Python behavior)
     // Example: credentials=["api_key"], name="fmp" → ["fmp_api_key"]

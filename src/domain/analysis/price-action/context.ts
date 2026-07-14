@@ -358,7 +358,7 @@ export async function analyzePriceActionMtf(
         liquidity: {
           poolCount: liquidityPools.length,
           sweepCount: liquiditySweeps.length,
-          recentSweeps: liquiditySweeps.slice(-3),
+          recentSweeps: liquiditySweeps.slice(0, 3),
         },
         zone: {
           fvgCount: fvgs.length,

@@ -263,6 +263,25 @@ describe('analyzeMarketStructure', () => {
     expect(result.stateByLevel.internal.lastBos).toEqual(result.bos[0])
   })
 
+  it('retains the latest confirmed range anchors after consuming a broken swing', () => {
+    const confirmedHigh = { index: 1, price: 105, type: 'high' as const }
+    const confirmedLow = { index: 0, price: 95, type: 'low' as const }
+    const result = analyzeMarketStructure({
+      bars: makeBars([99, 100, 106]),
+      swingPoints: makeSwingPoints({
+        highs: [confirmedHigh],
+        lows: [confirmedLow],
+      }),
+      internalLookback: 1,
+    })
+
+    expect(result.bos).toHaveLength(1)
+    expect(result.stateByLevel.internal).toMatchObject({
+      lastConfirmedHigh: confirmedHigh,
+      lastConfirmedLow: confirmedLow,
+    })
+  })
+
   it('bullish 状态下跌破最新 low 生成 bearish CHoCH 并切换为 bearish', () => {
     const result = analyzeMarketStructure({
       bars: makeBars([99, 100, 101, 106, 104, 103, 94]),

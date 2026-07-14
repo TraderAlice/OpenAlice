@@ -13,7 +13,6 @@
  */
 
 import type { BarParams, BarInterval, Bar } from '@traderalice/uta-protocol'
-import { TRADINGVIEW_BAR_CAPABILITY, TRADINGVIEW_PROVIDER_ID } from '@traderalice/opentypebb'
 import { aggregateSymbolSearch, type AssetClass } from '../aggregate-search.js'
 import type {
   BarService,
@@ -30,28 +29,6 @@ import { formatBarId, parseBarId } from './types.js'
 
 /** Hard ceiling on bars returned by any single fetch (explosion guard). */
 const MAX_BARS = 5000
-
-/** Vendor → bar capability (honest-ish defaults; vendors mostly serve delayed).
- *  Unlisted providers fall back to 'delayed' (the conservative default for
- *  unverified data sources). */
-const VENDOR_CAPABILITY: Record<string, BarCapability> = {
-  yfinance: 'delayed',
-  fmp: 'delayed',
-  eastmoney: 'delayed',
-  twse: 'delayed', // K-lines via Yahoo chart (symbols are .TW/.TWO)
-  // TradingView's anonymous/free global feed is exchange-dependent: bare US
-  // equities may resolve to free Cboe partial-market realtime data, but
-  // exchange-qualified US symbols and non-US equities (HK/A-shares/TW/etc.) are
-  // commonly delayed unless the account has exchange entitlements. At provider
-  // granularity, "delayed" is the honest conservative label; the provider docs
-  // carry the Cboe/partial-volume caveat.
-  [TRADINGVIEW_PROVIDER_ID]: TRADINGVIEW_BAR_CAPABILITY,
-}
-
-/** Safe VENDOR_CAPABILITY lookup with fallback. */
-function getVendorCapability(provider: string): BarCapability {
-  return VENDOR_CAPABILITY[provider] ?? 'delayed'
-}
 
 const BAR_INTERVALS: readonly BarInterval[] = ['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w']
 
@@ -197,6 +174,14 @@ function finalize(data: OhlcvBar[], count?: number): OhlcvBar[] {
 }
 
 export function createBarService(deps: BarServiceDeps): BarService {
+  const vendorMetadata = (provider: string) => deps.vendorBarMetadata?.[provider]
+  const getVendorCapability = (provider: string): BarCapability =>
+    vendorMetadata(provider)?.capability ?? 'delayed'
+  const getVendorIntervals = (provider: string): string[] | undefined => {
+    const intervals = vendorMetadata(provider)?.supportedIntervals
+    return intervals ? [...intervals] : undefined
+  }
+
   // -------- vendor fetch --------
   async function getVendorBars(
     provider: string,
@@ -208,15 +193,15 @@ export function createBarService(deps: BarServiceDeps): BarService {
     // Upper bound: the provider compatibility models apply end_date;
     // we also post-filter defensively in case a provider ignores it.
     const end_date = opts.end
-    // TradingView consumes count server-side; do not send it to every provider
-    // because several OpenTypeBB fetchers map params directly to vendor APIs.
-    const tvCountParam = provider === TRADINGVIEW_PROVIDER_ID && opts.count != null ? { count: opts.count } : {}
+    // Only providers that declare server-side count support receive this field;
+    // several compatibility fetchers map params directly to vendor APIs.
+    const countParam = vendorMetadata(provider)?.supportsCount && opts.count != null ? { count: opts.count } : {}
     const p = (extra?: Record<string, unknown>) => ({
       symbol,
       start_date,
       provider,
       ...(end_date ? { end_date } : {}),
-      ...tvCountParam,
+      ...countParam,
       ...extra,
     })
     let raw: Array<Record<string, unknown>>
@@ -245,6 +230,7 @@ export function createBarService(deps: BarServiceDeps): BarService {
         barId: formatBarId(provider, symbol),
         provider,
         barCapability: getVendorCapability(provider),
+        supportedIntervals: getVendorIntervals(provider),
         ...computeFreshness(filtered[filtered.length - 1]?.date ?? '', opts, () => new Date()),
       }),
     }
@@ -284,6 +270,7 @@ export function createBarService(deps: BarServiceDeps): BarService {
         sourceId,
         barId,
         barCapability: cap,
+        supportedIntervals: [...BAR_INTERVALS],
         ...computeFreshness(bars[bars.length - 1]?.date ?? '', opts, () => new Date()),
       }),
     }
@@ -323,6 +310,7 @@ export function createBarService(deps: BarServiceDeps): BarService {
             // when it deliberately falls back to one (yfinance/fmp are EOD-delayed).
             label: cap ? `${base} · ${cap}` : base,
             barCapability: cap,
+            supportedIntervals: getVendorIntervals(provider),
           })
         }
       }
@@ -345,6 +333,7 @@ export function createBarService(deps: BarServiceDeps): BarService {
             // blanket 'realtime'.
             label: (symbol ? `${symbol} (${hit.source})` : barId) + ` · ${cap}`,
             barCapability: cap,
+            supportedIntervals: [...BAR_INTERVALS],
           })
         }
       }
@@ -364,6 +353,31 @@ export function createBarService(deps: BarServiceDeps): BarService {
           (b.barCapability ? FRESHNESS_RANK[b.barCapability] : 5),
       )
       return out
+    },
+
+    async getSourceCapabilities(ref) {
+      if ('symbol' in ref) {
+        const provider = deps.vendorProviders[ref.assetClass]
+        return {
+          barCapability: getVendorCapability(provider),
+          supportedIntervals: getVendorIntervals(provider),
+        }
+      }
+
+      const parsed = parseBarId(ref.barId)
+      if (!parsed) throw new Error(`Invalid barId "${ref.barId}" (expected "sourceId|nativeSymbol")`)
+      if (await deps.utaManager.has(parsed.sourceId)) {
+        const caps = await deps.utaManager.getBarCapabilities?.() ?? {}
+        return {
+          barCapability: caps[parsed.sourceId] ?? 'realtime',
+          supportedIntervals: [...BAR_INTERVALS],
+        }
+      }
+
+      return {
+        barCapability: getVendorCapability(parsed.sourceId),
+        supportedIntervals: getVendorIntervals(parsed.sourceId),
+      }
     },
 
     async getBars(ref, opts) {

@@ -9,7 +9,14 @@ describe('analyzeOrderFlowContext', () => {
         bars: [
           { date: '2024-01-01 09:00:00', open: 100, high: 105, low: 99, close: 104, volume: 3000 },
         ],
-        meta: { symbol: 'AAPL', from: '2024-01-01', to: '2024-01-01', bars: 1, barId: 'tradingview|AAPL' },
+        meta: {
+          symbol: 'AAPL',
+          from: '2024-01-01',
+          to: '2024-01-01',
+          bars: 1,
+          barId: 'tradingview|AAPL',
+          supportedIntervals: ['1m', '3m', '5m', '15m', '30m', '1h', '4h', '1d', '1w'],
+        },
       } as BarsResult)
       .mockResolvedValueOnce({
         bars: [
@@ -19,7 +26,13 @@ describe('analyzeOrderFlowContext', () => {
         ],
         meta: { symbol: 'AAPL', from: '2024-01-01', to: '2024-01-01', bars: 3, barId: 'tradingview|AAPL' },
       } as BarsResult)
-    const barService = { searchBarSources: vi.fn(), getBars } as unknown as BarService
+    const barService = {
+      searchBarSources: vi.fn(),
+      getSourceCapabilities: async () => ({
+        supportedIntervals: ['1m', '3m', '5m', '15m', '30m', '1h', '4h', '1d', '1w'],
+      }),
+      getBars,
+    } as unknown as BarService
 
     const result = await analyzeOrderFlowContext(barService, {
       barId: 'tradingview|AAPL',
@@ -118,7 +131,13 @@ describe('analyzeOrderFlowContext', () => {
       ],
       meta: { symbol: 'AAPL', from: '2024-01-01', to: '2024-01-01', bars: 1 },
     } as BarsResult))
-    const barService = { searchBarSources: vi.fn(), getBars } as unknown as BarService
+    const barService = {
+      searchBarSources: vi.fn(),
+      getSourceCapabilities: async () => ({
+        supportedIntervals: ['1m', '3m', '5m', '15m', '30m', '1h', '4h', '1d', '1w'],
+      }),
+      getBars,
+    } as unknown as BarService
 
     const result = await analyzeOrderFlowContext(barService, {
       barId: 'tradingview|AAPL',
@@ -206,7 +225,14 @@ describe('analyzeOrderFlowContext', () => {
         bars: [
           { date: '2024-01-01 09:00:00', open: 100, high: 105, low: 99, close: 104, volume: 3000 },
         ],
-        meta: { symbol: 'AAPL', from: '2024-01-01', to: '2024-01-01', bars: 1, barId: 'tradingview|AAPL' },
+        meta: {
+          symbol: 'AAPL',
+          from: '2024-01-01',
+          to: '2024-01-01',
+          bars: 1,
+          barId: 'tradingview|AAPL',
+          supportedIntervals: ['1m', '3m', '5m', '15m', '30m', '1h', '4h', '1d', '1w'],
+        },
       } as BarsResult)
       .mockResolvedValueOnce({
         bars: [
@@ -214,7 +240,13 @@ describe('analyzeOrderFlowContext', () => {
         ],
         meta: { symbol: 'AAPL', from: '2024-01-01', to: '2024-01-01', bars: 1, barId: 'tradingview|AAPL' },
       } as BarsResult)
-    const barService = { searchBarSources: vi.fn(), getBars } as unknown as BarService
+    const barService = {
+      searchBarSources: vi.fn(),
+      getSourceCapabilities: async () => ({
+        supportedIntervals: ['1m', '3m', '5m', '15m', '30m', '1h', '4h', '1d', '1w'],
+      }),
+      getBars,
+    } as unknown as BarService
 
     const result = await analyzeOrderFlowContext(barService, {
       barId: 'tradingview|AAPL',

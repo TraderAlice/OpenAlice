@@ -73,12 +73,16 @@ interface TradingViewSearchResponse {
   symbols?: Array<Record<string, unknown>>
 }
 
-export function describeTradingViewFeed(assetKind: TradingViewAssetKind): TradingViewFeedSemantics {
+export function describeTradingViewFeed(
+  assetKind: TradingViewAssetKind,
+  symbol?: string,
+): TradingViewFeedSemantics {
+  const isBareEquitySymbol = assetKind === 'equity' && !symbol?.includes(':')
   return {
     provider: TRADINGVIEW_PROVIDER_ID,
     capability: TRADINGVIEW_BAR_CAPABILITY,
-    coverage: assetKind === 'equity' ? 'cboe_one' : 'tradingview_global',
-    volumeQuality: assetKind === 'equity' ? 'partial_market' : 'exchange_dependent',
+    coverage: isBareEquitySymbol ? 'cboe_one' : 'tradingview_global',
+    volumeQuality: isBareEquitySymbol ? 'partial_market' : 'exchange_dependent',
     isAnonymous: true,
     isFreshnessExchangeDependent: true,
     supportsInternal3mIntrabars: true,
@@ -90,14 +94,6 @@ export function describeTradingViewSearchFeed(): TradingViewSearchSemantics {
     coverage: 'tradingview_global',
     volumeQuality: 'exchange_dependent',
   }
-}
-
-export function isTradingViewSourceId(sourceId: string): boolean {
-  return sourceId === TRADINGVIEW_PROVIDER_ID
-}
-
-export function supportsTradingViewInternalIntrabar(sourceId: string, interval: string): boolean {
-  return isTradingViewSourceId(sourceId) && interval === '3m'
 }
 
 export function isValidTradingViewDateOnly(value: string): boolean {
@@ -182,7 +178,7 @@ export function mapTradingViewHistoricalBars<TRow>(
     assetKind: TradingViewAssetKind
   },
 ): TRow[] {
-  const semantics = describeTradingViewFeed(options.assetKind)
+  const semantics = describeTradingViewFeed(options.assetKind, query.symbol)
   const out = [...bars]
     .sort((a, b) => a.time - b.time)
     .map((bar) => options.mapBar({ bar, date: formatTradingViewTime(bar.time), semantics }))

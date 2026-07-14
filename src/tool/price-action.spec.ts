@@ -730,6 +730,28 @@ describe('analyzeMultiTimeframePriceAction', () => {
     })
   })
 
+  it('returns the three most recent liquidity sweeps in descending index order', async () => {
+    const tools = createPriceActionTools({
+      barService: fakeBarServiceByInterval({
+        '15m': repeatedSweepBars(),
+      }),
+    })
+
+    const result = await run(tools.analyzeMultiTimeframePriceAction, {
+      barId: 'test|MTF-SWEEPS',
+      intervals: ['15m'],
+      internalLookback: 2,
+      swingLookback: 2,
+      externalLookback: 2,
+      gapVolumeConfirmation: false,
+      ifvgVolumeConfirmation: false,
+      orderBlockVolumeConfirmation: false,
+    }) as Record<string, any>
+
+    expect(result.intervals[0].liquidity.sweepCount).toBe(5)
+    expect(result.intervals[0].liquidity.recentSweeps.map((sweep: any) => sweep.sweepIndex)).toEqual([9, 8, 7])
+  })
+
   it('preserves MTF breaker meta as all detected breakers, not proximity-filtered detail breakers', async () => {
     const tools = createPriceActionTools({
       barService: fakeBarServiceByInterval({
@@ -889,6 +911,23 @@ function eqhToolBars(): OhlcvBar[] {
     bar(99.3, 99.6, 98.8, 99.2, 7),
     bar(99.2, 100.2, 98.8, 99.9, 8),
   ]
+}
+
+function repeatedSweepBars(): OhlcvBar[] {
+  const values = [
+    { open: 99, high: 100, low: 98, close: 99 },
+    { open: 100, high: 102, low: 99, close: 101 },
+    { open: 105, high: 110, low: 104, close: 106 },
+    { open: 103, high: 104, low: 101, close: 102 },
+    { open: 103, high: 105, low: 102, close: 104 },
+    ...Array.from({ length: 5 }, () => ({ open: 109, high: 111, low: 108, close: 109 })),
+  ]
+
+  return values.map((value, index) => ({
+    date: `2024-01-01 09:${String(index).padStart(2, '0')}`,
+    ...value,
+    volume: 1000,
+  }))
 }
 
 function breakerFilteredBars(): OhlcvBar[] {

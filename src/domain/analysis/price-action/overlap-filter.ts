@@ -42,19 +42,20 @@ export function applyZoneOverlapFiltering<T>(
 
   for (const [inputIndex, item] of items.entries()) {
     const view = viewOf(item)
-    const overlappingIndex = kept.findIndex((candidate) =>
-      sameOverlapBucket(candidate.view, view) && rangesOverlap(candidate.view, view)
+    const overlappingIndexes = kept.flatMap((candidate, index) =>
+      sameOverlapBucket(candidate.view, view) && rangesOverlap(candidate.view, view) ? [index] : []
     )
 
-    if (overlappingIndex === -1) {
+    if (overlappingIndexes.length === 0) {
       kept.push({ item, view, inputIndex })
       continue
     }
 
     const current = { item, view, inputIndex }
-    if (shouldReplaceKept(kept[overlappingIndex], current, policy)) {
-      kept[overlappingIndex] = current
-    }
+    if (!overlappingIndexes.every((index) => shouldReplaceKept(kept[index], current, policy))) continue
+
+    for (const index of overlappingIndexes.reverse()) kept.splice(index, 1)
+    kept.push(current)
   }
 
   kept.sort((a, b) => a.inputIndex - b.inputIndex)

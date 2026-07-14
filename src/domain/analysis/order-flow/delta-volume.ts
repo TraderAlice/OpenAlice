@@ -6,7 +6,7 @@
  * 对成交量分类，累加为目标 bar 的 delta。
  */
 
-import type { OhlcvBar } from '@/domain/market-data/bars/types'
+import type { OhlcvBar } from '@/domain/market-data/bars/types.js'
 import { intervalToMinutesOrDefault, parseBarDateUTC } from './interval-time.js'
 
 // ==================== Delta Volume ====================

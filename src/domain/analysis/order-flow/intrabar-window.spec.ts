@@ -10,7 +10,13 @@ describe('loadIntrabarWindow', () => {
         bars: [
           { date: '2024-01-01', open: 100, high: 101, low: 99, close: 100, volume: 1000 },
         ],
-        meta: { symbol: 'AAPL', from: '2024-01-01', to: '2024-01-01', bars: 1 },
+        meta: {
+          symbol: 'AAPL',
+          from: '2024-01-01',
+          to: '2024-01-01',
+          bars: 1,
+          supportedIntervals: ['1m', '3m', '5m', '15m', '30m', '1h', '4h', '1d', '1w'],
+        },
       } as BarsResult)
       .mockResolvedValueOnce({
         bars: [
@@ -18,12 +24,16 @@ describe('loadIntrabarWindow', () => {
         ],
         meta: { symbol: 'AAPL', from: '2024-01-01', to: '2024-01-01', bars: 1 },
       } as BarsResult)
-    const barService = { getBars } as unknown as BarService
+    const barService = {
+      getBars,
+      getSourceCapabilities: async () => ({
+        supportedIntervals: ['1m', '3m', '5m', '15m', '30m', '1h', '4h', '1d', '1w'],
+      }),
+    } as unknown as BarService
 
     const result = await loadIntrabarWindow({
       barService,
       ref: { barId: 'tradingview|AAPL', assetClass: 'equity' },
-      barId: 'tradingview|AAPL',
       targetInterval: '1w',
       requestedCount: 800,
     })
@@ -56,7 +66,6 @@ describe('loadIntrabarWindow', () => {
     const result = await loadIntrabarWindow({
       barService,
       ref: { symbol: 'AAPL', assetClass: 'equity' },
-      barId: 'yfinance|AAPL',
       targetInterval: '1000h',
       requestedCount: bars.length,
       targetBars: bars,
@@ -83,7 +92,6 @@ describe('loadIntrabarWindow', () => {
     const result = await loadIntrabarWindow({
       barService,
       ref: { symbol: 'AAPL', assetClass: 'equity' },
-      barId: 'tradingview|AAPL',
       targetInterval: '15m',
       requestedCount: 1,
       targetBars: [

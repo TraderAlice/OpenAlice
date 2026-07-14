@@ -17,15 +17,12 @@
  */
 
 import { z } from 'zod'
-import { Fetcher } from '../../../core/provider/abstract/fetcher.js'
 import { EquityHistoricalDataSchema, EquityHistoricalQueryParamsSchema } from '../../../standard-models/equity-historical.js'
 import {
-  fetchTradingViewHistoricalBars,
   isValidTradingViewDateOnly,
-  mapTradingViewHistoricalBars,
   TRADINGVIEW_HISTORICAL_INTERVALS,
 } from '../domain.js'
-import type { TradingViewBar } from '../utils/websocket.js'
+import { createTradingViewHistoricalFetcher } from './factories.js'
 
 export const TradingViewEquityHistoricalQueryParamsSchema = EquityHistoricalQueryParamsSchema.extend({
   start_date: z.string().refine(isValidTradingViewDateOnly, 'Expected YYYY-MM-DD date.').nullable().default(null),
@@ -37,43 +34,10 @@ export const TradingViewEquityHistoricalQueryParamsSchema = EquityHistoricalQuer
 
 export type TradingViewEquityHistoricalQueryParams = z.infer<typeof TradingViewEquityHistoricalQueryParamsSchema>
 
-export class TradingViewEquityHistoricalFetcher extends Fetcher {
-  static override requireCredentials = false
-
-  static override transformQuery(params: Record<string, unknown>): TradingViewEquityHistoricalQueryParams {
-    return TradingViewEquityHistoricalQueryParamsSchema.parse(params)
-  }
-
-  static override async extractData(
-    query: TradingViewEquityHistoricalQueryParams,
-    _credentials: Record<string, string> | null,
-  ): Promise<TradingViewBar[]> {
-    return fetchTradingViewHistoricalBars(query, {
-      session: query.extended_hours ? 'extended' : undefined,
-    })
-  }
-
-  static override transformData(
-    query: TradingViewEquityHistoricalQueryParams,
-    bars: TradingViewBar[],
-  ) {
-    return mapTradingViewHistoricalBars(query, bars, {
-      assetKind: 'equity',
-      emptyDataMessage: 'No TradingView bars returned for the requested window.',
-      mapBar: ({ bar, date, semantics }) => ({
-        date,
-        open: bar.open,
-        high: bar.high,
-        low: bar.low,
-        close: bar.close,
-        volume: bar.volume,
-        vwap: null,
-        symbol: query.symbol,
-        provider: semantics.provider,
-        coverage: semantics.coverage,
-        volume_quality: semantics.volumeQuality,
-      }),
-      parse: (row) => EquityHistoricalDataSchema.parse(row),
-    })
-  }
-}
+export const TradingViewEquityHistoricalFetcher = createTradingViewHistoricalFetcher({
+  querySchema: TradingViewEquityHistoricalQueryParamsSchema,
+  dataSchema: EquityHistoricalDataSchema,
+  assetKind: 'equity',
+  emptyDataMessage: 'No TradingView bars returned for the requested window.',
+  sessionFor: (query) => query.extended_hours ? 'extended' : undefined,
+})

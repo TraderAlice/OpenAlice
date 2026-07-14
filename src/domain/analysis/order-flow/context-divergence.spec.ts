@@ -382,6 +382,13 @@ describe('analyzeOrderFlowContext confirmed-pivot divergence candidates', () => 
       count: 100,
       mode: 'summary',
       targetBars: fixture.targetBars,
+      targetMeta: {
+        symbol: 'DEGRADED',
+        from: fixture.targetBars[0]!.date,
+        to: fixture.targetBars.at(-1)!.date,
+        bars: fixture.targetBars.length,
+        supportedIntervals: ['1m', '3m', '5m', '15m', '30m', '1h', '4h', '1d', '1w'],
+      },
     })
 
     expect(result.meta.degradationReason).toContain('Auto-selected 3m')

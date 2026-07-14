@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { calculateDeltaVolume, calculateVolumeProfile } from './delta-volume.js'
-import type { OhlcvBar } from '@/domain/market-data/bars/types'
+import type { OhlcvBar } from '@/domain/market-data/bars/types.js'
 
 describe('calculateDeltaVolume', () => {
   it('基本计算：3 根 15m bar，每根有 3 个 1m intrabar，完美覆盖', () => {

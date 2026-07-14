@@ -224,14 +224,18 @@ function detectStructureBreaksAtLevel(
   let lastBos: BreakOfStructure | undefined
   let lastChoch: ChangeOfCharacter | undefined
   let lastBreak: BreakOfStructure | ChangeOfCharacter | undefined
+  let lastConfirmedHigh: SwingPoint | undefined
+  let lastConfirmedLow: SwingPoint | undefined
 
   const confirmSwings = (barIndex: number) => {
     while (nextHighIndex < highs.length && highs[nextHighIndex].index + lookback <= barIndex) {
-      confirmedHighs.unshift(highs[nextHighIndex])
+      lastConfirmedHigh = highs[nextHighIndex]
+      confirmedHighs.unshift(lastConfirmedHigh)
       nextHighIndex++
     }
     while (nextLowIndex < lows.length && lows[nextLowIndex].index + lookback <= barIndex) {
-      confirmedLows.unshift(lows[nextLowIndex])
+      lastConfirmedLow = lows[nextLowIndex]
+      confirmedLows.unshift(lastConfirmedLow)
       nextLowIndex++
     }
   }
@@ -313,8 +317,8 @@ function detectStructureBreaksAtLevel(
       lastBos,
       lastChoch,
       lastBreak,
-      lastConfirmedHigh: confirmedHighs[0],
-      lastConfirmedLow: confirmedLows[0],
+      lastConfirmedHigh,
+      lastConfirmedLow,
     },
   }
 }

@@ -3,15 +3,12 @@
  */
 
 import { z } from 'zod'
-import { Fetcher } from '../../../core/provider/abstract/fetcher.js'
 import { CryptoHistoricalDataSchema, CryptoHistoricalQueryParamsSchema } from '../../../standard-models/crypto-historical.js'
 import {
-  fetchTradingViewHistoricalBars,
   isValidTradingViewDateOnly,
-  mapTradingViewHistoricalBars,
   TRADINGVIEW_HISTORICAL_INTERVALS,
 } from '../domain.js'
-import type { TradingViewBar } from '../utils/websocket.js'
+import { createTradingViewHistoricalFetcher } from './factories.js'
 
 export const TradingViewCryptoHistoricalQueryParamsSchema = CryptoHistoricalQueryParamsSchema.extend({
   start_date: z.string().refine(isValidTradingViewDateOnly, 'Expected YYYY-MM-DD date.').nullable().default(null),
@@ -22,39 +19,9 @@ export const TradingViewCryptoHistoricalQueryParamsSchema = CryptoHistoricalQuer
 
 export type TradingViewCryptoHistoricalQueryParams = z.infer<typeof TradingViewCryptoHistoricalQueryParamsSchema>
 
-export class TradingViewCryptoHistoricalFetcher extends Fetcher {
-  static override requireCredentials = false
-
-  static override transformQuery(params: Record<string, unknown>): TradingViewCryptoHistoricalQueryParams {
-    return TradingViewCryptoHistoricalQueryParamsSchema.parse(params)
-  }
-
-  static override async extractData(
-    query: TradingViewCryptoHistoricalQueryParams,
-    _credentials: Record<string, string> | null,
-  ): Promise<TradingViewBar[]> {
-    return fetchTradingViewHistoricalBars(query)
-  }
-
-  static override transformData(
-    query: TradingViewCryptoHistoricalQueryParams,
-    bars: TradingViewBar[],
-  ) {
-    return mapTradingViewHistoricalBars(query, bars, {
-      assetKind: 'crypto',
-      emptyDataMessage: 'No TradingView crypto bars returned for the requested window.',
-      mapBar: ({ bar, date, semantics }) => ({
-        date,
-        open: bar.open,
-        high: bar.high,
-        low: bar.low,
-        close: bar.close,
-        volume: bar.volume,
-        vwap: null,
-        symbol: query.symbol,
-        provider: semantics.provider,
-      }),
-      parse: (row) => CryptoHistoricalDataSchema.parse(row),
-    })
-  }
-}
+export const TradingViewCryptoHistoricalFetcher = createTradingViewHistoricalFetcher({
+  querySchema: TradingViewCryptoHistoricalQueryParamsSchema,
+  dataSchema: CryptoHistoricalDataSchema,
+  assetKind: 'crypto',
+  emptyDataMessage: 'No TradingView crypto bars returned for the requested window.',
+})

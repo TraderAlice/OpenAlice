@@ -47,6 +47,19 @@ describe('zone overlap filtering', () => {
     expect(applyZoneOverlapFiltering(zones, 'none', (item) => item).items.map((item) => item.id)).toEqual(['older', 'newer'])
   })
 
+  it('removes every lower-ranked zone overlapped by a later winner', () => {
+    const zones = [
+      zone({ id: 'left', top: 2, bottom: 0, rank: 1 }),
+      zone({ id: 'right', top: 5, bottom: 3, rank: 1 }),
+      zone({ id: 'bridge-winner', top: 4, bottom: 1, rank: 3 }),
+    ]
+
+    const result = applyZoneOverlapFiltering(zones, 'ranked', (item) => item)
+
+    expect(result.overlapFilteredCount).toBe(2)
+    expect(result.items.map((item) => item.id)).toEqual(['bridge-winner'])
+  })
+
   it('builds staged family filter meta', () => {
     expect(buildFamilyFilterMeta({
       detectedCount: 5,

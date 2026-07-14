@@ -6,10 +6,10 @@ import {
   fetchTradingViewHistoricalBars,
   mapTradingViewHistoricalBars,
   mapTradingViewSearchRows,
-  supportsTradingViewInternalIntrabar,
   type TradingViewHistoricalQuery,
 } from './domain.js'
 import type { TradingViewBar } from './utils/websocket.js'
+import { tradingviewProvider } from './index.js'
 
 describe('TradingView domain', () => {
   it('describes anonymous feed semantics in one place', () => {
@@ -28,9 +28,15 @@ describe('TradingView domain', () => {
       coverage: 'tradingview_global',
       volumeQuality: 'exchange_dependent',
     })
-    expect(supportsTradingViewInternalIntrabar('tradingview', '3m')).toBe(true)
-    expect(supportsTradingViewInternalIntrabar('yfinance', '3m')).toBe(false)
-    expect(supportsTradingViewInternalIntrabar('tradingview', '5m')).toBe(false)
+    expect(tradingviewProvider.barMeta).toEqual({
+      capability: 'delayed',
+      supportedIntervals: ['1m', '3m', '5m', '15m', '30m', '1h', '4h', '1d', '1w'],
+      supportsCount: true,
+    })
+    expect(describeTradingViewFeed('equity', 'HKEX:0700')).toMatchObject({
+      coverage: 'tradingview_global',
+      volumeQuality: 'exchange_dependent',
+    })
   })
 
   it('builds websocket requests from the historical query contract', async () => {
@@ -121,6 +127,33 @@ describe('TradingView domain', () => {
         coverage: 'cboe_one',
       },
     ])
+  })
+
+  it('keeps exchange-qualified international equity feed metadata global', () => {
+    const query: TradingViewHistoricalQuery = {
+      symbol: 'HKEX:0700',
+      interval: '1d',
+      start_date: '2026-07-02',
+      end_date: '2026-07-02',
+    }
+
+    const out = mapTradingViewHistoricalBars(query, [
+      { time: 1_782_999_000, open: 1, high: 2, low: 1, close: 2, volume: 3 },
+    ], {
+      assetKind: 'equity',
+      emptyDataMessage: 'empty',
+      mapBar: ({ date, semantics }) => ({
+        date,
+        coverage: semantics.coverage,
+        volume_quality: semantics.volumeQuality,
+      }),
+      parse: (row) => row,
+    })
+
+    expect(out[0]).toMatchObject({
+      coverage: 'tradingview_global',
+      volume_quality: 'exchange_dependent',
+    })
   })
 
   it('throws the asset-specific empty-data message after date-window filtering', () => {

@@ -128,7 +128,6 @@ export async function analyzeOrderFlowContext(
   const window = await loadIntrabarWindow({
     barService,
     ref,
-    barId: params.barId,
     targetInterval: params.interval,
     requestedCount,
     start: params.start,

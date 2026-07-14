@@ -80,7 +80,16 @@ describe('getBars — vendor branch', () => {
   })
 
   it('labels TradingView as delayed at provider granularity because free freshness is exchange-dependent', async () => {
-    const deps = makeDeps({ vendorProviders: { equity: 'tradingview', crypto: 'yfinance', currency: 'yfinance', commodity: 'yfinance' } })
+    const deps = makeDeps({
+      vendorProviders: { equity: 'tradingview', crypto: 'yfinance', currency: 'yfinance', commodity: 'yfinance' },
+      vendorBarMetadata: {
+        tradingview: {
+          capability: 'delayed',
+          supportedIntervals: ['1m', '3m', '5m', '15m', '30m', '1h', '4h', '1d', '1w'],
+          supportsCount: true,
+        },
+      },
+    })
     const svc = createBarService(deps)
 
     const { meta } = await svc.getBars({ symbol: 'HKEX:0700', assetClass: 'equity' }, { interval: '1m', count: 10 })
@@ -91,6 +100,12 @@ describe('getBars — vendor branch', () => {
       provider: 'tradingview',
       barId: 'tradingview|HKEX:0700',
       barCapability: 'delayed',
+      supportedIntervals: ['1m', '3m', '5m', '15m', '30m', '1h', '4h', '1d', '1w'],
+    })
+    expect(deps.equityClient.getHistorical).toHaveBeenCalledWith(expect.objectContaining({ count: 10 }))
+    await expect(svc.getSourceCapabilities?.({ barId: 'tradingview|HKEX:0700', assetClass: 'equity' })).resolves.toEqual({
+      barCapability: 'delayed',
+      supportedIntervals: ['1m', '3m', '5m', '15m', '30m', '1h', '4h', '1d', '1w'],
     })
   })
 

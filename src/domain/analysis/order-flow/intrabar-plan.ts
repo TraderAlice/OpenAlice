@@ -1,5 +1,3 @@
-import { supportsTradingViewInternalIntrabar } from '@traderalice/opentypebb'
-import { parseBarId } from '@/domain/market-data/bars/index'
 import { intervalToMinutes } from './interval-time.js'
 
 export const MAX_INTRABAR_BARS = 5000
@@ -13,6 +11,8 @@ const INTRABAR_CANDIDATES: Record<string, string[]> = {
   '1w': ['1h', '4h', '1d'],
 }
 
+const DEFAULT_SUPPORTED_INTERVALS = ['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w']
+
 export interface IntrabarPlan {
   intrabarInterval: string
   intrabarsPerParent: number
@@ -25,7 +25,7 @@ export interface IntrabarPlan {
   degradationReason?: string
 }
 
-function candidatesFor(targetInterval: string, barId: string): string[] {
+function candidatesFor(targetInterval: string, supportedIntervals?: readonly string[]): string[] {
   const targetMinutes = intervalToMinutes(targetInterval)
   const candidates = INTRABAR_CANDIDATES[targetInterval]
     ?? (targetMinutes == null || targetMinutes <= 15
@@ -39,8 +39,8 @@ function candidatesFor(targetInterval: string, barId: string): string[] {
             : targetMinutes <= 1440
               ? ['3m', '5m', '15m', '1h']
               : ['1h', '4h', '1d'])
-  const sourceId = parseBarId(barId)?.sourceId ?? ''
-  return candidates.filter((interval) => interval !== '3m' || supportsTradingViewInternalIntrabar(sourceId, interval))
+  const supported = new Set(supportedIntervals ?? DEFAULT_SUPPORTED_INTERVALS)
+  return candidates.filter((interval) => supported.has(interval))
 }
 
 function intrabarsPerParent(parentInterval: string, intrabarInterval: string): number {
@@ -49,8 +49,12 @@ function intrabarsPerParent(parentInterval: string, intrabarInterval: string): n
   return Math.max(1, Math.ceil(parentMinutes / intrabarMinutes))
 }
 
-export function chooseIntrabarPlan(targetInterval: string, requestedCount: number, barId: string): IntrabarPlan {
-  const candidates = candidatesFor(targetInterval, barId)
+export function chooseIntrabarPlan(
+  targetInterval: string,
+  requestedCount: number,
+  supportedIntervals?: readonly string[],
+): IntrabarPlan {
+  const candidates = candidatesFor(targetInterval, supportedIntervals)
   const rejected: Array<{ interval: string; required: number }> = []
 
   for (const intrabarInterval of candidates) {
