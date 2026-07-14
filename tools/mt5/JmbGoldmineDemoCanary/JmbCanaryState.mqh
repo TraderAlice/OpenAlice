@@ -455,6 +455,32 @@ bool CanaryExactValuesMatch(const string &intended_values[],const string &verifi
    return true;
 }
 
+string CanaryCsvEscapedCell(const string value)
+{
+   bool quoted=false;
+   string escaped="";
+   for(int index=0;index<StringLen(value);index++)
+   {
+      string character=StringSubstr(value,index,1);
+      if(character=="\"" || character=="," || character=="\r" || character=="\n")
+         quoted=true;
+      if(character=="\"") escaped+="\"\"";
+      else escaped+=character;
+   }
+   return quoted ? "\""+escaped+"\"" : escaped;
+}
+
+string CanaryCsvRecord(const string &values[])
+{
+   string record="";
+   for(int index=0;index<ArraySize(values);index++)
+   {
+      if(index>0) record+=",";
+      record+=CanaryCsvEscapedCell(values[index]);
+   }
+   return record;
+}
+
 bool CanaryStatusProjectionIsPossible(const CanaryEvaluation &evaluation,
                                       const CanaryPolicy &policy,
                                       const bool execution_enabled,
@@ -497,7 +523,7 @@ bool WriteCanaryLatestStatus(const string broker,
    EnsureCanaryDirectory(broker,symbol);
    string destination_path=CanaryStatusDirectory(broker,symbol)+"\\latest_status.csv";
    string temporary_path=destination_path+"."+IntegerToString((int)GetTickCount())+".tmp";
-   int handle=FileOpen(temporary_path,FILE_WRITE|FILE_CSV|FILE_ANSI|FILE_COMMON,',');
+   int handle=FileOpen(temporary_path,FILE_WRITE|FILE_BIN|FILE_ANSI|FILE_COMMON);
    if(handle==INVALID_HANDLE)
    {
       detail="The temporary status file could not be opened.";
@@ -536,31 +562,13 @@ bool WriteCanaryLatestStatus(const string broker,
    intended_values[27]=evaluation.blockingGate;
    intended_values[28]=evaluation.nextSafeAction;
 
-   uint header_written=FileWrite(handle,
-      "schema_version","captured_at","broker","server","account_mode","symbol","state","detail",
-      "rollout_stage","execution_enabled","kill_switch","decision_id","observation_id","event_id",
-      "event_type","event_time","result_code","result_detail","stop_protection_confirmed","position_direction",
-      "position_volume","position_open_price","position_stop_loss","position_id","reconciliation_state",
-      "daily_loss_count","daily_realized_loss","blocking_gate","next_safe_action");
-   if(header_written==0)
+   string payload=CANARY_STATUS_HEADER+"\r\n"+CanaryCsvRecord(intended_values)+"\r\n";
+   uint written=FileWriteString(handle,payload);
+   if(written!=StringLen(payload))
    {
       FileClose(handle);
       FileDelete(temporary_path,FILE_COMMON);
-      detail="The strict status header could not be written completely.";
-      return false;
-   }
-   uint row_written=FileWrite(handle,
-      intended_values[0],intended_values[1],intended_values[2],intended_values[3],intended_values[4],
-      intended_values[5],intended_values[6],intended_values[7],intended_values[8],intended_values[9],
-      intended_values[10],intended_values[11],intended_values[12],intended_values[13],intended_values[14],
-      intended_values[15],intended_values[16],intended_values[17],intended_values[18],intended_values[19],
-      intended_values[20],intended_values[21],intended_values[22],intended_values[23],intended_values[24],
-      intended_values[25],intended_values[26],intended_values[27],intended_values[28]);
-   if(row_written==0)
-   {
-      FileClose(handle);
-      FileDelete(temporary_path,FILE_COMMON);
-      detail="The strict status row could not be written completely.";
+      detail="The strict status payload could not be written completely.";
       return false;
    }
    FileFlush(handle);
@@ -1044,22 +1052,11 @@ bool PersistCanaryStatusValues(const string broker,const string symbol,
    EnsureCanaryDirectory(broker,symbol);
    string destination_path=CanaryStatusDirectory(broker,symbol)+"\\latest_status.csv";
    string temporary_path=destination_path+"."+IntegerToString((long)GetTickCount())+".tmp";
-   int handle=FileOpen(temporary_path,FILE_WRITE|FILE_CSV|FILE_ANSI|FILE_COMMON,',');
+   int handle=FileOpen(temporary_path,FILE_WRITE|FILE_BIN|FILE_ANSI|FILE_COMMON);
    if(handle==INVALID_HANDLE) return false;
-   uint header_written=FileWrite(handle,
-      "schema_version","captured_at","broker","server","account_mode","symbol","state","detail",
-      "rollout_stage","execution_enabled","kill_switch","decision_id","observation_id","event_id",
-      "event_type","event_time","result_code","result_detail","stop_protection_confirmed","position_direction",
-      "position_volume","position_open_price","position_stop_loss","position_id","reconciliation_state",
-      "daily_loss_count","daily_realized_loss","blocking_gate","next_safe_action");
-   uint row_written=FileWrite(handle,
-      intended_values[0],intended_values[1],intended_values[2],intended_values[3],intended_values[4],
-      intended_values[5],intended_values[6],intended_values[7],intended_values[8],intended_values[9],
-      intended_values[10],intended_values[11],intended_values[12],intended_values[13],intended_values[14],
-      intended_values[15],intended_values[16],intended_values[17],intended_values[18],intended_values[19],
-      intended_values[20],intended_values[21],intended_values[22],intended_values[23],intended_values[24],
-      intended_values[25],intended_values[26],intended_values[27],intended_values[28]);
-   if(header_written==0 || row_written==0)
+   string payload=CANARY_STATUS_HEADER+"\r\n"+CanaryCsvRecord(intended_values)+"\r\n";
+   uint written=FileWriteString(handle,payload);
+   if(written!=StringLen(payload))
    {
       FileClose(handle);
       FileDelete(temporary_path,FILE_COMMON);
