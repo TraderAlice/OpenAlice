@@ -441,13 +441,13 @@ bool ParseCanaryGateResultsJson(const string json,bool &all_passed,string &detai
    return true;
 }
 
-string CanarySha256Identity(const string input)
+string CanarySha256Identity(const string source_text)
 {
    uchar source[];
    uchar key[];
    uchar digest[];
-   int copied=StringToCharArray(input,source,0,StringLen(input),CP_UTF8);
-   if(copied!=StringLen(input)) return "";
+   int copied=StringToCharArray(source_text,source,0,StringLen(source_text),CP_UTF8);
+   if(copied!=StringLen(source_text)) return "";
    ArrayResize(key,0);
    if(CryptEncode(CRYPT_HASH_SHA256,source,key,digest)!=32) return "";
    string hex="";

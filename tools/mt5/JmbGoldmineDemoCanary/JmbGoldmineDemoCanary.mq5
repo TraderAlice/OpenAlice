@@ -1,6 +1,6 @@
 // JMB Goldmine broker-local demo canary with one protected demo-order gateway.
 #property strict
-#property version "0.300"
+#property version "001.300"
 
 #include "JmbCanaryTypes.mqh"
 #include "JmbCanaryCsv.mqh"

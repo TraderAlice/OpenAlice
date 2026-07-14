@@ -1,7 +1,7 @@
 // JMB Goldmine demo risk shell. This Expert Advisor validates local gates and
 // writes status only. It deliberately has no trade-submit, amend, or close path.
 #property strict
-#property version "0.100"
+#property version "001.100"
 
 input string InpBrokerId = "hfmarkets";
 input string InpSymbol = "XAUUSD";
