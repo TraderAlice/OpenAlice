@@ -123,7 +123,7 @@ The exact copy layout, MetaEditor steps, inputs, Common Files paths, rollback, p
 1. The human operator recompiles the completed-D1 read-only bridge, policy script, `JmbGoldmineDemoCanary`, and no-order harness in both broker terminals. Every compile must report `0 errors, 0 warnings`, and the harness must end with `JMB_CANARY_HARNESS PASS` and zero failures.
 2. The operator writes a `status_only`, candidate-unapproved policy on each exact demo `XAUUSD` chart, enters the exact expected demo account login locally, and attaches HFM and IC with `InpDemoExecutionEnabled=false` and `InpKillSwitch=true`. Algo Trading remains disabled.
 3. The bridge stays on a duplicate Gold chart. Both `OpenAliceMt5ExecutionV1/<broker>/XAUUSD/latest_status.csv` files must advance for at least two ten-second cycles; both bridge heartbeats must also remain current. The operator confirms zero new orders and zero new positions in both terminals.
-4. Both `completed_d1.csv` files must contain a `bar_as_of` later than the stale `2026-06-23` artifact. File modification time alone is not evidence.
+4. Both `completed_d1.csv` files must contain a `bar_as_of` later than the stale `2026-06-23` artifact. File modification time alone is not evidence. The recompiled read-only bridge also refreshes the Gold `OpenAliceMt5TradeLedgerV1/<broker>/XAUUSD/deals.csv` file on a timer so the learning gate does not depend on a forgotten one-shot exporter run.
 5. Every new canary gate is compared with the existing `JmbGoldmineDemoRiskShell` output. A mismatch, missing artifact, wrong identity, or uncertain broker state leaves both brokers execution-disabled and triggers rollback to the status-only shell.
 
 This two-terminal observation is a pending human gate, not an automated test result.

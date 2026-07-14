@@ -17,10 +17,24 @@ describe('readMt5ReadOnlyBridge', () => {
     expect(source).toContain('input string InpSymbol = "XAUUSD";')
     expect(source).not.toContain('input string InpSymbol = "XAUUSDb";')
     expect(source).toContain('OUTPUT_ROOT+"\\\\"+InpBrokerId+"\\\\"+InpSymbol+"\\\\completed_d1.csv"')
+    expect(source).toContain('const string TRADE_LEDGER_ROOT = "OpenAliceMt5TradeLedgerV1";')
+    expect(source).toContain('bool WriteTradeLedger(const datetime captured_at)')
+    expect(source).toContain('HistorySelect(from_time, captured_at)')
     expect(source).toContain('%02d:%02d:%02d.000Z')
-    expect(source).toContain('IsoTime(TimeGMT())')
+    expect(source).toContain('datetime captured_at = TimeGMT()')
+    expect(source).toContain('IsoTime(captured_at)')
     expect(source).not.toContain('IsoTime(TimeCurrent())')
     expect(source).not.toContain('IsoTime(tick.time)')
+  })
+
+  it('keeps the bridge read-only with no order-capable calls', async () => {
+    const source = await readFile(join(process.cwd(), 'tools', 'mt5', 'OpenAliceMt5ReadOnlyBridge.mq5'), 'utf8')
+
+    expect(source).not.toMatch(/\bOrderSend\s*\(/)
+    expect(source).not.toMatch(/\bOrderCheck\s*\(/)
+    expect(source).not.toMatch(/\bCTrade\b/)
+    expect(source).not.toMatch(/\btrade\.(Buy|Sell)\s*\(/)
+    expect(source).not.toMatch(/\bPositionClose\s*\(/)
   })
 
   it('accepts a fresh demo-only read-only heartbeat', async () => {

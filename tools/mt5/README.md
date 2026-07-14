@@ -109,7 +109,7 @@ Run this check at normal market conditions, around rollover, and during a major-
 
 ## Read-Only MT5 Connector (Phase 1)
 
-`OpenAliceMt5ReadOnlyBridge.mq5` is the first connector component. Attach it as an Expert Advisor to the Gold chart in each **demo** terminal; it writes a fresh local heartbeat every 30 seconds. OpenAlice reads that heartbeat to show terminal mode, server, quote/spread, and open position/order counts in the Research Desk.
+`OpenAliceMt5ReadOnlyBridge.mq5` is the first connector component. Attach it as an Expert Advisor to the Gold chart in each **demo** terminal; it writes a fresh local heartbeat every 30 seconds. OpenAlice reads that heartbeat to show terminal mode, server, quote/spread, and open position/order counts in the Research Desk. The bridge also refreshes Gold completed-D1 bars, spread samples, and a read-only Gold trade ledger for learning evidence.
 
 It has no `CTrade` dependency and no order-placement, amendment, or cancellation function. A heartbeat from a non-demo account is displayed as unsafe and does not advance the connector.
 
@@ -128,9 +128,11 @@ The bridge remains read-only. Plan 3 adds a separate broker-local demo-canary EA
 
 ## Read-only trade ledger exporter
 
-`ExportMt5TradeLedger.mq5` exports MT5 deal history for one broker/symbol into MetaTrader Common Files:
+`OpenAliceMt5ReadOnlyBridge.mq5` now refreshes the Gold `XAUUSD` trade ledger automatically every `InpTradeLedgerRefreshMinutes` minutes after the bridge is recompiled and reattached. It writes MT5 deal history for the configured broker/symbol into MetaTrader Common Files:
 
 `OpenAliceMt5TradeLedgerV1/<broker>/<symbol>/deals.csv`
+
+`ExportMt5TradeLedger.mq5` remains available as a one-shot manual exporter, especially for EURUSD shadow-learning ledgers or for an immediate manual catch-up before the next bridge refresh.
 
 Use it on demo accounts first:
 
@@ -143,7 +145,7 @@ Use it on demo accounts first:
    - IC Markets demo Gold: `InpBrokerId=icmarkets`, `InpSymbol=XAUUSD`
    - IC Markets demo EURUSD: `InpBrokerId=icmarkets`, `InpSymbol=EURUSD`
 
-The exporter is read-only. It does not submit, modify, or close orders. If the exported account mode is not `demo`, JMB Goldmine must show the ledger as blocked for demo-autopilot progression.
+Both the bridge ledger refresh and the exporter are read-only. They do not submit, modify, or close orders. If the exported account mode is not `demo`, JMB Goldmine must show the ledger as blocked for demo-autopilot progression.
 
 ## Demo risk shell, no order submission
 
@@ -175,7 +177,7 @@ Codex does not launch MetaEditor, compile MQL, attach an EA, enable Algo Trading
 
 Perform these steps separately in the HFM demo terminal and the IC Markets demo terminal. Use each terminal's **File -> Open Data Folder** so files are copied into the correct installation.
 
-1. Re-copy `OpenAliceMt5ReadOnlyBridge.mq5` to `MQL5\Experts\OpenAliceMt5ReadOnlyBridge.mq5`. This version exports the latest 300 completed D1 bars and bounded spread samples in addition to its read-only heartbeat; recompile it even if an older bridge is already attached.
+1. Re-copy `OpenAliceMt5ReadOnlyBridge.mq5` to `MQL5\Experts\OpenAliceMt5ReadOnlyBridge.mq5`. This version exports the latest 300 completed D1 bars, bounded spread samples, and the read-only Gold trade ledger in addition to its read-only heartbeat; recompile it even if an older bridge is already attached.
 2. Copy `ConfigureJmbGoldmineDemoPolicy.mq5` to `MQL5\Scripts\ConfigureJmbGoldmineDemoPolicy.mq5`.
 3. Copy the complete repository folder `JmbGoldmineDemoCanary\` to `MQL5\Experts\JmbGoldmineDemoCanary\`. Preserve `JmbGoldmineDemoCanary.mq5` and every sibling `.mqh` file in that layout.
 4. Copy `tests\JmbGoldmineDemoCanaryHarness.mq5` to `MQL5\Experts\tests\JmbGoldmineDemoCanaryHarness.mq5`, preserving its relative path to `..\JmbGoldmineDemoCanary\`.
