@@ -574,26 +574,13 @@ bool WriteCanaryLatestStatus(const string broker,
    FileFlush(handle);
    FileClose(handle);
 
-   string expected_fields[];
-   string header_copy=CANARY_STATUS_HEADER;
-   if(StringSplit(header_copy,(ushort)StringGetCharacter(",",0),expected_fields)!=29)
-   {
-      FileDelete(temporary_path,FILE_COMMON);
-      detail="The internal strict status schema is invalid.";
-      return false;
-   }
-   string verified_values[];
+   string verified_payload="";
    string verification_detail="";
-   if(!ReadStrictCanaryCsv(temporary_path,expected_fields,verified_values,verification_detail))
+   if(!ReadCanaryCommonText(temporary_path,verified_payload,verification_detail)
+      || verified_payload!=payload)
    {
       FileDelete(temporary_path,FILE_COMMON);
-      detail="The temporary status file failed strict completeness verification.";
-      return false;
-   }
-   if(!CanaryExactValuesMatch(intended_values,verified_values))
-   {
-      FileDelete(temporary_path,FILE_COMMON);
-      detail="The temporary status file did not preserve every intended field exactly.";
+      detail="The temporary status file did not preserve the exact payload.";
       return false;
    }
 
@@ -813,6 +800,30 @@ void InitializeCanarySafetyLatch(CanarySafetyLatch &latch)
 {
    ZeroMemory(latch);
    latch.valid=false;
+   latch.unresolved=false;
+   latch.protectionError=false;
+   latch.pendingCloseDecisionId="";
+   latch.pendingCloseObservationId="";
+   latch.emergencyCloseAttempted=false;
+   latch.emergencyPositionId="";
+   latch.pendingEntryDecisionId="";
+   latch.pendingEntryObservationId="";
+   latch.pendingEntryAttemptedAt=0;
+   latch.pendingEntryOrderId="";
+   latch.pendingEntryDealId="";
+   latch.pendingRequestedVolume=0.0;
+   latch.pendingRequestedPrice=0.0;
+   latch.pendingRequestedStopLoss=0.0;
+   latch.pendingCalculatedRisk=0.0;
+   latch.pendingEntryComment="";
+   latch.activePositionDecisionId="";
+   latch.activePositionObservationId="";
+   latch.activePositionId="";
+   latch.activeRequestedVolume=0.0;
+   latch.activeRequestedPrice=0.0;
+   latch.activeRequestedStopLoss=0.0;
+   latch.activeCalculatedRisk=0.0;
+   latch.activeEntryComment="";
 }
 
 bool LoadCanarySafetyLatch(const string broker,const string symbol,
@@ -1064,17 +1075,14 @@ bool PersistCanaryStatusValues(const string broker,const string symbol,
    }
    FileFlush(handle);
    FileClose(handle);
-   string expected_fields[];
-   string header_copy=CANARY_STATUS_HEADER;
-   StringSplit(header_copy,(ushort)StringGetCharacter(",",0),expected_fields);
-   string verified_values[];
+   string verified_payload="";
    string verify_detail="";
-   if(!ReadStrictCanaryCsv(temporary_path,expected_fields,verified_values,verify_detail)
-      || !CanaryExactValuesMatch(intended_values,verified_values)
+   if(!ReadCanaryCommonText(temporary_path,verified_payload,verify_detail)
+      || verified_payload!=payload
       || !FileMove(temporary_path,FILE_COMMON,destination_path,FILE_COMMON|FILE_REWRITE))
    {
       FileDelete(temporary_path,FILE_COMMON);
-      detail="The authoritative status failed exact atomic verification.";
+      detail="The authoritative status failed exact payload verification or atomic replacement.";
       return false;
    }
    detail="The authoritative Task 5-compatible latest status was replaced atomically.";

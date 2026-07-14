@@ -8,6 +8,14 @@
 
 **Tech Stack:** TypeScript 5.9, Node.js file APIs, Vitest 4, Hono, React 19, MQL5, MT5 Common Files CSV/JSONL.
 
+## Operational Note — 2026-07-14
+
+- HFM and IC Markets XAUUSD read-only bridges are publishing current Common Files status.
+- HFM and IC Markets canary EAs compile cleanly and publish `OpenAliceMt5ExecutionV1/<broker>/XAUUSD/latest_status.csv`.
+- The no-order harness passed, then its compiled `.ex5` copies were disabled in the operator MT5 folders so it does not run during forward monitoring.
+- A false `reconciliation_required` state was traced to MQL5 `ZeroMemory` leaving latch string fields as `(null)`; `InitializeCanarySafetyLatch` now explicitly clears every latch field.
+- Current broker-local state is safe-disabled: `state=disabled`, `execution_enabled=0`, `kill_switch=1`; enabling demo evaluation/trading still requires a separate approved demo canary ceremony.
+
 ## Global Constraints
 
 - Source design: `docs/superpowers/specs/2026-07-13-jmb-goldmine-demo-canary-execution-design.md`.
