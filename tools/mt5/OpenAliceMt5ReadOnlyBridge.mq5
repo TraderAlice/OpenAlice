@@ -1,7 +1,7 @@
 // OpenAlice MT5 read-only bridge. This Expert Advisor does not include any
 // trade function and cannot place, change, or cancel orders.
 #property strict
-#property version "0.1.0"
+#property version "0.100"
 
 input string InpBrokerId = "hfmarkets";
 input string InpSymbol = "XAUUSD";
@@ -51,7 +51,7 @@ bool WriteCompletedD1()
    FileWrite(handle,"schema_version","captured_at","broker","server","account_mode","symbol","bar_as_of","bar_open_epoch","open","high","low","close");
    for(int i=0;i<copied;i++)
       FileWrite(handle,1,IsoTime(captured_at),InpBrokerId,AccountInfoString(ACCOUNT_SERVER),AccountModeLabel(),InpSymbol,
-         TimeToString(rates[i].time,TIME_DATE),LongToString((long)rates[i].time),rates[i].open,rates[i].high,rates[i].low,rates[i].close);
+         TimeToString(rates[i].time,TIME_DATE),IntegerToString((long)rates[i].time),rates[i].open,rates[i].high,rates[i].low,rates[i].close);
    FileFlush(handle);
    FileClose(handle);
    return ReplaceCommonFile(temp_path,final_path);
