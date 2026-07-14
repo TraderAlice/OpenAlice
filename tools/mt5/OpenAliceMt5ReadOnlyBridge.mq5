@@ -1,7 +1,7 @@
 // OpenAlice MT5 read-only bridge. This Expert Advisor does not include any
 // trade function and cannot place, change, or cancel orders.
 #property strict
-#property version "001.100"
+#property version "1.100"
 
 input string InpBrokerId = "hfmarkets";
 input string InpSymbol = "XAUUSD";

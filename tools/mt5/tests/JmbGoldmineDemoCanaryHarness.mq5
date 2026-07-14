@@ -1,6 +1,6 @@
 // Table-driven, submission-free harness for the Task 6 demo-canary pure contracts.
 #property strict
-#property version "001.200"
+#property version "1.200"
 
 #include "..\JmbGoldmineDemoCanary\JmbCanaryTypes.mqh"
 #include "..\JmbGoldmineDemoCanary\JmbCanaryGates.mqh"
