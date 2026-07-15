@@ -1,0 +1,8 @@
+{
+  "name": "open-alice",
+  "version": "0.0.0-remote-smoke",
+  "type": "module",
+  "scripts": {
+    "build:server": "node -e \"process.exit(0)\""
+  }
+}

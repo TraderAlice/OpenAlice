@@ -17,7 +17,7 @@ GitHub navigation.
 | [[docs/local-runtime.md]] | [Local Runtime and CLI bootstrap](local-runtime.md) | Source-backed localhost startup, dependency bootstrap, Runtime ownership, and headless bundle boundary |
 | [[docs/data-locations.md]] | [Data locations](data-locations.md) | Complete-home selection, desktop launcher preferences, concurrent instances, and directory safety |
 | [[docs/docker-deployment.md]] | [Docker deployment](docker-deployment.md) | Server image topology, remote-host safety, persistence, health, and container acceptance |
-| [[docs/remote-access.md]] | [Remote access](remote-access.md) | SSH tunnel experiment, local/remote ownership, and staged remote-control boundaries |
+| [[docs/remote-access.md]] | [Remote Runtime and access](remote-access.md) | Server lifecycle, SSH transport, managed remote bootstrap, client authority, and staged Studio protocol |
 | [[docs/connector-service.md]] | [Connector Service](connector-service.md) | Optional Discord/Telegram Inbox projection, adapters, secrets, health, Guardian lifecycle |
 | [[docs/ui-interaction-and-motion.md]] | [UI interaction and motion](ui-interaction-and-motion.md) | Clickable affordances, shared motion tokens, entrances/disclosures, reduced-motion policy |
 | [[docs/workspace-agent-guidance.md]] | [Workspace agent guidance](workspace-agent-guidance.md) | Always-loaded prompt contract, skill ownership, live CLI authority, guidance versioning |
@@ -35,7 +35,10 @@ guides.
 Reference notes under `docs/reference/` are non-authoritative research
 material. The [installer script note](reference/install-script/README.md)
 records Claude Code and Codex upstream links and design lessons without
-vendoring third-party code.
+vendoring third-party code. The
+[Herdr remote Runtime note](reference/herdr-remote-architecture.md) records a
+pinned public-source architecture comparison behind the authoritative remote
+guide, also without vendoring third-party code.
 
 ## Maintenance Rule
 

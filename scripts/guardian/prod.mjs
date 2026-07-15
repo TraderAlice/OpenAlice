@@ -27,7 +27,7 @@
  */
 
 import { spawn } from 'node:child_process'
-import { createDecipheriv } from 'node:crypto'
+import { createDecipheriv, randomUUID } from 'node:crypto'
 import { mkdir, readFile, watch } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
@@ -36,6 +36,7 @@ import {
   currentProcessStartedAt,
   takeoverRequested,
 } from '@traderalice/guardian-runtime'
+import { startGuardianControlServer } from './control-server.mjs'
 
 const DATA_HOME = process.env.OPENALICE_HOME
   ?? process.env.OPENALICE_USER_DATA_HOME // deprecated alias, one-release courtesy
@@ -47,6 +48,8 @@ const NODE_BINARY = process.env.OPENALICE_NODE_BINARY?.trim() || process.execPat
 const BIND_HOST = process.env.OPENALICE_BIND_HOST?.trim() || '127.0.0.1'
 const GUARDIAN_STARTED_AT = currentProcessStartedAt()
 const TAKEOVER = takeoverRequested()
+const SERVER_MODE = process.env.OPENALICE_SERVER_MODE?.trim() || 'foreground'
+const GUARDIAN_INSTANCE_ID = randomUUID()
 if (!process.env.OPENALICE_HOME && process.env.OPENALICE_USER_DATA_HOME) {
   console.warn('[guardian/prod] OPENALICE_USER_DATA_HOME is deprecated — set OPENALICE_HOME instead')
 }
@@ -171,12 +174,18 @@ let TRADING_MODE = await resolveTradingMode(process.env, DATA_HOME)
 const LITE_MODE = TRADING_MODE.mode === 'lite'
 
 let stopping = false
+let shutdownExitCode = 0
 let utaChild = null
 let connectorChild = null
 let aliceChild = null
 let restartingUTA = false
 let restartingConnector = false
 let guardianRuntimeLock = null
+let guardianControlServer = null
+let aliceStatus = 'starting'
+let utaStatus = LITE_MODE ? 'disabled' : 'starting'
+let connectorStatus = 'disabled'
+const RUNTIME_VERSION = await readRuntimeVersion()
 
 console.log('[guardian/prod] starting')
 console.log(`[guardian/prod] mode  → ${TRADING_MODE.mode} (${TRADING_MODE.source}${TRADING_MODE.envLocked ? ', env-locked' : ''})`)
@@ -187,6 +196,42 @@ console.log(`[guardian/prod] Alice → http://${BIND_HOST}:${WEB_PORT}`)
 console.log(`[guardian/prod] Tools → http://127.0.0.1:${MCP_PORT}/cli`)
 console.log(`[guardian/prod] MCP   → optional on http://127.0.0.1:${MCP_PORT}/mcp`)
 console.log(`[guardian/prod] flags → ${FLAG_PATH}, ${CONNECTOR_FLAG_PATH}`)
+
+async function readRuntimeVersion() {
+  try {
+    const manifest = JSON.parse(await readFile(resolve(process.cwd(), 'package.json'), 'utf8'))
+    return typeof manifest.version === 'string' ? manifest.version : 'dev'
+  } catch {
+    return 'dev'
+  }
+}
+
+function runtimeStatus() {
+  const owner = guardianRuntimeLock?.owner
+  return {
+    protocol: 1,
+    runtimeVersion: RUNTIME_VERSION,
+    state: stopping ? 'stopping' : aliceStatus === 'ready' ? 'running' : 'starting',
+    home: resolve(DATA_HOME),
+    owner: {
+      surface: LAUNCHER,
+      pid: process.pid,
+      instanceId: GUARDIAN_INSTANCE_ID,
+      startedAt: owner?.acquiredAt ?? new Date(GUARDIAN_STARTED_AT).toISOString(),
+      launchRoot: resolve(process.env.OPENALICE_APP_HOME ?? process.cwd()),
+      mode: SERVER_MODE,
+    },
+    endpoints: {
+      web: `http://${BIND_HOST}:${WEB_PORT}`,
+    },
+    components: {
+      alice: aliceStatus,
+      uta: utaStatus,
+      connector: connectorStatus,
+    },
+    capabilities: LAUNCHER === 'cli-server' ? ['runtime.stop'] : [],
+  }
+}
 
 async function readConnectorEnabled() {
   try {
@@ -219,6 +264,7 @@ function spawnUTA() {
   const child = spawn(spec.cmd, spec.args, { env: spec.env, stdio: 'inherit' })
   child.once('exit', (code, signal) => {
     if (stopping || restartingUTA) return
+    utaStatus = 'offline'
     console.error(`[guardian/prod] UTA exited unexpectedly (code=${code}, signal=${signal}) — trading offline, Alice stays up`)
   })
   return child
@@ -240,6 +286,7 @@ function spawnConnector() {
   })
   child.once('exit', (code, signal) => {
     if (stopping || restartingConnector) return
+    connectorStatus = 'offline'
     console.error(`[guardian/prod] Connector exited unexpectedly (code=${code}, signal=${signal}) — external notifications offline, Alice stays up`)
   })
   return child
@@ -265,8 +312,9 @@ function spawnAlice() {
   })
   child.once('exit', (code, signal) => {
     if (stopping) return
+    aliceStatus = 'offline'
     console.error(`[guardian/prod] Alice exited unexpectedly (code=${code}, signal=${signal})`)
-    shutdown()
+    shutdown(typeof code === 'number' && code !== 0 ? code : 1)
   })
   return child
 }
@@ -278,6 +326,22 @@ async function waitForUTA() {
     try {
       const res = await fetch(url)
       if (res.ok) return true
+    } catch { /* not ready */ }
+    await sleep(200)
+  }
+  return false
+}
+
+async function waitForAlice() {
+  const url = `http://127.0.0.1:${WEB_PORT}/api/auth/status`
+  const deadline = Date.now() + 60_000
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(url)
+      if (res.ok) {
+        const body = await res.json()
+        if (typeof body?.authed === 'boolean' && typeof body?.tokenConfigured === 'boolean') return true
+      }
     } catch { /* not ready */ }
     await sleep(200)
   }
@@ -307,10 +371,12 @@ async function restartConnector() {
       restartingConnector = false
       connectorChild = null
     }
+    connectorStatus = 'disabled'
     return
   }
   if (restartingConnector) return
   restartingConnector = true
+  connectorStatus = 'starting'
   try {
     const old = connectorChild
     if (old && old.exitCode === null) {
@@ -324,6 +390,7 @@ async function restartConnector() {
     }
     connectorChild = spawnConnector()
     const ready = await waitForConnector()
+    connectorStatus = ready ? 'ready' : 'offline'
     if (!ready) console.error('[guardian/prod] Connector did not become ready')
     else console.log('[guardian/prod] Connector ready')
   } finally {
@@ -344,15 +411,18 @@ async function restartUTA() {
     } else {
       console.warn('[guardian/prod] restart-uta.flag ignored — trading mode lite disables UTA')
     }
+    utaStatus = 'disabled'
     return
   }
   if (restartingUTA) return
   restartingUTA = true
+  utaStatus = 'starting'
   try {
     if (!utaChild) {
       console.log(`[guardian/prod] trading mode ${TRADING_MODE.mode} — starting UTA`)
       utaChild = spawnUTA()
       const ready = await waitForUTA()
+      utaStatus = ready ? 'ready' : 'offline'
       if (!ready) console.error('[guardian/prod] UTA did not come up')
       else console.log('[guardian/prod] UTA ready')
       return
@@ -370,6 +440,7 @@ async function restartUTA() {
     }
     utaChild = spawnUTA()
     const ready = await waitForUTA()
+    utaStatus = ready ? 'ready' : 'offline'
     if (!ready) {
       console.error('[guardian/prod] UTA did not come back up after restart')
     } else {
@@ -380,9 +451,13 @@ async function restartUTA() {
   }
 }
 
-function shutdown() {
+function shutdown(exitCode = 0) {
+  shutdownExitCode = Math.max(shutdownExitCode, exitCode)
   if (stopping) return
   stopping = true
+  if (aliceChild) aliceStatus = 'stopping'
+  if (utaChild) utaStatus = 'stopping'
+  if (connectorChild) connectorStatus = 'stopping'
   console.log('[guardian/prod] shutting down')
   for (const c of [utaChild, connectorChild, aliceChild]) {
     if (c && c.exitCode === null && !c.killed) {
@@ -391,16 +466,20 @@ function shutdown() {
   }
   setTimeout(() => {
     for (const c of [utaChild, connectorChild, aliceChild]) {
-      if (c && c.exitCode === null && !c.killed) {
+      if (c && c.exitCode === null) {
         try { c.kill('SIGKILL') } catch { /* noop */ }
       }
     }
+    const currentControl = guardianControlServer
+    guardianControlServer = null
     const current = guardianRuntimeLock
     guardianRuntimeLock = null
-    void Promise.resolve(current?.release())
+    void Promise.resolve(currentControl?.close())
+      .catch((err) => console.error('[guardian/prod] control endpoint close failed:', err))
+      .then(() => current?.release())
       .catch((err) => console.error('[guardian/prod] runtime lock release failed:', err))
-      .finally(() => process.exit(0))
-  }, 5_000).unref()
+      .finally(() => process.exit(shutdownExitCode))
+  }, 5_000)
 }
 
 process.on('SIGINT', shutdown)
@@ -449,23 +528,41 @@ async function main() {
   })
   if (TAKEOVER) console.log('[guardian/prod] takeover → previous OpenAlice runtime stopped')
 
+  guardianControlServer = await startGuardianControlServer({
+    homeRoot: DATA_HOME,
+    allowStop: LAUNCHER === 'cli-server',
+    getStatus: runtimeStatus,
+    onStop: () => shutdown(),
+  })
+  console.log(`[guardian/prod] Control → ${guardianControlServer.endpoint}`)
+
   if (TRADING_MODE.mode !== 'lite') {
+    utaStatus = 'starting'
     utaChild = spawnUTA()
     void waitForUTA().then((ready) => {
+      utaStatus = ready ? 'ready' : 'offline'
       if (ready) console.log('[guardian/prod] UTA ready')
       else console.warn('[guardian/prod] UTA did not become ready within 15s — continuing with trading offline')
     })
   }
 
   if (await readConnectorEnabled()) {
+    connectorStatus = 'starting'
     connectorChild = spawnConnector()
     void waitForConnector().then((ready) => {
+      connectorStatus = ready ? 'ready' : 'offline'
       if (ready) console.log('[guardian/prod] Connector ready')
       else console.warn('[guardian/prod] Connector did not become ready within 15s — external notifications offline')
     })
   }
 
+  aliceStatus = 'starting'
   aliceChild = spawnAlice()
+  void waitForAlice().then((ready) => {
+    aliceStatus = ready ? 'ready' : 'offline'
+    if (ready) console.log('[guardian/prod] Alice ready')
+    else console.error('[guardian/prod] Alice did not become ready within 60s')
+  })
   // Alice may create connector-service.json while applying the migration from
   // the retired Telegram config. Reconcile once after its startup path.
   void (async () => {
@@ -477,6 +574,5 @@ async function main() {
 
 main().catch((err) => {
   console.error('[guardian/prod] fatal:', err)
-  shutdown()
-  process.exit(1)
+  shutdown(1)
 })

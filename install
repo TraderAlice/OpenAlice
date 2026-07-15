@@ -392,7 +392,10 @@ FILES=(
   "package.json"
   "bin/openalice.mjs"
   "src/local-start.mjs"
+  "src/remote.mjs"
   "src/runtime-client.mjs"
+  "src/server.mjs"
+  "src/server-control.mjs"
   "src/ssh-connect.mjs"
 )
 
@@ -417,7 +420,10 @@ step 3 "Verifying the CLI"
 chmod +x "$STAGING/bin/openalice.mjs"
 node --check "$STAGING/bin/openalice.mjs"
 node --check "$STAGING/src/local-start.mjs"
+node --check "$STAGING/src/remote.mjs"
 node --check "$STAGING/src/runtime-client.mjs"
+node --check "$STAGING/src/server.mjs"
+node --check "$STAGING/src/server-control.mjs"
 node --check "$STAGING/src/ssh-connect.mjs"
 
 CLI_VERSION="$(node -e '

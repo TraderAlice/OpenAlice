@@ -5,6 +5,7 @@ import { dirname, join, resolve } from 'node:path'
 
 import {
   LOOPBACK,
+  createStartupSignalGuard,
   openBrowser,
   probeOpenAlice,
   waitForOpenAlice,
@@ -116,6 +117,8 @@ export async function startLocal(options, dependencies = {}) {
   })
 
   let ready = false
+  const readinessAbort = new AbortController()
+  const startupSignals = createStartupSignalGuard(runtime, 'Local OpenAlice start')
   const earlyFailure = new Promise((_, reject) => {
     runtime.once('error', reject)
     runtime.once('exit', (code, signal) => {
@@ -127,17 +130,22 @@ export async function startLocal(options, dependencies = {}) {
 
   try {
     await Promise.race([
-      waitForRuntime(localUrl, { timeoutMs: options.waitMs }),
+      waitForRuntime(localUrl, { timeoutMs: options.waitMs, signal: readinessAbort.signal }),
       earlyFailure,
+      startupSignals.promise,
     ])
     ready = true
+    const runtimeExit = holdRuntime(runtime)
+    startupSignals.release()
     stdout.write(`OpenAlice source: ${appDir}\n`)
     stdout.write(`OpenAlice home: ${homeRoot}\n`)
     stdout.write(`Local OpenAlice UI: ${localUrl}\n`)
     stdout.write('The local Runtime stays active until this command exits. Press Ctrl+C to stop it.\n')
     if (options.openBrowser) await launchBrowser(localUrl)
-    return await holdRuntime(runtime)
+    return await runtimeExit
   } catch (error) {
+    readinessAbort.abort()
+    startupSignals.release()
     runtime.kill('SIGTERM')
     throw error
   }

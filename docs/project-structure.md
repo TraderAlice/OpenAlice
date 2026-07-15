@@ -15,20 +15,23 @@ Related guides: [[docs/managed-workspace-runtime.md]],
 
 ## Runtime Topology
 
-OpenAlice has two long-running service processes supervised by Guardian:
+OpenAlice has two principal long-running service processes plus an optional
+Connector Service supervised by Guardian:
 
 ```text
 Guardian
+├── built Runtime control    versioned status + self-owned Server stop
 ├── Alice                    Workspace runtime + product/API process
 │   ├── Web UI transport     HTTP/Vite in dev, app:// + IPC in Electron
 │   ├── Workspace PTYs       claude / codex / opencode / pi / shell
 │   ├── ToolCenter           market, news, analysis, Inbox, UTA bridges
 │   └── file-backed state    config, sessions, issues, schedules, tool-call log
-└── UTA                      broker carrier and trading authority
-    ├── broker connections
-    ├── account state
-    ├── staged/committed trading operations
-    └── snapshots, FX, and execution
+├── UTA                      broker carrier and trading authority
+│   ├── broker connections
+│   ├── account state
+│   ├── staged/committed trading operations
+│   └── snapshots, FX, and execution
+└── Connector Service        optional external Inbox notification adapters
 ```
 
 Launchers share the same ownership model:
@@ -38,7 +41,9 @@ Launchers share the same ownership model:
   host. It starts Alice/UTA through Electron's Node mode.
 - `scripts/guardian/prod.mjs` supervises built Runtime services for Docker and
   the source-backed local CLI. Docker defaults to the `docker` launcher;
-  `openalice` supplies the distinct `cli` launcher and a loopback bind.
+  `openalice start` supplies the `cli` launcher, while `openalice server`
+  supplies `cli-server` plus a versioned local status/stop capability. All CLI
+  browser and SSH paths keep Alice on loopback.
 - `packages/guardian-runtime/` owns cross-launcher single-writer locks,
   heartbeat metadata, process identity, and controlled takeover.
 
@@ -87,7 +92,7 @@ packages/
 
 ui/                            React/Vite renderer
 apps/desktop/                  Electron main/preload/IPC shell
-scripts/guardian/              dev and production supervisors + smoke tests
+scripts/guardian/              dev/prod supervisors, local control + recovery tests
 default/                       shipped skills and factory defaults
 docs/                          owner guides and contributor documentation
 ```

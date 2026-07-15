@@ -106,6 +106,36 @@ Workspaces, runtime locks, credentials, and optional Broker Packs. See
 Use `--rebuild` after pulling source changes when existing build artifacts may
 be stale. Never use a real user-state root for launcher or recovery tests.
 
+## Server Lifecycle
+
+The browser convenience command and a persistent Server are separate lifetime
+contracts. `openalice start` remains foreground and browser-oriented. The
+installed Server surface is:
+
+```bash
+openalice server run [app-dir]     # foreground, no browser
+openalice server start [app-dir]   # detached, wait for real readiness
+openalice server status            # read-only, with stable --json output
+openalice server stop              # ask the owning Guardian to stop itself
+```
+
+These commands reuse the same checkout preparation, build artifacts,
+`OPENALICE_HOME`, loopback binding, Guardian lease, optional-component policy,
+and explicit `--takeover` rule as local start. They do not introduce a second
+launcher or a PID-file kill path. Detached start succeeds only after Guardian
+ownership, the local control endpoint, and Alice HTTP are ready.
+
+The control endpoint is local to the selected home and is not an Alice HTTP
+route. `server stop` sends a versioned structured request to a matching CLI
+Server, then waits for Guardian's normal child shutdown and ownership release.
+It refuses to guess at an unreachable PID or silently stop an Electron-owned
+Runtime. Exact status classes, control fields, recovery rules, and the managed
+SSH composition live in [[docs/remote-access.md]].
+
+The detached path is still source-backed: the checkout supplies the built
+Runtime while the installed CLI supplies lifecycle and transport control. A
+future standalone bundle changes preparation, not these ownership semantics.
+
 ## Dependency Bootstrap Direction
 
 Keep bootstrap observable and layered:
@@ -119,6 +149,10 @@ Keep bootstrap observable and layered:
 4. A future release asset can replace the source/build requirement with a
    downloadable headless Runtime while retaining the same CLI and localhost
    contract.
+
+The same Server command contract survives that transition. Source-backed and
+standalone-bundle Runtime providers differ in preparation, not in ownership,
+status, stop, browser, or SSH behavior.
 
 Do not silently place every optional agent runtime into Electron or the curl
 installer. The same dependency plan must remain inspectable and independently
@@ -145,6 +179,7 @@ When this surface changes:
 2. Run `pnpm build:server` and start with an isolated `--home` and test port.
 3. Open the real localhost route and verify the auth contract and Workspace UI.
 4. Run Guardian recovery checks when launcher ownership changes.
-5. Run Docker smoke when `scripts/guardian/prod.mjs` changes.
-6. Run Electron PTY/package smoke when dependency topology or shared Runtime
+5. Run `pnpm test:remote:docker` when managed SSH or Server lifecycle changes.
+6. Run Docker smoke when `scripts/guardian/prod.mjs` changes.
+7. Run Electron PTY/package smoke when dependency topology or shared Runtime
    behavior changes, even though the CLI itself does not package Electron.

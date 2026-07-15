@@ -60,12 +60,23 @@ bin_dir="$HOME/.openalice/bin"
 versions_dir="$HOME/.openalice/cli-versions"
 [[ "$($bin_dir/openalice --version)" == "0.2.0" ]] || fail "installed CLI version check failed"
 "$bin_dir/openalice" --help | grep -Fq "OpenAlice CLI" || fail "installed CLI help check failed"
+server_status="$($bin_dir/openalice server status --home "$HOME/openalice-server-smoke" --json)"
+node -e '
+const status = JSON.parse(process.argv[1]);
+if (status.class !== "absent" || status.state !== "absent") process.exit(1);
+' "$server_status" || fail "installed CLI server status check failed"
 [[ -f "$bin_dir/openalice.cmd" ]] || fail "Windows launcher was not installed"
 [[ ! -e "$HOME/.openalice/.cli-install.lock" ]] || fail "installer lock was not released"
 v1_release="$(find "$versions_dir" -mindepth 1 -maxdepth 1 -type d -name 'smoke-v1-*' -print -quit)"
 [[ -n "$v1_release" && -f "$v1_release/bin/openalice.mjs" ]] || fail "content-addressed CLI release was not installed"
 cmp /fixture/packages/cli/src/local-start.mjs "$v1_release/src/local-start.mjs" \
   || fail "downloaded CLI file differs from the fixture"
+cmp /fixture/packages/cli/src/remote.mjs "$v1_release/src/remote.mjs" \
+  || fail "downloaded Remote CLI file differs from the fixture"
+cmp /fixture/packages/cli/src/server.mjs "$v1_release/src/server.mjs" \
+  || fail "downloaded Server CLI file differs from the fixture"
+cmp /fixture/packages/cli/src/server-control.mjs "$v1_release/src/server-control.mjs" \
+  || fail "downloaded Server control file differs from the fixture"
 
 expected_path_line="export PATH=$HOME/.openalice/bin:\$PATH"
 path_count="$(grep -Fxc "$expected_path_line" "$HOME/.bashrc" || true)"

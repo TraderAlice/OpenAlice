@@ -60,9 +60,14 @@ assets and a release-owned authenticity chain; see
 - `packages/cli/package.json` — CLI version, engine requirement, bin entry, and
   published file list.
 - `packages/cli/bin/openalice.mjs` — installed command entry point.
+- `packages/cli/src/server{,-control}.mjs` — detached lifecycle and the
+  Guardian control client.
+- `packages/cli/src/remote.mjs` — consent-first managed SSH orchestration.
 - `packages/cli/src/install.spec.mjs` — plan, consent, PTY, layout, and live-lock
   contract tests.
 - `scripts/install-docker-smoke.mjs` — local Docker acceptance runner.
+- `scripts/remote-ssh-smoke.mjs` — local clean-host Server/SSH acceptance
+  runner; its product contract belongs to [[docs/remote-access.md]].
 - `scripts/install-smoke/` — clean user, local HTTP fixture, automated smoke,
   and manual playground.
 - `docs/local-runtime.md` — behavior after the installed command starts a
@@ -340,6 +345,8 @@ exercises the same remote-download branch as `curl | bash`. It verifies:
 - unattended refusal before the install root exists;
 - stale-lock recovery and lock cleanup;
 - downloaded payload equality;
+- installed `server status --json` execution and inclusion of every reachable
+  Server/remote module;
 - runnable shell and CMD launchers;
 - idempotent managed PATH configuration;
 - identical-release reuse;

@@ -38,6 +38,7 @@ export async function waitForOpenAlice(baseUrl, options = {}) {
   let lastError = 'connection refused'
 
   while (Date.now() < deadline) {
+    if (options.signal?.aborted) throw new Error(`OpenAlice readiness wait was cancelled at ${baseUrl}`)
     try {
       const response = await fetchImpl(`${baseUrl}/api/auth/status`, {
         signal: AbortSignal.timeout(Math.min(2_000, Math.max(250, deadline - Date.now()))),
@@ -52,9 +53,36 @@ export async function waitForOpenAlice(baseUrl, options = {}) {
     } catch (error) {
       lastError = error instanceof Error ? error.message : String(error)
     }
-    await new Promise((resolve) => setTimeout(resolve, pollMs))
+    if (await sleepOrAbort(pollMs, options.signal)) {
+      throw new Error(`OpenAlice readiness wait was cancelled at ${baseUrl}`)
+    }
   }
   throw new Error(`OpenAlice did not become ready at ${baseUrl} within ${Math.ceil(timeoutMs / 1_000)}s (${lastError})`)
+}
+
+export function createStartupSignalGuard(runtime, label) {
+  let interrupted = false
+  let rejectSignal
+  const promise = new Promise((_, rejectPromise) => {
+    rejectSignal = rejectPromise
+  })
+  const interrupt = (signal) => {
+    if (interrupted) return
+    interrupted = true
+    runtime.kill('SIGTERM')
+    rejectSignal(new Error(`${label} was interrupted by ${signal} before readiness`))
+  }
+  const onSigint = () => interrupt('SIGINT')
+  const onSigterm = () => interrupt('SIGTERM')
+  process.once('SIGINT', onSigint)
+  process.once('SIGTERM', onSigterm)
+  return {
+    promise,
+    release() {
+      process.off('SIGINT', onSigint)
+      process.off('SIGTERM', onSigterm)
+    },
+  }
 }
 
 export async function openBrowser(url, options = {}) {
@@ -65,4 +93,20 @@ export async function openBrowser(url, options = {}) {
   const child = spawnProcess(command, args, { detached: true, stdio: 'ignore', windowsHide: true })
   child.once?.('error', () => undefined)
   child.unref()
+}
+
+function sleepOrAbort(ms, signal) {
+  if (!signal) return new Promise((resolvePromise) => setTimeout(() => resolvePromise(false), ms))
+  if (signal.aborted) return Promise.resolve(true)
+  return new Promise((resolvePromise) => {
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort)
+      resolvePromise(false)
+    }, ms)
+    const onAbort = () => {
+      clearTimeout(timer)
+      resolvePromise(true)
+    }
+    signal.addEventListener('abort', onAbort, { once: true })
+  })
 }

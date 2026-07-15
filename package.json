@@ -11,6 +11,7 @@
     "docker:build": "docker build --tag openalice:local .",
     "docker:smoke": "node scripts/docker-runtime-smoke.mjs",
     "test:install:docker": "node scripts/install-docker-smoke.mjs",
+    "test:remote:docker": "node scripts/remote-ssh-smoke.mjs",
     "prebuild": "tsx scripts/build-migration-index.ts",
     "build": "turbo run build && tsup src/main.ts --format esm --dts",
     "prebuild:server": "tsx scripts/build-migration-index.ts",
