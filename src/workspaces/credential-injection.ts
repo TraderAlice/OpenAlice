@@ -1,6 +1,8 @@
 /**
  * Bridge from Alice's central credential store to a workspace's per-CLI AI
- * config.
+ * config. When a declaration does not pin a model, creation resolves the
+ * credential's remembered model and then its vendor flagship so Pi/OpenCode
+ * can materialize their context limit instead of writing a provider-only file.
  *
  * The central store (`aiProviderSchema.credentials` in `core/config.ts`) holds
  * the vendor-neutral secret: `{ vendor, authType, apiKey?, baseUrl? }`. Each CLI
@@ -16,6 +18,7 @@
 
 import { resolveAnthropicAuthMode } from '@/core/credential-inference.js'
 import { credentialWires, type Credential, type CredentialWireShape } from '@/core/config.js'
+import { DEFAULT_WORKSPACE_CONTEXT_WINDOW } from '@/core/workspace-defaults.js'
 import { DEFAULT_MODEL_BY_VENDOR } from '@/ai-providers/preset-catalog.js'
 import type { AdapterRegistry, WorkspaceAiCred } from './cli-adapter.js'
 import type { Logger } from './logger.js'
@@ -34,11 +37,11 @@ export const AGENT_WIRE_PREFERENCE: Record<string, CredentialWireShape[]> = {
   pi: ['openai-chat', 'anthropic', 'openai-responses'],
 }
 
-// Modern coding models are commonly sold as long-context runtimes. Pi defaults
-// unknown custom models to 128k and opencode defaults unknown limits to 0, so
-// new OpenAlice injections state the assumption explicitly while keeping the
-// field overridable from the workspace config UI.
-export const DEFAULT_CONTEXT_WINDOW = 1_000_000
+// Unknown custom/local models need an explicit limit: Pi otherwise assumes
+// 128k and opencode disables proactive context tracking. A conservative 256k
+// default avoids promising a 1M prefill that many local runtimes cannot hold,
+// while the per-workspace config remains the model-specific source of truth.
+export const DEFAULT_CONTEXT_WINDOW = DEFAULT_WORKSPACE_CONTEXT_WINDOW
 
 /**
  * The subset of a credential vault an agent can actually be driven by: those
@@ -99,7 +102,7 @@ export function pickAgentWire(
 export interface CredentialInjectionOverrides {
   /** Model id to run. Required in practice (a credential has none). */
   model?: string
-  /** Context window to write for custom-model runtimes; defaults to 1M for opencode/Pi. */
+  /** Context window to write for custom-model runtimes; defaults to 256K for opencode/Pi. */
   contextWindow?: number | null
   /** Claude only — which header carries the key. Defaults via baseUrl heuristic. */
   authMode?: 'x-api-key' | 'bearer'
@@ -186,8 +189,10 @@ export async function injectWorkspaceCredentials(opts: {
       })
       continue
     }
+    const resolvedModel = decl.model ?? resolveInjectionModel(credential)
     const wsCred = credentialToWorkspaceAiCred(credential, agentId, {
-      ...(decl.model !== undefined ? { model: decl.model } : {}),
+      ...(resolvedModel ? { model: resolvedModel } : {}),
+      ...(decl.contextWindow !== undefined ? { contextWindow: decl.contextWindow } : {}),
       ...(decl.authMode !== undefined ? { authMode: decl.authMode } : {}),
       ...(decl.wireApi !== undefined ? { wireApi: decl.wireApi } : {}),
     })
@@ -202,7 +207,7 @@ export async function injectWorkspaceCredentials(opts: {
     }
     await adapter.writeAiConfig(dir, wsCred)
     logger.info('workspace.cred_injected', {
-      agentId, credentialSlug: decl.credentialSlug, ...(decl.model ? { model: decl.model } : {}),
+      agentId, credentialSlug: decl.credentialSlug, ...(resolvedModel ? { model: resolvedModel } : {}),
     })
   }
 }

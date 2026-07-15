@@ -48,10 +48,10 @@ export const configKeysHandlers = [
   http.delete('/api/config/credentials/:slug', () => HttpResponse.json({ success: true })),
   http.post('/api/config/credentials/test', () => HttpResponse.json({ ok: true, response: 'Hi!' })),
 
-  // Per-agent default workspace credentials (AI Provider page)
+  // Per-agent new Workspace provider defaults (AI Provider page)
   http.get('/api/config/workspace-credential-defaults', () =>
     HttpResponse.json({
-      defaults: { opencode: { credentialSlug: 'openai-1' } },
+      defaults: { opencode: { credentialSlug: 'openai-1', contextWindow: 256_000 } },
       compatibleByAgent: {
         claude: ['anthropic-1'],
         codex: ['openai-1'],

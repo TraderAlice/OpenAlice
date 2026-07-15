@@ -185,7 +185,7 @@ describe('POST /quick-chat — loginless credential injection', () => {
     expect(cred.apiKey).toBe('sk-oa');
     expect(cred.wireShape).toBe('openai-chat');
     expect(cred.model).toBe('gpt-5.5'); // vendor flagship — no lastModel yet
-    expect(cred.contextWindow).toBe(1_000_000);
+    expect(cred.contextWindow).toBe(256_000);
     // model remembered on the cred for next time
     expect(vi.mocked(setCredentialLastModel)).toHaveBeenCalledWith('openai-1', 'gpt-5.5');
     expect(spawn).toHaveBeenCalledOnce();

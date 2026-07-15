@@ -18,6 +18,15 @@ import {
   type WebPiTranscriptItem,
 } from './webpi-transcript'
 
+const FOLLOW_LATEST_THRESHOLD_PX = 72
+
+export function isWebPiNearBottom(
+  metrics: Pick<HTMLElement, 'scrollTop' | 'scrollHeight' | 'clientHeight'>,
+  threshold = FOLLOW_LATEST_THRESHOLD_PX,
+): boolean {
+  return metrics.scrollHeight - metrics.clientHeight - metrics.scrollTop <= threshold
+}
+
 interface Props {
   readonly wsId: string
   readonly sessionId: string
@@ -32,8 +41,10 @@ export function WebPiView({ wsId, sessionId, label, onSessionLost }: Props): Rea
   const [snapshot, setSnapshot] = useState<WebPiSnapshot | null>(null)
   const [draft, setDraft] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [followingLatest, setFollowingLatest] = useState(true)
   const scrollerRef = useRef<HTMLDivElement | null>(null)
   const snapshotRef = useRef<WebPiSnapshot | null>(null)
+  const followLatestRef = useRef(true)
 
   const acceptSnapshot = useCallback((next: WebPiSnapshot): void => {
     snapshotRef.current = next
@@ -77,15 +88,25 @@ export function WebPiView({ wsId, sessionId, label, onSessionLost }: Props): Rea
   }, [snapshot])
   const transcript = useMemo(() => groupWebPiTranscript(messages), [messages])
 
+  const scrollToLatest = useCallback((behavior: ScrollBehavior = 'smooth'): void => {
+    const scroller = scrollerRef.current
+    if (!scroller) return
+    followLatestRef.current = true
+    setFollowingLatest(true)
+    scroller.scrollTo({ top: scroller.scrollHeight, behavior })
+  }, [])
+
   useEffect(() => {
-    scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight, behavior: 'smooth' })
-  }, [snapshot?.revision, transcript.length])
+    if (followLatestRef.current) scrollToLatest('auto')
+  }, [scrollToLatest, snapshot?.revision, transcript.length])
 
   const working = snapshot?.phase === 'working' || snapshot?.phase === 'compacting' || snapshot?.phase === 'retrying'
 
   const submit = async (): Promise<void> => {
     const message = draft.trim()
     if (!message || working) return
+    followLatestRef.current = true
+    setFollowingLatest(true)
     setDraft('')
     setError(null)
     try {
@@ -117,7 +138,15 @@ export function WebPiView({ wsId, sessionId, label, onSessionLost }: Props): Rea
         </div>
       </header>
 
-      <div ref={scrollerRef} className="webpi-messages">
+      <div
+        ref={scrollerRef}
+        className="webpi-messages"
+        onScroll={(event) => {
+          const follows = isWebPiNearBottom(event.currentTarget)
+          followLatestRef.current = follows
+          setFollowingLatest(follows)
+        }}
+      >
         {messages.length === 0 && !error && (
           <div className="webpi-empty">This Pi conversation is ready in the browser.</div>
         )}
@@ -137,6 +166,12 @@ export function WebPiView({ wsId, sessionId, label, onSessionLost }: Props): Rea
           </div>
         )}
       </div>
+
+      {!followingLatest && (
+        <button type="button" className="webpi-jump-latest" onClick={() => scrollToLatest()}>
+          Jump to latest
+        </button>
+      )}
 
       <div className="webpi-composer-wrap">
         <div className="webpi-composer">

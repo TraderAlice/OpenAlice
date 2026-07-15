@@ -96,10 +96,12 @@ export const configApi = {
 
 }
 
-/** A per-agent default credential seeded into new workspaces. */
+/** A per-agent provider state seeded into new workspaces. */
 export interface WorkspaceCredentialDefault {
   credentialSlug: string
   model?: string
+  /** Pi/OpenCode only. */
+  contextWindow?: number
 }
 
 /** GET /workspace-credential-defaults — current defaults + per-agent picker options. */

@@ -202,6 +202,39 @@ Do not add external-Pi version probing or upgrade UX to preserve flags used by
 the packaged runtime. Compatibility for the packaged app is maintained by
 pinning and upgrading the bundled Pi with the OpenAlice release.
 
+### Pi and OpenCode context limits
+
+Workspace provider overrides write the model context limit into both runtime
+formats: `provider.models.<id>.limit.context` for OpenCode and
+`providers.workspace.models[].contextWindow` for Pi. Unknown custom and local
+models default to **256K**, not 1M. Larger values remain explicit user choices;
+the provider connection probe cannot prove that a local backend has enough
+memory for a future long prefill, and some APIs apply a higher billing tier
+above 256K.
+
+**Settings → AI Provider → New Workspace defaults** owns the user-level
+creation preference. Each agent can select the vault credential copied into a
+new Workspace; Pi and OpenCode also select the context limit, with 256K as the
+visible default. The declaration is stored under
+`workspaceCredentialDefaults` in `data/config/ai-provider-manager.json`.
+Migration `0023_workspace_default_context_window` makes 256K explicit for
+existing Pi/OpenCode declarations. A template's `agentCredentials` entry still
+wins for that agent when a template intentionally pins provider state.
+
+Creation defaults affect only future Workspaces. After creation, the Workspace
+config file is the source of truth for its model-specific choice. Re-selecting
+the same vault credential and model must preserve the existing Workspace
+context limit. Selecting a different credential or model starts from the
+conservative default instead of carrying an unrelated 1M setting across
+providers.
+
+Pi and OpenCode load provider state at process startup. Saving a new context
+limit does not resize a running process: the UI must name affected running
+Sessions and tell the user to pause and resume them. WebPi follows new output
+only while the reader is already near the transcript tail; polling, retries,
+and streaming updates must never steal the scroll position from someone
+reading older messages.
+
 ### Codex interactive permissions
 
 OpenAlice launches interactive Codex TUI sessions with explicit

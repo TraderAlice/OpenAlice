@@ -10,6 +10,7 @@ import {
   type ConfigSection, type Credential, type CredentialWireShape,
   type WorkspaceCredentialDefault,
 } from '../../core/config.js'
+import { DEFAULT_WORKSPACE_CONTEXT_WINDOW } from '../../core/workspace-defaults.js'
 import { compatibleCredentials } from '../../workspaces/credential-injection.js'
 
 /** Validate a `{ [wireShape]: baseUrl }` body into a typed wires map. */
@@ -219,6 +220,27 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
   // user the per-workspace AI-config modal. References the vault above.
 
   const DEFAULTABLE_AGENTS = ['claude', 'codex', 'opencode', 'pi'] as const
+  const CONTEXT_AGENTS = new Set<string>(['opencode', 'pi'])
+
+  const normalizeWorkspaceDefaults = (
+    incoming: Record<string, WorkspaceCredentialDefault>,
+  ): Record<string, WorkspaceCredentialDefault> => {
+    const next: Record<string, WorkspaceCredentialDefault> = {}
+    for (const agent of DEFAULTABLE_AGENTS) {
+      const def = incoming[agent]
+      if (!def || typeof def.credentialSlug !== 'string' || !def.credentialSlug) continue
+      const contextWindow = typeof def.contextWindow === 'number' &&
+        Number.isInteger(def.contextWindow) && def.contextWindow > 0
+        ? def.contextWindow
+        : DEFAULT_WORKSPACE_CONTEXT_WINDOW
+      next[agent] = {
+        credentialSlug: def.credentialSlug,
+        ...(typeof def.model === 'string' && def.model ? { model: def.model } : {}),
+        ...(CONTEXT_AGENTS.has(agent) ? { contextWindow } : {}),
+      }
+    }
+    return next
+  }
 
   /**
    * GET /workspace-credential-defaults — the current per-agent defaults plus,
@@ -235,7 +257,7 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
       for (const agent of DEFAULTABLE_AGENTS) {
         compatibleByAgent[agent] = compatibleCredentials(creds, agent).map(([slug]) => slug)
       }
-      return c.json({ defaults, compatibleByAgent })
+      return c.json({ defaults: normalizeWorkspaceDefaults(defaults), compatibleByAgent })
     } catch (err) {
       return c.json({ error: String(err) }, 500)
     }
@@ -243,23 +265,13 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
 
   /**
    * PUT /workspace-credential-defaults — replace the whole per-agent map. Body:
-   * `{ defaults: { [agentId]: { credentialSlug, model? } } }`. An empty/absent
+   * `{ defaults: { [agentId]: { credentialSlug, model?, contextWindow? } } }`. An empty/absent
    * `credentialSlug` for an agent clears its default (handled in the writer).
    */
   app.put('/workspace-credential-defaults', async (c) => {
     try {
       const body = await c.req.json<{ defaults?: Record<string, WorkspaceCredentialDefault> }>()
-      const incoming = body.defaults ?? {}
-      const next: Record<string, WorkspaceCredentialDefault> = {}
-      for (const agent of DEFAULTABLE_AGENTS) {
-        const def = incoming[agent]
-        if (def && typeof def.credentialSlug === 'string' && def.credentialSlug) {
-          next[agent] = {
-            credentialSlug: def.credentialSlug,
-            ...(typeof def.model === 'string' && def.model ? { model: def.model } : {}),
-          }
-        }
-      }
+      const next = normalizeWorkspaceDefaults(body.defaults ?? {})
       await writeWorkspaceCredentialDefaults(next)
       return c.json({ defaults: next })
     } catch (err) {

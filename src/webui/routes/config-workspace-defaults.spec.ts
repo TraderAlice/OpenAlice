@@ -94,7 +94,9 @@ describe('GET /workspace-credential-defaults', () => {
 
     const { status, body } = await req(routes, 'GET', '/workspace-credential-defaults')
     expect(status).toBe(200)
-    expect(body!.defaults).toEqual({ opencode: { credentialSlug: 'openai-1', model: 'gpt-5.5' } })
+    expect(body!.defaults).toEqual({
+      opencode: { credentialSlug: 'openai-1', model: 'gpt-5.5', contextWindow: 256_000 },
+    })
 
     const compat = body!.compatibleByAgent as Record<string, string[]>
     // claude speaks anthropic only.
@@ -219,18 +221,18 @@ describe('GET/PUT /issue-default-agent', () => {
 })
 
 describe('PUT /workspace-credential-defaults', () => {
-  it('replaces the map, keeps optional model, persists via the writer', async () => {
+  it('replaces the map, keeps optional model/context, and defaults missing context to 256K', async () => {
     const routes = createConfigRoutes()
     const { status, body } = await req(routes, 'PUT', '/workspace-credential-defaults', {
       defaults: {
         opencode: { credentialSlug: 'openai-1', model: 'gpt-5.5' },
-        pi: { credentialSlug: 'anthropic-1' },
+        pi: { credentialSlug: 'anthropic-1', contextWindow: 512_000 },
       },
     })
     expect(status).toBe(200)
     expect(body!.defaults).toEqual({
-      opencode: { credentialSlug: 'openai-1', model: 'gpt-5.5' },
-      pi: { credentialSlug: 'anthropic-1' },
+      opencode: { credentialSlug: 'openai-1', model: 'gpt-5.5', contextWindow: 256_000 },
+      pi: { credentialSlug: 'anthropic-1', contextWindow: 512_000 },
     })
     expect(defaultsStore).toEqual(body!.defaults)
   })
@@ -240,7 +242,9 @@ describe('PUT /workspace-credential-defaults', () => {
     const { body } = await req(routes, 'PUT', '/workspace-credential-defaults', {
       defaults: { opencode: { credentialSlug: 'openai-1' }, pi: { credentialSlug: '' } },
     })
-    expect(body!.defaults).toEqual({ opencode: { credentialSlug: 'openai-1' } })
+    expect(body!.defaults).toEqual({
+      opencode: { credentialSlug: 'openai-1', contextWindow: 256_000 },
+    })
   })
 
   it('ignores unknown agent keys (only the four defaultable agents pass through)', async () => {
@@ -249,6 +253,14 @@ describe('PUT /workspace-credential-defaults', () => {
       defaults: { shell: { credentialSlug: 'openai-1' }, bogus: { credentialSlug: 'x' } },
     })
     expect(body!.defaults).toEqual({})
+  })
+
+  it('ignores contextWindow for runtimes that do not expose that Workspace setting', async () => {
+    const routes = createConfigRoutes()
+    const { body } = await req(routes, 'PUT', '/workspace-credential-defaults', {
+      defaults: { claude: { credentialSlug: 'anthropic-1', contextWindow: 1_000_000 } },
+    })
+    expect(body!.defaults).toEqual({ claude: { credentialSlug: 'anthropic-1' } })
   })
 
   it('clears all defaults on an empty body', async () => {

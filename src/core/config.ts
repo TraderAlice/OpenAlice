@@ -170,6 +170,8 @@ export function credentialWires(cred: Credential): Partial<Record<CredentialWire
  * setting. Keyed by agentId (`claude` / `codex` / `opencode` / `pi`).
  * `credentialSlug` points into `credentials`; `model` is the optional run model
  * (absent ⇒ resolved from the cred's `lastModel`, then the vendor flagship).
+ * `contextWindow` is meaningful for Pi/OpenCode and is copied into their
+ * Workspace-local provider config at creation time.
  * Structurally a superset-compatible mirror of the workspaces layer's
  * `AgentCredentialDecl`, so the creator can merge the two and feed
  * `injectWorkspaceCredentials` directly.
@@ -177,6 +179,7 @@ export function credentialWires(cred: Credential): Partial<Record<CredentialWire
 export const workspaceCredentialDefaultSchema = z.object({
   credentialSlug: z.string(),
   model: z.string().optional(),
+  contextWindow: z.number().int().positive().optional(),
 })
 export type WorkspaceCredentialDefault = z.infer<typeof workspaceCredentialDefaultSchema>
 
@@ -192,7 +195,7 @@ export const aiProviderSchema = z.object({
   credentials: z.record(z.string(), credentialSchema).default({}),
   /**
    * Per-agent default credential seeded into EVERY new workspace at create time
-   * (agentId → {credentialSlug, model?}). The user-level counterpart to a
+   * (agentId → {credentialSlug, model?, contextWindow?}). The user-level counterpart to a
    * template's `agentCredentials`: set a default cred per agent once and skip the
    * per-workspace AI-config modal on each launch. References slugs in
    * `credentials`; a dangling slug is loud-skipped at injection, never fatal.
