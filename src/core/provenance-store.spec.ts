@@ -84,6 +84,35 @@ describe('ArtifactProvenanceStore', () => {
     expect(reloaded.list()).toEqual([expect.objectContaining({ id: first.id, at: 250 })])
   })
 
+  it('merges field changes across one editing activity and drops net-zero fields', async () => {
+    const { value } = await store()
+    const input = {
+      artifact: { kind: 'issue' as const, workspaceId: 'ws-1', issueId: 'i1' },
+      action: 'updated' as const,
+      origin: { kind: 'human' as const },
+    }
+    await value.append({
+      ...input,
+      at: 100,
+      mutation: { fields: [{ field: 'status', before: 'todo', after: 'in_progress' }] },
+    }, { coalesceWithinMs: 300 })
+    await value.append({
+      ...input,
+      at: 200,
+      mutation: { fields: [
+        { field: 'status', before: 'in_progress', after: 'todo' },
+        { field: 'priority', before: 'none', after: 'high' },
+      ] },
+    }, { coalesceWithinMs: 300 })
+
+    expect(value.list()).toEqual([
+      expect.objectContaining({
+        at: 200,
+        mutation: { fields: [{ field: 'priority', before: 'none', after: 'high' }] },
+      }),
+    ])
+  })
+
   it('starts a new activity after an intervening event or a different origin', async () => {
     const { value } = await store()
     const artifact = { kind: 'issue' as const, workspaceId: 'ws-1', issueId: 'i1' }

@@ -15,6 +15,7 @@ import type { InboxEntry } from '../../core/inbox-store.js'
 import {
   ACTIVITY_UPDATE_COALESCE_MS,
   artifactOriginsMatch,
+  type ProvenanceMutation,
   type ArtifactOrigin,
   type ProvenanceAction,
   type ProvenanceRecord,
@@ -261,6 +262,7 @@ export interface IssueProvenanceRecord {
   action: ProvenanceAction
   origin: ArtifactOrigin
   at: number
+  mutation?: ProvenanceMutation
 }
 
 export type IssueActivityRecord =
@@ -284,7 +286,13 @@ export function issueProvenanceRecords(
     ) continue
     compacted.push(record)
   }
-  return compacted.map(({ id, action, origin, at }) => ({ id, action, origin, at }))
+  return compacted.map(({ id, action, origin, at, mutation }) => ({
+    id,
+    action,
+    origin,
+    at,
+    ...(mutation ? { mutation } : {}),
+  }))
 }
 
 /** Agent/UI-safe projection of one execution. `resumeId` is the only public

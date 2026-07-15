@@ -20,7 +20,7 @@
  *   title: <required, short human title>
  *   status: backlog | todo | in_progress | done | canceled   (optional → 'todo')
  *   priority: urgent | high | medium | low | none             (optional → 'none')
- *   assignee: "@workspace" | "@human" | "@unassigned" | "@<resumeId>"  (optional → '@workspace')
+ *   assignee: "@workspace" | "@new" | "@human" | "@unassigned" | "@<resumeId>"  (optional → '@workspace')
  *   when: { kind: at, at } | { kind: every, every } |
  *         { kind: cron, cron, timezone?: local | IANA zone }  (OPTIONAL — present iff scheduled)
  *   what: <legacy fire prompt; migrated into the markdown What body>
@@ -41,6 +41,7 @@ import { z } from 'zod'
 import { isValidScheduleTimezone, type Schedule } from '../../core/schedule-expr.js'
 import {
   HUMAN_ASSIGNEE,
+  NEW_ASSIGNEE,
   UNASSIGNED_ASSIGNEE,
   WORKSPACE_ASSIGNEE,
   resumeIdFromSignature,
@@ -85,9 +86,11 @@ export const issueWhenSchema = z.discriminatedUnion('kind', [
 ])
 
 /** Who owns the Issue. Workspace ownership recruits a fresh Session for each
- * scheduled fire; Session ownership resumes exactly one product Session. */
+ * scheduled fire; `@new` recruits once and is replaced by the allocated
+ * `@resumeId`; Session ownership resumes exactly one product Session. */
 export const issueAssigneeSchema = z.union([
   z.literal(WORKSPACE_ASSIGNEE),
+  z.literal(NEW_ASSIGNEE),
   z.literal(HUMAN_ASSIGNEE),
   z.literal(UNASSIGNED_ASSIGNEE),
   z.string().regex(/^@resume-[^\s]+$/, 'Session assignee must be @<resumeId>'),
@@ -96,6 +99,11 @@ export const issueAssigneeSchema = z.union([
 /** Exact product Session owner encoded by the single assignee contract. */
 export function issueAssigneeResumeId(assignee: string): string | null {
   return resumeIdFromSignature(assignee)
+}
+
+/** Transitional ownership: the first dispatch claims one durable Session. */
+export function issueAssigneeClaimsFirstSession(assignee: string): boolean {
+  return assignee === NEW_ASSIGNEE
 }
 
 /**
@@ -126,7 +134,14 @@ export const issueFrontmatterSchema = z.object({
     ctx.addIssue({
       code: 'custom',
       path: ['assignee'],
-      message: 'scheduled issues must be assigned to @workspace or an exact @resumeId',
+      message: 'scheduled issues must be assigned to @workspace, @new, or an exact @resumeId',
+    })
+  }
+  if (!value.when && value.assignee === NEW_ASSIGNEE) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['assignee'],
+      message: '@new needs a schedule so its first run can claim a Session',
     })
   }
   if (issueAssigneeResumeId(value.assignee) && value.agent) {

@@ -114,15 +114,17 @@ function scannerFor(
       t: number,
       trigger?: import('../headless-task-registry.js').HeadlessTaskTrigger,
       resumeId?: string,
-    ) => Promise<{ taskId: string }>
+    ) => Promise<{ taskId: string; resumeId: string }>
     markers?: MarkerStore
     now?: number
     adapter?: CliAdapter
     resolveAdapter?: ScheduleScannerDeps['resolveAdapter']
     resolveResumeWorkspace?: ScheduleScannerDeps['resolveResumeWorkspace']
+    claimFreshSession?: ScheduleScannerDeps['claimFreshSession']
+    observeIssues?: ScheduleScannerDeps['observeIssues']
   } = {},
 ) {
-  const dispatch = opts.dispatch ?? vi.fn(async () => ({ taskId: 'run-1' }))
+  const dispatch = opts.dispatch ?? vi.fn(async () => ({ taskId: 'run-1', resumeId: 'resume-new-worker-a1b2c3' }))
   const markers = opts.markers ?? new FakeMarkers()
   const scanner = new ScheduleScanner({
     registry: {
@@ -132,6 +134,8 @@ function scannerFor(
     resolveResumeWorkspace: opts.resolveResumeWorkspace ?? (() => workspaces[0]),
     resolveAdapter: opts.resolveAdapter ?? (() => opts.adapter ?? headlessAdapter),
     dispatch,
+    claimFreshSession: opts.claimFreshSession,
+    observeIssues: opts.observeIssues,
     markers,
     logger: noopLogger,
     now: () => opts.now ?? NOW,
@@ -206,6 +210,51 @@ describe('ScheduleScanner', () => {
     )
     expect(scanner.snapshot()!.workspaces[0].tasks[0].assignee)
       .toBe('@resume-kind-owl-abc123')
+  })
+
+  it('assigns @new to the first fresh Session before advancing the marker', async () => {
+    const ws = await makeWs('w1', [{
+      id: 'sticky',
+      title: 'sticky worker',
+      when: { kind: 'every', every: '30m' },
+      what: 'own this work from now on',
+      assignee: '@new',
+    }])
+    const claimFreshSession = vi.fn(async () => undefined)
+    const { scanner, dispatch, markers } = scannerFor([ws], { claimFreshSession })
+
+    await scanner.scan()
+
+    expect(dispatch).toHaveBeenCalledWith(
+      ws,
+      headlessAdapter,
+      'own this work from now on',
+      expect.any(Number),
+      { kind: 'issue', workspaceId: 'w1', issueId: 'sticky' },
+    )
+    expect(claimFreshSession).toHaveBeenCalledWith({
+      issueWorkspace: ws,
+      issueId: 'sticky',
+      taskId: 'run-1',
+      resumeId: 'resume-new-worker-a1b2c3',
+      agent: 'claude',
+    })
+    expect(markers.get('w1', 'sticky')).toBe(NOW)
+  })
+
+  it('advances the dispatched occurrence when the Session claim write fails', async () => {
+    const ws = await makeWs('w1', [{
+      id: 'sticky', title: 'sticky worker', when: { kind: 'every', every: '30m' },
+      what: 'own this work', assignee: '@new',
+    }])
+    const claimFreshSession = vi.fn(async () => { throw new Error('claim write failed') })
+    const { scanner, markers } = scannerFor([ws], { claimFreshSession })
+
+    await scanner.scan()
+
+    // The worker already started; retrying the due occurrence would recruit a
+    // second worker immediately. The claim failure is logged independently.
+    expect(markers.get('w1', 'sticky')).toBe(NOW)
   })
 
   it('executes an exact cross-Workspace signature while retaining the home Issue trigger', async () => {

@@ -179,8 +179,10 @@ the whole board (all workspaces); `create` / `update` / `comment` write **this**
 workspace's own `.alice/issues/` files (changing a peer's board is the
 human-approved peer-edit path). The full on-disk file model + self-scheduling
 (an issue with a `when` fires a headless run) lives in the **`self-scheduling`**
-skill. `assignee` is the single ownership and dispatch contract: `@workspace`
-recruits a new Session each fire, `@me` resolves to the caller, and an exact
-`@resumeId` keeps one accountable product Session. Issue/Inbox CLI actions are
-signed automatically. End standalone reports with `Signed-by: @resumeId`
+skill. `assignee` is the single ownership and dispatch contract: `@new`
+recruits once and then keeps that first Session, `@workspace` recruits a new
+Session each fire, `@me` resolves to the caller, and an exact `@resumeId` keeps
+one accountable product Session. Commit intentional Issue-file changes as a
+focused Git change; Activity remains an audit fallback, while Git is the exact
+rollback history. Issue/Inbox CLI actions are signed automatically. End standalone reports with `Signed-by: @resumeId`
 (copy it from `signature show`) so another Agent can return to the author.

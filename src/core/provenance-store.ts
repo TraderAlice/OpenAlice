@@ -56,6 +56,20 @@ const originSchema = z.union([
 ])
 export type ArtifactOrigin = z.infer<typeof originSchema>
 
+/** Compact field-level audit payload. Large documents such as Issue What are
+ * represented by a field-only entry; Git remains the content rollback layer. */
+const provenanceFieldChangeSchema = z.object({
+  field: z.string().min(1).max(64),
+  before: z.string().max(1000).optional(),
+  after: z.string().max(1000).optional(),
+})
+export type ProvenanceFieldChange = z.infer<typeof provenanceFieldChangeSchema>
+
+const provenanceMutationSchema = z.object({
+  fields: z.array(provenanceFieldChangeSchema).min(1).max(24),
+})
+export type ProvenanceMutation = z.infer<typeof provenanceMutationSchema>
+
 const recordSchema = z.object({
   id: z.string().min(1),
   artifact: artifactRefSchema,
@@ -63,6 +77,7 @@ const recordSchema = z.object({
   origin: originSchema,
   at: z.number().finite(),
   fingerprint: z.string().min(1).optional(),
+  mutation: provenanceMutationSchema.optional(),
 })
 export type ProvenanceRecord = z.infer<typeof recordSchema>
 
@@ -144,6 +159,11 @@ export class ArtifactProvenanceStore implements IProvenanceStore {
         artifactOriginsMatch(previous.origin, candidate.origin) &&
         elapsed >= 0 && elapsed <= coalesceWithinMs
       ) {
+        if (candidate.mutation) {
+          const merged = mergeProvenanceMutation(previous.mutation, candidate.mutation)
+          if (merged.fields.length > 0) previous.mutation = merged
+          else delete previous.mutation
+        }
         previous.at = candidate.at
         await this.flush()
         return previous
@@ -187,6 +207,34 @@ export class ArtifactProvenanceStore implements IProvenanceStore {
       this.logger.warn('provenance_store.flush_failed', { err })
     }
   }
+}
+
+/** Keep the first observed value and the latest value inside one autosave/edit
+ * window. A field that returns to its original value disappears from the net
+ * activity; content-only fields remain as one compact "edited" entry. */
+export function mergeProvenanceMutation(
+  previous: ProvenanceMutation | undefined,
+  next: ProvenanceMutation,
+): ProvenanceMutation {
+  const fields = new Map<string, ProvenanceFieldChange>()
+  for (const change of previous?.fields ?? []) fields.set(change.field, { ...change })
+  for (const change of next.fields) {
+    const earlier = fields.get(change.field)
+    const merged: ProvenanceFieldChange = earlier
+      ? {
+          field: change.field,
+          ...(earlier.before !== undefined ? { before: earlier.before } : {}),
+          ...(change.after !== undefined ? { after: change.after } : {}),
+        }
+      : { ...change }
+    if (
+      merged.before !== undefined &&
+      merged.after !== undefined &&
+      merged.before === merged.after
+    ) fields.delete(change.field)
+    else fields.set(change.field, merged)
+  }
+  return { fields: [...fields.values()] }
 }
 
 /** Product identity equality for grouping activity without exposing runtime

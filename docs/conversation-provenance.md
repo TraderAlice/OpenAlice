@@ -286,6 +286,13 @@ richer version of that same event. Scheduled/headless executions remain in the
 independent `runs[]` operational ledger; high-volume runtime history must not
 swallow the human-facing Activity timeline.
 
+Updated activities carry compact field-level before/after values. The large
+markdown What document is recorded only as “edited What”; its exact contents
+belong in the Workspace Git history. A launcher-owned snapshot detects direct
+Issue-file edits that bypass UI/CLI mutation routes. Such edits are attributed
+to a Session only when exactly one Session could have made them; concurrent
+edits remain explicitly unknown rather than crediting the wrong coworker.
+
 When an Issue has a fixed `@resumeId` owner, a comment from somebody else is
 delivered to that exact Session. The final assistant response is recorded as a
 reply comment, linked by `replyTo`; delivery state stays on the source comment.
@@ -313,7 +320,19 @@ authoritative product Session; OpenAlice resolves and persists the concrete
 `@resumeId` server-side. `@me` is never stored. A human UI may select an
 existing resumable Workspace Session.
 
-#### Mode B: a fresh worker per fire
+#### Mode B: recruit once, then keep that worker
+
+```yaml
+assignee: "@new"
+```
+
+- The first scheduled fire creates a new headless product Session.
+- OpenAlice immediately rewrites `@new` to that Session's exact `@resumeId`.
+- Later fires and Issue comments continue the same accountable coworker.
+- The Issue may specify `agent` before the first claim; after the claim, the
+  concrete Session owns its runtime.
+
+#### Mode C: a fresh worker per fire
 
 ```yaml
 assignee: "@workspace"
@@ -326,7 +345,7 @@ assignee: "@workspace"
   a unique worker.
 - Each run keeps its own origin so a user can still ask that specific worker.
 
-The Issue's creator provenance is stamped separately in both modes. Workspace
+The Issue's creator provenance is stamped separately in all modes. Workspace
 ownership does not erase who designed the Issue.
 
 Migration `0018_issue_assignee_ownership` removes the former `execution` field
@@ -429,8 +448,9 @@ approval state, routing, fills, and slippage.
 9. Mutable artifacts retain occurrence-level provenance instead of one mutable
    “author” field.
 10. Issue creation provenance and future execution responsibility are separate.
-11. Issue assignee is the only ownership/dispatch contract: `@workspace` or an
-    exact `@resumeId` for scheduled work.
+11. Issue assignee is the only ownership/dispatch contract: `@new` recruits
+    once and becomes an exact owner, `@workspace` recruits on every fire, and
+    an exact `@resumeId` continues one known Session.
 12. Trade decision attribution and trade execution authority remain separate.
 13. Provenance is stamped from authoritative context, not asserted by an agent.
 14. Existing UUID `resumeId`s remain valid; readable ids apply only to new

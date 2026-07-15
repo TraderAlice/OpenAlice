@@ -106,6 +106,18 @@ describe('issue_create', () => {
     expect((await readBack('fresh-owner'))?.assignee).toBe('@workspace')
   })
 
+  it('accepts @new as an explicit recruit-once ownership policy', async () => {
+    const created = await run(issueCreateFactory.build(ctx()), {
+      id: 'sticky-owner',
+      title: 'Sticky owner',
+      when: { kind: 'every', every: '30m' },
+      assignee: '@new',
+      agent: 'pi',
+    })
+    expect(created.ok).toBe(true)
+    expect(await readBack('sticky-owner')).toMatchObject({ assignee: '@new', agent: 'pi' })
+  })
+
   it('defaults creation to the server-attributed current Session', async () => {
     const context = ctx({
       origin: {

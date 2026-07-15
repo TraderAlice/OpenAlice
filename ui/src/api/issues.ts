@@ -57,6 +57,9 @@ export interface IssueProvenanceRecord {
   action: IssueProvenanceAction
   origin: IssueProvenanceOrigin
   at: number
+  mutation?: {
+    fields: Array<{ field: string; before?: string; after?: string }>
+  }
 }
 
 /** Human-facing Issue timeline. Runtime executions stay in `runs`. */
@@ -106,7 +109,7 @@ export interface IssueListItem {
   title: string
   status: IssueStatus
   priority: IssuePriority
-  /** @workspace | @human | @unassigned | exact @resumeId Session signature. */
+  /** @workspace | @new | @human | @unassigned | exact @resumeId Session signature. */
   assignee: string
   /** Adapter id for the scheduled fire override, if set. */
   agent?: string
@@ -194,7 +197,7 @@ export interface IssueDetailIssue {
   what: string
   status: IssueStatus
   priority: IssuePriority
-  /** @workspace | @human | @unassigned | exact @resumeId Session signature. */
+  /** @workspace | @new | @human | @unassigned | exact @resumeId Session signature. */
   assignee: string
   /** Present iff the issue self-schedules. */
   when?: ScheduleWhen

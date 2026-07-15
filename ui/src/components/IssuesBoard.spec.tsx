@@ -127,4 +127,24 @@ describe('IssuesBoard', () => {
     expect(screen.getByText('@resume-calm-market-desk-a1b2c3')).toBeTruthy()
     expect(screen.getByText('claude override')).toBeTruthy()
   })
+
+  it('explains transitional ownership without exposing the raw @new token', () => {
+    mocks.useIssues.mockReturnValue({
+      data: snapshot([
+        issue({
+          id: 'first-owner',
+          title: 'Assign one durable owner',
+          assignee: '@new',
+          when: { kind: 'every', every: '1h' },
+        }),
+      ]),
+      error: null,
+      loading: false,
+    })
+
+    render(<IssuesBoard />)
+
+    expect(screen.getByText('Assign on first run')).toBeTruthy()
+    expect(screen.queryByText('@new')).toBeNull()
+  })
 })

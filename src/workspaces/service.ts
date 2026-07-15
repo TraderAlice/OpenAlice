@@ -14,7 +14,11 @@ import { basename, join } from 'node:path';
 
 import { cliBinPath } from '@/core/paths.js';
 import { readCredentials, readIssueDefaultAgent, readWorkspaceDefaultAgent } from '@/core/config.js';
-import { ArtifactProvenanceStore } from '@/core/provenance-store.js';
+import {
+  ACTIVITY_UPDATE_COALESCE_MS,
+  ArtifactProvenanceStore,
+  type ArtifactOrigin,
+} from '@/core/provenance-store.js';
 import {
   readQuickChatPreferences,
   rememberRecentChatWorkspace,
@@ -81,10 +85,21 @@ import { completeOneShotIssueAfterRun } from './issues/auto-complete.js';
 import { readIssueComments } from './issues/comments.js';
 import { recordIssueCommentReply } from './issues/comment-delivery.js';
 import {
+  IssueChangeTracker,
+  issueMutation,
+  issueMutationFingerprint,
+} from './issues/change-tracker.js';
+import { updateIssueFields } from './issues/mutate.js';
+import {
   issueAutomationHealth,
   type IssueAutomationOwnerState,
 } from './issues/automation-health.js';
-import { issueAssigneeResumeId } from './issues/declaration.js';
+import {
+  issueAssigneeClaimsFirstSession,
+  issueAssigneeResumeId,
+  type IssueRecord,
+} from './issues/declaration.js';
+import { sessionSignature } from './session-signature.js';
 import { issueRunFailure } from './issues/run-failure.js';
 import type { IInboxStore } from '@/core/inbox-store.js';
 import { toSafeInboxOrigin } from '@/core/workspace-tool-center.js';
@@ -419,11 +434,88 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     join(config.launcherRoot, 'state', 'artifact-provenance.json'),
     launcherLogger.child({ scope: 'provenance-store' }),
   );
+  const issueChangeTracker = await IssueChangeTracker.load(
+    join(config.launcherRoot, 'state', 'issue-audit-snapshots.json'),
+    provenanceStore,
+    launcherLogger.child({ scope: 'issue-change-tracker' }),
+  );
   const activeResumeIds = new Set<string>();
   const claimResume = (resumeId: string): boolean => {
     if (activeResumeIds.has(resumeId)) return false;
     activeResumeIds.add(resumeId);
     return true;
+  };
+
+  /** Attribute a direct file edit only when exactly one product Session could
+   * have made it. Ambiguous concurrency is logged honestly instead of assigning
+   * another coworker's work to the wrong resumeId. */
+  const inferIssueMutationOrigin = async (wsId: string): Promise<ArtifactOrigin> => {
+    await sessionRegistry.ensureLoaded(wsId);
+    const candidates = new Map<string, ArtifactOrigin>();
+    for (const task of headlessTasks.list({ wsId }).filter((row) => row.status === 'running')) {
+      candidates.set(task.resumeId, {
+        kind: 'session',
+        workspaceId: wsId,
+        resumeId: task.resumeId,
+        agent: task.agent,
+        execution: { kind: 'headless', taskId: task.taskId },
+      });
+    }
+    for (const session of sessionRegistry.listFor(wsId).filter((row) => row.state === 'running')) {
+      if (session.agent === 'shell') continue;
+      candidates.set(session.resumeId, {
+        kind: 'session',
+        workspaceId: wsId,
+        resumeId: session.resumeId,
+        agent: session.agent,
+        execution: { kind: 'interactive', sessionRecordId: session.id },
+      });
+    }
+    if (candidates.size === 1) return [...candidates.values()][0]!;
+    return {
+      kind: 'unknown',
+      reason: candidates.size > 1 ? 'concurrent-workspace-edit' : 'direct-file-edit',
+    };
+  };
+
+  const observeIssueRecords = async (
+    ws: WorkspaceMeta,
+    issues: readonly IssueRecord[],
+    origin?: ArtifactOrigin,
+  ): Promise<void> => {
+    await issueChangeTracker.observeWorkspace({
+      workspaceId: ws.id,
+      issues,
+      origin: origin ?? await inferIssueMutationOrigin(ws.id),
+    });
+  };
+
+  /** Capture Issue-file work performed by one completed headless turn. The
+   * finished task is no longer in the running registry, so it is attributable
+   * only when no other product Session is still able to edit that Workspace. */
+  const observeHeadlessIssueChanges = async (
+    task: HeadlessTaskRecord,
+    executionWorkspace: WorkspaceMeta,
+  ): Promise<void> => {
+    const targets = new Map<string, WorkspaceMeta>([[executionWorkspace.id, executionWorkspace]]);
+    if (task.trigger?.kind === 'issue') {
+      const source = registry.get(task.trigger.workspaceId);
+      if (source) targets.set(source.id, source);
+    }
+    for (const target of targets.values()) {
+      const competing = await inferIssueMutationOrigin(target.id);
+      const origin: ArtifactOrigin = competing.kind === 'unknown' && competing.reason === 'direct-file-edit'
+        ? {
+            kind: 'session',
+            workspaceId: executionWorkspace.id,
+            resumeId: task.resumeId,
+            agent: task.agent,
+            execution: { kind: 'headless', taskId: task.taskId },
+          }
+        : { kind: 'unknown', reason: 'concurrent-workspace-edit' };
+      const result = await readWorkspaceIssues(target.dir);
+      if (result.ok) await observeIssueRecords(target, result.issues, origin);
+    }
   };
 
   /**
@@ -1319,6 +1411,13 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
             err,
           });
         }
+        await observeHeadlessIssueChanges(rec, ws).catch((err) =>
+          launcherLogger.warn('issue.headless_change_observation_failed', {
+            wsId: ws.id,
+            taskId: rec.taskId,
+            err,
+          }),
+        );
       })
       .catch(async (err) => {
         const message = err instanceof Error ? err.message : String(err);
@@ -1332,6 +1431,13 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           status: 'failed',
           error: message,
         });
+        await observeHeadlessIssueChanges(rec, ws).catch((observeErr) =>
+          launcherLogger.warn('issue.headless_change_observation_failed', {
+            wsId: ws.id,
+            taskId: rec.taskId,
+            err: observeErr,
+          }),
+        );
       })
       .finally(() => activeResumeIds.delete(rec.resumeId));
     return { taskId: rec.taskId, resumeId: rec.resumeId };
@@ -1365,6 +1471,56 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       return resolveAdapter(ws, await resolveIssueDefaultAgentId(ws));
     },
     dispatch: dispatchHeadlessTaskMethod,
+    claimFreshSession: async ({ issueWorkspace, issueId, taskId, resumeId, agent }) => {
+      const live = await readWorkspaceIssues(issueWorkspace.dir);
+      const candidate = live.ok ? live.issues.find((issue) => issue.id === issueId) : undefined;
+      if (!candidate || !issueAssigneeClaimsFirstSession(candidate.assignee)) {
+        launcherLogger.info('issue.first_session_claim_skipped', {
+          wsId: issueWorkspace.id,
+          issueId,
+          taskId,
+          resumeId,
+          reason: candidate ? 'assignee_changed' : 'issue_unavailable',
+        });
+        return;
+      }
+      const claimed = await updateIssueFields(issueWorkspace.dir, issueId, {
+        assignee: sessionSignature(resumeId),
+      });
+      if (!claimed.ok) {
+        throw new Error(
+          claimed.reason === 'invalid'
+            ? claimed.error
+            : `Issue disappeared before its first Session could claim it: ${issueId}`,
+        );
+      }
+      const mutation = issueMutation(claimed.previous, claimed.issue);
+      const origin: ArtifactOrigin = {
+        kind: 'session',
+        workspaceId: issueWorkspace.id,
+        resumeId,
+        agent,
+        execution: { kind: 'headless', taskId },
+      };
+      await provenanceStore.append({
+        artifact: { kind: 'issue', workspaceId: issueWorkspace.id, issueId },
+        action: 'updated',
+        origin,
+        at: Date.now(),
+        ...(mutation ? { mutation } : {}),
+        fingerprint: issueMutationFingerprint(issueWorkspace.id, issueId, claimed.issue),
+      }, { coalesceWithinMs: ACTIVITY_UPDATE_COALESCE_MS });
+      const reread = await readWorkspaceIssues(issueWorkspace.dir);
+      if (reread.ok) await observeIssueRecords(issueWorkspace, reread.issues, origin);
+      launcherLogger.info('issue.first_session_claimed', {
+        wsId: issueWorkspace.id,
+        issueId,
+        taskId,
+        resumeId,
+        agent,
+      });
+    },
+    observeIssues: (workspace, issues) => observeIssueRecords(workspace, issues),
     markers: scheduleMarkers,
     logger: launcherLogger.child({ scope: 'schedule' }),
   });
@@ -1431,6 +1587,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           }
           return { wsId: ws.id, tag: ws.tag, status: 'invalid', error: res.error, issues: [] };
         }
+        await observeIssueRecords(ws, res.issues);
         const issues: IssuesSnapshotIssue[] = res.issues.map((issue) => {
           // Unscheduled ⇒ pure board work item, no firing markers.
           if (!issue.when) return snapshotBoardIssue(issue, null);
@@ -1479,6 +1636,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     if (!ws) return null;
     const res = await readWorkspaceIssues(ws.dir);
     if (!res.ok) return null; // absent or unreadable issues dir ⇒ no such issue
+    await observeIssueRecords(ws, res.issues);
     const issue = res.issues.find((i) => i.id === id);
     if (!issue) return null;
     const commentsResult = await readIssueComments(ws.dir, issue.id);

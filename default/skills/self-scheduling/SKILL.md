@@ -151,12 +151,16 @@ plain tracked item; add a `when` and it starts firing.
 - **`assignee`** *(optional)* — the single owner and
   scheduled-dispatch policy:
   - `@workspace` recruits a new product Session for each scheduled fire;
+  - `@new` asks the Workspace to recruit once; the first successful dispatch
+    rewrites the Issue to that concrete `@resumeId`, so every later fire returns
+    to the same accountable coworker;
   - an exact `@resumeId` continues that accountable Session, even when its
     signed Workspace differs from the Issue's Workspace;
   - `@human` and `@unassigned` are valid only for unscheduled work.
   CLI `issue create` defaults to `@me` when called by an attributable Session
   (who creates it owns it); `@me` is resolved to a concrete `@resumeId` before
-  writing. Use `@workspace` explicitly when every fire should recruit a newcomer.
+  writing. Use `@new` when the job needs a new long-lived owner, and
+  `@workspace` explicitly only when every fire should recruit a newcomer.
 - **`when`** *(OPTIONAL — present iff the issue self-schedules)* — one of:
   - `{ kind: every, every: "30m" }` — repeat on an interval (`30m`, `2h`,
     `1h30m`). Runs on the next scan, then on the interval.
@@ -169,9 +173,10 @@ plain tracked item; add a `when` and it starts firing.
     only for compatibility with old files; new Issues should write it explicitly.
   - `{ kind: at, at: "2026-03-01T13:30:00Z" }` — run ONCE at an ISO timestamp,
     then never again.
-- **`agent`** *(optional)* — runtime override for `workspace`-owned scheduled
-  work; defaults to this Workspace's runtime resolution. A Session assignee
-  already has an immutable runtime, so Session-owned Issues cannot set this.
+- **`agent`** *(optional)* — runtime override for `@new` / `@workspace`
+  scheduled work; defaults to this Workspace's runtime resolution. An exact
+  Session assignee already has an immutable runtime, so Session-owned Issues
+  cannot set this.
 
 The old parallel `execution` field is retired and rejected after migration;
 never write it into a new Issue.
@@ -180,6 +185,12 @@ The markdown **What** below the closing `---` is the Issue's canonical work
 definition. It is useful for every Issue; when scheduled, this exact visible
 markdown becomes the headless prompt. Comments are separate structured markdown
 records in `.alice/issues/<id>.comments.json`, written through `issue comment`.
+
+Issue files are part of the Workspace's Git history. After intentionally
+creating or modifying `.alice/issues/<id>.md`, make a focused Git commit for
+that work-definition change; never sweep unrelated working-tree changes into
+it. OpenAlice Activity is the readable audit fallback (including edits made
+without a commit), while Git is the exact-content history and rollback layer.
 
 ## Link entities and issues with `[[name]]`
 

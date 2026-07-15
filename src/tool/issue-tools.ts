@@ -55,6 +55,7 @@ import {
   type IssueComment,
 } from '../workspaces/issues/comments.js'
 import { dispatchIssueCommentReply } from '../workspaces/issues/comment-delivery.js'
+import { issueMutation, issueMutationFingerprint } from '../workspaces/issues/change-tracker.js'
 import {
   WORKSPACE_ASSIGNEE,
   normalizeIssueAssigneeAlias,
@@ -102,7 +103,7 @@ async function remoteIssueWriteHint(ctx: WorkspaceToolContext, id: string): Prom
 
 const issueAssigneeInputSchema = z.string().min(1).refine(
   (value) => value.toLowerCase() === '@me' || issueAssigneeSchema.safeParse(normalizeIssueAssigneeAlias(value)).success,
-  'assignee must be @me, @workspace, @human, @unassigned, or an exact @resumeId',
+  'assignee must be @me, @new, @workspace, @human, @unassigned, or an exact @resumeId',
 )
 
 function resolveIssueAssignee(
@@ -165,18 +166,26 @@ async function recordIssueProvenance(
   ctx: WorkspaceToolContext,
   issueId: string,
   action: Extract<ProvenanceAction, 'created' | 'updated' | 'commented'>,
+  mutationInput?: { before: IssueRecord; after: IssueRecord },
 ): Promise<void> {
   if (!ctx.provenanceStore) return
   const origin = sessionOriginFromInboxOrigin(ctx.workspaceId, ctx.origin) ?? {
     kind: 'unknown' as const,
     reason: 'missing-session-origin',
   }
+  const mutation = mutationInput
+    ? issueMutation(mutationInput.before, mutationInput.after)
+    : null
   const input = {
     artifact: { kind: 'issue' as const, workspaceId: ctx.workspaceId, issueId },
     action,
     origin,
     at: Date.now(),
     ...(action === 'created' ? { fingerprint: `issue:${ctx.workspaceId}:${issueId}:created` } : {}),
+    ...(mutationInput && mutation ? {
+      mutation,
+      fingerprint: issueMutationFingerprint(ctx.workspaceId, issueId, mutationInput.after),
+    } : {}),
   }
   if (action === 'updated') {
     await ctx.provenanceStore.append(input, { coalesceWithinMs: ACTIVITY_UPDATE_COALESCE_MS })
@@ -287,7 +296,8 @@ export const issueUpdateFactory: WorkspaceToolFactory = {
         '',
         'Patch any subset of `status`, `priority`, `assignee`, `what`; omitted fields are',
         'left untouched. `assignee:"@me"` binds this current product',
-        'Session; pass an exact `@resumeId` to assign another known Session. What is the',
+        'Session; `@new` recruits once and assigns that first Session permanently;',
+        'pass an exact `@resumeId` to assign another known Session. What is the',
         'canonical markdown work definition and exact scheduled prompt. Other scheduling',
         'frontmatter (`when`/`agent`) is preserved — edit it by writing the file directly',
         '(`.alice/issues/<id>.md`).',
@@ -301,7 +311,7 @@ export const issueUpdateFactory: WorkspaceToolFactory = {
         priority: z.enum(ISSUE_PRIORITIES).optional().describe('New priority.'),
         assignee: issueAssigneeInputSchema
           .optional()
-          .describe('@workspace, @human, @unassigned, @me, or an exact @resumeId.'),
+          .describe('@new, @workspace, @human, @unassigned, @me, or an exact @resumeId.'),
         what: z.string().min(1).optional().describe('Canonical markdown work definition; exact scheduled prompt.'),
       }),
       execute: async ({ id, status, priority, assignee, what }) => {
@@ -319,7 +329,10 @@ export const issueUpdateFactory: WorkspaceToolFactory = {
           what,
         })
         if (res.ok) {
-          await recordIssueProvenance(ctx, res.issue.id, 'updated')
+          await recordIssueProvenance(ctx, res.issue.id, 'updated', {
+            before: res.previous,
+            after: res.issue,
+          })
           return { ok: true as const, issue: rowOf(res.issue) }
         }
         if (res.reason === 'not_found') {
@@ -418,7 +431,8 @@ export const issueCreateFactory: WorkspaceToolFactory = {
         'the scanner sends that exact visible What to the Agent Runtime; without',
         '`when` the same What remains a pure board work item. Assignee is the',
         'only ownership field:',
-        '`@workspace` recruits a new Session each fire. `@me` resolves to this',
+        '`@new` recruits once and keeps that first Session as owner. `@workspace`',
+        'recruits a new Session each fire. `@me` resolves to this',
         'calling Session, while an exact `@resumeId` keeps one accountable',
         'Session (including a deliberately signed Session from another Workspace).',
         'A scheduled run is unattended: if its result is meant for the human,',
@@ -435,12 +449,12 @@ export const issueCreateFactory: WorkspaceToolFactory = {
         priority: z.enum(ISSUE_PRIORITIES).optional().describe('Initial priority (default "none").'),
         assignee: issueAssigneeInputSchema
           .optional()
-          .describe('Initial owner. Omit or use @me for the current Session; use @workspace to recruit a fresh Session each fire.'),
+          .describe('Initial owner. Omit or use @me for the current Session; @new recruits once and keeps that Session; @workspace recruits a fresh Session each fire.'),
         when: issueWhenSchema
           .optional()
           .describe('Schedule shape — { kind:"at", at } | { kind:"every", every } | { kind:"cron", cron, timezone?:"local"|IANA }. Present iff the issue self-schedules.'),
         what: z.string().min(1).optional().describe('Markdown work definition; exact scheduled prompt. Defaults to title.'),
-        agent: z.string().min(1).optional().describe('Adapter id when assignee is @workspace; Session assignees own their runtime.'),
+        agent: z.string().min(1).optional().describe('Adapter id when assignee is @new or @workspace; an exact Session owns its runtime.'),
       }),
       execute: async ({ title, id, status, priority, assignee, when, what, agent }) => {
         const dir = selfDir(ctx)

@@ -372,6 +372,7 @@ function IssueRow({ wsId, wsTag, issue, agentRuntime, dupOthers, onOpen }: Board
   const titleMatchesId = issue.title.trim().toLowerCase() === issue.id.trim().toLowerCase()
   const explicitAssignee = issue.assignee !== '@workspace'
   const explicitAgent = agentRuntime?.source === 'override' && agentRuntime.distinctOverride !== false
+  const assigneeLabel = issue.assignee === '@new' ? 'Assign on first run' : issue.assignee
   return (
     <li>
       <button
@@ -417,7 +418,7 @@ function IssueRow({ wsId, wsTag, issue, agentRuntime, dupOthers, onOpen }: Board
             )}
             {explicitAssignee && (
               <span className="max-w-[14rem] truncate text-muted/70" title={`Assignee: ${issue.assignee}`}>
-                {issue.assignee}
+                {assigneeLabel}
               </span>
             )}
             {explicitAgent && agentRuntime && (

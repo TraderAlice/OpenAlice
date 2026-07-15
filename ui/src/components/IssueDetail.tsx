@@ -126,6 +126,7 @@ function AssigneeEditor({
       aria-label="Assignee"
       onChange={(event) => onChange(event.target.value)}
     >
+      {scheduled && <option value="@new">New Session · assign after first run</option>}
       <option value="@workspace">{scheduled ? '@Workspace · new Session each run' : '@Workspace'}</option>
       {!scheduled && <option value="@human">Human</option>}
       {!scheduled && <option value="@unassigned">Unassigned</option>}
@@ -389,11 +390,13 @@ function CommentComposer({
   wsId,
   id,
   ownerResumeId,
+  assignee,
   onPosted,
 }: {
   wsId: string
   id: string
   ownerResumeId: string | null
+  assignee: string
   onPosted: (next: IssueDetailData) => void
 }) {
   const [text, setText] = useState('')
@@ -437,7 +440,9 @@ function CommentComposer({
         <p className="min-w-0 flex-1 basis-full break-words text-[11px] leading-snug text-muted sm:basis-auto">
           {ownerResumeId
             ? <>The assigned Session <span className="font-mono text-text/75">@{ownerResumeId}</span> will reply here.</>
-            : 'No fixed Session owner — this comment is recorded as a timeline note.'}
+            : assignee === '@new'
+              ? 'The first scheduled run will assign a Session; until then this is a timeline note.'
+              : 'No fixed Session owner — this comment is recorded as a timeline note.'}
         </p>
         <button
           type="button"
@@ -600,12 +605,58 @@ const PROVENANCE_ACTION_LABEL: Record<IssueProvenanceRecord['action'], string> =
   reconstructed: 'reconstructed the Issue context',
 }
 
+const MUTATION_FIELD_LABEL: Record<string, string> = {
+  title: 'Title',
+  status: 'Status',
+  priority: 'Priority',
+  assignee: 'Assignee',
+  schedule: 'Schedule',
+  runtime: 'Runtime',
+  what: 'What',
+}
+
+function unknownOriginLabel(reason: string): string {
+  if (reason === 'direct-file-edit') return 'Direct file edit'
+  if (reason === 'concurrent-workspace-edit') return 'Concurrent Workspace edit · author unknown'
+  return `Unknown · ${reason.replaceAll('-', ' ')}`
+}
+
+function mutationValue(field: string, value: string): string {
+  if (field === 'assignee') {
+    if (value === '@new') return 'New Session, then keep owner'
+    if (value === '@workspace') return 'New Session each run'
+    if (value === '@human') return 'Human'
+    if (value === '@unassigned') return 'Unassigned'
+  }
+  if (field === 'status' || field === 'priority') return value.replaceAll('_', ' ')
+  if (field === 'schedule') {
+    try {
+      const schedule = JSON.parse(value) as { kind?: string; at?: string; every?: string; cron?: string; timezone?: string }
+      if (schedule.kind === 'at') return `Once · ${schedule.at}`
+      if (schedule.kind === 'every') return `Every ${schedule.every}`
+      if (schedule.kind === 'cron') return `${schedule.cron}${schedule.timezone ? ` · ${schedule.timezone}` : ''}`
+    } catch {
+      // Older audit rows can still carry a hand-written value; show it safely.
+    }
+  }
+  return value
+}
+
+function mutationSummary(change: { field: string; before?: string; after?: string }): string {
+  const label = MUTATION_FIELD_LABEL[change.field] ?? change.field
+  if (change.before === undefined && change.after === undefined) return `edited ${label}`
+  if (change.before === undefined) return `set ${label} to ${mutationValue(change.field, change.after!)}`
+  if (change.after === undefined) return `cleared ${label}`
+  return `changed ${label} from ${mutationValue(change.field, change.before)} to ${mutationValue(change.field, change.after)}`
+}
+
 function IssueActivity({
   activity,
   onContinue,
   wsId,
   issueId,
   ownerResumeId,
+  assignee,
   onPosted,
 }: {
   activity: IssueActivityRecord[]
@@ -613,6 +664,7 @@ function IssueActivity({
   wsId: string
   issueId: string
   ownerResumeId: string | null
+  assignee: string
   onPosted: (next: IssueDetailData) => void
 }) {
   const [continuingId, setContinuingId] = useState<string | null>(null)
@@ -683,17 +735,26 @@ function IssueActivity({
                 ? 'Human'
                 : origin.kind === 'external'
                   ? `External · ${origin.system}`
-                  : `Unknown · ${origin.reason}`
+                  : unknownOriginLabel(origin.reason)
             return (
-              <li key={`provenance:${record.id}`} className="relative flex min-w-0 items-center gap-2.5 py-1 pl-8">
+              <li key={`provenance:${record.id}`} className="relative flex min-w-0 items-start gap-2.5 py-1 pl-8">
                 <span className="absolute left-[3px] top-2 z-10 grid h-[18px] w-[18px] place-items-center rounded-full border border-border bg-bg text-muted">
                   <History size={10} aria-hidden />
                 </span>
-                <p className="min-w-0 flex-1 text-[12px] text-muted">
-                  <span className="font-medium text-text/80">{originLabel}</span>{' '}
-                  {PROVENANCE_ACTION_LABEL[record.action]} ·{' '}
-                  <span title={new Date(record.at).toLocaleString()}>{formatRelativeTime(record.at)}</span>
-                </p>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[12px] text-muted">
+                    <span className="font-medium text-text/80">{originLabel}</span>{' '}
+                    {PROVENANCE_ACTION_LABEL[record.action]} ·{' '}
+                    <span title={new Date(record.at).toLocaleString()}>{formatRelativeTime(record.at)}</span>
+                  </p>
+                  {record.mutation && (
+                    <ul className="mt-1 space-y-0.5 text-[11px] leading-relaxed text-muted/80">
+                      {record.mutation.fields.map((change) => (
+                        <li key={change.field}>{mutationSummary(change)}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
                 {isSession && (
                   <button
                     type="button"
@@ -714,6 +775,7 @@ function IssueActivity({
         wsId={wsId}
         id={issueId}
         ownerResumeId={ownerResumeId}
+        assignee={assignee}
         onPosted={onPosted}
       />
     </section>
@@ -1101,6 +1163,7 @@ export function IssueDetail({
             wsId={wsId}
             issueId={id}
             ownerResumeId={stableOwnerResumeId}
+            assignee={issue.assignee}
             onPosted={mutate}
           />
         </main>

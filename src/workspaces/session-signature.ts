@@ -8,6 +8,8 @@
  */
 
 export const WORKSPACE_ASSIGNEE = '@workspace' as const
+/** Recruit one fresh Session on the next run, then persist that Session as owner. */
+export const NEW_ASSIGNEE = '@new' as const
 export const HUMAN_ASSIGNEE = '@human' as const
 export const UNASSIGNED_ASSIGNEE = '@unassigned' as const
 
@@ -25,8 +27,8 @@ export function normalizeIssueAssigneeAlias(value: string): string {
   const trimmed = value.trim()
   const lower = trimmed.toLowerCase()
   if (lower === '@workspace' || lower === 'workspace') return WORKSPACE_ASSIGNEE
+  if (lower === '@new' || lower === 'new') return NEW_ASSIGNEE
   if (lower === '@human' || lower === 'human') return HUMAN_ASSIGNEE
   if (lower === '@unassigned' || lower === 'unassigned') return UNASSIGNED_ASSIGNEE
   return trimmed
 }
-

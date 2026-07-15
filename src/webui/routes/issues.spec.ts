@@ -197,6 +197,15 @@ describe('PATCH /api/issues/:wsId/:id', () => {
       artifact: { kind: 'issue', workspaceId: 'ws-1', issueId: 'i1' },
       action: 'updated',
       origin: { kind: 'human' },
+      mutation: {
+        fields: expect.arrayContaining([
+          { field: 'status', before: 'todo', after: 'in_progress' },
+          { field: 'priority', before: 'none', after: 'high' },
+          { field: 'assignee', before: '@workspace', after: '@human' },
+          { field: 'runtime', after: 'pi' },
+          { field: 'what' },
+        ]),
+      },
     }), { coalesceWithinMs: 900000 })
   })
 

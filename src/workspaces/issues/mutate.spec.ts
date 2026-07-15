@@ -64,6 +64,28 @@ describe('createIssue', () => {
     expect(issue?.what).toBe('run the research routine')
   })
 
+  it('accepts @new only for scheduled work that will choose its first owner', async () => {
+    const scheduled = await createIssue(dir, {
+      id: 'choose-owner',
+      title: 'Choose one owner',
+      assignee: '@new',
+      when: { kind: 'every', every: '30m' },
+      agent: 'pi',
+    })
+    expect(scheduled.ok && scheduled.issue.assignee).toBe('@new')
+
+    const unscheduled = await createIssue(dir, {
+      id: 'no-trigger',
+      title: 'No trigger',
+      assignee: '@new',
+    })
+    expect(unscheduled.ok).toBe(false)
+    if (!unscheduled.ok) {
+      expect(unscheduled.reason).toBe('invalid')
+      if (unscheduled.reason === 'invalid') expect(unscheduled.error).toContain('@new needs a schedule')
+    }
+  })
+
   it('refuses to overwrite an existing issue (conflict)', async () => {
     await createIssue(dir, { id: 'dup', title: 'first' })
     const res = await createIssue(dir, { id: 'dup', title: 'second' })

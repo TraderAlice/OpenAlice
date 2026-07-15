@@ -31,7 +31,14 @@ import type { Logger } from '../logger.js'
 import type { WorkspaceMeta, WorkspaceRegistry } from '../workspace-registry.js'
 import type { HeadlessTaskTrigger } from '../headless-task-registry.js'
 
-import { isFireable, issueAssigneeResumeId, issueFirePrompt, readWorkspaceIssues } from '../issues/declaration.js'
+import {
+  isFireable,
+  issueAssigneeClaimsFirstSession,
+  issueAssigneeResumeId,
+  issueFirePrompt,
+  readWorkspaceIssues,
+  type IssueRecord,
+} from '../issues/declaration.js'
 import { SCHEDULED_ISSUE_RUN_TIMEOUT_MS } from '../issues/run-failure.js'
 
 import {
@@ -84,7 +91,17 @@ export interface ScheduleScannerDeps {
     trigger?: HeadlessTaskTrigger,
     /** Product Session to continue. Omitted means allocate a fresh Session. */
     resumeId?: string,
-  ) => Promise<{ taskId: string }>
+  ) => Promise<{ taskId: string; resumeId: string }>
+  /** Persist @new -> exact @resumeId after the first fresh dispatch. */
+  claimFreshSession?: (input: {
+    issueWorkspace: WorkspaceMeta
+    issueId: string
+    taskId: string
+    resumeId: string
+    agent: string
+  }) => Promise<void>
+  /** Observe direct Issue file edits during the scanner's normal live read. */
+  observeIssues?: (workspace: WorkspaceMeta, issues: readonly IssueRecord[]) => Promise<void>
   markers: MarkerStore
   logger: Logger
   /** Injectable clock for tests. */
@@ -160,6 +177,7 @@ export class ScheduleScanner {
       issueFirePrompt(issue),
       issue.agent,
       issueAssigneeResumeId(issue.assignee) ?? undefined,
+      issueAssigneeClaimsFirstSession(issue.assignee),
       true,
     )
   }
@@ -233,6 +251,7 @@ export class ScheduleScanner {
         invalid: res.invalid.map((i) => i.id),
       })
     }
+    await this.deps.observeIssues?.(ws, res.issues)
 
     const tasks: ScheduleSnapshotTask[] = []
     for (const issue of res.issues) {
@@ -247,6 +266,7 @@ export class ScheduleScanner {
           issueFirePrompt(issue),
           issue.agent,
           issueAssigneeResumeId(issue.assignee) ?? undefined,
+          issueAssigneeClaimsFirstSession(issue.assignee),
           nowMs,
         )
       }
@@ -269,6 +289,7 @@ export class ScheduleScanner {
     what: string,
     agentId: string | undefined,
     resumeId: string | undefined,
+    claimFreshSession: boolean,
     nowMs: number,
   ): Promise<void> {
     try {
@@ -278,6 +299,7 @@ export class ScheduleScanner {
         what,
         agentId,
         resumeId,
+        claimFreshSession,
       )
       await this.deps.markers.set(issueWorkspace.id, taskId, nowMs)
       this.deps.logger.info('schedule.fired', {
@@ -304,6 +326,7 @@ export class ScheduleScanner {
     what: string,
     agentId?: string,
     resumeId?: string,
+    claimFreshSession = false,
     manual = false,
   ): Promise<{ taskId: string }> {
     const dispatchKey = `${issueWorkspace.id}:${issueId}`
@@ -349,6 +372,31 @@ export class ScheduleScanner {
             SCHEDULED_ISSUE_RUN_TIMEOUT_MS,
             trigger,
           )
+      if (claimFreshSession) {
+        if (!this.deps.claimFreshSession) {
+          throw new Error('Issue @new ownership cannot be persisted in this runtime')
+        }
+        try {
+          await this.deps.claimFreshSession({
+            issueWorkspace,
+            issueId,
+            taskId: result.taskId,
+            resumeId: result.resumeId,
+            agent: adapter.id,
+          })
+        } catch (err) {
+          // The worker is already running. Treat a claim-write failure as a
+          // separate control-plane fault so the due loop cannot immediately
+          // recruit a second worker for the same occurrence.
+          this.deps.logger.warn('schedule.first_session_claim_failed', {
+            wsId: issueWorkspace.id,
+            issueId,
+            taskId: result.taskId,
+            resumeId: result.resumeId,
+            err,
+          })
+        }
+      }
       this.deps.logger.info('schedule.issue_dispatched', {
         wsId: issueWorkspace.id,
         executionWsId: executionWorkspace.id,
@@ -357,7 +405,7 @@ export class ScheduleScanner {
         runId: result.taskId,
         manual,
       })
-      return result
+      return { taskId: result.taskId }
     } finally {
       this.dispatchingIssues.delete(dispatchKey)
     }

@@ -71,7 +71,7 @@ export interface CreateIssueInput {
 
 /** Result of an edit that targets an existing issue. */
 export type MutateResult =
-  | { ok: true; issue: IssueRecord }
+  | { ok: true; issue: IssueRecord; previous: IssueRecord }
   | { ok: false; reason: 'not_found' }
   | { ok: false; reason: 'invalid'; error: string }
 
@@ -153,7 +153,7 @@ export async function updateIssueFields(
     const a = patch.assignee.trim()
     const assignee = issueAssigneeSchema.safeParse(a)
     if (!assignee.success) {
-      return { ok: false, reason: 'invalid', error: 'assignee must be @workspace, @human, @unassigned, or an exact @resumeId' }
+      return { ok: false, reason: 'invalid', error: 'assignee must be @workspace, @new, @human, @unassigned, or an exact @resumeId' }
     }
     data.assignee = assignee.data
     if (issueAssigneeResumeId(assignee.data)) delete data.agent
@@ -183,7 +183,7 @@ export async function updateIssueFields(
   const reparsed = parseIssueContent(id, content)
   if (!reparsed.ok) return { ok: false, reason: 'invalid', error: reparsed.error }
   await writeWorkspaceFile(wsDir, relFor(id), content)
-  return { ok: true, issue: reparsed.issue }
+  return { ok: true, issue: reparsed.issue, previous: current.issue }
 }
 
 /**

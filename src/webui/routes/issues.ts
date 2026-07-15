@@ -30,6 +30,7 @@ import type { WorkspaceConversationControl } from '../../core/workspace-tool-cen
 import { ACTIVITY_UPDATE_COALESCE_MS } from '../../core/provenance-store.js'
 import { createWorkspaceConversationControl } from '../../workspaces/conversation-control.js'
 import { dispatchIssueCommentReply } from '../../workspaces/issues/comment-delivery.js'
+import { issueMutation, issueMutationFingerprint } from '../../workspaces/issues/change-tracker.js'
 import { updateIssueCommentDelivery } from '../../workspaces/issues/comments.js'
 import {
   ISSUE_PRIORITIES,
@@ -152,7 +153,7 @@ export function createIssuesRoutes(svc: WorkspaceService, deps: IssueRoutesDeps 
       const a = fields['assignee']
       const assignee = typeof a === 'string' ? issueAssigneeSchema.safeParse(a.trim()) : null
       if (!assignee?.success) {
-        return c.json({ error: 'invalid_assignee', message: 'assignee must be @workspace, @human, @unassigned, or an exact @resumeId' }, 400)
+        return c.json({ error: 'invalid_assignee', message: 'assignee must be @workspace, @new, @human, @unassigned, or an exact @resumeId' }, 400)
       }
       const resumeId = issueAssigneeResumeId(assignee.data)
       if (resumeId) {
@@ -213,11 +214,16 @@ export function createIssuesRoutes(svc: WorkspaceService, deps: IssueRoutesDeps 
         if (res.reason === 'not_found') return c.json({ error: 'not_found' }, 404)
         return c.json({ error: 'invalid_issue', message: res.error }, 422)
       }
+      const mutation = issueMutation(res.previous, res.issue)
       await svc.provenanceStore.append({
         artifact: { kind: 'issue', workspaceId: wsId, issueId: id },
         action: 'updated',
         origin: { kind: 'human' },
         at: Date.now(),
+        ...(mutation ? {
+          mutation,
+          fingerprint: issueMutationFingerprint(wsId, id, res.issue),
+        } : {}),
       }, { coalesceWithinMs: ACTIVITY_UPDATE_COALESCE_MS })
       launcherLogger.info('issue.updated', { wsId, id, fields: Object.keys(patch) })
       const detail = await svc.issueDetail(wsId, id)

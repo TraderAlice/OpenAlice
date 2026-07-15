@@ -48,6 +48,8 @@ The filename stem is the stable issue id. Frontmatter:
 - `status` — `backlog | todo | in_progress | done | canceled`; default `todo`.
 - `priority` — `urgent | high | medium | low | none`; default `none`.
 - `assignee` — the single ownership and dispatch contract:
+  - `@new` means the owning Workspace recruits one new product Session on the
+    first fire, then persists that concrete Session as the future owner;
   - `@workspace` means the owning Workspace recruits a new product Session for
     every scheduled fire;
   - an exact `@resumeId` continues one accountable product Session;
@@ -56,7 +58,7 @@ The filename stem is the stable issue id. Frontmatter:
   - `{ kind: at, at: <ISO timestamp> }`
   - `{ kind: every, every: <duration> }`
   - `{ kind: cron, cron: <5-field expression>, timezone: local | <IANA zone> }`
-- `agent` — optional CLI adapter id for `@workspace`-owned scheduled work;
+- `agent` — optional CLI adapter id for `@new` / `@workspace` scheduled work;
   otherwise Workspace/default resolution is used. A Session assignee already
   owns its runtime and cannot be overridden here.
 
@@ -289,10 +291,19 @@ use a later collect or one-shot read; agents should not manufacture shell sleep
 loops.
 
 The Issue detail UI treats scheduling as an intrinsic Work item capability.
-`assignee: "@workspace"` recruits a new Session on every fire;
-`assignee: "@resumeId"` keeps one responsible Session. Only the latter
-has a stable owner to ask; Workspace-owned execution exposes the creator and
-each concrete run as separate follow-up targets.
+`assignee: "@new"` recruits one fresh Session on the first fire and then
+rewrites itself to that concrete `@resumeId`; `assignee: "@workspace"`
+recruits a new Session on every fire; `assignee: "@resumeId"` keeps one already
+known responsible Session. The first and third modes produce a stable owner to
+ask; `@workspace` execution exposes the creator and each concrete run as
+separate follow-up targets.
+
+Issue mutation has two complementary histories. Activity records attributable
+field-level changes (and marks the canonical What document as edited without
+copying its body into launcher state), including direct file edits detected by
+the live scanner. The Workspace Git log remains the exact-content rollback
+layer, so agents should make a focused commit after intentionally changing an
+Issue file. Activity stays useful even if that commit is forgotten.
 
 Scheduling never bypasses trading approval. A headless agent may research or
 stage a trade, but execution remains behind UTA/Trading-as-Git permission and
