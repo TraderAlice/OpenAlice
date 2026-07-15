@@ -86,8 +86,8 @@ describe('credentialToWorkspaceAiCred', () => {
   })
 
   it('lets opencode/pi override the default context window', () => {
-    const cred = credentialToWorkspaceAiCred(chatOnlyGateway, 'pi', { model: 'some-model', contextWindow: 256_000 })!
-    expect(cred.contextWindow).toBe(256_000)
+    const cred = credentialToWorkspaceAiCred(chatOnlyGateway, 'pi', { model: 'some-model', contextWindow: 128_000 })!
+    expect(cred.contextWindow).toBe(128_000)
   })
 })
 
@@ -150,6 +150,56 @@ describe('injectWorkspaceCredentials', () => {
     expect(claudeCall.cred).toMatchObject({ apiKey: 'sk-ant', model: 'claude-opus-4-8', authMode: 'x-api-key' })
     const codexCall = calls.find((c) => c.id === 'codex')!
     expect(codexCall.cred).toMatchObject({ apiKey: 'sk-oa', model: 'gpt-5.5' })
+  })
+
+  it('copies a new-Workspace context preference into Pi/OpenCode config', async () => {
+    const calls: WriteCall[] = []
+    const reg = new AdapterRegistry()
+    reg.register(stubAdapter('pi', calls))
+    const { logger } = fakeLogger()
+
+    await injectWorkspaceCredentials({
+      dir: '/ws',
+      agents: ['pi'],
+      agentCredentials: {
+        pi: { credentialSlug: 'openai-1', model: 'gpt-5.5', contextWindow: 512_000 },
+      },
+      adapterRegistry: reg,
+      credentials,
+      logger,
+    })
+
+    expect(calls).toHaveLength(1)
+    expect(calls[0]?.cred).toMatchObject({ contextWindow: 512_000, model: 'gpt-5.5' })
+  })
+
+  it('resolves the credential model when a new-Workspace default only pins credential + context', async () => {
+    const calls: WriteCall[] = []
+    const reg = new AdapterRegistry()
+    reg.register(stubAdapter('pi', calls))
+    reg.register(stubAdapter('opencode', calls))
+    const { logger } = fakeLogger()
+
+    await injectWorkspaceCredentials({
+      dir: '/ws',
+      agents: ['pi', 'opencode'],
+      agentCredentials: {
+        pi: { credentialSlug: 'openai-1', contextWindow: 256_000 },
+        opencode: { credentialSlug: 'anthropic-1', contextWindow: 128_000 },
+      },
+      adapterRegistry: reg,
+      credentials,
+      logger,
+    })
+
+    expect(calls.find((call) => call.id === 'pi')?.cred).toMatchObject({
+      model: 'gpt-5.5',
+      contextWindow: 256_000,
+    })
+    expect(calls.find((call) => call.id === 'opencode')?.cred).toMatchObject({
+      model: 'claude-opus-4-8',
+      contextWindow: 128_000,
+    })
   })
 
   it('skips (loud warn) an agent declared but not enabled on the workspace', async () => {

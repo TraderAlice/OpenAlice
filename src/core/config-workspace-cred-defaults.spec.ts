@@ -40,13 +40,20 @@ describe('workspace credential defaults', () => {
   it('round-trips a per-agent map and keeps the optional model', async () => {
     const config = await loadConfigModule()
     await config.writeWorkspaceCredentialDefaults({
-      opencode: { credentialSlug: 'openai-1', model: 'gpt-5.5' },
+      opencode: { credentialSlug: 'openai-1', model: 'gpt-5.5', contextWindow: 512_000 },
       pi: { credentialSlug: 'anthropic-1' },
     })
     expect(await config.readWorkspaceCredentialDefaults()).toEqual({
-      opencode: { credentialSlug: 'openai-1', model: 'gpt-5.5' },
+      opencode: { credentialSlug: 'openai-1', model: 'gpt-5.5', contextWindow: 512_000 },
       pi: { credentialSlug: 'anthropic-1' },
     })
+  })
+
+  it('rejects a non-positive context default', async () => {
+    const config = await loadConfigModule()
+    await expect(config.writeWorkspaceCredentialDefaults({
+      pi: { credentialSlug: 'openai-1', contextWindow: 0 },
+    })).rejects.toThrow()
   })
 
   it('drops entries with an empty credentialSlug (the "don\'t seed" choice)', async () => {

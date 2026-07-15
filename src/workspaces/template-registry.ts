@@ -14,6 +14,8 @@ import type { Logger } from './logger.js';
 export interface AgentCredentialDecl {
   readonly credentialSlug: string;
   readonly model?: string;
+  /** Pi/OpenCode only; ignored by runtimes without a Workspace context knob. */
+  readonly contextWindow?: number;
   /** Claude only. */
   readonly authMode?: 'x-api-key' | 'bearer';
   /** Codex only. */
@@ -323,6 +325,7 @@ async function readTemplateMeta(path: string): Promise<ParsedTemplateMeta> {
 /**
  * Parse the optional `agentCredentials` map from a template.json. Shape:
  *   { "<agentId>": { "credentialSlug": "openai-1", "model": "gpt-5.5",
+ *                    "contextWindow"?: 256000,
  *                    "authMode"?: "x-api-key"|"bearer", "wireApi"?: "chat"|"responses" } }
  * Entries missing a string `credentialSlug` are dropped. Returns undefined when
  * nothing valid is present (so the field stays absent on the meta).
@@ -336,6 +339,13 @@ function parseAgentCredentials(raw: unknown): Record<string, AgentCredentialDecl
     if (typeof v['credentialSlug'] !== 'string' || v['credentialSlug'].length === 0) continue;
     const decl: AgentCredentialDecl = { credentialSlug: v['credentialSlug'] };
     if (typeof v['model'] === 'string') (decl as { model?: string }).model = v['model'];
+    if (
+      typeof v['contextWindow'] === 'number' &&
+      Number.isInteger(v['contextWindow']) &&
+      v['contextWindow'] > 0
+    ) {
+      (decl as { contextWindow?: number }).contextWindow = v['contextWindow'];
+    }
     if (v['authMode'] === 'x-api-key' || v['authMode'] === 'bearer') {
       (decl as { authMode?: 'x-api-key' | 'bearer' }).authMode = v['authMode'];
     }

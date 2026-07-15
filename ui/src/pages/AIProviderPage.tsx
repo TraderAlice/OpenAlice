@@ -16,12 +16,22 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { api, type Preset, type WireShape } from '../api'
-import type { CredentialSummary, WorkspaceCredentialDefaultsResponse } from '../api/config'
+import type {
+  CredentialSummary,
+  WorkspaceCredentialDefault,
+  WorkspaceCredentialDefaultsResponse,
+} from '../api/config'
 import { PageHeader } from '../components/PageHeader'
 import { PageLoading, Skeleton } from '../components/StateViews'
 import { inputClass } from '../components/form'
 import { CredentialModal } from '../components/credentials/CredentialModal'
 import { WIRE_SHAPE_SHORT, isApiKeyPreset } from '../lib/presetHelpers'
+import {
+  DEFAULT_WORKSPACE_CONTEXT_WINDOW,
+  WORKSPACE_CONTEXT_WINDOW_OPTIONS,
+  isPresetWorkspaceContextWindow,
+  normalizeWorkspaceContextWindow,
+} from '../lib/workspaceContext'
 
 const SHAPE_ORDER: WireShape[] = ['anthropic', 'openai-chat', 'openai-responses']
 
@@ -225,7 +235,7 @@ export function AIProviderPage() {
           </section>
         </div>
 
-        {/* ============== Default workspace credentials ============== */}
+        {/* ============== New Workspace provider defaults ============== */}
         <WorkspaceDefaultsSection credentials={credentials} />
       </div>
 
@@ -242,14 +252,11 @@ export function AIProviderPage() {
   )
 }
 
-// ==================== Default workspace credentials ====================
+// ==================== New Workspace provider defaults ====================
 //
-// A user-level "inject my usual key on every new workspace" setting. Per agent,
-// pick a vault credential to seed into each new workspace's file-based AI config
-// at create time. opencode/pi are the primary case (loginless — they need a key
-// to run); Claude Code / Codex run on their own CLI login by default, so they're
-// behind an "advanced" reveal — present (some users drive them via an unofficial
-// API key) but never pushed.
+// User-level creation defaults. Per agent, choose the vault credential that a
+// new Workspace receives; Pi/OpenCode also carry an explicit context limit.
+// Existing Workspaces remain file-backed and untouched.
 
 const PRIMARY_DEFAULT_AGENTS = [
   { id: 'opencode', name: 'opencode' },
@@ -261,7 +268,11 @@ const ADVANCED_DEFAULT_AGENTS = [
   { id: 'codex', name: 'Codex' },
 ] as const
 
-function WorkspaceDefaultsSection({ credentials }: { credentials: CredentialSummary[] }) {
+function supportsContextWindow(agentId: string): boolean {
+  return agentId === 'opencode' || agentId === 'pi'
+}
+
+export function WorkspaceDefaultsSection({ credentials }: { credentials: CredentialSummary[] }) {
   const [data, setData] = useState<WorkspaceCredentialDefaultsResponse | null>(null)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -281,11 +292,8 @@ function WorkspaceDefaultsSection({ credentials }: { credentials: CredentialSumm
     return c ? `${credentialLabel(c)} · ${slug}` : slug
   }
 
-  const setAgentDefault = async (agentId: string, slug: string) => {
+  const saveDefaults = async (nextDefaults: Record<string, WorkspaceCredentialDefault>) => {
     if (!data) return
-    const nextDefaults = { ...data.defaults }
-    if (slug) nextDefaults[agentId] = { credentialSlug: slug }
-    else delete nextDefaults[agentId]
     setSaving(true); setError('')
     setData({ ...data, defaults: nextDefaults }) // optimistic
     try {
@@ -299,11 +307,42 @@ function WorkspaceDefaultsSection({ credentials }: { credentials: CredentialSumm
     }
   }
 
+  const setAgentCredential = async (agentId: string, slug: string) => {
+    if (!data) return
+    const nextDefaults = { ...data.defaults }
+    const previous = data.defaults[agentId]
+    if (slug) {
+      nextDefaults[agentId] = {
+        credentialSlug: slug,
+        ...(previous?.credentialSlug === slug && previous.model ? { model: previous.model } : {}),
+        ...(supportsContextWindow(agentId)
+          ? { contextWindow: normalizeWorkspaceContextWindow(previous?.contextWindow) }
+          : {}),
+      }
+    } else {
+      delete nextDefaults[agentId]
+    }
+    await saveDefaults(nextDefaults)
+  }
+
+  const setAgentContext = async (agentId: string, contextWindow: number) => {
+    if (!data) return
+    const previous = data.defaults[agentId]
+    if (!previous?.credentialSlug || !supportsContextWindow(agentId)) return
+    await saveDefaults({
+      ...data.defaults,
+      [agentId]: { ...previous, contextWindow },
+    })
+  }
+
   const renderAgent = (agent: { id: string; name: string }, note?: string) => {
     const options = data?.compatibleByAgent[agent.id] ?? []
-    const current = data?.defaults[agent.id]?.credentialSlug ?? ''
+    const currentDefault = data?.defaults[agent.id]
+    const currentCredential = currentDefault?.credentialSlug ?? ''
+    const hasContextWindow = supportsContextWindow(agent.id)
+    const currentContextWindow = normalizeWorkspaceContextWindow(currentDefault?.contextWindow)
     return (
-      <div key={agent.id} className="flex items-center gap-3 rounded-lg border border-border bg-bg px-4 py-3">
+      <div key={agent.id} className="flex flex-col gap-3 rounded-lg border border-border bg-bg px-4 py-3 sm:flex-row sm:items-center">
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2">
             <span className="text-[13px] font-medium text-text">{agent.name}</span>
@@ -313,16 +352,48 @@ function WorkspaceDefaultsSection({ credentials }: { credentials: CredentialSumm
           {options.length === 0 && (
             <p className="text-[11px] text-text-muted/70 mt-0.5 leading-snug">No compatible credential in the vault yet.</p>
           )}
+          {hasContextWindow && currentCredential && currentContextWindow > DEFAULT_WORKSPACE_CONTEXT_WINDOW && (
+            <p className="mt-1 text-[11px] leading-snug text-yellow-300/90">
+              Above 256K may enter a higher API billing tier and increases local prefill memory.
+            </p>
+          )}
         </div>
-        <select
-          className={inputClass + ' max-w-[240px]'}
-          value={current}
-          disabled={saving || options.length === 0}
-          onChange={(e) => void setAgentDefault(agent.id, e.target.value)}
-        >
-          <option value="">Don’t seed</option>
-          {options.map((slug) => <option key={slug} value={slug}>{credLabel(slug)}</option>)}
-        </select>
+        <div className={`grid w-full gap-2 sm:w-auto ${hasContextWindow ? 'sm:grid-cols-[minmax(180px,240px)_150px]' : 'sm:grid-cols-[minmax(180px,240px)]'}`}>
+          <label className="grid gap-1 text-[10px] uppercase tracking-wide text-text-muted">
+            Credential
+            <select
+              aria-label={`${agent.name} default credential`}
+              className={inputClass}
+              value={currentCredential}
+              disabled={saving || options.length === 0}
+              onChange={(e) => void setAgentCredential(agent.id, e.target.value)}
+            >
+              <option value="">Don’t seed</option>
+              {options.map((slug) => <option key={slug} value={slug}>{credLabel(slug)}</option>)}
+            </select>
+          </label>
+          {hasContextWindow && (
+            <label className="grid gap-1 text-[10px] uppercase tracking-wide text-text-muted">
+              Context window
+              <select
+                aria-label={`${agent.name} default context window`}
+                className={inputClass}
+                value={currentContextWindow}
+                disabled={saving || !currentCredential}
+                onChange={(e) => void setAgentContext(agent.id, Number(e.target.value))}
+              >
+                {!isPresetWorkspaceContextWindow(currentContextWindow) && (
+                  <option value={currentContextWindow}>
+                    Custom — {currentContextWindow.toLocaleString('en-US')} tokens
+                  </option>
+                )}
+                {WORKSPACE_CONTEXT_WINDOW_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
       </div>
     )
   }
@@ -331,16 +402,15 @@ function WorkspaceDefaultsSection({ credentials }: { credentials: CredentialSumm
     <section className="max-w-[1100px] mx-auto mt-6">
       <div className="rounded-lg border border-border/50 bg-bg-secondary/50 px-4 py-3 mb-4">
         <p className="text-[13px] text-text-muted leading-relaxed">
-          Seed a default credential into every <em>new</em> workspace, so you don’t open the
-          per-workspace AI config each time. It’s written into the workspace’s own agent config
-          files at create — existing workspaces are untouched, and you can still override any
-          workspace afterwards. opencode and Pi need a key to run; Claude Code and Codex normally
-          run on their own CLI login (<code className="font-mono text-[11.5px]">claude login</code> /{' '}
-          <code className="font-mono text-[11.5px]">codex login</code>) and don’t need this.
+          Choose the provider state copied into every <em>new</em> Workspace. Pi and OpenCode
+          default to a 256K context window; choose a different limit here when the model,
+          provider pricing, and local memory support it. The values are written into each new
+          Workspace’s own agent config at creation time. Existing Workspaces are untouched and
+          remain independently editable.
         </p>
       </div>
 
-      <h2 className="text-[13px] font-semibold text-text uppercase tracking-wide mb-3">Default workspace credentials</h2>
+      <h2 className="text-[13px] font-semibold text-text uppercase tracking-wide mb-3">New Workspace defaults</h2>
 
       {!data ? (
         <div className="space-y-2.5" aria-hidden="true">

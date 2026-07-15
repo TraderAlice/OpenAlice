@@ -29,6 +29,12 @@ import { useTestGate } from '../../lib/useTestGate'
 import { useWorkspaces } from '../../contexts/workspaces-context'
 import { WorkspaceTemplateUpgradePanel } from './WorkspaceTemplateUpgradePanel'
 import { WorkspaceAbsorbPanel } from './WorkspaceAbsorbPanel'
+import {
+  DEFAULT_WORKSPACE_CONTEXT_WINDOW as DEFAULT_CONTEXT_WINDOW,
+  WORKSPACE_CONTEXT_WINDOW_OPTIONS as CONTEXT_WINDOW_OPTIONS,
+  isPresetWorkspaceContextWindow as isPresetContextWindow,
+  normalizeWorkspaceContextWindow as normalizeContextWindow,
+} from '../../lib/workspaceContext'
 
 // The agent tab implies a default vendor when the baseUrl alone can't say:
 // claude → Anthropic, codex → OpenAI; opencode/pi run anything so they have no
@@ -54,13 +60,6 @@ const inputClass =
   'w-full bg-bg-secondary border border-border rounded-md px-3 py-2 text-[13px] text-text placeholder:text-text-muted/60 focus:outline-none focus:border-accent'
 
 const TAB_LABEL: Record<Tab, string> = { claude: 'Claude Code', codex: 'Codex', opencode: 'opencode', pi: 'Pi' }
-export const DEFAULT_CONTEXT_WINDOW = 256_000
-const CONTEXT_WINDOW_OPTIONS = [
-  { value: 128_000, label: '128K' },
-  { value: 256_000, label: '256K — recommended' },
-  { value: 512_000, label: '512K' },
-  { value: 1_000_000, label: '1M' },
-] as const
 
 interface FormState {
   baseUrl: string
@@ -93,16 +92,6 @@ const EMPTY_FORM: FormState = {
   wireShape: 'anthropic',
   wireApi: 'responses',
   authMode: 'x-api-key',
-}
-
-function normalizeContextWindow(value: number | null | undefined): number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0
-    ? value
-    : DEFAULT_CONTEXT_WINDOW
-}
-
-function isPresetContextWindow(value: number): boolean {
-  return CONTEXT_WINDOW_OPTIONS.some((option) => option.value === value)
 }
 
 function configToForm(cfg: AgentConfig | null, tab: Tab): FormState {

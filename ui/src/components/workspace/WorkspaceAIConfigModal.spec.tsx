@@ -9,7 +9,8 @@ import {
   type AgentConfigBundle,
   type Workspace,
 } from './api'
-import { DEFAULT_CONTEXT_WINDOW, WorkspaceAIConfigModal } from './WorkspaceAIConfigModal'
+import { DEFAULT_WORKSPACE_CONTEXT_WINDOW } from '../../lib/workspaceContext'
+import { WorkspaceAIConfigModal } from './WorkspaceAIConfigModal'
 
 vi.mock('./api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./api')>()),
@@ -111,7 +112,7 @@ describe('WorkspaceAIConfigModal context state', () => {
     renderModal()
 
     const select = await screen.findByLabelText('Context window') as HTMLSelectElement
-    expect(select.value).toBe(String(DEFAULT_CONTEXT_WINDOW))
+    expect(select.value).toBe(String(DEFAULT_WORKSPACE_CONTEXT_WINDOW))
     expect(screen.getByRole('option', { name: '256K — recommended' })).toBeTruthy()
   })
 
