@@ -54,6 +54,8 @@ export type HeadlessInquirySubject =
       readonly issueId: string
       readonly relation: 'creator' | 'owner' | 'run'
       readonly runId?: string
+      /** Present when this inquiry is the automatic reply to an Issue comment. */
+      readonly commentId?: string
     }
 
 /** Reverse-index scope used to load every inquiry attached to one object. */

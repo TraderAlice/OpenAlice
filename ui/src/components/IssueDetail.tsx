@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { ArrowLeft, Hash, History, Inbox, ListChecks, RotateCcw, Settings, TrendingUp, X } from 'lucide-react'
+import { ArrowLeft, Hash, History, Inbox, ListChecks, MessageSquare, RotateCcw, Settings, TrendingUp, X } from 'lucide-react'
 
 import type { HeadlessTaskStatus } from '../api/headless'
 import type { InboxEntry } from '../api/inbox'
@@ -23,7 +23,6 @@ import {
   type WorkspaceSessionDirectoryEntry,
 } from './workspace/api'
 import { issuesApi } from '../api/issues'
-import { inquiriesApi } from '../api/inquiries'
 import { useIssueDetail } from '../hooks/useIssueDetail'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { formatRelativeTime } from '../lib/intl'
@@ -37,10 +36,9 @@ import { STATUS_META } from './issue-status-meta'
 import { MarkdownContent } from './MarkdownContent'
 import { MarkdownWhatEditor } from './MarkdownWhatEditor'
 import { CenteredLoading } from './StateViews'
-import { InquiryPanel } from './InquiryPanel'
 
 // Run-status pill tints — mirrors AutomationRunsSection's STATUS_STYLE so the
-// Activity feed reads the same as the headless-runs panel.
+// Issue's independent operational history stays consistent with Automation.
 const RUN_STATUS_STYLE: Record<HeadlessTaskStatus, string> = {
   running: 'bg-blue-500/15 text-blue-400',
   done: 'bg-emerald-500/15 text-emerald-400',
@@ -279,7 +277,7 @@ function PropertiesRail({
   const selectedReadiness = effectiveAgent ? agentReadiness[effectiveAgent] : undefined
   const agentNeedsCredential = selectedReadiness?.requiresCredential === true && !selectedReadiness.ready
   return (
-    <aside className="w-full shrink-0 space-y-3 lg:col-start-2 lg:row-start-1 lg:row-span-2">
+    <aside className="min-w-0 w-full shrink-0 space-y-3 lg:col-start-2 lg:row-start-1 lg:row-span-2">
       <PropertySection title="Work item" description="Ownership and schedule are part of this Issue.">
         <EditRow label="Status">
           <meta.Icon size={14} className={`shrink-0 ${meta.className}`} />
@@ -390,10 +388,12 @@ function PropertiesRail({
 function CommentComposer({
   wsId,
   id,
+  ownerResumeId,
   onPosted,
 }: {
   wsId: string
   id: string
+  ownerResumeId: string | null
   onPosted: (next: IssueDetailData) => void
 }) {
   const [text, setText] = useState('')
@@ -417,13 +417,12 @@ function CommentComposer({
   }, [text, sending, wsId, id, onPosted])
 
   return (
-    <section className="mt-8">
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted/70">Add comment</h3>
+    <div className="rounded-xl border border-border bg-bg px-3 py-3 shadow-sm transition-colors focus-within:border-accent/45">
       <textarea
         rows={3}
         value={text}
         disabled={sending}
-        placeholder="Leave a comment…  (⌘↵ / Ctrl↵ to send)"
+        placeholder={ownerResumeId ? `Comment to @${ownerResumeId}…` : 'Leave a comment…'}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
           if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
@@ -431,20 +430,25 @@ function CommentComposer({
             void submit()
           }
         }}
-        className="w-full resize-y rounded-lg border border-border bg-bg px-3 py-2 text-[13px] text-text outline-none transition-colors focus:border-accent/60 focus:shadow-[0_0_0_1px_var(--color-accent-dim)] disabled:opacity-50"
+        className="min-h-20 w-full resize-y bg-transparent px-1 py-1 text-[13px] leading-relaxed text-text outline-none placeholder:text-muted/60 disabled:opacity-50"
       />
       {error && <p className="mt-1.5 text-xs text-red-400">{error}</p>}
-      <div className="mt-2 flex justify-end">
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-2">
+        <p className="min-w-0 flex-1 basis-full break-words text-[11px] leading-snug text-muted sm:basis-auto">
+          {ownerResumeId
+            ? <>The assigned Session <span className="font-mono text-text/75">@{ownerResumeId}</span> will reply here.</>
+            : 'No fixed Session owner — this comment is recorded as a timeline note.'}
+        </p>
         <button
           type="button"
           onClick={() => void submit()}
           disabled={sending || text.trim().length === 0}
-          className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-bg transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40"
+          className="oa-pressable rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-bg transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {sending ? 'Sending…' : 'Comment'}
+          {sending ? 'Sending…' : ownerResumeId ? 'Comment & notify' : 'Comment'}
         </button>
       </div>
-    </section>
+    </div>
   )
 }
 
@@ -472,35 +476,15 @@ function WhatEditor({
   )
 }
 
-function IssueComments({ comments }: { comments: NonNullable<IssueDetailData['comments']> }) {
-  if (comments.length === 0) return null
-  return (
-    <section className="mt-8">
-      <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted/70">Comments</h2>
-      <div className="space-y-3">
-        {comments.map((comment) => (
-          <article key={comment.id} className="rounded-lg border border-border bg-bg-secondary px-4 py-3">
-            <div className="mb-2 flex items-center justify-between gap-3 text-[11px] text-muted">
-              <span className="font-medium text-text/80">{comment.author}</span>
-              <time dateTime={comment.at}>{new Date(comment.at).toLocaleString()}</time>
-            </div>
-            <MarkdownContent text={comment.markdown} />
-          </article>
-        ))}
-      </div>
-    </section>
-  )
-}
+// ==================== Run history ====================
 
-// ==================== Activity feed (headless runs) ====================
-
-function RunRow({ run, onAsk }: { run: IssueRunRecord; onAsk: (run: IssueRunRecord) => void }) {
+function RunRow({ run, onOpen }: { run: IssueRunRecord; onOpen: (run: IssueRunRecord) => void }) {
   const displayStatus = run.failure?.kind === 'system_paused' || run.failure?.kind === 'launcher_restarted'
     ? 'interrupted'
     : run.status
   return (
-    <li className="rounded-lg border border-border bg-bg-secondary px-3 py-2.5">
-      <div className="flex items-center gap-2">
+    <li className="min-w-0 overflow-hidden rounded-lg border border-border bg-bg-secondary px-3 py-2.5">
+      <div className="flex flex-wrap items-center gap-2">
         <span
           className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-medium ${RUN_STATUS_STYLE[displayStatus]}`}
         >
@@ -513,12 +497,12 @@ function RunRow({ run, onAsk }: { run: IssueRunRecord; onAsk: (run: IssueRunReco
         <span className="text-xs text-muted/70">· {fmtDuration(run.durationMs)}</span>
         <button
           type="button"
-          onClick={() => onAsk(run)}
+          onClick={() => onOpen(run)}
           disabled={!run.resumable || run.status === 'running'}
-          title={run.resumable ? 'Ask the Session behind this run' : 'This run did not capture a resumable Session'}
+          title={run.resumable ? 'Open the Session behind this run' : 'This run did not capture a resumable Session'}
           className="rounded-md border border-border px-2 py-1 text-[11px] text-muted transition-colors hover:border-accent/50 hover:text-text disabled:cursor-not-allowed disabled:opacity-40"
         >
-          Ask run
+          Open conversation
         </button>
       </div>
       {run.prompt && (
@@ -562,11 +546,10 @@ function RunRow({ run, onAsk }: { run: IssueRunRecord; onAsk: (run: IssueRunReco
 
 /**
  * The inbox reports this issue produced — the issue→inbox direction of the
- * cross-link (each entry's server-stamped `origin.issueId` is this issue). The
- * run→issue direction is the unified Activity feed. Each row jumps to the Inbox,
- * selecting + marking-read that entry. Rendered only when there are reports
- * (the Activity feed already establishes the run history; an empty inbox list
- * would just be noise).
+ * cross-link (each entry's server-stamped `origin.issueId` is this issue).
+ * Each row jumps to the Inbox, selecting + marking-read that entry. Rendered
+ * only when there are reports; an empty report list would just be noise beside
+ * the independent collaboration Activity and operational Runs sections.
  */
 function InboxReportsSection({
   reports,
@@ -606,25 +589,31 @@ function InboxReportsSection({
   )
 }
 
-// ==================== Issue activity (attribution + runs) ====================
+// ==================== Issue activity (changes + comments) ====================
 
 const PROVENANCE_ACTION_LABEL: Record<IssueProvenanceRecord['action'], string> = {
-  created: 'Created',
-  updated: 'Updated',
-  commented: 'Commented',
-  sent: 'Sent',
-  decided: 'Decided',
-  reconstructed: 'Reconstructed',
+  created: 'created the Issue',
+  updated: 'updated the Issue',
+  commented: 'commented',
+  sent: 'sent the Issue',
+  decided: 'recorded a decision',
+  reconstructed: 'reconstructed the Issue context',
 }
 
 function IssueActivity({
   activity,
   onContinue,
-  onAskRun,
+  wsId,
+  issueId,
+  ownerResumeId,
+  onPosted,
 }: {
   activity: IssueActivityRecord[]
   onContinue: (record: IssueProvenanceRecord) => Promise<void>
-  onAskRun: (run: IssueRunRecord) => void
+  wsId: string
+  issueId: string
+  ownerResumeId: string | null
+  onPosted: (next: IssueDetailData) => void
 }) {
   const [continuingId, setContinuingId] = useState<string | null>(null)
   const [continueError, setContinueError] = useState<string | null>(null)
@@ -643,16 +632,47 @@ function IssueActivity({
 
   return (
     <section className="mt-8">
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted/70">Activity</h3>
+      <div className="mb-3 flex items-baseline justify-between gap-3 border-t border-border/60 pt-5">
+        <h2 className="text-sm font-semibold text-text">Activity</h2>
+        <span className="hidden text-[11px] text-muted sm:inline">Changes and conversation</span>
+      </div>
       {activity.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-border px-4 py-4 text-center text-xs text-muted">
-          No activity has been recorded for this issue yet.
+        <p className="mb-3 rounded-lg border border-dashed border-border px-4 py-4 text-center text-xs text-muted">
+          No changes or comments have been recorded yet.
         </p>
       ) : (
-        <ul className="space-y-2">
+        <ul className="relative mb-4 space-y-3 before:absolute before:bottom-3 before:left-[11px] before:top-3 before:w-px before:bg-border">
           {activity.map((item) => {
-            if (item.kind === 'run') {
-              return <RunRow key={`run:${item.run.taskId}`} run={item.run} onAsk={onAskRun} />
+            if (item.kind === 'comment') {
+              const { comment } = item
+              const delivery = comment.delivery
+              return (
+                <li key={`comment:${comment.id}`} className="relative pl-8">
+                  <span className="absolute left-[3px] top-3 z-10 grid h-[18px] w-[18px] place-items-center rounded-full border border-border bg-bg text-accent">
+                    <MessageSquare size={10} aria-hidden />
+                  </span>
+                  <article className={`rounded-xl border bg-bg-secondary px-4 py-3 ${comment.replyTo ? 'ml-3 border-accent/25' : 'border-border'}`}>
+                    <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted">
+                      <span className="font-medium text-text/85">{comment.author}</span>
+                      {comment.replyTo && <span className="rounded bg-bg-tertiary px-1.5 py-0.5">reply</span>}
+                      <time className="ml-auto" dateTime={comment.at} title={new Date(comment.at).toLocaleString()}>
+                        {formatRelativeTime(item.at)}
+                      </time>
+                    </div>
+                    <MarkdownContent text={comment.markdown} />
+                    {delivery?.state === 'pending' && (
+                      <p className="mt-3 border-t border-border/60 pt-2 text-[11px] text-muted">
+                        Waiting for <span className="font-mono text-text/75">@{delivery.targetResumeId}</span> to reply…
+                      </p>
+                    )}
+                    {delivery?.state === 'failed' && (
+                      <p className="mt-3 rounded-md border border-amber-500/25 bg-amber-500/10 px-2.5 py-2 text-[11px] leading-snug text-amber-400">
+                        The comment is saved, but the owner could not be reached: {delivery.error}
+                      </p>
+                    )}
+                  </article>
+                </li>
+              )
             }
             const record = item
             const origin = record.origin
@@ -665,25 +685,21 @@ function IssueActivity({
                   ? `External · ${origin.system}`
                   : `Unknown · ${origin.reason}`
             return (
-              <li key={`provenance:${record.id}`} className="flex items-center gap-2.5 rounded-lg border border-border bg-bg-secondary px-3 py-2.5">
-                <History size={14} className="shrink-0 text-muted/70" aria-hidden />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-text">{PROVENANCE_ACTION_LABEL[record.action]}</span>
-                    <span className="text-xs text-muted" title={new Date(record.at).toLocaleString()}>
-                      {formatRelativeTime(record.at)}
-                    </span>
-                  </div>
-                  <p className="mt-0.5 truncate font-mono text-[11px] text-muted" title={originLabel}>
-                    {originLabel}
-                  </p>
-                </div>
+              <li key={`provenance:${record.id}`} className="relative flex min-w-0 items-center gap-2.5 py-1 pl-8">
+                <span className="absolute left-[3px] top-2 z-10 grid h-[18px] w-[18px] place-items-center rounded-full border border-border bg-bg text-muted">
+                  <History size={10} aria-hidden />
+                </span>
+                <p className="min-w-0 flex-1 text-[12px] text-muted">
+                  <span className="font-medium text-text/80">{originLabel}</span>{' '}
+                  {PROVENANCE_ACTION_LABEL[record.action]} ·{' '}
+                  <span title={new Date(record.at).toLocaleString()}>{formatRelativeTime(record.at)}</span>
+                </p>
                 {isSession && (
                   <button
                     type="button"
                     onClick={() => void continueSession(record)}
                     disabled={continuingId !== null}
-                    className="shrink-0 rounded-md border border-border px-2 py-1 text-[11px] text-muted transition-colors hover:border-accent/50 hover:text-text disabled:cursor-wait disabled:opacity-50"
+                    className="oa-pressable shrink-0 rounded-md border border-border px-2 py-1 text-[11px] text-muted transition-colors hover:border-accent/50 hover:text-text disabled:cursor-wait disabled:opacity-50"
                   >
                     {continuingId === record.id ? 'Opening…' : 'Continue'}
                   </button>
@@ -694,6 +710,47 @@ function IssueActivity({
         </ul>
       )}
       {continueError && <p className="mt-2 text-xs text-red-400">Could not continue Session: {continueError}</p>}
+      <CommentComposer
+        wsId={wsId}
+        id={issueId}
+        ownerResumeId={ownerResumeId}
+        onPosted={onPosted}
+      />
+    </section>
+  )
+}
+
+function RunsSection({
+  runs,
+  onOpen,
+}: {
+  runs: IssueRunRecord[]
+  onOpen: (run: IssueRunRecord) => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+  if (runs.length === 0) return null
+  const visible = expanded ? runs : runs.slice(0, 4)
+  return (
+    <section className="mt-8 rounded-xl border border-border bg-bg-secondary/45 px-3 py-3 sm:px-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold text-text">Runs</h2>
+          <p className="mt-0.5 text-[11px] text-muted">Operational execution history</p>
+        </div>
+        <span className="rounded-full bg-bg-tertiary px-2 py-0.5 text-[11px] text-muted">{runs.length}</span>
+      </div>
+      <ul className="space-y-2">
+        {visible.map((run) => <RunRow key={run.taskId} run={run} onOpen={onOpen} />)}
+      </ul>
+      {runs.length > 4 && (
+        <button
+          type="button"
+          onClick={() => setExpanded((value) => !value)}
+          className="oa-pressable mt-3 w-full rounded-md px-3 py-2 text-xs text-muted transition-colors hover:bg-bg-tertiary hover:text-text"
+        >
+          {expanded ? 'Show recent runs' : `Show ${runs.length - 4} more runs`}
+        </button>
+      )}
     </section>
   )
 }
@@ -793,8 +850,9 @@ function WikilinkPicker({
 
 /**
  * Linear-style issue detail (Phase 2b — interactive). Main column = title +
- * editable canonical What + structured markdown comments +
- * Activity feed + a comment composer. Right rail = Properties, with status /
+ * editable canonical What + a Linear-style Activity timeline where comments
+ * and changes share one flow. Runs stay in an independent operational section.
+ * Right rail = Properties, with status /
  * priority / assignee editable inline (each write PATCHes and applies the
  * server-returned detail — authoritative, refetch-free). The scheduled agent
  * runtime is editable because it is operational routing; schedule cadence and
@@ -807,11 +865,6 @@ interface IssueDetailProps {
   onBack?: () => void
   onOpenIssue?: (ref: WikilinkIssueRef) => void
 }
-
-type IssueInquiryTarget =
-  | { relation: 'creator' }
-  | { relation: 'owner' }
-  | { relation: 'run'; runId: string }
 
 export function IssueDetail({
   wsId,
@@ -836,7 +889,6 @@ export function IssueDetail({
   const [actionError, setActionError] = useState<string | null>(null)
   const [agentReadiness, setAgentReadiness] = useState<Record<string, AgentCredentialReadiness>>({})
   const [sessionDirectory, setSessionDirectory] = useState<readonly WorkspaceSessionDirectoryEntry[]>([])
-  const [inquiryTarget, setInquiryTarget] = useState<IssueInquiryTarget>({ relation: 'creator' })
   // Set when a clicked `[[name]]` resolves to >1 target — drives the picker.
   const [picker, setPicker] = useState<WikilinkResolution | null>(null)
 
@@ -851,10 +903,6 @@ export function IssueDetail({
       })
     return () => { live = false }
   }, [wsId])
-
-  useEffect(() => {
-    setInquiryTarget({ relation: 'creator' })
-  }, [wsId, id])
 
   useEffect(() => {
     let live = true
@@ -970,20 +1018,6 @@ export function IssueDetail({
     }
   }, [retrying, wsId, id, mutate])
 
-  const loadInquiries = useCallback(
-    () => inquiriesApi.forIssue(wsId, id),
-    [wsId, id],
-  )
-
-  const askIssue = useCallback(
-    (prompt: string) => inquiriesApi.askIssue(wsId, id, {
-      prompt,
-      relation: inquiryTarget.relation,
-      ...(inquiryTarget.relation === 'run' ? { runId: inquiryTarget.runId } : {}),
-    }),
-    [wsId, id, inquiryTarget],
-  )
-
   const backToBoard = (
     <button
       type="button"
@@ -1004,12 +1038,6 @@ export function IssueDetail({
   const stableOwnerResumeId = data?.issue.assignee.startsWith('@resume-')
     ? data.issue.assignee.slice(1)
     : null
-
-  useEffect(() => {
-    if (inquiryTarget.relation === 'owner' && !stableOwnerResumeId) {
-      setInquiryTarget({ relation: 'creator' })
-    }
-  }, [stableOwnerResumeId, inquiryTarget.relation])
 
   if (!data) {
     return (
@@ -1041,19 +1069,20 @@ export function IssueDetail({
   const inboxReports = data.inboxReports ?? []
   const provenance = data.provenance ?? []
   const activity = data.activity ?? [
-    ...provenance.map((record) => ({ ...record, kind: 'change' as const })),
-    ...runs.map((run) => ({ kind: 'run' as const, id: run.taskId, at: run.startedAt, run })),
-  ].sort((a, b) => b.at - a.at)
-  const inquiryDescription = inquiryTarget.relation === 'owner'
-    ? 'Continue the Session assigned to this Issue.'
-    : inquiryTarget.relation === 'run'
-      ? `Continue the exact Session behind run ${inquiryTarget.runId}.`
-      : 'Ask the attributable creator why this Issue exists. Legacy human-created Issues may require Workspace reconstruction.'
-
+    ...provenance
+      .filter((record) => record.action !== 'commented')
+      .map((record) => ({ ...record, kind: 'change' as const })),
+    ...comments.map((comment) => ({
+      kind: 'comment' as const,
+      id: comment.id,
+      at: Date.parse(comment.at),
+      comment,
+    })),
+  ].filter((record) => Number.isFinite(record.at)).sort((a, b) => a.at - b.at)
   return (
     <div className="mx-auto max-w-4xl px-4 py-5 md:px-6">
       {backToBoard}
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
+      <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
         <main className="min-w-0 lg:col-start-1 lg:row-start-1">
           <div className="mb-1 flex items-center gap-2">
             <span className="font-mono text-[11px] text-muted/70">{id}</span>
@@ -1066,41 +1095,14 @@ export function IssueDetail({
             scheduled={Boolean(issue.when)}
             onSave={(what) => onPatch({ what })}
           />
-          <InquiryPanel
-            title="Ask about this Issue"
-            description={inquiryDescription}
-            actionLabel={inquiryTarget.relation === 'owner' ? 'Ask owner' : inquiryTarget.relation === 'run' ? 'Ask run' : 'Ask creator'}
-            placeholder="What do you want to clarify?"
-            load={loadInquiries}
-            ask={askIssue}
-            controls={(
-              <div className="inline-flex rounded-lg border border-border bg-bg p-1 text-[11px]">
-                <button
-                  type="button"
-                  onClick={() => setInquiryTarget({ relation: 'creator' })}
-                  className={`rounded-md px-2 py-1 transition-colors ${inquiryTarget.relation === 'creator' ? 'bg-bg-tertiary text-text' : 'text-muted hover:text-text'}`}
-                >
-                  Creator
-                </button>
-                {stableOwnerResumeId && (
-                  <button
-                    type="button"
-                    onClick={() => setInquiryTarget({ relation: 'owner' })}
-                    className={`rounded-md px-2 py-1 transition-colors ${inquiryTarget.relation === 'owner' ? 'bg-bg-tertiary text-text' : 'text-muted hover:text-text'}`}
-                  >
-                    Owner
-                  </button>
-                )}
-                {inquiryTarget.relation === 'run' && (
-                  <button type="button" className="rounded-md bg-bg-tertiary px-2 py-1 text-text">
-                    Run {inquiryTarget.runId}
-                  </button>
-                )}
-              </div>
-            )}
+          <IssueActivity
+            activity={activity}
+            onContinue={continueProvenanceSession}
+            wsId={wsId}
+            issueId={id}
+            ownerResumeId={stableOwnerResumeId}
+            onPosted={mutate}
           />
-          <IssueComments comments={comments} />
-          <CommentComposer wsId={wsId} id={id} onPosted={mutate} />
         </main>
         <PropertiesRail
           issue={issue}
@@ -1118,12 +1120,13 @@ export function IssueDetail({
           onConfigureAgent={(agent) => openAgentConfig(wsId, agent)}
         />
         <div className="min-w-0 lg:col-start-1 lg:row-start-2">
-          <IssueActivity
-            activity={activity}
-            onContinue={continueProvenanceSession}
-            onAskRun={(run) => {
-              setInquiryTarget({ relation: 'run', runId: run.taskId })
-              window.requestAnimationFrame(() => document.getElementById('inquiries')?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
+          <RunsSection
+            runs={runs}
+            onOpen={(run) => {
+              setSidebar('workspaces')
+              void openHeadlessRun(run.wsId, run.resumeId, {
+                title: `${issue.title} · ${run.agent}`,
+              })
             }}
           />
           <InboxReportsSection reports={inboxReports} onOpen={gotoInbox} />

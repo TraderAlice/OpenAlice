@@ -209,8 +209,8 @@ export interface IssueFiringMarkers {
 // ==================== Detail (Phase 2a) ====================
 // The read-only shape GET /api/issues/:wsId/:id returns: one issue's full
 // fields INCLUDING markdown What and (iff scheduled) its firing markers +
-// scheduling frontmatter, plus that issue's headless run history (its Activity
-// feed). Unlike the board list, the detail loads What and the runs.
+// scheduling frontmatter, its collaboration Activity, and its independent
+// headless run history. Unlike the board list, the detail loads all three.
 
 /** One issue's full detail fields: the board row's fields + the canonical
  * markdown What. Markers are present iff scheduled. */
@@ -234,8 +234,8 @@ export interface IssueDetailIssue {
   automationHealth?: IssueAutomationHealth
 }
 
-/** GET /api/issues/:wsId/:id — one issue + its run history (Activity feed) +
- *  the inbox reports it produced. */
+/** GET /api/issues/:wsId/:id — one issue + its human-facing Activity timeline,
+ *  operational run history, and the inbox reports it produced. */
 export interface IssueDetail {
   issue: IssueDetailIssue
   /** Structured markdown comments loaded from the adjacent JSON sidecar. */
@@ -251,8 +251,8 @@ export interface IssueDetail {
    *  updates from one origin are one editing activity rather than autosave spam.
    *  `resumeId` is the only conversation handle exposed for Session origins. */
   provenance: IssueProvenanceRecord[]
-  /** Unified Issue log: human/Session changes and scheduled executions share
-   * one chronological contract while retaining their authoritative stores. */
+  /** Human-facing timeline: changes and comments, oldest first. Operational
+   * executions stay in `runs` so they do not swallow the collaboration log. */
   activity: IssueActivityRecord[]
 }
 
@@ -265,7 +265,7 @@ export interface IssueProvenanceRecord {
 
 export type IssueActivityRecord =
   | ({ kind: 'change' } & IssueProvenanceRecord)
-  | { kind: 'run'; id: string; at: number; run: IssueRunRecord }
+  | { kind: 'comment'; id: string; at: number; comment: IssueComment }
 
 /** Strip persistence-only artifact/fingerprint fields from Issue detail. */
 export function issueProvenanceRecords(
@@ -339,17 +339,28 @@ export function issueRunRecord(task: HeadlessTaskRecord, resumable: boolean): Is
   }
 }
 
-/** One chronological Issue log assembled from durable attribution edges and
- * the headless run registry. New activity kinds can join this projection
- * without forcing unrelated persistence systems into one file. */
+/** One human-facing Issue timeline assembled from durable attribution edges
+ * and structured comments. `commented` provenance is intentionally omitted:
+ * the comment record itself is the richer event and rendering both would
+ * duplicate one action. Headless executions remain in the independent Runs
+ * section because they are operational history, not collaboration activity. */
 export function issueActivityRecords(
   changes: readonly IssueProvenanceRecord[],
-  runs: readonly IssueRunRecord[],
+  comments: readonly IssueComment[],
 ): IssueActivityRecord[] {
   return [
-    ...changes.map((change) => ({ ...change, kind: 'change' as const })),
-    ...runs.map((run) => ({ kind: 'run' as const, id: run.taskId, at: run.startedAt, run })),
-  ].sort((a, b) => b.at - a.at)
+    ...changes
+      .filter((change) => change.action !== 'commented')
+      .map((change) => ({ ...change, kind: 'change' as const })),
+    ...comments
+      .map((comment) => ({
+        kind: 'comment' as const,
+        id: comment.id,
+        at: Date.parse(comment.at),
+        comment,
+      }))
+      .filter((record) => Number.isFinite(record.at)),
+  ].sort((a, b) => a.at - b.at)
 }
 
 /** Filter a workspace's inbox entries to the ones a given issue produced

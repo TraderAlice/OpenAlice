@@ -68,7 +68,7 @@ export function issueAutomationHealth(input: IssueAutomationHealthInput): IssueA
   if (latest?.status === 'failed') {
     return {
       state: 'failed',
-      message: latest.failure?.message ?? 'Latest scheduled run failed. Inspect its Activity entry, then retry when ready.',
+      message: latest.failure?.message ?? 'Latest scheduled run failed. Inspect its Runs entry, then retry when ready.',
       latestTaskId: latest.taskId,
     }
   }

@@ -79,6 +79,7 @@ import {
 } from './session-directory.js';
 import { completeOneShotIssueAfterRun } from './issues/auto-complete.js';
 import { readIssueComments } from './issues/comments.js';
+import { recordIssueCommentReply } from './issues/comment-delivery.js';
 import {
   issueAutomationHealth,
   type IssueAutomationOwnerState,
@@ -92,6 +93,7 @@ import {
   headlessLogPaths,
   type HeadlessTaskInquiry,
   type HeadlessTaskRecord,
+  type HeadlessTaskStatus,
   type HeadlessTaskTrigger,
 } from './headless-task-registry.js';
 import { ResumeRegistry } from './resume-registry.js';
@@ -422,6 +424,52 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     if (activeResumeIds.has(resumeId)) return false;
     activeResumeIds.add(resumeId);
     return true;
+  };
+
+  /**
+   * Automatic Issue-comment delivery ends by recording the owner's final
+   * answer as another durable comment. The source comment retains the delivery
+   * state, so a refresh never confuses "dispatched" with "replied".
+   */
+  const completeIssueCommentInquiry = async (input: {
+    task: HeadlessTaskRecord;
+    status: HeadlessTaskStatus;
+    assistantText?: string | null;
+    error?: string;
+  }): Promise<void> => {
+    const subject = input.task.inquiry?.subject;
+    if (subject?.kind !== 'issue' || !subject.commentId) return;
+    const issueWorkspace = registry.get(subject.workspaceId);
+    if (!issueWorkspace) {
+      launcherLogger.warn('issue.comment_reply_workspace_missing', {
+        taskId: input.task.taskId,
+        wsId: subject.workspaceId,
+        issueId: subject.issueId,
+      });
+      return;
+    }
+
+    try {
+      await recordIssueCommentReply({
+        issueWorkspaceId: subject.workspaceId,
+        issueWorkspaceDir: issueWorkspace.dir,
+        issueId: subject.issueId,
+        sourceCommentId: subject.commentId,
+        task: input.task,
+        status: input.status,
+        provenanceStore,
+        ...(input.assistantText !== undefined ? { assistantText: input.assistantText } : {}),
+        ...(input.error ? { error: input.error } : {}),
+      });
+    } catch (err) {
+      launcherLogger.warn('issue.comment_reply_record_failed', {
+        taskId: input.task.taskId,
+        wsId: subject.workspaceId,
+        issueId: subject.issueId,
+        commentId: subject.commentId,
+        err,
+      });
+    }
   };
 
   const scrollbackStore = new ScrollbackStore(
@@ -1226,6 +1274,12 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
             toolFailures: r.structured.metrics.toolFailures,
           },
         });
+        await completeIssueCommentInquiry({
+          task: rec,
+          status,
+          assistantText: r.structured.assistantText,
+          ...(status !== 'done' && r.stderrTail ? { error: r.stderrTail.slice(-1000) } : {}),
+        });
         // Scheduled one-shot issues are the only board items whose lifecycle can
         // be closed mechanically from a run exit. Repeating schedules keep their
         // issue open; failed one-shots stay open so the operator can inspect and
@@ -1266,13 +1320,19 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           });
         }
       })
-      .catch((err) =>
-        headlessTasks.complete(rec.taskId, {
+      .catch(async (err) => {
+        const message = err instanceof Error ? err.message : String(err);
+        await headlessTasks.complete(rec.taskId, {
           status: 'failed',
           finishedAt: Date.now(),
-          error: err instanceof Error ? err.message : String(err),
-        }),
-      )
+          error: message,
+        });
+        await completeIssueCommentInquiry({
+          task: rec,
+          status: 'failed',
+          error: message,
+        });
+      })
       .finally(() => activeResumeIds.delete(rec.resumeId));
     return { taskId: rec.taskId, resumeId: rec.resumeId };
   };
@@ -1411,8 +1471,8 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   // Read-only DETAIL for ONE issue (GET /api/issues/:wsId/:id). Resolves the
   // workspace, live-reads its issues, finds the matching id, enriches a scheduled
   // issue with the SAME firing math as the board (so last/next agree), and joins
-  // the headless registry on wsId+issueId for the issue's run history (Activity
-    // feed). Returns null when the workspace, its issues dir, or the id is absent —
+  // the headless registry on wsId+issueId for the independent Runs history.
+  // Returns null when the workspace, its issues dir, or the id is absent —
     // the route maps that to a 404. Includes canonical What (the list omits it).
   const issueDetail = async (wsId: string, id: string): Promise<IssueDetail | null> => {
     const ws = registry.get(wsId);
@@ -1481,7 +1541,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     const provenance = issueProvenanceRecords(provenanceStore.list({
       artifact: { kind: 'issue', workspaceId: ws.id, issueId: issue.id },
     }));
-    const activity = issueActivityRecords(provenance, runs);
+    const activity = issueActivityRecords(provenance, comments);
     return { issue: detailIssue(issue, markers), comments, runs, inboxReports, provenance, activity };
   };
 

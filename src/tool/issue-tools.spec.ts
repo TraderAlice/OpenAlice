@@ -240,6 +240,43 @@ describe('issue_comment', () => {
     expect(comments.ok && comments.comments[0]).toMatchObject({ author: 'ws:auto-quant', markdown: 'progress note' })
   })
 
+  it('signs the commenter Session and notifies a different fixed owner', async () => {
+    await run(issueCreateFactory.build(ctx()), {
+      id: 'owned-comment', title: 'Owned comment', assignee: '@resume-owner',
+    })
+    const ask = vi.fn(async () => ({
+      status: 'dispatched' as const,
+      taskId: 'run-reply',
+      resumeId: 'resume-owner',
+      workspaceId: 'ws-owner',
+      workspace: 'owner-desk',
+      agent: 'pi',
+      resolution: {
+        mode: 'exact' as const,
+        origin: { kind: 'session' as const, workspaceId: 'ws-owner', resumeId: 'resume-owner', agent: 'pi' },
+      },
+    }))
+    const context = ctx({
+      origin: {
+        kind: 'interactive', sessionId: 'surface-1', resumeId: 'resume-commenter', agent: 'codex',
+      },
+      conversation: { ask, read: vi.fn() },
+    })
+    const res = await run(issueCommentFactory.build(context), {
+      id: 'owned-comment', text: 'What changed?',
+    })
+    expect(res.ok).toBe(true)
+    const comments = await readIssueComments(dir, 'owned-comment')
+    expect(comments.ok && comments.comments[0]).toMatchObject({
+      author: '@resume-commenter',
+      delivery: { state: 'pending', targetResumeId: 'resume-owner', taskId: 'run-reply' },
+    })
+    expect(ask).toHaveBeenCalledWith(expect.objectContaining({
+      target: { kind: 'resume', resumeId: 'resume-owner' },
+      subject: expect.objectContaining({ commentId: expect.any(String) }),
+    }))
+  })
+
   it('errors cleanly on a missing issue', async () => {
     const res = await run(issueCommentFactory.build(ctx()), { id: 'nope', text: 'hi' })
     expect(res.ok).toBe(false)

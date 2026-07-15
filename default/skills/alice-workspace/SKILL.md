@@ -4,8 +4,8 @@ description: >
   Use the `alice-workspace` CLI for collaboration and provenance: Inbox
   delivery, the global Issue board, tracked entities, peer files, and asking an
   attributable product Session. Use it when work must be surfaced, remembered,
-  assigned, or followed back to the Agent that produced it. Read live help;
-  never guess flags or use `issue comment` as a substitute for `issue ask`.
+  assigned, or followed back to the Agent that produced it. Read live help and
+  choose comments for durable Issue discussion versus asks for historical inquiry.
 ---
 
 # Collaboration — `alice-workspace`
@@ -18,13 +18,16 @@ Choose the verb from the intent, not from whichever object you happen to have:
 | Read what desks already surfaced | `inbox read` |
 | Ask why one Inbox entry was produced | `inbox ask` |
 | Inspect the shared work board | `issue list` / `issue show` |
-| Ask an Issue's creator, owner, or selected run | `issue ask` |
-| Record a note on this Workspace's own Issue | `issue comment` |
+| Ask an Issue's creator or selected historical run | `issue ask` |
+| Discuss this Workspace's own Issue; notify its fixed owner | `issue comment` |
 | Ask by a known product Session/Workspace only when no business object exists | `conversation ask` |
 
-`issue comment` is a structured note for the human-visible board. It is a
-local write and **does not message or resume another agent**. When the goal is
-to obtain an answer, use `inbox ask` or `issue ask`, normally with `--await`.
+`issue comment` is the durable conversation entry for this Workspace's own
+Issue. If the Issue has an exact `@resumeId` assignee, a comment from somebody
+else resumes that owner in the background and records the final reply in the
+Activity timeline. `@workspace`-owned Issues keep comments as notes and do not
+recruit a random worker. Use `issue ask` when interrogating the creator or a
+specific historical run without adding a comment.
 
 **Hand finished work back to the user** — this is the outbound channel. It posts
 to the user's Inbox tab:
@@ -164,7 +167,7 @@ alice-workspace issue show --id <name> --mode detailed  # every execution prompt
 alice-workspace issue create --title "…"    # a new issue on THIS workspace's board
 alice-workspace issue create --title "…" --when '{"kind":"every","every":"1h"}' --assignee @me
 alice-workspace issue update --id <id> --status in_progress
-alice-workspace issue comment --id <id> --text "progress note / finding"
+alice-workspace issue comment --id <id> --text "question / progress note / finding"
 alice-workspace signature show               # your @resumeId for standalone Markdown
 ```
 

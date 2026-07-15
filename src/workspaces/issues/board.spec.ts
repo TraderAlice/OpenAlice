@@ -73,16 +73,27 @@ describe('issueProvenanceRecords', () => {
 })
 
 describe('issueActivityRecords', () => {
-  it('projects changes and runs into one newest-first Issue log', () => {
+  it('projects changes and comments into one oldest-first timeline', () => {
     const change = { id: 'p-1', action: 'updated' as const, origin: { kind: 'human' as const }, at: 100 }
-    const run = {
-      taskId: 'run-1', resumeId: 'resume-1', wsId: 'ws-1', issueId: 'audit', agent: 'codex',
-      prompt: 'scan', status: 'done' as const, startedAt: 200, resumable: true,
+    const comment = {
+      id: 'comment-1', author: 'human', at: new Date(200).toISOString(), markdown: 'please explain',
     }
 
-    expect(issueActivityRecords([change], [run])).toEqual([
-      { kind: 'run', id: 'run-1', at: 200, run },
+    expect(issueActivityRecords([change], [comment])).toEqual([
       { kind: 'change', ...change },
+      { kind: 'comment', id: 'comment-1', at: 200, comment },
+    ])
+  })
+
+  it('uses the comment record instead of duplicating commented provenance', () => {
+    const provenance = {
+      id: 'p-comment', action: 'commented' as const, origin: { kind: 'human' as const }, at: 100,
+    }
+    const comment = {
+      id: 'comment-1', author: 'human', at: new Date(100).toISOString(), markdown: 'one event',
+    }
+    expect(issueActivityRecords([provenance], [comment])).toEqual([
+      { kind: 'comment', id: 'comment-1', at: 100, comment },
     ])
   })
 })

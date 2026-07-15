@@ -16,8 +16,9 @@
  * (`.alice/issues/<id>.md`, YAML frontmatter + canonical markdown What) is the single
  * source of truth; writes are working-tree only (no auto-commit).
  *
- * Comments and created-issue authorship are tagged `ws:<workspaceLabel>` — the
- * agent never names its own identity; the factory stamps it.
+ * Comments are signed from authoritative run/session provenance (`@resumeId`)
+ * when available, with `ws:<workspaceLabel>` only as an unattributed fallback.
+ * The agent never supplies that identity as a tool argument.
  */
 
 import { join } from 'node:path'
@@ -48,7 +49,12 @@ import {
   createIssue,
   updateIssueFields,
 } from '../workspaces/issues/mutate.js'
-import { readIssueComments, type IssueComment } from '../workspaces/issues/comments.js'
+import {
+  readIssueComments,
+  updateIssueCommentDelivery,
+  type IssueComment,
+} from '../workspaces/issues/comments.js'
+import { dispatchIssueCommentReply } from '../workspaces/issues/comment-delivery.js'
 import {
   WORKSPACE_ASSIGNEE,
   normalizeIssueAssigneeAlias,
@@ -149,8 +155,11 @@ function defaultIssueAssignee(ctx: WorkspaceToolContext): string {
     : WORKSPACE_ASSIGNEE
 }
 
-/** The comment / create author for this workspace's writes. */
-const author = (ctx: WorkspaceToolContext): string => `ws:${ctx.workspaceLabel}`
+/** Prefer the signed product Session; fall back only for unattributed shells. */
+function commentAuthor(ctx: WorkspaceToolContext): string {
+  const origin = sessionOriginFromInboxOrigin(ctx.workspaceId, ctx.origin)
+  return origin ? sessionSignature(origin.resumeId) : `ws:${ctx.workspaceLabel}`
+}
 
 async function recordIssueProvenance(
   ctx: WorkspaceToolContext,
@@ -333,9 +342,11 @@ export const issueCommentFactory: WorkspaceToolFactory = {
         "Append a comment to one of THIS workspace's issues.",
         '',
         'The markdown comment is appended to the Issue’s structured JSON sidecar,',
-        'authored as `ws:<this workspace>`. It never mutates the canonical What',
-        'or silently changes the next scheduled prompt. Use it to leave a',
-        'progress note, a finding, or a question for the human reading the board.',
+        'signed by the current product Session when available. It never mutates',
+        'the canonical What or changes the next scheduled prompt. If the Issue',
+        'has a different fixed @resumeId owner, OpenAlice asks that Session in',
+        'the background and records its final reply in Activity. Workspace-owned',
+        'Issues keep the comment as a durable note and do not recruit a worker.',
       ].join('\n'),
       inputSchema: z.object({
         id: z.string().min(1).describe('The issue id to comment on.'),
@@ -344,10 +355,41 @@ export const issueCommentFactory: WorkspaceToolFactory = {
       execute: async ({ id, text }) => {
         const dir = selfDir(ctx)
         if (!dir.ok) return { ok: false as const, error: dir.error }
-        const res = await appendIssueComment(dir.dir, id, author(ctx), text)
+        const origin = sessionOriginFromInboxOrigin(ctx.workspaceId, ctx.origin)
+        const res = await appendIssueComment(dir.dir, id, commentAuthor(ctx), text)
         if (res.ok) {
           await recordIssueProvenance(ctx, res.issue.id, 'commented')
-          return { ok: true as const, issue: rowOf(res.issue) }
+          const dispatched = await dispatchIssueCommentReply({
+            conversation: ctx.conversation,
+            issueWorkspaceId: ctx.workspaceId,
+            issue: res.issue,
+            comment: res.comment,
+            ...(origin ? { authorResumeId: origin.resumeId } : {}),
+          })
+          if (dispatched.status !== 'not_requested') {
+            const updated = await updateIssueCommentDelivery(
+              dir.dir,
+              id,
+              res.comment.id,
+              dispatched.delivery,
+            )
+            if (!updated.ok) {
+              return {
+                ok: true as const,
+                issue: rowOf(res.issue),
+                delivery: {
+                  status: 'failed' as const,
+                  delivery: {
+                    state: 'failed' as const,
+                    targetResumeId: dispatched.delivery.targetResumeId,
+                    ...(dispatched.delivery.taskId ? { taskId: dispatched.delivery.taskId } : {}),
+                    error: `Comment saved, but delivery state could not be recorded: ${updated.error}`,
+                  },
+                },
+              }
+            }
+          }
+          return { ok: true as const, issue: rowOf(res.issue), delivery: dispatched }
         }
         if (res.reason === 'not_found') {
           const remoteHint = await remoteIssueWriteHint(ctx, id)

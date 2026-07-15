@@ -9,7 +9,7 @@
  *
  * Read endpoints:
  *   GET  /api/issues               → list across all workspaces
- *   GET  /api/issues/:wsId/:id      → one issue's detail { issue, runs, inboxReports }
+ *   GET  /api/issues/:wsId/:id      → one issue's detail { issue, activity, runs, inboxReports }
  *   POST /api/issues/:wsId/:id/retry → rerun the latest failed/interrupted schedule now
  *
  * Phase 2b adds the human/UI WRITE path (the agent edits the files directly /
@@ -17,7 +17,8 @@
  * (`workspaces/issues/mutate.ts`) so the human and agent surfaces can never
  * drift on file format or validation; writes are working-tree only (no commit):
  *   PATCH /api/issues/:wsId/:id           body { status?, priority?, assignee?, what? }
- *   POST  /api/issues/:wsId/:id/comments  body { text }  (author = 'human')
+ *   POST  /api/issues/:wsId/:id/comments  body { text }  (author = 'human';
+ *     exact Session owners are notified and their final reply returns here)
  *
  * Both return the same detail shape GET /api/issues/:wsId/:id does, so the UI
  * can swap its cache after an edit. They mirror the agent-config route's
@@ -25,7 +26,11 @@
  */
 import { Hono } from 'hono'
 
+import type { WorkspaceConversationControl } from '../../core/workspace-tool-center.js'
 import { ACTIVITY_UPDATE_COALESCE_MS } from '../../core/provenance-store.js'
+import { createWorkspaceConversationControl } from '../../workspaces/conversation-control.js'
+import { dispatchIssueCommentReply } from '../../workspaces/issues/comment-delivery.js'
+import { updateIssueCommentDelivery } from '../../workspaces/issues/comments.js'
 import {
   ISSUE_PRIORITIES,
   ISSUE_STATUSES,
@@ -60,8 +65,14 @@ async function safeJson(c: import('hono').Context): Promise<unknown> {
   }
 }
 
-export function createIssuesRoutes(svc: WorkspaceService): Hono {
+export interface IssueRoutesDeps {
+  /** Test seam; production uses the embedded provenance-aware control. */
+  conversation?: WorkspaceConversationControl
+}
+
+export function createIssuesRoutes(svc: WorkspaceService, deps: IssueRoutesDeps = {}): Hono {
   const app = new Hono()
+  const conversation = deps.conversation ?? createWorkspaceConversationControl(svc)
 
   // GET /api/issues → { workspaces: [{ wsId, tag, status, error?, issues: [...] }] }
   app.get('/', async (c) => {
@@ -218,8 +229,10 @@ export function createIssuesRoutes(svc: WorkspaceService): Hono {
   })
 
   // POST /api/issues/:wsId/:id/comments — append a structured markdown comment
-  // to `<id>.comments.json`. Author is fixed to 'human' here
-  // (the agent path stamps 'ws:<label>'). Returns the updated detail shape.
+  // to `<id>.comments.json`. Author is fixed to 'human' here (the agent path
+  // stamps its signed resume id when one is available). A different fixed
+  // Session owner is notified in the background; workspace-owned Issues remain
+  // durable notes and never recruit a random worker. Returns updated detail.
   app.post('/:wsId/:id/comments', async (c) => {
     const wsId = c.req.param('wsId')
     const id = c.req.param('id')
@@ -249,6 +262,23 @@ export function createIssuesRoutes(svc: WorkspaceService): Hono {
         origin: { kind: 'human' },
         at: Date.now(),
       })
+      const dispatched = await dispatchIssueCommentReply({
+        conversation,
+        issueWorkspaceId: wsId,
+        issue: res.issue,
+        comment: res.comment,
+      })
+      if (dispatched.status !== 'not_requested') {
+        const updated = await updateIssueCommentDelivery(meta.dir, id, res.comment.id, dispatched.delivery)
+        if (!updated.ok) {
+          launcherLogger.warn('issue.comment_delivery_state_failed', {
+            wsId,
+            id,
+            commentId: res.comment.id,
+            error: updated.error,
+          })
+        }
+      }
       launcherLogger.info('issue.comment_added', { wsId, id, author: 'human' })
       const detail = await svc.issueDetail(wsId, id)
       return c.json(detail ?? { issue: res.issue, comments: [res.comment], runs: [], inboxReports: [], provenance: [], activity: [] })

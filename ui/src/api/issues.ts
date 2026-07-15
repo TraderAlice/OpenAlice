@@ -59,11 +59,15 @@ export interface IssueProvenanceRecord {
   at: number
 }
 
-/** Unified Issue log. Persistence stays domain-owned; the API supplies one
- * chronological projection for UI, CLI, and future activity consumers. */
+/** Human-facing Issue timeline. Runtime executions stay in `runs`. */
 export type IssueActivityRecord =
   | ({ kind: 'change' } & IssueProvenanceRecord)
-  | { kind: 'run'; id: string; at: number; run: IssueRunRecord }
+  | { kind: 'comment'; id: string; at: number; comment: IssueComment }
+
+export type IssueCommentDelivery =
+  | { state: 'pending'; targetResumeId: string; taskId: string }
+  | { state: 'replied'; targetResumeId: string; taskId: string; replyCommentId: string }
+  | { state: 'failed'; targetResumeId: string; taskId?: string; error: string }
 
 export interface IssueComment {
   id: string
@@ -71,6 +75,8 @@ export interface IssueComment {
   at: string
   /** Full markdown payload. Comments deliberately do not share the agent-editable What file. */
   markdown: string
+  replyTo?: string
+  delivery?: IssueCommentDelivery
 }
 
 export type IssueRunFailureKind =
@@ -202,7 +208,7 @@ export interface IssueDetailIssue {
   automationHealth?: IssueAutomationHealth
 }
 
-/** GET /api/issues/:wsId/:id — one issue + its run history (Activity feed). */
+/** GET /api/issues/:wsId/:id — one issue + Activity, Runs, and reports. */
 export interface IssueDetail {
   issue: IssueDetailIssue
   /** Structured markdown comments from `<id>.comments.json`. */
@@ -217,12 +223,9 @@ export interface IssueDetail {
    * issue with no reports yields an empty array.
    */
   inboxReports?: InboxEntry[]
-  /** Creation/update/comment activity, newest first. Nearby updates from one
-   * origin are coalesced into an editing activity. Optional for legacy/demo
-   * payloads written before provenance projection existed. */
+  /** Raw provenance edges. Nearby updates from one origin are coalesced. */
   provenance?: IssueProvenanceRecord[]
-  /** Unified change + scheduled execution log. Optional for older/demo servers;
-   * the client can derive it from provenance/runs during rollout. */
+  /** Changes + comments, oldest first. Optional for older/demo servers. */
   activity?: IssueActivityRecord[]
 }
 

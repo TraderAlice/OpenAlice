@@ -69,9 +69,10 @@ alice-workspace issue create --title "Split the data fetcher" \
 # you silence a self-scheduled issue (there is no separate enabled flag).
 alice-workspace issue update --id morning-scan --status done
 
-# comment — append markdown to the structured `<id>.comments.json` sidecar, authored as
-# ws:<this workspace>. Use it for a human-visible progress note or finding. It
-# does not contact an Agent; use `issue ask` when you need a reply.
+# comment — append markdown to the structured `<id>.comments.json` sidecar. An
+# attributable Session signs with @resumeId. If somebody else comments on an
+# Issue with a fixed @resumeId owner, OpenAlice asks that owner in the background
+# and records the final reply in Activity. @workspace comments remain notes.
 alice-workspace issue comment --id morning-scan --text "Brief pushed; SPY gapped +0.4%."
 ```
 

@@ -4,6 +4,7 @@ import { api } from '../api'
 import type { IssueDetail } from '../api/issues'
 
 const POLL_MS = 15_000
+const ACTIVE_COMMENT_POLL_MS = 1_500
 
 export interface UseIssueDetail {
   data: IssueDetail | null
@@ -21,8 +22,8 @@ export interface UseIssueDetail {
 
 /**
  * Read-only detail for one issue (GET /api/issues/:wsId/:id) — its full fields,
- * markdown body, and headless run history (Activity feed). Light poll while the
- * detail tab is open so a running run's status / the feed stay live. Unlike the
+ * markdown body, Activity timeline, and headless Runs history. Light poll while
+ * the detail tab is open so execution and collaboration state stay live. Unlike the
  * board hook there's no process-level cache (detail is opened on demand, one at
  * a time); it refetches when (wsId, id) changes.
  */
@@ -64,6 +65,38 @@ export function useIssueDetail(wsId: string, id: string): UseIssueDetail {
       clearInterval(timer)
     }
   }, [wsId, id, requestKey])
+
+  const hasPendingCommentReply = Boolean(
+    data?.comments?.some((comment) => comment.delivery?.state === 'pending'),
+  )
+
+  useEffect(() => {
+    if (!hasPendingCommentReply) return
+    const refresh = async () => {
+      const startedAtMutation = mutationVersion.current
+      try {
+        const next = await api.issues.getDetail(wsId, id)
+        if (
+          mounted.current
+          && activeKey.current === requestKey
+          && mutationVersion.current === startedAtMutation
+        ) {
+          setData(next)
+          setError(null)
+        }
+      } catch (e) {
+        if (
+          mounted.current
+          && activeKey.current === requestKey
+          && mutationVersion.current === startedAtMutation
+        ) {
+          setError(e instanceof Error ? e.message : String(e))
+        }
+      }
+    }
+    const timer = setInterval(() => void refresh(), ACTIVE_COMMENT_POLL_MS)
+    return () => clearInterval(timer)
+  }, [hasPendingCommentReply, wsId, id, requestKey])
 
   const mutate = useCallback((next: IssueDetail) => {
     if (mounted.current && activeKey.current === requestKey) {

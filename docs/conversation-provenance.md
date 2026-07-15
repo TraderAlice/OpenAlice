@@ -269,22 +269,28 @@ An Issue has two independent identity questions:
 `assignee` is the single answer to the second question; schedule is an intrinsic
 capability of that Work item, not a second ownership object.
 
-Issue detail and `alice-workspace issue show` expose `created` / `updated` /
-`commented` activity newest-first. Adjacent updates from the same origin are
-projected as one editing activity, including historical autosave records written
-before store-side coalescing existed. Session origins carry a product
+Issue detail and `alice-workspace issue show` expose creation/update provenance
+plus structured comments. Adjacent updates from the same origin are projected
+as one editing activity, including historical autosave records written before
+store-side coalescing existed. Session origins carry a product
 `resumeId`, so a human or agent can continue that exact author without learning
 a runtime-native session id. Missing history remains visibly unattributed for
 legacy or manual files; it is never inferred from the current assignee,
 scheduled owner, or Workspace default runtime.
 
-The Issue detail API also exposes a unified chronological `activity[]` log.
-Change activities come from the provenance store; scheduled execution
-activities come from the headless run registry. They remain authoritative in
-their own persistence systems, while the projection gives UI, CLI, and future
-automation one extensible contract for “what happened to this Issue.” New kinds
-such as Inbox delivery or schedule skips should extend this activity union
-instead of creating another parallel timeline.
+The Issue detail API exposes a chronological `activity[]` collaboration
+timeline, oldest first. Change activities come from the provenance store and
+comment activities come from the structured comment sidecar. A `commented`
+provenance edge is not rendered separately because the full comment is the
+richer version of that same event. Scheduled/headless executions remain in the
+independent `runs[]` operational ledger; high-volume runtime history must not
+swallow the human-facing Activity timeline.
+
+When an Issue has a fixed `@resumeId` owner, a comment from somebody else is
+delivered to that exact Session. The final assistant response is recorded as a
+reply comment, linked by `replyTo`; delivery state stays on the source comment.
+Workspace-owned Issues do not recruit a fresh worker for comments. This keeps
+“leave a durable note” separate from “create a new execution owner.”
 
 #### Mode A: one responsible Session
 
@@ -532,6 +538,7 @@ inbox ask <entry>             -> sender Session or reconstructed Workspace Sessi
 issue ask <issue> --creator   -> creation provenance (shipped)
 issue ask <issue> --owner     -> declared Session assignee, or explain Workspace ownership (shipped)
 issue ask <issue> --run-id    -> that run's Session (shipped)
+issue comment <issue>         -> timeline note; fixed owner replies in Activity (shipped)
 report ask <path> [revision]  -> matching writer/update occurrence
 trade ask <order> --decision  -> initiating Session
 trade ask <order> --execution -> UTA/broker evidence, not an AI conversation
@@ -548,7 +555,7 @@ No feature should invent its own meaning of “the agent who made this.”
 | Product Session | `ResumeRegistry`, headless `resumeId`, interactive materialization | Standard origin projection and read-only lookup | Continue exact or create reconstructed Session |
 | Execution | `HeadlessTaskRegistry`, `parentTaskId`, normalized output | Bind every attributable occurrence to the execution and `resumeId` | Poll/stream the peer reply and tool activity |
 | Inbox | Server-stamped run/session origin | Safe exposure and legacy/unknown classification | Ask sender or reconstruct at Workspace |
-| Issue | `{ workspaceId, issueId }`, run and Inbox activity | Creator/mutation edges plus explicit Workspace/Session ownership | Ask creator, owner, or one selected run |
+| Issue | `{ workspaceId, issueId }`, Activity, Runs, and Inbox reports | Creator/mutation edges, structured comment threads, plus explicit Workspace/Session ownership | Comment to the fixed owner; explicitly ask creator or one selected run |
 | Report | Workspace path and git repository | Revision-level creation/update attribution | Ask writer of the selected revision |
 | Trade | UTA operation/order authority | Alice Session decision correlation across the UTA boundary | Ask initiator; route execution questions to UTA evidence |
 

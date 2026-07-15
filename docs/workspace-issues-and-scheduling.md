@@ -73,9 +73,19 @@ description/prompt fallback chain that can drift.
 
 Comments are markdown too, but they are not part of What. They persist in the
 adjacent `.alice/issues/<id>.comments.json` sidecar as structured records
-(`id`, `author`, `at`, `markdown`). The Issue document is intentionally editable
-by agents and has no reliable internal structure, so comments must not depend on
-a heading surviving an arbitrary rewrite.
+(`id`, `author`, `at`, `markdown`, plus optional reply/delivery metadata). The
+Issue document is intentionally editable by agents and has no reliable internal
+structure, so comments must not depend on a heading surviving an arbitrary
+rewrite.
+
+Comments are also the Issue's normal conversation entry. When `assignee` is an
+exact `@resumeId`, a comment from somebody else is delivered asynchronously to
+that Session and its final reply is appended as another structured comment.
+The source comment records `pending`, `replied`, or `failed`, so a durable note
+never masquerades as a delivered message. A comment on `@workspace`, `@human`,
+or `@unassigned` stays a timeline note: OpenAlice does not invent a new owner
+just because somebody commented. An owner commenting on their own Issue is not
+echoed back to the same Session.
 
 `done` and `canceled` are terminal and stop scheduled firing. There is no
 separate `enabled` flag. A successful one-shot `at` issue is automatically
@@ -116,6 +126,11 @@ alice-workspace issue comment --id <id> --text "..."
 The CLI and MCP tools use the same implementation and write the same files.
 Direct file editing is also valid and is the clearest way to author rich What
 markdown plus `when` / `assignee` / `agent` frontmatter.
+
+`issue comment` is preferable to a generic `issue ask --owner` for normal
+collaboration because it leaves the question and answer in the Issue Activity
+timeline. Explicit asks remain useful for interrogating the creator or one
+selected historical run without adding a board comment.
 
 Reads such as list/show aggregate all workspaces. Writes from an autonomous or
 headless run stay inside its own Workspace. Editing a peer Workspace requires
@@ -330,12 +345,14 @@ pnpm vitest run \
   src/webui/routes/headless.spec.ts \
   src/workspaces/issues/declaration.spec.ts \
   src/workspaces/issues/mutate.spec.ts \
+  src/workspaces/issues/comment-delivery.spec.ts \
   src/workspaces/issues/board.spec.ts \
+  src/webui/routes/issues.spec.ts \
   src/workspaces/issues/auto-complete.spec.ts \
   src/workspaces/schedule/scanner.spec.ts
 pnpm test
 ```
 
 For UI changes, run strict UI types and verify Issue board, issue detail,
-schedule projection, run history, and linked Inbox reports in the real browser
-surface.
+Activity comments/replies, the independent Runs section, schedule projection,
+and linked Inbox reports in the real browser surface.

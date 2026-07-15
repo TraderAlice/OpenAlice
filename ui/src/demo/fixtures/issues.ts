@@ -453,15 +453,18 @@ export function demoIssueDetail(wsId: string, id: string): IssueDetail | null {
     ? `${explicitWhat}\n\n## Context\n\n${legacyBody}`
     : explicitWhat || legacyBody || boardIssue.title
   const runs = extras?.runs ?? []
+  const comments = demoIssueComments[`${wsId}/${id}`] ?? []
   return {
     issue: {
       ...boardIssue,
       what,
       ...(extras?.agent ? { agent: extras.agent } : {}),
     },
-    comments: demoIssueComments[`${wsId}/${id}`] ?? [],
+    comments,
     runs,
-    activity: runs.map((run) => ({ kind: 'run' as const, id: run.taskId, at: run.startedAt, run })),
+    activity: comments
+      .map((comment) => ({ kind: 'comment' as const, id: comment.id, at: Date.parse(comment.at), comment }))
+      .sort((a, b) => a.at - b.at),
     // issue→inbox direction of the cross-link: every inbox report this issue
     // produced (server-stamped origin.issueId === id, this workspace), newest
     // first. Mirrors the real route's `inboxReportsFor` (webui/routes/issues.ts).
@@ -531,8 +534,39 @@ export function demoIssueAddComment(
   if (!boardIssue) return null
   const key = `${wsId}/${id}`
   const comments = demoIssueComments[key] ?? []
-  comments.push({ id: `demo-comment-${comments.length + 1}`, author, at: new Date().toISOString(), markdown: text })
+  const commentId = `demo-comment-${comments.length + 1}`
+  const ownerResumeId = boardIssue.assignee.startsWith('@resume-') ? boardIssue.assignee.slice(1) : null
+  const taskId = `demo-comment-run-${comments.length + 1}`
+  comments.push({
+    id: commentId,
+    author,
+    at: new Date().toISOString(),
+    markdown: text,
+    ...(ownerResumeId ? {
+      delivery: { state: 'pending' as const, targetResumeId: ownerResumeId, taskId },
+    } : {}),
+  })
   demoIssueComments[key] = comments
+  if (ownerResumeId) {
+    window.setTimeout(() => {
+      const source = comments.find((comment) => comment.id === commentId)
+      if (!source || source.delivery?.state !== 'pending') return
+      const replyCommentId = `demo-reply-${commentId}`
+      source.delivery = {
+        state: 'replied',
+        targetResumeId: ownerResumeId,
+        taskId,
+        replyCommentId,
+      }
+      comments.push({
+        id: replyCommentId,
+        author: `@${ownerResumeId}`,
+        at: new Date().toISOString(),
+        markdown: 'I saw the comment and will carry this context into the next pass.',
+        replyTo: commentId,
+      })
+    }, 900)
+  }
   return demoIssueDetail(wsId, id)
 }
 

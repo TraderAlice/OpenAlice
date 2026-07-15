@@ -21,13 +21,58 @@ export interface IssueComment {
   author: string
   at: string
   markdown: string
+  /** A reply remains a first-class timeline entry while retaining the thread edge. */
+  replyTo?: string
+  /** Delivery is optional because comments on unowned Issues are durable notes only. */
+  delivery?: IssueCommentDelivery
 }
+
+export type IssueCommentDelivery =
+  | {
+      state: 'pending'
+      targetResumeId: string
+      taskId: string
+    }
+  | {
+      state: 'replied'
+      targetResumeId: string
+      taskId: string
+      replyCommentId: string
+    }
+  | {
+      state: 'failed'
+      targetResumeId: string
+      taskId?: string
+      error: string
+    }
+
+const issueCommentDeliverySchema = z.discriminatedUnion('state', [
+  z.object({
+    state: z.literal('pending'),
+    targetResumeId: z.string().min(1),
+    taskId: z.string().min(1),
+  }),
+  z.object({
+    state: z.literal('replied'),
+    targetResumeId: z.string().min(1),
+    taskId: z.string().min(1),
+    replyCommentId: z.string().min(1),
+  }),
+  z.object({
+    state: z.literal('failed'),
+    targetResumeId: z.string().min(1),
+    taskId: z.string().min(1).optional(),
+    error: z.string().min(1),
+  }),
+])
 
 const issueCommentSchema = z.object({
   id: z.string().min(1),
   author: z.string().min(1),
   at: z.string().min(1),
   markdown: z.string().min(1),
+  replyTo: z.string().min(1).optional(),
+  delivery: issueCommentDeliverySchema.optional(),
 })
 
 const issueCommentsFileSchema = z.object({
@@ -65,11 +110,25 @@ export type AppendIssueCommentResult =
   | { ok: false; reason: 'not_found' }
   | { ok: false; reason: 'invalid'; error: string }
 
+export interface AppendIssueCommentOptions {
+  /** Deterministic ids make asynchronously recorded agent replies idempotent. */
+  id?: string
+  at?: string
+  replyTo?: string
+  delivery?: IssueCommentDelivery
+}
+
+async function writeIssueComments(wsDir: string, id: string, comments: IssueComment[]): Promise<void> {
+  const content = JSON.stringify({ version: 1, issueId: id, comments }, null, 2) + '\n'
+  await writeWorkspaceFile(wsDir, issueCommentsRel(id), content)
+}
+
 export async function appendIssueComment(
   wsDir: string,
   id: string,
   author: string,
   text: string,
+  options: AppendIssueCommentOptions = {},
 ): Promise<AppendIssueCommentResult> {
   if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(id)) return { ok: false, reason: 'not_found' }
   const issueRaw = await readWorkspaceFile(wsDir, issueRel(id))
@@ -84,13 +143,36 @@ export async function appendIssueComment(
   const existing = await readIssueComments(wsDir, id)
   if (!existing.ok) return { ok: false, reason: 'invalid', error: existing.error }
 
-  const comment: IssueComment = {
-    id: `comment-${randomUUID()}`,
-    author: author.trim(),
-    at: new Date().toISOString(),
-    markdown,
+  if (options.id) {
+    const duplicate = existing.comments.find((comment) => comment.id === options.id)
+    if (duplicate) return { ok: true, issue: issue.issue, comment: duplicate }
   }
-  const content = JSON.stringify({ version: 1, issueId: id, comments: [...existing.comments, comment] }, null, 2) + '\n'
-  await writeWorkspaceFile(wsDir, issueCommentsRel(id), content)
+
+  const comment: IssueComment = {
+    id: options.id ?? `comment-${randomUUID()}`,
+    author: author.trim(),
+    at: options.at ?? new Date().toISOString(),
+    markdown,
+    ...(options.replyTo ? { replyTo: options.replyTo } : {}),
+    ...(options.delivery ? { delivery: options.delivery } : {}),
+  }
+  await writeIssueComments(wsDir, id, [...existing.comments, comment])
   return { ok: true, issue: issue.issue, comment }
+}
+
+export async function updateIssueCommentDelivery(
+  wsDir: string,
+  id: string,
+  commentId: string,
+  delivery: IssueCommentDelivery,
+): Promise<{ ok: true; comment: IssueComment } | { ok: false; error: string }> {
+  const existing = await readIssueComments(wsDir, id)
+  if (!existing.ok) return existing
+  const index = existing.comments.findIndex((comment) => comment.id === commentId)
+  if (index < 0) return { ok: false, error: `comment not found: ${commentId}` }
+  const comment = { ...existing.comments[index], delivery }
+  const comments = [...existing.comments]
+  comments[index] = comment
+  await writeIssueComments(wsDir, id, comments)
+  return { ok: true, comment }
 }
