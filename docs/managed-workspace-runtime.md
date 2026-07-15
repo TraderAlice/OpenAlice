@@ -202,6 +202,28 @@ Do not add external-Pi version probing or upgrade UX to preserve flags used by
 the packaged runtime. Compatibility for the packaged app is maintained by
 pinning and upgrading the bundled Pi with the OpenAlice release.
 
+### Pi and OpenCode context limits
+
+Workspace provider overrides write the model context limit into both runtime
+formats: `provider.models.<id>.limit.context` for OpenCode and
+`providers.workspace.models[].contextWindow` for Pi. Unknown custom and local
+models default to **256K**, not 1M. Larger values remain explicit user choices;
+the provider connection probe cannot prove that a local backend has enough
+memory for a future long prefill.
+
+The Workspace config file is the source of truth for this model-specific
+choice. Re-selecting the same vault credential and model must preserve the
+existing Workspace context limit. Selecting a different credential or model
+starts from the conservative default instead of carrying an unrelated 1M
+setting across providers.
+
+Pi and OpenCode load provider state at process startup. Saving a new context
+limit does not resize a running process: the UI must name affected running
+Sessions and tell the user to pause and resume them. WebPi follows new output
+only while the reader is already near the transcript tail; polling, retries,
+and streaming updates must never steal the scroll position from someone
+reading older messages.
+
 ### Codex interactive permissions
 
 OpenAlice launches interactive Codex TUI sessions with explicit

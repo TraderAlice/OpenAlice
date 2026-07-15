@@ -54,10 +54,10 @@ const inputClass =
   'w-full bg-bg-secondary border border-border rounded-md px-3 py-2 text-[13px] text-text placeholder:text-text-muted/60 focus:outline-none focus:border-accent'
 
 const TAB_LABEL: Record<Tab, string> = { claude: 'Claude Code', codex: 'Codex', opencode: 'opencode', pi: 'Pi' }
-const DEFAULT_CONTEXT_WINDOW = 1_000_000
+export const DEFAULT_CONTEXT_WINDOW = 256_000
 const CONTEXT_WINDOW_OPTIONS = [
   { value: 128_000, label: '128K' },
-  { value: 256_000, label: '256K' },
+  { value: 256_000, label: '256K — recommended' },
   { value: 512_000, label: '512K' },
   { value: 1_000_000, label: '1M' },
 ] as const
@@ -96,8 +96,13 @@ const EMPTY_FORM: FormState = {
 }
 
 function normalizeContextWindow(value: number | null | undefined): number {
-  if (typeof value !== 'number') return DEFAULT_CONTEXT_WINDOW
-  return CONTEXT_WINDOW_OPTIONS.some((o) => o.value === value) ? value : DEFAULT_CONTEXT_WINDOW
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+    ? value
+    : DEFAULT_CONTEXT_WINDOW
+}
+
+function isPresetContextWindow(value: number): boolean {
+  return CONTEXT_WINDOW_OPTIONS.some((option) => option.value === value)
 }
 
 function configToForm(cfg: AgentConfig | null, tab: Tab): FormState {
@@ -138,13 +143,15 @@ function formToConfig(form: FormState, agent: AgentId): AgentConfig {
 // a result to the `key` it was tested against; editing any tested field changes
 // the key, so the result stops matching and Save re-locks. `testKey` lists
 // exactly the fields the probe covers (agent-specific: wireApi for codex,
-// authMode for claude).
+// authMode for claude). Context is deliberately absent: the lightweight probe
+// cannot prove that a local runtime has enough memory for a future long prefill.
 function testKey(form: FormState, agent: AgentId): string {
   return [
     form.baseUrl.trim(),
     form.apiKey.trim(),
     form.model.trim(),
     form.wireShape,
+    agent === 'codex' ? form.wireApi : '',
     agent === 'claude' ? form.authMode : '',
   ].join('|')
 }
@@ -170,7 +177,11 @@ export function WorkspaceAIConfigModal({ wsId, onClose, initialAgent = 'claude',
   const [showKey, setShowKey] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [savedFlash, setSavedFlash] = useState(false)
+  const [savedNotice, setSavedNotice] = useState<{
+    agent: Tab
+    contextChanged: boolean
+    activeSessions: number
+  } | null>(null)
   // Push-back prompt: shown after a successful Save when the just-saved key
   // isn't already in Alice's central store — offers to solidify it for reuse.
   const [offerSaveCred, setOfferSaveCred] = useState(false)
@@ -230,23 +241,32 @@ export function WorkspaceAIConfigModal({ wsId, onClose, initialAgent = 'claude',
   const result = gate.result
   const resultMatchesCurrent = gate.matchesCurrent(key)
   const testPassedForCurrent = gate.passedFor(key)
-  const dirty = useMemo(() => {
-    if (!bundle) return false
+  const changes = useMemo(() => {
+    if (!bundle) return { connection: false, context: false }
     const saved = bundle[tab]
     const savedForm = configToForm(saved, tab)
-    return (
+    const connection = (
       savedForm.baseUrl !== form.baseUrl ||
       savedForm.apiKey !== form.apiKey ||
       savedForm.model !== form.model ||
       savedForm.wireShape !== form.wireShape ||
-      ((tab === 'opencode' || tab === 'pi') && savedForm.contextWindow !== form.contextWindow) ||
-      (tab === 'claude' && savedForm.authMode !== form.authMode)
+      (tab === 'claude' && savedForm.authMode !== form.authMode) ||
+      (tab === 'codex' && savedForm.wireApi !== form.wireApi)
     )
+    const context = (tab === 'opencode' || tab === 'pi') &&
+      savedForm.contextWindow !== form.contextWindow
+    return { connection, context }
   }, [bundle, form, tab])
+  const dirty = changes.connection || changes.context
   // The primary footer button morphs Test → Save off this: an unsaved change
   // has to clear the connection test before it can be saved, so the lit button
   // is always the next action to take.
-  const needsTest = dirty && !testPassedForCurrent
+  const needsTest = changes.connection && !testPassedForCurrent
+  const activeAgentSessions = workspace?.sessions.filter(
+    (session) => session.agent === tab && session.state === 'running',
+  ).length ?? 0
+  const largeContextSelected = (tab === 'opencode' || tab === 'pi') &&
+    form.contextWindow > DEFAULT_CONTEXT_WINDOW
 
   const applyCredential = () => {
     const cred = credentials.find((x) => x.slug === pickedCredential)
@@ -280,8 +300,11 @@ export function WorkspaceAIConfigModal({ wsId, onClose, initialAgent = 'claude',
       await saveAgentConfig(wsId, tab, formToConfig(form, tab))
       const fresh = await getAgentConfig(wsId)
       setBundle(fresh)
-      setSavedFlash(true)
-      setTimeout(() => setSavedFlash(false), 1800)
+      setSavedNotice({
+        agent: tab,
+        contextChanged: changes.context,
+        activeSessions: activeAgentSessions,
+      })
       // Offer to solidify a hand-entered key into Alice's central store — but
       // only when that key isn't already there (one key = one account; dedup is
       // by key, so a known key shouldn't re-prompt).
@@ -324,8 +347,7 @@ export function WorkspaceAIConfigModal({ wsId, onClose, initialAgent = 'claude',
       const fresh = await getAgentConfig(wsId)
       setBundle(fresh)
       setForm({ ...EMPTY_FORM, wireShape: DEFAULT_WIRE_BY_TAB[tab] })
-      setSavedFlash(true)
-      setTimeout(() => setSavedFlash(false), 1800)
+      setSavedNotice({ agent: tab, contextChanged: false, activeSessions: activeAgentSessions })
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -708,16 +730,30 @@ export function WorkspaceAIConfigModal({ wsId, onClose, initialAgent = 'claude',
 
           {(tab === 'opencode' || tab === 'pi') && (
             <div>
-              <label className="block text-xs font-medium text-text-muted mb-1">Context window</label>
+              <label htmlFor={`context-window-${tab}`} className="block text-xs font-medium text-text-muted mb-1">Context window</label>
               <select
+                id={`context-window-${tab}`}
                 value={form.contextWindow}
                 onChange={(e) => setForm({ ...form, contextWindow: Number(e.target.value) })}
                 className={inputClass}
               >
+                {!isPresetContextWindow(form.contextWindow) && (
+                  <option value={form.contextWindow}>
+                    Custom — {form.contextWindow.toLocaleString('en-US')} tokens
+                  </option>
+                )}
                 {CONTEXT_WINDOW_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
               </select>
+              <p className="mt-1 text-[11px] leading-snug text-text-muted/75">
+                This is a model/runtime limit, not a capacity promise. The connection test checks the endpoint, key, and model only; it cannot verify that a local backend has enough memory for a long prefill.
+              </p>
+              {largeContextSelected && (
+                <div className="mt-2 rounded-md border border-yellow-400/35 bg-yellow-400/5 px-3 py-2 text-[11px] leading-snug text-yellow-300/90">
+                  Large context windows can sharply increase local prefill memory. Use values above 256K only when the model backend and available memory are known to support them.
+                </div>
+              )}
             </div>
           )}
 
@@ -768,9 +804,19 @@ export function WorkspaceAIConfigModal({ wsId, onClose, initialAgent = 'claude',
               {error}
             </div>
           )}
-          {savedFlash && (
+          {savedNotice && (
             <div className="rounded-md border border-green/40 bg-green/10 text-green text-[12px] px-3 py-2">
-              Saved. Pause + resume any open session to reload.
+              <div className="font-medium">Saved for {TAB_LABEL[savedNotice.agent]}.</div>
+              {savedNotice.activeSessions > 0 ? (
+                <div className="mt-1 leading-snug text-text">
+                  {savedNotice.activeSessions} running {TAB_LABEL[savedNotice.agent]} Session{savedNotice.activeSessions === 1 ? '' : 's'} still {savedNotice.activeSessions === 1 ? 'uses' : 'use'} the previous provider state. Pause and resume {savedNotice.activeSessions === 1 ? 'it' : 'them'} to apply this change.
+                </div>
+              ) : (
+                <div className="mt-1 leading-snug text-text">The next Session will use this provider state.</div>
+              )}
+              {savedNotice.contextChanged && (
+                <div className="mt-1 leading-snug text-text-muted">The selected context window is loaded when Pi or OpenCode starts; saving does not resize an already-running process.</div>
+              )}
             </div>
           )}
           {offerSaveCred && (

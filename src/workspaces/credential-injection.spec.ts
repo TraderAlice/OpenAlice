@@ -78,7 +78,7 @@ describe('credentialToWorkspaceAiCred', () => {
         expect(cred.wireShape).toBe('openai-chat')
         expect(cred.authMode).toBeUndefined()
         expect(cred.wireApi).toBeUndefined()
-        expect(cred.contextWindow).toBe(1_000_000)
+        expect(cred.contextWindow).toBe(256_000)
         expect(cred.apiKey).toBe('k')
         expect(cred.baseUrl).toBe('https://gw.example.com/v1')
       })

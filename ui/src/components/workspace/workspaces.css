@@ -979,6 +979,7 @@
 
 /* WebPi is deliberately a surface inside the existing terminal slot. */
 .webpi-shell {
+  position: relative;
   width: 100%;
   height: 100%;
   min-height: 0;
@@ -1096,6 +1097,8 @@
 
 .webpi-error { display: grid; gap: 7px; margin: 20px 0; padding: 13px; border: 1px solid color-mix(in srgb, #d65c5c 50%, var(--color-border)); border-radius: 10px; color: #d65c5c; font-size: 12px; }
 .webpi-error button { width: fit-content; color: var(--color-text); text-decoration: underline; }
+.webpi-jump-latest { position: absolute; right: max(18px, calc((100% - 760px) / 2)); bottom: 82px; z-index: 2; padding: 6px 10px; border: 1px solid color-mix(in srgb, var(--color-accent) 42%, var(--color-border)); border-radius: 999px; color: var(--color-text); background: color-mix(in srgb, var(--color-bg-secondary) 92%, transparent); box-shadow: 0 5px 18px color-mix(in srgb, #000 16%, transparent); font-size: 10px; font-weight: 650; }
+.webpi-jump-latest:hover { border-color: var(--color-accent); color: var(--color-accent); }
 .webpi-composer-wrap { padding: 10px max(18px, calc((100% - 760px) / 2)) 14px; border-top: 1px solid var(--color-border); background: color-mix(in srgb, var(--color-bg) 88%, transparent); }
 .webpi-composer { display: flex; align-items: flex-end; gap: 8px; padding: 9px 10px 9px 13px; border: 1px solid var(--color-border); border-radius: 14px; background: var(--color-bg-secondary); box-shadow: 0 6px 24px color-mix(in srgb, #000 9%, transparent); }
 .webpi-composer:focus-within { border-color: color-mix(in srgb, var(--color-accent) 60%, var(--color-border)); }
@@ -1116,6 +1119,7 @@
 
 @media (max-width: 720px) {
   .webpi-messages, .webpi-composer-wrap { padding-left: 12px; padding-right: 12px; }
+  .webpi-jump-latest { right: 12px; }
   .webpi-message.is-user { margin-left: 0; }
   .webpi-tool-step > summary { grid-template-columns: 18px minmax(52px, auto) minmax(0, 1fr) 14px; }
   .webpi-step-size { display: none; }

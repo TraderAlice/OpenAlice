@@ -85,6 +85,22 @@ function injectableCredentials(
   return out
 }
 
+function preserveMatchingWorkspaceContext(
+  next: WorkspaceAiCred,
+  current: WorkspaceAiCred | null,
+  sameCredential: boolean,
+): WorkspaceAiCred {
+  const currentContext = current?.contextWindow
+  if (
+    !sameCredential ||
+    current?.model !== next.model ||
+    typeof currentContext !== 'number' ||
+    !Number.isFinite(currentContext) ||
+    currentContext <= 0
+  ) return next
+  return { ...next, contextWindow: currentContext }
+}
+
 async function readWorkspaceConfig(meta: WorkspaceMeta, adapter: CliAdapter | undefined): Promise<WorkspaceAiCred | null> {
   if (!adapter?.readAiConfig) return null
   return adapter.readAiConfig(meta.dir).catch(() => null)
@@ -241,15 +257,24 @@ export async function ensureAgentCredentialReady(opts: {
   const chosen = injectableMap.get(chosenSlug)
   if (!chosen) throw new AgentCredentialError(agentId)
 
-  await adapter.writeAiConfig(meta.dir, chosen.wsCred)
-  if (chosen.wsCred.model) {
-    await setCredentialLastModel(chosenSlug, chosen.wsCred.model).catch(() => undefined)
+  // An explicit Quick Chat credential choice normally re-renders the workspace
+  // config. When it is the same credential and model, preserve the user's
+  // model-specific context selection instead of resetting it to the injection
+  // default. A different key/model starts from the safe default.
+  const workspaceCred = preserveMatchingWorkspaceContext(
+    chosen.wsCred,
+    cfg,
+    detectedCredentialSlug === chosenSlug,
+  )
+  await adapter.writeAiConfig(meta.dir, workspaceCred)
+  if (workspaceCred.model) {
+    await setCredentialLastModel(chosenSlug, workspaceCred.model).catch(() => undefined)
   }
   logger?.info('workspace.agent_cred_injected', {
     id: meta.id,
     agent: agentId,
     slug: chosenSlug,
-    ...(chosen.wsCred.model ? { model: chosen.wsCred.model } : {}),
+    ...(workspaceCred.model ? { model: workspaceCred.model } : {}),
     ...(detectedCredentialSlug && detectedCredentialSlug !== chosenSlug ? { replaced: detectedCredentialSlug } : {}),
   })
 

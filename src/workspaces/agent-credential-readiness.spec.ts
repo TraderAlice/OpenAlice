@@ -100,9 +100,59 @@ describe('agent credential readiness', () => {
       apiKey: 'sk-oa',
       model: 'gpt-5.5',
       wireShape: 'openai-chat',
-      contextWindow: 1_000_000,
+      contextWindow: 256_000,
     }));
     expect(vi.mocked(setCredentialLastModel)).toHaveBeenCalledWith('openai-1', 'gpt-5.5');
+  });
+
+  it.each(['opencode', 'pi'])('preserves a matching %s workspace context when its credential is explicitly reselected', async (agentId) => {
+    const a = adapter(agentId, {
+      baseUrl: null,
+      apiKey: 'sk-oa',
+      model: 'gpt-5.5',
+      wireShape: 'openai-chat',
+      contextWindow: 128_000,
+    });
+    vi.mocked(readCredentials).mockResolvedValue({ 'openai-1': openaiKey });
+
+    await ensureAgentCredentialReady({
+      meta,
+      agentId,
+      adapter: a,
+      pickedCredentialSlug: 'openai-1',
+    });
+
+    expect(a.writeAiConfig).toHaveBeenCalledWith('/tmp/ws-1', expect.objectContaining({
+      apiKey: 'sk-oa',
+      model: 'gpt-5.5',
+      contextWindow: 128_000,
+    }));
+  });
+
+  it('does not carry a previous provider context into a different credential', async () => {
+    const a = adapter('pi', {
+      baseUrl: null,
+      apiKey: 'sk-oa',
+      model: 'gpt-5.5',
+      wireShape: 'openai-chat',
+      contextWindow: 1_000_000,
+    });
+    vi.mocked(readCredentials).mockResolvedValue({
+      'openai-1': openaiKey,
+      'openai-2': { ...openaiKey, apiKey: 'sk-second' },
+    });
+
+    await ensureAgentCredentialReady({
+      meta,
+      agentId: 'pi',
+      adapter: a,
+      pickedCredentialSlug: 'openai-2',
+    });
+
+    expect(a.writeAiConfig).toHaveBeenCalledWith('/tmp/ws-1', expect.objectContaining({
+      apiKey: 'sk-second',
+      contextWindow: 256_000,
+    }));
   });
 
   it('does not treat a custom credential without a remembered model as injectable', async () => {
