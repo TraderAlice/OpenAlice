@@ -17,7 +17,7 @@ import { detailIssue } from '../../workspaces/issues/board.js'
 import { readWorkspaceIssues } from '../../workspaces/issues/declaration.js'
 import { createIssue } from '../../workspaces/issues/mutate.js'
 import { readIssueComments } from '../../workspaces/issues/comments.js'
-import type { WorkspaceService } from '../../workspaces/service.js'
+import { IssueRetryError, type WorkspaceService } from '../../workspaces/service.js'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -34,6 +34,20 @@ afterEach(async () => {
 // just echoes whatever inboxReports it's handed.
 function build(inboxReports: InboxEntry[] = []) {
   const appendProvenance = vi.fn(async (input) => ({ id: 'p-1', ...input }))
+  const readDetail = async (wsId: string, id: string) => {
+    if (wsId !== 'ws-1') return null
+    const r = await readWorkspaceIssues(wsDir)
+    if (!r.ok) return null
+    const issue = r.issues.find((i) => i.id === id)
+    if (!issue) return null
+    const comments = await readIssueComments(wsDir, id)
+    return { issue: detailIssue(issue, null), comments: comments.ok ? comments.comments : [], runs: [], inboxReports, provenance: [], activity: [] }
+  }
+  const retryIssue = vi.fn(async (wsId: string, id: string) => {
+    const detail = await readDetail(wsId, id)
+    if (!detail) throw new IssueRetryError('not_found', 'Issue not found.')
+    return detail
+  })
   const svc = {
     registry: {
       get: (id: string) => (
@@ -56,18 +70,11 @@ function build(inboxReports: InboxEntry[] = []) {
           ? { resumeId, wsId: 'ws-1', agent: 'codex', createdAt: 1, updatedAt: 1 }
         : null,
     },
-    issueDetail: async (wsId: string, id: string) => {
-      if (wsId !== 'ws-1') return null
-      const r = await readWorkspaceIssues(wsDir)
-      if (!r.ok) return null
-      const issue = r.issues.find((i) => i.id === id)
-      if (!issue) return null
-      const comments = await readIssueComments(wsDir, id)
-      return { issue: detailIssue(issue, null), comments: comments.ok ? comments.comments : [], runs: [], inboxReports, provenance: [], activity: [] }
-    },
+    issueDetail: readDetail,
+    retryIssue,
     provenanceStore: { append: appendProvenance, list: vi.fn(), latest: vi.fn() },
   } as unknown as WorkspaceService
-  return { app: createIssuesRoutes(svc), appendProvenance }
+  return { app: createIssuesRoutes(svc), appendProvenance, retryIssue }
 }
 
 async function req(app: any, method: string, path: string, body?: unknown) {
@@ -202,6 +209,29 @@ describe('GET /api/issues/:wsId/:id — inboxReports pass-through', () => {
     const r = await req(build().app, 'GET', '/ws-1/i1')
     expect(r.status).toBe(200)
     expect(r.body.inboxReports).toEqual([])
+  })
+})
+
+describe('POST /api/issues/:wsId/:id/retry', () => {
+  it('returns the authoritative detail with 202', async () => {
+    await createIssue(wsDir, { id: 'i1', title: 'T', when: { kind: 'every', every: '1h' } })
+    const { app, retryIssue } = build()
+    const r = await req(app, 'POST', '/ws-1/i1/retry')
+    expect(r.status).toBe(202)
+    expect(r.body.issue.id).toBe('i1')
+    expect(retryIssue).toHaveBeenCalledWith('ws-1', 'i1')
+  })
+
+  it('maps retry conflicts to an actionable response', async () => {
+    await createIssue(wsDir, { id: 'i1', title: 'T', when: { kind: 'every', every: '1h' } })
+    const { app, retryIssue } = build()
+    retryIssue.mockRejectedValueOnce(new IssueRetryError('already_running', 'This Issue already has a run in progress.'))
+    const r = await req(app, 'POST', '/ws-1/i1/retry')
+    expect(r.status).toBe(409)
+    expect(r.body).toEqual({
+      error: 'already_running',
+      message: 'This Issue already has a run in progress.',
+    })
   })
 })
 

@@ -108,6 +108,24 @@ describe('issueRunRecord', () => {
     })
     expect(projected).not.toHaveProperty('agentSessionId')
   })
+
+  it('derives an actionable failure explanation for legacy killed runs', () => {
+    const projected = issueRunRecord({
+      taskId: 'task-sleep',
+      resumeId: 'resume-sleep',
+      wsId: 'ws-1',
+      trigger: { kind: 'issue', workspaceId: 'ws-1', issueId: 'scan' },
+      agent: 'pi',
+      prompt: 'scan',
+      status: 'failed',
+      startedAt: 1,
+      durationMs: 44 * 60_000,
+      killed: true,
+      signal: 'SIGKILL',
+    }, false)
+
+    expect(projected.failure).toMatchObject({ kind: 'system_paused', retryable: true })
+  })
 })
 
 function ws(wsId: string, titles: string[]): IssuesSnapshotWorkspace {

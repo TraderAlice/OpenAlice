@@ -30,8 +30,21 @@ describe('issueAutomationHealth', () => {
       state: 'healthy', latestTaskId: 'run-b',
     })
     expect(issueAutomationHealth({ ...base, latestRun: { taskId: 'run-c', status: 'interrupted' } })).toMatchObject({
-      state: 'failed', latestTaskId: 'run-c',
+      state: 'interrupted', latestTaskId: 'run-c',
     })
+    expect(issueAutomationHealth({
+      ...base,
+      latestRun: {
+        taskId: 'run-sleep',
+        status: 'failed',
+        failure: {
+          kind: 'system_paused',
+          title: 'Computer or launcher was paused',
+          message: 'watchdog ran late',
+          retryable: true,
+        },
+      },
+    })).toMatchObject({ state: 'interrupted', message: 'watchdog ran late' })
   })
 
   it('blocks a future dispatch when an exact Session cannot resume', () => {

@@ -28,6 +28,7 @@ export type IssueAutomationHealthState =
   | 'due'
   | 'running'
   | 'healthy'
+  | 'interrupted'
   | 'failed'
   | 'blocked'
 
@@ -62,7 +63,7 @@ export interface IssueProvenanceRecord {
  * chronological projection for UI, CLI, and future activity consumers. */
 export type IssueActivityRecord =
   | ({ kind: 'change' } & IssueProvenanceRecord)
-  | { kind: 'run'; id: string; at: number; run: HeadlessTaskRecord }
+  | { kind: 'run'; id: string; at: number; run: IssueRunRecord }
 
 export interface IssueComment {
   id: string
@@ -70,6 +71,28 @@ export interface IssueComment {
   at: string
   /** Full markdown payload. Comments deliberately do not share the agent-editable What file. */
   markdown: string
+}
+
+export type IssueRunFailureKind =
+  | 'system_paused'
+  | 'launcher_restarted'
+  | 'timeout'
+  | 'launch_error'
+  | 'process_exit'
+  | 'runtime_error'
+
+export interface IssueRunFailure {
+  kind: IssueRunFailureKind
+  title: string
+  message: string
+  retryable: boolean
+}
+
+/** Issue-safe headless projection. Native runtime session ids remain hidden;
+ * failure is a read-side explanation derived by the backend. */
+export interface IssueRunRecord extends HeadlessTaskRecord {
+  issueId?: string
+  failure?: IssueRunFailure
 }
 
 export interface IssueListItem {
@@ -185,7 +208,7 @@ export interface IssueDetail {
   /** Structured markdown comments from `<id>.comments.json`. */
   comments?: IssueComment[]
   /** This issue's headless runs (wsId + issueId match), newest first. */
-  runs: HeadlessTaskRecord[]
+  runs: IssueRunRecord[]
   /**
    * The inbox reports this issue produced — every inbox entry from this
    * workspace whose server-stamped `origin.issueId` is this issue, newest-first.
@@ -253,6 +276,15 @@ export const issuesApi = {
     return fetchJson<IssueDetail>(
       `/api/issues/${encodeURIComponent(wsId)}/${encodeURIComponent(id)}/comments`,
       { method: 'POST', headers, body: JSON.stringify({ text }) },
+    )
+  },
+
+  /** Retry the latest failed/interrupted scheduled run with its live Issue
+   * prompt, owner, and runtime. The backend preserves the cadence marker. */
+  async retry(wsId: string, id: string): Promise<IssueDetail> {
+    return fetchJson<IssueDetail>(
+      `/api/issues/${encodeURIComponent(wsId)}/${encodeURIComponent(id)}/retry`,
+      { method: 'POST', headers },
     )
   },
 }

@@ -1,5 +1,4 @@
-import type { HeadlessTaskRecord } from '../../api/headless'
-import type { IssueComment, IssueDetail, IssuePriority, IssueSnapshot, IssueStatus } from '../../api/issues'
+import type { IssueComment, IssueDetail, IssuePriority, IssueRunRecord, IssueSnapshot, IssueStatus } from '../../api/issues'
 import { demoInboxEntries } from './inbox'
 
 // GET /api/issues aggregates every workspace's declared issues by SCANNING
@@ -57,7 +56,11 @@ export const demoIssuesSnapshot: IssueSnapshot = {
           when: { kind: 'every', every: '1h' },
           lastFiredAtMs: now - HOUR / 2,
           nextDueAtMs: now + HOUR / 2,
-          automationHealth: { state: 'failed', message: 'Latest scheduled run failed.', latestTaskId: 'demo-run-thesis-failed' },
+          automationHealth: {
+            state: 'interrupted',
+            message: 'The 30m watchdog ran 14m late. The computer likely slept or OpenAlice was paused; this run was not automatically retried.',
+            latestTaskId: 'demo-run-thesis-1',
+          },
         },
         // Pure work item — no `when`, scanner ignores it, board still shows it.
         {
@@ -174,7 +177,7 @@ interface IssueDetailExtras {
   /** Scheduling frontmatter `agent` (adapter id), if set. */
   agent?: string
   /** This issue's headless runs, newest-first (Activity feed). */
-  runs: HeadlessTaskRecord[]
+  runs: IssueRunRecord[]
 }
 
 // Keyed by `${wsId}/${id}`. Issues absent here fall back to a generic body + no
@@ -280,8 +283,18 @@ const demoIssueExtras: Record<string, IssueDetailExtras> = {
         wsId: 'demo-ws-auto-quant',
         agent: 'claude',
         prompt: 'Re-check every active thesis against the latest quotes; flag invalidations.',
-        status: 'running',
-        startedAt: now - 2 * 60_000,
+        startedAt: now - 44 * 60_000,
+        finishedAt: now,
+        durationMs: 44 * 60_000,
+        killed: true,
+        signal: 'SIGKILL',
+        status: 'failed',
+        failure: {
+          kind: 'system_paused',
+          title: 'Computer or launcher was paused',
+          message: 'The 30m watchdog ran 14m late. The computer likely slept or OpenAlice was paused; this run was not automatically retried.',
+          retryable: true,
+        },
       },
       {
         taskId: 'demo-run-thesis-2',
@@ -520,5 +533,33 @@ export function demoIssueAddComment(
   const comments = demoIssueComments[key] ?? []
   comments.push({ id: `demo-comment-${comments.length + 1}`, author, at: new Date().toISOString(), markdown: text })
   demoIssueComments[key] = comments
+  return demoIssueDetail(wsId, id)
+}
+
+/** POST-retry backing: add a fresh running execution without changing cadence. */
+export function demoIssueRetry(wsId: string, id: string): IssueDetail | null {
+  const boardIssue = findBoardIssue(wsId, id)
+  const extras = demoIssueExtras[`${wsId}/${id}`]
+  const latest = extras?.runs[0]
+  if (!boardIssue?.when || !extras || !latest || (latest.status !== 'failed' && latest.status !== 'interrupted')) {
+    return null
+  }
+  const run: IssueRunRecord = {
+    taskId: `demo-retry-${Date.now()}`,
+    resumeId: `demo-resume-retry-${Date.now()}`,
+    resumable: false,
+    wsId,
+    issueId: id,
+    agent: boardIssue.agent ?? extras.agent ?? latest.agent,
+    prompt: latest.prompt,
+    status: 'running',
+    startedAt: Date.now(),
+  }
+  extras.runs.unshift(run)
+  boardIssue.automationHealth = {
+    state: 'running',
+    message: 'A scheduled run is in progress.',
+    latestTaskId: run.taskId,
+  }
   return demoIssueDetail(wsId, id)
 }

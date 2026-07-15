@@ -150,6 +150,7 @@ const AUTOMATION_HEALTH_META: Record<IssueAutomationHealthState, { label: string
   due: { label: 'Due', className: 'bg-amber-500/15 text-amber-400' },
   running: { label: 'Running', className: 'bg-blue-500/15 text-blue-400' },
   healthy: { label: 'Healthy', className: 'bg-emerald-500/15 text-emerald-400' },
+  interrupted: { label: 'Interrupted', className: 'bg-amber-500/15 text-amber-400' },
   failed: { label: 'Failed', className: 'bg-red-500/15 text-red-400' },
   blocked: { label: 'Blocked', className: 'bg-red-500/15 text-red-400' },
 }
@@ -160,6 +161,7 @@ const BOARD_HEALTH_CLASS: Record<IssueAutomationHealthState, string> = {
   due: 'text-amber-400',
   running: 'text-blue-400',
   healthy: 'text-emerald-500/85',
+  interrupted: 'rounded-md bg-amber-500/15 px-2 py-1 text-amber-400',
   failed: 'rounded-md bg-red-500/15 px-2 py-1 text-red-400',
   blocked: 'rounded-md bg-red-500/15 px-2 py-1 text-red-400',
 }
@@ -291,11 +293,12 @@ function resolveAgentRuntime(
 const ATTENTION_ORDER: Record<IssueAutomationHealthState, number> = {
   blocked: 0,
   failed: 1,
-  running: 2,
-  due: 3,
-  not_started: 4,
-  healthy: 5,
-  inactive: 6,
+  interrupted: 2,
+  running: 3,
+  due: 4,
+  not_started: 5,
+  healthy: 6,
+  inactive: 7,
 }
 
 const PRIORITY_ORDER: Record<IssuePriority, number> = {

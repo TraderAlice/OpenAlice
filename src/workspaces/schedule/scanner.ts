@@ -32,6 +32,7 @@ import type { WorkspaceMeta, WorkspaceRegistry } from '../workspace-registry.js'
 import type { HeadlessTaskTrigger } from '../headless-task-registry.js'
 
 import { isFireable, issueAssigneeResumeId, issueFirePrompt, readWorkspaceIssues } from '../issues/declaration.js'
+import { SCHEDULED_ISSUE_RUN_TIMEOUT_MS } from '../issues/run-failure.js'
 
 import {
   fireBase,
@@ -42,8 +43,24 @@ import {
 } from './declaration.js'
 
 export const DEFAULT_INTERVAL_MS = 60_000
-/** Matches the legacy cron-router's headless dispatch timeout. */
-const RUN_TIMEOUT_MS = 30 * 60_000
+
+export type ScheduledIssueRunNowErrorCode =
+  | 'not_found'
+  | 'not_scheduled'
+  | 'not_fireable'
+  | 'already_running'
+
+/** Stable domain error for the manual retry path. The scheduler's automatic
+ * path still catches and logs dispatch failures without advancing its marker. */
+export class ScheduledIssueRunNowError extends Error {
+  constructor(
+    public readonly code: ScheduledIssueRunNowErrorCode,
+    message: string,
+  ) {
+    super(message)
+    this.name = 'ScheduledIssueRunNowError'
+  }
+}
 
 /** The slice of ScheduleMarkerStore the scanner needs (structural, for testing). */
 export interface MarkerStore {
@@ -80,6 +97,9 @@ export class ScheduleScanner {
   private timer: ReturnType<typeof setTimeout> | null = null
   private stopped = false
   private scanning = false
+  /** Close the tiny manual-retry vs schedule-tick race for one Issue. This is
+   * only a dispatch-start lock, not a per-Workspace execution lock. */
+  private readonly dispatchingIssues = new Set<string>()
   /** Snapshot built as a side-effect of each scan; null until the first scan. */
   private lastSnapshot: ScheduleSnapshot | null = null
   private readonly now: () => number
@@ -110,6 +130,38 @@ export class ScheduleScanner {
    *  tick, so this is free — the route serves it instead of re-walking disk. */
   snapshot(): ScheduleSnapshot | null {
     return this.lastSnapshot
+  }
+
+  /** Dispatch one scheduled Issue immediately without touching its firing
+   * marker. This is the authoritative manual-retry path: it re-reads the live
+   * Issue and reuses the exact prompt, owner, runtime, and timeout used by the
+   * scanner, while preserving the next scheduled occurrence. */
+  async runIssueNow(wsId: string, issueId: string): Promise<{ taskId: string }> {
+    const ws = this.deps.registry.get(wsId)
+    if (!ws) throw new ScheduledIssueRunNowError('not_found', 'Workspace not found.')
+
+    const res = await readWorkspaceIssues(ws.dir)
+    if (!res.ok) throw new ScheduledIssueRunNowError('not_found', 'Issue not found.')
+    const issue = res.issues.find((candidate) => candidate.id === issueId)
+    if (!issue) throw new ScheduledIssueRunNowError('not_found', 'Issue not found.')
+    if (!issue.when) {
+      throw new ScheduledIssueRunNowError('not_scheduled', 'Only scheduled Issues can be retried.')
+    }
+    if (!isFireable(issue)) {
+      throw new ScheduledIssueRunNowError(
+        'not_fireable',
+        `This Issue is ${issue.status}; reopen it before retrying.`,
+      )
+    }
+
+    return this.dispatchIssue(
+      ws,
+      issue.id,
+      issueFirePrompt(issue),
+      issue.agent,
+      issueAssigneeResumeId(issue.assignee) ?? undefined,
+      true,
+    )
   }
 
   private arm(): void {
@@ -220,34 +272,17 @@ export class ScheduleScanner {
     nowMs: number,
   ): Promise<void> {
     try {
-      const executionWorkspace = resumeId
-        ? this.resolveResumeWorkspace(resumeId)
-        : issueWorkspace
-      if (!executionWorkspace) {
-        this.deps.logger.warn('schedule.resume_workspace_missing', {
-          wsId: issueWorkspace.id, taskId, resumeId,
-        })
-        return
-      }
-      const adapter = await this.deps.resolveAdapter(executionWorkspace, agentId, resumeId)
-      if (!adapter.capabilities.headless || !adapter.composeHeadlessCommand) {
-        this.deps.logger.warn('schedule.adapter_not_headless', { wsId: executionWorkspace.id, taskId, agent: adapter.id })
-        return
-      }
-      const trigger: HeadlessTaskTrigger = {
-        kind: 'issue',
-        workspaceId: issueWorkspace.id,
-        issueId: taskId,
-      }
-      const { taskId: runId } = resumeId
-        ? await this.deps.dispatch(executionWorkspace, adapter, what, RUN_TIMEOUT_MS, trigger, resumeId)
-        : await this.deps.dispatch(executionWorkspace, adapter, what, RUN_TIMEOUT_MS, trigger)
+      const { taskId: runId } = await this.dispatchIssue(
+        issueWorkspace,
+        taskId,
+        what,
+        agentId,
+        resumeId,
+      )
       await this.deps.markers.set(issueWorkspace.id, taskId, nowMs)
       this.deps.logger.info('schedule.fired', {
         wsId: issueWorkspace.id,
-        executionWsId: executionWorkspace.id,
         taskId,
-        agent: adapter.id,
         runId,
         owner: resumeId ? 'session' : 'workspace',
         ...(resumeId ? { resumeId } : {}),
@@ -260,6 +295,71 @@ export class ScheduleScanner {
         taskId,
         reason: err instanceof Error ? err.message : String(err),
       })
+    }
+  }
+
+  private async dispatchIssue(
+    issueWorkspace: WorkspaceMeta,
+    issueId: string,
+    what: string,
+    agentId?: string,
+    resumeId?: string,
+    manual = false,
+  ): Promise<{ taskId: string }> {
+    const dispatchKey = `${issueWorkspace.id}:${issueId}`
+    if (this.dispatchingIssues.has(dispatchKey)) {
+      if (manual) {
+        throw new ScheduledIssueRunNowError(
+          'already_running',
+          'This Issue is already being dispatched.',
+        )
+      }
+      throw new Error(`Issue dispatch already in progress: ${dispatchKey}`)
+    }
+    this.dispatchingIssues.add(dispatchKey)
+    try {
+      const executionWorkspace = resumeId
+        ? this.resolveResumeWorkspace(resumeId)
+        : issueWorkspace
+      if (!executionWorkspace) {
+        throw new Error(`assigned Session Workspace is unavailable: ${resumeId}`)
+      }
+      const adapter = await this.deps.resolveAdapter(executionWorkspace, agentId, resumeId)
+      if (!adapter.capabilities.headless || !adapter.composeHeadlessCommand) {
+        throw new Error(`agent runtime does not support headless work: ${adapter.id}`)
+      }
+      const trigger: HeadlessTaskTrigger = {
+        kind: 'issue',
+        workspaceId: issueWorkspace.id,
+        issueId,
+      }
+      const result = resumeId
+        ? await this.deps.dispatch(
+            executionWorkspace,
+            adapter,
+            what,
+            SCHEDULED_ISSUE_RUN_TIMEOUT_MS,
+            trigger,
+            resumeId,
+          )
+        : await this.deps.dispatch(
+            executionWorkspace,
+            adapter,
+            what,
+            SCHEDULED_ISSUE_RUN_TIMEOUT_MS,
+            trigger,
+          )
+      this.deps.logger.info('schedule.issue_dispatched', {
+        wsId: issueWorkspace.id,
+        executionWsId: executionWorkspace.id,
+        issueId,
+        agent: adapter.id,
+        runId: result.taskId,
+        manual,
+      })
+      return result
+    } finally {
+      this.dispatchingIssues.delete(dispatchKey)
     }
   }
 

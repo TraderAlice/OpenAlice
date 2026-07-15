@@ -148,7 +148,11 @@ the latest scheduled run, and the assignee's resume availability. It is not
 persisted in markdown and does not create another Issue workflow status:
 
 - `not_started`, `due`, `running`, and `healthy` describe normal progress;
-- `failed` retains the latest failed/interrupted run until a later success;
+- `interrupted` means the work was cut off by launcher restart, or its 30-minute
+  watchdog itself woke substantially late (usually computer sleep / launcher
+  suspension); this is operational interruption, not an agent-work failure;
+- `failed` retains a real timeout, launch error, runtime error, or non-zero
+  process exit until a later success;
 - `blocked` means the schedule has no future fire, or an exact Session owner is
   missing, retired, or not resumable;
 - `inactive` means Issue status `done`/`canceled` has stopped the schedule.
@@ -157,10 +161,25 @@ Health measures scheduler fulfillment, not human attention. A successful run
 may correctly exit silently when its condition is false, so Inbox delivery is
 not a health prerequisite.
 
+Failure explanations are read-side projections from the durable run record.
+Old runs therefore gain structured `failure.kind/title/message/retryable`
+diagnostics without migration. A killed run close to 30 minutes is a timeout;
+a killed run whose watchdog closes much later is described conservatively as a
+paused computer/launcher rather than falsely blaming the agent.
+
+The Issue detail offers **Retry now** only for the latest failed or interrupted
+scheduled run. Retry re-reads the live Issue and uses the same markdown What,
+assignee, runtime, resume mapping, and 30-minute budget as a scheduled fire. It
+does not write the last-fired marker, so a recovery attempt never shifts the
+Issue's cadence. The backend rejects duplicate/racing retries and returns the
+authoritative running detail immediately; there is no automatic retry storm.
+
 Headless runs may overlap with interactive sessions or other runs in the same
 checkout. Agents must tolerate concurrent edits. The launcher currently admits
 at most eight headless processes globally and serializes registry persistence,
-but there is no per-Workspace exclusive lock.
+but there is no per-Workspace exclusive lock. One small dispatch-start guard
+prevents a manual retry and a schedule tick from launching the same Issue at the
+same instant; it is released as soon as the run is registered.
 
 Offboarding is the lifecycle exception: a Workspace with a live headless run
 cannot depart. Once its Catalog row enters `offboarding`, new dispatch is
@@ -276,6 +295,7 @@ provenance store.
 | `src/workspaces/issues/board.ts` | Global board/detail projections |
 | `src/workspaces/issues/auto-complete.ts` | Successful one-shot → `done` transition |
 | `src/workspaces/issues/automation-health.ts` | Live schedule/run/owner health projection |
+| `src/workspaces/issues/run-failure.ts` | Read-side scheduled-run termination explanation |
 | `src/workspaces/schedule/scanner.ts` | Workspace scan, due calculation, dispatch |
 | `src/workspaces/schedule/marker-store.ts` | Atomic last-fired persistence |
 | `src/workspaces/service.ts` | Scanner composition, agent resolution, headless registry |

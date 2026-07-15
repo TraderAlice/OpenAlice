@@ -125,7 +125,10 @@ function scannerFor(
   const dispatch = opts.dispatch ?? vi.fn(async () => ({ taskId: 'run-1' }))
   const markers = opts.markers ?? new FakeMarkers()
   const scanner = new ScheduleScanner({
-    registry: { list: () => workspaces } as unknown as WorkspaceRegistry,
+    registry: {
+      list: () => workspaces,
+      get: (id: string) => workspaces.find((workspace) => workspace.id === id),
+    } as unknown as WorkspaceRegistry,
     resolveResumeWorkspace: opts.resolveResumeWorkspace ?? (() => workspaces[0]),
     resolveAdapter: opts.resolveAdapter ?? (() => opts.adapter ?? headlessAdapter),
     dispatch,
@@ -137,6 +140,37 @@ function scannerFor(
 }
 
 describe('ScheduleScanner', () => {
+  it('manually retries with live Issue semantics without moving the schedule marker', async () => {
+    const ws = await makeWs('w1', [{
+      id: 'retry-me',
+      title: 'Retry me',
+      when: { kind: 'every', every: '30m' },
+      what: 'same exact prompt',
+      agent: 'claude',
+    }])
+    const { scanner, dispatch, markers } = scannerFor([ws])
+
+    await expect(scanner.runIssueNow('w1', 'retry-me')).resolves.toEqual({ taskId: 'run-1' })
+    expect(dispatch).toHaveBeenCalledWith(
+      ws,
+      headlessAdapter,
+      'same exact prompt',
+      30 * 60_000,
+      { kind: 'issue', workspaceId: 'w1', issueId: 'retry-me' },
+    )
+    expect(markers.get('w1', 'retry-me')).toBeUndefined()
+  })
+
+  it('refuses manual retry for an unscheduled or terminal Issue', async () => {
+    const ws = await makeWs('w1', [
+      { id: 'plain', title: 'Plain work' },
+      { id: 'closed', title: 'Closed', status: 'done', when: { kind: 'every', every: '30m' } },
+    ])
+    const { scanner } = scannerFor([ws])
+    await expect(scanner.runIssueNow('w1', 'plain')).rejects.toMatchObject({ code: 'not_scheduled' })
+    await expect(scanner.runIssueNow('w1', 'closed')).rejects.toMatchObject({ code: 'not_fireable' })
+  })
+
   it('fires a scheduled (every) issue on first sight and records the marker after dispatch', async () => {
     const ws = await makeWs('w1', [{ id: 't1', title: 'i1', when: { kind: 'every', every: '30m' }, what: 'go' }])
     const { scanner, dispatch, markers } = scannerFor([ws])

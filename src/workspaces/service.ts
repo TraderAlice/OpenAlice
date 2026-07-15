@@ -46,7 +46,11 @@ import {
   type AgentRuntimeReadinessSource,
 } from './agent-runtime-readiness.js';
 import { ScheduleMarkerStore } from './schedule/marker-store.js';
-import { ScheduleScanner, DEFAULT_INTERVAL_MS } from './schedule/scanner.js';
+import {
+  ScheduleScanner,
+  ScheduledIssueRunNowError,
+  DEFAULT_INTERVAL_MS,
+} from './schedule/scanner.js';
 import {
   readWorkspaceIssues,
   snapshotScheduledIssue,
@@ -80,6 +84,7 @@ import {
   type IssueAutomationOwnerState,
 } from './issues/automation-health.js';
 import { issueAssigneeResumeId } from './issues/declaration.js';
+import { issueRunFailure } from './issues/run-failure.js';
 import type { IInboxStore } from '@/core/inbox-store.js';
 import { toSafeInboxOrigin } from '@/core/workspace-tool-center.js';
 import {
@@ -111,6 +116,15 @@ function automationOwnerState(assignee: string, resumes: ResumeRegistry): IssueA
   return identity.agentSessionId ? 'ready' : 'unbound';
 }
 
+function automationLatestRun(task: HeadlessTaskRecord) {
+  const failure = issueRunFailure(task);
+  return {
+    taskId: task.taskId,
+    status: task.status,
+    ...(failure ? { failure } : {}),
+  };
+}
+
 /** Max concurrent in-flight headless tasks — backstop against unbounded spawn. */
 const MAX_CONCURRENT_HEADLESS = 8;
 
@@ -129,6 +143,21 @@ export class HeadlessResumeError extends Error {
   ) {
     super(message);
     this.name = 'HeadlessResumeError';
+  }
+}
+
+export class IssueRetryError extends Error {
+  constructor(
+    public readonly code:
+      | 'not_found'
+      | 'not_scheduled'
+      | 'not_fireable'
+      | 'not_retryable'
+      | 'already_running',
+    message: string,
+  ) {
+    super(message);
+    this.name = 'IssueRetryError';
   }
 }
 import { ScrollbackStore } from './scrollback-store.js';
@@ -291,6 +320,9 @@ export interface WorkspaceService {
    *  headless run history, newest first). `null` when the workspace or the issue
    *  id is absent. Powers GET /api/issues/:wsId/:id. */
   issueDetail(wsId: string, id: string): Promise<IssueDetail | null>;
+  /** Retry the latest unsuccessful scheduled execution now. Reuses the live
+   * Issue prompt/owner/runtime and never advances its schedule marker. */
+  retryIssue(wsId: string, id: string): Promise<IssueDetail>;
   /** Safe Workspace Session index. resumeId is the only public conversation handle. */
   sessionDirectory(wsId: string, limit?: number): Promise<WorkspaceSessionDirectory | null>;
   /** Resolve a `[[name]]` token to the issues across ALL workspaces that claim it.
@@ -1362,7 +1394,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
                 nowMs,
                 nextDueAtMs: fired.nextDueAtMs,
                 ownerState: automationOwnerState(issue.assignee, resumeRegistry),
-                ...(latestRun ? { latestRun: { taskId: latestRun.taskId, status: latestRun.status } } : {}),
+                ...(latestRun ? { latestRun: automationLatestRun(latestRun) } : {}),
               }),
             },
           );
@@ -1418,7 +1450,13 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         nowMs: Date.now(),
         nextDueAtMs: scheduledSnapshot.nextDueAtMs,
         ownerState: automationOwnerState(issue.assignee, resumeRegistry),
-        ...(runs[0] ? { latestRun: { taskId: runs[0].taskId, status: runs[0].status } } : {}),
+        ...(runs[0] ? {
+          latestRun: {
+            taskId: runs[0].taskId,
+            status: runs[0].status,
+            ...(runs[0].failure ? { failure: runs[0].failure } : {}),
+          },
+        } : {}),
       }),
     } : null;
     // The issue→inbox cross-link: the reports this issue produced (entries this
@@ -1445,6 +1483,59 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     }));
     const activity = issueActivityRecords(provenance, runs);
     return { issue: detailIssue(issue, markers), comments, runs, inboxReports, provenance, activity };
+  };
+
+  const retryingIssueKeys = new Set<string>();
+  const retryIssue = async (wsId: string, id: string): Promise<IssueDetail> => {
+    const key = `${wsId}:${id}`;
+    const ws = registry.get(wsId);
+    if (!ws) throw new IssueRetryError('not_found', 'Workspace not found.');
+    const issueResult = await readWorkspaceIssues(ws.dir);
+    const issue = issueResult.ok
+      ? issueResult.issues.find((candidate) => candidate.id === id)
+      : undefined;
+    if (!issue) throw new IssueRetryError('not_found', 'Issue not found.');
+    if (!issue.when) {
+      throw new IssueRetryError('not_scheduled', 'Only scheduled Issues can be retried.');
+    }
+    if (issue.status === 'done' || issue.status === 'canceled') {
+      throw new IssueRetryError(
+        'not_fireable',
+        `This Issue is ${issue.status}; reopen it before retrying.`,
+      );
+    }
+    const latest = headlessTasks.list({ issue: { workspaceId: wsId, issueId: id } })[0];
+    if (latest?.status === 'running' || retryingIssueKeys.has(key)) {
+      throw new IssueRetryError('already_running', 'This Issue already has a run in progress.');
+    }
+    if (!latest || (latest.status !== 'failed' && latest.status !== 'interrupted')) {
+      throw new IssueRetryError(
+        'not_retryable',
+        'Only the latest failed or interrupted scheduled run can be retried.',
+      );
+    }
+
+    retryingIssueKeys.add(key);
+    try {
+      const { taskId } = await scheduleScanner.runIssueNow(wsId, id);
+      launcherLogger.info('issue.retry_dispatched', {
+        wsId,
+        issueId: id,
+        previousTaskId: latest.taskId,
+        taskId,
+      });
+    } catch (err) {
+      if (err instanceof ScheduledIssueRunNowError) {
+        throw new IssueRetryError(err.code, err.message);
+      }
+      throw err;
+    } finally {
+      retryingIssueKeys.delete(key);
+    }
+
+    const detail = await issueDetail(wsId, id);
+    if (!detail) throw new IssueRetryError('not_found', 'Issue not found.');
+    return detail;
   };
 
   const sessionDirectory = async (
@@ -1835,6 +1926,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     scheduleSnapshot,
     issuesSnapshot,
     issueDetail,
+    retryIssue,
     sessionDirectory,
     resolveIssuesByName,
     headlessTasks,

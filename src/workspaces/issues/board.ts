@@ -28,6 +28,7 @@ import type {
 import type { IssuePriority, IssueRecord, IssueStatus } from './declaration.js'
 import type { IssueComment } from './comments.js'
 import type { IssueAutomationHealth } from './automation-health.js'
+import { issueRunFailure, type IssueRunFailure } from './run-failure.js'
 
 /** One board row: the issue's display fields, plus — iff it self-schedules — its
  *  `when` and the scanner's firing markers. No markdown What (Phase 2 loads it). */
@@ -305,6 +306,9 @@ export interface IssueRunRecord {
   killed?: boolean
   error?: string
   output?: HeadlessTaskOutputSummary
+  /** Read-side explanation for non-successful scheduled execution. Derived
+   * from durable fields so old registry entries need no migration. */
+  failure?: IssueRunFailure
   /** Whether OpenAlice currently has a native runtime mapping for resumeId. */
   resumable: boolean
 }
@@ -312,6 +316,7 @@ export interface IssueRunRecord {
 /** Explicit whitelist: do not spread HeadlessTaskRecord here. Old registry
  * records may contain adapter-specific compatibility fields. */
 export function issueRunRecord(task: HeadlessTaskRecord, resumable: boolean): IssueRunRecord {
+  const failure = issueRunFailure(task)
   return {
     taskId: task.taskId,
     resumeId: task.resumeId,
@@ -329,6 +334,7 @@ export function issueRunRecord(task: HeadlessTaskRecord, resumable: boolean): Is
     ...(task.killed !== undefined ? { killed: task.killed } : {}),
     ...(task.error !== undefined ? { error: task.error } : {}),
     ...(task.output !== undefined ? { output: task.output } : {}),
+    ...(failure ? { failure } : {}),
     resumable,
   }
 }

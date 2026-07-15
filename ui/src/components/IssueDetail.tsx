@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { ArrowLeft, Hash, History, Inbox, ListChecks, Settings, TrendingUp, X } from 'lucide-react'
+import { ArrowLeft, Hash, History, Inbox, ListChecks, RotateCcw, Settings, TrendingUp, X } from 'lucide-react'
 
-import type { HeadlessTaskRecord, HeadlessTaskStatus } from '../api/headless'
+import type { HeadlessTaskStatus } from '../api/headless'
 import type { InboxEntry } from '../api/inbox'
 import type {
   IssueDetail as IssueDetailData,
@@ -10,6 +10,7 @@ import type {
   IssueActivityRecord,
   IssuePriority,
   IssueProvenanceRecord,
+  IssueRunRecord,
   IssueStatus,
   WikilinkIssueRef,
   WikilinkResolution,
@@ -244,8 +245,11 @@ function PropertiesRail({
   agentReadiness,
   sessions,
   saving,
+  retrying,
   error,
+  canRetry,
   onPatch,
+  onRetry,
   onConfigureAgent,
 }: {
   issue: IssueDetailIssue
@@ -255,8 +259,11 @@ function PropertiesRail({
   agentReadiness: Readonly<Record<string, AgentCredentialReadiness>>
   sessions: readonly WorkspaceSessionDirectoryEntry[]
   saving: boolean
+  retrying: boolean
   error: string | null
+  canRetry: boolean
   onPatch: (patch: { status?: IssueStatus; priority?: IssuePriority; assignee?: string; agent?: string | null; what?: string }) => void
+  onRetry: () => void
   onConfigureAgent: (agent: AgentId) => void
 }) {
   const meta = STATUS_META[issue.status]
@@ -346,6 +353,17 @@ function PropertiesRail({
                 <span className="max-w-44 text-[11px] leading-snug text-muted">
                   {issue.automationHealth.message}
                 </span>
+                {canRetry && (
+                  <button
+                    type="button"
+                    disabled={retrying}
+                    onClick={onRetry}
+                    className="oa-pressable mt-1 inline-flex items-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-[11px] font-medium text-amber-400 transition-colors hover:border-amber-500/60 hover:bg-amber-500/15 disabled:cursor-wait disabled:opacity-50"
+                  >
+                    <RotateCcw size={12} aria-hidden />
+                    {retrying ? 'Retrying…' : 'Retry now'}
+                  </button>
+                )}
               </div>
             </PropRow>
           )}
@@ -476,14 +494,17 @@ function IssueComments({ comments }: { comments: NonNullable<IssueDetailData['co
 
 // ==================== Activity feed (headless runs) ====================
 
-function RunRow({ run, onAsk }: { run: HeadlessTaskRecord; onAsk: (run: HeadlessTaskRecord) => void }) {
+function RunRow({ run, onAsk }: { run: IssueRunRecord; onAsk: (run: IssueRunRecord) => void }) {
+  const displayStatus = run.failure?.kind === 'system_paused' || run.failure?.kind === 'launcher_restarted'
+    ? 'interrupted'
+    : run.status
   return (
     <li className="rounded-lg border border-border bg-bg-secondary px-3 py-2.5">
       <div className="flex items-center gap-2">
         <span
-          className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-medium ${RUN_STATUS_STYLE[run.status]}`}
+          className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-medium ${RUN_STATUS_STYLE[displayStatus]}`}
         >
-          {run.status}
+          {displayStatus}
         </span>
         <span className="text-xs text-muted">{run.agent}</span>
         <span className="ml-auto text-xs text-muted" title={new Date(run.startedAt).toLocaleString()}>
@@ -515,6 +536,22 @@ function RunRow({ run, onAsk }: { run: HeadlessTaskRecord; onAsk: (run: Headless
           {run.output.toolCalls} tool {run.output.toolCalls === 1 ? 'call' : 'calls'}
           {run.output.toolFailures > 0 ? ` · ${run.output.toolFailures} failed` : ''}
         </p>
+      )}
+      {run.failure && (
+        <div className={`mt-2 rounded-md border px-2.5 py-2 ${
+          run.failure.kind === 'system_paused' || run.failure.kind === 'launcher_restarted'
+            ? 'border-amber-500/25 bg-amber-500/10'
+            : 'border-red-500/25 bg-red-500/10'
+        }`}>
+          <p className={`text-[12px] font-medium ${
+            run.failure.kind === 'system_paused' || run.failure.kind === 'launcher_restarted'
+              ? 'text-amber-400'
+              : 'text-red-400'
+          }`}>
+            {run.failure.title}
+          </p>
+          <p className="mt-0.5 text-[11px] leading-snug text-muted">{run.failure.message}</p>
+        </div>
       )}
       {run.error && <p className="mt-1 text-[12px] text-red-400">{run.error}</p>}
     </li>
@@ -587,7 +624,7 @@ function IssueActivity({
 }: {
   activity: IssueActivityRecord[]
   onContinue: (record: IssueProvenanceRecord) => Promise<void>
-  onAskRun: (run: HeadlessTaskRecord) => void
+  onAskRun: (run: IssueRunRecord) => void
 }) {
   const [continuingId, setContinuingId] = useState<string | null>(null)
   const [continueError, setContinueError] = useState<string | null>(null)
@@ -795,6 +832,7 @@ export function IssueDetail({
   const gotoEntity = useWikilinkHandler()
 
   const [saving, setSaving] = useState(false)
+  const [retrying, setRetrying] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [agentReadiness, setAgentReadiness] = useState<Record<string, AgentCredentialReadiness>>({})
   const [sessionDirectory, setSessionDirectory] = useState<readonly WorkspaceSessionDirectoryEntry[]>([])
@@ -919,6 +957,19 @@ export function IssueDetail({
     [wsId, id, mutate],
   )
 
+  const onRetry = useCallback(async () => {
+    if (retrying) return
+    setRetrying(true)
+    setActionError(null)
+    try {
+      mutate(await issuesApi.retry(wsId, id))
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setRetrying(false)
+    }
+  }, [retrying, wsId, id, mutate])
+
   const loadInquiries = useCallback(
     () => inquiriesApi.forIssue(wsId, id),
     [wsId, id],
@@ -980,6 +1031,12 @@ export function IssueDetail({
   }
 
   const { issue, runs } = data
+  const latestRun = runs[0]
+  const canRetry = Boolean(
+    issue.when
+    && latestRun?.failure?.retryable
+    && (latestRun.status === 'failed' || latestRun.status === 'interrupted'),
+  )
   const comments = data.comments ?? []
   const inboxReports = data.inboxReports ?? []
   const provenance = data.provenance ?? []
@@ -1053,8 +1110,11 @@ export function IssueDetail({
           agentReadiness={agentReadiness}
           sessions={sessionDirectory}
           saving={saving}
+          retrying={retrying}
           error={actionError}
+          canRetry={canRetry}
           onPatch={onPatch}
+          onRetry={() => void onRetry()}
           onConfigureAgent={(agent) => openAgentConfig(wsId, agent)}
         />
         <div className="min-w-0 lg:col-start-1 lg:row-start-2">

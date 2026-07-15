@@ -3,6 +3,7 @@ import type { IssuePriority, IssueStatus } from '../../api/issues'
 import {
   demoIssueAddComment,
   demoIssueDetail,
+  demoIssueRetry,
   demoIssueUpdate,
   demoIssuesSnapshot,
 } from '../fixtures/issues'
@@ -135,5 +136,15 @@ export const issuesHandlers = [
     return detail
       ? HttpResponse.json(detail)
       : HttpResponse.json({ error: 'not_found' }, { status: 404 })
+  }),
+
+  http.post('/api/issues/:wsId/:id/retry', ({ params }) => {
+    const detail = demoIssueRetry(String(params.wsId), String(params.id))
+    return detail
+      ? HttpResponse.json(detail, { status: 202 })
+      : HttpResponse.json({
+          error: 'not_retryable',
+          message: 'Only the latest failed or interrupted scheduled run can be retried.',
+        }, { status: 409 })
   }),
 ]

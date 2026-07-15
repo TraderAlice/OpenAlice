@@ -10,6 +10,7 @@
  * Read endpoints:
  *   GET  /api/issues               → list across all workspaces
  *   GET  /api/issues/:wsId/:id      → one issue's detail { issue, runs, inboxReports }
+ *   POST /api/issues/:wsId/:id/retry → rerun the latest failed/interrupted schedule now
  *
  * Phase 2b adds the human/UI WRITE path (the agent edits the files directly /
  * via its own tools). Both writes go through the shared mutation helper
@@ -36,7 +37,12 @@ import {
 import { appendIssueComment, updateIssueFields } from '../../workspaces/issues/mutate.js'
 import { isAgentRuntime } from '../../workspaces/cli-adapter.js'
 import { logger as launcherLogger } from '../../workspaces/logger.js'
-import type { WorkspaceService } from '../../workspaces/service.js'
+import {
+  HeadlessCapacityError,
+  HeadlessResumeError,
+  IssueRetryError,
+  type WorkspaceService,
+} from '../../workspaces/service.js'
 
 /** Upper bound on a single comment's text (matches the headless seed cap). */
 const MAX_COMMENT = 16000
@@ -70,6 +76,36 @@ export function createIssuesRoutes(svc: WorkspaceService): Hono {
     const detail = await svc.issueDetail(c.req.param('wsId'), c.req.param('id'))
     if (!detail) return c.json({ error: 'not_found' }, 404)
     return c.json(detail)
+  })
+
+  // POST /api/issues/:wsId/:id/retry — the UI never supplies a prompt, runtime,
+  // owner, or timeout. The service re-reads the live Issue and reuses the same
+  // dispatch path as the scheduler without advancing its next-fire marker.
+  app.post('/:wsId/:id/retry', async (c) => {
+    const wsId = c.req.param('wsId')
+    const id = c.req.param('id')
+    if (!validId(wsId) || !validId(id)) return c.json({ error: 'not_found' }, 404)
+    try {
+      return c.json(await svc.retryIssue(wsId, id), 202)
+    } catch (err) {
+      if (err instanceof IssueRetryError) {
+        const status = err.code === 'not_found' ? 404
+          : err.code === 'not_scheduled' ? 422
+          : 409
+        return c.json({ error: err.code, message: err.message }, status)
+      }
+      if (err instanceof HeadlessCapacityError) {
+        return c.json({ error: 'capacity_reached', message: err.message }, 429)
+      }
+      if (err instanceof HeadlessResumeError) {
+        return c.json({ error: err.code, message: err.message }, 409)
+      }
+      launcherLogger.warn('issue.retry_failed', { wsId, id, err })
+      return c.json({
+        error: 'retry_failed',
+        message: err instanceof Error ? err.message : String(err),
+      }, 500)
+    }
   })
 
   // PATCH /api/issues/:wsId/:id — patch board fields { status?, priority?,

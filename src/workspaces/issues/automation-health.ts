@@ -1,5 +1,6 @@
 import type { HeadlessTaskStatus } from '../headless-task-registry.js'
 import type { IssueStatus } from './declaration.js'
+import type { IssueRunFailure } from './run-failure.js'
 
 /** Operational state of a scheduled Issue. This is a live projection, never a
  * field persisted into the agent-editable markdown file: workflow status says
@@ -11,6 +12,7 @@ export type IssueAutomationHealthState =
   | 'due'
   | 'running'
   | 'healthy'
+  | 'interrupted'
   | 'failed'
   | 'blocked'
 
@@ -29,7 +31,7 @@ export interface IssueAutomationHealthInput {
   nowMs: number
   nextDueAtMs: number | null
   ownerState: IssueAutomationOwnerState
-  latestRun?: { taskId: string; status: HeadlessTaskStatus }
+  latestRun?: { taskId: string; status: HeadlessTaskStatus; failure?: IssueRunFailure }
 }
 
 /** Derive one scheduler-health answer from authoritative stores. Ordering is
@@ -56,8 +58,19 @@ export function issueAutomationHealth(input: IssueAutomationHealthInput): IssueA
   if (input.ownerState === 'unbound') {
     return withLatest({ state: 'blocked', message: 'Assigned Session has no resumable runtime conversation yet.' })
   }
-  if (latest?.status === 'failed' || latest?.status === 'interrupted') {
-    return { state: 'failed', message: `Latest scheduled run ${latest.status}.`, latestTaskId: latest.taskId }
+  if (latest?.status === 'interrupted' || latest?.failure?.kind === 'system_paused') {
+    return {
+      state: 'interrupted',
+      message: latest.failure?.message ?? 'OpenAlice stopped while the latest scheduled run was active. It was not automatically retried.',
+      latestTaskId: latest.taskId,
+    }
+  }
+  if (latest?.status === 'failed') {
+    return {
+      state: 'failed',
+      message: latest.failure?.message ?? 'Latest scheduled run failed. Inspect its Activity entry, then retry when ready.',
+      latestTaskId: latest.taskId,
+    }
   }
   if (input.nextDueAtMs === null) {
     return withLatest({ state: 'blocked', message: 'Schedule has no future fire. Check its expression and timestamp.' })
