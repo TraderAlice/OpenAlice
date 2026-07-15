@@ -23,6 +23,7 @@
 
 import { app, BrowserWindow, dialog, Menu, protocol, session } from 'electron'
 import { runRendererTradingModeSmoke } from './trading-mode-smoke.js'
+import { runRendererDataHomeSmoke } from './data-home-smoke.js'
 import { runRendererWorkspaceAcceptanceSmoke } from './workspace-acceptance-smoke.js'
 import { planUTATransition } from './uta-lifecycle.js'
 import {
@@ -35,6 +36,7 @@ import {
   type RuntimeProcessLock,
 } from '@traderalice/guardian-runtime'
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { mkdir, readFile, watch, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { homedir } from 'node:os'
@@ -45,6 +47,14 @@ import { configureAutoUpdate } from './auto-update.js'
 import { fetchAliceWebRequest, handleOpenAliceIpcMessage, registerOpenAliceIpc } from './ipc.js'
 import { resolveManagedRuntimeEnv } from './managed-runtime.js'
 import { proxyEnvFromRules } from './proxy-env.js'
+import { rememberDataHome, writeDataHomePreferences } from './data-home.js'
+import {
+  chooseDataHomeDirectory,
+  createDesktopDataHomeController,
+  dataHomeErrorDetail,
+  resolveDesktopDataHome,
+  type ResolvedDesktopDataHome,
+} from './data-home-desktop.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -57,6 +67,7 @@ let restartingUTA = false
 let restartingConnector = false
 let pendingUTAMode: GuardianTradingModePlan | null = null
 let rendererOnboardingSmokeStarted = false
+let rendererDataHomeSmokeStarted = false
 let rendererTradingModeSmokeStarted = false
 let rendererWorkspaceAcceptanceSmokeStarted = false
 let guardianRuntimeLock: RuntimeProcessLock | null = null
@@ -66,6 +77,7 @@ const READY_TIMEOUT_MS = 30_000
 const UTA_READY_TIMEOUT_MS = 15_000
 const SIGTERM_GRACE_MS = 5_000
 const UTA_RESTART_GRACE_MS = 8_000
+const DATA_HOME_PREFERENCES_FILE = 'openalice-data-home.json'
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -373,7 +385,18 @@ async function runRendererOnboardingSmoke(win: BrowserWindow): Promise<void> {
     }
     const credentialPrimary = () => document.querySelector('[data-testid="credential-modal-primary"]')
 
-    await waitFor('Electron preload bridge', () => Boolean(window.openAlice?.runtime && window.openAlice?.pty))
+    await waitFor('Electron preload bridge', () => Boolean(
+      window.openAlice?.runtime && window.openAlice?.pty && window.openAlice?.dataHome
+    ))
+
+    const runtimeInfo = await window.openAlice.runtime.info()
+    const dataHomeStatus = await window.openAlice.dataHome.getStatus()
+    if (dataHomeStatus.currentHome !== runtimeInfo.userDataHome) {
+      throw new Error('data-home bridge disagrees with runtime info')
+    }
+    if (dataHomeStatus.source !== 'environment' || dataHomeStatus.selectionLock !== 'openalice-home-env') {
+      throw new Error('isolated packaged smoke should be locked by OPENALICE_HOME')
+    }
 
     const agents = await json(await fetch('/api/workspaces/agents'))
     const pi = agents.agents?.find((agent) => agent.id === 'pi')
@@ -448,6 +471,7 @@ async function runRendererOnboardingSmoke(win: BrowserWindow): Promise<void> {
       runtimeStatus: piReady.status,
       runtimeSource: piReady.source,
       tradingMode: tradingStatus.mode,
+      dataHome: dataHomeStatus.currentHome,
     }
   })()`, true) as {
     ok?: boolean
@@ -456,9 +480,10 @@ async function runRendererOnboardingSmoke(win: BrowserWindow): Promise<void> {
     runtimeStatus?: string
     runtimeSource?: string
     tradingMode?: string
+    dataHome?: string
   }
   console.log(
-    `[guardian] electron smoke onboarding → ok step=${result.step ?? ''} mode=${result.tradingMode ?? ''} pi=${result.piPath ?? 'managed'} runtime=${result.runtimeStatus ?? ''}/${result.runtimeSource ?? ''}`,
+    `[guardian] electron smoke onboarding → ok step=${result.step ?? ''} mode=${result.tradingMode ?? ''} pi=${result.piPath ?? 'managed'} runtime=${result.runtimeStatus ?? ''}/${result.runtimeSource ?? ''} data=${result.dataHome ?? ''}`,
   )
 }
 
@@ -473,15 +498,100 @@ app.whenReady().then(async () => {
   const utaEntry = resolve(repoRoot, 'services', 'uta', 'dist', 'uta.js')
   const connectorEntry = resolve(repoRoot, 'services', 'connector', 'dist', 'connector.cjs')
 
-  // Two homes — user data vs app resources. See src/core/paths.ts for why
-  // they're split. User data lives at ~/.openalice by default in BOTH branches
-  // — one store shared with `pnpm dev` and bare `pnpm start`, so accounts are
-  // configured once, not per topology. An explicit OPENALICE_HOME is honored
-  // for local packaged smoke tests, where we need app.isPackaged=true without
-  // touching the user's real store. App resources stay lifecycle-owned:
-  // .app/Contents/Resources when packaged, the repo in dev.
+  // User state and app resources have independent lifecycles. The desktop
+  // remembers its selected OpenAlice home under Electron's machine-local
+  // userData directory, because the selected home cannot safely own the
+  // pointer to itself. OPENALICE_HOME remains authoritative for automation and
+  // packaged smokes. App resources stay in the package (or repo in dev).
   const explicitUserDataHome = process.env['OPENALICE_HOME']?.trim()
-  const userDataHome = explicitUserDataHome || join(homedir(), '.openalice')
+  const defaultUserDataHome = join(homedir(), '.openalice')
+  const preferencePath = join(app.getPath('userData'), DATA_HOME_PREFERENCES_FILE)
+  let resolvedDataHome: ResolvedDesktopDataHome | null
+  try {
+    resolvedDataHome = await resolveDesktopDataHome({
+      defaultHome: defaultUserDataHome,
+      ...(explicitUserDataHome ? { explicitHome: explicitUserDataHome } : {}),
+      legacyDataPresent: app.isPackaged && existsSync(join(app.getPath('userData'), 'data')),
+      preferencePath,
+    })
+  } catch (error) {
+    dialog.showErrorBox(
+      'OpenAlice — data location failed',
+      `${dataHomeErrorDetail(error)}\n\nOpenAlice did not start or modify another data location.`,
+    )
+    app.quit()
+    return
+  }
+  if (!resolvedDataHome) {
+    app.quit()
+    return
+  }
+
+  let userDataHome = resolvedDataHome.home
+  let dataHomeSource = resolvedDataHome.source
+  let dataHomePreferences = resolvedDataHome.preferences
+  let selectedDefaultHome = resolvedDataHome.selectedDefault
+  const selectionLock = resolvedDataHome.selectionLock
+
+  // Resolve duplicate ownership before relocation, port reads, or any child
+  // process can mutate the selected store. An unlocked desktop launch can
+  // choose a different complete home instead of killing the existing owner.
+  let launcherRoot = process.env['AQ_LAUNCHER_ROOT']?.trim() || join(userDataHome, 'workspaces')
+  let takeover = takeoverRequested()
+  const guardianStartedAt = currentProcessStartedAt()
+  while (!takeover) {
+    const runtimeInspections = await inspectOpenAliceInstance({ userDataHome, launcherRoot })
+    const activeRuntime = runtimeInspections.find((row) => row.state === 'active' && row.owner)
+    if (!activeRuntime) break
+    const owner = activeRuntime.owner!
+    const staleDetail = activeRuntime.heartbeatStale
+      ? '\n\nThe process is still present, but its health heartbeat is stale.'
+      : ''
+    const canChooseAnother = selectionLock === null
+    const buttons = canChooseAnother
+      ? ['Keep existing instance', 'Choose another data location', 'Stop it and start this OpenAlice']
+      : ['Keep existing instance', 'Stop it and start this OpenAlice']
+    const { response } = await dialog.showMessageBox({
+      type: activeRuntime.heartbeatStale ? 'warning' : 'question',
+      title: 'OpenAlice is already running',
+      message: `Another OpenAlice ${owner.launcher} instance is using this data.`,
+      detail: `PID ${owner.pid}\nData: ${userDataHome}\nLast heartbeat: ${owner.heartbeatAt}${staleDetail}`,
+      buttons,
+      defaultId: activeRuntime.heartbeatStale ? buttons.length - 1 : 0,
+      cancelId: 0,
+      noLink: true,
+    })
+    if (response === 0) {
+      app.quit()
+      return
+    }
+    if (!canChooseAnother || response === 2) {
+      takeover = true
+      break
+    }
+
+    const chosen = await chooseDataHomeDirectory(userDataHome)
+    if (!chosen) continue
+    if (chosen.path === userDataHome) {
+      dialog.showErrorBox(
+        'OpenAlice — choose another location',
+        'That folder is the data location already owned by the running instance.',
+      )
+      continue
+    }
+    try {
+      dataHomePreferences = rememberDataHome(dataHomePreferences, chosen.path, { startupPromptCompleted: true })
+      await writeDataHomePreferences(preferencePath, dataHomePreferences)
+    } catch (error) {
+      dialog.showErrorBox('OpenAlice — could not remember data location', dataHomeErrorDetail(error))
+      continue
+    }
+    userDataHome = chosen.path
+    launcherRoot = join(userDataHome, 'workspaces')
+    dataHomeSource = 'desktop-preference'
+    selectedDefaultHome = false
+  }
+
   const homeEnv = app.isPackaged
     ? {
         OPENALICE_HOME: userDataHome,
@@ -495,38 +605,6 @@ app.whenReady().then(async () => {
         OPENALICE_HOME: userDataHome,
         OPENALICE_APP_HOME: repoRoot,
       }
-
-  // Resolve duplicate ownership before relocation, port reads, or any child
-  // process can mutate the selected store.
-  const launcherRoot = process.env['AQ_LAUNCHER_ROOT']?.trim() || join(userDataHome, 'workspaces')
-  let takeover = takeoverRequested()
-  const guardianStartedAt = currentProcessStartedAt()
-  const runtimeInspections = await inspectOpenAliceInstance({
-    userDataHome,
-    launcherRoot,
-  })
-  const activeRuntime = runtimeInspections.find((row) => row.state === 'active' && row.owner)
-  if (activeRuntime && !takeover) {
-    const owner = activeRuntime.owner!
-    const staleDetail = activeRuntime.heartbeatStale
-      ? '\n\nThe process is still present, but its health heartbeat is stale.'
-      : ''
-    const { response } = await dialog.showMessageBox({
-      type: activeRuntime.heartbeatStale ? 'warning' : 'question',
-      title: 'OpenAlice is already running',
-      message: `Another OpenAlice ${owner.launcher} instance is using this data.`,
-      detail: `PID ${owner.pid}\nData: ${userDataHome}\nLast heartbeat: ${owner.heartbeatAt}${staleDetail}`,
-      buttons: ['Keep existing instance', 'Stop it and start this OpenAlice'],
-      defaultId: activeRuntime.heartbeatStale ? 1 : 0,
-      cancelId: 0,
-      noLink: true,
-    })
-    if (response !== 1) {
-      app.quit()
-      return
-    }
-    takeover = true
-  }
   try {
     guardianRuntimeLock = await acquireGuardianRuntime({
       userDataHome,
@@ -554,7 +632,7 @@ app.whenReady().then(async () => {
   // backend boots (it would run migrations against an empty store). On
   // failure: surface and quit — booting beside the user's real data would
   // fork their trading history.
-  if (app.isPackaged && !explicitUserDataHome) {
+  if (app.isPackaged && !explicitUserDataHome && selectedDefaultHome) {
     try {
       await relocateLegacyData(app.getPath('userData'), userDataHome)
     } catch (err) {
@@ -714,6 +792,16 @@ app.whenReady().then(async () => {
   console.log(`[guardian] Tools    →  ${toolSocketPath}`)
   console.log(`[guardian] MCP      →  ${mcpPort !== null ? `http://127.0.0.1:${mcpPort}/mcp` : 'disabled'}`)
   console.log('')
+  let dataHomeRelaunchScheduled = false
+  const scheduleDataHomeRelaunch = (): void => {
+    if (dataHomeRelaunchScheduled) return
+    dataHomeRelaunchScheduled = true
+    setTimeout(() => {
+      if (appQuitting) return
+      app.relaunch()
+      shutdown()
+    }, 150)
+  }
   registerOpenAliceIpc({
     mode: launcherMode,
     userDataHome: homeEnv.OPENALICE_HOME,
@@ -722,6 +810,15 @@ app.whenReady().then(async () => {
     mcpPort,
     utaPort,
     getAliceProcess: () => alice,
+    dataHome: createDesktopDataHomeController({
+      currentHome: userDataHome,
+      defaultHome: defaultUserDataHome,
+      source: dataHomeSource,
+      selectionLock,
+      preferencePath,
+      initialPreferences: dataHomePreferences,
+      requestRelaunch: scheduleDataHomeRelaunch,
+    }),
   })
   protocol.handle('app', async (request) => {
     try {
@@ -808,7 +905,7 @@ app.whenReady().then(async () => {
     console.log(`[renderer] ${sourceId}:${line} ${message}`)
   })
   win.webContents.on('did-finish-load', () => {
-    void win.webContents.executeJavaScript('Boolean(window.openAlice?.pty && window.openAlice?.runtime)', true)
+    void win.webContents.executeJavaScript('Boolean(window.openAlice?.pty && window.openAlice?.runtime && window.openAlice?.dataHome)', true)
       .then((ready) => {
         console.log(`[guardian] renderer bridge → ${ready ? 'ready' : 'missing'}`)
         if (ready && process.env['OPENALICE_ELECTRON_SMOKE_PTY'] === '1') {
@@ -818,6 +915,23 @@ app.whenReady().then(async () => {
             })
             .catch((err) => {
               console.error(`[guardian] electron smoke pty → failed: ${err instanceof Error ? err.message : String(err)}`)
+              if (process.env['OPENALICE_ELECTRON_SMOKE_EXIT'] === '1') {
+                process.exitCode = 1
+                shutdown()
+              }
+            })
+        }
+        if (ready && process.env['OPENALICE_ELECTRON_SMOKE_DATA_HOME'] === '1' && !rendererDataHomeSmokeStarted) {
+          rendererDataHomeSmokeStarted = true
+          void runRendererDataHomeSmoke(win)
+            .then((result) => {
+              console.log(
+                `[guardian] electron smoke data home → ok source=${result.source} lock=${result.selectionLock ?? 'none'} data=${result.currentHome}`,
+              )
+              if (process.env['OPENALICE_ELECTRON_SMOKE_EXIT'] === '1') shutdown()
+            })
+            .catch((err) => {
+              console.error(`[guardian] electron smoke data home → failed: ${err instanceof Error ? err.message : String(err)}`)
               if (process.env['OPENALICE_ELECTRON_SMOKE_EXIT'] === '1') {
                 process.exitCode = 1
                 shutdown()

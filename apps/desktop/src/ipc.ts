@@ -24,6 +24,30 @@ export interface OpenAliceIpcOptions {
   readonly mcpPort: number | null
   readonly utaPort: number | null
   readonly getAliceProcess: () => ChildProcess | null
+  readonly dataHome: OpenAliceDataHomeController
+}
+
+export interface OpenAliceDataHomeStatus {
+  readonly currentHome: string
+  readonly defaultHome: string
+  readonly source: 'default' | 'desktop-preference' | 'environment'
+  readonly recentHomes: readonly string[]
+  readonly askOnStartup: boolean
+  readonly selectionLocked: boolean
+  readonly selectionLock: 'openalice-home-env' | 'workspace-root-env' | null
+}
+
+export interface OpenAliceDataHomeActionResult {
+  readonly outcome: 'cancelled' | 'restarting' | 'unchanged' | 'locked'
+  readonly status: OpenAliceDataHomeStatus
+}
+
+export interface OpenAliceDataHomeController {
+  getStatus(): OpenAliceDataHomeStatus
+  chooseAndRestart(): Promise<OpenAliceDataHomeActionResult>
+  useRecentAndRestart(path: string): Promise<OpenAliceDataHomeActionResult>
+  setAskOnStartup(enabled: boolean): Promise<OpenAliceDataHomeStatus>
+  openCurrent(): Promise<string>
 }
 
 const MSG_WEB_REQUEST = 'openalice:web:request'
@@ -159,6 +183,20 @@ export function registerOpenAliceIpc(opts: OpenAliceIpcOptions): void {
     userDataHome: opts.userDataHome,
     appHome: opts.appHome,
   }))
+
+  ipcMain.handle('openalice:data-home:get-status', () => opts.dataHome.getStatus())
+  ipcMain.handle('openalice:data-home:choose-and-restart', () => opts.dataHome.chooseAndRestart())
+  ipcMain.handle('openalice:data-home:use-recent-and-restart', (_event, path: unknown) => {
+    if (typeof path !== 'string' || path.length === 0 || path.length > 4096) {
+      throw new Error('invalid data-home path')
+    }
+    return opts.dataHome.useRecentAndRestart(path)
+  })
+  ipcMain.handle('openalice:data-home:set-ask-on-startup', (_event, enabled: unknown) => {
+    if (typeof enabled !== 'boolean') throw new Error('invalid ask-on-startup value')
+    return opts.dataHome.setAskOnStartup(enabled)
+  })
+  ipcMain.handle('openalice:data-home:open-current', () => opts.dataHome.openCurrent())
 
   ipcMain.handle('openalice:workspace:list-files', async (_event, input: unknown) => {
     const body = input && typeof input === 'object' ? input as Record<string, unknown> : {}

@@ -177,6 +177,8 @@ Read the relevant guide before editing its subsystem:
   atomic updates, PATH integration, installer tests, and release checks.
 - [[docs/local-runtime.md]] — [Local Runtime and CLI bootstrap](docs/local-runtime.md): source-backed
   localhost startup, dependency bootstrap, Runtime ownership, and the headless bundle boundary.
+- [[docs/data-locations.md]] — [Data locations](docs/data-locations.md): complete-home selection,
+  desktop launcher preferences, concurrent instances, and directory safety.
 - [[docs/docker-deployment.md]] — [Docker deployment](docs/docker-deployment.md): server image topology,
   remote-host safety, persistence, health, and container acceptance.
 - [[docs/remote-access.md]] — [Remote access](docs/remote-access.md): SSH tunnel experiment,

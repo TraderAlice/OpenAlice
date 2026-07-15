@@ -29,6 +29,20 @@ Source/dev and Docker installs are different deployment shapes. They do not
 inherit the packaged desktop's managed-agent promise and may require an agent
 CLI to be installed in the host environment or image.
 
+### Desktop data-location selection
+
+The desktop resolves the complete `OPENALICE_HOME` before acquiring runtime
+ownership or starting Alice/UTA. Fresh installs can choose a folder at startup;
+**Settings → General → Data location** can switch with a full restart, reopen a
+recent location, or ask on every launch. A duplicate-owner dialog can choose a
+different home instead of stopping the live instance.
+
+This launcher preference is stored under Electron `userData`, not inside the
+selected OpenAlice home and not inside portable `data/`. `OPENALICE_HOME` and
+`AQ_LAUNCHER_ROOT` environment overrides lock the desktop selector. Switching
+never copies or moves data. Follow [[docs/data-locations.md]] for precedence,
+concurrent-instance semantics, missing-drive behavior, and verification.
+
 ## Current Platform Payloads
 
 ### macOS packaged app

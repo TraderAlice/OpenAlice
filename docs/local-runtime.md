@@ -91,6 +91,18 @@ openalice start --home /tmp/openalice-test-home --port 41000
 openalice start /path/to/OpenAlice
 ```
 
+For concurrent source worktrees, select a complete home outside the checkout:
+
+```bash
+pnpm dev -- --home ~/.openalice-dev/feature-a
+pnpm dev -- --home ~/.openalice-dev/feature-b
+```
+
+The development `--home` override takes precedence over `OPENALICE_HOME` and
+moves the same complete boundary as `openalice start --home`: product data,
+Workspaces, runtime locks, credentials, and optional Broker Packs. See
+[[docs/data-locations.md]].
+
 Use `--rebuild` after pulling source changes when existing build artifacts may
 be stale. Never use a real user-state root for launcher or recovery tests.
 

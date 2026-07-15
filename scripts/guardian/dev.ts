@@ -45,6 +45,7 @@ import {
   buildTsxWatchArgs,
   isBackendHotReloadEnabled,
 } from './dev-hot-reload.js'
+import { parseDevGuardianOptions } from './dev-options.js'
 
 let guardianRuntimeLock: RuntimeProcessLock | null = null
 
@@ -55,10 +56,12 @@ async function releaseGuardianRuntimeLock(): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  const options = parseDevGuardianOptions(process.argv.slice(2))
   // One global store by default (~/.openalice) — shared with the packaged
-  // app. `OPENALICE_HOME=$PWD pnpm dev` pins a checkout-local store for
-  // experiments that shouldn't touch real data.
-  const dataHome = process.env['OPENALICE_HOME'] ?? resolve(homedir(), '.openalice')
+  // app. --home is the ergonomic per-checkout override; OPENALICE_HOME stays
+  // available for scripts and automation.
+  const dataHome = options.home ?? process.env['OPENALICE_HOME'] ?? resolve(homedir(), '.openalice')
+  const explicitDataHome = options.home !== null || Boolean(process.env['OPENALICE_HOME'])
   const launcherRoot = process.env['AQ_LAUNCHER_ROOT'] ?? resolve(dataHome, 'workspaces')
   const takeover = takeoverRequested()
   const guardianStartedAt = currentProcessStartedAt()
@@ -82,7 +85,7 @@ async function main(): Promise<void> {
       if (owner) {
         console.error(`[guardian] owner     → ${owner.launcher} pid=${owner.pid} heartbeat=${owner.heartbeatAt}`)
       }
-      console.error('[guardian] keep the existing instance, or run `pnpm dev --takeover` to stop it and start this checkout')
+      console.error('[guardian] keep the existing instance, use `pnpm dev -- --home <path>` for an isolated checkout, or run `pnpm dev --takeover` to replace it')
       process.exitCode = 2
       return
     }
@@ -94,7 +97,7 @@ async function main(): Promise<void> {
   // and the global one is still virgin. Never auto-move — multiple worktrees
   // may each carry a ./data and only the user knows which is canonical.
   if (
-    !process.env['OPENALICE_HOME'] &&
+    !explicitDataHome &&
     existsSync(resolve(process.cwd(), 'data', 'config')) &&
     !existsSync(resolve(dataHome, 'data', 'config'))
   ) {
@@ -229,7 +232,7 @@ async function main(): Promise<void> {
   const aliceReady = await waitForHttp(`http://127.0.0.1:${ports.webPort}/api/version`, { timeoutMs: 20_000 })
   if (!aliceReady) {
     console.error(`[guardian] Alice failed to come up within 20s — aborting before Vite starts`)
-    console.error(`[guardian] If another process won a startup race, rerun with --takeover or use an isolated OPENALICE_HOME.`)
+    console.error('[guardian] If another process won a startup race, rerun with --takeover or use `pnpm dev -- --home <path>`.')
     try { alice.kill('SIGTERM') } catch { /* noop */ }
     try { uta?.process.kill('SIGTERM') } catch { /* noop */ }
     try { connector?.process.kill('SIGTERM') } catch { /* noop */ }

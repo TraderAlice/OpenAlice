@@ -65,6 +65,171 @@ function LanguageSection() {
   )
 }
 
+// ==================== Data location ====================
+
+export function DataHomeSection() {
+  const { t } = useTranslation()
+  const bridge = window.openAlice?.dataHome
+  const [status, setStatus] = useState<OpenAliceDataHomeStatus | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [restarting, setRestarting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!bridge) return
+    bridge.getStatus()
+      .then(setStatus)
+      .catch(() => setError(t('settings.dataHome.loadError')))
+  }, [bridge, t])
+
+  if (!bridge) {
+    return (
+      <ConfigSection
+        title={t('settings.dataHome.title')}
+        description={t('settings.dataHome.description')}
+      >
+        <div className="rounded-lg border border-border/60 bg-bg-secondary/50 px-3 py-3">
+          <p className="text-[13px] text-text">{t('settings.dataHome.browserOnly')}</p>
+          <p className="mt-2 break-all font-mono text-[12px] text-text-muted">
+            openalice start --home &lt;path&gt;
+          </p>
+          <p className="mt-1 break-all font-mono text-[12px] text-text-muted">
+            pnpm dev -- --home &lt;path&gt;
+          </p>
+        </div>
+      </ConfigSection>
+    )
+  }
+
+  const runAction = async (action: () => Promise<OpenAliceDataHomeActionResult>) => {
+    setBusy(true)
+    setError(null)
+    try {
+      const result = await action()
+      setStatus(result.status)
+      if (result.outcome === 'restarting') setRestarting(true)
+    } catch {
+      setError(t('settings.dataHome.actionError'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const updateAskOnStartup = async (enabled: boolean) => {
+    setBusy(true)
+    setError(null)
+    try {
+      setStatus(await bridge.setAskOnStartup(enabled))
+    } catch {
+      setError(t('settings.dataHome.actionError'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const lockDescription = status?.selectionLock === 'openalice-home-env'
+    ? t('settings.dataHome.lockedByHome')
+    : status?.selectionLock === 'workspace-root-env'
+      ? t('settings.dataHome.lockedByWorkspace')
+      : null
+  const recentHomes = status?.recentHomes.filter((path) => path !== status.currentHome) ?? []
+
+  return (
+    <ConfigSection
+      title={t('settings.dataHome.title')}
+      description={t('settings.dataHome.description')}
+    >
+      <div className="rounded-lg border border-border/60 bg-bg-secondary/50 px-3 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-[11px] uppercase tracking-wide text-text-muted">
+            {t('settings.dataHome.current')}
+          </p>
+          {status && (
+            <span className="rounded-full border border-border px-2 py-0.5 text-[10px] text-text-muted">
+              {t(`settings.dataHome.source.${status.source}`)}
+            </span>
+          )}
+        </div>
+        <p data-testid="data-home-current" className="mt-1 break-all font-mono text-[12px] text-text">
+          {status?.currentHome ?? t('settings.dataHome.loading')}
+        </p>
+        <p className="mt-2 text-[11px] leading-relaxed text-text-muted">
+          {t('settings.dataHome.switchNote')}
+        </p>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          className="btn-secondary-sm"
+          disabled={!status || busy}
+          onClick={() => void bridge.openCurrent()
+            .then((message) => { if (message) setError(t('settings.dataHome.openError')) })
+            .catch(() => setError(t('settings.dataHome.openError')))}
+        >
+          {t('settings.dataHome.open')}
+        </button>
+        <button
+          data-testid="data-home-choose"
+          type="button"
+          className="btn-primary-sm"
+          disabled={!status || busy || restarting || status.selectionLocked}
+          onClick={() => void runAction(() => bridge.chooseAndRestart())}
+        >
+          {restarting ? t('settings.dataHome.restarting') : t('settings.dataHome.chooseAndRestart')}
+        </button>
+      </div>
+
+      <div className="mt-4 flex items-center justify-between gap-4 rounded-lg border border-border/60 px-3 py-2.5">
+        <div className="flex-1">
+          <p className="text-[13px] font-medium text-text">{t('settings.dataHome.askOnStartup')}</p>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-text-muted">
+            {t('settings.dataHome.askOnStartupDescription')}
+          </p>
+        </div>
+        <Toggle
+          checked={status?.askOnStartup ?? false}
+          disabled={!status || busy || status.selectionLocked}
+          ariaLabel={t('settings.dataHome.askOnStartup')}
+          onChange={(enabled) => void updateAskOnStartup(enabled)}
+        />
+      </div>
+
+      {recentHomes.length > 0 && (
+        <div className="mt-4">
+          <p className="mb-2 text-[11px] uppercase tracking-wide text-text-muted">
+            {t('settings.dataHome.recent')}
+          </p>
+          <div className="space-y-2">
+            {recentHomes.map((path) => (
+              <div key={path} className="flex items-center gap-2 rounded-lg border border-border/60 px-3 py-2">
+                <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-text" title={path}>
+                  {path}
+                </span>
+                <button
+                  type="button"
+                  className="btn-secondary-sm shrink-0"
+                  disabled={busy || restarting || status?.selectionLocked}
+                  onClick={() => void runAction(() => bridge.useRecentAndRestart(path))}
+                >
+                  {t('settings.dataHome.useAndRestart')}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {lockDescription && (
+        <p className="mt-3 rounded-lg border border-yellow/30 bg-yellow/5 px-3 py-2 text-[11px] leading-relaxed text-yellow">
+          {lockDescription}
+        </p>
+      )}
+      {error && <p className="mt-3 text-[11px] text-red">{error}</p>}
+    </ConfigSection>
+  )
+}
+
 // ==================== Windows workspace shell ====================
 
 function WorkspaceShellSection() {
@@ -186,6 +351,9 @@ function SettingsSection() {
 
         {/* Language */}
         <LanguageSection />
+
+        {/* Complete OpenAlice home + runtime lock boundary */}
+        <DataHomeSection />
 
         {/* Windows-only workspace shell */}
         <WorkspaceShellSection />

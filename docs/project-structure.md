@@ -6,6 +6,7 @@ new long-lived process, package, or state root is introduced.
 
 Related guides: [[docs/managed-workspace-runtime.md]],
 [[docs/cli-installer.md]], [[docs/local-runtime.md]], [[docs/broker-packs.md]],
+[[docs/data-locations.md]],
 [[docs/docker-deployment.md]],
 [[docs/workspace-lifecycle.md]],
 [[docs/workspace-template-upgrade.md]],
@@ -213,6 +214,12 @@ materialized once and then reused as a normal Session for follow-up.
 `~/.openalice`. Guardian injects the resolved value into child processes so the
 launcher and services agree.
 
+The desktop may select another complete root before Guardian ownership is
+acquired. Its machine-local path preference lives under Electron `userData`,
+outside every selectable root; see [[docs/data-locations.md]]. Never implement
+selection by moving only `data/`, because Workspaces, locks, credentials,
+sealing, and Broker Packs must remain coherent.
+
 ```text
 <OPENALICE_HOME>/
 ├── data/                      portable user data
@@ -268,6 +275,7 @@ generated `src/migrations/INDEX.md`.
 | Retired event-bus scheduler and UTA journal boundary | [Event-system retirement note](event-system.md) |
 | User-state schema | `src/migrations/` + generated migration index |
 | Process lock/recovery and optional-service supervision | `packages/guardian-runtime/` and all three launchers |
+| Desktop home selection and concurrent local instances | [Data locations](data-locations.md) + `apps/desktop/src/data-home.ts` |
 
 When current code disagrees with this guide, verify the runtime behavior and
 update the guide in the same change rather than leaving a second source of

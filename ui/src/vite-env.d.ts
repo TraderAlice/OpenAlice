@@ -37,6 +37,13 @@ interface Window {
         appHome: string
       }>
     }
+    readonly dataHome: {
+      getStatus(): Promise<OpenAliceDataHomeStatus>
+      chooseAndRestart(): Promise<OpenAliceDataHomeActionResult>
+      useRecentAndRestart(path: string): Promise<OpenAliceDataHomeActionResult>
+      setAskOnStartup(enabled: boolean): Promise<OpenAliceDataHomeStatus>
+      openCurrent(): Promise<string>
+    }
     readonly updater?: {
       getStatus(): Promise<
         | { phase: 'available'; version?: string; releaseUrl?: string }
@@ -96,4 +103,19 @@ interface Window {
       ): () => void
     }
   }
+}
+
+interface OpenAliceDataHomeStatus {
+  readonly currentHome: string
+  readonly defaultHome: string
+  readonly source: 'default' | 'desktop-preference' | 'environment'
+  readonly recentHomes: readonly string[]
+  readonly askOnStartup: boolean
+  readonly selectionLocked: boolean
+  readonly selectionLock: 'openalice-home-env' | 'workspace-root-env' | null
+}
+
+interface OpenAliceDataHomeActionResult {
+  readonly outcome: 'cancelled' | 'restarting' | 'unchanged' | 'locked'
+  readonly status: OpenAliceDataHomeStatus
 }

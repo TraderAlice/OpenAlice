@@ -111,6 +111,15 @@ const api = {
   runtime: {
     info: () => ipcRenderer.invoke('openalice:runtime:info'),
   },
+  dataHome: {
+    getStatus: () => ipcRenderer.invoke('openalice:data-home:get-status'),
+    chooseAndRestart: () => ipcRenderer.invoke('openalice:data-home:choose-and-restart'),
+    useRecentAndRestart: (path: string) =>
+      ipcRenderer.invoke('openalice:data-home:use-recent-and-restart', path),
+    setAskOnStartup: (enabled: boolean) =>
+      ipcRenderer.invoke('openalice:data-home:set-ask-on-startup', enabled),
+    openCurrent: () => ipcRenderer.invoke('openalice:data-home:open-current'),
+  },
   updater: {
     getStatus: () => ipcRenderer.invoke('openalice:updater:get-status'),
     onStatus: (cb: (status: UpdaterStatus) => void) => {
