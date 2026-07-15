@@ -20,7 +20,7 @@ import { PageHeader } from '../components/PageHeader'
 import { Skeleton } from '../components/StateViews'
 import { MarkdownContent } from '../components/MarkdownContent'
 import { FileContentView } from '../components/FileContentView'
-import { InquiryPanel } from '../components/InquiryPanel'
+import { InboxReplyThread } from '../components/InboxReplyThread'
 import { api } from '../api'
 import { inboxLive, refreshInbox, removeInboxOptimistically } from '../live/inbox'
 import { useInboxSelection } from '../live/inbox-selection'
@@ -308,17 +308,44 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
               {formatRelativeTime(entry.ts)}
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onDelete}
-            className="oa-pressable -mr-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-muted/45 hover:bg-red/10 hover:text-red"
-            title={t('inbox.deleteEntryTitle')}
-            aria-label={t('inbox.deleteEntryAriaLabel')}
-          >
-            <Trash2 size={14} strokeWidth={1.75} />
-          </button>
+          <div className="-mr-1 flex shrink-0 items-center gap-1">
+            {wsAlive && (
+              <button
+                type="button"
+                onClick={() => void continueOrigin()}
+                disabled={continuing}
+                className="oa-pressable inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-bg px-2 text-[11px] font-medium text-text-muted hover:border-accent/35 hover:text-accent disabled:cursor-not-allowed disabled:opacity-45 sm:px-2.5"
+                title={canContinueOrigin ? t('inbox.openConversation') : t('inbox.openWorkspace')}
+                aria-label={canContinueOrigin ? t('inbox.openConversation') : t('inbox.openWorkspace')}
+              >
+                {canContinueOrigin
+                  ? <Terminal size={13} strokeWidth={1.75} aria-hidden />
+                  : <MessageSquare size={13} strokeWidth={1.75} aria-hidden />}
+                <span className="hidden sm:inline">
+                  {continuing
+                    ? t('inbox.continuingSession')
+                    : canContinueOrigin
+                      ? t('inbox.openConversation')
+                      : t('inbox.openWorkspace')}
+                </span>
+                <span className="sm:hidden">
+                  {canContinueOrigin ? t('inbox.openConversationShort') : t('inbox.openWorkspaceShort')}
+                </span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onDelete}
+              className="oa-pressable inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-muted/45 hover:bg-red/10 hover:text-red"
+              title={t('inbox.deleteEntryTitle')}
+              aria-label={t('inbox.deleteEntryAriaLabel')}
+            >
+              <Trash2 size={14} strokeWidth={1.75} />
+            </button>
+          </div>
         </div>
       </header>
+      {continueError && <div className="-mt-3 mb-5 text-[12px] text-red">{continueError}</div>}
 
       {/* The sender's message is the Inbox asset's primary content. */}
       {hasComments && (
@@ -353,36 +380,12 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
       )}
 
       {wsAlive ? (
-        <>
-          <InquiryPanel
-            title={hasSenderIdentity ? t('inbox.followUpSender') : t('inbox.followUpWorkspace')}
-            description={hasSenderIdentity
-              ? t('inbox.followUpSenderDescription')
-              : t('inbox.followUpWorkspaceDescription', { workspace: displayLabel })}
-            actionLabel={hasSenderIdentity ? t('inbox.askInBackground') : t('inbox.askWorkspace')}
-            placeholder={t('inbox.followUpPlaceholder')}
-            load={loadInquiries}
-            ask={askInbox}
-            controls={(
-              <button
-                type="button"
-                onClick={() => void continueOrigin()}
-                disabled={continuing}
-                className="oa-pressable inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-bg px-2.5 text-[11px] font-medium text-text-muted hover:border-accent/35 hover:text-accent disabled:cursor-not-allowed disabled:opacity-45"
-              >
-                {canContinueOrigin
-                  ? <Terminal size={13} strokeWidth={1.75} aria-hidden />
-                  : <MessageSquare size={13} strokeWidth={1.75} aria-hidden />}
-                {continuing
-                  ? t('inbox.continuingSession')
-                  : canContinueOrigin
-                    ? t('inbox.openConversation')
-                    : t('inbox.openWorkspace')}
-              </button>
-            )}
-          />
-          {continueError && <div className="mt-2 text-[12px] text-red">{continueError}</div>}
-        </>
+        <InboxReplyThread
+          sender={origin?.agent ?? senderSignature ?? displayLabel}
+          hasExactSender={hasSenderIdentity}
+          load={loadInquiries}
+          ask={askInbox}
+        />
       ) : (
         <div className="mt-8 border-t border-border/50 pt-4 text-[12px] italic text-text-muted/60">
           {t('inbox.cannotReplyWorkspaceGone')}

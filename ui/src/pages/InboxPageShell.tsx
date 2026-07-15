@@ -15,7 +15,7 @@ export function InboxPageShell({ children }: InboxPageShellProps) {
       title={t('nav.item.inbox')}
       defaultWidth={260}
       actions={<InboxViewToggle />}
-      sidebar={<InboxSidebar />}
+      sidebar={({ closeMobileDrawer }) => <InboxSidebar onNavigate={closeMobileDrawer} />}
     >
       {children}
     </PageSidebarLayout>

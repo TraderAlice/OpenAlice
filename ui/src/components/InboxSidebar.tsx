@@ -23,7 +23,7 @@ import type { InboxEntry } from '../api/inbox'
  * so clustering is a sidebar affordance, not a merge. Selecting a row
  * marks just that push read; j/k walks the currently-displayed order.
  */
-export function InboxSidebar() {
+export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   const { t } = useTranslation()
   const entries = inboxLive.useStore((s) => s.entries)
   const loading = inboxLive.useStore((s) => s.loading)
@@ -52,6 +52,7 @@ export function InboxSidebar() {
   const selectAndRead = (id: string) => {
     select(id)
     markRead(id)
+    onNavigate?.()
   }
 
   // Default-select the first row on first non-empty load. Latch once.

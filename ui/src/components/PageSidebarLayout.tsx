@@ -65,9 +65,14 @@ interface PageSidebarLayoutProps {
   storageKey: string
   title: string
   actions?: ReactNode
-  sidebar: ReactNode
+  sidebar: ReactNode | ((controls: PageSidebarControls) => ReactNode)
   children: ReactNode
   defaultWidth?: number
+}
+
+export interface PageSidebarControls {
+  /** Close the phone drawer after a business object is selected. No-op on desktop. */
+  closeMobileDrawer: () => void
 }
 
 /**
@@ -96,6 +101,10 @@ export function PageSidebarLayout({
   )
   const maxWidth = responsiveMaxWidth(containerWidth)
   const width = Math.min(preferredWidth, maxWidth)
+  const closeMobileDrawer = useCallback(() => setDrawerOpen(false), [])
+  const sidebarContent = typeof sidebar === 'function'
+    ? sidebar({ closeMobileDrawer })
+    : sidebar
 
   const persistWidth = useCallback((next: number) => {
     window.localStorage.setItem(storageName(storageKey), String(next))
@@ -176,7 +185,7 @@ export function PageSidebarLayout({
 
   const sidebarPanel = (
     <Sidebar title={title} actions={desktopActions}>
-      {sidebar}
+      {sidebarContent}
     </Sidebar>
   )
 
@@ -245,6 +254,8 @@ export function PageSidebarLayout({
         onClick={() => setDrawerOpen(false)}
       />
       <div
+        data-testid="page-sidebar-drawer"
+        data-state={drawerOpen ? 'open' : 'closed'}
         className={`absolute inset-y-0 left-0 z-40 w-[280px] max-w-[85vw] transition-transform duration-200 ${
           drawerOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
@@ -263,7 +274,7 @@ export function PageSidebarLayout({
             </button>
           }
         >
-          {sidebar}
+          {sidebarContent}
         </Sidebar>
       </div>
     </div>

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { Bot, LoaderCircle, MessageSquareText, Send } from 'lucide-react'
 
 import type { InquiryRecord } from '../api/inquiries'
+import { useInquiryThread } from '../hooks/useInquiryThread'
 import { formatRelativeTime } from '../lib/intl'
 import { MarkdownContent } from './MarkdownContent'
 
@@ -72,63 +73,7 @@ export function InquiryPanel({
   load: () => Promise<InquiryRecord[]>
   ask: (prompt: string) => Promise<unknown>
 }) {
-  const [records, setRecords] = useState<InquiryRecord[]>([])
-  const [loading, setLoading] = useState(true)
-  const [prompt, setPrompt] = useState('')
-  const [sending, setSending] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const refresh = useCallback(async () => {
-    try {
-      const next = await load()
-      setRecords(next)
-      setError(null)
-      return next
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
-      return []
-    } finally {
-      setLoading(false)
-    }
-  }, [load])
-
-  useEffect(() => {
-    let live = true
-    setLoading(true)
-    void load().then((next) => {
-      if (live) {
-        setRecords(next)
-        setError(null)
-      }
-    }).catch((err) => {
-      if (live) setError(err instanceof Error ? err.message : String(err))
-    }).finally(() => {
-      if (live) setLoading(false)
-    })
-    return () => { live = false }
-  }, [load])
-
-  useEffect(() => {
-    if (!records.some((record) => record.status === 'running')) return
-    const timer = window.setInterval(() => { void refresh() }, 1500)
-    return () => window.clearInterval(timer)
-  }, [records, refresh])
-
-  const submit = async () => {
-    const question = prompt.trim()
-    if (!question || sending) return
-    setSending(true)
-    setError(null)
-    try {
-      await ask(question)
-      setPrompt('')
-      await refresh()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setSending(false)
-    }
-  }
+  const thread = useInquiryThread({ load, ask })
 
   return (
     <section id="inquiries" className="mt-8 rounded-xl border border-border bg-bg-tertiary/20 p-4">
@@ -146,35 +91,35 @@ export function InquiryPanel({
       <div className="mt-3 flex items-end gap-2">
         <textarea
           rows={2}
-          value={prompt}
-          disabled={sending}
+          value={thread.prompt}
+          disabled={thread.sending}
           placeholder={placeholder}
-          onChange={(event) => setPrompt(event.target.value)}
+          onChange={(event) => thread.setPrompt(event.target.value)}
           onKeyDown={(event) => {
             if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
               event.preventDefault()
-              void submit()
+              void thread.submit()
             }
           }}
           className="min-h-[68px] min-w-0 flex-1 resize-y rounded-lg border border-border bg-bg px-3 py-2 text-[13px] text-text outline-none transition-colors focus:border-accent/60 disabled:opacity-50"
         />
         <button
           type="button"
-          onClick={() => void submit()}
-          disabled={sending || prompt.trim().length === 0}
+          onClick={() => void thread.submit()}
+          disabled={thread.sending || thread.prompt.trim().length === 0}
           className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-medium text-bg transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {sending ? <LoaderCircle size={13} className="animate-spin" /> : <Send size={13} />}
-          {sending ? 'Dispatching…' : actionLabel}
+          {thread.sending ? <LoaderCircle size={13} className="animate-spin" /> : <Send size={13} />}
+          {thread.sending ? 'Dispatching…' : actionLabel}
         </button>
       </div>
-      {error && <p className="mt-2 text-[12px] text-red-400">{error}</p>}
+      {thread.error && <p className="mt-2 text-[12px] text-red-400">{thread.error}</p>}
 
-      {loading && records.length === 0 ? (
+      {thread.loading && thread.records.length === 0 ? (
         <p className="mt-4 text-[12px] text-muted">Loading previous questions…</p>
-      ) : records.length > 0 ? (
+      ) : thread.records.length > 0 ? (
         <div className="mt-4 space-y-2">
-          {records.map((record) => <InquiryCard key={record.taskId} record={record} />)}
+          {thread.records.map((record) => <InquiryCard key={record.taskId} record={record} />)}
         </div>
       ) : null}
     </section>
