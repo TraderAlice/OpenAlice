@@ -14,7 +14,10 @@ non-authoritative and lives in
 
 ## Product Boundary
 
-The installer makes one small `openalice` command available. It does not:
+The installer always makes one small `openalice` command available. On Linux,
+it can also install the source Runtime's native build tools, but only after the
+user selects that option and approves the exact system command. By default it
+does not:
 
 - clone the OpenAlice repository;
 - install or modify Electron;
@@ -22,6 +25,11 @@ The installer makes one small `openalice` command available. It does not:
 - configure credentials or native agent CLIs;
 - expose a public listener;
 - remove user data during an update.
+
+`--with-runtime-deps` is deliberately narrower than a general machine setup
+mode. It covers Git, Python 3, make, and a C++ compiler because pnpm may need to
+compile native Node modules such as `node-pty`. It does not install Node,
+optional Agent CLIs, broker SDKs, credentials, Docker, or Electron.
 
 The current browser-local distribution remains source-backed:
 
@@ -63,6 +71,8 @@ assets and a release-owned authenticity chain; see
 - `packages/cli/src/server{,-control}.mjs` — detached lifecycle and the
   Guardian control client.
 - `packages/cli/src/remote.mjs` — consent-first managed SSH orchestration.
+- `packages/cli/src/runtime-deps.mjs` — source-build tool probe and actionable
+  local-start failure.
 - `packages/cli/src/install.spec.mjs` — plan, consent, PTY, layout, and live-lock
   contract tests.
 - `scripts/install-docker-smoke.mjs` — local Docker acceptance runner.
@@ -92,8 +102,10 @@ The durable sequence is:
 
 ```text
 preflight
+  -> optional source-build-tool selection
   -> visible install plan
   -> explicit consent
+  -> optional system package command
   -> installer lock
   -> download or local copy into staging
   -> syntax, manifest, and executable validation
@@ -107,8 +119,11 @@ preflight
   -> optional, separate localhost start prompt
 ```
 
-Nothing under the install root is created before the install plan is approved.
-The `--plan` path exits immediately after preflight and the plan.
+Nothing under the install root is created and no package manager is invoked
+before the install plan is approved. The `--plan` path exits immediately after
+preflight and the plan. System package managers are not transactional with the
+CLI install: a package-manager failure can leave packages partially updated,
+but it cannot publish a partial OpenAlice CLI release.
 
 ### Preflight and plan
 
@@ -118,26 +133,57 @@ Preflight validates:
 - Node.js availability and major version;
 - `curl` for remote installs, or CLI sources for `--source` installs;
 - target paths and shell-profile choice;
+- whether Git, Python 3, make, and a C++ compiler are already available;
+- on Linux, the supported package manager and whether root or `sudo` is
+  available when Runtime-tool installation is selected;
 - whether another `openalice` currently resolves earlier on `PATH`.
 
 The visible plan includes action, source, ref, install root, command path, shell
-change, and any PATH conflict. A check that only reads the system may happen
-before consent; no installer-owned filesystem mutation may happen there.
+change, Runtime-tool action, exact package-manager command when selected, and
+any PATH conflict. A check that only reads the system may happen before consent;
+no installer-owned filesystem mutation may happen there.
 
 ### Consent contract
 
 | Invocation | Required behavior |
 |---|---|
-| Interactive default | Ask `Continue with this install? [y/N]`; only an explicit `y` proceeds |
+| Interactive default with missing build tools | First ask whether to include the tools, then print one complete plan and ask `Continue with this install? [y/N]` |
+| Interactive default with tools ready | Print the plan and ask `Continue with this install? [y/N]`; only an explicit `y` proceeds |
 | Blank or `n` | Exit successfully without changing files |
 | No TTY and no `--yes` | Exit with code 2 before creating the install root |
-| `--yes` | Approve installation only; never start the Runtime |
+| `--yes` | Approve only the actions already selected by flags; never implies Runtime tools and never starts the Runtime |
+| `--with-runtime-deps` | Select missing Linux build tools; does not bypass the final confirmation |
 | `--plan` | Print the same plan and exit without opening a prompt or changing files |
 | Interactive install inside a checkout | After success, separately ask `Start OpenAlice now? [y/N]` |
 
-The installer reads prompts from `/dev/tty`, not the curl pipe. Both prompts are
-default-no. Installation consent and service-start consent are intentionally
-different decisions.
+The installer reads prompts from `/dev/tty`, not the curl pipe. The
+Runtime-tool selection, final plan approval, and optional service start are all
+default-no. They are intentionally different decisions. For automation,
+`--yes --with-runtime-deps` is the explicit pair that approves the displayed
+Linux package command as well as the CLI transaction.
+
+### Source Runtime build tools
+
+The Linux package mapping is:
+
+| Manager | Packages |
+|---|---|
+| `apt-get` | `git python3 make g++` |
+| `dnf`, `yum` | `git python3 make gcc-c++` |
+| `apk` | `git python3 make g++` |
+| `pacman` | `git python make gcc` |
+
+The installer uses the package manager directly as root and prefixes it with
+`sudo` otherwise. It refuses the selected action if neither authority is
+available or if the host has no supported manager. It re-probes every tool
+after the package command and fails before downloading the CLI if the machine
+is still incomplete.
+
+On macOS, the installer detects the same tool groups but does not try to launch
+the GUI-backed Command Line Tools flow over a curl pipe or SSH session. A
+selected but incomplete setup stops with the local-session instruction
+`xcode-select --install`. Native Windows remains the Electron lane; WSL follows
+the Linux contract.
 
 ### Lock and staging
 
@@ -264,6 +310,7 @@ Public options:
 |---|---|
 | `--version <git-ref>` | Select a tag, branch, or commit for remote payloads and the installed source-ref label |
 | `--install-dir <path>` | Override the OpenAlice install/user root |
+| `--with-runtime-deps` | Include missing Linux Git/Python/make/C++ source-build tools in the approved plan |
 | `--no-modify-path` | Install launchers without editing a shell profile |
 | `--plan` | Show the exact plan and make no changes |
 | `-y`, `--yes` | Explicit non-interactive installation consent |
@@ -330,6 +377,7 @@ The unit suite covers:
 - refusal without TTY or `--yes`;
 - blank-input cancellation;
 - explicit interactive approval and separate start refusal;
+- source-build-tool preflight before pnpm;
 - live installer lock rejection.
 
 ### Clean Docker acceptance
@@ -345,6 +393,11 @@ exercises the same remote-download branch as `curl | bash`. It verifies:
 - unattended refusal before the install root exists;
 - stale-lock recovery and lock cleanup;
 - downloaded payload equality;
+- default install does not invoke a package manager;
+- `--with-runtime-deps --plan` shows the exact elevated command without
+  running it;
+- approved Runtime-tool setup invokes the expected package list and re-probes
+  the resulting commands;
 - installed `server status --json` execution and inclusion of every reachable
   Server/remote module;
 - runnable shell and CMD launchers;
@@ -360,15 +413,19 @@ This is a local pre-release gate. It is intentionally not delegated to PR CI.
 pnpm test:install:docker --interactive
 ```
 
-The playground stops at the real plan and prompt, then leaves the tester in the
-clean container. Review the copy and spacing, approve with an explicit `y`, and
-run at least:
+The playground first offers the Runtime-tool choice, stops again at the real
+combined plan, and then leaves the tester in the clean container. Its fake
+offline package manager records the exact command while still exercising the
+non-root plus `sudo` branch. Review both choices, copy, and spacing, approve
+with an explicit `y`, and run at least:
 
 ```bash
 command -v openalice
 openalice --version
 cat ~/.bashrc
 curl -fsSL "$OPENALICE_INSTALL_URL" | bash -s -- --plan
+curl -fsSL "$OPENALICE_INSTALL_URL" | bash -s -- --plan --with-runtime-deps
+cat "$OPENALICE_RUNTIME_DEPS_LOG"
 ```
 
 Manual review is required when prompt text, color, progress, profile behavior,

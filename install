@@ -7,6 +7,7 @@ SOURCE_DIR=""
 MODIFY_PATH=1
 ASSUME_YES=0
 PLAN_ONLY=0
+WITH_RUNTIME_DEPS=0
 INSTALL_ROOT="${OPENALICE_INSTALL_DIR:-${HOME}/.openalice}"
 
 BOLD=""
@@ -23,6 +24,11 @@ LOCK_HELD=0
 TTY_OPEN=0
 SHELL_LAUNCHER_TEMP=""
 CMD_LAUNCHER_TEMP=""
+RUNTIME_DEPS_MANAGER=""
+RUNTIME_DEPS_COMMAND=""
+RUNTIME_DEPS_BLOCKER=""
+RUNTIME_MISSING=()
+ELEVATE=()
 
 if [[ -t 1 && -z "${NO_COLOR:-}" && "${TERM:-}" != "dumb" ]]; then
   BOLD=$'\033[1m'
@@ -57,7 +63,7 @@ die() {
 }
 
 step() {
-  printf '\n%b[%s/4]%b %s\n' "$CYAN" "$1" "$RESET" "$2"
+  printf '\n%b[%s/5]%b %s\n' "$CYAN" "$1" "$RESET" "$2"
 }
 
 ok() {
@@ -74,12 +80,13 @@ OpenAlice CLI installer
 
 Usage:
   curl -fsSL https://raw.githubusercontent.com/TraderAlice/OpenAlice/dev/install | bash
-  ./install [--version <git-ref>] [--install-dir <path>] [--no-modify-path] [--yes]
+  ./install [--version <git-ref>] [--install-dir <path>] [--with-runtime-deps] [--no-modify-path] [--yes]
 
 Options:
   --version <git-ref>   Git tag, branch, or commit to install (default: dev)
   --install-dir <path>  OpenAlice user root (default: ~/.openalice)
   --source <path>       Install CLI files from a local checkout (development)
+  --with-runtime-deps   Install missing Linux source-build tools after consent
   --no-modify-path      Do not update the shell profile
   --plan                Show the install plan and exit without changing files
   -y, --yes             Accept the install plan without an interactive prompt
@@ -218,6 +225,92 @@ while (true) {
 NODE
 }
 
+probe_runtime_deps() {
+  RUNTIME_MISSING=()
+  command -v git >/dev/null 2>&1 || RUNTIME_MISSING+=("git")
+  command -v python3 >/dev/null 2>&1 || RUNTIME_MISSING+=("python3")
+  command -v make >/dev/null 2>&1 || RUNTIME_MISSING+=("make")
+  if ! command -v c++ >/dev/null 2>&1 \
+    && ! command -v g++ >/dev/null 2>&1 \
+    && ! command -v clang++ >/dev/null 2>&1; then
+    RUNTIME_MISSING+=("cxx")
+  fi
+}
+
+runtime_missing_text() {
+  local dependency
+  local label
+  local output=""
+  for dependency in "${RUNTIME_MISSING[@]}"; do
+    case "$dependency" in
+      git) label="Git" ;;
+      python3) label="Python 3" ;;
+      make) label="make" ;;
+      cxx) label="a C++ compiler" ;;
+    esac
+    [[ -z "$output" ]] || output+=", "
+    output+="$label"
+  done
+  printf '%s' "$output"
+}
+
+resolve_runtime_deps_plan() {
+  RUNTIME_DEPS_MANAGER=""
+  RUNTIME_DEPS_COMMAND=""
+  RUNTIME_DEPS_BLOCKER=""
+  ELEVATE=()
+  [[ ${#RUNTIME_MISSING[@]} -gt 0 ]] || return 0
+
+  if [[ "$(uname -s)" != "Linux" ]]; then
+    RUNTIME_DEPS_BLOCKER='Automatic source Runtime prerequisite setup is currently supported on Linux. On macOS, run "xcode-select --install" in a local session, then retry.'
+    return 1
+  fi
+  if [[ "$EUID" -ne 0 ]]; then
+    if command -v sudo >/dev/null 2>&1; then
+      ELEVATE=(sudo)
+    else
+      RUNTIME_DEPS_BLOCKER="Installing source Runtime prerequisites requires root or sudo on this Linux host."
+      return 1
+    fi
+  fi
+
+  local prefix=""
+  [[ ${#ELEVATE[@]} -eq 0 ]] || prefix="sudo "
+  if command -v apt-get >/dev/null 2>&1; then
+    RUNTIME_DEPS_MANAGER="apt-get"
+    RUNTIME_DEPS_COMMAND="${prefix}apt-get update && ${prefix}apt-get install -y git python3 make g++"
+  elif command -v dnf >/dev/null 2>&1; then
+    RUNTIME_DEPS_MANAGER="dnf"
+    RUNTIME_DEPS_COMMAND="${prefix}dnf install -y git python3 make gcc-c++"
+  elif command -v yum >/dev/null 2>&1; then
+    RUNTIME_DEPS_MANAGER="yum"
+    RUNTIME_DEPS_COMMAND="${prefix}yum install -y git python3 make gcc-c++"
+  elif command -v apk >/dev/null 2>&1; then
+    RUNTIME_DEPS_MANAGER="apk"
+    RUNTIME_DEPS_COMMAND="${prefix}apk add --no-cache git python3 make g++"
+  elif command -v pacman >/dev/null 2>&1; then
+    RUNTIME_DEPS_MANAGER="pacman"
+    RUNTIME_DEPS_COMMAND="${prefix}pacman -Sy --needed --noconfirm git python make gcc"
+  else
+    RUNTIME_DEPS_BLOCKER="No supported Linux package manager was found (apt-get, dnf, yum, apk, or pacman)."
+    return 1
+  fi
+}
+
+install_runtime_deps() {
+  case "$RUNTIME_DEPS_MANAGER" in
+    apt-get)
+      "${ELEVATE[@]}" apt-get update
+      "${ELEVATE[@]}" apt-get install -y git python3 make g++
+      ;;
+    dnf) "${ELEVATE[@]}" dnf install -y git python3 make gcc-c++ ;;
+    yum) "${ELEVATE[@]}" yum install -y git python3 make gcc-c++ ;;
+    apk) "${ELEVATE[@]}" apk add --no-cache git python3 make g++ ;;
+    pacman) "${ELEVATE[@]}" pacman -Sy --needed --noconfirm git python make gcc ;;
+    *) die "No source Runtime prerequisite install command is available." ;;
+  esac
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --version)
@@ -237,6 +330,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --no-modify-path)
       MODIFY_PATH=0
+      shift
+      ;;
+    --with-runtime-deps)
+      WITH_RUNTIME_DEPS=1
       shift
       ;;
     --plan)
@@ -320,7 +417,7 @@ fi
 printf '\n%bOpenAlice%b\n' "${BOLD}${CYAN}" "$RESET"
 printf '%bLocal Runtime CLI installer%b\n\n' "$BOLD" "$RESET"
 printf 'Install one small command, then run OpenAlice locally in your browser.\n'
-printf '%bYour checkout, Electron app, credentials, and services stay untouched until you start them yourself.%b\n' "$DIM" "$RESET"
+printf '%bSystem build tools are optional and listed before consent. Your checkout, Electron app, credentials, and services otherwise stay untouched.%b\n' "$DIM" "$RESET"
 
 step 1 "Checking your system"
 if ! command -v node >/dev/null 2>&1; then
@@ -351,6 +448,38 @@ else
   fi
 fi
 
+probe_runtime_deps
+runtime_deps_ready=0
+[[ ${#RUNTIME_MISSING[@]} -gt 0 ]] || runtime_deps_ready=1
+resolve_runtime_deps_plan || true
+if [[ "$runtime_deps_ready" -eq 1 ]]; then
+  ok "Source Runtime build tools are available"
+else
+  warn "Source Runtime build tools are missing: $(runtime_missing_text)"
+fi
+
+if [[ "$WITH_RUNTIME_DEPS" -eq 0 && "$PLAN_ONLY" -eq 0 && "$ASSUME_YES" -eq 0 \
+  && "$runtime_deps_ready" -eq 0 && -z "$RUNTIME_DEPS_BLOCKER" ]]; then
+  if open_tty; then
+    printf '\nThe CLI can prepare a source checkout later, but native Node modules may need these tools.\n' >&3
+    runtime_choice=0
+    prompt_yes_no "Also install the missing source Runtime build tools?" || runtime_choice=$?
+    if [[ "$runtime_choice" -eq 0 ]]; then
+      WITH_RUNTIME_DEPS=1
+    fi
+  fi
+fi
+
+if [[ "$runtime_deps_ready" -eq 1 ]]; then
+  runtime_setup="Already ready"
+elif [[ "$WITH_RUNTIME_DEPS" -eq 1 && -z "$RUNTIME_DEPS_BLOCKER" ]]; then
+  runtime_setup="Install $(runtime_missing_text)"
+elif [[ -n "$RUNTIME_DEPS_BLOCKER" ]]; then
+  runtime_setup="Manual setup required"
+else
+  runtime_setup="Skip (use --with-runtime-deps)"
+fi
+
 printf '\n%bInstall plan%b\n' "$BOLD" "$RESET"
 printf '  %-14s %s\n' "Action" "$install_action"
 printf '  %-14s %s\n' "Source" "$install_source"
@@ -358,13 +487,27 @@ printf '  %-14s %s\n' "Version" "$VERSION"
 printf '  %-14s %s\n' "Install root" "$INSTALL_ROOT"
 printf '  %-14s %s\n' "Command" "$BIN_DIR/openalice"
 printf '  %-14s %s\n' "Shell setup" "$shell_setup"
+printf '  %-14s %s\n' "Runtime tools" "$runtime_setup"
+if [[ "$WITH_RUNTIME_DEPS" -eq 1 && "$runtime_deps_ready" -eq 0 && -n "$RUNTIME_DEPS_COMMAND" ]]; then
+  printf '  %-14s %s\n' "System command" "$RUNTIME_DEPS_COMMAND"
+elif [[ "$runtime_deps_ready" -eq 0 && -n "$RUNTIME_DEPS_BLOCKER" ]]; then
+  printf '  %-14s %s\n' "Runtime note" "$RUNTIME_DEPS_BLOCKER"
+fi
 if [[ -n "$existing_command" && "$existing_command" != "$BIN_DIR/openalice" ]]; then
   printf '  %-14s %s\n' "PATH warning" "$existing_command currently resolves first"
 fi
 
 if [[ "$PLAN_ONLY" -eq 1 ]]; then
+  if [[ "$WITH_RUNTIME_DEPS" -eq 1 && "$runtime_deps_ready" -eq 0 && -n "$RUNTIME_DEPS_BLOCKER" ]]; then
+    printf '\n%bBlocked:%b %s\n' "${RED}${BOLD}" "$RESET" "$RUNTIME_DEPS_BLOCKER" >&2
+    exit 1
+  fi
   printf '\n%bPlan complete.%b No files were changed.\n\n' "$BOLD" "$RESET"
   exit 0
+fi
+
+if [[ "$WITH_RUNTIME_DEPS" -eq 1 && "$runtime_deps_ready" -eq 0 && -n "$RUNTIME_DEPS_BLOCKER" ]]; then
+  die "$RUNTIME_DEPS_BLOCKER"
 fi
 
 if [[ "$ASSUME_YES" -eq 0 ]]; then
@@ -388,18 +531,32 @@ if [[ "$ASSUME_YES" -eq 0 ]]; then
   esac
 fi
 
+step 2 "Preparing source Runtime tools"
+if [[ "$WITH_RUNTIME_DEPS" -eq 1 && "$runtime_deps_ready" -eq 0 ]]; then
+  install_runtime_deps
+  probe_runtime_deps
+  if [[ ${#RUNTIME_MISSING[@]} -gt 0 ]]; then
+    die "The package manager finished, but source Runtime build tools are still missing: $(runtime_missing_text)"
+  fi
+  runtime_deps_ready=1
+  ok "Source Runtime build tools are ready"
+else
+  printf '      No system packages were changed.\n'
+fi
+
 FILES=(
   "package.json"
   "bin/openalice.mjs"
   "src/local-start.mjs"
   "src/remote.mjs"
+  "src/runtime-deps.mjs"
   "src/runtime-client.mjs"
   "src/server.mjs"
   "src/server-control.mjs"
   "src/ssh-connect.mjs"
 )
 
-step 2 "Downloading the CLI"
+step 3 "Downloading the CLI"
 acquire_install_lock
 STAGING="$(mktemp -d "${TMPDIR:-/tmp}/openalice-cli.XXXXXX")"
 mkdir -p "$STAGING/bin" "$STAGING/src"
@@ -416,11 +573,12 @@ else
 fi
 ok "CLI files are ready"
 
-step 3 "Verifying the CLI"
+step 4 "Verifying the CLI"
 chmod +x "$STAGING/bin/openalice.mjs"
 node --check "$STAGING/bin/openalice.mjs"
 node --check "$STAGING/src/local-start.mjs"
 node --check "$STAGING/src/remote.mjs"
+node --check "$STAGING/src/runtime-deps.mjs"
 node --check "$STAGING/src/runtime-client.mjs"
 node --check "$STAGING/src/server.mjs"
 node --check "$STAGING/src/server-control.mjs"
@@ -436,7 +594,7 @@ STAGED_VERSION="$(node "$STAGING/bin/openalice.mjs" --version)"
 CONTENT_ID="$(content_id "$STAGING" "${FILES[@]}")"
 ok "OpenAlice CLI $CLI_VERSION passed validation ($CONTENT_ID)"
 
-step 4 "Installing the command"
+step 5 "Installing the command"
 mkdir -p "$BIN_DIR" "$VERSIONS_DIR"
 DESTINATION="$VERSIONS_DIR/${SAFE_VERSION}-${CONTENT_ID}"
 if [[ -e "$DESTINATION" ]]; then

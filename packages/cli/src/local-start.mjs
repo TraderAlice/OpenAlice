@@ -10,6 +10,10 @@ import {
   probeOpenAlice,
   waitForOpenAlice,
 } from './runtime-client.mjs'
+import {
+  inspectRuntimeBuildTools,
+  runtimeBuildToolsError,
+} from './runtime-deps.mjs'
 
 const RUNTIME_ARTIFACTS = [
   'dist/main.js',
@@ -200,6 +204,12 @@ export async function prepareSourceCheckout(appDir, options, dependencies = {}) 
   const platform = dependencies.platform ?? process.platform
   const pnpmBin = configuredPnpm ?? (platform === 'win32' ? 'pnpm.cmd' : 'pnpm')
   const runCommand = dependencies.runCommand ?? runChecked
+
+  const inspectBuildTools = dependencies.inspectBuildTools ?? inspectRuntimeBuildTools
+  const buildTools = await inspectBuildTools({ platform, env })
+  if (buildTools.supported && buildTools.missing.length > 0) {
+    throw new Error(runtimeBuildToolsError(buildTools))
+  }
 
   stdout.write('Preparing the local OpenAlice Runtime (Electron is excluded)...\n')
   const installArgs = [

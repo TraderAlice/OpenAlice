@@ -13,6 +13,7 @@ COPY --chown=smoke:smoke install /fixture/install
 COPY --chown=smoke:smoke packages/cli /fixture/packages/cli
 COPY --chown=smoke:smoke scripts/install-smoke/interactive.sh /fixture/interactive.sh
 COPY --chown=smoke:smoke scripts/install-smoke/run.sh /fixture/run.sh
+COPY --chown=smoke:smoke scripts/install-smoke/fake-package-manager.sh /fixture/fake-package-manager.sh
 COPY --chown=smoke:smoke scripts/install-smoke/static-server.mjs /fixture/static-server.mjs
 
 USER smoke

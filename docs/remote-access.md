@@ -22,7 +22,8 @@ The repository now contains the source-backed Stage 0 through Stage 2 path:
 - `openalice server run|start|status|stop` provides a browserless foreground or
   detached Runtime lifecycle backed by Guardian's local control endpoint;
 - `openalice remote <target>` probes, plans, installs the ordinary CLI when
-  approved, starts or reuses the remote Server, and opens the same loopback
+  approved, installs missing Linux source-build tools when the checkout needs
+  preparation, starts or reuses the remote Server, and opens the same loopback
   tunnel;
 - Electron remains a complete local desktop distribution.
 
@@ -509,6 +510,9 @@ The read-only plan reports:
 - detected OpenAlice CLI path and version;
 - control protocol compatibility;
 - Server state and source/bundle root;
+- whether the selected source checkout already has complete Runtime artifacts;
+- missing Git, Python 3, make, or C++ tools and the package-manager action that
+  would provide them;
 - proposed install/update/start actions;
 - destination paths and whether PATH changes are required;
 - whether a running owner would be affected;
@@ -517,13 +521,18 @@ The read-only plan reports:
 Apply rules:
 
 1. no compatible CLI: ask before invoking the normal installer;
-2. compatible CLI, absent Server: start after explicit plan consent;
-3. compatible healthy Server: reuse without mutation;
-4. incompatible stopped CLI: ask before update;
-5. incompatible running Server: stop/restart or update only after a second
+2. source artifacts absent and Linux build tools missing: include
+   `--with-runtime-deps` in that same normal installer invocation after plan
+   consent;
+3. complete source artifacts: do not modify system packages merely because a
+   compiler is absent;
+4. compatible CLI, absent Server: start after explicit plan consent;
+5. compatible healthy Server: reuse without mutation;
+6. incompatible stopped CLI: ask before update;
+7. incompatible running Server: stop/restart or update only after a second
    effect-specific confirmation;
-6. owner conflict: fail unless the user separately passed `--takeover`;
-7. non-interactive mode: require flags that cover every proposed mutation.
+8. owner conflict: fail unless the user separately passed `--takeover`;
+9. non-interactive mode: require flags that cover every proposed mutation.
 
 The local orchestrator must compare protocol ranges, not only human version
 strings. It may tolerate a newer compatible Runtime, but it must fail clearly
@@ -584,6 +593,43 @@ Runtime model.
 - remaining release observation: validate ordinary Agent TUI interaction under
   representative network shaping before deciding whether Stage 3 is useful.
 
+#### Railway cold-host observation — 2026-07-15
+
+A disposable Railway Sandbox provided the first real clean-host acceptance for
+Stage 2. The host was Debian 13 x86_64 with Node 24, pnpm 11, curl, and Git. A
+fresh `dev` checkout did not have Python 3; `node-pty` had no matching bundled
+Linux x64 prebuild for that Node version, fell back to `node-gyp`, and made the
+old bootstrap fail during `pnpm install`. Installing Python 3, make, and g++
+allowed the same source preparation and detached Server start to complete.
+This failure is the reason the ordinary installer now owns the explicit Linux
+source-build-tool plan.
+
+The subsequent macOS-to-Railway loop verified:
+
+- real SSH plan, default-no confirmation boundary, CLI install, source build,
+  detached Server readiness, and local loopback tunnel;
+- a Shell Workspace Session accepted `printf 'REMOTE_PTY_OK\\n'`; the result and
+  next prompt were visible in the first observation within 500 ms;
+- closing the tunnel left the Server and Shell Session alive;
+- reconnecting on a new local port replayed the existing terminal scrollback;
+- structured `openalice server stop` returned the isolated home to `absent`.
+
+Claude Code, Codex, opencode, and Pi executables were present on that host, but
+only Shell completed an end-to-end PTY interaction. A harmless Codex prompt
+reached the remote process and failed with missing provider authentication, so
+this observation does not claim an authenticated model turn or the full Agent
+TUI matrix. No provider credentials were copied into the disposable host.
+Representative 20/80/150 ms network shaping also remains unmeasured.
+
+After the bootstrap fix, a second fresh Sandbox repeated the same cold-host
+shape with Python 3 absent. The managed plan reported only that missing tool,
+one outer confirmation authorized the normal installer, and the installer
+installed the declared Linux package set without a manual `apt` command.
+Python 3.13.5 was then available; source preparation, detached readiness, the
+real `/chat` route, tunnel disconnect, and reconnection on a new local port all
+passed. The Server was stopped through its control endpoint before the Sandbox
+was destroyed.
+
 ### Stage 3 — terminal transport optimization
 
 - build only if Stage 2 measurements justify it;
@@ -634,6 +680,8 @@ Runtime model.
 | missing remote CLI, non-interactive | fails unless explicit approval is present |
 | incompatible running Server | explains process impact before update/restart |
 | remote source missing | fails with actionable `--app-dir` guidance; no surprise clone |
+| source artifacts missing, build tools missing | plan names the tools and normal installer command; default no leaves packages untouched |
+| source artifacts complete, compiler missing | reuse artifacts without an unnecessary package-manager mutation |
 | tunnel disconnect | local command exits; remote Server and work continue |
 | reconnect | same Runtime and live terminal are reachable |
 | host-key failure | fails without disabling verification |

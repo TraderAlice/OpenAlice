@@ -151,6 +151,7 @@ describe('OpenAlice local Runtime launcher', () => {
       rebuild: false,
     }, {
       artifactsReady: async () => artifactsReady,
+      inspectBuildTools: async () => ({ platform: 'linux', supported: true, missing: [] }),
       platform: 'linux',
       runCommand,
       stdout: { write: vi.fn() },
@@ -162,6 +163,26 @@ describe('OpenAlice local Runtime launcher', () => {
       ['corepack', ['pnpm', 'install', '--frozen-lockfile', '--filter=!@traderalice/desktop']],
       ['corepack', ['pnpm', 'build:server']],
     ])
+  })
+
+  it('fails before pnpm with an actionable native build-tool error', async () => {
+    const runCommand = vi.fn()
+    await expect(prepareSourceCheckout('/tmp/OpenAlice', {
+      prepare: true,
+      rebuild: false,
+    }, {
+      artifactsReady: async () => false,
+      inspectBuildTools: async () => ({
+        platform: 'linux',
+        supported: true,
+        missing: ['python3', 'cxx'],
+      }),
+      platform: 'linux',
+      runCommand,
+      stdout: { write: vi.fn() },
+      env: {},
+    })).rejects.toThrow('installer with --with-runtime-deps')
+    expect(runCommand).not.toHaveBeenCalled()
   })
 })
 

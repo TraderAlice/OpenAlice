@@ -31,7 +31,8 @@ describe.skipIf(process.platform === 'win32')('OpenAlice CLI installer', () => {
     ], { env: { ...process.env, HOME: home } })
 
     expect(installed.stdout).toContain('Local Runtime CLI installer')
-    expect(installed.stdout).toContain('services stay untouched until you start them yourself')
+    expect(installed.stdout).toContain('System build tools are optional and listed before consent')
+    expect(installed.stdout).toContain('No system packages were changed')
     expect(installed.stdout).toContain('Install plan')
     expect(installed.stdout).toContain('OpenAlice CLI is ready')
     const releases = await readdir(join(installRoot, 'cli-versions'))

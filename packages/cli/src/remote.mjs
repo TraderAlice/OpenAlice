@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 import { createInterface } from 'node:readline/promises'
 
+import { formatMissingRuntimeBuildTools } from './runtime-deps.mjs'
 import { connectSsh } from './ssh-connect.mjs'
 
 const DEFAULT_INSTALL_URL = 'https://raw.githubusercontent.com/TraderAlice/OpenAlice/dev/install'
@@ -109,10 +110,18 @@ export async function connectRemote(options, dependencies = {}) {
   }
 
   const runRemote = dependencies.runRemote ?? runSshCommand
-  if (plan.installCli) {
+  if (plan.runInstaller) {
     const expectedRemainingMutations = remainingMutationsAfterInstall(plan)
-    stdout.write(`Installing the OpenAlice CLI on ${options.destination} with the normal installer...\n`)
-    await runRemote(options, buildRemoteInstallCommand(plan.installUrl, plan.installVersion, plan.installBaseUrl), dependencies)
+    const installerPurpose = plan.installRuntimeDeps
+      ? 'Preparing the OpenAlice CLI and source Runtime build tools'
+      : 'Installing the OpenAlice CLI'
+    stdout.write(`${installerPurpose} on ${options.destination} with the normal installer...\n`)
+    await runRemote(options, buildRemoteInstallCommand(
+      plan.installUrl,
+      plan.installVersion,
+      plan.installBaseUrl,
+      plan.installRuntimeDeps,
+    ), dependencies)
     remote = await probe(options, dependencies)
     if (!remote.cliPath || !remote.cliCompatible) {
       throw new Error('The remote OpenAlice CLI install completed, but a compatible CLI was not detected')
@@ -174,6 +183,7 @@ export function createRemotePlan(options, remote, install = {}) {
   const mutations = []
   let blocker = ''
   let installCli = false
+  let installRuntimeDeps = false
   let startServer = false
   let remotePort = options.remotePort
 
@@ -183,12 +193,12 @@ export function createRemotePlan(options, remote, install = {}) {
     blocker = 'The remote host does not have Node.js 20 or newer; install Node.js before applying this plan.'
   } else if (!nodeVersionSupported(remote.nodeVersion)) {
     blocker = `The remote host reports ${remote.nodeVersion}; OpenAlice requires Node.js 20 or newer.`
+  } else if (options.appDir && remote.sourceCheckoutPresent === false) {
+    blocker = `No OpenAlice source checkout was found at ${options.appDir}. Clone it first or pass the correct --app-dir.`
   }
 
   if (!remote.cliPath || !remote.cliCompatible) {
     installCli = true
-    mutations.push(remote.cliPath ? 'update remote OpenAlice CLI' : 'install remote OpenAlice CLI')
-    if (!remote.hasCurl && !blocker) blocker = 'The remote host does not have curl, which the normal OpenAlice installer requires.'
   }
 
   const status = remote.status
@@ -229,6 +239,21 @@ export function createRemotePlan(options, remote, install = {}) {
     }
   }
 
+  const runtimeBuildToolsMissing = remote.runtimeBuildToolsMissing ?? []
+  if (!blocker && startServer && remote.sourceArtifactsReady !== true && runtimeBuildToolsMissing.length > 0) {
+    if (remote.platform?.os === 'linux') {
+      installRuntimeDeps = true
+    } else {
+      blocker = `The remote source Runtime is missing ${formatMissingRuntimeBuildTools(runtimeBuildToolsMissing)}. Run "xcode-select --install" in a local macOS session before reconnecting.`
+    }
+  }
+  if (installRuntimeDeps) mutations.unshift('install source Runtime build tools')
+  if (installCli) mutations.unshift(remote.cliPath ? 'update remote OpenAlice CLI' : 'install remote OpenAlice CLI')
+  const runInstaller = installCli || installRuntimeDeps
+  if (runInstaller && !remote.hasCurl && !blocker) {
+    blocker = 'The remote host does not have curl, which the normal OpenAlice installer requires.'
+  }
+
   return {
     target: options.destination,
     platform: remote.platform?.label ?? 'unknown',
@@ -243,7 +268,12 @@ export function createRemotePlan(options, remote, install = {}) {
     remotePort,
     localPort: options.localPort || 'auto',
     installCli,
+    installRuntimeDeps,
+    runInstaller,
     startServer,
+    sourceCheckoutPresent: remote.sourceCheckoutPresent ?? null,
+    sourceArtifactsReady: remote.sourceArtifactsReady ?? null,
+    runtimeBuildToolsMissing,
     installUrl,
     installVersion,
     installBaseUrl,
@@ -256,7 +286,16 @@ export function formatRemotePlan(plan) {
   const actions = plan.mutations.length > 0
     ? [...plan.mutations, 'open local SSH tunnel']
     : ['reuse compatible remote CLI Server', 'open local SSH tunnel']
-  return `\nOpenAlice Remote\n\nRemote plan\n  Target         ${plan.target}\n  Platform       ${plan.platform}\n  Node.js        ${plan.nodeVersion}\n  CLI            ${plan.cliPath} (${plan.cliVersion}${plan.cliCompatible ? ', compatible' : ', install/update required'})\n  Runtime        ${plan.runtimeClass} (${plan.runtimeOwner})\n  Source         ${plan.appDir}\n  Home           ${plan.remoteHome}\n  Tunnel         127.0.0.1:${plan.localPort} -> remote 127.0.0.1:${plan.remotePort}\n  Actions        ${actions.join('; ')}\n${plan.installCli ? `  Installer      ${plan.installUrl} (${plan.installVersion})\n` : ''}${plan.blocker ? `\nBlocked: ${plan.blocker}\n` : '\nNothing has changed yet.\n'}\n`
+  const buildTools = plan.sourceCheckoutPresent === false
+    ? 'Not inspected (source missing)'
+    : plan.sourceArtifactsReady === true
+    ? 'Not needed (built artifacts present)'
+    : plan.runtimeBuildToolsMissing.length > 0
+      ? `Missing: ${formatMissingRuntimeBuildTools(plan.runtimeBuildToolsMissing)}`
+      : plan.appDir === 'not selected'
+        ? 'Not inspected'
+        : 'Ready'
+  return `\nOpenAlice Remote\n\nRemote plan\n  Target         ${plan.target}\n  Platform       ${plan.platform}\n  Node.js        ${plan.nodeVersion}\n  CLI            ${plan.cliPath} (${plan.cliVersion}${plan.cliCompatible ? ', compatible' : ', install/update required'})\n  Runtime        ${plan.runtimeClass} (${plan.runtimeOwner})\n  Source         ${plan.appDir}\n  Build tools    ${buildTools}\n  Home           ${plan.remoteHome}\n  Tunnel         127.0.0.1:${plan.localPort} -> remote 127.0.0.1:${plan.remotePort}\n  Actions        ${actions.join('; ')}\n${plan.runInstaller ? `  Installer      ${plan.installUrl} (${plan.installVersion})\n` : ''}${plan.blocker ? `\nBlocked: ${plan.blocker}\n` : '\nNothing has changed yet.\n'}\n`
 }
 
 export async function probeRemoteHost(options, dependencies = {}) {
@@ -266,9 +305,24 @@ export async function probeRemoteHost(options, dependencies = {}) {
   const platform = normalizeRemotePlatform(kernel, architecture)
   const nodeVersion = (await runRemote(options, 'command -v node >/dev/null 2>&1 && node --version || true', dependencies)).trim() || null
   const hasCurl = (await runRemote(options, 'command -v curl >/dev/null 2>&1 && printf yes || true', dependencies)).trim() === 'yes'
+  let sourceCheckoutPresent = null
+  let sourceArtifactsReady = null
+  let runtimeBuildToolsMissing = []
+  if (options.appDir) {
+    sourceCheckoutPresent = (await runRemote(options, buildRemoteCheckoutProbeCommand(options.appDir), dependencies)).trim() === 'present'
+    if (sourceCheckoutPresent) {
+      sourceArtifactsReady = (await runRemote(options, buildRemoteArtifactsProbeCommand(options.appDir), dependencies)).trim() === 'ready'
+    }
+    if (sourceCheckoutPresent && !sourceArtifactsReady) {
+      runtimeBuildToolsMissing = (await runRemote(options, buildRemoteBuildToolsProbeCommand(), dependencies))
+        .trim()
+        .split(/\r?\n/)
+        .filter((value) => ['git', 'python3', 'make', 'cxx'].includes(value))
+    }
+  }
   const cliPath = normalizeRemoteCliPath((await runRemote(options, 'command -v openalice 2>/dev/null || { [ ! -x "$HOME/.openalice/bin/openalice" ] || printf "%s\\n" "$HOME/.openalice/bin/openalice"; }', dependencies)).trim())
   if (!cliPath) {
-    return { platform, nodeVersion, hasCurl, cliPath: null, cliVersion: null, cliCompatible: false, status: null }
+    return { platform, nodeVersion, hasCurl, sourceCheckoutPresent, sourceArtifactsReady, runtimeBuildToolsMissing, cliPath: null, cliVersion: null, cliCompatible: false, status: null }
   }
 
   let cliVersion = null
@@ -282,7 +336,21 @@ export async function probeRemoteHost(options, dependencies = {}) {
   } catch {
     cliCompatible = false
   }
-  return { platform, nodeVersion, hasCurl, cliPath, cliVersion, cliCompatible, status }
+  return { platform, nodeVersion, hasCurl, sourceCheckoutPresent, sourceArtifactsReady, runtimeBuildToolsMissing, cliPath, cliVersion, cliCompatible, status }
+}
+
+export function buildRemoteCheckoutProbeCommand(appDir) {
+  const manifest = shellQuote(`${appDir.replace(/\/$/, '')}/package.json`)
+  return `test -f ${manifest} && grep -Eq '"name"[[:space:]]*:[[:space:]]*"open-alice"' ${manifest} && printf present || true`
+}
+
+export function buildRemoteArtifactsProbeCommand(appDir) {
+  const root = shellQuote(appDir)
+  return `root=${root}\ntest -f "$root/dist/main.js" \\\n  && test -f "$root/ui/dist/index.html" \\\n  && test -f "$root/services/uta/dist/uta.js" \\\n  && test -f "$root/services/connector/dist/connector.cjs" \\\n  && test -f "$root/packages/guardian-runtime/dist/index.js" \\\n  && test -d "$root/node_modules" \\\n  && printf ready || true`
+}
+
+export function buildRemoteBuildToolsProbeCommand() {
+  return `command -v git >/dev/null 2>&1 || printf 'git\\n'\ncommand -v python3 >/dev/null 2>&1 || printf 'python3\\n'\ncommand -v make >/dev/null 2>&1 || printf 'make\\n'\n{ command -v c++ >/dev/null 2>&1 || command -v g++ >/dev/null 2>&1 || command -v clang++ >/dev/null 2>&1; } || printf 'cxx\\n'`
 }
 
 export function buildRemoteStatusCommand(options, cliPath) {
@@ -305,11 +373,12 @@ export function buildRemoteServerStartCommand(options, cliPath) {
   return args.join(' ')
 }
 
-export function buildRemoteInstallCommand(installUrl, installVersion, installBaseUrl = '') {
+export function buildRemoteInstallCommand(installUrl, installVersion, installBaseUrl = '', withRuntimeDeps = false) {
   const url = shellQuote(installUrl)
   const version = shellQuote(installVersion)
   const installEnv = installBaseUrl ? `OPENALICE_INSTALL_BASE_URL=${shellQuote(installBaseUrl)} ` : ''
-  return `set -eu\ntmp=$(mktemp "${'${TMPDIR:-/tmp}'}/openalice-install.XXXXXX")\ntrap 'rm -f "$tmp"' EXIT HUP INT TERM\ncurl -fsSL ${url} -o "$tmp"\n${installEnv}bash "$tmp" --yes --no-modify-path --version ${version}`
+  const runtimeDepsFlag = withRuntimeDeps ? ' --with-runtime-deps' : ''
+  return `set -eu\ntmp=$(mktemp "${'${TMPDIR:-/tmp}'}/openalice-install.XXXXXX")\ntrap 'rm -f "$tmp"' EXIT HUP INT TERM\ncurl -fsSL ${url} -o "$tmp"\n${installEnv}bash "$tmp" --yes --no-modify-path --version ${version}${runtimeDepsFlag}`
 }
 
 export function buildRemoteSshArgs(options, remoteCommand) {
@@ -436,7 +505,10 @@ function remoteRuntimePort(status) {
 }
 
 function remainingMutationsAfterInstall(plan) {
-  return plan.mutations.filter((mutation) => !/^(install|update) remote OpenAlice CLI$/.test(mutation))
+  return plan.mutations.filter((mutation) => (
+    !/^(install|update) remote OpenAlice CLI$/.test(mutation)
+    && mutation !== 'install source Runtime build tools'
+  ))
 }
 
 function validateSshDestination(destination) {

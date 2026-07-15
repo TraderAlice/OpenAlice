@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import {
+  buildRemoteArtifactsProbeCommand,
+  buildRemoteBuildToolsProbeCommand,
+  buildRemoteCheckoutProbeCommand,
   buildRemoteInstallCommand,
   buildRemoteServerStartCommand,
   buildRemoteSshArgs,
@@ -53,14 +56,19 @@ describe('OpenAlice managed remote connector', () => {
       platform: { os: 'linux', label: 'Linux x86_64' },
       nodeVersion: 'v22.0.0',
       hasCurl: true,
+      sourceCheckoutPresent: true,
+      sourceArtifactsReady: false,
+      runtimeBuildToolsMissing: ['git', 'python3', 'make', 'cxx'],
       cliPath: null,
       cliCompatible: false,
       status: null,
     })
     expect(plan.installCli).toBe(true)
+    expect(plan.installRuntimeDeps).toBe(true)
     expect(plan.startServer).toBe(true)
     expect(plan.mutations).toEqual([
       'install remote OpenAlice CLI',
+      'install source Runtime build tools',
       'start remote OpenAlice Server',
     ])
     expect(plan.blocker).toBe('')
@@ -78,6 +86,38 @@ describe('OpenAlice managed remote connector', () => {
     expect(plan.installCli).toBe(false)
     expect(plan.startServer).toBe(false)
     expect(plan.blocker).toBe('')
+  })
+
+  it('does not install build tools when a source Runtime is already built', () => {
+    const plan = createRemotePlan(parseRemoteArgs(['host', '--app-dir', '/srv/OpenAlice']), {
+      ...missingRemote(),
+      sourceArtifactsReady: true,
+    })
+    expect(plan.installRuntimeDeps).toBe(false)
+    expect(plan.mutations).toEqual([
+      'install remote OpenAlice CLI',
+      'start remote OpenAlice Server',
+    ])
+  })
+
+  it('blocks remote macOS prerequisite installation with local-session guidance', () => {
+    const plan = createRemotePlan(parseRemoteArgs(['host', '--app-dir', '/srv/OpenAlice']), {
+      ...missingRemote(),
+      platform: { os: 'darwin', label: 'Darwin arm64' },
+    })
+    expect(plan.blocker).toContain('xcode-select --install')
+    expect(plan.installRuntimeDeps).toBe(false)
+  })
+
+  it('blocks a missing checkout before proposing system-package changes', () => {
+    const plan = createRemotePlan(parseRemoteArgs(['host', '--app-dir', '/srv/missing']), {
+      ...missingRemote(),
+      sourceCheckoutPresent: false,
+      runtimeBuildToolsMissing: ['python3'],
+    })
+    expect(plan.blocker).toContain('Clone it first')
+    expect(plan.installRuntimeDeps).toBe(false)
+    expect(plan.mutations).toEqual(['install remote OpenAlice CLI'])
   })
 
   it('uses the detected Server port and blocks an explicit mismatch', () => {
@@ -162,6 +202,7 @@ describe('OpenAlice managed remote connector', () => {
       'https://example.test/install',
       'dev-test',
       'https://example.test/packages/cli/',
+      true,
     ))
     expect(runRemote.mock.calls[1][1]).toContain('server start')
     expect(connectTunnel).toHaveBeenCalledWith(expect.objectContaining({
@@ -195,6 +236,15 @@ describe('OpenAlice managed remote connector', () => {
     expect(connectTunnel).not.toHaveBeenCalled()
     expect(stdout.write).toHaveBeenCalledWith(expect.stringContaining('refreshed plan'))
   })
+
+  it('builds read-only remote probes without interpolating source paths as shell code', () => {
+    const probe = buildRemoteArtifactsProbeCommand("/srv/Alice's source")
+    expect(probe).toContain("root='/srv/Alice'\\''s source'")
+    expect(probe).toContain('test -f "$root/dist/main.js"')
+    expect(buildRemoteCheckoutProbeCommand("/srv/Alice's source"))
+      .toContain("'/srv/Alice'\\''s source/package.json'")
+    expect(buildRemoteBuildToolsProbeCommand()).toContain("printf 'cxx\\n'")
+  })
 })
 
 function missingRemote() {
@@ -202,6 +252,9 @@ function missingRemote() {
     platform: { os: 'linux', label: 'Linux x86_64' },
     nodeVersion: 'v22.0.0',
     hasCurl: true,
+    sourceCheckoutPresent: true,
+    sourceArtifactsReady: false,
+    runtimeBuildToolsMissing: ['git', 'python3', 'make', 'cxx'],
     cliPath: null,
     cliVersion: null,
     cliCompatible: false,
@@ -214,6 +267,9 @@ function compatibleRemote(statusOverrides = {}) {
     platform: { os: 'linux', label: 'Linux x86_64' },
     nodeVersion: 'v22.0.0',
     hasCurl: true,
+    sourceCheckoutPresent: null,
+    sourceArtifactsReady: null,
+    runtimeBuildToolsMissing: [],
     cliPath: '/home/alice/.openalice/bin/openalice',
     cliVersion: '0.2.0',
     cliCompatible: true,

@@ -41,12 +41,14 @@ The current installer distributes the small JavaScript CLI from the `dev` ref:
 curl -fsSL https://raw.githubusercontent.com/TraderAlice/OpenAlice/dev/install | bash
 ```
 
-The preview requires Node.js 20 or newer. It installs only the small CLI; it
-does not clone OpenAlice, write application state, install Electron, or start a
-service without separate consent. The curl entry targets macOS, Linux, WSL,
-and Git Bash; native Windows desktop distribution remains the signed Electron
-installer. The complete consent, update, filesystem, PATH, authenticity, and
-test contract lives in [[docs/cli-installer.md]].
+The preview requires Node.js 20 or newer. It always installs the small CLI and,
+when explicitly selected, can install missing Linux Git/Python/make/C++ tools
+needed to build the source Runtime. It does not clone OpenAlice, write
+application state, install Electron, or start a service without separate
+consent. The curl entry targets macOS, Linux, WSL, and Git Bash; native Windows
+desktop distribution remains the signed Electron installer. The complete
+consent, update, filesystem, PATH, authenticity, and test contract lives in
+[[docs/cli-installer.md]].
 
 Installer flags, non-interactive consent, development seams, the clean Docker
 fixture, and the manual prompt playground are documented only in
@@ -140,12 +142,16 @@ future standalone bundle changes preparation, not these ownership semantics.
 
 Keep bootstrap observable and layered:
 
-1. The shell installer validates Node and makes only the `openalice` command available.
-2. Local start validates the source and built artifacts, using pnpm or Corepack
-   when preparation is required.
-3. A guided setup layer should validate Git and present optional native agent
-   CLIs, installing only
-   the user's selections, with explicit commands, versions, and retry status.
+1. The shell installer validates Node and makes the `openalice` command
+   available. Its optional, explicit Linux Runtime plan installs only Git,
+   Python 3, make, and a C++ compiler.
+2. Local start validates the source and built artifacts. Before pnpm or
+   Corepack preparation, it rechecks those native build tools and points Linux
+   users back to `--with-runtime-deps` instead of exposing a late `node-gyp`
+   failure.
+3. A later guided setup layer may present optional native Agent CLIs,
+   installing only the user's selections with explicit commands, versions,
+   and retry status.
 4. A future release asset can replace the source/build requirement with a
    downloadable headless Runtime while retaining the same CLI and localhost
    contract.

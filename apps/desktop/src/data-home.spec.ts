@@ -42,7 +42,7 @@ describe('desktop data-home preferences', () => {
   it('normalizes, bounds, and de-duplicates recent locations', () => {
     const homes = Array.from({ length: 10 }, (_, index) => resolve(root, String(index)))
     expect(dedupeRecentDataHomes([homes[0], homes[0], ...homes])).toEqual(homes.slice(0, 8))
-    expect(dedupeRecentDataHomes(['/Alice', '/alice'], 'win32')).toEqual(['/Alice'])
+    expect(dedupeRecentDataHomes(['/Alice', '/alice'], 'win32')).toEqual([resolve('/Alice')])
   })
 
   it('ignores relative and invalid persisted paths', () => {

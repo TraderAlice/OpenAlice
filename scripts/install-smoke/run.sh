@@ -14,12 +14,22 @@ fi
 
 server_log="$(mktemp)"
 refusal_log="$(mktemp)"
+runtime_deps_log="$(mktemp)"
+runtime_fixture_bin="$(mktemp -d)"
+cp /fixture/fake-package-manager.sh "$runtime_fixture_bin/fake-package-manager"
+chmod +x "$runtime_fixture_bin/fake-package-manager"
+ln -s fake-package-manager "$runtime_fixture_bin/apt-get"
+ln -s fake-package-manager "$runtime_fixture_bin/sudo"
+export OPENALICE_RUNTIME_DEPS_SHIM_DIR="$runtime_fixture_bin"
+export OPENALICE_RUNTIME_DEPS_LOG="$runtime_deps_log"
+export PATH="$runtime_fixture_bin:$PATH"
 node /fixture/static-server.mjs >"$server_log" 2>&1 &
 server_pid=$!
 cleanup() {
   kill "$server_pid" >/dev/null 2>&1 || true
   wait "$server_pid" >/dev/null 2>&1 || true
-  rm -f "$server_log" "$refusal_log"
+  rm -rf "$runtime_fixture_bin"
+  rm -f "$server_log" "$refusal_log" "$runtime_deps_log"
 }
 trap cleanup EXIT
 
@@ -52,6 +62,11 @@ install_version() {
   curl -fsSL "$installer_url" | bash -s -- --yes --version "$version"
 }
 
+install_version_with_runtime_deps() {
+  local version="$1"
+  curl -fsSL "$installer_url" | bash -s -- --yes --with-runtime-deps --version "$version"
+}
+
 mkdir -p "$HOME/.openalice/.cli-install.lock"
 printf '99999999\n' > "$HOME/.openalice/.cli-install.lock/pid"
 install_version smoke-v1
@@ -73,6 +88,8 @@ cmp /fixture/packages/cli/src/local-start.mjs "$v1_release/src/local-start.mjs" 
   || fail "downloaded CLI file differs from the fixture"
 cmp /fixture/packages/cli/src/remote.mjs "$v1_release/src/remote.mjs" \
   || fail "downloaded Remote CLI file differs from the fixture"
+cmp /fixture/packages/cli/src/runtime-deps.mjs "$v1_release/src/runtime-deps.mjs" \
+  || fail "downloaded Runtime dependency probe differs from the fixture"
 cmp /fixture/packages/cli/src/server.mjs "$v1_release/src/server.mjs" \
   || fail "downloaded Server CLI file differs from the fixture"
 cmp /fixture/packages/cli/src/server-control.mjs "$v1_release/src/server-control.mjs" \
@@ -83,6 +100,20 @@ path_count="$(grep -Fxc "$expected_path_line" "$HOME/.bashrc" || true)"
 [[ "$path_count" == "1" ]] || fail "installer did not add exactly one shell PATH entry"
 [[ "$(grep -Fxc '# >>> OpenAlice CLI >>>' "$HOME/.bashrc" || true)" == "1" ]] \
   || fail "installer did not add its managed PATH block"
+
+[[ ! -s "$runtime_deps_log" ]] || fail "default install changed system packages"
+runtime_plan="$(curl -fsSL "$installer_url" | bash -s -- --plan --with-runtime-deps --version smoke-v1)"
+grep -Fq "sudo apt-get update && sudo apt-get install -y git python3 make g++" <<<"$runtime_plan" \
+  || fail "runtime dependency plan did not show the exact package command"
+[[ ! -s "$runtime_deps_log" ]] || fail "runtime dependency plan changed system packages"
+
+install_version_with_runtime_deps smoke-v1
+grep -Fxq "apt-get update" "$runtime_deps_log" || fail "runtime dependency setup skipped apt-get update"
+grep -Fxq "apt-get install -y git python3 make g++" "$runtime_deps_log" \
+  || fail "runtime dependency setup used the wrong package list"
+for tool in git python3 make g++; do
+  command -v "$tool" >/dev/null 2>&1 || fail "runtime dependency setup did not provide $tool"
+done
 
 install_version smoke-v1
 path_count="$(grep -Fxc "$expected_path_line" "$HOME/.bashrc" || true)"

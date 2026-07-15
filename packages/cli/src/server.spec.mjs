@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events'
+import { resolve } from 'node:path'
 
 import { describe, expect, it, vi } from 'vitest'
 
@@ -92,7 +93,7 @@ describe('OpenAlice Server CLI', () => {
       detached: true,
       stdio: ['ignore', 9, 9],
       env: expect.objectContaining({
-        OPENALICE_HOME: '/tmp/alice-home',
+        OPENALICE_HOME: resolve('/tmp/alice-home'),
         OPENALICE_BIND_HOST: '127.0.0.1',
         OPENALICE_WEB_PORT: '41000',
         OPENALICE_LAUNCHER: 'cli-server',
