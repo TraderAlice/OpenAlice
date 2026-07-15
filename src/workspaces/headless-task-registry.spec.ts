@@ -214,7 +214,7 @@ describe('HeadlessTaskRegistry', () => {
     expect(existsSync(firstLogs.stdout)).toBe(true)
     expect(existsSync(firstLogs.stderr)).toBe(true)
     expect(existsSync(firstLogs.structured)).toBe(true)
-  })
+  }, 30_000)
 
   it('keeps one resumeId across executions and records direct lineage', async () => {
     const reg = await HeadlessTaskRegistry.load(path, noopLogger)

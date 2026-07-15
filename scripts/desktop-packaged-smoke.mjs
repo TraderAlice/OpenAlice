@@ -11,6 +11,7 @@ import {
   DEFAULT_DESKTOP_PACKAGE_ROOT,
 } from './desktop-package-artifact.mjs'
 import { buildDesktopPackagedSmokePlan } from './desktop-packaged-smoke-plan.mjs'
+import { composePnpmCommand } from './pnpm-command.mjs'
 import { packagedElectronExecutable } from './smoke-packaged-toolchain.mjs'
 import { startWorkspaceAcceptanceAiMock } from './workspace-acceptance-ai-mock.mjs'
 
@@ -58,7 +59,10 @@ Options:
 
 function run(label, command, commandArgs, extraEnv = {}) {
   console.log(`\n[desktop-smoke] ${label}`)
-  const result = spawnSync(command, commandArgs, {
+  const childCommand = command === 'pnpm'
+    ? composePnpmCommand(commandArgs, { env: process.env })
+    : { command, args: commandArgs }
+  const result = spawnSync(childCommand.command, childCommand.args, {
     cwd: repoRoot,
     stdio: 'inherit',
     env: { ...process.env, ...extraEnv },

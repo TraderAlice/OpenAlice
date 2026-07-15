@@ -144,11 +144,16 @@ describe('desktop data-home preferences', () => {
     await expect(prepareDataHome(missing)).rejects.toBeInstanceOf(DataHomeUnavailableError)
   })
 
-  it('resolves symlink aliases to one physical location', async () => {
+  it('resolves symlink aliases to one physical location', async ({ skip }) => {
     const actual = join(root, 'actual')
     const alias = join(root, 'alias')
     await mkdir(actual)
-    await symlink(actual, alias, 'dir')
+    try {
+      await symlink(actual, alias, 'dir')
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'EPERM') skip('symlinks unavailable on this runner')
+      throw error
+    }
 
     expect((await prepareDataHome(alias)).path).toBe((await prepareDataHome(actual)).path)
   })

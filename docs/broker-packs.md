@@ -115,7 +115,8 @@ The build command also extracts every generated archive, verifies its catalog
 membership, size, SHA-256, package identity, entry containment, and absence of
 workspace/deployment metadata, then imports the entry in a clean Node process.
 `pnpm broker-packs:verify` repeats that acceptance check against an existing
-`dist/broker-packs/` directory.
+`dist/broker-packs/` directory. Release scripts invoke Corepack's `pnpm.cmd`
+through `ComSpec` on Windows; package scripts must not rely on POSIX quoting.
 
 Desktop package acceptance rejects `ccxt`, `longbridge`, its native binding,
 and `@alpacahq/alpaca-trade-api` if they reappear under packaged

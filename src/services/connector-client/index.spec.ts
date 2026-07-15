@@ -166,12 +166,17 @@ describe('Inbox Connector bridge', () => {
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('encoding unchanged'))
   })
 
-  it('refuses to attach a Markdown symlink that escapes the Workspace', async () => {
+  it('refuses to attach a Markdown symlink that escapes the Workspace', async ({ skip }) => {
     const root = await mkdtemp(join(tmpdir(), 'openalice-connector-workspace-'))
     const outside = await mkdtemp(join(tmpdir(), 'openalice-connector-outside-'))
     tempDirs.push(root, outside)
     await writeFile(join(outside, 'secret.md'), '# outside\n')
-    await symlink(join(outside, 'secret.md'), join(root, 'leak.md'))
+    try {
+      await symlink(join(outside, 'secret.md'), join(root, 'leak.md'))
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'EPERM') skip('symlinks unavailable on this runner')
+      throw error
+    }
     const warn = vi.fn()
 
     const attachments = await projectInboxAttachments({

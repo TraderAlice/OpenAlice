@@ -19,6 +19,7 @@ import {
   type BrokerPackRequirement,
   type BrokerPackReleaseCatalog,
 } from '../src/core/broker-pack-catalog.js'
+import { composePnpmCommand } from './pnpm-command.mjs'
 
 const repoRoot = resolve(import.meta.dirname, '..')
 const packageJson = JSON.parse(await readFile(resolve(repoRoot, 'package.json'), 'utf8')) as { version: string }
@@ -77,12 +78,16 @@ try {
 }
 
 function deployPackage(packageName: string, target: string): void {
-  const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
-  const result = spawnSync(pnpm, [
+  const command = composePnpmCommand([
     '--config.inject-workspace-packages=true',
     '--filter', packageName,
     'deploy', '--prod', target,
-  ], { cwd: repoRoot, stdio: 'inherit', env: process.env })
+  ])
+  const result = spawnSync(command.command, command.args, {
+    cwd: repoRoot,
+    stdio: 'inherit',
+    env: process.env,
+  })
   if (result.error) throw result.error
   if (result.status !== 0) throw new Error(`pnpm deploy failed for ${packageName} (${result.status})`)
 }
