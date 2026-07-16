@@ -122,9 +122,9 @@ export type OccurrenceEvidenceRecord =
       readonly viewport: ThemeColorScenario['viewport']
       readonly deviceScaleFactor: number
       readonly targetBounds: PixelBounds
-      readonly annotation: { readonly label: string; readonly color: '#ff2d55'; readonly bounds: PixelBounds }
+      readonly annotation: { readonly strategy: 'element-bounds' | 'surface-sample'; readonly label: string; readonly color: '#ff2d55'; readonly bounds: PixelBounds }
       readonly context: EvidenceJpeg
-      readonly crop: EvidenceJpeg & { readonly targetBoundsInImage: PixelBounds }
+      readonly crop: EvidenceJpeg & { readonly annotationBoundsInImage: PixelBounds }
     }
   | {
       readonly kind: 'non-visual-probe'
@@ -135,7 +135,7 @@ export type OccurrenceEvidenceRecord =
     }
 
 export interface ThemeColorEvidenceBundle {
-  readonly schemaVersion: 2
+  readonly schemaVersion: 3
   readonly sourceCommit: string
   readonly staticManifestSchemaVersion: number
   readonly runtimeBindingSchemaVersion: number
