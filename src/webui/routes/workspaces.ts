@@ -31,7 +31,7 @@ import { isAgentRuntime, type CliAdapter, type WorkspaceAiCred } from '../../wor
 import { generatePetnameId } from '../../workspaces/petname-id.js';
 import { addCredential, readCredentials, readWorkspaceDefaultAgent, setCredentialLastModel, credentialWires, credentialWireShapeEnum, type Credential } from '../../core/config.js';
 import { inferCredentialVendor, resolveAnthropicAuthMode } from '../../core/credential-inference.js';
-import { compatibleCredentials, matchCredentialByApiKey } from '../../workspaces/credential-injection.js';
+import { compatibleCredentials, matchCredentialByApiKey, resolveInjectionModel } from '../../workspaces/credential-injection.js';
 import {
   AgentCredentialError,
   ensureAgentCredentialReady,
@@ -549,13 +549,25 @@ export function createWorkspaceRoutes(
     meta: WorkspaceMeta,
     agentId: string,
     credentials: Record<string, Credential>,
-  ): Promise<{ slug: string; model: string | null } | null> => {
+  ): Promise<{
+    slug: string;
+    model: string | null;
+    contextWindow: number | null;
+    wireShape: WireShape | null;
+  } | null> => {
     const adapter = svc.adapters.get(agentId);
     if (!adapter?.readAiConfig) return null;
     const cfg = await adapter.readAiConfig(meta.dir).catch(() => null);
     if (!cfg) return null;
     const slug = matchCredentialByApiKey(credentials, cfg.apiKey);
-    return slug ? { slug, model: cfg.model ?? null } : null;
+    return slug
+      ? {
+          slug,
+          model: cfg.model ?? null,
+          contextWindow: cfg.contextWindow ?? null,
+          wireShape: cfg.wireShape ?? null,
+        }
+      : null;
   };
 
   // ── templates / agents ───────────────────────────────────────────────────
@@ -1899,19 +1911,23 @@ export function createWorkspaceRoutes(
       // `?agent=<id>` filters to the credentials that agent can actually be
       // driven by (its wire shapes) — the quick-chat runtime dropdown uses this
       // so it never offers a cred the agent can't speak. apiKey omitted in this
-      // mode (the dropdown only needs to label + pick), kept for the modal's
-      // unfiltered "load saved" picker.
+      // mode; the dropdown receives only presentation/injection metadata, while
+      // the unfiltered Workspace modal keeps the key-bearing response.
       const agent = c.req.query('agent');
       const entries = agent ? compatibleCredentials(credentials, agent) : Object.entries(credentials);
-      const list = entries.map(([slug, cred]) => ({
-        slug,
-        vendor: cred.vendor,
-        ...(cred.label ? { label: cred.label } : {}),
-        authType: cred.authType,
-        wires: credentialWires(cred), // shape → endpoint; the modal picks one per agent
-        ...(cred.lastModel ? { lastModel: cred.lastModel } : {}),
-        ...(agent ? {} : { apiKey: cred.apiKey ?? null }),
-      }));
+      const list = entries.map(([slug, cred]) => {
+        const resolvedModel = resolveInjectionModel(cred);
+        return {
+          slug,
+          vendor: cred.vendor,
+          ...(cred.label ? { label: cred.label } : {}),
+          authType: cred.authType,
+          wires: credentialWires(cred), // shape → endpoint; the modal picks one per agent
+          ...(cred.lastModel ? { lastModel: cred.lastModel } : {}),
+          ...(resolvedModel ? { resolvedModel } : {}),
+          ...(agent ? {} : { apiKey: cred.apiKey ?? null }),
+        };
+      });
       return c.json({ credentials: list });
     } catch (err) {
       launcherLogger.warn('credentials.read_failed', { err });
@@ -1969,9 +1985,9 @@ export function createWorkspaceRoutes(
   });
 
   // Which vault credential this workspace's agent is currently configured with
-  // (slug + model), or null. Feeds the quick-chat composer's overwrite notice:
-  // "this workspace uses X — sending with Y will switch it". Detection only —
-  // never mutates.
+  // (slug + effective model/protocol/context), or null. Feeds the quick-chat
+  // composer's overwrite notice and its compact launch-config summary.
+  // Detection only — never mutates.
   app.get('/:id/agent-config/:agent/credential', async (c) => {
     const id = c.req.param('id');
     const agent = c.req.param('agent');
@@ -1980,11 +1996,16 @@ export function createWorkspaceRoutes(
     if (!meta) return c.json({ error: 'not_found' }, 404);
     try {
       const detected = await detectWorkspaceCred(meta, agent, await readCredentials());
-      return c.json({ slug: detected?.slug ?? null, model: detected?.model ?? null });
+      return c.json({
+        slug: detected?.slug ?? null,
+        model: detected?.model ?? null,
+        contextWindow: detected?.contextWindow ?? null,
+        wireShape: detected?.wireShape ?? null,
+      });
     } catch (err) {
       if (err instanceof PathTraversal) return c.json({ error: 'invalid_path' }, 400);
       launcherLogger.warn('agent_config.detect_cred_failed', { id, agent, err });
-      return c.json({ slug: null, model: null });
+      return c.json({ slug: null, model: null, contextWindow: null, wireShape: null });
     }
   });
 

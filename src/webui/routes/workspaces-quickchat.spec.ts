@@ -155,6 +155,11 @@ async function quickChat(app: any, body: unknown) {
   return { status: res.status, body: await res.json().catch(() => null) };
 }
 
+async function get(app: any, path: string) {
+  const res = await app.request(path);
+  return { status: res.status, body: await res.json().catch(() => null) };
+}
+
 async function spawnSession(app: any, body: unknown) {
   const res = await app.request('/ws-1/sessions/spawn', {
     method: 'POST',
@@ -169,6 +174,59 @@ beforeEach(() => {
   vi.mocked(readWorkspaceDefaultAgent).mockResolvedValue(null);
   vi.mocked(readWorkspaceDefaultContextWindow).mockResolvedValue(256_000);
   vi.mocked(setCredentialLastModel).mockClear();
+});
+
+describe('GET /credentials — Quick Chat launch metadata', () => {
+  it('returns the model a compatible credential would inject before first use', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({
+      'google-1': {
+        vendor: 'google',
+        authType: 'api-key',
+        apiKey: 'AQ.test',
+        wires: { 'google-generative-ai': 'https://generativelanguage.googleapis.com/v1beta' },
+      },
+    });
+    const { app } = build();
+
+    const result = await get(app, '/credentials?agent=opencode');
+
+    expect(result.status).toBe(200);
+    expect(result.body.credentials).toEqual([
+      expect.objectContaining({
+        slug: 'google-1',
+        resolvedModel: 'gemini-3.1-flash-lite',
+      }),
+    ]);
+  });
+
+  it('returns the target workspace model, context, and protocol for the selected credential', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({
+      'google-1': {
+        vendor: 'google',
+        authType: 'api-key',
+        apiKey: 'AQ.test',
+        wires: { 'google-generative-ai': 'https://generativelanguage.googleapis.com/v1beta' },
+      },
+    });
+    const { app } = build({
+      opencodeConfig: {
+        apiKey: 'AQ.test',
+        model: 'gemini-3.5-flash',
+        contextWindow: 512_000,
+        wireShape: 'google-generative-ai',
+      },
+    });
+
+    const result = await get(app, '/ws-1/agent-config/opencode/credential');
+
+    expect(result.status).toBe(200);
+    expect(result.body).toEqual({
+      slug: 'google-1',
+      model: 'gemini-3.5-flash',
+      contextWindow: 512_000,
+      wireShape: 'google-generative-ai',
+    });
+  });
 });
 
 describe('POST /quick-chat — loginless credential injection', () => {

@@ -131,6 +131,14 @@ export function presetDefaultModel(p: Preset | null | undefined): string {
   return typeof value === 'string' ? value : presetModels(p)[0]?.id ?? ''
 }
 
+/** Model shown when a saved credential is loaded into a Workspace editor. */
+export function savedCredentialModel(
+  credential: { lastModel?: string } | null | undefined,
+  preset: Preset | null | undefined,
+): string {
+  return credential?.lastModel?.trim() || presetDefaultModel(preset)
+}
+
 /** Only api-key presets belong in the credential vault — oauth ones log in via the CLI. */
 export function isApiKeyPreset(p: Preset): boolean {
   return 'apiKey' in schemaProps(p.schema)

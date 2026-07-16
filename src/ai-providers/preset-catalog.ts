@@ -185,9 +185,12 @@ export const GEMINI: PresetDef = {
     apiKey: z.string().min(1).describe('Google AI API key'),
   }),
   models: [
-    { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash' },
-    { id: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash-Lite' },
-    { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+    { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash (Stable)' },
+    { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro (Preview, paid)' },
+    { id: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash-Lite (Stable)' },
+    { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (Previous generation)' },
+    { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (Previous generation)' },
+    { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite (Previous generation)' },
   ],
   // Google is moving newly-created keys from legacy AIza traffic keys to AQ
   // authorization keys. The native wire sends x-goog-api-key and works for
@@ -197,7 +200,7 @@ export const GEMINI: PresetDef = {
     apiKeyLabel: 'Google AI API key',
     apiKeyPlaceholder: 'AQ... or AIza...',
     apiKeyHelp: 'Use a Gemini API key from Google AI Studio. Current AQ authorization keys and legacy AIza keys are both supported.',
-    modelHelp: 'Choose a Gemini model available to this key, or paste another exact model ID. Flash-Lite is the reliable free-tier default; Gemini 3.5 Flash can return temporary high-demand errors.',
+    modelHelp: 'Choose a general-purpose Gemini model available to this project, or paste another exact model ID. Flash-Lite stays the conservative default; Gemini 3.5 Flash is the current stable agentic/coding tier and Gemini 3.1 Pro Preview requires paid access.',
   },
   writeOnlyFields: ['apiKey'],
 }

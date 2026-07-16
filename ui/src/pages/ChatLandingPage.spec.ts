@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  formatContextWindow,
   resolveChatAgent,
   resolveChatCredential,
   resolveChatWorkspaceTarget,
+  resolveQuickChatAiDetails,
   resolveQuickChatCredentialSlug,
 } from './ChatLandingPage'
 import type { AgentRuntimeReadinessSnapshot, Workspace } from '../components/workspace/api'
@@ -193,5 +195,70 @@ describe('resolveQuickChatCredentialSlug', () => {
 
   it('does not send credentials to login-backed runtimes', () => {
     expect(resolveQuickChatCredentialSlug(false, 'meituan-longcat')).toBeUndefined()
+  })
+})
+
+describe('resolveQuickChatAiDetails', () => {
+  const credential = { slug: 'google-1', resolvedModel: 'gemini-3.5-flash' }
+
+  it('shows the effective model and context already written in the target workspace', () => {
+    expect(resolveQuickChatAiDetails(
+      'google-1',
+      credential,
+      {
+        slug: 'google-1',
+        model: 'gemini-3.1-flash-lite',
+        contextWindow: 256_000,
+        wireShape: 'google-generative-ai',
+      },
+      { credentialSlug: 'google-1', model: 'gemini-3.1-pro-preview' },
+      512_000,
+      true,
+    )).toEqual({
+      model: 'gemini-3.1-flash-lite',
+      contextWindow: 256_000,
+      source: 'workspace',
+    })
+  })
+
+  it('shows the selected credential model and global context for a replacement injection', () => {
+    expect(resolveQuickChatAiDetails(
+      'google-1',
+      credential,
+      {
+        slug: 'openai-1',
+        model: 'gpt-5.5',
+        contextWindow: 1_000_000,
+        wireShape: 'openai-chat',
+      },
+      undefined,
+      256_000,
+      true,
+    )).toEqual({
+      model: 'gemini-3.5-flash',
+      contextWindow: 256_000,
+      source: 'new-injection',
+    })
+  })
+
+  it('shows the configured creation model before the first workspace exists', () => {
+    expect(resolveQuickChatAiDetails(
+      'google-1',
+      credential,
+      null,
+      { credentialSlug: 'google-1', model: 'gemini-3.1-pro-preview' },
+      512_000,
+      false,
+    )).toEqual({
+      model: 'gemini-3.1-pro-preview',
+      contextWindow: 512_000,
+      source: 'new-injection',
+    })
+  })
+
+  it('formats the supported context tiers compactly', () => {
+    expect(formatContextWindow(128_000)).toBe('128K')
+    expect(formatContextWindow(256_000)).toBe('256K')
+    expect(formatContextWindow(1_000_000)).toBe('1M')
   })
 })

@@ -29,6 +29,7 @@ import {
   agentWireShapes,
   anthropicAuthModeForBaseUrl,
   baseUrlToVendor,
+  savedCredentialModel,
   vendorPreset,
   presetModels,
   pickAgentWire,
@@ -271,11 +272,12 @@ export function WorkspaceAIConfigModal({ wsId, onClose, initialAgent = 'claude',
     // (The picker only lists compatible credentials, so this is non-null.)
     const picked = pickAgentWire(cred.wires, tab, pickedWireShape || undefined)
     if (!picked) return
-    // A credential carries no model, so default it to the matched provider's
-    // first model — a stale model from a previous provider (e.g. minimax-m3 left
-    // on a GLM endpoint) would 404. The user can still pick another below.
+    // Prefer the model this credential last used. A newly-created credential
+    // falls back to the catalog's explicit default, not list order: catalogs
+    // put the newest models first for discovery while retaining a conservative
+    // default for first use (notably Gemini Flash-Lite vs 3.5 Flash).
     const vendorP = vendorPreset(cred.vendor, presets)
-    const defaultModel = vendorP ? (presetModels(vendorP)[0]?.id ?? '') : ''
+    const defaultModel = savedCredentialModel(cred, vendorP)
     setForm({
       ...form,
       baseUrl: picked.baseUrl,
@@ -294,6 +296,10 @@ export function WorkspaceAIConfigModal({ wsId, onClose, initialAgent = 'claude',
       await saveAgentConfig(wsId, tab, formToConfig(form, tab))
       const fresh = await getAgentConfig(wsId)
       setBundle(fresh)
+      window.dispatchEvent(new CustomEvent('openalice:workspace-agent-config-changed', {
+        detail: { wsId, agent: tab },
+      }))
+      window.dispatchEvent(new CustomEvent('openalice:credentials-changed'))
       setSavedFlash(true)
       setTimeout(() => setSavedFlash(false), 1800)
       // Offer to solidify a hand-entered key into Alice's central store — but

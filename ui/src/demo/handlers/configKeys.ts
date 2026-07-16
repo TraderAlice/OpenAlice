@@ -39,7 +39,18 @@ const demoCredentialPresets = [
       type: 'object',
       properties: {
         apiKey: { type: 'string' },
-        model: { type: 'string', default: 'gemini-3.1-flash-lite', oneOf: [{ const: 'gemini-3.1-flash-lite', title: 'Gemini 3.1 Flash-Lite' }] },
+        model: {
+          type: 'string',
+          default: 'gemini-3.1-flash-lite',
+          oneOf: [
+            { const: 'gemini-3.5-flash', title: 'Gemini 3.5 Flash (Stable)' },
+            { const: 'gemini-3.1-pro-preview', title: 'Gemini 3.1 Pro (Preview, paid)' },
+            { const: 'gemini-3.1-flash-lite', title: 'Gemini 3.1 Flash-Lite (Stable)' },
+            { const: 'gemini-2.5-pro', title: 'Gemini 2.5 Pro (Previous generation)' },
+            { const: 'gemini-2.5-flash', title: 'Gemini 2.5 Flash (Previous generation)' },
+            { const: 'gemini-2.5-flash-lite', title: 'Gemini 2.5 Flash-Lite (Previous generation)' },
+          ],
+        },
       },
     },
     regions: [{ id: 'default', label: 'Google', wires: { 'google-generative-ai': 'https://generativelanguage.googleapis.com/v1beta' } }],

@@ -7,11 +7,13 @@ import {
   ChevronDown,
   Code2,
   Cpu,
+  Gauge,
   KeyRound,
   LayoutGrid,
   Loader2,
   MessageSquare,
   Paperclip,
+  Settings2,
   Sparkles,
   X,
   type LucideIcon,
@@ -30,12 +32,18 @@ import {
   type AgentCredentialReadiness,
   type AgentRuntimeReadinessSnapshot,
   type SavedCredential,
+  type WorkspaceCredentialDetection,
   type Workspace,
 } from '../components/workspace/api'
 import { workspaceDisplayTitle } from '../components/workspace/display'
 import { useWorkspace } from '../tabs/store'
-import { configApi, type WorkspaceCredentialDefault } from '../api/config'
+import {
+  configApi,
+  type WorkspaceContextWindow,
+  type WorkspaceCredentialDefault,
+} from '../api/config'
 import { preferencesApi } from '../api/preferences'
+import { WORKSPACE_DEFAULTS_CHANGED_EVENT } from '../lib/workspaceAiEvents'
 
 /** Agent runtimes with no login of their own — they need an injected AI config
  *  to start (claude/codex carry their own CLI login). Mirrors the backend's
@@ -138,6 +146,48 @@ export function resolveQuickChatCredentialSlug(
   return needsCredential ? (effectiveCredential ?? undefined) : undefined
 }
 
+export interface QuickChatAiDetails {
+  readonly model: string | null
+  readonly contextWindow: number
+  readonly source: 'workspace' | 'new-injection'
+}
+
+/** Resolve the exact model/context Quick Chat will launch with. Existing
+ * Workspace config wins when the visible credential already matches it; a
+ * different selection is a new injection and therefore uses that credential's
+ * resolved model plus the global creation-time context default. */
+export function resolveQuickChatAiDetails(
+  effectiveCredential: string | null,
+  credential: Pick<SavedCredential, 'slug' | 'resolvedModel'> | null,
+  detected: WorkspaceCredentialDetection | null,
+  creationDefault: WorkspaceCredentialDefault | undefined,
+  defaultContextWindow: number,
+  hasWorkspace: boolean,
+): QuickChatAiDetails | null {
+  if (!effectiveCredential || credential?.slug !== effectiveCredential) return null
+  if (hasWorkspace && detected?.slug === effectiveCredential) {
+    return {
+      model: detected.model ?? credential.resolvedModel ?? null,
+      contextWindow: detected.contextWindow ?? defaultContextWindow,
+      source: 'workspace',
+    }
+  }
+  const creationModel = !hasWorkspace && creationDefault?.credentialSlug === effectiveCredential
+    ? creationDefault.model
+    : undefined
+  return {
+    model: creationModel ?? credential.resolvedModel ?? null,
+    contextWindow: defaultContextWindow,
+    source: 'new-injection',
+  }
+}
+
+export function formatContextWindow(value: number): string {
+  if (value >= 1_000_000 && value % 1_000_000 === 0) return `${value / 1_000_000}M`
+  if (value >= 1_000 && value % 1_000 === 0) return `${value / 1_000}K`
+  return String(value)
+}
+
 /**
  * Quick-chat landing — the "type a message → you're in" front door for the
  * "Ask Alice" activity. A single composer: the user types a first message and
@@ -149,7 +199,7 @@ export function resolveQuickChatCredentialSlug(
  */
 export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: string } } }) {
   const { t } = useTranslation()
-  const { quickChat, agents, workspaces, defaultAgent, setDefaultAgent } = useWorkspaces()
+  const { quickChat, agents, workspaces, defaultAgent, setDefaultAgent, openAgentConfig } = useWorkspaces()
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
 
   // Targeted launch: the chat sidebar's Workspace row and per-workspace "+"
@@ -242,13 +292,16 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
   const [pickedCred, setPickedCred] = useState<string | null>(null)
   // The credential the visible target Workspace is configured with, if any.
   const [detectedCred, setDetectedCred] = useState<string | null>(null)
+  const [detectedCredentialConfig, setDetectedCredentialConfig] = useState<WorkspaceCredentialDetection | null>(null)
   const [agentReadiness, setAgentReadiness] = useState<AgentCredentialReadiness | null>(null)
   const [credentialWorkspaceResolved, setCredentialWorkspaceResolved] = useState(false)
   const [workspaceCredentialDefaults, setWorkspaceCredentialDefaults] = useState<
     Record<string, WorkspaceCredentialDefault>
   >({})
+  const [workspaceDefaultContextWindow, setWorkspaceDefaultContextWindow] = useState<WorkspaceContextWindow>(256_000)
   const [lastCredentialByAgent, setLastCredentialByAgent] = useState<Record<string, string>>({})
   const [credMenuOpen, setCredMenuOpen] = useState(false)
+  const [agentConfigRevision, setAgentConfigRevision] = useState(0)
   const credBoxRef = useRef<HTMLDivElement>(null)
 
   // Credential state belongs to the Workspace the composer visibly targets.
@@ -267,9 +320,26 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
   useEffect(() => {
     let live = true
     const refreshCredentials = () => {
-      void listAgentCredentials('opencode')
-        .then((list) => { if (live) setCreds(list) })
-        .catch(() => { if (live) setCreds([]) })
+      void Promise.all([
+        listAgentCredentials('opencode').catch(() => []),
+        configApi.getWorkspaceCredentialDefaults().catch(() => null),
+      ]).then(([list, defaults]) => {
+        if (!live) return
+        setCreds(list)
+        if (defaults) {
+          setWorkspaceCredentialDefaults(defaults.defaults)
+          setWorkspaceDefaultContextWindow(defaults.contextWindow)
+        }
+      })
+    }
+    const refreshWorkspaceDefaults = () => {
+      void configApi.getWorkspaceCredentialDefaults()
+        .then((defaults) => {
+          if (!live) return
+          setWorkspaceCredentialDefaults(defaults.defaults)
+          setWorkspaceDefaultContextWindow(defaults.contextWindow)
+        })
+        .catch(() => undefined)
     }
     void Promise.all([
       listAgentCredentials('opencode').catch(() => []),
@@ -286,13 +356,30 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
       setLastCredentialByAgent(preferences.lastCredentialByAgent)
       setRecentChatWorkspaceId(preferences.recentChatWorkspaceId)
       setWorkspaceCredentialDefaults(defaults.defaults)
+      setWorkspaceDefaultContextWindow(defaults.contextWindow)
     })
     window.addEventListener('openalice:credentials-changed', refreshCredentials)
+    window.addEventListener(WORKSPACE_DEFAULTS_CHANGED_EVENT, refreshWorkspaceDefaults)
     return () => {
       live = false
       window.removeEventListener('openalice:credentials-changed', refreshCredentials)
+      window.removeEventListener(WORKSPACE_DEFAULTS_CHANGED_EVENT, refreshWorkspaceDefaults)
     }
   }, [])
+
+  useEffect(() => {
+    const onWorkspaceAgentConfigChanged = (event: Event) => {
+      const detail = (event as CustomEvent<{ wsId?: string; agent?: string }>).detail
+      if (!detail || (
+        detail.wsId === credentialWorkspace?.id &&
+        detail.agent === effectiveAgent
+      )) {
+        setAgentConfigRevision((revision) => revision + 1)
+      }
+    }
+    window.addEventListener('openalice:workspace-agent-config-changed', onWorkspaceAgentConfigChanged)
+    return () => window.removeEventListener('openalice:workspace-agent-config-changed', onWorkspaceAgentConfigChanged)
+  }, [credentialWorkspace?.id, effectiveAgent])
 
   useEffect(() => {
     let live = true
@@ -307,6 +394,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
   useEffect(() => {
     if (!needsCred || effectiveAgent === null || credentialWorkspace === null || credentialWorkspace === undefined) {
       setDetectedCred(null)
+      setDetectedCredentialConfig(null)
       setAgentReadiness(null)
       setCredentialWorkspaceResolved(true)
       return
@@ -318,7 +406,9 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
       getAgentReadiness(credentialWorkspace.id),
     ]).then(([detected, readiness]) => {
       if (!live) return
-      setDetectedCred(detected.status === 'fulfilled' ? detected.value.slug : null)
+      const detectedValue = detected.status === 'fulfilled' ? detected.value : null
+      setDetectedCred(detectedValue?.slug ?? null)
+      setDetectedCredentialConfig(detectedValue)
       setAgentReadiness(
         readiness.status === 'fulfilled'
           ? readiness.value.agents[effectiveAgent] ?? null
@@ -327,7 +417,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
       setCredentialWorkspaceResolved(true)
     })
     return () => { live = false }
-  }, [needsCred, effectiveAgent, credentialWorkspace])
+  }, [needsCred, effectiveAgent, credentialWorkspace, agentConfigRevision])
 
   const workspaceCredReady =
     needsCred &&
@@ -353,6 +443,17 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
     credentialWorkspaceResolved,
   )
   const credInfo = creds?.find((c) => c.slug === effectiveCred) ?? null
+  const effectiveWorkspaceDefault = effectiveAgent
+    ? workspaceCredentialDefaults[effectiveAgent]
+    : undefined
+  const quickChatAiDetails = resolveQuickChatAiDetails(
+    effectiveCred,
+    credInfo,
+    detectedCredentialConfig,
+    effectiveWorkspaceDefault,
+    workspaceDefaultContextWindow,
+    credentialWorkspace !== null && credentialWorkspace !== undefined,
+  )
   // Warn when sending will overwrite the workspace's existing cred with a
   // different one (only meaningful once today's workspace exists).
   const willOverwrite =
@@ -371,6 +472,17 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
 
   const goConfigureProvider = () => {
     openOrFocus({ kind: 'settings', params: { category: 'ai-provider' } })
+  }
+
+  const adjustQuickChatAi = () => {
+    if (
+      credentialWorkspace &&
+      (effectiveAgent === 'opencode' || effectiveAgent === 'pi')
+    ) {
+      openAgentConfig(credentialWorkspace.id, effectiveAgent, 'ai')
+      return
+    }
+    goConfigureProvider()
   }
 
   // A missing runtime choice should open the picker, not leave a mysteriously
@@ -704,7 +816,14 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
                             }}
                             className={`w-full flex items-center gap-2 px-3 py-1.5 text-[12px] text-left transition-colors hover:bg-bg-tertiary ${active ? 'text-accent' : 'text-text'}`}
                           >
-                            <span className="flex-1 truncate">{cr.label?.trim() || cr.slug}</span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate">{cr.label?.trim() || cr.slug}</span>
+                              {cr.resolvedModel && (
+                                <span className="block truncate text-[10px] text-text-muted">
+                                  {cr.resolvedModel}
+                                </span>
+                              )}
+                            </span>
                             <span className="text-[10px] text-text-muted shrink-0">{cr.vendor}</span>
                             {active && <Check className="w-3.5 h-3.5 shrink-0" />}
                           </button>
@@ -737,6 +856,50 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
               </button>
             </div>
           </div>
+          {needsCred && credInfo && quickChatAiDetails && (
+            <div className="mx-1 mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 border-t border-border/50 px-1 pt-2 text-[10.5px] text-text-muted">
+              <span
+                className="inline-flex min-w-0 max-w-full items-center gap-1"
+                aria-label={t('chatLanding.modelSummary', {
+                  model: quickChatAiDetails.model ?? t('chatLanding.runtimeDefaultModel'),
+                })}
+                title={quickChatAiDetails.model ?? t('chatLanding.runtimeDefaultModel')}
+              >
+                <Cpu className="h-3 w-3 shrink-0" />
+                <span className="truncate font-mono text-text/80">
+                  {quickChatAiDetails.model ?? t('chatLanding.runtimeDefaultModel')}
+                </span>
+              </span>
+              <span aria-hidden className="text-text-muted/40">·</span>
+              <span
+                className="inline-flex shrink-0 items-center gap-1"
+                aria-label={t('chatLanding.contextSummary', {
+                  limit: formatContextWindow(quickChatAiDetails.contextWindow),
+                })}
+              >
+                <Gauge className="h-3 w-3" />
+                {t('chatLanding.contextSummary', {
+                  limit: formatContextWindow(quickChatAiDetails.contextWindow),
+                })}
+              </span>
+              <button
+                type="button"
+                onClick={adjustQuickChatAi}
+                className="oa-pressable inline-flex min-h-7 items-center gap-1 rounded-md px-2 py-1 text-accent hover:bg-accent/10 sm:ml-auto"
+                aria-label={credentialWorkspace
+                  ? t('chatLanding.adjustWorkspaceAi')
+                  : t('chatLanding.providerSettings')}
+                title={credentialWorkspace
+                  ? t('chatLanding.adjustWorkspaceAi')
+                  : t('chatLanding.providerSettings')}
+              >
+                <Settings2 className="h-3 w-3" />
+                {credentialWorkspace
+                  ? t('chatLanding.adjustWorkspaceAi')
+                  : t('chatLanding.providerSettings')}
+              </button>
+            </div>
+          )}
         </div>
 
         {error !== null && <div className="text-[12px] text-red px-1">{error}</div>}

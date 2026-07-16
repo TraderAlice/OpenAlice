@@ -453,8 +453,8 @@ export const workspacesHandlers = [
   http.get('/api/workspaces/credentials', () =>
     HttpResponse.json({
       credentials: [
-        { slug: 'openai-1', vendor: 'openai', label: 'OpenAI', authType: 'api-key', wires: { 'openai-chat': '' }, lastModel: 'gpt-5.5', apiKey: null },
-        { slug: 'minimax-1', vendor: 'minimax', label: 'MiniMax', authType: 'api-key', wires: { 'openai-chat': '' }, lastModel: 'MiniMax-M2.1', apiKey: null },
+        { slug: 'openai-1', vendor: 'openai', label: 'OpenAI', authType: 'api-key', wires: { 'openai-chat': '' }, lastModel: 'gpt-5.5', resolvedModel: 'gpt-5.5', apiKey: null },
+        { slug: 'minimax-1', vendor: 'minimax', label: 'MiniMax', authType: 'api-key', wires: { 'openai-chat': '' }, lastModel: 'MiniMax-M2.1', resolvedModel: 'MiniMax-M2.1', apiKey: null },
       ],
     }),
   ),
@@ -671,7 +671,7 @@ export const workspacesHandlers = [
   // Credential detection — demo workspaces have no on-disk config, so report
   // none (no overwrite notice; the picker defaults to the first compatible).
   http.get('/api/workspaces/:id/agent-config/:agent/credential', () =>
-    HttpResponse.json({ slug: null, model: null }),
+    HttpResponse.json({ slug: null, model: null, contextWindow: null, wireShape: null }),
   ),
   http.put('/api/workspaces/:id/agent-config/:agent', () => HttpResponse.json({ ok: true })),
   http.post('/api/workspaces/:id/agent-config/:agent/test', () =>

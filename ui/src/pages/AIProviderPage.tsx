@@ -33,6 +33,7 @@ import {
   compatibleAgentIds,
   isApiKeyPreset,
 } from '../lib/presetHelpers'
+import { notifyWorkspaceDefaultsChanged } from '../lib/workspaceAiEvents'
 
 function credentialLabel(cred: Pick<CredentialSummary, 'slug' | 'vendor' | 'label'>): string {
   return cred.label?.trim() || cred.slug
@@ -308,6 +309,7 @@ function WorkspaceDefaultsSection({ credentials }: { credentials: CredentialSumm
     try {
       const res = await api.config.setWorkspaceCredentialDefaults(nextDefaults, contextWindow)
       setData((d) => (d ? { ...d, defaults: res.defaults, contextWindow: res.contextWindow } : d))
+      notifyWorkspaceDefaultsChanged()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed')
       await reload()

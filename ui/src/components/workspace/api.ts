@@ -1211,6 +1211,8 @@ export interface SavedCredential {
   readonly wires: Partial<Record<WireShape, string>>;
   /** Last model run against this key, when remembered. Absent until first use. */
   readonly lastModel?: string;
+  /** Model injection resolves right now (lastModel, then the vendor default). */
+  readonly resolvedModel?: string;
   /** Omitted in the per-agent (`?agent=`) listing — only the unfiltered list returns it. */
   readonly apiKey?: string | null;
 }
@@ -1231,15 +1233,22 @@ export async function listAgentCredentials(agent: string): Promise<SavedCredenti
 }
 
 /** Which vault credential a workspace's agent is currently configured with (null = none/hand-edited). */
+export interface WorkspaceCredentialDetection {
+  readonly slug: string | null;
+  readonly model: string | null;
+  readonly contextWindow: number | null;
+  readonly wireShape: WireShape | null;
+}
+
 export async function detectWorkspaceCredential(
   wsId: string,
   agent: string,
-): Promise<{ slug: string | null; model: string | null }> {
+): Promise<WorkspaceCredentialDetection> {
   const res = await fetch(
     `/api/workspaces/${encodeURIComponent(wsId)}/agent-config/${encodeURIComponent(agent)}/credential`,
   );
-  if (!res.ok) return { slug: null, model: null };
-  return (await res.json()) as { slug: string | null; model: string | null };
+  if (!res.ok) return { slug: null, model: null, contextWindow: null, wireShape: null };
+  return (await res.json()) as WorkspaceCredentialDetection;
 }
 
 /** Persist a hand-entered provider as a reusable central credential. Returns the slug. */

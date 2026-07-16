@@ -81,6 +81,21 @@ higher-price tiers implicitly. Changing these settings never rewrites an
 existing Workspace; that Workspace's settings modal remains the explicit
 override surface.
 
+Quick Chat must summarize the launch configuration behind its credential pill:
+the effective model ID and context limit are visible before Send. For an
+existing Workspace these values come from its CLI-native config; selecting a
+different credential previews the model that credential will inject and the
+global context default. The adjacent adjustment action opens that Workspace's
+AI injector when a target exists, and falls back to AI Provider settings before
+the first Workspace has been created. Saving the Workspace modal refreshes this
+summary without requiring a page reload.
+
+Provider model catalogs are curated suggestions, not allowlists. Keep the
+free-text model field so a newly released or project-specific model remains
+usable before OpenAlice updates its catalog. Gemini suggestions should contain
+general-purpose text/tool models only; image, Live, TTS, embedding, and managed
+agent model IDs are different product surfaces and do not belong in Quick Chat.
+
 Editing must round-trip the stored `lastModel` and any endpoint that no longer
 matches a current preset. A catalog refresh must never silently replace either
 value merely because the user opened and saved the form.

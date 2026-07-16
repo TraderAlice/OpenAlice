@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_MODEL_BY_VENDOR, LONGCAT } from './preset-catalog.js';
+import { DEFAULT_MODEL_BY_VENDOR, GEMINI, LONGCAT } from './preset-catalog.js';
 import { BUILTIN_PRESETS } from './presets.js';
 
 describe('LONGCAT preset', () => {
@@ -16,6 +16,17 @@ describe('LONGCAT preset', () => {
 });
 
 describe('credential form catalog', () => {
+  it('offers current general-purpose Gemini tiers without mixing in media-only models', () => {
+    expect(GEMINI.models?.map((model) => model.id)).toEqual([
+      'gemini-3.5-flash',
+      'gemini-3.1-pro-preview',
+      'gemini-3.1-flash-lite',
+      'gemini-2.5-pro',
+      'gemini-2.5-flash',
+      'gemini-2.5-flash-lite',
+    ]);
+  });
+
   it('serializes provider-aware setup guidance for every API-key preset', () => {
     const apiKeyPresets = BUILTIN_PRESETS.filter((preset) => {
       const properties = preset.schema['properties'] as Record<string, unknown> | undefined;
