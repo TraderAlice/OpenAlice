@@ -42,7 +42,6 @@ async function main(): Promise<void> {
     recorder: journal,
     updateAdapterSettings: (id, patch) => configStore.patchAdapter(id, patch),
   })
-  await manager.start()
 
   const app = new Hono()
   app.get('/__connector/health', (c) => c.json(manager.health()))
@@ -75,6 +74,12 @@ async function main(): Promise<void> {
   }
   process.on('SIGINT', () => { void shutdown('SIGINT') })
   process.on('SIGTERM', () => { void shutdown('SIGTERM') })
+
+  // Adapter SDK startup reaches external services. Keep the loopback health
+  // endpoint available while an adapter is connecting or recovering so
+  // Guardian and Alice can report a degraded adapter instead of treating the
+  // whole optional service as unavailable.
+  await manager.start()
 }
 
 main().catch((error) => {

@@ -17,6 +17,8 @@ import {
   formatPlainInboxNotification,
 } from './shared.js'
 
+const STARTUP_TIMEOUT_MS = 10_000
+
 export class TelegramConnectorAdapter implements ConnectorAdapter {
   readonly id = 'telegram'
   private readonly tracker = new AdapterHealthTracker(this.id)
@@ -29,7 +31,6 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
     this.ownerUserId = optionalString(config, 'ownerUserId')
     this.chatId = optionalString(config, 'chatId')
     const bot = new Bot(token)
-    bot.api.config.use(autoRetry())
     this.bot = bot
 
     for (const command of TELEGRAM_CONNECTOR_DEFINITION.commands) {
@@ -50,11 +51,29 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
       })
     }
     this.registerCommands(context)
-    await bot.api.setMyCommands(TELEGRAM_CONNECTOR_DEFINITION.commands.map(({ name, description }) => ({
-      command: name,
-      description,
-    })))
-    await bot.init()
+    try {
+      await withTimeout(async () => {
+        await bot.api.setMyCommands(TELEGRAM_CONNECTOR_DEFINITION.commands.map(({ name, description }) => ({
+          command: name,
+          description,
+        })))
+        await bot.init()
+      }, STARTUP_TIMEOUT_MS, 'Telegram API did not become ready within 10 seconds')
+    } catch (error) {
+      this.tracker.degraded(error)
+      this.bot = undefined
+      throw error
+    }
+    // Keep startup API calls untransformed. The bundled retry transformer can
+    // fail `setMyCommands` on this runtime even though the plain Telegram API
+    // call succeeds. Delivery still gets bounded retry behavior once the bot
+    // has initialized.
+    bot.api.config.use(autoRetry({
+      maxRetryAttempts: 1,
+      maxDelaySeconds: 5,
+      rethrowHttpErrors: true,
+      rethrowInternalServerErrors: true,
+    }))
     if (this.ownerUserId && this.chatId) this.tracker.healthy(this.ownerUserId)
     else this.tracker.awaitingLink()
     void bot.start({ drop_pending_updates: true }).catch((error) => {
@@ -134,4 +153,19 @@ function requiredString(config: ConnectorAdapterConfig, key: string): string {
 function optionalString(config: ConnectorAdapterConfig, key: string): string | undefined {
   const value = config.settings[key]
   return typeof value === 'string' && value.trim() ? value.trim() : undefined
+}
+
+export async function withTimeout<T>(operation: () => Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  let timer: NodeJS.Timeout | undefined
+  try {
+    return await Promise.race([
+      operation(),
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error(message)), timeoutMs)
+        timer.unref?.()
+      }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
 }
