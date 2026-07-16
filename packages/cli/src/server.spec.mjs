@@ -105,6 +105,46 @@ describe('OpenAlice Server CLI', () => {
     expect(stdout.write).toHaveBeenCalledWith(expect.stringContaining('keep running'))
   })
 
+  it('waits for an explicit takeover to replace the previous owner', async () => {
+    const child = new FakeChild()
+    const spawnProcess = vi.fn(() => child)
+    const previousOwner = {
+      ...runningStatus(),
+      class: 'owned_elsewhere',
+      owner: { ...runningStatus().owner, surface: 'cli-server' },
+      endpoints: {},
+      capabilities: [],
+    }
+    const readStatus = vi.fn()
+      .mockResolvedValueOnce(previousOwner)
+      .mockResolvedValueOnce(previousOwner)
+      .mockResolvedValue(runningStatus())
+
+    await expect(startRuntimeServer(parseServerArgs('start', [
+      '--app-dir', '/tmp/OpenAlice',
+      '--home', '/tmp/alice-home',
+      '--takeover',
+    ]), {
+      detached: true,
+      env: { PATH: '/bin' },
+      nodeBinary: '/test/node',
+      resolveRoot: async (path) => path,
+      prepareSource: async () => ({ prepared: false }),
+      spawnProcess,
+      openFile: async () => ({ fd: 9, close: async () => undefined }),
+      mkdirImpl: async () => undefined,
+      readStatus,
+      sleep: async () => undefined,
+      stdout: { write: vi.fn() },
+    })).resolves.toBe(0)
+
+    expect(readStatus).toHaveBeenCalledTimes(3)
+    expect(spawnProcess).toHaveBeenCalledWith('/test/node', ['scripts/guardian/prod.mjs'], expect.objectContaining({
+      env: expect.objectContaining({ OPENALICE_TAKEOVER: '1' }),
+    }))
+    expect(child.kill).not.toHaveBeenCalled()
+  })
+
   it('keeps server run in the foreground until its Guardian exits', async () => {
     const child = new FakeChild()
     const stdout = { write: vi.fn((text) => {

@@ -681,6 +681,24 @@ browser, SSH tunnel, remote PTY, remote Pi process, and provider round trip.
 This validates the functional Pi path; representative 20/80/150 ms network
 shaping remains a separate latency observation.
 
+A 2026-07-16 persistent-volume Railway service then exercised the stable
+`master` installer through ordinary OpenSSH. Cold bootstrap, source build,
+detached readiness, tunnel HTTP/auth, disconnect persistence, idempotent plan,
+and same-container restart recovery all passed. A full Railway redeploy kept
+the checkout, build artifacts, and `OPENALICE_HOME` on the volume while
+correctly dropping the container-local CLI and Pi, which managed remote then
+reinstalled from `https://openalice.ai/install` without rebuilding the source
+Runtime.
+
+The redeploy also confirmed the cross-machine safety boundary. The reattached
+volume still named the removed container as Guardian and Alice owner; ordinary
+start refused it, and explicit `--takeover` still refused to signal or reclaim
+an owner from another machine. After Railway independently reported the old
+deployment as removed, the operator quarantined all three foreign lock records
+before starting the new owner. This is an operational recovery observation,
+not automatic cross-machine failover: heartbeat expiry alone must never grant
+permission to reclaim a shared volume.
+
 ### Stage 3 — terminal transport optimization
 
 - build only if Stage 2 measurements justify it;
