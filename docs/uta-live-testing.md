@@ -50,8 +50,10 @@ The commands are intentionally asymmetric:
 # Ordinary product E2E: safe for routine local development and CI.
 pnpm test:e2e
 
-# One explicitly selected account-trading spec.
-OPENALICE_UTA_LIVE_PAPER=1 pnpm test:uta:live-paper -- \
+# One explicitly selected account-trading spec. Invoke Vitest directly so
+# pnpm does not forward a literal `--` that defeats Vitest's file filter.
+OPENALICE_UTA_LIVE_PAPER=1 pnpm exec vitest run \
+  --config vitest.uta-live.config.ts \
   services/uta/src/domain/trading/__test__/e2e/uta-bybit.e2e.spec.ts
 
 # Full configured demo/paper account suite. Use only for a deliberate sweep.
@@ -82,6 +84,24 @@ query the venue again, cancel new open orders, close only positions created by
 the test, reject leftover Alice staging, and confirm the account returned to
 its baseline. If that cannot be proven, stop the development lane and report
 the account as requiring manual cleanup.
+
+IBKR routing smoke uses
+`services/uta/src/domain/trading/__test__/e2e/live-paper-evidence.ts` to append
+a small JSONL run record under ignored `data/uta-live-paper-runs/` by default.
+Set `OPENALICE_UTA_LIVE_RECORD_DIR` to choose another local destination. The
+record format deliberately excludes account ids, balances, credentials, and
+position payloads. When live contract data should become an offline regression
+input, manually review and copy only stable canonical contract fields into a
+tracked fixture; never make a test overwrite tracked fixtures directly.
+
+When selecting a test by name, keep the same direct invocation pattern:
+
+```bash
+OPENALICE_UTA_LIVE_PAPER=1 pnpm exec vitest run \
+  --config vitest.uta-live.config.ts \
+  services/uta/src/domain/trading/__test__/e2e/ibkr-paper.e2e.spec.ts \
+  -t 'canonical conId routing'
+```
 
 ## Ground rules
 

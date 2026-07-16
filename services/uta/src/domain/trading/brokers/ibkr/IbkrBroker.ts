@@ -16,6 +16,8 @@ import Decimal from 'decimal.js'
 import {
   EClient,
   Contract,
+  ComboLeg,
+  DeltaNeutralContract,
   Order,
   OrderCancel,
   OrderState,
@@ -42,6 +44,19 @@ import { aggregateAccountFromPositions } from '../../position-math.js'
 import { RequestBridge } from './request-bridge.js'
 import { resolveSymbol } from './ibkr-contracts.js'
 import type { IbkrBrokerConfig } from './ibkr-types.js'
+
+/** IBKR models are mutable because the wire decoder fills them field by field.
+ * Broker routing must not let a caller mutate a cached canonical contract (or
+ * let routing defaults mutate a staged/ledger contract), so clone at the
+ * boundary where contracts change ownership. */
+function cloneContract(contract: Contract): Contract {
+  const clone = Object.assign(new Contract(), contract)
+  clone.comboLegs = (contract.comboLegs ?? []).map(leg => Object.assign(new ComboLeg(), leg))
+  clone.deltaNeutralContract = contract.deltaNeutralContract
+    ? Object.assign(new DeltaNeutralContract(), contract.deltaNeutralContract)
+    : null
+  return clone
+}
 
 export class IbkrBroker implements IBroker {
   // ---- Self-registration ----
@@ -84,6 +99,9 @@ export class IbkrBroker implements IBroker {
   private client: EClient
   private readonly config: IbkrBrokerConfig
   private accountId: string | null = null
+  /** A promise cache deduplicates simultaneous quote/order resolution for the
+   * same conId. Cached contracts are canonical TWS values; callers get clones. */
+  private readonly conIdContracts = new Map<number, Promise<Contract>>()
 
   constructor(config: IbkrBrokerConfig) {
     this.config = config
@@ -236,19 +254,91 @@ export class IbkrBroker implements IBroker {
   /** All matching contract details (a conId resolves to one; a family query
    *  like EUR/CASH or an issuerId resolves to many). */
   private async contractDetailsQuery(query: Contract): Promise<ContractDetails[]> {
+    const requestContract = cloneContract(query)
     // Routing defaults are for SYMBOL-form STK queries only. A conId (or
     // issuerId) resolves globally, and non-STK secTypes don't live on SMART
     // (EUR.USD is on IDEALPRO; conId+SMART → TWS error 200, found live).
     // Forcing USD would also narrow a CASH family query to one pair.
-    if (!query.conId && !query.issuerId && (!query.secType || query.secType === 'STK')) {
-      if (!query.exchange) query.exchange = 'SMART'
-      if (!query.currency) query.currency = 'USD'
+    if (!requestContract.conId && !requestContract.issuerId && (!requestContract.secType || requestContract.secType === 'STK')) {
+      if (!requestContract.exchange) requestContract.exchange = 'SMART'
+      if (!requestContract.currency) requestContract.currency = 'USD'
     }
 
     const reqId = this.bridge.allocReqId()
     const promise = this.bridge.requestCollector<ContractDetails>(reqId)
-    this.client.reqContractDetails(reqId, query)
-    return promise
+    this.client.reqContractDetails(reqId, requestContract)
+    const details = await promise
+    for (const detail of details) this.rememberCanonicalContract(detail.contract)
+    return details
+  }
+
+  /** Seed the cache from any authoritative ContractDetails response. Do not
+   * replace an in-flight lookup for the same conId. */
+  private rememberCanonicalContract(contract: Contract): void {
+    if (!contract.conId || this.conIdContracts.has(contract.conId)) return
+    this.conIdContracts.set(contract.conId, Promise.resolve(cloneContract(contract)))
+  }
+
+  /** Resolve a conId with a deliberately clean request. conId is authoritative
+   * identity; caller-provided routing fields must not narrow this lookup. */
+  private async resolveConIdContract(conId: number): Promise<Contract> {
+    let pending = this.conIdContracts.get(conId)
+    if (!pending) {
+      pending = (async () => {
+        const query = new Contract()
+        query.conId = conId
+        const details = await this.contractDetailsQuery(query)
+        const canonical = details.find(item => item.contract.conId === conId)?.contract
+        if (!canonical) {
+          throw new BrokerError('EXCHANGE', `IBKR conId ${conId} did not resolve to a canonical contract`)
+        }
+        return cloneContract(canonical)
+      })()
+      this.conIdContracts.set(conId, pending)
+    }
+
+    try {
+      return cloneContract(await pending)
+    } catch (err) {
+      // A transient TWS/network failure must not become a permanent rejected
+      // cache entry. Only delete the promise that this caller observed.
+      if (this.conIdContracts.get(conId) === pending) this.conIdContracts.delete(conId)
+      throw err
+    }
+  }
+
+  /** Convert an identity/display contract into a contract safe to send to a
+   * TWS quote or order request. */
+  private async resolveRoutableContract(contract: Contract): Promise<Contract> {
+    if (contract.conId) {
+      const canonical = await this.resolveConIdContract(contract.conId)
+      if (contract.aliceId) canonical.aliceId = contract.aliceId
+      return canonical
+    }
+
+    const routed = cloneContract(contract)
+    // Bare symbols are the one supported convenience form. They mean a US
+    // stock unless the caller supplied a different secType explicitly.
+    if (!routed.secType && routed.symbol) routed.secType = 'STK'
+    if (routed.secType === 'STK') {
+      if (!routed.exchange) routed.exchange = 'SMART'
+      if (!routed.currency) routed.currency = 'USD'
+      return routed
+    }
+
+    const missing: string[] = []
+    if (!routed.secType) missing.push('secType')
+    if (!routed.exchange) missing.push('exchange')
+    if (!routed.currency) missing.push('currency')
+    if (!routed.symbol && !routed.localSymbol) missing.push('symbol/localSymbol')
+    if (missing.length > 0) {
+      throw new BrokerError(
+        'EXCHANGE',
+        `IBKR contract without conId is missing ${missing.join(', ')}. ` +
+        'Resolve it through contract search/expand before requesting a quote or order.',
+      )
+    }
+    return routed
   }
 
   /**
@@ -358,19 +448,12 @@ export class IbkrBroker implements IBroker {
         error: 'IBKR attached TP/SL (bracket) is not implemented yet — refusing to place a naked entry. Place the entry first, then a standalone STP/LMT protective order.',
       }
     }
-    // TWS requires exchange and currency on the contract. Upstream layers
-    // (staging, AI tools) typically only populate symbol + secType.
-    // Default to SMART routing. Currency defaults to USD — non-USD markets
-    // (LSE/GBP, TSE/JPY) and forex (CASH secType) will need the caller
-    // to specify currency explicitly.
-    if (!contract.exchange) contract.exchange = 'SMART'
-    if (!contract.currency) contract.currency = 'USD'
-
     try {
       this._ensureAlive()
+      const routedContract = await this.resolveRoutableContract(contract)
       const orderId = this.bridge.getNextOrderId()
       const promise = this.bridge.requestOrder(orderId)
-      this.client.placeOrder(orderId, contract, order)
+      this.client.placeOrder(orderId, routedContract, order)
       const result = await promise
       return {
         success: true,
@@ -401,9 +484,10 @@ export class IbkrBroker implements IBroker {
       if (changes.trailingPercent != null) mergedOrder.trailingPercent = changes.trailingPercent
       if (changes.trailStopPrice != null) mergedOrder.trailStopPrice = changes.trailStopPrice
 
+      const routedContract = await this.resolveRoutableContract(original.contract)
       const numericId = parseInt(orderId, 10)
       const promise = this.bridge.requestOrder(numericId)
-      this.client.placeOrder(numericId, original.contract, mergedOrder)
+      this.client.placeOrder(numericId, routedContract, mergedOrder)
       const result = await promise
 
       return {
@@ -445,9 +529,10 @@ export class IbkrBroker implements IBroker {
       return { success: false, error: `No position for ${symbol ?? `conId=${contract.conId}`}` }
     }
 
-    // Use the position's contract (has conId etc.) but route via SMART
-    const closeContract = pos.contract
-    closeContract.exchange = 'SMART'
+    // The position contract came from TWS and may live somewhere other than
+    // SMART (for example CASH on IDEALPRO). Do not mutate or override it;
+    // placeOrder will canonicalize the conId again at the write boundary.
+    const closeContract = cloneContract(pos.contract)
     const order = new Order()
     order.action = pos.side === 'long' ? 'SELL' : 'BUY'
     order.orderType = 'MKT'
@@ -615,40 +700,17 @@ export class IbkrBroker implements IBroker {
    * Each call briefly occupies one TWS market data line (limit ~100),
    * auto-released after tickSnapshotEnd.
    */
-  /** conId → resolved full contract, so by-conId quotes pay reqContractDetails once. */
-  private readonly conIdContracts = new Map<number, Contract>()
-
   async getQuote(contract: Contract): Promise<Quote> {
-    // Enrichment must run BEFORE routing defaults: a premature SMART poisons
-    // the conId details lookup for anything not on SMART (EUR.USD@IDEALPRO).
-    // The enriched contract carries its real exchange/currency.
-
-    // TWS rejects reqMktData on a bare conId (error 321: symbol/localSymbol/
-    // secId required) even though the wire carries conId — resolution by
-    // conId is only honoured via reqContractDetails. Enrich once and cache.
-    if (contract.conId && !contract.symbol && !contract.localSymbol) {
-      let full = this.conIdContracts.get(contract.conId)
-      if (!full) {
-        const details = await this.getContractDetails(contract)
-        if (!details?.contract) {
-          throw new BrokerError('EXCHANGE', `conId ${contract.conId} did not resolve to a contract`)
-        }
-        full = details.contract
-        this.conIdContracts.set(contract.conId, full)
-      }
-      contract = full
-    }
-
-    if (!contract.exchange) contract.exchange = 'SMART'
-    if (!contract.currency) contract.currency = 'USD'
+    this._ensureAlive()
+    const routedContract = await this.resolveRoutableContract(contract)
 
     const reqId = this.bridge.allocReqId()
     const promise = this.bridge.requestSnapshot(reqId)
-    this.client.reqMktData(reqId, contract, '', true, false, [])
+    this.client.reqMktData(reqId, routedContract, '', true, false, [])
     const snap = await promise
 
     return {
-      contract,
+      contract: routedContract,
       last: String(snap.last ?? 0),
       bid: String(snap.bid ?? 0),
       ask: String(snap.ask ?? 0),

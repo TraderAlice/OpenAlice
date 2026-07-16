@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import Decimal from 'decimal.js'
 import { Contract, Order } from '@traderalice/ibkr'
 import { IbkrBroker } from './IbkrBroker.js'
+import contractCorpus from './__fixtures__/contract-resolution.v1.json'
 
 /**
  * The gate must fire BEFORE any bridge/client access, so it is testable on
@@ -24,6 +25,233 @@ function stkOrder(): { contract: Contract; order: Order } {
   order.lmtPrice = new Decimal(100)
   return { contract, order }
 }
+
+function recordedContract(name: string): Contract {
+  const recorded = contractCorpus.cases.find(item => item.name === name)?.canonical
+  if (!recorded) throw new Error(`missing recorded IBKR contract fixture: ${name}`)
+  const contract = new Contract()
+  Object.assign(contract, recorded)
+  contract.secType = recorded.secType as Contract['secType']
+  return contract
+}
+
+function usdChfContract(): Contract {
+  return recordedContract('usd-chf-cash')
+}
+
+function brokerWithContractIo(resolvedContract = usdChfContract()): {
+  broker: IbkrBroker
+  bridge: {
+    requestCollector: ReturnType<typeof vi.fn>
+    requestSnapshot: ReturnType<typeof vi.fn>
+    requestOrder: ReturnType<typeof vi.fn>
+  }
+  client: {
+    reqContractDetails: ReturnType<typeof vi.fn>
+    reqMktData: ReturnType<typeof vi.fn>
+    placeOrder: ReturnType<typeof vi.fn>
+  }
+} {
+  const broker = new IbkrBroker({ id: 'ibkr-test', host: '127.0.0.1', port: 7497, clientId: 91 })
+  const bridge = {
+    connectionDead: false,
+    allocReqId: vi.fn(() => 17),
+    requestCollector: vi.fn(async () => [{ contract: Object.assign(new Contract(), resolvedContract) }]),
+    requestSnapshot: vi.fn(async () => ({ last: 0.8, bid: 0.79, ask: 0.81, volume: 1 })),
+    getNextOrderId: vi.fn(() => 42),
+    requestOrder: vi.fn(async () => ({ orderState: { status: 'Submitted' } })),
+  }
+  const client = {
+    reqContractDetails: vi.fn(),
+    reqMktData: vi.fn(),
+    placeOrder: vi.fn(),
+  }
+  ;(broker as unknown as { bridge: unknown }).bridge = bridge
+  ;(broker as unknown as { client: unknown }).client = client
+  return { broker, bridge, client }
+}
+
+function limitBuy(): Order {
+  const order = new Order()
+  order.action = 'BUY'
+  order.orderType = 'LMT'
+  order.totalQuantity = new Decimal(1)
+  order.lmtPrice = new Decimal('0.1')
+  return order
+}
+
+describe('IbkrBroker — canonical conId contract resolution', () => {
+  it.each(contractCorpus.cases)('replays the recorded $name canonical contract', async ({ canonical }) => {
+    const resolved = new Contract()
+    Object.assign(resolved, canonical)
+    resolved.secType = canonical.secType as Contract['secType']
+    const { broker, client } = brokerWithContractIo(resolved)
+    const identity = Object.assign(new Contract(), {
+      conId: canonical.conId,
+      symbol: 'DISPLAY-ONLY',
+      secType: 'STK' as const,
+      exchange: 'SMART',
+      currency: 'USD',
+    })
+
+    const result = await broker.placeOrder(identity, limitBuy())
+
+    expect(result.success).toBe(true)
+    const sent = client.placeOrder.mock.calls[0][1] as Contract
+    expect({
+      conId: sent.conId,
+      symbol: sent.symbol,
+      localSymbol: sent.localSymbol,
+      secType: sent.secType,
+      exchange: sent.exchange,
+      primaryExchange: sent.primaryExchange,
+      currency: sent.currency,
+      tradingClass: sent.tradingClass,
+      multiplier: sent.multiplier,
+    }).toEqual(canonical)
+  })
+
+  it('resolves a polluted conId through a clean lookup before placing an order', async () => {
+    const { broker, client } = brokerWithContractIo()
+    const input = new Contract()
+    input.conId = 12087820
+    input.symbol = 'USDCHF' // display-only value carried by UTA staging
+    input.secType = 'STK'
+    input.exchange = 'SMART'
+    input.currency = 'USD'
+
+    const result = await broker.placeOrder(input, limitBuy())
+
+    expect(result.success).toBe(true)
+    expect(client.reqContractDetails).toHaveBeenCalledOnce()
+    const lookup = client.reqContractDetails.mock.calls[0][1] as Contract
+    expect({
+      conId: lookup.conId,
+      symbol: lookup.symbol,
+      secType: lookup.secType,
+      exchange: lookup.exchange,
+      currency: lookup.currency,
+    }).toEqual({ conId: 12087820, symbol: '', secType: '', exchange: '', currency: '' })
+
+    const sent = client.placeOrder.mock.calls[0][1] as Contract
+    expect({
+      conId: sent.conId,
+      symbol: sent.symbol,
+      localSymbol: sent.localSymbol,
+      secType: sent.secType,
+      exchange: sent.exchange,
+      currency: sent.currency,
+    }).toEqual({
+      conId: 12087820,
+      symbol: 'USD',
+      localSymbol: 'USD.CHF',
+      secType: 'CASH',
+      exchange: 'IDEALPRO',
+      currency: 'CHF',
+    })
+  })
+
+  it('does not mutate a symbol-form stock while applying its convenience defaults', async () => {
+    const { broker, client } = brokerWithContractIo()
+    const input = new Contract()
+    input.symbol = 'AAPL'
+    input.secType = 'STK'
+
+    await broker.placeOrder(input, limitBuy())
+
+    expect(input.exchange).toBe('')
+    expect(input.currency).toBe('')
+    const sent = client.placeOrder.mock.calls[0][1] as Contract
+    expect(sent.symbol).toBe('AAPL')
+    expect(sent.secType).toBe('STK')
+    expect(sent.exchange).toBe('SMART')
+    expect(sent.currency).toBe('USD')
+    expect(client.reqContractDetails).not.toHaveBeenCalled()
+  })
+
+  it('refuses to guess routing fields for a non-stock contract without conId', async () => {
+    const { broker, client } = brokerWithContractIo()
+    const input = new Contract()
+    input.symbol = 'USD'
+    input.secType = 'CASH'
+    input.currency = 'CHF'
+
+    const result = await broker.placeOrder(input, limitBuy())
+
+    expect(result.success).toBe(false)
+    expect(result.error).toMatch(/missing exchange.*search\/expand/i)
+    expect(client.placeOrder).not.toHaveBeenCalled()
+    expect(client.reqContractDetails).not.toHaveBeenCalled()
+  })
+
+  it('deduplicates concurrent conId lookups and returns independent contracts', async () => {
+    const { broker, client } = brokerWithContractIo()
+    const left = Object.assign(new Contract(), { conId: 12087820 })
+    const right = Object.assign(new Contract(), { conId: 12087820 })
+
+    const [a, b] = await Promise.all([broker.getQuote(left), broker.getQuote(right)])
+
+    expect(client.reqContractDetails).toHaveBeenCalledOnce()
+    expect(a.contract).not.toBe(b.contract)
+    a.contract.exchange = 'MUTATED'
+    expect(b.contract.exchange).toBe('IDEALPRO')
+  })
+
+  it('drops a failed cached lookup so the conId can be retried', async () => {
+    const { broker, bridge, client } = brokerWithContractIo()
+    bridge.requestCollector
+      .mockRejectedValueOnce(new Error('temporary contract lookup failure'))
+      .mockResolvedValueOnce([{ contract: usdChfContract() }])
+    const input = Object.assign(new Contract(), { conId: 12087820 })
+
+    await expect(broker.getQuote(input)).rejects.toThrow(/temporary contract lookup failure/)
+    await expect(broker.getQuote(input)).resolves.toMatchObject({ contract: { exchange: 'IDEALPRO' } })
+    expect(client.reqContractDetails).toHaveBeenCalledTimes(2)
+  })
+
+  it('canonicalizes a conId contract before an order modification', async () => {
+    const { broker, client } = brokerWithContractIo()
+    const polluted = Object.assign(new Contract(), {
+      conId: 12087820,
+      symbol: 'USDCHF',
+      secType: 'STK',
+      exchange: 'SMART',
+      currency: 'USD',
+    })
+    ;(broker as unknown as { getOrder: unknown }).getOrder = vi.fn(async () => ({
+      contract: polluted,
+      order: limitBuy(),
+      orderState: { status: 'Submitted' },
+    }))
+
+    const result = await broker.modifyOrder('42', { lmtPrice: new Decimal('0.2') })
+
+    expect(result.success).toBe(true)
+    const sent = client.placeOrder.mock.calls[0][1] as Contract
+    expect(sent.secType).toBe('CASH')
+    expect(sent.exchange).toBe('IDEALPRO')
+    expect(sent.currency).toBe('CHF')
+  })
+
+  it('closes an FX position without overwriting its venue contract', async () => {
+    const broker = bareBroker()
+    const positionContract = usdChfContract()
+    ;(broker as unknown as { getPositions: unknown }).getPositions = vi.fn(async () => [{
+      contract: positionContract,
+      side: 'long',
+      quantity: new Decimal('1'),
+    }])
+    const placeOrder = vi.fn(async () => ({ success: true, orderId: '42' }))
+    ;(broker as unknown as { placeOrder: unknown }).placeOrder = placeOrder
+
+    const result = await broker.closePosition(Object.assign(new Contract(), { conId: 12087820 }))
+
+    expect(result.success).toBe(true)
+    const sent = placeOrder.mock.calls[0][0] as Contract
+    expect(sent.exchange).toBe('IDEALPRO')
+    expect(positionContract.exchange).toBe('IDEALPRO')
+  })
+})
 
 describe('IbkrBroker — attached TP/SL refusal gate', () => {
   // Guards the silent naked-entry failure: the tpsl param used to be
