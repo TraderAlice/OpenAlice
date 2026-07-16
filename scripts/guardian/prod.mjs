@@ -34,6 +34,7 @@ import { setTimeout as sleep } from 'node:timers/promises'
 import {
   acquireGuardianRuntime,
   currentProcessStartedAt,
+  normalizeProcessExitCode,
   takeoverRequested,
 } from '@traderalice/guardian-runtime'
 import { startGuardianControlServer } from './control-server.mjs'
@@ -452,7 +453,7 @@ async function restartUTA() {
 }
 
 function shutdown(exitCode = 0) {
-  shutdownExitCode = Math.max(shutdownExitCode, exitCode)
+  shutdownExitCode = Math.max(shutdownExitCode, normalizeProcessExitCode(exitCode))
   if (stopping) return
   stopping = true
   if (aliceChild) aliceStatus = 'stopping'
@@ -482,9 +483,9 @@ function shutdown(exitCode = 0) {
   }, 5_000)
 }
 
-process.on('SIGINT', shutdown)
-process.on('SIGTERM', shutdown)
-process.on('SIGHUP', shutdown)
+process.on('SIGINT', () => shutdown())
+process.on('SIGTERM', () => shutdown())
+process.on('SIGHUP', () => shutdown())
 
 async function startFlagWatcher() {
   await mkdir(dirname(FLAG_PATH), { recursive: true })

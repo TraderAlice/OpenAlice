@@ -41,6 +41,18 @@ export function currentProcessStartedAt(): number {
   return Math.floor((Date.now() - process.uptime() * 1_000) / 1_000) * 1_000
 }
 
+/**
+ * Keep process shutdown codes safe when a callback is also used as a Node
+ * signal handler. Signal listeners receive the signal name as their first
+ * argument, which must never flow into `process.exit()` as though it were a
+ * numeric child-process exit code.
+ */
+export function normalizeProcessExitCode(value: unknown): number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0
+    ? value
+    : 0
+}
+
 export async function isSameProcess(
   pid: number,
   expectedStartedAt: string | undefined,

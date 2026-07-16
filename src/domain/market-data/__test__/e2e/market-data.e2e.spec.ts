@@ -49,11 +49,11 @@ describe('market-data e2e — FRED via webui routes', () => {
   })
 
   it('fred_series multi-symbol returns rows with both columns populated', async () => {
-    // Catches the same asc bug indirectly — with old asc default, GDP (from 1947)
-    // and UNRATE (from 1948) latest-N timestamps had near-zero overlap, so
-    // merged rows were almost always single-column. With desc default,
-    // both series share the same recent dates.
-    const rows = await getJson(t.app, '/api/market-data-v1/economy/fred_series?provider=federal_reserve&symbol=GDP,UNRATE&limit=5')
+    // Exercise the date merge over an explicit recent window. Using `limit=5`
+    // independently for quarterly GDP and monthly UNRATE is time-dependent:
+    // once the monthly series advances far enough beyond the latest GDP
+    // publication, neither set is required to contain the same date.
+    const rows = await getJson(t.app, '/api/market-data-v1/economy/fred_series?provider=federal_reserve&symbol=GDP,UNRATE&start_date=2024-01-01')
     expect(rows.length).toBeGreaterThan(0)
     const hasBoth = rows.some(r => r.GDP != null && r.UNRATE != null)
     expect(hasBoth).toBe(true)

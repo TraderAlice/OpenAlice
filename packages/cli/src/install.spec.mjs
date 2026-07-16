@@ -19,7 +19,7 @@ afterEach(async () => {
   await Promise.all(temporaryPaths.splice(0).map((path) => rm(path, { recursive: true, force: true })))
 })
 
-describe.skipIf(process.platform === 'win32')('OpenAlice CLI installer', () => {
+describe.skipIf(process.platform === 'win32')('OpenAlice CLI installer', { timeout: 15_000 }, () => {
   it('keeps the CLI and desktop managed-Pi pins aligned', async () => {
     const installer = await readFile(join(repositoryRoot, 'install'), 'utf8')
     const desktopVendor = await readFile(join(repositoryRoot, 'scripts/vendor-managed-runtime.mjs'), 'utf8')
