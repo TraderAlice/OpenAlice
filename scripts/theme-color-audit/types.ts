@@ -74,3 +74,28 @@ export interface RuntimeBindingManifest {
   readonly sourceCommit: string
   readonly bindings: readonly RuntimeColorBinding[]
 }
+
+export interface EvidenceImage {
+  readonly scenarioId: string
+  readonly theme: 'light' | 'dark'
+  readonly state: ThemeColorScenario['state']
+  readonly relativePath: string
+  readonly sha256: string
+  readonly format: 'jpeg'
+  readonly quality: 80
+  readonly width: number
+  readonly height: number
+  readonly viewport: ThemeColorScenario['viewport']
+  readonly deviceScaleFactor: number
+  readonly inventoryIds: readonly string[]
+}
+
+export interface ThemeColorEvidenceBundle {
+  readonly schemaVersion: 1
+  readonly sourceCommit: string
+  readonly staticManifestSchemaVersion: number
+  readonly runtimeBindingSchemaVersion: number
+  readonly playwrightVersion: string
+  readonly browserVersion: string
+  readonly images: readonly EvidenceImage[]
+}
