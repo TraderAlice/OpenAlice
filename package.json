@@ -1,6 +1,6 @@
 {
   "name": "open-alice",
-  "version": "0.81.0-beta",
+  "version": "0.82.0-beta",
   "description": "File-based trading agent engine",
   "type": "module",
   "main": "dist/electron/main.js",
@@ -11,6 +11,7 @@
     "docker:build": "docker build --tag openalice:local .",
     "docker:smoke": "node scripts/docker-runtime-smoke.mjs",
     "test:install:docker": "node scripts/install-docker-smoke.mjs",
+    "test:install:dev-channel": "node scripts/install-channel-smoke.mjs",
     "test:remote:docker": "node scripts/remote-ssh-smoke.mjs",
     "prebuild": "tsx scripts/build-migration-index.ts",
     "build": "turbo run build && tsup src/main.ts --format esm --dts",

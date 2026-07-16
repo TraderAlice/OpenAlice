@@ -137,7 +137,7 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
 
   if (sessionId && session) {
     return (
-      <div className="flex h-full min-h-0 flex-col bg-bg">
+      <div className="workspaces-root flex h-full min-h-0 flex-col bg-bg">
         <header className="flex shrink-0 items-center justify-between gap-3 border-b border-border bg-bg-secondary/35 px-3 py-2 md:px-4">
           <div className="flex min-w-0 items-center gap-2.5">
             <button
@@ -161,7 +161,7 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
             <Bot size={11} /> {runtimeLabel(session.agent, agents)} · {session.surface === 'webpi' ? 'WebPi' : 'TUI'}
           </span>
         </header>
-        <div className="min-h-0 flex-1 p-2 md:p-3">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-2 md:p-3">
           {session.state === 'paused' ? (
             <ResumeCta
               record={session}

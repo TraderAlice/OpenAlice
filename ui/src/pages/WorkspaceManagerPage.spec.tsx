@@ -379,13 +379,14 @@ describe('WorkspaceManagerPage runtime selection', () => {
     const snapshot = managerSnapshot([session])
     mocks.useWorkspaces.mockImplementation(() => context('codex', snapshot))
 
-    render(<WorkspaceManagerPage spec={{
+    const { container } = render(<WorkspaceManagerPage spec={{
       kind: 'workspace-manager',
       params: { sessionId: session.id },
     }} />)
 
     expect(mocks.resumeSession).not.toHaveBeenCalled()
     expect(screen.queryByTestId('terminal-view')).toBeNull()
+    expect(container.firstElementChild?.classList.contains('workspaces-root')).toBe(true)
 
     fireEvent.click(screen.getByRole('button', { name: 'Continue in terminal' }))
 

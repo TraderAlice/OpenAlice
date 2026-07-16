@@ -219,6 +219,28 @@ jobs:
           compression-level: 0
           retention-days: 1
 
+  cli-installer-acceptance:
+    name: Accept CLI installer candidate
+    needs: release
+    if: needs.release.outputs.created == 'true' && !github.event.inputs.mirror_tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.19.0
+
+      - name: Exercise candidate installer in a clean HTTP fixture
+        run: node scripts/install-docker-smoke.mjs
+
+      - name: Exercise candidate installer through managed SSH remote
+        run: node scripts/remote-ssh-smoke.mjs
+
   build-linux-broker-packs:
     name: Build Linux Broker Packs
     needs: release
@@ -255,8 +277,8 @@ jobs:
 
   publish-release:
     name: Publish accepted release
-    needs: [release, build-desktop, build-linux-broker-packs]
-    if: needs.release.outputs.created == 'true' && needs.build-desktop.result == 'success' && needs.build-linux-broker-packs.result == 'success'
+    needs: [release, build-desktop, build-linux-broker-packs, cli-installer-acceptance]
+    if: needs.release.outputs.created == 'true' && needs.build-desktop.result == 'success' && needs.build-linux-broker-packs.result == 'success' && needs.cli-installer-acceptance.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       actions: read
@@ -308,6 +330,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # A manual mirror is an idempotent repair of an existing release.
+          # Always derive the installer from that tag, never from whichever
+          # commit happens to be at master when the workflow is dispatched.
+          ref: ${{ github.event.inputs.mirror_tag || needs.release.outputs.tag }}
 
       - uses: actions/setup-node@v4
         with:
@@ -326,6 +353,9 @@ jobs:
           TAG: ${{ github.event.inputs.mirror_tag || needs.release.outputs.tag }}
         run: |
           VERSION="${TAG#v}"
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          test "$PACKAGE_VERSION" = "$VERSION"
+          bash -n install
           cp install "dist/r2-upload/OpenAlice-${VERSION}-install"
 
       - name: Prepare CDN download aliases
@@ -447,6 +477,7 @@ jobs:
       - name: Verify CDN metadata
         env:
           DOWNLOAD_BASE_URL: ${{ secrets.DOWNLOAD_BASE_URL }}
+          PUBLIC_INSTALL_URL: https://openalice.ai/install
           TAG: ${{ github.event.inputs.mirror_tag || needs.release.outputs.tag }}
         run: |
           BASE_URL="${DOWNLOAD_BASE_URL%/}"
@@ -484,8 +515,13 @@ jobs:
           curl -fsSI "${BASE_URL}/manifest.json"
           curl -fsSI "${BASE_URL}/OpenAlice-${VERSION}-install"
           curl -fsSI "${BASE_URL}/install"
+          curl -fsSL "${BASE_URL}/OpenAlice-${VERSION}-install" -o /tmp/openalice-versioned-install
           curl -fsSL "${BASE_URL}/install" -o /tmp/openalice-install
+          curl -fsSL "$PUBLIC_INSTALL_URL" -o /tmp/openalice-site-install
+          cmp /tmp/openalice-versioned-install "dist/r2-upload/OpenAlice-${VERSION}-install"
           cmp /tmp/openalice-install dist/r2-upload/install
+          cmp /tmp/openalice-versioned-install /tmp/openalice-install
+          cmp /tmp/openalice-install /tmp/openalice-site-install
           bash -n /tmp/openalice-install
           bash /tmp/openalice-install --plan | tee /tmp/openalice-install-plan
           grep -Eq '^  Branch[[:space:]]+master$' /tmp/openalice-install-plan

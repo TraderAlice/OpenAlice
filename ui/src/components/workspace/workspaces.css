@@ -854,6 +854,9 @@
 .terminal-shell {
   display: grid;
   grid-template-rows: auto 1fr;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   min-height: 0;
   flex: 1 1 auto;
   border: 1px solid var(--border);
@@ -866,6 +869,8 @@
 .terminal-header {
   display: flex;
   align-items: center;
+  min-width: 0;
+  overflow: hidden;
   gap: 10px;
   padding: 8px 12px;
   background: linear-gradient(180deg, var(--color-bg-tertiary), var(--color-bg-secondary));
@@ -876,6 +881,10 @@
 }
 
 .terminal-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--fg);
   font-weight: 600;
   letter-spacing: 0.2px;
@@ -883,6 +892,10 @@
 }
 
 .terminal-meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   margin-left: auto;
   font-variant-numeric: tabular-nums;
 }
@@ -905,6 +918,7 @@
 
 .terminal-theme-switch {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   height: 24px;
   padding: 2px;
@@ -945,17 +959,31 @@
   display: inline-block;
 }
 
-.terminal-host {
+.terminal-body {
+  min-width: 0;
   min-height: 0;
   padding: 8px 8px 4px;
+  overflow: hidden;
   background: var(--bg);
 }
 
-.terminal-host .xterm,
-.terminal-host .xterm-viewport,
-.terminal-host .xterm-screen {
-  height: 100% !important;
-  width: 100% !important;
+.terminal-host {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* xterm owns the inline dimensions of its viewport, screen, and canvases.
+ * Overriding those descendants with `!important` desynchronizes the DOM box
+ * from the renderer's cell grid. Only size the xterm root; FitAddon will keep
+ * the managed descendants inside it. */
+.terminal-host > .xterm {
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  min-width: 0;
 }
 
 .terminal-host .xterm-viewport {

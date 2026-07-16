@@ -183,6 +183,10 @@ describe('ChatWorkspaceSection actions', () => {
     const managerSection = managerButton.parentElement?.parentElement
     expect(managerSection).toBeTruthy()
     const managerUi = within(managerSection as HTMLElement)
+
+    expect(managerUi.queryByRole('button', { name: 'Inspect the floor' })).toBeNull()
+    fireEvent.click(managerUi.getByRole('button', { name: 'Expand sessions' }))
+
     const runningSession = managerUi.getByRole('button', { name: 'Inspect the floor' })
     const pausedSession = managerUi.getByRole('button', { name: 'Coordinate owners' })
 

@@ -67,11 +67,20 @@ upstream content.
 
 The script requires Node.js 22.19.0 or newer, matching the pinned Pi runtime's
 engine floor. With no selector, it targets the stable `master` branch.
-Development dogfooding must opt into `--branch dev` explicitly:
+
+The independently active development channel deliberately uses GitHub's raw
+branch endpoint rather than the release CDN. Both layers must select `dev`:
 
 ```bash
-curl -fsSL https://openalice.ai/install | bash -s -- --branch dev
+curl -fsSL https://raw.githubusercontent.com/TraderAlice/OpenAlice/dev/install \
+  | bash -s -- --branch dev
 ```
+
+That command tests the current dev installer script and the current dev CLI
+payload together. Running the stable `https://openalice.ai/install` script with
+`--branch dev` can be useful as a compatibility probe, but it does not prove
+that changes to `dev/install` work. The raw endpoint is mutable preview
+infrastructure for maintainers, not a user-facing release mirror.
 
 `--version` selects a tag or commit, and the two selectors are mutually
 exclusive. The default install root is `~/.openalice`, and the downloaded
@@ -96,10 +105,14 @@ runs `npm ci --omit=dev --ignore-scripts` in the staged release.
 - `packages/cli/src/install.spec.mjs` — plan, consent, PTY, layout, and live-lock
   contract tests.
 - `scripts/install-docker-smoke.mjs` — local Docker acceptance runner.
+- `scripts/install-channel-smoke.mjs` — clean-host acceptance for the live raw
+  dev installer and matching dev payload.
 - `scripts/remote-ssh-smoke.mjs` — local clean-host Server/SSH acceptance
   runner; its product contract belongs to [[docs/remote-access.md]].
 - `scripts/install-smoke/` — clean user, local HTTP fixture, automated smoke,
   manual playground, exact Pi release assets, and an offline npm fixture.
+- `.github/workflows/cli-installer-smoke.yml` — checkout acceptance on relevant
+  PRs and live raw-channel acceptance after installer changes merge to `dev`.
 - `docs/local-runtime.md` — behavior after the installed command starts a
   source-backed localhost Runtime.
 - `docs/reference/install-script/README.md` — Claude Code and Codex research;
@@ -436,7 +449,8 @@ after that trust chain is added.
 ### Fast local feedback
 
 ```bash
-bash -n install scripts/install-smoke/run.sh scripts/install-smoke/interactive.sh
+bash -n install scripts/install-smoke/run.sh scripts/install-smoke/interactive.sh \
+  scripts/install-channel-smoke/run.sh
 pnpm -F @traderalice/openalice-cli test
 ```
 
@@ -485,7 +499,34 @@ It verifies:
 - identical-release reuse;
 - ref switching without deleting the prior release.
 
-This is a local pre-release gate. It is intentionally not delegated to PR CI.
+Relevant PRs run this deterministic acceptance in CI against the exact checkout.
+The same workflow runs `pnpm test:remote:docker` in a separate clean SSH fixture
+so installer changes cannot pass while managed remote is broken.
+
+### Live dev-channel acceptance
+
+```bash
+pnpm test:install:dev-channel
+```
+
+This smoke builds an empty non-root container but copies no OpenAlice installer
+or CLI payload into it. It downloads
+`https://raw.githubusercontent.com/TraderAlice/OpenAlice/dev/install`, installs
+the matching `--branch dev` payload through the real network path, and verifies:
+
+- the response is the Bash installer and passes syntax validation;
+- `--plan` selects dev without writing the install root;
+- the complete OpenAlice CLI and managed Pi transaction succeeds;
+- installed provenance records the raw dev URL and branch selector;
+- the CLI version, Pi version, and `server status --json` execute;
+- an identical second install reuses the same content identity and immutable
+  release directory.
+
+The workflow runs this job after relevant changes merge to `dev`. PR checks use
+the checkout fixtures instead, because the raw dev URL correctly continues to
+represent the previously merged branch until the PR lands. A network failure is
+reported separately from deterministic checkout acceptance rather than being
+hidden by a local fixture.
 
 ### Manual interaction review
 
@@ -542,18 +583,25 @@ Before publishing or promoting a change that affects the installer:
    asset hashes, lockfile engine floor, and root/CLI Node engines. Do not
    accidentally advertise mutable `dev` as a stable release.
 3. Run the fast installer tests and the full repository-required checks.
-4. Run `pnpm test:install:docker` locally.
-5. Walk `pnpm test:install:docker --interactive` as a human.
+4. Require checkout install and managed-remote CI acceptance to pass, then
+   require the post-merge `pnpm test:install:dev-channel` result for current
+   `dev` to be green.
+5. Walk `pnpm test:install:docker --interactive` as a human when prompts,
+   progress, PATH guidance, or next steps changed.
 6. Exercise the installed CLI from `--source`; include the localhost handoff if
    the payload or start boundary changed.
-7. Verify the versioned installer asset, R2 `install` alias, manifest checksum,
-   and main-site proxy. State the remaining archive/signature gap explicitly.
+7. Treat the `dev` to `master` merge as the release event. The release workflow
+   repeats checkout acceptance before publication, creates the installer from
+   the accepted tag, then verifies the versioned asset, R2 `install` alias,
+   manifest checksum, and main-site proxy. State the remaining
+   archive/signature gap explicitly.
 8. Keep Electron signing and notarization in the Electron release lane; the CLI
    preview must not read those secrets.
 
-For a `dev` to `master` promotion that publishes installer behavior, the local
-Docker installer smoke remains a required manual gate under
-[[docs/development-workflow.md]].
+Do not refresh the stable installer from an unreleased `master` commit. A
+manual release mirror may only reproduce the exact bytes owned by its requested
+tag; new installer behavior stays on the live dev channel until the next
+versioned promotion under [[docs/development-workflow.md]].
 
 ## Troubleshooting
 

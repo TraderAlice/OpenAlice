@@ -245,7 +245,7 @@ interface ManagerWorkspaceRowProps {
  * but remain outside the business Workspace tree and registry. */
 function ManagerWorkspaceRow(props: ManagerWorkspaceRowProps): ReactElement {
   const { t } = useTranslation()
-  const [expanded, setExpanded] = useState(true)
+  const [expanded, setExpanded] = useState(false)
   const sessions = useMemo(
     () => orderSessionsForSidebar(props.manager?.sessions ?? []),
     [props.manager?.sessions],

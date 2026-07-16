@@ -632,7 +632,13 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
         )}
         <TerminalThemeControl />
       </header>
-      <div ref={containerRef} className="terminal-host" />
+      {/* FitAddon reads the computed size of xterm's direct parent. Keep that
+          parent padding-free: putting the visual inset on `.terminal-host`
+          makes FitAddon count the padding as usable columns, so the xterm
+          screen/canvas becomes wider than the pane at narrow widths. */}
+      <div className="terminal-body">
+        <div ref={containerRef} className="terminal-host" />
+      </div>
     </div>
   );
 }

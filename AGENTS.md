@@ -56,8 +56,13 @@ for current ownership and entry points.
 ## Delivery and Branch Policy
 
 - `dev` is the integration lane. Routine PRs target `dev`.
+- `dev` is also the active preview channel: installer work must pass against
+  both the checked-out tree and the matching `raw/.../dev/install` +
+  `--branch dev` network path before promotion.
 - `master` is the stable/user-facing lane. Only human-directed promotions from
   `dev` and explicit emergency hotfixes target `master`.
+- A merge to `master` is a versioned release event, not a post-release staging
+  step. Stable CDN aliases are updated only from the resulting tag.
 - Do not commit directly to `master`. Avoid direct commits to `dev` unless the
   maintainer explicitly requests integration work.
 - Never force-push or delete `master` or `dev`.
