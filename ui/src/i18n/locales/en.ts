@@ -733,6 +733,7 @@ export const en = {
     upgradeLoading: 'Building a three-way upgrade preview…',
     upgradeUnavailableTitle: 'In-place upgrade is not available',
     upgradeManagedAssets: 'Managed template assets',
+    upgradeLatestVersion: 'Latest version',
     upgradeCurrentDescription: 'This Workspace is on the latest recorded template baseline. Its own customizations remain independent.',
     upgradeDescription: 'Only launcher-managed instructions and skills are compared. Research, reports, issues, credentials, and other work stay outside this upgrade.',
     upgradeRefresh: 'Refresh preview',

@@ -128,9 +128,20 @@ export function WorkspaceTemplateUpgradePanel({
                     {t('workspace.upgradeManagedAssets')}
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-[18px] font-semibold text-text">
-                    <span>v{plan.fromVersion}</span>
-                    <ArrowRight size={17} className="text-text-muted" />
-                    <span className={current ? '' : 'text-accent'}>v{plan.toVersion}</span>
+                    {current ? (
+                      <>
+                        <span className="text-accent">v{plan.toVersion}</span>
+                        <span className="rounded-full border border-accent/25 bg-accent/10 px-2 py-0.5 text-[10px] font-semibold text-accent">
+                          {t('workspace.upgradeLatestVersion')}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span>v{plan.fromVersion}</span>
+                        <ArrowRight size={17} className="text-text-muted" />
+                        <span className="text-accent">v{plan.toVersion}</span>
+                      </>
+                    )}
                   </div>
                   <p className="mt-1 max-w-xl text-[12px] leading-relaxed text-text-muted">
                     {current
