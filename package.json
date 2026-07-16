@@ -40,7 +40,11 @@
     "audit:theme-colors:scan": "tsx scripts/theme-color-audit/cli.ts scan",
     "audit:theme-colors:check-static": "tsx scripts/theme-color-audit/cli.ts check-static",
     "audit:theme-colors:validate-manifest": "tsx scripts/theme-color-audit/cli.ts validate-manifest",
+    "audit:theme-colors:validate-scenarios": "tsx scripts/theme-color-audit/scenario-cli.ts validate",
+    "audit:theme-colors:check-scenario-coverage": "tsx scripts/theme-color-audit/scenario-cli.ts coverage",
+    "audit:theme-colors:serve-and-check-scenarios": "tsx scripts/theme-color-audit/scenario-cli.ts browser",
     "test:theme-color-static-inventory": "vitest run scripts/theme-color-audit/static-inventory.spec.ts --project node",
+    "test:theme-color-scenarios": "vitest run scripts/theme-color-audit/scenarios.spec.ts --project node",
     "postinstall": "node scripts/fix-pty-perms.mjs"
   },
   "keywords": [
@@ -144,6 +148,7 @@
   },
   "devDependencies": {
     "@ai-sdk/provider": "^3.0.8",
+    "@playwright/test": "1.58.2",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
     "@types/node": "^25.2.3",
