@@ -1,13 +1,14 @@
-import { type LucideIcon, MessageSquare, Inbox, Telescope, LineChart, GitBranch, BarChart3, Newspaper, Zap, Settings, Code2, TerminalSquare, ChevronDown, Info, ListChecks, PanelLeftClose, PanelLeftOpen, Plug } from 'lucide-react'
+import { ChevronDown, Info, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { type Page } from '../App'
 import { useWorkspace } from '../tabs/store'
-import type { ActivitySection, ViewSpec } from '../tabs/types'
+import type { ActivitySection } from '../tabs/types'
 import { useUnreadInboxCount } from '../live/inbox-read'
 import { usePendingPushCount } from '../live/trading-push'
 import { useActivityBarCollapse } from '../live/activity-bar-collapse'
 import { useTranslation } from 'react-i18next'
 import { ThemeToggle } from './ThemeToggle'
+import { NAV_SECTIONS } from './activity-navigation'
 
 /**
  * Map ActivityBar page enum (visual layout grouping) to the ActivitySection
@@ -42,98 +43,6 @@ interface ActivityBarProps {
   compactRailForced?: boolean
 }
 
-// ==================== Nav item definitions ====================
-
-type NavItemKey =
-  | 'nav.item.inbox' | 'nav.item.tracked' | 'nav.item.chat' | 'nav.item.workspaces'
-  | 'nav.item.market' | 'nav.item.news' | 'nav.item.tradingAsGit' | 'nav.item.issue'
-  | 'nav.item.portfolio' | 'nav.item.connectors' | 'nav.item.automation' | 'nav.item.settings' | 'nav.item.dev'
-
-interface NavLeaf {
-  page: Page
-  labelKey: NavItemKey
-  icon: LucideIcon
-  /**
-   * What page opens when this ActivityBar item is clicked. Local navigators
-   * are page-owned now, so every rail item has a concrete landing surface.
-   */
-  defaultTab: ViewSpec
-}
-
-interface NavSection {
-  /** Stable identity — the collapse-state storage key and the labeled-vs-
-   *  pinned check. '' = the unlabeled top section. Display comes from
-   *  `labelKey`, not this. */
-  sectionLabel: string
-  /** i18n key for the displayed section header (labeled sections only). */
-  labelKey?: 'nav.section.beta' | 'nav.section.system'
-  items: NavLeaf[]
-  /** When true, the section starts collapsed on a user's first visit
-   *  (or after they clear localStorage). User-toggled collapse state
-   *  still wins — `defaultCollapsed` only fills in the absence-of-key
-   *  default. Useful for "this section exists but isn't the recommended
-   *  path" framing (Legacy). */
-  defaultCollapsed?: boolean
-  /** i18n key for the muted-text paragraph rendered between the section
-   *  header and its items (visible only when expanded) — e.g. Beta's
-   *  lifecycle hint. */
-  descriptionKey?: 'nav.betaDescription'
-}
-
-const NAV_SECTIONS: NavSection[] = [
-  // Top — primary nav, always visible (no header, not collapsible).
-  // Mental model: Chat (Ask Alice) is THE entry — for an AI product the
-  // chat surface is the front door (how you use the thing), so it sits at
-  // the very top, above Inbox (which is task sync, not the core loop).
-  // Workspaces (the all-templates index) is the power-user surface for
-  // hands-on session management; the two aren't redundant (Workspaces =
-  // whole set, Chat = chat-shape subset shortcut), but because day-to-day
-  // work rarely leaves Ask Alice, Workspaces sits at the bottom of this
-  // group rather than alongside Chat.
-  //
-  // Market / News are operational tools that work but aren't load-
-  // bearing — they live here because they don't need lifecycle
-  // labelling.
-  {
-    sectionLabel: '',
-    items: [
-      { page: 'chat',       labelKey: 'nav.item.chat',       icon: MessageSquare, defaultTab: { kind: 'chat-landing', params: {} } },
-      { page: 'inbox',      labelKey: 'nav.item.inbox',      icon: Inbox, defaultTab: { kind: 'inbox', params: {} } },
-      { page: 'issue',      labelKey: 'nav.item.issue',      icon: ListChecks, defaultTab: { kind: 'issue', params: {} } },
-      { page: 'tracked',    labelKey: 'nav.item.tracked',    icon: Telescope, defaultTab: { kind: 'tracked', params: {} } },
-      { page: 'market',     labelKey: 'nav.item.market',     icon: BarChart3, defaultTab: { kind: 'market-list', params: {} } },
-      { page: 'news',       labelKey: 'nav.item.news',       icon: Newspaper, defaultTab: { kind: 'news', params: {} } },
-      { page: 'workspaces', labelKey: 'nav.item.workspaces', icon: TerminalSquare, defaultTab: { kind: 'workspace-list', params: {} } },
-    ],
-  },
-  // Beta — useful product surfaces whose state model and UX are still
-  // settling. Configuration remains in Settings; these entries show the
-  // operational product state rather than editing credentials.
-  {
-    sectionLabel: 'Beta',
-    labelKey: 'nav.section.beta',
-    descriptionKey: 'nav.betaDescription',
-    items: [
-      { page: 'trading-as-git', labelKey: 'nav.item.tradingAsGit', icon: GitBranch, defaultTab: { kind: 'trading-as-git', params: {} } },
-      { page: 'portfolio',      labelKey: 'nav.item.portfolio',    icon: LineChart, defaultTab: { kind: 'portfolio', params: {} } },
-      { page: 'connectors',     labelKey: 'nav.item.connectors',   icon: Plug, defaultTab: { kind: 'connectors', params: {} } },
-    ],
-  },
-  {
-    sectionLabel: 'System',
-    labelKey: 'nav.section.system',
-    items: [
-      // Automation lives here now: Issues (the board) is the primary
-      // management surface, and scheduled issues fire from there. Automation
-      // is the operations/plumbing side (headless runs, API, event bus) —
-      // System chrome, not a daily-driver nav target.
-      { page: 'automation', labelKey: 'nav.item.automation', icon: Zap, defaultTab: { kind: 'automation', params: { section: 'runs' } } },
-      { page: 'settings', labelKey: 'nav.item.settings', icon: Settings, defaultTab: { kind: 'settings', params: { category: 'general' } } },
-      { page: 'dev',      labelKey: 'nav.item.dev',      icon: Code2, defaultTab: { kind: 'dev', params: { tab: 'tools' } } },
-    ],
-  },
-]
-
 function useMediaQuery(query: string): boolean {
   const [matches, setMatches] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia(query).matches : false,
@@ -155,8 +64,8 @@ function useMediaQuery(query: string): boolean {
  * text rail. The recessed-rail look comes from bg-tertiary
  * (one elevation step up from the secondary Sidebar and the base main
  * pane) — rail → sidebar → main read as three distinct tiers. Top
- * section (no header) is the pinned-nav block — Chat, Inbox,
- * Workspaces, etc. — always visible. Labeled sections (Agent, System)
+ * section (no header) is the pinned product-navigation block — Chat, Inbox,
+ * Issues, etc. — always visible. Labeled sections (Beta, System)
  * get collapsible chevron headers; collapse state persists to
  * localStorage.
  *

@@ -55,6 +55,7 @@ import {
 import { useWorkspace } from '../tabs/store'
 import type { WorkspaceSource } from '../tabs/types'
 import { WorkspacesContext, type SpawnOpts } from './workspaces-context'
+import { reconcileWorkspaceList } from './workspace-list-reconcile'
 
 const LIST_POLL_MS = 3000
 
@@ -86,11 +87,12 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
 
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const closeTab = useWorkspace((s) => s.closeTab)
+  const setSidebar = useWorkspace((s) => s.setSidebar)
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
       const list = await listWorkspaces()
-      setWorkspaces(list)
+      setWorkspaces((current) => reconcileWorkspaceList(current, list))
       setHasLoaded(true)
       setListError(null)
     } catch (err) {
@@ -222,10 +224,16 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
             : workspace,
         ),
       )
-      openOrFocus({ kind: 'workspace', params: { wsId, sessionId: nextSession.id } })
+      // A resumed headless conversation is user-facing Chat, even though its
+      // durable Session still belongs to a Workspace underneath.
+      setSidebar('chat')
+      openOrFocus({
+        kind: 'workspace',
+        params: { wsId, sessionId: nextSession.id, source: 'chat' },
+      })
       void refresh()
     },
-    [openOrFocus, refresh, terminalTheme],
+    [openOrFocus, refresh, setSidebar, terminalTheme],
   )
 
   const setIssueDefaultAgent = useCallback(async (agent: string | null): Promise<void> => {

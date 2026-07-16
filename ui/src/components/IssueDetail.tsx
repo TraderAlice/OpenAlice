@@ -1005,7 +1005,7 @@ export function IssueDetail({
   const continueProvenanceSession = useCallback(
     async (record: IssueProvenanceRecord) => {
       if (record.origin.kind !== 'session') return
-      setSidebar('workspaces')
+      setSidebar('chat')
       await openHeadlessRun(record.origin.workspaceId, record.origin.resumeId, {
         title: `${data?.issue.title ?? id} · ${record.action}`,
       })
@@ -1186,7 +1186,7 @@ export function IssueDetail({
           <RunsSection
             runs={runs}
             onOpen={(run) => {
-              setSidebar('workspaces')
+              setSidebar('chat')
               void openHeadlessRun(run.wsId, run.resumeId, {
                 title: `${issue.title} · ${run.agent}`,
               })

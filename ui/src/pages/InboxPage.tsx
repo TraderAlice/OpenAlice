@@ -227,7 +227,6 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
     if (!wsAlive) return
     setContinueError(null)
     setContinuing(true)
-    setSidebar('workspaces')
     try {
       if (origin?.kind === 'headless' && (origin.resumeId || origin.runId)) {
         // Legacy Inbox JSONL stored only taskId. Runs are retained, so one
@@ -238,10 +237,14 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
           ...(entry.comments ? { title: entry.comments.slice(0, 200) } : {}),
         })
       } else if (sessionId && sessionRecord) {
+        setSidebar('chat')
         if (sessionRecord.state === 'paused') {
-          await workspacesCtx.resumeSession(entry.workspaceId, sessionId)
+          await workspacesCtx.resumeSession(entry.workspaceId, sessionId, 'chat')
         } else {
-          openOrFocus({ kind: 'workspace', params: { wsId: entry.workspaceId, sessionId } })
+          openOrFocus({
+            kind: 'workspace',
+            params: { wsId: entry.workspaceId, sessionId, source: 'chat' },
+          })
         }
       } else {
         openWorkspace()

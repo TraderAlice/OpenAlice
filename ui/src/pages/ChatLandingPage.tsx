@@ -308,6 +308,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
   // With no Chat workspace yet this remains null; the backend creates one
   // stable starter workspace on the first successful send.
   const credentialWorkspace = workspaceTarget
+  const credentialWorkspaceId = credentialWorkspace?.id ?? null
 
   // Preload the loginless credential set ONCE on mount — NOT gated on the
   // selected agent. Previously this fired only after the agents list resolved
@@ -371,7 +372,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
     const onWorkspaceAgentConfigChanged = (event: Event) => {
       const detail = (event as CustomEvent<{ wsId?: string; agent?: string }>).detail
       if (!detail || (
-        detail.wsId === credentialWorkspace?.id &&
+        detail.wsId === credentialWorkspaceId &&
         detail.agent === effectiveAgent
       )) {
         setAgentConfigRevision((revision) => revision + 1)
@@ -379,7 +380,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
     }
     window.addEventListener('openalice:workspace-agent-config-changed', onWorkspaceAgentConfigChanged)
     return () => window.removeEventListener('openalice:workspace-agent-config-changed', onWorkspaceAgentConfigChanged)
-  }, [credentialWorkspace?.id, effectiveAgent])
+  }, [credentialWorkspaceId, effectiveAgent])
 
   useEffect(() => {
     let live = true
@@ -392,7 +393,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
   // Detect the target workspace's current cred/readiness for this runtime (for the default
   // selection + the overwrite notice). Only when the workspace already exists.
   useEffect(() => {
-    if (!needsCred || effectiveAgent === null || credentialWorkspace === null || credentialWorkspace === undefined) {
+    if (!needsCred || effectiveAgent === null || credentialWorkspaceId === null) {
       setDetectedCred(null)
       setDetectedCredentialConfig(null)
       setAgentReadiness(null)
@@ -402,8 +403,8 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
     let live = true
     setCredentialWorkspaceResolved(false)
     void Promise.allSettled([
-      detectWorkspaceCredential(credentialWorkspace.id, effectiveAgent),
-      getAgentReadiness(credentialWorkspace.id),
+      detectWorkspaceCredential(credentialWorkspaceId, effectiveAgent),
+      getAgentReadiness(credentialWorkspaceId),
     ]).then(([detected, readiness]) => {
       if (!live) return
       const detectedValue = detected.status === 'fulfilled' ? detected.value : null
@@ -417,7 +418,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
       setCredentialWorkspaceResolved(true)
     })
     return () => { live = false }
-  }, [needsCred, effectiveAgent, credentialWorkspace, agentConfigRevision])
+  }, [needsCred, effectiveAgent, credentialWorkspaceId, agentConfigRevision])
 
   const workspaceCredReady =
     needsCred &&
