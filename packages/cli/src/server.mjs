@@ -164,6 +164,7 @@ export async function startRuntimeServer(options, dependencies = {}) {
       waitForServerReady(homeRoot, options.waitMs, {
         ...dependencies,
         readStatus,
+        allowOwnerTransition: options.takeover,
         signal: readinessAbort.signal,
       }),
       earlyFailure,
@@ -254,7 +255,10 @@ async function waitForServerReady(homeRoot, timeoutMs, dependencies) {
     if (dependencies.signal?.aborted) return null
     lastStatus = await readStatus({ homeRoot, timeoutMs: Math.min(1_000, Math.max(100, deadline - Date.now())) }, dependencies)
     if (lastStatus.class === 'running' && lastStatus.owner?.surface === 'cli-server') return lastStatus
-    if (lastStatus.class === 'owned_elsewhere' || lastStatus.class === 'incompatible') {
+    if (
+      !dependencies.allowOwnerTransition
+      && (lastStatus.class === 'owned_elsewhere' || lastStatus.class === 'incompatible')
+    ) {
       throw new Error(formatOwnershipRefusal(lastStatus))
     }
     const aborted = await sleepOrAbort(
