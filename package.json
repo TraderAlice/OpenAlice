@@ -54,6 +54,9 @@
     "audit:theme-colors:check-decisions": "tsx scripts/theme-color-audit/decision-cli.ts check-decisions",
     "audit:theme-colors:check-completeness": "tsx scripts/theme-color-audit/decision-cli.ts check-completeness",
     "audit:theme-colors:export-migration-contracts": "tsx scripts/theme-color-audit/decision-cli.ts export-migration-contracts",
+    "audit:theme-colors:report-inactive": "tsx scripts/theme-color-audit/inactive-cli.ts report",
+    "audit:theme-colors:check-inactive-analysis": "tsx scripts/theme-color-audit/inactive-cli.ts check",
+    "audit:theme-colors:verify-inactive-samples": "tsx scripts/theme-color-audit/inactive-cli.ts verify-samples",
     "test:theme-color-static-inventory": "vitest run scripts/theme-color-audit/static-inventory.spec.ts --project node",
     "test:theme-color-scenarios": "vitest run scripts/theme-color-audit/scenarios.spec.ts --project node",
     "test:theme-color-runtime-provenance": "vitest run scripts/theme-color-audit/runtime-provenance.spec.ts --project node",
@@ -61,6 +64,7 @@
     "test:theme-color-capture-failures": "vitest run scripts/theme-color-audit/evidence.spec.ts --project node",
     "test:theme-color-annotations": "vitest run scripts/theme-color-audit/annotations.spec.ts --project node",
     "test:theme-color-decisions": "vitest run scripts/theme-color-audit/decisions.spec.ts --project node",
+    "test:theme-color-inactive-analysis": "vitest run scripts/theme-color-audit/inactive-analysis.spec.ts --project node",
     "postinstall": "node scripts/fix-pty-perms.mjs"
   },
   "keywords": [
