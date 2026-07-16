@@ -34,9 +34,16 @@ export function validateOccurrenceEvidenceRecord(record: OccurrenceEvidenceRecor
   if (record.surfaceKind === 'dom-element' && !record.locator.startsWith('#') && !record.locator.includes(record.inventoryId)) throw new Error(`${record.inventoryId}: locator does not identify current occurrence`)
   if (targetBounds.width <= 0 || targetBounds.height <= 0) throw new Error(`${record.inventoryId}: target has zero area`)
   if (targetBounds.x < 0 || targetBounds.y < 0 || targetBounds.x + targetBounds.width > record.viewport.width || targetBounds.y + targetBounds.height > record.viewport.height) throw new Error(`${record.inventoryId}: target is outside viewport`)
-  if (JSON.stringify(annotation.bounds) !== JSON.stringify(targetBounds) || !annotation.label.includes(record.inventoryId) || !annotation.label.includes(record.channel)) throw new Error(`${record.inventoryId}: annotation does not identify target and channel`)
+  const viewportArea = record.viewport.width * record.viewport.height
+  const targetAreaRatio = targetBounds.width * targetBounds.height / viewportArea
+  const annotationAreaRatio = annotation.bounds.width * annotation.bounds.height / viewportArea
+  if (!annotation.label.includes(record.inventoryId) || !annotation.label.includes(record.channel)) throw new Error(`${record.inventoryId}: annotation does not identify target and channel`)
+  if (annotation.bounds.x < targetBounds.x || annotation.bounds.y < targetBounds.y || annotation.bounds.x + annotation.bounds.width > targetBounds.x + targetBounds.width || annotation.bounds.y + annotation.bounds.height > targetBounds.y + targetBounds.height) throw new Error(`${record.inventoryId}: annotation bounds leave target surface`)
+  if (targetAreaRatio > 0.5) {
+    if (annotation.strategy !== 'surface-sample' || annotationAreaRatio >= 0.1) throw new Error(`${record.inventoryId}: viewport-majority target requires a bounded surface sample`)
+  } else if (annotation.strategy !== 'element-bounds' || JSON.stringify(annotation.bounds) !== JSON.stringify(targetBounds)) throw new Error(`${record.inventoryId}: element annotation must match target bounds`)
   if (context.width !== record.viewport.width || context.height !== record.viewport.height) throw new Error(`${record.inventoryId}: context dimensions do not match viewport`)
-  if (crop.width <= 0 || crop.height <= 0 || crop.targetBoundsInImage.x < 0 || crop.targetBoundsInImage.y < 0 || crop.targetBoundsInImage.x + crop.targetBoundsInImage.width > crop.width || crop.targetBoundsInImage.y + crop.targetBoundsInImage.height > crop.height) throw new Error(`${record.inventoryId}: crop bounds are invalid`)
+  if (crop.width <= 0 || crop.height <= 0 || crop.annotationBoundsInImage.x < 0 || crop.annotationBoundsInImage.y < 0 || crop.annotationBoundsInImage.x + crop.annotationBoundsInImage.width > crop.width || crop.annotationBoundsInImage.y + crop.annotationBoundsInImage.height > crop.height) throw new Error(`${record.inventoryId}: crop bounds are invalid`)
 }
 
 export function validateOccurrenceJpeg(record: Extract<OccurrenceEvidenceRecord, { kind: 'visual-element' }>, role: 'context' | 'crop', content: Uint8Array): void {
