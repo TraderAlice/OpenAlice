@@ -21,6 +21,8 @@ describe('occurrence screenshot annotations', () => {
     expect(() => validateOccurrenceEvidenceRecord(visual())).not.toThrow()
     expect(() => validateOccurrenceEvidenceRecord({ ...visual(), targetBounds: { x: 10, y: 10, width: 0, height: 20 } })).toThrow('zero area')
     expect(() => validateOccurrenceEvidenceRecord({ ...visual(), annotation: { ...visual().annotation, label: 'unrelated' } })).toThrow('does not identify')
+    expect(() => validateOccurrenceEvidenceRecord({ ...visual(), channel: '--color-bg' })).toThrow('CSS variable definition')
+    expect(() => validateOccurrenceEvidenceRecord({ ...visual(), locator: '[data-openalice-color-audit~="color-other"]' })).toThrow('locator does not identify')
     expect(() => validateOccurrenceEvidenceRecord({ ...visual(), crop: { ...visual().crop, targetBoundsInImage: { x: 30, y: 30, width: 20, height: 20 } } })).toThrow('crop bounds')
   })
 
