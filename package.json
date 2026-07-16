@@ -43,8 +43,11 @@
     "audit:theme-colors:validate-scenarios": "tsx scripts/theme-color-audit/scenario-cli.ts validate",
     "audit:theme-colors:check-scenario-coverage": "tsx scripts/theme-color-audit/scenario-cli.ts coverage",
     "audit:theme-colors:serve-and-check-scenarios": "tsx scripts/theme-color-audit/scenario-cli.ts browser",
+    "audit:theme-colors:check-runtime-bindings": "tsx scripts/theme-color-audit/runtime-binding-cli.ts check",
+    "audit:theme-colors:assert-no-audit-runtime": "tsx scripts/theme-color-audit/runtime-binding-cli.ts assert-production-clean",
     "test:theme-color-static-inventory": "vitest run scripts/theme-color-audit/static-inventory.spec.ts --project node",
     "test:theme-color-scenarios": "vitest run scripts/theme-color-audit/scenarios.spec.ts --project node",
+    "test:theme-color-runtime-provenance": "vitest run scripts/theme-color-audit/runtime-provenance.spec.ts --project node",
     "postinstall": "node scripts/fix-pty-perms.mjs"
   },
   "keywords": [
@@ -162,6 +165,7 @@
     "tsx": "^4.21.0",
     "turbo": "^2.9.14",
     "typescript": "^5.9.3",
+    "vite": "7.3.6",
     "vitest": "^4.1.5"
   }
 }
