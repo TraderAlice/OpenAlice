@@ -138,6 +138,16 @@ export function WebPiView({ wsId, sessionId, label, onSessionLost }: Props): Rea
         )}
       </div>
 
+      {snapshot?.phase === 'compacting' && (
+        <div className="webpi-compaction-status" role="status" aria-live="polite">
+          <LoaderCircle size={14} className="animate-spin" aria-hidden="true" />
+          <div>
+            <strong>Compacting conversation context</strong>
+            <span>Pi is summarizing older history. Sending will resume when the compact finishes.</span>
+          </div>
+        </div>
+      )}
+
       <div className="webpi-composer-wrap">
         <div className="webpi-composer">
           <textarea

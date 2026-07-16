@@ -12,9 +12,16 @@ class FakeRpcProcess extends EventEmitter {
   readonly stdout = new PassThrough()
   readonly stderr = new PassThrough()
   private messages: unknown[] = []
+  private state: Record<string, unknown>
 
-  constructor() {
+  constructor(state: Record<string, unknown> = {}) {
     super()
+    this.state = {
+      sessionId: 'native-pi', thinkingLevel: 'medium', isStreaming: false,
+      isCompacting: false, steeringMode: 'all', followUpMode: 'one-at-a-time',
+      autoCompactionEnabled: true, messageCount: 0, pendingMessageCount: 0,
+      ...state,
+    }
     this.stdin.setEncoding('utf8')
     let buffer = ''
     this.stdin.on('data', (chunk: string) => {
@@ -35,15 +42,18 @@ class FakeRpcProcess extends EventEmitter {
     return true
   }
 
+  event(value: Record<string, unknown>): void {
+    this.line(value)
+  }
+
   private command(command: Record<string, unknown>): void {
     const id = command['id']
     const type = command['type']
     if (type === 'get_state') {
-      this.line({ type: 'response', id, command: type, success: true, data: {
-        sessionId: 'native-pi', thinkingLevel: 'medium', isStreaming: false,
-        isCompacting: false, steeringMode: 'all', followUpMode: 'one-at-a-time',
-        autoCompactionEnabled: true, messageCount: this.messages.length, pendingMessageCount: 0,
-      } })
+      this.line({
+        type: 'response', id, command: type, success: true,
+        data: { ...this.state, messageCount: this.messages.length },
+      })
       return
     }
     if (type === 'get_messages') {
@@ -122,5 +132,26 @@ describe('WebPiSessionHost', () => {
     expect(host.has(input.recordId)).toBe(false)
     expect(onExit).toHaveBeenCalledWith(input.recordId, expect.objectContaining({ intentional: true }))
   })
-})
 
+  it('restores Pi compaction state reported at startup', async () => {
+    const rpc = new FakeRpcProcess({ isCompacting: true })
+    const host = new WebPiSessionHost(logger, {}, () => rpc as never)
+
+    expect((await host.start(input)).phase).toBe('compacting')
+  })
+
+  it('follows Pi compaction events until the agent settles', async () => {
+    const rpc = new FakeRpcProcess()
+    const host = new WebPiSessionHost(logger, {}, () => rpc as never)
+    await host.start(input)
+
+    rpc.event({ type: 'compaction_start', reason: 'threshold' })
+    expect(host.get(input.recordId)?.phase).toBe('compacting')
+
+    rpc.event({ type: 'compaction_end', reason: 'threshold', willRetry: false })
+    expect(host.get(input.recordId)?.phase).toBe('working')
+
+    rpc.event({ type: 'agent_settled' })
+    expect(host.get(input.recordId)?.phase).toBe('idle')
+  })
+})

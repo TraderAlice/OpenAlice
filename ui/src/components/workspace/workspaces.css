@@ -1096,6 +1096,11 @@
 
 .webpi-error { display: grid; gap: 7px; margin: 20px 0; padding: 13px; border: 1px solid color-mix(in srgb, #d65c5c 50%, var(--color-border)); border-radius: 10px; color: #d65c5c; font-size: 12px; }
 .webpi-error button { width: fit-content; color: var(--color-text); text-decoration: underline; }
+.webpi-compaction-status { display: flex; align-items: flex-start; gap: 9px; margin: 0 max(18px, calc((100% - 760px) / 2)) 10px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--color-accent) 34%, var(--color-border)); border-radius: 10px; color: var(--color-accent); background: color-mix(in srgb, var(--color-accent) 7%, var(--color-bg-secondary)); }
+.webpi-compaction-status > svg { flex: 0 0 auto; margin-top: 2px; }
+.webpi-compaction-status > div { display: grid; gap: 2px; min-width: 0; }
+.webpi-compaction-status strong { color: var(--color-text); font-size: 11px; font-weight: 650; }
+.webpi-compaction-status span { color: var(--color-text-muted); font-size: 10px; line-height: 1.45; }
 .webpi-composer-wrap { padding: 10px max(18px, calc((100% - 760px) / 2)) 14px; border-top: 1px solid var(--color-border); background: color-mix(in srgb, var(--color-bg) 88%, transparent); }
 .webpi-composer { display: flex; align-items: flex-end; gap: 8px; padding: 9px 10px 9px 13px; border: 1px solid var(--color-border); border-radius: 14px; background: var(--color-bg-secondary); box-shadow: 0 6px 24px color-mix(in srgb, #000 9%, transparent); }
 .webpi-composer:focus-within { border-color: color-mix(in srgb, var(--color-accent) 60%, var(--color-border)); }
@@ -1116,6 +1121,7 @@
 
 @media (max-width: 720px) {
   .webpi-messages, .webpi-composer-wrap { padding-left: 12px; padding-right: 12px; }
+  .webpi-compaction-status { margin-left: 12px; margin-right: 12px; }
   .webpi-message.is-user { margin-left: 0; }
   .webpi-tool-step > summary { grid-template-columns: 18px minmax(52px, auto) minmax(0, 1fr) 14px; }
   .webpi-step-size { display: none; }
