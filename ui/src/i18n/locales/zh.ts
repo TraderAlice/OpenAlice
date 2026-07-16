@@ -248,6 +248,7 @@ export const zh: Resources = {
     selectCredential: 'AI 提供方',
     configureProvider: '配置一个 AI 提供方',
     runtimeDefaultModel: '运行时默认模型',
+    runtimeManagedAi: '模型和上下文由 {{runtime}} 管理',
     modelSummary: '模型 {{model}}',
     contextSummary: '{{limit}} 上下文',
     adjustWorkspaceAi: '调整工作区 AI',

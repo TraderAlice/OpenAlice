@@ -44,6 +44,7 @@ function build(opts: {
   recentChatWorkspaceId?: string | null;
   opencodeConfig?: WorkspaceAiCred | null;
   opencodeRuntimeSource?: 'global-config' | 'global-login' | 'managed-runtime';
+  runtimeWorkspace?: any;
 } = {}) {
   const META = {
     id: 'ws-1',
@@ -102,6 +103,9 @@ function build(opts: {
     // Default []: today's tag never matches → creator.create path. Tests that
     // exercise targetWsId pass the workspace in so registry resolves it by id.
     registry,
+    resolveRuntimeWorkspace: (id: string) => (
+      opts.runtimeWorkspace?.id === id ? opts.runtimeWorkspace : registry.get(id)
+    ),
     creator,
     resolveOrCreateChatWorkspace: (preferredWorkspaceId?: string | null) =>
       chatWorkspaceResolver.resolveOrCreate(preferredWorkspaceId),
@@ -226,6 +230,82 @@ describe('GET /credentials — Quick Chat launch metadata', () => {
       contextWindow: 512_000,
       wireShape: 'google-generative-ai',
     });
+  });
+
+  it('reads launch metadata from the reserved Manager runtime workspace', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({
+      'google-1': {
+        vendor: 'google',
+        authType: 'api-key',
+        apiKey: 'AQ.test',
+        wires: { 'google-generative-ai': 'https://generativelanguage.googleapis.com/v1beta' },
+      },
+    });
+    const { app } = build({
+      runtimeWorkspace: {
+        id: 'workspace-manager',
+        dir: '/manager',
+        agents: ['opencode'],
+        template: 'workspace-manager',
+        tag: 'Workspace Manager',
+        createdAt: '2026-07-16T00:00:00.000Z',
+      },
+      opencodeConfig: {
+        apiKey: 'AQ.test',
+        model: 'gemini-3.5-flash',
+        contextWindow: 512_000,
+        wireShape: 'google-generative-ai',
+      },
+    });
+
+    const credential = await get(app, '/workspace-manager/agent-config/opencode/credential');
+    const readiness = await get(app, '/workspace-manager/agent-readiness');
+
+    expect(credential).toEqual({
+      status: 200,
+      body: {
+        slug: 'google-1',
+        model: 'gemini-3.5-flash',
+        contextWindow: 512_000,
+        wireShape: 'google-generative-ai',
+      },
+    });
+    expect(readiness.status).toBe(200);
+    expect(readiness.body.agents.opencode).toMatchObject({
+      agent: 'opencode',
+      ready: true,
+      source: 'workspace-config',
+      detectedCredentialSlug: 'google-1',
+    });
+  });
+
+  it('writes AI adjustments to the reserved Manager runtime workspace', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({});
+    const { app, opencode } = build({
+      runtimeWorkspace: {
+        id: 'workspace-manager',
+        dir: '/manager',
+        agents: ['opencode'],
+        template: 'workspace-manager',
+        tag: 'Workspace Manager',
+        createdAt: '2026-07-16T00:00:00.000Z',
+      },
+    });
+    const config = {
+      apiKey: 'AQ.test',
+      model: 'gemini-3.5-flash',
+      contextWindow: 512_000,
+      wireShape: 'google-generative-ai',
+    };
+
+    const response = await app.request('/workspace-manager/agent-config/opencode', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(config),
+    });
+
+    expect(response.status).toBe(200);
+    expect(opencode.writeAiConfig).toHaveBeenCalledWith('/manager', config);
   });
 });
 

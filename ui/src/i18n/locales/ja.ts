@@ -248,6 +248,7 @@ export const ja: Resources = {
     selectCredential: 'AI プロバイダー',
     configureProvider: 'AI プロバイダーを設定',
     runtimeDefaultModel: 'ランタイム既定モデル',
+    runtimeManagedAi: 'モデルとコンテキストは {{runtime}} が管理します',
     modelSummary: 'モデル {{model}}',
     contextSummary: '{{limit}} コンテキスト',
     adjustWorkspaceAi: 'ワークスペース AI を調整',

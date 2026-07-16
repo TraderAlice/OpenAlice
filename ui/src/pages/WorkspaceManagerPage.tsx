@@ -5,41 +5,34 @@ import {
   ArrowUp,
   Bot,
   Building2,
-  Check,
-  ChevronDown,
   ChevronRight,
   ClipboardCheck,
-  Code2,
-  Cpu,
   GitMerge,
-  KeyRound,
   Loader2,
   Network,
   RefreshCw,
-  Sparkles,
   UsersRound,
   type LucideIcon,
 } from 'lucide-react'
 import '@xterm/xterm/css/xterm.css'
 
-import { preferencesApi } from '../api/preferences'
-import type { QuickChatPreferences } from '../api/preferences'
 import {
-  getAgentRuntimeReadiness,
   getWorkspaceManager,
-  listAgentCredentials,
   MANAGER_WORKSPACE_ID,
   openWebPiSession,
-  probeAgentRuntimeReadiness,
   quickStartWorkspaceManager,
   resumeSession,
   type ManagerWorkspaceSnapshot,
-  type SavedCredential,
 } from '../components/workspace/api'
+import {
+  AgentLaunchDetails,
+  AgentLaunchSelectors,
+  type AgentLaunchSelectorsHandle,
+} from '../components/workspace/AgentLaunchControls'
 import { TerminalView } from '../components/workspace/Terminal'
 import { WebPiView } from '../components/workspace/WebPiView'
 import { useWorkspaces } from '../contexts/workspaces-context'
-import { isLoginlessAgent, resolveAgentRuntime } from '../lib/agentRuntime'
+import { useAgentLaunchConfig, useAgentLaunchPreferences } from '../hooks/useAgentLaunchConfig'
 import { useWorkspace } from '../tabs/store'
 import type { ViewSpec } from '../tabs/types'
 import { keyMapForAgent } from '../components/workspace/terminalInput'
@@ -47,45 +40,30 @@ import { keyMapForAgent } from '../components/workspace/terminalInput'
 type ManagerSpec = Extract<ViewSpec, { kind: 'workspace-manager' }>
 
 const SUGGESTION_ICONS = [ClipboardCheck, UsersRound, GitMerge, RefreshCw] as const
-const AGENT_ICONS: Record<string, LucideIcon> = {
-  claude: Sparkles,
-  codex: Cpu,
-  opencode: Code2,
-  pi: Bot,
-}
 
 export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
   const { t } = useTranslation()
-  const { agents, defaultAgent, setDefaultAgent } = useWorkspaces()
+  const { agents, defaultAgent, setDefaultAgent, openAgentConfig } = useWorkspaces()
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
   const [manager, setManager] = useState<ManagerWorkspaceSnapshot | null>(null)
-  const [credentials, setCredentials] = useState<SavedCredential[] | null>(null)
-  const [credentialSlug, setCredentialSlug] = useState<string | null>(null)
-  const [runtimeReadiness, setRuntimeReadiness] = useState<Awaited<ReturnType<typeof getAgentRuntimeReadiness>> | null>(null)
-  const [selectedAgent, setSelectedAgent] = useState<string | null>(null)
-  const [agentMenuOpen, setAgentMenuOpen] = useState(false)
   const [draft, setDraft] = useState('')
   const [loading, setLoading] = useState(true)
   const [launching, setLaunching] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const openingRef = useRef<string | null>(null)
-  const agentBoxRef = useRef<HTMLDivElement>(null)
+  const launchSelectorsRef = useRef<AgentLaunchSelectorsHandle>(null)
 
   const runtimeAgents = useMemo(() => agents.filter((agent) => agent.kind !== 'utility'), [agents])
-  const effectiveAgent = resolveAgentRuntime(runtimeAgents, selectedAgent, defaultAgent, runtimeReadiness)
-  const selectedRuntime = runtimeAgents.find((agent) => agent.id === effectiveAgent) ?? null
-  const SelectedRuntimeIcon = selectedRuntime ? AGENT_ICONS[selectedRuntime.id] : undefined
-  const needsCredential = isLoginlessAgent(effectiveAgent)
-  const selectedReadiness = effectiveAgent ? runtimeReadiness?.agents[effectiveAgent] ?? null : null
-  const selectedRuntimeUsesGlobalConfig = selectedReadiness?.ready === true && (
-    selectedReadiness.source === 'global-config' ||
-    selectedReadiness.source === 'global-login' ||
-    selectedReadiness.source === 'managed-runtime'
-  )
-  const needsProviderSetup = needsCredential && !selectedRuntimeUsesGlobalConfig && credentials?.length === 0
-  const credentialSelectionReady = !needsCredential || selectedRuntimeUsesGlobalConfig || (
-    credentials !== null && credentialSlug !== null
-  )
+  const launchPreferences = useAgentLaunchPreferences()
+  const launchConfig = useAgentLaunchConfig({
+    agents: runtimeAgents,
+    defaultAgent,
+    setDefaultAgent,
+    preferences: launchPreferences,
+    workspaceId: MANAGER_WORKSPACE_ID,
+    hasWorkspace: true,
+  })
+  const effectiveAgent = launchConfig.effectiveAgent
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
@@ -100,45 +78,7 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
 
   useEffect(() => {
     void refresh()
-    void getAgentRuntimeReadiness()
-      .then(setRuntimeReadiness)
-      .catch(() => setRuntimeReadiness(null))
   }, [refresh])
-
-  useEffect(() => {
-    if (!effectiveAgent || !isLoginlessAgent(effectiveAgent)) {
-      setCredentials([])
-      setCredentialSlug(null)
-      return
-    }
-    let live = true
-    setCredentials(null)
-    void Promise.all([
-      listAgentCredentials(effectiveAgent).catch(() => []),
-      preferencesApi.getQuickChat().catch((): QuickChatPreferences => ({ lastCredentialByAgent: {}, recentChatWorkspaceId: null })),
-    ]).then(([available, preferences]) => {
-      if (!live) return
-      setCredentials(available)
-      const remembered = preferences.lastCredentialByAgent[effectiveAgent]
-      setCredentialSlug(
-        remembered && available.some((credential) => credential.slug === remembered)
-          ? remembered
-          : available[0]?.slug ?? null,
-      )
-    })
-    return () => { live = false }
-  }, [effectiveAgent])
-
-  useEffect(() => {
-    if (!agentMenuOpen) return
-    const onDown = (event: MouseEvent) => {
-      if (agentBoxRef.current && !agentBoxRef.current.contains(event.target as Node)) {
-        setAgentMenuOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
-  }, [agentMenuOpen])
 
   const sessionId = spec.params.sessionId
   const session = sessionId
@@ -174,23 +114,17 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
   const submit = async (): Promise<void> => {
     const prompt = draft.trim()
     if (!prompt || launching) return
-    if (!credentialSelectionReady) return
+    if (!launchConfig.credentialSelectionReady) return
     if (!effectiveAgent) {
-      setAgentMenuOpen(true)
+      launchSelectorsRef.current?.openAgentMenu()
       return
     }
     setLaunching(true)
     setError(null)
     try {
-      let readiness = runtimeReadiness
-      let runtimeRow = readiness?.agents[effectiveAgent] ?? null
+      const runtimeRow = await launchConfig.checkSelectedRuntime()
       if (runtimeRow?.ready !== true) {
-        readiness = await probeAgentRuntimeReadiness(effectiveAgent)
-        setRuntimeReadiness(readiness)
-        runtimeRow = readiness.agents[effectiveAgent] ?? null
-      }
-      if (runtimeRow?.ready !== true) {
-        if (runtimeRow?.repairTarget === 'ai-provider' || needsProviderSetup) {
+        if (runtimeRow?.repairTarget === 'ai-provider' || launchConfig.needsProviderSetup) {
           openOrFocus({ kind: 'settings', params: { category: 'ai-provider' } })
           return
         }
@@ -200,7 +134,7 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
       const result = await quickStartWorkspaceManager(
         prompt,
         effectiveAgent,
-        needsCredential ? credentialSlug ?? undefined : undefined,
+        launchConfig.launchCredentialSlug,
       )
       setManager(result.manager)
       setDraft('')
@@ -217,6 +151,18 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
       event.preventDefault()
       void submit()
     }
+  }
+
+  const goConfigureProvider = () => {
+    openOrFocus({ kind: 'settings', params: { category: 'ai-provider' } })
+  }
+
+  const adjustManagerAi = () => {
+    if (effectiveAgent === 'opencode' || effectiveAgent === 'pi') {
+      openAgentConfig(MANAGER_WORKSPACE_ID, effectiveAgent, 'ai')
+      return
+    }
+    goConfigureProvider()
   }
 
   if (sessionId && session) {
@@ -288,13 +234,8 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
               {t('workspaceManager.subheading')}
             </p>
           </div>
-          <div className="workspace-manager-stats grid grid-cols-2 gap-2">
+          <div className="workspace-manager-stats grid max-w-56 grid-cols-1 gap-2">
             <ManagerStat icon={Building2} label={t('workspaceManager.scope')} value={loading ? '—' : String(manager?.activeWorkspaceCount ?? 0)} />
-            <ManagerStat
-              icon={Bot}
-              label={t('workspaceManager.runtime')}
-              value={selectedRuntime?.displayName ?? t('chatLanding.selectAgent')}
-            />
           </div>
         </div>
 
@@ -308,93 +249,30 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
             className="min-h-28 w-full resize-none bg-transparent px-1 py-1 text-[14px] leading-relaxed text-text outline-none placeholder:text-text-muted/55 md:text-[15px]"
           />
           <div className="workspace-manager-composer-footer mt-3 flex flex-col gap-2 border-t border-border/60 pt-3">
-            <div className="flex min-w-0 items-center gap-2">
-              <div ref={agentBoxRef} className="relative">
-                <button
-                  type="button"
-                  onClick={() => setAgentMenuOpen((open) => !open)}
-                  disabled={runtimeAgents.length === 0}
-                  aria-haspopup="menu"
-                  aria-expanded={agentMenuOpen}
-                  aria-label={t('chatLanding.selectAgent')}
-                  className="oa-pressable inline-flex min-h-8 max-w-48 items-center gap-1.5 rounded-md bg-bg-tertiary px-2.5 py-1 text-[11px] text-text-muted hover:text-text disabled:opacity-50"
-                >
-                  {SelectedRuntimeIcon ? <SelectedRuntimeIcon size={12} /> : <Bot size={12} />}
-                  <span className="truncate">{selectedRuntime?.displayName ?? t('chatLanding.selectAgent')}</span>
-                  <ChevronDown size={12} className="opacity-60" />
-                </button>
-                {agentMenuOpen && runtimeAgents.length > 0 && (
-                  <div
-                    role="menu"
-                    className="oa-popover-enter absolute bottom-full left-0 z-10 mb-1 min-w-48 rounded-lg border border-border/70 bg-bg-secondary py-1 shadow-lg"
-                  >
-                    {runtimeAgents.map((agent) => {
-                      const Icon = AGENT_ICONS[agent.id]
-                      const active = agent.id === effectiveAgent
-                      const missing = agent.installed === false
-                      return (
-                        <button
-                          key={agent.id}
-                          type="button"
-                          role="menuitem"
-                          onClick={() => {
-                            setSelectedAgent(agent.id)
-                            void setDefaultAgent(agent.id)
-                            setAgentMenuOpen(false)
-                          }}
-                          className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] transition-colors hover:bg-bg-tertiary ${active ? 'text-accent' : missing ? 'text-text-muted' : 'text-text'}`}
-                        >
-                          {Icon ? <Icon size={14} className="shrink-0" /> : <span className="w-3.5 shrink-0" />}
-                          <span className="min-w-0 flex-1 truncate">{agent.displayName}</span>
-                          {missing && <span className="shrink-0 text-[10px] text-text-muted">{t('chatLanding.agentNotInstalled')}</span>}
-                          {active && <Check size={14} className="shrink-0" />}
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
+            <div className="workspace-manager-composer-actions flex min-w-0 flex-col gap-2">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <AgentLaunchSelectors
+                  ref={launchSelectorsRef}
+                  config={launchConfig}
+                  onConfigureProvider={goConfigureProvider}
+                />
               </div>
-              {needsCredential && credentials && credentials.length > 0 ? (
-                <label className="relative inline-flex min-w-0 items-center gap-1.5 rounded-md bg-bg-tertiary px-2.5 py-1.5 text-[11px] text-text-muted">
-                  <KeyRound size={12} className="shrink-0" />
-                  <select
-                    aria-label={t('workspaceManager.credential')}
-                    value={credentialSlug ?? ''}
-                    onChange={(event) => {
-                      const next = event.target.value || null
-                      setCredentialSlug(next)
-                      if (isLoginlessAgent(effectiveAgent)) {
-                        void preferencesApi.rememberQuickChatCredential(effectiveAgent, next).catch(() => undefined)
-                      }
-                    }}
-                    className="max-w-44 appearance-none truncate bg-transparent pr-3 text-text outline-none"
-                  >
-                    {credentials.map((credential) => (
-                      <option key={credential.slug} value={credential.slug}>
-                        {credential.label?.trim() || credential.slug}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ) : needsProviderSetup ? (
-                <button
-                  type="button"
-                  onClick={() => openOrFocus({ kind: 'settings', params: { category: 'ai-provider' } })}
-                  className="oa-pressable inline-flex items-center gap-1.5 rounded-md bg-amber-500/10 px-2.5 py-1.5 text-[11px] text-amber-600 dark:text-amber-400"
-                >
-                  <KeyRound size={12} /> {t('workspaceManager.configureCredential')}
-                </button>
-              ) : null}
+              <button
+                type="button"
+                onClick={() => void submit()}
+                disabled={!draft.trim() || launching || !launchConfig.credentialSelectionReady}
+                className="oa-pressable inline-flex min-h-9 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-[12px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                {launching ? <Loader2 size={14} className="animate-spin" /> : <ArrowUp size={14} />}
+                {launching ? t('workspaceManager.launching') : t('workspaceManager.send')}
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => void submit()}
-              disabled={!draft.trim() || launching || !credentialSelectionReady}
-              className="oa-pressable inline-flex min-h-9 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-[12px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-45"
-            >
-              {launching ? <Loader2 size={14} className="animate-spin" /> : <ArrowUp size={14} />}
-              {launching ? t('workspaceManager.launching') : t('workspaceManager.send')}
-            </button>
+            <AgentLaunchDetails
+              config={launchConfig}
+              hasWorkspaceTarget
+              onAdjustAi={adjustManagerAi}
+              className="border-t border-border/45 pt-2"
+            />
           </div>
         </section>
 

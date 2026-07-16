@@ -1992,7 +1992,7 @@ export function createWorkspaceRoutes(
   app.get('/:id/agent-config', async (c) => {
     const id = c.req.param('id');
     if (!validId(id)) return c.json({ error: 'not_found' }, 404);
-    const meta = svc.registry.get(id);
+    const meta = svc.resolveRuntimeWorkspace?.(id) ?? svc.registry.get(id);
     if (!meta) return c.json({ error: 'not_found' }, 404);
     try {
       const [claude, codex, opencode, pi] = await Promise.all([
@@ -2017,7 +2017,7 @@ export function createWorkspaceRoutes(
     const id = c.req.param('id');
     const agent = c.req.param('agent');
     if (!validId(id)) return c.json({ error: 'not_found' }, 404);
-    const meta = svc.registry.get(id);
+    const meta = svc.resolveRuntimeWorkspace?.(id) ?? svc.registry.get(id);
     if (!meta) return c.json({ error: 'not_found' }, 404);
     try {
       const detected = await detectWorkspaceCred(meta, agent, await readCredentials());
@@ -2037,7 +2037,7 @@ export function createWorkspaceRoutes(
   app.get('/:id/agent-readiness', async (c) => {
     const id = c.req.param('id');
     if (!validId(id)) return c.json({ error: 'not_found' }, 404);
-    const meta = svc.registry.get(id);
+    const meta = svc.resolveRuntimeWorkspace?.(id) ?? svc.registry.get(id);
     if (!meta) return c.json({ error: 'not_found' }, 404);
     try {
       const credentials = await readCredentials();
@@ -2061,7 +2061,7 @@ export function createWorkspaceRoutes(
     const id = c.req.param('id');
     const agent = c.req.param('agent');
     if (!validId(id)) return c.json({ error: 'not_found' }, 404);
-    const meta = svc.registry.get(id);
+    const meta = svc.resolveRuntimeWorkspace?.(id) ?? svc.registry.get(id);
     if (!meta) return c.json({ error: 'not_found' }, 404);
     try {
       const row = await getAgentCredentialReadiness({
@@ -2084,7 +2084,7 @@ export function createWorkspaceRoutes(
     if (agent !== 'claude' && agent !== 'codex' && agent !== 'opencode' && agent !== 'pi') {
       return c.json({ error: 'unknown_agent' }, 400);
     }
-    const meta = svc.registry.get(id);
+    const meta = svc.resolveRuntimeWorkspace?.(id) ?? svc.registry.get(id);
     if (!meta) return c.json({ error: 'not_found' }, 404);
 
     const body = (await safeJson(c)) as WorkspaceAiCred | null;

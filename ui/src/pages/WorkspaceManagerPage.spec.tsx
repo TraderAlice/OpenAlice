@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { WorkspacesContextValue } from '../contexts/workspaces-context'
@@ -16,11 +16,15 @@ const mocks = vi.hoisted(() => ({
   getAgentRuntimeReadiness: vi.fn(),
   probeAgentRuntimeReadiness: vi.fn(),
   listAgentCredentials: vi.fn(),
+  detectWorkspaceCredential: vi.fn(),
+  getAgentReadiness: vi.fn(),
+  getWorkspaceCredentialDefaults: vi.fn(),
   quickStartWorkspaceManager: vi.fn(),
   openWebPiSession: vi.fn(),
   resumeSession: vi.fn(),
   getQuickChat: vi.fn(),
   rememberQuickChatCredential: vi.fn(),
+  openAgentConfig: vi.fn(),
 }))
 
 vi.mock('../contexts/workspaces-context', () => ({
@@ -40,6 +44,8 @@ vi.mock('../components/workspace/api', async (importOriginal) => {
     getAgentRuntimeReadiness: mocks.getAgentRuntimeReadiness,
     probeAgentRuntimeReadiness: mocks.probeAgentRuntimeReadiness,
     listAgentCredentials: mocks.listAgentCredentials,
+    detectWorkspaceCredential: mocks.detectWorkspaceCredential,
+    getAgentReadiness: mocks.getAgentReadiness,
     quickStartWorkspaceManager: mocks.quickStartWorkspaceManager,
     openWebPiSession: mocks.openWebPiSession,
     resumeSession: mocks.resumeSession,
@@ -50,6 +56,12 @@ vi.mock('../api/preferences', () => ({
   preferencesApi: {
     getQuickChat: mocks.getQuickChat,
     rememberQuickChatCredential: mocks.rememberQuickChatCredential,
+  },
+}))
+
+vi.mock('../api/config', () => ({
+  configApi: {
+    getWorkspaceCredentialDefaults: mocks.getWorkspaceCredentialDefaults,
   },
 }))
 
@@ -110,7 +122,7 @@ function context(defaultAgent: string): WorkspacesContextValue {
     resumeSession: vi.fn(async () => undefined),
     openWebPiSession: vi.fn(async () => undefined),
     requestDeleteSession: vi.fn(),
-    openAgentConfig: vi.fn(),
+    openAgentConfig: mocks.openAgentConfig,
     saveWorkspaceMetadata: vi.fn(async () => undefined),
     renameWorkspace: vi.fn(async () => undefined),
   }
@@ -142,6 +154,18 @@ beforeEach(async () => {
   mocks.getAgentRuntimeReadiness.mockResolvedValue(readiness())
   mocks.probeAgentRuntimeReadiness.mockResolvedValue(readiness())
   mocks.listAgentCredentials.mockResolvedValue([])
+  mocks.detectWorkspaceCredential.mockResolvedValue({
+    slug: null,
+    model: null,
+    contextWindow: null,
+    wireShape: null,
+  })
+  mocks.getAgentReadiness.mockResolvedValue({ agents: {} })
+  mocks.getWorkspaceCredentialDefaults.mockResolvedValue({
+    defaults: {},
+    compatibleByAgent: {},
+    contextWindow: 256_000,
+  })
   mocks.getQuickChat.mockResolvedValue({ lastCredentialByAgent: {}, recentChatWorkspaceId: null })
   mocks.rememberQuickChatCredential.mockResolvedValue(undefined)
   mocks.openWebPiSession.mockResolvedValue(undefined)
@@ -174,6 +198,7 @@ describe('WorkspaceManagerPage runtime selection', () => {
 
     const picker = await screen.findByRole('button', { name: 'Select agent' })
     expect(picker.textContent).toContain('Codex')
+    expect(screen.getByText('Model and context are managed by Codex')).toBeTruthy()
     fireEvent.click(picker)
 
     for (const name of ['Claude', 'Codex', 'OpenCode', 'Pi']) {
@@ -197,7 +222,76 @@ describe('WorkspaceManagerPage runtime selection', () => {
     })
   })
 
-  it('keeps the loginless provider selection in the shared per-runtime preferences', async () => {
+  it('shows and launches the Manager workspace model/context from the shared config', async () => {
+    mocks.useWorkspaces.mockImplementation(() => context('pi'))
+    mocks.listAgentCredentials.mockResolvedValue([
+      {
+        slug: 'google-1',
+        label: 'Gemini',
+        vendor: 'google',
+        authType: 'api-key',
+        wires: { 'google-generative-ai': 'https://generativelanguage.googleapis.com/v1beta' },
+        resolvedModel: 'gemini-3.1-flash-lite',
+      },
+      {
+        slug: 'deepseek-1',
+        label: 'DeepSeek',
+        vendor: 'deepseek',
+        authType: 'api-key',
+        wires: { 'openai-chat': 'https://api.deepseek.com' },
+        resolvedModel: 'deepseek-chat',
+      },
+    ])
+    mocks.getQuickChat.mockResolvedValue({
+      lastCredentialByAgent: { pi: 'deepseek-1' },
+      recentChatWorkspaceId: null,
+    })
+    mocks.detectWorkspaceCredential.mockResolvedValue({
+      slug: 'google-1',
+      model: 'gemini-3.1-flash-lite',
+      contextWindow: 256_000,
+      wireShape: 'google-generative-ai',
+    })
+    mocks.getAgentReadiness.mockResolvedValue({
+      agents: {
+        pi: {
+          agent: 'pi',
+          ready: true,
+          requiresCredential: true,
+          source: 'workspace-config',
+          hasWorkspaceConfig: true,
+          hasUsableWorkspaceConfig: true,
+          detectedCredentialSlug: 'google-1',
+          compatibleCredentialSlugs: ['google-1'],
+          injectableCredentialSlugs: ['google-1'],
+        },
+      },
+    })
+
+    render(<WorkspaceManagerPage spec={{ kind: 'workspace-manager', params: {} }} />)
+
+    expect((await screen.findByRole('button', { name: 'AI provider' })).textContent).toContain('Gemini')
+    expect(screen.getByLabelText('Model gemini-3.1-flash-lite')).toBeTruthy()
+    expect(screen.getByLabelText('256K context')).toBeTruthy()
+    expect(screen.queryByText('Agent runtime')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Adjust workspace AI' }))
+    expect(mocks.openAgentConfig).toHaveBeenCalledWith('workspace-manager', 'pi', 'ai')
+
+    fireEvent.click(screen.getByRole('button', { name: 'AI provider' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /DeepSeek/ }))
+    expect(screen.getByLabelText('Model deepseek-chat')).toBeTruthy()
+    expect(mocks.rememberQuickChatCredential).toHaveBeenCalledWith('pi', 'deepseek-1')
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Audit issues.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Start manager' }))
+
+    await waitFor(() => expect(mocks.quickStartWorkspaceManager).toHaveBeenCalledWith(
+      'Audit issues.',
+      'pi',
+      'deepseek-1',
+    ))
+  })
+
+  it('does not flash a fallback credential before remembered preferences resolve', async () => {
     mocks.useWorkspaces.mockImplementation(() => context('pi'))
     mocks.listAgentCredentials.mockResolvedValue([{
       slug: 'google-1',
@@ -207,22 +301,56 @@ describe('WorkspaceManagerPage runtime selection', () => {
       wires: { 'google-generative-ai': 'https://generativelanguage.googleapis.com/v1beta' },
       resolvedModel: 'gemini-3.1-flash-lite',
     }])
-    mocks.getQuickChat.mockResolvedValue({
-      lastCredentialByAgent: { pi: 'google-1' },
-      recentChatWorkspaceId: null,
+    let resolvePreferences!: (value: {
+      lastCredentialByAgent: Record<string, string>
+      recentChatWorkspaceId: string | null
+    }) => void
+    mocks.getQuickChat.mockReturnValue(new Promise((resolve) => {
+      resolvePreferences = resolve
+    }))
+
+    render(<WorkspaceManagerPage spec={{ kind: 'workspace-manager', params: {} }} />)
+
+    await waitFor(() => expect(mocks.listAgentCredentials).toHaveBeenCalled())
+    expect(screen.getByRole('button', { name: 'AI provider' }).textContent).toContain('AI provider')
+    expect(screen.queryByText('Gemini')).toBeNull()
+    expect(screen.queryByLabelText('Model gemini-3.1-flash-lite')).toBeNull()
+
+    await act(async () => {
+      resolvePreferences({ lastCredentialByAgent: { pi: 'google-1' }, recentChatWorkspaceId: null })
+    })
+    expect((await screen.findByRole('button', { name: 'AI provider' })).textContent).toContain('Gemini')
+  })
+
+  it('shows model/context for a usable hand-edited Manager config without a vault credential', async () => {
+    mocks.useWorkspaces.mockImplementation(() => context('pi'))
+    mocks.detectWorkspaceCredential.mockResolvedValue({
+      slug: null,
+      model: 'local-manual-model',
+      contextWindow: 128_000,
+      wireShape: 'openai-chat',
+    })
+    mocks.getAgentReadiness.mockResolvedValue({
+      agents: {
+        pi: {
+          agent: 'pi',
+          ready: true,
+          requiresCredential: true,
+          source: 'workspace-config',
+          hasWorkspaceConfig: true,
+          hasUsableWorkspaceConfig: true,
+          detectedCredentialSlug: null,
+          compatibleCredentialSlugs: [],
+          injectableCredentialSlugs: [],
+        },
+      },
     })
 
     render(<WorkspaceManagerPage spec={{ kind: 'workspace-manager', params: {} }} />)
 
-    await screen.findByRole('combobox', { name: 'AI provider' })
-    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Audit issues.' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Start manager' }))
-
-    await waitFor(() => expect(mocks.quickStartWorkspaceManager).toHaveBeenCalledWith(
-      'Audit issues.',
-      'pi',
-      'google-1',
-    ))
+    expect(await screen.findByLabelText('Model local-manual-model')).toBeTruthy()
+    expect(screen.getByLabelText('128K context')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'AI provider' })).toBeNull()
   })
 
   it('resumes a paused non-Pi Manager Session through the native terminal path', async () => {

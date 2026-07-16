@@ -259,6 +259,7 @@ export const en = {
     selectCredential: 'AI provider',
     configureProvider: 'Configure an AI provider',
     runtimeDefaultModel: 'Runtime default model',
+    runtimeManagedAi: 'Model and context are managed by {{runtime}}',
     modelSummary: 'Model {{model}}',
     contextSummary: '{{limit}} context',
     adjustWorkspaceAi: 'Adjust workspace AI',

@@ -256,6 +256,7 @@ export const zhHant: Resources = {
     selectCredential: 'AI 供應方',
     configureProvider: '設定一個 AI 供應方',
     runtimeDefaultModel: '執行環境預設模型',
+    runtimeManagedAi: '模型與上下文由 {{runtime}} 管理',
     modelSummary: '模型 {{model}}',
     contextSummary: '{{limit}} 上下文',
     adjustWorkspaceAi: '調整工作區 AI',

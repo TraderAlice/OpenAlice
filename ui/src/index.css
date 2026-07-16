@@ -948,7 +948,7 @@ html[lang="ja"] .oa-onboarding-title {
 }
 
 @container workspace-manager-layout (min-width: 34rem) {
-  .workspace-manager-composer-footer {
+  .workspace-manager-composer-actions {
     flex-direction: row;
     align-items: center;
     justify-content: space-between;

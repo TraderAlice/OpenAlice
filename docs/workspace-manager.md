@@ -22,8 +22,20 @@ such as:
 
 It is not a normal Chat Workspace. The UI gives it a distinct entry and a
 management-specific quick start. Its runtime picker consumes the same registered
-Agent list, saved default, install state, and readiness contract as Quick Chat.
-Pi uses WebPi; Claude, Codex, and OpenCode retain their native TUI surfaces.
+Agent list, saved default, install state, readiness, credential, model, and
+context contract as Quick Chat. `useAgentLaunchConfig` owns that resolution and
+the shared `AgentLaunchControls` components render it on both surfaces. Pi uses
+WebPi; Claude, Codex, and OpenCode retain their native TUI surfaces.
+
+For OpenCode and Pi, the summary describes the exact credential, model, and
+context that the next launch will inject. An existing Manager config wins over
+the global default and remembered choice. A usable hand-edited config (or one
+whose original vault credential was later deleted) still reports its on-disk
+model and context. Claude and Codex own their provider
+state, so the UI says that model/context are CLI-managed instead of inventing a
+value. The Manager's reserved Workspace resolves through
+`resolveRuntimeWorkspace` for config/readiness reads and writes; it must not be
+added to the business Workspace registry just to support this UI.
 
 ## Identity and Cwd
 
@@ -110,8 +122,12 @@ apply remains preview-first.
 - `src/tool/workspace-list.ts` — active floor inventory.
 - `src/server/cli.ts` and `src/server/cli-commands.ts` — embedded CLI exposure.
 - `src/webui/routes/workspaces.ts` — manager status, quick start, and resume.
-- `ui/src/lib/agentRuntime.ts` — shared Quick Chat/Manager runtime resolution.
-- `ui/src/pages/WorkspaceManagerPage.tsx` — runtime picker and WebPi/TUI shell.
+- `ui/src/lib/agentRuntime.ts` — shared runtime-selection policy.
+- `ui/src/hooks/useAgentLaunchConfig.ts` — shared readiness, credential,
+  model, context, and launch-parameter resolution.
+- `ui/src/components/workspace/AgentLaunchControls.tsx` — shared selectors and
+  truthful launch summary.
+- `ui/src/pages/WorkspaceManagerPage.tsx` — manager composer and WebPi/TUI shell.
 - `ui/src/components/workspace/ChatWorkspaceSection.tsx` — Chat sidebar entry.
 
 ## Verification
@@ -128,11 +144,14 @@ pnpm vitest run src/tool/workspace-list.spec.ts \
 
 Then use the real `/chat/manager` route with at least two available runtimes:
 
-1. verify the runtime picker agrees with Quick Chat and preserves the saved default;
-2. start one Pi/WebPi and one native-TUI Manager Session, then reopen both;
-3. inventory the active floor and confirm real `peer list` tool use;
-4. compare a harmless `--ws-id` reconstruction with an exact `--resume-id`
+1. verify the runtime/provider picker agrees with Quick Chat and preserves the
+   saved default;
+2. on Pi or OpenCode, verify the visible model/context matches the Manager
+   Workspace config, switch provider, and confirm the launch uses the new one;
+3. start one Pi/WebPi and one native-TUI Manager Session, then reopen both;
+4. inventory the active floor and confirm real `peer list` tool use;
+5. compare a harmless `--ws-id` reconstruction with an exact `--resume-id`
    continuation and verify their resolution modes remain visible;
-5. preview a peer template upgrade without `--apply`;
-6. confirm no business artifact appeared at the floor root;
-7. reload the manager conversation and confirm the same resume identity opens.
+6. preview a peer template upgrade without `--apply`;
+7. confirm no business artifact appeared at the floor root;
+8. reload the manager conversation and confirm the same resume identity opens.
