@@ -1,6 +1,7 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
@@ -48,8 +49,24 @@ describe('OpenAlice install source', () => {
   })
 
   it('derives installed content identity only from an immutable release directory', () => {
-    expect(installedContentIdentity('file:///tmp/.openalice/cli-versions/master-0123456789abcdef/src/install-source.mjs'))
+    const installedModuleUrl = pathToFileURL(join(
+      tmpdir(),
+      '.openalice',
+      'cli-versions',
+      'master-0123456789abcdef',
+      'src',
+      'install-source.mjs',
+    ))
+    const sourceModuleUrl = pathToFileURL(join(
+      tmpdir(),
+      'OpenAlice',
+      'packages',
+      'cli',
+      'src',
+      'install-source.mjs',
+    ))
+    expect(installedContentIdentity(installedModuleUrl))
       .toBe('0123456789abcdef')
-    expect(installedContentIdentity('file:///tmp/OpenAlice/packages/cli/src/install-source.mjs')).toBeNull()
+    expect(installedContentIdentity(sourceModuleUrl)).toBeNull()
   })
 })
