@@ -49,7 +49,11 @@
     "audit:theme-colors:check-runtime-bindings": "tsx scripts/theme-color-audit/runtime-binding-cli.ts check",
     "audit:theme-colors:test-missing-target-guard": "tsx scripts/theme-color-audit/runtime-binding-cli.ts test-missing-target-guard",
     "audit:theme-colors:assert-no-audit-runtime": "tsx scripts/theme-color-audit/runtime-binding-cli.ts assert-production-clean",
-    "test:theme-color-runtime-provenance": "vitest run scripts/theme-color-audit/runtime-provenance.spec.ts --project node"
+    "test:theme-color-runtime-provenance": "vitest run scripts/theme-color-audit/runtime-provenance.spec.ts --project node",
+    "test:theme-color-evidence": "vitest run scripts/theme-color-audit/evidence.spec.ts --project node",
+    "audit:theme-colors:capture": "tsx scripts/theme-color-audit/evidence-cli.ts capture",
+    "audit:theme-colors:check-annotations": "tsx scripts/theme-color-audit/evidence-cli.ts check-annotations",
+    "audit:theme-colors:build-review-index": "tsx scripts/theme-color-audit/evidence-cli.ts build-review-index"
   },
   "keywords": [
     "trading",
