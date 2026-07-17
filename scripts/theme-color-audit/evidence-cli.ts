@@ -28,6 +28,17 @@ type EvidenceManifest = { schemaVersion: 1; sourceCommit: string; jpegQuality: 8
 
 function sha256(value: Buffer): string { return createHash('sha256').update(value).digest('hex') }
 function safeName(id: string): string { return id.replace(/[^a-z0-9-]/gi, '-') }
+function jpegDimensions(buffer: Buffer): { width: number; height: number } {
+  let offset = 2
+  while (offset + 9 < buffer.length) {
+    if (buffer[offset] !== 0xff) { offset += 1; continue }
+    const marker = buffer[offset + 1]!
+    if ([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf].includes(marker)) return { height: buffer.readUInt16BE(offset + 5), width: buffer.readUInt16BE(offset + 7) }
+    if (marker === 0xd8 || marker === 0xd9) { offset += 2; continue }
+    offset += 2 + buffer.readUInt16BE(offset + 2)
+  }
+  throw new Error('JPEG dimensions unavailable')
+}
 
 async function annotate(page: Page, event: RuntimeCaptureEvent): Promise<{ context: { x: number; y: number; width: number; height: number }; crop: { x: number; y: number; width: number; height: number } }> {
   return page.evaluate(({ binding, occurrence }) => {
@@ -42,13 +53,13 @@ async function annotate(page: Page, event: RuntimeCaptureEvent): Promise<{ conte
     label.textContent = `${binding.inventoryId} · ${occurrence.path}:${occurrence.span.startLine} · ${binding.channel}`
     Object.assign(label.style, { position: 'absolute', pointerEvents: 'none', zIndex: '2147483647', left: `${pageX}px`, top: `${Math.max(0, pageY - 28)}px`, maxWidth: '900px', padding: '5px 8px', color: 'white', background: 'rgb(255, 45, 85)', border: '2px solid white', borderRadius: '4px', font: 'bold 13px/16px ui-monospace, SFMono-Regular, Menlo, monospace', whiteSpace: 'nowrap' })
     document.body.append(box, label)
-    const clip = (padding: number, maxWidth: number, maxHeight: number) => {
+    const clip = (padding: number, minWidth: number, minHeight: number, maxWidth: number, maxHeight: number) => {
       const desiredX = Math.max(0, pageX - padding); const desiredY = Math.max(0, pageY - padding - 30)
-      const desiredWidth = Math.min(maxWidth, Math.max(binding.target.width + padding * 2, 240))
-      const desiredHeight = Math.min(maxHeight, Math.max(binding.target.height + padding * 2 + 30, 160))
+      const desiredWidth = Math.min(maxWidth, Math.max(binding.target.width + padding * 2, minWidth))
+      const desiredHeight = Math.min(maxHeight, Math.max(binding.target.height + padding * 2 + 30, minHeight))
       return { x: Math.min(desiredX, Math.max(0, pageWidth - desiredWidth)), y: Math.min(desiredY, Math.max(0, pageHeight - desiredHeight)), width: Math.min(desiredWidth, pageWidth), height: Math.min(desiredHeight, pageHeight) }
     }
-    return { context: clip(120, 1200, 820), crop: clip(36, 760, 540) }
+    return { context: clip(120, 900, 360, 1200, 820), crop: clip(36, 600, 220, 760, 540) }
   }, { binding: event.binding, occurrence: event.occurrence })
 }
 
@@ -60,12 +71,13 @@ async function captureOne(event: RuntimeCaptureEvent): Promise<EvidenceEntry> {
   const cropBuffer = await event.page.screenshot({ type: 'jpeg', quality: jpegQuality, clip: clips.crop })
   await writeFile(resolve(evidenceRoot, contextRel), contextBuffer); await writeFile(resolve(evidenceRoot, cropRel), cropBuffer)
   const label = `${event.binding.inventoryId} · ${event.occurrence.path}:${event.occurrence.span.startLine} · ${event.binding.channel}`
+  const contextSize = jpegDimensions(contextBuffer); const cropSize = jpegDimensions(cropBuffer)
   return {
     kind: 'occurrence-evidence', inventoryId: event.binding.inventoryId, source: event.occurrence,
     scenario: { scenarioId: event.scenario.scenarioId, state: event.scenario.state, fixtureProfile: event.scenario.fixtureProfile, theme: event.binding.theme },
     channel: event.binding.channel, actualValue: event.binding.actualValue, target: { ...event.binding.target, active: true }, sampleBounds: { selector: event.binding.target.selector, ...clips.crop },
-    context: { path: contextRel, sha256: sha256(contextBuffer), width: Math.round(clips.context.width), height: Math.round(clips.context.height), label },
-    crop: { path: cropRel, sha256: sha256(cropBuffer), width: Math.round(clips.crop.width), height: Math.round(clips.crop.height), label },
+    context: { path: contextRel, sha256: sha256(contextBuffer), ...contextSize, label },
+    crop: { path: cropRel, sha256: sha256(cropBuffer), ...cropSize, label },
   }
 }
 
