@@ -14,7 +14,7 @@ import {
 
 const COLOR_LITERAL = /#[\da-fA-F]{3,8}\b|\b(?:rgba?|hsla?)\(\s*[^()]*\)/g
 const CSS_COLOR_LITERAL = /#[\da-fA-F]{3,8}\b|\b(?:rgba?|hsla?)\(\s*[^()]*\)|\b(?:black|white|transparent)\b/g
-const TAILWIND_PALETTE = /\b(?:bg|text|border|ring|outline|shadow|fill|stroke|from|via|to|divide|decoration|caret|accent)-(?:(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-(?:50|[1-9]00)|black|white|transparent)(?:\/\d{1,3})?\b/g
+const TAILWIND_PALETTE = /\b(?:bg|text|border|ring|outline|shadow|fill|stroke|from|via|to|divide|decoration|caret|accent)-(?:(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-(?:50|[1-9]00)|black|white|transparent)(?:\/\d{1,3}|\/\[[^\]\s]+\])?(?=\s|['"`}]|$)/g
 const SOURCE_EXTENSIONS = new Set(['.css', '.ts', '.tsx'])
 
 interface RawMatch {

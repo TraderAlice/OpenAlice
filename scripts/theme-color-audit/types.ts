@@ -44,7 +44,7 @@ export type ScenarioAction =
   | { readonly kind: 'hover-css'; readonly selector: string }
   | { readonly kind: 'focus-css'; readonly selector: string }
   | { readonly kind: 'fill-css'; readonly selector: string; readonly value: string }
-  | { readonly kind: 'click'; readonly role: 'button' | 'tab' | 'link'; readonly name: string; readonly exact?: boolean }
+  | { readonly kind: 'click'; readonly role: 'button' | 'tab' | 'link' | 'switch'; readonly name: string; readonly exact?: boolean }
   | { readonly kind: 'hover'; readonly role: 'button' | 'link'; readonly name: string; readonly exact?: boolean }
   | { readonly kind: 'focus'; readonly role: 'button' | 'textbox'; readonly name: string; readonly exact?: boolean }
   | { readonly kind: 'fill'; readonly placeholder: string; readonly value: string }
@@ -74,6 +74,12 @@ export interface RuntimeTarget {
   readonly height: number
 }
 
+export type RuntimeWinnerProof =
+  | { readonly kind: 'tailwind-utility'; readonly sourceUtility: string; readonly activeClassToken: string; readonly isolatedValue: string }
+  | { readonly kind: 'css-cascade-marker'; readonly winnerProperty: string }
+  | { readonly kind: 'runtime-value-match'; readonly consumedValue: string }
+  | { readonly kind: 'typed-runtime-value'; readonly consumedValue: string }
+
 export interface RuntimeColorBinding {
   readonly inventoryId: string
   readonly scenarioId: string
@@ -81,11 +87,12 @@ export interface RuntimeColorBinding {
   readonly surfaceKind: RuntimeSurfaceKind
   readonly channel: string
   readonly actualValue: string
+  readonly winner: RuntimeWinnerProof
   readonly target: RuntimeTarget
 }
 
 export interface RuntimeBindingManifest {
-  readonly schemaVersion: 2
+  readonly schemaVersion: 3
   readonly sourceCommit: string
   readonly bindings: readonly RuntimeColorBinding[]
 }

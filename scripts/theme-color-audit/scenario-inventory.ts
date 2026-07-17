@@ -160,7 +160,7 @@ export const scenarioInventory = {
     "color-d97df3cac1701f953de5",
     "color-525479e91d7e30910455",
     "color-34fd550609688a612fee",
-    "color-a6d02f0b767196ac5ceb",
+    "color-dae7fb052582625df57e",
     "color-273cc63954ff1cea477f",
     "color-4269d352f2e8ff54b94d",
     "color-e3ac39f288ed4875028c",

@@ -12,7 +12,8 @@ import type { RuntimeBindingManifest, RuntimeColorBinding, ScenarioAction, Stati
 import { assertBindingIntegrity, assertEveryTarget, metadataForDeclaredIds, type RuntimeBindingMetadata } from './runtime-provenance.js'
 
 const root = resolve(import.meta.dirname, '../..')
-const baseUrl = 'http://127.0.0.1:5173'
+const auditPort = Number.parseInt(process.env['OPENALICE_THEME_AUDIT_PORT'] ?? '41731', 10)
+const baseUrl = `http://127.0.0.1:${auditPort}`
 const output = resolve(root, '.artifacts/theme-color-audit/runtime-bindings.json')
 const winnerPrefix = '--openalice-audit-winner-'
 
@@ -20,7 +21,7 @@ type Metadata = RuntimeBindingMetadata
 
 function startServer(): ChildProcess {
   return spawn('pnpm', ['-F', 'open-alice-ui', 'exec', 'vite', '--mode', 'demo', '--config', '../scripts/theme-color-audit/audit-vite.config.ts'], {
-    cwd: root, stdio: ['ignore', 'inherit', 'inherit'], detached: true, env: { ...process.env, OPENALICE_UI_PORT: '5173', VITE_OPENALICE_FIRST_RUN_GUIDE: '1' },
+    cwd: root, stdio: ['ignore', 'inherit', 'inherit'], detached: true, env: { ...process.env, OPENALICE_UI_PORT: String(auditPort), OPENALICE_THEME_AUDIT_PORT: String(auditPort), VITE_OPENALICE_FIRST_RUN_GUIDE: '1' },
   })
 }
 function stopServer(server: ChildProcess): void {
@@ -31,7 +32,7 @@ function stopServer(server: ChildProcess): void {
 }
 async function waitForServer(): Promise<void> {
   for (let attempt = 0; attempt < 120; attempt += 1) {
-    try { if ((await fetch(baseUrl)).ok) return } catch { /* starting */ }
+    try { const response = await fetch(baseUrl); if (response.ok && (await response.text()).includes('__OPENALICE_THEME_COLOR_CONSUME__')) return } catch { /* starting */ }
     await delay(250)
   }
   throw new Error('audit Vite server did not become ready')
@@ -92,20 +93,20 @@ async function metadataFor(entries: readonly StaticColorOccurrence[]): Promise<M
 async function collect(page: Page, scenarioId: string, theme: 'light' | 'dark', metadata: readonly Metadata[]): Promise<RuntimeColorBinding[]> {
   return page.evaluate(({ scenarioId, theme, metadata, winnerPrefix }) => {
     type RectTarget = { selector: string; x: number; y: number; width: number; height: number }
-    type Consumed = { value: string; kind: string }
+    type Consumed = { value: string; kind: string; active: boolean }
     const isCssColorValue = (value: string): boolean => /^(?:#[\da-f]{3,8}|(?:rgb|rgba|hsl|hsla|oklch|oklab|lab|lch|color)\([^)]*\)|transparent|currentcolor)$/i.test(value.trim())
     const bindings: RuntimeColorBinding[] = []
     const consumed = (globalThis as typeof globalThis & { __OPENALICE_THEME_COLOR_CONSUMED__?: Map<string, Consumed> }).__OPENALICE_THEME_COLOR_CONSUMED__
-    const target = (element: Element): RectTarget | null => {
+    const target = (element: Element, inventoryId: string): RectTarget | null => {
       const rect = element.getBoundingClientRect()
       if (rect.width <= 0 || rect.height <= 0) return null
-      const audit = element.getAttribute('data-openalice-color-audit')?.split(' ')[0]
-      const selector = element.id ? `#${CSS.escape(element.id)}` : audit ? `[data-openalice-color-audit~="${audit}"]` : element.classList.length ? `${element.tagName.toLowerCase()}.${CSS.escape(element.classList[0]!)}` : element.tagName.toLowerCase()
+      const marker = `openalice-audit-${inventoryId}`
+      const selector = element.classList.contains(marker) ? `.${CSS.escape(marker)}` : element.getAttribute('data-openalice-color-audit')?.split(' ').includes(inventoryId) ? `[data-openalice-color-audit~="${inventoryId}"]` : element.id ? `#${CSS.escape(element.id)}` : element.classList.length ? `${element.tagName.toLowerCase()}.${CSS.escape(element.classList[0]!)}` : element.tagName.toLowerCase()
       return { selector, x: rect.x, y: rect.y, width: rect.width, height: rect.height }
     }
-    const push = (item: Metadata, element: Element, surfaceKind: RuntimeColorBinding['surfaceKind'], actualValue: string): boolean => {
-      const rect = target(element); if (!rect) return false
-      bindings.push({ inventoryId: item.id, scenarioId, theme, surfaceKind, channel: item.channel, actualValue, target: rect })
+    const push = (item: Metadata, element: Element, surfaceKind: RuntimeColorBinding['surfaceKind'], actualValue: string, winner: RuntimeColorBinding['winner']): boolean => {
+      const rect = target(element, item.id); if (!rect) return false
+      bindings.push({ inventoryId: item.id, scenarioId, theme, surfaceKind, channel: item.channel, actualValue, winner, target: rect })
       return true
     }
     const normalize = (value: string): string => {
@@ -124,11 +125,13 @@ async function collect(page: Page, scenarioId: string, theme: 'light' | 'dark', 
           for (const pseudo of pseudos) {
             const style = getComputedStyle(element, pseudo)
             if (!style.getPropertyValue(`${winnerPrefix}${item.channel.replace(/[^a-z0-9-]/gi, '-')}`).replace(/["']/g, '').trim().split(/\s+/).includes(item.id)) continue
-            bound = push(item, element, 'css-cascade-winner', style.getPropertyValue(item.channel).trim()) || bound
+            const winnerProperty = `${winnerPrefix}${item.channel.replace(/[^a-z0-9-]/gi, '-')}`
+            bound = push(item, element, 'css-cascade-winner', style.getPropertyValue(item.channel).trim(), { kind: 'css-cascade-marker', winnerProperty }) || bound
           }
         }
       } else {
-        const direct = [...document.querySelectorAll(`[data-openalice-color-audit~="${item.id}"],.openalice-audit-${item.id}`)]
+        const directSelector = item.syntaxKind === 'tailwind-palette-utility' ? `.openalice-audit-${item.id}` : `[data-openalice-color-audit~="${item.id}"],.openalice-audit-${item.id}`
+        const direct = [...document.querySelectorAll(directSelector)]
         for (const element of direct) {
           const style = getComputedStyle(element)
           const channel = item.syntaxKind === 'tailwind-palette-utility'
@@ -136,14 +139,20 @@ async function collect(page: Page, scenarioId: string, theme: 'light' | 'dark', 
             : item.channel
           if (!channel) continue
           const actualValue = style.getPropertyValue(channel).trim() || element.getAttribute(channel) || ''
-          if (actualValue && actualValue !== item.sourceText) bound = push(item, element, 'dom-element', actualValue) || bound
+          if (item.syntaxKind === 'tailwind-palette-utility') {
+            const activeToken = [...element.classList].find((token) => token === item.sourceText || token.endsWith(`:${item.sourceText}`))
+            if (!activeToken) continue
+            const probe = document.createElement(element.tagName.toLowerCase()); probe.className = item.sourceText; probe.style.position = 'fixed'; probe.style.visibility = 'hidden'; document.body.append(probe)
+            const isolatedUtilityValue = getComputedStyle(probe).getPropertyValue(channel).trim(); probe.remove()
+            if (actualValue && actualValue === isolatedUtilityValue) bound = push(item, element, 'dom-element', actualValue, { kind: 'tailwind-utility', sourceUtility: item.sourceText, activeClassToken: activeToken, isolatedValue: isolatedUtilityValue }) || bound
+          } else if (actualValue && actualValue !== item.sourceText) bound = push(item, element, 'dom-element', actualValue, { kind: 'runtime-value-match', consumedValue: actualValue }) || bound
         }
         const execution = consumed?.get(item.id)
         if (!bound && execution) {
           const typedSelectors = item.path.includes('KlinePanel') ? ['canvas'] : item.path.includes('MarketBoardPage') || item.path.includes('MarketRotationPage') ? ['svg'] : []
           for (const selector of typedSelectors) {
             const element = document.querySelector(selector)
-            if (element && push(item, element, 'typed-surface', execution.value)) { bound = true; break }
+            if (element && push(item, element, 'typed-surface', execution.value, { kind: 'typed-runtime-value', consumedValue: execution.value })) { bound = true; break }
           }
         }
         if (!bound && execution && item.syntaxKind !== 'tailwind-palette-utility' && isCssColorValue(execution.value)) {
@@ -155,7 +164,7 @@ async function collect(page: Page, scenarioId: string, theme: 'light' | 'dark', 
             const style = getComputedStyle(element)
             const values = [style.color, style.backgroundColor, style.borderColor, style.fill, style.stroke, element.getAttribute('fill') ?? '', element.getAttribute('stroke') ?? '']
             const actualValue = values.find((value) => normalize(value) === expected)
-            if (actualValue && push(item, element, 'dom-element', actualValue)) { bound = true; break }
+            if (actualValue && push(item, element, 'dom-element', actualValue, { kind: 'runtime-value-match', consumedValue: execution.value })) { bound = true; break }
           }
         }
       }
@@ -192,7 +201,7 @@ export async function buildBindings(options: RuntimeBindingOptions = {}): Promis
         : themeColorScenarios
       for (const scenario of selectedScenarios) for (const theme of scenario.themes) {
         console.log(`binding ${scenario.scenarioId} ${theme}`)
-        const context = await browser.newContext({ viewport: scenario.viewport })
+        const context = await browser.newContext({ viewport: scenario.viewport, colorScheme: theme })
         const page = await context.newPage()
         try {
         page.on('pageerror', (error) => console.error('audit page error', error.stack ?? error.message))
@@ -265,9 +274,9 @@ export async function buildBindings(options: RuntimeBindingOptions = {}): Promis
     } finally { await browser.close() }
     const unique = [...new Map(bindings.map((entry) => [`${entry.inventoryId}:${entry.scenarioId}:${entry.theme}`, entry])).values()]
     assertBindingIntegrity(unique, allMetadata)
-    await mkdir(resolve(output, '..'), { recursive: true }); await writeFile(output, `${JSON.stringify({ schemaVersion: 2, sourceCommit: staticManifest.sourceCommit, bindings: unique }, null, 2)}\n`)
+    await mkdir(resolve(output, '..'), { recursive: true }); await writeFile(output, `${JSON.stringify({ schemaVersion: 3, sourceCommit: staticManifest.sourceCommit, bindings: unique }, null, 2)}\n`)
     if (!process.env['AUDIT_SCENARIO']) assertEveryTarget(runtime.map((entry) => entry.inventoryId), unique, 'complete manifest')
-    const manifest: RuntimeBindingManifest = { schemaVersion: 2, sourceCommit: staticManifest.sourceCommit, bindings: unique }
+    const manifest: RuntimeBindingManifest = { schemaVersion: 3, sourceCommit: staticManifest.sourceCommit, bindings: unique }
     return manifest
   } finally { stopServer(server) }
 }

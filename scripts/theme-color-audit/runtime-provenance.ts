@@ -16,6 +16,10 @@ export function tailwindComputedChannel(channel: string): string | null {
   } as Record<string, string>)[channel] ?? null
 }
 
+export function isTailwindRuntimeWinner(sourceText: string, classTokens: readonly string[], actualValue: string, isolatedUtilityValue: string): boolean {
+  return classTokens.some((token) => token === sourceText || token.endsWith(`:${sourceText}`)) && actualValue.trim() !== '' && actualValue.trim() === isolatedUtilityValue.trim()
+}
+
 export function isCssColor(value: string): boolean {
   if (!value.trim()) return false
   return /^(?:#[\da-f]{3,8}|(?:rgb|rgba|hsl|hsla|oklch|oklab|lab|lch|color)\([^)]*\)|transparent|currentcolor)$/i.test(value.trim())
@@ -35,6 +39,12 @@ export function assertBindingIntegrity(bindings: readonly RuntimeColorBinding[],
     const item = byId.get(binding.inventoryId)
     if (item?.syntaxKind === 'tailwind-palette-utility' && binding.actualValue === item.sourceText) {
       throw new Error(`Tailwind source text used as runtime value: ${binding.inventoryId} (${binding.actualValue})`)
+    }
+    if (item?.syntaxKind === 'tailwind-palette-utility') {
+      if (binding.winner.kind !== 'tailwind-utility') throw new Error(`Tailwind binding lacks utility winner proof: ${binding.inventoryId}`)
+      if (binding.winner.sourceUtility !== item.sourceText) throw new Error(`Tailwind winner source mismatch: ${binding.inventoryId}`)
+      if (!(binding.winner.activeClassToken === item.sourceText || binding.winner.activeClassToken.endsWith(`:${item.sourceText}`))) throw new Error(`Tailwind winner class mismatch: ${binding.inventoryId}`)
+      if (binding.actualValue.trim() === '' || binding.actualValue.trim() !== binding.winner.isolatedValue.trim()) throw new Error(`Tailwind winner computed mismatch: ${binding.inventoryId}`)
     }
   }
 }

@@ -8,7 +8,8 @@ import { themeColorScenarios } from './scenarios.js'
 import type { RuntimeColorWorklist, ScenarioAction, ThemeColorScenario } from './types.js'
 
 const root = resolve(import.meta.dirname, '../..')
-const baseUrl = 'http://127.0.0.1:5173'
+const auditPort = Number.parseInt(process.env['OPENALICE_THEME_AUDIT_PORT'] ?? '41731', 10)
+const baseUrl = `http://127.0.0.1:${auditPort}`
 
 async function action(page: Page, item: ScenarioAction): Promise<void> {
   if (item.kind === 'wait') { await page.waitForTimeout(item.milliseconds); return }
@@ -26,12 +27,12 @@ async function action(page: Page, item: ScenarioAction): Promise<void> {
 }
 
 function server(): ChildProcess {
-  return spawn('pnpm', ['-F', 'open-alice-ui', 'exec', 'vite', '--mode', 'demo', '--config', '../scripts/theme-color-audit/audit-vite.config.ts'], { cwd: root, stdio: 'inherit', detached: true, env: { ...process.env, OPENALICE_UI_PORT: '5173', VITE_OPENALICE_FIRST_RUN_GUIDE: '1' } })
+  return spawn('pnpm', ['-F', 'open-alice-ui', 'exec', 'vite', '--mode', 'demo', '--config', '../scripts/theme-color-audit/audit-vite.config.ts'], { cwd: root, stdio: 'inherit', detached: true, env: { ...process.env, OPENALICE_UI_PORT: String(auditPort), OPENALICE_THEME_AUDIT_PORT: String(auditPort), VITE_OPENALICE_FIRST_RUN_GUIDE: '1' } })
 }
 
 async function waitForServer(): Promise<void> {
   for (let attempt = 0; attempt < 120; attempt += 1) {
-    try { if ((await fetch(baseUrl)).ok) return } catch { /* starting */ }
+    try { const response = await fetch(baseUrl); if (response.ok && (await response.text()).includes('__OPENALICE_THEME_COLOR_CONSUME__')) return } catch { /* starting */ }
     await delay(250)
   }
   throw new Error('demo server did not become ready')

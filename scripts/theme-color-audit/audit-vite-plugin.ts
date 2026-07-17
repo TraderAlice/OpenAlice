@@ -45,6 +45,7 @@ function transformTs(path: string, code: string, occurrences: readonly StaticCol
   const replacements: { start: number; end: number; text: string }[] = []
   const elements = new Map<number, { element: ts.JsxOpeningLikeElement; ids: Set<string> }>()
   const values = new Map<number, { node: ts.StringLiteralLike | ts.TemplateExpression; ids: Set<string>; kind: StaticColorOccurrence['syntaxKind'] }>()
+  const occurrenceById = new Map(occurrences.map((occurrence) => [occurrence.inventoryId, occurrence]))
   for (const occurrence of occurrences) {
     const node = findSmallestNode(file, occurrence.span.startOffset, occurrence.span.endOffset)
     if (!node) continue
@@ -62,7 +63,8 @@ function transformTs(path: string, code: string, occurrences: readonly StaticCol
   }
   for (const { node, ids, kind } of values.values()) {
     const original = code.slice(node.getStart(file), node.getEnd())
-    const wrapped = `globalThis.${VALUE_HOOK}(${JSON.stringify([...ids])},${original},${JSON.stringify(kind)})`
+    const records = [...ids].map((id) => ({ id, sourceText: occurrenceById.get(id)!.sourceText }))
+    const wrapped = `globalThis.${VALUE_HOOK}(${JSON.stringify(records)},${original},${JSON.stringify(kind)})`
     replacements.push({ start: node.getStart(file), end: node.getEnd(), text: ts.isJsxAttribute(node.parent) ? `{${wrapped}}` : wrapped })
   }
   for (const { element, ids } of elements.values()) {
@@ -102,6 +104,10 @@ export function themeColorAuditPlugin(repoRoot: string): Plugin {
       const occurrences = manifest.occurrences.filter((entry) => entry.sourceClass === 'runtime' && entry.role === 'color-consumer' && entry.path === path)
       if (occurrences.length === 0 && path !== 'ui/src/App.tsx') return null
       let transformed = occurrences.length === 0 ? code : path.endsWith('.css') ? transformCss(path, code, occurrences) : transformTs(path, code, occurrences)
+      if (path === 'ui/src/index.css') {
+        const utilities = [...new Set(manifest.occurrences.filter((entry) => entry.syntaxKind === 'tailwind-palette-utility').map((entry) => entry.sourceText))]
+        transformed += `\n@source inline(${JSON.stringify(utilities.join(' '))});\n`
+      }
       if (path === 'ui/src/App.tsx') {
         transformed = transformed.replace("const firstRunGuideEnabled = import.meta.env.VITE_OPENALICE_FIRST_RUN_GUIDE === '1'", 'const firstRunGuideEnabled = true')
       }
@@ -121,7 +127,7 @@ export function themeColorAuditPlugin(repoRoot: string): Plugin {
     transformIndexHtml: {
       order: 'pre',
       handler() {
-        return [{ tag: 'script', injectTo: 'head-prepend', children: `globalThis.${VALUE_HOOK}=(ids,value,kind)=>{const m=globalThis.__OPENALICE_THEME_COLOR_CONSUMED__??=new Map();for(const id of ids)m.set(id,{value:String(value),kind});return kind==='tailwind-palette-utility'?String(value)+ids.map(id=>' openalice-audit-'+id).join(''):String(value)};` }]
+        return [{ tag: 'script', injectTo: 'head-prepend', children: `globalThis.${VALUE_HOOK}=(records,value,kind)=>{const m=globalThis.__OPENALICE_THEME_COLOR_CONSUMED__??=new Map(),text=String(value),tokens=text.split(/\\s+/),active=(source)=>tokens.some(token=>token===source||token.endsWith(':'+source));for(const record of records)m.set(record.id,{value:text,kind,active:kind!=='tailwind-palette-utility'||active(record.sourceText)});return kind==='tailwind-palette-utility'?text+records.filter(record=>active(record.sourceText)).map(record=>' openalice-audit-'+record.id).join(''):text};` }]
       },
     },
   }
