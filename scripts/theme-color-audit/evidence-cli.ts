@@ -46,7 +46,7 @@ async function relocateForCapture(event: RuntimeCaptureEvent): Promise<RuntimeCa
   if (await locator.count() === 0) return event
   await locator.scrollIntoViewIfNeeded(); await event.page.waitForTimeout(20)
   const target = await locator.evaluate((element) => { const rect = element.getBoundingClientRect(); return { x: rect.x, y: rect.y, width: rect.width, height: rect.height } })
-  if (target.width <= 0 || target.height <= 0) throw new Error(`capture target has zero area: ${event.binding.inventoryId}`)
+  if (target.width <= 0 || target.height <= 0) return event
   return { ...event, binding: { ...event.binding, target: { ...event.binding.target, ...target } } }
 }
 
