@@ -1,6 +1,12 @@
 import type { RuntimeColorWorklist, ThemeColorScenario } from './types.js'
 import { themeColorScenarios } from './scenarios.js'
 
+export function assertScenarioPath(scenarioId: string, route: string, actualUrl: string): void {
+  const expectedPath = new URL(route, 'http://openalice.audit').pathname
+  const actualPath = new URL(actualUrl).pathname
+  if (actualPath !== expectedPath) throw new Error(`${scenarioId}: redirected to ${actualUrl}`)
+}
+
 export function validateScenarioCoverage(worklist: RuntimeColorWorklist, scenarios: readonly ThemeColorScenario[] = themeColorScenarios): void {
   const expected = new Set(worklist.items.map((item) => item.inventoryId))
   const seenScenarios = new Set<string>()

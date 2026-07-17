@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { validateScenarioCoverage } from './scenario-catalog.js'
+import { assertScenarioPath, validateScenarioCoverage } from './scenario-catalog.js'
 import type { RuntimeColorWorklist, ThemeColorScenario } from './types.js'
 
 const source = { inventoryId: 'color-a', path: 'ui/src/A.tsx', sourceText: 'text-red-500', sourceClass: 'runtime', syntaxKind: 'tailwind-palette-utility', ownerHint: 'A', role: 'color-consumer', span: { startOffset: 0, endOffset: 12, startLine: 1, startColumn: 1, endLine: 1, endColumn: 13 } } as const
@@ -13,4 +13,8 @@ describe('occurrence-driven scenario coverage', () => {
     expect(() => validateScenarioCoverage(worklist, [{ ...scenario, inventoryIds: ['color-stale'] }])).toThrow('unknown or stale')
   })
   it('requires a real action for a non-baseline state', () => expect(() => validateScenarioCoverage(worklist, [{ ...scenario, state: 'warning' }])).toThrow('requires a user action'))
+  it('compares route pathnames without treating a required query as a redirect', () => {
+    expect(() => assertScenarioPath('first-run', '/onboarding?onboardingStep=broker', 'http://127.0.0.1:5173/onboarding?onboardingStep=broker&themeAuditFixture=first-run-locked')).not.toThrow()
+    expect(() => assertScenarioPath('first-run', '/onboarding?onboardingStep=broker', 'http://127.0.0.1:5173/chat')).toThrow('redirected')
+  })
 })

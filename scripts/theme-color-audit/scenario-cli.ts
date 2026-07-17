@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { chromium, type Page } from '@playwright/test'
-import { validateScenarioCoverage } from './scenario-catalog.js'
+import { assertScenarioPath, validateScenarioCoverage } from './scenario-catalog.js'
 import { themeColorScenarios } from './scenarios.js'
 import type { RuntimeColorWorklist, ScenarioAction, ThemeColorScenario } from './types.js'
 
@@ -26,7 +26,7 @@ async function action(page: Page, item: ScenarioAction): Promise<void> {
 }
 
 function server(): ChildProcess {
-  return spawn('pnpm', ['-F', 'open-alice-ui', 'dev:demo', '--host', '127.0.0.1'], { cwd: root, stdio: 'inherit', detached: true, env: { ...process.env, OPENALICE_UI_PORT: '5173' } })
+  return spawn('pnpm', ['-F', 'open-alice-ui', 'exec', 'vite', '--mode', 'demo', '--config', '../scripts/theme-color-audit/audit-vite.config.ts'], { cwd: root, stdio: 'inherit', detached: true, env: { ...process.env, OPENALICE_UI_PORT: '5173', VITE_OPENALICE_FIRST_RUN_GUIDE: '1' } })
 }
 
 async function waitForServer(): Promise<void> {
@@ -38,7 +38,7 @@ async function waitForServer(): Promise<void> {
 }
 
 async function ready(page: Page, scenario: ThemeColorScenario): Promise<void> {
-  const locator = scenario.ready.role === 'main' ? page.getByRole('main') : page.getByRole(scenario.ready.role, { name: scenario.ready.name, exact: true }).last()
+  const locator = scenario.ready.role === 'main' ? page.getByRole('main').last() : page.getByRole(scenario.ready.role, { name: scenario.ready.name, exact: true }).last()
   await locator.waitFor({ state: 'visible' })
 }
 
@@ -54,20 +54,49 @@ if (command === 'coverage') {
     await waitForServer()
     const browser = await chromium.launch({ headless: true, channel: process.env['PLAYWRIGHT_CHANNEL'] ?? 'chrome' })
     try {
-      const page = await browser.newPage()
-      const pageErrors: string[] = []
-      page.on('pageerror', (error) => pageErrors.push(error.message))
       for (const scenario of themeColorScenarios) {
-        pageErrors.length = 0
-        await page.setViewportSize(scenario.viewport)
-        await page.setExtraHTTPHeaders(scenario.fixtureProfile === 'demo' ? {} : { 'x-openalice-theme-audit-fixture': scenario.fixtureProfile, 'x-openalice-theme-audit-run': scenario.scenarioId })
-        const route = scenario.fixtureProfile === 'demo' ? scenario.route : `${scenario.route}${scenario.route.includes('?') ? '&' : '?'}themeAuditFixture=${encodeURIComponent(scenario.fixtureProfile)}`
-        await page.goto(`${baseUrl}${route}`, { waitUntil: scenario.collectBeforeNetworkIdle ? 'domcontentloaded' : 'networkidle' })
-        if (new URL(page.url()).pathname !== scenario.route) throw new Error(`${scenario.scenarioId}: redirected to ${page.url()}`)
-        for (const item of scenario.actions) await action(page, item)
-        await ready(page, scenario)
-        if (pageErrors.length > 0) throw new Error(`${scenario.scenarioId}: page errors: ${pageErrors.join('; ')}`)
-        console.log(`scenario ${scenario.scenarioId}: ready (${scenario.inventoryIds.length} IDs)`)
+        const context = await browser.newContext({ viewport: scenario.viewport })
+        const page = await context.newPage(); const pageErrors: string[] = []
+        try {
+          page.on('pageerror', (error) => pageErrors.push(error.message))
+          if (scenario.fixtureProfile !== 'demo') {
+            await page.setExtraHTTPHeaders({ 'x-openalice-theme-audit-fixture': scenario.fixtureProfile, 'x-openalice-theme-audit-run': scenario.scenarioId })
+            await page.addInitScript(({ fixture, auditRun }) => {
+              if (fixture === 'first-run-locked' || fixture === 'first-run-no-uta') window.sessionStorage.setItem('__OPENALICE_AUDIT_ONBOARDING_SEARCH__', '?onboardingStep=broker')
+              if (fixture === 'market-search-variants') window.localStorage.setItem('openalice.watchlist.v1', JSON.stringify({ state: { entries: [{ assetClass: 'crypto', symbol: 'BTC-USD', addedAt: 2 }, { assetClass: 'commodity', symbol: 'GC=F', addedAt: 1 }] }, version: 1 }))
+              const originalFetch = globalThis.fetch.bind(globalThis)
+              globalThis.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+                const request = new Request(input, init); const headers = new Headers(request.headers)
+                headers.set('x-openalice-theme-audit-fixture', fixture); headers.set('x-openalice-theme-audit-run', auditRun)
+                return originalFetch(new Request(request, { headers }))
+              }
+            }, { fixture: scenario.fixtureProfile, auditRun: scenario.scenarioId })
+          }
+          if (scenario.fixtureProfile.startsWith('terminal-')) await page.addInitScript((fixture) => {
+            ;(globalThis as typeof globalThis & { __name?: (value: unknown) => unknown }).__name = (value) => value
+            type Listener = (event?: { data?: unknown; code?: number }) => void
+            class AuditWebSocket {
+              static readonly OPEN = 1; readonly OPEN = 1; readyState = 0; binaryType = 'arraybuffer'
+              private readonly listeners = new Map<string, Listener[]>()
+              constructor(_url: string) {
+                const emit = (type: string, event?: { data?: unknown; code?: number }): void => { for (const listener of this.listeners.get(type) ?? []) listener(event) }
+                if (fixture === 'terminal-connecting') return
+                setTimeout(() => { this.readyState = 1; emit('open'); if (fixture !== 'terminal-connected') setTimeout(() => { this.readyState = 3; emit('close', { code: fixture === 'terminal-kicked' ? 4001 : fixture === 'terminal-locked' ? 4409 : fixture === 'terminal-closed' ? 4404 : 1006 }) }, 40) }, 20)
+              }
+              addEventListener(type: string, listener: Listener): void { const current = this.listeners.get(type) ?? []; current.push(listener); this.listeners.set(type, current) }
+              send(_data: unknown): void {}
+              close(): void { this.readyState = 3 }
+            }
+            Object.assign(globalThis, { __OPENALICE_AUDIT_WEBSOCKET__: AuditWebSocket })
+          }, scenario.fixtureProfile)
+          const route = scenario.fixtureProfile === 'demo' ? scenario.route : `${scenario.route}${scenario.route.includes('?') ? '&' : '?'}themeAuditFixture=${encodeURIComponent(scenario.fixtureProfile)}`
+          await page.goto(`${baseUrl}${route}`, { waitUntil: scenario.collectBeforeNetworkIdle ? 'domcontentloaded' : 'networkidle' })
+          assertScenarioPath(scenario.scenarioId, scenario.route, page.url())
+          for (const item of scenario.actions) await action(page, item)
+          await ready(page, scenario)
+          if (pageErrors.length > 0) throw new Error(`${scenario.scenarioId}: page errors: ${pageErrors.join('; ')}`)
+          console.log(`scenario ${scenario.scenarioId}: ready (${scenario.inventoryIds.length} IDs)`)
+        } finally { await context.close() }
       }
     } finally { await browser.close() }
   } finally { if (child.pid) process.kill(-child.pid, 'SIGTERM') }
