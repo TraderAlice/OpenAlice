@@ -160,6 +160,7 @@
     "@types/ws": "^8.18.1",
     "@vitest/coverage-v8": "^4.1.5",
     "jsdom": "^29.0.0",
+    "playwright": "1.58.2",
     "tsup": "^8.5.1",
     "tsx": "^4.21.0",
     "turbo": "^2.9.14",

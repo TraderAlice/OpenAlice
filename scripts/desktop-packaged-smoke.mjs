@@ -14,6 +14,7 @@ import { buildDesktopPackagedSmokePlan } from './desktop-packaged-smoke-plan.mjs
 import { runPnpmSync } from './pnpm-command.mjs'
 import { packagedElectronExecutable } from './smoke-packaged-toolchain.mjs'
 import { startWorkspaceAcceptanceAiMock } from './workspace-acceptance-ai-mock.mjs'
+import { failedReceiptChecks } from './smoke-receipt.mjs'
 
 const repoRoot = resolve(import.meta.dirname, '..')
 const plan = buildDesktopPackagedSmokePlan(process.argv.slice(2), process.env)
@@ -238,6 +239,7 @@ async function main() {
       ? process.env['OPENALICE_SMOKE_RECEIPT_PATH']?.trim() || join(smokeRoot, 'workspace-acceptance-receipt.json')
       : null
     if (receiptPath) env.OPENALICE_SMOKE_RECEIPT_PATH = receiptPath
+    const electronProfile = smokeRoot ? join(smokeRoot, 'electron-profile') : null
 
     console.log('\n[desktop-smoke] launching packaged app')
     console.log(`[desktop-smoke] app: ${appPath}`)
@@ -262,7 +264,7 @@ async function main() {
       console.log('[desktop-smoke] close the app window or press Ctrl-C here to stop')
     }
 
-    const child = spawn(appPath, [], {
+    const child = spawn(appPath, electronProfile ? [`--user-data-dir=${electronProfile}`] : [], {
       cwd: repoRoot,
       stdio: 'inherit',
       env,
@@ -273,14 +275,47 @@ async function main() {
 
     if (!exit.signal && workspaceAcceptance && finalCode === 0) {
       const receipt = JSON.parse(readFileSync(receiptPath, 'utf8'))
-      const failedChecks = Object.entries(receipt.checks ?? {})
-        .filter(([, ok]) => ok !== true)
-        .map(([name]) => name)
+      const failedChecks = failedReceiptChecks(receipt)
       if (failedChecks.length > 0) throw new Error(`failed receipt checks: ${failedChecks.join(', ')}`)
       if (aiMock.stats.acceptanceToolTurns < 1 || aiMock.stats.acceptanceFinalTurns < 1) {
         throw new Error(`mock did not observe both Pi turns: ${JSON.stringify(aiMock.stats)}`)
       }
       console.log(`[desktop-smoke] workspace acceptance receipt: ${JSON.stringify(receipt)}`)
+
+      // Reuse the same isolated OPENALICE_HOME and Chromium profile across two
+      // distinct packaged Electron processes. This proves both file-backed
+      // authority and the pre-React resolved-token first-paint cache.
+      let expectedThemeFamilyId = null
+      for (const stage of ['seed', 'apply', 'restart']) {
+        const themeReceiptPath = join(smokeRoot, `theme-${stage}-receipt.json`)
+        const themeEnv = {
+          ...env,
+          OPENALICE_ELECTRON_SMOKE_WORKSPACE_ACCEPTANCE: '0',
+          OPENALICE_ELECTRON_SMOKE_THEME: stage,
+          OPENALICE_THEME_SMOKE_RECEIPT_PATH: themeReceiptPath,
+        }
+        delete themeEnv.OPENALICE_SMOKE_RECEIPT_PATH
+        console.log(`[desktop-smoke] theme ${stage}: launching packaged app`)
+        const themeChild = spawn(appPath, [`--user-data-dir=${electronProfile}`], {
+          cwd: repoRoot,
+          stdio: 'inherit',
+          env: themeEnv,
+        })
+        const themeExit = await waitForPackagedApp(themeChild, true)
+        if (themeExit.timedOut || themeExit.signal || themeExit.code !== 0) {
+          throw new Error(`theme ${stage} packaged app exited ${themeExit.code ?? themeExit.signal ?? 'unknown'}`)
+        }
+        const themeReceipt = JSON.parse(readFileSync(themeReceiptPath, 'utf8'))
+        if (expectedThemeFamilyId === null) expectedThemeFamilyId = themeReceipt.familyId
+        if (themeReceipt.familyId !== expectedThemeFamilyId) {
+          throw new Error(`theme ${stage} restored ${themeReceipt.familyId}, expected ${expectedThemeFamilyId}`)
+        }
+        const themeFailedChecks = failedReceiptChecks(themeReceipt)
+        if (themeFailedChecks.length > 0) {
+          throw new Error(`theme ${stage} failed receipt checks: ${themeFailedChecks.join(', ')}`)
+        }
+        console.log(`[desktop-smoke] theme ${stage} receipt: ${JSON.stringify(themeReceipt)}`)
+      }
     }
   } catch (error) {
     finalCode = 1

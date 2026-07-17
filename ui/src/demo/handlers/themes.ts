@@ -32,6 +32,25 @@ function validFamily(value: unknown): value is ThemeFamily {
   return (['light', 'dark'] as const).every((mode) => !variants[mode] || variants[mode]?.mode === mode)
 }
 
+function validAppearance(value: unknown, restoredFamilies: readonly ThemeFamily[]): value is AppearancePreferences {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Partial<AppearancePreferences>
+  if (typeof candidate.activeFamilyId !== 'string'
+    || !restoredFamilies.some((family) => family.id === candidate.activeFamilyId)
+    || (candidate.mode !== 'light' && candidate.mode !== 'dark' && candidate.mode !== 'system')
+    || candidate.marketColors !== 'protected'
+    || (candidate.marketDirection !== 'green-up-red-down' && candidate.marketDirection !== 'red-up-green-down')
+    || candidate.statusColors !== 'protected'
+    || !candidate.terminal || typeof candidate.terminal !== 'object') return false
+  const terminal = candidate.terminal
+  if (terminal.mode === 'follow') return true
+  if (terminal.mode !== 'override'
+    || typeof terminal.familyId !== 'string'
+    || (terminal.variant !== 'light' && terminal.variant !== 'dark')) return false
+  const terminalFamily = restoredFamilies.find((family) => family.id === terminal.familyId)
+  return terminalFamily?.variants[terminal.variant] !== undefined
+}
+
 function familyReferenced(id: string): boolean {
   return appearance.activeFamilyId === id
     || (appearance.terminal.mode === 'override' && appearance.terminal.familyId === id)
@@ -43,15 +62,17 @@ function restoreDemoState(): void {
     if (raw === null) return
     const parsed = JSON.parse(raw) as { families?: unknown; appearance?: unknown }
     if (!Array.isArray(parsed.families) || !parsed.families.every(validFamily)) return
-    const restoredAppearance = parsed.appearance as AppearancePreferences | undefined
-    if (restoredAppearance === undefined
-      || !parsed.families.some((family) => family.id === restoredAppearance.activeFamilyId)) return
+    const restoredFamilies = parsed.families as ThemeFamily[]
+    if (!validAppearance(parsed.appearance, restoredFamilies)) {
+      localStorage.removeItem(DEMO_THEME_STATE_KEY)
+      return
+    }
     families.clear()
     families.set(builtin.id, builtin)
-    for (const family of parsed.families) {
+    for (const family of restoredFamilies) {
       if (family.id !== builtin.id) families.set(family.id, structuredClone(family))
     }
-    appearance = structuredClone(restoredAppearance)
+    appearance = structuredClone(parsed.appearance)
   } catch {
     localStorage.removeItem(DEMO_THEME_STATE_KEY)
   }
