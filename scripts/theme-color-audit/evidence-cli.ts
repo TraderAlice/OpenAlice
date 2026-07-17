@@ -3,7 +3,7 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { chromium, type Page } from '@playwright/test'
 import { buildBindings, type RuntimeCaptureEvent } from './runtime-binding-cli.js'
-import { buildStaticManifest } from './static-inventory.js'
+import { assertUiSourceTreeMatchesCommit, buildStaticManifest } from './static-inventory.js'
 import { validateThemeColorEvidenceManifest } from './evidence.js'
 
 const root = resolve(import.meta.dirname, '../..')
@@ -124,7 +124,10 @@ async function decodeAndInspect(page: Page, path: string): Promise<{ width: numb
 
 async function checkAnnotations(): Promise<void> {
   const input = JSON.parse(await readFile(manifestPath, 'utf8')) as unknown
-  const staticManifest = await buildStaticManifest(root); const runtime = staticManifest.occurrences.filter((entry) => entry.sourceClass === 'runtime' && entry.role === 'color-consumer')
+  const declaredCommit = (input as { sourceCommit?: unknown }).sourceCommit
+  if (typeof declaredCommit !== 'string') throw new Error('evidence manifest sourceCommit must be a string')
+  assertUiSourceTreeMatchesCommit(root, declaredCommit)
+  const staticManifest = await buildStaticManifest(root, declaredCommit); const runtime = staticManifest.occurrences.filter((entry) => entry.sourceClass === 'runtime' && entry.role === 'color-consumer')
   const manifest = validateThemeColorEvidenceManifest(input, runtime.map((entry) => ({ inventoryId: entry.inventoryId, path: entry.path, sourceText: entry.sourceText, span: entry.span })), staticManifest.sourceCommit)
   const expected = new Set(runtime.map((entry) => entry.inventoryId)); const seen = new Set<string>()
   const browser = await chromium.launch({ headless: true, channel: process.env['PLAYWRIGHT_CHANNEL'] ?? 'chrome' }); const page = await browser.newPage()

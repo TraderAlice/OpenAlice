@@ -53,7 +53,13 @@
     "test:theme-color-evidence": "vitest run scripts/theme-color-audit/evidence.spec.ts --project node",
     "audit:theme-colors:capture": "tsx scripts/theme-color-audit/evidence-cli.ts capture",
     "audit:theme-colors:check-annotations": "tsx scripts/theme-color-audit/evidence-cli.ts check-annotations",
-    "audit:theme-colors:build-review-index": "tsx scripts/theme-color-audit/evidence-cli.ts build-review-index"
+    "audit:theme-colors:build-review-index": "tsx scripts/theme-color-audit/evidence-cli.ts build-review-index",
+    "audit:theme-colors:analyze": "tsx scripts/theme-color-audit/migration-contract-cli.ts analyze",
+    "audit:theme-colors:review": "tsx scripts/theme-color-audit/migration-contract-cli.ts review",
+    "audit:theme-colors:validate-decisions": "tsx scripts/theme-color-audit/migration-contract-cli.ts validate-decisions",
+    "audit:theme-colors:check-completeness": "tsx scripts/theme-color-audit/migration-contract-cli.ts check-completeness",
+    "audit:theme-colors:export-migration-contracts": "tsx scripts/theme-color-audit/migration-contract-cli.ts export",
+    "test:theme-color-migration-contract": "vitest run scripts/theme-color-audit/migration-contract.spec.ts --project node"
   },
   "keywords": [
     "trading",
