@@ -25,7 +25,6 @@ export function buildAnalysisBundle(
     const hashes = imagesById.get(inventoryId) ?? new Set<string>()
     hashes.add(image.sha256); imagesById.set(inventoryId, hashes)
   }
-  const occurrenceEvidence = new Map(evidenceBundle.occurrenceRecords.map((record) => [record.inventoryId, record]))
   return {
     schemaVersion: 1,
     sourceCommit: staticManifest.sourceCommit,
@@ -34,17 +33,11 @@ export function buildAnalysisBundle(
     evidenceBundleSha256: jsonSha256(evidenceBundle),
     records: staticManifest.occurrences.map((occurrence) => ({
       occurrence,
-      evidence: (() => {
-        const record = occurrenceEvidence.get(occurrence.inventoryId)
-        return {
+      evidence: {
         inventoryId: occurrence.inventoryId,
         runtimeBindingIndexes: bindingsById.get(occurrence.inventoryId) ?? [],
         imageSha256: [...(imagesById.get(occurrence.inventoryId) ?? [])].sort(),
-        occurrenceEvidenceKind: record?.kind ?? 'non-visual-probe',
-        annotationContextSha256: record?.kind === 'visual-element' ? record.context.sha256 : null,
-        annotationCropSha256: record?.kind === 'visual-element' ? record.crop.sha256 : null,
-        }
-      })(),
+      },
     })),
   }
 }
@@ -165,5 +158,4 @@ export function exportContracts(decisions: ThemeColorDecisionManifest): readonly
 
 export function assertEvidence(evidence: DecisionEvidenceReference, runtime: boolean): void {
   if (runtime && (evidence.runtimeBindingIndexes.length === 0 || evidence.imageSha256.length === 0)) throw new Error(`runtime evidence incomplete: ${evidence.inventoryId}`)
-  if (runtime && evidence.occurrenceEvidenceKind === 'visual-element' && (!evidence.annotationContextSha256 || !evidence.annotationCropSha256)) throw new Error(`visual annotation evidence incomplete: ${evidence.inventoryId}`)
 }

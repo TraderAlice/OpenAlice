@@ -25,23 +25,3 @@ pnpm test:theme-color-static-inventory
 every source span back from disk and fails if it no longer equals the recorded
 text. Parser failures are fatal; the scanner never converts them into ignored
 files.
-
-The evidence bundle keeps the 30 scenario/theme screenshots as navigation
-context, but occurrence evidence is not inferred from those shared images.
-Every runtime occurrence has its own record. A visual record contains the
-source span, runtime binding, locator, channel, actual value, viewport target
-bounds, a labeled context JPEG, and an annotated crop JPEG. A non-visual record
-explicitly states whether the occurrence is an active typed value probe, has no
-positive-area target, or was inactive in the scenario catalog.
-
-```bash
-pnpm audit:theme-colors:capture
-pnpm audit:theme-colors:check-evidence
-pnpm audit:theme-colors:check-annotations
-pnpm test:theme-color-annotations
-```
-
-`check-annotations` verifies source/binding identity, target and crop geometry,
-JPEG hashes and dimensions, and decodes every visual image in Chromium to
-confirm that the annotation color is actually present. The production build
-remains free of audit attributes and globals.

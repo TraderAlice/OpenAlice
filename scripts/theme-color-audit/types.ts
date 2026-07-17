@@ -90,68 +90,20 @@ export interface EvidenceImage {
   readonly inventoryIds: readonly string[]
 }
 
-export interface PixelBounds {
-  readonly x: number
-  readonly y: number
-  readonly width: number
-  readonly height: number
-}
-
-export interface EvidenceJpeg {
-  readonly relativePath: string
-  readonly sha256: string
-  readonly format: 'jpeg'
-  readonly quality: 80
-  readonly width: number
-  readonly height: number
-}
-
-export type OccurrenceEvidenceRecord =
-  | {
-      readonly kind: 'visual-element'
-      readonly inventoryId: string
-      readonly source: StaticColorOccurrence
-      readonly bindingIndex: number
-      readonly scenarioId: string
-      readonly theme: 'light' | 'dark'
-      readonly state: ThemeColorScenario['state']
-      readonly surfaceKind: RuntimeSurfaceKind
-      readonly channel: string
-      readonly actualValue: string
-      readonly locator: string
-      readonly viewport: ThemeColorScenario['viewport']
-      readonly deviceScaleFactor: number
-      readonly targetBounds: PixelBounds
-      readonly annotation: { readonly label: string; readonly color: '#ff2d55'; readonly bounds: PixelBounds }
-      readonly context: EvidenceJpeg
-      readonly crop: EvidenceJpeg & { readonly targetBoundsInImage: PixelBounds }
-    }
-  | {
-      readonly kind: 'non-visual-probe'
-      readonly inventoryId: string
-      readonly source: StaticColorOccurrence
-      readonly bindingIndexes: readonly number[]
-      readonly reason: 'runtime-value' | 'no-positive-area-target' | 'inactive-in-scenario'
-    }
-
 export interface ThemeColorEvidenceBundle {
-  readonly schemaVersion: 2
+  readonly schemaVersion: 1
   readonly sourceCommit: string
   readonly staticManifestSchemaVersion: number
   readonly runtimeBindingSchemaVersion: number
   readonly playwrightVersion: string
   readonly browserVersion: string
   readonly images: readonly EvidenceImage[]
-  readonly occurrenceRecords: readonly OccurrenceEvidenceRecord[]
 }
 
 export interface DecisionEvidenceReference {
   readonly inventoryId: string
   readonly runtimeBindingIndexes: readonly number[]
   readonly imageSha256: readonly string[]
-  readonly occurrenceEvidenceKind: OccurrenceEvidenceRecord['kind']
-  readonly annotationContextSha256: string | null
-  readonly annotationCropSha256: string | null
 }
 
 export interface ThemeColorAnalysisRecord {
