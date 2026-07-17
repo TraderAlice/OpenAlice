@@ -40,6 +40,16 @@ function jpegDimensions(buffer: Buffer): { width: number; height: number } {
   throw new Error('JPEG dimensions unavailable')
 }
 
+async function relocateForCapture(event: RuntimeCaptureEvent): Promise<RuntimeCaptureEvent> {
+  const direct = event.page.locator(`[data-openalice-color-audit~="${event.binding.inventoryId}"], .openalice-audit-${event.binding.inventoryId}`).first()
+  const locator = await direct.count() > 0 ? direct : event.page.locator(event.binding.target.selector).first()
+  if (await locator.count() === 0) throw new Error(`capture target disappeared: ${event.binding.inventoryId} ${event.binding.target.selector}`)
+  await locator.scrollIntoViewIfNeeded(); await event.page.waitForTimeout(20)
+  const target = await locator.evaluate((element) => { const rect = element.getBoundingClientRect(); return { x: rect.x, y: rect.y, width: rect.width, height: rect.height } })
+  if (target.width <= 0 || target.height <= 0) throw new Error(`capture target has zero area: ${event.binding.inventoryId}`)
+  return { ...event, binding: { ...event.binding, target: { ...event.binding.target, ...target } } }
+}
+
 async function annotate(page: Page, event: RuntimeCaptureEvent): Promise<{ context: { x: number; y: number; width: number; height: number }; crop: { x: number; y: number; width: number; height: number } }> {
   return page.evaluate(({ binding, occurrence }) => {
     document.querySelectorAll('[data-openalice-evidence-overlay]').forEach((element) => element.remove())
@@ -63,7 +73,8 @@ async function annotate(page: Page, event: RuntimeCaptureEvent): Promise<{ conte
   }, { binding: event.binding, occurrence: event.occurrence })
 }
 
-async function captureOne(event: RuntimeCaptureEvent): Promise<EvidenceEntry> {
+async function captureOne(originalEvent: RuntimeCaptureEvent): Promise<EvidenceEntry> {
+  const event = await relocateForCapture(originalEvent)
   const clips = await annotate(event.page, event)
   const name = safeName(event.binding.inventoryId)
   const contextRel = `images/${name}-context.jpg`; const cropRel = `images/${name}-crop.jpg`
