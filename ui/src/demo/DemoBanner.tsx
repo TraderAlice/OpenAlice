@@ -11,7 +11,7 @@ export function DemoBanner(): ReactElement {
         Snapshot data · Read-only
       </span>
       <span className="hidden min-w-0 flex-1 truncate text-text-muted sm:block">
-        You&apos;re looking at a snapshot of OpenAlice with recorded data. Mutations don&apos;t persist; the agent terminal is replayed.
+        You&apos;re looking at a snapshot of OpenAlice with recorded data. Appearance themes persist in this browser; other demo mutations may reset, and the agent terminal is replayed.
       </span>
       <a
         href="https://github.com/TraderAlice/OpenAlice"

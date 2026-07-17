@@ -231,7 +231,7 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
   const { profile: terminalThemeProfile } = useResolvedTerminalTheme();
   const themeRef = useRef(terminalThemeProfile.xtermTheme);
   themeRef.current = terminalThemeProfile.xtermTheme;
-  const appliedThemeVariantRef = useRef(terminalThemeProfile.variant);
+  const appliedThemeVariantRef = useRef(terminalThemeProfile.variantId);
   const termRef = useRef<Xterm | null>(null);
 
   useEffect(() => {
@@ -239,8 +239,8 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
     if (!term) return;
     term.options.theme = terminalThemeProfile.xtermTheme;
 
-    if (appliedThemeVariantRef.current === terminalThemeProfile.variant) return;
-    appliedThemeVariantRef.current = terminalThemeProfile.variant;
+    if (appliedThemeVariantRef.current === terminalThemeProfile.variantId) return;
+    appliedThemeVariantRef.current = terminalThemeProfile.variantId;
     // Muxy-style terminal theming treats the raw PTY stream as the source of
     // truth and the active theme as renderer config. Reattach so the server
     // replays raw scrollback through the current xterm theme/profile, without

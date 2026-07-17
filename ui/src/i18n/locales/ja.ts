@@ -47,6 +47,18 @@ export const ja: Resources = {
       showEditorTabsOn: 'エディタ上部にタブバーを表示 —— クリックで切替、× または中クリックで閉じる。',
       showEditorTabsOff: 'タブバーは非表示。サイドバーから移動します。VS Code 風のタブが欲しい場合はオンに。',
     },
+    themeManager: {
+      loading: 'ファイルテーマを読み込み中…', builtIn: '組み込みテーマ', importedThemes: 'インポート済みテーマ',
+      noImported: 'インポート済みテーマはありません。', selection: '現在の外観', none: 'テーマ未選択', mode: 'テーマモード',
+      modes: { system: 'システム', light: 'ライト', dark: 'ダーク' }, cancel: 'キャンセル', apply: '適用', applied: 'テーマを適用しました。',
+      importTitle: 'テーマをインポート', importDescription: 'Base16/Base24、iTerm2、Windows Terminal、Alacritty、Kitty/Ghostty、Xresources に対応。',
+      missingVariant: 'メタデータのないファイルの明暗', chooseFile: 'ファイルを選択', imported: 'テーマをインポートしました。',
+      paired: 'ライトとダークのバリアントをペアにしました。', deleted: 'テーマを削除しました。', unknownAuthor: '作者不明',
+      complementaryCollision: 'この ID には補完するバリアントがあります。明示的にペアにしますか？',
+      idCollision: '同じ安定 ID のテーマが存在します。既存ファイルは上書きしません。', pairVariants: 'バリアントをペアにする',
+      saveImport: 'インポートを保存', reference: 'ライブテーマ参照', active: '使用中', delete: '削除',
+      surface: 'サーフェス', card: 'カード', accent: 'アクセント', xtermPreview: 'ライブ xterm.js パレット', loadFailed: 'テーマの読み込みに失敗しました。',
+    },
     dataHome: {
       title: 'データの保存場所',
       description: 'このインスタンスが使う OpenAlice ホーム全体。データ、ワークスペース、認証情報、Broker Pack、実行ロックを含みます。',

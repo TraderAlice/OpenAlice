@@ -55,6 +55,18 @@ export const zhHant: Resources = {
       showEditorTabsOn: '編輯器上方顯示分頁列 —— 點擊切換，× 或中鍵關閉。',
       showEditorTabsOff: '分頁列已隱藏。從側欄導覽；想要 VS Code 式分頁就開啟它。',
     },
+    themeManager: {
+      loading: '正在載入檔案主題…', builtIn: '內建主題', importedThemes: '已匯入主題', noImported: '尚未匯入主題。',
+      selection: '目前外觀', none: '未選擇主題', mode: '主題模式', modes: { system: '跟隨系統', light: '淺色', dark: '深色' },
+      cancel: '取消', apply: '套用', applied: '主題已套用。', importTitle: '匯入主題',
+      importDescription: '支援 Base16/Base24、iTerm2、Windows Terminal、Alacritty、Kitty/Ghostty 與 Xresources。',
+      missingVariant: '為缺少中繼資料的檔案選擇明暗模式', chooseFile: '選擇檔案', imported: '主題已匯入。',
+      paired: '淺色與深色變體已配對。', deleted: '主題已刪除。', unknownAuthor: '作者不詳',
+      complementaryCollision: '此 ID 已有互補的明暗變體。要明確將兩者配對嗎？',
+      idCollision: '相同穩定 ID 的主題已存在；不會覆寫現有檔案。', pairVariants: '配對變體', saveImport: '儲存匯入',
+      reference: '即時主題參照', active: '使用中', delete: '刪除', surface: '基礎表面', card: '卡片', accent: '強調色',
+      xtermPreview: '即時 xterm.js 色盤', loadFailed: '主題載入失敗。',
+    },
     dataHome: {
       title: '資料儲存位置',
       description: '目前執行個體使用的完整 OpenAlice 主目錄，包含資料、工作區、憑證、Broker Pack 與執行鎖。',
