@@ -5,9 +5,11 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import {
   readPreferences,
+  readAppearancePreferences,
   readQuickChatPreferences,
   rememberQuickChatCredential,
   rememberRecentChatWorkspace,
+  saveAppearancePreferences,
 } from './preferences.js'
 
 const roots: string[] = []
@@ -28,6 +30,14 @@ describe('preferences', () => {
     expect(await readPreferences(path)).toEqual({
       version: 1,
       quickChat: { lastCredentialByAgent: {}, recentChatWorkspaceId: null },
+      appearance: {
+        activeFamilyId: 'builtin-openalice',
+        mode: 'system',
+        terminal: { mode: 'follow' },
+        marketColors: 'protected',
+        marketDirection: 'green-up-red-down',
+        statusColors: 'protected',
+      },
     })
 
     await writeFile(path, '{not-json', 'utf-8')
@@ -80,5 +90,27 @@ describe('preferences', () => {
       lastCredentialByAgent: { pi: 'meituan-1' },
       recentChatWorkspaceId: null,
     })
+  })
+
+  it('persists appearance policy without disturbing quick-chat state', async () => {
+    const path = await preferenceFile()
+    await rememberQuickChatCredential('pi', 'meituan-1', path)
+    await saveAppearancePreferences({
+      activeFamilyId: 'imported-eighties-1234',
+      mode: 'dark',
+      terminal: { mode: 'override', familyId: 'imported-eighties-1234', variant: 'dark' },
+      marketColors: 'theme',
+      marketDirection: 'red-up-green-down',
+      statusColors: 'theme',
+    }, path)
+    expect(await readAppearancePreferences(path)).toEqual({
+      activeFamilyId: 'imported-eighties-1234',
+      mode: 'dark',
+      terminal: { mode: 'override', familyId: 'imported-eighties-1234', variant: 'dark' },
+      marketColors: 'theme',
+      marketDirection: 'red-up-green-down',
+      statusColors: 'theme',
+    })
+    expect((await readQuickChatPreferences(path)).lastCredentialByAgent).toEqual({ pi: 'meituan-1' })
   })
 })

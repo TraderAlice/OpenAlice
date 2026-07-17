@@ -29,6 +29,7 @@ import { createWikilinkRoutes } from './routes/wikilink.js'
 import { createVersionRoutes } from './routes/version.js'
 import { createAuthRoutes } from './routes/auth.js'
 import { createPreferencesRoutes } from './routes/preferences.js'
+import { createThemeRoutes } from './routes/themes.js'
 import { initializeWindowsWorkspaceShellPreference } from '../core/windows-workspace-shell.js'
 import { createAuthMiddleware } from './middleware/auth.js'
 import { mountMarketDataCompat } from '../server/market-data-compat.js'
@@ -217,6 +218,7 @@ export class WebPlugin implements Plugin {
     app.route('/api/config', createConfigRoutes({ ctx }))
     app.route('/api/connectors', createConnectorRoutes())
     app.route('/api/preferences', createPreferencesRoutes())
+    app.route('/api/themes', createThemeRoutes())
     app.route('/api/market-data', createMarketDataRoutes(ctx))
     app.route('/api/trading/config', createTradingConfigRoutes(ctx))
     // `/api/trading/*` and `/api/simulator/*` are proxied to the UTA carrier.
