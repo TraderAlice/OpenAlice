@@ -11,7 +11,15 @@ const root = resolve(import.meta.dirname, '../..')
 const baseUrl = 'http://127.0.0.1:5173'
 
 async function action(page: Page, item: ScenarioAction): Promise<void> {
-  const locator = page.getByRole(item.role, { name: item.name, exact: true }).first()
+  if (item.kind === 'wait') { await page.waitForTimeout(item.milliseconds); return }
+  if (item.kind === 'select') { await page.locator('select').nth(item.index).selectOption(item.value); return }
+  if (item.kind === 'click-css') { await page.locator(item.selector).filter({ hasText: item.text }).first().click(); return }
+  if (item.kind === 'hover-css') { await page.locator(item.selector).first().hover(); return }
+  if (item.kind === 'focus-css') { await page.locator(item.selector).first().focus(); return }
+  if (item.kind === 'fill-css') { await page.locator(item.selector).first().fill(item.value); return }
+  if (item.kind === 'fill') { await page.getByPlaceholder(item.placeholder, { exact: true }).fill(item.value); return }
+  const role = page.getByRole(item.role, { name: item.name, exact: item.exact ?? true }).first()
+  const locator = await role.count() > 0 ? role : page.getByText(item.name, { exact: item.exact ?? true }).first()
   if (item.kind === 'click') await locator.click()
   else if (item.kind === 'hover') await locator.hover()
   else await locator.focus()
@@ -52,7 +60,9 @@ if (command === 'coverage') {
       for (const scenario of themeColorScenarios) {
         pageErrors.length = 0
         await page.setViewportSize(scenario.viewport)
-        await page.goto(`${baseUrl}${scenario.route}`, { waitUntil: 'networkidle' })
+        await page.setExtraHTTPHeaders(scenario.fixtureProfile === 'demo' ? {} : { 'x-openalice-theme-audit-fixture': scenario.fixtureProfile, 'x-openalice-theme-audit-run': scenario.scenarioId })
+        const route = scenario.fixtureProfile === 'demo' ? scenario.route : `${scenario.route}${scenario.route.includes('?') ? '&' : '?'}themeAuditFixture=${encodeURIComponent(scenario.fixtureProfile)}`
+        await page.goto(`${baseUrl}${route}`, { waitUntil: scenario.collectBeforeNetworkIdle ? 'domcontentloaded' : 'networkidle' })
         if (new URL(page.url()).pathname !== scenario.route) throw new Error(`${scenario.scenarioId}: redirected to ${page.url()}`)
         for (const item of scenario.actions) await action(page, item)
         await ready(page, scenario)

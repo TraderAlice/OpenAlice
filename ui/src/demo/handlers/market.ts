@@ -9,6 +9,7 @@ import type { BarSourceCandidate, BarMeta } from '../../api/market'
 import type { MoversBoard, MoverRow, CalendarBoard, MacroBoard, MacroSeriesCard, TermStructureBoard, ValuationStrip, GlobalMacroBoard, ShippingBoard, FedBoard } from '../../api/reference'
 
 const AAPL = 'AAPL'
+const auditFixture = (request: Request): string | null => request.headers.get('x-openalice-theme-audit-fixture')
 
 function symbolFromUrl(url: string): string {
   return (new URL(url).searchParams.get('symbol') ?? '').toUpperCase()
@@ -35,7 +36,7 @@ export const marketHandlers = [
   http.get('/api/market/sector-rotation', () => HttpResponse.json(demoSectorRotation)),
 
   // Movers board — static snapshot, typed against the canonical contract.
-  http.get('/api/reference/movers', () => HttpResponse.json(demoMovers)),
+  http.get('/api/reference/movers', ({ request }) => HttpResponse.json(auditFixture(request) === 'market-stale' ? { ...demoMovers, meta: { ...demoMovers.meta, stale: true } } : demoMovers)),
   http.get('/api/reference/calendar', () => HttpResponse.json(demoCalendar)),
   http.get('/api/reference/macro', () => HttpResponse.json(demoMacro)),
   http.get('/api/reference/term-structure', () => HttpResponse.json(demoTermStructure)),
@@ -47,6 +48,13 @@ export const marketHandlers = [
   // ---- federated bars (multi-source K-lines) ----
   // AAPL has two demo sources so the source picker is exercised.
   http.get('/api/bars/search', ({ request }) => {
+    if (auditFixture(request) === 'market-search-variants') {
+      const candidates: BarSourceCandidate[] = [
+        { barId: 'coinbase|BTC-USD', source: 'uta', sourceId: 'coinbase', symbol: 'BTC-USD', name: 'Bitcoin', assetClass: 'crypto', label: 'BTC', barCapability: 'subscription' },
+        { barId: 'vendor|GC=F', source: 'vendor', sourceId: 'vendor', symbol: 'GC=F', name: 'Gold', assetClass: 'commodity', label: 'Gold', barCapability: 'subscription' },
+      ]
+      return HttpResponse.json({ candidates, count: candidates.length })
+    }
     const q = (new URL(request.url).searchParams.get('query') ?? '').toUpperCase()
     if (!q.includes('AAPL') && !q.includes('APPLE')) return HttpResponse.json({ candidates: [], count: 0 })
     const candidates: BarSourceCandidate[] = [

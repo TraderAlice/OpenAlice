@@ -35,8 +35,34 @@ const snapshot: ConnectorSettingsSnapshot = {
   },
 }
 
+const auditFixture = (request: Request): string | null => request.headers.get('x-openalice-theme-audit-fixture')
+
+function snapshotFor(request: Request): ConnectorSettingsSnapshot {
+  const fixture = auditFixture(request)
+  if (!fixture?.startsWith('connector-')) return snapshot
+  const result = structuredClone(snapshot)
+  const adapter = result.health.service?.adapters[0]
+  if (fixture === 'connector-starting' && adapter) { adapter.status = 'starting'; delete adapter.owner }
+  if (fixture === 'connector-awaiting' || fixture === 'connector-awaiting-status') {
+    result.definitions[0]!.fields.push({ key: 'owner', label: 'Owner', kind: 'text', required: true, learnedBy: '/alice-link' })
+    if (fixture === 'connector-awaiting-status') result.config.adapters['mattermost']!.settings.owner = '@pending-link'
+    if (adapter) { adapter.status = 'awaiting_link'; delete adapter.owner }
+  }
+  if (fixture === 'connector-ready') {
+    result.definitions[0]!.fields.push({ key: 'owner', label: 'Owner', kind: 'text', required: true, learnedBy: '/alice-link' })
+    result.config.serviceEnabled = false
+    if (adapter) { adapter.status = 'stopped'; delete adapter.owner }
+  }
+  if (fixture === 'connector-needs-setup') {
+    result.config.adapters['mattermost']!.settings = {}
+    result.config.adapters['mattermost']!.configuredSecrets = []
+    if (adapter) { adapter.status = 'starting'; delete adapter.owner }
+  }
+  return result
+}
+
 export const connectorHandlers = [
-  http.get('/api/connectors', () => HttpResponse.json(snapshot)),
+  http.get('/api/connectors', ({ request }) => HttpResponse.json(snapshotFor(request))),
   http.put('/api/connectors', async ({ request }) => {
     const config = await request.json() as PublicConnectorConfig
     snapshot.config = config
