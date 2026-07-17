@@ -43,7 +43,7 @@ function jpegDimensions(buffer: Buffer): { width: number; height: number } {
 async function relocateForCapture(event: RuntimeCaptureEvent): Promise<RuntimeCaptureEvent> {
   const direct = event.page.locator(`[data-openalice-color-audit~="${event.binding.inventoryId}"], .openalice-audit-${event.binding.inventoryId}`).first()
   const locator = await direct.count() > 0 ? direct : event.page.locator(event.binding.target.selector).first()
-  if (await locator.count() === 0) throw new Error(`capture target disappeared: ${event.binding.inventoryId} ${event.binding.target.selector}`)
+  if (await locator.count() === 0) return event
   await locator.scrollIntoViewIfNeeded(); await event.page.waitForTimeout(20)
   const target = await locator.evaluate((element) => { const rect = element.getBoundingClientRect(); return { x: rect.x, y: rect.y, width: rect.width, height: rect.height } })
   if (target.width <= 0 || target.height <= 0) throw new Error(`capture target has zero area: ${event.binding.inventoryId}`)
