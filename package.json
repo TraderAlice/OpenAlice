@@ -37,10 +37,6 @@
     "test:guardian-recovery": "tsx scripts/guardian/runtime-recovery-smoke.ts",
     "test:connector-service": "node scripts/connector-service-smoke.mjs",
     "test:connector-replay": "vitest run services/connector/src/core/io-replay.spec.ts services/connector/src/core/io-events.spec.ts services/connector/src/adapters/shared.spec.ts",
-    "audit:theme-colors:scan": "tsx scripts/theme-color-audit/cli.ts scan",
-    "audit:theme-colors:check-static": "tsx scripts/theme-color-audit/cli.ts check-static",
-    "audit:theme-colors:validate-manifest": "tsx scripts/theme-color-audit/cli.ts validate-manifest",
-    "test:theme-color-static-inventory": "vitest run scripts/theme-color-audit/static-inventory.spec.ts --project node",
     "postinstall": "node scripts/fix-pty-perms.mjs"
   },
   "keywords": [
@@ -152,7 +148,6 @@
     "@types/ws": "^8.18.1",
     "@vitest/coverage-v8": "^4.1.5",
     "jsdom": "^29.0.0",
-    "postcss": "8.5.6",
     "tsup": "^8.5.1",
     "tsx": "^4.21.0",
     "turbo": "^2.9.14",

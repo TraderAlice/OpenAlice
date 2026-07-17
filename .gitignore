@@ -26,7 +26,6 @@ Thumbs.db
 
 # Test
 coverage/
-.artifacts/
 
 # Claude Code — ignore local config, but track shared dev skills/commands
 .claude/*
