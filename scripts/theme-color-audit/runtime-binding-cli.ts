@@ -1,13 +1,14 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
 import { chromium, type Page } from '@playwright/test'
 import postcss from 'postcss'
 import ts from 'typescript'
 import { buildStaticManifest } from './static-inventory.js'
 import { themeColorScenarios } from './scenarios.js'
-import type { RuntimeBindingManifest, RuntimeColorBinding, ScenarioAction, StaticColorOccurrence } from './types.js'
+import type { RuntimeBindingManifest, RuntimeColorBinding, ScenarioAction, StaticColorOccurrence, ThemeColorScenario } from './types.js'
 import { assertBindingIntegrity, assertEveryTarget, metadataForDeclaredIds, type RuntimeBindingMetadata } from './runtime-provenance.js'
 
 const root = resolve(import.meta.dirname, '../..')
@@ -163,7 +164,18 @@ async function collect(page: Page, scenarioId: string, theme: 'light' | 'dark', 
   }, { scenarioId, theme, metadata, winnerPrefix })
 }
 
-async function buildBindings(): Promise<RuntimeBindingManifest> {
+export interface RuntimeCaptureEvent {
+  readonly page: Page
+  readonly binding: RuntimeColorBinding
+  readonly occurrence: StaticColorOccurrence
+  readonly scenario: ThemeColorScenario
+}
+
+export interface RuntimeBindingOptions {
+  readonly onBinding?: (event: RuntimeCaptureEvent) => Promise<void>
+}
+
+export async function buildBindings(options: RuntimeBindingOptions = {}): Promise<RuntimeBindingManifest> {
   const staticManifest = await buildStaticManifest(root)
   const runtime = staticManifest.occurrences.filter((entry) => entry.sourceClass === 'runtime' && entry.role === 'color-consumer')
   const allMetadata = await metadataFor(runtime)
@@ -241,6 +253,13 @@ async function buildBindings(): Promise<RuntimeBindingManifest> {
         const scenarioIds = new Set<string>(scenario.inventoryIds)
         const collected = await collect(page, scenario.scenarioId, theme, metadataForDeclaredIds(allMetadata, [...scenarioIds]))
         bindings.push(...collected)
+        if (options.onBinding) {
+          const occurrenceById = new Map(runtime.map((entry) => [entry.inventoryId, entry]))
+          for (const binding of collected) {
+            const occurrence = occurrenceById.get(binding.inventoryId)
+            if (occurrence) await options.onBinding({ page, binding, occurrence, scenario })
+          }
+        }
         } finally { await context.close() }
       }
     } finally { await browser.close() }
@@ -261,12 +280,16 @@ async function assertProductionClean(): Promise<void> {
   console.log('production assets contain no theme color audit runtime')
 }
 
-const command = process.argv[2]
-if (command === 'check') console.log(`validated ${(await buildBindings()).bindings.length} runtime bindings`)
-else if (command === 'test-missing-target-guard') {
-  try { assertEveryTarget(['deliberately-missing'], [], 'guard'); throw new Error('guard accepted a missing target') } catch (error) {
-    if (!(error instanceof Error) || !error.message.includes('deliberately-missing')) throw error
-    console.log('missing target guard rejected an unbound inventory ID')
-  }
-} else if (command === 'assert-production-clean') await assertProductionClean()
-else throw new Error(`unknown runtime binding command: ${command ?? '<missing>'}`)
+async function main(): Promise<void> {
+  const command = process.argv[2]
+  if (command === 'check') console.log(`validated ${(await buildBindings()).bindings.length} runtime bindings`)
+  else if (command === 'test-missing-target-guard') {
+    try { assertEveryTarget(['deliberately-missing'], [], 'guard'); throw new Error('guard accepted a missing target') } catch (error) {
+      if (!(error instanceof Error) || !error.message.includes('deliberately-missing')) throw error
+      console.log('missing target guard rejected an unbound inventory ID')
+    }
+  } else if (command === 'assert-production-clean') await assertProductionClean()
+  else throw new Error(`unknown runtime binding command: ${command ?? '<missing>'}`)
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await main()
