@@ -722,6 +722,7 @@ export const zh: Resources = {
     upgradeLoading: '正在生成三方升级预览…',
     upgradeUnavailableTitle: '此模板不支持原地升级',
     upgradeManagedAssets: '模板管理资产',
+    upgradeLatestVersion: '最新版本',
     upgradeCurrentDescription: '此工作区已使用最新的模板基线；它自己的定制内容仍保持独立。',
     upgradeDescription: '这里只比较由 OpenAlice 管理的说明和 Skill。研究、报告、Issue、凭据及其他工作产物不会参与升级。',
     upgradeRefresh: '刷新预览',

@@ -722,6 +722,7 @@ export const ja: Resources = {
     upgradeLoading: '3-way アップグレードのプレビューを作成中…',
     upgradeUnavailableTitle: 'このテンプレートはインプレース更新に対応していません',
     upgradeManagedAssets: 'テンプレート管理資産',
+    upgradeLatestVersion: '最新バージョン',
     upgradeCurrentDescription: 'このワークスペースは最新のテンプレート基準を使用しています。独自のカスタマイズは引き続き独立して保持されます。',
     upgradeDescription: 'OpenAlice が管理する指示と Skill だけを比較します。調査、レポート、Issue、認証情報、その他の成果物は更新対象外です。',
     upgradeRefresh: 'プレビューを更新',

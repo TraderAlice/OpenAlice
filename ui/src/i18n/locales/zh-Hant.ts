@@ -730,6 +730,7 @@ export const zhHant: Resources = {
     upgradeLoading: '正在建立三方升級預覽…',
     upgradeUnavailableTitle: '此範本不支援原地升級',
     upgradeManagedAssets: '範本管理資產',
+    upgradeLatestVersion: '最新版本',
     upgradeCurrentDescription: '此工作區已使用最新的範本基線；自己的客製內容仍保持獨立。',
     upgradeDescription: '這裡只比較由 OpenAlice 管理的說明與 Skill。研究、報告、Issue、憑證及其他工作成果不會參與升級。',
     upgradeRefresh: '重新整理預覽',

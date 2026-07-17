@@ -119,6 +119,8 @@ describe('WorkspaceTemplateUpgradePanel', () => {
       { '.agents/skills/self-scheduling/SKILL.md': 'template' },
     ))
     await waitFor(() => expect(screen.getByText('Template upgrade complete')).toBeTruthy())
+    expect(screen.getByText('Latest version')).toBeTruthy()
+    expect(screen.getAllByText(`v${plan.toVersion}`)).toHaveLength(1)
     expect(onWorkspaceChanged).toHaveBeenCalled()
   })
 
