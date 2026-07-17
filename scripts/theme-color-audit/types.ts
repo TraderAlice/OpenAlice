@@ -49,28 +49,3 @@ export interface ThemeColorScenario {
   readonly actions: readonly ScenarioAction[]
   readonly sourcePaths: readonly string[]
 }
-
-export type RuntimeSurfaceKind = 'css-rule' | 'dom-element' | 'runtime-value'
-
-export interface RuntimeColorBinding {
-  readonly inventoryId: string
-  readonly scenarioId: string
-  readonly theme: 'light' | 'dark'
-  readonly surfaceKind: RuntimeSurfaceKind
-  readonly channel: string
-  readonly actualValue: string
-  readonly active: boolean
-  readonly target: {
-    readonly selector: string
-    readonly x: number
-    readonly y: number
-    readonly width: number
-    readonly height: number
-  } | null
-}
-
-export interface RuntimeBindingManifest {
-  readonly schemaVersion: 1
-  readonly sourceCommit: string
-  readonly bindings: readonly RuntimeColorBinding[]
-}
