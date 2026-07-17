@@ -218,6 +218,14 @@ export async function buildStaticManifest(root: string, sourceCommit?: string): 
   }
 }
 
+export function assertUiSourceTreeMatchesCommit(root: string, sourceCommit: string): void {
+  const commitTree = execFileSync('git', ['rev-parse', `${sourceCommit}:ui/src`], { cwd: root, encoding: 'utf8' }).trim()
+  const currentUiTree = execFileSync('git', ['rev-parse', 'HEAD:ui/src'], { cwd: root, encoding: 'utf8' }).trim()
+  if (commitTree !== currentUiTree) throw new Error(`stale evidence UI source tree: ${sourceCommit} does not match current HEAD`)
+  try { execFileSync('git', ['diff', '--quiet', 'HEAD', '--', 'ui/src'], { cwd: root }) }
+  catch { throw new Error('stale evidence UI source tree: ui/src has uncommitted changes') }
+}
+
 export async function validateStaticManifest(root: string, manifest: StaticColorManifest): Promise<void> {
   if (manifest.schemaVersion !== STATIC_MANIFEST_SCHEMA_VERSION) throw new Error('unsupported static manifest schema')
   if (manifest.generatedFrom !== 'ui/src') throw new Error('unexpected manifest source root')
