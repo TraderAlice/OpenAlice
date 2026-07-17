@@ -25,6 +25,7 @@ import { app, BrowserWindow, dialog, Menu, protocol, session } from 'electron'
 import { runRendererTradingModeSmoke } from './trading-mode-smoke.js'
 import { runRendererDataHomeSmoke } from './data-home-smoke.js'
 import { runRendererWorkspaceAcceptanceSmoke } from './workspace-acceptance-smoke.js'
+import { runRendererThemeSmoke } from './theme-smoke.js'
 import { planUTATransition } from './uta-lifecycle.js'
 import {
   acquireGuardianRuntime,
@@ -70,6 +71,7 @@ let rendererOnboardingSmokeStarted = false
 let rendererDataHomeSmokeStarted = false
 let rendererTradingModeSmokeStarted = false
 let rendererWorkspaceAcceptanceSmokeStarted = false
+let rendererThemeSmokeStarted = false
 let guardianRuntimeLock: RuntimeProcessLock | null = null
 
 const DEFAULT_WEB_PORT_START = 47331
@@ -1002,6 +1004,30 @@ app.whenReady().then(async () => {
                   process.exitCode = 1
                   shutdown()
                 }
+              })
+          }
+        }
+        const themeSmokeStage = process.env['OPENALICE_ELECTRON_SMOKE_THEME']
+        if (ready && (themeSmokeStage === 'seed' || themeSmokeStage === 'apply' || themeSmokeStage === 'restart') && !rendererThemeSmokeStarted) {
+          rendererThemeSmokeStarted = true
+          const receiptPath = process.env['OPENALICE_THEME_SMOKE_RECEIPT_PATH']?.trim()
+          if (!receiptPath) {
+            console.error('[guardian] electron smoke theme → failed: receipt path missing')
+            process.exitCode = 1
+            shutdown()
+          } else {
+            void runRendererThemeSmoke(win, themeSmokeStage)
+              .then(async (result) => {
+                await writeFile(receiptPath, `${JSON.stringify(result, null, 2)}\n`, 'utf8')
+                const failed = Object.entries(result.checks).filter(([, ok]) => ok !== true).map(([name]) => name)
+                if (failed.length > 0) throw new Error(`failed checks: ${failed.join(', ')}`)
+                console.log(`[guardian] electron smoke theme ${themeSmokeStage} → ok ${JSON.stringify(result)}`)
+                shutdown()
+              })
+              .catch((err) => {
+                console.error(`[guardian] electron smoke theme ${themeSmokeStage} → failed: ${err instanceof Error ? err.message : String(err)}`)
+                process.exitCode = 1
+                shutdown()
               })
           }
         }

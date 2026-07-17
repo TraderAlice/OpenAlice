@@ -6,7 +6,7 @@ import { ToastProvider } from './components/Toast'
 import { AuthProvider } from './auth/AuthContext'
 import { AuthGate } from './auth/AuthGate'
 import './index.css'
-import './theme' // side-effect: apply persisted color theme to <html data-theme>
+import { initializeTheme } from './theme'
 import './i18n' // side-effect: init react-i18next + seed locale before first render
 
 if (import.meta.env.VITE_DEMO_MODE) {
@@ -16,6 +16,10 @@ if (import.meta.env.VITE_DEMO_MODE) {
   // See ui/src/demo/recorder/README.md.
   await import('./demo/recorder')
 }
+
+await initializeTheme().catch((error: unknown) => {
+  console.error('Failed to load the file-backed appearance theme', error)
+})
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

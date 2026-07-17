@@ -47,6 +47,18 @@ export const zh: Resources = {
       showEditorTabsOn: '编辑器上方显示标签栏 —— 点击切换，× 或中键关闭。',
       showEditorTabsOff: '标签栏已隐藏。从侧栏导航；想要 VS Code 式标签页就打开它。',
     },
+    themeManager: {
+      loading: '正在加载文件主题…', builtIn: '内置主题', importedThemes: '已导入主题', noImported: '尚未导入主题。',
+      selection: '当前外观', none: '未选择主题', mode: '主题模式', modes: { system: '跟随系统', light: '浅色', dark: '深色' },
+      cancel: '取消', apply: '应用', applied: '主题已应用。', importTitle: '导入主题',
+      importDescription: '支持 Base16/Base24、iTerm2、Windows Terminal、Alacritty、Kitty/Ghostty 和 Xresources。',
+      missingVariant: '为缺少元数据的文件选择明暗模式', chooseFile: '选择文件', imported: '主题已导入。',
+      paired: '浅色和深色变体已配对。', deleted: '主题已删除。', unknownAuthor: '作者未知',
+      complementaryCollision: '该 ID 已有互补的明暗变体。要明确将两者配对吗？',
+      idCollision: '相同稳定 ID 的主题已存在；现有文件不会被覆盖。', pairVariants: '配对变体', saveImport: '保存导入',
+      reference: '实时主题参照', active: '使用中', delete: '删除', surface: '基础表面', card: '卡片', accent: '强调色',
+      xtermPreview: '实时 xterm.js 色板', loadFailed: '主题加载失败。',
+    },
     dataHome: {
       title: '资料存放位置',
       description: '当前实例使用的完整 OpenAlice 主目录，包括资料、工作区、凭据、Broker Pack 和运行锁。',

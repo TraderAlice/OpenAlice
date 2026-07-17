@@ -58,6 +58,18 @@ export const en = {
       showEditorTabsOn: 'The tab strip above the editor is shown — click to switch, × or middle-click to close.',
       showEditorTabsOff: 'The tab strip is hidden. Navigate from the sidebar; turn this on for VS Code-style tabs.',
     },
+    themeManager: {
+      loading: 'Loading file-backed themes…', builtIn: 'Built-in themes', importedThemes: 'Imported themes',
+      noImported: 'No imported themes yet.', selection: 'Active appearance', none: 'No theme selected', mode: 'Theme mode',
+      modes: { system: 'System', light: 'Light', dark: 'Dark' }, cancel: 'Cancel', apply: 'Apply', applied: 'Theme applied.',
+      importTitle: 'Import a theme', importDescription: 'Base16/Base24, iTerm2, Windows Terminal, Alacritty, Kitty/Ghostty, or Xresources.',
+      missingVariant: 'Variant for files without metadata', chooseFile: 'Choose file', imported: 'Theme imported.',
+      paired: 'Light and dark variants paired.', deleted: 'Theme deleted.', unknownAuthor: 'Unknown author',
+      complementaryCollision: 'This ID already has the complementary variant. Pair them explicitly?',
+      idCollision: 'A theme with this stable ID already exists. Existing files are never overwritten.',
+      pairVariants: 'Pair variants', saveImport: 'Save import', reference: 'Live theme reference', active: 'Active', delete: 'Delete',
+      surface: 'Surface', card: 'Card', accent: 'Accent', xtermPreview: 'Live xterm.js palette', loadFailed: 'Failed to load themes.',
+    },
     dataHome: {
       title: 'Data location',
       description: 'The complete OpenAlice home used by this instance, including data, Workspaces, credentials, Broker Packs, and runtime locks.',

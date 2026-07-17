@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next'
 import { useLocale, useSetLocale, LOCALE_LABELS } from '../i18n/useLocale'
 import { useEditorTabsPref } from '../live/editor-tabs-pref'
 import { preferencesApi, type WorkspaceShellStatus } from '../api/preferences'
+import { ThemeManager } from '../components/settings/ThemeManager'
 
 // ==================== Appearance ====================
 
@@ -20,6 +21,8 @@ function AppearanceSection() {
   const setShowEditorTabs = useEditorTabsPref((s) => s.setShowEditorTabs)
   return (
     <ConfigSection title={t('settings.appearance.title')} description={t('settings.appearance.description')}>
+      <ThemeManager />
+      <div className="my-4 border-t border-border" />
       <div className="flex items-center justify-between gap-4 py-1">
         <div className="flex-1">
           <span className="text-sm font-medium text-text">

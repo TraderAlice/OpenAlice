@@ -1,94 +1,90 @@
 import type { ITheme } from '@xterm/xterm'
 
-export type TerminalThemeVariant = 'light' | 'dark'
+import type { RgbHex, ThemePalette, ThemeVariant, ThemeVariantMode } from '../../api/themes'
+
+export type TerminalThemeVariant = ThemeVariantMode
 export type TerminalThemeRgb = readonly [number, number, number]
 
 export interface TerminalThemeProfile {
   readonly variant: TerminalThemeVariant
+  readonly variantId: string
   readonly name: string
   readonly foreground: TerminalThemeRgb
   readonly background: TerminalThemeRgb
   readonly palette: readonly TerminalThemeRgb[]
+  readonly extendedAnsi: readonly TerminalThemeRgb[]
   readonly cursorColor: TerminalThemeRgb
   readonly cursorText: TerminalThemeRgb
   readonly selectionBackground: TerminalThemeRgb
-  readonly selectionBackgroundAlpha?: number
   readonly selectionForeground: TerminalThemeRgb
-  /**
-   * xterm uses this not just for paint. Its built-in OSC 4/10/11/12 handlers can
-   * report colors from the active theme service back to the PTY, which is the web
-   * equivalent of Muxy applying a client theme config to a terminal surface.
-   */
   readonly xtermTheme: ITheme
 }
 
-type TerminalThemeProfileInput = Omit<TerminalThemeProfile, 'xtermTheme'>
+export type TerminalThemePreference = 'follow' | 'light' | 'dark'
 
-const lightProfile = defineTerminalThemeProfile({
-  variant: 'light',
-  name: 'OpenAlice Light',
-  foreground: [28, 42, 65],
-  background: [250, 248, 241],
-  palette: [
-    [28, 42, 65],
-    [207, 34, 46],
-    [17, 99, 41],
-    [122, 77, 5],
-    [9, 105, 218],
-    [130, 80, 223],
-    [27, 124, 131],
-    [110, 119, 129],
-    [87, 96, 106],
-    [164, 14, 38],
-    [26, 127, 55],
-    [99, 60, 1],
-    [33, 139, 255],
-    [164, 117, 249],
-    [49, 146, 170],
-    [36, 41, 47],
-  ],
-  cursorColor: [47, 98, 176],
-  cursorText: [250, 248, 241],
-  selectionBackground: [47, 98, 176],
-  selectionBackgroundAlpha: 0.22,
-  selectionForeground: [250, 248, 241],
-})
-
-const darkProfile = defineTerminalThemeProfile({
-  variant: 'dark',
-  name: 'OpenAlice Dark',
-  foreground: [230, 237, 243],
-  background: [11, 13, 16],
-  palette: [
-    [72, 79, 88],
-    [255, 123, 114],
-    [126, 231, 135],
-    [210, 153, 34],
-    [121, 192, 255],
-    [210, 168, 255],
-    [165, 214, 255],
-    [230, 237, 243],
-    [110, 118, 129],
-    [255, 161, 152],
-    [86, 211, 100],
-    [227, 179, 65],
-    [165, 214, 255],
-    [210, 168, 255],
-    [182, 227, 255],
-    [240, 246, 252],
-  ],
-  cursorColor: [126, 231, 135],
-  cursorText: [11, 13, 16],
-  selectionBackground: [38, 79, 120],
-  selectionForeground: [240, 246, 252],
-})
-
-export function xtermThemeForVariant(variant: TerminalThemeVariant): ITheme {
-  return terminalThemeProfileForVariant(variant).xtermTheme
+export function resolveTerminalThemeVariant(
+  preference: TerminalThemePreference,
+  appTheme: TerminalThemeVariant,
+): TerminalThemeVariant {
+  return preference === 'follow' ? appTheme : preference
 }
 
-export function terminalThemeProfileForVariant(variant: TerminalThemeVariant): TerminalThemeProfile {
-  return variant === 'light' ? lightProfile : darkProfile
+export function terminalThemeProfileForVariant(variant: ThemeVariant): TerminalThemeProfile {
+  const ansi = variant.ansi16Override ?? basePaletteAnsi(variant.palette)
+  const foreground = hexToRgb(variant.ansi16Override?.foreground ?? variant.palette.base05)
+  const background = hexToRgb(variant.ansi16Override?.background ?? variant.palette.base00)
+  const cursorColor = hexToRgb(variant.ansi16Override?.cursor ?? variant.palette.base0D)
+  const cursorText = hexToRgb(variant.ansi16Override?.cursorText ?? variant.palette.base00)
+  const selectionBackground = hexToRgb(
+    variant.ansi16Override?.selectionBackground ?? variant.tokens.selection,
+  )
+  const selectionForeground = hexToRgb(
+    variant.ansi16Override?.selectionForeground ?? variant.palette.base05,
+  )
+  const palette = ansi.colors.map(hexToRgb)
+  const extendedAnsi = [
+    variant.palette.base09,
+    variant.palette.base0F,
+    variant.palette.base01,
+    variant.palette.base02,
+    variant.palette.base04,
+    variant.palette.base06,
+  ].map(hexToRgb)
+  const xtermTheme = xtermThemeFromColors({
+    foreground: ansi.foreground,
+    background: ansi.background,
+    cursor: ansi.cursor,
+    cursorText: ansi.cursorText,
+    selectionBackground: ansi.selectionBackground,
+    selectionForeground: ansi.selectionForeground,
+    colors: ansi.colors,
+    extendedAnsi: [
+      variant.palette.base09,
+      variant.palette.base0F,
+      variant.palette.base01,
+      variant.palette.base02,
+      variant.palette.base04,
+      variant.palette.base06,
+    ],
+  })
+  return {
+    variant: variant.mode,
+    variantId: variant.id,
+    name: variant.name,
+    foreground,
+    background,
+    palette,
+    extendedAnsi,
+    cursorColor,
+    cursorText,
+    selectionBackground,
+    selectionForeground,
+    xtermTheme,
+  }
+}
+
+export function xtermThemeForVariant(variant: ThemeVariant): ITheme {
+  return terminalThemeProfileForVariant(variant).xtermTheme
 }
 
 export interface TerminalClientThemeDTO {
@@ -113,51 +109,75 @@ export function terminalClientThemeDTO(profile: TerminalThemeProfile): TerminalC
   }
 }
 
-function defineTerminalThemeProfile(input: TerminalThemeProfileInput): TerminalThemeProfile {
+function basePaletteAnsi(palette: ThemePalette): {
+  foreground: RgbHex
+  background: RgbHex
+  cursor: RgbHex
+  cursorText: RgbHex
+  selectionBackground: RgbHex
+  selectionForeground: RgbHex
+  colors: readonly [
+    RgbHex, RgbHex, RgbHex, RgbHex, RgbHex, RgbHex, RgbHex, RgbHex,
+    RgbHex, RgbHex, RgbHex, RgbHex, RgbHex, RgbHex, RgbHex, RgbHex,
+  ]
+} {
   return {
-    ...input,
-    xtermTheme: xtermThemeFromProfile(input),
+    foreground: palette.base05,
+    background: palette.base00,
+    cursor: palette.base0D,
+    cursorText: palette.base00,
+    selectionBackground: palette.base02,
+    selectionForeground: palette.base05,
+    colors: [
+      palette.base00, palette.base08, palette.base0B, palette.base0A,
+      palette.base0D, palette.base0E, palette.base0C, palette.base05,
+      palette.base03,
+      palette.base12 ?? palette.base08,
+      palette.base14 ?? palette.base0B,
+      palette.base13 ?? palette.base0A,
+      palette.base16 ?? palette.base0D,
+      palette.base17 ?? palette.base0E,
+      palette.base15 ?? palette.base0C,
+      palette.base07,
+    ],
   }
 }
 
-function xtermThemeFromProfile(profile: TerminalThemeProfileInput): ITheme {
-  const palette = profile.palette
+function xtermThemeFromColors(input: {
+  foreground: RgbHex
+  background: RgbHex
+  cursor: RgbHex
+  cursorText: RgbHex
+  selectionBackground: RgbHex
+  selectionForeground: RgbHex
+  colors: readonly RgbHex[]
+  extendedAnsi: readonly RgbHex[]
+}): ITheme {
+  const palette = input.colors
   return {
-    background: rgbToHex(profile.background),
-    foreground: rgbToHex(profile.foreground),
-    cursor: rgbToHex(profile.cursorColor),
-    cursorAccent: rgbToHex(profile.cursorText),
-    selectionBackground: profile.selectionBackgroundAlpha === undefined
-      ? rgbToHex(profile.selectionBackground)
-      : rgbToRgba(profile.selectionBackground, profile.selectionBackgroundAlpha),
-    selectionForeground: rgbToHex(profile.selectionForeground),
-    black: rgbToHex(palette[0]!),
-    red: rgbToHex(palette[1]!),
-    green: rgbToHex(palette[2]!),
-    yellow: rgbToHex(palette[3]!),
-    blue: rgbToHex(palette[4]!),
-    magenta: rgbToHex(palette[5]!),
-    cyan: rgbToHex(palette[6]!),
-    white: rgbToHex(palette[7]!),
-    brightBlack: rgbToHex(palette[8]!),
-    brightRed: rgbToHex(palette[9]!),
-    brightGreen: rgbToHex(palette[10]!),
-    brightYellow: rgbToHex(palette[11]!),
-    brightBlue: rgbToHex(palette[12]!),
-    brightMagenta: rgbToHex(palette[13]!),
-    brightCyan: rgbToHex(palette[14]!),
-    brightWhite: rgbToHex(palette[15]!),
+    background: input.background,
+    foreground: input.foreground,
+    cursor: input.cursor,
+    cursorAccent: input.cursorText,
+    selectionBackground: input.selectionBackground,
+    selectionForeground: input.selectionForeground,
+    black: palette[0], red: palette[1], green: palette[2], yellow: palette[3],
+    blue: palette[4], magenta: palette[5], cyan: palette[6], white: palette[7],
+    brightBlack: palette[8], brightRed: palette[9], brightGreen: palette[10],
+    brightYellow: palette[11], brightBlue: palette[12], brightMagenta: palette[13],
+    brightCyan: palette[14], brightWhite: palette[15],
+    extendedAnsi: [...input.extendedAnsi],
   }
+}
+
+function hexToRgb(hex: RgbHex): TerminalThemeRgb {
+  return [
+    Number.parseInt(hex.slice(1, 3), 16),
+    Number.parseInt(hex.slice(3, 5), 16),
+    Number.parseInt(hex.slice(5, 7), 16),
+  ]
 }
 
 function rgbToInt(rgb: TerminalThemeRgb): number {
   return (rgb[0] << 16) + (rgb[1] << 8) + rgb[2]
-}
-
-function rgbToHex(rgb: TerminalThemeRgb): string {
-  return `#${rgbToInt(rgb).toString(16).padStart(6, '0')}`
-}
-
-function rgbToRgba(rgb: TerminalThemeRgb, alpha: number): string {
-  return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})`
 }

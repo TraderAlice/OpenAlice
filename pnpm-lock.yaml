@@ -91,6 +91,12 @@ importers:
       pino:
         specifier: ^10.3.1
         version: 10.3.1
+      plist:
+        specifier: ^5.0.0
+        version: 5.0.0
+      smol-toml:
+        specifier: ^1.7.0
+        version: 1.7.0
       tar:
         specifier: ^7.5.10
         version: 7.5.16
@@ -134,6 +140,9 @@ importers:
       jsdom:
         specifier: ^29.0.0
         version: 29.0.0(@noble/hashes@2.2.0)
+      playwright:
+        specifier: 1.58.2
+        version: 1.58.2
       tsup:
         specifier: ^8.5.1
         version: 8.5.1(jiti@2.6.1)(postcss@8.5.10)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.9.0)
@@ -2772,6 +2781,11 @@ packages:
   fs.realpath@1.0.0:
     resolution: {integrity: sha512-OO0pH2lK6a0hZnAdau5ItzHPI6pUlvI7jMVnxUQRtw4owF2wk8lOSabtGDCTP4Ggrg2MbGnWO9X8K1t4+fGMDw==}
 
+  fsevents@2.3.2:
+    resolution: {integrity: sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA==}
+    engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
+    os: [darwin]
+
   fsevents@2.3.3:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
@@ -3652,6 +3666,16 @@ packages:
     resolution: {integrity: sha512-emEcLuomt2j03vxD54giVB4SxTjnsqkU692xZOZXHDVoYyypEm+b3jpiTcc+Cf+myooc+/Ly0z01jqeNHVgJGw==}
     engines: {node: '>=16.0.0'}
 
+  playwright-core@1.58.2:
+    resolution: {integrity: sha512-yZkEtftgwS8CsfYo7nm0KE8jsvm6i/PTgVtB8DL726wNf6H2IMsDuxCpJj59KDaxCtSnrWan2AeDqM7JBaultg==}
+    engines: {node: '>=18'}
+    hasBin: true
+
+  playwright@1.58.2:
+    resolution: {integrity: sha512-vA30H8Nvkq/cPBnNw4Q8TWz1EJyqgpuinBcHET0YVJVFldr8JDNiU9LaWAE1KqSkRYazuaBhTpB5ZzShOezQ6A==}
+    engines: {node: '>=18'}
+    hasBin: true
+
   plist@3.1.0:
     resolution: {integrity: sha512-uysumyrvkUX0rX/dEVqt8gC3sTBzd4zoWfLeS29nb53imdaXVvLINYXTI2GNqzaMuvacNx4uJQ8+b3zXR0pkgQ==}
     engines: {node: '>=10.4.0'}
@@ -3659,6 +3683,10 @@ packages:
   plist@3.1.1:
     resolution: {integrity: sha512-ZIfcLJC+7E7FBFnDxm9MPmt7D+DidyQ26lewieO75AdhA2ayMtsJSES0iWzqJQbcVRSrTufQoy0DR94xHue0oA==}
     engines: {node: '>=10.4.0'}
+
+  plist@5.0.0:
+    resolution: {integrity: sha512-20N+g1DvMm/DFRbsvER7tT4wDryq0WunK7VMkDaiJcKNapAnUMkTsAnacFYf8n420F4Hf6/hefgmJRkMb1M0fg==}
+    engines: {node: '>=18'}
 
   postcss-load-config@6.0.1:
     resolution: {integrity: sha512-oPtTM4oerL+UXmx+93ytZVN82RrlY/wPUV8IeDxFrzIjXOLF1pN+EmKPLbubvKHT2HC20xXsCAH2Z+CKV6Oz/g==}
@@ -4063,6 +4091,10 @@ packages:
   simple-update-notifier@2.0.0:
     resolution: {integrity: sha512-a2B9Y0KlNXl9u/vsW6sTIu9vGEpfKu2wRV6l1H3XEas/0gUIzGzBoP/IouTcUQbm9JWZLH3COxyn03TYlFax6w==}
     engines: {node: '>=10'}
+
+  smol-toml@1.7.0:
+    resolution: {integrity: sha512-aqVvWoyO21L23mb+drl4RmMXbf6N7FdHjAhTRA9ZBL7apWBgfWC16KjrASI+1p9GAroljyMHj6fK67i0UiTNvQ==}
+    engines: {node: '>= 18'}
 
   sonic-boom@4.2.1:
     resolution: {integrity: sha512-w6AxtubXa2wTXAUsZMMWERrsIRAdrK0Sc+FUytWvYAhBJLyuI4llrMIC1DtlNSdI99EI86KZum2MMq3EAZlF9Q==}
@@ -6999,6 +7031,9 @@ snapshots:
 
   fs.realpath@1.0.0: {}
 
+  fsevents@2.3.2:
+    optional: true
+
   fsevents@2.3.3:
     optional: true
 
@@ -7813,6 +7848,14 @@ snapshots:
       pvutils: 1.1.5
       tslib: 2.8.1
 
+  playwright-core@1.58.2: {}
+
+  playwright@1.58.2:
+    dependencies:
+      playwright-core: 1.58.2
+    optionalDependencies:
+      fsevents: 2.3.2
+
   plist@3.1.0:
     dependencies:
       '@xmldom/xmldom': 0.8.13
@@ -7823,6 +7866,11 @@ snapshots:
     dependencies:
       '@xmldom/xmldom': 0.9.10
       base64-js: 1.5.1
+      xmlbuilder: 15.1.1
+
+  plist@5.0.0:
+    dependencies:
+      '@xmldom/xmldom': 0.9.10
       xmlbuilder: 15.1.1
 
   postcss-load-config@6.0.1(jiti@2.6.1)(postcss@8.5.10)(tsx@4.21.0)(yaml@2.9.0):
@@ -8295,6 +8343,8 @@ snapshots:
   simple-update-notifier@2.0.0:
     dependencies:
       semver: 7.7.4
+
+  smol-toml@1.7.0: {}
 
   sonic-boom@4.2.1:
     dependencies:

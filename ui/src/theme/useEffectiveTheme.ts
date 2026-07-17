@@ -2,9 +2,15 @@ import { useSyncExternalStore } from 'react'
 
 import { useThemeStore } from './store'
 
-const mq = window.matchMedia('(prefers-color-scheme: dark)')
+const systemThemeQuery = (): MediaQueryList | null => (
+  typeof window.matchMedia === 'function'
+    ? window.matchMedia('(prefers-color-scheme: dark)')
+    : null
+)
 
 function subscribeSystem(cb: () => void): () => void {
+  const mq = systemThemeQuery()
+  if (!mq) return () => undefined
   mq.addEventListener('change', cb)
   return () => mq.removeEventListener('change', cb)
 }
@@ -20,7 +26,7 @@ export function useEffectiveTheme(): 'light' | 'dark' {
   const theme = useThemeStore((s) => s.theme)
   const systemDark = useSyncExternalStore(
     subscribeSystem,
-    () => mq.matches,
+    () => systemThemeQuery()?.matches ?? true,
     () => true,
   )
   if (theme === 'light') return 'light'
