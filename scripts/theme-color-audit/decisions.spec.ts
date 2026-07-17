@@ -12,7 +12,7 @@ describe('theme color decisions', () => {
   it('keeps agent suggestions separate from reviewed final decisions', () => {
     const staticManifest: StaticColorManifest = { schemaVersion: 1, sourceCommit: 'abc', generatedFrom: 'ui/src', occurrences: [occurrence('runtime'), occurrence('demo', 'demo')] }
     const runtimeManifest: RuntimeBindingManifest = { schemaVersion: 1, sourceCommit: 'abc', bindings: [{ inventoryId: 'runtime', scenarioId: 'panel', theme: 'light', surfaceKind: 'dom-element', channel: 'color', actualValue: 'rgb(255,255,255)', active: true, target: null }] }
-    const evidence: ThemeColorEvidenceBundle = { schemaVersion: 3, sourceCommit: 'abc', staticManifestSchemaVersion: 1, runtimeBindingSchemaVersion: 1, playwrightVersion: '1', browserVersion: '1', images: [{ scenarioId: 'panel', theme: 'light', state: 'normal', relativePath: 'panel.jpg', sha256: 'hash', format: 'jpeg', quality: 80, width: 10, height: 10, viewport: { width: 10, height: 10 }, deviceScaleFactor: 1, inventoryIds: ['runtime'] }], occurrenceRecords: [{ kind: 'non-visual-probe', inventoryId: 'runtime', source: occurrence('runtime'), bindingIndexes: [0], reason: 'runtime-value' }] }
+    const evidence: ThemeColorEvidenceBundle = { schemaVersion: 2, sourceCommit: 'abc', staticManifestSchemaVersion: 1, runtimeBindingSchemaVersion: 1, playwrightVersion: '1', browserVersion: '1', images: [{ scenarioId: 'panel', theme: 'light', state: 'normal', relativePath: 'panel.jpg', sha256: 'hash', format: 'jpeg', quality: 80, width: 10, height: 10, viewport: { width: 10, height: 10 }, deviceScaleFactor: 1, inventoryIds: ['runtime'] }], occurrenceRecords: [{ kind: 'non-visual-probe', inventoryId: 'runtime', source: occurrence('runtime'), bindingIndexes: [0], reason: 'runtime-value' }] }
     const input = buildAnalysisBundle(staticManifest, runtimeManifest, evidence)
     const suggestions = analyze(input)
     expect(suggestions.suggestions[0]).not.toHaveProperty('reviewer')
@@ -23,7 +23,7 @@ describe('theme color decisions', () => {
 
   it('does not promote an agent suggestion by merely labeling it reviewed', () => {
     const staticManifest: StaticColorManifest = { schemaVersion: 1, sourceCommit: 'abc', generatedFrom: 'ui/src', occurrences: [occurrence('runtime')] }
-    const input = buildAnalysisBundle(staticManifest, { schemaVersion: 1, sourceCommit: 'abc', bindings: [] }, { schemaVersion: 3, sourceCommit: 'abc', staticManifestSchemaVersion: 1, runtimeBindingSchemaVersion: 1, playwrightVersion: '1', browserVersion: '1', images: [], occurrenceRecords: [] })
+    const input = buildAnalysisBundle(staticManifest, { schemaVersion: 1, sourceCommit: 'abc', bindings: [] }, { schemaVersion: 2, sourceCommit: 'abc', staticManifestSchemaVersion: 1, runtimeBindingSchemaVersion: 1, playwrightVersion: '1', browserVersion: '1', images: [], occurrenceRecords: [] })
     const suggestions = analyze(input)
     const tampered = { ...suggestions, suggestions: [{ ...suggestions.suggestions[0]!, disposition: { kind: 'allowed-literal', invariant: 'external-brand', reason: 'agent guess' } as const }] }
     const reviewed = reviewSuggestions(tampered, input)

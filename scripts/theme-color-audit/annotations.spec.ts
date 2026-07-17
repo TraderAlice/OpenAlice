@@ -11,9 +11,9 @@ const source: StaticColorOccurrence = {
 const visual = (): Extract<OccurrenceEvidenceRecord, { kind: 'visual-element' }> => ({
   kind: 'visual-element', inventoryId: source.inventoryId, source, bindingIndex: 0, scenarioId: 'fixture', theme: 'light', state: 'normal',
   surfaceKind: 'dom-element', channel: 'color', actualValue: 'rgb(255, 255, 255)', locator: '#fixture', viewport: { width: 100, height: 100 }, deviceScaleFactor: 1,
-  targetBounds: { x: 10, y: 10, width: 20, height: 20 }, annotation: { strategy: 'element-bounds', label: 'color-fixture · color', color: '#ff2d55', bounds: { x: 10, y: 10, width: 20, height: 20 } },
+  targetBounds: { x: 10, y: 10, width: 20, height: 20 }, annotation: { label: 'color-fixture · color', color: '#ff2d55', bounds: { x: 10, y: 10, width: 20, height: 20 } },
   context: { relativePath: 'context.jpg', sha256: 'bad', format: 'jpeg', quality: 80, width: 100, height: 100 },
-  crop: { relativePath: 'crop.jpg', sha256: 'bad', format: 'jpeg', quality: 80, width: 40, height: 40, annotationBoundsInImage: { x: 10, y: 10, width: 20, height: 20 } },
+  crop: { relativePath: 'crop.jpg', sha256: 'bad', format: 'jpeg', quality: 80, width: 40, height: 40, targetBoundsInImage: { x: 10, y: 10, width: 20, height: 20 } },
 })
 
 describe('occurrence screenshot annotations', () => {
@@ -23,8 +23,7 @@ describe('occurrence screenshot annotations', () => {
     expect(() => validateOccurrenceEvidenceRecord({ ...visual(), annotation: { ...visual().annotation, label: 'unrelated' } })).toThrow('does not identify')
     expect(() => validateOccurrenceEvidenceRecord({ ...visual(), channel: '--color-bg' })).toThrow('CSS variable definition')
     expect(() => validateOccurrenceEvidenceRecord({ ...visual(), locator: '[data-openalice-color-audit~="color-other"]' })).toThrow('locator does not identify')
-    expect(() => validateOccurrenceEvidenceRecord({ ...visual(), crop: { ...visual().crop, annotationBoundsInImage: { x: 30, y: 30, width: 20, height: 20 } } })).toThrow('crop bounds')
-    expect(() => validateOccurrenceEvidenceRecord({ ...visual(), targetBounds: { x: 0, y: 0, width: 100, height: 100 }, annotation: { ...visual().annotation, bounds: { x: 0, y: 0, width: 100, height: 100 } } })).toThrow('bounded surface sample')
+    expect(() => validateOccurrenceEvidenceRecord({ ...visual(), crop: { ...visual().crop, targetBoundsInImage: { x: 30, y: 30, width: 20, height: 20 } } })).toThrow('crop bounds')
   })
 
   it('rejects missing, blank and substituted JPEG bytes', () => {

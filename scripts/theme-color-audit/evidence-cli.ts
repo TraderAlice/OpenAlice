@@ -67,17 +67,6 @@ async function annotatedEvidence(
   scenario: ThemeColorScenario,
 ): Promise<OccurrenceEvidenceRecord> {
   const targetBounds = await locateTarget(page, binding)
-  const targetAreaRatio = targetBounds.width * targetBounds.height / (scenario.viewport.width * scenario.viewport.height)
-  const annotationStrategy = targetAreaRatio > 0.5 ? 'surface-sample' : 'element-bounds'
-  const annotationBounds: PixelBounds = annotationStrategy === 'surface-sample'
-    ? {
-        x: Math.max(targetBounds.x + 24, targetBounds.x),
-        y: Math.max(targetBounds.y + targetBounds.height - 144, targetBounds.y),
-        width: Math.min(160, targetBounds.width - 48),
-        height: Math.min(120, targetBounds.height - 48),
-      }
-    : targetBounds
-  if (annotationBounds.width <= 0 || annotationBounds.height <= 0) throw new Error(`${binding.inventoryId}: annotation sample has no area`)
   const label = `${binding.inventoryId} · ${binding.channel}`
   await page.evaluate(({ bounds, label }) => {
     const overlay = document.createElement('div')
@@ -94,7 +83,7 @@ async function annotatedEvidence(
       background: '#ff2d55', color: '#fff', font: 'bold 12px/20px monospace', padding: '1px 5px', whiteSpace: 'nowrap',
     })
     overlay.append(badge); document.body.append(overlay)
-  }, { bounds: annotationBounds, label })
+  }, { bounds: targetBounds, label })
   try {
     const safeId = binding.inventoryId.replace(/[^a-zA-Z0-9-]/g, '-')
     const stem = `annotations/${safeId}--${binding.scenarioId}--${binding.theme}`
@@ -105,9 +94,9 @@ async function annotatedEvidence(
     if (!contextSize.width || !contextSize.height) throw new Error(`${binding.inventoryId}: context dimensions unavailable`)
     const padding = 24
     const cropBounds = {
-      x: Math.max(0, annotationBounds.x - padding), y: Math.max(0, annotationBounds.y - padding),
-      width: Math.min(scenario.viewport.width - Math.max(0, annotationBounds.x - padding), annotationBounds.width + padding * 2),
-      height: Math.min(scenario.viewport.height - Math.max(0, annotationBounds.y - padding), annotationBounds.height + padding * 2),
+      x: Math.max(0, targetBounds.x - padding), y: Math.max(0, targetBounds.y - padding),
+      width: Math.min(scenario.viewport.width - Math.max(0, targetBounds.x - padding), targetBounds.width + padding * 2),
+      height: Math.min(scenario.viewport.height - Math.max(0, targetBounds.y - padding), targetBounds.height + padding * 2),
     }
     if (cropBounds.width <= 0 || cropBounds.height <= 0) throw new Error(`${binding.inventoryId}: crop is outside viewport`)
     const cropRelativePath = `${stem}--crop.jpg`
@@ -120,11 +109,11 @@ async function annotatedEvidence(
       scenarioId: binding.scenarioId, theme: binding.theme, state: scenario.state, surfaceKind: binding.surfaceKind,
       channel: binding.channel, actualValue: binding.actualValue, locator: binding.target.selector,
       viewport: scenario.viewport, deviceScaleFactor: 1, targetBounds,
-      annotation: { strategy: annotationStrategy, label, color: '#ff2d55', bounds: annotationBounds },
+      annotation: { label, color: '#ff2d55', bounds: targetBounds },
       context: { relativePath: contextRelativePath, sha256: sha256(contextContent), format: 'jpeg', quality: 80, width: contextSize.width, height: contextSize.height },
       crop: {
         relativePath: cropRelativePath, sha256: sha256(cropContent), format: 'jpeg', quality: 80, width: cropSize.width, height: cropSize.height,
-        annotationBoundsInImage: { x: annotationBounds.x - cropBounds.x, y: annotationBounds.y - cropBounds.y, width: annotationBounds.width, height: annotationBounds.height },
+        targetBoundsInImage: { x: targetBounds.x - cropBounds.x, y: targetBounds.y - cropBounds.y, width: targetBounds.width, height: targetBounds.height },
       },
     }
   } finally {
@@ -235,7 +224,7 @@ async function generateBundle(): Promise<ThemeColorEvidenceBundle> {
       }
     } finally { await browser.close() }
     const bundle: ThemeColorEvidenceBundle = {
-      schemaVersion: 3, sourceCommit: staticManifest.sourceCommit,
+      schemaVersion: 2, sourceCommit: staticManifest.sourceCommit,
       staticManifestSchemaVersion: staticManifest.schemaVersion,
       runtimeBindingSchemaVersion: runtimeManifest.schemaVersion,
       playwrightVersion, browserVersion, images: sortEvidence(images), occurrenceRecords,
@@ -320,7 +309,7 @@ async function checkBundle(bundle: ThemeColorEvidenceBundle): Promise<void> {
   const missing = [...runtimeIds].filter((id) => !evidenced.has(id))
   if (missing.length > 0) throw new Error(`runtime occurrences without screenshot evidence: ${missing.join(', ')}`)
   if (bundle.images.length !== themeColorScenarios.reduce((sum, scenario) => sum + scenario.themes.length, 0)) throw new Error('scenario/theme image matrix is incomplete')
-  if (bundle.schemaVersion !== 3) throw new Error(`unsupported evidence schema: ${bundle.schemaVersion}`)
+  if (bundle.schemaVersion !== 2) throw new Error(`unsupported evidence schema: ${bundle.schemaVersion}`)
   const records = new Map<string, OccurrenceEvidenceRecord>()
   for (const record of bundle.occurrenceRecords) {
     if (records.has(record.inventoryId)) throw new Error(`duplicate occurrence evidence: ${record.inventoryId}`)
