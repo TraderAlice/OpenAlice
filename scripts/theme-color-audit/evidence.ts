@@ -1,6 +1,6 @@
-import type { RuntimeTarget, SourceSpan } from './types.js'
+import type { RuntimeTarget, RuntimeWinnerProof, SourceSpan } from './types.js'
 
-export const THEME_COLOR_EVIDENCE_SCHEMA_VERSION = 1 as const
+export const THEME_COLOR_EVIDENCE_SCHEMA_VERSION = 2 as const
 
 export interface EvidenceImage {
   readonly path: string
@@ -17,6 +17,7 @@ export interface ThemeColorOccurrenceEvidence {
   readonly scenario: { readonly scenarioId: string; readonly state: string; readonly fixtureProfile: string; readonly theme: 'light' | 'dark' }
   readonly channel: string
   readonly actualValue: string
+  readonly winner: RuntimeWinnerProof
   readonly target: RuntimeTarget & { readonly active: true }
   readonly sampleBounds: RuntimeTarget
   readonly context: EvidenceImage
@@ -69,10 +70,18 @@ const image = (value: unknown, label: string): EvidenceImage => {
   if (result.width <= 0 || result.height <= 0) throw new Error(`${label} must have positive dimensions`)
   return result
 }
+const winner = (value: unknown, label: string): RuntimeWinnerProof => {
+  const input = rec(value, label)
+  const kind = text(input.kind, `${label}.kind`)
+  if (kind === 'tailwind-utility') return { kind, sourceUtility: text(input.sourceUtility, `${label}.sourceUtility`), activeClassToken: text(input.activeClassToken, `${label}.activeClassToken`), isolatedValue: text(input.isolatedValue, `${label}.isolatedValue`) }
+  if (kind === 'css-cascade-marker') return { kind, winnerProperty: text(input.winnerProperty, `${label}.winnerProperty`) }
+  if (kind === 'runtime-value-match' || kind === 'typed-runtime-value') return { kind, consumedValue: text(input.consumedValue, `${label}.consumedValue`) }
+  throw new Error(`${label}.kind is unsupported`)
+}
 
 export function validateThemeColorEvidenceManifest(input: unknown, expected: readonly (string | ExpectedEvidenceOccurrence)[], currentCommit: string): ThemeColorEvidenceManifest {
   const manifest = rec(input, 'evidence manifest')
-  if (manifest.schemaVersion !== 1) throw new Error('unsupported evidence manifest schemaVersion')
+  if (manifest.schemaVersion !== THEME_COLOR_EVIDENCE_SCHEMA_VERSION) throw new Error('unsupported evidence manifest schemaVersion')
   const sourceCommit = text(manifest.sourceCommit, 'evidence manifest sourceCommit')
   if (!COMMIT.test(sourceCommit)) throw new Error('evidence manifest sourceCommit must be a git commit hash')
   if (sourceCommit !== currentCommit) throw new Error(`stale evidence source commit: expected ${currentCommit}, received ${sourceCommit}`)
@@ -94,11 +103,11 @@ export function validateThemeColorEvidenceManifest(input: unknown, expected: rea
     const scenarioInput = rec(item.scenario, `entries[${index}].scenario`)
     const theme = scenarioInput.theme
     if (theme !== 'light' && theme !== 'dark') throw new Error(`entries[${index}].scenario.theme must be light or dark`)
-    return { kind: 'occurrence-evidence', inventoryId, source, scenario: { scenarioId: text(scenarioInput.scenarioId, `entries[${index}].scenario.scenarioId`), state: text(scenarioInput.state, `entries[${index}].scenario.state`), fixtureProfile: text(scenarioInput.fixtureProfile, `entries[${index}].scenario.fixtureProfile`), theme }, channel: text(item.channel, `entries[${index}].channel`), actualValue: text(item.actualValue, `entries[${index}].actualValue`), target: bounds(item.target, `entries[${index}].target`, true) as RuntimeTarget & { active: true }, sampleBounds: bounds(item.sampleBounds, `entries[${index}].sampleBounds`), context: image(item.context, `entries[${index}].context`), crop: image(item.crop, `entries[${index}].crop`) }
+    return { kind: 'occurrence-evidence', inventoryId, source, scenario: { scenarioId: text(scenarioInput.scenarioId, `entries[${index}].scenario.scenarioId`), state: text(scenarioInput.state, `entries[${index}].scenario.state`), fixtureProfile: text(scenarioInput.fixtureProfile, `entries[${index}].scenario.fixtureProfile`), theme }, channel: text(item.channel, `entries[${index}].channel`), actualValue: text(item.actualValue, `entries[${index}].actualValue`), winner: winner(item.winner, `entries[${index}].winner`), target: bounds(item.target, `entries[${index}].target`, true) as RuntimeTarget & { active: true }, sampleBounds: bounds(item.sampleBounds, `entries[${index}].sampleBounds`), context: image(item.context, `entries[${index}].context`), crop: image(item.crop, `entries[${index}].crop`) }
   })
   const missing = [...expectedById.keys()].filter((id) => !seen.has(id))
   if (missing.length) throw new Error(`missing occurrence evidence (${missing.length}): ${missing.join(', ')}`)
-  return { schemaVersion: 1, sourceCommit, entries }
+  return { schemaVersion: THEME_COLOR_EVIDENCE_SCHEMA_VERSION, sourceCommit, entries }
 }
 
 export const validateEvidenceManifest = validateThemeColorEvidenceManifest

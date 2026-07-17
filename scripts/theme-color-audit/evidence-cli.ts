@@ -86,7 +86,7 @@ async function captureOne(originalEvent: RuntimeCaptureEvent): Promise<EvidenceE
   return {
     kind: 'occurrence-evidence', inventoryId: event.binding.inventoryId, source: event.occurrence,
     scenario: { scenarioId: event.scenario.scenarioId, state: event.scenario.state, fixtureProfile: event.scenario.fixtureProfile, theme: event.binding.theme },
-    channel: event.binding.channel, actualValue: event.binding.actualValue, target: { ...event.binding.target, active: true }, sampleBounds: { selector: event.binding.target.selector, ...clips.crop },
+    channel: event.binding.channel, actualValue: event.binding.actualValue, winner: event.binding.winner, target: { ...event.binding.target, active: true }, sampleBounds: { selector: event.binding.target.selector, ...clips.crop },
     context: { path: contextRel, sha256: sha256(contextBuffer), ...contextSize, label },
     crop: { path: cropRel, sha256: sha256(cropBuffer), ...cropSize, label },
   }
