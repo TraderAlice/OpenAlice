@@ -1,7 +1,6 @@
 import { useCallback } from 'react'
 
 import { IssueDetail } from '../components/IssueDetail'
-import type { WikilinkIssueRef } from '../api/issues'
 import { useWorkspace } from '../tabs/store'
 import type { ViewSpec } from '../tabs/types'
 
@@ -26,16 +25,7 @@ export function TrackedIssueDetailPage({
     openOrFocus({ kind: 'tracked', params: {} })
   }, [openOrFocus, setSidebar])
 
-  const openTrackedIssue = useCallback(
-    (ref: WikilinkIssueRef) => {
-      setSidebar('tracked')
-      openOrFocus({
-        kind: 'tracked-issue-detail',
-        params: { wsId: ref.wsId, id: ref.id },
-      })
-    },
-    [openOrFocus, setSidebar],
-  )
+
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -45,7 +35,6 @@ export function TrackedIssueDetailPage({
           id={id}
           backLabel="Tracked"
           onBack={openTracked}
-          onOpenIssue={openTrackedIssue}
         />
       </div>
     </div>

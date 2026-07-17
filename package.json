@@ -43,7 +43,29 @@
     "test:guardian-recovery": "tsx scripts/guardian/runtime-recovery-smoke.ts",
     "test:connector-service": "node scripts/connector-service-smoke.mjs",
     "test:connector-replay": "vitest run services/connector/src/core/io-replay.spec.ts services/connector/src/core/io-events.spec.ts services/connector/src/adapters/shared.spec.ts",
-    "postinstall": "node scripts/fix-pty-perms.mjs"
+    "audit:theme-colors:scan": "tsx scripts/theme-color-audit/cli.ts scan",
+    "audit:theme-colors:check-static": "tsx scripts/theme-color-audit/cli.ts check-static",
+    "audit:theme-colors:validate-manifest": "tsx scripts/theme-color-audit/cli.ts validate-manifest",
+    "audit:theme-colors:export-runtime-worklist": "tsx scripts/theme-color-audit/cli.ts export-runtime-worklist",
+    "test:theme-color-static-inventory": "vitest run scripts/theme-color-audit/static-inventory.spec.ts --project node",
+    "audit:theme-colors:check-scenario-coverage": "tsx scripts/theme-color-audit/scenario-cli.ts coverage",
+    "audit:theme-colors:serve-and-check-scenarios": "tsx scripts/theme-color-audit/scenario-cli.ts browser",
+    "test:theme-color-scenarios": "vitest run scripts/theme-color-audit/scenarios.spec.ts --project node",
+    "postinstall": "node scripts/fix-pty-perms.mjs",
+    "audit:theme-colors:check-runtime-bindings": "tsx scripts/theme-color-audit/runtime-binding-cli.ts check",
+    "audit:theme-colors:test-missing-target-guard": "tsx scripts/theme-color-audit/runtime-binding-cli.ts test-missing-target-guard",
+    "audit:theme-colors:assert-no-audit-runtime": "tsx scripts/theme-color-audit/runtime-binding-cli.ts assert-production-clean",
+    "test:theme-color-runtime-provenance": "vitest run scripts/theme-color-audit/runtime-provenance.spec.ts --project node",
+    "test:theme-color-evidence": "vitest run scripts/theme-color-audit/evidence.spec.ts --project node",
+    "audit:theme-colors:capture": "tsx scripts/theme-color-audit/evidence-cli.ts capture",
+    "audit:theme-colors:check-annotations": "tsx scripts/theme-color-audit/evidence-cli.ts check-annotations",
+    "audit:theme-colors:build-review-index": "tsx scripts/theme-color-audit/evidence-cli.ts build-review-index",
+    "audit:theme-colors:analyze": "tsx scripts/theme-color-audit/migration-contract-cli.ts analyze",
+    "audit:theme-colors:review": "tsx scripts/theme-color-audit/migration-contract-cli.ts review",
+    "audit:theme-colors:validate-decisions": "tsx scripts/theme-color-audit/migration-contract-cli.ts validate-decisions",
+    "audit:theme-colors:check-completeness": "tsx scripts/theme-color-audit/migration-contract-cli.ts check-completeness",
+    "audit:theme-colors:export-migration-contracts": "tsx scripts/theme-color-audit/migration-contract-cli.ts export",
+    "test:theme-color-migration-contract": "vitest run scripts/theme-color-audit/migration-contract.spec.ts --project node"
   },
   "keywords": [
     "trading",
@@ -152,6 +174,7 @@
   },
   "devDependencies": {
     "@ai-sdk/provider": "^3.0.8",
+    "@playwright/test": "1.58.2",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
     "@types/node": "^25.2.3",
@@ -161,10 +184,12 @@
     "@vitest/coverage-v8": "^4.1.5",
     "jsdom": "^29.0.0",
     "playwright": "1.58.2",
+    "postcss": "8.5.10",
     "tsup": "^8.5.1",
     "tsx": "^4.21.0",
     "turbo": "^2.9.14",
     "typescript": "^5.9.3",
+    "vite": "7.3.6",
     "vitest": "^4.1.5"
   }
 }

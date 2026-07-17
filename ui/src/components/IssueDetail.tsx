@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { ArrowLeft, Hash, History, Inbox, ListChecks, MessageSquare, RotateCcw, Settings, TrendingUp, X } from 'lucide-react'
+import { ArrowLeft, History, Inbox, ListChecks, MessageSquare, RotateCcw, Settings } from 'lucide-react'
 
 import type { HeadlessTaskStatus } from '../api/headless'
 import type { InboxEntry } from '../api/inbox'
@@ -12,8 +12,6 @@ import type {
   IssueProvenanceRecord,
   IssueRunRecord,
   IssueStatus,
-  WikilinkIssueRef,
-  WikilinkResolution,
 } from '../api/issues'
 import {
   getAgentReadiness,
@@ -29,7 +27,6 @@ import { formatRelativeTime } from '../lib/intl'
 import { useInboxRead } from '../live/inbox-read'
 import { useInboxSelection } from '../live/inbox-selection'
 import { previewForEntry } from '../live/inbox-threads'
-import { useWikilinkHandler } from '../live/wikilink'
 import { useWorkspace } from '../tabs/store'
 import { AutomationHealthPill, CadencePill, PriorityIndicator } from './IssuesBoard'
 import { STATUS_META } from './issue-status-meta'
@@ -817,97 +814,6 @@ function RunsSection({
   )
 }
 
-// ==================== Wikilink disambiguation picker ====================
-
-/**
- * Inline picker shown when a `[[name]]` in the body resolves to MORE THAN ONE
- * target (entity + issue(s), or the same name claimed by issues in >1
- * workspace). A name is a global handle, so the click can't pick for the user —
- * this enumerates the candidates by workspace (the "wsId-precise" affordance).
- * A unique token never reaches here (the handler navigates straight through).
- */
-function WikilinkPicker({
-  resolution,
-  onClose,
-  onEntity,
-  onIssue,
-}: {
-  resolution: WikilinkResolution
-  onClose: () => void
-  onEntity: (name: string) => void
-  onIssue: (ref: WikilinkIssueRef) => void
-}) {
-  const EntityIcon = resolution.entity?.type === 'asset' ? TrendingUp : Hash
-  return (
-    <div
-      role="presentation"
-      onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm rounded-lg border border-border bg-bg-secondary p-4 shadow-xl"
-      >
-        <div className="mb-1 flex items-start justify-between gap-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted/70">
-            <span className="font-mono normal-case text-text">[[{resolution.name}]]</span> matches several
-          </h3>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="-mr-1 -mt-0.5 shrink-0 rounded p-0.5 text-muted transition-colors hover:text-text"
-          >
-            <X size={14} />
-          </button>
-        </div>
-        <p className="mb-3 text-[12px] leading-snug text-muted">
-          This name is a global handle pointing at more than one thing — pick the one you meant.
-        </p>
-        <ul className="space-y-1.5">
-          {resolution.entity && (
-            <li>
-              <button
-                type="button"
-                onClick={() => onEntity(resolution.entity!.name)}
-                title={`Open tracked entity ${resolution.entity.name}`}
-                className="group flex w-full items-center gap-2.5 rounded-lg border border-border bg-bg-tertiary/30 px-3 py-2 text-left transition-colors hover:border-accent/40 hover:bg-bg-tertiary"
-              >
-                <EntityIcon size={14} className="shrink-0 text-muted/70 transition-colors group-hover:text-accent" aria-hidden />
-                <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-text">
-                  {resolution.entity.name}
-                </span>
-                <span className="shrink-0 rounded-full bg-bg-tertiary px-2 py-0.5 text-[11px] uppercase tracking-wide text-muted">
-                  {resolution.entity.type}
-                </span>
-              </button>
-            </li>
-          )}
-          {resolution.issues.map((iss) => (
-            <li key={`${iss.wsId}:${iss.id}`}>
-              <button
-                type="button"
-                onClick={() => onIssue(iss)}
-                title={`Open ${iss.id} in ${iss.wsTag}`}
-                className="group flex w-full items-center gap-2.5 rounded-lg border border-border bg-bg-tertiary/30 px-3 py-2 text-left transition-colors hover:border-accent/40 hover:bg-bg-tertiary"
-              >
-                <ListChecks size={14} className="shrink-0 text-muted/70 transition-colors group-hover:text-accent" aria-hidden />
-                <span className="min-w-0 flex-1 truncate text-[12px] text-text">{iss.title}</span>
-                <span
-                  className="shrink-0 rounded-full bg-bg-tertiary px-2 py-0.5 text-[11px] text-muted"
-                  title={`Workspace: ${iss.wsTag} (${iss.wsId.slice(0, 8)})`}
-                >
-                  {iss.wsTag}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  )
-}
-
 // ==================== Detail view ====================
 
 /**
@@ -925,7 +831,6 @@ interface IssueDetailProps {
   id: string
   backLabel?: string
   onBack?: () => void
-  onOpenIssue?: (ref: WikilinkIssueRef) => void
 }
 
 export function IssueDetail({
@@ -933,7 +838,6 @@ export function IssueDetail({
   id,
   backLabel = 'Issues',
   onBack,
-  onOpenIssue,
 }: IssueDetailProps) {
   const { data, error, loading, mutate } = useIssueDetail(wsId, id)
   const { agents, defaultAgent, issueDefaultAgent, openAgentConfig, openHeadlessRun, workspaces } = useWorkspaces()
@@ -941,18 +845,13 @@ export function IssueDetail({
   const setSidebar = useWorkspace((s) => s.setSidebar)
   const selectInboxEntry = useInboxSelection((s) => s.select)
   const markInboxRead = useInboxRead((s) => s.markRead)
-  // Reuse the canonical `[[name]]` navigation (jump to Tracked + select the
-  // entity) — see live/wikilink. We only override the click to first RESOLVE
-  // the token across both namespaces (entity + issues).
-  const gotoEntity = useWikilinkHandler()
+
 
   const [saving, setSaving] = useState(false)
   const [retrying, setRetrying] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [agentReadiness, setAgentReadiness] = useState<Record<string, AgentCredentialReadiness>>({})
   const [sessionDirectory, setSessionDirectory] = useState<readonly WorkspaceSessionDirectoryEntry[]>([])
-  // Set when a clicked `[[name]]` resolves to >1 target — drives the picker.
-  const [picker, setPicker] = useState<WikilinkResolution | null>(null)
 
   useEffect(() => {
     let live = true
@@ -978,17 +877,7 @@ export function IssueDetail({
     return () => { live = false }
   }, [wsId])
 
-  const gotoIssue = useCallback(
-    (ref: WikilinkIssueRef) => {
-      if (onOpenIssue) {
-        onOpenIssue(ref)
-        return
-      }
-      setSidebar('issue')
-      openOrFocus({ kind: 'issue-detail', params: { wsId: ref.wsId, id: ref.id } })
-    },
-    [onOpenIssue, openOrFocus, setSidebar],
-  )
+
 
   // Open the Inbox at a specific entry (the issue→inbox cross-link). Mirrors the
   // sidebar's select-and-read, then surfaces the Inbox tab + sidebar.
@@ -1013,32 +902,7 @@ export function IssueDetail({
     [data?.issue.title, id, openHeadlessRun, setSidebar],
   )
 
-  // Clicking a `[[name]]` in the body resolves it across BOTH namespaces. A
-  // unique target navigates straight through (entity → Tracked, issue →
-  // wsId-precise detail); a collision opens the disambiguation picker. The key
-  // arrives lowercased from MarkdownContent (entity keys + the resolver match
-  // are both case-insensitive). On resolver failure we fall back to the
-  // default Tracked jump.
-  const onWikilink = useCallback(
-    async (key: string) => {
-      try {
-        const res = await issuesApi.resolveWikilink(key)
-        const count = (res.entity ? 1 : 0) + res.issues.length
-        if (count > 1) {
-          setPicker(res)
-        } else if (res.entity) {
-          gotoEntity(res.entity.name)
-        } else if (res.issues[0]) {
-          gotoIssue(res.issues[0])
-        } else {
-          gotoEntity(key) // nothing resolved — preserve prior behaviour
-        }
-      } catch {
-        gotoEntity(key)
-      }
-    },
-    [gotoEntity, gotoIssue],
-  )
+
 
   const workspace = workspaces.find((w) => w.id === wsId) ?? null
   const agentOptions = agents.filter(
@@ -1195,20 +1059,7 @@ export function IssueDetail({
           <InboxReportsSection reports={inboxReports} onOpen={gotoInbox} />
         </div>
       </div>
-      {picker && (
-        <WikilinkPicker
-          resolution={picker}
-          onClose={() => setPicker(null)}
-          onEntity={(name) => {
-            setPicker(null)
-            gotoEntity(name)
-          }}
-          onIssue={(ref) => {
-            setPicker(null)
-            gotoIssue(ref)
-          }}
-        />
-      )}
+
     </div>
   )
 }

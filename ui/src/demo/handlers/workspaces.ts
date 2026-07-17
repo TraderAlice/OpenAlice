@@ -1,7 +1,64 @@
 import { http, HttpResponse } from 'msw'
 import { demoChatWorkspace, demoWorkspaces, demoTemplates } from '../fixtures/workspaces'
 import { demoWorkspaceFiles } from '../fixtures/inbox'
-import type { DepartedWorkspace, WorkspaceMetadataPatch } from '../../components/workspace/api'
+import type { DepartedWorkspace, Workspace, WorkspaceMetadataPatch, WebPiSnapshot } from '../../components/workspace/api'
+const auditFixture = (request: Request): string | null => request.headers.get('x-openalice-theme-audit-fixture')
+
+const auditPiSession = {
+  ...demoChatWorkspace.sessions.find((session) => session.agent === 'pi')!,
+  id: 'audit-pi-session',
+  name: 'p-audit',
+  state: 'paused' as const,
+  surface: 'terminal' as const,
+}
+
+function workspaceFixture(request: Request): Workspace[] {
+  const fixture = auditFixture(request)
+  if (fixture === 'inbox-dead' || fixture === 'workspace-empty') return []
+  if (fixture === 'workspace-resume') return [{ ...demoChatWorkspace, id: 'demo-ws', sessions: [auditPiSession] }]
+  if (fixture === 'workspace-webpi' || fixture === 'workspace-webpi-complete' || fixture === 'workspace-webpi-running') return [{
+    ...demoChatWorkspace,
+    id: 'demo-ws',
+    sessions: [{ ...auditPiSession, state: 'running', surface: 'webpi', pid: 4242, startedAt: Date.now() }],
+  }]
+  return demoWorkspaces
+}
+
+const auditWebPiSnapshot: WebPiSnapshot = {
+  recordId: 'audit-pi-session', wsId: 'demo-ws', resumeId: auditPiSession.resumeId,
+  pid: 4242, startedAt: Date.now(), phase: 'failed', state: null, revision: 7,
+  error: 'Typed audit fixture: Pi transport failed after preserving the transcript.', stderrTail: 'audit stderr',
+  streamingMessage: null,
+  messages: [
+    { role: 'user', content: 'Inspect the runtime color provenance.' },
+    { role: 'assistant', content: [{ type: 'text', text: 'Tracing the visible state.' }, { type: 'thinking', thinking: 'Follow the actual consumer.' }, { type: 'toolCall', id: 'ok', name: 'read', arguments: { path: 'ui/src/App.tsx' } }, { type: 'toolCall', id: 'bad', name: 'shell', arguments: { command: 'false' } }] },
+    { role: 'toolResult', toolCallId: 'ok', content: [{ type: 'text', text: 'read 42 chars' }], isError: false },
+    { role: 'toolResult', toolCallId: 'bad', content: [{ type: 'text', text: 'exit 1' }], isError: true },
+  ],
+}
+
+const auditWebPiCompleteSnapshot: WebPiSnapshot = {
+  ...auditWebPiSnapshot,
+  phase: 'stopped',
+  error: null,
+  stderrTail: '',
+  messages: [
+    { role: 'user', content: 'Inspect the runtime color provenance.' },
+    { role: 'assistant', content: [{ type: 'toolCall', id: 'done', name: 'read', arguments: { path: 'ui/src/App.tsx' } }] },
+    { role: 'toolResult', toolCallId: 'done', content: [{ type: 'text', text: 'read 42 chars' }], isError: false },
+  ],
+}
+
+const auditWebPiRunningSnapshot: WebPiSnapshot = {
+  ...auditWebPiSnapshot,
+  phase: 'working',
+  error: null,
+  stderrTail: '',
+  messages: [
+    { role: 'user', content: 'Inspect the runtime color provenance.' },
+    { role: 'assistant', content: [{ type: 'toolCall', id: 'running', name: 'read', arguments: { path: 'ui/src/App.tsx' } }] },
+  ],
+}
 
 const demoManagerSession = {
   id: 'demo-manager-session',
@@ -153,7 +210,7 @@ const demoTemplateUpgradePlan = (workspaceId: string) => ({
 })
 
 export const workspacesHandlers = [
-  http.get('/api/workspaces', () => HttpResponse.json({ workspaces: demoWorkspaces })),
+  http.get('/api/workspaces', ({ request }) => HttpResponse.json({ workspaces: workspaceFixture(request) })),
   http.get('/api/workspaces/manager', () => HttpResponse.json({
     manager: {
       id: 'workspace-manager', tag: 'Workspace Manager',
@@ -244,10 +301,10 @@ export const workspacesHandlers = [
     })
     return HttpResponse.json({ ok: true })
   }),
-  http.get('/api/workspaces/:id/template-upgrade', ({ params }) => {
+  http.get('/api/workspaces/:id/template-upgrade', ({ params, request }) => {
     const workspace = demoWorkspaces.find((candidate) => candidate.id === String(params.id))
     if (!workspace) return HttpResponse.json({ error: 'not_found' }, { status: 404 })
-    if (!workspace.upgradeAvailable) {
+    if (!workspace.upgradeAvailable && auditFixture(request) !== 'workspace-upgrade' && auditFixture(request) !== 'workspace-upgrade-blocked') {
       return HttpResponse.json({
         plan: {
           ...demoTemplateUpgradePlan(workspace.id),
@@ -259,7 +316,10 @@ export const workspacesHandlers = [
         },
       })
     }
-    return HttpResponse.json({ plan: demoTemplateUpgradePlan(workspace.id) })
+    const plan = demoTemplateUpgradePlan(workspace.id)
+    return HttpResponse.json({ plan: auditFixture(request) === 'workspace-upgrade-blocked'
+      ? { ...plan, blocked: true, blockers: ['active_sessions'], activity: { busy: true, sessions: [{ sessionId: 'audit-active', name: 'active audit', agent: 'codex', surface: 'terminal' }], headless: [] } }
+      : plan })
   }),
   http.post('/api/workspaces/:id/template-upgrade', async ({ params, request }) => {
     const workspace = demoWorkspaces.find((candidate) => candidate.id === String(params.id))
@@ -288,7 +348,7 @@ export const workspacesHandlers = [
       workspace,
     })
   }),
-  http.get('/api/workspaces/:id/absorb/:sourceId', ({ params }) => {
+  http.get('/api/workspaces/:id/absorb/:sourceId', ({ params, request }) => {
     const target = demoWorkspaces.find((candidate) => candidate.id === String(params.id))
     const source = demoWorkspaces.find((candidate) => candidate.id === String(params.sourceId))
     if (!target || !source || target.id === source.id) {
@@ -300,9 +360,12 @@ export const workspacesHandlers = [
         target: { id: target.id, tag: target.tag, displayName: target.displayName },
         importRoot: `imports/${source.tag}-${source.id.slice(-6)}`,
         planDigest: `demo-absorb-${target.id}-${source.id}`,
-        blocked: false,
-        blockers: [],
-        activity: {
+        blocked: auditFixture(request) === 'workspace-absorb-blocked',
+        blockers: auditFixture(request) === 'workspace-absorb-blocked' ? ['target_staged_changes'] : [],
+        activity: auditFixture(request) === 'workspace-absorb-blocked' ? {
+          source: { busy: true, sessions: [{ sessionId: 'audit-source', name: 'source audit', agent: 'codex', surface: 'terminal' }], headless: [] },
+          target: { busy: false, sessions: [], headless: [] },
+        } : {
           source: { busy: false, sessions: [], headless: [] },
           target: { busy: false, sessions: [], headless: [] },
         },
@@ -418,16 +481,16 @@ export const workspacesHandlers = [
     HttpResponse.text('', { status: 404 }),
   ),
 
-  http.get('/api/workspaces/agents', () =>
+  http.get('/api/workspaces/agents', ({ request }) =>
     HttpResponse.json({
       // `installed` is PATH-probed on a real backend; the demo has no host to
       // probe, so present everything as installed (a clean showcase, not a
       // "go install things" prompt).
       agents: [
-        { id: 'claude', displayName: 'Claude Code', installed: true, binPath: '/usr/local/bin/claude', capabilities: { parallelPerCwd: true, resumeLast: false, resumeById: true, transcriptDiscovery: 'fs-watch' } },
-        { id: 'codex', displayName: 'Codex', installed: true, binPath: '/usr/local/bin/codex', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess' } },
-        { id: 'opencode', displayName: 'opencode', installed: true, binPath: '/usr/local/bin/opencode', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess' } },
-        { id: 'pi', displayName: 'Pi', installed: true, binPath: '/usr/local/bin/pi', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'none' } },
+        { id: 'claude', displayName: 'Claude Code', installed: !['chat-no-agents', 'chat-selected-missing', 'first-run-incomplete'].includes(auditFixture(request) ?? ''), binPath: '/usr/local/bin/claude', capabilities: { parallelPerCwd: true, resumeLast: false, resumeById: true, transcriptDiscovery: 'fs-watch' } },
+        { id: 'codex', displayName: 'Codex', installed: !['chat-no-agents', 'first-run-incomplete'].includes(auditFixture(request) ?? ''), binPath: '/usr/local/bin/codex', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess' } },
+        { id: 'opencode', displayName: 'opencode', installed: !['chat-no-agents', 'first-run-incomplete'].includes(auditFixture(request) ?? ''), binPath: '/usr/local/bin/opencode', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess' } },
+        { id: 'pi', displayName: 'Pi', installed: !['chat-no-agents', 'first-run-incomplete'].includes(auditFixture(request) ?? ''), binPath: '/usr/local/bin/pi', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'none' } },
       ],
     }),
   ),
@@ -450,9 +513,9 @@ export const workspacesHandlers = [
   // Two sample vault credentials let the quick-chat demo show that a remembered
   // provider can win over the first compatible option. Both speak openai-chat,
   // which every loginless runtime accepts.
-  http.get('/api/workspaces/credentials', () =>
+  http.get('/api/workspaces/credentials', ({ request }) =>
     HttpResponse.json({
-      credentials: [
+      credentials: auditFixture(request) === 'chat-no-creds' ? [] : [
         { slug: 'openai-1', vendor: 'openai', label: 'OpenAI', authType: 'api-key', wires: { 'openai-chat': '' }, lastModel: 'gpt-5.6', resolvedModel: 'gpt-5.6', apiKey: null },
         { slug: 'minimax-1', vendor: 'minimax', label: 'MiniMax', authType: 'api-key', wires: { 'openai-chat': '' }, lastModel: 'MiniMax-M2.1', resolvedModel: 'MiniMax-M2.1', apiKey: null },
       ],
@@ -464,15 +527,17 @@ export const workspacesHandlers = [
 
   http.get('/api/workspaces/:id/git/log', () => HttpResponse.json({ entries: [] })),
   http.get('/api/workspaces/:id/git/status', () =>
-    HttpResponse.json({ branch: 'main', clean: true, files: [] }),
-  ),
-  http.get('/api/workspaces/:id/files', () =>
-    HttpResponse.json({ path: '/', entries: [] }),
-  ),
+    HttpResponse.json({ branch: 'main', clean: true, files: [] })),
+  http.get('/api/workspaces/:id/files', () => HttpResponse.json({
+    path: '/',
+    entries: [{ name: 'audit-report.html', kind: 'file', sizeBytes: 196, mtime: '2026-07-18T00:00:00.000Z' }],
+  })),
   http.get('/api/workspaces/:id/file', ({ request }) => {
     const url = new URL(request.url)
     const path = url.searchParams.get('path') ?? ''
-    const content = demoWorkspaceFiles[path]
+    const content = path === 'audit-report.html'
+      ? '<!doctype html><html><head><title>Audit report</title></head><body><main><h1>Theme audit report</h1><p>Rendered inside the sandboxed HTML report viewer.</p></main></body></html>'
+      : demoWorkspaceFiles[path]
     if (content != null) return HttpResponse.json({ content })
     return HttpResponse.json({ error: 'file_not_found' }, { status: 404 })
   }),
@@ -544,7 +609,8 @@ export const workspacesHandlers = [
       })),
     })
   }),
-  http.post('/api/workspaces/:id/resumes/:resumeId/session', ({ params }) => {
+  http.post('/api/workspaces/:id/resumes/:resumeId/session', ({ params, request }) => {
+    if (auditFixture(request) === 'issue-continue-error') return HttpResponse.json({ error: 'audit_continue_failure' }, { status: 500 })
     const wsId = String(params.id)
     const resumeId = String(params.resumeId)
     const workspace = demoWorkspaces.find((candidate) => candidate.id === wsId)
@@ -597,6 +663,10 @@ export const workspacesHandlers = [
   }),
   http.post('/api/workspaces/:id/sessions/:sid/pause', () => HttpResponse.json(true)),
   http.post('/api/workspaces/:id/sessions/:sid/resume', () => HttpResponse.json(null)),
+  http.get('/api/workspaces/:id/sessions/:sid/webpi', ({ request }) => {
+    const fixture = auditFixture(request)
+    return HttpResponse.json({ snapshot: fixture === 'workspace-webpi-complete' ? auditWebPiCompleteSnapshot : fixture === 'workspace-webpi-running' ? auditWebPiRunningSnapshot : auditWebPiSnapshot })
+  }),
   http.delete('/api/workspaces/:id/sessions/:sid', () => HttpResponse.json(true)),
   http.get('/api/workspaces/:id/sessions/:sid/diagnostics', () =>
     HttpResponse.json({ status: 'demo' }),
@@ -617,8 +687,12 @@ export const workspacesHandlers = [
   http.post('/api/workspaces/:id/sessions/:sid/webpi/abort', () =>
     HttpResponse.json({ snapshot: demoManagerSnapshot() })),
 
-  http.get('/api/workspaces/:id/agent-config', () => HttpResponse.json({})),
-  http.get('/api/workspaces/:id/agent-readiness', () =>
+  http.get('/api/workspaces/:id/agent-config', ({ request }) => HttpResponse.json(
+    auditFixture(request) === 'workspace-config-stale'
+      ? { claude: { baseUrl: 'https://api.anthropic.com', apiKey: 'audit-key-original', model: 'claude-audit', wireShape: 'anthropic', authMode: 'x-api-key' }, codex: null, opencode: null, pi: null }
+      : {},
+  )),
+  http.get('/api/workspaces/:id/agent-readiness', ({ request }) =>
     HttpResponse.json({
       agents: {
         claude: {
@@ -634,9 +708,9 @@ export const workspacesHandlers = [
         },
         codex: {
           agent: 'codex',
-          ready: true,
-          requiresCredential: false,
-          source: 'runtime-login',
+          ready: auditFixture(request) !== 'issue-credential-missing',
+          requiresCredential: auditFixture(request) === 'issue-credential-missing',
+          source: auditFixture(request) === 'issue-credential-missing' ? 'missing' : 'runtime-login',
           hasWorkspaceConfig: false,
           hasUsableWorkspaceConfig: false,
           detectedCredentialSlug: null,

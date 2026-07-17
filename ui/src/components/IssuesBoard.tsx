@@ -144,15 +144,15 @@ export function CadencePill({ when }: { when: ScheduleWhen }) {
   )
 }
 
-const AUTOMATION_HEALTH_META: Record<IssueAutomationHealthState, { label: string; className: string }> = {
-  inactive: { label: 'Inactive', className: 'bg-bg-tertiary text-muted' },
-  not_started: { label: 'Not started', className: 'bg-bg-tertiary text-muted' },
-  due: { label: 'Due', className: 'bg-amber-500/15 text-amber-400' },
-  running: { label: 'Running', className: 'bg-blue-500/15 text-blue-400' },
-  healthy: { label: 'Healthy', className: 'bg-emerald-500/15 text-emerald-400' },
-  interrupted: { label: 'Interrupted', className: 'bg-amber-500/15 text-amber-400' },
-  failed: { label: 'Failed', className: 'bg-red-500/15 text-red-400' },
-  blocked: { label: 'Blocked', className: 'bg-red-500/15 text-red-400' },
+const AUTOMATION_HEALTH_META: Record<IssueAutomationHealthState, { label: string }> = {
+  inactive: { label: 'Inactive' },
+  not_started: { label: 'Not started' },
+  due: { label: 'Due' },
+  running: { label: 'Running' },
+  healthy: { label: 'Healthy' },
+  interrupted: { label: 'Interrupted' },
+  failed: { label: 'Failed' },
+  blocked: { label: 'Blocked' },
 }
 
 const BOARD_HEALTH_CLASS: Record<IssueAutomationHealthState, string> = {
@@ -171,7 +171,7 @@ export function AutomationHealthPill({ health }: { health: IssueAutomationHealth
   return (
     <span
       title={health.message}
-      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium ${meta.className}`}
+      className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-bg-tertiary px-2 py-0.5 text-[11px] font-medium text-muted"
     >
       <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />
       {meta.label}
