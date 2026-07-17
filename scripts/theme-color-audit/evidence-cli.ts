@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 import { chromium, type Page } from '@playwright/test'
 import { buildBindings, type RuntimeCaptureEvent } from './runtime-binding-cli.js'
 import { assertUiSourceTreeMatchesCommit, buildStaticManifest } from './static-inventory.js'
-import { validateThemeColorEvidenceManifest } from './evidence.js'
+import { THEME_COLOR_EVIDENCE_SCHEMA_VERSION, validateThemeColorEvidenceManifest } from './evidence.js'
 
 const root = resolve(import.meta.dirname, '../..')
 const evidenceRoot = resolve(root, '.artifacts/theme-color-audit/evidence')
@@ -19,12 +19,13 @@ type EvidenceEntry = {
   scenario: { scenarioId: string; state: string; fixtureProfile: string; theme: 'light' | 'dark' }
   channel: string
   actualValue: string
+  winner: RuntimeCaptureEvent['binding']['winner']
   target: RuntimeCaptureEvent['binding']['target'] & { active: true }
   sampleBounds: { selector: string; x: number; y: number; width: number; height: number }
   context: ImageRecord
   crop: ImageRecord
 }
-type EvidenceManifest = { schemaVersion: 1; sourceCommit: string; jpegQuality: 80; entries: EvidenceEntry[] }
+type EvidenceManifest = { schemaVersion: typeof THEME_COLOR_EVIDENCE_SCHEMA_VERSION; sourceCommit: string; jpegQuality: 80; entries: EvidenceEntry[] }
 
 function sha256(value: Buffer): string { return createHash('sha256').update(value).digest('hex') }
 function safeName(id: string): string { return id.replace(/[^a-z0-9-]/gi, '-') }
@@ -104,7 +105,7 @@ async function capture(): Promise<void> {
   } })
   const missing = [...runtimeIds].filter((id) => !captured.has(id)); if (missing.length) throw new Error(`missing occurrence evidence (${missing.length}):\n${missing.join('\n')}`)
   entries.sort((a, b) => a.source.path.localeCompare(b.source.path) || a.source.span.startLine - b.source.span.startLine || a.inventoryId.localeCompare(b.inventoryId))
-  const manifest: EvidenceManifest = { schemaVersion: 1, sourceCommit: result.sourceCommit, jpegQuality, entries }
+  const manifest: EvidenceManifest = { schemaVersion: THEME_COLOR_EVIDENCE_SCHEMA_VERSION, sourceCommit: result.sourceCommit, jpegQuality, entries }
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
   console.log(`captured ${entries.length} independent occurrence evidence records`)
 }
