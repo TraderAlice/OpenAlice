@@ -45,14 +45,9 @@
     "audit:theme-colors:serve-and-check-scenarios": "tsx scripts/theme-color-audit/scenario-cli.ts browser",
     "audit:theme-colors:check-runtime-bindings": "tsx scripts/theme-color-audit/runtime-binding-cli.ts check",
     "audit:theme-colors:assert-no-audit-runtime": "tsx scripts/theme-color-audit/runtime-binding-cli.ts assert-production-clean",
-    "audit:theme-colors:capture": "tsx scripts/theme-color-audit/evidence-cli.ts capture",
-    "audit:theme-colors:check-evidence": "tsx scripts/theme-color-audit/evidence-cli.ts check",
-    "audit:theme-colors:inspect-images": "tsx scripts/theme-color-audit/evidence-cli.ts inspect-images",
     "test:theme-color-static-inventory": "vitest run scripts/theme-color-audit/static-inventory.spec.ts --project node",
     "test:theme-color-scenarios": "vitest run scripts/theme-color-audit/scenarios.spec.ts --project node",
     "test:theme-color-runtime-provenance": "vitest run scripts/theme-color-audit/runtime-provenance.spec.ts --project node",
-    "test:theme-color-evidence-bundle": "vitest run scripts/theme-color-audit/evidence.spec.ts --project node",
-    "test:theme-color-capture-failures": "vitest run scripts/theme-color-audit/evidence.spec.ts --project node",
     "postinstall": "node scripts/fix-pty-perms.mjs"
   },
   "keywords": [
@@ -164,7 +159,6 @@
     "@types/react-dom": "^19.2.3",
     "@types/ws": "^8.18.1",
     "@vitest/coverage-v8": "^4.1.5",
-    "image-size": "2.0.2",
     "jsdom": "^29.0.0",
     "postcss": "8.5.6",
     "tsup": "^8.5.1",

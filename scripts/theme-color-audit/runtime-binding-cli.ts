@@ -121,7 +121,7 @@ async function buildBindings(): Promise<RuntimeBindingManifest> {
       for (const scenario of themeColorScenarios) {
         for (const theme of scenario.themes) {
           console.log(`binding ${scenario.scenarioId} ${theme}`)
-          await page.addInitScript((selectedTheme) => localStorage.setItem('openalice.theme.v1', JSON.stringify({ state: { theme: selectedTheme }, version: 1 })), theme)
+          await page.addInitScript((selectedTheme) => localStorage.setItem('openalice.color-theme', selectedTheme), theme)
           await page.setViewportSize(scenario.viewport)
           await page.goto(`${baseUrl}${scenario.route}`, { waitUntil: 'networkidle' })
           await page.evaluate(async (paths) => {
