@@ -189,30 +189,6 @@ export const SECURITIES_SDK_OPTIONS: SDKOption[] = [
   },
 ]
 
-export const PLATFORM_TYPE_OPTIONS: SDKOption[] = [
-  {
-    id: 'ccxt',
-    name: 'CCXT (Crypto)',
-    description: 'Unified API for 100+ crypto exchanges. Supports Binance, Bybit, OKX, Coinbase, and more.',
-    badge: 'CC',
-    badgeColor: 'text-accent',
-  },
-  {
-    id: 'alpaca',
-    name: 'Alpaca (Securities)',
-    description: 'Commission-free US equities and ETFs with fractional share support.',
-    badge: 'AL',
-    badgeColor: 'text-green',
-  },
-  {
-    id: 'ibkr',
-    name: 'IBKR (Interactive Brokers)',
-    description: 'Professional-grade trading via TWS or IB Gateway. Stocks, options, futures, bonds.',
-    badge: 'IB',
-    badgeColor: 'text-orange-400',
-  },
-]
-
 export const DATASOURCE_OPTIONS: SDKOption[] = [
   {
     id: 'marketData',

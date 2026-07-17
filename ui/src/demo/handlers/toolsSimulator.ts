@@ -1,5 +1,30 @@
 import { http, HttpResponse } from 'msw'
 
+import type { SimulatorState, SimulatorUTAEntry } from '../../api/simulator'
+
+const auditFixture = (request: Request): string | null => request.headers.get('x-openalice-theme-audit-fixture')
+  ?? (request.referrer ? new URL(request.referrer).searchParams.get('themeAuditFixture') : null)
+
+const auditSimulatorUtas: SimulatorUTAEntry[] = [
+  { id: 'audit-sim-primary', label: 'Audit primary' },
+  { id: 'audit-sim-secondary', label: 'Audit secondary' },
+]
+
+const auditSimulatorState: SimulatorState = {
+  cash: '10000',
+  markPrices: [{ nativeKey: 'AAPL', price: '100.50' }],
+  positions: [],
+  pendingOrders: [{
+    orderId: 'audit-near-trigger',
+    nativeKey: 'AAPL',
+    symbol: 'AAPL',
+    action: 'BUY',
+    orderType: 'LMT',
+    totalQuantity: '1',
+    lmtPrice: '100.00',
+  }],
+}
+
 export const toolsSimulatorHandlers = [
   http.get('/api/tools', () => HttpResponse.json({ inventory: [], disabled: [] })),
   http.put('/api/tools', () => HttpResponse.json({ disabled: [] })),
@@ -10,10 +35,13 @@ export const toolsSimulatorHandlers = [
     HttpResponse.json({ content: [{ type: 'text', text: 'Demo mode — tool execution is disabled.' }], isError: true }),
   ),
 
-  http.get('/api/simulator/utas', () => HttpResponse.json({ utas: [] })),
-  http.get('/api/simulator/uta/:id/state', () =>
-    HttpResponse.json({ positions: [], orders: [], cash: '0' }),
-  ),
+  http.get('/api/simulator/utas', ({ request }) => HttpResponse.json({
+    utas: auditFixture(request) === 'simulator-audit' ? auditSimulatorUtas : [],
+  })),
+  http.get('/api/simulator/uta/:id/state', ({ request }) =>
+    HttpResponse.json(auditFixture(request) === 'simulator-audit'
+      ? auditSimulatorState
+      : { cash: '0', markPrices: [], positions: [], pendingOrders: [] })),
   http.post('/api/simulator/uta/:id/mark-price', () => HttpResponse.json({ filled: [] })),
   http.post('/api/simulator/uta/:id/tick-price', () => HttpResponse.json({ filled: [] })),
   http.post('/api/simulator/uta/:id/orders/:orderId/fill', () => HttpResponse.json({ ok: true })),

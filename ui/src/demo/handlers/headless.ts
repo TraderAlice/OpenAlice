@@ -67,8 +67,47 @@ const demoOutput = (taskId: string): HeadlessOutput | null => {
   }
 }
 
+const auditFixture = (request: Request): string | null => request.headers.get('x-openalice-theme-audit-fixture')
+  ?? (request.referrer ? new URL(request.referrer).searchParams.get('themeAuditFixture') : null)
+const auditRefreshCounts = new Map<string, number>()
+
+const failedAuditTask: HeadlessTaskRecord = {
+  taskId: 'audit-headless-failed', resumeId: 'audit-resume-failed', resumable: true,
+  wsId: 'demo-ws', agent: 'codex', prompt: 'Audit failed automation output', status: 'failed',
+  startedAt: now - 60_000, finishedAt: now - 30_000, durationMs: 30_000, exitCode: 1,
+  error: 'Broker validation failed',
+}
+
+const failedAuditOutput: HeadlessOutput = {
+  taskId: failedAuditTask.taskId, status: failedAuditTask.status,
+  structured: {
+    schemaVersion: 1, assistantText: '', truncated: true,
+    blocks: [
+      { type: 'tool', id: 'audit-tool-failed', name: 'alice push', status: 'failed', input: { symbol: 'NVDA' }, output: 'rejected' },
+      { type: 'tool', id: 'audit-tool-running', name: 'alice retry', status: 'running', input: {}, output: undefined },
+      { type: 'error', message: 'Broker validation failed' },
+    ],
+    metrics: { textBlocks: 0, toolCalls: 2, toolFailures: 1 },
+  },
+  stdout: { text: 'audit stdout', sizeBytes: 12, truncated: true },
+  stderr: { text: 'audit stderr', sizeBytes: 12, truncated: false },
+}
+
 export const headlessHandlers = [
-  http.get('/api/headless', ({ request }) => {
+  http.get('/api/headless', async ({ request }) => {
+    const fixture = auditFixture(request)
+    if (fixture === 'automation-loading') await new Promise((resolve) => setTimeout(resolve, 3_000))
+    if (fixture === 'automation-list-error') return HttpResponse.json({ error: 'audit_list_failure' }, { status: 500 })
+    if (fixture === 'automation-refresh-error') {
+      const run = request.headers.get('x-openalice-theme-audit-run') ?? 'unknown'
+      const count = auditRefreshCounts.get(run) ?? 0
+      auditRefreshCounts.set(run, count + 1)
+      if (count > 0) return HttpResponse.json({ error: 'audit_refresh_failure' }, { status: 500 })
+    }
+    if (fixture === 'automation-run-failed') return HttpResponse.json({
+      tasks: [failedAuditTask], page: { total: 1, hasMore: false, nextCursor: null },
+      summary: { done: 0, needsAttention: 1 }, capacity: { running: 0, limit: 8 },
+    })
     const wsId = new URL(request.url).searchParams.get('wsId')
     const tasks = wsId ? demoHeadlessTasks.filter((t) => t.wsId === wsId) : demoHeadlessTasks
     return HttpResponse.json({
@@ -82,7 +121,11 @@ export const headlessHandlers = [
     })
   }),
   // Path-specific route BEFORE the :taskId catch-all (msw matches in order).
-  http.get('/api/headless/:taskId/output', ({ params }) => {
+  http.get('/api/headless/:taskId/output', ({ params, request }) => {
+    if (auditFixture(request) === 'automation-output-error' && params.taskId === 'demo-headless-1') {
+      return HttpResponse.json({ error: 'audit_output_failure' }, { status: 500 })
+    }
+    if (auditFixture(request) === 'automation-run-failed' && params.taskId === failedAuditTask.taskId) return HttpResponse.json(failedAuditOutput)
     const out = demoOutput(String(params.taskId))
     return out ? HttpResponse.json(out) : HttpResponse.json({ error: 'not_found' }, { status: 404 })
   }),

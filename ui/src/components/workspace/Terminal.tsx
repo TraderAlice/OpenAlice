@@ -34,7 +34,7 @@ const DemoTerminalReplay = lazy(() =>
 
 export type { KeyMap } from './terminalInput';
 
-type Status = 'connecting' | 'reconnecting' | 'connected' | 'closed' | 'error' | 'kicked' | 'locked';
+type Status = 'connecting' | 'reconnecting' | 'connected' | 'closed' | 'kicked' | 'locked';
 
 interface SocketMessageEventLike {
   readonly data: unknown;
@@ -662,7 +662,6 @@ function StatusDot({ status }: { status: Status }): ReactElement {
     reconnecting: '#d29922',
     connected: '#7ee787',
     closed: '#6e7681',
-    error: '#ff7b72',
     kicked: '#d2a8ff',
     locked: '#d2a8ff',
   };

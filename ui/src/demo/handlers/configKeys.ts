@@ -1,4 +1,16 @@
 import { http, HttpResponse } from 'msw'
+import type { Preset } from '../../api/types'
+
+const auditFixture = (request: Request): string | null => request.headers.get('x-openalice-theme-audit-fixture')
+  ?? (request.referrer ? new URL(request.referrer).searchParams.get('themeAuditFixture') : null)
+const auditCredentialPreset: Preset = {
+  id: 'audit-openai', label: 'Audit OpenAI', description: 'Typed audit credential fixture', category: 'official',
+  defaultName: 'Audit OpenAI', schema: { type: 'object', properties: {
+    apiKey: { type: 'string', writeOnly: true },
+    model: { type: 'string', oneOf: [{ const: 'gpt-audit', title: 'GPT Audit' }] },
+  } },
+  regions: [{ id: 'official', label: 'Official', wires: { 'openai-responses': '' } }],
+}
 
 export const configKeysHandlers = [
   http.get('/api/config/api-keys/status', () => HttpResponse.json({})),
@@ -6,14 +18,18 @@ export const configKeysHandlers = [
   // Echo the body back — the real route returns the validated section,
   // and useConfigPage adopts the echo, so `{}` here would wipe the page.
   http.put('/api/config/marketData', async ({ request }) => HttpResponse.json(await request.json())),
-  http.put('/api/config/trading', async ({ request }) => HttpResponse.json(await request.json())),
+  http.put('/api/config/trading', async ({ request }) => {
+    const body = await request.json()
+    if (auditFixture(request) === 'first-run-no-uta') await new Promise((resolve) => setTimeout(resolve, 2_000))
+    return HttpResponse.json(body)
+  }),
   http.put('/api/config/snapshot', async ({ request }) => HttpResponse.json(await request.json())),
 
-  http.get('/api/config', () =>
+  http.get('/api/config', ({ request }) =>
     HttpResponse.json({
       aiProvider: { apiKeys: {}, profiles: {}, activeProfile: '' },
       engine: {},
-      agent: { allowAiTrading: false, claudeCode: {} },
+      agent: { allowAiTrading: auditFixture(request) === 'agent-permissions-warning', claudeCode: {} },
       compaction: { maxContextTokens: 0, maxOutputTokens: 0 },
       snapshot: { enabled: false, every: '1h' },
       trading: { observeExternalOrdersEvery: '15m' },
@@ -29,13 +45,13 @@ export const configKeysHandlers = [
     }),
   ),
 
-  http.get('/api/config/presets', () => HttpResponse.json({ presets: [] })),
+  http.get('/api/config/presets', ({ request }) => HttpResponse.json({ presets: auditFixture(request) === 'credential-test' ? [auditCredentialPreset] : [] })),
 
   // Credential vault (AI Provider page) — a small representative set so the
   // page (and the per-agent default pickers) render with content in the demo.
-  http.get('/api/config/credentials', () =>
+  http.get('/api/config/credentials', ({ request }) =>
     HttpResponse.json({
-      credentials: [
+      credentials: auditFixture(request) === 'first-run-incomplete' ? [] : [
         { slug: 'anthropic-1', vendor: 'anthropic', label: 'Anthropic', authType: 'api-key', wires: { anthropic: '' }, apiKey: null, hasApiKey: true },
         { slug: 'openai-1', vendor: 'openai', label: 'OpenAI', authType: 'api-key', wires: { 'openai-responses': '', 'openai-chat': '' }, apiKey: null, hasApiKey: true },
       ],
@@ -65,7 +81,7 @@ export const configKeysHandlers = [
     return HttpResponse.json({ defaults: body.defaults ?? {} })
   }),
 
-  http.get('/api/config/workspace-default-agent', () => HttpResponse.json({ agent: 'claude' })),
+  http.get('/api/config/workspace-default-agent', ({ request }) => HttpResponse.json({ agent: auditFixture(request) === 'chat-no-creds' ? 'opencode' : 'claude' })),
   http.put('/api/config/workspace-default-agent', async ({ request }) => {
     const body = (await request.json().catch(() => ({}))) as { agent?: unknown }
     return HttpResponse.json({ agent: typeof body.agent === 'string' ? body.agent : null })

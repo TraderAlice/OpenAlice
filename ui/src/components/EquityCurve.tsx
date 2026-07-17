@@ -124,10 +124,10 @@ export function EquityCurve({
             width={width}
             height={height}
             data={chartData}
-            onClick={(e: any) => {
-              if (e?.activePayload?.[0]?.payload && onPointClick) {
-                onPointClick(e.activePayload[0].payload as EquityCurvePoint)
-              }
+            onClick={(state) => {
+              if (!onPointClick || state?.activeTooltipIndex == null) return
+              const point = chartData[Number(state.activeTooltipIndex)]
+              if (point) onPointClick(point)
             }}
           >
           <defs>

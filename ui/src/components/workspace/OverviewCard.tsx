@@ -41,10 +41,9 @@ interface Props {
   /**
    * Open the template's detail page — used by the upgrade badge so the
    * user (or the agent reading the page) can see what's new before
-   * deciding to self-upgrade. Optional; when absent the badge still
-   * displays but isn't clickable.
+   * deciding to self-upgrade.
    */
-  onOpenTemplate?: (templateName: string) => void
+  onOpenTemplate: (templateName: string) => void
 }
 
 export function OverviewCard({
@@ -106,12 +105,11 @@ export function OverviewCard({
               e.stopPropagation()
               onOpenTemplate?.(w.template!)
             }}
-            disabled={!onOpenTemplate}
             title={t('workspace.templateUpgrade', {
               from: w.upgradeAvailable.from,
               to: w.upgradeAvailable.to,
             })}
-            className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-accent border border-accent/40 hover:border-accent/80 hover:bg-accent/10 transition-colors disabled:cursor-default disabled:hover:border-accent/40 disabled:hover:bg-transparent"
+            className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-accent border border-accent/40 hover:border-accent/80 hover:bg-accent/10 transition-colors"
           >
             <ArrowUpCircle size={10} strokeWidth={2.25} />
             <span>v{w.upgradeAvailable.to}</span>
