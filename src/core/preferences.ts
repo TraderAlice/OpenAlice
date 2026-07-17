@@ -19,15 +19,40 @@ const quickChatPreferencesSchema = z.object({
   recentChatWorkspaceId: z.string().nullable().default(null),
 })
 
+export const appearancePreferencesSchema = z.object({
+  activeFamilyId: z.string().regex(/^[a-z0-9][a-z0-9._-]{0,127}$/).default('builtin-openalice'),
+  mode: z.enum(['system', 'light', 'dark']).default('system'),
+  terminal: z.discriminatedUnion('mode', [
+    z.object({ mode: z.literal('follow') }).strict(),
+    z.object({
+      mode: z.literal('override'),
+      familyId: z.string().regex(/^[a-z0-9][a-z0-9._-]{0,127}$/),
+      variant: z.enum(['light', 'dark']),
+    }).strict(),
+  ]).default({ mode: 'follow' }),
+  marketColors: z.enum(['protected', 'theme']).default('protected'),
+  marketDirection: z.enum(['green-up-red-down', 'red-up-green-down']).default('green-up-red-down'),
+  statusColors: z.enum(['protected', 'theme']).default('protected'),
+}).strict()
+
 const preferencesSchema = z.object({
   version: z.literal(1).default(1),
   quickChat: quickChatPreferencesSchema.default({
     lastCredentialByAgent: {},
     recentChatWorkspaceId: null,
   }),
+  appearance: appearancePreferencesSchema.default({
+    activeFamilyId: 'builtin-openalice',
+    mode: 'system',
+    terminal: { mode: 'follow' },
+    marketColors: 'protected',
+    marketDirection: 'green-up-red-down',
+    statusColors: 'protected',
+  }),
 })
 
 export type QuickChatPreferences = z.infer<typeof quickChatPreferencesSchema>
+export type AppearancePreferences = z.infer<typeof appearancePreferencesSchema>
 export type Preferences = z.infer<typeof preferencesSchema>
 
 function emptyPreferences(): Preferences {
@@ -53,6 +78,11 @@ export async function readQuickChatPreferences(path = preferencesPath()): Promis
     lastCredentialByAgent: { ...preferences.quickChat.lastCredentialByAgent },
     recentChatWorkspaceId: preferences.quickChat.recentChatWorkspaceId,
   }
+}
+
+export async function readAppearancePreferences(path = preferencesPath()): Promise<AppearancePreferences> {
+  const preferences = await readPreferences(path)
+  return structuredClone(preferences.appearance)
 }
 
 // Alice is single-writer at the process level, but two UI requests can still
@@ -119,6 +149,21 @@ export async function rememberRecentChatWorkspace(
     })
     await writePreferences(updated, path)
     return copyQuickChatPreferences(updated.quickChat)
+  })
+  mutationQueue = operation
+  return operation
+}
+
+export async function saveAppearancePreferences(
+  input: AppearancePreferences,
+  path = preferencesPath(),
+): Promise<AppearancePreferences> {
+  const appearance = appearancePreferencesSchema.parse(input)
+  const operation = mutationQueue.catch(() => undefined).then(async () => {
+    const preferences = await readPreferences(path)
+    const updated = preferencesSchema.parse({ ...preferences, appearance })
+    await writePreferences(updated, path)
+    return structuredClone(updated.appearance)
   })
   mutationQueue = operation
   return operation
