@@ -137,6 +137,9 @@ importers:
       jsdom:
         specifier: ^29.0.0
         version: 29.0.0(@noble/hashes@2.2.0)
+      postcss:
+        specifier: 8.5.10
+        version: 8.5.10
       tsup:
         specifier: ^8.5.1
         version: 8.5.1(jiti@2.6.1)(postcss@8.5.10)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.9.0)
