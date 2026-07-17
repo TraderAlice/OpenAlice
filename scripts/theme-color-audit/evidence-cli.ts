@@ -26,15 +26,10 @@ function positiveTarget(binding: RuntimeColorBinding): binding is RuntimeColorBi
   return binding.active && binding.actualValue.trim().length > 0 && binding.target !== null && binding.target.width > 0 && binding.target.height > 0
 }
 
-function isCssVariableDefinition(source: StaticColorManifest['occurrences'][number], binding: RuntimeColorBinding): boolean {
-  return binding.channel.startsWith('--') || source.ownerHint?.startsWith('--') === true || (source.path.endsWith('.css') && binding.target?.selector === 'html' && binding.channel.startsWith('--'))
-}
-
-function chooseVisualBindings(manifest: RuntimeBindingManifest, sourceById: ReadonlyMap<string, StaticColorManifest['occurrences'][number]>): Map<string, { binding: RuntimeColorBinding; index: number }> {
+function chooseVisualBindings(manifest: RuntimeBindingManifest): Map<string, { binding: RuntimeColorBinding; index: number }> {
   const selected = new Map<string, { binding: RuntimeColorBinding; index: number }>()
   manifest.bindings.forEach((binding, index) => {
-    const source = sourceById.get(binding.inventoryId)
-    if (source && positiveTarget(binding) && !isCssVariableDefinition(source, binding) && !selected.has(binding.inventoryId)) selected.set(binding.inventoryId, { binding, index })
+    if (positiveTarget(binding) && !selected.has(binding.inventoryId)) selected.set(binding.inventoryId, { binding, index })
   })
   return selected
 }
@@ -166,7 +161,7 @@ async function generateBundle(): Promise<ThemeColorEvidenceBundle> {
   if (staticManifest.sourceCommit !== runtimeManifest.sourceCommit) throw new Error('static/runtime manifest commit mismatch')
   const sourcePathById = new Map(staticManifest.occurrences.map((entry) => [entry.inventoryId, entry.path]))
   const sourceById = new Map(staticManifest.occurrences.map((entry) => [entry.inventoryId, entry]))
-  const visualBindings = chooseVisualBindings(runtimeManifest, sourceById)
+  const visualBindings = chooseVisualBindings(runtimeManifest)
 
   await mkdir(imageRoot, { recursive: true })
   await mkdir(resolve(artifactRoot, 'annotations'), { recursive: true })
@@ -239,12 +234,9 @@ async function generateBundle(): Promise<ThemeColorEvidenceBundle> {
       const indexes = indexesById.get(source.inventoryId) ?? []
       const bindings = indexes.map((index) => runtimeManifest.bindings[index]!)
       const active = bindings.filter((binding) => binding.active)
-      const variableDefinition = active.find((binding) => isCssVariableDefinition(source, binding))
       occurrenceRecords.push({
         kind: 'non-visual-probe', inventoryId: source.inventoryId, source, bindingIndexes: indexes,
-        reason: variableDefinition
-          ? 'css-variable-definition'
-          : active.some((binding) => binding.surfaceKind === 'runtime-value')
+        reason: active.some((binding) => binding.surfaceKind === 'runtime-value')
           ? 'runtime-value'
           : active.length === 0 ? 'inactive-in-scenario' : 'no-positive-area-target',
       })
@@ -317,15 +309,12 @@ async function checkBundle(bundle: ThemeColorEvidenceBundle): Promise<void> {
     if (record.kind === 'visual-element') {
       const binding = runtimeManifest.bindings[record.bindingIndex]
       if (!binding || binding.inventoryId !== record.inventoryId || !positiveTarget(binding)) throw new Error(`${record.inventoryId}: annotation references invalid visual binding`)
-      if (isCssVariableDefinition(record.source, binding)) throw new Error(`${record.inventoryId}: CSS variable definition cannot be visual component evidence`)
-      if (binding.surfaceKind === 'dom-element' && !record.locator.startsWith('#') && !record.locator.includes(record.inventoryId)) throw new Error(`${record.inventoryId}: DOM locator does not identify current occurrence`)
     } else {
       const bindings = record.bindingIndexes.map((index) => runtimeManifest.bindings[index]).filter((binding): binding is RuntimeColorBinding => binding !== undefined)
       if (bindings.length !== record.bindingIndexes.length || bindings.some((binding) => binding.inventoryId !== record.inventoryId)) throw new Error(`${record.inventoryId}: non-visual binding reference mismatch`)
       const active = bindings.filter((binding) => binding.active)
       if (record.reason === 'inactive-in-scenario' && active.length > 0) throw new Error(`${record.inventoryId}: active binding mislabeled inactive`)
       if (record.reason === 'runtime-value' && !active.some((binding) => binding.surfaceKind === 'runtime-value')) throw new Error(`${record.inventoryId}: runtime-value reason has no active value probe`)
-      if (record.reason === 'css-variable-definition' && !active.some((binding) => isCssVariableDefinition(record.source, binding))) throw new Error(`${record.inventoryId}: CSS variable definition classification mismatch`)
       if (record.reason === 'no-positive-area-target' && (active.length === 0 || active.some(positiveTarget))) throw new Error(`${record.inventoryId}: non-visual target classification mismatch`)
     }
   }

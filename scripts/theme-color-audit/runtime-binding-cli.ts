@@ -85,7 +85,8 @@ async function collect(page: Page, scenarioId: string, theme: 'light' | 'dark', 
           matchedCssTarget = true
           const style = getComputedStyle(element, pseudo)
           const rect = element.getBoundingClientRect()
-          const selector = element.id ? `#${CSS.escape(element.id)}` : query
+          const audit = element.getAttribute('data-openalice-color-audit')?.split(' ')[0]
+          const selector = element.id ? `#${CSS.escape(element.id)}` : audit ? `[data-openalice-color-audit~="${audit}"]` : element.tagName.toLowerCase()
           result.push({ inventoryId: item.id, scenarioId, theme, surfaceKind: 'css-rule', channel: item.css.channel, actualValue: style.getPropertyValue(item.css.channel), active: true, target: { selector, x: rect.x, y: rect.y, width: rect.width, height: rect.height } })
           }
         }
@@ -95,7 +96,8 @@ async function collect(page: Page, scenarioId: string, theme: 'light' | 'dark', 
         const style = getComputedStyle(element)
         const classActive = item.syntaxKind !== 'tailwind-palette-utility' || element.className.toString().split(/\s+/).includes(item.sourceText)
         const rect = element.getBoundingClientRect()
-        const selector = element.id ? `#${CSS.escape(element.id)}` : `[data-openalice-color-audit~="${item.id}"]`
+        const audit = element.getAttribute('data-openalice-color-audit')?.split(' ')[0]
+        const selector = element.id ? `#${CSS.escape(element.id)}` : audit ? `[data-openalice-color-audit~="${audit}"]` : element.tagName.toLowerCase()
         result.push({ inventoryId: item.id, scenarioId, theme, surfaceKind: 'dom-element', channel: item.channel, actualValue: style.getPropertyValue(item.channel), active: classActive, target: { selector, x: rect.x, y: rect.y, width: rect.width, height: rect.height } })
       }
       const values = (globalThis as typeof globalThis & { __OPENALICE_THEME_COLOR_VALUES__?: Map<string, { value: string; active: boolean }> }).__OPENALICE_THEME_COLOR_VALUES__

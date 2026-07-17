@@ -131,7 +131,7 @@ export type OccurrenceEvidenceRecord =
       readonly inventoryId: string
       readonly source: StaticColorOccurrence
       readonly bindingIndexes: readonly number[]
-      readonly reason: 'runtime-value' | 'no-positive-area-target' | 'inactive-in-scenario' | 'css-variable-definition'
+      readonly reason: 'runtime-value' | 'no-positive-area-target' | 'inactive-in-scenario'
     }
 
 export interface ThemeColorEvidenceBundle {

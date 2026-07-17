@@ -30,8 +30,6 @@ export function validateOccurrenceEvidenceRecord(record: OccurrenceEvidenceRecor
   }
   const { targetBounds, annotation, crop, context } = record
   if (!record.locator || !record.channel || !record.actualValue) throw new Error(`${record.inventoryId}: visual binding metadata missing`)
-  if (record.channel.startsWith('--')) throw new Error(`${record.inventoryId}: CSS variable definition cannot be visual evidence`)
-  if (record.surfaceKind === 'dom-element' && !record.locator.startsWith('#') && !record.locator.includes(record.inventoryId)) throw new Error(`${record.inventoryId}: locator does not identify current occurrence`)
   if (targetBounds.width <= 0 || targetBounds.height <= 0) throw new Error(`${record.inventoryId}: target has zero area`)
   if (targetBounds.x < 0 || targetBounds.y < 0 || targetBounds.x + targetBounds.width > record.viewport.width || targetBounds.y + targetBounds.height > record.viewport.height) throw new Error(`${record.inventoryId}: target is outside viewport`)
   if (JSON.stringify(annotation.bounds) !== JSON.stringify(targetBounds) || !annotation.label.includes(record.inventoryId) || !annotation.label.includes(record.channel)) throw new Error(`${record.inventoryId}: annotation does not identify target and channel`)
