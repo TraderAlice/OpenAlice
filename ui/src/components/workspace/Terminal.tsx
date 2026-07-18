@@ -19,6 +19,7 @@ import {
   type KeyMap,
 } from './terminalInput';
 import {
+  applyTerminalTheme,
   useResolvedTerminalTheme,
   useTerminalThemeStore,
   type TerminalThemePreference,
@@ -231,21 +232,12 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
   const { profile: terminalThemeProfile } = useResolvedTerminalTheme();
   const themeRef = useRef(terminalThemeProfile.xtermTheme);
   themeRef.current = terminalThemeProfile.xtermTheme;
-  const appliedThemeVariantRef = useRef(terminalThemeProfile.variantId);
   const termRef = useRef<Xterm | null>(null);
 
   useEffect(() => {
     const term = termRef.current;
     if (!term) return;
-    term.options.theme = terminalThemeProfile.xtermTheme;
-
-    if (appliedThemeVariantRef.current === terminalThemeProfile.variantId) return;
-    appliedThemeVariantRef.current = terminalThemeProfile.variantId;
-    // Muxy-style terminal theming treats the raw PTY stream as the source of
-    // truth and the active theme as renderer config. Reattach so the server
-    // replays raw scrollback through the current xterm theme/profile, without
-    // mutating the output bytes themselves.
-    connectRef.current?.();
+    applyTerminalTheme(term, terminalThemeProfile);
   }, [terminalThemeProfile]);
 
   useEffect(() => {

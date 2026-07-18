@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { importThemeScheme } from './importer.js'
+import { TerminalThemeContrastError } from './colors.js'
 import {
   ThemeFamilyConflictError,
   ThemeFamilyDeleteError,
@@ -49,6 +50,21 @@ describe('theme family store', () => {
     const fabricated = structuredClone(family)
     fabricated.variants.dark!.tokens.bodyText = '#ffffff'
     await expect(saveThemeFamily(fabricated, dir)).rejects.toBeInstanceOf(ThemeFamilyValidationError)
+  })
+
+  it('refuses an exact ANSI override whose terminal pairs are unreadable', async () => {
+    const dir = await directory()
+    const family = importedFamily()
+    const variant = family.variants.dark!
+    variant.ansi16Override = {
+      foreground: '#777777', background: '#777777', cursor: '#777777', cursorText: '#777777',
+      selectionForeground: '#888888', selectionBackground: '#888888',
+      colors: [
+        '#777777', '#777777', '#777777', '#777777', '#777777', '#777777', '#777777', '#777777',
+        '#777777', '#777777', '#777777', '#777777', '#777777', '#777777', '#777777', '#777777',
+      ],
+    }
+    await expect(saveThemeFamily(family, dir)).rejects.toBeInstanceOf(TerminalThemeContrastError)
   })
 
   it('replaces an existing family explicitly and protects the active family', async () => {

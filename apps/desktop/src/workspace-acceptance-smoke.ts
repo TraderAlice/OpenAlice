@@ -13,6 +13,7 @@ export interface WorkspaceAcceptanceReceipt {
     readonly workspaceCreated: boolean
     readonly gitReady: boolean
     readonly cliEnvironmentInjected: boolean
+    readonly terminalEnvironmentResolved: boolean
     readonly allCliManifestsLoaded: boolean
     readonly shellCliRoundTrip: boolean
     readonly managedPiAssistantReply: boolean
@@ -51,6 +52,7 @@ export async function runRendererWorkspaceAcceptanceSmoke(
       workspaceCreated: false,
       gitReady: false,
       cliEnvironmentInjected: false,
+      terminalEnvironmentResolved: false,
       allCliManifestsLoaded: false,
       shellCliRoundTrip: false,
       managedPiAssistantReply: false,
@@ -118,6 +120,7 @@ export async function runRendererWorkspaceAcceptanceSmoke(
         }
         output += decode(msg.data)
         if (output.includes('__OPENALICE_CLI_ENV_OK__')) checks.cliEnvironmentInjected = true
+        if (output.includes('__OPENALICE_TERMINAL_ENV_OK__')) checks.terminalEnvironmentResolved = true
         if (output.includes('__OPENALICE_CLI_MANIFESTS_OK__')) checks.allCliManifestsLoaded = true
         if (output.includes('__OPENALICE_GIT_OK__')) checks.gitReady = true
         if (output.includes(shellFailureMarker)) {
@@ -141,6 +144,11 @@ export async function runRendererWorkspaceAcceptanceSmoke(
           'test "$AQ_WS_ID" = "' + workspaceId + '"',
           'test -n "$OPENALICE_TOOL_URL"',
           'test -n "$OPENALICE_TOOL_SOCKET"',
+          'test "$TERM" = "xterm-256color"',
+          'test "$COLORTERM" = "truecolor"',
+          'test "$OPENALICE_TERMINAL_THEME" = "dark"',
+          'test "$COLORFGBG" = "15;0"',
+          "printf '__OPENALICE_%s_OK__\\\\n' 'TERMINAL_ENV'",
           'command -v alice >/dev/null',
           'command -v alice-workspace >/dev/null',
           'command -v traderhub >/dev/null',
@@ -193,7 +201,7 @@ export async function runRendererWorkspaceAcceptanceSmoke(
       const spawned = await json(await fetch('/api/workspaces/' + encodeURIComponent(workspaceId) + '/sessions/spawn', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ agent: 'shell' }),
+        body: JSON.stringify({ agent: 'shell', terminalTheme: 'dark' }),
       }))
       shellSessionId = spawned.sessionId
       await runShellContract(workspaceId, shellSessionId)
