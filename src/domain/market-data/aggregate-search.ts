@@ -81,6 +81,7 @@ export async function aggregateSymbolSearch(
 ): Promise<MarketSearchResult[]> {
   const q = query.trim()
   if (!q) return []
+  const boundedLimit = Math.max(1, Math.min(100, Number.isFinite(limit) ? Math.floor(limit) : 20))
 
   const equityVendors = typeof deps.equityVendors === 'function'
     ? await deps.equityVendors()
@@ -90,11 +91,11 @@ export async function aggregateSymbolSearch(
   // Local SEC index — US-only, zero-latency, authoritative for US tickers.
   // Attributed to the primary equity vendor (its symbols feed that provider).
   const equityResults = deps.symbolIndex
-    .search(q, limit)
+    .search(q, boundedLimit)
     .map((r) => ({ ...r, assetClass: 'equity' as const, sourceId: primaryEquity }))
 
   const commodityResults = deps.commodityCatalog
-    .search(q, limit)
+    .search(q, boundedLimit)
     .map((r) => ({ ...r, assetClass: 'commodity' as const }))
 
   // Online searches, concurrent: crypto + currency on yfinance; equity fanned
@@ -161,4 +162,5 @@ export async function aggregateSymbolSearch(
     .map((r, i) => ({ r, i, s: matchScore(q, r) }))
     .sort((a, b) => b.s - a.s || a.i - b.i)
     .map((x) => x.r)
+    .slice(0, boundedLimit)
 }

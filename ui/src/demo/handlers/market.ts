@@ -45,28 +45,56 @@ export const marketHandlers = [
   http.get('/api/reference/fed', () => HttpResponse.json(demoFed)),
 
   // ---- federated bars (multi-source K-lines) ----
-  // AAPL has two demo sources so the source picker is exercised.
+  // Cover the provider/asset-class combinations that have historically broken
+  // at the UI → bar-service boundary. AAPL has two sources so the picker is
+  // exercised; the other rows validate vendor-native namespaces.
   http.get('/api/bars/search', ({ request }) => {
     const q = (new URL(request.url).searchParams.get('query') ?? '').toUpperCase()
-    if (!q.includes('AAPL') && !q.includes('APPLE')) return HttpResponse.json({ candidates: [], count: 0 })
-    const candidates: BarSourceCandidate[] = [
-      { barId: 'yfinance|AAPL', source: 'vendor', sourceId: 'yfinance', symbol: 'AAPL', name: 'Apple Inc.', assetClass: 'equity', label: 'AAPL', barCapability: 'delayed' },
-      { barId: 'alpaca-paper|AAPL', source: 'uta', sourceId: 'alpaca-paper', symbol: 'AAPL', name: 'Apple Inc.', assetClass: 'equity', label: 'AAPL', barCapability: 'iex' },
-    ]
+    let candidates: BarSourceCandidate[] = []
+    if (q.includes('AAPL') || q.includes('APPLE')) {
+      candidates = [
+        { barId: 'yfinance|AAPL', source: 'vendor', sourceId: 'yfinance', symbol: 'AAPL', name: 'Apple Inc.', assetClass: 'equity', label: 'AAPL', barCapability: 'delayed' },
+        { barId: 'alpaca-paper|AAPL', source: 'uta', sourceId: 'alpaca-paper', symbol: 'AAPL', name: 'Apple Inc.', assetClass: 'equity', label: 'AAPL', barCapability: 'iex' },
+      ]
+    } else if (q.includes('EUR') || q.includes('EURO')) {
+      candidates = [
+        { barId: 'yfinance|EURUSD', source: 'vendor', sourceId: 'yfinance', symbol: 'EURUSD', name: 'Euro / U.S. Dollar', assetClass: 'currency', label: 'EURUSD', barCapability: 'delayed' },
+      ]
+    } else if (q.includes('GOLD') || q.includes('XAU') || q.includes('黄金')) {
+      candidates = [
+        { barId: 'yfinance|gold', source: 'vendor', sourceId: 'yfinance', symbol: 'gold', name: 'Gold', assetClass: 'commodity', label: 'gold', barCapability: 'delayed' },
+      ]
+    } else if (q.includes('600519') || q.includes('茅台')) {
+      candidates = [
+        { barId: 'eastmoney|1.600519', source: 'vendor', sourceId: 'eastmoney', symbol: '1.600519', name: '贵州茅台', assetClass: 'equity', label: '1.600519', barCapability: 'delayed' },
+      ]
+    }
     return HttpResponse.json({ candidates, count: candidates.length })
   }),
   http.get('/api/bars', ({ request }) => {
     const url = new URL(request.url)
     const barId = url.searchParams.get('barId')
-    const symbol = (url.searchParams.get('symbol') ?? '').toUpperCase()
-    if (!(barId?.includes('AAPL') || symbol === AAPL)) {
+    const assetClass = url.searchParams.get('assetClass')
+    const fallbackSymbol = url.searchParams.get('symbol') ?? ''
+    const knownSources: Record<string, { symbol: string; assetClass: string }> = {
+      'yfinance|AAPL': { symbol: 'AAPL', assetClass: 'equity' },
+      'alpaca-paper|AAPL': { symbol: 'AAPL', assetClass: 'equity' },
+      'yfinance|EURUSD': { symbol: 'EURUSD', assetClass: 'currency' },
+      'yfinance|gold': { symbol: 'gold', assetClass: 'commodity' },
+      'eastmoney|1.600519': { symbol: '1.600519', assetClass: 'equity' },
+    }
+    const selected = barId ? knownSources[barId] : Object.values(knownSources).find((row) => row.symbol === fallbackSymbol)
+    if (!selected) {
       return HttpResponse.json({ results: null, meta: null, error: 'No demo data for this symbol.' })
+    }
+    if (barId && !barId.startsWith('alpaca-paper|') && assetClass !== selected.assetClass) {
+      return HttpResponse.json({ results: null, meta: null, error: `Vendor barId needs assetClass=${selected.assetClass}.` })
     }
     const results = demoMarketAAPL.historical.results
     const sourceId = barId ? barId.split('|')[0] : 'yfinance'
     const meta: BarMeta = {
-      symbol: 'AAPL', from: results[0]?.date ?? '', to: results[results.length - 1]?.date ?? '', bars: results.length,
-      source: sourceId === 'alpaca-paper' ? 'uta' : 'vendor', sourceId, barId: barId ?? `${sourceId}|AAPL`,
+      symbol: selected.symbol, from: results[0]?.date ?? '', to: results[results.length - 1]?.date ?? '', bars: results.length,
+      source: sourceId === 'alpaca-paper' ? 'uta' : 'vendor', sourceId, barId: barId ?? `${sourceId}|${selected.symbol}`,
       provider: sourceId, barCapability: sourceId === 'alpaca-paper' ? 'iex' : 'delayed',
     }
     return HttpResponse.json({ results, meta })

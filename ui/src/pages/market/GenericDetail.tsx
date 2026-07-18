@@ -5,6 +5,7 @@ import type { AssetClass } from '../../api/market'
 interface Props {
   symbol: string
   assetClass: AssetClass
+  source?: string
 }
 
 /**
@@ -12,7 +13,7 @@ interface Props {
  * Shows just the K-line — quote/fundamentals panels are equity-shaped and
  * would be misleading if forced onto crypto/currency/commodity.
  */
-export function GenericDetail({ symbol, assetClass }: Props) {
+export function GenericDetail({ symbol, assetClass, source }: Props) {
   return (
     <div className="flex flex-col gap-3 min-h-0 flex-1">
       <div className="flex items-end gap-2 px-1">
@@ -25,7 +26,7 @@ export function GenericDetail({ symbol, assetClass }: Props) {
         </span>
       </div>
       <div className="flex-1 min-h-[420px]">
-        <KlinePanel selection={{ symbol, assetClass }} />
+        <KlinePanel selection={{ symbol, assetClass }} source={source} />
       </div>
 
       <TradeableContractsPanel symbol={symbol} assetClass={assetClass} />

@@ -10,7 +10,7 @@ interface MarketDetailPageProps {
 }
 
 export function MarketDetailPage({ spec }: MarketDetailPageProps) {
-  const { assetClass, symbol } = spec.params
+  const { assetClass, symbol, source } = spec.params
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
@@ -22,9 +22,9 @@ export function MarketDetailPage({ spec }: MarketDetailPageProps) {
       <div className="flex-1 flex flex-col gap-3 px-4 md:px-8 py-4 min-h-0 overflow-y-auto">
         <SearchBox />
         {assetClass === 'equity' ? (
-          <EquityDetail symbol={symbol} />
+          <EquityDetail symbol={symbol} source={source} />
         ) : (
-          <GenericDetail symbol={symbol} assetClass={assetClass} />
+          <GenericDetail symbol={symbol} assetClass={assetClass} source={source} />
         )}
       </div>
     </div>

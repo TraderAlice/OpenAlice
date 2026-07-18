@@ -59,15 +59,21 @@ function toUTCTimestamp(s: string): UTCTimestamp {
 
 interface Props {
   selection: { symbol: string; assetClass: AssetClass } | null
+  /** Explicit provider identity from the focused market tab. This cannot rely
+   * only on React Router state: tab switches project their URL with
+   * history.replaceState, which intentionally does not notify the router. */
+  source?: string
 }
 
-export function KlinePanel({ selection }: Props) {
+export function KlinePanel({ selection, source }: Props) {
   const effectiveTheme = useEffectiveTheme()
   const [searchParams, setSearchParams] = useSearchParams()
   const interval = parseInterval(searchParams.get('interval'))
   const tf = parseTimeframe(searchParams.get('range'))
-  // The provider picked at search time (a barId), if any — opens the chart on it.
-  const sourceParam = searchParams.get('source')
+  // The provider picked at search time (a barId), if any — opens the chart on
+  // it. Unlike interval/range, source comes from the focused tab spec. Router
+  // search state can be stale after history.replaceState-based tab switches.
+  const requestedBarId = source ?? null
 
   // Local setter named `selectInterval` rather than `setInterval` so it
   // doesn't shadow the global timer function we use for polling below.
@@ -92,8 +98,8 @@ export function KlinePanel({ selection }: Props) {
   const [meta, setMeta] = useState<BarMeta | null>(null)
   const [candidates, setCandidates] = useState<BarSourceCandidate[]>([])
   // null = vendor default for this symbol; a barId = an explicitly-picked source.
-  // Seed from the URL so the very first fetch is the right source (no vendor flicker).
-  const [selectedBarId, setSelectedBarId] = useState<string | null>(sourceParam)
+  // Seed from the focused tab so the first fetch is right (no vendor flicker).
+  const [selectedBarId, setSelectedBarId] = useState<string | null>(requestedBarId)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -155,36 +161,47 @@ export function KlinePanel({ selection }: Props) {
   }, [interval, effectiveTheme])
 
   // Discover the available bar sources for this symbol (populates the picker).
-  // Seed the picked source from the URL (?source=barId, set at search time);
-  // otherwise null → vendor default.
+  // Seed the picked source from the focused tab; otherwise null → vendor default.
   useEffect(() => {
-    setSelectedBarId(sourceParam)
+    setSelectedBarId(requestedBarId)
     setCandidates([])
-    if (!selection || selection.assetClass === 'commodity') return
+    if (!selection) return
     let cancelled = false
     barsApi.searchSources(selection.symbol, 12)
-      .then((r) => { if (!cancelled) setCandidates(r.candidates) })
+      .then((r) => {
+        if (cancelled) return
+        const selectedSymbol = selection.symbol.trim().toLowerCase()
+        // Federated search is intentionally fuzzy across asset classes. The
+        // chart picker is not: it may switch providers for the current asset,
+        // but must never offer similarly named instruments (e.g. GOLD stock
+        // and gold-miner equities on the commodity/gold chart).
+        setCandidates(r.candidates.filter((candidate) =>
+          candidate.symbol.trim().toLowerCase() === selectedSymbol &&
+          (candidate.assetClass === selection.assetClass || candidate.assetClass === 'unknown'),
+        ))
+      })
       .catch(() => { if (!cancelled) setCandidates([]) })
     return () => { cancelled = true }
-  }, [selection, sourceParam])
+  }, [selection, requestedBarId])
 
   // Fetch bars: an explicitly-picked source (barId) or the vendor default
   // (symbol+assetClass). Re-polls so a long-open tab doesn't show stale bars.
   useEffect(() => {
     if (!selection) { setBars(null); setMeta(null); setError(null); return }
-    if (selection.assetClass === 'commodity') {
-      setBars(null)
-      setMeta(null)
-      setError('Commodity K-line support is coming in the next step.')
-      return
-    }
     let cancelled = false
     const run = (isInitial: boolean) => {
       if (isInitial) setLoading(true)
       setError(null)
       const days = daysForTimeframe(tf)
       const params: Parameters<typeof barsApi.bars>[0] = { interval }
-      if (selectedBarId) params.barId = selectedBarId
+      // Vendor barIds share the same `{source}|{nativeSymbol}` shape as UTA
+      // aliceIds, so the server needs the selected asset class to distinguish
+      // which vendor client owns the native symbol. UTA sources safely ignore
+      // this extra routing hint.
+      if (selectedBarId) {
+        params.barId = selectedBarId
+        params.assetClass = selection.assetClass
+      }
       else { params.symbol = selection.symbol; params.assetClass = selection.assetClass }
       if (days != null) params.start = startDateFromToday(days)
 

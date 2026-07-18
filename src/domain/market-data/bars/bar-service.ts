@@ -5,11 +5,9 @@
  * OHLCV, tagging the result with source metadata. `searchBarSources(query)`
  * surfaces candidate sources for an asset.
  *
- * Phase 0 scope: the vendor branch is fully wired; the UTA branch calls
- * `UTAAccountSDK.getHistorical` (404s until the Phase-1 server route + a
- * per-broker `getHistorical` land). `searchBarSources` is vendor-only here —
- * the UTA search side (and the `ContractSearchResult` wire-shape fix) lands in
- * Phase 1 alongside CCXT. No Phase-0 consumer calls `searchBarSources`.
+ * Vendor and UTA sources share one explicit identity namespace. Broker search
+ * hits are only exposed as K-line sources when their capability declaration
+ * says historical bars are supported.
  */
 
 import type { BarParams, BarInterval, Bar } from '@traderalice/uta-protocol'
@@ -56,6 +54,17 @@ function secTypeToAssetClass(secType: string | undefined): AssetClass | 'unknown
     case 'FUT': case 'FOP': case 'CMDTY': return 'commodity'
     default: return 'unknown'
   }
+}
+
+function candidateRelevance(query: string, candidate: BarSourceCandidate): number {
+  const q = query.trim().toLowerCase()
+  const symbol = candidate.symbol.toLowerCase()
+  const name = candidate.name?.toLowerCase() ?? ''
+  if (symbol === q || name === q) return 4
+  if (symbol.startsWith(q)) return 3
+  if (name.startsWith(q)) return 2
+  if (symbol.includes(q) || name.includes(q)) return 1
+  return 0
 }
 
 // ---- window heuristics (legacy behavior-preserving; lifted from tool/analysis.ts) ----
@@ -233,7 +242,11 @@ export function createBarService(deps: BarServiceDeps): BarService {
     // not a blanket 'realtime'. Falls back to 'realtime' when the gateway can't
     // surface it (mocks / brokers that declare no quality).
     const caps: Record<string, BarCapability> = (await deps.utaManager.getBarCapabilities?.()) ?? {}
-    const cap: BarCapability = caps[sourceId] ?? 'realtime'
+    const cap = caps[sourceId]
+    if (deps.utaManager.getBarCapabilities && !cap) {
+      throw new Error(`UTA source "${sourceId}" does not advertise historical-bar support.`)
+    }
+    const effectiveCap: BarCapability = cap ?? 'realtime'
     // Mirror the vendor branch: a count-only request becomes a START WINDOW we
     // over-fetch and then tail-slice (finalize keeps the most-recent `count`).
     // We deliberately do NOT forward `count` as the broker's `limit`. Alpaca's
@@ -258,7 +271,7 @@ export function createBarService(deps: BarServiceDeps): BarService {
         source: 'uta',
         sourceId,
         barId,
-        barCapability: cap,
+        barCapability: effectiveCap,
         ...computeFreshness(bars[bars.length - 1]?.date ?? '', opts, () => new Date()),
       }),
     }
@@ -266,7 +279,9 @@ export function createBarService(deps: BarServiceDeps): BarService {
 
   return {
     async searchBarSources(query, opts) {
-      const limit = opts?.limit ?? 20
+      const requestedLimit = opts?.limit ?? 20
+      const limit = Math.max(1, Math.min(100, Number.isFinite(requestedLimit) ? Math.floor(requestedLimit) : 20))
+      const capabilityAware = typeof deps.utaManager.getBarCapabilities === 'function'
       // Federate embedded vendor + broker (UTA) search. allSettled so one
       // side failing (e.g. no UTA configured) doesn't kill the other. Flat
       // candidates, no cross-source dedup — redundancy is the feature.
@@ -277,6 +292,12 @@ export function createBarService(deps: BarServiceDeps): BarService {
       ])
       const caps: Record<string, BarCapability> = capsRes.status === 'fulfilled' ? capsRes.value : {}
       const out: BarSourceCandidate[] = []
+      const seenBarIds = new Set<string>()
+      const append = (candidate: BarSourceCandidate) => {
+        if (!candidate.symbol.trim() || !candidate.barId.trim() || seenBarIds.has(candidate.barId)) return
+        seenBarIds.add(candidate.barId)
+        out.push(candidate)
+      }
 
       if (vendorRes.status === 'fulfilled') {
         for (const r of vendorRes.value) {
@@ -286,7 +307,7 @@ export function createBarService(deps: BarServiceDeps): BarService {
           const provider = r.sourceId ?? deps.vendorProviders[r.assetClass]
           const cap = VENDOR_CAPABILITY[provider]
           const base = r.name ? `${symbol} · ${r.name} (${provider})` : `${symbol} (${provider})`
-          out.push({
+          append({
             barId: formatBarId(provider, symbol),
             source: 'vendor',
             sourceId: provider,
@@ -306,9 +327,17 @@ export function createBarService(deps: BarServiceDeps): BarService {
         for (const hit of utaRes.value) {
           const barId = hit.contract.aliceId
           if (!barId) continue // need the operational identity to fetch later
-          const symbol = hit.contract.symbol || hit.contract.localSymbol || ''
-          const cap: BarCapability = caps[hit.source] ?? 'realtime'
-          out.push({
+          const parsed = parseBarId(barId)
+          const symbol = (hit.contract.symbol || hit.contract.localSymbol || '').trim()
+          const cap = caps[hit.source]
+          // Production gateways expose the capability map. Missing capability
+          // means this account can search/trade contracts but cannot supply
+          // historical bars (IBKR is a common example), so it is not a bar
+          // source. Gateways without capability discovery retain the legacy
+          // realtime fallback for tests/custom integrations.
+          if ((capabilityAware && (!cap || capsRes.status !== 'fulfilled')) || !parsed || parsed.nativeSymbol === '-1') continue
+          const effectiveCap: BarCapability = cap ?? 'realtime'
+          append({
             barId,
             source: 'uta',
             sourceId: hit.source,
@@ -318,26 +347,25 @@ export function createBarService(deps: BarServiceDeps): BarService {
             assetClass: hit.assetClass ?? secTypeToAssetClass(hit.contract.secType),
             // Honest entitlement in the label too (Alpaca free = 'iex'), not a
             // blanket 'realtime'.
-            label: (symbol ? `${symbol} (${hit.source})` : barId) + ` · ${cap}`,
-            barCapability: cap,
+            label: `${symbol} (${hit.source}) · ${effectiveCap}`,
+            barCapability: effectiveCap,
           })
         }
       }
 
-      // Order by freshness so the agent's default pick is the freshest source:
-      // broker bars (realtime) float above delayed vendors (yfinance/fmp). The
-      // list stays fully redundant — this is only the suggested ordering; every
-      // candidate is still returned. (Array.sort is stable → within-source order
-      // is preserved.)
+      // User intent first, freshness second: an exact delayed EURUSD result must
+      // not disappear below dozens of vaguely-related realtime contracts. Auto
+      // source resolution applies its own derivative/freshness policy later.
       const FRESHNESS_RANK: Record<BarCapability, number> = {
         realtime: 0, iex: 1, subscription: 2, delayed: 3, free: 4,
       }
       out.sort(
         (a, b) =>
+          candidateRelevance(query, b) - candidateRelevance(query, a) ||
           (a.barCapability ? FRESHNESS_RANK[a.barCapability] : 5) -
           (b.barCapability ? FRESHNESS_RANK[b.barCapability] : 5),
       )
-      return out
+      return out.slice(0, limit)
     },
 
     async getBars(ref, opts) {
