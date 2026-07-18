@@ -4,6 +4,8 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '../i18n'
+import { demoThemeFamily } from '../demo/fixtures/themes'
+import { useThemeStore } from '../theme/store'
 import { readWorkspaceFile } from '../components/workspace/api'
 import { InboxAttachment } from './InboxPage'
 
@@ -14,6 +16,18 @@ vi.mock('../components/workspace/api', async (importOriginal) => {
 
 beforeEach(async () => {
   await i18n.changeLanguage('en')
+  useThemeStore.setState({
+    families: [demoThemeFamily('tinted-base16', 'Report test', ['light', 'dark'])],
+    appearance: {
+      activeFamilyId: 'demo-tinted-base16-report-test',
+      mode: 'light',
+      terminal: { mode: 'follow' },
+      marketColors: 'protected',
+      marketDirection: 'green-up-red-down',
+      statusColors: 'protected',
+    },
+    status: 'ready',
+  })
   vi.mocked(readWorkspaceFile).mockResolvedValue({
     kind: 'ok',
     content: '<!doctype html><html><body><h1>Close report</h1></body></html>',
@@ -22,6 +36,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   cleanup()
+  useThemeStore.setState({ families: [], appearance: null, status: 'idle' })
   vi.clearAllMocks()
 })
 

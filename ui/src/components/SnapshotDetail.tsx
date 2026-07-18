@@ -121,7 +121,7 @@ export function SnapshotDetail({ snapshot, onClose }: SnapshotDetailProps) {
 
 function HealthDot({ health }: { health: string }) {
   const color = health === 'healthy' ? 'bg-green'
-    : health === 'degraded' ? 'bg-yellow-400'
+    : health === 'degraded' ? 'bg-[var(--color-snapshot-detail-warning-bg)]'
     : health === 'disabled' ? 'bg-text-muted/40'
     : 'bg-red'
   return <div className={`w-1.5 h-1.5 rounded-full ${color}`} />

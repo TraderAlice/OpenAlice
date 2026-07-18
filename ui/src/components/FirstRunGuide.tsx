@@ -715,7 +715,7 @@ export function FirstRunGuide() {
                   disabled={primaryDisabled}
                   data-testid="first-run-guide-primary"
                   data-onboarding-action={primaryAction}
-                  className="flex min-w-0 items-center justify-center gap-2 rounded-md bg-accent px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-accent/90 disabled:cursor-default disabled:opacity-60 disabled:hover:bg-accent"
+                  className="flex min-w-0 items-center justify-center gap-2 rounded-md bg-accent px-4 py-2 text-[13px] font-semibold text-[var(--color-first-run-guide-on-strong-text)] transition-colors hover:bg-accent/90 disabled:cursor-default disabled:opacity-60 disabled:hover:bg-accent"
                 >
                   <span className="min-w-0 truncate">{activeStep.primary}</span>
                   <ArrowRight className="h-4 w-4 shrink-0" />
@@ -995,7 +995,7 @@ function TradingModeChoices({
       {envLocked && (
         <div className="mt-3 text-[11px] leading-relaxed text-text-muted/70">
           <span className="inline-flex items-center gap-1.5">
-            <AlertTriangle className="h-3.5 w-3.5 text-yellow-500" />
+            <AlertTriangle className="h-3.5 w-3.5 text-[var(--color-first-run-guide-warning-text)]" />
             {t('firstRunGuide.tradingChoices.envLocked')}
           </span>
         </div>

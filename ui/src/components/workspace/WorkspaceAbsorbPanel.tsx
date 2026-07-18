@@ -163,7 +163,7 @@ export function WorkspaceAbsorbPanel({
                     setResult(null)
                     setError(null)
                   }}
-                  className="mt-1 min-w-0 bg-transparent text-[13px] font-semibold text-text outline-none"
+                  className="mt-1 min-w-0 bg-[var(--color-workspace-absorb-panel-neutral-dark-bg)] text-[13px] font-semibold text-text outline-none"
                   aria-label="Workspace to absorb"
                 >
                   <option value="">Choose a Workspace…</option>
@@ -247,12 +247,12 @@ export function WorkspaceAbsorbPanel({
             )}
 
             {conflicts.length > 0 && (
-              <section className="overflow-hidden rounded-xl border border-amber-500/35 bg-bg-secondary/20">
+              <section className="overflow-hidden rounded-xl border border-[var(--color-workspace-absorb-panel-warning-border-subtle)] bg-bg-secondary/20">
                 <div className="border-b border-border px-4 py-3">
                   <div className="flex items-center gap-2 text-[13px] font-semibold text-text">
-                    <AlertTriangle size={15} className="text-amber-600 dark:text-amber-400" />
+                    <AlertTriangle size={15} className="text-[var(--color-workspace-absorb-panel-warning-text)] dark:text-[var(--color-workspace-absorb-panel-warning-text)]" />
                     Paths that need a decision
-                    <span className="rounded-full bg-amber-500/12 px-2 py-0.5 text-[10px] text-amber-700 dark:text-amber-300">{conflicts.length}</span>
+                    <span className="rounded-full bg-[var(--color-workspace-absorb-panel-warning-bg-subtle-alpha-12)] px-2 py-0.5 text-[10px] text-[var(--color-workspace-absorb-panel-warning-text)] dark:text-[var(--color-workspace-absorb-panel-warning-text)]">{conflicts.length}</span>
                   </div>
                   <p className="mt-1 text-[11px] leading-relaxed text-text-muted">
                     Keep both is selected by default and places the source copy below <code className="font-mono">{plan.importRoot}</code>.
@@ -293,7 +293,7 @@ export function WorkspaceAbsorbPanel({
             type="button"
             onClick={() => void apply()}
             disabled={!canApply}
-            className="oa-pressable inline-flex min-h-9 items-center gap-2 whitespace-nowrap rounded-lg bg-accent px-4 text-[12px] font-semibold text-white hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40"
+            className="oa-pressable inline-flex min-h-9 items-center gap-2 whitespace-nowrap rounded-lg bg-accent px-4 text-[12px] font-semibold text-[var(--color-workspace-absorb-panel-on-strong-text)] hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {applying ? <LoaderCircle size={14} className="animate-spin" /> : <Archive size={14} />}
             {applying ? 'Absorbing…' : plan ? 'Absorb and archive source' : 'Choose a Workspace'}
@@ -323,7 +323,7 @@ function Metric({ value, label, tone }: {
   label: string
   tone: 'accent' | 'neutral' | 'warning'
 }): ReactElement {
-  const color = tone === 'accent' ? 'text-accent' : tone === 'warning' ? 'text-amber-700 dark:text-amber-300' : 'text-text'
+  const color = tone === 'accent' ? 'text-accent' : tone === 'warning' ? 'text-[var(--color-workspace-absorb-panel-warning-text)] dark:text-[var(--color-workspace-absorb-panel-warning-text)]' : 'text-text'
   return (
     <div className="border-r border-border px-2 py-2.5 text-center last:border-r-0">
       <div className={`text-[16px] font-semibold tabular-nums ${color}`}>{value}</div>
@@ -363,8 +363,8 @@ function ActivityBlockers({ plan }: { plan: WorkspaceAbsorbPlan }): ReactElement
     ...plan.activity.target.headless.map((item) => `${plan.target.tag}: ${item.taskId ?? 'synchronous run'} (${item.agent})`),
   ]
   return (
-    <div className="rounded-lg border border-amber-500/35 bg-amber-500/8 px-3 py-3 text-[12px] text-text">
-      <div className="flex items-center gap-2 font-semibold text-amber-700 dark:text-amber-300">
+    <div className="rounded-lg border border-[var(--color-workspace-absorb-panel-warning-border-subtle)] bg-[var(--color-workspace-absorb-panel-warning-bg-subtle-alpha-8)] px-3 py-3 text-[12px] text-text">
+      <div className="flex items-center gap-2 font-semibold text-[var(--color-workspace-absorb-panel-warning-text)] dark:text-[var(--color-workspace-absorb-panel-warning-text)]">
         <AlertTriangle size={15} />
         Finish the real work listed below before absorbing
       </div>
@@ -451,7 +451,7 @@ function Choice({ active, disabled = false, onClick, children }: {
   children: React.ReactNode
 }): ReactElement {
   return (
-    <button type="button" role="radio" aria-checked={active} disabled={disabled} onClick={onClick} className={`oa-pressable rounded-md px-2.5 py-1.5 text-[10px] font-medium disabled:cursor-not-allowed disabled:opacity-35 ${active ? 'bg-accent text-white shadow-sm' : 'text-text-muted hover:text-text'}`}>
+    <button type="button" role="radio" aria-checked={active} disabled={disabled} onClick={onClick} className={`oa-pressable rounded-md px-2.5 py-1.5 text-[10px] font-medium disabled:cursor-not-allowed disabled:opacity-35 ${active ? 'bg-accent text-[var(--color-workspace-absorb-panel-on-strong-text)] shadow-sm' : 'text-text-muted hover:text-text'}`}>
       {children}
     </button>
   )

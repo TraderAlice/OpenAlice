@@ -1,39 +1,27 @@
 @import "tailwindcss";
 
-/* ============================================================
-   Theme tokens — two palettes, one identity. Alice-blue (her dress)
-   is the brand accent in BOTH modes. @theme below is Daybreak (light)
-   and the DEFAULT; the [data-theme="dark"] block + the prefers-color-
-   scheme block flip the same token names, so every `bg-bg`/`text-accent`/
-   `border-border` utility follows the active theme with zero component
-   changes. Living color card: ui/design/theme-study.html. The toggle lives in the
-   ActivityBar footer (light / dark / auto), persisted by the theme store
-   (ui/src/theme) and mirrored pre-paint by the inline script in index.html.
-   ============================================================ */
+/* Tailwind registers these public semantic aliases. Their runtime values come
+   exclusively from ui/src/theme/projection.ts (or its versioned first-paint
+   projection cache before the module graph starts). */
 @theme {
-  /* Daybreak — light (default). Warm paper · engraved navy · alice-blue. */
-  --color-bg: #fbfaf6;
-  --color-bg-secondary: #f1ede4;
-  --color-bg-tertiary: #e4dccb;
-  --color-border: #d8d2c4;
-  --color-text: #1c2a41;
-  --color-text-muted: #5e6573;
-  --color-accent: #2f62b0;
-  --color-accent-dim: rgba(47, 98, 176, 0.14);
-  --color-user-bubble: #2f62b0;
-  --color-assistant-bubble: #fffdf8;
-  --color-notification-bg: #fbf1d6;
-  --color-notification-border: #c99a2e;
-  --color-green: #2e8b6f;
-  --color-red: #be4138;
-  --color-purple: #6b5bc2;
-  --color-purple-dim: rgba(107, 91, 194, 0.14);
-
-  /* Elevation overlays — theme-aware "subtle wash on hover / active".
-     Light darkens with navy ink; dark lightens with white. Components use
-     `bg-overlay` / `bg-overlay-strong`; raw CSS uses `var(--color-overlay)`. */
-  --color-overlay: rgba(28, 42, 65, 0.045);
-  --color-overlay-strong: rgba(28, 42, 65, 0.075);
+  --color-bg: var(--oa-token-page-background);
+  --color-bg-secondary: var(--oa-token-secondary-surface);
+  --color-bg-tertiary: var(--oa-token-card-surface);
+  --color-border: var(--oa-token-border);
+  --color-text: var(--oa-token-body-text);
+  --color-text-muted: var(--oa-token-muted-text);
+  --color-accent: var(--oa-token-accent);
+  --color-accent-dim: var(--oa-runtime-accent-dim);
+  --color-user-bubble: var(--oa-token-accent);
+  --color-assistant-bubble: var(--oa-token-card-surface);
+  --color-notification-bg: var(--oa-token-subtle-surface);
+  --color-notification-border: var(--oa-token-warning);
+  --color-green: var(--oa-token-success);
+  --color-red: var(--oa-token-danger);
+  --color-purple: var(--oa-token-secondary-accent);
+  --color-purple-dim: var(--oa-runtime-purple-dim);
+  --color-overlay: var(--oa-runtime-overlay);
+  --color-overlay-strong: var(--oa-runtime-overlay-strong);
 
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Microsoft YaHei", "Hiragino Sans GB", "Noto Sans CJK SC", sans-serif;
@@ -41,70 +29,12 @@
     monospace;
 }
 
-/* Base resolution (no attribute / explicit light). */
 :root {
-  color-scheme: light;
-  --app-bg-wash: radial-gradient(circle at 50% 24%, rgba(47, 98, 176, 0.045), transparent 38rem);
   --motion-fast: 120ms;
   --motion-standard: 180ms;
   --motion-slow: 260ms;
   --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
-}
-
-/* ---- Midnight — dark (neutral charcoal-black) ----
-   Reverted to the #353 neutral-black palette: a navy-tinted dark read as
-   "too blue" once the full shell (rail + sidebar + tabs) was on screen — a
-   large neutral surface is calmer. Alice-blue survives ONLY as small brand
-   highlights (accent + the user's own bubble), so the large-area blue tint
-   is gone while the brand stays consistent with Daybreak.
-   Forced via data-theme="dark", AND the resolution for data-theme="auto"
-   when the OS is in dark mode (media block below). KEEP THE TWO IN SYNC. */
-:root[data-theme="dark"] {
-  --color-bg: #0b0c0e;
-  --color-bg-secondary: #0e0f12;
-  --color-bg-tertiary: #1a1b21;
-  --color-border: #24262c;
-  --color-text: #dfe1e6;
-  --color-text-muted: #8f929b;
-  --color-accent: #3b82f6;
-  --color-accent-dim: rgba(59, 130, 246, 0.16);
-  --color-user-bubble: #2f62b0;
-  --color-assistant-bubble: #141519;
-  --color-notification-bg: #1d1610;
-  --color-notification-border: #8a5b2f;
-  --color-green: #23b99a;
-  --color-red: #e5484d;
-  --color-purple: #8f72ff;
-  --color-purple-dim: rgba(143, 114, 255, 0.16);
-  --color-overlay: rgba(255, 255, 255, 0.04);
-  --color-overlay-strong: rgba(255, 255, 255, 0.07);
-  color-scheme: dark;
-  --app-bg-wash: radial-gradient(circle at 50% 28%, rgba(255, 255, 255, 0.02), transparent 34rem);
-}
-@media (prefers-color-scheme: dark) {
-  :root[data-theme="auto"] {
-    --color-bg: #0b0c0e;
-    --color-bg-secondary: #0e0f12;
-    --color-bg-tertiary: #1a1b21;
-    --color-border: #24262c;
-    --color-text: #dfe1e6;
-    --color-text-muted: #8f929b;
-    --color-accent: #3b82f6;
-    --color-accent-dim: rgba(59, 130, 246, 0.16);
-    --color-user-bubble: #2f62b0;
-    --color-assistant-bubble: #141519;
-    --color-notification-bg: #1d1610;
-    --color-notification-border: #8a5b2f;
-    --color-green: #23b99a;
-    --color-red: #e5484d;
-    --color-purple: #8f72ff;
-    --color-purple-dim: rgba(143, 114, 255, 0.16);
-    --color-overlay: rgba(255, 255, 255, 0.04);
-    --color-overlay-strong: rgba(255, 255, 255, 0.07);
-    color-scheme: dark;
-    --app-bg-wash: radial-gradient(circle at 50% 28%, rgba(255, 255, 255, 0.02), transparent 34rem);
-  }
 }
 
 /* Japanese gets a JP-first sans stack so shared Han characters render in
@@ -734,7 +664,7 @@ html[lang="ja"] .oa-onboarding-title {
 }
 
 .markdown-content a.session-signature {
-  color: var(--color-accent, #3b82f6);
+  color: var(--color-accent, var(--color-index-info-color));
   cursor: pointer;
   font-weight: 600;
   text-decoration: none;

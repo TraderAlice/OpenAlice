@@ -478,7 +478,7 @@ function PrimaryAction({
     <button
       type="button"
       onClick={() => onAction(step.target)}
-      className="flex w-full items-center justify-between gap-3 rounded-lg bg-accent px-3 py-2.5 text-left text-white transition-colors hover:bg-accent/90"
+      className="flex w-full items-center justify-between gap-3 rounded-lg bg-accent px-3 py-2.5 text-left text-[var(--color-onboarding-design-page-on-strong-text)] transition-colors hover:bg-accent/90"
     >
       <span className="min-w-0 truncate text-[13px] font-semibold">{step.action}</span>
       <ArrowRight className="h-4 w-4 shrink-0" />

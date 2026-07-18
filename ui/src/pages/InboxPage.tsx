@@ -507,7 +507,7 @@ export function InboxAttachment({
               disabled={!markdownActionsAvailable}
               title={copied ? t('inbox.docCopiedMarkdown') : t('inbox.docCopyMarkdown')}
               aria-label={copied ? t('inbox.docCopiedMarkdown') : t('inbox.docCopyMarkdown')}
-              className="oa-pressable inline-flex h-7 w-7 items-center justify-center rounded-md text-text-muted/55 hover:bg-bg-tertiary hover:text-accent disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-text-muted/55"
+              className="oa-pressable inline-flex h-7 w-7 items-center justify-center rounded-md text-text-muted/55 hover:bg-bg-tertiary hover:text-accent disabled:cursor-default disabled:opacity-30 disabled:hover:bg-[var(--color-inbox-page-neutral-dark-bg)] disabled:hover:text-text-muted/55"
             >
               {copied ? <Check size={14} strokeWidth={2} /> : <Copy size={14} strokeWidth={1.75} />}
             </button>
@@ -517,7 +517,7 @@ export function InboxAttachment({
               disabled={!markdownActionsAvailable}
               title={t('inbox.docDownloadMarkdown')}
               aria-label={t('inbox.docDownloadMarkdown')}
-              className="oa-pressable inline-flex h-7 w-7 items-center justify-center rounded-md text-text-muted/55 hover:bg-bg-tertiary hover:text-accent disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-text-muted/55"
+              className="oa-pressable inline-flex h-7 w-7 items-center justify-center rounded-md text-text-muted/55 hover:bg-bg-tertiary hover:text-accent disabled:cursor-default disabled:opacity-30 disabled:hover:bg-[var(--color-inbox-page-neutral-dark-bg)] disabled:hover:text-text-muted/55"
             >
               <Download size={14} strokeWidth={1.75} />
             </button>

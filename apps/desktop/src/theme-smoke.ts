@@ -69,7 +69,10 @@ export async function runRendererThemeSmoke(
       checks: {
         importedFamilyRestoredFromFiles: family.id === appearance.activeFamilyId && family.variants?.dark?.provenance?.kind === 'imported',
         activeAppearanceRestoredFromFiles: appearance.mode === 'dark',
-        resolvedCacheIsMinimal: cache?.schemaVersion === 1 && cache?.familyId === appearance.activeFamilyId && cache?.tokens?.pageBackground === '#101010' && !('palette' in cache) && !('provenance' in cache) && !('family' in cache),
+        resolvedCacheIsMinimal: cache?.schemaVersion === 1 && cache?.familyId === appearance.activeFamilyId && cache?.variables?.['--oa-token-page-background'] === '#101010' && !Object.keys(cache.variables ?? {}).some((key) => /^--oa-base/.test(key)) && !('tokens' in cache) && !('palette' in cache) && !('provenance' in cache) && !('family' in cache),
+        firstPaintLifecycleIsExplicit: stage === 'restart'
+          ? root.dataset.themeFirstPaint === 'cache'
+          : root.dataset.themeFirstPaint === 'stale',
         firstFrameFamilyMatchesActive: root.dataset.themeFamily === appearance.activeFamilyId && root.dataset.themeVariant === family.variants.dark.id,
         firstFrameTokenMatchesActive: getComputedStyle(root).getPropertyValue('--color-bg').trim() === '#101010',
       },

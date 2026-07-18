@@ -24,7 +24,7 @@ export function Toggle({ checked, onChange, size = 'md', ariaLabel, disabled = f
     >
       <span
         className={`absolute rounded-full transition-all ${thumb} ${
-          checked ? `${translate} bg-white` : 'bg-text-muted'
+          checked ? `${translate} bg-[var(--color-toggle-on-strong-bg)]` : 'bg-text-muted'
         }`}
       />
     </button>

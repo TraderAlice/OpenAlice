@@ -74,7 +74,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #28c840;
+  background: var(--color-workspaces-warning-background);
 }
 .resume-tui-titlebar-title {
   flex: 1 1 auto;
@@ -173,8 +173,8 @@
   background: radial-gradient(
     ellipse at center,
     rgba(0, 0, 0, 0) 0%,
-    rgba(0, 0, 0, 0.35) 60%,
-    rgba(0, 0, 0, 0.55) 100%
+    var(--color-workspaces-neutral-dark-background-subtle-alpha-35) 60%,
+    var(--color-workspaces-neutral-dark-background-subtle-alpha-55) 100%
   );
 }
 
@@ -902,7 +902,7 @@
 .webpi-subtitle { margin-top: 2px; color: var(--color-text-muted); font-size: 10px; }
 .webpi-phase { display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px; border: 1px solid var(--color-border); border-radius: 999px; color: var(--color-text-muted); font-size: 10px; text-transform: capitalize; }
 .webpi-phase.is-working, .webpi-phase.is-retrying, .webpi-phase.is-compacting { color: var(--color-accent); }
-.webpi-phase.is-failed { color: var(--color-danger, #d65c5c); }
+.webpi-phase.is-failed { color: var(--color-danger, var(--color-workspaces-danger-color)); }
 
 .webpi-messages {
   flex: 1;
@@ -934,7 +934,7 @@
 }
 .webpi-activity:hover { border-color: color-mix(in srgb, var(--color-accent) 24%, var(--color-border)); }
 .webpi-activity[open] { background: color-mix(in srgb, var(--color-bg-secondary) 72%, transparent); box-shadow: 0 8px 24px color-mix(in srgb, #000 5%, transparent); }
-.webpi-activity.is-error { border-color: color-mix(in srgb, #d65c5c 48%, var(--color-border)); }
+.webpi-activity.is-error { border-color: color-mix(in srgb, var(--color-workspaces-danger-border-color) 48%, var(--color-border)); }
 .webpi-activity > summary,
 .webpi-tool-step > summary,
 .webpi-reasoning > summary {
@@ -956,7 +956,7 @@
 }
 .webpi-activity-status { width: 18px; height: 18px; flex: 0 0 18px; display: grid; place-items: center; border-radius: 6px; color: color-mix(in srgb, var(--color-text-muted) 82%, transparent); background: color-mix(in srgb, var(--color-border) 42%, transparent); }
 .webpi-activity.is-running .webpi-activity-status { color: var(--color-accent); background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
-.webpi-activity.is-error .webpi-activity-status { color: #d65c5c; background: color-mix(in srgb, #d65c5c 10%, transparent); }
+.webpi-activity.is-error .webpi-activity-status { color: var(--color-workspaces-danger-color); background: color-mix(in srgb, var(--color-workspaces-danger-background) 10%, transparent); }
 .webpi-activity-title { flex: 0 0 auto; color: color-mix(in srgb, var(--color-text) 88%, var(--color-text-muted)); font-weight: 650; }
 .webpi-activity-meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 10px/1.4 var(--font-mono, monospace); }
 .webpi-disclosure { flex: 0 0 auto; margin-left: auto; transition: transform 150ms ease; }
@@ -972,7 +972,7 @@
 .webpi-tool-step > summary:hover { color: var(--color-text); }
 .webpi-step-status { width: 18px; height: 18px; display: grid; place-items: center; color: color-mix(in srgb, var(--color-text-muted) 70%, transparent); }
 .webpi-tool-step.is-running .webpi-step-status { color: var(--color-accent); }
-.webpi-tool-step.is-failed .webpi-step-status { color: #d65c5c; }
+.webpi-tool-step.is-failed .webpi-step-status { color: var(--color-workspaces-danger-color); }
 .webpi-tool-step > summary code { overflow: hidden; color: color-mix(in srgb, var(--color-text) 90%, var(--color-text-muted)); font: 600 10px/1.4 var(--font-mono, monospace); text-overflow: ellipsis; }
 .webpi-step-summary { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
 .webpi-step-size { white-space: nowrap; color: color-mix(in srgb, var(--color-text-muted) 72%, transparent); font: 9px/1.4 var(--font-mono, monospace); }
@@ -989,7 +989,7 @@
 .webpi-reasoning-notes { display: grid; gap: 8px; margin: 0 0 7px; padding: 8px 10px; border-left: 2px solid color-mix(in srgb, var(--color-accent) 24%, var(--color-border)); color: color-mix(in srgb, var(--color-text) 82%, var(--color-text-muted)); font-size: 10px; }
 .webpi-reasoning pre { max-height: 220px; margin: 0 0 7px; overflow: auto; white-space: pre-wrap; font: 10px/1.5 var(--font-mono, monospace); }
 
-.webpi-error { display: grid; gap: 7px; margin: 20px 0; padding: 13px; border: 1px solid color-mix(in srgb, #d65c5c 50%, var(--color-border)); border-radius: 10px; color: #d65c5c; font-size: 12px; }
+.webpi-error { display: grid; gap: 7px; margin: 20px 0; padding: 13px; border: 1px solid color-mix(in srgb, var(--color-workspaces-danger-border) 50%, var(--color-border)); border-radius: 10px; color: var(--color-workspaces-danger-color); font-size: 12px; }
 .webpi-error button { width: fit-content; color: var(--color-text); text-decoration: underline; }
 .webpi-compaction-status { display: flex; align-items: flex-start; gap: 9px; margin: 0 max(18px, calc((100% - 760px) / 2)) 10px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--color-accent) 34%, var(--color-border)); border-radius: 10px; color: var(--color-accent); background: color-mix(in srgb, var(--color-accent) 7%, var(--color-bg-secondary)); }
 .webpi-compaction-status > svg { flex: 0 0 auto; margin-top: 2px; }
@@ -1000,7 +1000,7 @@
 .webpi-composer { display: flex; align-items: flex-end; gap: 8px; padding: 9px 10px 9px 13px; border: 1px solid var(--color-border); border-radius: 14px; background: var(--color-bg-secondary); box-shadow: 0 6px 24px color-mix(in srgb, #000 9%, transparent); }
 .webpi-composer:focus-within { border-color: color-mix(in srgb, var(--color-accent) 60%, var(--color-border)); }
 .webpi-composer textarea { flex: 1; min-height: 25px; max-height: 150px; resize: none; border: 0; outline: 0; color: var(--color-text); background: transparent; font: inherit; font-size: 13px; line-height: 1.6; }
-.webpi-send { width: 30px; height: 30px; flex: 0 0 30px; display: grid; place-items: center; border-radius: 9px; color: white; background: var(--color-accent); }
+.webpi-send { width: 30px; height: 30px; flex: 0 0 30px; display: grid; place-items: center; border-radius: 9px; color: var(--color-workspaces-on-strong-color); background: var(--color-accent); }
 .webpi-send:disabled { opacity: .35; }
 .webpi-composer-hint { padding: 5px 3px 0; text-align: right; color: var(--color-text-muted); font-size: 9px; }
 

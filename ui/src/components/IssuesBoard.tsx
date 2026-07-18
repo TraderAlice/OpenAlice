@@ -158,12 +158,12 @@ const AUTOMATION_HEALTH_META: Record<IssueAutomationHealthState, { label: string
 const BOARD_HEALTH_CLASS: Record<IssueAutomationHealthState, string> = {
   inactive: 'text-muted/70',
   not_started: 'text-muted/70',
-  due: 'text-amber-400',
-  running: 'text-blue-400',
-  healthy: 'text-emerald-500/85',
-  interrupted: 'rounded-md bg-amber-500/15 px-2 py-1 text-amber-400',
-  failed: 'rounded-md bg-red-500/15 px-2 py-1 text-red-400',
-  blocked: 'rounded-md bg-red-500/15 px-2 py-1 text-red-400',
+  due: 'text-[var(--color-issues-board-warning-text)]',
+  running: 'text-[var(--color-issues-board-info-text)]',
+  healthy: 'text-[var(--color-issues-board-success-text-subtle)]',
+  interrupted: 'rounded-md bg-[var(--color-issues-board-warning-bg-subtle-alpha-15)] px-2 py-1 text-[var(--color-issues-board-warning-text)]',
+  failed: 'rounded-md bg-[var(--color-issues-board-danger-bg-subtle)] px-2 py-1 text-[var(--color-issues-board-danger-text)]',
+  blocked: 'rounded-md bg-[var(--color-issues-board-danger-bg-subtle)] px-2 py-1 text-[var(--color-issues-board-danger-text)]',
 }
 
 export function AutomationHealthPill({ health }: { health: IssueAutomationHealth }) {
@@ -192,7 +192,7 @@ export function PriorityIndicator({ priority }: { priority: IssuePriority }) {
       <span
         title="Urgent"
         aria-label="Urgent priority"
-        className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[3px] bg-amber-500 text-[10px] font-bold leading-none text-black"
+        className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[3px] bg-[var(--color-issues-board-warning-bg)] text-[10px] font-bold leading-none text-[var(--color-issues-board-neutral-dark-text)]"
       >
         !
       </span>
@@ -398,7 +398,7 @@ function IssueRow({ wsId, wsTag, issue, agentRuntime, dupOthers, onOpen }: Board
                   (dupOthers ?? 1) === 1 ? '' : 's'
                 }. A [[name]] is a global handle; resolve manually.`}
                 aria-label="Duplicate issue name across workspaces"
-                className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-medium text-amber-400"
+                className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--color-issues-board-warning-bg-subtle-alpha-10)] px-1.5 py-0.5 text-[9px] font-medium text-[var(--color-issues-board-warning-text)]"
               >
                 <Copy size={9} aria-hidden /> dup
               </span>
@@ -493,10 +493,10 @@ function InvalidWorkspaces({ workspaces }: { workspaces: IssueWorkspace[] }) {
       {workspaces.map((ws) => (
         <div
           key={ws.wsId}
-          className="rounded-lg border border-red-500/30 bg-red-500/[0.06] px-4 py-2.5 text-xs text-red-400"
+          className="rounded-lg border border-[var(--color-issues-board-danger-border-subtle)] bg-[var(--color-issues-board-danger-bg)] px-4 py-2.5 text-xs text-[var(--color-issues-board-danger-text)]"
         >
-          <span className="font-medium text-red-300">{ws.tag}</span>{' '}
-          <span className="font-mono text-red-400/70">{ws.wsId.slice(0, 8)}</span>
+          <span className="font-medium text-[var(--color-issues-board-danger-text)]">{ws.tag}</span>{' '}
+          <span className="font-mono text-[var(--color-issues-board-danger-text-subtle)]">{ws.wsId.slice(0, 8)}</span>
           <p className="mt-1 leading-relaxed">{ws.error ?? 'issues are unreadable for this workspace'}</p>
         </div>
       ))}
@@ -538,7 +538,7 @@ export function IssuesBoard() {
   // flipping to a loading/error screen on a transient refresh failure.
   if (!data) {
     if (loading) return <CenteredLoading />
-    return <div className="text-sm text-red-400">Failed to load issues: {error}</div>
+    return <div className="text-sm text-[var(--color-issues-board-danger-text)]">Failed to load issues: {error}</div>
   }
 
   // Defensive: tolerate a malformed/empty payload (e.g. the demo catchAll's
@@ -589,7 +589,7 @@ export function IssuesBoard() {
   })).filter((g) => g.rows.length > 0)
 
   const staleBanner = error ? (
-    <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-400">
+    <div className="rounded-lg border border-[var(--color-issues-board-warning-border-subtle)] bg-[var(--color-issues-board-warning-bg-subtle-alpha-10)] px-3 py-1.5 text-xs text-[var(--color-issues-board-warning-text)]">
       Live refresh failing — showing the last known issues.
     </div>
   ) : null

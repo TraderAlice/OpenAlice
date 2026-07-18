@@ -214,7 +214,7 @@ export function CredentialModal({ mode, cred, presets, initialPresetId, initialA
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--color-credential-modal-neutral-dark-bg-subtle)] backdrop-blur-sm" onClick={onClose}>
       <div className="bg-bg border border-border rounded-xl shadow-2xl w-[calc(100vw-24px)] max-w-xl max-h-[88vh] flex flex-col" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div>
@@ -426,7 +426,7 @@ export function CredentialModal({ mode, cred, presets, initialPresetId, initialA
                 </div>
               )}
               {staleResult && (
-                <p className="text-[11px] text-yellow-400/90">Form changed since the last test - re-test before saving.</p>
+                <p className="text-[11px] text-[var(--color-credential-modal-warning-text-subtle)]">Form changed since the last test - re-test before saving.</p>
               )}
             </>
           )}
@@ -441,8 +441,8 @@ export function CredentialModal({ mode, cred, presets, initialPresetId, initialA
                   Connection verified
                 </span>
               ) : staleResult ? (
-                <span className="inline-flex items-center gap-2 text-yellow-400/90">
-                  <span className="h-2 w-2 rounded-full bg-yellow-400/80" />
+                <span className="inline-flex items-center gap-2 text-[var(--color-credential-modal-warning-text-subtle)]">
+                  <span className="h-2 w-2 rounded-full bg-[var(--color-credential-modal-warning-bg-subtle)]" />
                   Form changed - test again
                 </span>
               ) : gate.result && !gate.result.ok ? (

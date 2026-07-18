@@ -1,63 +1,12 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="auto">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <link rel="icon" href="/alice.ico" />
     <title>OpenAlice</title>
     <meta name="color-scheme" content="light dark" />
-    <script>
-      // No-flash theme: use only the versioned resolved-token cache here. The
-      // file-backed /api/themes state remains authoritative and corrects this
-      // cache before React renders.
-      (function () {
-        try {
-          var raw = localStorage.getItem('openalice.theme.first-paint.v1');
-          if (!raw) return;
-          var cache = JSON.parse(raw);
-          var tokens = cache.tokens || {};
-          if (cache.schemaVersion !== 1 || cache.mappingVersion !== 1 ||
-              (cache.mode !== 'light' && cache.mode !== 'dark')) return;
-          var required = ['pageBackground', 'secondarySurface', 'cardSurface', 'border',
-            'mutedText', 'bodyText', 'strongText', 'highestContrastText', 'danger', 'orange',
-            'warning', 'success', 'info', 'accent', 'secondaryAccent', 'special', 'onAccent',
-            'hoverSurface', 'activeSurface', 'selection', 'focusRing', 'subtleSurface',
-            'chartGrid', 'overlay'];
-          for (var i = 0; i < required.length; i++) {
-            if (!/^#[0-9a-f]{6}$/.test(tokens[required[i]] || '')) return;
-          }
-          var map = {
-            '--color-bg': 'pageBackground', '--color-bg-secondary': 'secondarySurface',
-            '--color-bg-tertiary': 'cardSurface', '--color-border': 'border',
-            '--color-text': 'bodyText', '--color-text-muted': 'mutedText',
-            '--color-accent': 'accent', '--color-user-bubble': 'accent',
-            '--color-assistant-bubble': 'cardSurface', '--color-notification-bg': 'subtleSurface',
-            '--color-notification-border': 'warning', '--color-green': 'success',
-            '--color-red': 'danger', '--color-purple': 'secondaryAccent'
-          };
-          for (var cssName in map) {
-            var value = tokens[map[cssName]];
-            document.documentElement.style.setProperty(cssName, value);
-          }
-          document.documentElement.style.setProperty('--color-accent-dim',
-            'color-mix(in srgb, ' + tokens.accent + ' 16%, transparent)');
-          document.documentElement.style.setProperty('--color-purple-dim',
-            'color-mix(in srgb, ' + tokens.secondaryAccent + ' 16%, transparent)');
-          document.documentElement.style.setProperty('--color-overlay',
-            'color-mix(in srgb, ' + tokens.overlay + ' 55%, transparent)');
-          document.documentElement.style.setProperty('--color-overlay-strong',
-            'color-mix(in srgb, ' + tokens.activeSurface + ' 72%, transparent)');
-          document.documentElement.style.setProperty('--app-bg-wash',
-            'radial-gradient(circle at 50% 26%, color-mix(in srgb, ' + tokens.accent + ' 6%, transparent), transparent 38rem)');
-          document.documentElement.dataset.theme = cache.mode;
-          document.documentElement.dataset.themeFamily = cache.familyId;
-          document.documentElement.dataset.themeVariant = cache.variantId;
-          document.documentElement.style.colorScheme = cache.mode;
-        } catch (e) {
-          localStorage.removeItem('openalice.theme.first-paint.v1');
-        }
-      })();
-    </script>
+    <script src="/theme-first-paint.js"></script>
   </head>
   <body class="h-full bg-bg text-text">
     <div id="root"></div>

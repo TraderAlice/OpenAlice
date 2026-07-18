@@ -37,10 +37,10 @@ import { CenteredLoading } from './StateViews'
 // Run-status pill tints — mirrors AutomationRunsSection's STATUS_STYLE so the
 // Issue's independent operational history stays consistent with Automation.
 const RUN_STATUS_STYLE: Record<HeadlessTaskStatus, string> = {
-  running: 'bg-blue-500/15 text-blue-400',
-  done: 'bg-emerald-500/15 text-emerald-400',
-  failed: 'bg-red-500/15 text-red-400',
-  interrupted: 'bg-amber-500/15 text-amber-400',
+  running: 'bg-[var(--color-issue-detail-info-bg-subtle)] text-[var(--color-issue-detail-info-text)]',
+  done: 'bg-[var(--color-issue-detail-success-bg-subtle)] text-[var(--color-issue-detail-success-text)]',
+  failed: 'bg-[var(--color-issue-detail-danger-bg-subtle-alpha-15)] text-[var(--color-issue-detail-danger-text)]',
+  interrupted: 'bg-[var(--color-issue-detail-warning-bg-subtle-alpha-15)] text-[var(--color-issue-detail-warning-text)]',
 }
 
 // Dropdown ordering for the editable Properties rail. Mirrors the board's
@@ -340,7 +340,7 @@ function PropertiesRail({
             </EditRow>
           )}
           {agentNeedsCredential && (
-            <p className="py-2 text-right text-[11px] leading-snug text-amber-400">AI credential missing.</p>
+            <p className="py-2 text-right text-[11px] leading-snug text-[var(--color-issue-detail-warning-text)]">AI credential missing.</p>
           )}
           {issue.automationHealth && (
             <PropRow label="Health">
@@ -354,7 +354,7 @@ function PropertiesRail({
                     type="button"
                     disabled={retrying}
                     onClick={onRetry}
-                    className="oa-pressable mt-1 inline-flex items-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-[11px] font-medium text-amber-400 transition-colors hover:border-amber-500/60 hover:bg-amber-500/15 disabled:cursor-wait disabled:opacity-50"
+                    className="oa-pressable mt-1 inline-flex items-center gap-1.5 rounded-md border border-[var(--color-issue-detail-warning-border-subtle-alpha-30)] bg-[var(--color-issue-detail-warning-bg-subtle-alpha-10)] px-2.5 py-1.5 text-[11px] font-medium text-[var(--color-issue-detail-warning-text)] transition-colors hover:border-[var(--color-issue-detail-warning-border-subtle-alpha-60)] hover:bg-[var(--color-issue-detail-warning-bg-subtle-alpha-15)] disabled:cursor-wait disabled:opacity-50"
                   >
                     <RotateCcw size={12} aria-hidden />
                     {retrying ? 'Retrying…' : 'Retry now'}
@@ -372,7 +372,7 @@ function PropertiesRail({
           </>
         )}
       </PropertySection>
-      {error && <p className="mt-2 text-[11px] leading-snug text-red-400">{error}</p>}
+      {error && <p className="mt-2 text-[11px] leading-snug text-[var(--color-issue-detail-danger-text)]">{error}</p>}
     </aside>
   )
 }
@@ -430,9 +430,9 @@ function CommentComposer({
             void submit()
           }
         }}
-        className="min-h-20 w-full resize-y bg-transparent px-1 py-1 text-[13px] leading-relaxed text-text outline-none placeholder:text-muted/60 disabled:opacity-50"
+        className="min-h-20 w-full resize-y bg-[var(--color-issue-detail-neutral-dark-bg)] px-1 py-1 text-[13px] leading-relaxed text-text outline-none placeholder:text-muted/60 disabled:opacity-50"
       />
-      {error && <p className="mt-1.5 text-xs text-red-400">{error}</p>}
+      {error && <p className="mt-1.5 text-xs text-[var(--color-issue-detail-danger-text)]">{error}</p>}
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-2">
         <p className="min-w-0 flex-1 basis-full break-words text-[11px] leading-snug text-muted sm:basis-auto">
           {ownerResumeId
@@ -518,7 +518,7 @@ function RunRow({ run, onOpen }: { run: IssueRunRecord; onOpen: (run: IssueRunRe
         </p>
       )}
       {run.output && (run.output.toolCalls > 0 || run.output.toolFailures > 0) && (
-        <p className={`mt-1 text-[11px] ${run.output.toolFailures > 0 ? 'text-red-400' : 'text-muted/60'}`}>
+        <p className={`mt-1 text-[11px] ${run.output.toolFailures > 0 ? 'text-[var(--color-issue-detail-danger-text)]' : 'text-muted/60'}`}>
           {run.output.toolCalls} tool {run.output.toolCalls === 1 ? 'call' : 'calls'}
           {run.output.toolFailures > 0 ? ` · ${run.output.toolFailures} failed` : ''}
         </p>
@@ -526,20 +526,20 @@ function RunRow({ run, onOpen }: { run: IssueRunRecord; onOpen: (run: IssueRunRe
       {run.failure && (
         <div className={`mt-2 rounded-md border px-2.5 py-2 ${
           run.failure.kind === 'system_paused' || run.failure.kind === 'launcher_restarted'
-            ? 'border-amber-500/25 bg-amber-500/10'
-            : 'border-red-500/25 bg-red-500/10'
+            ? 'border-[var(--color-issue-detail-warning-border-subtle-alpha-25)] bg-[var(--color-issue-detail-warning-bg-subtle-alpha-10)]'
+            : 'border-[var(--color-issue-detail-danger-border-subtle)] bg-[var(--color-issue-detail-danger-bg-subtle-alpha-10)]'
         }`}>
           <p className={`text-[12px] font-medium ${
             run.failure.kind === 'system_paused' || run.failure.kind === 'launcher_restarted'
-              ? 'text-amber-400'
-              : 'text-red-400'
+              ? 'text-[var(--color-issue-detail-warning-text)]'
+              : 'text-[var(--color-issue-detail-danger-text)]'
           }`}>
             {run.failure.title}
           </p>
           <p className="mt-0.5 text-[11px] leading-snug text-muted">{run.failure.message}</p>
         </div>
       )}
-      {run.error && <p className="mt-1 text-[12px] text-red-400">{run.error}</p>}
+      {run.error && <p className="mt-1 text-[12px] text-[var(--color-issue-detail-danger-text)]">{run.error}</p>}
     </li>
   )
 }
@@ -715,7 +715,7 @@ function IssueActivity({
                       </p>
                     )}
                     {delivery?.state === 'failed' && (
-                      <p className="mt-3 rounded-md border border-amber-500/25 bg-amber-500/10 px-2.5 py-2 text-[11px] leading-snug text-amber-400">
+                      <p className="mt-3 rounded-md border border-[var(--color-issue-detail-warning-border-subtle-alpha-25)] bg-[var(--color-issue-detail-warning-bg-subtle-alpha-10)] px-2.5 py-2 text-[11px] leading-snug text-[var(--color-issue-detail-warning-text)]">
                         The comment is saved, but the owner could not be reached: {delivery.error}
                       </p>
                     )}
@@ -767,7 +767,7 @@ function IssueActivity({
           })}
         </ul>
       )}
-      {continueError && <p className="mt-2 text-xs text-red-400">Could not continue Session: {continueError}</p>}
+      {continueError && <p className="mt-2 text-xs text-[var(--color-issue-detail-danger-text)]">Could not continue Session: {continueError}</p>}
       <CommentComposer
         wsId={wsId}
         id={issueId}
@@ -974,7 +974,7 @@ export function IssueDetail({
         ) : (
           <div className="rounded-lg border border-border bg-bg-secondary px-6 py-12 text-center">
             <ListChecks size={24} className="mx-auto text-muted/50" />
-            <p className="mt-3 text-sm text-red-400">Failed to load issue: {error}</p>
+            <p className="mt-3 text-sm text-[var(--color-issue-detail-danger-text)]">Failed to load issue: {error}</p>
             <p className="mt-1 font-mono text-xs text-muted/70">
               {wsId.slice(0, 8)} / {id}
             </p>

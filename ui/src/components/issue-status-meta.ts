@@ -16,9 +16,9 @@ export interface StatusMeta {
 }
 
 export const STATUS_META: Record<IssueStatus, StatusMeta> = {
-  in_progress: { label: 'In Progress', Icon: CircleDot, className: 'text-amber-400' },
+  in_progress: { label: 'In Progress', Icon: CircleDot, className: 'text-[var(--color-issue-status-meta-warning-text)]' },
   todo: { label: 'Todo', Icon: Circle, className: 'text-muted' },
   backlog: { label: 'Backlog', Icon: CircleDashed, className: 'text-muted/60' },
-  done: { label: 'Done', Icon: CheckCircle2, className: 'text-emerald-400' },
+  done: { label: 'Done', Icon: CheckCircle2, className: 'text-[var(--color-issue-status-meta-success-text)]' },
   canceled: { label: 'Canceled', Icon: XCircle, className: 'text-muted/50' },
 }

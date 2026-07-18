@@ -328,7 +328,7 @@ function SetupStatePanel({
           {(setup.stage === 'ready_to_link' || setup.stage === 'linked_offline') && (
             <button
               type="button"
-              className="oa-pressable inline-flex items-center gap-2 rounded-lg bg-accent px-3 py-2 text-[12px] font-medium text-white hover:bg-accent/90 disabled:opacity-50"
+              className="oa-pressable inline-flex items-center gap-2 rounded-lg bg-accent px-3 py-2 text-[12px] font-medium text-[var(--color-connectors-page-on-strong-text)] hover:bg-accent/90 disabled:opacity-50"
               disabled={saving}
               onClick={onStart}
             >
@@ -390,8 +390,8 @@ function setupPresentation(
         badge: 'Starting',
         description: `OpenAlice is starting the ${label} adapter. The ${command} instructions will appear as soon as it is online.`,
         icon: Power,
-        iconClass: 'text-yellow-500',
-        container: 'border-yellow-400/25 bg-yellow-400/5',
+        iconClass: 'text-[var(--color-connectors-page-warning-text)]',
+        container: 'border-[var(--color-connectors-page-warning-border-subtle-alpha-25)] bg-[var(--color-connectors-page-warning-bg-subtle)]',
       }
     case 'awaiting_link':
       return {
@@ -399,8 +399,8 @@ function setupPresentation(
         badge: 'Waiting for /link',
         description: `The ${label} bot is running, but no owner is linked yet. Complete the three steps below.`,
         icon: Link2,
-        iconClass: 'text-yellow-500',
-        container: 'border-yellow-400/30 bg-yellow-400/5',
+        iconClass: 'text-[var(--color-connectors-page-warning-text)]',
+        container: 'border-[var(--color-connectors-page-warning-border-subtle-alpha-30)] bg-[var(--color-connectors-page-warning-bg-subtle)]',
       }
     case 'linked':
       return {

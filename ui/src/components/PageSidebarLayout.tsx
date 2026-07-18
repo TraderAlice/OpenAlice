@@ -248,7 +248,7 @@ export function PageSidebarLayout({
       <div className="flex min-h-0 flex-1 flex-col">{children}</div>
 
       <div
-        className={`absolute inset-0 z-30 bg-black/40 transition-opacity duration-200 ${
+        className={`absolute inset-0 z-30 bg-[var(--color-page-sidebar-layout-neutral-dark-bg-subtle)] transition-opacity duration-200 ${
           drawerOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
         onClick={() => setDrawerOpen(false)}
@@ -299,7 +299,7 @@ function ResizeHandle({
       aria-valuenow={width}
       tabIndex={0}
       onPointerDown={onPointerDown}
-      className="group relative z-10 w-2.5 shrink-0 cursor-col-resize touch-none select-none bg-transparent"
+      className="group relative z-10 w-2.5 shrink-0 cursor-col-resize touch-none select-none bg-[var(--color-page-sidebar-layout-neutral-dark-bg)]"
     >
       <span
         aria-hidden
