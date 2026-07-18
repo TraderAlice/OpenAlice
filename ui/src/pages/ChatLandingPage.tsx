@@ -241,8 +241,8 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
           dropped: they drift on portrait and read as pixel-placed art, not a
           responsive surface. pointer-events-none so it never intercepts clicks. */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-overlay to-transparent" />
-        <div className="absolute inset-x-0 bottom-0 h-[38%] bg-gradient-to-t from-overlay-strong to-transparent" />
+        <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-overlay to-[var(--color-chat-landing-page-neutral-dark-to)]" />
+        <div className="absolute inset-x-0 bottom-0 h-[38%] bg-gradient-to-t from-overlay-strong to-[var(--color-chat-landing-page-neutral-dark-to)]" />
         <div className="absolute inset-0 opacity-[0.06] [background-image:linear-gradient(to_right,var(--color-text)_1px,transparent_1px),linear-gradient(to_bottom,var(--color-text)_1px,transparent_1px)] [background-size:96px_96px]" />
       </div>
 
@@ -292,7 +292,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
             placeholder={t('chatLanding.placeholder')}
             rows={3}
             autoFocus
-            className="w-full max-h-[40vh] min-h-[92px] resize-none bg-transparent px-2 py-1.5 text-[15px] text-text outline-none placeholder:text-text-muted/70 md:min-h-[72px]"
+            className="w-full max-h-[40vh] min-h-[92px] resize-none bg-[var(--color-chat-landing-page-neutral-dark-bg)] px-2 py-1.5 text-[15px] text-text outline-none placeholder:text-text-muted/70 md:min-h-[72px]"
           />
           <div className="flex flex-col gap-2 px-1 pt-1 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -371,7 +371,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
                 disabled={!canSend}
                 title={t('chatLanding.send')}
                 aria-label={t('chatLanding.send')}
-                className="oa-icon-action w-10 h-10 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center bg-accent text-white transition-colors hover:bg-accent/90 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="oa-icon-action w-10 h-10 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center bg-accent text-[var(--color-chat-landing-page-on-strong-text)] transition-colors hover:bg-accent/90 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {launching ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowUp className="w-4 h-4" />}
               </button>
@@ -391,12 +391,12 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
             no-runtime is now an abnormal setup/debug state, not a prompt to
             make a fresh user install a CLI. */}
         {launchConfig.agentsKnown && !launchConfig.anyInstalled ? (
-          <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-[12px] space-y-1.5">
+          <div className="rounded-lg border border-[var(--color-chat-landing-page-warning-border-subtle)] bg-[var(--color-chat-landing-page-warning-bg-subtle)] px-3 py-2.5 text-[12px] space-y-1.5">
             <div className="font-medium text-text">{t('chatLanding.noAgentsTitle')}</div>
             <p className="text-text-muted">{t('chatLanding.noAgentsBody')}</p>
           </div>
         ) : launchConfig.selectedMissing && selectedInfo ? (
-          <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-[12px] space-y-1.5">
+          <div className="rounded-lg border border-[var(--color-chat-landing-page-warning-border-subtle)] bg-[var(--color-chat-landing-page-warning-bg-subtle)] px-3 py-2.5 text-[12px] space-y-1.5">
             <p className="text-text-muted">
               {t('chatLanding.agentMissing', { name: selectedInfo.displayName })}
             </p>
@@ -424,7 +424,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
         {/* Loginless runtime has no provider configured — the conversion
             dead-end. Guide the user to set one up instead of a silent failure. */}
         {launchConfig.noCredentials && selectedInfo && (
-          <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-[12px] space-y-1.5">
+          <div className="rounded-lg border border-[var(--color-chat-landing-page-warning-border-subtle)] bg-[var(--color-chat-landing-page-warning-bg-subtle)] px-3 py-2.5 text-[12px] space-y-1.5">
             <p className="text-text-muted">
               {t('chatLanding.noCredBody', { name: selectedInfo.displayName })}
             </p>
@@ -467,7 +467,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
           </div>
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-bg via-bg/90 to-transparent md:hidden"
+            className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-bg via-bg/90 to-[var(--color-chat-landing-page-neutral-dark-to)] md:hidden"
           />
         </div>
       </div>

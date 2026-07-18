@@ -103,7 +103,7 @@ export function ActivityBar({
     <>
       {/* Backdrop — mobile only */}
       <div
-        className={`fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity duration-200 ${
+        className={`fixed inset-0 bg-[var(--color-activity-bar-neutral-dark-bg-subtle)] z-40 md:hidden transition-opacity duration-200 ${
           open ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         onClick={onClose}
@@ -218,7 +218,7 @@ export function ActivityBar({
                           {item.page === 'inbox' && unreadInbox > 0 && (
                             <span
                               aria-label={t('nav.unread', { count: unreadInbox })}
-                              className={`shrink-0 min-w-[18px] h-[18px] px-1.5 rounded-full bg-red text-[10px] font-semibold text-white tabular-nums flex items-center justify-center ${
+                              className={`shrink-0 min-w-[18px] h-[18px] px-1.5 rounded-full bg-red text-[10px] font-semibold text-[var(--color-activity-bar-on-strong-text)] tabular-nums flex items-center justify-center ${
                                 compactRail ? 'md:absolute md:-right-1 md:-top-1 md:h-4 md:min-w-4 md:px-1 md:text-[9px]' : ''
                               }`}
                             >
@@ -228,7 +228,7 @@ export function ActivityBar({
                           {item.page === 'trading-as-git' && pendingPush > 0 && (
                             <span
                               aria-label={t('nav.pendingPush', { count: pendingPush })}
-                              className={`shrink-0 min-w-[18px] h-[18px] px-1.5 rounded-full bg-red text-[10px] font-semibold text-white tabular-nums flex items-center justify-center ${
+                              className={`shrink-0 min-w-[18px] h-[18px] px-1.5 rounded-full bg-red text-[10px] font-semibold text-[var(--color-activity-bar-on-strong-text)] tabular-nums flex items-center justify-center ${
                                 compactRail ? 'md:absolute md:-right-1 md:-top-1 md:h-4 md:min-w-4 md:px-1 md:text-[9px]' : ''
                               }`}
                             >

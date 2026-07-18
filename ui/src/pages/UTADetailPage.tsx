@@ -353,7 +353,7 @@ function SubAccountSelector({ subAccounts, selected, onSelect }: {
 }) {
   const pill = (active: boolean) =>
     `px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-      active ? 'bg-accent text-white' : 'text-text-muted hover:text-text hover:bg-surface-hover'
+      active ? 'bg-accent text-[var(--color-utadetail-page-on-strong-text)]' : 'text-text-muted hover:text-text hover:bg-surface-hover'
     }`
   return (
     <div className="flex items-center gap-1 p-1 rounded-lg bg-surface border border-border">

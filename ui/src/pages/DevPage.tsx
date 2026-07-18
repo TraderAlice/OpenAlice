@@ -168,7 +168,7 @@ function SnapshotRow({ snapshot: s, expanded, onToggle, onDelete }: {
   onDelete: () => void
 }) {
   const [confirming, setConfirming] = useState(false)
-  const healthColor = s.health === 'healthy' ? 'bg-green' : s.health === 'degraded' ? 'bg-yellow-400' : 'bg-red'
+  const healthColor = s.health === 'healthy' ? 'bg-green' : s.health === 'degraded' ? 'bg-[var(--color-dev-page-warning-bg)]' : 'bg-red'
 
   return (
     <>

@@ -106,7 +106,7 @@ export function OverviewCard({
               from: w.upgradeAvailable.from,
               to: w.upgradeAvailable.to,
             })}
-            className="oa-pressable shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-accent border border-accent/40 hover:border-accent/80 hover:bg-accent/10 transition-colors disabled:cursor-default disabled:hover:border-accent/40 disabled:hover:bg-transparent"
+            className="oa-pressable shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-accent border border-accent/40 hover:border-accent/80 hover:bg-accent/10 transition-colors disabled:cursor-default disabled:hover:border-accent/40 disabled:hover:bg-[var(--color-overview-card-neutral-dark-bg)]"
           >
             <ArrowUpCircle size={10} strokeWidth={2.25} />
             <span>v{w.upgradeAvailable.to}</span>

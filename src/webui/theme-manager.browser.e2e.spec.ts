@@ -1,10 +1,12 @@
 import { once } from 'node:events'
 import { createServer } from 'node:net'
 import { spawn, type ChildProcess } from 'node:child_process'
-import { chromium, type Browser, type Page } from 'playwright'
+import { chromium, type Browser, type BrowserContext, type ConsoleMessage, type Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { demoThemeImportFixtures } from '../../ui/src/demo/fixtures/themes.js'
+import { demoThemeFamily } from '../../ui/src/demo/fixtures/themes.js'
+import type { AppearanceMode, AppearancePreferences, ThemeFamily } from '../../ui/src/api/themes.js'
 
 const uiRoot = new URL('../../ui', import.meta.url).pathname
 const viteCli = new URL('../../ui/node_modules/vite/bin/vite.js', import.meta.url).pathname
@@ -45,6 +47,117 @@ async function upload(page: Page, fixture: { filename: string; contents: string 
     mimeType: 'text/plain',
     buffer: Buffer.from(fixture.contents),
   })
+}
+
+const firstPaintCacheKey = 'openalice.theme.first-paint.v1'
+
+function customPairedFamily(suffix: string): ThemeFamily {
+  const family = demoThemeFamily('tinted-base16', `Cold Paint ${suffix}`, ['light', 'dark'])
+  family.id = `cold-paint-${suffix}`
+  const light = family.variants.light
+  const dark = family.variants.dark
+  if (light === undefined || dark === undefined) throw new Error('Paired demo fixture omitted a variant')
+  light.id = `${family.id}-light`
+  light.tokens.pageBackground = '#faf1e8'
+  light.tokens.accent = '#8a4b20'
+  dark.id = `${family.id}-dark`
+  dark.tokens.pageBackground = '#120f1c'
+  dark.tokens.accent = '#c5a2ff'
+  return family
+}
+
+function appearance(familyId: string, mode: AppearanceMode): AppearancePreferences {
+  return {
+    activeFamilyId: familyId,
+    mode,
+    terminal: { mode: 'follow' },
+    marketColors: 'protected',
+    marketDirection: 'green-up-red-down',
+    statusColors: 'protected',
+  }
+}
+
+async function putDemoTheme(page: Page, family: ThemeFamily, mode: AppearanceMode): Promise<void> {
+  const result = await page.evaluate(async ({ familyPayload, appearancePayload }) => {
+    const familyResponse = await fetch('/api/themes', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(familyPayload),
+    })
+    const appearanceResponse = await fetch('/api/themes/appearance', {
+      method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(appearancePayload),
+    })
+    return { familyStatus: familyResponse.status, appearanceStatus: appearanceResponse.status }
+  }, { familyPayload: family, appearancePayload: appearance(family.id, mode) })
+  expect(result).toEqual({ familyStatus: 201, appearanceStatus: 200 })
+  // Hydrate the production store from the demo API and let it write the exact
+  // typed first-paint projection that the blocking HTML reader will replay.
+  await page.reload()
+  await expect.poll(async () => page.evaluate(() => document.documentElement.dataset.themeFamily)).toBe(family.id)
+  await expect.poll(async () => page.evaluate((key) => localStorage.getItem(key) !== null, firstPaintCacheKey)).toBe(true)
+}
+
+interface FirstPaintSnapshot {
+  theme: string | undefined
+  appearance: string | undefined
+  family: string | undefined
+  variant: string | undefined
+  background: string
+  accent: string
+  cachePresent: boolean
+}
+
+async function readWhileMainIsBlocked(page: Page): Promise<FirstPaintSnapshot> {
+  let releaseMain!: () => void
+  const release = new Promise<void>((resolve) => { releaseMain = resolve })
+  let intercepted!: () => void
+  const requestSeen = new Promise<void>((resolve) => { intercepted = resolve })
+  await page.route('**/src/main.tsx*', async (route) => {
+    intercepted()
+    await release
+    await route.continue()
+  }, { times: 1 })
+
+  try {
+    await page.goto(`${baseUrl}/settings?cold=${Date.now()}`, { waitUntil: 'commit' })
+    await intercepted
+    // The route callback observes the module request when the preload scanner
+    // reaches it; allow the already-fetched blocking classic script to finish
+    // its synchronous cache replay before sampling the still-unhydrated DOM.
+    await page.waitForTimeout(100)
+    // The parser may already report `interactive` while the deferred module
+    // is blocked, but React cannot have mounted: its sole entry module has not
+    // received a byte and the app root remains empty. Therefore these values
+    // can only have come from index.html's blocking boot script.
+    expect(await page.evaluate(() => ({
+      readyState: document.readyState,
+      appChildren: document.getElementById('root')?.childElementCount,
+    }))).toEqual({ readyState: 'interactive', appChildren: 0 })
+    return await page.evaluate((key) => {
+      const root = document.documentElement
+      const style = getComputedStyle(root)
+      return {
+        theme: root.dataset.theme,
+        appearance: root.dataset.themeAppearance,
+        family: root.dataset.themeFamily,
+        variant: root.dataset.themeVariant,
+        background: style.getPropertyValue('--color-bg').trim(),
+        accent: style.getPropertyValue('--color-accent').trim(),
+        cachePresent: localStorage.getItem(key) !== null,
+      }
+    }, firstPaintCacheKey)
+  } finally {
+    releaseMain()
+    await page.waitForLoadState('domcontentloaded')
+    await page.unroute('**/src/main.tsx*')
+  }
+}
+
+async function isolatedPage(colorScheme: 'light' | 'dark'): Promise<{ context: BrowserContext; page: Page }> {
+  if (browser === undefined) throw new Error('Browser setup did not create a browser')
+  const context = await browser.newContext({ locale: 'en-US', colorScheme })
+  const testPage = await context.newPage()
+  await testPage.goto(`${baseUrl}/settings`)
+  await expect.poll(async () => testPage.getByTestId('theme-manager').isVisible()).toBe(true)
+  return { context, page: testPage }
 }
 
 describe('Theme Manager real-browser workflow', () => {
@@ -135,4 +248,128 @@ describe('Theme Manager real-browser workflow', () => {
     await expect.poll(async () => testPage.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--color-accent').trim())).toBe('#75a7f0')
     await expect.poll(async () => testPage.getByRole('button', { name: /demo-base24.*Active/i }).count()).toBe(1)
   }, 60_000)
+
+  it.each([
+    { mode: 'light' as const, os: 'dark' as const, expectedBackground: '#faf1e8', expectedAccent: '#8a4b20' },
+    { mode: 'dark' as const, os: 'light' as const, expectedBackground: '#120f1c', expectedAccent: '#c5a2ff' },
+  ])('replays a custom $mode family before the React module can run', async ({ mode, os, expectedBackground, expectedAccent }) => {
+    const { context, page: testPage } = await isolatedPage(os)
+    try {
+      const family = customPairedFamily(`${mode}-${Date.now()}`)
+      await putDemoTheme(testPage, family, mode)
+      const snapshot = await readWhileMainIsBlocked(testPage)
+      expect(snapshot).toMatchObject({
+        theme: mode,
+        appearance: mode,
+        family: family.id,
+        variant: `${family.id}-${mode}`,
+        background: expectedBackground,
+        accent: expectedAccent,
+        cachePresent: true,
+      })
+    } finally {
+      await context.close()
+    }
+  }, 30_000)
+
+  it.each([
+    { os: 'light' as const, expectedBackground: '#faf1e8', expectedVariant: 'light' },
+    { os: 'dark' as const, expectedBackground: '#120f1c', expectedVariant: 'dark' },
+  ])('resolves system appearance against a cold $os OS before hydration', async ({ os, expectedBackground, expectedVariant }) => {
+    const { context, page: testPage } = await isolatedPage(os)
+    try {
+      const family = customPairedFamily(`system-${os}-${Date.now()}`)
+      await putDemoTheme(testPage, family, 'system')
+      const snapshot = await readWhileMainIsBlocked(testPage)
+      expect(snapshot).toMatchObject({
+        theme: expectedVariant,
+        appearance: 'system',
+        family: family.id,
+        variant: `${family.id}-${expectedVariant}`,
+        background: expectedBackground,
+        cachePresent: true,
+      })
+    } finally {
+      await context.close()
+    }
+  }, 30_000)
+
+  it('ignores OS changes in an explicit mode, follows them in system mode, and preserves mounted page state', async () => {
+    const { context, page: testPage } = await isolatedPage('light')
+    try {
+      const first = customPairedFamily(`media-a-${Date.now()}`)
+      const second = customPairedFamily(`media-b-${Date.now()}`)
+      second.variants.light!.tokens.pageBackground = '#e6f7f1'
+      expect(await testPage.evaluate(async (payload) => (await fetch('/api/themes', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload),
+      })).status, second)).toBe(201)
+      await putDemoTheme(testPage, first, 'light')
+
+      const manager = testPage.getByTestId('theme-manager')
+      await manager.locator('select').selectOption('dark')
+      const managerIdentity = await manager.evaluate((node) => {
+        const id = `manager-${Date.now()}`
+        ;(node as HTMLElement & { __mountIdentity?: string }).__mountIdentity = id
+        return id
+      })
+
+      await testPage.emulateMedia({ colorScheme: 'dark' })
+      await expect.poll(async () => testPage.evaluate(() => document.documentElement.dataset.theme)).toBe('light')
+      await expect.poll(async () => testPage.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--color-bg').trim())).toBe('#faf1e8')
+
+      // Select and apply through the real Settings UI. The locally selected
+      // legacy-import option is an unrelated page-state canary.
+      await manager.getByRole('button', { name: second.name, exact: false }).click()
+      await manager.getByRole('button', { name: 'System', exact: true }).click()
+      await manager.getByRole('button', { name: 'Apply', exact: true }).click()
+      await expect.poll(async () => testPage.evaluate(() => document.documentElement.dataset.themeFamily)).toBe(second.id)
+      expect(await manager.evaluate((node) => (node as HTMLElement & { __mountIdentity?: string }).__mountIdentity)).toBe(managerIdentity)
+      expect(await manager.locator('select').inputValue()).toBe('dark')
+
+      await expect.poll(async () => testPage.evaluate(() => document.documentElement.dataset.theme)).toBe('dark')
+      await testPage.emulateMedia({ colorScheme: 'light' })
+      await expect.poll(async () => testPage.evaluate(() => document.documentElement.dataset.theme)).toBe('light')
+      await expect.poll(async () => testPage.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--color-bg').trim())).toBe('#e6f7f1')
+    } finally {
+      await context.close()
+    }
+  }, 30_000)
+
+  it.each([
+    {
+      label: 'stale',
+      corrupt: (raw: string) => JSON.stringify({ ...JSON.parse(raw) as object, mappingVersion: 999 }),
+      diagnostic: 'version mismatch',
+    },
+    { label: 'malformed', corrupt: () => '{not-json', diagnostic: 'Evicted stale cache' },
+  ])('evicts a $label first-paint cache and emits a boot diagnostic', async ({ corrupt, diagnostic }) => {
+    const { context, page: testPage } = await isolatedPage('light')
+    const warnings: ConsoleMessage[] = []
+    testPage.on('console', (message) => {
+      if (message.text().includes('[theme:first-paint]')) warnings.push(message)
+    })
+    try {
+      const family = customPairedFamily(`invalid-cache-${Date.now()}-${diagnostic.length}`)
+      await putDemoTheme(testPage, family, 'light')
+      await testPage.evaluate(({ key, corruption }) => {
+        const current = localStorage.getItem(key)
+        if (current === null) throw new Error('Runtime did not create a first-paint cache')
+        localStorage.setItem(key, corruption)
+      }, {
+        key: firstPaintCacheKey,
+        corruption: await testPage.evaluate(({ key }) => {
+          const current = localStorage.getItem(key)
+          if (current === null) throw new Error('Runtime did not create a first-paint cache')
+          return current
+        }, { key: firstPaintCacheKey }).then(corrupt),
+      })
+
+      const snapshot = await readWhileMainIsBlocked(testPage)
+      expect(snapshot.cachePresent).toBe(false)
+      expect(snapshot.family).toBeUndefined()
+      await expect.poll(() => warnings.map((message) => message.text()).join('\n')).toContain(diagnostic)
+    } finally {
+      await context.close()
+    }
+  }, 30_000)
 })

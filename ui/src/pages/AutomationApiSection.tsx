@@ -6,11 +6,11 @@
  * the retired event-bus webhook route is not part of the architecture.
  */
 
-const CODE = 'rounded bg-black/30 px-1 py-0.5 font-mono text-[12px] text-text/90'
+const CODE = 'rounded bg-[var(--color-automation-api-section-neutral-dark-bg-subtle)] px-1 py-0.5 font-mono text-[12px] text-text/90'
 
 function Block({ children }: { children: string }) {
   return (
-    <pre className="overflow-auto rounded bg-black/30 p-3 text-[12px] leading-snug text-muted whitespace-pre-wrap">
+    <pre className="overflow-auto rounded bg-[var(--color-automation-api-section-neutral-dark-bg-subtle)] p-3 text-[12px] leading-snug text-muted whitespace-pre-wrap">
       {children}
     </pre>
   )

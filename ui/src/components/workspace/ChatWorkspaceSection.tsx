@@ -264,7 +264,7 @@ function ManagerWorkspaceRow(props: ManagerWorkspaceRowProps): ReactElement {
             : 'border-border/70 bg-bg-secondary/45 text-text hover:border-accent/25 hover:bg-bg-tertiary'
         }`}
       >
-        <span className="pointer-events-none absolute inset-y-0 right-0 w-20 bg-gradient-to-l from-accent/[0.07] to-transparent" />
+        <span className="pointer-events-none absolute inset-y-0 right-0 w-20 bg-gradient-to-l from-accent/[0.07] to-[var(--color-chat-workspace-section-neutral-dark-to)]" />
         <button
           type="button"
           onClick={() => setExpanded((current) => !current)}

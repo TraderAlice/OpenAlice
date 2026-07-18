@@ -204,7 +204,7 @@ function DesignCanvas({ variant }: { variant: DesignVariant }) {
       <div className="flex min-w-0 items-center justify-between gap-3 border-b border-border bg-bg-tertiary/55 px-3 py-2">
         <div className="flex min-w-0 items-center gap-2">
           <span className="h-2.5 w-2.5 rounded-full bg-red/70" aria-hidden />
-          <span className="h-2.5 w-2.5 rounded-full bg-yellow-400/70" aria-hidden />
+          <span className="h-2.5 w-2.5 rounded-full bg-[var(--color-design-project-page-warning-bg-subtle)]" aria-hidden />
           <span className="h-2.5 w-2.5 rounded-full bg-green/70" aria-hidden />
           <span className="ml-1 truncate font-mono text-[10px] text-text-muted">first-run-guide/{variant.id.toLowerCase()}</span>
         </div>
@@ -387,7 +387,7 @@ function MockButton({ children, primary = false }: { children: string; primary?:
       type="button"
       className={`inline-flex min-h-9 items-center justify-center gap-2 rounded-md px-3.5 py-2 text-[13px] font-semibold ${
         primary
-          ? 'bg-accent text-white'
+          ? 'bg-accent text-[var(--color-design-project-page-on-strong-text)]'
           : 'border border-border bg-bg text-text-muted'
       }`}
     >

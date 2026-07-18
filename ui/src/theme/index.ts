@@ -1,113 +1,138 @@
-import type { ResolvedThemeTokens, ThemeVariant, ThemeVariantMode } from '../api/themes'
+import type { AppearanceMode, ThemeVariant, ThemeVariantMode } from '../api/themes'
+import { createFirstPaintCache, FIRST_PAINT_THEME_CACHE_KEY } from './firstPaint'
+import { projectThemeVariant, THEME_MAPPING_VERSION } from './projection'
 import { activeThemeVariant, useThemeStore } from './store'
 
-export const FIRST_PAINT_THEME_CACHE_KEY = 'openalice.theme.first-paint.v1'
-
-interface FirstPaintThemeCache {
-  schemaVersion: 1
-  mappingVersion: 1
-  familyId: string
-  variantId: string
-  mode: ThemeVariantMode
-  tokens: ResolvedThemeTokens
-}
+export { FIRST_PAINT_THEME_CACHE_KEY } from './firstPaint'
+export { fingerprintVariables, projectThemeVariant } from './projection'
 
 const media = window.matchMedia('(prefers-color-scheme: dark)')
-const tokenKeys: ReadonlyArray<keyof ResolvedThemeTokens> = [
-  'pageBackground', 'secondarySurface', 'cardSurface', 'border', 'mutedText', 'bodyText',
-  'strongText', 'highestContrastText', 'danger', 'orange', 'warning', 'success', 'info',
-  'accent', 'secondaryAccent', 'special', 'onAccent', 'hoverSurface', 'activeSurface',
-  'selection', 'focusRing', 'subtleSurface', 'chartGrid', 'overlay',
-]
 
 export async function initializeTheme(): Promise<void> {
-  await useThemeStore.getState().initialize()
-  applyCurrentTheme()
+  const bootIdentity = readBootIdentity()
+  try {
+    await useThemeStore.getState().initialize()
+    applyCurrentTheme(true)
+    validateBootIdentity(bootIdentity)
+  } catch (error) {
+    clearThemeProjection()
+    throw error
+  }
 }
 
-export function applyThemeVariant(familyId: string, variant: ThemeVariant): void {
+
+interface BootThemeIdentity {
+  familyId: string
+  variantId: string
+  fingerprint: string
+}
+
+function readBootIdentity(): BootThemeIdentity | null {
+  const root = document.documentElement
+  if (root.dataset.themeFirstPaint !== 'cache') return null
+  const { themeFamily, themeVariant, themeFingerprint } = root.dataset
+  return themeFamily && themeVariant && themeFingerprint
+    ? { familyId: themeFamily, variantId: themeVariant, fingerprint: themeFingerprint }
+    : null
+}
+
+function validateBootIdentity(boot: BootThemeIdentity | null): void {
+  if (boot === null) return
+  const root = document.documentElement
+  if (root.dataset.themeFamily === boot.familyId
+    && root.dataset.themeVariant === boot.variantId
+    && root.dataset.themeFingerprint === boot.fingerprint) return
+  root.dataset.themeFirstPaint = 'stale'
+  console.warn('[theme:first-paint] Cached projection did not match authoritative file-backed appearance')
+}
+
+export function applyThemeVariant(
+  familyId: string,
+  appearanceMode: AppearanceMode,
+  variant: ThemeVariant,
+): void {
+  if (variant.provenance.mappingVersion !== THEME_MAPPING_VERSION) {
+    throw new Error(`Unsupported theme mapping version ${variant.provenance.mappingVersion}`)
+  }
+  const projection = projectThemeVariant(variant)
+  // Cache persistence is best-effort: storage policy must not prevent the
+  // authoritative file-backed theme from rendering in the current process.
+  let cachePersisted = true
+  try {
+    localStorage.setItem(FIRST_PAINT_THEME_CACHE_KEY, JSON.stringify(createFirstPaintCache({
+      appearanceMode,
+      resolvedMode: variant.mode,
+      familyId,
+      variantId: variant.id,
+      variables: projection.firstPaint,
+    })))
+  } catch (error) {
+    cachePersisted = false
+    console.warn('[theme:first-paint] Cache persistence unavailable', error)
+    removeFirstPaintCache()
+  }
   const root = document.documentElement
   root.dataset.theme = variant.mode
+  root.dataset.themeAppearance = appearanceMode
   root.dataset.themeFamily = familyId
   root.dataset.themeVariant = variant.id
+  root.dataset.themeFingerprint = projection.fingerprint
+  if (!cachePersisted) root.dataset.themeFirstPaint = 'unavailable'
   root.style.colorScheme = variant.mode
-  applyTokens(variant.tokens)
-  const cache: FirstPaintThemeCache = {
-    schemaVersion: 1,
-    mappingVersion: variant.provenance.mappingVersion,
-    familyId,
-    variantId: variant.id,
-    mode: variant.mode,
-    tokens: variant.tokens,
-  }
-  localStorage.setItem(FIRST_PAINT_THEME_CACHE_KEY, JSON.stringify(cache))
+  applyVariables(projection.all)
 }
 
-function applyCurrentTheme(): void {
+function applyCurrentTheme(strict = false): void {
   const state = useThemeStore.getState()
   const systemMode: ThemeVariantMode = media.matches ? 'dark' : 'light'
   const variant = activeThemeVariant(state.families, state.appearance, systemMode)
   if (variant !== undefined && state.appearance !== null) {
-    applyThemeVariant(state.appearance.activeFamilyId, variant)
+    applyThemeVariant(state.appearance.activeFamilyId, state.appearance.mode, variant)
+    return
+  }
+  if (state.appearance !== null) {
+    clearThemeProjection()
+    const error = new Error(`Active theme ${state.appearance.activeFamilyId} has no resolved ${systemMode} variant`)
+    console.error('[theme] Refusing to use a stale or fallback theme', error)
+    if (strict) throw error
   }
 }
 
-function applyFirstPaintCache(): void {
-  try {
-    const raw = localStorage.getItem(FIRST_PAINT_THEME_CACHE_KEY)
-    if (raw === null) return
-    const cache = JSON.parse(raw) as Partial<FirstPaintThemeCache>
-    if (cache.schemaVersion !== 1 || cache.mappingVersion !== 1
-      || typeof cache.familyId !== 'string' || typeof cache.variantId !== 'string'
-      || (cache.mode !== 'light' && cache.mode !== 'dark') || !isTokens(cache.tokens)) {
-      localStorage.removeItem(FIRST_PAINT_THEME_CACHE_KEY)
-      return
-    }
-    const root = document.documentElement
-    root.dataset.theme = cache.mode
-    root.dataset.themeFamily = cache.familyId
-    root.dataset.themeVariant = cache.variantId
-    root.style.colorScheme = cache.mode
-    applyTokens(cache.tokens)
-  } catch {
-    localStorage.removeItem(FIRST_PAINT_THEME_CACHE_KEY)
-  }
-}
-
-function applyTokens(tokens: ResolvedThemeTokens): void {
+function applyVariables(variables: Readonly<Record<string, string>>): void {
   const style = document.documentElement.style
-  const values: Record<string, string> = {
-    '--color-bg': tokens.pageBackground,
-    '--color-bg-secondary': tokens.secondarySurface,
-    '--color-bg-tertiary': tokens.cardSurface,
-    '--color-border': tokens.border,
-    '--color-text': tokens.bodyText,
-    '--color-text-muted': tokens.mutedText,
-    '--color-accent': tokens.accent,
-    '--color-accent-dim': `color-mix(in srgb, ${tokens.accent} 16%, transparent)`,
-    '--color-user-bubble': tokens.accent,
-    '--color-assistant-bubble': tokens.cardSurface,
-    '--color-notification-bg': tokens.subtleSurface,
-    '--color-notification-border': tokens.warning,
-    '--color-green': tokens.success,
-    '--color-red': tokens.danger,
-    '--color-purple': tokens.secondaryAccent,
-    '--color-purple-dim': `color-mix(in srgb, ${tokens.secondaryAccent} 16%, transparent)`,
-    '--color-overlay': `color-mix(in srgb, ${tokens.overlay} 55%, transparent)`,
-    '--color-overlay-strong': `color-mix(in srgb, ${tokens.activeSurface} 72%, transparent)`,
-    '--app-bg-wash': `radial-gradient(circle at 50% 26%, color-mix(in srgb, ${tokens.accent} 6%, transparent), transparent 38rem)`,
+  for (const [name, value] of Object.entries(variables)) style.setProperty(name, value)
+}
+
+function removeFirstPaintCache(): void {
+  try {
+    localStorage.removeItem(FIRST_PAINT_THEME_CACHE_KEY)
+  } catch (error) {
+    console.warn('[theme:first-paint] Cache eviction unavailable', error)
   }
-  for (const [name, value] of Object.entries(values)) style.setProperty(name, value)
 }
 
-function isTokens(value: unknown): value is ResolvedThemeTokens {
-  if (typeof value !== 'object' || value === null) return false
-  const record = value as Record<string, unknown>
-  return Object.keys(record).length === tokenKeys.length && tokenKeys.every((key) => (
-    typeof record[key] === 'string' && /^#[0-9a-f]{6}$/.test(record[key] as string)
-  ))
+export function clearThemeProjection(): void {
+  const style = document.documentElement.style
+  const dynamicNames: string[] = []
+  for (let index = 0; index < style.length; index += 1) {
+    const name = style.item(index)
+    if (name.startsWith('--oa-') || name.startsWith('--color-') || name === '--app-bg-wash') {
+      dynamicNames.push(name)
+    }
+  }
+  for (const name of dynamicNames) style.removeProperty(name)
+  removeFirstPaintCache()
+  const root = document.documentElement
+  delete root.dataset.theme
+  delete root.dataset.themeAppearance
+  delete root.dataset.themeFamily
+  delete root.dataset.themeVariant
+  delete root.dataset.themeFingerprint
+  delete root.dataset.themeFirstPaint
+  root.style.removeProperty('color-scheme')
 }
 
-applyFirstPaintCache()
-useThemeStore.subscribe(applyCurrentTheme)
-media.addEventListener('change', applyCurrentTheme)
+useThemeStore.subscribe(() => applyCurrentTheme())
+media.addEventListener('change', () => {
+  if (useThemeStore.getState().appearance?.mode === 'system') applyCurrentTheme()
+})

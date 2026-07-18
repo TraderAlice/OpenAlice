@@ -164,8 +164,8 @@ export function WorkspaceTemplateUpgradePanel({
             )}
 
             {plan.blockers.length > 0 && (
-              <div className="rounded-lg border border-amber-500/35 bg-amber-500/8 px-3 py-3 text-[12px] text-text">
-                <div className="flex items-center gap-2 font-semibold text-amber-700 dark:text-amber-300">
+              <div className="rounded-lg border border-[var(--color-workspace-template-upgrade-panel-warning-border-subtle)] bg-[var(--color-workspace-template-upgrade-panel-warning-bg-subtle-alpha-8)] px-3 py-3 text-[12px] text-text">
+                <div className="flex items-center gap-2 font-semibold text-[var(--color-workspace-template-upgrade-panel-warning-text)] dark:text-[var(--color-workspace-template-upgrade-panel-warning-text)]">
                   <AlertTriangle size={15} />
                   {t('workspace.upgradeBlockedTitle')}
                 </div>
@@ -215,12 +215,12 @@ export function WorkspaceTemplateUpgradePanel({
             )}
 
             {!current && conflicts.length > 0 && (
-              <section className="rounded-xl border border-amber-500/35 bg-bg-secondary/20">
+              <section className="rounded-xl border border-[var(--color-workspace-template-upgrade-panel-warning-border-subtle)] bg-bg-secondary/20">
                 <div className="border-b border-border px-4 py-3">
                   <div className="flex items-center gap-2 text-[13px] font-semibold text-text">
-                    <AlertTriangle size={15} className="text-amber-600 dark:text-amber-400" />
+                    <AlertTriangle size={15} className="text-[var(--color-workspace-template-upgrade-panel-warning-text)] dark:text-[var(--color-workspace-template-upgrade-panel-warning-text)]" />
                     {t('workspace.upgradeConflictTitle')}
-                    <span className="rounded-full bg-amber-500/12 px-2 py-0.5 text-[10px] text-amber-700 dark:text-amber-300">
+                    <span className="rounded-full bg-[var(--color-workspace-template-upgrade-panel-warning-bg-subtle-alpha-12)] px-2 py-0.5 text-[10px] text-[var(--color-workspace-template-upgrade-panel-warning-text)] dark:text-[var(--color-workspace-template-upgrade-panel-warning-text)]">
                       {conflicts.length}
                     </span>
                   </div>
@@ -286,7 +286,7 @@ export function WorkspaceTemplateUpgradePanel({
               type="button"
               onClick={() => void apply()}
               disabled={!canApply}
-              className="oa-pressable inline-flex min-h-9 items-center gap-2 rounded-lg bg-accent px-4 text-[12px] font-semibold text-white hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40"
+              className="oa-pressable inline-flex min-h-9 items-center gap-2 rounded-lg bg-accent px-4 text-[12px] font-semibold text-[var(--color-workspace-template-upgrade-panel-on-strong-text)] hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {applying ? <LoaderCircle size={14} className="animate-spin" /> : <GitCommitHorizontal size={14} />}
               {applying ? t('workspace.upgradeApplying') : t('workspace.upgradeApply')}
@@ -305,7 +305,7 @@ function Metric({ value, label, tone }: {
   const valueClass = tone === 'accent'
     ? 'text-accent'
     : tone === 'warning'
-      ? 'text-amber-700 dark:text-amber-300'
+      ? 'text-[var(--color-workspace-template-upgrade-panel-warning-text)] dark:text-[var(--color-workspace-template-upgrade-panel-warning-text)]'
       : 'text-text'
   return (
     <div className="border-r border-border px-3 py-2.5 text-center last:border-r-0">
@@ -419,7 +419,7 @@ function Choice({ active, disabled = false, onClick, children }: {
       disabled={disabled}
       onClick={onClick}
       className={`oa-pressable rounded-md px-2.5 py-1.5 text-[10px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-35 ${
-        active ? 'bg-accent text-white shadow-sm' : 'text-text-muted hover:text-text'
+        active ? 'bg-accent text-[var(--color-workspace-template-upgrade-panel-on-strong-text)] shadow-sm' : 'text-text-muted hover:text-text'
       }`}
     >
       {children}

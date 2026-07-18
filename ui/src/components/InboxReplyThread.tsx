@@ -62,7 +62,7 @@ export function InboxReplyThread({
               void thread.submit()
             }
           }}
-          className="min-h-[76px] w-full resize-y bg-transparent px-3.5 pb-2 pt-3 text-[13px] leading-relaxed text-text outline-none placeholder:text-text-muted/45 disabled:opacity-50 sm:min-h-[84px] sm:px-4"
+          className="min-h-[76px] w-full resize-y bg-[var(--color-inbox-reply-thread-neutral-dark-bg)] px-3.5 pb-2 pt-3 text-[13px] leading-relaxed text-text outline-none placeholder:text-text-muted/45 disabled:opacity-50 sm:min-h-[84px] sm:px-4"
         />
         <div className="flex min-h-11 items-center gap-3 border-t border-border/55 bg-bg-secondary/25 px-2.5 py-1.5 sm:px-3">
           <span className="min-w-0 flex-1 text-[10px] leading-relaxed text-text-muted/50 sm:text-[11px]">
@@ -123,7 +123,7 @@ function InboxReplyRecord({ record }: { record: InquiryRecord }) {
               : t('inbox.replyAgent', { agent: record.agent })}
           </span>
           {reconstructed && (
-            <span className="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-medium text-amber-500">
+            <span className="rounded-full bg-[var(--color-inbox-reply-thread-warning-bg-subtle)] px-1.5 py-0.5 text-[9px] font-medium text-[var(--color-inbox-reply-thread-warning-text)]">
               {t('inbox.replyReconstructed')}
             </span>
           )}

@@ -193,7 +193,7 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
   return (
     <div className="relative h-full overflow-y-auto bg-bg">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-accent/[0.07] to-transparent" />
+        <div className="absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-accent/[0.07] to-[var(--color-workspace-manager-page-neutral-dark-to)]" />
         <div className="absolute -right-24 top-12 h-72 w-72 rounded-full border border-accent/10" />
         <div className="absolute -right-8 top-28 h-44 w-44 rounded-full border border-accent/10" />
       </div>
@@ -223,7 +223,7 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
             onKeyDown={onKeyDown}
             placeholder={t('workspaceManager.placeholder')}
             rows={4}
-            className="min-h-28 w-full resize-none bg-transparent px-1 py-1 text-[14px] leading-relaxed text-text outline-none placeholder:text-text-muted/55 md:text-[15px]"
+            className="min-h-28 w-full resize-none bg-[var(--color-workspace-manager-page-neutral-dark-bg)] px-1 py-1 text-[14px] leading-relaxed text-text outline-none placeholder:text-text-muted/55 md:text-[15px]"
           />
           <div className="workspace-manager-composer-footer mt-3 flex flex-col gap-2 border-t border-border/60 pt-3">
             <div className="workspace-manager-composer-actions flex min-w-0 flex-col gap-2">
@@ -238,7 +238,7 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
                 type="button"
                 onClick={() => void submit()}
                 disabled={!draft.trim() || launching || !launchConfig.credentialSelectionReady}
-                className="oa-pressable inline-flex min-h-9 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-[12px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-45"
+                className="oa-pressable inline-flex min-h-9 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-[12px] font-semibold text-[var(--color-workspace-manager-page-on-strong-text)] disabled:cursor-not-allowed disabled:opacity-45"
               >
                 {launching ? <Loader2 size={14} className="animate-spin" /> : <ArrowUp size={14} />}
                 {launching ? t('workspaceManager.launching') : t('workspaceManager.send')}

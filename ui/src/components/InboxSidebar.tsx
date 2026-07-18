@@ -257,7 +257,7 @@ function ClusterRow({
       )}
       <span
         aria-hidden
-        className={`mt-[7px] shrink-0 w-1.5 h-1.5 rounded-full ${unread ? 'bg-accent' : 'bg-transparent'}`}
+        className={`mt-[7px] shrink-0 w-1.5 h-1.5 rounded-full ${unread ? 'bg-accent' : 'bg-[var(--color-inbox-sidebar-neutral-dark-bg)]'}`}
       />
       <span className={`min-w-0 truncate text-[11px] leading-5 ${unread ? 'text-text-muted' : 'text-text-muted/70'}`}>
         {previewForEntry(entry)}
@@ -339,7 +339,7 @@ function TimeRow({
       <div className="flex items-center gap-1.5">
         <span
           aria-hidden
-          className={`shrink-0 w-1.5 h-1.5 rounded-full ${unread ? 'bg-accent' : 'bg-transparent'}`}
+          className={`shrink-0 w-1.5 h-1.5 rounded-full ${unread ? 'bg-accent' : 'bg-[var(--color-inbox-sidebar-neutral-dark-bg)]'}`}
         />
         <span className={`flex-1 truncate text-[12px] ${unread ? 'font-medium text-text' : 'text-text'}`}>
           {entry.workspaceLabel ?? entry.workspaceId}

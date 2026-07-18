@@ -62,7 +62,7 @@ export function ConnectorStatusPage() {
             </button>
             <button
               type="button"
-              className="oa-pressable inline-flex items-center gap-2 rounded-lg bg-accent px-3 py-2 text-[13px] font-medium text-white hover:bg-accent/90"
+              className="oa-pressable inline-flex items-center gap-2 rounded-lg bg-accent px-3 py-2 text-[13px] font-medium text-[var(--color-connector-status-page-on-strong-text)] hover:bg-accent/90"
               onClick={configure}
             >
               <Settings2 size={14} />
@@ -252,24 +252,24 @@ function adapterPresentation(input: {
     return { label: 'Off', tone: 'neutral', dot: 'bg-text-muted/30' }
   }
   if (!input.configured) {
-    return { label: 'Needs setup', tone: 'warning', dot: 'bg-yellow-400' }
+    return { label: 'Needs setup', tone: 'warning', dot: 'bg-[var(--color-connector-status-page-warning-bg)]' }
   }
   if (input.runtimeStatus === 'healthy') {
     return { label: 'Connected', tone: 'healthy', dot: 'bg-green' }
   }
   if (input.runtimeStatus === 'awaiting_link') {
-    return { label: 'Waiting for /link', tone: 'warning', dot: 'bg-yellow-400' }
+    return { label: 'Waiting for /link', tone: 'warning', dot: 'bg-[var(--color-connector-status-page-warning-bg)]' }
   }
   if (input.runtimeStatus === 'degraded' || input.runtimeStatus === 'stopped') {
     return { label: 'Needs attention', tone: 'danger', dot: 'bg-red' }
   }
-  return { label: 'Starting', tone: 'warning', dot: 'bg-yellow-400' }
+  return { label: 'Starting', tone: 'warning', dot: 'bg-[var(--color-connector-status-page-warning-bg)]' }
 }
 
 function StatusBadge({ tone, children }: { tone: StatusTone; children: string }) {
   const styles: Record<StatusTone, string> = {
     healthy: 'border-green/20 bg-green/10 text-green',
-    warning: 'border-yellow-400/25 bg-yellow-400/10 text-yellow-600 dark:text-yellow-300',
+    warning: 'border-[var(--color-connector-status-page-warning-border-subtle)] bg-[var(--color-connector-status-page-warning-bg-subtle)] text-[var(--color-connector-status-page-warning-text)] dark:text-[var(--color-connector-status-page-warning-text)]',
     danger: 'border-red/25 bg-red/10 text-red',
     neutral: 'border-border bg-bg-tertiary text-text-muted',
   }

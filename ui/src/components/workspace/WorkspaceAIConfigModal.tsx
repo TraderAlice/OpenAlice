@@ -409,7 +409,7 @@ export function WorkspaceAIConfigModal({ wsId, onClose, initialAgent = 'claude',
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--color-workspace-aiconfig-modal-neutral-dark-bg-subtle)] backdrop-blur-sm"
       onMouseDown={handleBackdropMouseDown}
     >
       <div
@@ -938,7 +938,7 @@ export function WorkspaceAIConfigModal({ wsId, onClose, initialAgent = 'claude',
             </div>
           )}
           {!testing && result && !resultMatchesCurrent && (
-            <div className="rounded-md border border-yellow-400/30 bg-yellow-400/5 text-yellow-400/90 text-[12px] px-3 py-2">
+            <div className="rounded-md border border-[var(--color-workspace-aiconfig-modal-warning-border-subtle)] bg-[var(--color-workspace-aiconfig-modal-warning-bg-subtle)] text-[var(--color-workspace-aiconfig-modal-warning-text-subtle)] text-[12px] px-3 py-2">
               Form changed since last test — re-test before saving.
             </div>
           )}

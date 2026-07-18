@@ -160,10 +160,10 @@ export function MarkdownWhatEditor({ value, onSave }: MarkdownWhatEditorProps) {
 
   return (
     <div>
-      <div className="what-editor-shell rounded-lg border border-transparent transition-colors hover:border-border/40 focus-within:border-border/70 focus-within:bg-bg-secondary/20">
+      <div className="what-editor-shell rounded-lg border border-[var(--color-markdown-what-editor-neutral-dark-border)] transition-colors hover:border-border/40 focus-within:border-border/70 focus-within:bg-bg-secondary/20">
         <EditorContent editor={editor} className="markdown-content what-editor-content" />
       </div>
-      <div aria-live="polite" className={`mt-1 min-h-4 text-right text-[11px] transition-opacity ${saveState === 'error' ? 'text-red-400' : 'text-muted/60'} ${status ? 'opacity-100' : 'opacity-0'}`}>
+      <div aria-live="polite" className={`mt-1 min-h-4 text-right text-[11px] transition-opacity ${saveState === 'error' ? 'text-[var(--color-markdown-what-editor-danger-text)]' : 'text-muted/60'} ${status ? 'opacity-100' : 'opacity-0'}`}>
         {status || '\u00a0'}
       </div>
     </div>

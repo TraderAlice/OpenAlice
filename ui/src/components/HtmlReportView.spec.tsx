@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { createSandboxedHtmlReportDocument, HtmlReportView } from './HtmlReportView'
 
+const reportTheme = { background: '#f7f7f7', text: '#334455' }
+
 afterEach(cleanup)
 
 describe('HtmlReportView', () => {
@@ -15,7 +17,7 @@ describe('HtmlReportView', () => {
         <h1 class="metric" onclick="alert(1)">Close report</h1>
         <svg viewBox="0 0 10 10"><circle cx="5" cy="5" r="4" /></svg>
         <form action="https://example.com"><input name="secret"></form>
-      </body></html>`)
+      </body></html>`, reportTheme)
 
     expect(document).toContain('.metric { color: rebeccapurple }')
     expect(document).toContain('<svg')
@@ -32,7 +34,7 @@ describe('HtmlReportView', () => {
       <img id="embedded" src="data:image/svg+xml;base64,PHN2Zy8+">
       <a id="external" href="https://example.com">external</a>
       <a id="local" href="#details">details</a>
-    `)
+    `, reportTheme)
     const parsed = new DOMParser().parseFromString(document, 'text/html')
 
     expect(parsed.querySelector('#remote')?.hasAttribute('src')).toBe(false)
@@ -42,7 +44,7 @@ describe('HtmlReportView', () => {
   })
 
   it('renders through an origin-less iframe sandbox', () => {
-    render(<HtmlReportView path="research/close.html" content="<h1>Close</h1>" />)
+    render(<HtmlReportView path="research/close.html" content="<h1>Close</h1>" resolvedTheme={reportTheme} />)
 
     const frame = screen.getByTitle('HTML report: research/close.html')
     expect(frame.getAttribute('sandbox')).toBe('')

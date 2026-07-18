@@ -87,7 +87,7 @@ export function SDKSelector(props: SDKSelectorProps) {
               <span className="absolute top-2.5 right-2.5">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                   <circle cx="8" cy="8" r="8" className="fill-accent" />
-                  <path d="M5 8l2 2 4-4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M5 8l2 2 4-4" stroke="var(--color-sdkselector-on-strong-stroke)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </span>
             )}

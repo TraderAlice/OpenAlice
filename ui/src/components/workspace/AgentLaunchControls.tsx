@@ -120,7 +120,7 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
         <button
           type="button"
           onClick={onConfigureProvider}
-          className="oa-pressable inline-flex min-h-8 items-center gap-1.5 rounded-md bg-amber-500/10 px-2.5 py-1 text-[11px] text-amber-600 hover:bg-amber-500/20 dark:text-amber-400"
+          className="oa-pressable inline-flex min-h-8 items-center gap-1.5 rounded-md bg-[var(--color-agent-launch-controls-warning-bg-subtle-alpha-10)] px-2.5 py-1 text-[11px] text-[var(--color-agent-launch-controls-warning-text)] hover:bg-[var(--color-agent-launch-controls-warning-bg-subtle-alpha-20)] dark:text-[var(--color-agent-launch-controls-warning-text)]"
         >
           <KeyRound className="h-3 w-3" />
           {t('chatLanding.configureProvider')}
