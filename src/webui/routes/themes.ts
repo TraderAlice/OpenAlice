@@ -8,7 +8,7 @@ import {
   type AppearancePreferences,
 } from '../../core/preferences.js'
 import { ThemeImportError, importThemeScheme } from '../../core/themes/importer.js'
-import { ThemeContrastError } from '../../core/themes/colors.js'
+import { TerminalThemeContrastError, ThemeContrastError } from '../../core/themes/colors.js'
 import {
   ThemeFamilyConflictError,
   ThemeFamilyDeleteError,
@@ -236,6 +236,9 @@ function themeStoreError(c: Context, error: unknown) {
   }
   if (error instanceof ThemeContrastError) {
     return c.json({ error: 'theme_contrast_failed', failures: error.failures }, 422)
+  }
+  if (error instanceof TerminalThemeContrastError) {
+    return c.json({ error: 'terminal_theme_contrast_failed', failures: error.failures }, 422)
   }
   throw error
 }

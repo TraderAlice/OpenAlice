@@ -20,6 +20,18 @@ export interface TerminalThemeProfile {
   readonly xtermTheme: ITheme
 }
 
+/**
+ * Re-skin an existing xterm instance without touching its parser, buffer,
+ * selection, addons, or PTY connection. xterm applies this option live and
+ * uses it for subsequent OSC colour queries.
+ */
+export function applyTerminalTheme(
+  terminal: { options: { theme?: ITheme } },
+  profile: TerminalThemeProfile,
+): void {
+  terminal.options.theme = profile.xtermTheme
+}
+
 export type TerminalThemePreference = 'follow' | 'light' | 'dark'
 
 export function resolveTerminalThemeVariant(
@@ -51,12 +63,12 @@ export function terminalThemeProfileForVariant(variant: ThemeVariant): TerminalT
     variant.palette.base06,
   ].map(hexToRgb)
   const xtermTheme = xtermThemeFromColors({
-    foreground: ansi.foreground,
-    background: ansi.background,
-    cursor: ansi.cursor,
-    cursorText: ansi.cursorText,
-    selectionBackground: ansi.selectionBackground,
-    selectionForeground: ansi.selectionForeground,
+    foreground: variant.ansi16Override?.foreground ?? variant.palette.base05,
+    background: variant.ansi16Override?.background ?? variant.palette.base00,
+    cursor: variant.ansi16Override?.cursor ?? variant.palette.base0D,
+    cursorText: variant.ansi16Override?.cursorText ?? variant.palette.base00,
+    selectionBackground: variant.ansi16Override?.selectionBackground ?? variant.tokens.selection,
+    selectionForeground: variant.ansi16Override?.selectionForeground ?? variant.palette.base05,
     colors: ansi.colors,
     extendedAnsi: [
       variant.palette.base09,

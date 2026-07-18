@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path'
 
 import { dataPath } from '../paths.js'
 import { BUILTIN_THEME_FAMILIES } from './builtins.js'
-import { resolveThemeTokens } from './colors.js'
+import { resolveThemeTokens, validateTerminalThemeContrast } from './colors.js'
 import { containsBuiltinThemeVariant, themeFamilySchema, type ThemeFamily } from './types.js'
 
 export class ThemeFamilyConflictError extends Error {
@@ -159,6 +159,14 @@ function validateThemeFamily(input: unknown): ThemeFamily {
     if (JSON.stringify(variant.tokens) !== JSON.stringify(expected)) {
       throw new ThemeFamilyValidationError(family.id, mode)
     }
+    const terminal = variant.ansi16Override
+    validateTerminalThemeContrast({
+      foreground: terminal?.foreground ?? variant.palette.base05,
+      background: terminal?.background ?? variant.palette.base00,
+      cursor: terminal?.cursor ?? variant.palette.base0D,
+      selectionForeground: terminal?.selectionForeground ?? variant.palette.base05,
+      selectionBackground: terminal?.selectionBackground ?? variant.tokens.selection,
+    })
   }
   return family
 }

@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
-import { contrastRatio, mixOklab, normalizeRgbHex, resolveThemeTokens, ThemeContrastError } from './colors.js'
+import {
+  contrastRatio,
+  mixOklab,
+  normalizeRgbHex,
+  resolveThemeTokens,
+  TerminalThemeContrastError,
+  ThemeContrastError,
+  validateTerminalThemeContrast,
+} from './colors.js'
 import type { ThemePalette } from './types.js'
 
 const palette: ThemePalette = {
@@ -38,5 +46,36 @@ describe('theme colors', () => {
       base05: '#222222',
       base0D: '#222222',
     })).toThrow(ThemeContrastError)
+  })
+
+  it('validates terminal foreground, cursor, and selection pairs without changing colors', () => {
+    const colors = {
+      foreground: '#f0f0f0', background: '#101010', cursor: '#80c0ff',
+      selectionForeground: '#ffffff', selectionBackground: '#303060',
+    } as const
+    expect(() => validateTerminalThemeContrast(colors)).not.toThrow()
+    expect(colors).toEqual({
+      foreground: '#f0f0f0', background: '#101010', cursor: '#80c0ff',
+      selectionForeground: '#ffffff', selectionBackground: '#303060',
+    })
+  })
+
+  it('reports every unusable terminal pair', () => {
+    expect(() => validateTerminalThemeContrast({
+      foreground: '#777777', background: '#777777', cursor: '#777777',
+      selectionForeground: '#888888', selectionBackground: '#888888',
+    })).toThrow(TerminalThemeContrastError)
+    try {
+      validateTerminalThemeContrast({
+        foreground: '#777777', background: '#777777', cursor: '#777777',
+        selectionForeground: '#888888', selectionBackground: '#888888',
+      })
+    } catch (error) {
+      expect((error as TerminalThemeContrastError).failures.map((failure) => (
+        `${failure.foreground}/${failure.background}`
+      ))).toEqual([
+        'foreground/background', 'cursor/background', 'selectionForeground/selectionBackground',
+      ])
+    }
   })
 })

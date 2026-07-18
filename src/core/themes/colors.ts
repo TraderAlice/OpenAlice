@@ -28,6 +28,29 @@ export class ThemeContrastError extends Error {
   }
 }
 
+export type TerminalContrastRole =
+  | 'foreground'
+  | 'background'
+  | 'cursor'
+  | 'selectionForeground'
+  | 'selectionBackground'
+
+export interface TerminalContrastFailure {
+  readonly foreground: TerminalContrastRole
+  readonly background: TerminalContrastRole
+  readonly actual: number
+  readonly required: number
+}
+
+export class TerminalThemeContrastError extends Error {
+  constructor(readonly failures: readonly TerminalContrastFailure[]) {
+    super(`Terminal theme contrast validation failed: ${failures.map((failure) => (
+      `${failure.foreground}/${failure.background}=${failure.actual.toFixed(2)}<${failure.required}`
+    )).join(', ')}`)
+    this.name = 'TerminalThemeContrastError'
+  }
+}
+
 export function normalizeRgbHex(input: string): RgbHex {
   const normalized = input.startsWith('#') ? input : `#${input}`
   if (!/^#[0-9a-fA-F]{6}$/.test(normalized)) {
@@ -108,6 +131,24 @@ export function validateThemeContrast(tokens: ResolvedThemeTokens): void {
     return actual + Number.EPSILON < check.required ? [{ ...check, actual }] : []
   })
   if (failures.length > 0) throw new ThemeContrastError(failures)
+}
+
+/** Validate exact terminal colors without rewriting an imported ANSI16 table. */
+export function validateTerminalThemeContrast(colors: Readonly<Record<TerminalContrastRole, RgbHex>>): void {
+  const checks: ReadonlyArray<{
+    foreground: TerminalContrastRole
+    background: TerminalContrastRole
+    required: number
+  }> = [
+    { foreground: 'foreground', background: 'background', required: 4.5 },
+    { foreground: 'cursor', background: 'background', required: 3 },
+    { foreground: 'selectionForeground', background: 'selectionBackground', required: 4.5 },
+  ]
+  const failures = checks.flatMap((check) => {
+    const actual = contrastRatio(colors[check.foreground], colors[check.background])
+    return actual + Number.EPSILON < check.required ? [{ ...check, actual }] : []
+  })
+  if (failures.length > 0) throw new TerminalThemeContrastError(failures)
 }
 
 function hexToRgb(hex: RgbHex): Rgb {

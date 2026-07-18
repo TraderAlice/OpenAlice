@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { delimiter, join } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import { buildCliPath, buildSpawnEnv } from './spawn-env.js'
+import { terminalThemeEnv } from './terminal-theme.js'
 
 /**
  * Guards the precedence the git-identity injection leans on: per-workspace
@@ -12,6 +13,20 @@ import { buildCliPath, buildSpawnEnv } from './spawn-env.js'
  * commits would silently self-attribute to the host instead.
  */
 describe('buildSpawnEnv', () => {
+  it('replaces host terminal capabilities with the canonical Workspace profile', () => {
+    const out = buildSpawnEnv({
+      TERM: 'xterm-kitty',
+      COLORTERM: '24bit',
+      OPENALICE_TERMINAL_THEME: 'light',
+      COLORFGBG: '0;15',
+    })
+
+    expect(out['TERM']).toBe('xterm-256color')
+    expect(out['COLORTERM']).toBe('truecolor')
+    expect(out['OPENALICE_TERMINAL_THEME']).toBeUndefined()
+    expect(out['COLORFGBG']).toBeUndefined()
+  })
+
   it('passes extras through and they WIN over a colliding parent var', () => {
     const out = buildSpawnEnv(
       { GIT_AUTHOR_NAME: 'host-user', GIT_AUTHOR_EMAIL: 'host@example.com', KEEP: 'x' },
@@ -76,8 +91,7 @@ describe('buildSpawnEnv', () => {
       {
         OPENALICE_TOOL_URL: '/cli',
         OPENALICE_TOOL_SOCKET: '/tmp/current.sock',
-        OPENALICE_TERMINAL_THEME: 'dark',
-        COLORFGBG: '15;0',
+        ...terminalThemeEnv('dark'),
       },
     )
     expect(out['OPENALICE_MCP_URL']).toBeUndefined()
@@ -86,6 +100,32 @@ describe('buildSpawnEnv', () => {
     expect(out['OPENALICE_TOOL_SOCKET']).toBe('/tmp/current.sock')
     expect(out['OPENALICE_TERMINAL_THEME']).toBe('dark')
     expect(out['COLORFGBG']).toBe('15;0')
+    expect(out['TERM']).toBe('xterm-256color')
+    expect(out['COLORTERM']).toBe('truecolor')
+  })
+
+  it('projects a light resolved variant without mutating the host environment', () => {
+    const parent = {
+      TERM: 'screen-256color',
+      COLORTERM: '24bit',
+      OPENALICE_TERMINAL_THEME: 'dark',
+      COLORFGBG: '15;0',
+    }
+
+    const out = buildSpawnEnv(parent, { ...terminalThemeEnv('light') })
+
+    expect(out).toMatchObject({
+      TERM: 'xterm-256color',
+      COLORTERM: 'truecolor',
+      OPENALICE_TERMINAL_THEME: 'light',
+      COLORFGBG: '0;15',
+    })
+    expect(parent).toEqual({
+      TERM: 'screen-256color',
+      COLORTERM: '24bit',
+      OPENALICE_TERMINAL_THEME: 'dark',
+      COLORFGBG: '15;0',
+    })
   })
 
   it('defaults terminal locale to UTF-8 without overriding explicit locale', () => {

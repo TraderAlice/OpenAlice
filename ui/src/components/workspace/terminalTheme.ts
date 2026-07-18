@@ -10,6 +10,7 @@ import {
 } from './terminalThemeProfile'
 
 export {
+  applyTerminalTheme,
   resolveTerminalThemeVariant,
   terminalClientThemeDTO,
   terminalThemeProfileForVariant,

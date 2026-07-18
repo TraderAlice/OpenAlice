@@ -19,6 +19,7 @@ import { homedir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
 
 import { runtimeProfileFromEnv } from '@/core/runtime-profile.js';
+import { TERMINAL_CAPABILITY_ENV } from './terminal-theme.js';
 
 const STRIP_EXACT = new Set<string>([
   'TERM_PROGRAM',
@@ -79,8 +80,7 @@ export function buildSpawnEnv(
     out[k] = v;
   }
   // Announce ourselves honestly so well-behaved TUI apps can detect us.
-  out['TERM'] = 'xterm-256color';
-  out['COLORTERM'] = 'truecolor';
+  Object.assign(out, TERMINAL_CAPABILITY_ENV);
   out['TERM_PROGRAM'] = 'openalice-workspaces';
   out['TERM_PROGRAM_VERSION'] = SELF_VERSION;
   if (!out['LANG']) out['LANG'] = 'en_US.UTF-8';
