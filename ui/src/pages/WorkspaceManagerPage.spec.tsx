@@ -163,6 +163,7 @@ beforeEach(async () => {
   mocks.probeAgentRuntimeReadiness.mockResolvedValue(readiness())
   mocks.listAgentCredentials.mockResolvedValue([])
   mocks.detectWorkspaceCredential.mockResolvedValue({
+    configured: false,
     slug: null,
     model: null,
     contextWindow: null,
@@ -207,6 +208,8 @@ describe('WorkspaceManagerPage runtime selection', () => {
     const picker = await screen.findByRole('button', { name: 'Select agent' })
     expect(picker.textContent).toContain('Codex')
     expect(screen.getByText('Model and context are managed by Codex')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Configure workspace AI' }))
+    expect(mocks.openAgentConfig).toHaveBeenCalledWith('workspace-manager', 'codex', 'ai')
     fireEvent.click(picker)
 
     for (const name of ['Claude', 'Codex', 'OpenCode', 'Pi']) {
@@ -228,6 +231,38 @@ describe('WorkspaceManagerPage runtime selection', () => {
       kind: 'workspace-manager',
       params: { sessionId: 'manager-session' },
     })
+  })
+
+  it('discloses a Claude Workspace override and its native first-run gate', async () => {
+    mocks.useWorkspaces.mockImplementation(() => context('claude'))
+    mocks.listAgentCredentials.mockResolvedValue([{
+      slug: 'minimax-1',
+      label: 'MiniMax',
+      vendor: 'minimax',
+      authType: 'api-key',
+      wires: { anthropic: 'https://api.example.test/anthropic' },
+      resolvedModel: 'MiniMax-M2.5',
+    }])
+    mocks.detectWorkspaceCredential.mockResolvedValue({
+      configured: true,
+      slug: 'minimax-1',
+      model: 'MiniMax-M2.5',
+      contextWindow: null,
+      wireShape: 'anthropic',
+      interactiveSetupStatus: 'runtime-onboarding-required',
+    })
+
+    render(<WorkspaceManagerPage spec={{ kind: 'workspace-manager', params: {} }} />)
+
+    expect(await screen.findByText('Saved in this workspace')).toBeTruthy()
+    expect(screen.getByLabelText('Model MiniMax-M2.5')).toBeTruthy()
+    expect(screen.queryByText(/context$/)).toBeNull()
+    expect(screen.getByRole('status').textContent).toContain('Claude Code still needs its own first-run setup')
+    expect(mocks.listAgentCredentials).toHaveBeenCalledWith('claude')
+    expect(mocks.getAgentReadiness).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Adjust workspace AI' }))
+    expect(mocks.openAgentConfig).toHaveBeenCalledWith('workspace-manager', 'claude', 'ai')
   })
 
   it('shows and launches the Manager workspace model/context from the shared config', async () => {
@@ -255,6 +290,7 @@ describe('WorkspaceManagerPage runtime selection', () => {
       recentChatWorkspaceId: null,
     })
     mocks.detectWorkspaceCredential.mockResolvedValue({
+      configured: true,
       slug: 'google-1',
       model: 'gemini-3.1-flash-lite',
       contextWindow: 256_000,
@@ -333,6 +369,7 @@ describe('WorkspaceManagerPage runtime selection', () => {
   it('shows model/context for a usable hand-edited Manager config without a vault credential', async () => {
     mocks.useWorkspaces.mockImplementation(() => context('pi'))
     mocks.detectWorkspaceCredential.mockResolvedValue({
+      configured: true,
       slug: null,
       model: 'local-manual-model',
       contextWindow: 128_000,

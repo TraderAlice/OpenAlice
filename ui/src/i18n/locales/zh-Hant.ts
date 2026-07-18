@@ -463,6 +463,8 @@ export const zhHant: Resources = {
     adjustWorkspaceAi: '調整工作區 AI',
     configureWorkspaceAi: '設定工作區 AI',
     providerSettings: '供應方設定',
+    claudeOnboardingRequired: 'Claude Code 仍需完成它自己的首次設定。請在 TUI 中完成後繼續；OpenAlice 不會改動 Claude 的登入狀態。',
+    claudeWorkspaceTrustRequired: 'Claude Code 首次進入此工作區時會要求確認信任；確認一次後，已排隊的提示會繼續執行。',
     noCredBody: '{{name}} 尚未設定 AI 供應方，先新增一個才能開始對話。',
     credOverwrite: '傳送會把此 workspace 的供應方從 {{from}} 切換為 {{to}}。',
     send: '傳送',

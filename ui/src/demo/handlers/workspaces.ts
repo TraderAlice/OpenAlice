@@ -673,7 +673,7 @@ export const workspacesHandlers = [
   // Credential detection — demo workspaces have no on-disk config, so report
   // none (no overwrite notice; the picker defaults to the first compatible).
   http.get('/api/workspaces/:id/agent-config/:agent/credential', () =>
-    HttpResponse.json({ slug: null, model: null, contextWindow: null, wireShape: null }),
+    HttpResponse.json({ configured: false, slug: null, model: null, contextWindow: null, wireShape: null }),
   ),
   http.put('/api/workspaces/:id/agent-config/:agent', () => HttpResponse.json({ ok: true })),
   http.post('/api/workspaces/:id/agent-config/:agent/test', () =>

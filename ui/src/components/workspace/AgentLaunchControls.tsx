@@ -1,6 +1,7 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
+  AlertTriangle,
   Bot,
   Check,
   ChevronDown,
@@ -190,8 +191,8 @@ export interface AgentLaunchDetailsProps {
   readonly className?: string
 }
 
-/** Compact, truthful launch metadata. Loginless runtimes show the exact
- * model/context that will be injected; native-login CLIs say who owns it. */
+/** Compact, truthful launch metadata. Workspace-local config always wins the
+ * disclosure, while absent native fields remain unknown rather than inferred. */
 export function AgentLaunchDetails({
   config,
   hasWorkspaceTarget,
@@ -200,9 +201,11 @@ export function AgentLaunchDetails({
 }: AgentLaunchDetailsProps) {
   const { t } = useTranslation()
 
-  if (config.needsCredential && config.aiDetails) {
+  if (hasWorkspaceTarget && !config.workspaceConfigResolved) return null
+
+  let summary: ReactNode = null
+  if (config.aiDetails) {
     const model = config.aiDetails.model ?? t('chatLanding.runtimeDefaultModel')
-    const context = formatContextWindow(config.aiDetails.contextWindow)
     const workspaceSaved = config.aiDetails.source === 'workspace'
     const sourceLabel = workspaceSaved
       ? t('chatLanding.workspaceAiSaved')
@@ -214,8 +217,8 @@ export function AgentLaunchDetails({
         ? t('chatLanding.adjustWorkspaceAi')
         : t('chatLanding.configureWorkspaceAi')
       : t('chatLanding.providerSettings')
-    return (
-      <div className={`flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] text-muted-foreground ${className}`}>
+    summary = (
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] text-muted-foreground">
         <span className={workspaceSaved ? 'text-success' : 'text-primary'}>
           {sourceLabel}
         </span>
@@ -228,14 +231,22 @@ export function AgentLaunchDetails({
           <Cpu className="h-3 w-3 shrink-0" />
           <span className="truncate font-mono text-foreground/80">{model}</span>
         </span>
-        <span aria-hidden className="text-muted-foreground/40">·</span>
-        <span
-          className="inline-flex shrink-0 items-center gap-1"
-          aria-label={t('chatLanding.contextSummary', { limit: context })}
-        >
-          <Gauge className="h-3 w-3" />
-          {t('chatLanding.contextSummary', { limit: context })}
-        </span>
+        {config.aiDetails.contextWindow !== null && (
+          <>
+            <span aria-hidden className="text-muted-foreground/40">·</span>
+            <span
+              className="inline-flex shrink-0 items-center gap-1"
+              aria-label={t('chatLanding.contextSummary', {
+                limit: formatContextWindow(config.aiDetails.contextWindow),
+              })}
+            >
+              <Gauge className="h-3 w-3" />
+              {t('chatLanding.contextSummary', {
+                limit: formatContextWindow(config.aiDetails.contextWindow),
+              })}
+            </span>
+          </>
+        )}
         <button
           type="button"
           onClick={onAdjustAi}
@@ -248,16 +259,49 @@ export function AgentLaunchDetails({
         </button>
       </div>
     )
-  }
-
-  if (config.selectedAgent && (!config.needsCredential || config.selectedRuntimeUsesGlobalConfig)) {
-    return (
-      <div className={`flex min-w-0 items-center gap-1.5 text-[10.5px] text-muted-foreground ${className}`}>
-        <Bot className="h-3 w-3 shrink-0" />
-        <span>{t('chatLanding.runtimeManagedAi', { runtime: config.selectedAgent.displayName })}</span>
+  } else if (config.selectedAgent && (!config.needsCredential || config.selectedRuntimeUsesGlobalConfig)) {
+    summary = (
+      <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[10.5px] text-muted-foreground">
+        <span className="inline-flex min-w-0 items-center gap-1.5">
+          <Bot className="h-3 w-3 shrink-0" />
+          <span>{t('chatLanding.runtimeManagedAi', { runtime: config.selectedAgent.displayName })}</span>
+        </span>
+        {!config.needsCredential && hasWorkspaceTarget && (
+          <button
+            type="button"
+            onClick={onAdjustAi}
+            className="oa-pressable inline-flex min-h-7 items-center gap-1 rounded-md px-2 py-1 text-primary hover:bg-primary/10 sm:ml-auto"
+            aria-label={t('chatLanding.configureWorkspaceAi')}
+            title={t('chatLanding.configureWorkspaceAi')}
+          >
+            <Settings2 className="h-3 w-3" />
+            {t('chatLanding.configureWorkspaceAi')}
+          </button>
+        )}
       </div>
     )
   }
 
-  return null
+  const setupStatus = config.detectedCredential?.interactiveSetupStatus
+  const setupNotice = setupStatus === 'runtime-onboarding-required'
+    ? t('chatLanding.claudeOnboardingRequired')
+    : setupStatus === 'workspace-trust-required'
+      ? t('chatLanding.claudeWorkspaceTrustRequired')
+      : null
+
+  if (summary === null && setupNotice === null) return null
+  return (
+    <div className={`flex min-w-0 flex-col gap-1.5 ${className}`}>
+      {summary}
+      {setupNotice !== null && (
+        <div
+          role="status"
+          className="flex min-w-0 items-start gap-1.5 text-[10.5px] leading-relaxed text-warning"
+        >
+          <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+          <span>{setupNotice}</span>
+        </div>
+      )}
+    </div>
+  )
 }

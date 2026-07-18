@@ -28,6 +28,7 @@ import { WebPiView } from '../components/workspace/WebPiView'
 import { ResumeCta } from '../components/workspace/ResumeCta'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { useAgentLaunchConfig, useAgentLaunchPreferences } from '../hooks/useAgentLaunchConfig'
+import { isWorkspaceAiAgent } from '../lib/agentRuntime'
 import { useWorkspace } from '../tabs/store'
 import type { ViewSpec } from '../tabs/types'
 
@@ -127,7 +128,7 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
   }
 
   const adjustManagerAi = () => {
-    if (effectiveAgent === 'opencode' || effectiveAgent === 'pi') {
+    if (isWorkspaceAiAgent(effectiveAgent)) {
       openAgentConfig(MANAGER_WORKSPACE_ID, effectiveAgent, 'ai')
       return
     }

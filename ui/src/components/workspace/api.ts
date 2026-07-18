@@ -1221,11 +1221,18 @@ export async function listAgentCredentials(agent: string): Promise<SavedCredenti
 
 /** Which vault credential a workspace's agent is currently configured with (null = none/hand-edited). */
 export interface WorkspaceCredentialDetection {
+  /** True when the runtime has any usable native Workspace config, even when its key is hand-edited. */
+  readonly configured: boolean;
   readonly slug: string | null;
   readonly model: string | null;
   readonly contextWindow: number | null;
   readonly wireShape: WireShape | null;
   readonly reasoning?: boolean | null;
+  readonly interactiveSetupStatus?:
+    | 'ready'
+    | 'runtime-onboarding-required'
+    | 'workspace-trust-required'
+    | 'unknown';
 }
 
 export async function detectWorkspaceCredential(
@@ -1235,7 +1242,14 @@ export async function detectWorkspaceCredential(
   const res = await fetch(
     `/api/workspaces/${encodeURIComponent(wsId)}/agent-config/${encodeURIComponent(agent)}/credential`,
   );
-  if (!res.ok) return { slug: null, model: null, contextWindow: null, wireShape: null, reasoning: null };
+  if (!res.ok) return {
+    configured: false,
+    slug: null,
+    model: null,
+    contextWindow: null,
+    wireShape: null,
+    reasoning: null,
+  };
   return (await res.json()) as WorkspaceCredentialDetection;
 }
 

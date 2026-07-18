@@ -1,7 +1,13 @@
+import { readFile, realpath } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-import type { CliAdapter, SpawnContext, WorkspaceAiCred } from '../cli-adapter.js';
+import type {
+  AgentInteractiveSetupStatus,
+  CliAdapter,
+  SpawnContext,
+  WorkspaceAiCred,
+} from '../cli-adapter.js';
 import { readWorkspaceFile } from '../file-service.js';
 import type { HeadlessOutputEvent } from '../headless-output.js';
 import { resetOwnedJsonConfig, writeOwnedJsonConfig } from './owned-json-config.js';
@@ -43,6 +49,69 @@ const HEADLESS_ALLOWED_TOOLS = [
   'Bash(traderhub:*)',
 ].join(',');
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Claude Code has two native gates that can consume the first interactive
+ * screen before a seeded prompt: global onboarding and per-project trust.
+ * Current Claude Code exposes no status/accept command for either gate, so we
+ * read only the small booleans it already owns in `~/.claude.json`.
+ *
+ * This deliberately remains advisory and fail-open. The private file is never
+ * changed, and an unfamiliar/corrupt shape returns `unknown` rather than
+ * blocking launch or guessing that setup is complete.
+ */
+export async function readClaudeInteractiveSetupStatus(
+  cwd: string,
+  homeDir = homedir(),
+): Promise<AgentInteractiveSetupStatus> {
+  let parsed: unknown;
+  try {
+    const raw = await readFile(join(homeDir, '.claude.json'), 'utf8');
+    parsed = JSON.parse(raw) as unknown;
+  } catch (error) {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      (error as { code?: string }).code === 'ENOENT'
+    ) {
+      return 'runtime-onboarding-required';
+    }
+    return 'unknown';
+  }
+
+  if (!isRecord(parsed)) return 'unknown';
+  const onboarding = parsed['hasCompletedOnboarding'];
+  if (onboarding === false || onboarding === undefined) {
+    return 'runtime-onboarding-required';
+  }
+  if (onboarding !== true) return 'unknown';
+
+  const projects = parsed['projects'];
+  if (projects === undefined) return 'workspace-trust-required';
+  if (!isRecord(projects)) return 'unknown';
+  const resolvedCwd = resolve(cwd);
+  const physicalCwd = await realpath(resolvedCwd).catch(() => resolvedCwd);
+  let projectSeen = false;
+  const trusted = [resolvedCwd, physicalCwd].some((candidate) => {
+    const project = projects[candidate];
+    if (project !== undefined) projectSeen = true;
+    return isRecord(project) && project['hasTrustDialogAccepted'] === true;
+  });
+  if (!trusted && projectSeen) {
+    const project = projects[resolvedCwd] ?? projects[physicalCwd];
+    if (!isRecord(project)) return 'unknown';
+    const accepted = project['hasTrustDialogAccepted'];
+    if (accepted !== undefined && typeof accepted !== 'boolean') return 'unknown';
+  }
+  return trusted
+    ? 'ready'
+    : 'workspace-trust-required';
+}
+
 /** dashed-cwd convention used by Claude Code's project store. */
 function projectKey(workspaceDir: string): string {
   const abs = resolve(workspaceDir);
@@ -81,6 +150,8 @@ export const claudeAdapter: CliAdapter = {
     transcriptDiscovery: 'fs-watch',
     headless: true,
   },
+
+  readInteractiveSetupStatus: readClaudeInteractiveSetupStatus,
 
   composeCommand(base: readonly string[], ctx: SpawnContext): readonly string[] {
     const cmd = [...base, '--settings', AUTOTRUST_SETTINGS];
