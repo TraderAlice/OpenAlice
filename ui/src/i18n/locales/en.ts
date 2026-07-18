@@ -53,7 +53,13 @@ export const en = {
     },
     appearance: {
       title: 'Appearance',
-      description: 'Layout and chrome preferences. Stored locally on this device.',
+      description: 'Color and layout preferences. Stored locally on this device.',
+      colorMode: 'Color mode',
+      colorModeDescription: 'Auto follows the system; Day and Night pin one side of the configured palette pair.',
+      dayPalette: 'Day palette',
+      dayPaletteDescription: 'Used in Day mode and while Auto resolves to a light appearance.',
+      nightPalette: 'Night palette',
+      nightPaletteDescription: 'Used in Night mode and while Auto resolves to a dark appearance.',
       showEditorTabs: 'Show editor tabs',
       showEditorTabsOn: 'The tab strip above the editor is shown — click to switch, × or middle-click to close.',
       showEditorTabsOff: 'The tab strip is hidden. Navigate from the sidebar; turn this on for VS Code-style tabs.',
@@ -442,6 +448,13 @@ export const en = {
   theme: {
     mode: { auto: 'Auto', light: 'Light', dark: 'Dark' },
     switchTo: 'Switch to {{mode}}',
+    palette: { paper: 'Paper', porcelain: 'Porcelain', graphite: 'Graphite', midnight: 'Midnight' },
+    paletteDescription: {
+      paper: 'Warm, editorial neutrals',
+      porcelain: 'Cool, crisp workspace',
+      graphite: 'Neutral low-glare dark',
+      midnight: 'Deep blue night palette',
+    },
   },
   dev: {
     snapshots: 'Snapshots',

@@ -3,6 +3,14 @@ import { basename, extname, resolve } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
+import {
+  DARK_PALETTES,
+  LIGHT_PALETTES,
+  THEME_PALETTES,
+  resolveEffectivePalette,
+  type ThemePaletteId,
+} from './palettes'
+
 const repoRoot = basename(process.cwd()) === 'ui' ? resolve(process.cwd(), '..') : process.cwd()
 const uiRoot = resolve(repoRoot, 'ui')
 const palette = readFileSync(resolve(uiRoot, 'src/theme/palette.css'), 'utf8')
@@ -29,6 +37,8 @@ const CORE_TOKENS = [
   'input',
   'ring',
 ] as const
+
+const PALETTE_IDS: readonly ThemePaletteId[] = ['paper', 'porcelain', 'graphite', 'midnight']
 
 const ALLOWED_LITERAL_COLOR_FILES = new Set([
   // Single product color authority.
@@ -60,24 +70,44 @@ function withoutComments(source: string): string {
     .replace(/^\s*\/\/.*$/gm, '')
 }
 
+function paletteBlock(id: ThemePaletteId): string {
+  const block = palette.match(new RegExp(`\\[data-palette-preview="${id}"\\]\\s*\\{([\\s\\S]*?)\\n\\}`))?.[1]
+  expect(block, `missing ${id} palette`).toBeDefined()
+  return block!
+}
+
 describe('semantic color contract', () => {
-  it('defines the Orca/shadcn core vocabulary for light, dark, and auto-dark', () => {
-    for (const token of CORE_TOKENS) {
-      expect(palette.match(new RegExp(`--${token}:`, 'g'))?.length, token).toBe(3)
-      expect(indexCss, token).toContain(`--color-${token}: var(--${token});`)
+  it('ships two complete light cards and two complete dark cards', () => {
+    expect(LIGHT_PALETTES.map(({ id }) => id)).toEqual(['paper', 'porcelain'])
+    expect(DARK_PALETTES.map(({ id }) => id)).toEqual(['graphite', 'midnight'])
+    expect(THEME_PALETTES.map(({ id }) => id)).toEqual(PALETTE_IDS)
+    expect(new Set(PALETTE_IDS).size).toBe(4)
+
+    for (const id of PALETTE_IDS) {
+      const block = paletteBlock(id)
+      for (const token of CORE_TOKENS) {
+        expect(block, `${id}: --${token}`).toContain(`--${token}:`)
+        expect(indexCss, token).toContain(`--color-${token}: var(--${token});`)
+      }
     }
   })
 
-  it('keeps every palette token symmetric across light, dark, and auto-dark', () => {
-    const lightBlock = palette.match(/:root\s*\{([\s\S]*?)\n\}/)?.[1]
-    expect(lightBlock).toBeDefined()
-
-    const tokens = [...lightBlock!.matchAll(/^\s*(--[\w-]+):/gm)].map((match) => match[1])
+  it('keeps every semantic token symmetric across all four cards', () => {
+    const tokens = [...paletteBlock('paper').matchAll(/^\s*(--[\w-]+):/gm)].map((match) => match[1])
     expect(tokens.length).toBeGreaterThan(CORE_TOKENS.length)
 
-    for (const token of tokens) {
-      expect(palette.match(new RegExp(`${token}:`, 'g'))?.length, token).toBe(3)
+    for (const id of PALETTE_IDS) {
+      const cardTokens = [...paletteBlock(id).matchAll(/^\s*(--[\w-]+):/gm)].map((match) => match[1])
+      expect(cardTokens.sort(), id).toEqual([...tokens].sort())
     }
+  })
+
+  it('resolves auto, day, and night modes through one palette selector', () => {
+    expect(resolveEffectivePalette('auto', false, 'porcelain', 'midnight')).toBe('porcelain')
+    expect(resolveEffectivePalette('auto', true, 'porcelain', 'midnight')).toBe('midnight')
+    expect(resolveEffectivePalette('light', true, 'paper', 'graphite')).toBe('paper')
+    expect(resolveEffectivePalette('dark', false, 'paper', 'graphite')).toBe('graphite')
+    expect(palette).not.toMatch(/data-theme|prefers-color-scheme/)
   })
 
   it('keeps literal product colors in the color card', () => {

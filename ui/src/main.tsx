@@ -6,7 +6,7 @@ import { ToastProvider } from './components/Toast'
 import { AuthProvider } from './auth/AuthContext'
 import { AuthGate } from './auth/AuthGate'
 import './index.css'
-import './theme' // side-effect: apply persisted color theme to <html data-theme>
+import './theme' // side-effect: resolve persisted mode + palette pair on <html>
 import './i18n' // side-effect: init react-i18next + seed locale before first render
 
 if (import.meta.env.VITE_DEMO_MODE) {

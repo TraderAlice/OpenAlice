@@ -12,7 +12,7 @@ import {
 } from 'lightweight-charts'
 import { barsApi, type AssetClass, type HistoricalBar, type BarSourceCandidate, type BarMeta } from '../../api/market'
 import { readSemanticColor } from '../../theme/semanticColors'
-import { useEffectiveTheme } from '../../theme/useEffectiveTheme'
+import { useEffectivePalette, useEffectiveTheme } from '../../theme/useEffectiveTheme'
 import { Skeleton } from '../StateViews'
 
 type Interval = '1m' | '5m' | '1h' | '1d'
@@ -67,6 +67,7 @@ interface Props {
 
 export function KlinePanel({ selection, source }: Props) {
   const effectiveTheme = useEffectiveTheme()
+  const effectivePalette = useEffectivePalette()
   const [searchParams, setSearchParams] = useSearchParams()
   const interval = parseInterval(searchParams.get('interval'))
   const tf = parseTimeframe(searchParams.get('range'))
@@ -153,12 +154,12 @@ export function KlinePanel({ selection, source }: Props) {
       candleRef.current = null
       volumeRef.current = null
     }
-  }, [effectiveTheme])
+  }, [effectiveTheme, effectivePalette])
 
   // Toggle time-axis detail when interval flips between intraday and daily.
   useEffect(() => {
     chartRef.current?.timeScale().applyOptions({ timeVisible: INTRADAY.has(interval) })
-  }, [interval, effectiveTheme])
+  }, [interval, effectiveTheme, effectivePalette])
 
   // Discover the available bar sources for this symbol (populates the picker).
   // Seed the picked source from the focused tab; otherwise null → vendor default.
@@ -256,7 +257,7 @@ export function KlinePanel({ selection, source }: Props) {
     candleRef.current.setData(candleData)
     volumeRef.current.setData(volumeData)
     chartRef.current.timeScale().fitContent()
-  }, [bars, effectiveTheme])
+  }, [bars, effectiveTheme, effectivePalette])
 
   const title = useMemo(() => {
     if (!selection) return 'Select a symbol'

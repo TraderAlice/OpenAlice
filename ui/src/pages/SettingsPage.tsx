@@ -11,6 +11,8 @@ import { useTranslation } from 'react-i18next'
 import { useLocale, useSetLocale, LOCALE_LABELS } from '../i18n/useLocale'
 import { useEditorTabsPref } from '../live/editor-tabs-pref'
 import { preferencesApi, type WorkspaceShellStatus } from '../api/preferences'
+import { DARK_PALETTES, LIGHT_PALETTES, type ThemePaletteDefinition, type ThemePaletteId } from '../theme/palettes'
+import { useThemeStore, type AppTheme } from '../theme/store'
 
 // ==================== Appearance ====================
 
@@ -18,8 +20,60 @@ function AppearanceSection() {
   const { t } = useTranslation()
   const showEditorTabs = useEditorTabsPref((s) => s.showEditorTabs)
   const setShowEditorTabs = useEditorTabsPref((s) => s.setShowEditorTabs)
+  const theme = useThemeStore((s) => s.theme)
+  const lightPalette = useThemeStore((s) => s.lightPalette)
+  const darkPalette = useThemeStore((s) => s.darkPalette)
+  const setTheme = useThemeStore((s) => s.setTheme)
+  const setLightPalette = useThemeStore((s) => s.setLightPalette)
+  const setDarkPalette = useThemeStore((s) => s.setDarkPalette)
+  const modes: readonly AppTheme[] = ['auto', 'light', 'dark']
   return (
     <ConfigSection title={t('settings.appearance.title')} description={t('settings.appearance.description')}>
+      <div className="border-b border-border/60 pb-5">
+        <div>
+          <span className="text-sm font-medium text-foreground">
+            {t('settings.appearance.colorMode')}
+          </span>
+          <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
+            {t('settings.appearance.colorModeDescription')}
+          </p>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={t('settings.appearance.colorMode')}>
+          {modes.map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setTheme(mode)}
+              aria-pressed={theme === mode}
+              className={`rounded-md border px-3 py-1.5 text-[12px] font-medium transition-colors ${
+                theme === mode
+                  ? 'border-primary bg-primary-muted text-primary'
+                  : 'border-border bg-background text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {t(`theme.mode.${mode}`)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid gap-5 border-b border-border/60 py-5 lg:grid-cols-2">
+        <PalettePicker
+          title={t('settings.appearance.dayPalette')}
+          description={t('settings.appearance.dayPaletteDescription')}
+          palettes={LIGHT_PALETTES}
+          selected={lightPalette}
+          onSelect={setLightPalette}
+        />
+        <PalettePicker
+          title={t('settings.appearance.nightPalette')}
+          description={t('settings.appearance.nightPaletteDescription')}
+          palettes={DARK_PALETTES}
+          selected={darkPalette}
+          onSelect={setDarkPalette}
+        />
+      </div>
+
       <div className="flex items-center justify-between gap-4 py-1">
         <div className="flex-1">
           <span className="text-sm font-medium text-foreground">
@@ -34,6 +88,78 @@ function AppearanceSection() {
         <Toggle checked={showEditorTabs} onChange={setShowEditorTabs} />
       </div>
     </ConfigSection>
+  )
+}
+
+function PalettePicker<T extends ThemePaletteId>({
+  title,
+  description,
+  palettes,
+  selected,
+  onSelect,
+}: {
+  title: string
+  description: string
+  palettes: readonly ThemePaletteDefinition<T>[]
+  selected: T
+  onSelect: (palette: T) => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <div>
+      <span className="text-sm font-medium text-foreground">{title}</span>
+      <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">{description}</p>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+        {palettes.map((palette) => (
+          <button
+            key={palette.id}
+            type="button"
+            data-palette-preview={palette.id}
+            onClick={() => onSelect(palette.id)}
+            aria-pressed={selected === palette.id}
+            className={`min-w-0 rounded-lg border bg-background p-3 text-left text-foreground shadow-sm transition-all ${
+              selected === palette.id
+                ? 'border-primary ring-2 ring-primary/25'
+                : 'border-border hover:border-primary/60'
+            }`}
+          >
+            <span className="flex items-start justify-between gap-2">
+              <span className="min-w-0">
+                <span className="block truncate text-[12px] font-semibold">{t(palette.labelKey)}</span>
+                <span className="mt-0.5 block text-[10px] leading-snug text-muted-foreground">
+                  {t(palette.descriptionKey)}
+                </span>
+              </span>
+              <span
+                className={`mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full border ${
+                  selected === palette.id ? 'border-primary bg-primary' : 'border-border bg-muted'
+                }`}
+                aria-hidden
+              />
+            </span>
+            <span className="mt-3 flex items-center gap-1.5" aria-hidden>
+              <span className="h-4 flex-1 rounded-sm bg-primary" />
+              <span className="h-4 flex-1 rounded-sm bg-success" />
+              <span className="h-4 flex-1 rounded-sm bg-warning" />
+              <span className="h-4 flex-1 rounded-sm bg-destructive" />
+            </span>
+            <span
+              className="mt-2 flex h-5 items-center gap-1 rounded border border-border px-1.5"
+              style={{ background: 'var(--terminal-background)', color: 'var(--terminal-foreground)' }}
+              aria-hidden
+            >
+              <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--terminal-red)' }} />
+              <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--terminal-yellow)' }} />
+              <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--terminal-green)' }} />
+              <span
+                className="ml-1 h-px flex-1"
+                style={{ background: 'color-mix(in srgb, var(--terminal-foreground) 35%, transparent)' }}
+              />
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
   )
 }
 

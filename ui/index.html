@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="auto">
+<html lang="en" data-theme="auto" data-palette="paper" data-light-palette="paper" data-dark-palette="graphite">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
@@ -7,22 +7,34 @@
     <title>OpenAlice</title>
     <meta name="color-scheme" content="light dark" />
     <script>
-      // No-flash theme: mirror the persisted preference onto <html data-theme>
-      // before first paint. Source of truth is the zustand theme store
-      // (openalice.theme.v1); ui/src/theme re-applies + self-heals on boot.
+      // No-flash theme: resolve the persisted mode + day/night palette pair
+      // before first paint. ui/src/theme re-applies and self-heals on boot.
       (function () {
         try {
           var raw = localStorage.getItem('openalice.theme.v1');
-          var t = raw ? (JSON.parse(raw).state || {}).theme : 'auto';
-          document.documentElement.dataset.theme =
-            t === 'light' || t === 'dark' ? t : 'auto';
+          var state = raw ? (JSON.parse(raw).state || {}) : {};
+          var t = state.theme === 'light' || state.theme === 'dark' ? state.theme : 'auto';
+          var light = state.lightPalette === 'porcelain' ? 'porcelain' : 'paper';
+          var dark = state.darkPalette === 'midnight' ? 'midnight' : 'graphite';
+          var effective = t === 'auto'
+            ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+            : t;
+          var root = document.documentElement;
+          root.dataset.theme = t;
+          root.dataset.lightPalette = light;
+          root.dataset.darkPalette = dark;
+          root.dataset.palette = effective === 'dark' ? dark : light;
         } catch (e) {
-          document.documentElement.dataset.theme = 'auto';
+          var root = document.documentElement;
+          root.dataset.theme = 'auto';
+          root.dataset.lightPalette = 'paper';
+          root.dataset.darkPalette = 'graphite';
+          root.dataset.palette = 'paper';
         }
       })();
     </script>
   </head>
-  <body class="h-full bg-bg text-text">
+  <body class="h-full bg-background text-foreground">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

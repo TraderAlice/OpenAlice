@@ -9,7 +9,7 @@ import { useMemo } from 'react'
 
 import type { ITheme } from '@xterm/xterm'
 
-import { useEffectiveTheme } from '../../theme/useEffectiveTheme'
+import { useEffectivePalette, useEffectiveTheme } from '../../theme/useEffectiveTheme'
 import type { TerminalViewAttributes, TerminalViewRgb } from './protocol'
 
 export type TerminalColorSchemeMode = 'dark' | 'light'
@@ -169,7 +169,8 @@ export function resolveTerminalAppearance(
 
 export function useTerminalAppearance(): TerminalAppearance {
   const mode = useEffectiveTheme()
-  return useMemo(() => resolveTerminalAppearance(mode), [mode])
+  const palette = useEffectivePalette()
+  return useMemo(() => resolveTerminalAppearance(mode), [mode, palette])
 }
 
 export function terminalThemesEqual(a: ITheme | undefined, b: ITheme): boolean {

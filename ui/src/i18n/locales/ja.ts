@@ -42,7 +42,13 @@ export const ja: Resources = {
     },
     appearance: {
       title: '外観',
-      description: 'レイアウトと UI の設定。この端末にのみ保存されます。',
+      description: '色とレイアウトの設定。この端末にのみ保存されます。',
+      colorMode: 'カラーモード',
+      colorModeDescription: '自動はシステムに追従し、ライトとダークは設定したパレットの片側に固定します。',
+      dayPalette: '昼用パレット',
+      dayPaletteDescription: 'ライトモードと、自動がライト表示になる場合に使います。',
+      nightPalette: '夜用パレット',
+      nightPaletteDescription: 'ダークモードと、自動がダーク表示になる場合に使います。',
       showEditorTabs: 'エディタタブを表示',
       showEditorTabsOn: 'エディタ上部にタブバーを表示 —— クリックで切替、× または中クリックで閉じる。',
       showEditorTabsOff: 'タブバーは非表示。サイドバーから移動します。VS Code 風のタブが欲しい場合はオンに。',
@@ -431,6 +437,13 @@ export const ja: Resources = {
   theme: {
     mode: { auto: '自動', light: 'ライト', dark: 'ダーク' },
     switchTo: '{{mode}}に切り替え',
+    palette: { paper: 'ペーパー', porcelain: 'ポーセリン', graphite: 'グラファイト', midnight: 'ミッドナイト' },
+    paletteDescription: {
+      paper: '温かみのある編集向け中間色',
+      porcelain: '涼しく鮮明なワークスペース',
+      graphite: '低反射のニュートラルダーク',
+      midnight: '深いブルーの夜間パレット',
+    },
   },
   dev: {
     snapshots: 'スナップショット',

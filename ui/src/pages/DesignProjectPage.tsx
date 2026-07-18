@@ -20,7 +20,7 @@ import type { ReactNode } from 'react'
 
 import { designProjects, getDesignProject, type DesignProject, type DesignVariant } from '../design/projects'
 import { readSemanticColor } from '../theme/semanticColors'
-import { useEffectiveTheme } from '../theme/useEffectiveTheme'
+import { useEffectivePalette, useEffectiveTheme } from '../theme/useEffectiveTheme'
 import type { ViewSpec } from '../tabs/types'
 
 interface DesignProjectPageProps {
@@ -321,16 +321,17 @@ const TERMINAL_COLOR_TOKENS = [
 
 function SemanticColorCard() {
   const effectiveTheme = useEffectiveTheme()
+  const effectivePalette = useEffectivePalette()
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <div className="text-[13px] font-semibold text-foreground">Resolved semantic tokens</div>
-          <div className="mt-1 text-[11px] text-muted-foreground">Reading the live {effectiveTheme} palette from palette.css</div>
+          <div className="mt-1 text-[11px] text-muted-foreground">Reading the live {effectivePalette} ({effectiveTheme}) card from palette.css</div>
         </div>
         <span className="rounded-full border border-border bg-secondary px-2 py-1 text-[10px] font-medium text-muted-foreground">
-          {effectiveTheme}
+          {effectivePalette} · {effectiveTheme}
         </span>
       </div>
 

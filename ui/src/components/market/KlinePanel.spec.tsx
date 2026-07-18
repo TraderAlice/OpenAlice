@@ -29,6 +29,7 @@ vi.mock('../../api/market', async (importOriginal) => {
 
 vi.mock('../../theme/useEffectiveTheme', () => ({
   useEffectiveTheme: () => 'light',
+  useEffectivePalette: () => 'paper',
 }))
 
 vi.mock('../../theme/semanticColors', () => ({

@@ -1,11 +1,12 @@
 /**
  * The color-theme toggle that lives in the ActivityBar footer. One icon
  * button cycles auto → light → dark → auto. The icon reflects the concrete
- * effective palette (sun / moon); auto adds a tiny badge instead of using an
+ * effective mode (sun / moon); auto adds a tiny badge instead of using an
  * abstract monitor icon.
  *
  * State is the theme store (ui/src/theme/store); the side-effect module
- * applies `<html data-theme>`, CSS does the rest. No prop drilling.
+ * resolves the configured day/night card onto `<html data-palette>`. No prop
+ * drilling.
  */
 
 import { Moon, Sun } from 'lucide-react'
