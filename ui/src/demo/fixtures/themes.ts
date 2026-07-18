@@ -3,6 +3,8 @@ import type {
   ImportedThemeFormat,
   ResolvedThemeTokens,
   ThemeFamily,
+  ThemeGeneratorDetectionSnapshot,
+  ThemeGeneratorId,
   ThemePalette,
   ThemeVariantMode,
 } from '../../api/themes'
@@ -63,6 +65,65 @@ export function demoThemeFamily(
   }
   return family
 }
+
+export const demoGeneratorDetectionIds = {
+  matugen: '11111111-1111-4111-8111-111111111111',
+  hellwal: '22222222-2222-4222-8222-222222222222',
+} as const
+
+export function demoGeneratedThemeFamily(
+  generator: ThemeGeneratorId,
+  name: string,
+  modes: readonly ThemeVariantMode[],
+  parameters: Readonly<Record<string, string | number>>,
+): ThemeFamily {
+  const family = demoThemeFamily('tinted-base16', name, modes)
+  family.id = `demo-generated-${generator}-${modes.join('-')}`
+  for (const mode of modes) {
+    const variant = family.variants[mode]!
+    variant.id = `${family.id}-${mode}`
+    variant.provenance = {
+      kind: 'generated', generator,
+      executablePath: generator === 'matugen' ? '/demo/bin/matugen' : '/demo/bin/hellwal',
+      executableVersion: generator === 'matugen' ? 'matugen 4.1.0' : '1.0.7',
+      imageSha256: 'd'.repeat(64), parameters: { ...parameters, mode },
+      generatedAt: '2026-07-18T00:00:00.000Z', mappingVersion: 1,
+    }
+  }
+  return family
+}
+
+export const demoGeneratorSnapshots = {
+  available: {
+    refreshedAt: '2026-07-18T00:00:00.000Z',
+    generators: {
+      matugen: {
+        kind: 'available', generator: 'matugen', detectionId: demoGeneratorDetectionIds.matugen,
+        executablePath: '/demo/bin/matugen', version: 'matugen 4.1.0', binarySha256: 'a'.repeat(64),
+        capabilities: { kind: 'matugen', dryRunJson: true, modes: ['light', 'dark'], schemes: ['tonal-spot', 'vibrant'] },
+      },
+      hellwal: {
+        kind: 'available', generator: 'hellwal', detectionId: demoGeneratorDetectionIds.hellwal,
+        executablePath: '/demo/bin/hellwal', version: '1.0.7', binarySha256: 'b'.repeat(64),
+        capabilities: { kind: 'hellwal', json: true, noCache: true, skipTermColors: true, modes: ['light', 'dark'], offsets: ['dark', 'bright'] },
+      },
+    },
+  },
+  unavailable: {
+    refreshedAt: '2026-07-18T00:00:00.000Z',
+    generators: {
+      matugen: { kind: 'unavailable', generator: 'matugen', reason: 'not-on-path' },
+      hellwal: { kind: 'unavailable', generator: 'hellwal', reason: 'not-on-path' },
+    },
+  },
+  unsupported: {
+    refreshedAt: '2026-07-18T00:00:00.000Z',
+    generators: {
+      matugen: { kind: 'unsupported', generator: 'matugen', executablePath: '/demo/bin/matugen', reason: 'missing required image capability' },
+      hellwal: { kind: 'unsupported', generator: 'hellwal', executablePath: '/demo/bin/hellwal', reason: 'missing --no-cache' },
+    },
+  },
+} as const satisfies Readonly<Record<string, ThemeGeneratorDetectionSnapshot>>
 
 export interface DemoThemeImportFixture {
   filename: string

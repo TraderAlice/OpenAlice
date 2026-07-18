@@ -58,6 +58,23 @@ export const zh: Resources = {
       idCollision: '相同稳定 ID 的主题已存在；现有文件不会被覆盖。', pairVariants: '配对变体', saveImport: '保存导入',
       reference: '实时主题参照', active: '使用中', delete: '删除', surface: '基础表面', card: '卡片', accent: '强调色',
       xtermPreview: '实时 xterm.js 色板', loadFailed: '主题加载失败。',
+      base16Label: 'Base16 色板', ansiLabel: 'ANSI 0–15', extendedAnsiLabel: '扩展 ANSI 16–21',
+      appearance: {
+        terminal: '终端主题', followApp: '跟随应用', override: '独立终端主题', marketColors: '市场颜色来源', marketDirection: '市场涨跌习惯', statusColors: '状态颜色来源',
+        protected: '高辨识度保护色', theme: '主题颜色', greenUp: '绿涨红跌', redUp: '红涨绿跌', systemUnavailable: '跟随系统需要同时具备浅色和深色变体。', deleteReferenced: '删除前请先切换应用或终端正在使用的主题。',
+      },
+      generator: {
+        title: '从图片生成', description: '保存前先在本地预览主题。', refresh: '刷新工具', matugen: 'Matugen', hellwal: 'Hellwal', unavailable: '未在应用 PATH 中找到', unsupported: '已安装但不受支持',
+        available: '可用', executablePath: '可执行文件路径', version: '版本', capabilities: '已验证能力', image: '图片', chooseImage: '选择图片', familyName: '主题名称', modes: '变体', scheme: 'Material 方案',
+        darkOffset: '暗色偏移', brightOffset: '亮色偏移', offsetHint: '0–1', generate: '生成预览', generating: '正在生成…', cancel: '取消生成', cancelled: '生成已取消，输入已保留。', failed: '生成失败', stale: '工具已变化，请刷新能力。',
+        save: '保存生成主题', fullFamily: '浅色和深色完整 family', singleVariant: '单个变体',
+      },
+      provenance: { title: '来源详情', source: '来源', mappingVersion: '映射版本', contentDigest: '内容摘要', imageDigest: '图片摘要', importedAt: '导入时间', generatedAt: '生成时间', parameters: '参数', author: '作者' },
+      crossSurfacePreview: {
+        title: '跨界面预览', description: '只预览候选颜色，不会改变当前外观。', application: '应用与交互', surface: '表面与正文', textHierarchy: '文字层级', mutedText: '辅助文字', hover: '悬停', active: '按下', selection: '选中', focus: '键盘焦点',
+        success: '成功', warning: '警告', danger: '危险', info: '信息', market: '市场与图表', chart: 'K 线、成交量和图表界面预览', pnlUp: '正收益', pnlDown: '负收益', buy: '买入方向', sell: '卖出方向',
+        risk: '风险含义不变量', destructive: '破坏性操作', permissionDenied: '权限拒绝', tradeConfirm: '真实交易确认', brokerFailure: 'Broker 写入失败', riskBlocked: '风控阻止', terminal: '终端色板', terminalSelection: '终端选中文字',
+      },
     },
     dataHome: {
       title: '资料存放位置',

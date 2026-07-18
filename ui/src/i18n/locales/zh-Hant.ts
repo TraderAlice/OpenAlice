@@ -66,6 +66,23 @@ export const zhHant: Resources = {
       idCollision: '相同穩定 ID 的主題已存在；不會覆寫現有檔案。', pairVariants: '配對變體', saveImport: '儲存匯入',
       reference: '即時主題參照', active: '使用中', delete: '刪除', surface: '基礎表面', card: '卡片', accent: '強調色',
       xtermPreview: '即時 xterm.js 色盤', loadFailed: '主題載入失敗。',
+      base16Label: 'Base16 色盤', ansiLabel: 'ANSI 0–15', extendedAnsiLabel: '擴充 ANSI 16–21',
+      appearance: {
+        terminal: '終端主題', followApp: '跟隨應用程式', override: '獨立終端主題', marketColors: '市場顏色來源', marketDirection: '市場漲跌慣例', statusColors: '狀態顏色來源',
+        protected: '高辨識度保護色', theme: '主題顏色', greenUp: '綠漲紅跌', redUp: '紅漲綠跌', systemUnavailable: '跟隨系統需要同時具備淺色與深色變體。', deleteReferenced: '刪除前請先切換應用程式或終端正在使用的主題。',
+      },
+      generator: {
+        title: '從圖片產生', description: '儲存前先在本機預覽主題。', refresh: '重新整理工具', matugen: 'Matugen', hellwal: 'Hellwal', unavailable: '未在應用程式 PATH 中找到', unsupported: '已安裝但不受支援',
+        available: '可用', executablePath: '可執行檔路徑', version: '版本', capabilities: '已驗證能力', image: '圖片', chooseImage: '選擇圖片', familyName: '主題名稱', modes: '變體', scheme: 'Material 方案',
+        darkOffset: '暗色偏移', brightOffset: '亮色偏移', offsetHint: '0–1', generate: '產生預覽', generating: '正在產生…', cancel: '取消產生', cancelled: '產生已取消，輸入已保留。', failed: '產生失敗', stale: '工具已變更，請重新整理能力。',
+        save: '儲存產生的主題', fullFamily: '淺色與深色完整 family', singleVariant: '單一變體',
+      },
+      provenance: { title: '來源詳情', source: '來源', mappingVersion: '映射版本', contentDigest: '內容摘要', imageDigest: '圖片摘要', importedAt: '匯入時間', generatedAt: '產生時間', parameters: '參數', author: '作者' },
+      crossSurfacePreview: {
+        title: '跨介面預覽', description: '只預覽候選顏色，不會改變目前外觀。', application: '應用程式與互動', surface: '表面與正文', textHierarchy: '文字層級', mutedText: '輔助文字', hover: '懸停', active: '按下', selection: '選取', focus: '鍵盤焦點',
+        success: '成功', warning: '警告', danger: '危險', info: '資訊', market: '市場與圖表', chart: 'K 線、成交量與圖表介面預覽', pnlUp: '正收益', pnlDown: '負收益', buy: '買入方向', sell: '賣出方向',
+        risk: '風險含義不變量', destructive: '破壞性操作', permissionDenied: '權限拒絕', tradeConfirm: '真實交易確認', brokerFailure: 'Broker 寫入失敗', riskBlocked: '風控阻止', terminal: '終端色盤', terminalSelection: '終端選取文字',
+      },
     },
     dataHome: {
       title: '資料儲存位置',

@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { Terminal as Xterm } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
 
@@ -15,6 +16,14 @@ import {
 import { terminalThemeProfileForVariant } from '../workspace/terminalThemeProfile'
 import { useEffectiveTheme } from '../../theme/useEffectiveTheme'
 import { useThemeStore } from '../../theme/store'
+import { ThemeAppearanceControls } from './ThemeAppearanceControls'
+import { ThemeCrossSurfacePreview } from './ThemeCrossSurfacePreview'
+import { ThemeGeneratorPanel, type ThemeGeneratorPanelLabels } from './ThemeGeneratorPanel'
+import {
+  createThemeManagerAppearanceState,
+  themeManagerAppearanceIsDirty,
+  themeManagerAppearanceReducer,
+} from './themeManagerState'
 
 export function ThemeManager() {
   const { t } = useTranslation()
@@ -28,45 +37,42 @@ export function ThemeManager() {
   const deleteFamily = useThemeStore((state) => state.deleteFamily)
   const effectiveMode = useEffectiveTheme()
   const fileInput = useRef<HTMLInputElement | null>(null)
-  const [draftFamilyId, setDraftFamilyId] = useState(appearance?.activeFamilyId ?? '')
-  const [draftMode, setDraftMode] = useState<AppearanceMode>(appearance?.mode ?? 'system')
+  const [appearanceState, dispatchAppearance] = useReducer(
+    themeManagerAppearanceReducer,
+    appearance ?? defaultAppearance,
+    createThemeManagerAppearanceState,
+  )
   const [legacyVariant, setLegacyVariant] = useState<ThemeVariantMode>('dark')
   const [preview, setPreview] = useState<ThemeImportPreview | null>(null)
+  const [generatedPreview, setGeneratedPreview] = useState<ThemeFamily | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
 
   useEffect(() => {
     if (appearance === null) return
-    setDraftFamilyId(appearance.activeFamilyId)
-    setDraftMode(appearance.mode)
+    dispatchAppearance({ type: 'authoritative-changed', appearance })
   }, [appearance])
 
-  const draftFamily = families.find((family) => family.id === draftFamilyId)
-  const displayedVariant = resolvePreviewVariant(draftFamily, draftMode, effectiveMode)
-  const existingCollision = preview === null
+  const draftAppearance = appearanceState.draft
+  const draftFamily = families.find((family) => family.id === draftAppearance.activeFamilyId)
+  const candidateFamily = generatedPreview ?? preview?.family ?? null
+  const displayedFamily = candidateFamily ?? draftFamily
+  const displayedVariant = resolvePreviewVariant(displayedFamily, candidateFamily === null ? draftAppearance.mode : preferredCandidateMode(displayedFamily), effectiveMode)
+  const existingCollision = candidateFamily === null
     ? undefined
-    : families.find((family) => family.id === preview.family.id)
-  const pairable = preview !== null && existingCollision !== undefined
-    && complementary(existingCollision, preview.family)
-  const dirty = appearance !== null
-    && (appearance.activeFamilyId !== draftFamilyId || appearance.mode !== draftMode)
-
-  const selectFamily = (family: ThemeFamily) => {
-    setDraftFamilyId(family.id)
-    if (draftMode === 'system' && (family.variants.light === undefined || family.variants.dark === undefined)) {
-      setDraftMode(family.variants.light === undefined ? 'dark' : 'light')
-    } else if (draftMode !== 'system' && family.variants[draftMode] === undefined) {
-      setDraftMode(family.variants.light === undefined ? 'dark' : 'light')
-    }
-  }
+    : families.find((family) => family.id === candidateFamily.id)
+  const pairable = candidateFamily !== null && existingCollision !== undefined
+    && complementary(existingCollision, candidateFamily)
+  const dirty = themeManagerAppearanceIsDirty(appearanceState)
 
   const apply = async () => {
     if (appearance === null || draftFamily === undefined) return
     setBusy(true)
     setNotice(null)
     try {
-      await saveAppearance({ ...appearance, activeFamilyId: draftFamily.id, mode: draftMode })
+      await saveAppearance(draftAppearance)
+      dispatchAppearance({ type: 'saved', appearance: draftAppearance })
       setNotice(t('settings.themeManager.applied'))
     } catch (error) {
       setNotice(errorMessage(error))
@@ -82,6 +88,7 @@ export function ThemeManager() {
     setNotice(null)
     try {
       const parsed = await themesApi.preview(await file.text(), file.name, legacyVariant)
+      setGeneratedPreview(null)
       setPreview(parsed)
     } catch (error) {
       setImportError(importErrorMessage(error))
@@ -92,22 +99,23 @@ export function ThemeManager() {
   }
 
   const persistPreview = async (pair: boolean) => {
-    if (preview === null) return
+    if (candidateFamily === null) return
     setBusy(true)
     setNotice(null)
     try {
       if (pair) {
-        if (existingCollision === undefined || !complementary(existingCollision, preview.family)) return
+        if (existingCollision === undefined || !complementary(existingCollision, candidateFamily)) return
         await replaceFamily({
           ...existingCollision,
-          variants: { ...existingCollision.variants, ...preview.family.variants },
+          variants: { ...existingCollision.variants, ...candidateFamily.variants },
         })
         setNotice(t('settings.themeManager.paired'))
       } else {
-        await saveFamily(preview.family)
+        await saveFamily(candidateFamily)
         setNotice(t('settings.themeManager.imported'))
       }
       setPreview(null)
+      setGeneratedPreview(null)
     } catch (error) {
       setNotice(errorMessage(error))
     } finally {
@@ -145,63 +153,41 @@ export function ThemeManager() {
           title={t('settings.themeManager.builtIn')}
           families={builtins}
           activeFamilyId={appearance.activeFamilyId}
-          selectedFamilyId={draftFamilyId}
-          onSelect={(id) => {
-            const family = families.find((item) => item.id === id)
-            if (family !== undefined) selectFamily(family)
-          }}
+          selectedFamilyId={draftAppearance.activeFamilyId}
+          onSelect={(familyId) => dispatchAppearance({ type: 'select-family', familyId, families })}
         />
         <ThemeFamilyList
           title={t('settings.themeManager.importedThemes')}
           families={imported}
           activeFamilyId={appearance.activeFamilyId}
-          selectedFamilyId={draftFamilyId}
-          onSelect={(id) => {
-            const family = families.find((item) => item.id === id)
-            if (family !== undefined) selectFamily(family)
-          }}
+          selectedFamilyId={draftAppearance.activeFamilyId}
+          onSelect={(familyId) => dispatchAppearance({ type: 'select-family', familyId, families })}
           onDelete={(family) => void remove(family)}
+          terminalReferencedFamilyId={appearance.terminal.mode === 'override' ? appearance.terminal.familyId : undefined}
           busy={busy}
           empty={t('settings.themeManager.noImported')}
         />
       </div>
 
-      <div className="rounded-lg border border-border bg-bg-secondary p-4 space-y-3">
+      <div className="rounded-lg border border-border bg-bg-secondary p-4 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h4 className="text-sm font-semibold text-text">{t('settings.themeManager.selection')}</h4>
             <p className="text-xs text-text-muted">{draftFamily?.name ?? t('settings.themeManager.none')}</p>
           </div>
-          <div className="flex gap-2" role="group" aria-label={t('settings.themeManager.mode')}>
-            {(['system', 'light', 'dark'] as const).map((mode) => {
-              const unavailable = mode === 'system'
-                ? draftFamily?.variants.light === undefined || draftFamily?.variants.dark === undefined
-                : draftFamily?.variants[mode] === undefined
-              return (
-                <button
-                  key={mode}
-                  type="button"
-                  disabled={unavailable}
-                  aria-pressed={draftMode === mode}
-                  onClick={() => setDraftMode(mode)}
-                  className={`rounded-md border px-3 py-1.5 text-xs transition-colors ${draftMode === mode
-                    ? 'border-accent bg-accent/10 text-accent'
-                    : 'border-border text-text-muted hover:text-text'} disabled:cursor-not-allowed disabled:opacity-40`}
-                >
-                  {t(`settings.themeManager.modes.${mode}`)}
-                </button>
-              )
-            })}
-          </div>
         </div>
+        <ThemeAppearanceControls
+          state={appearanceState}
+          families={families}
+          dispatch={dispatchAppearance}
+          disabled={busy}
+          labels={appearanceLabels(t)}
+        />
         <div className="flex justify-end gap-2">
           <button
             type="button"
             disabled={!dirty || busy}
-            onClick={() => {
-              setDraftFamilyId(appearance.activeFamilyId)
-              setDraftMode(appearance.mode)
-            }}
+            onClick={() => dispatchAppearance({ type: 'reset' })}
             className="rounded-md border border-border px-3 py-1.5 text-xs text-text-muted hover:text-text disabled:opacity-40"
           >
             {t('settings.themeManager.cancel')}
@@ -216,6 +202,16 @@ export function ThemeManager() {
           </button>
         </div>
       </div>
+
+      <ThemeGeneratorPanel
+        labels={generatorLabels(t)}
+        disabled={busy}
+        onPreview={(family) => {
+          setPreview(null)
+          setGeneratedPreview(family)
+          setNotice(null)
+        }}
+      />
 
       <div className="rounded-lg border border-border p-4 space-y-3" data-testid="theme-import-panel">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -266,7 +262,23 @@ export function ThemeManager() {
         )}
       </div>
 
-      {displayedVariant !== undefined && <ThemeReference variant={displayedVariant} />}
+      {generatedPreview !== null && (
+        <GeneratedPreview
+          family={generatedPreview}
+          collision={existingCollision}
+          pairable={pairable}
+          busy={busy}
+          onCancel={() => setGeneratedPreview(null)}
+          onSave={() => void persistPreview(false)}
+          onPair={() => void persistPreview(true)}
+        />
+      )}
+      {displayedVariant !== undefined && (
+        <>
+          <ThemeCrossSurfacePreview variant={displayedVariant} appearance={draftAppearance} />
+          <ThemeReference variant={displayedVariant} />
+        </>
+      )}
       {notice !== null && <p className="text-xs text-text-muted" role="status">{notice}</p>}
     </div>
   )
@@ -279,6 +291,7 @@ function ThemeFamilyList(props: {
   selectedFamilyId: string
   onSelect: (id: string) => void
   onDelete?: (family: ThemeFamily) => void
+  terminalReferencedFamilyId?: string
   busy?: boolean
   empty?: string
 }) {
@@ -289,6 +302,7 @@ function ThemeFamilyList(props: {
       <div className="space-y-2">
         {props.families.length === 0 && <p className="text-xs text-text-muted">{props.empty}</p>}
         {props.families.map((family) => {
+          const deletionBlocked = props.activeFamilyId === family.id || props.terminalReferencedFamilyId === family.id
           const provenance = family.variants.light?.provenance ?? family.variants.dark?.provenance
           const author = provenance?.kind === 'imported' ? provenance.author : null
           const source = provenance?.kind === 'imported' ? provenance.format
@@ -317,10 +331,12 @@ function ThemeFamilyList(props: {
                   {provenance?.kind === 'imported' && <><span>·</span><time dateTime={provenance.importedAt}>{new Date(provenance.importedAt).toLocaleDateString()}</time></>}
                 </span>
               </button>
+              <ProvenanceDetails family={family} />
               {props.onDelete !== undefined && (
                 <button
                   type="button"
-                  disabled={props.busy || props.activeFamilyId === family.id}
+                  disabled={props.busy || deletionBlocked}
+                  title={deletionBlocked ? t('settings.themeManager.appearance.deleteReferenced') : undefined}
                   className="mt-2 text-[11px] text-red hover:underline disabled:cursor-not-allowed disabled:opacity-40"
                   onClick={() => props.onDelete?.(family)}
                 >
@@ -332,6 +348,46 @@ function ThemeFamilyList(props: {
         })}
       </div>
     </section>
+  )
+}
+
+function ProvenanceDetails({ family }: { family: ThemeFamily }) {
+  const { t } = useTranslation()
+  return (
+    <details className="mt-2 text-[11px] text-text-muted">
+      <summary className="cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
+        {t('settings.themeManager.provenance.title')}
+      </summary>
+      <div className="mt-2 space-y-2 break-all rounded-md bg-bg/60 p-2">
+        {(['light', 'dark'] as const).map((mode) => {
+          const variant = family.variants[mode]
+          if (variant === undefined) return null
+          const provenance = variant.provenance
+          return (
+            <div key={mode} data-testid={`theme-provenance-${mode}`}>
+              <strong className="text-text">{t(`settings.themeManager.modes.${mode}`)}</strong>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-2">
+                <dt>{t('settings.themeManager.provenance.source')}</dt>
+                <dd>{provenance.kind === 'builtin' ? provenance.sourceName : provenance.kind === 'imported' ? provenance.sourceName : provenance.generator}</dd>
+                <dt>{t('settings.themeManager.provenance.mappingVersion')}</dt><dd>{provenance.mappingVersion}</dd>
+                {provenance.kind === 'imported' && <>
+                  <dt>{t('settings.themeManager.provenance.author')}</dt><dd>{provenance.author ?? t('settings.themeManager.unknownAuthor')}</dd>
+                  <dt>{t('settings.themeManager.provenance.contentDigest')}</dt><dd>{provenance.contentSha256}</dd>
+                  <dt>{t('settings.themeManager.provenance.importedAt')}</dt><dd>{new Date(provenance.importedAt).toLocaleString()}</dd>
+                </>}
+                {provenance.kind === 'generated' && <>
+                  <dt>{t('settings.themeManager.generator.executablePath')}</dt><dd>{provenance.executablePath}</dd>
+                  <dt>{t('settings.themeManager.generator.version')}</dt><dd>{provenance.executableVersion}</dd>
+                  <dt>{t('settings.themeManager.provenance.imageDigest')}</dt><dd>{provenance.imageSha256}</dd>
+                  <dt>{t('settings.themeManager.provenance.parameters')}</dt><dd>{JSON.stringify(provenance.parameters)}</dd>
+                  <dt>{t('settings.themeManager.provenance.generatedAt')}</dt><dd>{new Date(provenance.generatedAt).toLocaleString()}</dd>
+                </>}
+              </dl>
+            </div>
+          )
+        })}
+      </div>
+    </details>
   )
 }
 
@@ -387,6 +443,38 @@ function ImportPreview(props: {
   )
 }
 
+function GeneratedPreview(props: {
+  family: ThemeFamily
+  collision?: ThemeFamily
+  pairable: boolean
+  busy: boolean
+  onCancel: () => void
+  onSave: () => void
+  onPair: () => void
+}) {
+  const { t } = useTranslation()
+  const variant = props.family.variants.light ?? props.family.variants.dark!
+  return (
+    <section className="space-y-3 rounded-lg border border-accent/50 bg-accent/5 p-4" data-testid="theme-generated-preview">
+      <div>
+        <h4 className="text-sm font-semibold text-text">{props.family.name}</h4>
+        <p className="text-xs text-text-muted">{variant.provenance.kind === 'generated' ? variant.provenance.generator : ''}</p>
+      </div>
+      {props.collision !== undefined && (
+        <p className="text-xs text-text-muted">{props.pairable
+          ? t('settings.themeManager.complementaryCollision')
+          : t('settings.themeManager.idCollision')}</p>
+      )}
+      <div className="flex justify-end gap-2">
+        <button type="button" className="rounded-md border border-border px-3 py-1.5 text-xs" onClick={props.onCancel}>{t('settings.themeManager.cancel')}</button>
+        {props.pairable
+          ? <button type="button" disabled={props.busy} className="btn-primary-sm" onClick={props.onPair}>{t('settings.themeManager.pairVariants')}</button>
+          : <button type="button" disabled={props.busy || props.collision !== undefined} className="btn-primary-sm" onClick={props.onSave}>{t('settings.themeManager.generator.save')}</button>}
+      </div>
+    </section>
+  )
+}
+
 function ThemeReference({ variant }: { variant: ThemeVariant }) {
   const { t } = useTranslation()
   const terminal = useMemo(() => terminalThemeProfileForVariant(variant), [variant])
@@ -409,11 +497,11 @@ function ThemeReference({ variant }: { variant: ThemeVariant }) {
         ))}
       </div>
       <div>
-        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-text-muted">Base16</p>
+        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-text-muted">{t('settings.themeManager.base16Label')}</p>
         <PaletteStrip variant={variant} />
       </div>
       <div>
-        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-text-muted">ANSI 0–15</p>
+        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-text-muted">{t('settings.themeManager.ansiLabel')}</p>
         <div className="grid grid-cols-8 gap-1" data-testid="ansi-grid">
           {terminal.palette.map((rgb, index) => {
             const color = `#${rgb.map((channel) => channel.toString(16).padStart(2, '0')).join('')}`
@@ -422,7 +510,7 @@ function ThemeReference({ variant }: { variant: ThemeVariant }) {
         </div>
       </div>
       <div>
-        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-text-muted">Extended ANSI 16–21</p>
+        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-text-muted">{t('settings.themeManager.extendedAnsiLabel')}</p>
         <div className="grid grid-cols-6 gap-1" data-testid="extended-ansi-grid">
           {terminal.extendedAnsi.map((rgb, index) => {
             const color = `#${rgb.map((channel) => channel.toString(16).padStart(2, '0')).join('')}`
@@ -483,6 +571,103 @@ function resolvePreviewVariant(
   return family?.variants[mode === 'system' ? effectiveMode : mode]
 }
 
+const defaultAppearance = {
+  activeFamilyId: 'builtin-openalice',
+  mode: 'system',
+  terminal: { mode: 'follow' },
+  marketColors: 'protected',
+  marketDirection: 'green-up-red-down',
+  statusColors: 'protected',
+} as const
+
+function preferredCandidateMode(family: ThemeFamily | undefined): AppearanceMode {
+  if (family?.variants.light !== undefined && family.variants.dark !== undefined) return 'system'
+  return family?.variants.dark !== undefined ? 'dark' : 'light'
+}
+
+function appearanceLabels(t: TFunction) {
+  return {
+    family: t('settings.themeManager.selection'),
+    mode: t('settings.themeManager.mode'),
+    modes: {
+      system: t('settings.themeManager.modes.system'),
+      light: t('settings.themeManager.modes.light'),
+      dark: t('settings.themeManager.modes.dark'),
+    },
+    systemRequiresBothVariants: t('settings.themeManager.appearance.systemUnavailable'),
+    terminal: {
+      title: t('settings.themeManager.appearance.terminal'),
+      behavior: t('settings.themeManager.appearance.terminal'),
+      follow: t('settings.themeManager.appearance.followApp'),
+      override: t('settings.themeManager.appearance.override'),
+      family: t('settings.themeManager.selection'),
+      variant: t('settings.themeManager.mode'),
+    },
+    marketColors: t('settings.themeManager.appearance.marketColors'),
+    marketDirection: t('settings.themeManager.appearance.marketDirection'),
+    statusColors: t('settings.themeManager.appearance.statusColors'),
+    colorSource: {
+      protected: t('settings.themeManager.appearance.protected'),
+      theme: t('settings.themeManager.appearance.theme'),
+    },
+    directions: {
+      greenUp: t('settings.themeManager.appearance.greenUp'),
+      redUp: t('settings.themeManager.appearance.redUp'),
+    },
+  }
+}
+
+function generatorLabels(t: TFunction): ThemeGeneratorPanelLabels {
+  const failed = t('settings.themeManager.generator.failed')
+  return {
+    title: t('settings.themeManager.generator.title'),
+    loading: t('settings.themeManager.loading'),
+    loadFailed: t('settings.themeManager.loadFailed'),
+    refresh: t('settings.themeManager.generator.refresh'),
+    refreshing: t('settings.themeManager.generator.refresh'),
+    generator: t('settings.themeManager.generator.title'),
+    statuses: {
+      available: t('settings.themeManager.generator.available'),
+      unavailable: t('settings.themeManager.generator.unavailable'),
+      unsupported: t('settings.themeManager.generator.unsupported'),
+    },
+    executablePath: t('settings.themeManager.generator.executablePath'),
+    version: t('settings.themeManager.generator.version'),
+    image: t('settings.themeManager.generator.image'),
+    chooseImage: t('settings.themeManager.generator.chooseImage'),
+    name: t('settings.themeManager.generator.familyName'),
+    modes: t('settings.themeManager.generator.modes'),
+    mode: { light: t('settings.themeManager.modes.light'), dark: t('settings.themeManager.modes.dark') },
+    matugenScheme: t('settings.themeManager.generator.scheme'),
+    hellwalDarkOffset: t('settings.themeManager.generator.darkOffset'),
+    hellwalBrightOffset: t('settings.themeManager.generator.brightOffset'),
+    offsetHint: t('settings.themeManager.generator.offsetHint'),
+    generate: t('settings.themeManager.generator.generate'),
+    generating: t('settings.themeManager.generator.generating'),
+    cancel: t('settings.themeManager.generator.cancel'),
+    validation: {
+      imageRequired: t('settings.themeManager.generator.image'),
+      nameRequired: t('settings.themeManager.generator.familyName'),
+      modeRequired: t('settings.themeManager.generator.modes'),
+      offsetInvalid: failed,
+      schemeRequired: t('settings.themeManager.generator.scheme'),
+    },
+    errors: {
+      generator_unavailable: t('settings.themeManager.generator.unavailable'),
+      generator_unsupported: t('settings.themeManager.generator.unsupported'),
+      detection_stale: t('settings.themeManager.generator.stale'),
+      cancelled: t('settings.themeManager.generator.cancelled'),
+      invalid_parameters: failed,
+      spawn_failed: failed,
+      non_zero_exit: failed,
+      invalid_output: failed,
+      contrast_failed: failed,
+      staging_cleanup_failed: failed,
+      unknown: failed,
+    },
+  }
+}
+
 function isBuiltinFamily(family: ThemeFamily): boolean {
   return Object.values(family.variants).some((variant) => variant?.provenance.kind === 'builtin')
 }
@@ -495,7 +680,9 @@ function complementary(existing: ThemeFamily, incoming: ThemeFamily): boolean {
 
 function importErrorMessage(error: unknown): string {
   if (error instanceof ThemeApiError && error.payload.diagnostics !== undefined) {
-    return error.payload.diagnostics.map((item) => `${item.path || '<root>'}: ${item.message}`).join(' · ')
+    return error.payload.diagnostics.map((item) => typeof item === 'string'
+      ? item
+      : `${item.path || '<root>'}: ${item.message}`).join(' · ')
   }
   return errorMessage(error)
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { useTranslation } from 'react-i18next'
+import { useTranslation } from 'react-i18next'; import type { TFunction } from 'i18next'
 import { ArrowUpRight, CalendarDays, Globe2, TrendingUp } from 'lucide-react'
 import { BoardMeta } from '../components/market/BoardMeta'
 import { PageHeader } from '../components/PageHeader'
@@ -130,7 +130,7 @@ function MarketLaunchCard({
   )
 }
 
-function valuationLabel(id: string, t: ReturnType<typeof useTranslation>['t']): string | null {
+function valuationLabel(id: string, t: TFunction<'translation'>): string | null {
   switch (id) {
     case 'pe_month': return t('market.valPe')
     case 'shiller_pe_month': return t('market.valCape')
