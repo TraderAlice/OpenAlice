@@ -21,6 +21,7 @@ import {
   saveThemeFamily,
 } from '../../core/themes/store.js'
 import { themeFamilySchema, type ThemeFamily } from '../../core/themes/types.js'
+import { ThemeGenerationError, ThemeGeneratorService } from '../../core/themes/generators/service.js'
 
 const importPreviewSchema = z.object({
   contents: z.string().min(1).max(1024 * 1024),
@@ -36,6 +37,7 @@ interface ThemeRouteDeps {
   deleteFamily(familyId: string, activeFamilyId: string): Promise<void>
   readAppearance(): Promise<AppearancePreferences>
   saveAppearance(appearance: AppearancePreferences): Promise<AppearancePreferences>
+  generatorService: Pick<ThemeGeneratorService, 'availability' | 'preview'>
 }
 
 const defaultDeps: ThemeRouteDeps = {
@@ -46,9 +48,11 @@ const defaultDeps: ThemeRouteDeps = {
   deleteFamily: (familyId, activeFamilyId) => deleteThemeFamily(familyId, activeFamilyId),
   readAppearance: () => readAppearancePreferences(),
   saveAppearance: (appearance) => saveAppearancePreferences(appearance),
+  generatorService: new ThemeGeneratorService(),
 }
 
-export function createThemeRoutes(deps: ThemeRouteDeps = defaultDeps) {
+export function createThemeRoutes(overrides: Partial<ThemeRouteDeps> = {}) {
+  const deps: ThemeRouteDeps = { ...defaultDeps, ...overrides }
   const app = new Hono()
 
   app.get('/', async (c) => c.json({ families: await deps.listFamilies() }))
@@ -99,6 +103,46 @@ export function createThemeRoutes(deps: ThemeRouteDeps = defaultDeps) {
     }
   })
 
+  app.get('/generators', async (c) => c.json(await deps.generatorService.availability()))
+
+  app.post('/generators/refresh', async (c) => c.json(await deps.generatorService.availability(true)))
+
+  app.post('/generators/preview', async (c) => {
+    const body = await c.req.parseBody().catch(() => null)
+    const rawRequest = body?.['request']
+    const image = body?.['image']
+    if (typeof rawRequest !== 'string' || !isUploadedFile(image)) {
+      return c.json({ error: 'invalid_generation_request', diagnostics: ['multipart fields request and image are required'] }, 400)
+    }
+    let request: unknown
+    try {
+      request = JSON.parse(rawRequest)
+    } catch {
+      return c.json({ error: 'invalid_generation_request', diagnostics: ['request must be valid JSON'] }, 400)
+    }
+    try {
+      const family = await deps.generatorService.preview(
+        request,
+        new Uint8Array(await image.arrayBuffer()),
+        c.req.raw.signal,
+      )
+      return c.json(family)
+    } catch (error) {
+      if (error instanceof ThemeGenerationError) {
+        const status = error.code === 'invalid_parameters' ? 400
+          : error.code === 'detection_stale' ? 409
+            : 422
+        return c.json({
+          error: error.code,
+          generator: error.generator,
+          diagnostics: error.diagnostics,
+          ...(error.process === undefined ? {} : { process: error.process }),
+        }, status)
+      }
+      throw error
+    }
+  })
+
   app.post('/', async (c) => {
     const parsed = themeFamilySchema.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return c.json({ error: 'invalid_theme_family', issues: parsed.error.issues }, 400)
@@ -143,6 +187,12 @@ export function createThemeRoutes(deps: ThemeRouteDeps = defaultDeps) {
   })
 
   return app
+}
+
+function isUploadedFile(value: unknown): value is Blob {
+  return typeof value === 'object'
+    && value !== null
+    && typeof (value as { arrayBuffer?: unknown }).arrayBuffer === 'function'
 }
 
 class InvalidAppearanceError extends Error {
