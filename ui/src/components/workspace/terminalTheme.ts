@@ -18,6 +18,7 @@ export {
   type TerminalClientThemeDTO,
   type TerminalThemeProfile,
   type TerminalThemeRgb,
+  type TerminalStatusColors,
   type TerminalThemeVariant,
 } from './terminalThemeProfile'
 

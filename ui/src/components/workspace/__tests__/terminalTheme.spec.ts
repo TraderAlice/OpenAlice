@@ -69,7 +69,8 @@ describe('terminal theme helpers', () => {
   })
 
   it('maps canonical Base16 and extended ANSI slots into xterm', () => {
-    const theme = xtermThemeForVariant(variant)
+    const profile = terminalThemeProfileForVariant(variant)
+    const theme = profile.xtermTheme
     expect(theme).toMatchObject({
       background: '#101010', foreground: '#d8d8d8', cursor: '#7cafc2',
       cursorAccent: '#101010', selectionBackground: '#2c373b', selectionForeground: '#d8d8d8',
@@ -91,6 +92,11 @@ describe('terminal theme helpers', () => {
       '#585858', '#ab4642', '#a1b56c', '#f7ca88',
       '#7cafc2', '#ba8baf', '#86c1b9', '#f8f8f8',
     ])
+    expect(profile.statusColors).toEqual({
+      connecting: '#f7ca88', reconnecting: '#f7ca88',
+      connected: '#a1b56c', closed: '#101010',
+      kicked: '#ba8baf', locked: '#ba8baf',
+    })
   })
 
   it('uses Base24 bright slots and exact ANSI16 overrides without losing colors', () => {

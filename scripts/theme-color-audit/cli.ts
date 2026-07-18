@@ -21,7 +21,9 @@ async function readManifest(): Promise<StaticColorManifest> {
 
 function runtimeWorklist(manifest: StaticColorManifest): RuntimeColorWorklist {
   return { schemaVersion: 1, sourceCommit: manifest.sourceCommit, items: manifest.occurrences
-    .filter((occurrence) => occurrence.sourceClass === 'runtime' && occurrence.role === 'color-consumer')
+    .filter((occurrence) =>
+      (occurrence.sourceClass === 'runtime' && occurrence.role === 'color-consumer')
+      || occurrence.role === 'protected-source-data')
     .map((source) => ({ inventoryId: source.inventoryId, source })) }
 }
 

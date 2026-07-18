@@ -1,4 +1,4 @@
-import type { RuntimeColorWorklist, ThemeColorScenario } from './types.js'
+import type { ThemeColorScenario } from './types.js'
 import { themeColorScenarios } from './scenarios.js'
 
 export function assertScenarioPath(scenarioId: string, route: string, actualUrl: string): void {
@@ -7,8 +7,8 @@ export function assertScenarioPath(scenarioId: string, route: string, actualUrl:
   if (actualPath !== expectedPath) throw new Error(`${scenarioId}: redirected to ${actualUrl}`)
 }
 
-export function validateScenarioCoverage(worklist: RuntimeColorWorklist, scenarios: readonly ThemeColorScenario[] = themeColorScenarios): void {
-  const expected = new Set(worklist.items.map((item) => item.inventoryId))
+export function validateScenarioCoverage(expectedInventoryIds: readonly string[], scenarios: readonly ThemeColorScenario[] = themeColorScenarios): void {
+  const expected = new Set(expectedInventoryIds)
   const seenScenarios = new Set<string>()
   const assigned = new Map<string, string[]>()
   for (const scenario of scenarios) {

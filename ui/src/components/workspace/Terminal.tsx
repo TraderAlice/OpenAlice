@@ -596,7 +596,7 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
   return (
     <div className="terminal-shell">
       <header className="terminal-header">
-        <StatusDot status={status} />
+        <StatusDot status={status} color={terminalThemeProfile.statusColors[status]} />
         <span className="terminal-title">{props.label ?? wsId}</span>
         <span className="terminal-meta">
           {pid !== null ? `pid ${pid}` : ''}
@@ -666,19 +666,11 @@ function TerminalThemeControl(): ReactElement {
   );
 }
 
-function StatusDot({ status }: { status: Status }): ReactElement {
-  const colors: Record<Status, string> = {
-    connecting: '#d29922',
-    reconnecting: '#d29922',
-    connected: '#7ee787',
-    closed: '#6e7681',
-    kicked: '#d2a8ff',
-    locked: '#d2a8ff',
-  };
+function StatusDot({ status, color }: { status: Status; color: string }): ReactElement {
   return (
     <span
       className="status-dot"
-      style={{ background: colors[status] }}
+      style={{ background: color }}
       title={status}
       aria-label={status}
     />

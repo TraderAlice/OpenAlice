@@ -17,7 +17,17 @@ export interface TerminalThemeProfile {
   readonly cursorText: TerminalThemeRgb
   readonly selectionBackground: TerminalThemeRgb
   readonly selectionForeground: TerminalThemeRgb
+  readonly statusColors: TerminalStatusColors
   readonly xtermTheme: ITheme
+}
+
+export interface TerminalStatusColors {
+  readonly connecting: RgbHex
+  readonly reconnecting: RgbHex
+  readonly connected: RgbHex
+  readonly closed: RgbHex
+  readonly kicked: RgbHex
+  readonly locked: RgbHex
 }
 
 /**
@@ -91,6 +101,14 @@ export function terminalThemeProfileForVariant(variant: ThemeVariant): TerminalT
     cursorText,
     selectionBackground,
     selectionForeground,
+    statusColors: {
+      connecting: variant.palette.base0A,
+      reconnecting: variant.palette.base0A,
+      connected: variant.palette.base0B,
+      closed: variant.palette.base00,
+      kicked: variant.palette.base0E,
+      locked: variant.palette.base0E,
+    },
     xtermTheme,
   }
 }

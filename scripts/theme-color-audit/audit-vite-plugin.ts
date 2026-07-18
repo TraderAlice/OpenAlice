@@ -9,6 +9,29 @@ const ATTRIBUTE = 'data-openalice-color-audit'
 const VALUE_HOOK = '__OPENALICE_THEME_COLOR_CONSUME__'
 const WINNER_PREFIX = '--openalice-audit-winner-'
 
+const AUDIT_OVERRIDE_PATHS = new Set([
+  'ui/src/App.tsx',
+  'ui/src/components/FirstRunGuide.tsx',
+  'ui/src/components/workspace/Terminal.tsx',
+])
+
+export function applyAuditRuntimeOverrides(path: string, code: string): string {
+  if (path === 'ui/src/App.tsx') {
+    return code.replace("const firstRunGuideEnabled = import.meta.env.VITE_OPENALICE_FIRST_RUN_GUIDE === '1'", 'const firstRunGuideEnabled = true')
+  }
+  if (path === 'ui/src/components/FirstRunGuide.tsx') {
+    return code
+      .replace("const ONBOARDING_TEST_MODE = import.meta.env.VITE_OPENALICE_ONBOARDING_TEST === '1'", 'const ONBOARDING_TEST_MODE = true')
+      .replace('parseFirstRunStepOverride(window.location.search, ONBOARDING_TEST_MODE)', "parseFirstRunStepOverride(window.location.search || window.sessionStorage.getItem('__OPENALICE_AUDIT_ONBOARDING_SEARCH__') || '', ONBOARDING_TEST_MODE)")
+  }
+  if (path === 'ui/src/components/workspace/Terminal.tsx') {
+    return code
+      .replace('if (import.meta.env.VITE_DEMO_MODE)', 'if (false)')
+      .replace('new WebSocket(currentUrl())', 'new globalThis.__OPENALICE_AUDIT_WEBSOCKET__(currentUrl())')
+  }
+  return code
+}
+
 function repoPath(root: string, id: string): string {
   return relative(root, id.split('?')[0]!).split(sep).join('/')
 }
@@ -102,26 +125,13 @@ export function themeColorAuditPlugin(repoRoot: string): Plugin {
       if (!id.startsWith(resolve(repoRoot, 'ui/src'))) return null
       const path = repoPath(repoRoot, id)
       const occurrences = manifest.occurrences.filter((entry) => entry.sourceClass === 'runtime' && entry.role === 'color-consumer' && entry.path === path)
-      if (occurrences.length === 0 && path !== 'ui/src/App.tsx') return null
+      if (occurrences.length === 0 && !AUDIT_OVERRIDE_PATHS.has(path)) return null
       let transformed = occurrences.length === 0 ? code : path.endsWith('.css') ? transformCss(path, code, occurrences) : transformTs(path, code, occurrences)
       if (path === 'ui/src/index.css') {
         const utilities = [...new Set(manifest.occurrences.filter((entry) => entry.syntaxKind === 'tailwind-palette-utility').map((entry) => entry.sourceText))]
         transformed += `\n@source inline(${JSON.stringify(utilities.join(' '))});\n`
       }
-      if (path === 'ui/src/App.tsx') {
-        transformed = transformed.replace("const firstRunGuideEnabled = import.meta.env.VITE_OPENALICE_FIRST_RUN_GUIDE === '1'", 'const firstRunGuideEnabled = true')
-      }
-      if (path === 'ui/src/components/FirstRunGuide.tsx') {
-        transformed = transformed.replace("const ONBOARDING_TEST_MODE = import.meta.env.VITE_OPENALICE_ONBOARDING_TEST === '1'", 'const ONBOARDING_TEST_MODE = true')
-        transformed = transformed.replace('parseFirstRunStepOverride(window.location.search, ONBOARDING_TEST_MODE)', "parseFirstRunStepOverride(window.location.search || window.sessionStorage.getItem('__OPENALICE_AUDIT_ONBOARDING_SEARCH__') || '', ONBOARDING_TEST_MODE)")
-      }
-      // The normal demo intentionally substitutes a replay component for the
-      // real xterm surface.  The audit build instead drives TerminalView with a
-      // typed WebSocket fixture so its actual status/theme consumers execute.
-      if (path === 'ui/src/components/workspace/Terminal.tsx') {
-        transformed = transformed.replace('if (import.meta.env.VITE_DEMO_MODE)', 'if (false)')
-        transformed = transformed.replace('new WebSocket(currentUrl())', 'new globalThis.__OPENALICE_AUDIT_WEBSOCKET__(currentUrl())')
-      }
+      transformed = applyAuditRuntimeOverrides(path, transformed)
       return { code: transformed, map: null }
     },
     transformIndexHtml: {

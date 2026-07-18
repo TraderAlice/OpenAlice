@@ -23,7 +23,7 @@ export interface StaticColorOccurrence {
   readonly sourceClass: SourceClass
   readonly syntaxKind: SyntaxKind
   readonly ownerHint: string | null
-  readonly role: 'css-variable-definition' | 'color-consumer'
+  readonly role: 'css-variable-definition' | 'color-consumer' | 'protected-source-data'
   readonly span: SourceSpan
 }
 

@@ -5,7 +5,7 @@ const desktop = { width: 1440, height: 1000 } as const;
 const mobile = { width: 390, height: 844 } as const;
 const themes = ["light", "dark"] as const;
 
-export const themeColorScenarios = [
+const allThemeColorScenarios = [
   {
     scenarioId: "workspace-overview",
     route: "/workspaces",
@@ -43,6 +43,19 @@ export const themeColorScenarios = [
     actions: [{ kind: "hover", role: "button", name: "New workspace" }],
     expectedSurface: "dom-or-css",
     inventoryIds: ids["workspace-overview"],
+  },
+  {
+    scenarioId: "workspace-danger-hover",
+    route: "/workspaces",
+    fixtureProfile: "demo",
+    state: "hover",
+    stateDriver: "action",
+    themes,
+    viewport: desktop,
+    ready: { role: "button", name: "Purge files" },
+    actions: [{ kind: "hover", role: "button", name: "Purge files" }],
+    expectedSurface: "dom-or-css",
+    inventoryIds: ids["global-css"],
   },
   {
     scenarioId: "workspace-config-dialog",
@@ -1878,3 +1891,5 @@ export const themeColorScenarios = [
     inventoryIds: ids["onboarding-design"],
   },
 ] as const satisfies readonly ThemeColorScenario[];
+
+export const themeColorScenarios: readonly ThemeColorScenario[] = allThemeColorScenarios.filter((scenario) => scenario.inventoryIds.length > 0)

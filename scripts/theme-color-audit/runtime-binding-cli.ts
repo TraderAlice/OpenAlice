@@ -10,6 +10,9 @@ import { buildStaticManifest } from './static-inventory.js'
 import { themeColorScenarios } from './scenarios.js'
 import type { RuntimeBindingManifest, RuntimeColorBinding, ScenarioAction, StaticColorOccurrence, ThemeColorScenario } from './types.js'
 import { assertBindingIntegrity, assertEveryTarget, htmlReportComputedProperty, metadataForDeclaredIds, type RuntimeBindingMetadata } from './runtime-provenance.js'
+import { residualReview } from './residual-review-data.js'
+import { browserTargetIds, validateResidualReview } from './residual-review.js'
+import type { RuntimeColorWorklist } from './types.js'
 
 const root = resolve(import.meta.dirname, '../..')
 const auditPort = Number.parseInt(process.env['OPENALICE_THEME_AUDIT_PORT'] ?? '41731', 10)
@@ -216,10 +219,13 @@ export interface RuntimeBindingOptions {
 
 export async function buildBindings(options: RuntimeBindingOptions = {}): Promise<RuntimeBindingManifest> {
   const staticManifest = await buildStaticManifest(root)
-  const runtime = staticManifest.occurrences.filter((entry) => entry.sourceClass === 'runtime' && entry.role === 'color-consumer')
+  const worklist = JSON.parse(await readFile(resolve(root, '.artifacts/theme-color-audit/runtime-worklist.json'), 'utf8')) as RuntimeColorWorklist
+  validateResidualReview(worklist, residualReview)
+  const browserTargets = new Set(browserTargetIds(residualReview))
+  const runtime = staticManifest.occurrences.filter((entry) => browserTargets.has(entry.inventoryId))
   const allMetadata = await metadataFor(runtime)
   const declaredIds = new Set(themeColorScenarios.flatMap((scenario) => [...scenario.inventoryIds]))
-  const undeclared = runtime.map((entry) => entry.inventoryId).filter((id) => !declaredIds.has(id))
+  const undeclared = [...browserTargets].filter((id) => !declaredIds.has(id))
   if (undeclared.length) throw new Error(`runtime occurrences without a declared scenario (${undeclared.length}):\n${undeclared.join('\n')}`)
   const server = startServer()
   try {
