@@ -4,6 +4,11 @@ export interface ThemeSmokeReceipt {
   readonly stage: 'seed' | 'apply' | 'restart'
   readonly familyId: string
   readonly checks: Readonly<Record<string, boolean>>
+  readonly generatorDetections?: Readonly<Record<string, {
+    readonly kind: string
+    readonly executablePath?: string
+    readonly version?: string
+  }>>
 }
 
 /**
@@ -16,6 +21,7 @@ export interface ThemeSmokeReceipt {
 export async function runRendererThemeSmoke(
   win: BrowserWindow,
   stage: 'seed' | 'apply' | 'restart',
+  verifyGenerators = false,
 ): Promise<ThemeSmokeReceipt> {
   return win.webContents.executeJavaScript(`(async () => {
     const request = async (url, init) => {
@@ -38,7 +44,9 @@ export async function runRendererThemeSmoke(
       },
     })}
     const stage = ${JSON.stringify(stage)}
+    const verifyGenerators = ${JSON.stringify(verifyGenerators)}
     if (stage === 'seed') {
+      const generatorSnapshot = verifyGenerators ? await request('/api/themes/generators') : null
       const preview = await request('/api/themes/imports/preview', {
         method: 'POST', headers, body: JSON.stringify({ filename: 'packaged-restart.json', contents: JSON.stringify(imported) }),
       })
@@ -55,7 +63,12 @@ export async function runRendererThemeSmoke(
           builtinUsedAppearancePath: builtin.activeFamilyId === 'builtin-openalice',
           importedUsedAppearancePath: selected.activeFamilyId === preview.family.id,
           importedFamilyPersisted: (await request('/api/themes/' + encodeURIComponent(preview.family.id))).id === preview.family.id,
+          ...(verifyGenerators ? {
+            packagedMatugenDetected: generatorSnapshot?.generators?.matugen?.kind === 'available' && generatorSnapshot.generators.matugen.executablePath?.startsWith('/'),
+            packagedHellwalDetected: generatorSnapshot?.generators?.hellwal?.kind === 'available' && generatorSnapshot.generators.hellwal.executablePath?.startsWith('/'),
+          } : {}),
         },
+        ...(verifyGenerators ? { generatorDetections: generatorSnapshot.generators } : {}),
       }
     }
 

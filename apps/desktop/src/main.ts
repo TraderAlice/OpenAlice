@@ -1016,7 +1016,11 @@ app.whenReady().then(async () => {
             process.exitCode = 1
             shutdown()
           } else {
-            void runRendererThemeSmoke(win, themeSmokeStage)
+            void runRendererThemeSmoke(
+              win,
+              themeSmokeStage,
+              process.env['OPENALICE_ELECTRON_SMOKE_THEME_GENERATORS'] === '1',
+            )
               .then(async (result) => {
                 await writeFile(receiptPath, `${JSON.stringify(result, null, 2)}\n`, 'utf8')
                 const failed = Object.entries(result.checks).filter(([, ok]) => ok !== true).map(([name]) => name)
