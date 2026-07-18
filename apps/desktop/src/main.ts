@@ -286,6 +286,12 @@ async function runRendererPtySmoke(win: BrowserWindow): Promise<void> {
   const result = await win.webContents.executeJavaScript(`(async () => {
     const bridge = window.openAlice?.pty
     if (!bridge) throw new Error('window.openAlice.pty missing')
+    const keyboard = window.openAlice?.keyboard
+    if (!keyboard?.getInputSourceId) throw new Error('window.openAlice.keyboard missing')
+    const keyboardInputSourceId = await keyboard.getInputSourceId()
+    if (keyboardInputSourceId !== null && typeof keyboardInputSourceId !== 'string') {
+      throw new Error('keyboard input source bridge returned an invalid value')
+    }
     const tag = 'electron-smoke-' + Date.now().toString(36)
     const json = async (res) => {
       const text = await res.text()
@@ -335,7 +341,10 @@ async function runRendererPtySmoke(win: BrowserWindow): Promise<void> {
           reject(new Error('PTY closed before attach: ' + ev.code))
         })
       })
-      return { ok: true, workspaceId, sessionId, attached }
+      if (typeof attached.kittyKeyboardFlags !== 'number') {
+        throw new Error('PTY attach omitted Kitty keyboard flags')
+      }
+      return { ok: true, workspaceId, sessionId, attached, keyboardInputSourceId }
     } finally {
       if (connectionId) bridge.close(connectionId)
       if (!${keepWorkspace ? 'true' : 'false'}) {
@@ -347,8 +356,15 @@ async function runRendererPtySmoke(win: BrowserWindow): Promise<void> {
         }
       }
     }
-  })()`, true) as { ok?: boolean; workspaceId?: string; sessionId?: string }
-  console.log(`[guardian] electron smoke pty → ok workspace=${result.workspaceId ?? ''} session=${result.sessionId ?? ''}`)
+  })()`, true) as {
+    ok?: boolean
+    workspaceId?: string
+    sessionId?: string
+    keyboardInputSourceId?: string | null
+  }
+  console.log(
+    `[guardian] electron smoke pty → ok workspace=${result.workspaceId ?? ''} session=${result.sessionId ?? ''} inputSource=${result.keyboardInputSourceId ?? 'unknown'}`,
+  )
 }
 
 async function runRendererOnboardingSmoke(win: BrowserWindow): Promise<void> {
@@ -905,7 +921,7 @@ app.whenReady().then(async () => {
     console.log(`[renderer] ${sourceId}:${line} ${message}`)
   })
   win.webContents.on('did-finish-load', () => {
-    void win.webContents.executeJavaScript('Boolean(window.openAlice?.pty && window.openAlice?.runtime && window.openAlice?.dataHome)', true)
+    void win.webContents.executeJavaScript('Boolean(window.openAlice?.pty && window.openAlice?.runtime && window.openAlice?.dataHome && window.openAlice?.keyboard)', true)
       .then((ready) => {
         console.log(`[guardian] renderer bridge → ${ready ? 'ready' : 'missing'}`)
         if (ready && process.env['OPENALICE_ELECTRON_SMOKE_PTY'] === '1') {

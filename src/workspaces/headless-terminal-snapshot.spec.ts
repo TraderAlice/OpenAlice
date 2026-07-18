@@ -46,4 +46,16 @@ describe('HeadlessTerminalSnapshot', () => {
       terminal.dispose()
     }
   })
+
+  it('carries Kitty keyboard flags beside snapshots because SerializeAddon omits them', () => {
+    const terminal = new HeadlessTerminalSnapshot({ cols: 80, rows: 24 })
+    try {
+      terminal.write('\x1b[>3u')
+      expect(terminal.getKittyKeyboardFlags()).toBe(3)
+      terminal.write('\x1b[<u')
+      expect(terminal.getKittyKeyboardFlags()).toBe(0)
+    } finally {
+      terminal.dispose()
+    }
+  })
 })

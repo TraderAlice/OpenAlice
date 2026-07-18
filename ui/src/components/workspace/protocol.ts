@@ -34,6 +34,7 @@ export interface AttachedMessage {
   readonly replayFromSeq: number;
   readonly seq: number;
   readonly scrollbackTruncated: boolean;
+  readonly kittyKeyboardFlags: number;
 }
 
 export interface CursorMessage {
@@ -102,6 +103,8 @@ export function parseServerControl(text: string): ServerControlMessage | null {
           replayFromSeq: v['replayFromSeq'],
           seq: v['seq'],
           scrollbackTruncated: v['scrollbackTruncated'],
+          kittyKeyboardFlags:
+            typeof v['kittyKeyboardFlags'] === 'number' ? v['kittyKeyboardFlags'] : 0,
         };
       }
       return null;

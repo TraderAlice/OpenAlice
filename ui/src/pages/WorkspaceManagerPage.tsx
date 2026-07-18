@@ -30,7 +30,6 @@ import { useWorkspaces } from '../contexts/workspaces-context'
 import { useAgentLaunchConfig, useAgentLaunchPreferences } from '../hooks/useAgentLaunchConfig'
 import { useWorkspace } from '../tabs/store'
 import type { ViewSpec } from '../tabs/types'
-import { keyMapForAgent } from '../components/workspace/terminalInput'
 
 type ManagerSpec = Extract<ViewSpec, { kind: 'workspace-manager' }>
 
@@ -181,7 +180,6 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
               sessionId={sessionId}
               renderer={session.agent === 'opencode' ? 'dom' : 'auto'}
               label={`${t('workspaceManager.title')} · ${session.name}`}
-              keyMap={keyMapForAgent(session.agent)}
               onSessionLost={() => void refreshWorkspaceManager()}
             />
           )}

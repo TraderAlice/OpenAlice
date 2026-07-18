@@ -15,12 +15,11 @@ import { attachWebglRenderer } from './renderer';
 import {
   describeTerminalInput,
   TERMINAL_FONT_FAMILY,
-  type KeyMap,
 } from './terminalInput';
 import {
   installTerminalKeyboardController,
-  RESET_KITTY_KEYBOARD_PROTOCOL,
-} from './terminalKeyboard';
+} from './terminal-keyboard-controller';
+import { TerminalKittyKeyboardModeTracker } from './terminal-kitty-keyboard-mode-tracker';
 import {
   useResolvedTerminalTheme,
   useTerminalThemeStore,
@@ -34,8 +33,6 @@ import {
 const DemoTerminalReplay = lazy(() =>
   import('../../demo/DemoTerminalReplay').then((m) => ({ default: m.DemoTerminalReplay })),
 );
-
-export type { KeyMap } from './terminalInput';
 
 type Status = 'connecting' | 'reconnecting' | 'connected' | 'closed' | 'error' | 'kicked' | 'locked';
 
@@ -179,11 +176,6 @@ export interface TerminalViewProps {
   readonly label?: string;
   /** WebSocket URL base. Defaults to `${ws/wss}://${location.host}/pty`. */
   readonly wsUrl?: string;
-  /**
-   * Pre-xterm keydown interceptor. See `KeyMap`. Changing this prop does NOT
-   * tear down the WebSocket — updates apply on the next keystroke.
-   */
-  readonly keyMap?: KeyMap;
   /** OpenTUI currently corrupts to an all-black canvas in xterm's WebGL addon. */
   readonly renderer?: 'auto' | 'dom';
   /**
@@ -221,8 +213,6 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
   const controllerIdRef = useRef<string>('');
   if (!controllerIdRef.current) controllerIdRef.current = getTerminalControllerId();
 
-  const keyMapRef = useRef<KeyMap | undefined>(props.keyMap);
-  keyMapRef.current = props.keyMap;
   const onAttachedRef = useRef<TerminalViewProps['onAttached']>(props.onAttached);
   onAttachedRef.current = props.onAttached;
   const onSessionLostRef = useRef<TerminalViewProps['onSessionLost']>(props.onSessionLost);
@@ -338,6 +328,8 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
     };
 
     const encoder = new TextEncoder();
+    let kittyKeyboardDecoder = new TextDecoder();
+    const kittyKeyboardMode = new TerminalKittyKeyboardModeTracker();
     const debugInput = (): boolean => {
       try {
         return localStorage.getItem('openalice.terminal.debugInput') === '1';
@@ -366,6 +358,7 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
     };
 
     const writeToTerm = (data: Uint8Array): void => {
+      kittyKeyboardMode.scan(kittyKeyboardDecoder.decode(data, { stream: true }));
       try {
         term.write(data);
       } catch (err) {
@@ -384,8 +377,8 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
 
     const keyboardController = installTerminalKeyboardController({
       terminalElement: term.element,
-      getKeyMap: () => keyMapRef.current,
       hasSelection: () => term.hasSelection(),
+      isKittyKeyboardActive: () => kittyKeyboardMode.flags > 0,
       sendInput: (data, source) => {
         logInput(source, data);
         const ws = activeWs;
@@ -395,7 +388,7 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
         // A TUI can exit on Ctrl+C before restoring its negotiated renderer
         // flags. Reset xterm's local keyboard state for the resumed shell.
         queueMicrotask(() => {
-          if (!teardown) term.write(RESET_KITTY_KEYBOARD_PROTOCOL);
+          if (!teardown) term.write('\x1b[<99u\x1b[=0u');
         });
       },
     });
@@ -431,6 +424,8 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
 
     function connect(): void {
       if (teardown) return;
+      kittyKeyboardMode.reset();
+      kittyKeyboardDecoder = new TextDecoder();
       const previousWs = activeWs;
       activeWs = null;
       try {
@@ -478,6 +473,7 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
             case 'attached':
               setPid(msg.pid);
               setScrollbackTruncated(msg.scrollbackTruncated);
+              kittyKeyboardMode.scan(`\x1b[=${msg.kittyKeyboardFlags};1u`);
               onAttachedRef.current?.(msg.sessionId);
               break;
             case 'cursor':

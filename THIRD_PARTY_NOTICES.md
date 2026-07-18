@@ -6,8 +6,11 @@
 [`stablyai/orca`](https://github.com/stablyai/orca) commit
 `1b331f282cd4da880b888f242e3545fffbba4cb5`.
 
-`patches/@xterm__xterm@6.1.0-beta.287.patch` and the Kitty keyboard / IME
-policy in `ui/src/components/workspace/terminalKeyboard.ts` are adapted from
+`patches/@xterm__xterm@6.1.0-beta.287.patch`, the focused keyboard shortcut,
+Kitty keyboard / IME
+modules in `ui/src/components/workspace/terminal-*.ts` and
+`ui/src/components/workspace/xterm-bypass-policy.ts`, and the macOS input-source
+probe in `apps/desktop/src/keyboard-input-source.ts` are adapted from
 [`stablyai/orca`](https://github.com/stablyai/orca) commit
 `ab0f220c60739c90ecbedd327d0b4619e715570d`.
 

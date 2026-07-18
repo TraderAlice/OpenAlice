@@ -13,6 +13,9 @@ const { Terminal } = HeadlessXterm
 type TerminalWithSynchronousWrite = XtermHeadlessTerminal & {
   _core?: {
     writeSync?: (data: string | Uint8Array) => void
+    coreService?: {
+      kittyKeyboard?: { flags?: number }
+    }
   }
 }
 
@@ -106,6 +109,13 @@ export class HeadlessTerminalSnapshot {
   snapshot(): string | null {
     if (this.disposed || this.pendingAsyncWrites > 0) return null
     return this.serializer.serialize({ scrollback: DEFAULT_SCROLLBACK_ROWS })
+  }
+
+  /** SerializeAddon omits Kitty flags, so attach metadata carries them beside the snapshot. */
+  getKittyKeyboardFlags(): number {
+    const flags = (this.terminal as TerminalWithSynchronousWrite)._core?.coreService
+      ?.kittyKeyboard?.flags
+    return typeof flags === 'number' ? flags : 0
   }
 
   dispose(): void {

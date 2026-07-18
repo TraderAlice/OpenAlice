@@ -409,6 +409,7 @@ export class PersistentSession {
       replayFromSeq: slice.effectiveSeq,
       seq: slice.tailSeq,
       scrollbackTruncated,
+      kittyKeyboardFlags: this.headless.getKittyKeyboardFlags(),
     };
     ws.send(JSON.stringify(attached));
     this.lastCursorSeq = slice.tailSeq;

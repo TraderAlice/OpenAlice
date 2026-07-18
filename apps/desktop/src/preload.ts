@@ -111,6 +111,9 @@ const api = {
   runtime: {
     info: () => ipcRenderer.invoke('openalice:runtime:info'),
   },
+  keyboard: {
+    getInputSourceId: () => ipcRenderer.invoke('openalice:keyboard:get-input-source-id'),
+  },
   dataHome: {
     getStatus: () => ipcRenderer.invoke('openalice:data-home:get-status'),
     chooseAndRestart: () => ipcRenderer.invoke('openalice:data-home:choose-and-restart'),

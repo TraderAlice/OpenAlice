@@ -37,6 +37,9 @@ interface Window {
         appHome: string
       }>
     }
+    readonly keyboard: {
+      getInputSourceId(): Promise<string | null>
+    }
     readonly dataHome: {
       getStatus(): Promise<OpenAliceDataHomeStatus>
       chooseAndRestart(): Promise<OpenAliceDataHomeActionResult>

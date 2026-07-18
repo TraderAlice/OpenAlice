@@ -25,7 +25,6 @@ import { useWorkspaces } from '../contexts/workspaces-context'
 import { useWorkspace } from '../tabs/store'
 import { WorkspaceView } from '../components/workspace/WorkspaceView'
 import { WorkspaceFilesToggle } from '../components/workspace/WorkspaceFilesToggle'
-import { keyMapForAgent } from '../components/workspace/terminalInput'
 import type { ViewSpec } from '../tabs/types'
 
 interface Props {
@@ -46,7 +45,6 @@ export function WorkspacePage({ spec, visible }: Props) {
   const activeRecord = sessionId
     ? sessions.find((s) => s.id === sessionId) ?? null
     : null
-  const keyMap = keyMapForAgent(activeRecord?.agent)
   const defaultAgentEnabled =
     ctx.defaultAgent !== null &&
     workspace?.agents.includes(ctx.defaultAgent) === true &&
@@ -145,7 +143,6 @@ export function WorkspacePage({ spec, visible }: Props) {
           activeRecord={activeRecord}
           sessions={workspace.sessions}
           label={workspace.tag}
-          keyMap={keyMap}
           onSpawnFresh={spawnDefault}
           onResume={(id) => void ctx.resumeSession(wsId, id, source)}
           onOpenWebPi={(id) => void ctx.openWebPiSession(wsId, id, source)}

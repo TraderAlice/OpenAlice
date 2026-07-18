@@ -7,7 +7,7 @@ import type { SessionRecord } from './api';
 import { FilesPanel } from './FilesPanel';
 import { ResumeCta, prefixOf } from './ResumeCta';
 import { formatRelativeTime } from '../../lib/intl';
-import { TerminalView, type KeyMap } from './Terminal';
+import { TerminalView } from './Terminal';
 import { WebPiView } from './WebPiView';
 import { useIsDesktop } from '../../live/use-is-desktop';
 import { useWorkspaceSidePanels } from '../../live/workspace-side-panels';
@@ -27,7 +27,6 @@ export interface WorkspaceViewProps {
    */
   readonly sessions: readonly SessionRecord[];
   readonly label?: string;
-  readonly keyMap?: KeyMap;
   readonly onSpawnFresh: () => void;
   readonly onResume: (sessionId: string) => void;
   readonly onOpenWebPi: (sessionId: string) => void;
@@ -119,7 +118,6 @@ export function WorkspaceView(props: WorkspaceViewProps): ReactElement {
                     sessionId={s.id}
                     renderer={s.agent === 'opencode' ? 'dom' : 'auto'}
                     {...(props.label !== undefined ? { label: `${props.label} · ${s.name}` } : {})}
-                    {...(props.keyMap !== undefined ? { keyMap: props.keyMap } : {})}
                     onSessionLost={props.onSessionLost}
                   />
                 )}

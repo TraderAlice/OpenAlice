@@ -49,6 +49,8 @@ export interface AttachedMessage {
   readonly seq: number;
   /** True if `since` in attach was older than the buffer's headSeq. */
   readonly scrollbackTruncated: boolean;
+  /** Kitty keyboard flags omitted by xterm's ANSI serializer. */
+  readonly kittyKeyboardFlags: number;
 }
 
 export interface CursorMessage {

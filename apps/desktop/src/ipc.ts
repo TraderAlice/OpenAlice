@@ -3,6 +3,7 @@ import type { ChildProcess, Serializable } from 'node:child_process'
 import { lstat, readFile, readdir, realpath, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { isAbsolute, join, normalize, resolve, sep } from 'node:path'
+import { readKeyboardInputSourceId } from './keyboard-input-source.js'
 
 interface WorkspaceMeta {
   readonly id: string
@@ -183,6 +184,8 @@ export function registerOpenAliceIpc(opts: OpenAliceIpcOptions): void {
     userDataHome: opts.userDataHome,
     appHome: opts.appHome,
   }))
+
+  ipcMain.handle('openalice:keyboard:get-input-source-id', () => readKeyboardInputSourceId())
 
   ipcMain.handle('openalice:data-home:get-status', () => opts.dataHome.getStatus())
   ipcMain.handle('openalice:data-home:choose-and-restart', () => opts.dataHome.chooseAndRestart())
