@@ -506,9 +506,9 @@ function PortfolioSkeleton() {
 // ==================== Account Strip ====================
 
 const HEALTH_DOT: Record<string, string> = {
-  healthy: 'bg-green',
-  degraded: 'bg-yellow-400',
-  offline: 'bg-red',
+  healthy: 'bg-[var(--oa-status-success)]',
+  degraded: 'bg-[var(--oa-status-warning)]',
+  offline: 'bg-[var(--oa-status-danger)]',
 }
 
 function AccountStrip({ sources, perAccountCurve }: {
@@ -553,11 +553,11 @@ function AccountStrip({ sources, perAccountCurve }: {
                     : (
                       <span className="text-[11px] tabular-nums">
                         {todayDelta ? (
-                          <span className={todayDelta.delta >= 0 ? 'text-green' : 'text-red'}>
+                          <span className={todayDelta.delta >= 0 ? 'text-[var(--oa-market-positive)]' : 'text-[var(--oa-market-negative)]'}>
                             {todayDelta.delta >= 0 ? '▲' : '▼'} {fmtPnl(todayDelta.delta)} today
                           </span>
                         ) : s.unrealizedPnL !== 0 ? (
-                          <span className={s.unrealizedPnL >= 0 ? 'text-green' : 'text-red'}>
+                          <span className={s.unrealizedPnL >= 0 ? 'text-[var(--oa-market-positive)]' : 'text-[var(--oa-market-negative)]'}>
                             {fmtPnl(s.unrealizedPnL)} unrealized
                           </span>
                         ) : (
@@ -658,10 +658,10 @@ function PositionsTable({ positions, fxRates }: { positions: PositionWithAccount
                       {ccy === 'USD' ? '—' : fmt(usdValue)}
                     </td>
                   )}
-                  <td className={`px-3 py-2 text-right font-medium ${Number(p.unrealizedPnL) >= 0 ? 'text-green' : 'text-red'}`}>
+                  <td className={`px-3 py-2 text-right font-medium ${Number(p.unrealizedPnL) >= 0 ? 'text-[var(--oa-market-positive)]' : 'text-[var(--oa-market-negative)]'}`}>
                     {fmtPnl(Number(p.unrealizedPnL), p.currency)}
                   </td>
-                  <td className={`px-3 py-2 text-right ${Number(p.unrealizedPnL) >= 0 ? 'text-green' : 'text-red'}`}>
+                  <td className={`px-3 py-2 text-right ${Number(p.unrealizedPnL) >= 0 ? 'text-[var(--oa-market-positive)]' : 'text-[var(--oa-market-negative)]'}`}>
                     {(() => {
                       const cost = Number(p.avgCost) * Number(p.quantity)
                       const pct = cost > 0 ? (Number(p.unrealizedPnL) / cost) * 100 : 0
@@ -693,7 +693,7 @@ function FxRatesPanel({ rates }: { rates: FxRateInfo[] }) {
               <tr key={r.currency} className="border-t border-border first:border-t-0">
                 <td className="px-2.5 py-1.5">
                   <div className="flex items-center gap-1.5">
-                    <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${r.source === 'live' ? 'bg-green' : r.source === 'cached' ? 'bg-yellow-400' : 'bg-text-muted/40'}`} />
+                    <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${r.source === 'live' ? 'bg-[var(--oa-status-success)]' : r.source === 'cached' ? 'bg-[var(--oa-status-warning)]' : 'bg-text-muted/40'}`} />
                     <span className="font-medium text-text">{r.currency}</span>
                   </div>
                 </td>

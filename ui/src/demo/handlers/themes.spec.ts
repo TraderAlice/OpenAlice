@@ -49,6 +49,14 @@ describe('demo theme API', () => {
       marketColors: 'protected', marketDirection: 'green-up-red-down', statusColors: 'protected',
     }
     expect((await api('/api/themes/appearance', { method: 'PUT', headers: json, body: JSON.stringify(selected) })).status).toBe(200)
+    const themedPolicy = {
+      ...selected,
+      marketColors: 'theme', marketDirection: 'red-up-green-down', statusColors: 'theme',
+    }
+    expect((await api('/api/themes/appearance', { method: 'PUT', headers: json, body: JSON.stringify(themedPolicy) })).status).toBe(200)
+    await expect((await api('/api/themes/appearance')).json()).resolves.toMatchObject({
+      marketColors: 'theme', marketDirection: 'red-up-green-down', statusColors: 'theme',
+    })
     expect((await api(`/api/themes/${paired.id}`, { method: 'DELETE' })).status).toBe(409)
     expect((await api('/api/themes/builtin-openalice', { method: 'DELETE' })).status).toBe(403)
 

@@ -77,7 +77,7 @@ export function QuoteHeader({ symbol }: Props) {
           ) : (
             change != null &&
             changePct != null && (
-              <span className={`text-[13px] font-medium ${up ? 'text-green' : 'text-red'}`}>
+              <span className={`text-[13px] font-medium ${up ? 'text-[var(--oa-market-positive)]' : 'text-[var(--oa-market-negative)]'}`}>
                 {up ? '+' : ''}{fmtNumber(change)} ({up ? '+' : ''}{fmtPercent(changePct)})
               </span>
             )

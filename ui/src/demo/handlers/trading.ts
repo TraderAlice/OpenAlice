@@ -26,6 +26,7 @@ const auditWalletStatus: WalletStatus = {
   staged: [
     { action: 'modifyOrder', orderId: 'audit-order', contract: { symbol: 'AAPL' } },
     { action: 'placeOrder', contract: { symbol: 'NVDA' }, order: { action: 'BUY', orderType: 'LMT', totalQuantity: 2, lmtPrice: 180 } },
+    { action: 'placeOrder', contract: { symbol: 'TSLA' }, order: { action: 'SELL', orderType: 'LMT', totalQuantity: 1, lmtPrice: 320 } },
   ],
   pendingMessage: 'Risk review required before broker submission', head: 'audit-head', commitCount: 3,
 }

@@ -1,5 +1,6 @@
 import type { ResolvedThemeTokens, ThemePalette, ThemeVariant } from '../api/themes'
 import { projectSemanticConsumerVariables } from './semanticConsumers'
+import { DEFAULT_COLOR_POLICY, projectColorPolicy, type ColorPolicyPreferences } from './colorPolicy'
 
 export const THEME_MAPPING_VERSION = 1 as const
 
@@ -47,7 +48,10 @@ export function fingerprintVariableNames(names: readonly string[]): string {
 }
 
 /** The only runtime authority that translates a validated variant into CSS. */
-export function projectThemeVariant(variant: ThemeVariant): ThemeProjection {
+export function projectThemeVariant(
+  variant: ThemeVariant,
+  colorPolicy: ColorPolicyPreferences = DEFAULT_COLOR_POLICY,
+): ThemeProjection {
   const tokenVariables = Object.fromEntries(resolvedTokenKeys.map((key) => [
     `--oa-token-${toKebabCase(key)}`,
     variant.tokens[key],
@@ -71,13 +75,14 @@ export function projectThemeVariant(variant: ThemeVariant): ThemeProjection {
     '--oa-runtime-overlay-strong': derivedValues['--color-overlay-strong'],
   }
   const semanticConsumers = projectSemanticConsumerVariables(variant.palette)
+  const policyVariables = projectColorPolicy(variant, colorPolicy)
   // Empty optional Base24 slots actively clear values left by the previously
   // selected family; no prior variant is allowed to remain a second authority.
   const paletteVariables = Object.fromEntries(paletteKeys.map((key) => [
     `--oa-${key.toLowerCase()}`,
     variant.palette[key] ?? '',
   ]))
-  const consumerProjection = { ...tokenVariables, ...aliases, ...derived, ...semanticConsumers }
+  const consumerProjection = { ...tokenVariables, ...aliases, ...derived, ...semanticConsumers, ...policyVariables }
   const all = { ...paletteVariables, ...consumerProjection }
   // The cache is a resolved consumer projection, not a second persisted theme
   // palette. Raw Base24 slots are applied after the appearance API resolves;

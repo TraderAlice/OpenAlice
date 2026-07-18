@@ -68,7 +68,7 @@ export function PendingOrders({ utaId, state, run, loading }: {
                   <td className="py-1 pr-3">{o.orderType}</td>
                   <td className="py-1 pr-3 font-mono text-xs text-right">{o.totalQuantity}</td>
                   <td className="py-1 pr-3 font-mono text-xs text-right">{trigger ?? '—'}</td>
-                  <td className={`py-1 pr-3 font-mono text-xs text-right ${closeToFire ? 'text-yellow-400' : 'text-text-muted'}`}>
+                  <td className={`py-1 pr-3 font-mono text-xs text-right ${closeToFire ? 'text-[var(--oa-status-warning)]' : 'text-text-muted'}`}>
                     {distance == null ? '—' : `${distance >= 0 ? '+' : ''}${distance.toFixed(2)}`}
                   </td>
                   <td className="py-1 pr-3">

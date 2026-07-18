@@ -544,10 +544,20 @@ html[lang="ja"] .oa-onboarding-title {
 }
 
 .btn-danger {
-  @apply px-4 py-2 text-[13px] font-medium rounded-lg border border-red/30 text-red
-    hover:bg-red/10 transition-all active:scale-[0.98]
+  @apply px-4 py-2 text-[13px] font-medium rounded-lg border
+    transition-all active:scale-[0.98]
     disabled:opacity-40 disabled:cursor-default cursor-pointer
-    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg;
+    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-bg;
+  color: var(--oa-risk-destructive);
+  border-color: color-mix(in srgb, var(--oa-risk-destructive) 30%, transparent);
+}
+
+.btn-danger:hover {
+  background: color-mix(in srgb, var(--oa-risk-destructive) 10%, transparent);
+}
+
+.btn-danger:focus-visible {
+  --tw-ring-color: color-mix(in srgb, var(--oa-risk-destructive) 40%, transparent);
 }
 
 .btn-primary-sm {

@@ -313,7 +313,7 @@ function AgentBadgeGlyph({ agentId }: { agentId: string }): ReactElement {
 /** Hover-revealed square action button used for the per-row controls. */
 function rowAction(danger = false): string {
   return `oa-icon-action shrink-0 w-5 h-5 rounded flex items-center justify-center text-text-muted/70 transition-colors ${
-    danger ? 'hover:text-red hover:bg-red/10' : 'hover:text-text hover:bg-bg-secondary'
+    danger ? 'hover:text-[var(--oa-risk-destructive)] hover:bg-[var(--oa-risk-destructive)]/10' : 'hover:text-text hover:bg-bg-secondary'
   }`;
 }
 

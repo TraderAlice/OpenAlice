@@ -1,4 +1,4 @@
-import type { AppearanceMode, ThemeVariantMode } from '../api/themes'
+import type { AppearanceMode, AppearancePreferences, ThemeVariantMode } from '../api/themes'
 import { fingerprintVariableNames, fingerprintVariables, THEME_MAPPING_VERSION } from './projection'
 
 export const FIRST_PAINT_THEME_CACHE_KEY = 'openalice.theme.first-paint.v1'
@@ -11,6 +11,9 @@ export interface FirstPaintThemeCache {
   resolvedMode: ThemeVariantMode
   familyId: string
   variantId: string
+  marketColors: AppearancePreferences['marketColors']
+  marketDirection: AppearancePreferences['marketDirection']
+  statusColors: AppearancePreferences['statusColors']
   tokenFingerprint: string
   projectionShapeFingerprint: string
   variables: Readonly<Record<string, string>>

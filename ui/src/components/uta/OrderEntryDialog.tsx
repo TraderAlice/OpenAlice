@@ -369,8 +369,8 @@ function PushResultPanel({ result }: { result: WalletPushResult }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
-        <span className={`w-2 h-2 rounded-full shrink-0 ${fullySubmitted ? 'bg-green' : 'bg-yellow-400'}`} />
-        <span className={`text-[13px] font-medium ${fullySubmitted ? 'text-green' : 'text-yellow-400'}`}>
+        <span className={`w-2 h-2 rounded-full shrink-0 ${fullySubmitted ? 'bg-[var(--oa-status-success)]' : 'bg-[var(--oa-status-warning)]'}`} />
+        <span className={`text-[13px] font-medium ${fullySubmitted ? 'text-[var(--oa-status-success)]' : 'text-[var(--oa-status-warning)]'}`}>
           {fullySubmitted
             ? `${totalSubmitted} operation${totalSubmitted > 1 ? 's' : ''} submitted to broker`
             : `${totalSubmitted} submitted, ${totalRejected} rejected`}

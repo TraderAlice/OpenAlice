@@ -179,11 +179,11 @@ function DepositTab({ utaId, knownKeys, run, loading }: {
         <div className="flex rounded overflow-hidden border border-border">
           <button
             onClick={() => setMode('in')}
-            className={`px-2 py-1 text-xs ${mode === 'in' ? 'bg-green/20 text-green' : 'text-text-muted hover:text-text'}`}
+            className={`px-2 py-1 text-xs ${mode === 'in' ? 'bg-[var(--oa-market-buy)]/20 text-[var(--oa-market-buy)]' : 'text-text-muted hover:text-text'}`}
           >Deposit</button>
           <button
             onClick={() => setMode('out')}
-            className={`px-2 py-1 text-xs ${mode === 'out' ? 'bg-red/20 text-red' : 'text-text-muted hover:text-text'}`}
+            className={`px-2 py-1 text-xs ${mode === 'out' ? 'bg-[var(--oa-market-sell)]/20 text-[var(--oa-market-sell)]' : 'text-text-muted hover:text-text'}`}
           >Withdraw</button>
         </div>
 
@@ -203,7 +203,7 @@ function DepositTab({ utaId, knownKeys, run, loading }: {
               className="btn-primary-sm"
             >Deposit</button>
             {draftOk && <span className="text-[11px] text-text-muted/70 font-mono">→ {draftOk.nativeKey}</span>}
-            {draftError && draft.symbol && <span className="text-[11px] text-yellow-400">{draftError}</span>}
+            {draftError && draft.symbol && <span className="text-[11px] text-[var(--oa-status-warning)]">{draftError}</span>}
           </>
         ) : (
           <>
@@ -268,11 +268,11 @@ function TradeTab({ utaId, run, loading }: {
       <div className="flex rounded overflow-hidden border border-border">
         <button
           onClick={() => setSide('BUY')}
-          className={`px-2 py-1 text-xs ${side === 'BUY' ? 'bg-green/20 text-green' : 'text-text-muted hover:text-text'}`}
+          className={`px-2 py-1 text-xs ${side === 'BUY' ? 'bg-[var(--oa-market-buy)]/20 text-[var(--oa-market-buy)]' : 'text-text-muted hover:text-text'}`}
         >BUY</button>
         <button
           onClick={() => setSide('SELL')}
-          className={`px-2 py-1 text-xs ${side === 'SELL' ? 'bg-red/20 text-red' : 'text-text-muted hover:text-text'}`}
+          className={`px-2 py-1 text-xs ${side === 'SELL' ? 'bg-[var(--oa-market-sell)]/20 text-[var(--oa-market-sell)]' : 'text-text-muted hover:text-text'}`}
         >SELL</button>
       </div>
       <InstrumentInput draft={draft} onChange={setDraft} />
@@ -280,7 +280,7 @@ function TradeTab({ utaId, run, loading }: {
       <input className={`${inputClassMono} w-24`} placeholder="price" value={price} onChange={(e) => setPrice(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} />
       <button disabled={loading || !draftOk || !qty || !price} onClick={submit} className="btn-primary-sm">Submit</button>
       {draftOk && <span className="text-[11px] text-text-muted/70 font-mono">→ {draftOk.nativeKey}</span>}
-      {draftError && draft.symbol && <span className="text-[11px] text-yellow-400">{draftError}</span>}
+      {draftError && draft.symbol && <span className="text-[11px] text-[var(--oa-status-warning)]">{draftError}</span>}
       <span className="text-[11px] text-text-muted ml-auto">Cash {side === 'BUY' ? '−' : '+'} qty × price.</span>
     </div>
   )
@@ -327,8 +327,8 @@ function OrderTab({ utaId, knownKeys, run, loading }: {
   return (
     <div className="flex items-center gap-2 flex-wrap">
       <div className="flex rounded overflow-hidden border border-border">
-        <button onClick={() => setSide('BUY')} className={`px-2 py-1 text-xs ${side === 'BUY' ? 'bg-green/20 text-green' : 'text-text-muted hover:text-text'}`}>BUY</button>
-        <button onClick={() => setSide('SELL')} className={`px-2 py-1 text-xs ${side === 'SELL' ? 'bg-red/20 text-red' : 'text-text-muted hover:text-text'}`}>SELL</button>
+        <button onClick={() => setSide('BUY')} className={`px-2 py-1 text-xs ${side === 'BUY' ? 'bg-[var(--oa-market-buy)]/20 text-[var(--oa-market-buy)]' : 'text-text-muted hover:text-text'}`}>BUY</button>
+        <button onClick={() => setSide('SELL')} className={`px-2 py-1 text-xs ${side === 'SELL' ? 'bg-[var(--oa-market-sell)]/20 text-[var(--oa-market-sell)]' : 'text-text-muted hover:text-text'}`}>SELL</button>
       </div>
       <select value={orderType} onChange={(e) => setOrderType(e.target.value as 'MKT' | 'LMT')} className={`${inputClass} w-20`}>
         <option value="MKT">MKT</option>

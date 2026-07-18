@@ -1,10 +1,13 @@
-import type { AppearanceMode, ThemeVariant, ThemeVariantMode } from '../api/themes'
+import type { AppearanceMode, AppearancePreferences, ThemeVariant, ThemeVariantMode } from '../api/themes'
+import { DEFAULT_COLOR_POLICY, type ColorPolicyPreferences } from './colorPolicy'
 import { createFirstPaintCache, FIRST_PAINT_THEME_CACHE_KEY } from './firstPaint'
 import { projectThemeVariant, THEME_MAPPING_VERSION } from './projection'
 import { activeThemeVariant, useThemeStore } from './store'
 
 export { FIRST_PAINT_THEME_CACHE_KEY } from './firstPaint'
 export { fingerprintVariables, projectThemeVariant } from './projection'
+export { DEFAULT_COLOR_POLICY, projectColorPolicy } from './colorPolicy'
+export type { ColorPolicyPreferences } from './colorPolicy'
 
 const media = window.matchMedia('(prefers-color-scheme: dark)')
 
@@ -25,14 +28,21 @@ interface BootThemeIdentity {
   familyId: string
   variantId: string
   fingerprint: string
+  marketColors: AppearancePreferences['marketColors']
+  marketDirection: AppearancePreferences['marketDirection']
+  statusColors: AppearancePreferences['statusColors']
 }
 
 function readBootIdentity(): BootThemeIdentity | null {
   const root = document.documentElement
   if (root.dataset.themeFirstPaint !== 'cache') return null
-  const { themeFamily, themeVariant, themeFingerprint } = root.dataset
+  const { themeFamily, themeVariant, themeFingerprint, themeMarketColors, themeMarketDirection, themeStatusColors } = root.dataset
   return themeFamily && themeVariant && themeFingerprint
-    ? { familyId: themeFamily, variantId: themeVariant, fingerprint: themeFingerprint }
+    && (themeMarketColors === 'protected' || themeMarketColors === 'theme')
+    && (themeMarketDirection === 'green-up-red-down' || themeMarketDirection === 'red-up-green-down')
+    && (themeStatusColors === 'protected' || themeStatusColors === 'theme')
+    ? { familyId: themeFamily, variantId: themeVariant, fingerprint: themeFingerprint,
+        marketColors: themeMarketColors, marketDirection: themeMarketDirection, statusColors: themeStatusColors }
     : null
 }
 
@@ -41,7 +51,10 @@ function validateBootIdentity(boot: BootThemeIdentity | null): void {
   const root = document.documentElement
   if (root.dataset.themeFamily === boot.familyId
     && root.dataset.themeVariant === boot.variantId
-    && root.dataset.themeFingerprint === boot.fingerprint) return
+    && root.dataset.themeFingerprint === boot.fingerprint
+    && root.dataset.themeMarketColors === boot.marketColors
+    && root.dataset.themeMarketDirection === boot.marketDirection
+    && root.dataset.themeStatusColors === boot.statusColors) return
   root.dataset.themeFirstPaint = 'stale'
   console.warn('[theme:first-paint] Cached projection did not match authoritative file-backed appearance')
 }
@@ -50,11 +63,12 @@ export function applyThemeVariant(
   familyId: string,
   appearanceMode: AppearanceMode,
   variant: ThemeVariant,
+  colorPolicy: ColorPolicyPreferences = DEFAULT_COLOR_POLICY,
 ): void {
   if (variant.provenance.mappingVersion !== THEME_MAPPING_VERSION) {
     throw new Error(`Unsupported theme mapping version ${variant.provenance.mappingVersion}`)
   }
-  const projection = projectThemeVariant(variant)
+  const projection = projectThemeVariant(variant, colorPolicy)
   // Cache persistence is best-effort: storage policy must not prevent the
   // authoritative file-backed theme from rendering in the current process.
   let cachePersisted = true
@@ -64,6 +78,7 @@ export function applyThemeVariant(
       resolvedMode: variant.mode,
       familyId,
       variantId: variant.id,
+      ...colorPolicy,
       variables: projection.firstPaint,
     })))
   } catch (error) {
@@ -77,6 +92,9 @@ export function applyThemeVariant(
   root.dataset.themeFamily = familyId
   root.dataset.themeVariant = variant.id
   root.dataset.themeFingerprint = projection.fingerprint
+  root.dataset.themeMarketColors = colorPolicy.marketColors
+  root.dataset.themeMarketDirection = colorPolicy.marketDirection
+  root.dataset.themeStatusColors = colorPolicy.statusColors
   if (!cachePersisted) root.dataset.themeFirstPaint = 'unavailable'
   root.style.colorScheme = variant.mode
   applyVariables(projection.all)
@@ -87,7 +105,7 @@ function applyCurrentTheme(strict = false): void {
   const systemMode: ThemeVariantMode = media.matches ? 'dark' : 'light'
   const variant = activeThemeVariant(state.families, state.appearance, systemMode)
   if (variant !== undefined && state.appearance !== null) {
-    applyThemeVariant(state.appearance.activeFamilyId, state.appearance.mode, variant)
+    applyThemeVariant(state.appearance.activeFamilyId, state.appearance.mode, variant, state.appearance)
     return
   }
   if (state.appearance !== null) {
@@ -128,6 +146,9 @@ export function clearThemeProjection(): void {
   delete root.dataset.themeFamily
   delete root.dataset.themeVariant
   delete root.dataset.themeFingerprint
+  delete root.dataset.themeMarketColors
+  delete root.dataset.themeMarketDirection
+  delete root.dataset.themeStatusColors
   delete root.dataset.themeFirstPaint
   root.style.removeProperty('color-scheme')
 }

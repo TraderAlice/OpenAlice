@@ -1,0 +1,3276 @@
+{
+  "schemaVersion": 1,
+  "owner": "#18",
+  "status": "historical-supplemental-and-current-reconciled",
+  "historicalContract": {
+    "sourceCommit": "c34b2bd1f1b6e2be45de6620394f6c5a04b44dfb",
+    "decisionCount": 83,
+    "reconciledCount": 83,
+    "stableInventoryIdCount": 76,
+    "spanIdMappingCount": 7,
+    "ownerCounts": {
+      "market-color-policy": 50,
+      "trading-risk-policy": 31,
+      "permission-risk-policy": 2
+    },
+    "receipts": [
+      {
+        "historical": {
+          "inventoryId": "color-0f54ad5c71a59fea1846",
+          "path": "ui/src/components/market/BoardMeta.tsx",
+          "line": 27,
+          "literal": "text-amber-700",
+          "scenarioId": "market-stale",
+          "state": "warning",
+          "channel": "text",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "market-color-policy",
+            "targetFamily": "--oa-market-* / --oa-status-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-0f54ad5c71a59fea1846",
+          "currentPath": "ui/src/components/market/BoardMeta.tsx",
+          "currentLine": 27
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/market/BoardMeta.tsx",
+          "historicalLocator": {
+            "line": 27,
+            "channel": "text"
+          },
+          "targetLine": 27,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "text-amber-700",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-33ee436a8bdb534f8f44",
+          "path": "ui/src/components/market/BoardMeta.tsx",
+          "line": 27,
+          "literal": "bg-amber-500/15",
+          "scenarioId": "market-stale",
+          "state": "warning",
+          "channel": "bg",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "market-color-policy",
+            "targetFamily": "--oa-market-* / --oa-status-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-33ee436a8bdb534f8f44",
+          "currentPath": "ui/src/components/market/BoardMeta.tsx",
+          "currentLine": 27
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/market/BoardMeta.tsx",
+          "historicalLocator": {
+            "line": 27,
+            "channel": "bg"
+          },
+          "targetLine": 27,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "bg-amber-500/15",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-df8f98149ee86c4a4567",
+          "path": "ui/src/components/market/BoardMeta.tsx",
+          "line": 27,
+          "literal": "text-amber-300",
+          "scenarioId": "market-stale",
+          "state": "warning",
+          "channel": "text",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "market-color-policy",
+            "targetFamily": "--oa-market-* / --oa-status-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-df8f98149ee86c4a4567",
+          "currentPath": "ui/src/components/market/BoardMeta.tsx",
+          "currentLine": 27
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/market/BoardMeta.tsx",
+          "historicalLocator": {
+            "line": 27,
+            "channel": "text"
+          },
+          "targetLine": 27,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "text-amber-300",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-eeaeda01b44b8f962fc0",
+          "path": "ui/src/components/market/KlinePanel.tsx",
+          "line": 107,
+          "literal": "transparent",
+          "scenarioId": "market-search-sidebar-variants",
+          "state": "selected",
+          "channel": "color",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-muted",
+          "semanticDisposition": {
+            "kind": "no-paint",
+            "authority": "explicit-paint-removal",
+            "targetFamily": null,
+            "rationale": "This occurrence removes paint and must remain semantically colorless."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-eeaeda01b44b8f962fc0",
+          "currentPath": "ui/src/components/market/KlinePanel.tsx",
+          "currentLine": 107
+        },
+        "currentOutcome": {
+          "kind": "retained-no-paint",
+          "targetPath": "ui/src/components/market/KlinePanel.tsx",
+          "historicalLocator": {
+            "line": 107,
+            "channel": "color"
+          },
+          "targetLine": 149,
+          "sourceAssertion": "transparent",
+          "forbiddenHistoricalLiteral": null,
+          "rationale": "Current source retains the reviewed explicit no-paint channel."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-3395b7efc2bab78e86fe",
+          "path": "ui/src/components/market/KlinePanel.tsx",
+          "line": 108,
+          "literal": "#c9d1d9",
+          "scenarioId": "market-search-sidebar-variants",
+          "state": "selected",
+          "channel": "textColor",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-on-strong",
+          "semanticDisposition": {
+            "kind": "theme-only",
+            "authority": "active-theme-projection",
+            "targetFamily": "--oa-chart-* / semantic theme variables",
+            "rationale": "This is chart or market-neutral chrome; it follows the active theme and never market direction or risk preferences."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-3395b7efc2bab78e86fe",
+          "currentPath": "ui/src/components/market/KlinePanel.tsx",
+          "currentLine": 108
+        },
+        "currentOutcome": {
+          "kind": "local-theme-channel",
+          "targetPath": "ui/src/components/market/KlinePanel.tsx",
+          "historicalLocator": {
+            "line": 108,
+            "channel": "textColor"
+          },
+          "targetLine": 150,
+          "sourceAssertion": "colors.axisText",
+          "forbiddenHistoricalLiteral": "#c9d1d9",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-d900a14d16453364b96e",
+          "path": "ui/src/components/market/KlinePanel.tsx",
+          "line": 109,
+          "literal": "#58a6ff33",
+          "scenarioId": "market-search-sidebar-variants",
+          "state": "selected",
+          "channel": "separatorHoverColor",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-info",
+          "semanticDisposition": {
+            "kind": "theme-only",
+            "authority": "active-theme-projection",
+            "targetFamily": "--oa-chart-* / semantic theme variables",
+            "rationale": "This is chart or market-neutral chrome; it follows the active theme and never market direction or risk preferences."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-d900a14d16453364b96e",
+          "currentPath": "ui/src/components/market/KlinePanel.tsx",
+          "currentLine": 109
+        },
+        "currentOutcome": {
+          "kind": "local-theme-channel",
+          "targetPath": "ui/src/components/market/KlinePanel.tsx",
+          "historicalLocator": {
+            "line": 109,
+            "channel": "separatorHoverColor"
+          },
+          "targetLine": 151,
+          "sourceAssertion": "colors.selection",
+          "forbiddenHistoricalLiteral": "#58a6ff33",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-e04461b9656058956d03",
+          "path": "ui/src/components/market/KlinePanel.tsx",
+          "line": 109,
+          "literal": "#30363d",
+          "scenarioId": "market-search-sidebar-variants",
+          "state": "selected",
+          "channel": "separatorColor",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-muted",
+          "semanticDisposition": {
+            "kind": "theme-only",
+            "authority": "active-theme-projection",
+            "targetFamily": "--oa-chart-* / semantic theme variables",
+            "rationale": "This is chart or market-neutral chrome; it follows the active theme and never market direction or risk preferences."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-e04461b9656058956d03",
+          "currentPath": "ui/src/components/market/KlinePanel.tsx",
+          "currentLine": 109
+        },
+        "currentOutcome": {
+          "kind": "local-theme-channel",
+          "targetPath": "ui/src/components/market/KlinePanel.tsx",
+          "historicalLocator": {
+            "line": 109,
+            "channel": "separatorColor"
+          },
+          "targetLine": 151,
+          "sourceAssertion": "colors.axisBorder",
+          "forbiddenHistoricalLiteral": "#30363d",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-441cd832edf52fbed60a",
+          "path": "ui/src/components/market/KlinePanel.tsx",
+          "line": 112,
+          "literal": "#21262d",
+          "scenarioId": "market-search-sidebar-variants",
+          "state": "selected",
+          "channel": "color",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-neutral-dark",
+          "semanticDisposition": {
+            "kind": "theme-only",
+            "authority": "active-theme-projection",
+            "targetFamily": "--oa-chart-* / semantic theme variables",
+            "rationale": "This is chart or market-neutral chrome; it follows the active theme and never market direction or risk preferences."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-441cd832edf52fbed60a",
+          "currentPath": "ui/src/components/market/KlinePanel.tsx",
+          "currentLine": 112
+        },
+        "currentOutcome": {
+          "kind": "local-theme-channel",
+          "targetPath": "ui/src/components/market/KlinePanel.tsx",
+          "historicalLocator": {
+            "line": 112,
+            "channel": "color"
+          },
+          "targetLine": 154,
+          "sourceAssertion": "colors.grid",
+          "forbiddenHistoricalLiteral": "#21262d",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-4f9115681c24a0aa9546",
+          "path": "ui/src/components/market/KlinePanel.tsx",
+          "line": 113,
+          "literal": "#21262d",
+          "scenarioId": "market-search-sidebar-variants",
+          "state": "selected",
+          "channel": "color",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-neutral-dark",
+          "semanticDisposition": {
+            "kind": "theme-only",
+            "authority": "active-theme-projection",
+            "targetFamily": "--oa-chart-* / semantic theme variables",
+            "rationale": "This is chart or market-neutral chrome; it follows the active theme and never market direction or risk preferences."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-4f9115681c24a0aa9546",
+          "currentPath": "ui/src/components/market/KlinePanel.tsx",
+          "currentLine": 113
+        },
+        "currentOutcome": {
+          "kind": "local-theme-channel",
+          "targetPath": "ui/src/components/market/KlinePanel.tsx",
+          "historicalLocator": {
+            "line": 113,
+            "channel": "color"
+          },
+          "targetLine": 155,
+          "sourceAssertion": "colors.grid",
+          "forbiddenHistoricalLiteral": "#21262d",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-4c2ebc5f01c8393d4fc2",
+          "path": "ui/src/components/market/KlinePanel.tsx",
+          "line": 115,
+          "literal": "#30363d",
+          "scenarioId": "market-search-sidebar-variants",
+          "state": "selected",
+          "channel": "borderColor",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-muted",
+          "semanticDisposition": {
+            "kind": "theme-only",
+            "authority": "active-theme-projection",
+            "targetFamily": "--oa-chart-* / semantic theme variables",
+            "rationale": "This is chart or market-neutral chrome; it follows the active theme and never market direction or risk preferences."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-4c2ebc5f01c8393d4fc2",
+          "currentPath": "ui/src/components/market/KlinePanel.tsx",
+          "currentLine": 115
+        },
+        "currentOutcome": {
+          "kind": "local-theme-channel",
+          "targetPath": "ui/src/components/market/KlinePanel.tsx",
+          "historicalLocator": {
+            "line": 115,
+            "channel": "borderColor"
+          },
+          "targetLine": 158,
+          "sourceAssertion": "colors.axisBorder",
+          "forbiddenHistoricalLiteral": "#30363d",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-6a1e602212b13b1205ac",
+          "path": "ui/src/components/market/KlinePanel.tsx",
+          "line": 116,
+          "literal": "#30363d",
+          "scenarioId": "market-search-sidebar-variants",
+          "state": "selected",
+          "channel": "borderColor",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-muted",
+          "semanticDisposition": {
+            "kind": "theme-only",
+            "authority": "active-theme-projection",
+            "targetFamily": "--oa-chart-* / semantic theme variables",
+            "rationale": "This is chart or market-neutral chrome; it follows the active theme and never market direction or risk preferences."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-6a1e602212b13b1205ac",
+          "currentPath": "ui/src/components/market/KlinePanel.tsx",
+          "currentLine": 116
+        },
+        "currentOutcome": {
+          "kind": "local-theme-channel",
+          "targetPath": "ui/src/components/market/KlinePanel.tsx",
+          "historicalLocator": {
+            "line": 116,
+            "channel": "borderColor"
+          },
+          "targetLine": 159,
+          "sourceAssertion": "colors.axisBorder",
+          "forbiddenHistoricalLiteral": "#30363d",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-34f7d7c463847db10801",
+          "path": "ui/src/components/market/KlinePanel.tsx",
+          "line": 121,
+          "literal": "#3fb950",
+          "scenarioId": "market-search-sidebar-variants",
+          "state": "selected",
+          "channel": "upColor",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-success",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "market-color-policy",
+            "targetFamily": "--oa-market-* / --oa-status-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-34f7d7c463847db10801",
+          "currentPath": "ui/src/components/market/KlinePanel.tsx",
+          "currentLine": 121
+        },
+        "currentOutcome": {
+          "kind": "retained-no-paint",
+          "targetPath": "ui/src/components/market/KlinePanel.tsx",
+          "historicalLocator": {
+            "line": 121,
+            "channel": "upColor"
+          },
+          "targetLine": 165,
+          "sourceAssertion": "upColor: 'transparent'",
+          "forbiddenHistoricalLiteral": "#3fb950",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-1684f78e36c3c770fb89",
+          "path": "ui/src/components/market/KlinePanel.tsx",
+          "line": 122,
+          "literal": "#f85149",
+          "scenarioId": "market-search-sidebar-variants",
+          "state": "selected",
+          "channel": "downColor",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-danger",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "market-color-policy",
+            "targetFamily": "--oa-market-* / --oa-status-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-1684f78e36c3c770fb89",
+          "currentPath": "ui/src/components/market/KlinePanel.tsx",
+          "currentLine": 122
+        },
+        "currentOutcome": {
+          "kind": "local-theme-channel",
+          "targetPath": "ui/src/components/market/KlinePanel.tsx",
+          "historicalLocator": {
+            "line": 122,
+            "channel": "downColor"
+          },
+          "targetLine": 166,
+          "sourceAssertion": "colors.down",
+          "forbiddenHistoricalLiteral": "#f85149",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-af5c27879f1dff7524fa",
+          "path": "ui/src/components/market/KlinePanel.tsx",
+          "line": 123,
+          "literal": "#3fb950",
+          "scenarioId": "market-search-sidebar-variants",
+          "state": "selected",
+          "channel": "borderUpColor",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-success",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "market-color-policy",
+            "targetFamily": "--oa-market-* / --oa-status-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-af5c27879f1dff7524fa",
+          "currentPath": "ui/src/components/market/KlinePanel.tsx",
+          "currentLine": 123
+        },
+        "currentOutcome": {
+          "kind": "local-theme-channel",
+          "targetPath": "ui/src/components/market/KlinePanel.tsx",
+          "historicalLocator": {
+            "line": 123,
+            "channel": "borderUpColor"
+          },
+          "targetLine": 167,
+          "sourceAssertion": "colors.up",
+          "forbiddenHistoricalLiteral": "#3fb950",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-747e2e0188b50dd9bc4a",
+          "path": "ui/src/components/market/KlinePanel.tsx",
+          "line": 124,
+          "literal": "#f85149",
+          "scenarioId": "market-search-sidebar-variants",
+          "state": "selected",
+          "channel": "borderDownColor",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-danger",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "market-color-policy",
+            "targetFamily": "--oa-market-* / --oa-status-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-747e2e0188b50dd9bc4a",
+          "currentPath": "ui/src/components/market/KlinePanel.tsx",
+          "currentLine": 124
+        },
+        "currentOutcome": {
+          "kind": "local-theme-channel",
+          "targetPath": "ui/src/components/market/KlinePanel.tsx",
+          "historicalLocator": {
+            "line": 124,
+            "channel": "borderDownColor"
+          },
+          "targetLine": 168,
+          "sourceAssertion": "colors.down",
+          "forbiddenHistoricalLiteral": "#f85149",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-01dcaabe9b6cf88f67e7",
+          "path": "ui/src/components/market/KlinePanel.tsx",
+          "line": 125,
+          "literal": "#3fb950",
+          "scenarioId": "market-search-sidebar-variants",
+          "state": "selected",
+          "channel": "wickUpColor",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-success",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "market-color-policy",
+            "targetFamily": "--oa-market-* / --oa-status-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-01dcaabe9b6cf88f67e7",
+          "currentPath": "ui/src/components/market/KlinePanel.tsx",
+          "currentLine": 125
+        },
+        "currentOutcome": {
+          "kind": "local-theme-channel",
+          "targetPath": "ui/src/components/market/KlinePanel.tsx",
+          "historicalLocator": {
+            "line": 125,
+            "channel": "wickUpColor"
+          },
+          "targetLine": 169,
+          "sourceAssertion": "colors.up",
+          "forbiddenHistoricalLiteral": "#3fb950",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-f914783853d2aa57eb36",
+          "path": "ui/src/components/market/KlinePanel.tsx",
+          "line": 126,
+          "literal": "#f85149",
+          "scenarioId": "market-search-sidebar-variants",
+          "state": "selected",
+          "channel": "wickDownColor",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-danger",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "market-color-policy",
+            "targetFamily": "--oa-market-* / --oa-status-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-f914783853d2aa57eb36",
+          "currentPath": "ui/src/components/market/KlinePanel.tsx",
+          "currentLine": 126
+        },
+        "currentOutcome": {
+          "kind": "local-theme-channel",
+          "targetPath": "ui/src/components/market/KlinePanel.tsx",
+          "historicalLocator": {
+            "line": 126,
+            "channel": "wickDownColor"
+          },
+          "targetLine": 170,
+          "sourceAssertion": "colors.down",
+          "forbiddenHistoricalLiteral": "#f85149",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-20be3e4e74fbff4cc6b9",
+          "path": "ui/src/components/market/KlinePanel.tsx",
+          "line": 230,
+          "literal": "#f8514955",
+          "scenarioId": "market-search-sidebar-variants",
+          "state": "selected",
+          "channel": "color",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-danger",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "market-color-policy",
+            "targetFamily": "--oa-market-* / --oa-status-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-20be3e4e74fbff4cc6b9",
+          "currentPath": "ui/src/components/market/KlinePanel.tsx",
+          "currentLine": 230
+        },
+        "currentOutcome": {
+          "kind": "local-theme-channel",
+          "targetPath": "ui/src/components/market/KlinePanel.tsx",
+          "historicalLocator": {
+            "line": 230,
+            "channel": "color"
+          },
+          "targetLine": 313,
+          "sourceAssertion": "colors.volumeDown",
+          "forbiddenHistoricalLiteral": "#f8514955",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-8076032fd4d324f8f8c5",
+          "path": "ui/src/components/market/KlinePanel.tsx",
+          "line": 230,
+          "literal": "#3fb95055",
+          "scenarioId": "market-search-sidebar-variants",
+          "state": "selected",
+          "channel": "color",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-success",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "market-color-policy",
+            "targetFamily": "--oa-market-* / --oa-status-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-8076032fd4d324f8f8c5",
+          "currentPath": "ui/src/components/market/KlinePanel.tsx",
+          "currentLine": 230
+        },
+        "currentOutcome": {
+          "kind": "local-theme-channel",
+          "targetPath": "ui/src/components/market/KlinePanel.tsx",
+          "historicalLocator": {
+            "line": 230,
+            "channel": "color"
+          },
+          "targetLine": 313,
+          "sourceAssertion": "colors.volumeUp",
+          "forbiddenHistoricalLiteral": "#3fb95055",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-84dd59d7521f280d503a",
+          "path": "ui/src/components/market/SearchBox.tsx",
+          "line": 8,
+          "literal": "bg-amber-500/15",
+          "scenarioId": "market-search-main-variants",
+          "state": "selected",
+          "channel": "bg",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "market-color-policy",
+            "targetFamily": "--oa-market-* / --oa-status-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-84dd59d7521f280d503a",
+          "currentPath": "ui/src/components/market/SearchBox.tsx",
+          "currentLine": 8
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/market/SearchBox.tsx",
+          "historicalLocator": {
+            "line": 8,
+            "channel": "bg"
+          },
+          "targetLine": 8,
+          "sourceAssertion": "--oa-token-warning",
+          "forbiddenHistoricalLiteral": "bg-amber-500/15",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-850828875410214e2475",
+          "path": "ui/src/components/market/SearchBox.tsx",
+          "line": 8,
+          "literal": "text-amber-400",
+          "scenarioId": "market-search-main-variants",
+          "state": "selected",
+          "channel": "text",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "market-color-policy",
+            "targetFamily": "--oa-market-* / --oa-status-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-850828875410214e2475",
+          "currentPath": "ui/src/components/market/SearchBox.tsx",
+          "currentLine": 8
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/market/SearchBox.tsx",
+          "historicalLocator": {
+            "line": 8,
+            "channel": "text"
+          },
+          "targetLine": 8,
+          "sourceAssertion": "--oa-token-warning",
+          "forbiddenHistoricalLiteral": "text-amber-400",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-6bea0f5a535c6d8eae93",
+          "path": "ui/src/components/market/SearchBox.tsx",
+          "line": 10,
+          "literal": "text-purple-400",
+          "scenarioId": "market-search-main-variants",
+          "state": "selected",
+          "channel": "text",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-special",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "market-color-policy",
+            "targetFamily": "--oa-market-* / --oa-status-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-6bea0f5a535c6d8eae93",
+          "currentPath": "ui/src/components/market/SearchBox.tsx",
+          "currentLine": 10
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/market/SearchBox.tsx",
+          "historicalLocator": {
+            "line": 10,
+            "channel": "text"
+          },
+          "targetLine": 10,
+          "sourceAssertion": "--oa-token-special",
+          "forbiddenHistoricalLiteral": "text-purple-400",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-cfb7b41ee9f2c459cfe1",
+          "path": "ui/src/components/market/SearchBox.tsx",
+          "line": 10,
+          "literal": "bg-purple-500/15",
+          "scenarioId": "market-search-main-variants",
+          "state": "selected",
+          "channel": "bg",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-special",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "market-color-policy",
+            "targetFamily": "--oa-market-* / --oa-status-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-cfb7b41ee9f2c459cfe1",
+          "currentPath": "ui/src/components/market/SearchBox.tsx",
+          "currentLine": 10
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/market/SearchBox.tsx",
+          "historicalLocator": {
+            "line": 10,
+            "channel": "bg"
+          },
+          "targetLine": 10,
+          "sourceAssertion": "--oa-token-special",
+          "forbiddenHistoricalLiteral": "bg-purple-500/15",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-d7b1317df72215f731f8",
+          "path": "ui/src/components/market/SearchBox.tsx",
+          "line": 18,
+          "literal": "text-amber-400",
+          "scenarioId": "market-search-main-variants",
+          "state": "selected",
+          "channel": "text",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "market-color-policy",
+            "targetFamily": "--oa-market-* / --oa-status-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-d7b1317df72215f731f8",
+          "currentPath": "ui/src/components/market/SearchBox.tsx",
+          "currentLine": 18
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/market/SearchBox.tsx",
+          "historicalLocator": {
+            "line": 18,
+            "channel": "text"
+          },
+          "targetLine": 18,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "text-amber-400",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-4c8bf3d2c7142fcef7be",
+          "path": "ui/src/components/MarketSidebar.tsx",
+          "line": 14,
+          "literal": "bg-amber-500/15",
+          "scenarioId": "market-search-main-variants",
+          "state": "selected",
+          "channel": "bg",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "market-color-policy",
+            "targetFamily": "--oa-market-* / --oa-status-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-4c8bf3d2c7142fcef7be",
+          "currentPath": "ui/src/components/MarketSidebar.tsx",
+          "currentLine": 14
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/MarketSidebar.tsx",
+          "historicalLocator": {
+            "line": 14,
+            "channel": "bg"
+          },
+          "targetLine": 14,
+          "sourceAssertion": "--oa-token-warning",
+          "forbiddenHistoricalLiteral": "bg-amber-500/15",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-56901fd12d53551f6b51",
+          "path": "ui/src/components/MarketSidebar.tsx",
+          "line": 14,
+          "literal": "text-amber-400",
+          "scenarioId": "market-search-main-variants",
+          "state": "selected",
+          "channel": "text",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "market-color-policy",
+            "targetFamily": "--oa-market-* / --oa-status-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-56901fd12d53551f6b51",
+          "currentPath": "ui/src/components/MarketSidebar.tsx",
+          "currentLine": 14
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/MarketSidebar.tsx",
+          "historicalLocator": {
+            "line": 14,
+            "channel": "text"
+          },
+          "targetLine": 14,
+          "sourceAssertion": "--oa-token-warning",
+          "forbiddenHistoricalLiteral": "text-amber-400",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-0845127691f813646fbf",
+          "path": "ui/src/components/MarketSidebar.tsx",
+          "line": 16,
+          "literal": "text-purple-400",
+          "scenarioId": "market-search-main-variants",
+          "state": "selected",
+          "channel": "text",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-special",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "market-color-policy",
+            "targetFamily": "--oa-market-* / --oa-status-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-0845127691f813646fbf",
+          "currentPath": "ui/src/components/MarketSidebar.tsx",
+          "currentLine": 16
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/MarketSidebar.tsx",
+          "historicalLocator": {
+            "line": 16,
+            "channel": "text"
+          },
+          "targetLine": 16,
+          "sourceAssertion": "--oa-token-special",
+          "forbiddenHistoricalLiteral": "text-purple-400",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-a0af9c1cf5d585cfbdf2",
+          "path": "ui/src/components/MarketSidebar.tsx",
+          "line": 16,
+          "literal": "bg-purple-500/15",
+          "scenarioId": "market-search-main-variants",
+          "state": "selected",
+          "channel": "bg",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-special",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "market-color-policy",
+            "targetFamily": "--oa-market-* / --oa-status-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-a0af9c1cf5d585cfbdf2",
+          "currentPath": "ui/src/components/MarketSidebar.tsx",
+          "currentLine": 16
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/MarketSidebar.tsx",
+          "historicalLocator": {
+            "line": 16,
+            "channel": "bg"
+          },
+          "targetLine": 16,
+          "sourceAssertion": "--oa-token-special",
+          "forbiddenHistoricalLiteral": "bg-purple-500/15",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-64161f55bd3ed1748e6b",
+          "path": "ui/src/components/MarketSidebar.tsx",
+          "line": 22,
+          "literal": "text-amber-300",
+          "scenarioId": "market-search-sidebar-variants",
+          "state": "selected",
+          "channel": "text",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "market-color-policy",
+            "targetFamily": "--oa-market-* / --oa-status-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-64161f55bd3ed1748e6b",
+          "currentPath": "ui/src/components/MarketSidebar.tsx",
+          "currentLine": 22
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/MarketSidebar.tsx",
+          "historicalLocator": {
+            "line": 22,
+            "channel": "text"
+          },
+          "targetLine": 22,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "text-amber-300",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-e26c39320ee791399091",
+          "path": "ui/src/components/MarketSidebar.tsx",
+          "line": 22,
+          "literal": "text-amber-700",
+          "scenarioId": "market-search-sidebar-variants",
+          "state": "selected",
+          "channel": "text",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "market-color-policy",
+            "targetFamily": "--oa-market-* / --oa-status-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-e26c39320ee791399091",
+          "currentPath": "ui/src/components/MarketSidebar.tsx",
+          "currentLine": 22
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/MarketSidebar.tsx",
+          "historicalLocator": {
+            "line": 22,
+            "channel": "text"
+          },
+          "targetLine": 22,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "text-amber-700",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-3d468b3785cb7a2d451b",
+          "path": "ui/src/components/PushApprovalPanel.tsx",
+          "line": 176,
+          "literal": "text-yellow-300",
+          "scenarioId": "trading-as-git",
+          "state": "warning",
+          "channel": "text",
+          "contractPolicyOwner": "trading-risk-policy",
+          "reviewedSemanticToken": "--color-trading-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "trading-risk-policy",
+            "targetFamily": "--oa-status-* / --oa-risk-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-3d468b3785cb7a2d451b",
+          "currentPath": "ui/src/components/PushApprovalPanel.tsx",
+          "currentLine": 176
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/PushApprovalPanel.tsx",
+          "historicalLocator": {
+            "line": 176,
+            "channel": "text"
+          },
+          "targetLine": 177,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "text-yellow-300",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-623be2b5cf768b0f4752",
+          "path": "ui/src/components/PushApprovalPanel.tsx",
+          "line": 176,
+          "literal": "bg-yellow-400/5",
+          "scenarioId": "trading-as-git",
+          "state": "warning",
+          "channel": "bg",
+          "contractPolicyOwner": "trading-risk-policy",
+          "reviewedSemanticToken": "--color-trading-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "trading-risk-policy",
+            "targetFamily": "--oa-status-* / --oa-risk-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-623be2b5cf768b0f4752",
+          "currentPath": "ui/src/components/PushApprovalPanel.tsx",
+          "currentLine": 176
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/PushApprovalPanel.tsx",
+          "historicalLocator": {
+            "line": 176,
+            "channel": "bg"
+          },
+          "targetLine": 177,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "bg-yellow-400/5",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-d828edbf89b384fd4f72",
+          "path": "ui/src/components/PushApprovalPanel.tsx",
+          "line": 176,
+          "literal": "border-yellow-400/30",
+          "scenarioId": "trading-as-git",
+          "state": "warning",
+          "channel": "border",
+          "contractPolicyOwner": "trading-risk-policy",
+          "reviewedSemanticToken": "--color-trading-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "trading-risk-policy",
+            "targetFamily": "--oa-status-* / --oa-risk-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-d828edbf89b384fd4f72",
+          "currentPath": "ui/src/components/PushApprovalPanel.tsx",
+          "currentLine": 176
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/PushApprovalPanel.tsx",
+          "historicalLocator": {
+            "line": 176,
+            "channel": "border"
+          },
+          "targetLine": 177,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "border-yellow-400/30",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-dd744eb45e0b09fd6af6",
+          "path": "ui/src/components/PushApprovalPanel.tsx",
+          "line": 183,
+          "literal": "text-blue-400",
+          "scenarioId": "trading-as-git-submitted",
+          "state": "selected",
+          "channel": "text",
+          "contractPolicyOwner": "trading-risk-policy",
+          "reviewedSemanticToken": "--color-trading-info",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "trading-risk-policy",
+            "targetFamily": "--oa-status-* / --oa-risk-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-dd744eb45e0b09fd6af6",
+          "currentPath": "ui/src/components/PushApprovalPanel.tsx",
+          "currentLine": 183
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/PushApprovalPanel.tsx",
+          "historicalLocator": {
+            "line": 183,
+            "channel": "text"
+          },
+          "targetLine": 184,
+          "sourceAssertion": "--oa-status-info",
+          "forbiddenHistoricalLiteral": "text-blue-400",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-1704254a9622fc1de3d7",
+          "path": "ui/src/components/PushApprovalPanel.tsx",
+          "line": 186,
+          "literal": "text-orange-400",
+          "scenarioId": "trading-as-git-rejected",
+          "state": "selected",
+          "channel": "text",
+          "contractPolicyOwner": "trading-risk-policy",
+          "reviewedSemanticToken": "--color-trading-attention",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "trading-risk-policy",
+            "targetFamily": "--oa-status-* / --oa-risk-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-1704254a9622fc1de3d7",
+          "currentPath": "ui/src/components/PushApprovalPanel.tsx",
+          "currentLine": 186
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/PushApprovalPanel.tsx",
+          "historicalLocator": {
+            "line": 186,
+            "channel": "text"
+          },
+          "targetLine": 187,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "text-orange-400",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-c066221168d5d4d85a23",
+          "path": "ui/src/components/PushApprovalPanel.tsx",
+          "line": 389,
+          "literal": "text-yellow-300",
+          "scenarioId": "trading-as-git",
+          "state": "warning",
+          "channel": "text",
+          "contractPolicyOwner": "trading-risk-policy",
+          "reviewedSemanticToken": "--color-trading-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "trading-risk-policy",
+            "targetFamily": "--oa-status-* / --oa-risk-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-c066221168d5d4d85a23",
+          "currentPath": "ui/src/components/PushApprovalPanel.tsx",
+          "currentLine": 389
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/PushApprovalPanel.tsx",
+          "historicalLocator": {
+            "line": 389,
+            "channel": "text"
+          },
+          "targetLine": 390,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "text-yellow-300",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-54177e5f3d46714581f6",
+          "path": "ui/src/components/PushApprovalPanel.tsx",
+          "line": 495,
+          "literal": "border-yellow-400/30",
+          "scenarioId": "trading-as-git",
+          "state": "warning",
+          "channel": "border",
+          "contractPolicyOwner": "trading-risk-policy",
+          "reviewedSemanticToken": "--color-trading-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "trading-risk-policy",
+            "targetFamily": "--oa-status-* / --oa-risk-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-54177e5f3d46714581f6",
+          "currentPath": "ui/src/components/PushApprovalPanel.tsx",
+          "currentLine": 495
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/PushApprovalPanel.tsx",
+          "historicalLocator": {
+            "line": 495,
+            "channel": "border"
+          },
+          "targetLine": 496,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "border-yellow-400/30",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-6b7ccec373cb47118f3a",
+          "path": "ui/src/components/PushApprovalPanel.tsx",
+          "line": 495,
+          "literal": "bg-yellow-400/5",
+          "scenarioId": "trading-as-git",
+          "state": "warning",
+          "channel": "bg",
+          "contractPolicyOwner": "trading-risk-policy",
+          "reviewedSemanticToken": "--color-trading-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "trading-risk-policy",
+            "targetFamily": "--oa-status-* / --oa-risk-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-6b7ccec373cb47118f3a",
+          "currentPath": "ui/src/components/PushApprovalPanel.tsx",
+          "currentLine": 495
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/PushApprovalPanel.tsx",
+          "historicalLocator": {
+            "line": 495,
+            "channel": "bg"
+          },
+          "targetLine": 496,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "bg-yellow-400/5",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-85c146564315e79622a1",
+          "path": "ui/src/components/PushApprovalPanel.tsx",
+          "line": 496,
+          "literal": "text-yellow-300",
+          "scenarioId": "trading-as-git",
+          "state": "warning",
+          "channel": "text",
+          "contractPolicyOwner": "trading-risk-policy",
+          "reviewedSemanticToken": "--color-trading-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "trading-risk-policy",
+            "targetFamily": "--oa-status-* / --oa-risk-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-85c146564315e79622a1",
+          "currentPath": "ui/src/components/PushApprovalPanel.tsx",
+          "currentLine": 496
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/PushApprovalPanel.tsx",
+          "historicalLocator": {
+            "line": 496,
+            "channel": "text"
+          },
+          "targetLine": 497,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "text-yellow-300",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-71a071056a101cfb4f41",
+          "path": "ui/src/components/PushApprovalPanel.tsx",
+          "line": 521,
+          "literal": "border-transparent",
+          "scenarioId": "trading-as-git",
+          "state": "warning",
+          "channel": "border",
+          "contractPolicyOwner": "trading-risk-policy",
+          "reviewedSemanticToken": "--color-trading-neutral-dark",
+          "semanticDisposition": {
+            "kind": "no-paint",
+            "authority": "explicit-paint-removal",
+            "targetFamily": null,
+            "rationale": "This occurrence removes paint and must remain semantically colorless."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-71a071056a101cfb4f41",
+          "currentPath": "ui/src/components/PushApprovalPanel.tsx",
+          "currentLine": 521
+        },
+        "currentOutcome": {
+          "kind": "retained-no-paint",
+          "targetPath": "ui/src/components/PushApprovalPanel.tsx",
+          "historicalLocator": {
+            "line": 521,
+            "channel": "border"
+          },
+          "targetLine": 522,
+          "sourceAssertion": "border-transparent",
+          "forbiddenHistoricalLiteral": null,
+          "rationale": "Current source retains the reviewed explicit no-paint channel."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-330464f29a28f4311273",
+          "path": "ui/src/components/PushApprovalPanel.tsx",
+          "line": 689,
+          "literal": "text-yellow-100/80",
+          "scenarioId": "trading-as-git-staged",
+          "state": "selected",
+          "channel": "text",
+          "contractPolicyOwner": "trading-risk-policy",
+          "reviewedSemanticToken": "--color-trading-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "trading-risk-policy",
+            "targetFamily": "--oa-status-* / --oa-risk-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-330464f29a28f4311273",
+          "currentPath": "ui/src/components/PushApprovalPanel.tsx",
+          "currentLine": 689
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/PushApprovalPanel.tsx",
+          "historicalLocator": {
+            "line": 689,
+            "channel": "text"
+          },
+          "targetLine": 690,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "text-yellow-100/80",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-5390ed21daaad9be122a",
+          "path": "ui/src/components/PushApprovalPanel.tsx",
+          "line": 689,
+          "literal": "border-yellow-400/25",
+          "scenarioId": "trading-as-git-staged",
+          "state": "selected",
+          "channel": "border",
+          "contractPolicyOwner": "trading-risk-policy",
+          "reviewedSemanticToken": "--color-trading-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "trading-risk-policy",
+            "targetFamily": "--oa-status-* / --oa-risk-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-5390ed21daaad9be122a",
+          "currentPath": "ui/src/components/PushApprovalPanel.tsx",
+          "currentLine": 689
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/PushApprovalPanel.tsx",
+          "historicalLocator": {
+            "line": 689,
+            "channel": "border"
+          },
+          "targetLine": 690,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "border-yellow-400/25",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-5d117da727d86795bd49",
+          "path": "ui/src/components/PushApprovalPanel.tsx",
+          "line": 689,
+          "literal": "bg-yellow-400/5",
+          "scenarioId": "trading-as-git-staged",
+          "state": "selected",
+          "channel": "bg",
+          "contractPolicyOwner": "trading-risk-policy",
+          "reviewedSemanticToken": "--color-trading-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "trading-risk-policy",
+            "targetFamily": "--oa-status-* / --oa-risk-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-5d117da727d86795bd49",
+          "currentPath": "ui/src/components/PushApprovalPanel.tsx",
+          "currentLine": 689
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/PushApprovalPanel.tsx",
+          "historicalLocator": {
+            "line": 689,
+            "channel": "bg"
+          },
+          "targetLine": 690,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "bg-yellow-400/5",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-c3bc79d12d7f70e82416",
+          "path": "ui/src/components/PushApprovalPanel.tsx",
+          "line": 709,
+          "literal": "border-yellow-400/30",
+          "scenarioId": "trading-as-git",
+          "state": "warning",
+          "channel": "border",
+          "contractPolicyOwner": "trading-risk-policy",
+          "reviewedSemanticToken": "--color-trading-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "trading-risk-policy",
+            "targetFamily": "--oa-status-* / --oa-risk-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-c3bc79d12d7f70e82416",
+          "currentPath": "ui/src/components/PushApprovalPanel.tsx",
+          "currentLine": 709
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/PushApprovalPanel.tsx",
+          "historicalLocator": {
+            "line": 709,
+            "channel": "border"
+          },
+          "targetLine": 710,
+          "sourceAssertion": "--oa-risk-trade-confirm",
+          "forbiddenHistoricalLiteral": "border-yellow-400/30",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-df9e7cf67d355786355d",
+          "path": "ui/src/components/PushApprovalPanel.tsx",
+          "line": 709,
+          "literal": "text-yellow-200",
+          "scenarioId": "trading-as-git",
+          "state": "warning",
+          "channel": "text",
+          "contractPolicyOwner": "trading-risk-policy",
+          "reviewedSemanticToken": "--color-trading-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "trading-risk-policy",
+            "targetFamily": "--oa-status-* / --oa-risk-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-df9e7cf67d355786355d",
+          "currentPath": "ui/src/components/PushApprovalPanel.tsx",
+          "currentLine": 709
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/PushApprovalPanel.tsx",
+          "historicalLocator": {
+            "line": 709,
+            "channel": "text"
+          },
+          "targetLine": 710,
+          "sourceAssertion": "--oa-risk-trade-confirm",
+          "forbiddenHistoricalLiteral": "text-yellow-200",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-ffe273287c6fc1dfa06b",
+          "path": "ui/src/components/PushApprovalPanel.tsx",
+          "line": 709,
+          "literal": "bg-yellow-400/10",
+          "scenarioId": "trading-as-git",
+          "state": "warning",
+          "channel": "bg",
+          "contractPolicyOwner": "trading-risk-policy",
+          "reviewedSemanticToken": "--color-trading-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "trading-risk-policy",
+            "targetFamily": "--oa-status-* / --oa-risk-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-ffe273287c6fc1dfa06b",
+          "currentPath": "ui/src/components/PushApprovalPanel.tsx",
+          "currentLine": 709
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/PushApprovalPanel.tsx",
+          "historicalLocator": {
+            "line": 709,
+            "channel": "bg"
+          },
+          "targetLine": 710,
+          "sourceAssertion": "--oa-risk-trade-confirm",
+          "forbiddenHistoricalLiteral": "bg-yellow-400/10",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-47a570ccf5bb69503c48",
+          "path": "ui/src/components/PushApprovalPanel.tsx",
+          "line": 717,
+          "literal": "border-blue-400/25",
+          "scenarioId": "trading-as-git-staged",
+          "state": "selected",
+          "channel": "border",
+          "contractPolicyOwner": "trading-risk-policy",
+          "reviewedSemanticToken": "--color-trading-info",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "trading-risk-policy",
+            "targetFamily": "--oa-status-* / --oa-risk-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-47a570ccf5bb69503c48",
+          "currentPath": "ui/src/components/PushApprovalPanel.tsx",
+          "currentLine": 717
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/PushApprovalPanel.tsx",
+          "historicalLocator": {
+            "line": 717,
+            "channel": "border"
+          },
+          "targetLine": 718,
+          "sourceAssertion": "--oa-status-info",
+          "forbiddenHistoricalLiteral": "border-blue-400/25",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-484348b46794c7f80ca4",
+          "path": "ui/src/components/PushApprovalPanel.tsx",
+          "line": 717,
+          "literal": "text-blue-200",
+          "scenarioId": "trading-as-git-staged",
+          "state": "selected",
+          "channel": "text",
+          "contractPolicyOwner": "trading-risk-policy",
+          "reviewedSemanticToken": "--color-trading-info",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "trading-risk-policy",
+            "targetFamily": "--oa-status-* / --oa-risk-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-484348b46794c7f80ca4",
+          "currentPath": "ui/src/components/PushApprovalPanel.tsx",
+          "currentLine": 717
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/PushApprovalPanel.tsx",
+          "historicalLocator": {
+            "line": 717,
+            "channel": "text"
+          },
+          "targetLine": 718,
+          "sourceAssertion": "--oa-status-info",
+          "forbiddenHistoricalLiteral": "text-blue-200",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-9475390a31b3fe3fe30f",
+          "path": "ui/src/components/PushApprovalPanel.tsx",
+          "line": 717,
+          "literal": "bg-blue-400/10",
+          "scenarioId": "trading-as-git-staged",
+          "state": "selected",
+          "channel": "bg",
+          "contractPolicyOwner": "trading-risk-policy",
+          "reviewedSemanticToken": "--color-trading-info",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "trading-risk-policy",
+            "targetFamily": "--oa-status-* / --oa-risk-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-9475390a31b3fe3fe30f",
+          "currentPath": "ui/src/components/PushApprovalPanel.tsx",
+          "currentLine": 717
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/PushApprovalPanel.tsx",
+          "historicalLocator": {
+            "line": 717,
+            "channel": "bg"
+          },
+          "targetLine": 718,
+          "sourceAssertion": "--oa-status-info",
+          "forbiddenHistoricalLiteral": "bg-blue-400/10",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-a07ab9e779f5950ef867",
+          "path": "ui/src/components/uta/CreateUTADialog.tsx",
+          "line": 155,
+          "literal": "bg-transparent",
+          "scenarioId": "first-run-uta-escape-disabled",
+          "state": "disabled",
+          "channel": "bg",
+          "contractPolicyOwner": "trading-risk-policy",
+          "reviewedSemanticToken": "--color-trading-neutral-dark",
+          "semanticDisposition": {
+            "kind": "no-paint",
+            "authority": "explicit-paint-removal",
+            "targetFamily": null,
+            "rationale": "This occurrence removes paint and must remain semantically colorless."
+          }
+        },
+        "mapping": {
+          "method": "span-shift-semantic-signature",
+          "currentInventoryId": "color-3a44ec475306c0e9d3d7",
+          "currentPath": "ui/src/components/uta/CreateUTADialog.tsx",
+          "currentLine": 200
+        },
+        "currentOutcome": {
+          "kind": "retained-no-paint",
+          "targetPath": "ui/src/components/uta/CreateUTADialog.tsx",
+          "historicalLocator": {
+            "line": 200,
+            "channel": "bg"
+          },
+          "targetLine": 200,
+          "sourceAssertion": "bg-transparent",
+          "forbiddenHistoricalLiteral": null,
+          "rationale": "Current source retains the reviewed explicit no-paint channel."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-a7cace79533ab29db735",
+          "path": "ui/src/components/uta/CreateUTADialog.tsx",
+          "line": 326,
+          "literal": "bg-yellow-400",
+          "scenarioId": "create-uta-conflict",
+          "state": "warning",
+          "channel": "bg",
+          "contractPolicyOwner": "trading-risk-policy",
+          "reviewedSemanticToken": "--color-trading-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "trading-risk-policy",
+            "targetFamily": "--oa-status-* / --oa-risk-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "span-shift-semantic-signature",
+          "currentInventoryId": "color-13208fdfc2e8a438bee4",
+          "currentPath": "ui/src/components/uta/CreateUTADialog.tsx",
+          "currentLine": 418
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/uta/CreateUTADialog.tsx",
+          "historicalLocator": {
+            "line": 418,
+            "channel": "bg"
+          },
+          "targetLine": 418,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "bg-yellow-400",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-1d4d8582e91317003a7c",
+          "path": "ui/src/components/uta/CreateUTADialog.tsx",
+          "line": 329,
+          "literal": "border-yellow-400/30",
+          "scenarioId": "create-uta-conflict",
+          "state": "warning",
+          "channel": "border",
+          "contractPolicyOwner": "trading-risk-policy",
+          "reviewedSemanticToken": "--color-trading-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "trading-risk-policy",
+            "targetFamily": "--oa-status-* / --oa-risk-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "span-shift-semantic-signature",
+          "currentInventoryId": "color-16b844bc319a7471d651",
+          "currentPath": "ui/src/components/uta/CreateUTADialog.tsx",
+          "currentLine": 421
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/uta/CreateUTADialog.tsx",
+          "historicalLocator": {
+            "line": 421,
+            "channel": "border"
+          },
+          "targetLine": 421,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "border-yellow-400/30",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-77a120e9208dfe88e7e1",
+          "path": "ui/src/components/uta/CreateUTADialog.tsx",
+          "line": 329,
+          "literal": "bg-yellow-400/5",
+          "scenarioId": "create-uta-conflict",
+          "state": "warning",
+          "channel": "bg",
+          "contractPolicyOwner": "trading-risk-policy",
+          "reviewedSemanticToken": "--color-trading-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "trading-risk-policy",
+            "targetFamily": "--oa-status-* / --oa-risk-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "span-shift-semantic-signature",
+          "currentInventoryId": "color-60433e2b39873db5ad26",
+          "currentPath": "ui/src/components/uta/CreateUTADialog.tsx",
+          "currentLine": 421
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/uta/CreateUTADialog.tsx",
+          "historicalLocator": {
+            "line": 421,
+            "channel": "bg"
+          },
+          "targetLine": 421,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "bg-yellow-400/5",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-7c527d0b22b540bf7a1f",
+          "path": "ui/src/components/uta/Dialog.tsx",
+          "line": 21,
+          "literal": "bg-black/40",
+          "scenarioId": "first-run-uta-escape-disabled",
+          "state": "disabled",
+          "channel": "bg",
+          "contractPolicyOwner": "trading-risk-policy",
+          "reviewedSemanticToken": "--color-trading-neutral-dark",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "trading-risk-policy",
+            "targetFamily": "--oa-status-* / --oa-risk-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-7c527d0b22b540bf7a1f",
+          "currentPath": "ui/src/components/uta/Dialog.tsx",
+          "currentLine": 21
+        },
+        "currentOutcome": {
+          "kind": "theme-channel",
+          "targetPath": "ui/src/components/uta/Dialog.tsx",
+          "historicalLocator": {
+            "line": 21,
+            "channel": "bg"
+          },
+          "targetLine": 21,
+          "sourceAssertion": "--oa-runtime-overlay-strong",
+          "forbiddenHistoricalLiteral": "bg-black/40",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-27683f701368c699fede",
+          "path": "ui/src/components/uta/HealthBadge.tsx",
+          "line": 39,
+          "literal": "text-yellow-400",
+          "scenarioId": "trading-degraded",
+          "state": "warning",
+          "channel": "text",
+          "contractPolicyOwner": "trading-risk-policy",
+          "reviewedSemanticToken": "--color-trading-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "trading-risk-policy",
+            "targetFamily": "--oa-status-* / --oa-risk-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-27683f701368c699fede",
+          "currentPath": "ui/src/components/uta/HealthBadge.tsx",
+          "currentLine": 39
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/uta/HealthBadge.tsx",
+          "historicalLocator": {
+            "line": 39,
+            "channel": "text"
+          },
+          "targetLine": 39,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "text-yellow-400",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-cda1564b0b28e964beed",
+          "path": "ui/src/components/uta/HealthBadge.tsx",
+          "line": 40,
+          "literal": "bg-yellow-400",
+          "scenarioId": "trading-degraded",
+          "state": "warning",
+          "channel": "bg",
+          "contractPolicyOwner": "trading-risk-policy",
+          "reviewedSemanticToken": "--color-trading-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "trading-risk-policy",
+            "targetFamily": "--oa-status-* / --oa-risk-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-cda1564b0b28e964beed",
+          "currentPath": "ui/src/components/uta/HealthBadge.tsx",
+          "currentLine": 40
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/uta/HealthBadge.tsx",
+          "historicalLocator": {
+            "line": 40,
+            "channel": "bg"
+          },
+          "targetLine": 40,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "bg-yellow-400",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-acdc59572b28965d8680",
+          "path": "ui/src/components/uta/OrderEntryDialog.tsx",
+          "line": 372,
+          "literal": "bg-yellow-400",
+          "scenarioId": "uta-order-partial",
+          "state": "warning",
+          "channel": "bg",
+          "contractPolicyOwner": "trading-risk-policy",
+          "reviewedSemanticToken": "--color-trading-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "trading-risk-policy",
+            "targetFamily": "--oa-status-* / --oa-risk-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-acdc59572b28965d8680",
+          "currentPath": "ui/src/components/uta/OrderEntryDialog.tsx",
+          "currentLine": 372
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/uta/OrderEntryDialog.tsx",
+          "historicalLocator": {
+            "line": 372,
+            "channel": "bg"
+          },
+          "targetLine": 372,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "bg-yellow-400",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-25dcacadbc90d1fb393c",
+          "path": "ui/src/components/uta/OrderEntryDialog.tsx",
+          "line": 373,
+          "literal": "text-yellow-400",
+          "scenarioId": "uta-order-partial",
+          "state": "warning",
+          "channel": "text",
+          "contractPolicyOwner": "trading-risk-policy",
+          "reviewedSemanticToken": "--color-trading-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "trading-risk-policy",
+            "targetFamily": "--oa-status-* / --oa-risk-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-25dcacadbc90d1fb393c",
+          "currentPath": "ui/src/components/uta/OrderEntryDialog.tsx",
+          "currentLine": 373
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/uta/OrderEntryDialog.tsx",
+          "historicalLocator": {
+            "line": 373,
+            "channel": "text"
+          },
+          "targetLine": 373,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "text-yellow-400",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-48ceb9e9aefd3682dec3",
+          "path": "ui/src/pages/AgentPermissionsPage.tsx",
+          "line": 200,
+          "literal": "bg-yellow-400/5",
+          "scenarioId": "agent-permissions",
+          "state": "warning",
+          "channel": "bg",
+          "contractPolicyOwner": "permission-risk-policy",
+          "reviewedSemanticToken": "--color-permission-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "permission-risk-policy",
+            "targetFamily": "--oa-risk-permission-denied",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-48ceb9e9aefd3682dec3",
+          "currentPath": "ui/src/pages/AgentPermissionsPage.tsx",
+          "currentLine": 200
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/pages/AgentPermissionsPage.tsx",
+          "historicalLocator": {
+            "line": 200,
+            "channel": "bg"
+          },
+          "targetLine": 200,
+          "sourceAssertion": "--oa-risk-permission-denied",
+          "forbiddenHistoricalLiteral": "bg-yellow-400/5",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-876b2228fc46e357bfe6",
+          "path": "ui/src/pages/AgentPermissionsPage.tsx",
+          "line": 200,
+          "literal": "border-yellow-400/30",
+          "scenarioId": "agent-permissions",
+          "state": "warning",
+          "channel": "border",
+          "contractPolicyOwner": "permission-risk-policy",
+          "reviewedSemanticToken": "--color-permission-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "permission-risk-policy",
+            "targetFamily": "--oa-risk-permission-denied",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-876b2228fc46e357bfe6",
+          "currentPath": "ui/src/pages/AgentPermissionsPage.tsx",
+          "currentLine": 200
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/pages/AgentPermissionsPage.tsx",
+          "historicalLocator": {
+            "line": 200,
+            "channel": "border"
+          },
+          "targetLine": 200,
+          "sourceAssertion": "--oa-risk-permission-denied",
+          "forbiddenHistoricalLiteral": "border-yellow-400/30",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-c2b3e5a577758218fedb",
+          "path": "ui/src/pages/MarketBoardPage.tsx",
+          "line": 428,
+          "literal": "#7d8590",
+          "scenarioId": "market-term-structure",
+          "state": "normal",
+          "channel": "fill",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-neutral-dark",
+          "semanticDisposition": {
+            "kind": "theme-only",
+            "authority": "active-theme-projection",
+            "targetFamily": "--oa-chart-* / semantic theme variables",
+            "rationale": "This is chart or market-neutral chrome; it follows the active theme and never market direction or risk preferences."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-c2b3e5a577758218fedb",
+          "currentPath": "ui/src/pages/MarketBoardPage.tsx",
+          "currentLine": 428
+        },
+        "currentOutcome": {
+          "kind": "theme-channel",
+          "targetPath": "ui/src/pages/MarketBoardPage.tsx",
+          "historicalLocator": {
+            "line": 428,
+            "channel": "fill"
+          },
+          "targetLine": 428,
+          "sourceAssertion": "--oa-chart-axis-text",
+          "forbiddenHistoricalLiteral": "#7d8590",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-c375df8c89c6c61d44c5",
+          "path": "ui/src/pages/MarketBoardPage.tsx",
+          "line": 428,
+          "literal": "#7d8590",
+          "scenarioId": "market-term-structure",
+          "state": "normal",
+          "channel": "stroke",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-neutral-dark",
+          "semanticDisposition": {
+            "kind": "theme-only",
+            "authority": "active-theme-projection",
+            "targetFamily": "--oa-chart-* / semantic theme variables",
+            "rationale": "This is chart or market-neutral chrome; it follows the active theme and never market direction or risk preferences."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-c375df8c89c6c61d44c5",
+          "currentPath": "ui/src/pages/MarketBoardPage.tsx",
+          "currentLine": 428
+        },
+        "currentOutcome": {
+          "kind": "theme-channel",
+          "targetPath": "ui/src/pages/MarketBoardPage.tsx",
+          "historicalLocator": {
+            "line": 428,
+            "channel": "stroke"
+          },
+          "targetLine": 428,
+          "sourceAssertion": "--oa-chart-axis-border",
+          "forbiddenHistoricalLiteral": "#7d8590",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-16f18b78198c88eaf687",
+          "path": "ui/src/pages/MarketBoardPage.tsx",
+          "line": 429,
+          "literal": "#7d8590",
+          "scenarioId": "market-term-structure",
+          "state": "normal",
+          "channel": "fill",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-neutral-dark",
+          "semanticDisposition": {
+            "kind": "theme-only",
+            "authority": "active-theme-projection",
+            "targetFamily": "--oa-chart-* / semantic theme variables",
+            "rationale": "This is chart or market-neutral chrome; it follows the active theme and never market direction or risk preferences."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-16f18b78198c88eaf687",
+          "currentPath": "ui/src/pages/MarketBoardPage.tsx",
+          "currentLine": 429
+        },
+        "currentOutcome": {
+          "kind": "theme-channel",
+          "targetPath": "ui/src/pages/MarketBoardPage.tsx",
+          "historicalLocator": {
+            "line": 429,
+            "channel": "fill"
+          },
+          "targetLine": 429,
+          "sourceAssertion": "--oa-chart-axis-text",
+          "forbiddenHistoricalLiteral": "#7d8590",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-5f48135d5ccbac618b87",
+          "path": "ui/src/pages/MarketBoardPage.tsx",
+          "line": 429,
+          "literal": "#7d8590",
+          "scenarioId": "market-term-structure",
+          "state": "normal",
+          "channel": "stroke",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-neutral-dark",
+          "semanticDisposition": {
+            "kind": "theme-only",
+            "authority": "active-theme-projection",
+            "targetFamily": "--oa-chart-* / semantic theme variables",
+            "rationale": "This is chart or market-neutral chrome; it follows the active theme and never market direction or risk preferences."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-5f48135d5ccbac618b87",
+          "currentPath": "ui/src/pages/MarketBoardPage.tsx",
+          "currentLine": 429
+        },
+        "currentOutcome": {
+          "kind": "theme-channel",
+          "targetPath": "ui/src/pages/MarketBoardPage.tsx",
+          "historicalLocator": {
+            "line": 429,
+            "channel": "stroke"
+          },
+          "targetLine": 429,
+          "sourceAssertion": "--oa-chart-axis-border",
+          "forbiddenHistoricalLiteral": "#7d8590",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-868bad4ba60b71cc085a",
+          "path": "ui/src/pages/MarketBoardPage.tsx",
+          "line": 580,
+          "literal": "#7d8590",
+          "scenarioId": "market-shipping",
+          "state": "normal",
+          "channel": "fill",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-neutral-dark",
+          "semanticDisposition": {
+            "kind": "theme-only",
+            "authority": "active-theme-projection",
+            "targetFamily": "--oa-chart-* / semantic theme variables",
+            "rationale": "This is chart or market-neutral chrome; it follows the active theme and never market direction or risk preferences."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-868bad4ba60b71cc085a",
+          "currentPath": "ui/src/pages/MarketBoardPage.tsx",
+          "currentLine": 580
+        },
+        "currentOutcome": {
+          "kind": "theme-channel",
+          "targetPath": "ui/src/pages/MarketBoardPage.tsx",
+          "historicalLocator": {
+            "line": 580,
+            "channel": "fill"
+          },
+          "targetLine": 580,
+          "sourceAssertion": "--oa-chart-axis-text",
+          "forbiddenHistoricalLiteral": "#7d8590",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-97f3ac7c392c5bee796d",
+          "path": "ui/src/pages/MarketBoardPage.tsx",
+          "line": 580,
+          "literal": "#7d8590",
+          "scenarioId": "market-shipping",
+          "state": "normal",
+          "channel": "stroke",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-neutral-dark",
+          "semanticDisposition": {
+            "kind": "theme-only",
+            "authority": "active-theme-projection",
+            "targetFamily": "--oa-chart-* / semantic theme variables",
+            "rationale": "This is chart or market-neutral chrome; it follows the active theme and never market direction or risk preferences."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-97f3ac7c392c5bee796d",
+          "currentPath": "ui/src/pages/MarketBoardPage.tsx",
+          "currentLine": 580
+        },
+        "currentOutcome": {
+          "kind": "theme-channel",
+          "targetPath": "ui/src/pages/MarketBoardPage.tsx",
+          "historicalLocator": {
+            "line": 580,
+            "channel": "stroke"
+          },
+          "targetLine": 580,
+          "sourceAssertion": "--oa-chart-axis-border",
+          "forbiddenHistoricalLiteral": "#7d8590",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-4e2bb7fb0c0bc5c7305d",
+          "path": "ui/src/pages/MarketBoardPage.tsx",
+          "line": 581,
+          "literal": "#7d8590",
+          "scenarioId": "market-shipping",
+          "state": "normal",
+          "channel": "fill",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-neutral-dark",
+          "semanticDisposition": {
+            "kind": "theme-only",
+            "authority": "active-theme-projection",
+            "targetFamily": "--oa-chart-* / semantic theme variables",
+            "rationale": "This is chart or market-neutral chrome; it follows the active theme and never market direction or risk preferences."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-4e2bb7fb0c0bc5c7305d",
+          "currentPath": "ui/src/pages/MarketBoardPage.tsx",
+          "currentLine": 581
+        },
+        "currentOutcome": {
+          "kind": "theme-channel",
+          "targetPath": "ui/src/pages/MarketBoardPage.tsx",
+          "historicalLocator": {
+            "line": 581,
+            "channel": "fill"
+          },
+          "targetLine": 581,
+          "sourceAssertion": "--oa-chart-axis-text",
+          "forbiddenHistoricalLiteral": "#7d8590",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-bd2d6914a0cb4c1e8c02",
+          "path": "ui/src/pages/MarketBoardPage.tsx",
+          "line": 581,
+          "literal": "#7d8590",
+          "scenarioId": "market-shipping",
+          "state": "normal",
+          "channel": "stroke",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-neutral-dark",
+          "semanticDisposition": {
+            "kind": "theme-only",
+            "authority": "active-theme-projection",
+            "targetFamily": "--oa-chart-* / semantic theme variables",
+            "rationale": "This is chart or market-neutral chrome; it follows the active theme and never market direction or risk preferences."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-bd2d6914a0cb4c1e8c02",
+          "currentPath": "ui/src/pages/MarketBoardPage.tsx",
+          "currentLine": 581
+        },
+        "currentOutcome": {
+          "kind": "theme-channel",
+          "targetPath": "ui/src/pages/MarketBoardPage.tsx",
+          "historicalLocator": {
+            "line": 581,
+            "channel": "stroke"
+          },
+          "targetLine": 581,
+          "sourceAssertion": "--oa-chart-axis-border",
+          "forbiddenHistoricalLiteral": "#7d8590",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-133c07c6504d688c49b8",
+          "path": "ui/src/pages/MarketBoardPage.tsx",
+          "line": 688,
+          "literal": "text-amber-400",
+          "scenarioId": "market-board",
+          "state": "normal",
+          "channel": "text",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "market-color-policy",
+            "targetFamily": "--oa-market-* / --oa-status-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-133c07c6504d688c49b8",
+          "currentPath": "ui/src/pages/MarketBoardPage.tsx",
+          "currentLine": 688
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/pages/MarketBoardPage.tsx",
+          "historicalLocator": {
+            "line": 688,
+            "channel": "text"
+          },
+          "targetLine": 688,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "text-amber-400",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-3141b5f7d3b9e37a7632",
+          "path": "ui/src/pages/MarketDetailPage.tsx",
+          "line": 51,
+          "literal": "bg-amber-500/15",
+          "scenarioId": "market-detail-pinned-hover",
+          "state": "hover",
+          "channel": "bg",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "market-color-policy",
+            "targetFamily": "--oa-market-* / --oa-status-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-3141b5f7d3b9e37a7632",
+          "currentPath": "ui/src/pages/MarketDetailPage.tsx",
+          "currentLine": 51
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/pages/MarketDetailPage.tsx",
+          "historicalLocator": {
+            "line": 51,
+            "channel": "bg"
+          },
+          "targetLine": 51,
+          "sourceAssertion": "--oa-token-selection",
+          "forbiddenHistoricalLiteral": "bg-amber-500/15",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-834f34f518c0d2d4c2a6",
+          "path": "ui/src/pages/MarketDetailPage.tsx",
+          "line": 51,
+          "literal": "bg-amber-500/10",
+          "scenarioId": "market-detail-pinned",
+          "state": "selected",
+          "channel": "bg",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "market-color-policy",
+            "targetFamily": "--oa-market-* / --oa-status-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-834f34f518c0d2d4c2a6",
+          "currentPath": "ui/src/pages/MarketDetailPage.tsx",
+          "currentLine": 51
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/pages/MarketDetailPage.tsx",
+          "historicalLocator": {
+            "line": 51,
+            "channel": "bg"
+          },
+          "targetLine": 51,
+          "sourceAssertion": "--oa-token-active-surface",
+          "forbiddenHistoricalLiteral": "bg-amber-500/10",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-ef69adcab7375b241140",
+          "path": "ui/src/pages/MarketDetailPage.tsx",
+          "line": 51,
+          "literal": "border-amber-500/40",
+          "scenarioId": "market-detail-pinned",
+          "state": "selected",
+          "channel": "border",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "market-color-policy",
+            "targetFamily": "--oa-market-* / --oa-status-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-ef69adcab7375b241140",
+          "currentPath": "ui/src/pages/MarketDetailPage.tsx",
+          "currentLine": 51
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/pages/MarketDetailPage.tsx",
+          "historicalLocator": {
+            "line": 51,
+            "channel": "border"
+          },
+          "targetLine": 51,
+          "sourceAssertion": "--oa-token-focus-ring",
+          "forbiddenHistoricalLiteral": "border-amber-500/40",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-f3a511b44437b4f5e08c",
+          "path": "ui/src/pages/MarketDetailPage.tsx",
+          "line": 51,
+          "literal": "text-amber-400",
+          "scenarioId": "market-detail-pinned",
+          "state": "selected",
+          "channel": "text",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "market-color-policy",
+            "targetFamily": "--oa-market-* / --oa-status-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-f3a511b44437b4f5e08c",
+          "currentPath": "ui/src/pages/MarketDetailPage.tsx",
+          "currentLine": 51
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/pages/MarketDetailPage.tsx",
+          "historicalLocator": {
+            "line": 51,
+            "channel": "text"
+          },
+          "targetLine": 51,
+          "sourceAssertion": "--oa-token-accent",
+          "forbiddenHistoricalLiteral": "text-amber-400",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-fabf05a7956c538be69f",
+          "path": "ui/src/pages/MarketRotationPage.tsx",
+          "line": 16,
+          "literal": "#7d8590",
+          "scenarioId": "market-rotation",
+          "state": "normal",
+          "channel": "MUTED",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-neutral-dark",
+          "semanticDisposition": {
+            "kind": "theme-only",
+            "authority": "active-theme-projection",
+            "targetFamily": "--oa-chart-* / semantic theme variables",
+            "rationale": "This is chart or market-neutral chrome; it follows the active theme and never market direction or risk preferences."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-fabf05a7956c538be69f",
+          "currentPath": "ui/src/pages/MarketRotationPage.tsx",
+          "currentLine": 16
+        },
+        "currentOutcome": {
+          "kind": "theme-channel",
+          "targetPath": "ui/src/pages/MarketRotationPage.tsx",
+          "historicalLocator": {
+            "line": 16,
+            "channel": "MUTED"
+          },
+          "targetLine": 16,
+          "sourceAssertion": "--oa-chart-axis-text",
+          "forbiddenHistoricalLiteral": "#7d8590",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-7ebdadd4a59d34f16101",
+          "path": "ui/src/pages/PortfolioPage.tsx",
+          "line": 510,
+          "literal": "bg-yellow-400",
+          "scenarioId": "portfolio-health-degraded",
+          "state": "warning",
+          "channel": "bg",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "market-color-policy",
+            "targetFamily": "--oa-market-* / --oa-status-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-7ebdadd4a59d34f16101",
+          "currentPath": "ui/src/pages/PortfolioPage.tsx",
+          "currentLine": 510
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/pages/PortfolioPage.tsx",
+          "historicalLocator": {
+            "line": 510,
+            "channel": "bg"
+          },
+          "targetLine": 510,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "bg-yellow-400",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-2c42c5720430fe5d1687",
+          "path": "ui/src/pages/PortfolioPage.tsx",
+          "line": 696,
+          "literal": "bg-yellow-400",
+          "scenarioId": "portfolio-cached",
+          "state": "warning",
+          "channel": "bg",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "market-color-policy",
+            "targetFamily": "--oa-market-* / --oa-status-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-2c42c5720430fe5d1687",
+          "currentPath": "ui/src/pages/PortfolioPage.tsx",
+          "currentLine": 696
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/pages/PortfolioPage.tsx",
+          "historicalLocator": {
+            "line": 696,
+            "channel": "bg"
+          },
+          "targetLine": 696,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "bg-yellow-400",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-204790a835ccb69adbb7",
+          "path": "ui/src/pages/simulator/ActionPanel.tsx",
+          "line": 206,
+          "literal": "text-yellow-400",
+          "scenarioId": "simulator-deposit-draft-error",
+          "state": "warning",
+          "channel": "text",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "market-color-policy",
+            "targetFamily": "--oa-market-* / --oa-status-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-204790a835ccb69adbb7",
+          "currentPath": "ui/src/pages/simulator/ActionPanel.tsx",
+          "currentLine": 206
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/pages/simulator/ActionPanel.tsx",
+          "historicalLocator": {
+            "line": 206,
+            "channel": "text"
+          },
+          "targetLine": 206,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "text-yellow-400",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-414dd3b45ca32f44b246",
+          "path": "ui/src/pages/simulator/ActionPanel.tsx",
+          "line": 283,
+          "literal": "text-yellow-400",
+          "scenarioId": "simulator-trade-draft-error",
+          "state": "warning",
+          "channel": "text",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "market-color-policy",
+            "targetFamily": "--oa-market-* / --oa-status-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-414dd3b45ca32f44b246",
+          "currentPath": "ui/src/pages/simulator/ActionPanel.tsx",
+          "currentLine": 283
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/pages/simulator/ActionPanel.tsx",
+          "historicalLocator": {
+            "line": 283,
+            "channel": "text"
+          },
+          "targetLine": 283,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "text-yellow-400",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-fa6381d5b8f990771243",
+          "path": "ui/src/pages/simulator/PendingOrders.tsx",
+          "line": 71,
+          "literal": "text-yellow-400",
+          "scenarioId": "simulator",
+          "state": "normal",
+          "channel": "text",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "market-color-policy",
+            "targetFamily": "--oa-market-* / --oa-status-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-fa6381d5b8f990771243",
+          "currentPath": "ui/src/pages/simulator/PendingOrders.tsx",
+          "currentLine": 71
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/pages/simulator/PendingOrders.tsx",
+          "historicalLocator": {
+            "line": 71,
+            "channel": "text"
+          },
+          "targetLine": 71,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "text-yellow-400",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-ed404f80a0d816f47659",
+          "path": "ui/src/pages/SimulatorPage.tsx",
+          "line": 106,
+          "literal": "border-transparent",
+          "scenarioId": "simulator",
+          "state": "normal",
+          "channel": "border",
+          "contractPolicyOwner": "market-color-policy",
+          "reviewedSemanticToken": "--color-market-neutral-dark",
+          "semanticDisposition": {
+            "kind": "no-paint",
+            "authority": "explicit-paint-removal",
+            "targetFamily": null,
+            "rationale": "This occurrence removes paint and must remain semantically colorless."
+          }
+        },
+        "mapping": {
+          "method": "stable-inventory-id",
+          "currentInventoryId": "color-ed404f80a0d816f47659",
+          "currentPath": "ui/src/pages/SimulatorPage.tsx",
+          "currentLine": 106
+        },
+        "currentOutcome": {
+          "kind": "retained-no-paint",
+          "targetPath": "ui/src/pages/SimulatorPage.tsx",
+          "historicalLocator": {
+            "line": 106,
+            "channel": "border"
+          },
+          "targetLine": 106,
+          "sourceAssertion": "border-transparent",
+          "forbiddenHistoricalLiteral": null,
+          "rationale": "Current source retains the reviewed explicit no-paint channel."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-ace3797f30f9477df369",
+          "path": "ui/src/pages/TradingPage.tsx",
+          "line": 400,
+          "literal": "bg-yellow-400/5",
+          "scenarioId": "trading-degraded",
+          "state": "warning",
+          "channel": "bg",
+          "contractPolicyOwner": "trading-risk-policy",
+          "reviewedSemanticToken": "--color-trading-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "trading-risk-policy",
+            "targetFamily": "--oa-status-* / --oa-risk-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "span-shift-semantic-signature",
+          "currentInventoryId": "color-ba0f3c95886f72d19dff",
+          "currentPath": "ui/src/pages/TradingPage.tsx",
+          "currentLine": 503
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/pages/TradingPage.tsx",
+          "historicalLocator": {
+            "line": 503,
+            "channel": "bg"
+          },
+          "targetLine": 503,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "bg-yellow-400/5",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-f9a7ad5c79327b2ee388",
+          "path": "ui/src/pages/TradingPage.tsx",
+          "line": 400,
+          "literal": "border-yellow-400/30",
+          "scenarioId": "trading-degraded",
+          "state": "warning",
+          "channel": "border",
+          "contractPolicyOwner": "trading-risk-policy",
+          "reviewedSemanticToken": "--color-trading-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "trading-risk-policy",
+            "targetFamily": "--oa-status-* / --oa-risk-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "span-shift-semantic-signature",
+          "currentInventoryId": "color-ee2cb841fa6073e10a16",
+          "currentPath": "ui/src/pages/TradingPage.tsx",
+          "currentLine": 503
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/pages/TradingPage.tsx",
+          "historicalLocator": {
+            "line": 503,
+            "channel": "border"
+          },
+          "targetLine": 503,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "border-yellow-400/30",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "historical": {
+          "inventoryId": "color-8ebc54f7c848d9af84ff",
+          "path": "ui/src/pages/TradingPage.tsx",
+          "line": 401,
+          "literal": "text-yellow-400",
+          "scenarioId": "trading-degraded",
+          "state": "warning",
+          "channel": "text",
+          "contractPolicyOwner": "trading-risk-policy",
+          "reviewedSemanticToken": "--color-trading-warning",
+          "semanticDisposition": {
+            "kind": "policy-variable",
+            "authority": "trading-risk-policy",
+            "targetFamily": "--oa-status-* / --oa-risk-*",
+            "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+          }
+        },
+        "mapping": {
+          "method": "span-shift-semantic-signature",
+          "currentInventoryId": "color-100951ac7b1b4cde830d",
+          "currentPath": "ui/src/pages/TradingPage.tsx",
+          "currentLine": 504
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/pages/TradingPage.tsx",
+          "historicalLocator": {
+            "line": 504,
+            "channel": "text"
+          },
+          "targetLine": 504,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "text-yellow-400",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      }
+    ]
+  },
+  "supplementalContract": {
+    "sourceCommit": "e9318e43647f61b3f2070cc0fc59610f9144b857",
+    "decisionCount": 88,
+    "mappedFromHistoricalCount": 83,
+    "additionCount": 5,
+    "additions": [
+      {
+        "inventoryId": "color-188cadfe8ad262d71bea",
+        "path": "ui/src/components/uta/CreateUTADialog.tsx",
+        "line": 389,
+        "literal": "text-yellow-400",
+        "scenarioId": "create-uta-install-pack",
+        "state": "warning",
+        "channel": "text",
+        "contractPolicyOwner": "trading-risk-policy",
+        "reviewedSemanticToken": "--color-trading-warning",
+        "semanticDisposition": {
+          "kind": "policy-variable",
+          "authority": "trading-risk-policy",
+          "targetFamily": "--oa-status-* / --oa-risk-*",
+          "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/components/uta/CreateUTADialog.tsx",
+          "historicalLocator": {
+            "line": 389,
+            "channel": "text"
+          },
+          "targetLine": 389,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "text-yellow-400",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "inventoryId": "color-08ea9a850711cff32abf",
+        "path": "ui/src/pages/TradingPage.tsx",
+        "line": 266,
+        "literal": "bg-yellow-400/5",
+        "scenarioId": "trading-missing-broker-pack",
+        "state": "warning",
+        "channel": "bg",
+        "contractPolicyOwner": "trading-risk-policy",
+        "reviewedSemanticToken": "--color-trading-warning",
+        "semanticDisposition": {
+          "kind": "policy-variable",
+          "authority": "trading-risk-policy",
+          "targetFamily": "--oa-status-* / --oa-risk-*",
+          "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/pages/TradingPage.tsx",
+          "historicalLocator": {
+            "line": 266,
+            "channel": "bg"
+          },
+          "targetLine": 266,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "bg-yellow-400/5",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "inventoryId": "color-c9d00187b863714ce331",
+        "path": "ui/src/pages/TradingPage.tsx",
+        "line": 266,
+        "literal": "border-yellow-400/30",
+        "scenarioId": "trading-missing-broker-pack",
+        "state": "warning",
+        "channel": "border",
+        "contractPolicyOwner": "trading-risk-policy",
+        "reviewedSemanticToken": "--color-trading-warning",
+        "semanticDisposition": {
+          "kind": "policy-variable",
+          "authority": "trading-risk-policy",
+          "targetFamily": "--oa-status-* / --oa-risk-*",
+          "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/pages/TradingPage.tsx",
+          "historicalLocator": {
+            "line": 266,
+            "channel": "border"
+          },
+          "targetLine": 266,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "border-yellow-400/30",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "inventoryId": "color-3da39e51ef82bc50ec8a",
+        "path": "ui/src/pages/TradingPage.tsx",
+        "line": 268,
+        "literal": "text-yellow-400",
+        "scenarioId": "trading-missing-broker-pack",
+        "state": "warning",
+        "channel": "text",
+        "contractPolicyOwner": "trading-risk-policy",
+        "reviewedSemanticToken": "--color-trading-warning",
+        "semanticDisposition": {
+          "kind": "policy-variable",
+          "authority": "trading-risk-policy",
+          "targetFamily": "--oa-status-* / --oa-risk-*",
+          "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/pages/TradingPage.tsx",
+          "historicalLocator": {
+            "line": 268,
+            "channel": "text"
+          },
+          "targetLine": 268,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "text-yellow-400",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      },
+      {
+        "inventoryId": "color-98da76a8d2ae8d7608e4",
+        "path": "ui/src/pages/TradingPage.tsx",
+        "line": 280,
+        "literal": "text-yellow-400",
+        "scenarioId": "trading-missing-broker-pack",
+        "state": "warning",
+        "channel": "text",
+        "contractPolicyOwner": "trading-risk-policy",
+        "reviewedSemanticToken": "--color-trading-warning",
+        "semanticDisposition": {
+          "kind": "policy-variable",
+          "authority": "trading-risk-policy",
+          "targetFamily": "--oa-status-* / --oa-risk-*",
+          "rationale": "This painted occurrence is resolved through the typed protected color policy rather than a literal or Base-slot approximation."
+        },
+        "currentOutcome": {
+          "kind": "exact-variable",
+          "targetPath": "ui/src/pages/TradingPage.tsx",
+          "historicalLocator": {
+            "line": 280,
+            "channel": "text"
+          },
+          "targetLine": 280,
+          "sourceAssertion": "--oa-status-warning",
+          "forbiddenHistoricalLiteral": "text-yellow-400",
+          "rationale": "Current source contains this exact post-migration policy/theme binding and no longer contains the reviewed protected literal."
+        }
+      }
+    ],
+    "ownerCounts": {
+      "market-color-policy": 50,
+      "trading-risk-policy": 36,
+      "permission-risk-policy": 2
+    }
+  },
+  "ownerSeparation": {
+    "issue16HistoricalIntersection": 0,
+    "issue16SupplementalIntersection": 0
+  },
+  "destructiveActionPolicy": {
+    "inventoryOccurrenceCount": 0,
+    "enforcement": "zero-occurrence-runtime-invariant",
+    "invariant": "Destructive actions always resolve through --oa-risk-destructive and are unaffected by market direction, market source, status source, or theme choice; the reviewed inventory contains no destructive occurrence and therefore no fourth owner is fabricated."
+  },
+  "currentClosure": {
+    "decisionCount": 88,
+    "ownedCount": 88,
+    "unownedCount": 0,
+    "sourceEvidenceCount": 88,
+    "scanEvidence": {
+      "staticOccurrenceCount": 399,
+      "runtimeWorkItemCount": 62,
+      "capturedAtCommit": "working-tree",
+      "staticManifest": {
+        "path": ".artifacts/theme-color-audit/static-manifest.json",
+        "sha256": "fd94fe95a58ab3eca9c3eaf29b4181d8881ff6b00683475f45d32d7571cdff6b"
+      },
+      "runtimeWorklist": {
+        "path": ".artifacts/theme-color-audit/runtime-worklist.json",
+        "sha256": "416c81cd8943902920f8f0bbe73dbfea0944dba06f61daf12ef45a76e79ea992"
+      }
+    }
+  }
+}

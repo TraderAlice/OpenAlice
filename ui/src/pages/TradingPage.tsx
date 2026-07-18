@@ -263,9 +263,9 @@ export function MissingBrokerPacksNotice({ packs, onInstalled }: {
   }
 
   return (
-    <div className="rounded-lg border border-yellow-400/30 bg-yellow-400/5 px-4 py-3">
+    <div className="rounded-lg border border-[var(--oa-status-warning)]/30 bg-[var(--oa-status-warning)]/5 px-4 py-3">
       <div className="flex items-start gap-2.5">
-        <AlertTriangle size={15} className="mt-0.5 shrink-0 text-yellow-400" />
+        <AlertTriangle size={15} className="mt-0.5 shrink-0 text-[var(--oa-status-warning)]" />
         <div className="min-w-0 flex-1">
           <div className="text-[12px] font-medium text-text">Optional broker support is missing</div>
           <p className="mt-0.5 text-[11px] leading-relaxed text-text-muted">
@@ -277,7 +277,7 @@ export function MissingBrokerPacksNotice({ packs, onInstalled }: {
                 <div className="min-w-0">
                   <div className="text-[12px] font-medium uppercase text-text">{pack.engine}</div>
                   <div className="truncate text-[11px] text-text-muted">Required by {pack.requiredBy.join(', ')}</div>
-                  {pack.reason && <div className="mt-0.5 text-[11px] text-yellow-400">{pack.reason}</div>}
+                  {pack.reason && <div className="mt-0.5 text-[11px] text-[var(--oa-status-warning)]">{pack.reason}</div>}
                 </div>
                 <button
                   className="btn-secondary shrink-0"
@@ -500,8 +500,8 @@ function PageShell({ subtitle, children }: { subtitle: string; children?: React.
 
 function TradingServiceOfflineBanner({ status }: { status: TradingServiceStatus }) {
   return (
-    <div className="flex gap-3 rounded-lg border border-yellow-400/30 bg-yellow-400/5 px-4 py-3" role="status">
-      <AlertTriangle size={16} className="mt-0.5 shrink-0 text-yellow-400" aria-hidden />
+    <div className="flex gap-3 rounded-lg border border-[var(--oa-status-warning)]/30 bg-[var(--oa-status-warning)]/5 px-4 py-3" role="status">
+      <AlertTriangle size={16} className="mt-0.5 shrink-0 text-[var(--oa-status-warning)]" aria-hidden />
       <div className="min-w-0">
         <div className="text-[12px] font-medium text-text">Trading service offline</div>
         <div className="mt-0.5 text-[11px] text-text-muted leading-relaxed">

@@ -11,15 +11,15 @@ import { Spinner } from './StateViews'
 
 const ASSET_CLASS_COLORS: Record<string, string> = {
   equity: 'bg-accent/15 text-accent',
-  crypto: 'bg-amber-500/15 text-amber-400',
-  currency: 'bg-green/15 text-green',
-  commodity: 'bg-purple-500/15 text-purple-400',
+  crypto: 'bg-[var(--oa-token-warning)]/15 text-[var(--oa-token-warning)]',
+  currency: 'bg-[var(--oa-token-success)]/15 text-[var(--oa-token-success)]',
+  commodity: 'bg-[var(--oa-token-special)]/15 text-[var(--oa-token-special)]',
   unknown: 'bg-bg-tertiary text-text-muted',
 }
 
 const CAPABILITY_COLOR: Record<string, string> = {
-  realtime: 'text-green', iex: 'text-accent', delayed: 'text-text-muted',
-  subscription: 'text-amber-700 dark:text-amber-300', free: 'text-text-muted',
+  realtime: 'text-[var(--oa-status-success)]', iex: 'text-accent', delayed: 'text-text-muted',
+  subscription: 'text-[var(--oa-status-warning)]', free: 'text-text-muted',
 }
 
 /** A crypto venue's "AAPL" is synthetic — the route segment still needs a valid

@@ -142,7 +142,7 @@ function TradingModeSection() {
           : t('settings.agentPermissions.mode.source', { source: status.modeSource })}
       </div>
       {error && (
-        <div className="mt-2 rounded-md border border-red/30 bg-red/5 px-3 py-2 text-[12px] text-red leading-relaxed">
+        <div className="mt-2 rounded-md border border-[var(--oa-risk-trade-confirm)]/30 bg-[var(--oa-risk-trade-confirm)]/5 px-3 py-2 text-[12px] text-[var(--oa-risk-trade-confirm)] leading-relaxed">
           {error}
         </div>
       )}
@@ -192,12 +192,12 @@ function AiTradingToggle({
         <Toggle checked={enabled} onChange={onToggle} />
       </div>
       {enabled && (
-        <div className="mt-2 rounded-md border border-red/30 bg-red/5 px-3 py-2 text-[12px] text-red leading-relaxed">
+        <div className="mt-2 rounded-md border border-[var(--oa-risk-trade-confirm)]/30 bg-[var(--oa-risk-trade-confirm)]/5 px-3 py-2 text-[12px] text-[var(--oa-risk-trade-confirm)] leading-relaxed">
           {t('settings.agent.allowAiTradingWarning')}
         </div>
       )}
       {enabled && mode !== 'pro' && (
-        <div className="mt-2 rounded-md border border-yellow-400/30 bg-yellow-400/5 px-3 py-2 text-[12px] text-text-muted leading-relaxed">
+        <div className="mt-2 rounded-md border border-[var(--oa-risk-permission-denied)]/30 bg-[var(--oa-risk-permission-denied)]/5 px-3 py-2 text-[12px] text-text-muted leading-relaxed">
           {t('settings.agentPermissions.aiPush.proOnly')}
         </div>
       )}

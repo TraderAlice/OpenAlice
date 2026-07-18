@@ -24,7 +24,7 @@ export function BoardMeta({ meta, extra }: { meta: ReferenceMeta; extra?: string
       {extra && <> · {extra}</>}
       {' · '}{sourceWord}
       {meta.stale && (
-        <span className="ml-1.5 rounded bg-amber-500/15 px-1 py-px text-[9px] uppercase tracking-wide text-amber-700 dark:text-amber-300">stale</span>
+        <span className="ml-1.5 rounded bg-[var(--oa-status-warning)]/15 px-1 py-px text-[9px] uppercase tracking-wide text-[var(--oa-status-warning)]">stale</span>
       )}
     </span>
   )

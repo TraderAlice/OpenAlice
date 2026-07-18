@@ -425,8 +425,8 @@ function TermCurveCard({ curve }: { curve: TermCurve }) {
       <MeasuredChartFrame className="h-40">
         {({ width, height }) => (
           <LineChart width={width} height={height} data={chartData} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
-            <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#7d8590' }} stroke="#7d8590" />
-            <YAxis domain={['dataMin', 'dataMax']} tick={{ fontSize: 10, fill: '#7d8590' }} stroke="#7d8590" width={70}
+            <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--oa-chart-axis-text)' }} stroke="var(--oa-chart-axis-border)" />
+            <YAxis domain={['dataMin', 'dataMax']} tick={{ fontSize: 10, fill: 'var(--oa-chart-axis-text)' }} stroke="var(--oa-chart-axis-border)" width={70}
               tickFormatter={(v: number) => v.toLocaleString('en-US')} />
             <Tooltip
               formatter={(v) => [Number(v).toLocaleString('en-US'), '']}
@@ -441,7 +441,7 @@ function TermCurveCard({ curve }: { curve: TermCurve }) {
         {curve.points.map((p) => (
           <span key={p.expiration} className="text-[11px] px-1.5 py-0.5 rounded bg-bg-tertiary/60 font-mono" title={`${p.daysToExpiry ?? '—'}d`}>
             {p.expiration.slice(2)}{' '}
-            <span className={p.annualizedBasis == null ? 'text-text-muted' : p.annualizedBasis >= 0 ? 'text-green' : 'text-red'}>
+            <span className={p.annualizedBasis == null ? 'text-text-muted' : p.annualizedBasis >= 0 ? 'text-[var(--oa-market-positive)]' : 'text-[var(--oa-market-negative)]'}>
               {p.annualizedBasis == null ? '—' : `${p.annualizedBasis >= 0 ? '+' : ''}${p.annualizedBasis.toFixed(1)}%`}
             </span>
           </span>
@@ -517,7 +517,7 @@ function GlobalCell({ cell, fmt, colorBy }: { cell: GlobalMacroCell; fmt: (v: nu
   }
   let color = 'text-text'
   if (colorBy === 'cpi') color = cell.value >= 4 ? 'text-red' : cell.value <= 1 ? 'text-text-muted' : 'text-text'
-  if (colorBy === 'cli') color = cell.value >= 100 ? 'text-green' : 'text-red'
+  if (colorBy === 'cli') color = cell.value >= 100 ? 'text-[var(--oa-market-positive)]' : 'text-[var(--oa-market-negative)]'
   return (
     <td className={`py-1.5 px-3 text-right font-mono ${color}`} title={cell.date ?? ''}>{fmt(cell.value)}</td>
   )
@@ -577,8 +577,8 @@ function ChokepointCard({ curve }: { curve: ShippingCurve }) {
       <MeasuredChartFrame className="h-28">
         {({ width, height }) => (
           <LineChart width={width} height={height} data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-            <XAxis dataKey="label" tick={{ fontSize: 9, fill: '#7d8590' }} stroke="#7d8590" minTickGap={28} />
-            <YAxis tick={{ fontSize: 9, fill: '#7d8590' }} stroke="#7d8590" width={36}
+            <XAxis dataKey="label" tick={{ fontSize: 9, fill: 'var(--oa-chart-axis-text)' }} stroke="var(--oa-chart-axis-border)" minTickGap={28} />
+            <YAxis tick={{ fontSize: 9, fill: 'var(--oa-chart-axis-text)' }} stroke="var(--oa-chart-axis-border)" width={36}
               tickFormatter={(v: number) => v.toFixed(1)} domain={['auto', 'auto']} />
             <Tooltip
               formatter={(v) => [`${Number(v).toFixed(2)}M t`, '']}
@@ -681,9 +681,9 @@ function fmtCompact(x: number | null, prefix = ''): string {
 }
 function signColor(x: number | null): string {
   if (x == null) return 'text-text-muted'
-  return x > 0 ? 'text-green' : x < 0 ? 'text-red' : 'text-text-muted'
+  return x > 0 ? 'text-[var(--oa-market-positive)]' : x < 0 ? 'text-[var(--oa-market-negative)]' : 'text-text-muted'
 }
 function rvolColor(x: number | null): string {
   if (x == null) return 'text-text-muted'
-  return x >= 2 ? 'text-amber-400 font-semibold' : 'text-text'
+  return x >= 2 ? 'text-[var(--oa-status-warning)] font-semibold' : 'text-text'
 }
