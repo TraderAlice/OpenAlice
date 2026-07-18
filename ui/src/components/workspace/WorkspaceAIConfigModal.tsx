@@ -50,7 +50,7 @@ const TAB_FALLBACK_VENDOR: Record<Tab, string | null> = {
   pi: null,
 }
 
-type Tab = 'claude' | 'codex' | 'opencode' | 'pi'
+export type Tab = 'claude' | 'codex' | 'opencode' | 'pi'
 type Section = 'general' | 'ai' | 'template' | 'absorb'
 
 interface Props {
@@ -72,11 +72,12 @@ const CONTEXT_WINDOW_OPTIONS = [
   { value: 1_000_000, label: '1M' },
 ] as const
 
-interface FormState {
+export interface FormState {
   baseUrl: string
   apiKey: string
   model: string
   contextWindow: number
+  reasoning: boolean
   /** The wire protocol — drives the test + how the adapter is configured. */
   wireShape: WireShape
   wireApi: 'chat' | 'responses'
@@ -100,6 +101,7 @@ const EMPTY_FORM: FormState = {
   apiKey: '',
   model: '',
   contextWindow: DEFAULT_CONTEXT_WINDOW,
+  reasoning: false,
   wireShape: 'anthropic',
   wireApi: 'responses',
   authMode: 'x-api-key',
@@ -110,20 +112,21 @@ function normalizeContextWindow(value: number | null | undefined): number {
   return CONTEXT_WINDOW_OPTIONS.some((o) => o.value === value) ? value : DEFAULT_CONTEXT_WINDOW
 }
 
-function configToForm(cfg: AgentConfig | null, tab: Tab): FormState {
+export function configToForm(cfg: AgentConfig | null, tab: Tab): FormState {
   if (!cfg) return { ...EMPTY_FORM, wireShape: DEFAULT_WIRE_BY_TAB[tab] }
   return {
     baseUrl: cfg.baseUrl ?? '',
     apiKey: cfg.apiKey ?? '',
     model: cfg.model ?? '',
     contextWindow: normalizeContextWindow(cfg.contextWindow),
+    reasoning: cfg.reasoning === true,
     wireShape: cfg.wireShape ?? DEFAULT_WIRE_BY_TAB[tab],
     wireApi: 'responses',
     authMode: cfg.authMode === 'bearer' ? 'bearer' : 'x-api-key',
   }
 }
 
-function formToConfig(form: FormState, agent: AgentId): AgentConfig {
+export function formToConfig(form: FormState, agent: AgentId): AgentConfig {
   const cfg: AgentConfig = {
     baseUrl: form.baseUrl.trim() || null,
     apiKey: form.apiKey.trim() || null,
@@ -134,6 +137,7 @@ function formToConfig(form: FormState, agent: AgentId): AgentConfig {
     return {
       ...cfg,
       contextWindow: form.contextWindow,
+      ...(agent === 'pi' ? { reasoning: form.reasoning } : {}),
       ...(form.wireShape === 'anthropic' ? { authMode: form.authMode } : {}),
     }
   }
@@ -257,6 +261,7 @@ export function WorkspaceAIConfigModal({ wsId, onClose, initialAgent = 'claude',
       savedForm.model !== form.model ||
       savedForm.wireShape !== form.wireShape ||
       ((tab === 'opencode' || tab === 'pi') && savedForm.contextWindow !== form.contextWindow) ||
+      (tab === 'pi' && savedForm.reasoning !== form.reasoning) ||
       (form.wireShape === 'anthropic' && savedForm.authMode !== form.authMode)
     )
   }, [bundle, form, tab])
@@ -704,6 +709,23 @@ export function WorkspaceAIConfigModal({ wsId, onClose, initialAgent = 'claude',
             </div>
           )}
 
+          {tab === 'pi' && (
+            <label className="flex items-start gap-2.5 rounded-md border border-border bg-bg-secondary/50 px-3 py-2.5">
+              <input
+                type="checkbox"
+                aria-label="Pi model supports reasoning"
+                checked={form.reasoning}
+                onChange={(e) => setForm({ ...form, reasoning: e.target.checked })}
+                className="mt-0.5"
+              />
+              <span className="text-[12px] leading-relaxed text-text-muted">
+                <strong className="text-text">Model supports reasoning.</strong>{' '}
+                Enables Pi's native thinking controls for this custom model. Leave this off for
+                models that do not expose reasoning tokens.
+              </span>
+            </label>
+          )}
+
           <div>
             <label className="block text-xs font-medium text-text-muted mb-1">Base URL</label>
             <input
@@ -861,8 +883,10 @@ export function WorkspaceAIConfigModal({ wsId, onClose, initialAgent = 'claude',
                   <><strong className="text-text">OpenAI Chat Completions wire</strong> — connects
                   directly to DeepSeek, Qwen, Kimi, GLM, MiniMax and local runtimes; Base URL is the
                   provider's OpenAI-compatible endpoint, Model is the bare model id.</>
-                )}{' '}Written to a
-                per-workspace <code className="font-mono text-[11.5px]">.pi-agent/models.json</code>.
+                )}{' '}OpenAlice registers the custom provider in Pi's normal user model registry,
+                then selects it with the Workspace-local{' '}
+                <code className="font-mono text-[11.5px]">.pi/settings.json</code>. Pi's own global
+                packages, settings, auth, resources, and sessions continue to load normally.
                 Trading tools reach Pi through the <code className="font-mono text-[11.5px]">alice-uta</code>{' '}
                 CLI on PATH (the <code className="font-mono text-[11.5px]">alice-uta</code> skill),
                 not MCP — Pi has no native MCP.
@@ -950,7 +974,7 @@ export function WorkspaceAIConfigModal({ wsId, onClose, initialAgent = 'claude',
             {tab === 'claude' && ' Claude reads `.claude/settings.local.json` from the workspace cwd.'}
             {tab === 'codex' && ' Codex reads `.codex/config.toml` + `.codex/env.json` (via CODEX_HOME).'}
             {tab === 'opencode' && ' opencode reads `opencode.json` from the workspace cwd; OpenAlice injects its MCP servers at spawn.'}
-            {tab === 'pi' && ' Pi reads `.pi-agent/models.json` (via PI_CODING_AGENT_DIR); tools reach it via the `alice` CLI on PATH.'}
+            {tab === 'pi' && ' Pi uses its normal global agent directory plus the Workspace-local `.pi/settings.json`; tools reach it via the `alice` CLI on PATH.'}
           </p>
         </div>
 

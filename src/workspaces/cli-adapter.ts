@@ -96,6 +96,8 @@ export interface WorkspaceAiCred {
    * injectors may choose a modern default for newly-written configs.
    */
   contextWindow?: number | null;
+  /** Pi custom-model capability; enables its native thinking controls. */
+  reasoning?: boolean | null;
   /** Codex only — legacy/explicit wire_api; superseded by wireShape when set. */
   wireApi?: 'chat' | 'responses' | null;
   /** Header mode for an Anthropic wire, regardless of the consuming runtime. */

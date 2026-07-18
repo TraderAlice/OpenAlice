@@ -2035,6 +2035,10 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     webPi,
     isWorkspaceHeadlessActive: (id) => headlessActivity.has(id),
     operationGuard: workspaceOperationGuard,
+    cleanupWorkspaceState: async (_record, cwd) => {
+      if (!existsSync(join(cwd, '.pi', 'openalice-provider.json')) && !existsSync(join(cwd, '.pi-agent'))) return;
+      await piAdapter.writeAiConfig?.(cwd, {});
+    },
     logger: launcherLogger.child({ scope: 'workspace-lifecycle' }),
   });
   await lifecycle.recover();
@@ -2105,7 +2109,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       claude: existsSync(join(w.dir, '.claude', 'settings.local.json')),
       codex: existsSync(join(w.dir, '.codex')),
       opencode: existsSync(join(w.dir, 'opencode.json')),
-      pi: existsSync(join(w.dir, '.pi-agent')),
+      pi: existsSync(join(w.dir, '.pi', 'openalice-provider.json')),
     };
     // Version lineage + upgrade hint. Applied template state, not mutable
     // README frontmatter, is authoritative: changing a document is not the

@@ -105,8 +105,15 @@ describe('credentialToWorkspaceAiCred', () => {
   })
 
   it('lets opencode/pi override the default context window', () => {
-    const cred = credentialToWorkspaceAiCred(chatOnlyGateway, 'pi', { model: 'some-model', contextWindow: 256_000 })!
+    const cred = credentialToWorkspaceAiCred(chatOnlyGateway, 'pi', {
+      model: 'some-model',
+      contextWindow: 256_000,
+      reasoning: true,
+    })!
     expect(cred.contextWindow).toBe(256_000)
+    expect(cred.reasoning).toBe(true)
+    expect(credentialToWorkspaceAiCred(chatOnlyGateway, 'opencode', { reasoning: true })?.reasoning)
+      .toBeUndefined()
   })
 
   it('injects Google through the native wire for opencode and Pi only', () => {

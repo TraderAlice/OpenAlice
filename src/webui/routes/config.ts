@@ -288,6 +288,9 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
             credentialSlug: def.credentialSlug,
             ...(typeof def.model === 'string' && def.model ? { model: def.model } : {}),
             ...(parsedWire.success ? { wireShape: parsedWire.data } : {}),
+            ...(agent === 'pi' && typeof def.reasoning === 'boolean'
+              ? { reasoning: def.reasoning }
+              : {}),
           }
         }
       }
