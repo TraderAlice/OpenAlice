@@ -18,6 +18,7 @@ import * as pty from 'node-pty';
 
 import { PersistentSession, type PersistentSessionOptions } from './persistent-session.js';
 import type { Logger } from './logger.js';
+import type { TerminalViewAttributes } from './terminal-view-attributes.js';
 
 vi.mock('node-pty', () => ({ spawn: vi.fn() }));
 
@@ -83,6 +84,18 @@ function makeOptions(over: Partial<PersistentSessionOptions> = {}): PersistentSe
     lowWatermarkBytes: 256,
     onDisposed: () => {},
     ...over,
+  };
+}
+
+function terminalViewAttributes(mode: 'dark' | 'light'): TerminalViewAttributes {
+  return {
+    foreground: mode === 'dark' ? [223, 225, 230] : [28, 42, 65],
+    background: mode === 'dark' ? [11, 12, 14] : [251, 250, 246],
+    cursor: [35, 185, 154],
+    ansi: Array.from({ length: 256 }, (_, index) => [index, index, index]),
+    colorSchemeMode: mode,
+    cursorStyle: 'block',
+    cursorBlink: true,
   };
 }
 
@@ -202,6 +215,25 @@ describe('PersistentSession backpressure / socket-drop deadlock', () => {
 
     expect(term.write).toHaveBeenCalledOnce();
     expect(term.write).toHaveBeenCalledWith(rendererReply);
+
+    session.dispose('test');
+  });
+
+  it('pushes mode 2031 theme flips only while the subscribed TUI is hidden', () => {
+    const session = new PersistentSession(makeOptions({
+      initialTerminalViewAttributes: terminalViewAttributes('dark'),
+    }));
+    term.emitData(Buffer.from('\x1b[?2031h'));
+    term.write.mockClear();
+
+    session.setTerminalViewAttributes(terminalViewAttributes('light'));
+    expect(term.write).toHaveBeenCalledWith('\x1b[?997;2n');
+
+    const ws = new FakeWs();
+    session.attach(ws as never, 80, 24, undefined);
+    term.write.mockClear();
+    session.setTerminalViewAttributes(terminalViewAttributes('dark'));
+    expect(term.write).not.toHaveBeenCalled();
 
     session.dispose('test');
   });

@@ -9,6 +9,10 @@ import {
 } from './protocol.js';
 import { ReplayBuffer } from './replay-buffer.js';
 import { resolveLaunchCommand } from './win-command.js';
+import {
+  terminalColorSchemeUpdateSequence,
+  type TerminalViewAttributes,
+} from './terminal-view-attributes.js';
 
 export interface PersistentSessionOptions {
   /** The workspace this session belongs to (for routing, logging, cwd context). */
@@ -27,6 +31,8 @@ export interface PersistentSessionOptions {
   readonly highWatermarkBytes: number;
   readonly lowWatermarkBytes: number;
   readonly onDisposed: () => void;
+  readonly initialTerminalViewAttributes?: TerminalViewAttributes;
+  readonly onTerminalViewAttributes?: (attributes: TerminalViewAttributes) => void;
   /**
    * V3.S5 — bytes prepended to the ReplayBuffer before the PTY spawns. Used
    * by shell resume: the prior session's scrollback is pushed back into the
@@ -82,6 +88,7 @@ export class PersistentSession {
   private term: pty.IPty;
   private readonly buffer: ReplayBuffer;
   private readonly headless: HeadlessTerminalSnapshot;
+  private terminalViewAttributes: TerminalViewAttributes | null = null;
   private readonly opts: PersistentSessionOptions;
   private readonly log: Logger;
   private ws: WebSocket | null = null;
@@ -135,6 +142,10 @@ export class PersistentSession {
       rows: this.currentRows,
       onQueryReply: (reply) => this.onHeadlessQueryReply(reply),
     });
+    if (opts.initialTerminalViewAttributes) {
+      this.terminalViewAttributes = opts.initialTerminalViewAttributes;
+      this.headless.setTerminalViewAttributes(opts.initialTerminalViewAttributes);
+    }
     if (opts.initialReplayBytes && opts.initialReplayBytes.length > 0) {
       // Seed visual state from persisted shell scrollback, but never answer
       // old queries replayed from a prior PTY lifetime.
@@ -410,6 +421,7 @@ export class PersistentSession {
       seq: slice.tailSeq,
       scrollbackTruncated,
       kittyKeyboardFlags: this.headless.getKittyKeyboardFlags(),
+      colorSchemeUpdatesSubscribed: this.headless.getColorSchemeUpdatesSubscribed(),
     };
     ws.send(JSON.stringify(attached));
     this.lastCursorSeq = slice.tailSeq;
@@ -576,6 +588,8 @@ export class PersistentSession {
 
     if (parsed.type === 'resize') {
       this.resize(parsed.cols, parsed.rows);
+    } else if (parsed.type === 'terminal-view-attributes') {
+      this.opts.onTerminalViewAttributes?.(parsed.attributes);
     }
     // `attach` mid-stream is ignored — the initial attach already happened.
   }
@@ -614,6 +628,26 @@ export class PersistentSession {
       this.term.resize(c, r);
     } catch {
       // PTY may be dying; ignore.
+    }
+  }
+
+  setTerminalViewAttributes(attributes: TerminalViewAttributes): void {
+    const previous = this.terminalViewAttributes;
+    this.terminalViewAttributes = attributes;
+    this.headless.setTerminalViewAttributes(attributes);
+    if (
+      previous
+      && previous.colorSchemeMode !== attributes.colorSchemeMode
+      && this.headless.getColorSchemeUpdatesSubscribed()
+      && (this.ws === null || this.ws.readyState !== this.ws.OPEN)
+    ) {
+      // No renderer is present to perform the DEC mode 2031 push. Keep the
+      // hidden TUI in sync from the same renderer-authored app-global value.
+      try {
+        this.term.write(terminalColorSchemeUpdateSequence(attributes.colorSchemeMode));
+      } catch (err) {
+        this.log.warn('session.color_scheme_update_error', { err });
+      }
     }
   }
 

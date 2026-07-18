@@ -163,6 +163,9 @@ const api = {
     resize: (connectionId: string, cols: number, rows: number) => {
       ipcRenderer.send('openalice:pty:client-message', { connectionId, type: 'resize', cols, rows })
     },
+    control: (connectionId: string, data: string) => {
+      ipcRenderer.send('openalice:pty:client-message', { connectionId, type: 'control', data })
+    },
     close: (connectionId: string) => {
       ipcRenderer.send('openalice:pty:client-close', { connectionId })
       cleanupPty(connectionId)

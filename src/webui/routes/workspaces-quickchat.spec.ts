@@ -71,6 +71,7 @@ function build(opts: {
     agentSessionId: null,
     startedAt: 1,
   }));
+  const setTerminalViewAttributes = vi.fn(() => true);
   const creator = { create: vi.fn(async () => ({ ok: true as const, workspace: META })) };
   const registry = {
     list: () => opts.workspaces ?? [],
@@ -113,7 +114,7 @@ function build(opts: {
     adapters: { get: (id: string) => adapters[id] },
     sessionRegistry,
     resumeRegistry,
-    pool: { spawn, get: vi.fn(() => undefined) },
+    pool: { spawn, get: vi.fn(() => undefined), setTerminalViewAttributes },
     publicMeta: vi.fn(async () => META),
     config: { launcherRepoRoot: '/repo' },
     getAgentRuntimeReadiness: vi.fn(() => ({
@@ -147,7 +148,7 @@ function build(opts: {
     })),
     rememberRecentChatWorkspace,
   });
-  return { app, opencode, spawn, creator, rememberRecentChatWorkspace };
+  return { app, opencode, spawn, creator, rememberRecentChatWorkspace, setTerminalViewAttributes };
 }
 
 async function quickChat(app: any, body: unknown) {
@@ -178,6 +179,41 @@ beforeEach(() => {
   vi.mocked(readWorkspaceDefaultAgent).mockResolvedValue(null);
   vi.mocked(readWorkspaceDefaultContextWindow).mockResolvedValue(256_000);
   vi.mocked(setCredentialLastModel).mockClear();
+});
+
+describe('PUT /terminal-view-attributes', () => {
+  it('validates and publishes the renderer palette to the session pool', async () => {
+    const { app, setTerminalViewAttributes } = build();
+    const attributes = {
+      foreground: [1, 2, 3],
+      background: [4, 5, 6],
+      cursor: [7, 8, 9],
+      ansi: Array.from({ length: 256 }, () => [0, 0, 0]),
+      colorSchemeMode: 'dark',
+      cursorStyle: 'block',
+      cursorBlink: true,
+    };
+    const response = await app.request('/terminal-view-attributes', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(attributes),
+    });
+
+    expect(response.status).toBe(200);
+    expect(setTerminalViewAttributes).toHaveBeenCalledWith(attributes);
+  });
+
+  it('rejects incomplete palettes', async () => {
+    const { app, setTerminalViewAttributes } = build();
+    const response = await app.request('/terminal-view-attributes', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ foreground: [1, 2, 3], ansi: [] }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(setTerminalViewAttributes).not.toHaveBeenCalled();
+  });
 });
 
 describe('GET /credentials — Quick Chat launch metadata', () => {
@@ -463,24 +499,6 @@ describe('POST /quick-chat — loginless credential injection', () => {
     expect(creator.create).not.toHaveBeenCalled(); // reused, not created
     expect(spawn).toHaveBeenCalledOnce();
     expect((spawn.mock.calls[0] as any[])[0]).toBe('ws-1'); // spawned into the target
-  });
-
-  it('passes a concrete terminal theme hint into the spawned session', async () => {
-    const { app, spawn } = build();
-    const r = await quickChat(app, { prompt: 'hi', agent: 'claude', terminalTheme: 'light' });
-
-    expect(r.status).toBe(201);
-    expect(spawn).toHaveBeenCalledOnce();
-    expect((spawn.mock.calls[0] as any[])[1].terminalTheme).toBe('light');
-  });
-
-  it('rejects UI-only terminal theme preferences at the HTTP boundary', async () => {
-    const { app, spawn } = build();
-    const r = await quickChat(app, { prompt: 'hi', agent: 'claude', terminalTheme: 'follow' });
-
-    expect(r.status).toBe(400);
-    expect(r.body.message).toBe('terminalTheme must be "light" or "dark"');
-    expect(spawn).not.toHaveBeenCalled();
   });
 
   it('omitted agent ignores shell at agents[0] and uses the first agent runtime', async () => {

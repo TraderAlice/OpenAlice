@@ -63,7 +63,7 @@ describe('buildSpawnEnv', () => {
     }
   })
 
-  it('strips launcher-owned tool/MCP env from the parent and only trusts extras', () => {
+  it('strips launcher-owned tool/MCP and stale terminal color env from the parent', () => {
     const out = buildSpawnEnv(
       {
         OPENALICE_MCP_URL: 'http://stale/mcp',
@@ -76,16 +76,14 @@ describe('buildSpawnEnv', () => {
       {
         OPENALICE_TOOL_URL: '/cli',
         OPENALICE_TOOL_SOCKET: '/tmp/current.sock',
-        OPENALICE_TERMINAL_THEME: 'dark',
-        COLORFGBG: '15;0',
       },
     )
     expect(out['OPENALICE_MCP_URL']).toBeUndefined()
     expect(out['OPENCODE_CONFIG_CONTENT']).toBeUndefined()
     expect(out['OPENALICE_TOOL_URL']).toBe('/cli')
     expect(out['OPENALICE_TOOL_SOCKET']).toBe('/tmp/current.sock')
-    expect(out['OPENALICE_TERMINAL_THEME']).toBe('dark')
-    expect(out['COLORFGBG']).toBe('15;0')
+    expect(out['OPENALICE_TERMINAL_THEME']).toBeUndefined()
+    expect(out['COLORFGBG']).toBeUndefined()
   })
 
   it('defaults terminal locale to UTF-8 without overriding explicit locale', () => {

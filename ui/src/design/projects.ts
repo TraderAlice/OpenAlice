@@ -46,12 +46,12 @@ export const designProjects: DesignProject[] = [
       ],
       constraints: [
         'The route consumes the real CSS variables; it must not duplicate palette values.',
-        'Terminal ANSI colors remain separately projected until the later unified appearance work.',
+        'Product UI and xterm read one semantic CSS card; the renderer remains the only terminal color authority.',
         'Product components must not select Tailwind palette shades directly.',
       ],
       openQuestions: [
-        'Which product extensions can collapse into the terminal-compatible subset later?',
-        'Should imported terminal themes optionally seed the neutral product surfaces?',
+        'Which product extensions can reuse terminal-compatible roles before earning a separate semantic token?',
+        'How should future imported terminal palettes map into the shared card without silently recoloring product-only roles?',
       ],
     },
     variants: [

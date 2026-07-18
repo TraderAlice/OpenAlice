@@ -4,7 +4,6 @@ import type { ReactElement } from 'react';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { Terminal as Xterm } from '@xterm/xterm';
-import { Monitor, Moon, Sun, type LucideIcon } from 'lucide-react';
 import '@xterm/xterm/css/xterm.css';
 
 import {
@@ -21,10 +20,11 @@ import {
 } from './terminal-keyboard-controller';
 import { TerminalKittyKeyboardModeTracker } from './terminal-kitty-keyboard-mode-tracker';
 import {
-  useResolvedTerminalTheme,
-  useTerminalThemeStore,
-  type TerminalThemePreference,
-} from './terminalTheme';
+  colorSchemeUpdateSequence,
+  terminalThemesEqual,
+  useTerminalAppearance,
+  type TerminalAppearance,
+} from './terminalAppearance';
 // Lazy-import so the demo subtree (transcripts, fixtures, handlers) is
 // dynamic-imported only when demo mode is actually on. With a static import,
 // Rollup is conservative about module side-effects (the transcript file
@@ -101,6 +101,7 @@ class ElectronPtySocket implements SocketLike {
     if (typeof data === 'string') {
       const parsed = parseResizeControl(data);
       if (parsed) this.bridge.resize(this.connectionId, parsed.cols, parsed.rows);
+      else this.bridge.control(this.connectionId, data);
       return;
     }
     this.bridge.send(this.connectionId, data);
@@ -218,27 +219,14 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
   const onSessionLostRef = useRef<TerminalViewProps['onSessionLost']>(props.onSessionLost);
   onSessionLostRef.current = props.onSessionLost;
 
-  // Terminal palette is its own preference, not just the app chrome theme. Read
-  // the current value through a ref so the connect effect doesn't recreate the
-  // terminal on a theme flip — a separate effect re-skins the live instance.
-  const { profile: terminalThemeProfile } = useResolvedTerminalTheme();
-  const themeRef = useRef(terminalThemeProfile.xtermTheme);
-  themeRef.current = terminalThemeProfile.xtermTheme;
-  const appliedThemeVariantRef = useRef(terminalThemeProfile.variant);
-  const termRef = useRef<Xterm | null>(null);
+  const terminalAppearance = useTerminalAppearance();
+  const appearanceRef = useRef(terminalAppearance);
+  appearanceRef.current = terminalAppearance;
+  const applyAppearanceRef = useRef<((appearance: TerminalAppearance) => void) | null>(null);
 
   useEffect(() => {
-    const term = termRef.current;
-    if (!term) return;
-    term.options.theme = terminalThemeProfile.xtermTheme;
-
-    if (appliedThemeVariantRef.current === terminalThemeProfile.variant) return;
-    appliedThemeVariantRef.current = terminalThemeProfile.variant;
-    // Terminal theming keeps the PTY state and renderer palette separate.
-    // Reattach so the server serializes the authoritative screen at the live
-    // dimensions and xterm repaints it with the current palette.
-    connectRef.current?.();
-  }, [terminalThemeProfile]);
+    applyAppearanceRef.current?.(terminalAppearance);
+  }, [terminalAppearance]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -251,7 +239,7 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
     setChildExited(false);
 
     const term = new Xterm({
-      theme: themeRef.current,
+      theme: appearanceRef.current.theme,
       fontFamily: TERMINAL_FONT_FAMILY,
       fontSize: 13,
       lineHeight: 1.2,
@@ -278,8 +266,6 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
         getWinSizeChars: true,
       },
     });
-    termRef.current = term;
-
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.loadAddon(new WebLinksAddon());
@@ -321,6 +307,13 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
     let resizeObserver: ResizeObserver | null = null;
     let initTimer: ReturnType<typeof setTimeout> | undefined;
     let pendingWriteFrame: ReturnType<typeof requestAnimationFrame> | undefined;
+    let replaying = true;
+    let replayGeneration = 0;
+    let replayBoundaryAttached = false;
+    let pendingReplayWrites = 0;
+    let attachedColorSchemeSubscription = false;
+    let colorSchemeUpdatesSubscribed = false;
+    let appliedColorSchemeMode = appearanceRef.current.mode;
 
     const sendControl = (msg: ClientControlMessage): void => {
       const ws = activeWs;
@@ -344,10 +337,39 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
     };
 
     const sendStdin = (data: string): void => {
+      if (replaying) return;
       logInput('stdin', data);
       const ws = activeWs;
       if (ws && ws.readyState === ws.OPEN) ws.send(encoder.encode(data));
     };
+
+    const applyAppearance = (appearance: TerminalAppearance): void => {
+      if (!terminalThemesEqual(term.options.theme, appearance.theme)) {
+        // Value-gated: xterm rebuilds its palette on every theme assignment,
+        // which otherwise discards live TUI OSC color mutations.
+        term.options.theme = appearance.theme;
+      }
+      sendControl({ type: 'terminal-view-attributes', attributes: appearance.viewAttributes });
+      if (colorSchemeUpdatesSubscribed && appliedColorSchemeMode !== appearance.mode) {
+        sendStdin(colorSchemeUpdateSequence(appearance.mode));
+      }
+      appliedColorSchemeMode = appearance.mode;
+    };
+    applyAppearanceRef.current = applyAppearance;
+
+    const containsMode2031 = (params: (number | number[])[]): boolean =>
+      params.some((value) => Array.isArray(value) ? value.includes(2031) : value === 2031);
+    const mode2031Subscribe = term.parser.registerCsiHandler({ prefix: '?', final: 'h' }, (params) => {
+      if (containsMode2031(params) && !replaying) {
+        colorSchemeUpdatesSubscribed = true;
+        sendStdin(colorSchemeUpdateSequence(appliedColorSchemeMode));
+      }
+      return false;
+    });
+    const mode2031Unsubscribe = term.parser.registerCsiHandler({ prefix: '?', final: 'l' }, (params) => {
+      if (containsMode2031(params)) colorSchemeUpdatesSubscribed = false;
+      return false;
+    });
 
     const safeFocus = (): void => {
       try {
@@ -357,18 +379,46 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
       }
     };
 
+    const maybeFinishReplay = (): void => {
+      if (!replaying || !replayBoundaryAttached || pendingReplayWrites > 0) return;
+      replaying = false;
+      colorSchemeUpdatesSubscribed = attachedColorSchemeSubscription;
+      if (colorSchemeUpdatesSubscribed) {
+        sendStdin(colorSchemeUpdateSequence(appliedColorSchemeMode));
+      }
+    };
+
     const writeToTerm = (data: Uint8Array): void => {
       kittyKeyboardMode.scan(kittyKeyboardDecoder.decode(data, { stream: true }));
+      const generation = replayGeneration;
+      const countsAsReplay = replaying;
+      if (countsAsReplay) pendingReplayWrites += 1;
+      let completed = false;
+      const complete = (): void => {
+        if (completed) return;
+        completed = true;
+        if (countsAsReplay && generation === replayGeneration) {
+          pendingReplayWrites = Math.max(0, pendingReplayWrites - 1);
+          maybeFinishReplay();
+        }
+      };
       try {
-        term.write(data);
+        term.write(data, complete);
       } catch (err) {
-        if (teardown || pendingWriteFrame !== undefined) return;
+        if (teardown || pendingWriteFrame !== undefined) {
+          complete();
+          return;
+        }
         pendingWriteFrame = requestAnimationFrame(() => {
           pendingWriteFrame = undefined;
-          if (teardown) return;
+          if (teardown) {
+            complete();
+            return;
+          }
           try {
-            term.write(data);
+            term.write(data, complete);
           } catch (retryErr) {
+            complete();
             console.warn('[openalice:terminal] dropped terminal frame after xterm write failure', retryErr ?? err);
           }
         });
@@ -381,8 +431,7 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
       isKittyKeyboardActive: () => kittyKeyboardMode.flags > 0,
       sendInput: (data, source) => {
         logInput(source, data);
-        const ws = activeWs;
-        if (ws && ws.readyState === ws.OPEN) ws.send(encoder.encode(data));
+        sendStdin(data);
       },
       resetKittyProtocol: () => {
         // A TUI can exit on Ctrl+C before restoring its negotiated renderer
@@ -426,6 +475,12 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
       if (teardown) return;
       kittyKeyboardMode.reset();
       kittyKeyboardDecoder = new TextDecoder();
+      replayGeneration += 1;
+      replaying = true;
+      replayBoundaryAttached = false;
+      pendingReplayWrites = 0;
+      attachedColorSchemeSubscription = false;
+      colorSchemeUpdatesSubscribed = false;
       const previousWs = activeWs;
       activeWs = null;
       try {
@@ -461,6 +516,10 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
         setStatus('connected');
         safeFocus();
         handleResize();
+        sendControl({
+          type: 'terminal-view-attributes',
+          attributes: appearanceRef.current.viewAttributes,
+        });
       });
 
       ws.addEventListener('message', (ev) => {
@@ -474,6 +533,9 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
               setPid(msg.pid);
               setScrollbackTruncated(msg.scrollbackTruncated);
               kittyKeyboardMode.scan(`\x1b[=${msg.kittyKeyboardFlags};1u`);
+              replayBoundaryAttached = true;
+              attachedColorSchemeSubscription = msg.colorSchemeUpdatesSubscribed;
+              maybeFinishReplay();
               onAttachedRef.current?.(msg.sessionId);
               break;
             case 'cursor':
@@ -529,6 +591,7 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
 
     const stdinSub = term.onData(sendStdin);
     const binarySub = term.onBinary((d) => {
+      if (replaying) return;
       const ws = activeWs;
       if (!ws || ws.readyState !== ws.OPEN) return;
       logInput('binary', d);
@@ -569,6 +632,8 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
       stdinSub.dispose();
       binarySub.dispose();
       keyboardController.dispose();
+      mode2031Subscribe.dispose();
+      mode2031Unsubscribe.dispose();
       resizeObserver?.disconnect();
       window.removeEventListener('resize', handleResize);
       try {
@@ -577,9 +642,9 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
         // ignore
       }
       if (connectRef.current === connect) connectRef.current = null;
+      if (applyAppearanceRef.current === applyAppearance) applyAppearanceRef.current = null;
       webgl?.dispose();
       term.dispose();
-      termRef.current = null;
     };
   }, [wsId, sessionId, wsUrl, props.renderer]);
 
@@ -612,7 +677,6 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
             take over
           </button>
         )}
-        <TerminalThemeControl />
       </header>
       {/* FitAddon reads the computed size of xterm's direct parent. Keep that
           parent padding-free: putting the visual inset on `.terminal-host`
@@ -621,37 +685,6 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
       <div className="terminal-body">
         <div ref={containerRef} className="terminal-host" />
       </div>
-    </div>
-  );
-}
-
-function TerminalThemeControl(): ReactElement {
-  const { preference, appTheme } = useResolvedTerminalTheme();
-  const setPreference = useTerminalThemeStore((s) => s.setPreference);
-  const options: Array<{
-    preference: TerminalThemePreference;
-    label: string;
-    icon: LucideIcon;
-  }> = [
-    { preference: 'follow', label: `Follow app (${appTheme})`, icon: Monitor },
-    { preference: 'dark', label: 'Dark terminal', icon: Moon },
-    { preference: 'light', label: 'Light terminal', icon: Sun },
-  ];
-  return (
-    <div className="terminal-theme-switch" role="group" aria-label="Terminal theme">
-      {options.map(({ preference: value, label, icon: Icon }) => (
-        <button
-          key={value}
-          type="button"
-          className={`terminal-theme-option ${preference === value ? 'active' : ''}`}
-          aria-label={label}
-          aria-pressed={preference === value}
-          title={label}
-          onClick={() => setPreference(value)}
-        >
-          <Icon size={12} strokeWidth={2.2} aria-hidden="true" />
-        </button>
-      ))}
     </div>
   );
 }

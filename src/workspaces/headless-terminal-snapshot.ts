@@ -4,6 +4,12 @@ import { SerializeAddon } from '@xterm/addon-serialize'
 import HeadlessXterm from '@xterm/headless'
 import type { Terminal as XtermHeadlessTerminal } from '@xterm/headless'
 
+import {
+  installTerminalViewAttributeResponder,
+  type TerminalViewAttributeResponder,
+} from './terminal-view-attribute-responder.js'
+import type { TerminalViewAttributes } from './terminal-view-attributes.js'
+
 // This beta is published as CommonJS even though its declaration file exposes
 // named exports. Native Node ESM therefore sees the package as one default
 // namespace object; normalize that shape here instead of relying on bundler
@@ -46,6 +52,9 @@ export class HeadlessTerminalSnapshot {
   private readonly terminal: XtermHeadlessTerminal
   private readonly serializer: SerializeAddon
   private readonly onQueryReply: ((reply: string) => void) | null
+  private terminalViewAttributes: TerminalViewAttributes | null = null
+  private readonly viewAttributeResponder: TerminalViewAttributeResponder
+  private colorSchemeUpdatesSubscribed = false
   private queryReplyForwardingDepth = 0
   private pendingAsyncWrites = 0
   private disposed = false
@@ -64,9 +73,22 @@ export class HeadlessTerminalSnapshot {
     this.onQueryReply = options.onQueryReply ?? null
     if (this.onQueryReply) {
       this.terminal.onData((reply) => {
-        if (this.queryReplyForwardingDepth > 0) this.onQueryReply?.(reply)
+        if (this.queryReplyForwardingDepth <= 0) return
+        // xterm can emit an unsolicited native 997 push while parsing mode
+        // 2031. Renderer truth owns that notification; forwarding the
+        // headless default would race the explicit mode update.
+        const filtered = reply.replace(/\x1b\[\?997;[12]n/g, '')
+        if (filtered) this.onQueryReply?.(filtered)
       })
     }
+    this.viewAttributeResponder = installTerminalViewAttributeResponder({
+      parser: this.terminal.parser,
+      getBaseAttributes: () => this.terminalViewAttributes,
+      emitReply: (reply) => {
+        if (this.queryReplyForwardingDepth > 0) this.onQueryReply?.(reply)
+      },
+    })
+    this.installColorSchemeUpdateTracking()
   }
 
   write(data: string | Uint8Array, options: HeadlessTerminalWriteOptions = {}): void {
@@ -116,6 +138,34 @@ export class HeadlessTerminalSnapshot {
     const flags = (this.terminal as TerminalWithSynchronousWrite)._core?.coreService
       ?.kittyKeyboard?.flags
     return typeof flags === 'number' ? flags : 0
+  }
+
+  /** Apply the renderer's actual palette to the hidden-query authority. */
+  setTerminalViewAttributes(attributes: TerminalViewAttributes): void {
+    if (this.disposed) return
+    this.terminalViewAttributes = attributes
+    this.terminal.options.cursorStyle = attributes.cursorStyle
+    this.terminal.options.cursorBlink = attributes.cursorBlink
+    // A visible xterm theme assignment also replaces OSC color mutations.
+    this.viewAttributeResponder.clearColorOverrides()
+  }
+
+  /** Contour/Kitty DEC mode 2031 subscription state tracked from live PTY output. */
+  getColorSchemeUpdatesSubscribed(): boolean {
+    return this.colorSchemeUpdatesSubscribed
+  }
+
+  private installColorSchemeUpdateTracking(): void {
+    const contains2031 = (params: (number | number[])[]): boolean =>
+      params.some((value) => Array.isArray(value) ? value.includes(2031) : value === 2031)
+    this.terminal.parser.registerCsiHandler({ prefix: '?', final: 'h' }, (params) => {
+      if (contains2031(params)) this.colorSchemeUpdatesSubscribed = true
+      return false
+    })
+    this.terminal.parser.registerCsiHandler({ prefix: '?', final: 'l' }, (params) => {
+      if (contains2031(params)) this.colorSchemeUpdatesSubscribed = false
+      return false
+    })
   }
 
   dispose(): void {

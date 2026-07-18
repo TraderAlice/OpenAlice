@@ -54,6 +54,30 @@
   --report-canvas: #ffffff;
   --shadow-color: #1c2a41;
 
+  /* Terminal roles are part of the product color vocabulary, not a second palette. */
+  --terminal-background: #fbfaf6;
+  --terminal-foreground: #1c2a41;
+  --terminal-cursor: #2f62b0;
+  --terminal-cursor-accent: #fffdf8;
+  --terminal-selection-background: rgba(47, 98, 176, 0.22);
+  --terminal-selection-foreground: #fffdf8;
+  --terminal-black: #1c2a41;
+  --terminal-red: #cf222e;
+  --terminal-green: #116329;
+  --terminal-yellow: #7a4d05;
+  --terminal-blue: #0969da;
+  --terminal-magenta: #8250df;
+  --terminal-cyan: #1b7c83;
+  --terminal-white: #6e7781;
+  --terminal-bright-black: #57606a;
+  --terminal-bright-red: #a40e26;
+  --terminal-bright-green: #1a7f37;
+  --terminal-bright-yellow: #633c01;
+  --terminal-bright-blue: #218bff;
+  --terminal-bright-magenta: #a475f9;
+  --terminal-bright-cyan: #3192aa;
+  --terminal-bright-white: #24292f;
+
   /* Data visualization roles. */
   --chart-1: #2f62b0;
   --chart-2: #2e8b6f;
@@ -124,6 +148,29 @@
   --report-canvas: #ffffff;
   --shadow-color: #000000;
 
+  --terminal-background: #0b0c0e;
+  --terminal-foreground: #dfe1e6;
+  --terminal-cursor: #23b99a;
+  --terminal-cursor-accent: #0b0c0e;
+  --terminal-selection-background: rgba(59, 130, 246, 0.32);
+  --terminal-selection-foreground: #ffffff;
+  --terminal-black: #484f58;
+  --terminal-red: #ff7b72;
+  --terminal-green: #7ee787;
+  --terminal-yellow: #d29922;
+  --terminal-blue: #79c0ff;
+  --terminal-magenta: #d2a8ff;
+  --terminal-cyan: #a5d6ff;
+  --terminal-white: #dfe1e6;
+  --terminal-bright-black: #6e7681;
+  --terminal-bright-red: #ffa198;
+  --terminal-bright-green: #56d364;
+  --terminal-bright-yellow: #e3b341;
+  --terminal-bright-blue: #a5d6ff;
+  --terminal-bright-magenta: #d2a8ff;
+  --terminal-bright-cyan: #b6e3ff;
+  --terminal-bright-white: #f0f6fc;
+
   --chart-1: #79c0ff;
   --chart-2: #23b99a;
   --chart-3: #f0b95b;
@@ -192,6 +239,29 @@
     --code-background: rgba(0, 0, 0, 0.3);
     --report-canvas: #ffffff;
     --shadow-color: #000000;
+
+    --terminal-background: #0b0c0e;
+    --terminal-foreground: #dfe1e6;
+    --terminal-cursor: #23b99a;
+    --terminal-cursor-accent: #0b0c0e;
+    --terminal-selection-background: rgba(59, 130, 246, 0.32);
+    --terminal-selection-foreground: #ffffff;
+    --terminal-black: #484f58;
+    --terminal-red: #ff7b72;
+    --terminal-green: #7ee787;
+    --terminal-yellow: #d29922;
+    --terminal-blue: #79c0ff;
+    --terminal-magenta: #d2a8ff;
+    --terminal-cyan: #a5d6ff;
+    --terminal-white: #dfe1e6;
+    --terminal-bright-black: #6e7681;
+    --terminal-bright-red: #ffa198;
+    --terminal-bright-green: #56d364;
+    --terminal-bright-yellow: #e3b341;
+    --terminal-bright-blue: #a5d6ff;
+    --terminal-bright-magenta: #d2a8ff;
+    --terminal-bright-cyan: #b6e3ff;
+    --terminal-bright-white: #f0f6fc;
 
     --chart-1: #79c0ff;
     --chart-2: #23b99a;

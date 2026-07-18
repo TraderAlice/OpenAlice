@@ -19,7 +19,24 @@ export interface ResizeMessage {
   readonly rows: number;
 }
 
-export type ClientControlMessage = AttachMessage | ResizeMessage;
+export type TerminalViewRgb = [number, number, number];
+
+export interface TerminalViewAttributes {
+  readonly foreground: TerminalViewRgb;
+  readonly background: TerminalViewRgb;
+  readonly cursor: TerminalViewRgb;
+  readonly ansi: TerminalViewRgb[];
+  readonly colorSchemeMode: 'dark' | 'light';
+  readonly cursorStyle: 'bar' | 'block' | 'underline';
+  readonly cursorBlink: boolean;
+}
+
+export interface TerminalViewAttributesMessage {
+  readonly type: 'terminal-view-attributes';
+  readonly attributes: TerminalViewAttributes;
+}
+
+export type ClientControlMessage = AttachMessage | ResizeMessage | TerminalViewAttributesMessage;
 
 // ── server → client ─────────────────────────────────────────────────────────
 
@@ -35,6 +52,7 @@ export interface AttachedMessage {
   readonly seq: number;
   readonly scrollbackTruncated: boolean;
   readonly kittyKeyboardFlags: number;
+  readonly colorSchemeUpdatesSubscribed: boolean;
 }
 
 export interface CursorMessage {
@@ -105,6 +123,7 @@ export function parseServerControl(text: string): ServerControlMessage | null {
           scrollbackTruncated: v['scrollbackTruncated'],
           kittyKeyboardFlags:
             typeof v['kittyKeyboardFlags'] === 'number' ? v['kittyKeyboardFlags'] : 0,
+          colorSchemeUpdatesSubscribed: v['colorSchemeUpdatesSubscribed'] === true,
         };
       }
       return null;

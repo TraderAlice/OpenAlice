@@ -60,8 +60,13 @@ vi.mock('../components/workspace/api', async (importOriginal) => {
   }
 })
 
-vi.mock('../components/workspace/terminalTheme', () => ({
-  useResolvedTerminalThemeVariant: () => 'dark',
+vi.mock('../components/workspace/terminalAppearance', () => ({
+  useTerminalAppearance: () => ({
+    mode: 'dark',
+    theme: {},
+    viewAttributes: { foreground: [255, 255, 255], background: [0, 0, 0] },
+  }),
+  publishTerminalViewAttributes: vi.fn().mockResolvedValue(true),
 }))
 
 vi.mock('../components/workspace/WorkspaceAIConfigModal', () => ({

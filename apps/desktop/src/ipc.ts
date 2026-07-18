@@ -312,6 +312,13 @@ export function registerOpenAliceIpc(opts: OpenAliceIpcOptions): void {
         binary: false,
         data: JSON.stringify({ type: 'resize', cols: body['cols'], rows: body['rows'] }),
       })
+    } else if (body['type'] === 'control' && typeof body['data'] === 'string') {
+      child.send({
+        type: MSG_PTY_CLIENT,
+        connectionId,
+        binary: false,
+        data: body['data'],
+      })
     }
   })
 

@@ -33,8 +33,6 @@ const CORE_TOKENS = [
 const ALLOWED_LITERAL_COLOR_FILES = new Set([
   // Single product color authority.
   resolve(uiRoot, 'src/theme/palette.css'),
-  // xterm remains a separate terminal-palette projection in this increment.
-  resolve(uiRoot, 'src/components/workspace/terminalThemeProfile.ts'),
   // An origin-less document has no access to parent CSS variables; these are
   // safe fallback colors for unstyled agent-authored HTML, not app chrome.
   resolve(uiRoot, 'src/components/HtmlReportView.tsx'),

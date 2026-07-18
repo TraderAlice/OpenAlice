@@ -166,9 +166,8 @@ export function buildCliPath(env: NodeJS.ProcessEnv = process.env): string {
 function shouldStrip(name: string, value: string): boolean {
   if (STRIP_EXACT.has(name)) return true;
   // Parent shells and launchers often export these style switches globally.
-  // Do not let a stale "disable color" choice override the terminal theme
-  // OpenAlice injects for this Workspace. Explicit non-zero preferences and
-  // caller-supplied extras remain authoritative.
+  // Do not let a parent process's logging preference disable color in a fresh
+  // terminal emulator. User shell startup files may still set these again.
   if (name === 'NO_COLOR') return true;
   if ((name === 'FORCE_COLOR' || name === 'CLICOLOR') && value === '0') return true;
   return STRIP_PREFIXES.some((p) => name.startsWith(p));

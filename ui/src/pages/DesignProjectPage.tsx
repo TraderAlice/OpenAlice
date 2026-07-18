@@ -294,6 +294,31 @@ const CHART_COLOR_TOKENS = [
   'chart-grid',
 ] as const
 
+const TERMINAL_COLOR_TOKENS = [
+  'terminal-background',
+  'terminal-foreground',
+  'terminal-cursor',
+  'terminal-cursor-accent',
+  'terminal-selection-background',
+  'terminal-selection-foreground',
+  'terminal-black',
+  'terminal-red',
+  'terminal-green',
+  'terminal-yellow',
+  'terminal-blue',
+  'terminal-magenta',
+  'terminal-cyan',
+  'terminal-white',
+  'terminal-bright-black',
+  'terminal-bright-red',
+  'terminal-bright-green',
+  'terminal-bright-yellow',
+  'terminal-bright-blue',
+  'terminal-bright-magenta',
+  'terminal-bright-cyan',
+  'terminal-bright-white',
+] as const
+
 function SemanticColorCard() {
   const effectiveTheme = useEffectiveTheme()
 
@@ -313,6 +338,7 @@ function SemanticColorCard() {
       <ColorTokenGroup title="OpenAlice extensions" tokens={PRODUCT_COLOR_TOKENS} />
       <ColorTokenGroup title="Sidebar projection" tokens={SIDEBAR_COLOR_TOKENS} />
       <ColorTokenGroup title="Data visualization" tokens={CHART_COLOR_TOKENS} />
+      <ColorTokenGroup title="Terminal projection" tokens={TERMINAL_COLOR_TOKENS} />
 
       <section>
         <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Pairing smoke test</div>

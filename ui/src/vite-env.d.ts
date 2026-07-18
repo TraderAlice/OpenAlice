@@ -95,6 +95,7 @@ interface Window {
       }): string
       send(connectionId: string, data: Uint8Array): void
       resize(connectionId: string, cols: number, rows: number): void
+      control(connectionId: string, data: string): void
       close(connectionId: string): void
       onMessage(
         connectionId: string,

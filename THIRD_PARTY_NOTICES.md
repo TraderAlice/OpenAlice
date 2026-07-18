@@ -19,6 +19,12 @@ snapshot implementation in `src/workspaces/`, and the inherited terminal
 color-environment sanitization in `src/workspaces/spawn-env.ts` are adapted
 from the same Orca commit.
 
+The terminal view-attribute contract and publisher, headless OSC 4/10/11/12
+responder, value-gated xterm theme application, replay reply guard, and
+Contour/Kitty DEC mode 2031 color-scheme notifications are adapted from
+[`stablyai/orca`](https://github.com/stablyai/orca) commit
+`72d0a403a3eff0988f905d9546fcd0638b379351`.
+
 MIT License
 
 Copyright (c) 2026 Lovecast Inc.

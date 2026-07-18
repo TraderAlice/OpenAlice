@@ -182,7 +182,6 @@ import { ScrollbackStore } from './scrollback-store.js';
 import { SessionPool, type SessionFactoryContext } from './session-pool.js';
 import { SessionRegistry, type SessionRecord } from './session-registry.js';
 import { buildCliPath, buildSpawnEnv } from './spawn-env.js';
-import { terminalThemeEnv } from './terminal-theme.js';
 import { TemplateRegistry } from './template-registry.js';
 import { TemplateUpgradeManager } from './template-upgrade.js';
 import { WorkspaceOperationGuard } from './workspace-operation-guard.js';
@@ -1870,7 +1869,6 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         // `alice` shim forwards it as the `x-openalice-session` header, resolved
         // server-side against the session registry — agent never sees it.
         {
-          ...terminalThemeEnv(ctx.terminalTheme),
           AQ_SESSION_ID: ctx.recordId,
           ...(productSession?.resumeId ? {
             OPENALICE_RESUME_ID: productSession.resumeId,

@@ -8,7 +8,7 @@ import { Terminal as Xterm } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
 
 import { attachWebglRenderer } from '../components/workspace/renderer'
-import { useResolvedTerminalTheme } from '../components/workspace/terminalTheme'
+import { useTerminalAppearance } from '../components/workspace/terminalAppearance'
 import { DemoTerminalStub } from './DemoTerminalStub'
 import { transcriptsByWorkspace } from './fixtures/transcripts'
 import type { Transcript } from './types'
@@ -29,14 +29,14 @@ function ReplayPane({ label, transcript }: { label: string; transcript: Transcri
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [done, setDone] = useState(false)
   const [replayKey, setReplayKey] = useState(0)
-  const { profile: terminalThemeProfile } = useResolvedTerminalTheme()
+  const terminalAppearance = useTerminalAppearance()
 
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
 
     const term = new Xterm({
-      theme: terminalThemeProfile.xtermTheme,
+      theme: terminalAppearance.theme,
       fontFamily:
         'ui-monospace, "SF Mono", Menlo, Monaco, "Cascadia Mono", "DejaVu Sans Mono", monospace',
       fontSize: 13,
@@ -114,7 +114,7 @@ function ReplayPane({ label, transcript }: { label: string; transcript: Transcri
       webgl?.dispose()
       term.dispose()
     }
-  }, [transcript, replayKey, terminalThemeProfile])
+  }, [transcript, replayKey, terminalAppearance])
 
   return (
     <div className="terminal-shell">

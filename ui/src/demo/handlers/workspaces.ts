@@ -153,6 +153,8 @@ const demoTemplateUpgradePlan = (workspaceId: string) => ({
 })
 
 export const workspacesHandlers = [
+  http.put('/api/workspaces/terminal-view-attributes', () =>
+    HttpResponse.json({ ok: true, changed: true })),
   http.get('/api/workspaces', () => HttpResponse.json({ workspaces: demoWorkspaces })),
   http.get('/api/workspaces/manager', () => HttpResponse.json({
     manager: {
