@@ -5,6 +5,8 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { chromium, type Page } from '@playwright/test'
 import { assertScenarioPath, validateScenarioCoverage } from './scenario-catalog.js'
 import { themeColorScenarios } from './scenarios.js'
+import { residualReview } from './residual-review-data.js'
+import { browserTargetIds, validateResidualReview } from './residual-review.js'
 import type { RuntimeColorWorklist, ScenarioAction, ThemeColorScenario } from './types.js'
 
 const root = resolve(import.meta.dirname, '../..')
@@ -45,11 +47,13 @@ async function ready(page: Page, scenario: ThemeColorScenario): Promise<void> {
 
 const command = process.argv[2]
 const worklist = JSON.parse(await readFile(resolve(root, '.artifacts/theme-color-audit/runtime-worklist.json'), 'utf8')) as RuntimeColorWorklist
+validateResidualReview(worklist, residualReview)
+const expectedInventoryIds = browserTargetIds(residualReview)
 if (command === 'coverage') {
-  validateScenarioCoverage(worklist)
-  console.log(`validated ${worklist.items.length} explicit inventory-to-scenario assignments`)
+  validateScenarioCoverage(expectedInventoryIds)
+  console.log(`validated ${expectedInventoryIds.length} explicit inventory-to-scenario assignments`)
 } else if (command === 'browser') {
-  validateScenarioCoverage(worklist)
+  validateScenarioCoverage(expectedInventoryIds)
   const child = server()
   try {
     await waitForServer()

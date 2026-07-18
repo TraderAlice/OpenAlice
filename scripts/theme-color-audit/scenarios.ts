@@ -5,7 +5,7 @@ const desktop = { width: 1440, height: 1000 } as const;
 const mobile = { width: 390, height: 844 } as const;
 const themes = ["light", "dark"] as const;
 
-export const themeColorScenarios = [
+const allThemeColorScenarios = [
   {
     scenarioId: "workspace-overview",
     route: "/workspaces",
@@ -1878,3 +1878,5 @@ export const themeColorScenarios = [
     inventoryIds: ids["onboarding-design"],
   },
 ] as const satisfies readonly ThemeColorScenario[];
+
+export const themeColorScenarios: readonly ThemeColorScenario[] = allThemeColorScenarios.filter((scenario) => scenario.inventoryIds.length > 0)

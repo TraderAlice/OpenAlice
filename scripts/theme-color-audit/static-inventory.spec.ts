@@ -48,4 +48,34 @@ describe('static theme color inventory', () => {
     const root = await fixture({ 'broken.ts': "export const color = '#fff" })
     await expect(buildStaticManifest(root, 'fixture-commit')).rejects.toThrow('Unterminated string literal')
   })
+
+  it('classifies only the eight protectedColors AST leaves as protected source data', async () => {
+    const root = await fixture({
+      'theme/colorPolicy.ts': `
+        type ModePair = Readonly<Record<'light' | 'dark', string>>
+        const nearby = '#ffffff'
+        const protectedColors = {
+          green: { light: '#137333', dark: '#81c995' },
+          red: { light: '#b3261e', dark: '#f28b82' },
+          warning: { light: '#8a4b00', dark: '#fdd663' },
+          info: { light: '#0b57d0', dark: '#8ab4f8' },
+        } as const satisfies Readonly<Record<string, ModePair>>
+        const other = { green: { light: '#010101', dark: '#020202' } }
+      `,
+      'other.ts': `const protectedColors = { green: { light: '#030303', dark: '#040404' } }`,
+    })
+
+    const manifest = await buildStaticManifest(root, 'fixture-commit')
+    const protectedEntries = manifest.occurrences.filter((entry) => entry.role === 'protected-source-data')
+    expect(protectedEntries).toHaveLength(8)
+    expect(protectedEntries.map((entry) => entry.sourceText)).toEqual([
+      '#137333', '#81c995', '#b3261e', '#f28b82',
+      '#8a4b00', '#fdd663', '#0b57d0', '#8ab4f8',
+    ])
+    expect(protectedEntries.every((entry) => entry.sourceClass === 'built-in-source-data')).toBe(true)
+
+    const decoys = manifest.occurrences.filter((entry) => !protectedEntries.includes(entry))
+    expect(decoys).toHaveLength(5)
+    expect(decoys.every((entry) => entry.role === 'color-consumer' && entry.sourceClass === 'runtime')).toBe(true)
+  })
 })

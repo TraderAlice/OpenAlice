@@ -24,6 +24,7 @@ interface RawMatch {
   readonly syntaxKind: SyntaxKind
   readonly ownerHint: string | null
   readonly role: StaticColorOccurrence['role']
+  readonly sourceClassOverride?: SourceClass
 }
 
 function sourceClassFor(path: string): SourceClass {
@@ -130,6 +131,50 @@ function nearestOwner(node: ts.Node): string | null {
   return null
 }
 
+const PROTECTED_COLOR_KEYS = new Set(['green', 'red', 'warning', 'info'])
+const PROTECTED_MODE_KEYS = new Set(['light', 'dark'])
+
+function propertyName(node: ts.PropertyName, file: ts.SourceFile): string | null {
+  return ts.isIdentifier(node) || ts.isStringLiteral(node) || ts.isNumericLiteral(node)
+    ? node.text
+    : node.getText(file)
+}
+
+function unwrapExpressionParent(node: ts.Expression): ts.Node {
+  let current: ts.Node = node
+  while (
+    ts.isAsExpression(current.parent)
+    || ts.isSatisfiesExpression(current.parent)
+    || ts.isParenthesizedExpression(current.parent)
+  ) current = current.parent
+  return current.parent
+}
+
+/**
+ * Recognize only the eight literal leaves of colorPolicy.ts's protectedColors
+ * declaration.  This is deliberately structural: nearby literals and future
+ * additions do not inherit a file-level exemption.
+ */
+function isProtectedColorSourceLeaf(path: string, node: ts.StringLiteralLike, file: ts.SourceFile): boolean {
+  if (path !== 'ui/src/theme/colorPolicy.ts') return false
+  const modeProperty = node.parent
+  if (!ts.isPropertyAssignment(modeProperty) || modeProperty.initializer !== node) return false
+  const mode = propertyName(modeProperty.name, file)
+  if (mode === null || !PROTECTED_MODE_KEYS.has(mode)) return false
+  const pair = modeProperty.parent
+  if (!ts.isObjectLiteralExpression(pair)) return false
+  const colorProperty = pair.parent
+  if (!ts.isPropertyAssignment(colorProperty) || colorProperty.initializer !== pair) return false
+  const color = propertyName(colorProperty.name, file)
+  if (color === null || !PROTECTED_COLOR_KEYS.has(color)) return false
+  const protectedObject = colorProperty.parent
+  if (!ts.isObjectLiteralExpression(protectedObject)) return false
+  const declaration = unwrapExpressionParent(protectedObject)
+  return ts.isVariableDeclaration(declaration)
+    && ts.isIdentifier(declaration.name)
+    && declaration.name.text === 'protectedColors'
+}
+
 function typescriptMatches(path: string, source: string): RawMatch[] {
   const kind = path.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
   const file = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, kind)
@@ -150,7 +195,16 @@ function typescriptMatches(path: string, source: string): RawMatch[] {
     if (ts.isStringLiteralLike(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
       const nodeText = node.getText(file)
       const contentStart = node.getStart(file) + 1
-      matches.push(...scanText(nodeText.slice(1, -1), contentStart, nearestOwner(node)))
+      const literalMatches = scanText(nodeText.slice(1, -1), contentStart, nearestOwner(node))
+      if (isProtectedColorSourceLeaf(path, node, file)) {
+        matches.push(...literalMatches.map((match) => ({
+          ...match,
+          role: 'protected-source-data' as const,
+          sourceClassOverride: 'built-in-source-data' as const,
+        })))
+      } else {
+        matches.push(...literalMatches)
+      }
     } else if (ts.isTemplateExpression(node)) {
       scanTemplatePart(node.head, nearestOwner(node))
       for (const span of node.templateSpans) scanTemplatePart(span.literal, nearestOwner(node))
@@ -194,7 +248,7 @@ export async function buildStaticManifest(root: string, sourceCommit?: string): 
         inventoryId: makeId(path, raw),
         path,
         sourceText: raw.sourceText,
-        sourceClass: sourceClassFor(path),
+        sourceClass: raw.sourceClassOverride ?? sourceClassFor(path),
         syntaxKind: raw.syntaxKind,
         ownerHint: raw.ownerHint,
         role: raw.role,
