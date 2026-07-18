@@ -29,19 +29,19 @@ export function HealthBadge({ health, size = 'sm' }: { health?: BrokerHealthInfo
     case 'healthy':
       // At target reach. The label tells the user the account's role.
       return pill(
-        'text-green',
-        'bg-green',
+        'text-[var(--oa-status-success)]',
+        'bg-[var(--oa-status-success)]',
         health.tier === 'data' ? 'Data source' : health.tier === 'account' ? 'Connected · read-only' : 'Connected',
       )
     case 'degraded':
       // Reachable but below target — e.g. transport up but account-read failing.
       return pill(
-        'text-yellow-400',
-        'bg-yellow-400',
+        'text-[var(--oa-status-warning)]',
+        'bg-[var(--oa-status-warning)]',
         health.reach === 'connected' ? 'No account access' : 'Unstable',
         health.lastError,
       )
     case 'offline':
-      return pill('text-red', 'bg-red', health.recovering ? 'Reconnecting...' : 'Offline', health.lastError, true)
+      return pill('text-[var(--oa-status-danger)]', 'bg-[var(--oa-status-danger)]', health.recovering ? 'Reconnecting...' : 'Offline', health.lastError, true)
   }
 }

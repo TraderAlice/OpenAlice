@@ -386,7 +386,7 @@ function BrokerPackInstallPanel({ preset, status, error }: {
       <div className="rounded-md border border-border px-3 py-2.5 text-[11px] leading-relaxed text-text-muted">
         The downloaded pack is matched to this OpenAlice version and operating system, checksum-verified, then activated atomically. Your account credentials are requested only after installation.
       </div>
-      {status?.reason && <p className="text-[12px] text-yellow-400">{status.reason}</p>}
+      {status?.reason && <p className="text-[12px] text-[var(--oa-status-warning)]">{status.reason}</p>}
       {error && <p className="text-[12px] text-red">{error}</p>}
     </div>
   )
@@ -415,10 +415,10 @@ function BrokerConflictPanel({ existing, onOpenExisting }: {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <span className="w-2 h-2 rounded-full bg-yellow-400 shrink-0" />
+        <span className="w-2 h-2 rounded-full bg-[var(--oa-status-warning)] shrink-0" />
         <span className="text-[13px] font-medium text-text">Broker already configured</span>
       </div>
-      <div className="rounded-md border border-yellow-400/30 bg-yellow-400/5 px-3 py-2.5">
+      <div className="rounded-md border border-[var(--oa-status-warning)]/30 bg-[var(--oa-status-warning)]/5 px-3 py-2.5">
         <p className="text-[12px] text-text leading-relaxed">
           Another broker connector already exists for this broker (same identity-defining credentials).
           Re-using the same key from a separate account would double-count its positions in
@@ -463,7 +463,7 @@ function TestResultPanel({ result, utaId }: { result: TestConnectionResult; utaI
     <div className="space-y-4">
       <div className="flex items-center gap-2">
         <span className="w-2 h-2 rounded-full bg-green shrink-0" />
-        <span className="text-[13px] font-medium text-green">Connected as {utaId}</span>
+        <span className="text-[13px] font-medium text-[var(--oa-status-success)]">Connected as {utaId}</span>
       </div>
 
       {acct && (

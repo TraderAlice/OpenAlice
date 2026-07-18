@@ -2,7 +2,7 @@
  * projection authority writes the exact resolved CSS-variable projection. */
 (function () {
   var key = 'openalice.theme.first-paint.v1'
-  var expectedProjectionShapeFingerprint = 'fnv1a32-ba62d433'
+  var expectedProjectionShapeFingerprint = 'fnv1a32-b9241240'
   function fingerprint(serialized) {
     var hash = 0x811c9dc5
     for (var index = 0; index < serialized.length; index += 1) {
@@ -28,6 +28,9 @@
     if (!['system', 'light', 'dark'].includes(cache.appearanceMode) ||
         !['light', 'dark'].includes(cache.resolvedMode) ||
         typeof cache.familyId !== 'string' || typeof cache.variantId !== 'string' ||
+        !['protected', 'theme'].includes(cache.marketColors) ||
+        !['green-up-red-down', 'red-up-green-down'].includes(cache.marketDirection) ||
+        !['protected', 'theme'].includes(cache.statusColors) ||
         typeof cache.tokenFingerprint !== 'string' ||
         cache.projectionShapeFingerprint !== expectedProjectionShapeFingerprint || !cache.variables ||
         Object.getPrototypeOf(cache.variables) !== Object.prototype) return evict('invalid shape')
@@ -35,7 +38,7 @@
     if (actualShapeFingerprint !== expectedProjectionShapeFingerprint) return evict('incomplete projection')
     for (var name in cache.variables) {
       var value = cache.variables[name]
-      if (!/^(?:--oa-(?:token|runtime)-.+|--color-.+|--app-bg-wash)$/.test(name) || typeof value !== 'string' ||
+      if (!/^(?:--oa-(?:token|runtime|market|chart|status|risk)-.+|--color-.+|--app-bg-wash)$/.test(name) || typeof value !== 'string' ||
           value.length > 256 || /[;}]/.test(value)) return evict('invalid projection')
     }
     var serialized = Object.keys(cache.variables).sort().map(function (name) {
@@ -54,6 +57,9 @@
     document.documentElement.dataset.themeFamily = cache.familyId
     document.documentElement.dataset.themeVariant = cache.variantId
     document.documentElement.dataset.themeFingerprint = cache.tokenFingerprint
+    document.documentElement.dataset.themeMarketColors = cache.marketColors
+    document.documentElement.dataset.themeMarketDirection = cache.marketDirection
+    document.documentElement.dataset.themeStatusColors = cache.statusColors
     document.documentElement.dataset.themeFirstPaint = 'cache'
     document.documentElement.style.colorScheme = cache.resolvedMode
   } catch (error) {

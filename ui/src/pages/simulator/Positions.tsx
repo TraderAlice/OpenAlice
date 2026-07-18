@@ -57,7 +57,7 @@ export function Positions({ state }: { state: SimulatorState }) {
               const pnl = mark && Number.isFinite(qty) && Number.isFinite(avg)
                 ? (Number(mark) - avg) * qty * mult * (p.side === 'long' ? 1 : -1)
                 : null
-              const pnlClass = pnl == null ? 'text-text-muted' : pnl > 0 ? 'text-green' : pnl < 0 ? 'text-red' : 'text-text'
+              const pnlClass = pnl == null ? 'text-text-muted' : pnl > 0 ? 'text-[var(--oa-market-positive)]' : pnl < 0 ? 'text-[var(--oa-market-negative)]' : 'text-text'
               return (
                 <tr key={p.nativeKey} className="text-text">
                   <td className="py-1 pr-3">
@@ -66,7 +66,7 @@ export function Positions({ state }: { state: SimulatorState }) {
                       {p.secType && (
                         <span className="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded bg-bg-tertiary text-text-muted/80">{p.secType}</span>
                       )}
-                      <span className={`text-[10px] px-1 py-0.5 rounded font-medium ${p.side === 'long' ? 'bg-green/15 text-green' : 'bg-red/15 text-red'}`}>
+                      <span className={`text-[10px] px-1 py-0.5 rounded font-medium ${p.side === 'long' ? 'bg-[var(--oa-market-buy)]/15 text-[var(--oa-market-buy)]' : 'bg-[var(--oa-market-sell)]/15 text-[var(--oa-market-sell)]'}`}>
                         {p.side}
                       </span>
                       {p.multiplier && p.multiplier !== '1' && (

@@ -12,6 +12,8 @@ import {
 } from 'lightweight-charts'
 import { barsApi, type AssetClass, type HistoricalBar, type BarSourceCandidate, type BarMeta } from '../../api/market'
 import { Skeleton } from '../StateViews'
+import { useThemeStore } from '../../theme/store'
+import { useEffectiveTheme } from '../../theme/useEffectiveTheme'
 
 type Interval = '1m' | '5m' | '1h' | '1d'
 type Timeframe = '1D' | '5D' | '1M' | '3M' | '1Y' | '5Y' | 'All'
@@ -59,7 +61,46 @@ interface Props {
   selection: { symbol: string; assetClass: AssetClass } | null
 }
 
+interface ChartPolicyColors {
+  axisText: string
+  axisBorder: string
+  crosshair: string
+  grid: string
+  selection: string
+  up: string
+  down: string
+  volumeUp: string
+  volumeDown: string
+}
+
+function cssPolicyColors(): ChartPolicyColors {
+  const style = getComputedStyle(document.documentElement)
+  const read = (name: string) => style.getPropertyValue(name).trim()
+  return {
+    axisText: read('--oa-chart-axis-text'),
+    axisBorder: read('--oa-chart-axis-border'),
+    crosshair: read('--oa-chart-crosshair'),
+    grid: read('--oa-chart-grid'),
+    selection: read('--oa-chart-selection'),
+    up: read('--oa-market-up'),
+    down: read('--oa-market-down'),
+    volumeUp: read('--oa-market-volume-up'),
+    volumeDown: read('--oa-market-volume-down'),
+  }
+}
+
+function withAlpha(color: string, alpha: number): string {
+  const match = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(color)
+  if (match === null) return color
+  return `rgba(${Number.parseInt(match[1]!, 16)}, ${Number.parseInt(match[2]!, 16)}, ${Number.parseInt(match[3]!, 16)}, ${alpha})`
+}
+
 export function KlinePanel({ selection }: Props) {
+  const effectiveTheme = useEffectiveTheme()
+  const marketColors = useThemeStore((state) => state.appearance?.marketColors)
+  const marketDirection = useThemeStore((state) => state.appearance?.marketDirection)
+  const activeFamilyId = useThemeStore((state) => state.appearance?.activeFamilyId)
+  const themeFamilies = useThemeStore((state) => state.families)
   const [searchParams, setSearchParams] = useSearchParams()
   const interval = parseInterval(searchParams.get('interval'))
   const tf = parseTimeframe(searchParams.get('range'))
@@ -102,28 +143,31 @@ export function KlinePanel({ selection }: Props) {
   // Build chart once.
   useEffect(() => {
     if (!containerRef.current) return
+    const colors = cssPolicyColors()
     const chart = createChart(containerRef.current, {
       layout: {
         background: { color: 'transparent' },
-        textColor: '#c9d1d9',
-        panes: { separatorColor: '#30363d', separatorHoverColor: '#58a6ff33' },
+        textColor: colors.axisText,
+        panes: { separatorColor: colors.axisBorder, separatorHoverColor: colors.selection },
       },
       grid: {
-        vertLines: { color: '#21262d' },
-        horzLines: { color: '#21262d' },
+        vertLines: { color: colors.grid },
+        horzLines: { color: colors.grid },
       },
-      rightPriceScale: { borderColor: '#30363d' },
-      timeScale: { borderColor: '#30363d', timeVisible: false, secondsVisible: false },
+      crosshair: { vertLine: { color: colors.crosshair }, horzLine: { color: colors.crosshair } },
+      rightPriceScale: { borderColor: colors.axisBorder },
+      timeScale: { borderColor: colors.axisBorder, timeVisible: false, secondsVisible: false },
       autoSize: true,
     })
 
     const candle = chart.addSeries(CandlestickSeries, {
-      upColor: '#3fb950',
-      downColor: '#f85149',
-      borderUpColor: '#3fb950',
-      borderDownColor: '#f85149',
-      wickUpColor: '#3fb950',
-      wickDownColor: '#f85149',
+      // Hollow rising candles remain distinguishable without color alone.
+      upColor: 'transparent',
+      downColor: colors.down,
+      borderUpColor: colors.up,
+      borderDownColor: colors.down,
+      wickUpColor: colors.up,
+      wickDownColor: colors.down,
     })
 
     const volume = chart.addSeries(HistogramSeries, {
@@ -143,6 +187,43 @@ export function KlinePanel({ selection }: Props) {
       volumeRef.current = null
     }
   }, [])
+
+  // Re-project the existing chart when appearance policy changes. The chart
+  // and its data source remain mounted; only visual options and volume colors
+  // are updated.
+  useEffect(() => {
+    const chart = chartRef.current
+    const candle = candleRef.current
+    const volume = volumeRef.current
+    if (chart === null || candle === null || volume === null) return
+    const colors = cssPolicyColors()
+    chart.applyOptions({
+      layout: {
+        background: { color: 'transparent' },
+        textColor: colors.axisText,
+        panes: { separatorColor: colors.axisBorder, separatorHoverColor: colors.selection },
+      },
+      grid: { vertLines: { color: colors.grid }, horzLines: { color: colors.grid } },
+      crosshair: { vertLine: { color: colors.crosshair }, horzLine: { color: colors.crosshair } },
+      rightPriceScale: { borderColor: colors.axisBorder },
+      timeScale: { borderColor: colors.axisBorder },
+    })
+    candle.applyOptions({
+      upColor: 'transparent',
+      downColor: colors.down,
+      borderUpColor: colors.up,
+      borderDownColor: colors.down,
+      wickUpColor: colors.up,
+      wickDownColor: colors.down,
+    })
+    if (bars !== null) {
+      volume.setData(bars.map((bar) => ({
+        time: toUTCTimestamp(bar.date),
+        value: bar.volume ?? 0,
+        color: withAlpha(bar.close >= bar.open ? colors.volumeUp : colors.volumeDown, 0.33),
+      })))
+    }
+  }, [activeFamilyId, effectiveTheme, marketColors, marketDirection, themeFamilies, bars])
 
   // Toggle time-axis detail when interval flips between intraday and daily.
   useEffect(() => {
@@ -224,10 +305,14 @@ export function KlinePanel({ selection }: Props) {
       low: b.low,
       close: b.close,
     }))
+    const colors = cssPolicyColors()
     const volumeData: HistogramData[] = bars.map((b) => ({
       time: toUTCTimestamp(b.date),
       value: b.volume ?? 0,
-      color: b.close >= b.open ? '#3fb95055' : '#f8514955',
+      color: withAlpha(
+        b.close >= b.open ? colors.volumeUp : colors.volumeDown,
+        0.33,
+      ),
     }))
 
     candleRef.current.setData(candleData)

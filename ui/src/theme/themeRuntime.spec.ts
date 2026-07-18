@@ -64,7 +64,10 @@ describe('canonical theme runtime', () => {
     expect(cache).toMatchObject({ schemaVersion: 1, mappingVersion: 1, appearanceMode: 'system', resolvedMode: 'dark', familyId: 'runtime-family' })
     expect(cache).toHaveProperty('variables')
     expect(cache).toHaveProperty('tokenFingerprint')
-    expect(cache).toHaveProperty('projectionShapeFingerprint', 'fnv1a32-ba62d433')
+    expect(cache).toHaveProperty('projectionShapeFingerprint', 'fnv1a32-b9241240')
+    expect(cache).toMatchObject({
+      marketColors: 'protected', marketDirection: 'green-up-red-down', statusColors: 'protected',
+    })
     expect(cache).not.toHaveProperty('variables.--oa-base00')
     expect(cache).toHaveProperty('variables.--color-issue-detail-danger-text', '#ab4642')
     expect(cache).not.toHaveProperty('tokens')
@@ -83,6 +86,50 @@ describe('canonical theme runtime', () => {
     expect(projection.all['--color-notification-border']).toBe('#f7ca88')
     expect(Object.keys(projection.all).filter((name) => name.startsWith('--oa-token-'))).toHaveLength(24)
     expect(projection.all['--oa-base10']).toBe('')
+  })
+
+  it.each([
+    ['protected', 'green-up-red-down', '#81c995', '#f28b82'],
+    ['protected', 'red-up-green-down', '#f28b82', '#81c995'],
+    ['theme', 'green-up-red-down', '#a1b56c', '#ab4642'],
+    ['theme', 'red-up-green-down', '#ab4642', '#a1b56c'],
+  ] as const)('projects the %s market source with %s direction consistently', (marketColors, marketDirection, up, down) => {
+    const variables = themeRuntime.projectThemeVariant(variant, {
+      marketColors, marketDirection, statusColors: 'protected',
+    }).all
+    for (const name of ['--oa-market-up', '--oa-market-positive', '--oa-market-buy', '--oa-market-volume-up-solid']) {
+      expect(variables[name]).toBe(up)
+    }
+    for (const name of ['--oa-market-down', '--oa-market-negative', '--oa-market-sell', '--oa-market-volume-down-solid']) {
+      expect(variables[name]).toBe(down)
+    }
+    expect(variables['--oa-market-volume-up']).toBe(`${up}55`)
+    expect(variables['--oa-market-volume-down']).toBe(`${down}55`)
+  })
+
+  it.each(['protected', 'theme'] as const)('keeps risk colors invariant under %s status colors', (statusColors) => {
+    const first = themeRuntime.projectThemeVariant(variant, {
+      marketColors: 'protected', marketDirection: 'green-up-red-down', statusColors,
+    }).all
+    const swapped = themeRuntime.projectThemeVariant(variant, {
+      marketColors: 'theme', marketDirection: 'red-up-green-down', statusColors,
+    }).all
+    for (const name of ['--oa-risk-destructive', '--oa-risk-permission-denied', '--oa-risk-trade-confirm', '--oa-risk-broker-write-failed', '--oa-risk-risk-blocked']) {
+      expect(first[name]).toBe('#f28b82')
+      expect(swapped[name]).toBe(first[name])
+    }
+    expect(first['--oa-status-success']).toBe(statusColors === 'theme' ? '#a1b56c' : '#81c995')
+  })
+
+  it('projects chart neutrals only from the resolved theme', () => {
+    const variables = themeRuntime.projectThemeVariant(variant, {
+      marketColors: 'theme', marketDirection: 'red-up-green-down', statusColors: 'theme',
+    }).all
+    expect(variables).toMatchObject({
+      '--oa-chart-background': '#282828', '--oa-chart-grid': '#464646',
+      '--oa-chart-axis-text': '#b8b8b8', '--oa-chart-axis-border': '#585858',
+      '--oa-chart-crosshair': '#d8d8d8', '--oa-chart-selection': '#2c373b',
+    })
   })
 
   it('replays exactly the cached first-paint projection before application startup', () => {
@@ -210,6 +257,30 @@ describe('canonical theme runtime', () => {
     await themeRuntime.initializeTheme()
     expect(document.documentElement.dataset.themeFamily).toBe('file-family')
     expect(document.documentElement.dataset.themeFirstPaint).toBe('stale')
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('did not match authoritative'))
+    initialize.mockRestore()
+    warn.mockRestore()
+  })
+
+  it('diagnoses policy preferences changed in authoritative file-backed appearance', async () => {
+    themeRuntime.applyThemeVariant('runtime-family', 'dark', variant)
+    document.documentElement.removeAttribute('style')
+    window.eval(bootSource)
+    const initialize = vi.spyOn(useThemeStore.getState(), 'initialize').mockImplementation(async () => {
+      useThemeStore.setState({
+        families: [{ schemaVersion: 1, id: 'runtime-family', name: 'Runtime', variants: { dark: variant } }],
+        appearance: {
+          activeFamilyId: 'runtime-family', mode: 'dark', terminal: { mode: 'follow' },
+          marketColors: 'theme', marketDirection: 'red-up-green-down', statusColors: 'theme',
+        },
+        status: 'ready',
+      })
+    })
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    await themeRuntime.initializeTheme()
+    expect(document.documentElement.dataset.themeFirstPaint).toBe('stale')
+    expect(document.documentElement.dataset.themeMarketColors).toBe('theme')
+    expect(document.documentElement.style.getPropertyValue('--oa-market-up')).toBe('#ab4642')
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('did not match authoritative'))
     initialize.mockRestore()
     warn.mockRestore()

@@ -34,13 +34,13 @@ export function Sparkline({
   const data = useMemo(() => values.map((v, i) => ({ i, v })), [values])
 
   const stroke = useMemo(() => {
-    if (color === 'green') return 'var(--color-green)'
-    if (color === 'red') return 'var(--color-red)'
+    if (color === 'green') return 'var(--oa-market-up)'
+    if (color === 'red') return 'var(--oa-market-down)'
     if (color === 'accent') return 'var(--color-accent)'
     if (values.length < 2) return 'var(--color-accent)'
     return values[values.length - 1] >= values[0]
-      ? 'var(--color-green)'
-      : 'var(--color-red)'
+      ? 'var(--oa-market-up)'
+      : 'var(--oa-market-down)'
   }, [color, values])
 
   if (values.length < 2) return null

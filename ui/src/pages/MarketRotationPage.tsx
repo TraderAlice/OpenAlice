@@ -11,9 +11,9 @@ import { PageHeader } from '../components/PageHeader'
 import { CenteredLoading } from '../components/StateViews'
 import { marketApi, type SectorRotationResult, type SectorRotationRow } from '../api/market'
 
-const GREEN = 'var(--color-green)'
-const RED = 'var(--color-red)'
-const MUTED = '#7d8590'
+const GREEN = 'var(--oa-market-positive)'
+const RED = 'var(--oa-market-negative)'
+const MUTED = 'var(--oa-chart-axis-text)'
 const REFRESH_MS = 5 * 60 * 1000
 
 function pct(x: number | null | undefined, places = 1): string {
@@ -21,7 +21,7 @@ function pct(x: number | null | undefined, places = 1): string {
 }
 function signColor(x: number | null | undefined): string {
   if (x == null) return 'text-text-muted'
-  return x > 0 ? 'text-green' : x < 0 ? 'text-red' : 'text-text-muted'
+  return x > 0 ? 'text-[var(--oa-market-positive)]' : x < 0 ? 'text-[var(--oa-market-negative)]' : 'text-text-muted'
 }
 function dotColor(score: number | null): string {
   if (score == null) return MUTED
@@ -115,10 +115,10 @@ function QuadrantChart({ points, t }: { points: Point[]; t: TFunction }) {
     <div className="relative">
       {/* Quadrant corner labels */}
       <div className="pointer-events-none absolute inset-0 z-10">
-        <CornerLabel className="top-1 right-2 text-green/70" text={t('market.quadRotatingIn')} />
+        <CornerLabel className="top-1 right-2 text-[var(--oa-market-positive)]" text={t('market.quadRotatingIn')} />
         <CornerLabel className="top-1 left-12 text-text-muted/60" text={t('market.quadImproving')} />
         <CornerLabel className="bottom-7 right-2 text-text-muted/60" text={t('market.quadWeakening')} />
-        <CornerLabel className="bottom-7 left-12 text-red/70" text={t('market.quadRotatingOut')} />
+        <CornerLabel className="bottom-7 left-12 text-[var(--oa-market-negative)]" text={t('market.quadRotatingOut')} />
       </div>
       <MeasuredChartFrame className="h-[420px] w-full">
         {({ width, height }) => (

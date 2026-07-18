@@ -48,7 +48,7 @@ function PinButton({ assetClass, symbol }: PinButtonProps) {
       title={pinned ? 'Remove from watchlist' : 'Add to watchlist'}
       className={`flex items-center gap-1.5 px-2.5 py-1 text-[12px] rounded-md border transition-colors ${
         pinned
-          ? 'border-amber-500/40 text-amber-400 bg-amber-500/10 hover:bg-amber-500/15'
+          ? 'border-[var(--oa-token-focus-ring)]/40 text-[var(--oa-token-accent)] bg-[var(--oa-token-selection)] hover:bg-[var(--oa-token-active-surface)]'
           : 'border-border text-text-muted hover:text-text hover:bg-bg-tertiary'
       }`}
     >

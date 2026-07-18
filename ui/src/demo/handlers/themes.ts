@@ -38,9 +38,9 @@ function validAppearance(value: unknown, restoredFamilies: readonly ThemeFamily[
   if (typeof candidate.activeFamilyId !== 'string'
     || !restoredFamilies.some((family) => family.id === candidate.activeFamilyId)
     || (candidate.mode !== 'light' && candidate.mode !== 'dark' && candidate.mode !== 'system')
-    || candidate.marketColors !== 'protected'
+    || (candidate.marketColors !== 'protected' && candidate.marketColors !== 'theme')
     || (candidate.marketDirection !== 'green-up-red-down' && candidate.marketDirection !== 'red-up-green-down')
-    || candidate.statusColors !== 'protected'
+    || (candidate.statusColors !== 'protected' && candidate.statusColors !== 'theme')
     || !candidate.terminal || typeof candidate.terminal !== 'object') return false
   const terminal = candidate.terminal
   if (terminal.mode === 'follow') return true
