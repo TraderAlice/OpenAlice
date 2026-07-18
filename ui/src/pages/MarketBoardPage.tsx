@@ -79,7 +79,7 @@ function MoversBoardView() {
                   : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
               }`}
             >
-              {listLabel(k, t)}
+              {t(listLabelKey(k))}
             </button>
           ))}
         </div>
@@ -97,15 +97,15 @@ function MoversBoardView() {
   )
 }
 
-function listLabel(k: MoversList, t: ReturnType<typeof useTranslation>['t']): string {
+function listLabelKey(k: MoversList) {
   switch (k) {
-    case 'gainers': return t('market.moversGainers')
-    case 'losers': return t('market.moversLosers')
-    case 'active': return t('market.moversActive')
-    case 'undervaluedGrowth': return t('market.moversUndervaluedGrowth')
-    case 'growthTech': return t('market.moversGrowthTech')
-    case 'smallCaps': return t('market.moversSmallCaps')
-    case 'undervaluedLarge': return t('market.moversUndervaluedLarge')
+    case 'gainers': return 'market.moversGainers' as const
+    case 'losers': return 'market.moversLosers' as const
+    case 'active': return 'market.moversActive' as const
+    case 'undervaluedGrowth': return 'market.moversUndervaluedGrowth' as const
+    case 'growthTech': return 'market.moversGrowthTech' as const
+    case 'smallCaps': return 'market.moversSmallCaps' as const
+    case 'undervaluedLarge': return 'market.moversUndervaluedLarge' as const
   }
 }
 
@@ -183,7 +183,7 @@ function CalendarBoardView() {
                   : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
               }`}
             >
-              {calendarLabel(k, t)} ({data?.[k].length ?? 0})
+              {t(calendarLabelKey(k))} ({data?.[k].length ?? 0})
             </button>
           ))}
         </div>
@@ -218,11 +218,11 @@ function CalendarBoardView() {
   )
 }
 
-function calendarLabel(k: CalendarList, t: ReturnType<typeof useTranslation>['t']): string {
+function calendarLabelKey(k: CalendarList) {
   switch (k) {
-    case 'earnings': return t('market.calEarnings')
-    case 'ipos': return t('market.calIpos')
-    case 'dividends': return t('market.calDividends')
+    case 'earnings': return 'market.calEarnings' as const
+    case 'ipos': return 'market.calIpos' as const
+    case 'dividends': return 'market.calDividends' as const
   }
 }
 
@@ -339,9 +339,12 @@ function MacroBoardView() {
         )}
         {data && (
           <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            {data.cards.map((c) => (
-              <SeriesCard key={c.id} card={c} label={macroLabel(c, t)} emptyText={t('market.noMatches')} />
-            ))}
+            {data.cards.map((c) => {
+              const labelKey = MACRO_LABEL_KEYS[c.id as keyof typeof MACRO_LABEL_KEYS]
+              return (
+                <SeriesCard key={c.id} card={c} label={labelKey ? t(labelKey) : c.label} emptyText={t('market.noMatches')} />
+              )
+            })}
           </div>
         )}
       </div>
@@ -351,25 +354,22 @@ function MacroBoardView() {
 
 /** Known FRED ids → localized labels; anything else falls back to the
  *  English label the contract carries. */
-function macroLabel(card: MacroSeriesCard, t: ReturnType<typeof useTranslation>['t']): string {
-  switch (card.id) {
-    case 'DFF': return t('market.macroFedFunds')
-    case 'DGS2': return t('market.macro2y')
-    case 'DGS10': return t('market.macro10y')
-    case 'T10Y2Y': return t('market.macroSpread')
-    case 'UNRATE': return t('market.macroUnemployment')
-    case 'CPI_YOY': return t('market.macroCpiYoy')
-    case 'ICSA': return t('market.macroClaims')
-    case 'DCOILWTICO': return t('market.macroWti')
-    case 'DTWEXBGS': return t('market.macroDollar')
-    case 'PAYEMS': return t('market.macroPayrolls')
-    case 'M2SL': return t('market.macroM2')
-    case 'UMCSENT': return t('market.macroSentiment')
-    case 'T10YIE': return t('market.macroBreakeven')
-    case 'DRTSCILM': return t('market.macroSloos')
-    default: return card.label
-  }
-}
+const MACRO_LABEL_KEYS = {
+  DFF: 'market.macroFedFunds',
+  DGS2: 'market.macro2y',
+  DGS10: 'market.macro10y',
+  T10Y2Y: 'market.macroSpread',
+  UNRATE: 'market.macroUnemployment',
+  CPI_YOY: 'market.macroCpiYoy',
+  ICSA: 'market.macroClaims',
+  DCOILWTICO: 'market.macroWti',
+  DTWEXBGS: 'market.macroDollar',
+  PAYEMS: 'market.macroPayrolls',
+  M2SL: 'market.macroM2',
+  UMCSENT: 'market.macroSentiment',
+  T10YIE: 'market.macroBreakeven',
+  DRTSCILM: 'market.macroSloos',
+} as const
 
 // ==================== Term structure ====================
 
@@ -620,9 +620,12 @@ function FedBoardView() {
         ))}
         {data && data.cards.length > 0 && (
           <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            {data.cards.map((c) => (
-              <SeriesCard key={c.id} card={c} label={fedLabel(c.id, t) ?? c.label} emptyText={t('market.noMatches')} />
-            ))}
+            {data.cards.map((c) => {
+              const labelKey = FED_LABEL_KEYS[c.id as keyof typeof FED_LABEL_KEYS]
+              return (
+                <SeriesCard key={c.id} card={c} label={labelKey ? t(labelKey) : c.label} emptyText={t('market.noMatches')} />
+              )
+            })}
           </div>
         )}
         {data && data.documents.length > 0 && (
@@ -652,16 +655,13 @@ function FedBoardView() {
   )
 }
 
-function fedLabel(id: string, t: ReturnType<typeof useTranslation>['t']): string | null {
-  switch (id) {
-    case 'WALCL': return t('market.fedTotalAssets')
-    case 'TREAST': return t('market.fedTreasuries')
-    case 'WSHOMCB': return t('market.fedMbs')
-    case 'PD_NET': return t('market.fedDealerNet')
-    case 'PD_UST': return t('market.fedDealerTreasuries')
-    default: return null
-  }
-}
+const FED_LABEL_KEYS = {
+  WALCL: 'market.fedTotalAssets',
+  TREAST: 'market.fedTreasuries',
+  WSHOMCB: 'market.fedMbs',
+  PD_NET: 'market.fedDealerNet',
+  PD_UST: 'market.fedDealerTreasuries',
+} as const
 
 function fmtPrice(x: number | null): string {
   return x == null ? '—' : x.toLocaleString('en-US', { maximumFractionDigits: 2 })

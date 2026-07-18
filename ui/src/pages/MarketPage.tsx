@@ -50,9 +50,12 @@ export function MarketPage() {
           )}
           {strip && (
             <div className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(210px,1fr))]">
-              {strip.cards.map((c) => (
-                <SeriesCard key={c.id} card={c} label={valuationLabel(c.id, t) ?? c.label} emptyText={t('market.noMatches')} />
-              ))}
+              {strip.cards.map((c) => {
+                const labelKey = valuationLabelKey(c.id)
+                return (
+                  <SeriesCard key={c.id} card={c} label={labelKey ? t(labelKey) : c.label} emptyText={t('market.noMatches')} />
+                )
+              })}
             </div>
           )}
         </div>
@@ -130,12 +133,17 @@ function MarketLaunchCard({
   )
 }
 
-function valuationLabel(id: string, t: ReturnType<typeof useTranslation>['t']): string | null {
+function valuationLabelKey(id: string):
+  | 'market.valPe'
+  | 'market.valCape'
+  | 'market.valEarningsYield'
+  | 'market.valDividendYield'
+  | null {
   switch (id) {
-    case 'pe_month': return t('market.valPe')
-    case 'shiller_pe_month': return t('market.valCape')
-    case 'earnings_yield_month': return t('market.valEarningsYield')
-    case 'dividend_yield_month': return t('market.valDividendYield')
+    case 'pe_month': return 'market.valPe'
+    case 'shiller_pe_month': return 'market.valCape'
+    case 'earnings_yield_month': return 'market.valEarningsYield'
+    case 'dividend_yield_month': return 'market.valDividendYield'
     default: return null
   }
 }

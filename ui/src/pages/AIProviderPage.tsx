@@ -14,7 +14,8 @@
  * helper: it carries each vendor's endpoint + model suggestions + request shape.
  */
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api, type Preset, type WireShape } from '../api'
 import type {
   CredentialSummary,
@@ -52,52 +53,46 @@ function credentialLabel(cred: Pick<CredentialSummary, 'slug' | 'vendor' | 'labe
 interface RuntimeInfo {
   id: string
   name: string
-  blurb: string
-  facts: Array<[label: string, value: string]>
+  blurbKey: 'aiProvider.runtime.claude.blurb' | 'aiProvider.runtime.codex.blurb' | 'aiProvider.runtime.opencode.blurb' | 'aiProvider.runtime.pi.blurb'
+  modelsKey: 'aiProvider.runtime.claude.models' | 'aiProvider.runtime.codex.models' | 'aiProvider.runtime.opencode.models' | 'aiProvider.runtime.pi.models'
+  authKey: 'aiProvider.runtime.claude.auth' | 'aiProvider.runtime.codex.auth' | 'aiProvider.runtime.opencode.auth' | 'aiProvider.runtime.pi.auth'
 }
 
 const AGENT_RUNTIMES: RuntimeInfo[] = [
   {
     id: 'claude',
     name: 'Claude Code',
-    blurb: "Anthropic's coding-agent CLI — the deepest agentic loop.",
-    facts: [
-      ['Models', 'Claude (Anthropic). Anthropic-compatible gateways — GLM, MiniMax, Kimi, DeepSeek — via base URL + auth header'],
-      ['Auth', 'Claude Pro/Max subscription (claude login) or an Anthropic API key'],
-    ],
+    blurbKey: 'aiProvider.runtime.claude.blurb',
+    modelsKey: 'aiProvider.runtime.claude.models',
+    authKey: 'aiProvider.runtime.claude.auth',
   },
   {
     id: 'codex',
     name: 'Codex',
-    blurb: "OpenAI's coding-agent CLI.",
-    facts: [
-      ['Models', 'OpenAI (GPT). Responses API only — Chat-only providers need a Responses proxy (OpenRouter / VibeAround)'],
-      ['Auth', 'ChatGPT subscription (codex login) or an OpenAI API key'],
-    ],
+    blurbKey: 'aiProvider.runtime.codex.blurb',
+    modelsKey: 'aiProvider.runtime.codex.models',
+    authKey: 'aiProvider.runtime.codex.auth',
   },
   {
     id: 'opencode',
     name: 'opencode',
-    blurb: 'Provider-agnostic open-source agent CLI (AI SDK + Models.dev, 75+ providers).',
-    facts: [
-      ['Models', 'Anthropic, OpenAI, Google, OpenRouter, Bedrock/Azure, and anything OpenAI-compatible — incl. local (Ollama, vLLM, LM Studio)'],
-      ['Auth', 'Per-provider API key (Claude Pro/Max isn’t sanctioned in opencode — API billing only for Claude models)'],
-    ],
+    blurbKey: 'aiProvider.runtime.opencode.blurb',
+    modelsKey: 'aiProvider.runtime.opencode.models',
+    authKey: 'aiProvider.runtime.opencode.auth',
   },
   {
     id: 'pi',
     name: 'Pi',
-    blurb: 'Minimal open-source agent CLI (earendil-works/pi) — unified multi-provider API.',
-    facts: [
-      ['Models', 'OpenAI, Anthropic, Google + custom (Ollama, vLLM, LM Studio, proxies); native Gemini, OpenAI-compatible, and Anthropic wires'],
-      ['Auth', 'Per-provider API key'],
-    ],
+    blurbKey: 'aiProvider.runtime.pi.blurb',
+    modelsKey: 'aiProvider.runtime.pi.models',
+    authKey: 'aiProvider.runtime.pi.auth',
   },
 ]
 
 // ==================== Page ====================
 
 export function AIProviderPage() {
+  const { t } = useTranslation()
   const [credentials, setCredentials] = useState<CredentialSummary[] | null>(null)
   const [presets, setPresets] = useState<Preset[]>([])
   const [modal, setModal] = useState<{ mode: 'add' } | { mode: 'edit'; cred: CredentialSummary } | null>(null)
@@ -116,14 +111,14 @@ export function AIProviderPage() {
       await api.config.deleteCredential(slug)
       await reload()
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Delete failed')
+      alert(err instanceof Error ? err.message : t('aiProvider.deleteFailed'))
     }
   }
 
   if (!credentials) {
     return (
       <div className="flex flex-col flex-1 min-h-0">
-        <PageHeader title="AI Provider" description="Provider accounts and model defaults Alice can inject into workspaces." />
+        <PageHeader title={t('aiProvider.title')} description={t('aiProvider.description')} />
         <PageLoading />
       </div>
     )
@@ -131,28 +126,24 @@ export function AIProviderPage() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <PageHeader title="AI Provider" description="Provider accounts and model defaults Alice can inject into workspaces." />
+      <PageHeader title={t('aiProvider.title')} description={t('aiProvider.description')} />
       <SettingsScrollArea className="px-4 py-6 md:px-8">
         <div className="mx-auto grid min-w-0 max-w-[1100px] gap-6 2xl:grid-cols-2">
           {/* ============== Credentials ============== */}
           <section className="min-w-0">
             <div className="rounded-lg border border-border/50 bg-secondary/50 px-4 py-3 mb-4">
               <p className="text-[13px] text-muted-foreground leading-relaxed">
-                The API keys Alice keeps centrally. Templates inject them into new
-                workspaces, and a workspace's AI config can load any of them. Subscription
-                logins (Claude Pro/Max, ChatGPT) aren't stored here — they live in the agent
-                CLI's own login (<code className="font-mono text-[11.5px]">claude login</code> /{' '}
-                <code className="font-mono text-[11.5px]">codex login</code>).
+                {t('aiProvider.vaultIntro')}
               </p>
             </div>
 
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-[13px] font-semibold text-foreground uppercase tracking-wide">Credentials</h2>
+              <h2 className="text-[13px] font-semibold text-foreground uppercase tracking-wide">{t('aiProvider.credentials')}</h2>
               <button
                 onClick={() => setModal({ mode: 'add' })}
                 className="text-[11px] px-2 py-1 rounded-md border border-border text-muted-foreground hover:text-primary hover:border-primary transition-colors"
               >
-                + Add
+                + {t('common.add')}
               </button>
             </div>
 
@@ -172,13 +163,13 @@ export function AIProviderPage() {
                           <span key={agentId} className="text-[10px] text-muted-foreground border border-border rounded px-1">{AGENT_LABELS[agentId] ?? agentId}</span>
                         ))}
                         {cred.hasApiKey && (
-                          <span className="text-[10px] text-success border border-success/40 rounded px-1">key set</span>
+                          <span className="text-[10px] text-success border border-success/40 rounded px-1">{t('aiProvider.keySet')}</span>
                         )}
                       </div>
                       <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                        Default model: <span className="font-mono">{cred.lastModel || 'not set'}</span>
+                        {t('aiProvider.defaultModel')}: <span className="font-mono">{cred.lastModel || t('aiProvider.notSet')}</span>
                         <span className="px-1.5 text-muted-foreground/50">·</span>
-                        <span className="font-mono">{Object.values(cred.wires)[0] || 'provider official endpoint'}</span>
+                        <span className="font-mono">{Object.values(cred.wires)[0] || t('aiProvider.officialEndpoint')}</span>
                       </div>
                     </div>
                     <div className="flex shrink-0 gap-2 self-end sm:self-auto">
@@ -186,13 +177,13 @@ export function AIProviderPage() {
                         onClick={() => setModal({ mode: 'edit', cred })}
                         className="text-[11px] px-2 py-1 rounded-md border border-border text-muted-foreground hover:text-foreground transition-colors"
                       >
-                        Edit
+                        {t('common.edit')}
                       </button>
                       <button
                         onClick={() => handleDelete(cred.slug)}
                         className="text-[11px] px-2 py-1 rounded-md border border-border text-muted-foreground hover:text-destructive transition-colors"
                       >
-                        Delete
+                        {t('common.delete')}
                       </button>
                     </div>
                   </div>
@@ -204,51 +195,53 @@ export function AIProviderPage() {
                   onClick={() => setModal({ mode: 'add' })}
                   className="w-full p-4 rounded-xl border-2 border-dashed border-border text-muted-foreground hover:border-primary/50 hover:text-primary transition-all text-[13px] font-medium"
                 >
-                  + Add your first credential
+                  + {t('aiProvider.addFirst')}
                 </button>
               )}
             </div>
           </section>
 
-          {/* ============== Agent runtimes ============== */}
-          <section className="min-w-0">
+          {/* ============== Default workspace credentials ============== */}
+          <WorkspaceDefaultsSection credentials={credentials} presets={presets} />
+        </div>
+
+        {/* Runtime descriptions are reference material, not a prerequisite for
+            choosing the creation defaults above. Keep them available without
+            pushing the primary settings below several screens of prose. */}
+        <details className="group max-w-[1100px] min-w-0 mx-auto mt-6 rounded-lg border border-border bg-background">
+          <summary className="cursor-pointer list-none px-4 py-3 text-[13px] font-semibold text-foreground">
+            <span className="mr-2 inline-block text-muted-foreground transition-transform group-open:rotate-90">▸</span>
+            {t('aiProvider.runtimeReference')}
+          </summary>
+          <div className="border-t border-border p-4">
             <div className="rounded-lg border border-border/50 bg-secondary/50 px-4 py-3 mb-4">
               <p className="text-[13px] text-muted-foreground leading-relaxed">
-                The agent runtimes a workspace can launch — a credential above feeds whichever
-                one a workspace (or cron job) runs. Pick by the models/provider you want; every
-                runtime reaches the full OpenAlice tool surface either way (native MCP where
-                supported, the <code className="font-mono text-[11.5px]">alice</code> CLI on PATH
-                otherwise). Each credential remembers a tested default model; a workspace can
-                override that model when needed.
+                {t('aiProvider.runtimeIntro')}
               </p>
             </div>
-
-            <h2 className="text-[13px] font-semibold text-foreground uppercase tracking-wide mb-3">Agent runtimes</h2>
-
-            <div className="space-y-2.5">
+            <div className="grid gap-2.5 lg:grid-cols-2">
               {AGENT_RUNTIMES.map((rt) => (
                 <div key={rt.id} className="rounded-lg border border-border bg-background px-4 py-3">
                   <div className="flex items-baseline gap-2">
                     <span className="text-[13px] font-medium text-foreground">{rt.name}</span>
                     <span className="text-[11px] text-muted-foreground font-mono">{rt.id}</span>
                   </div>
-                  <p className="text-[12px] text-muted-foreground mt-0.5 leading-snug">{rt.blurb}</p>
+                  <p className="text-[12px] text-muted-foreground mt-0.5 leading-snug">{t(rt.blurbKey)}</p>
                   <dl className="mt-2 space-y-1">
-                    {rt.facts.map(([label, value]) => (
-                      <div key={label} className="flex gap-2 text-[11px] leading-snug">
-                        <dt className="text-muted-foreground/70 shrink-0 w-[58px]">{label}</dt>
-                        <dd className="text-muted-foreground">{value}</dd>
-                      </div>
-                    ))}
+                    <div className="flex gap-2 text-[11px] leading-snug">
+                      <dt className="text-muted-foreground/70 shrink-0 w-[58px]">{t('aiProvider.models')}</dt>
+                      <dd className="text-muted-foreground">{t(rt.modelsKey)}</dd>
+                    </div>
+                    <div className="flex gap-2 text-[11px] leading-snug">
+                      <dt className="text-muted-foreground/70 shrink-0 w-[58px]">{t('aiProvider.auth')}</dt>
+                      <dd className="text-muted-foreground">{t(rt.authKey)}</dd>
+                    </div>
                   </dl>
                 </div>
               ))}
             </div>
-          </section>
-        </div>
-
-        {/* ============== Default workspace credentials ============== */}
-        <WorkspaceDefaultsSection credentials={credentials} presets={presets} />
+          </div>
+        </details>
       </SettingsScrollArea>
 
       {modal && (
@@ -284,10 +277,13 @@ const ADVANCED_DEFAULT_AGENTS = [
 ] as const
 
 function WorkspaceDefaultsSection({ credentials, presets }: { credentials: CredentialSummary[]; presets: Preset[] }) {
+  const { t } = useTranslation()
   const [data, setData] = useState<WorkspaceCredentialDefaultsResponse | null>(null)
   const [showAdvanced, setShowAdvanced] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const saveRevision = useRef(0)
   const [error, setError] = useState('')
+  const saving = saveStatus === 'saving'
 
   const reload = () =>
     api.config.getWorkspaceCredentialDefaults()
@@ -308,17 +304,23 @@ function WorkspaceDefaultsSection({ credentials, presets }: { credentials: Crede
     contextWindow: WorkspaceContextWindow,
   ) => {
     if (!data) return
-    setSaving(true); setError('')
+    const revision = ++saveRevision.current
+    setSaveStatus('saving'); setError('')
     setData({ ...data, defaults: nextDefaults, contextWindow }) // optimistic
     try {
       const res = await api.config.setWorkspaceCredentialDefaults(nextDefaults, contextWindow)
       setData((d) => (d ? { ...d, defaults: res.defaults, contextWindow: res.contextWindow } : d))
       notifyWorkspaceDefaultsChanged()
+      if (saveRevision.current === revision) {
+        setSaveStatus('saved')
+        setTimeout(() => {
+          if (saveRevision.current === revision) setSaveStatus('idle')
+        }, 1800)
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Save failed')
+      setError(err instanceof Error ? err.message : t('aiProvider.saveFailed'))
       await reload()
-    } finally {
-      setSaving(false)
+      if (saveRevision.current === revision) setSaveStatus('idle')
     }
   }
 
@@ -398,23 +400,23 @@ function WorkspaceDefaultsSection({ credentials, presets }: { credentials: Crede
           </div>
           {note && <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{note}</p>}
           {options.length === 0 && (
-            <p className="text-[11px] text-muted-foreground/70 mt-0.5 leading-snug">No compatible credential in the vault yet.</p>
+            <p className="text-[11px] text-muted-foreground/70 mt-0.5 leading-snug">{t('aiProvider.noCompatible')}</p>
           )}
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[260px]">
           <select
-            aria-label={`${agent.name} default credential`}
+            aria-label={t('aiProvider.defaultCredentialLabel', { agent: agent.name })}
             className={inputClass}
             value={current}
             disabled={saving || options.length === 0}
             onChange={(e) => void setAgentDefault(agent.id, e.target.value)}
           >
-            <option value="">Don’t seed</option>
+            <option value="">{t('aiProvider.dontSeed')}</option>
             {options.map((slug) => <option key={slug} value={slug}>{credLabel(slug)}</option>)}
           </select>
           {current && wireShapes.length > 1 && (
             <select
-              aria-label={`${agent.name} API protocol`}
+              aria-label={t('aiProvider.apiProtocolLabel', { agent: agent.name })}
               className={inputClass}
               value={selectedWire}
               disabled={saving}
@@ -427,20 +429,20 @@ function WorkspaceDefaultsSection({ credentials, presets }: { credentials: Crede
           )}
           {current && wireShapes.length === 1 && (
             <p className="px-1 text-[10.5px] text-muted-foreground">
-              Protocol: {WIRE_SHAPE_GUIDANCE[wireShapes[0]!]}
+              {t('aiProvider.protocol', { protocol: WIRE_SHAPE_GUIDANCE[wireShapes[0]!] })}
             </p>
           )}
           {(agent.id === 'pi' || agent.id === 'opencode') && current && semanticsSummary && (
             <p className="px-1 text-[10.5px] leading-snug text-muted-foreground">
-              Model: <span className="font-mono">{selectedModelId}</span><br />
-              Auto: {semanticsSummary}
+              {t('aiProvider.model', { model: selectedModelId })}<br />
+              {t('aiProvider.automatic', { summary: semanticsSummary })}
             </p>
           )}
           {(agent.id === 'pi' || agent.id === 'opencode') && current && !selectedSemantics?.reasoning && (
             <details className="px-1 text-[10.5px] text-muted-foreground">
-              <summary className="cursor-pointer">Advanced — unknown model reasoning</summary>
+              <summary className="cursor-pointer">{t('aiProvider.advancedReasoning')}</summary>
               <select
-                aria-label={`Default ${agent.name} unknown model reasoning override`}
+                aria-label={t('aiProvider.reasoningOverrideLabel', { agent: agent.name })}
                 className={inputClass + ' mt-1.5'}
                 value={typeof data?.defaults[agent.id]?.reasoning !== 'boolean' ||
                   data.defaults[agent.id]?.reasoningModel !== selectedModelId
@@ -453,9 +455,9 @@ function WorkspaceDefaultsSection({ credentials, presets }: { credentials: Crede
                   event.target.value === 'auto' ? null : event.target.value === 'enabled',
                 )}
               >
-                <option value="auto">Use runtime default</option>
-                <option value="enabled">Model supports reasoning</option>
-                <option value="disabled">Model has no reasoning mode</option>
+                <option value="auto">{t('aiProvider.useRuntimeDefault')}</option>
+                <option value="enabled">{t('aiProvider.supportsReasoning')}</option>
+                <option value="disabled">{t('aiProvider.noReasoning')}</option>
               </select>
             </details>
           )}
@@ -465,20 +467,19 @@ function WorkspaceDefaultsSection({ credentials, presets }: { credentials: Crede
   }
 
   return (
-    <section className="max-w-[1100px] mx-auto mt-6">
+    <section className="min-w-0">
       <div className="rounded-lg border border-border/50 bg-secondary/50 px-4 py-3 mb-4">
         <p className="text-[13px] text-muted-foreground leading-relaxed">
-          Seed a default credential into every <em>new</em> workspace, so you don’t open the
-          per-workspace AI config each time. Choose the credential, protocol, and context policy
-          written into the workspace’s own agent config
-          files at create — existing workspaces are untouched, and you can still override any
-          workspace afterwards. opencode and Pi need a key to run; Claude Code and Codex normally
-          run on their own CLI login (<code className="font-mono text-[11.5px]">claude login</code> /{' '}
-          <code className="font-mono text-[11.5px]">codex login</code>) and don’t need this.
+          {t('aiProvider.defaultsIntro')}
         </p>
       </div>
 
-      <h2 className="text-[13px] font-semibold text-foreground uppercase tracking-wide mb-3">Default workspace credentials</h2>
+      <div className="mb-3 flex min-h-5 items-center justify-between gap-3">
+        <h2 className="text-[13px] font-semibold text-foreground uppercase tracking-wide">{t('aiProvider.defaultsTitle')}</h2>
+        <span aria-live="polite" className={`text-[11px] ${saveStatus === 'saved' ? 'text-success' : 'text-muted-foreground'}`}>
+          {saveStatus === 'saving' ? t('common.saving') : saveStatus === 'saved' ? t('common.saved') : ''}
+        </span>
+      </div>
 
       {!data ? (
         <div className="space-y-2.5" aria-hidden="true">
@@ -496,13 +497,13 @@ function WorkspaceDefaultsSection({ credentials, presets }: { credentials: Crede
         <div className="space-y-2.5">
           <div className="flex flex-col gap-3 rounded-lg border border-border bg-background px-4 py-3 sm:flex-row sm:items-center">
             <div className="min-w-0 flex-1">
-              <div className="text-[13px] font-medium text-foreground">Default context window</div>
+              <div className="text-[13px] font-medium text-foreground">{t('aiProvider.defaultContext')}</div>
               <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
-                Applied to new opencode and Pi model entries. Registered model limits cap impossible values automatically; 256K avoids common higher-price tiers. Existing workspaces stay unchanged.
+                {t('aiProvider.contextDescription')}
               </p>
             </div>
             <select
-              aria-label="Default workspace context window"
+              aria-label={t('aiProvider.contextWindowLabel')}
               className={inputClass + ' w-full sm:w-[160px]'}
               value={data.contextWindow}
               disabled={saving}
@@ -521,15 +522,13 @@ function WorkspaceDefaultsSection({ credentials, presets }: { credentials: Crede
             onClick={() => setShowAdvanced((v) => !v)}
             className="text-[11px] text-muted-foreground hover:text-foreground transition-colors pt-1"
           >
-            {showAdvanced ? '▾' : '▸'} Advanced — Claude Code / Codex (unofficial API)
+            {showAdvanced ? '▾' : '▸'} {t('aiProvider.advancedAgents')}
           </button>
 
           {showAdvanced && (
             <>
               <p className="text-[11px] text-muted-foreground/80 leading-snug px-1">
-                Only set these if you drive Claude Code / Codex through an unofficial API key
-                instead of their built-in login. A default here overwrites the CLI login in each
-                new workspace.
+                {t('aiProvider.advancedAgentsDescription')}
               </p>
               {ADVANCED_DEFAULT_AGENTS.map((a) => renderAgent(a))}
             </>

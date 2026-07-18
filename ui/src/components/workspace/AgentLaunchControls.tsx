@@ -203,8 +203,23 @@ export function AgentLaunchDetails({
   if (config.needsCredential && config.aiDetails) {
     const model = config.aiDetails.model ?? t('chatLanding.runtimeDefaultModel')
     const context = formatContextWindow(config.aiDetails.contextWindow)
+    const workspaceSaved = config.aiDetails.source === 'workspace'
+    const sourceLabel = workspaceSaved
+      ? t('chatLanding.workspaceAiSaved')
+      : hasWorkspaceTarget
+        ? t('chatLanding.workspaceAiWillInject')
+        : t('chatLanding.newWorkspaceAiWillSeed')
+    const actionLabel = hasWorkspaceTarget
+      ? workspaceSaved
+        ? t('chatLanding.adjustWorkspaceAi')
+        : t('chatLanding.configureWorkspaceAi')
+      : t('chatLanding.providerSettings')
     return (
       <div className={`flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] text-muted-foreground ${className}`}>
+        <span className={workspaceSaved ? 'text-success' : 'text-primary'}>
+          {sourceLabel}
+        </span>
+        <span aria-hidden className="text-muted-foreground/40">·</span>
         <span
           className="inline-flex min-w-0 max-w-full items-center gap-1"
           aria-label={t('chatLanding.modelSummary', { model })}
@@ -225,11 +240,11 @@ export function AgentLaunchDetails({
           type="button"
           onClick={onAdjustAi}
           className="oa-pressable inline-flex min-h-7 items-center gap-1 rounded-md px-2 py-1 text-primary hover:bg-primary/10 sm:ml-auto"
-          aria-label={hasWorkspaceTarget ? t('chatLanding.adjustWorkspaceAi') : t('chatLanding.providerSettings')}
-          title={hasWorkspaceTarget ? t('chatLanding.adjustWorkspaceAi') : t('chatLanding.providerSettings')}
+          aria-label={actionLabel}
+          title={actionLabel}
         >
           <Settings2 className="h-3 w-3" />
-          {hasWorkspaceTarget ? t('chatLanding.adjustWorkspaceAi') : t('chatLanding.providerSettings')}
+          {actionLabel}
         </button>
       </div>
     )

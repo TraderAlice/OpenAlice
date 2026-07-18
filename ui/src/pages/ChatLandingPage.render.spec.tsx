@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, render, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { WorkspacesContextValue } from '../contexts/workspaces-context'
@@ -194,5 +194,43 @@ describe('ChatLandingPage polling stability', () => {
 
     expect(mocks.detectWorkspaceCredential).toHaveBeenCalledTimes(1)
     expect(mocks.getAgentReadiness).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('ChatLandingPage AI source disclosure', () => {
+  it('labels an existing Workspace-local provider as already saved', async () => {
+    render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
+
+    expect(await screen.findByText('Saved in this workspace')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Adjust workspace AI' })).toBeTruthy()
+  })
+
+  it('labels a vault fallback as a pending write instead of existing Workspace config', async () => {
+    mocks.detectWorkspaceCredential.mockResolvedValue({
+      slug: null,
+      model: null,
+      contextWindow: null,
+      wireShape: null,
+    })
+    mocks.getAgentReadiness.mockResolvedValue({
+      agents: {
+        pi: {
+          agent: 'pi',
+          ready: true,
+          requiresCredential: true,
+          source: 'launcher-vault',
+          hasWorkspaceConfig: false,
+          hasUsableWorkspaceConfig: false,
+          detectedCredentialSlug: null,
+          compatibleCredentialSlugs: ['google-1'],
+          injectableCredentialSlugs: ['google-1'],
+        },
+      },
+    })
+
+    render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
+
+    expect(await screen.findByText('Will write to this workspace when you send')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Configure workspace AI' })).toBeTruthy()
   })
 })

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { configToForm, formToConfig } from './WorkspaceAIConfigModal'
+import { configToForm, connectionFieldsChanged, formToConfig } from './WorkspaceAIConfigModal'
 
 describe('WorkspaceAIConfigModal Pi model capability mapping', () => {
   it.each([true, false])('round-trips reasoning=%s for Pi', (reasoning) => {
@@ -31,5 +31,40 @@ describe('WorkspaceAIConfigModal Pi model capability mapping', () => {
     const form = configToForm(null, 'pi')
     expect(form.reasoning).toBeNull()
     expect(formToConfig(form, 'pi').reasoning).toBeUndefined()
+  })
+
+  it('does not invalidate a connection test for local context or reasoning metadata', () => {
+    const saved = {
+      baseUrl: 'https://provider.test/v1',
+      apiKey: 'secret',
+      model: 'unknown-model',
+      contextWindow: 256_000,
+      wireShape: 'openai-chat' as const,
+      reasoning: null,
+    }
+    const form = configToForm(saved, 'pi')
+    form.contextWindow = 512_000
+    form.reasoning = true
+
+    expect(connectionFieldsChanged(saved, form, 'pi')).toBe(false)
+  })
+
+  it.each([
+    ['baseUrl', 'https://other.test/v1'],
+    ['apiKey', 'other-secret'],
+    ['model', 'other-model'],
+    ['wireShape', 'anthropic'],
+  ] as const)('requires a new connection test when %s changes', (field, value) => {
+    const saved = {
+      baseUrl: 'https://provider.test/v1',
+      apiKey: 'secret',
+      model: 'model-a',
+      contextWindow: 256_000,
+      wireShape: 'openai-chat' as const,
+    }
+    const form = configToForm(saved, 'pi')
+    Object.assign(form, { [field]: value })
+
+    expect(connectionFieldsChanged(saved, form, 'pi')).toBe(true)
   })
 })

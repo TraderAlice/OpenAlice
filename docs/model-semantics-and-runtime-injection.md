@@ -115,6 +115,19 @@ They do not prove the complete capability set. Error-guided retries (for
 example, a model that mandates thinking) are useful diagnostics but do not
 replace the curated registry.
 
+The UI must disclose configuration ownership instead of presenting every
+resolved launch value as if it were already on disk. A launch surface
+distinguishes a Workspace-local binding from a credential that will be written
+only when the next session starts. Creation defaults are also explicitly
+creation-time policy: changing one never rewrites an existing Workspace.
+
+The test-before-save gate follows the same boundary as the probe. Changes to
+the key, endpoint, wire shape, authentication mode, or model require a fresh
+probe. Context-window and unknown-model reasoning metadata are local runtime
+registration fields; changing only those fields saves directly without making
+an unrelated provider request. Both automatic creation-default saves and
+explicit Workspace saves must acknowledge completion in the UI.
+
 ## Configuration Ownership and Reset
 
 Agent configuration files may also contain user- or runtime-owned settings.
