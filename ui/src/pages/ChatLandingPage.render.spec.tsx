@@ -128,6 +128,7 @@ beforeEach(async () => {
     resolvedModel: 'gemini-3.1-flash-lite',
   }])
   mocks.detectWorkspaceCredential.mockResolvedValue({
+    configured: true,
     slug: 'google-1',
     model: 'gemini-3.1-flash-lite',
     contextWindow: 256_000,
@@ -207,6 +208,7 @@ describe('ChatLandingPage AI source disclosure', () => {
 
   it('labels a vault fallback as a pending write instead of existing Workspace config', async () => {
     mocks.detectWorkspaceCredential.mockResolvedValue({
+      configured: false,
       slug: null,
       model: null,
       contextWindow: null,

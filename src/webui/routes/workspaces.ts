@@ -574,15 +574,16 @@ export function createWorkspaceRoutes(
     }
   });
 
-  // Detect which vault credential a workspace's loginless agent is currently
-  // configured with (null when none / hand-edited). The "which cred is this
-  // workspace using" probe the overwrite-notice and reuse-default both build on.
+  // Detect which vault credential a workspace agent is currently configured
+  // with. A null slug can still be a real hand-edited native config; returning
+  // that distinction is what lets launch surfaces describe Claude/Codex as
+  // truthfully as the loginless runtimes.
   const detectWorkspaceCred = async (
     meta: WorkspaceMeta,
     agentId: string,
     credentials: Record<string, Credential>,
   ): Promise<{
-    slug: string;
+    slug: string | null;
     model: string | null;
     contextWindow: number | null;
     wireShape: WireShape | null;
@@ -593,15 +594,13 @@ export function createWorkspaceRoutes(
     const cfg = await adapter.readAiConfig(meta.dir).catch(() => null);
     if (!cfg) return null;
     const slug = matchCredentialByApiKey(credentials, cfg.apiKey);
-    return slug
-      ? {
-          slug,
-          model: cfg.model ?? null,
-          contextWindow: cfg.contextWindow ?? null,
-          wireShape: cfg.wireShape ?? null,
-          reasoning: cfg.reasoning ?? null,
-        }
-      : null;
+    return {
+      slug,
+      model: cfg.model ?? null,
+      contextWindow: cfg.contextWindow ?? null,
+      wireShape: cfg.wireShape ?? null,
+      reasoning: cfg.reasoning ?? null,
+    };
   };
 
   // ── templates / agents ───────────────────────────────────────────────────
@@ -2005,8 +2004,8 @@ export function createWorkspaceRoutes(
   });
 
   // Which vault credential this workspace's agent is currently configured with
-  // (slug + effective model/protocol/context), or null. Feeds the quick-chat
-  // composer's overwrite notice and its compact launch-config summary.
+  // (slug + effective model/protocol/context), plus any native pre-prompt setup
+  // gate the adapter can inspect without changing runtime-owned state.
   // Ordinary detection does not overwrite config. The Pi adapter may perform
   // its one-time legacy `.pi-agent` layout migration before reading.
   app.get('/:id/agent-config/:agent/credential', async (c) => {
@@ -2016,18 +2015,24 @@ export function createWorkspaceRoutes(
     const meta = svc.resolveRuntimeWorkspace?.(id) ?? svc.registry.get(id);
     if (!meta) return c.json({ error: 'not_found' }, 404);
     try {
-      const detected = await detectWorkspaceCred(meta, agent, await readCredentials());
+      const adapter = svc.adapters.get(agent);
+      const [detected, interactiveSetupStatus] = await Promise.all([
+        detectWorkspaceCred(meta, agent, await readCredentials()),
+        adapter?.readInteractiveSetupStatus?.(meta.dir).catch(() => 'unknown' as const) ?? null,
+      ]);
       return c.json({
+        configured: detected !== null,
         slug: detected?.slug ?? null,
         model: detected?.model ?? null,
         contextWindow: detected?.contextWindow ?? null,
         wireShape: detected?.wireShape ?? null,
         ...(typeof detected?.reasoning === 'boolean' ? { reasoning: detected.reasoning } : {}),
+        ...(interactiveSetupStatus !== null ? { interactiveSetupStatus } : {}),
       });
     } catch (err) {
       if (err instanceof PathTraversal) return c.json({ error: 'invalid_path' }, 400);
       launcherLogger.warn('agent_config.detect_cred_failed', { id, agent, err });
-      return c.json({ slug: null, model: null, contextWindow: null, wireShape: null });
+      return c.json({ configured: false, slug: null, model: null, contextWindow: null, wireShape: null });
     }
   });
 

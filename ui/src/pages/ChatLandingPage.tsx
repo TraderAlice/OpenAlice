@@ -29,6 +29,7 @@ import {
   useAgentLaunchConfig,
   useAgentLaunchPreferences,
 } from '../hooks/useAgentLaunchConfig'
+import { isWorkspaceAiAgent } from '../lib/agentRuntime'
 
 export { resolveAgentRuntime as resolveChatAgent } from '../lib/agentRuntime'
 export {
@@ -137,10 +138,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
   }
 
   const adjustQuickChatAi = () => {
-    if (
-      credentialWorkspace &&
-      (effectiveAgent === 'opencode' || effectiveAgent === 'pi')
-    ) {
+    if (credentialWorkspace && isWorkspaceAiAgent(effectiveAgent)) {
       openAgentConfig(credentialWorkspace.id, effectiveAgent, 'ai')
       return
     }

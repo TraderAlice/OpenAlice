@@ -455,6 +455,8 @@ export const zh: Resources = {
     adjustWorkspaceAi: '调整工作区 AI',
     configureWorkspaceAi: '配置工作区 AI',
     providerSettings: '提供方设置',
+    claudeOnboardingRequired: 'Claude Code 仍需完成它自己的首次设置。请在 TUI 中完成后继续；OpenAlice 不会改动 Claude 的登录状态。',
+    claudeWorkspaceTrustRequired: 'Claude Code 首次进入此工作区时会要求确认信任；确认一次后，已排队的提示会继续执行。',
     noCredBody: '{{name}} 还没有配置 AI 提供方，先添加一个才能开始对话。',
     credOverwrite: '发送会把此 workspace 的提供方从 {{from}} 切换为 {{to}}。',
     send: '发送',

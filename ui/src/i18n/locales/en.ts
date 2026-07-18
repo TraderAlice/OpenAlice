@@ -466,6 +466,8 @@ export const en = {
     adjustWorkspaceAi: 'Adjust workspace AI',
     configureWorkspaceAi: 'Configure workspace AI',
     providerSettings: 'Provider settings',
+    claudeOnboardingRequired: "Claude Code still needs its own first-run setup. Complete it in the TUI before continuing; OpenAlice leaves Claude's login state untouched.",
+    claudeWorkspaceTrustRequired: 'Claude Code will ask you to trust this workspace once before the queued prompt continues.',
     noCredBody: '{{name}} has no AI provider configured. Add one to start chatting.',
     credOverwrite: "Sending switches this workspace's provider from {{from}} to {{to}}.",
     send: 'Send',

@@ -42,6 +42,8 @@ function build(opts: {
   workspaces?: any[];
   sessionsByWorkspace?: Record<string, any[]>;
   recentChatWorkspaceId?: string | null;
+  claudeConfig?: WorkspaceAiCred | null;
+  claudeInteractiveSetupStatus?: 'ready' | 'runtime-onboarding-required' | 'workspace-trust-required' | 'unknown';
   opencodeConfig?: WorkspaceAiCred | null;
   opencodeRuntimeSource?: 'global-config' | 'global-login' | 'managed-runtime';
   runtimeWorkspace?: any;
@@ -60,7 +62,12 @@ function build(opts: {
     writeAiConfig: vi.fn(async () => {}),
     readAiConfig: vi.fn(async () => opts.opencodeConfig ?? null),
   };
-  const claude = { id: 'claude', namePrefix: 'c' };
+  const claude = {
+    id: 'claude',
+    namePrefix: 'c',
+    readAiConfig: vi.fn(async () => opts.claudeConfig ?? null),
+    readInteractiveSetupStatus: vi.fn(async () => opts.claudeInteractiveSetupStatus ?? 'ready'),
+  };
   const shell = { id: 'shell', kind: 'utility', namePrefix: 'sh' };
   const adapters: Record<string, any> = { opencode, claude, shell };
   const spawn = vi.fn((_wsId: string, ctx: any) => ({
@@ -261,10 +268,69 @@ describe('GET /credentials — Quick Chat launch metadata', () => {
 
     expect(result.status).toBe(200);
     expect(result.body).toEqual({
+      configured: true,
       slug: 'google-1',
       model: 'gemini-3.5-flash',
       contextWindow: 512_000,
       wireShape: 'google-generative-ai',
+    });
+  });
+
+  it('keeps hand-edited Workspace config visible when no vault key matches', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({});
+    const { app } = build({
+      opencodeConfig: {
+        apiKey: 'hand-edited-key',
+        model: 'local-manual-model',
+        contextWindow: 128_000,
+        wireShape: 'openai-chat',
+      },
+    });
+
+    const result = await get(app, '/ws-1/agent-config/opencode/credential');
+
+    expect(result).toEqual({
+      status: 200,
+      body: {
+        configured: true,
+        slug: null,
+        model: 'local-manual-model',
+        contextWindow: 128_000,
+        wireShape: 'openai-chat',
+      },
+    });
+  });
+
+  it('returns Claude project metadata and its native interactive setup gate', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({
+      'minimax-1': {
+        vendor: 'minimax',
+        authType: 'api-key',
+        apiKey: 'minimax-test-key',
+        wires: { anthropic: 'https://api.example.test/anthropic' },
+      },
+    });
+    const { app } = build({
+      claudeConfig: {
+        apiKey: 'minimax-test-key',
+        model: 'MiniMax-M2.5',
+        wireShape: 'anthropic',
+      },
+      claudeInteractiveSetupStatus: 'workspace-trust-required',
+    });
+
+    const result = await get(app, '/ws-1/agent-config/claude/credential');
+
+    expect(result).toEqual({
+      status: 200,
+      body: {
+        configured: true,
+        slug: 'minimax-1',
+        model: 'MiniMax-M2.5',
+        contextWindow: null,
+        wireShape: 'anthropic',
+        interactiveSetupStatus: 'workspace-trust-required',
+      },
     });
   });
 
@@ -300,6 +366,7 @@ describe('GET /credentials — Quick Chat launch metadata', () => {
     expect(credential).toEqual({
       status: 200,
       body: {
+        configured: true,
         slug: 'google-1',
         model: 'gemini-3.5-flash',
         contextWindow: 512_000,

@@ -120,6 +120,21 @@ resolved launch value as if it were already on disk. A launch surface
 distinguishes a Workspace-local binding from a credential that will be written
 only when the next session starts. Creation defaults are also explicitly
 creation-time policy: changing one never rewrites an existing Workspace.
+This disclosure applies to all four supported Agent runtimes. Claude Code and
+Codex use their native global login and global runtime configuration by default.
+Merely storing a compatible credential in Alice never selects or injects it;
+only an explicit Workspace binding or explicit new-Workspace creation default
+overrides the native fallback. When a Workspace-local override exists its real
+model must be shown instead of a generic “runtime managed” label. Their native
+project files do not declare a context limit, so the UI omits that field rather
+than borrowing the Pi/opencode injection default.
+
+Headless provider readiness does not prove that an interactive TUI can consume
+its first queued prompt immediately. A native runtime may still own global
+onboarding or per-project trust gates. OpenAlice may expose those gates as
+read-only, best-effort launch guidance, but it must not mark private global
+state complete or accept trust on the user's behalf. Unknown native state is
+advisory and fail-open; it never becomes a fabricated ready/not-ready fact.
 
 The test-before-save gate follows the same boundary as the probe. Changes to
 the key, endpoint, wire shape, authentication mode, or model require a fresh

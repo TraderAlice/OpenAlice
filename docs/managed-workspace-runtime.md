@@ -91,13 +91,27 @@ model id so it cannot leak across a later model change. Follow
 [[docs/model-semantics-and-runtime-injection.md]] for the full contract.
 
 Quick Chat must summarize the launch configuration behind its credential pill:
-the effective model ID and context limit are visible before Send. For an
-existing Workspace these values come from its CLI-native config; selecting a
-different credential previews the model that credential will inject and the
-global context default. The adjacent adjustment action opens that Workspace's
-AI injector when a target exists, and falls back to AI Provider settings before
-the first Workspace has been created. Saving the Workspace modal refreshes this
-summary without requiring a page reload.
+the effective model ID and every context limit actually declared by the native
+project config are visible before Send. For an existing Workspace these values
+come from its CLI-native config; selecting a different Pi/opencode credential
+previews the model that credential will inject and the global context default.
+Claude Code and Codex Workspace overrides show their model but omit context
+because those native project files do not declare one. The adjacent adjustment
+action opens that Workspace's AI injector for all four runtimes, and falls back
+to AI Provider settings before the first Workspace has been created. Saving the
+Workspace modal refreshes this summary without requiring a page reload.
+Their default remains the CLI's own global login and configuration: Alice never
+chooses the first compatible vault credential simply because one exists. Only
+an explicit Workspace binding or creation default opts into injection.
+
+Claude Code can place global onboarding and per-project trust screens before an
+interactive seeded prompt even after the same Workspace passes a headless
+provider probe. Its current CLI exposes authentication status but no supported
+status/accept command for these two gates. OpenAlice therefore reads only the
+existing completion booleans in Claude's native state and displays an advisory
+before launch. It never writes those booleans, substitutes a private config
+directory, or treats the advisory as a provider-readiness failure. An unknown
+or changed native state shape fails open and leaves Claude in control.
 
 Provider model catalogs are curated suggestions, not allowlists. Keep the
 free-text model field so a newly released or project-specific model remains

@@ -455,6 +455,8 @@ export const ja: Resources = {
     adjustWorkspaceAi: 'ワークスペース AI を調整',
     configureWorkspaceAi: 'ワークスペース AI を設定',
     providerSettings: 'プロバイダー設定',
+    claudeOnboardingRequired: 'Claude Code 側の初回セットアップが必要です。TUI で完了してから続行してください。OpenAlice は Claude のログイン状態を変更しません。',
+    claudeWorkspaceTrustRequired: 'Claude Code は、このワークスペースを初めて開くときに信頼確認を表示します。一度承認すると、待機中のプロンプトが続行されます。',
     noCredBody: '{{name}} には AI プロバイダーが設定されていません。追加するとチャットを開始できます。',
     credOverwrite: '送信すると、この workspace のプロバイダーが {{from}} から {{to}} に切り替わります。',
     send: '送信',

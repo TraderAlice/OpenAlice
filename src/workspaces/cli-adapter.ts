@@ -115,6 +115,17 @@ export interface EnvOverrides {
   readonly set?: Readonly<Record<string, string>>;
 }
 
+/**
+ * Best-effort status for native interactive gates that run before a queued
+ * prompt. This is advisory only: adapters must never satisfy a runtime's
+ * onboarding or project-trust prompt by mutating private global state.
+ */
+export type AgentInteractiveSetupStatus =
+  | 'ready'
+  | 'runtime-onboarding-required'
+  | 'workspace-trust-required'
+  | 'unknown';
+
 export interface CliAdapter {
   readonly id: string;                          // 'claude' | 'codex' | 'shell'
   readonly displayName: string;
@@ -163,6 +174,12 @@ export interface CliAdapter {
      */
     readonly headless?: boolean;
   };
+
+  /**
+   * Inspect native first-use state without changing it. Omit when the runtime
+   * has no known pre-prompt interactive gate or exposes no safe read seam.
+   */
+  readInteractiveSetupStatus?(cwd: string): Promise<AgentInteractiveSetupStatus>;
 
   /**
    * Translate the base command (from `WEB_TERMINAL_COMMAND` / template) +
