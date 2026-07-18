@@ -145,10 +145,54 @@ export interface ThemeImportDiagnostic {
   message: string
 }
 
-export class ThemeApiError extends Error {
+export type ThemeGeneratorId = 'matugen' | 'hellwal'
+
+export type ThemeGeneratorCapabilities =
+  | { kind: 'matugen'; dryRunJson: true; modes: readonly ['light', 'dark']; schemes: readonly string[] }
+  | {
+      kind: 'hellwal'; json: true; noCache: true; skipTermColors: true
+      modes: readonly ['light', 'dark']; offsets: readonly ['dark', 'bright']
+    }
+
+export type ThemeGeneratorDetection =
+  | { kind: 'unavailable'; generator: ThemeGeneratorId; reason: 'not-on-path' }
+  | { kind: 'unsupported'; generator: ThemeGeneratorId; executablePath: string; reason: string }
+  | {
+      kind: 'available'; generator: ThemeGeneratorId; detectionId: string
+      executablePath: string; version: string; binarySha256: string
+      capabilities: ThemeGeneratorCapabilities
+    }
+
+export interface ThemeGeneratorDetectionSnapshot {
+  refreshedAt: string
+  generators: Readonly<Record<ThemeGeneratorId, ThemeGeneratorDetection>>
+}
+
+interface ThemeGenerationRequestBase {
+  detectionId: string
+  name: string
+  modes: readonly ['light'] | readonly ['dark'] | readonly ['light', 'dark']
+}
+
+export type ThemeGenerationRequest =
+  | (ThemeGenerationRequestBase & { generator: 'matugen'; scheme: string })
+  | (ThemeGenerationRequestBase & { generator: 'hellwal'; darkOffset: number; brightOffset: number })
+
+export type ThemeGenerationErrorCode =
+  | 'generator_unavailable' | 'generator_unsupported' | 'detection_stale' | 'invalid_parameters'
+  | 'spawn_failed' | 'cancelled' | 'non_zero_exit' | 'invalid_output' | 'contrast_failed'
+  | 'staging_cleanup_failed'
+
+export class ThemeApiError<TDiagnostic = ThemeImportDiagnostic> extends Error {
   constructor(
     readonly status: number,
-    readonly payload: { error?: string; diagnostics?: ThemeImportDiagnostic[]; familyId?: string },
+    readonly payload: {
+      error?: string
+      diagnostics?: TDiagnostic[]
+      familyId?: string
+      generator?: ThemeGeneratorId
+      process?: { exitCode: number | null; signal: string | null }
+    },
   ) {
     super(payload.error ?? `Theme request failed (${status})`)
     this.name = 'ThemeApiError'
@@ -187,6 +231,23 @@ export const themesApi = {
     return themeJson('/api/themes/imports/preview', {
       method: 'POST', headers, body: JSON.stringify({ contents, filename, legacyVariant }),
     })
+  },
+  generatorAvailability(): Promise<ThemeGeneratorDetectionSnapshot> {
+    return themeJson('/api/themes/generators')
+  },
+  refreshGeneratorAvailability(): Promise<ThemeGeneratorDetectionSnapshot> {
+    return themeJson('/api/themes/generators/refresh', { method: 'POST' })
+  },
+  generatePreview(
+    request: ThemeGenerationRequest,
+    image: Blob,
+    signal?: AbortSignal,
+  ): Promise<ThemeFamily> {
+    const body = new FormData()
+    body.set('request', JSON.stringify(request))
+    const filename = typeof File !== 'undefined' && image instanceof File ? image.name : 'theme-image'
+    body.set('image', image, filename)
+    return themeJson('/api/themes/generators/preview', { method: 'POST', body, signal })
   },
   save(family: ThemeFamily): Promise<ThemeFamily> {
     return themeJson('/api/themes', { method: 'POST', headers, body: JSON.stringify(family) })

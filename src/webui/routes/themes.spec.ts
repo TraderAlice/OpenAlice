@@ -76,6 +76,20 @@ describe('theme routes', () => {
     expect((await app.request('/builtin-openalice', { method: 'DELETE' })).status).toBe(409)
   })
 
+  it('protects a family referenced by the terminal override from deletion', async () => {
+    const deps = memoryDeps()
+    const family = importThemeScheme(tintedDocument(), { filename: 'theme.json' }).family
+    await deps.saveFamily(family)
+    deps.appearance.terminal = { mode: 'override', familyId: family.id, variant: 'dark' }
+    const response = await createThemeRoutes(deps).request(`/${family.id}`, { method: 'DELETE' })
+    expect(response.status).toBe(409)
+    expect(await response.json()).toEqual({
+      error: 'theme_family_terminal_referenced',
+      familyId: family.id,
+    })
+    expect(deps.deleteFamily).not.toHaveBeenCalled()
+  })
+
   it('reports cached generator availability and explicitly refreshes detection', async () => {
     const deps = memoryDeps()
     deps.generatorService.availability

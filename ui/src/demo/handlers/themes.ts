@@ -1,6 +1,12 @@
 import { http, HttpResponse } from 'msw'
-import type { AppearancePreferences, ImportedThemeFormat, ThemeFamily } from '../../api/themes'
-import { demoThemeFamily, demoThemeImportFixtures } from '../fixtures/themes'
+import type {
+  AppearancePreferences, ImportedThemeFormat, ThemeFamily, ThemeGenerationRequest,
+  ThemeGeneratorDetectionSnapshot,
+} from '../../api/themes'
+import {
+  demoGeneratedThemeFamily, demoGeneratorDetectionIds, demoGeneratorSnapshots,
+  demoThemeFamily, demoThemeImportFixtures,
+} from '../fixtures/themes'
 
 const builtin = demoThemeFamily('tinted-base16', 'OpenAlice', ['light', 'dark'])
 builtin.id = 'builtin-openalice'
@@ -85,6 +91,38 @@ function persistDemoState(): void {
   }))
 }
 
+function generatorFixture(request: Request): keyof typeof demoGeneratorSnapshots | 'failed' {
+  const fixture = request.headers.get('x-openalice-generator-fixture')
+  return fixture === 'unavailable' || fixture === 'unsupported' || fixture === 'failed' ? fixture : 'available'
+}
+
+function snapshotFor(request: Request): ThemeGeneratorDetectionSnapshot {
+  const fixture = generatorFixture(request)
+  return fixture === 'failed' ? demoGeneratorSnapshots.available : demoGeneratorSnapshots[fixture]
+}
+
+function validGenerationRequest(value: unknown): value is ThemeGenerationRequest {
+  if (!value || typeof value !== 'object') return false
+  const request = value as Record<string, unknown>
+  if ((request.generator !== 'matugen' && request.generator !== 'hellwal')
+    || typeof request.detectionId !== 'string' || typeof request.name !== 'string' || request.name.trim() === ''
+    || !Array.isArray(request.modes) || request.modes.length < 1 || request.modes.length > 2
+    || request.modes.some((mode) => mode !== 'light' && mode !== 'dark')
+    || (request.modes.length === 2 && (request.modes[0] !== 'light' || request.modes[1] !== 'dark'))) return false
+  if (request.generator === 'matugen') return typeof request['scheme'] === 'string' && request['scheme'].length > 0
+  return typeof request.darkOffset === 'number' && Number.isFinite(request.darkOffset)
+    && request.darkOffset >= 0 && request.darkOffset <= 1
+    && typeof request.brightOffset === 'number' && Number.isFinite(request.brightOffset)
+    && request.brightOffset >= 0 && request.brightOffset <= 1
+}
+
+function validImageUpload(value: unknown): value is Blob {
+  return typeof value === 'object' && value !== null
+    && typeof (value as { arrayBuffer?: unknown }).arrayBuffer === 'function'
+    && typeof (value as { size?: unknown }).size === 'number'
+    && (value as { size: number }).size > 0
+}
+
 restoreDemoState()
 
 export const themesHandlers = [
@@ -95,9 +133,16 @@ export const themesHandlers = [
     const active = next && families.get(next.activeFamilyId)
     const terminalFamily = next?.terminal.mode === 'override' ? families.get(next.terminal.familyId) : undefined
     const validMode = next?.mode === 'light' || next?.mode === 'dark' || next?.mode === 'system'
-    if (!next || !active || !validMode || (next.mode === 'system' && (!active.variants.light || !active.variants.dark))
-      || (next.terminal.mode === 'override' && (!terminalFamily || !terminalFamily.variants[next.terminal.variant]))) {
-      return HttpResponse.json({ error: 'invalid_appearance_preferences' }, { status: 400 })
+    if (!next || !validMode) return HttpResponse.json({ error: 'invalid_appearance' }, { status: 400 })
+    if (!active) return HttpResponse.json({ error: 'theme_family_not_found', familyId: next.activeFamilyId }, { status: 422 })
+    if (next.mode === 'system' && (!active.variants.light || !active.variants.dark)) {
+      return HttpResponse.json({ error: 'system_requires_complete_family', familyId: active.id }, { status: 422 })
+    }
+    if (next.terminal.mode === 'override' && !terminalFamily) {
+      return HttpResponse.json({ error: 'theme_family_not_found', familyId: next.terminal.familyId }, { status: 422 })
+    }
+    if (next.terminal.mode === 'override' && !terminalFamily?.variants[next.terminal.variant]) {
+      return HttpResponse.json({ error: 'terminal_variant_not_found', familyId: terminalFamily!.id }, { status: 422 })
     }
     appearance = structuredClone(next)
     persistDemoState()
@@ -124,10 +169,55 @@ export const themesHandlers = [
     const family = demoThemeFamily(format, name, [legacyVariant ?? (name.includes('light') ? 'light' : 'dark')])
     return HttpResponse.json({ family, format })
   }),
+  http.get('/api/themes/generators', ({ request }) => HttpResponse.json(snapshotFor(request))),
+  http.post('/api/themes/generators/refresh', ({ request }) => HttpResponse.json({
+    ...snapshotFor(request), refreshedAt: '2026-07-18T00:01:00.000Z',
+  })),
+  http.post('/api/themes/generators/preview', async ({ request }) => {
+    const fixture = generatorFixture(request)
+    const body = await request.formData().catch(() => null)
+    const raw = body?.get('request')
+    const image = body?.get('image')
+    let generation: unknown
+    try { generation = typeof raw === 'string' ? JSON.parse(raw) : null } catch { generation = null }
+    if (generation === null || !validImageUpload(image)) {
+      return HttpResponse.json({ error: 'invalid_generation_request', diagnostics: ['multipart fields request and image are required'] }, { status: 400 })
+    }
+    if (!validGenerationRequest(generation)) {
+      const generator = typeof generation === 'object' && generation !== null
+        && (generation as { generator?: unknown }).generator === 'hellwal' ? 'hellwal' : 'matugen'
+      return HttpResponse.json({ error: 'invalid_parameters', generator, diagnostics: ['request parameters are invalid'] }, { status: 400 })
+    }
+    const detection = snapshotFor(request).generators[generation.generator]
+    if (detection.kind === 'unavailable') {
+      return HttpResponse.json({ error: 'generator_unavailable', generator: generation.generator, diagnostics: [detection.reason] }, { status: 422 })
+    }
+    if (detection.kind === 'unsupported') {
+      return HttpResponse.json({ error: 'generator_unsupported', generator: generation.generator, diagnostics: [detection.reason] }, { status: 422 })
+    }
+    if (generation.detectionId !== detection.detectionId) {
+      return HttpResponse.json({ error: 'detection_stale', generator: generation.generator, diagnostics: ['detection id is stale'] }, { status: 409 })
+    }
+    if (generation.generator === 'matugen' && detection.capabilities.kind === 'matugen'
+      && !detection.capabilities.schemes.includes(generation.scheme)) {
+      return HttpResponse.json({ error: 'invalid_parameters', generator: 'matugen', diagnostics: [`scheme: unsupported ${generation.scheme}`] }, { status: 400 })
+    }
+    if (fixture === 'failed') {
+      return HttpResponse.json({ error: 'non_zero_exit', generator: generation.generator, diagnostics: ['demo generator failed'], process: { exitCode: 2, signal: null } }, { status: 422 })
+    }
+    if (generation.generator === 'matugen') {
+      return HttpResponse.json(demoGeneratedThemeFamily('matugen', generation.name, generation.modes, {
+        scheme: generation.scheme,
+      }))
+    }
+    return HttpResponse.json(demoGeneratedThemeFamily('hellwal', generation.name, generation.modes, {
+      darkOffset: generation.darkOffset, brightOffset: generation.brightOffset,
+    }))
+  }),
   http.post('/api/themes', async ({ request }) => {
     const family = await request.json().catch(() => null)
     if (!validFamily(family)) return HttpResponse.json({ error: 'invalid_theme_family' }, { status: 400 })
-    if (families.has(family.id)) return HttpResponse.json({ error: 'theme_family_exists', familyId: family.id }, { status: 409 })
+    if (families.has(family.id)) return HttpResponse.json({ error: 'theme_family_conflict', familyId: family.id }, { status: 409 })
     families.set(family.id, structuredClone(family))
     persistDemoState()
     return HttpResponse.json(family, { status: 201 })
@@ -143,7 +233,7 @@ export const themesHandlers = [
     const current = families.get(id)
     if (!current) return HttpResponse.json({ error: 'theme_family_not_found' }, { status: 404 })
     if (current.variants.light?.provenance.kind === 'builtin' || current.variants.dark?.provenance.kind === 'builtin') {
-      return HttpResponse.json({ error: 'builtin_theme_read_only' }, { status: 403 })
+      return HttpResponse.json({ error: 'theme_family_builtin', familyId: id }, { status: 409 })
     }
     families.set(id, structuredClone(family))
     persistDemoState()
@@ -154,9 +244,9 @@ export const themesHandlers = [
     const family = families.get(id)
     if (!family) return HttpResponse.json({ error: 'theme_family_not_found' }, { status: 404 })
     if (family.variants.light?.provenance.kind === 'builtin' || family.variants.dark?.provenance.kind === 'builtin') {
-      return HttpResponse.json({ error: 'builtin_theme_read_only' }, { status: 403 })
+      return HttpResponse.json({ error: 'theme_family_builtin', familyId: id }, { status: 409 })
     }
-    if (familyReferenced(id)) return HttpResponse.json({ error: 'active_theme_cannot_be_deleted' }, { status: 409 })
+    if (familyReferenced(id)) return HttpResponse.json({ error: 'theme_family_active', familyId: id }, { status: 409 })
     families.delete(id)
     persistDemoState()
     return new HttpResponse(null, { status: 204 })

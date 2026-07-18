@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useTranslation } from 'react-i18next'
+import { useTranslation } from 'react-i18next'; import type { TFunction } from 'i18next'
 import { LineChart, Line, YAxis, XAxis, Tooltip } from 'recharts'
 import { useReferenceBoard } from '../components/market/useReferenceBoard'
 import { BoardMeta } from '../components/market/BoardMeta'
@@ -97,7 +97,7 @@ function MoversBoardView() {
   )
 }
 
-function listLabel(k: MoversList, t: ReturnType<typeof useTranslation>['t']): string {
+function listLabel(k: MoversList, t: TFunction<'translation'>): string {
   switch (k) {
     case 'gainers': return t('market.moversGainers')
     case 'losers': return t('market.moversLosers')
@@ -218,7 +218,7 @@ function CalendarBoardView() {
   )
 }
 
-function calendarLabel(k: CalendarList, t: ReturnType<typeof useTranslation>['t']): string {
+function calendarLabel(k: CalendarList, t: TFunction<'translation'>): string {
   switch (k) {
     case 'earnings': return t('market.calEarnings')
     case 'ipos': return t('market.calIpos')
@@ -351,7 +351,7 @@ function MacroBoardView() {
 
 /** Known FRED ids → localized labels; anything else falls back to the
  *  English label the contract carries. */
-function macroLabel(card: MacroSeriesCard, t: ReturnType<typeof useTranslation>['t']): string {
+function macroLabel(card: MacroSeriesCard, t: TFunction<'translation'>): string {
   switch (card.id) {
     case 'DFF': return t('market.macroFedFunds')
     case 'DGS2': return t('market.macro2y')
@@ -652,7 +652,7 @@ function FedBoardView() {
   )
 }
 
-function fedLabel(id: string, t: ReturnType<typeof useTranslation>['t']): string | null {
+function fedLabel(id: string, t: TFunction<'translation'>): string | null {
   switch (id) {
     case 'WALCL': return t('market.fedTotalAssets')
     case 'TREAST': return t('market.fedTreasuries')

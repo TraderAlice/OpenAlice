@@ -179,7 +179,11 @@ export function createThemeRoutes(overrides: Partial<ThemeRouteDeps> = {}) {
   app.delete('/:familyId', async (c) => {
     try {
       const appearance = await deps.readAppearance()
-      await deps.deleteFamily(c.req.param('familyId'), appearance.activeFamilyId)
+      const familyId = c.req.param('familyId')
+      if (appearance.terminal.mode === 'override' && appearance.terminal.familyId === familyId) {
+        return c.json({ error: 'theme_family_terminal_referenced', familyId }, 409)
+      }
+      await deps.deleteFamily(familyId, appearance.activeFamilyId)
       return c.body(null, 204)
     } catch (error) {
       return themeStoreError(c, error)

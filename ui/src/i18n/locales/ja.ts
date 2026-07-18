@@ -58,6 +58,23 @@ export const ja: Resources = {
       idCollision: '同じ安定 ID のテーマが存在します。既存ファイルは上書きしません。', pairVariants: 'バリアントをペアにする',
       saveImport: 'インポートを保存', reference: 'ライブテーマ参照', active: '使用中', delete: '削除',
       surface: 'サーフェス', card: 'カード', accent: 'アクセント', xtermPreview: 'ライブ xterm.js パレット', loadFailed: 'テーマの読み込みに失敗しました。',
+      base16Label: 'Base16 パレット', ansiLabel: 'ANSI 0–15', extendedAnsiLabel: '拡張 ANSI 16–21',
+      appearance: {
+        terminal: 'ターミナルテーマ', followApp: 'アプリに従う', override: '独立したターミナルテーマ', marketColors: '市場色のソース', marketDirection: '騰落色の慣例', statusColors: 'ステータス色のソース',
+        protected: '識別保護色', theme: 'テーマ色', greenUp: '緑が上昇／赤が下落', redUp: '赤が上昇／緑が下落', systemUnavailable: 'システムモードにはライトとダークの両方が必要です。', deleteReferenced: '削除前に、アプリまたはターミナルで使用中のテーマを切り替えてください。',
+      },
+      generator: {
+        title: '画像から生成', description: '保存する前にテーマをローカルでプレビューします。', refresh: 'ツールを再検出', matugen: 'Matugen', hellwal: 'Hellwal', unavailable: 'アプリの PATH にありません', unsupported: 'インストール済みですが非対応です',
+        available: '利用可能', executablePath: '実行ファイルパス', version: 'バージョン', capabilities: '検証済み機能', image: '画像', chooseImage: '画像を選択', familyName: 'テーマ名', modes: 'バリアント', scheme: 'Material スキーム',
+        darkOffset: 'ダークオフセット', brightOffset: 'ブライトオフセット', offsetHint: '0–1', generate: 'プレビューを生成', generating: '生成中…', cancel: '生成をキャンセル', cancelled: '生成をキャンセルしました。入力は保持されています。', failed: '生成に失敗しました', stale: 'ツールが変更されました。機能を再検出してください。',
+        save: '生成テーマを保存', fullFamily: 'ライト／ダークの完全な family', singleVariant: '単一バリアント',
+      },
+      provenance: { title: 'ソース詳細', source: 'ソース', mappingVersion: 'マッピング版', contentDigest: 'コンテンツダイジェスト', imageDigest: '画像ダイジェスト', importedAt: 'インポート日時', generatedAt: '生成日時', parameters: 'パラメーター', author: '作者' },
+      crossSurfacePreview: {
+        title: '横断プレビュー', description: '候補色のみを表示し、現在の外観は変更しません。', application: 'アプリと操作', surface: 'サーフェスと本文', textHierarchy: 'テキスト階層', mutedText: '補助テキスト', hover: 'ホバー', active: 'アクティブ', selection: '選択', focus: 'キーボードフォーカス',
+        success: '成功', warning: '警告', danger: '危険', info: '情報', market: '市場とチャート', chart: 'ローソク足、出来高、チャート外観のプレビュー', pnlUp: '正の損益', pnlDown: '負の損益', buy: '買い方向', sell: '売り方向',
+        risk: '不変のリスク意味', destructive: '破壊的操作', permissionDenied: '権限拒否', tradeConfirm: '実取引の確認', brokerFailure: 'Broker 書き込み失敗', riskBlocked: 'リスク管理による阻止', terminal: 'ターミナルパレット', terminalSelection: '選択されたターミナル文字',
+      },
     },
     dataHome: {
       title: 'データの保存場所',

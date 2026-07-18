@@ -306,7 +306,8 @@ describe('Theme Manager real-browser workflow', () => {
       await putDemoTheme(testPage, first, 'light')
 
       const manager = testPage.getByTestId('theme-manager')
-      await manager.locator('select').selectOption('dark')
+      const legacyVariant = manager.getByLabel('Variant for files without metadata')
+      await legacyVariant.selectOption('dark')
       const managerIdentity = await manager.evaluate((node) => {
         const id = `manager-${Date.now()}`
         ;(node as HTMLElement & { __mountIdentity?: string }).__mountIdentity = id
@@ -324,7 +325,7 @@ describe('Theme Manager real-browser workflow', () => {
       await manager.getByRole('button', { name: 'Apply', exact: true }).click()
       await expect.poll(async () => testPage.evaluate(() => document.documentElement.dataset.themeFamily)).toBe(second.id)
       expect(await manager.evaluate((node) => (node as HTMLElement & { __mountIdentity?: string }).__mountIdentity)).toBe(managerIdentity)
-      expect(await manager.locator('select').inputValue()).toBe('dark')
+      expect(await legacyVariant.inputValue()).toBe('dark')
 
       await expect.poll(async () => testPage.evaluate(() => document.documentElement.dataset.theme)).toBe('dark')
       await testPage.emulateMedia({ colorScheme: 'light' })
