@@ -184,6 +184,8 @@ export const workspaceCredentialDefaultSchema = z.object({
   model: z.string().optional(),
   /** Optional explicit protocol when a credential exposes more than one wire. */
   wireShape: credentialWireShapeEnum.optional(),
+  /** Pi only: custom-model reasoning capability. */
+  reasoning: z.boolean().optional(),
 })
 export type WorkspaceCredentialDefault = z.infer<typeof workspaceCredentialDefaultSchema>
 

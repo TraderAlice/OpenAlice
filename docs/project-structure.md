@@ -170,7 +170,9 @@ for built-in templates. `bootstrap.sh` remains only as a third-party fallback.
 Workspace tools are exposed as CLI shims on `PATH`. The `alice*` and
 `traderhub` skills teach the native agents how to call those shims. Shared
 project skills are copied to `.agents/skills/` and Claude-specific discovery to
-`.claude/skills/`; Pi provider state lives separately under `.pi-agent/`.
+`.claude/skills/`. Pi keeps providers in its normal user agent directory and
+selects a Workspace provider through `.pi/settings.json`; OpenAlice never
+redirects Pi away from its native global packages, settings, auth, or sessions.
 
 ## Alice and UTA Boundary
 

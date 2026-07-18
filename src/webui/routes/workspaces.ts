@@ -579,6 +579,7 @@ export function createWorkspaceRoutes(
     model: string | null;
     contextWindow: number | null;
     wireShape: WireShape | null;
+    reasoning: boolean | null;
   } | null> => {
     const adapter = svc.adapters.get(agentId);
     if (!adapter?.readAiConfig) return null;
@@ -591,6 +592,7 @@ export function createWorkspaceRoutes(
           model: cfg.model ?? null,
           contextWindow: cfg.contextWindow ?? null,
           wireShape: cfg.wireShape ?? null,
+          reasoning: cfg.reasoning ?? null,
         }
       : null;
   };
@@ -2015,7 +2017,8 @@ export function createWorkspaceRoutes(
   // Which vault credential this workspace's agent is currently configured with
   // (slug + effective model/protocol/context), or null. Feeds the quick-chat
   // composer's overwrite notice and its compact launch-config summary.
-  // Detection only — never mutates.
+  // Ordinary detection does not overwrite config. The Pi adapter may perform
+  // its one-time legacy `.pi-agent` layout migration before reading.
   app.get('/:id/agent-config/:agent/credential', async (c) => {
     const id = c.req.param('id');
     const agent = c.req.param('agent');
@@ -2029,6 +2032,7 @@ export function createWorkspaceRoutes(
         model: detected?.model ?? null,
         contextWindow: detected?.contextWindow ?? null,
         wireShape: detected?.wireShape ?? null,
+        ...(typeof detected?.reasoning === 'boolean' ? { reasoning: detected.reasoning } : {}),
       });
     } catch (err) {
       if (err instanceof PathTraversal) return c.json({ error: 'invalid_path' }, 400);

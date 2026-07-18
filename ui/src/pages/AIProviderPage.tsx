@@ -346,6 +346,16 @@ function WorkspaceDefaultsSection({ credentials }: { credentials: CredentialSumm
     await persist(data.defaults, contextWindow)
   }
 
+  const setPiReasoning = async (reasoning: boolean) => {
+    if (!data) return
+    const current = data.defaults.pi
+    if (!current) return
+    await persist({
+      ...data.defaults,
+      pi: { ...current, reasoning },
+    }, data.contextWindow)
+  }
+
   const renderAgent = (agent: { id: string; name: string }, note?: string) => {
     const options = data?.compatibleByAgent[agent.id] ?? []
     const current = data?.defaults[agent.id]?.credentialSlug ?? ''
@@ -395,6 +405,18 @@ function WorkspaceDefaultsSection({ credentials }: { credentials: CredentialSumm
             <p className="px-1 text-[10.5px] text-text-muted">
               Protocol: {WIRE_SHAPE_GUIDANCE[wireShapes[0]!]}
             </p>
+          )}
+          {agent.id === 'pi' && current && (
+            <label className="flex items-center gap-2 px-1 text-[10.5px] text-text-muted">
+              <input
+                type="checkbox"
+                aria-label="Default Pi model supports reasoning"
+                checked={data?.defaults.pi?.reasoning === true}
+                disabled={saving}
+                onChange={(event) => void setPiReasoning(event.target.checked)}
+              />
+              Model supports reasoning
+            </label>
           )}
         </div>
       </div>

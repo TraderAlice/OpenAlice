@@ -43,7 +43,7 @@ export interface Workspace {
   /**
    * Whether the workspace has UI-saved AI provider overrides for each
    * agent. claude = `.claude/settings.local.json` exists; codex = `.codex/`
-   * dir; opencode = `opencode.json`; pi = `.pi-agent/` dir. Surfaced in the
+   * dir; opencode = `opencode.json`; pi = `.pi/settings.json`. Surfaced in the
    * Overview dashboard.
    */
   readonly agentOverride?: {
@@ -1154,6 +1154,8 @@ export interface AgentConfig {
   readonly model: string | null;
   /** Optional custom-model context window for opencode/Pi provider overrides. */
   readonly contextWindow?: number | null;
+  /** Pi only: whether this custom model exposes native reasoning. */
+  readonly reasoning?: boolean | null;
   /** Wire protocol the endpoint speaks — drives how the adapter is configured. */
   readonly wireShape?: WireShape | null;
   /** Codex only — wire format for the upstream API. */
@@ -1240,6 +1242,7 @@ export interface WorkspaceCredentialDetection {
   readonly model: string | null;
   readonly contextWindow: number | null;
   readonly wireShape: WireShape | null;
+  readonly reasoning?: boolean | null;
 }
 
 export async function detectWorkspaceCredential(
@@ -1249,7 +1252,7 @@ export async function detectWorkspaceCredential(
   const res = await fetch(
     `/api/workspaces/${encodeURIComponent(wsId)}/agent-config/${encodeURIComponent(agent)}/credential`,
   );
-  if (!res.ok) return { slug: null, model: null, contextWindow: null, wireShape: null };
+  if (!res.ok) return { slug: null, model: null, contextWindow: null, wireShape: null, reasoning: null };
   return (await res.json()) as WorkspaceCredentialDetection;
 }
 

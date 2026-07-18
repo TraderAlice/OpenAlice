@@ -200,10 +200,11 @@ or deleted, the setting is reported as invalid and process launch fails
 explicitly; OpenAlice does not silently fall back to Auto.
 
 During Windows Pi bootstrap, OpenAlice mirrors the resolved global shell into
-the Workspace's `.pi-agent/settings.json`. This also backfills existing
+the Workspace's `.pi/settings.json`. This also backfills existing
 Workspaces created before the global preference existed, while preserving all
-other Pi-owned settings. The Pi file is a derived compatibility cache; the
-machine-local preference remains the source of truth.
+other Pi-owned project settings. OpenAlice records the prior value so reset can
+restore it. The Pi file is a derived compatibility cache; the machine-local
+preference remains the source of truth.
 
 ## Packaging and Runtime Flow
 
@@ -267,7 +268,7 @@ remain at the OpenAlice/UTA boundary.
   canonicalizes `Path`/`PATH` so Pi's nested shell keeps the injected entries.
 - `src/workspaces/adapters/pi.ts` launches the npm runtime as
   `[managedPiNodePath, managedPiPath, ...args]` and writes the managed shell
-  path into `.pi-agent/settings.json` during Windows Workspace bootstrap.
+  path into `.pi/settings.json` during Windows Workspace bootstrap.
 
 The packaged Electron managed npm runtime is not added to `PATH` as a fake
 `pi` binary; the Pi adapter owns its explicit launch command. The curl
@@ -298,10 +299,13 @@ Do not add external-Pi version probing or upgrade UX to preserve flags used by
 the packaged runtime. Compatibility for the packaged app is maintained by
 pinning and upgrading the bundled Pi with the OpenAlice release.
 
-When a Workspace has a `.pi-agent/` provider override, its trust file lives in
-that redirected agent directory. Otherwise OpenAlice updates Pi's normal agent
-directory; it must not create `.pi-agent/` solely for trust because doing so
-would hide the user's global Pi settings and extensions.
+OpenAlice always updates trust in Pi's normal user agent directory (or an
+explicit user-provided `PI_CODING_AGENT_DIR`). Provider overrides do not change
+that directory: OpenAlice adds a namespaced provider to its `models.json` and
+uses the native Workspace `.pi/settings.json` layer to select it. This keeps
+Pi's global settings, packages, auth, resources, trust, and sessions visible.
+An old Workspace `.pi-agent/` tree is migrated into this native layout before
+launch and removed only after its configuration and session data are preserved.
 
 ### Codex interactive permissions
 
@@ -335,9 +339,10 @@ OpenAlice copies Workspace skills into two canonical project paths:
 - `.claude/skills/` for Claude Code;
 - `.agents/skills/` for Codex, current Pi, and compatible shared-skill readers.
 
-Pi's provider state lives separately under `.pi-agent/`. Do not restore a
-duplicate `.pi/skills/` copy: current Pi discovers the shared
-`.agents/skills/` tree from the Workspace working directory.
+Pi's provider definition lives in its normal user `models.json`; the Workspace
+stores only provider/model selection and OpenAlice rollback metadata under
+`.pi/`. Do not restore a duplicate `.pi/skills/` copy: current Pi discovers the
+shared `.agents/skills/` tree from the Workspace working directory.
 
 ## Packaging Invariants
 
@@ -354,8 +359,8 @@ Keep these true together:
 - Managed `fd` and `ripgrep` versions, release URLs, checksums, binaries, and
   license files remain pinned together in `scripts/vendor-managed-runtime.mjs`.
 - Pi remains network-capable. The managed search tools prevent its normal
-  startup probe from downloading a separate copy into each redirected
-  `PI_CODING_AGENT_DIR`; they do not force `PI_OFFLINE` or patch Pi itself.
+  startup probe from downloading redundant copies into its user agent
+  directory; they do not force `PI_OFFLINE` or patch Pi itself.
 - Every packaged Workspace CLI includes the shared `openalice-cli.cjs` payload,
   its POSIX launcher, and its Windows `.cmd` twin; packaged smoke must execute
   the payload through Electron Node.

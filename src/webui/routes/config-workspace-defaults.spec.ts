@@ -270,14 +270,14 @@ describe('PUT /workspace-credential-defaults', () => {
     const { status, body } = await req(routes, 'PUT', '/workspace-credential-defaults', {
       defaults: {
         opencode: { credentialSlug: 'openai-1', model: 'gpt-5.5', wireShape: 'openai-responses' },
-        pi: { credentialSlug: 'anthropic-1' },
+        pi: { credentialSlug: 'anthropic-1', reasoning: true },
       },
       contextWindow: 512_000,
     })
     expect(status).toBe(200)
     expect(body!.defaults).toEqual({
       opencode: { credentialSlug: 'openai-1', model: 'gpt-5.5', wireShape: 'openai-responses' },
-      pi: { credentialSlug: 'anthropic-1' },
+      pi: { credentialSlug: 'anthropic-1', reasoning: true },
     })
     expect(defaultsStore).toEqual(body!.defaults)
     expect(body!.contextWindow).toBe(512_000)

@@ -115,6 +115,8 @@ export interface CredentialInjectionOverrides {
   wireShape?: CredentialWireShape
   /** Context window to write for custom-model runtimes; defaults to 256K for opencode/Pi. */
   contextWindow?: number | null
+  /** Pi only — whether the selected custom model exposes native reasoning. */
+  reasoning?: boolean | null
   /** Anthropic wire only — which header carries the key. Defaults via baseUrl heuristic. */
   authMode?: 'x-api-key' | 'bearer'
   /** Codex only — Responses vs Chat Completions. Adapter defaults to 'chat'. */
@@ -148,6 +150,9 @@ export function credentialToWorkspaceAiCred(
   if (agentId === 'opencode' || agentId === 'pi') {
     cred.contextWindow = overrides.contextWindow ?? DEFAULT_CONTEXT_WINDOW
   }
+  if (agentId === 'pi' && typeof overrides.reasoning === 'boolean') {
+    cred.reasoning = overrides.reasoning
+  }
 
   if (picked.shape === 'anthropic') {
     cred.authMode = resolveAnthropicAuthMode({
@@ -168,7 +173,8 @@ export function credentialToWorkspaceAiCred(
  *
  * MUST run AFTER the launcher's initial commit: `writeAiConfig` writes the
  * secret into `.claude/settings.local.json` / `.codex/env.json` / `opencode.json`
- * / `.pi-agent/`, which `_common.sh`'s `setup_git_excludes` keeps out of git —
+ * / Pi's global models plus `.pi/settings.json`, which `_common.sh`'s
+ * `setup_git_excludes` keeps out of git —
  * but only post-commit are we certain the key never lands in the initial commit.
  *
  * Every miss (agent not enabled, no adapter, credential slug absent) is a loud
@@ -210,6 +216,7 @@ export async function injectWorkspaceCredentials(opts: {
         : opts.defaultContextWindow !== undefined
           ? { contextWindow: opts.defaultContextWindow }
           : {}),
+      ...(decl.reasoning !== undefined ? { reasoning: decl.reasoning } : {}),
       ...(decl.authMode !== undefined ? { authMode: decl.authMode } : {}),
       ...(decl.wireApi !== undefined ? { wireApi: decl.wireApi } : {}),
     })
