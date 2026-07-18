@@ -115,46 +115,52 @@ function PalettePicker<T extends ThemePaletteId>({
             key={palette.id}
             type="button"
             data-palette-preview={palette.id}
+            data-selected={selected === palette.id}
             onClick={() => onSelect(palette.id)}
             aria-pressed={selected === palette.id}
-            className={`min-w-0 rounded-lg border bg-background p-3 text-left text-foreground shadow-sm transition-all ${
-              selected === palette.id
-                ? 'border-primary ring-2 ring-primary/25'
-                : 'border-border hover:border-primary/60'
-            }`}
+            className="oa-palette-preview min-w-0 rounded-lg border p-3 text-left shadow-sm transition-all"
           >
             <span className="flex items-start justify-between gap-2">
               <span className="min-w-0">
                 <span className="block break-words text-[12px] font-semibold">{t(palette.labelKey)}</span>
-                <span className="mt-0.5 block text-[10px] leading-snug text-muted-foreground">
+                <span className="oa-palette-preview-muted mt-0.5 block text-[10px] leading-snug">
                   {t(palette.descriptionKey)}
                 </span>
               </span>
-              <span
-                className={`mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full border ${
-                  selected === palette.id ? 'border-primary bg-primary' : 'border-border bg-muted'
-                }`}
-                aria-hidden
-              />
+              <span className="oa-palette-preview-indicator mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full border" aria-hidden />
             </span>
-            <span className="mt-3 flex items-center gap-1.5" aria-hidden>
-              <span className="h-4 flex-1 rounded-sm bg-primary" />
-              <span className="h-4 flex-1 rounded-sm bg-success" />
-              <span className="h-4 flex-1 rounded-sm bg-warning" />
-              <span className="h-4 flex-1 rounded-sm bg-destructive" />
+
+            <span className="oa-palette-preview-shell mt-3 flex h-9 overflow-hidden rounded border" aria-hidden>
+              <span className="oa-palette-preview-sidebar flex w-5 shrink-0 items-center justify-center border-r">
+                <span className="oa-palette-preview-sidebar-dot h-1.5 w-1.5 rounded-full" />
+              </span>
+              <span className="oa-palette-preview-canvas flex min-w-0 flex-1 flex-col justify-center gap-1.5 px-2">
+                <span className="oa-palette-preview-primary-line h-1.5 w-1/2 rounded-full" />
+                <span className="flex gap-1">
+                  <span className="oa-palette-preview-muted-line h-1 flex-1 rounded-full" />
+                  <span className="oa-palette-preview-muted-line h-1 w-1/4 rounded-full" />
+                </span>
+              </span>
+            </span>
+
+            <span className="mt-2 flex items-center gap-1.5" aria-hidden>
+              <span className="h-3 flex-1 rounded-sm" style={{ background: 'var(--primary)' }} />
+              <span className="h-3 flex-1 rounded-sm" style={{ background: 'var(--success)' }} />
+              <span className="h-3 flex-1 rounded-sm" style={{ background: 'var(--warning)' }} />
+              <span className="h-3 flex-1 rounded-sm" style={{ background: 'var(--destructive)' }} />
+              <span className="h-3 flex-1 rounded-sm" style={{ background: 'var(--ai-action)' }} />
             </span>
             <span
-              className="mt-2 flex h-5 items-center gap-1 rounded border border-border px-1.5"
-              style={{ background: 'var(--terminal-background)', color: 'var(--terminal-foreground)' }}
+              className="oa-palette-preview-terminal mt-2 flex h-5 items-center gap-1 rounded border px-1.5"
               aria-hidden
             >
               <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--terminal-red)' }} />
               <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--terminal-yellow)' }} />
               <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--terminal-green)' }} />
-              <span
-                className="ml-1 h-px flex-1"
-                style={{ background: 'color-mix(in srgb, var(--terminal-foreground) 35%, transparent)' }}
-              />
+              <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--terminal-cyan)' }} />
+              <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--terminal-blue)' }} />
+              <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--terminal-magenta)' }} />
+              <span className="oa-palette-preview-terminal-line ml-1 h-px flex-1" />
             </span>
           </button>
         ))}

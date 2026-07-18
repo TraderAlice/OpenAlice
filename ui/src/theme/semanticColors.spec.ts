@@ -76,6 +76,12 @@ function paletteBlock(id: ThemePaletteId): string {
   return block!
 }
 
+function paletteToken(id: ThemePaletteId, token: string): string {
+  const value = paletteBlock(id).match(new RegExp(`--${token}:\\s*([^;]+);`))?.[1]?.trim()
+  expect(value, `${id}: --${token}`).toBeDefined()
+  return value!
+}
+
 describe('semantic color contract', () => {
   it('ships two complete light cards and two complete dark cards', () => {
     expect(LIGHT_PALETTES.map(({ id }) => id)).toEqual(['paper', 'porcelain'])
@@ -100,6 +106,29 @@ describe('semantic color contract', () => {
       const cardTokens = [...paletteBlock(id).matchAll(/^\s*(--[\w-]+):/gm)].map((match) => match[1])
       expect(cardTokens.sort(), id).toEqual([...tokens].sort())
     }
+  })
+
+  it('keeps the four visible palette preview signatures distinct', () => {
+    const previewTokens = [
+      'background',
+      'secondary',
+      'primary',
+      'success',
+      'warning',
+      'destructive',
+      'ai-action',
+      'terminal-background',
+      'terminal-red',
+      'terminal-green',
+      'terminal-blue',
+      'terminal-magenta',
+      'terminal-cyan',
+    ]
+    const signatures = PALETTE_IDS.map((id) => previewTokens.map((token) => paletteToken(id, token)).join('|'))
+
+    expect(new Set(signatures).size).toBe(PALETTE_IDS.length)
+    expect(palette).toContain('[data-palette-preview][data-selected="true"]')
+    expect(palette).toContain('.oa-palette-preview-terminal')
   })
 
   it('resolves auto, day, and night modes through one palette selector', () => {

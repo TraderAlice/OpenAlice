@@ -375,3 +375,71 @@
     transparent 38rem
   );
 }
+
+/* Palette cards are miniature, isolated product surfaces. Keep their chrome
+ * bound directly to the preview card's variables so the active app palette
+ * cannot make all four choices look alike. */
+[data-palette-preview] {
+  background: var(--background);
+  color: var(--foreground);
+  border-color: var(--border);
+}
+
+[data-palette-preview]:hover {
+  border-color: color-mix(in srgb, var(--primary) 60%, var(--border));
+}
+
+[data-palette-preview][data-selected="true"] {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 25%, transparent);
+}
+
+[data-palette-preview] .oa-palette-preview-muted {
+  color: var(--muted-foreground);
+}
+
+[data-palette-preview] .oa-palette-preview-indicator {
+  background: var(--muted);
+  border-color: var(--border);
+}
+
+[data-palette-preview][data-selected="true"] .oa-palette-preview-indicator {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+[data-palette-preview] .oa-palette-preview-shell,
+[data-palette-preview] .oa-palette-preview-terminal {
+  border-color: var(--border);
+}
+
+[data-palette-preview] .oa-palette-preview-shell {
+  background: var(--card);
+}
+
+[data-palette-preview] .oa-palette-preview-sidebar {
+  background: var(--sidebar);
+  border-color: var(--sidebar-border);
+}
+
+[data-palette-preview] .oa-palette-preview-sidebar-dot,
+[data-palette-preview] .oa-palette-preview-primary-line {
+  background: var(--primary);
+}
+
+[data-palette-preview] .oa-palette-preview-canvas {
+  background: var(--background);
+}
+
+[data-palette-preview] .oa-palette-preview-muted-line {
+  background: var(--muted);
+}
+
+[data-palette-preview] .oa-palette-preview-terminal {
+  background: var(--terminal-background);
+  color: var(--terminal-foreground);
+}
+
+[data-palette-preview] .oa-palette-preview-terminal-line {
+  background: color-mix(in srgb, var(--terminal-foreground) 35%, transparent);
+}
