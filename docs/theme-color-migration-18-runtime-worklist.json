@@ -1,0 +1,1246 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "f36ed6769a4915fd189e4eb6e934bebbd671c781",
+  "items": [
+    {
+      "inventoryId": "color-5342a2ec7be48dcf0bc8",
+      "source": {
+        "inventoryId": "color-5342a2ec7be48dcf0bc8",
+        "path": "ui/src/components/market/KlinePanel.tsx",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "typescript-color-literal",
+        "ownerHint": "chart",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 5482,
+          "endOffset": 5493,
+          "startLine": 149,
+          "startColumn": 31,
+          "endLine": 149,
+          "endColumn": 42
+        }
+      }
+    },
+    {
+      "inventoryId": "color-c0d7545df9514efb606f",
+      "source": {
+        "inventoryId": "color-c0d7545df9514efb606f",
+        "path": "ui/src/components/market/KlinePanel.tsx",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "typescript-color-literal",
+        "ownerHint": "candle",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 6176,
+          "endOffset": 6187,
+          "startLine": 165,
+          "startColumn": 17,
+          "endLine": 165,
+          "endColumn": 28
+        }
+      }
+    },
+    {
+      "inventoryId": "color-92b88e6d693ce872d05f",
+      "source": {
+        "inventoryId": "color-92b88e6d693ce872d05f",
+        "path": "ui/src/components/market/KlinePanel.tsx",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "typescript-color-literal",
+        "ownerHint": "KlinePanel",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 7288,
+          "endOffset": 7299,
+          "startLine": 202,
+          "startColumn": 31,
+          "endLine": 202,
+          "endColumn": 42
+        }
+      }
+    },
+    {
+      "inventoryId": "color-6e486fc82329de0722b3",
+      "source": {
+        "inventoryId": "color-6e486fc82329de0722b3",
+        "path": "ui/src/components/market/KlinePanel.tsx",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "typescript-color-literal",
+        "ownerHint": "KlinePanel",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 7788,
+          "endOffset": 7799,
+          "startLine": 212,
+          "startColumn": 17,
+          "endLine": 212,
+          "endColumn": 28
+        }
+      }
+    },
+    {
+      "inventoryId": "color-fc39f0c208f8c60877f5",
+      "source": {
+        "inventoryId": "color-fc39f0c208f8c60877f5",
+        "path": "ui/src/components/PushApprovalPanel.tsx",
+        "sourceText": "border-transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "tailwind-palette-utility",
+        "ownerHint": "QueueRow",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 18335,
+          "endOffset": 18353,
+          "startLine": 522,
+          "startColumn": 14,
+          "endLine": 522,
+          "endColumn": 32
+        }
+      }
+    },
+    {
+      "inventoryId": "color-3a44ec475306c0e9d3d7",
+      "source": {
+        "inventoryId": "color-3a44ec475306c0e9d3d7",
+        "path": "ui/src/components/uta/CreateUTADialog.tsx",
+        "sourceText": "bg-transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "tailwind-palette-utility",
+        "ownerHint": "escapeButton",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 6799,
+          "endOffset": 6813,
+          "startLine": 200,
+          "startColumn": 189,
+          "endLine": 200,
+          "endColumn": 203
+        }
+      }
+    },
+    {
+      "inventoryId": "color-a88c6b99a057a1abc78e",
+      "source": {
+        "inventoryId": "color-a88c6b99a057a1abc78e",
+        "path": "ui/src/components/workspace/Terminal.tsx",
+        "sourceText": "#d29922",
+        "sourceClass": "runtime",
+        "syntaxKind": "typescript-color-literal",
+        "ownerHint": "colors",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 25013,
+          "endOffset": 25020,
+          "startLine": 679,
+          "startColumn": 18,
+          "endLine": 679,
+          "endColumn": 25
+        }
+      }
+    },
+    {
+      "inventoryId": "color-a2502638dac58ad2d0cf",
+      "source": {
+        "inventoryId": "color-a2502638dac58ad2d0cf",
+        "path": "ui/src/components/workspace/Terminal.tsx",
+        "sourceText": "#d29922",
+        "sourceClass": "runtime",
+        "syntaxKind": "typescript-color-literal",
+        "ownerHint": "colors",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 25042,
+          "endOffset": 25049,
+          "startLine": 680,
+          "startColumn": 20,
+          "endLine": 680,
+          "endColumn": 27
+        }
+      }
+    },
+    {
+      "inventoryId": "color-fad8da22911ee1320a13",
+      "source": {
+        "inventoryId": "color-fad8da22911ee1320a13",
+        "path": "ui/src/components/workspace/Terminal.tsx",
+        "sourceText": "#7ee787",
+        "sourceClass": "runtime",
+        "syntaxKind": "typescript-color-literal",
+        "ownerHint": "colors",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 25068,
+          "endOffset": 25075,
+          "startLine": 681,
+          "startColumn": 17,
+          "endLine": 681,
+          "endColumn": 24
+        }
+      }
+    },
+    {
+      "inventoryId": "color-509231ce3ed382f1d728",
+      "source": {
+        "inventoryId": "color-509231ce3ed382f1d728",
+        "path": "ui/src/components/workspace/Terminal.tsx",
+        "sourceText": "#6e7681",
+        "sourceClass": "runtime",
+        "syntaxKind": "typescript-color-literal",
+        "ownerHint": "colors",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 25091,
+          "endOffset": 25098,
+          "startLine": 682,
+          "startColumn": 14,
+          "endLine": 682,
+          "endColumn": 21
+        }
+      }
+    },
+    {
+      "inventoryId": "color-19d01484e0de1757b806",
+      "source": {
+        "inventoryId": "color-19d01484e0de1757b806",
+        "path": "ui/src/components/workspace/Terminal.tsx",
+        "sourceText": "#d2a8ff",
+        "sourceClass": "runtime",
+        "syntaxKind": "typescript-color-literal",
+        "ownerHint": "colors",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 25114,
+          "endOffset": 25121,
+          "startLine": 683,
+          "startColumn": 14,
+          "endLine": 683,
+          "endColumn": 21
+        }
+      }
+    },
+    {
+      "inventoryId": "color-2afe94d71738134b0696",
+      "source": {
+        "inventoryId": "color-2afe94d71738134b0696",
+        "path": "ui/src/components/workspace/Terminal.tsx",
+        "sourceText": "#d2a8ff",
+        "sourceClass": "runtime",
+        "syntaxKind": "typescript-color-literal",
+        "ownerHint": "colors",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 25137,
+          "endOffset": 25144,
+          "startLine": 684,
+          "startColumn": 14,
+          "endLine": 684,
+          "endColumn": 21
+        }
+      }
+    },
+    {
+      "inventoryId": "color-c2ede41d725f6ffeb91c",
+      "source": {
+        "inventoryId": "color-c2ede41d725f6ffeb91c",
+        "path": "ui/src/components/workspace/workspaces.css",
+        "sourceText": "rgba(0, 0, 0, 0)",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".resume-cta-overlay",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 4144,
+          "endOffset": 4160,
+          "startLine": 175,
+          "startColumn": 5,
+          "endLine": 175,
+          "endColumn": 21
+        }
+      }
+    },
+    {
+      "inventoryId": "color-9ed31ee430992d65b2d4",
+      "source": {
+        "inventoryId": "color-9ed31ee430992d65b2d4",
+        "path": "ui/src/components/workspace/workspaces.css",
+        "sourceText": "rgba(0, 0, 0, 0.4)",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".resume-cta-card",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 4588,
+          "endOffset": 4606,
+          "startLine": 192,
+          "startColumn": 26,
+          "endLine": 192,
+          "endColumn": 44
+        }
+      }
+    },
+    {
+      "inventoryId": "color-dbe0d64d1bfcfdde51f9",
+      "source": {
+        "inventoryId": "color-dbe0d64d1bfcfdde51f9",
+        "path": "ui/src/components/workspace/workspaces.css",
+        "sourceText": "rgba(0, 0, 0, 0.65)",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".workspace-page-shell .workspace-side",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 7911,
+          "endOffset": 7930,
+          "startLine": 348,
+          "startColumn": 36,
+          "endLine": 348,
+          "endColumn": 55
+        }
+      }
+    },
+    {
+      "inventoryId": "color-b11a84070c5b31870cf9",
+      "source": {
+        "inventoryId": "color-b11a84070c5b31870cf9",
+        "path": "ui/src/components/workspace/workspaces.css",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".workspace-empty-secondary-btn",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 11914,
+          "endOffset": 11925,
+          "startLine": 533,
+          "startColumn": 15,
+          "endLine": 533,
+          "endColumn": 26
+        }
+      }
+    },
+    {
+      "inventoryId": "color-3bf871aa30ef2daa9c4f",
+      "source": {
+        "inventoryId": "color-3bf871aa30ef2daa9c4f",
+        "path": "ui/src/components/workspace/workspaces.css",
+        "sourceText": "rgba(0, 0, 0, 0.35)",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".terminal-shell",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 16022,
+          "endOffset": 16041,
+          "startLine": 733,
+          "startColumn": 27,
+          "endLine": 733,
+          "endColumn": 46
+        }
+      }
+    },
+    {
+      "inventoryId": "color-ee2a601683fe8af57fc0",
+      "source": {
+        "inventoryId": "color-ee2a601683fe8af57fc0",
+        "path": "ui/src/components/workspace/workspaces.css",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".terminal-theme-option",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 17520,
+          "endOffset": 17531,
+          "startLine": 807,
+          "startColumn": 15,
+          "endLine": 807,
+          "endColumn": 26
+        }
+      }
+    },
+    {
+      "inventoryId": "color-700feacb3627b8b8aac4",
+      "source": {
+        "inventoryId": "color-700feacb3627b8b8aac4",
+        "path": "ui/src/components/workspace/workspaces.css",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".terminal-host .xterm-viewport",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 18522,
+          "endOffset": 18533,
+          "startLine": 857,
+          "startColumn": 21,
+          "endLine": 857,
+          "endColumn": 32
+        }
+      }
+    },
+    {
+      "inventoryId": "color-feb7653bad6501870cb0",
+      "source": {
+        "inventoryId": "color-feb7653bad6501870cb0",
+        "path": "ui/src/components/workspace/workspaces.css",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".webpi-shell",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 19162,
+          "endOffset": 19173,
+          "startLine": 885,
+          "startColumn": 84,
+          "endLine": 885,
+          "endColumn": 95
+        }
+      }
+    },
+    {
+      "inventoryId": "color-e539e4da5c5fcaa79e15",
+      "source": {
+        "inventoryId": "color-e539e4da5c5fcaa79e15",
+        "path": "ui/src/components/workspace/workspaces.css",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".webpi-shell",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 19176,
+          "endOffset": 19187,
+          "startLine": 885,
+          "startColumn": 98,
+          "endLine": 885,
+          "endColumn": 109
+        }
+      }
+    },
+    {
+      "inventoryId": "color-1ce410d7e37f382a9d36",
+      "source": {
+        "inventoryId": "color-1ce410d7e37f382a9d36",
+        "path": "ui/src/components/workspace/workspaces.css",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".webpi-header",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 19475,
+          "endOffset": 19486,
+          "startLine": 897,
+          "startColumn": 65,
+          "endLine": 897,
+          "endColumn": 76
+        }
+      }
+    },
+    {
+      "inventoryId": "color-33f50e0e713f740dc7de",
+      "source": {
+        "inventoryId": "color-33f50e0e713f740dc7de",
+        "path": "ui/src/components/workspace/workspaces.css",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".webpi-activity",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 21655,
+          "endOffset": 21666,
+          "startLine": 930,
+          "startColumn": 65,
+          "endLine": 930,
+          "endColumn": 76
+        }
+      }
+    },
+    {
+      "inventoryId": "color-831c90547409921b1911",
+      "source": {
+        "inventoryId": "color-831c90547409921b1911",
+        "path": "ui/src/components/workspace/workspaces.css",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".webpi-activity",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 21756,
+          "endOffset": 21767,
+          "startLine": 932,
+          "startColumn": 65,
+          "endLine": 932,
+          "endColumn": 76
+        }
+      }
+    },
+    {
+      "inventoryId": "color-b9598f01b8a9a87c3a8b",
+      "source": {
+        "inventoryId": "color-b9598f01b8a9a87c3a8b",
+        "path": "ui/src/components/workspace/workspaces.css",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".webpi-activity[open]",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 22055,
+          "endOffset": 22066,
+          "startLine": 936,
+          "startColumn": 87,
+          "endLine": 936,
+          "endColumn": 98
+        }
+      }
+    },
+    {
+      "inventoryId": "color-b079cd359c85a1184062",
+      "source": {
+        "inventoryId": "color-b079cd359c85a1184062",
+        "path": "ui/src/components/workspace/workspaces.css",
+        "sourceText": "#000",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".webpi-activity[open]",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 22111,
+          "endOffset": 22115,
+          "startLine": 936,
+          "startColumn": 143,
+          "endLine": 936,
+          "endColumn": 147
+        }
+      }
+    },
+    {
+      "inventoryId": "color-690cecd6eaf1a4cf3fb8",
+      "source": {
+        "inventoryId": "color-690cecd6eaf1a4cf3fb8",
+        "path": "ui/src/components/workspace/workspaces.css",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".webpi-activity[open]",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 22120,
+          "endOffset": 22131,
+          "startLine": 936,
+          "startColumn": 152,
+          "endLine": 936,
+          "endColumn": 163
+        }
+      }
+    },
+    {
+      "inventoryId": "color-9f704b33c9fe8e2d44c0",
+      "source": {
+        "inventoryId": "color-9f704b33c9fe8e2d44c0",
+        "path": "ui/src/components/workspace/workspaces.css",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".webpi-activity-status",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 22943,
+          "endOffset": 22954,
+          "startLine": 957,
+          "startColumn": 180,
+          "endLine": 957,
+          "endColumn": 191
+        }
+      }
+    },
+    {
+      "inventoryId": "color-4513f66238d75149ec7e",
+      "source": {
+        "inventoryId": "color-4513f66238d75149ec7e",
+        "path": "ui/src/components/workspace/workspaces.css",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".webpi-activity-status",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 23013,
+          "endOffset": 23024,
+          "startLine": 957,
+          "startColumn": 250,
+          "endLine": 957,
+          "endColumn": 261
+        }
+      }
+    },
+    {
+      "inventoryId": "color-36c1561a3f1a8820af8f",
+      "source": {
+        "inventoryId": "color-36c1561a3f1a8820af8f",
+        "path": "ui/src/components/workspace/workspaces.css",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".webpi-activity.is-running .webpi-activity-status",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 23165,
+          "endOffset": 23176,
+          "startLine": 958,
+          "startColumn": 137,
+          "endLine": 958,
+          "endColumn": 148
+        }
+      }
+    },
+    {
+      "inventoryId": "color-e848f9c740205ec6720a",
+      "source": {
+        "inventoryId": "color-e848f9c740205ec6720a",
+        "path": "ui/src/components/workspace/workspaces.css",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".webpi-activity.is-error .webpi-activity-status",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 23354,
+          "endOffset": 23365,
+          "startLine": 959,
+          "startColumn": 174,
+          "endLine": 959,
+          "endColumn": 185
+        }
+      }
+    },
+    {
+      "inventoryId": "color-003d5fbf6d5b24c1611c",
+      "source": {
+        "inventoryId": "color-003d5fbf6d5b24c1611c",
+        "path": "ui/src/components/workspace/workspaces.css",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".webpi-activity-body",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 23964,
+          "endOffset": 23975,
+          "startLine": 965,
+          "startColumn": 90,
+          "endLine": 965,
+          "endColumn": 101
+        }
+      }
+    },
+    {
+      "inventoryId": "color-1e1ee7c13829c01b1dcf",
+      "source": {
+        "inventoryId": "color-1e1ee7c13829c01b1dcf",
+        "path": "ui/src/components/workspace/workspaces.css",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".webpi-tool-step",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 24238,
+          "endOffset": 24249,
+          "startLine": 969,
+          "startColumn": 89,
+          "endLine": 969,
+          "endColumn": 100
+        }
+      }
+    },
+    {
+      "inventoryId": "color-a3aa4d22a4a9fe8f9f87",
+      "source": {
+        "inventoryId": "color-a3aa4d22a4a9fe8f9f87",
+        "path": "ui/src/components/workspace/workspaces.css",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".webpi-step-status",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 24726,
+          "endOffset": 24737,
+          "startLine": 973,
+          "startColumn": 140,
+          "endLine": 973,
+          "endColumn": 151
+        }
+      }
+    },
+    {
+      "inventoryId": "color-21dd6b1a08f483e99e1c",
+      "source": {
+        "inventoryId": "color-21dd6b1a08f483e99e1c",
+        "path": "ui/src/components/workspace/workspaces.css",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".webpi-step-size",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 25332,
+          "endOffset": 25343,
+          "startLine": 978,
+          "startColumn": 96,
+          "endLine": 978,
+          "endColumn": 107
+        }
+      }
+    },
+    {
+      "inventoryId": "color-decb08654a737e36ec6c",
+      "source": {
+        "inventoryId": "color-decb08654a737e36ec6c",
+        "path": "ui/src/components/workspace/workspaces.css",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".webpi-step-detail",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 25605,
+          "endOffset": 25616,
+          "startLine": 980,
+          "startColumn": 150,
+          "endLine": 980,
+          "endColumn": 161
+        }
+      }
+    },
+    {
+      "inventoryId": "color-449797a792f8937e54b1",
+      "source": {
+        "inventoryId": "color-449797a792f8937e54b1",
+        "path": "ui/src/components/workspace/workspaces.css",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".webpi-step-detail",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 25691,
+          "endOffset": 25702,
+          "startLine": 980,
+          "startColumn": 236,
+          "endLine": 980,
+          "endColumn": 247
+        }
+      }
+    },
+    {
+      "inventoryId": "color-bdedd90ca9146f43dfff",
+      "source": {
+        "inventoryId": "color-bdedd90ca9146f43dfff",
+        "path": "ui/src/components/workspace/workspaces.css",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".webpi-composer-wrap",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 28099,
+          "endOffset": 28110,
+          "startLine": 999,
+          "startColumn": 175,
+          "endLine": 999,
+          "endColumn": 186
+        }
+      }
+    },
+    {
+      "inventoryId": "color-1aaa13b52b7bd57b9e02",
+      "source": {
+        "inventoryId": "color-1aaa13b52b7bd57b9e02",
+        "path": "ui/src/components/workspace/workspaces.css",
+        "sourceText": "#000",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".webpi-composer",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 28350,
+          "endOffset": 28354,
+          "startLine": 1000,
+          "startColumn": 236,
+          "endLine": 1000,
+          "endColumn": 240
+        }
+      }
+    },
+    {
+      "inventoryId": "color-6bf0b8a3c37ccfd516b0",
+      "source": {
+        "inventoryId": "color-6bf0b8a3c37ccfd516b0",
+        "path": "ui/src/components/workspace/workspaces.css",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".webpi-composer",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 28359,
+          "endOffset": 28370,
+          "startLine": 1000,
+          "startColumn": 245,
+          "endLine": 1000,
+          "endColumn": 256
+        }
+      }
+    },
+    {
+      "inventoryId": "color-ee220623240d97426c5d",
+      "source": {
+        "inventoryId": "color-ee220623240d97426c5d",
+        "path": "ui/src/components/workspace/workspaces.css",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".webpi-composer textarea",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 28636,
+          "endOffset": 28647,
+          "startLine": 1002,
+          "startColumn": 149,
+          "endLine": 1002,
+          "endColumn": 160
+        }
+      }
+    },
+    {
+      "inventoryId": "color-a1a26f258a7fbbdbe131",
+      "source": {
+        "inventoryId": "color-a1a26f258a7fbbdbe131",
+        "path": "ui/src/index.css",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": "::selection",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 2796,
+          "endOffset": 2807,
+          "startLine": 74,
+          "startColumn": 59,
+          "endLine": 74,
+          "endColumn": 70
+        }
+      }
+    },
+    {
+      "inventoryId": "color-d7d58e4dfbb3028fa1fb",
+      "source": {
+        "inventoryId": "color-d7d58e4dfbb3028fa1fb",
+        "path": "ui/src/index.css",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".oa-pressable:hover:not(:disabled):not([aria-disabled=\"true\"])",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 4816,
+          "endOffset": 4827,
+          "startLine": 129,
+          "startColumn": 69,
+          "endLine": 129,
+          "endColumn": 80
+        }
+      }
+    },
+    {
+      "inventoryId": "color-2bb33a2ca9e54c5a28d1",
+      "source": {
+        "inventoryId": "color-2bb33a2ca9e54c5a28d1",
+        "path": "ui/src/index.css",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".oa-onboarding-completion-ring",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 10256,
+          "endOffset": 10267,
+          "startLine": 397,
+          "startColumn": 76,
+          "endLine": 397,
+          "endColumn": 87
+        }
+      }
+    },
+    {
+      "inventoryId": "color-da57229f25c270008370",
+      "source": {
+        "inventoryId": "color-da57229f25c270008370",
+        "path": "ui/src/index.css",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".skeleton",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 12377,
+          "endOffset": 12388,
+          "startLine": 477,
+          "startColumn": 5,
+          "endLine": 477,
+          "endColumn": 16
+        }
+      }
+    },
+    {
+      "inventoryId": "color-6697e3270ecda8da085f",
+      "source": {
+        "inventoryId": "color-6697e3270ecda8da085f",
+        "path": "ui/src/index.css",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".skeleton",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 12434,
+          "endOffset": 12445,
+          "startLine": 479,
+          "startColumn": 5,
+          "endLine": 479,
+          "endColumn": 16
+        }
+      }
+    },
+    {
+      "inventoryId": "color-65fad81f1a4eec83881d",
+      "source": {
+        "inventoryId": "color-65fad81f1a4eec83881d",
+        "path": "ui/src/index.css",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".btn-danger",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 14734,
+          "endOffset": 14745,
+          "startLine": 552,
+          "startColumn": 68,
+          "endLine": 552,
+          "endColumn": 79
+        }
+      }
+    },
+    {
+      "inventoryId": "color-a4accdd1e833c1e516c8",
+      "source": {
+        "inventoryId": "color-a4accdd1e833c1e516c8",
+        "path": "ui/src/index.css",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".btn-danger:hover",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 14836,
+          "endOffset": 14847,
+          "startLine": 556,
+          "startColumn": 66,
+          "endLine": 556,
+          "endColumn": 77
+        }
+      }
+    },
+    {
+      "inventoryId": "color-36aead8fa2e0e54a33ed",
+      "source": {
+        "inventoryId": "color-36aead8fa2e0e54a33ed",
+        "path": "ui/src/index.css",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": "::-webkit-scrollbar-track",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 15873,
+          "endOffset": 15884,
+          "startLine": 583,
+          "startColumn": 15,
+          "endLine": 583,
+          "endColumn": 26
+        }
+      }
+    },
+    {
+      "inventoryId": "color-7c934a658d62469a1862",
+      "source": {
+        "inventoryId": "color-7c934a658d62469a1862",
+        "path": "ui/src/index.css",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".markdown-content a.wikilink",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 18277,
+          "endOffset": 18288,
+          "startLine": 670,
+          "startColumn": 73,
+          "endLine": 670,
+          "endColumn": 84
+        }
+      }
+    },
+    {
+      "inventoryId": "color-5445b5f7fe99cc0f8707",
+      "source": {
+        "inventoryId": "color-5445b5f7fe99cc0f8707",
+        "path": "ui/src/index.css",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".markdown-content a.session-signature:hover",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 18668,
+          "endOffset": 18679,
+          "startLine": 686,
+          "startColumn": 52,
+          "endLine": 686,
+          "endColumn": 63
+        }
+      }
+    },
+    {
+      "inventoryId": "color-2833fbb9d0848ce47509",
+      "source": {
+        "inventoryId": "color-2833fbb9d0848ce47509",
+        "path": "ui/src/index.css",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".what-editor-content .ProseMirror-focused",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 20349,
+          "endOffset": 20360,
+          "startLine": 759,
+          "startColumn": 15,
+          "endLine": 759,
+          "endColumn": 26
+        }
+      }
+    },
+    {
+      "inventoryId": "color-dc5086eee0bb39e03b48",
+      "source": {
+        "inventoryId": "color-dc5086eee0bb39e03b48",
+        "path": "ui/src/index.css",
+        "sourceText": "transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "css-color-literal",
+        "ownerHint": ".what-editor-content .ProseMirror-selectednode",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 20478,
+          "endOffset": 20489,
+          "startLine": 762,
+          "startColumn": 66,
+          "endLine": 762,
+          "endColumn": 77
+        }
+      }
+    },
+    {
+      "inventoryId": "color-ed404f80a0d816f47659",
+      "source": {
+        "inventoryId": "color-ed404f80a0d816f47659",
+        "path": "ui/src/pages/SimulatorPage.tsx",
+        "sourceText": "border-transparent",
+        "sourceClass": "runtime",
+        "syntaxKind": "tailwind-palette-utility",
+        "ownerHint": "TopBar",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 4118,
+          "endOffset": 4136,
+          "startLine": 106,
+          "startColumn": 61,
+          "endLine": 106,
+          "endColumn": 79
+        }
+      }
+    },
+    {
+      "inventoryId": "color-87b0eeef319dbb31bd4b",
+      "source": {
+        "inventoryId": "color-87b0eeef319dbb31bd4b",
+        "path": "ui/src/theme/colorPolicy.ts",
+        "sourceText": "#137333",
+        "sourceClass": "runtime",
+        "syntaxKind": "typescript-color-literal",
+        "ownerHint": "protectedColors",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 701,
+          "endOffset": 708,
+          "startLine": 17,
+          "startColumn": 20,
+          "endLine": 17,
+          "endColumn": 27
+        }
+      }
+    },
+    {
+      "inventoryId": "color-dbdecb8fb229ef75e44a",
+      "source": {
+        "inventoryId": "color-dbdecb8fb229ef75e44a",
+        "path": "ui/src/theme/colorPolicy.ts",
+        "sourceText": "#81c995",
+        "sourceClass": "runtime",
+        "syntaxKind": "typescript-color-literal",
+        "ownerHint": "protectedColors",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 718,
+          "endOffset": 725,
+          "startLine": 17,
+          "startColumn": 37,
+          "endLine": 17,
+          "endColumn": 44
+        }
+      }
+    },
+    {
+      "inventoryId": "color-3294ce3566f57d6ed54c",
+      "source": {
+        "inventoryId": "color-3294ce3566f57d6ed54c",
+        "path": "ui/src/theme/colorPolicy.ts",
+        "sourceText": "#b3261e",
+        "sourceClass": "runtime",
+        "syntaxKind": "typescript-color-literal",
+        "ownerHint": "protectedColors",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 747,
+          "endOffset": 754,
+          "startLine": 18,
+          "startColumn": 18,
+          "endLine": 18,
+          "endColumn": 25
+        }
+      }
+    },
+    {
+      "inventoryId": "color-f06accfcd365dee8e95a",
+      "source": {
+        "inventoryId": "color-f06accfcd365dee8e95a",
+        "path": "ui/src/theme/colorPolicy.ts",
+        "sourceText": "#f28b82",
+        "sourceClass": "runtime",
+        "syntaxKind": "typescript-color-literal",
+        "ownerHint": "protectedColors",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 764,
+          "endOffset": 771,
+          "startLine": 18,
+          "startColumn": 35,
+          "endLine": 18,
+          "endColumn": 42
+        }
+      }
+    },
+    {
+      "inventoryId": "color-c668d0e28e75fbcf7134",
+      "source": {
+        "inventoryId": "color-c668d0e28e75fbcf7134",
+        "path": "ui/src/theme/colorPolicy.ts",
+        "sourceText": "#8a4b00",
+        "sourceClass": "runtime",
+        "syntaxKind": "typescript-color-literal",
+        "ownerHint": "protectedColors",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 797,
+          "endOffset": 804,
+          "startLine": 19,
+          "startColumn": 22,
+          "endLine": 19,
+          "endColumn": 29
+        }
+      }
+    },
+    {
+      "inventoryId": "color-872d34056aad082f8142",
+      "source": {
+        "inventoryId": "color-872d34056aad082f8142",
+        "path": "ui/src/theme/colorPolicy.ts",
+        "sourceText": "#fdd663",
+        "sourceClass": "runtime",
+        "syntaxKind": "typescript-color-literal",
+        "ownerHint": "protectedColors",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 814,
+          "endOffset": 821,
+          "startLine": 19,
+          "startColumn": 39,
+          "endLine": 19,
+          "endColumn": 46
+        }
+      }
+    },
+    {
+      "inventoryId": "color-9c9b3118a53098509a32",
+      "source": {
+        "inventoryId": "color-9c9b3118a53098509a32",
+        "path": "ui/src/theme/colorPolicy.ts",
+        "sourceText": "#0b57d0",
+        "sourceClass": "runtime",
+        "syntaxKind": "typescript-color-literal",
+        "ownerHint": "protectedColors",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 844,
+          "endOffset": 851,
+          "startLine": 20,
+          "startColumn": 19,
+          "endLine": 20,
+          "endColumn": 26
+        }
+      }
+    },
+    {
+      "inventoryId": "color-ed02c1e3775baaa7bb65",
+      "source": {
+        "inventoryId": "color-ed02c1e3775baaa7bb65",
+        "path": "ui/src/theme/colorPolicy.ts",
+        "sourceText": "#8ab4f8",
+        "sourceClass": "runtime",
+        "syntaxKind": "typescript-color-literal",
+        "ownerHint": "protectedColors",
+        "role": "color-consumer",
+        "span": {
+          "startOffset": 861,
+          "endOffset": 868,
+          "startLine": 20,
+          "startColumn": 36,
+          "endLine": 20,
+          "endColumn": 43
+        }
+      }
+    }
+  ]
+}

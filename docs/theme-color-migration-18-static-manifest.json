@@ -1,0 +1,6790 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "f36ed6769a4915fd189e4eb6e934bebbd671c781",
+  "generatedFrom": "ui/src",
+  "occurrences": [
+    {
+      "inventoryId": "color-452abfb21ad9c25a8cb9",
+      "path": "ui/src/components/HtmlReportView.spec.tsx",
+      "sourceText": "#f7f7f7",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "reportTheme",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 244,
+        "endOffset": 251,
+        "startLine": 6,
+        "startColumn": 36,
+        "endLine": 6,
+        "endColumn": 43
+      }
+    },
+    {
+      "inventoryId": "color-4cc9271b536a51f53442",
+      "path": "ui/src/components/HtmlReportView.spec.tsx",
+      "sourceText": "#334455",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "reportTheme",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 261,
+        "endOffset": 268,
+        "startLine": 6,
+        "startColumn": 53,
+        "endLine": 6,
+        "endColumn": 60
+      }
+    },
+    {
+      "inventoryId": "color-804d75c382604a921f56",
+      "path": "ui/src/components/market/KlinePanel.colorPolicy.spec.tsx",
+      "sourceText": "#aaaaaa",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "values",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1716,
+        "endOffset": 1723,
+        "startLine": 42,
+        "startColumn": 30,
+        "endLine": 42,
+        "endColumn": 37
+      }
+    },
+    {
+      "inventoryId": "color-00cd51100fda276728c1",
+      "path": "ui/src/components/market/KlinePanel.colorPolicy.spec.tsx",
+      "sourceText": "#333333",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "values",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1753,
+        "endOffset": 1760,
+        "startLine": 42,
+        "startColumn": 67,
+        "endLine": 42,
+        "endColumn": 74
+      }
+    },
+    {
+      "inventoryId": "color-d2e1b131e6e185eb508f",
+      "path": "ui/src/components/market/KlinePanel.colorPolicy.spec.tsx",
+      "sourceText": "#111111",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "values",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1793,
+        "endOffset": 1800,
+        "startLine": 43,
+        "startColumn": 31,
+        "endLine": 43,
+        "endColumn": 38
+      }
+    },
+    {
+      "inventoryId": "color-2dbc2400ea83bd5c4dc5",
+      "path": "ui/src/components/market/KlinePanel.colorPolicy.spec.tsx",
+      "sourceText": "#eeeeee",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "values",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1828,
+        "endOffset": 1835,
+        "startLine": 43,
+        "startColumn": 66,
+        "endLine": 43,
+        "endColumn": 73
+      }
+    },
+    {
+      "inventoryId": "color-1005f391248efde59d86",
+      "path": "ui/src/components/market/KlinePanel.colorPolicy.spec.tsx",
+      "sourceText": "#222222",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "values",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1862,
+        "endOffset": 1869,
+        "startLine": 44,
+        "startColumn": 25,
+        "endLine": 44,
+        "endColumn": 32
+      }
+    },
+    {
+      "inventoryId": "color-f1ea6fce90ec5c84b250",
+      "path": "ui/src/components/market/KlinePanel.colorPolicy.spec.tsx",
+      "sourceText": "#444444",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "values",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1897,
+        "endOffset": 1904,
+        "startLine": 44,
+        "startColumn": 60,
+        "endLine": 44,
+        "endColumn": 67
+      }
+    },
+    {
+      "inventoryId": "color-2ca9c9b09ab46c4e0a6b",
+      "path": "ui/src/components/market/KlinePanel.colorPolicy.spec.tsx",
+      "sourceText": "#00aa00",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2209,
+        "endOffset": 2216,
+        "startLine": 53,
+        "startColumn": 17,
+        "endLine": 53,
+        "endColumn": 24
+      }
+    },
+    {
+      "inventoryId": "color-b85713f72dd396b742c7",
+      "path": "ui/src/components/market/KlinePanel.colorPolicy.spec.tsx",
+      "sourceText": "#cc0000",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2220,
+        "endOffset": 2227,
+        "startLine": 53,
+        "startColumn": 28,
+        "endLine": 53,
+        "endColumn": 35
+      }
+    },
+    {
+      "inventoryId": "color-e7159354658eef7def62",
+      "path": "ui/src/components/market/KlinePanel.colorPolicy.spec.tsx",
+      "sourceText": "#cc0000",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3205,
+        "endOffset": 3212,
+        "startLine": 73,
+        "startColumn": 17,
+        "endLine": 73,
+        "endColumn": 24
+      }
+    },
+    {
+      "inventoryId": "color-df8b0c9f36615acf590e",
+      "path": "ui/src/components/market/KlinePanel.colorPolicy.spec.tsx",
+      "sourceText": "#00aa00",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3216,
+        "endOffset": 3223,
+        "startLine": 73,
+        "startColumn": 28,
+        "endLine": 73,
+        "endColumn": 35
+      }
+    },
+    {
+      "inventoryId": "color-2fba515bc54e2a375227",
+      "path": "ui/src/components/market/KlinePanel.colorPolicy.spec.tsx",
+      "sourceText": "#cc0000",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3536,
+        "endOffset": 3543,
+        "startLine": 77,
+        "startColumn": 106,
+        "endLine": 77,
+        "endColumn": 113
+      }
+    },
+    {
+      "inventoryId": "color-8a59feea00200927f818",
+      "path": "ui/src/components/market/KlinePanel.colorPolicy.spec.tsx",
+      "sourceText": "#00aa00",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3558,
+        "endOffset": 3565,
+        "startLine": 77,
+        "startColumn": 128,
+        "endLine": 77,
+        "endColumn": 135
+      }
+    },
+    {
+      "inventoryId": "color-5342a2ec7be48dcf0bc8",
+      "path": "ui/src/components/market/KlinePanel.tsx",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "chart",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 5482,
+        "endOffset": 5493,
+        "startLine": 149,
+        "startColumn": 31,
+        "endLine": 149,
+        "endColumn": 42
+      }
+    },
+    {
+      "inventoryId": "color-c0d7545df9514efb606f",
+      "path": "ui/src/components/market/KlinePanel.tsx",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "candle",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 6176,
+        "endOffset": 6187,
+        "startLine": 165,
+        "startColumn": 17,
+        "endLine": 165,
+        "endColumn": 28
+      }
+    },
+    {
+      "inventoryId": "color-92b88e6d693ce872d05f",
+      "path": "ui/src/components/market/KlinePanel.tsx",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "KlinePanel",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 7288,
+        "endOffset": 7299,
+        "startLine": 202,
+        "startColumn": 31,
+        "endLine": 202,
+        "endColumn": 42
+      }
+    },
+    {
+      "inventoryId": "color-6e486fc82329de0722b3",
+      "path": "ui/src/components/market/KlinePanel.tsx",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "KlinePanel",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 7788,
+        "endOffset": 7799,
+        "startLine": 212,
+        "startColumn": 17,
+        "endLine": 212,
+        "endColumn": 28
+      }
+    },
+    {
+      "inventoryId": "color-fc39f0c208f8c60877f5",
+      "path": "ui/src/components/PushApprovalPanel.tsx",
+      "sourceText": "border-transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "tailwind-palette-utility",
+      "ownerHint": "QueueRow",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 18335,
+        "endOffset": 18353,
+        "startLine": 522,
+        "startColumn": 14,
+        "endLine": 522,
+        "endColumn": 32
+      }
+    },
+    {
+      "inventoryId": "color-3a44ec475306c0e9d3d7",
+      "path": "ui/src/components/uta/CreateUTADialog.tsx",
+      "sourceText": "bg-transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "tailwind-palette-utility",
+      "ownerHint": "escapeButton",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 6799,
+        "endOffset": 6813,
+        "startLine": 200,
+        "startColumn": 189,
+        "endLine": 200,
+        "endColumn": 203
+      }
+    },
+    {
+      "inventoryId": "color-89831637ee8dab5b96f8",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#101010",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 381,
+        "endOffset": 388,
+        "startLine": 16,
+        "startColumn": 14,
+        "endLine": 16,
+        "endColumn": 21
+      }
+    },
+    {
+      "inventoryId": "color-ec8f29da6a861950d2d3",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#181818",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 400,
+        "endOffset": 407,
+        "startLine": 16,
+        "startColumn": 33,
+        "endLine": 16,
+        "endColumn": 40
+      }
+    },
+    {
+      "inventoryId": "color-6f7d771413f37c676d1a",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#282828",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 419,
+        "endOffset": 426,
+        "startLine": 16,
+        "startColumn": 52,
+        "endLine": 16,
+        "endColumn": 59
+      }
+    },
+    {
+      "inventoryId": "color-10d3e4ee685eff922143",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#585858",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 438,
+        "endOffset": 445,
+        "startLine": 16,
+        "startColumn": 71,
+        "endLine": 16,
+        "endColumn": 78
+      }
+    },
+    {
+      "inventoryId": "color-dcf82bb4c73a4a454f38",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#b8b8b8",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 461,
+        "endOffset": 468,
+        "startLine": 17,
+        "startColumn": 14,
+        "endLine": 17,
+        "endColumn": 21
+      }
+    },
+    {
+      "inventoryId": "color-8cdbcabce71d36a02aef",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#d8d8d8",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 480,
+        "endOffset": 487,
+        "startLine": 17,
+        "startColumn": 33,
+        "endLine": 17,
+        "endColumn": 40
+      }
+    },
+    {
+      "inventoryId": "color-51648c98a0b7a505fc77",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#e8e8e8",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 499,
+        "endOffset": 506,
+        "startLine": 17,
+        "startColumn": 52,
+        "endLine": 17,
+        "endColumn": 59
+      }
+    },
+    {
+      "inventoryId": "color-9b0be4285484a54e33a2",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#f8f8f8",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 518,
+        "endOffset": 525,
+        "startLine": 17,
+        "startColumn": 71,
+        "endLine": 17,
+        "endColumn": 78
+      }
+    },
+    {
+      "inventoryId": "color-e7eed16cbe2e899cbd82",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#ab4642",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 541,
+        "endOffset": 548,
+        "startLine": 18,
+        "startColumn": 14,
+        "endLine": 18,
+        "endColumn": 21
+      }
+    },
+    {
+      "inventoryId": "color-35befdbabd6437248c00",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#dc9656",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 560,
+        "endOffset": 567,
+        "startLine": 18,
+        "startColumn": 33,
+        "endLine": 18,
+        "endColumn": 40
+      }
+    },
+    {
+      "inventoryId": "color-2c8f8887710cb2e9ef1a",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#f7ca88",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 579,
+        "endOffset": 586,
+        "startLine": 18,
+        "startColumn": 52,
+        "endLine": 18,
+        "endColumn": 59
+      }
+    },
+    {
+      "inventoryId": "color-f8ce43640ccc8ef78d06",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#a1b56c",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 598,
+        "endOffset": 605,
+        "startLine": 18,
+        "startColumn": 71,
+        "endLine": 18,
+        "endColumn": 78
+      }
+    },
+    {
+      "inventoryId": "color-19b47cac63c7ec52b162",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#86c1b9",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 621,
+        "endOffset": 628,
+        "startLine": 19,
+        "startColumn": 14,
+        "endLine": 19,
+        "endColumn": 21
+      }
+    },
+    {
+      "inventoryId": "color-3dad41b0737769a8aec8",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#7cafc2",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 640,
+        "endOffset": 647,
+        "startLine": 19,
+        "startColumn": 33,
+        "endLine": 19,
+        "endColumn": 40
+      }
+    },
+    {
+      "inventoryId": "color-21c5906fbf7ad5d6b81b",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#ba8baf",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 659,
+        "endOffset": 666,
+        "startLine": 19,
+        "startColumn": 52,
+        "endLine": 19,
+        "endColumn": 59
+      }
+    },
+    {
+      "inventoryId": "color-0efe280dccca78f11c9c",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#a16946",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 678,
+        "endOffset": 685,
+        "startLine": 19,
+        "startColumn": 71,
+        "endLine": 19,
+        "endColumn": 78
+      }
+    },
+    {
+      "inventoryId": "color-0c0a3f30512969dbcac5",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#101010",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 803,
+        "endOffset": 810,
+        "startLine": 23,
+        "startColumn": 22,
+        "endLine": 23,
+        "endColumn": 29
+      }
+    },
+    {
+      "inventoryId": "color-f0dc08ecad54fc51a85e",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#181818",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 832,
+        "endOffset": 839,
+        "startLine": 23,
+        "startColumn": 51,
+        "endLine": 23,
+        "endColumn": 58
+      }
+    },
+    {
+      "inventoryId": "color-6e619472f8c30b4965ed",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#282828",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 856,
+        "endOffset": 863,
+        "startLine": 23,
+        "startColumn": 75,
+        "endLine": 23,
+        "endColumn": 82
+      }
+    },
+    {
+      "inventoryId": "color-03bade958968c6bc1619",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#585858",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 875,
+        "endOffset": 882,
+        "startLine": 23,
+        "startColumn": 94,
+        "endLine": 23,
+        "endColumn": 101
+      }
+    },
+    {
+      "inventoryId": "color-74889eb0d034d1021e5b",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#b8b8b8",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 901,
+        "endOffset": 908,
+        "startLine": 24,
+        "startColumn": 17,
+        "endLine": 24,
+        "endColumn": 24
+      }
+    },
+    {
+      "inventoryId": "color-45accad8248f338129da",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#d8d8d8",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 922,
+        "endOffset": 929,
+        "startLine": 24,
+        "startColumn": 38,
+        "endLine": 24,
+        "endColumn": 45
+      }
+    },
+    {
+      "inventoryId": "color-0e0a5b19bbee612da661",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#e8e8e8",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 945,
+        "endOffset": 952,
+        "startLine": 24,
+        "startColumn": 61,
+        "endLine": 24,
+        "endColumn": 68
+      }
+    },
+    {
+      "inventoryId": "color-a92d1dfd87479bdeea56",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#f8f8f8",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 977,
+        "endOffset": 984,
+        "startLine": 24,
+        "startColumn": 93,
+        "endLine": 24,
+        "endColumn": 100
+      }
+    },
+    {
+      "inventoryId": "color-20c34ab0fc1977386b7e",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#ab4642",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1000,
+        "endOffset": 1007,
+        "startLine": 25,
+        "startColumn": 14,
+        "endLine": 25,
+        "endColumn": 21
+      }
+    },
+    {
+      "inventoryId": "color-80e89e304a785a5dbbc2",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#dc9656",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1019,
+        "endOffset": 1026,
+        "startLine": 25,
+        "startColumn": 33,
+        "endLine": 25,
+        "endColumn": 40
+      }
+    },
+    {
+      "inventoryId": "color-bbcac4bed02f99a80e9f",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#f7ca88",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1039,
+        "endOffset": 1046,
+        "startLine": 25,
+        "startColumn": 53,
+        "endLine": 25,
+        "endColumn": 60
+      }
+    },
+    {
+      "inventoryId": "color-ab61d4b392c8747dd83c",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#a1b56c",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1059,
+        "endOffset": 1066,
+        "startLine": 25,
+        "startColumn": 73,
+        "endLine": 25,
+        "endColumn": 80
+      }
+    },
+    {
+      "inventoryId": "color-5655720e6cbbb1869ad1",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#86c1b9",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1076,
+        "endOffset": 1083,
+        "startLine": 25,
+        "startColumn": 90,
+        "endLine": 25,
+        "endColumn": 97
+      }
+    },
+    {
+      "inventoryId": "color-6f9f671c582e10e94c6b",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#7cafc2",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1099,
+        "endOffset": 1106,
+        "startLine": 26,
+        "startColumn": 14,
+        "endLine": 26,
+        "endColumn": 21
+      }
+    },
+    {
+      "inventoryId": "color-82f55649ee2100d551a0",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#ba8baf",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1127,
+        "endOffset": 1134,
+        "startLine": 26,
+        "startColumn": 42,
+        "endLine": 26,
+        "endColumn": 49
+      }
+    },
+    {
+      "inventoryId": "color-82109b74a790a74720a2",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#a16946",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1147,
+        "endOffset": 1154,
+        "startLine": 26,
+        "startColumn": 62,
+        "endLine": 26,
+        "endColumn": 69
+      }
+    },
+    {
+      "inventoryId": "color-f6ea0602f9ef364e18cf",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#101010",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1168,
+        "endOffset": 1175,
+        "startLine": 26,
+        "startColumn": 83,
+        "endLine": 26,
+        "endColumn": 90
+      }
+    },
+    {
+      "inventoryId": "color-a6e16283eb76a362e499",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#252525",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1197,
+        "endOffset": 1204,
+        "startLine": 27,
+        "startColumn": 20,
+        "endLine": 27,
+        "endColumn": 27
+      }
+    },
+    {
+      "inventoryId": "color-58199c6b0d16ac713ce3",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#272d2f",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1223,
+        "endOffset": 1230,
+        "startLine": 27,
+        "startColumn": 46,
+        "endLine": 27,
+        "endColumn": 53
+      }
+    },
+    {
+      "inventoryId": "color-5152be37af809b85647b",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#2c373b",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1245,
+        "endOffset": 1252,
+        "startLine": 27,
+        "startColumn": 68,
+        "endLine": 27,
+        "endColumn": 75
+      }
+    },
+    {
+      "inventoryId": "color-bc96b3464b69a39f7a73",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#7cafc2",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1267,
+        "endOffset": 1274,
+        "startLine": 27,
+        "startColumn": 90,
+        "endLine": 27,
+        "endColumn": 97
+      }
+    },
+    {
+      "inventoryId": "color-d31a0bcf06dc165216c7",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#171717",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1297,
+        "endOffset": 1304,
+        "startLine": 28,
+        "startColumn": 21,
+        "endLine": 28,
+        "endColumn": 28
+      }
+    },
+    {
+      "inventoryId": "color-5ee806c12e3986fdbf4f",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#464646",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1319,
+        "endOffset": 1326,
+        "startLine": 28,
+        "startColumn": 43,
+        "endLine": 28,
+        "endColumn": 50
+      }
+    },
+    {
+      "inventoryId": "color-32f5df64b8877bc2ab01",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#1f1f1f",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1339,
+        "endOffset": 1346,
+        "startLine": 28,
+        "startColumn": 63,
+        "endLine": 28,
+        "endColumn": 70
+      }
+    },
+    {
+      "inventoryId": "color-a4725aa0cdc3d6ce8e57",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#101010",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1939,
+        "endOffset": 1946,
+        "startLine": 43,
+        "startColumn": 20,
+        "endLine": 43,
+        "endColumn": 27
+      }
+    },
+    {
+      "inventoryId": "color-efec06e861d7d2588f00",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#d8d8d8",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1962,
+        "endOffset": 1969,
+        "startLine": 43,
+        "startColumn": 43,
+        "endLine": 43,
+        "endColumn": 50
+      }
+    },
+    {
+      "inventoryId": "color-bb977c30d3ca30c3bedd",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#7cafc2",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1981,
+        "endOffset": 1988,
+        "startLine": 43,
+        "startColumn": 62,
+        "endLine": 43,
+        "endColumn": 69
+      }
+    },
+    {
+      "inventoryId": "color-dc20b49984b8fe540630",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#101010",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2005,
+        "endOffset": 2012,
+        "startLine": 44,
+        "startColumn": 15,
+        "endLine": 44,
+        "endColumn": 22
+      }
+    },
+    {
+      "inventoryId": "color-378c0bb30b5db1ecc021",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#ab4642",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2021,
+        "endOffset": 2028,
+        "startLine": 44,
+        "startColumn": 31,
+        "endLine": 44,
+        "endColumn": 38
+      }
+    },
+    {
+      "inventoryId": "color-29af37f3bc62b178a6cf",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#a1b56c",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2039,
+        "endOffset": 2046,
+        "startLine": 44,
+        "startColumn": 49,
+        "endLine": 44,
+        "endColumn": 56
+      }
+    },
+    {
+      "inventoryId": "color-1b472c74a84ff4560ffa",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#f7ca88",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2058,
+        "endOffset": 2065,
+        "startLine": 44,
+        "startColumn": 68,
+        "endLine": 44,
+        "endColumn": 75
+      }
+    },
+    {
+      "inventoryId": "color-3a0ba299bbb163ab9230",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#7cafc2",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2081,
+        "endOffset": 2088,
+        "startLine": 45,
+        "startColumn": 14,
+        "endLine": 45,
+        "endColumn": 21
+      }
+    },
+    {
+      "inventoryId": "color-fc2591f8387886ea06fc",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#ba8baf",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2101,
+        "endOffset": 2108,
+        "startLine": 45,
+        "startColumn": 34,
+        "endLine": 45,
+        "endColumn": 41
+      }
+    },
+    {
+      "inventoryId": "color-bd235d58a08eb3618f37",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#86c1b9",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2118,
+        "endOffset": 2125,
+        "startLine": 45,
+        "startColumn": 51,
+        "endLine": 45,
+        "endColumn": 58
+      }
+    },
+    {
+      "inventoryId": "color-dbc489ea7e627b761a16",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#d8d8d8",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2136,
+        "endOffset": 2143,
+        "startLine": 45,
+        "startColumn": 69,
+        "endLine": 45,
+        "endColumn": 76
+      }
+    },
+    {
+      "inventoryId": "color-32c00f95d2533b532cf8",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#585858",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2166,
+        "endOffset": 2173,
+        "startLine": 46,
+        "startColumn": 21,
+        "endLine": 46,
+        "endColumn": 28
+      }
+    },
+    {
+      "inventoryId": "color-2bf1ca8f1e7159ae9d29",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#ab4642",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2188,
+        "endOffset": 2195,
+        "startLine": 46,
+        "startColumn": 43,
+        "endLine": 46,
+        "endColumn": 50
+      }
+    },
+    {
+      "inventoryId": "color-a5154b8ce16826b78ad1",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#a1b56c",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2212,
+        "endOffset": 2219,
+        "startLine": 46,
+        "startColumn": 67,
+        "endLine": 46,
+        "endColumn": 74
+      }
+    },
+    {
+      "inventoryId": "color-10fddeb08f8d4216dc5a",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#f7ca88",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2243,
+        "endOffset": 2250,
+        "startLine": 47,
+        "startColumn": 22,
+        "endLine": 47,
+        "endColumn": 29
+      }
+    },
+    {
+      "inventoryId": "color-2bb7f52a5259ba729388",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#7cafc2",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2266,
+        "endOffset": 2273,
+        "startLine": 47,
+        "startColumn": 45,
+        "endLine": 47,
+        "endColumn": 52
+      }
+    },
+    {
+      "inventoryId": "color-4a712a4bd3851ed72a8b",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#ba8baf",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2292,
+        "endOffset": 2299,
+        "startLine": 47,
+        "startColumn": 71,
+        "endLine": 47,
+        "endColumn": 78
+      }
+    },
+    {
+      "inventoryId": "color-451a1c764f7d0477c075",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#86c1b9",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2321,
+        "endOffset": 2328,
+        "startLine": 48,
+        "startColumn": 20,
+        "endLine": 48,
+        "endColumn": 27
+      }
+    },
+    {
+      "inventoryId": "color-e4caf175b0e5fa61f314",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#f8f8f8",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2345,
+        "endOffset": 2352,
+        "startLine": 48,
+        "startColumn": 44,
+        "endLine": 48,
+        "endColumn": 51
+      }
+    },
+    {
+      "inventoryId": "color-510f6d622c04ff3db06b",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#dc9656",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2377,
+        "endOffset": 2384,
+        "startLine": 49,
+        "startColumn": 23,
+        "endLine": 49,
+        "endColumn": 30
+      }
+    },
+    {
+      "inventoryId": "color-e6db630ee50bbba6e97c",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#a16946",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2388,
+        "endOffset": 2395,
+        "startLine": 49,
+        "startColumn": 34,
+        "endLine": 49,
+        "endColumn": 41
+      }
+    },
+    {
+      "inventoryId": "color-00d928f3003c40ab3220",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#181818",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2399,
+        "endOffset": 2406,
+        "startLine": 49,
+        "startColumn": 45,
+        "endLine": 49,
+        "endColumn": 52
+      }
+    },
+    {
+      "inventoryId": "color-0eb396db89440d3da233",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#282828",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2410,
+        "endOffset": 2417,
+        "startLine": 49,
+        "startColumn": 56,
+        "endLine": 49,
+        "endColumn": 63
+      }
+    },
+    {
+      "inventoryId": "color-791a31c2dd629852dc56",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#b8b8b8",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2421,
+        "endOffset": 2428,
+        "startLine": 49,
+        "startColumn": 67,
+        "endLine": 49,
+        "endColumn": 74
+      }
+    },
+    {
+      "inventoryId": "color-35e32d579ea007c7cc52",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#e8e8e8",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2432,
+        "endOffset": 2439,
+        "startLine": 49,
+        "startColumn": 78,
+        "endLine": 49,
+        "endColumn": 85
+      }
+    },
+    {
+      "inventoryId": "color-d47757b52660a9e577e2",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#202020",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "base24",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2689,
+        "endOffset": 2696,
+        "startLine": 59,
+        "startColumn": 18,
+        "endLine": 59,
+        "endColumn": 25
+      }
+    },
+    {
+      "inventoryId": "color-ac04c7ce18f4a22616ef",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#303030",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "base24",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2708,
+        "endOffset": 2715,
+        "startLine": 59,
+        "startColumn": 37,
+        "endLine": 59,
+        "endColumn": 44
+      }
+    },
+    {
+      "inventoryId": "color-cdb33146db9900eaaeb3",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#ba1e2e",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "base24",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2727,
+        "endOffset": 2734,
+        "startLine": 59,
+        "startColumn": 56,
+        "endLine": 59,
+        "endColumn": 63
+      }
+    },
+    {
+      "inventoryId": "color-6061cbfa9cb32636d32c",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#ffe066",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "base24",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2746,
+        "endOffset": 2753,
+        "startLine": 59,
+        "startColumn": 75,
+        "endLine": 59,
+        "endColumn": 82
+      }
+    },
+    {
+      "inventoryId": "color-5bdfd14be0348bfd48a3",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#90d070",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "base24",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2773,
+        "endOffset": 2780,
+        "startLine": 60,
+        "startColumn": 18,
+        "endLine": 60,
+        "endColumn": 25
+      }
+    },
+    {
+      "inventoryId": "color-b68466cbaa57c0bd414c",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#70d0d0",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "base24",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2792,
+        "endOffset": 2799,
+        "startLine": 60,
+        "startColumn": 37,
+        "endLine": 60,
+        "endColumn": 44
+      }
+    },
+    {
+      "inventoryId": "color-edc3ca2847af5caec838",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#70a0f0",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "base24",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2811,
+        "endOffset": 2818,
+        "startLine": 60,
+        "startColumn": 56,
+        "endLine": 60,
+        "endColumn": 63
+      }
+    },
+    {
+      "inventoryId": "color-3954cfe695c5d1a0b471",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#d080e0",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "base24",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2830,
+        "endOffset": 2837,
+        "startLine": 60,
+        "startColumn": 75,
+        "endLine": 60,
+        "endColumn": 82
+      }
+    },
+    {
+      "inventoryId": "color-7668e63ad9f3ad7b0653",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#ba1e2e",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2930,
+        "endOffset": 2937,
+        "startLine": 64,
+        "startColumn": 19,
+        "endLine": 64,
+        "endColumn": 26
+      }
+    },
+    {
+      "inventoryId": "color-31bcfeaec7d59542aec5",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#90d070",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2954,
+        "endOffset": 2961,
+        "startLine": 64,
+        "startColumn": 43,
+        "endLine": 64,
+        "endColumn": 50
+      }
+    },
+    {
+      "inventoryId": "color-1db78f23dae2b4981326",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#ffe066",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2979,
+        "endOffset": 2986,
+        "startLine": 64,
+        "startColumn": 68,
+        "endLine": 64,
+        "endColumn": 75
+      }
+    },
+    {
+      "inventoryId": "color-a0c637aa82d6b43fcf3f",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#70a0f0",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3008,
+        "endOffset": 3015,
+        "startLine": 65,
+        "startColumn": 20,
+        "endLine": 65,
+        "endColumn": 27
+      }
+    },
+    {
+      "inventoryId": "color-3e413f039b6beef08c27",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#d080e0",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3034,
+        "endOffset": 3041,
+        "startLine": 65,
+        "startColumn": 46,
+        "endLine": 65,
+        "endColumn": 53
+      }
+    },
+    {
+      "inventoryId": "color-55f5321157433902b1dc",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#70d0d0",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3057,
+        "endOffset": 3064,
+        "startLine": 65,
+        "startColumn": 69,
+        "endLine": 65,
+        "endColumn": 76
+      }
+    },
+    {
+      "inventoryId": "color-206244789b7c97b5f88a",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#000000",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "colors",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3103,
+        "endOffset": 3110,
+        "startLine": 69,
+        "startColumn": 8,
+        "endLine": 69,
+        "endColumn": 15
+      }
+    },
+    {
+      "inventoryId": "color-dde8edbe24e95adcaed8",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#110000",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "colors",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3114,
+        "endOffset": 3121,
+        "startLine": 69,
+        "startColumn": 19,
+        "endLine": 69,
+        "endColumn": 26
+      }
+    },
+    {
+      "inventoryId": "color-31eac65ea79f4bf4766c",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#001100",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "colors",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3125,
+        "endOffset": 3132,
+        "startLine": 69,
+        "startColumn": 30,
+        "endLine": 69,
+        "endColumn": 37
+      }
+    },
+    {
+      "inventoryId": "color-e36343dc72b6d6c81bfe",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#111100",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "colors",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3136,
+        "endOffset": 3143,
+        "startLine": 69,
+        "startColumn": 41,
+        "endLine": 69,
+        "endColumn": 48
+      }
+    },
+    {
+      "inventoryId": "color-e79cef128fbdcdc2efa8",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#000011",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "colors",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3147,
+        "endOffset": 3154,
+        "startLine": 69,
+        "startColumn": 52,
+        "endLine": 69,
+        "endColumn": 59
+      }
+    },
+    {
+      "inventoryId": "color-84235ca5e79f0a859293",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#110011",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "colors",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3158,
+        "endOffset": 3165,
+        "startLine": 69,
+        "startColumn": 63,
+        "endLine": 69,
+        "endColumn": 70
+      }
+    },
+    {
+      "inventoryId": "color-f0a20eab75379294bbb8",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#001111",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "colors",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3169,
+        "endOffset": 3176,
+        "startLine": 69,
+        "startColumn": 74,
+        "endLine": 69,
+        "endColumn": 81
+      }
+    },
+    {
+      "inventoryId": "color-b1a1d5938db00326b748",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#aaaaaa",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "colors",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3180,
+        "endOffset": 3187,
+        "startLine": 69,
+        "startColumn": 85,
+        "endLine": 69,
+        "endColumn": 92
+      }
+    },
+    {
+      "inventoryId": "color-5cd0f810a2b398904783",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#555555",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "colors",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3197,
+        "endOffset": 3204,
+        "startLine": 70,
+        "startColumn": 8,
+        "endLine": 70,
+        "endColumn": 15
+      }
+    },
+    {
+      "inventoryId": "color-50615ec73e1873bfbd96",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#ff0000",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "colors",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3208,
+        "endOffset": 3215,
+        "startLine": 70,
+        "startColumn": 19,
+        "endLine": 70,
+        "endColumn": 26
+      }
+    },
+    {
+      "inventoryId": "color-4345cce6eeb900a4f6e4",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#00ff00",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "colors",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3219,
+        "endOffset": 3226,
+        "startLine": 70,
+        "startColumn": 30,
+        "endLine": 70,
+        "endColumn": 37
+      }
+    },
+    {
+      "inventoryId": "color-e477e57f345b37e072e8",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#ffff00",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "colors",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3230,
+        "endOffset": 3237,
+        "startLine": 70,
+        "startColumn": 41,
+        "endLine": 70,
+        "endColumn": 48
+      }
+    },
+    {
+      "inventoryId": "color-cd7c49e41d03d5c4b3f2",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#0000ff",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "colors",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3241,
+        "endOffset": 3248,
+        "startLine": 70,
+        "startColumn": 52,
+        "endLine": 70,
+        "endColumn": 59
+      }
+    },
+    {
+      "inventoryId": "color-0531e87858203331e216",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#ff00ff",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "colors",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3252,
+        "endOffset": 3259,
+        "startLine": 70,
+        "startColumn": 63,
+        "endLine": 70,
+        "endColumn": 70
+      }
+    },
+    {
+      "inventoryId": "color-b0037eff8444542338f1",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#00ffff",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "colors",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3263,
+        "endOffset": 3270,
+        "startLine": 70,
+        "startColumn": 74,
+        "endLine": 70,
+        "endColumn": 81
+      }
+    },
+    {
+      "inventoryId": "color-a59e3584df05123e9e69",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#ffffff",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "colors",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3274,
+        "endOffset": 3281,
+        "startLine": 70,
+        "startColumn": 85,
+        "endLine": 70,
+        "endColumn": 92
+      }
+    },
+    {
+      "inventoryId": "color-78f0fff0cc760afc4de2",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#cccccc",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "overridden",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3427,
+        "endOffset": 3434,
+        "startLine": 76,
+        "startColumn": 22,
+        "endLine": 76,
+        "endColumn": 29
+      }
+    },
+    {
+      "inventoryId": "color-f7e042c761c3e807535f",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#050505",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "overridden",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3450,
+        "endOffset": 3457,
+        "startLine": 76,
+        "startColumn": 45,
+        "endLine": 76,
+        "endColumn": 52
+      }
+    },
+    {
+      "inventoryId": "color-a9e0b5e86ffecd3beabf",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#eeeeee",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "overridden",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3469,
+        "endOffset": 3476,
+        "startLine": 76,
+        "startColumn": 64,
+        "endLine": 76,
+        "endColumn": 71
+      }
+    },
+    {
+      "inventoryId": "color-6e4a4a9d4b7edd49c029",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#050505",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "overridden",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3492,
+        "endOffset": 3499,
+        "startLine": 76,
+        "startColumn": 87,
+        "endLine": 76,
+        "endColumn": 94
+      }
+    },
+    {
+      "inventoryId": "color-079425b09f8ada0678d7",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#333333",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "overridden",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3532,
+        "endOffset": 3539,
+        "startLine": 77,
+        "startColumn": 31,
+        "endLine": 77,
+        "endColumn": 38
+      }
+    },
+    {
+      "inventoryId": "color-dbe2f18a9e0537801af9",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#ffffff",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "overridden",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3564,
+        "endOffset": 3571,
+        "startLine": 77,
+        "startColumn": 63,
+        "endLine": 77,
+        "endColumn": 70
+      }
+    },
+    {
+      "inventoryId": "color-82d0cc24983728049f26",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#050505",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3726,
+        "endOffset": 3733,
+        "startLine": 82,
+        "startColumn": 20,
+        "endLine": 82,
+        "endColumn": 27
+      }
+    },
+    {
+      "inventoryId": "color-f875fb1100e26e8f9cc4",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#cccccc",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3749,
+        "endOffset": 3756,
+        "startLine": 82,
+        "startColumn": 43,
+        "endLine": 82,
+        "endColumn": 50
+      }
+    },
+    {
+      "inventoryId": "color-5b6f27bdf570a1d716c8",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#ff00ff",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3775,
+        "endOffset": 3782,
+        "startLine": 82,
+        "startColumn": 69,
+        "endLine": 82,
+        "endColumn": 76
+      }
+    },
+    {
+      "inventoryId": "color-8549e994d571480aebdb",
+      "path": "ui/src/components/workspace/__tests__/terminalTheme.spec.ts",
+      "sourceText": "#00ffff",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3798,
+        "endOffset": 3805,
+        "startLine": 82,
+        "startColumn": 92,
+        "endLine": 82,
+        "endColumn": 99
+      }
+    },
+    {
+      "inventoryId": "color-a88c6b99a057a1abc78e",
+      "path": "ui/src/components/workspace/Terminal.tsx",
+      "sourceText": "#d29922",
+      "sourceClass": "runtime",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "colors",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 25013,
+        "endOffset": 25020,
+        "startLine": 679,
+        "startColumn": 18,
+        "endLine": 679,
+        "endColumn": 25
+      }
+    },
+    {
+      "inventoryId": "color-a2502638dac58ad2d0cf",
+      "path": "ui/src/components/workspace/Terminal.tsx",
+      "sourceText": "#d29922",
+      "sourceClass": "runtime",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "colors",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 25042,
+        "endOffset": 25049,
+        "startLine": 680,
+        "startColumn": 20,
+        "endLine": 680,
+        "endColumn": 27
+      }
+    },
+    {
+      "inventoryId": "color-fad8da22911ee1320a13",
+      "path": "ui/src/components/workspace/Terminal.tsx",
+      "sourceText": "#7ee787",
+      "sourceClass": "runtime",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "colors",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 25068,
+        "endOffset": 25075,
+        "startLine": 681,
+        "startColumn": 17,
+        "endLine": 681,
+        "endColumn": 24
+      }
+    },
+    {
+      "inventoryId": "color-509231ce3ed382f1d728",
+      "path": "ui/src/components/workspace/Terminal.tsx",
+      "sourceText": "#6e7681",
+      "sourceClass": "runtime",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "colors",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 25091,
+        "endOffset": 25098,
+        "startLine": 682,
+        "startColumn": 14,
+        "endLine": 682,
+        "endColumn": 21
+      }
+    },
+    {
+      "inventoryId": "color-19d01484e0de1757b806",
+      "path": "ui/src/components/workspace/Terminal.tsx",
+      "sourceText": "#d2a8ff",
+      "sourceClass": "runtime",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "colors",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 25114,
+        "endOffset": 25121,
+        "startLine": 683,
+        "startColumn": 14,
+        "endLine": 683,
+        "endColumn": 21
+      }
+    },
+    {
+      "inventoryId": "color-2afe94d71738134b0696",
+      "path": "ui/src/components/workspace/Terminal.tsx",
+      "sourceText": "#d2a8ff",
+      "sourceClass": "runtime",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "colors",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 25137,
+        "endOffset": 25144,
+        "startLine": 684,
+        "startColumn": 14,
+        "endLine": 684,
+        "endColumn": 21
+      }
+    },
+    {
+      "inventoryId": "color-c2ede41d725f6ffeb91c",
+      "path": "ui/src/components/workspace/workspaces.css",
+      "sourceText": "rgba(0, 0, 0, 0)",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".resume-cta-overlay",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 4144,
+        "endOffset": 4160,
+        "startLine": 175,
+        "startColumn": 5,
+        "endLine": 175,
+        "endColumn": 21
+      }
+    },
+    {
+      "inventoryId": "color-9ed31ee430992d65b2d4",
+      "path": "ui/src/components/workspace/workspaces.css",
+      "sourceText": "rgba(0, 0, 0, 0.4)",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".resume-cta-card",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 4588,
+        "endOffset": 4606,
+        "startLine": 192,
+        "startColumn": 26,
+        "endLine": 192,
+        "endColumn": 44
+      }
+    },
+    {
+      "inventoryId": "color-dbe0d64d1bfcfdde51f9",
+      "path": "ui/src/components/workspace/workspaces.css",
+      "sourceText": "rgba(0, 0, 0, 0.65)",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".workspace-page-shell .workspace-side",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 7911,
+        "endOffset": 7930,
+        "startLine": 348,
+        "startColumn": 36,
+        "endLine": 348,
+        "endColumn": 55
+      }
+    },
+    {
+      "inventoryId": "color-b11a84070c5b31870cf9",
+      "path": "ui/src/components/workspace/workspaces.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".workspace-empty-secondary-btn",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 11914,
+        "endOffset": 11925,
+        "startLine": 533,
+        "startColumn": 15,
+        "endLine": 533,
+        "endColumn": 26
+      }
+    },
+    {
+      "inventoryId": "color-3bf871aa30ef2daa9c4f",
+      "path": "ui/src/components/workspace/workspaces.css",
+      "sourceText": "rgba(0, 0, 0, 0.35)",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".terminal-shell",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 16022,
+        "endOffset": 16041,
+        "startLine": 733,
+        "startColumn": 27,
+        "endLine": 733,
+        "endColumn": 46
+      }
+    },
+    {
+      "inventoryId": "color-ee2a601683fe8af57fc0",
+      "path": "ui/src/components/workspace/workspaces.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".terminal-theme-option",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 17520,
+        "endOffset": 17531,
+        "startLine": 807,
+        "startColumn": 15,
+        "endLine": 807,
+        "endColumn": 26
+      }
+    },
+    {
+      "inventoryId": "color-700feacb3627b8b8aac4",
+      "path": "ui/src/components/workspace/workspaces.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".terminal-host .xterm-viewport",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 18522,
+        "endOffset": 18533,
+        "startLine": 857,
+        "startColumn": 21,
+        "endLine": 857,
+        "endColumn": 32
+      }
+    },
+    {
+      "inventoryId": "color-feb7653bad6501870cb0",
+      "path": "ui/src/components/workspace/workspaces.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".webpi-shell",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 19162,
+        "endOffset": 19173,
+        "startLine": 885,
+        "startColumn": 84,
+        "endLine": 885,
+        "endColumn": 95
+      }
+    },
+    {
+      "inventoryId": "color-e539e4da5c5fcaa79e15",
+      "path": "ui/src/components/workspace/workspaces.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".webpi-shell",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 19176,
+        "endOffset": 19187,
+        "startLine": 885,
+        "startColumn": 98,
+        "endLine": 885,
+        "endColumn": 109
+      }
+    },
+    {
+      "inventoryId": "color-1ce410d7e37f382a9d36",
+      "path": "ui/src/components/workspace/workspaces.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".webpi-header",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 19475,
+        "endOffset": 19486,
+        "startLine": 897,
+        "startColumn": 65,
+        "endLine": 897,
+        "endColumn": 76
+      }
+    },
+    {
+      "inventoryId": "color-33f50e0e713f740dc7de",
+      "path": "ui/src/components/workspace/workspaces.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".webpi-activity",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 21655,
+        "endOffset": 21666,
+        "startLine": 930,
+        "startColumn": 65,
+        "endLine": 930,
+        "endColumn": 76
+      }
+    },
+    {
+      "inventoryId": "color-831c90547409921b1911",
+      "path": "ui/src/components/workspace/workspaces.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".webpi-activity",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 21756,
+        "endOffset": 21767,
+        "startLine": 932,
+        "startColumn": 65,
+        "endLine": 932,
+        "endColumn": 76
+      }
+    },
+    {
+      "inventoryId": "color-b9598f01b8a9a87c3a8b",
+      "path": "ui/src/components/workspace/workspaces.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".webpi-activity[open]",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 22055,
+        "endOffset": 22066,
+        "startLine": 936,
+        "startColumn": 87,
+        "endLine": 936,
+        "endColumn": 98
+      }
+    },
+    {
+      "inventoryId": "color-b079cd359c85a1184062",
+      "path": "ui/src/components/workspace/workspaces.css",
+      "sourceText": "#000",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".webpi-activity[open]",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 22111,
+        "endOffset": 22115,
+        "startLine": 936,
+        "startColumn": 143,
+        "endLine": 936,
+        "endColumn": 147
+      }
+    },
+    {
+      "inventoryId": "color-690cecd6eaf1a4cf3fb8",
+      "path": "ui/src/components/workspace/workspaces.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".webpi-activity[open]",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 22120,
+        "endOffset": 22131,
+        "startLine": 936,
+        "startColumn": 152,
+        "endLine": 936,
+        "endColumn": 163
+      }
+    },
+    {
+      "inventoryId": "color-9f704b33c9fe8e2d44c0",
+      "path": "ui/src/components/workspace/workspaces.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".webpi-activity-status",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 22943,
+        "endOffset": 22954,
+        "startLine": 957,
+        "startColumn": 180,
+        "endLine": 957,
+        "endColumn": 191
+      }
+    },
+    {
+      "inventoryId": "color-4513f66238d75149ec7e",
+      "path": "ui/src/components/workspace/workspaces.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".webpi-activity-status",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 23013,
+        "endOffset": 23024,
+        "startLine": 957,
+        "startColumn": 250,
+        "endLine": 957,
+        "endColumn": 261
+      }
+    },
+    {
+      "inventoryId": "color-36c1561a3f1a8820af8f",
+      "path": "ui/src/components/workspace/workspaces.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".webpi-activity.is-running .webpi-activity-status",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 23165,
+        "endOffset": 23176,
+        "startLine": 958,
+        "startColumn": 137,
+        "endLine": 958,
+        "endColumn": 148
+      }
+    },
+    {
+      "inventoryId": "color-e848f9c740205ec6720a",
+      "path": "ui/src/components/workspace/workspaces.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".webpi-activity.is-error .webpi-activity-status",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 23354,
+        "endOffset": 23365,
+        "startLine": 959,
+        "startColumn": 174,
+        "endLine": 959,
+        "endColumn": 185
+      }
+    },
+    {
+      "inventoryId": "color-003d5fbf6d5b24c1611c",
+      "path": "ui/src/components/workspace/workspaces.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".webpi-activity-body",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 23964,
+        "endOffset": 23975,
+        "startLine": 965,
+        "startColumn": 90,
+        "endLine": 965,
+        "endColumn": 101
+      }
+    },
+    {
+      "inventoryId": "color-1e1ee7c13829c01b1dcf",
+      "path": "ui/src/components/workspace/workspaces.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".webpi-tool-step",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 24238,
+        "endOffset": 24249,
+        "startLine": 969,
+        "startColumn": 89,
+        "endLine": 969,
+        "endColumn": 100
+      }
+    },
+    {
+      "inventoryId": "color-a3aa4d22a4a9fe8f9f87",
+      "path": "ui/src/components/workspace/workspaces.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".webpi-step-status",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 24726,
+        "endOffset": 24737,
+        "startLine": 973,
+        "startColumn": 140,
+        "endLine": 973,
+        "endColumn": 151
+      }
+    },
+    {
+      "inventoryId": "color-21dd6b1a08f483e99e1c",
+      "path": "ui/src/components/workspace/workspaces.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".webpi-step-size",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 25332,
+        "endOffset": 25343,
+        "startLine": 978,
+        "startColumn": 96,
+        "endLine": 978,
+        "endColumn": 107
+      }
+    },
+    {
+      "inventoryId": "color-decb08654a737e36ec6c",
+      "path": "ui/src/components/workspace/workspaces.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".webpi-step-detail",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 25605,
+        "endOffset": 25616,
+        "startLine": 980,
+        "startColumn": 150,
+        "endLine": 980,
+        "endColumn": 161
+      }
+    },
+    {
+      "inventoryId": "color-449797a792f8937e54b1",
+      "path": "ui/src/components/workspace/workspaces.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".webpi-step-detail",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 25691,
+        "endOffset": 25702,
+        "startLine": 980,
+        "startColumn": 236,
+        "endLine": 980,
+        "endColumn": 247
+      }
+    },
+    {
+      "inventoryId": "color-bdedd90ca9146f43dfff",
+      "path": "ui/src/components/workspace/workspaces.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".webpi-composer-wrap",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 28099,
+        "endOffset": 28110,
+        "startLine": 999,
+        "startColumn": 175,
+        "endLine": 999,
+        "endColumn": 186
+      }
+    },
+    {
+      "inventoryId": "color-1aaa13b52b7bd57b9e02",
+      "path": "ui/src/components/workspace/workspaces.css",
+      "sourceText": "#000",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".webpi-composer",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 28350,
+        "endOffset": 28354,
+        "startLine": 1000,
+        "startColumn": 236,
+        "endLine": 1000,
+        "endColumn": 240
+      }
+    },
+    {
+      "inventoryId": "color-6bf0b8a3c37ccfd516b0",
+      "path": "ui/src/components/workspace/workspaces.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".webpi-composer",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 28359,
+        "endOffset": 28370,
+        "startLine": 1000,
+        "startColumn": 245,
+        "endLine": 1000,
+        "endColumn": 256
+      }
+    },
+    {
+      "inventoryId": "color-ee220623240d97426c5d",
+      "path": "ui/src/components/workspace/workspaces.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".webpi-composer textarea",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 28636,
+        "endOffset": 28647,
+        "startLine": 1002,
+        "startColumn": 149,
+        "endLine": 1002,
+        "endColumn": 160
+      }
+    },
+    {
+      "inventoryId": "color-2f5056d620592f5f2476",
+      "path": "ui/src/demo/DemoBanner.tsx",
+      "sourceText": "border-amber-500/40",
+      "sourceClass": "demo",
+      "syntaxKind": "tailwind-palette-utility",
+      "ownerHint": "DemoBanner",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 160,
+        "endOffset": 179,
+        "startLine": 5,
+        "startColumn": 62,
+        "endLine": 5,
+        "endColumn": 81
+      }
+    },
+    {
+      "inventoryId": "color-ae52786c82b4e904e9e0",
+      "path": "ui/src/demo/DemoBanner.tsx",
+      "sourceText": "bg-amber-500/10",
+      "sourceClass": "demo",
+      "syntaxKind": "tailwind-palette-utility",
+      "ownerHint": "DemoBanner",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 180,
+        "endOffset": 195,
+        "startLine": 5,
+        "startColumn": 82,
+        "endLine": 5,
+        "endColumn": 97
+      }
+    },
+    {
+      "inventoryId": "color-74bf4501019f9253f48f",
+      "path": "ui/src/demo/DemoBanner.tsx",
+      "sourceText": "text-amber-700",
+      "sourceClass": "demo",
+      "syntaxKind": "tailwind-palette-utility",
+      "ownerHint": "DemoBanner",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 358,
+        "endOffset": 372,
+        "startLine": 6,
+        "startColumn": 117,
+        "endLine": 6,
+        "endColumn": 131
+      }
+    },
+    {
+      "inventoryId": "color-8bcd25fc1f8b15de7e8d",
+      "path": "ui/src/demo/DemoBanner.tsx",
+      "sourceText": "text-amber-300",
+      "sourceClass": "demo",
+      "syntaxKind": "tailwind-palette-utility",
+      "ownerHint": "DemoBanner",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 378,
+        "endOffset": 392,
+        "startLine": 6,
+        "startColumn": 137,
+        "endLine": 6,
+        "endColumn": 151
+      }
+    },
+    {
+      "inventoryId": "color-e5c85cf480211cc04df7",
+      "path": "ui/src/demo/DemoBanner.tsx",
+      "sourceText": "bg-amber-500",
+      "sourceClass": "demo",
+      "syntaxKind": "tailwind-palette-utility",
+      "ownerHint": "DemoBanner",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 445,
+        "endOffset": 457,
+        "startLine": 7,
+        "startColumn": 51,
+        "endLine": 7,
+        "endColumn": 63
+      }
+    },
+    {
+      "inventoryId": "color-73a14d9b93077e4e8065",
+      "path": "ui/src/demo/DemoBanner.tsx",
+      "sourceText": "text-amber-700",
+      "sourceClass": "demo",
+      "syntaxKind": "tailwind-palette-utility",
+      "ownerHint": "DemoBanner",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1082,
+        "endOffset": 1096,
+        "startLine": 20,
+        "startColumn": 41,
+        "endLine": 20,
+        "endColumn": 55
+      }
+    },
+    {
+      "inventoryId": "color-02f41e97c3a897f22846",
+      "path": "ui/src/demo/DemoBanner.tsx",
+      "sourceText": "text-amber-300",
+      "sourceClass": "demo",
+      "syntaxKind": "tailwind-palette-utility",
+      "ownerHint": "DemoBanner",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1118,
+        "endOffset": 1132,
+        "startLine": 20,
+        "startColumn": 77,
+        "endLine": 20,
+        "endColumn": 91
+      }
+    },
+    {
+      "inventoryId": "color-053c40f0dfc504f7893a",
+      "path": "ui/src/demo/DemoTerminalReplay.tsx",
+      "sourceText": "text-amber-400",
+      "sourceClass": "demo",
+      "syntaxKind": "tailwind-palette-utility",
+      "ownerHint": "ReplayPane",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 4526,
+        "endOffset": 4540,
+        "startLine": 122,
+        "startColumn": 96,
+        "endLine": 122,
+        "endColumn": 110
+      }
+    },
+    {
+      "inventoryId": "color-a3329189c044adab4902",
+      "path": "ui/src/demo/DemoTerminalReplay.tsx",
+      "sourceText": "bg-amber-400",
+      "sourceClass": "demo",
+      "syntaxKind": "tailwind-palette-utility",
+      "ownerHint": "ReplayPane",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 4595,
+        "endOffset": 4607,
+        "startLine": 123,
+        "startColumn": 53,
+        "endLine": 123,
+        "endColumn": 65
+      }
+    },
+    {
+      "inventoryId": "color-6f4ec1e4792847407232",
+      "path": "ui/src/demo/DemoTerminalReplay.tsx",
+      "sourceText": "text-amber-400",
+      "sourceClass": "demo",
+      "syntaxKind": "tailwind-palette-utility",
+      "ownerHint": "ReplayPane",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 4926,
+        "endOffset": 4940,
+        "startLine": 132,
+        "startColumn": 36,
+        "endLine": 132,
+        "endColumn": 50
+      }
+    },
+    {
+      "inventoryId": "color-1b44e09c8f321d717e70",
+      "path": "ui/src/demo/DemoTerminalStub.tsx",
+      "sourceText": "text-zinc-400",
+      "sourceClass": "demo",
+      "syntaxKind": "tailwind-palette-utility",
+      "ownerHint": "DemoTerminalStub",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 282,
+        "endOffset": 295,
+        "startLine": 9,
+        "startColumn": 84,
+        "endLine": 9,
+        "endColumn": 97
+      }
+    },
+    {
+      "inventoryId": "color-90a2132bc7e4210ab797",
+      "path": "ui/src/demo/DemoTerminalStub.tsx",
+      "sourceText": "text-zinc-500",
+      "sourceClass": "demo",
+      "syntaxKind": "tailwind-palette-utility",
+      "ownerHint": "DemoTerminalStub",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 422,
+        "endOffset": 435,
+        "startLine": 11,
+        "startColumn": 72,
+        "endLine": 11,
+        "endColumn": 85
+      }
+    },
+    {
+      "inventoryId": "color-c0a4c6f4f00a2f307106",
+      "path": "ui/src/demo/DemoTerminalStub.tsx",
+      "sourceText": "text-zinc-200",
+      "sourceClass": "demo",
+      "syntaxKind": "tailwind-palette-utility",
+      "ownerHint": "DemoTerminalStub",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 519,
+        "endOffset": 532,
+        "startLine": 14,
+        "startColumn": 49,
+        "endLine": 14,
+        "endColumn": 62
+      }
+    },
+    {
+      "inventoryId": "color-6f5d2106e9ff89fff88a",
+      "path": "ui/src/demo/DemoTerminalStub.tsx",
+      "sourceText": "text-zinc-400",
+      "sourceClass": "demo",
+      "syntaxKind": "tailwind-palette-utility",
+      "ownerHint": "DemoTerminalStub",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 623,
+        "endOffset": 636,
+        "startLine": 17,
+        "startColumn": 49,
+        "endLine": 17,
+        "endColumn": 62
+      }
+    },
+    {
+      "inventoryId": "color-d529682f347f52599e55",
+      "path": "ui/src/demo/DemoTerminalStub.tsx",
+      "sourceText": "text-zinc-300",
+      "sourceClass": "demo",
+      "syntaxKind": "tailwind-palette-utility",
+      "ownerHint": "DemoTerminalStub",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 742,
+        "endOffset": 755,
+        "startLine": 19,
+        "startColumn": 28,
+        "endLine": 19,
+        "endColumn": 41
+      }
+    },
+    {
+      "inventoryId": "color-a031367072adf2b4f36d",
+      "path": "ui/src/demo/DemoTerminalStub.tsx",
+      "sourceText": "text-zinc-300",
+      "sourceClass": "demo",
+      "syntaxKind": "tailwind-palette-utility",
+      "ownerHint": "DemoTerminalStub",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 809,
+        "endOffset": 822,
+        "startLine": 20,
+        "startColumn": 28,
+        "endLine": 20,
+        "endColumn": 41
+      }
+    },
+    {
+      "inventoryId": "color-c8a1c2335b7f586c18a7",
+      "path": "ui/src/demo/DemoTerminalStub.tsx",
+      "sourceText": "text-zinc-300",
+      "sourceClass": "demo",
+      "syntaxKind": "tailwind-palette-utility",
+      "ownerHint": "DemoTerminalStub",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 873,
+        "endOffset": 886,
+        "startLine": 21,
+        "startColumn": 28,
+        "endLine": 21,
+        "endColumn": 41
+      }
+    },
+    {
+      "inventoryId": "color-5109e242e451b34444af",
+      "path": "ui/src/demo/DemoTerminalStub.tsx",
+      "sourceText": "text-zinc-500",
+      "sourceClass": "demo",
+      "syntaxKind": "tailwind-palette-utility",
+      "ownerHint": "DemoTerminalStub",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1025,
+        "endOffset": 1038,
+        "startLine": 23,
+        "startColumn": 33,
+        "endLine": 23,
+        "endColumn": 46
+      }
+    },
+    {
+      "inventoryId": "color-cf7d8167f6ed5cdf2157",
+      "path": "ui/src/demo/DemoTerminalStub.tsx",
+      "sourceText": "text-amber-400",
+      "sourceClass": "demo",
+      "syntaxKind": "tailwind-palette-utility",
+      "ownerHint": "DemoTerminalStub",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1374,
+        "endOffset": 1388,
+        "startLine": 31,
+        "startColumn": 75,
+        "endLine": 31,
+        "endColumn": 89
+      }
+    },
+    {
+      "inventoryId": "color-60bdecee818fa57d5c4d",
+      "path": "ui/src/demo/fixtures/themes.ts",
+      "sourceText": "#101216",
+      "sourceClass": "demo",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 199,
+        "endOffset": 206,
+        "startLine": 11,
+        "startColumn": 12,
+        "endLine": 11,
+        "endColumn": 19
+      }
+    },
+    {
+      "inventoryId": "color-6853a1693296f5509f26",
+      "path": "ui/src/demo/fixtures/themes.ts",
+      "sourceText": "#181b20",
+      "sourceClass": "demo",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 218,
+        "endOffset": 225,
+        "startLine": 11,
+        "startColumn": 31,
+        "endLine": 11,
+        "endColumn": 38
+      }
+    },
+    {
+      "inventoryId": "color-944c5c77f82172716fc1",
+      "path": "ui/src/demo/fixtures/themes.ts",
+      "sourceText": "#252a32",
+      "sourceClass": "demo",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 237,
+        "endOffset": 244,
+        "startLine": 11,
+        "startColumn": 50,
+        "endLine": 11,
+        "endColumn": 57
+      }
+    },
+    {
+      "inventoryId": "color-219ec22b95275026fc81",
+      "path": "ui/src/demo/fixtures/themes.ts",
+      "sourceText": "#343b46",
+      "sourceClass": "demo",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 256,
+        "endOffset": 263,
+        "startLine": 11,
+        "startColumn": 69,
+        "endLine": 11,
+        "endColumn": 76
+      }
+    },
+    {
+      "inventoryId": "color-4c7836617726785691bf",
+      "path": "ui/src/demo/fixtures/themes.ts",
+      "sourceText": "#8993a4",
+      "sourceClass": "demo",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 277,
+        "endOffset": 284,
+        "startLine": 12,
+        "startColumn": 12,
+        "endLine": 12,
+        "endColumn": 19
+      }
+    },
+    {
+      "inventoryId": "color-c806f095d8d86b8b6be9",
+      "path": "ui/src/demo/fixtures/themes.ts",
+      "sourceText": "#d7dce5",
+      "sourceClass": "demo",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 296,
+        "endOffset": 303,
+        "startLine": 12,
+        "startColumn": 31,
+        "endLine": 12,
+        "endColumn": 38
+      }
+    },
+    {
+      "inventoryId": "color-8febe1484dec4c66201a",
+      "path": "ui/src/demo/fixtures/themes.ts",
+      "sourceText": "#edf0f5",
+      "sourceClass": "demo",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 315,
+        "endOffset": 322,
+        "startLine": 12,
+        "startColumn": 50,
+        "endLine": 12,
+        "endColumn": 57
+      }
+    },
+    {
+      "inventoryId": "color-b69d8e2a72aae596180d",
+      "path": "ui/src/demo/fixtures/themes.ts",
+      "sourceText": "#ffffff",
+      "sourceClass": "demo",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 334,
+        "endOffset": 341,
+        "startLine": 12,
+        "startColumn": 69,
+        "endLine": 12,
+        "endColumn": 76
+      }
+    },
+    {
+      "inventoryId": "color-47fd12be7d7e67db784f",
+      "path": "ui/src/demo/fixtures/themes.ts",
+      "sourceText": "#ef6b73",
+      "sourceClass": "demo",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 355,
+        "endOffset": 362,
+        "startLine": 13,
+        "startColumn": 12,
+        "endLine": 13,
+        "endColumn": 19
+      }
+    },
+    {
+      "inventoryId": "color-a1f96f43bcd435f05728",
+      "path": "ui/src/demo/fixtures/themes.ts",
+      "sourceText": "#e89b58",
+      "sourceClass": "demo",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 374,
+        "endOffset": 381,
+        "startLine": 13,
+        "startColumn": 31,
+        "endLine": 13,
+        "endColumn": 38
+      }
+    },
+    {
+      "inventoryId": "color-41fe3e50af77ff49856c",
+      "path": "ui/src/demo/fixtures/themes.ts",
+      "sourceText": "#dfc66d",
+      "sourceClass": "demo",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 393,
+        "endOffset": 400,
+        "startLine": 13,
+        "startColumn": 50,
+        "endLine": 13,
+        "endColumn": 57
+      }
+    },
+    {
+      "inventoryId": "color-1bf5f5e875c6566d6189",
+      "path": "ui/src/demo/fixtures/themes.ts",
+      "sourceText": "#75c991",
+      "sourceClass": "demo",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 412,
+        "endOffset": 419,
+        "startLine": 13,
+        "startColumn": 69,
+        "endLine": 13,
+        "endColumn": 76
+      }
+    },
+    {
+      "inventoryId": "color-450d0e643354a84a8d4e",
+      "path": "ui/src/demo/fixtures/themes.ts",
+      "sourceText": "#6ecaca",
+      "sourceClass": "demo",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 433,
+        "endOffset": 440,
+        "startLine": 14,
+        "startColumn": 12,
+        "endLine": 14,
+        "endColumn": 19
+      }
+    },
+    {
+      "inventoryId": "color-c48ff433f2776e7353aa",
+      "path": "ui/src/demo/fixtures/themes.ts",
+      "sourceText": "#75a7f0",
+      "sourceClass": "demo",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 452,
+        "endOffset": 459,
+        "startLine": 14,
+        "startColumn": 31,
+        "endLine": 14,
+        "endColumn": 38
+      }
+    },
+    {
+      "inventoryId": "color-5eed03100854d4b13d33",
+      "path": "ui/src/demo/fixtures/themes.ts",
+      "sourceText": "#b39df3",
+      "sourceClass": "demo",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 471,
+        "endOffset": 478,
+        "startLine": 14,
+        "startColumn": 50,
+        "endLine": 14,
+        "endColumn": 57
+      }
+    },
+    {
+      "inventoryId": "color-0d0952514c135e7e3044",
+      "path": "ui/src/demo/fixtures/themes.ts",
+      "sourceText": "#d18cba",
+      "sourceClass": "demo",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 490,
+        "endOffset": 497,
+        "startLine": 14,
+        "startColumn": 69,
+        "endLine": 14,
+        "endColumn": 76
+      }
+    },
+    {
+      "inventoryId": "color-cbc2d699d36a9ab61f03",
+      "path": "ui/src/demo/fixtures/themes.ts",
+      "sourceText": "#f8f9fb",
+      "sourceClass": "demo",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "lightPalette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 565,
+        "endOffset": 572,
+        "startLine": 19,
+        "startColumn": 12,
+        "endLine": 19,
+        "endColumn": 19
+      }
+    },
+    {
+      "inventoryId": "color-1eb4055d543a81784e76",
+      "path": "ui/src/demo/fixtures/themes.ts",
+      "sourceText": "#eef1f5",
+      "sourceClass": "demo",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "lightPalette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 584,
+        "endOffset": 591,
+        "startLine": 19,
+        "startColumn": 31,
+        "endLine": 19,
+        "endColumn": 38
+      }
+    },
+    {
+      "inventoryId": "color-fb1581b940460af186ae",
+      "path": "ui/src/demo/fixtures/themes.ts",
+      "sourceText": "#dfe4eb",
+      "sourceClass": "demo",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "lightPalette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 603,
+        "endOffset": 610,
+        "startLine": 19,
+        "startColumn": 50,
+        "endLine": 19,
+        "endColumn": 57
+      }
+    },
+    {
+      "inventoryId": "color-71a6aa600be43b984b06",
+      "path": "ui/src/demo/fixtures/themes.ts",
+      "sourceText": "#cbd2dc",
+      "sourceClass": "demo",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "lightPalette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 622,
+        "endOffset": 629,
+        "startLine": 19,
+        "startColumn": 69,
+        "endLine": 19,
+        "endColumn": 76
+      }
+    },
+    {
+      "inventoryId": "color-fb0e4b81ffbdb59ec0ba",
+      "path": "ui/src/demo/fixtures/themes.ts",
+      "sourceText": "#596579",
+      "sourceClass": "demo",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "lightPalette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 643,
+        "endOffset": 650,
+        "startLine": 20,
+        "startColumn": 12,
+        "endLine": 20,
+        "endColumn": 19
+      }
+    },
+    {
+      "inventoryId": "color-5dcafa7439438754ebc1",
+      "path": "ui/src/demo/fixtures/themes.ts",
+      "sourceText": "#293448",
+      "sourceClass": "demo",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "lightPalette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 662,
+        "endOffset": 669,
+        "startLine": 20,
+        "startColumn": 31,
+        "endLine": 20,
+        "endColumn": 38
+      }
+    },
+    {
+      "inventoryId": "color-88a52438f3d1555b8c34",
+      "path": "ui/src/demo/fixtures/themes.ts",
+      "sourceText": "#172136",
+      "sourceClass": "demo",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "lightPalette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 681,
+        "endOffset": 688,
+        "startLine": 20,
+        "startColumn": 50,
+        "endLine": 20,
+        "endColumn": 57
+      }
+    },
+    {
+      "inventoryId": "color-ea30b50ad3484e70c81d",
+      "path": "ui/src/demo/fixtures/themes.ts",
+      "sourceText": "#08101d",
+      "sourceClass": "demo",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "lightPalette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 700,
+        "endOffset": 707,
+        "startLine": 20,
+        "startColumn": 69,
+        "endLine": 20,
+        "endColumn": 76
+      }
+    },
+    {
+      "inventoryId": "color-0d3ac163f8a9c98a9bd3",
+      "path": "ui/src/demo/fixtures/themes.ts",
+      "sourceText": "#ff8790",
+      "sourceClass": "demo",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "ansi16",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1695,
+        "endOffset": 1702,
+        "startLine": 39,
+        "startColumn": 22,
+        "endLine": 39,
+        "endColumn": 29
+      }
+    },
+    {
+      "inventoryId": "color-00ad253519f7cf152bd3",
+      "path": "ui/src/demo/fixtures/themes.ts",
+      "sourceText": "#91e6aa",
+      "sourceClass": "demo",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "ansi16",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1706,
+        "endOffset": 1713,
+        "startLine": 39,
+        "startColumn": 33,
+        "endLine": 39,
+        "endColumn": 40
+      }
+    },
+    {
+      "inventoryId": "color-a1ce6a7afd321f375ab7",
+      "path": "ui/src/demo/fixtures/themes.ts",
+      "sourceText": "#f8df86",
+      "sourceClass": "demo",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "ansi16",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1717,
+        "endOffset": 1724,
+        "startLine": 39,
+        "startColumn": 44,
+        "endLine": 39,
+        "endColumn": 51
+      }
+    },
+    {
+      "inventoryId": "color-2e512a7d7ba563aed8c1",
+      "path": "ui/src/demo/fixtures/themes.ts",
+      "sourceText": "#91bdff",
+      "sourceClass": "demo",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "ansi16",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1728,
+        "endOffset": 1735,
+        "startLine": 39,
+        "startColumn": 55,
+        "endLine": 39,
+        "endColumn": 62
+      }
+    },
+    {
+      "inventoryId": "color-7028c93cbf84bf167322",
+      "path": "ui/src/demo/fixtures/themes.ts",
+      "sourceText": "#cdb7ff",
+      "sourceClass": "demo",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "ansi16",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1739,
+        "endOffset": 1746,
+        "startLine": 39,
+        "startColumn": 66,
+        "endLine": 39,
+        "endColumn": 73
+      }
+    },
+    {
+      "inventoryId": "color-da80fe0ecb5f60ff166a",
+      "path": "ui/src/demo/fixtures/themes.ts",
+      "sourceText": "#8be5e5",
+      "sourceClass": "demo",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "ansi16",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1750,
+        "endOffset": 1757,
+        "startLine": 39,
+        "startColumn": 77,
+        "endLine": 39,
+        "endColumn": 84
+      }
+    },
+    {
+      "inventoryId": "color-7e56078a9316599a162a",
+      "path": "ui/src/demo/fixtures/themes.ts",
+      "sourceText": "black",
+      "sourceClass": "demo",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "namedAnsi",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3579,
+        "endOffset": 3584,
+        "startLine": 88,
+        "startColumn": 21,
+        "endLine": 88,
+        "endColumn": 26
+      }
+    },
+    {
+      "inventoryId": "color-7320b4173ae00d198abe",
+      "path": "ui/src/demo/fixtures/themes.ts",
+      "sourceText": "white",
+      "sourceClass": "demo",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "namedAnsi",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3641,
+        "endOffset": 3646,
+        "startLine": 88,
+        "startColumn": 83,
+        "endLine": 88,
+        "endColumn": 88
+      }
+    },
+    {
+      "inventoryId": "color-6ca4e1976964c0d85cec",
+      "path": "ui/src/demo/handlers/trading.ts",
+      "sourceText": "text-orange-400",
+      "sourceClass": "demo",
+      "syntaxKind": "tailwind-palette-utility",
+      "ownerHint": "auditBrokerPreset",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2047,
+        "endOffset": 2062,
+        "startLine": 42,
+        "startColumn": 56,
+        "endLine": 42,
+        "endColumn": 71
+      }
+    },
+    {
+      "inventoryId": "color-5d946fa139eebd2d9df1",
+      "path": "ui/src/demo/handlers/trading.ts",
+      "sourceText": "text-emerald-400",
+      "sourceClass": "demo",
+      "syntaxKind": "tailwind-palette-utility",
+      "ownerHint": "demoBrokerPresets",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3271,
+        "endOffset": 3287,
+        "startLine": 75,
+        "startColumn": 79,
+        "endLine": 75,
+        "endColumn": 95
+      }
+    },
+    {
+      "inventoryId": "color-147e102128593a6ee9d0",
+      "path": "ui/src/demo/handlers/trading.ts",
+      "sourceText": "text-sky-400",
+      "sourceClass": "demo",
+      "syntaxKind": "tailwind-palette-utility",
+      "ownerHint": "demoBrokerPresets",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3848,
+        "endOffset": 3860,
+        "startLine": 89,
+        "startColumn": 71,
+        "endLine": 89,
+        "endColumn": 83
+      }
+    },
+    {
+      "inventoryId": "color-a1a26f258a7fbbdbe131",
+      "path": "ui/src/index.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": "::selection",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2796,
+        "endOffset": 2807,
+        "startLine": 74,
+        "startColumn": 59,
+        "endLine": 74,
+        "endColumn": 70
+      }
+    },
+    {
+      "inventoryId": "color-d7d58e4dfbb3028fa1fb",
+      "path": "ui/src/index.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".oa-pressable:hover:not(:disabled):not([aria-disabled=\"true\"])",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 4816,
+        "endOffset": 4827,
+        "startLine": 129,
+        "startColumn": 69,
+        "endLine": 129,
+        "endColumn": 80
+      }
+    },
+    {
+      "inventoryId": "color-2bb33a2ca9e54c5a28d1",
+      "path": "ui/src/index.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".oa-onboarding-completion-ring",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 10256,
+        "endOffset": 10267,
+        "startLine": 397,
+        "startColumn": 76,
+        "endLine": 397,
+        "endColumn": 87
+      }
+    },
+    {
+      "inventoryId": "color-da57229f25c270008370",
+      "path": "ui/src/index.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".skeleton",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 12377,
+        "endOffset": 12388,
+        "startLine": 477,
+        "startColumn": 5,
+        "endLine": 477,
+        "endColumn": 16
+      }
+    },
+    {
+      "inventoryId": "color-6697e3270ecda8da085f",
+      "path": "ui/src/index.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".skeleton",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 12434,
+        "endOffset": 12445,
+        "startLine": 479,
+        "startColumn": 5,
+        "endLine": 479,
+        "endColumn": 16
+      }
+    },
+    {
+      "inventoryId": "color-65fad81f1a4eec83881d",
+      "path": "ui/src/index.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".btn-danger",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 14734,
+        "endOffset": 14745,
+        "startLine": 552,
+        "startColumn": 68,
+        "endLine": 552,
+        "endColumn": 79
+      }
+    },
+    {
+      "inventoryId": "color-a4accdd1e833c1e516c8",
+      "path": "ui/src/index.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".btn-danger:hover",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 14836,
+        "endOffset": 14847,
+        "startLine": 556,
+        "startColumn": 66,
+        "endLine": 556,
+        "endColumn": 77
+      }
+    },
+    {
+      "inventoryId": "color-ed320b7b8a45ee61d0e3",
+      "path": "ui/src/index.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".btn-danger:focus-visible",
+      "role": "css-variable-definition",
+      "span": {
+        "startOffset": 14951,
+        "endOffset": 14962,
+        "startLine": 560,
+        "startColumn": 71,
+        "endLine": 560,
+        "endColumn": 82
+      }
+    },
+    {
+      "inventoryId": "color-36aead8fa2e0e54a33ed",
+      "path": "ui/src/index.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": "::-webkit-scrollbar-track",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 15873,
+        "endOffset": 15884,
+        "startLine": 583,
+        "startColumn": 15,
+        "endLine": 583,
+        "endColumn": 26
+      }
+    },
+    {
+      "inventoryId": "color-7c934a658d62469a1862",
+      "path": "ui/src/index.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".markdown-content a.wikilink",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 18277,
+        "endOffset": 18288,
+        "startLine": 670,
+        "startColumn": 73,
+        "endLine": 670,
+        "endColumn": 84
+      }
+    },
+    {
+      "inventoryId": "color-5445b5f7fe99cc0f8707",
+      "path": "ui/src/index.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".markdown-content a.session-signature:hover",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 18668,
+        "endOffset": 18679,
+        "startLine": 686,
+        "startColumn": 52,
+        "endLine": 686,
+        "endColumn": 63
+      }
+    },
+    {
+      "inventoryId": "color-2833fbb9d0848ce47509",
+      "path": "ui/src/index.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".what-editor-content .ProseMirror-focused",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 20349,
+        "endOffset": 20360,
+        "startLine": 759,
+        "startColumn": 15,
+        "endLine": 759,
+        "endColumn": 26
+      }
+    },
+    {
+      "inventoryId": "color-dc5086eee0bb39e03b48",
+      "path": "ui/src/index.css",
+      "sourceText": "transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "css-color-literal",
+      "ownerHint": ".what-editor-content .ProseMirror-selectednode",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 20478,
+        "endOffset": 20489,
+        "startLine": 762,
+        "startColumn": 66,
+        "endLine": 762,
+        "endColumn": 77
+      }
+    },
+    {
+      "inventoryId": "color-2d7a52308ba223f30ae4",
+      "path": "ui/src/lib/contract-display.spec.ts",
+      "sourceText": "#340",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 214,
+        "endOffset": 218,
+        "startLine": 4,
+        "startColumn": 72,
+        "endLine": 4,
+        "endColumn": 76
+      }
+    },
+    {
+      "inventoryId": "color-b60ce38ca358eaa76313",
+      "path": "ui/src/lib/contract-display.spec.ts",
+      "sourceText": "#340",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 890,
+        "endOffset": 894,
+        "startLine": 19,
+        "startColumn": 61,
+        "endLine": 19,
+        "endColumn": 65
+      }
+    },
+    {
+      "inventoryId": "color-12a782269e4767931774",
+      "path": "ui/src/lib/contract-display.spec.ts",
+      "sourceText": "#340",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2515,
+        "endOffset": 2519,
+        "startLine": 57,
+        "startColumn": 42,
+        "endLine": 57,
+        "endColumn": 46
+      }
+    },
+    {
+      "inventoryId": "color-ed404f80a0d816f47659",
+      "path": "ui/src/pages/SimulatorPage.tsx",
+      "sourceText": "border-transparent",
+      "sourceClass": "runtime",
+      "syntaxKind": "tailwind-palette-utility",
+      "ownerHint": "TopBar",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 4118,
+        "endOffset": 4136,
+        "startLine": 106,
+        "startColumn": 61,
+        "endLine": 106,
+        "endColumn": 79
+      }
+    },
+    {
+      "inventoryId": "color-c9548c39258089857c96",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#ffffff",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 178,
+        "endOffset": 185,
+        "startLine": 7,
+        "startColumn": 12,
+        "endLine": 7,
+        "endColumn": 19
+      }
+    },
+    {
+      "inventoryId": "color-177a015713ec0a106e51",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#f0f0f0",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 197,
+        "endOffset": 204,
+        "startLine": 7,
+        "startColumn": 31,
+        "endLine": 7,
+        "endColumn": 38
+      }
+    },
+    {
+      "inventoryId": "color-db79ac0d3b525120a67b",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#e0e0e0",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 216,
+        "endOffset": 223,
+        "startLine": 7,
+        "startColumn": 50,
+        "endLine": 7,
+        "endColumn": 57
+      }
+    },
+    {
+      "inventoryId": "color-073ec298b9665314f268",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#777777",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 235,
+        "endOffset": 242,
+        "startLine": 7,
+        "startColumn": 69,
+        "endLine": 7,
+        "endColumn": 76
+      }
+    },
+    {
+      "inventoryId": "color-d43dce02945f08ffd7fc",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#666666",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 256,
+        "endOffset": 263,
+        "startLine": 8,
+        "startColumn": 12,
+        "endLine": 8,
+        "endColumn": 19
+      }
+    },
+    {
+      "inventoryId": "color-9e423f393435b4648ae9",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#222222",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 275,
+        "endOffset": 282,
+        "startLine": 8,
+        "startColumn": 31,
+        "endLine": 8,
+        "endColumn": 38
+      }
+    },
+    {
+      "inventoryId": "color-6c7059b54f852f8af19b",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#111111",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 294,
+        "endOffset": 301,
+        "startLine": 8,
+        "startColumn": 50,
+        "endLine": 8,
+        "endColumn": 57
+      }
+    },
+    {
+      "inventoryId": "color-ca6fa0f59311bd3e6204",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#000000",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 313,
+        "endOffset": 320,
+        "startLine": 8,
+        "startColumn": 69,
+        "endLine": 8,
+        "endColumn": 76
+      }
+    },
+    {
+      "inventoryId": "color-5faac82ac1fc033c8e3c",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#aa0000",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 334,
+        "endOffset": 341,
+        "startLine": 9,
+        "startColumn": 12,
+        "endLine": 9,
+        "endColumn": 19
+      }
+    },
+    {
+      "inventoryId": "color-9c1391d1cff315960ca4",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#a05000",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 353,
+        "endOffset": 360,
+        "startLine": 9,
+        "startColumn": 31,
+        "endLine": 9,
+        "endColumn": 38
+      }
+    },
+    {
+      "inventoryId": "color-eab8fe60aa0d93f0fa22",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#886600",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 372,
+        "endOffset": 379,
+        "startLine": 9,
+        "startColumn": 50,
+        "endLine": 9,
+        "endColumn": 57
+      }
+    },
+    {
+      "inventoryId": "color-9485109900ba43d6843d",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#007a30",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 391,
+        "endOffset": 398,
+        "startLine": 9,
+        "startColumn": 69,
+        "endLine": 9,
+        "endColumn": 76
+      }
+    },
+    {
+      "inventoryId": "color-ba894e788b9f70e1ce04",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#007777",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 412,
+        "endOffset": 419,
+        "startLine": 10,
+        "startColumn": 12,
+        "endLine": 10,
+        "endColumn": 19
+      }
+    },
+    {
+      "inventoryId": "color-738d1bf3c06cc19f5a5e",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#0055aa",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 431,
+        "endOffset": 438,
+        "startLine": 10,
+        "startColumn": 31,
+        "endLine": 10,
+        "endColumn": 38
+      }
+    },
+    {
+      "inventoryId": "color-f3ca70fdbedc2f35da95",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#770077",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 450,
+        "endOffset": 457,
+        "startLine": 10,
+        "startColumn": 50,
+        "endLine": 10,
+        "endColumn": 57
+      }
+    },
+    {
+      "inventoryId": "color-fe30284a858d9354ed86",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#773300",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 469,
+        "endOffset": 476,
+        "startLine": 10,
+        "startColumn": 69,
+        "endLine": 10,
+        "endColumn": 76
+      }
+    },
+    {
+      "inventoryId": "color-dffa88976171ee70c184",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#101010",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 669,
+        "endOffset": 676,
+        "startLine": 17,
+        "startColumn": 44,
+        "endLine": 17,
+        "endColumn": 51
+      }
+    },
+    {
+      "inventoryId": "color-4c16a95e7d3221fab95d",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#ffffff",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 681,
+        "endOffset": 688,
+        "startLine": 17,
+        "startColumn": 56,
+        "endLine": 17,
+        "endColumn": 63
+      }
+    },
+    {
+      "inventoryId": "color-09ccfc6475d35246f67a",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#101010",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 813,
+        "endOffset": 820,
+        "startLine": 20,
+        "startColumn": 31,
+        "endLine": 20,
+        "endColumn": 38
+      }
+    },
+    {
+      "inventoryId": "color-5f28e4808189f8dbcc94",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#ffffff",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 825,
+        "endOffset": 832,
+        "startLine": 20,
+        "startColumn": 43,
+        "endLine": 20,
+        "endColumn": 50
+      }
+    },
+    {
+      "inventoryId": "color-176a35f93263a772af93",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#181818",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 861,
+        "endOffset": 868,
+        "startLine": 20,
+        "startColumn": 79,
+        "endLine": 20,
+        "endColumn": 86
+      }
+    },
+    {
+      "inventoryId": "color-c742f35d0e727b9994b5",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#f0f0f0",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 873,
+        "endOffset": 880,
+        "startLine": 20,
+        "startColumn": 91,
+        "endLine": 20,
+        "endColumn": 98
+      }
+    },
+    {
+      "inventoryId": "color-2606e7ded8e9d3b8d1d7",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#1a1b21",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1049,
+        "endOffset": 1056,
+        "startLine": 23,
+        "startColumn": 28,
+        "endLine": 23,
+        "endColumn": 35
+      }
+    },
+    {
+      "inventoryId": "color-05894f4671835e573209",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#e4dccb",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1061,
+        "endOffset": 1068,
+        "startLine": 23,
+        "startColumn": 40,
+        "endLine": 23,
+        "endColumn": 47
+      }
+    },
+    {
+      "inventoryId": "color-697a43b8d78a1cdd8418",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#666666",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1087,
+        "endOffset": 1094,
+        "startLine": 23,
+        "startColumn": 66,
+        "endLine": 23,
+        "endColumn": 73
+      }
+    },
+    {
+      "inventoryId": "color-9ec4d729f06dd0734d44",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#777777",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1099,
+        "endOffset": 1106,
+        "startLine": 23,
+        "startColumn": 78,
+        "endLine": 23,
+        "endColumn": 85
+      }
+    },
+    {
+      "inventoryId": "color-e8281a15faffe51534f8",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#aaaaaa",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1134,
+        "endOffset": 1141,
+        "startLine": 24,
+        "startColumn": 26,
+        "endLine": 24,
+        "endColumn": 33
+      }
+    },
+    {
+      "inventoryId": "color-8faaf39fc22a1df47808",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#666666",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1146,
+        "endOffset": 1153,
+        "startLine": 24,
+        "startColumn": 38,
+        "endLine": 24,
+        "endColumn": 45
+      }
+    },
+    {
+      "inventoryId": "color-5bc627177922183570d2",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#eeeeee",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1174,
+        "endOffset": 1181,
+        "startLine": 24,
+        "startColumn": 66,
+        "endLine": 24,
+        "endColumn": 73
+      }
+    },
+    {
+      "inventoryId": "color-50bddacbcf518120c94a",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#222222",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1186,
+        "endOffset": 1193,
+        "startLine": 24,
+        "startColumn": 78,
+        "endLine": 24,
+        "endColumn": 85
+      }
+    },
+    {
+      "inventoryId": "color-1d503e54873018660aeb",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#ffffff",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1222,
+        "endOffset": 1229,
+        "startLine": 25,
+        "startColumn": 27,
+        "endLine": 25,
+        "endColumn": 34
+      }
+    },
+    {
+      "inventoryId": "color-33ed765eb61a97bac61a",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#111111",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1234,
+        "endOffset": 1241,
+        "startLine": 25,
+        "startColumn": 39,
+        "endLine": 25,
+        "endColumn": 46
+      }
+    },
+    {
+      "inventoryId": "color-120f4bdfdf132fb17513",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#ffffff",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1273,
+        "endOffset": 1280,
+        "startLine": 25,
+        "startColumn": 78,
+        "endLine": 25,
+        "endColumn": 85
+      }
+    },
+    {
+      "inventoryId": "color-03c5696abcf9120f8a7f",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#000000",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1285,
+        "endOffset": 1292,
+        "startLine": 25,
+        "startColumn": 90,
+        "endLine": 25,
+        "endColumn": 97
+      }
+    },
+    {
+      "inventoryId": "color-2172a5c4e264d3b5ec86",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#aa0000",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1310,
+        "endOffset": 1317,
+        "startLine": 26,
+        "startColumn": 16,
+        "endLine": 26,
+        "endColumn": 23
+      }
+    },
+    {
+      "inventoryId": "color-507925e2e61d77534ad7",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#a05000",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1329,
+        "endOffset": 1336,
+        "startLine": 26,
+        "startColumn": 35,
+        "endLine": 26,
+        "endColumn": 42
+      }
+    },
+    {
+      "inventoryId": "color-dffce54a66ea434939ff",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#886600",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1349,
+        "endOffset": 1356,
+        "startLine": 26,
+        "startColumn": 55,
+        "endLine": 26,
+        "endColumn": 62
+      }
+    },
+    {
+      "inventoryId": "color-0db7c9633eba24e53f43",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#007a30",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1369,
+        "endOffset": 1376,
+        "startLine": 26,
+        "startColumn": 75,
+        "endLine": 26,
+        "endColumn": 82
+      }
+    },
+    {
+      "inventoryId": "color-bb585131707608576f93",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#0055aa",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1386,
+        "endOffset": 1393,
+        "startLine": 26,
+        "startColumn": 92,
+        "endLine": 26,
+        "endColumn": 99
+      }
+    },
+    {
+      "inventoryId": "color-2d078b9de662a3ff80bd",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#0055aa",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1411,
+        "endOffset": 1418,
+        "startLine": 27,
+        "startColumn": 16,
+        "endLine": 27,
+        "endColumn": 23
+      }
+    },
+    {
+      "inventoryId": "color-77bb91534b8d5860157c",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#770077",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1439,
+        "endOffset": 1446,
+        "startLine": 27,
+        "startColumn": 44,
+        "endLine": 27,
+        "endColumn": 51
+      }
+    },
+    {
+      "inventoryId": "color-7e3f8d8f58f4b65646eb",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#773300",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1459,
+        "endOffset": 1466,
+        "startLine": 27,
+        "startColumn": 64,
+        "endLine": 27,
+        "endColumn": 71
+      }
+    },
+    {
+      "inventoryId": "color-b3a4681e99f0a0cafb25",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#ffffff",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1480,
+        "endOffset": 1487,
+        "startLine": 27,
+        "startColumn": 85,
+        "endLine": 27,
+        "endColumn": 92
+      }
+    },
+    {
+      "inventoryId": "color-2fba4b80632ab60ff8f0",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#282828",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1518,
+        "endOffset": 1525,
+        "startLine": 28,
+        "startColumn": 29,
+        "endLine": 28,
+        "endColumn": 36
+      }
+    },
+    {
+      "inventoryId": "color-92e7c96cb38da1fb2e7f",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#eeeeee",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1530,
+        "endOffset": 1537,
+        "startLine": 28,
+        "startColumn": 41,
+        "endLine": 28,
+        "endColumn": 48
+      }
+    },
+    {
+      "inventoryId": "color-ac2cb368ae8c4accfc91",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#303030",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1563,
+        "endOffset": 1570,
+        "startLine": 28,
+        "startColumn": 74,
+        "endLine": 28,
+        "endColumn": 81
+      }
+    },
+    {
+      "inventoryId": "color-9321f0d319bb5d89745a",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#dddddd",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1575,
+        "endOffset": 1582,
+        "startLine": 28,
+        "startColumn": 86,
+        "endLine": 28,
+        "endColumn": 93
+      }
+    },
+    {
+      "inventoryId": "color-374d82380f2304b30f7a",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#304050",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1610,
+        "endOffset": 1617,
+        "startLine": 29,
+        "startColumn": 26,
+        "endLine": 29,
+        "endColumn": 33
+      }
+    },
+    {
+      "inventoryId": "color-96a381b9fe9caaaf5def",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#ccddee",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1622,
+        "endOffset": 1629,
+        "startLine": 29,
+        "startColumn": 38,
+        "endLine": 29,
+        "endColumn": 45
+      }
+    },
+    {
+      "inventoryId": "color-6a37e08b8e0efa6a4e9e",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#0055aa",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1644,
+        "endOffset": 1651,
+        "startLine": 29,
+        "startColumn": 60,
+        "endLine": 29,
+        "endColumn": 67
+      }
+    },
+    {
+      "inventoryId": "color-575c8a1392c8a0d7cdd3",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#181818",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1677,
+        "endOffset": 1684,
+        "startLine": 29,
+        "startColumn": 93,
+        "endLine": 29,
+        "endColumn": 100
+      }
+    },
+    {
+      "inventoryId": "color-01ba4ff26c755896a209",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#f5f5f5",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1689,
+        "endOffset": 1696,
+        "startLine": 29,
+        "startColumn": 105,
+        "endLine": 29,
+        "endColumn": 112
+      }
+    },
+    {
+      "inventoryId": "color-8f584d5a09f71b0eb9ba",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#666666",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1724,
+        "endOffset": 1731,
+        "startLine": 30,
+        "startColumn": 26,
+        "endLine": 30,
+        "endColumn": 33
+      }
+    },
+    {
+      "inventoryId": "color-0d57a6e77ea2b6757909",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#999999",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1736,
+        "endOffset": 1743,
+        "startLine": 30,
+        "startColumn": 38,
+        "endLine": 30,
+        "endColumn": 45
+      }
+    },
+    {
+      "inventoryId": "color-02897d2fb55ee34d691c",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#101010",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1763,
+        "endOffset": 1770,
+        "startLine": 30,
+        "startColumn": 65,
+        "endLine": 30,
+        "endColumn": 72
+      }
+    },
+    {
+      "inventoryId": "color-af2fc0ae54e9ba6d5b38",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#000000",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "makeVariant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1775,
+        "endOffset": 1782,
+        "startLine": 30,
+        "startColumn": 77,
+        "endLine": 30,
+        "endColumn": 84
+      }
+    },
+    {
+      "inventoryId": "color-d505c63756d578d19317",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#137333",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "green",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3078,
+        "endOffset": 3085,
+        "startLine": 55,
+        "startColumn": 97,
+        "endLine": 55,
+        "endColumn": 104
+      }
+    },
+    {
+      "inventoryId": "color-c57c4f740d75050e6dd8",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#81c995",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "green",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3090,
+        "endOffset": 3097,
+        "startLine": 55,
+        "startColumn": 109,
+        "endLine": 55,
+        "endColumn": 116
+      }
+    },
+    {
+      "inventoryId": "color-18d8dee7ff10f47e3612",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#b3261e",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "red",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3193,
+        "endOffset": 3200,
+        "startLine": 56,
+        "startColumn": 95,
+        "endLine": 56,
+        "endColumn": 102
+      }
+    },
+    {
+      "inventoryId": "color-8d49ed69cb940dea58f0",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#f28b82",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "red",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3205,
+        "endOffset": 3212,
+        "startLine": 56,
+        "startColumn": 107,
+        "endLine": 56,
+        "endColumn": 114
+      }
+    },
+    {
+      "inventoryId": "color-24ad24bf70290c14f67d",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#137333",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3620,
+        "endOffset": 3627,
+        "startLine": 62,
+        "startColumn": 60,
+        "endLine": 62,
+        "endColumn": 67
+      }
+    },
+    {
+      "inventoryId": "color-ff25112d0dc10cc668d4",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#81c995",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3632,
+        "endOffset": 3639,
+        "startLine": 62,
+        "startColumn": 72,
+        "endLine": 62,
+        "endColumn": 79
+      }
+    },
+    {
+      "inventoryId": "color-fa19d52c8e7921bba750",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#b3261e",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3780,
+        "endOffset": 3787,
+        "startLine": 64,
+        "startColumn": 59,
+        "endLine": 64,
+        "endColumn": 66
+      }
+    },
+    {
+      "inventoryId": "color-c2b6a172dc8e748d6021",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#f28b82",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3792,
+        "endOffset": 3799,
+        "startLine": 64,
+        "startColumn": 71,
+        "endLine": 64,
+        "endColumn": 78
+      }
+    },
+    {
+      "inventoryId": "color-6ba1b30739be408f7b79",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#b3261e",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3880,
+        "endOffset": 3887,
+        "startLine": 65,
+        "startColumn": 79,
+        "endLine": 65,
+        "endColumn": 86
+      }
+    },
+    {
+      "inventoryId": "color-ff4cb05dad80a4c2c8bc",
+      "path": "ui/src/theme/colorPolicy.spec.ts",
+      "sourceText": "#f28b82",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3892,
+        "endOffset": 3899,
+        "startLine": 65,
+        "startColumn": 91,
+        "endLine": 65,
+        "endColumn": 98
+      }
+    },
+    {
+      "inventoryId": "color-87b0eeef319dbb31bd4b",
+      "path": "ui/src/theme/colorPolicy.ts",
+      "sourceText": "#137333",
+      "sourceClass": "runtime",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "protectedColors",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 701,
+        "endOffset": 708,
+        "startLine": 17,
+        "startColumn": 20,
+        "endLine": 17,
+        "endColumn": 27
+      }
+    },
+    {
+      "inventoryId": "color-dbdecb8fb229ef75e44a",
+      "path": "ui/src/theme/colorPolicy.ts",
+      "sourceText": "#81c995",
+      "sourceClass": "runtime",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "protectedColors",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 718,
+        "endOffset": 725,
+        "startLine": 17,
+        "startColumn": 37,
+        "endLine": 17,
+        "endColumn": 44
+      }
+    },
+    {
+      "inventoryId": "color-3294ce3566f57d6ed54c",
+      "path": "ui/src/theme/colorPolicy.ts",
+      "sourceText": "#b3261e",
+      "sourceClass": "runtime",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "protectedColors",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 747,
+        "endOffset": 754,
+        "startLine": 18,
+        "startColumn": 18,
+        "endLine": 18,
+        "endColumn": 25
+      }
+    },
+    {
+      "inventoryId": "color-f06accfcd365dee8e95a",
+      "path": "ui/src/theme/colorPolicy.ts",
+      "sourceText": "#f28b82",
+      "sourceClass": "runtime",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "protectedColors",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 764,
+        "endOffset": 771,
+        "startLine": 18,
+        "startColumn": 35,
+        "endLine": 18,
+        "endColumn": 42
+      }
+    },
+    {
+      "inventoryId": "color-c668d0e28e75fbcf7134",
+      "path": "ui/src/theme/colorPolicy.ts",
+      "sourceText": "#8a4b00",
+      "sourceClass": "runtime",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "protectedColors",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 797,
+        "endOffset": 804,
+        "startLine": 19,
+        "startColumn": 22,
+        "endLine": 19,
+        "endColumn": 29
+      }
+    },
+    {
+      "inventoryId": "color-872d34056aad082f8142",
+      "path": "ui/src/theme/colorPolicy.ts",
+      "sourceText": "#fdd663",
+      "sourceClass": "runtime",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "protectedColors",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 814,
+        "endOffset": 821,
+        "startLine": 19,
+        "startColumn": 39,
+        "endLine": 19,
+        "endColumn": 46
+      }
+    },
+    {
+      "inventoryId": "color-9c9b3118a53098509a32",
+      "path": "ui/src/theme/colorPolicy.ts",
+      "sourceText": "#0b57d0",
+      "sourceClass": "runtime",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "protectedColors",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 844,
+        "endOffset": 851,
+        "startLine": 20,
+        "startColumn": 19,
+        "endLine": 20,
+        "endColumn": 26
+      }
+    },
+    {
+      "inventoryId": "color-ed02c1e3775baaa7bb65",
+      "path": "ui/src/theme/colorPolicy.ts",
+      "sourceText": "#8ab4f8",
+      "sourceClass": "runtime",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "protectedColors",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 861,
+        "endOffset": 868,
+        "startLine": 20,
+        "startColumn": 36,
+        "endLine": 20,
+        "endColumn": 43
+      }
+    },
+    {
+      "inventoryId": "color-5d13f98979125e680b27",
+      "path": "ui/src/theme/semanticConsumers.spec.ts",
+      "sourceText": "#101010",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 287,
+        "endOffset": 294,
+        "startLine": 9,
+        "startColumn": 12,
+        "endLine": 9,
+        "endColumn": 19
+      }
+    },
+    {
+      "inventoryId": "color-e45d8f5cec4191ea2637",
+      "path": "ui/src/theme/semanticConsumers.spec.ts",
+      "sourceText": "#181818",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 306,
+        "endOffset": 313,
+        "startLine": 9,
+        "startColumn": 31,
+        "endLine": 9,
+        "endColumn": 38
+      }
+    },
+    {
+      "inventoryId": "color-b01a115d7c5f6ebc8225",
+      "path": "ui/src/theme/semanticConsumers.spec.ts",
+      "sourceText": "#282828",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 325,
+        "endOffset": 332,
+        "startLine": 9,
+        "startColumn": 50,
+        "endLine": 9,
+        "endColumn": 57
+      }
+    },
+    {
+      "inventoryId": "color-3ea8f12cbc70851fb704",
+      "path": "ui/src/theme/semanticConsumers.spec.ts",
+      "sourceText": "#585858",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 344,
+        "endOffset": 351,
+        "startLine": 9,
+        "startColumn": 69,
+        "endLine": 9,
+        "endColumn": 76
+      }
+    },
+    {
+      "inventoryId": "color-1993ea7708f66c7bc2de",
+      "path": "ui/src/theme/semanticConsumers.spec.ts",
+      "sourceText": "#b8b8b8",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 365,
+        "endOffset": 372,
+        "startLine": 10,
+        "startColumn": 12,
+        "endLine": 10,
+        "endColumn": 19
+      }
+    },
+    {
+      "inventoryId": "color-fa5da80cd20bd222c4b3",
+      "path": "ui/src/theme/semanticConsumers.spec.ts",
+      "sourceText": "#d8d8d8",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 384,
+        "endOffset": 391,
+        "startLine": 10,
+        "startColumn": 31,
+        "endLine": 10,
+        "endColumn": 38
+      }
+    },
+    {
+      "inventoryId": "color-dce80730e95702e8f3a0",
+      "path": "ui/src/theme/semanticConsumers.spec.ts",
+      "sourceText": "#e8e8e8",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 403,
+        "endOffset": 410,
+        "startLine": 10,
+        "startColumn": 50,
+        "endLine": 10,
+        "endColumn": 57
+      }
+    },
+    {
+      "inventoryId": "color-416fb2b5b7eee5493403",
+      "path": "ui/src/theme/semanticConsumers.spec.ts",
+      "sourceText": "#f8f8f8",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 422,
+        "endOffset": 429,
+        "startLine": 10,
+        "startColumn": 69,
+        "endLine": 10,
+        "endColumn": 76
+      }
+    },
+    {
+      "inventoryId": "color-e528515b4dc9f0c3384f",
+      "path": "ui/src/theme/semanticConsumers.spec.ts",
+      "sourceText": "#ab4642",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 443,
+        "endOffset": 450,
+        "startLine": 11,
+        "startColumn": 12,
+        "endLine": 11,
+        "endColumn": 19
+      }
+    },
+    {
+      "inventoryId": "color-9f684f906e5d206d8c3b",
+      "path": "ui/src/theme/semanticConsumers.spec.ts",
+      "sourceText": "#dc9656",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 462,
+        "endOffset": 469,
+        "startLine": 11,
+        "startColumn": 31,
+        "endLine": 11,
+        "endColumn": 38
+      }
+    },
+    {
+      "inventoryId": "color-1e1b873176581f4cc035",
+      "path": "ui/src/theme/semanticConsumers.spec.ts",
+      "sourceText": "#f7ca88",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 481,
+        "endOffset": 488,
+        "startLine": 11,
+        "startColumn": 50,
+        "endLine": 11,
+        "endColumn": 57
+      }
+    },
+    {
+      "inventoryId": "color-5ea680be882ae798bf8e",
+      "path": "ui/src/theme/semanticConsumers.spec.ts",
+      "sourceText": "#a1b56c",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 500,
+        "endOffset": 507,
+        "startLine": 11,
+        "startColumn": 69,
+        "endLine": 11,
+        "endColumn": 76
+      }
+    },
+    {
+      "inventoryId": "color-aaa8af9b5a67a2bb397d",
+      "path": "ui/src/theme/semanticConsumers.spec.ts",
+      "sourceText": "#86c1b9",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 521,
+        "endOffset": 528,
+        "startLine": 12,
+        "startColumn": 12,
+        "endLine": 12,
+        "endColumn": 19
+      }
+    },
+    {
+      "inventoryId": "color-42ef09ee61ea3941af50",
+      "path": "ui/src/theme/semanticConsumers.spec.ts",
+      "sourceText": "#7cafc2",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 540,
+        "endOffset": 547,
+        "startLine": 12,
+        "startColumn": 31,
+        "endLine": 12,
+        "endColumn": 38
+      }
+    },
+    {
+      "inventoryId": "color-d02a0e5fab41a24570aa",
+      "path": "ui/src/theme/semanticConsumers.spec.ts",
+      "sourceText": "#ba8baf",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 559,
+        "endOffset": 566,
+        "startLine": 12,
+        "startColumn": 50,
+        "endLine": 12,
+        "endColumn": 57
+      }
+    },
+    {
+      "inventoryId": "color-b5c9cd75bb4256398fd4",
+      "path": "ui/src/theme/semanticConsumers.spec.ts",
+      "sourceText": "#a16946",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "palette",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 578,
+        "endOffset": 585,
+        "startLine": 12,
+        "startColumn": 69,
+        "endLine": 12,
+        "endColumn": 76
+      }
+    },
+    {
+      "inventoryId": "color-99ad5d65a267493e93da",
+      "path": "ui/src/theme/semanticConsumers.spec.ts",
+      "sourceText": "#f7ca88",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 4742,
+        "endOffset": 4749,
+        "startLine": 120,
+        "startColumn": 34,
+        "endLine": 120,
+        "endColumn": 41
+      }
+    },
+    {
+      "inventoryId": "color-f0acda677c943307db88",
+      "path": "ui/src/theme/semanticConsumers.spec.ts",
+      "sourceText": "#101010",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 4755,
+        "endOffset": 4762,
+        "startLine": 120,
+        "startColumn": 47,
+        "endLine": 120,
+        "endColumn": 54
+      }
+    },
+    {
+      "inventoryId": "color-3639f450c515befa75a5",
+      "path": "ui/src/theme/semanticConsumers.spec.ts",
+      "sourceText": "#f7ca88",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 4877,
+        "endOffset": 4884,
+        "startLine": 122,
+        "startColumn": 34,
+        "endLine": 122,
+        "endColumn": 41
+      }
+    },
+    {
+      "inventoryId": "color-0dbe3f3a99fdedea623b",
+      "path": "ui/src/theme/semanticConsumers.spec.ts",
+      "sourceText": "#101010",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 4890,
+        "endOffset": 4897,
+        "startLine": 122,
+        "startColumn": 47,
+        "endLine": 122,
+        "endColumn": 54
+      }
+    },
+    {
+      "inventoryId": "color-4ffb5f79b41dd774ea74",
+      "path": "ui/src/theme/semanticConsumers.spec.ts",
+      "sourceText": "#f7ca88",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 5012,
+        "endOffset": 5019,
+        "startLine": 124,
+        "startColumn": 34,
+        "endLine": 124,
+        "endColumn": 41
+      }
+    },
+    {
+      "inventoryId": "color-9df2f8c0b1c4ca8993ae",
+      "path": "ui/src/theme/semanticConsumers.spec.ts",
+      "sourceText": "#101010",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 5025,
+        "endOffset": 5032,
+        "startLine": 124,
+        "startColumn": 47,
+        "endLine": 124,
+        "endColumn": 54
+      }
+    },
+    {
+      "inventoryId": "color-ff460cf381bbd3caeb80",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#101010",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 385,
+        "endOffset": 392,
+        "startLine": 12,
+        "startColumn": 14,
+        "endLine": 12,
+        "endColumn": 21
+      }
+    },
+    {
+      "inventoryId": "color-edfeb83c3be6cd6cc340",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#181818",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 404,
+        "endOffset": 411,
+        "startLine": 12,
+        "startColumn": 33,
+        "endLine": 12,
+        "endColumn": 40
+      }
+    },
+    {
+      "inventoryId": "color-00178282ab5410e83051",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#282828",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 423,
+        "endOffset": 430,
+        "startLine": 12,
+        "startColumn": 52,
+        "endLine": 12,
+        "endColumn": 59
+      }
+    },
+    {
+      "inventoryId": "color-c9e23c2e4ef2be85af5f",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#585858",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 442,
+        "endOffset": 449,
+        "startLine": 12,
+        "startColumn": 71,
+        "endLine": 12,
+        "endColumn": 78
+      }
+    },
+    {
+      "inventoryId": "color-eb168d332cb550357a6d",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#b8b8b8",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 465,
+        "endOffset": 472,
+        "startLine": 13,
+        "startColumn": 14,
+        "endLine": 13,
+        "endColumn": 21
+      }
+    },
+    {
+      "inventoryId": "color-e430f6c2201365b265e0",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#d8d8d8",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 484,
+        "endOffset": 491,
+        "startLine": 13,
+        "startColumn": 33,
+        "endLine": 13,
+        "endColumn": 40
+      }
+    },
+    {
+      "inventoryId": "color-ddf12d35bb994a29e8ed",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#e8e8e8",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 503,
+        "endOffset": 510,
+        "startLine": 13,
+        "startColumn": 52,
+        "endLine": 13,
+        "endColumn": 59
+      }
+    },
+    {
+      "inventoryId": "color-1000aa7a817ddc46398f",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#f8f8f8",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 522,
+        "endOffset": 529,
+        "startLine": 13,
+        "startColumn": 71,
+        "endLine": 13,
+        "endColumn": 78
+      }
+    },
+    {
+      "inventoryId": "color-8b39f3dbd1ea6b2f164f",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#ab4642",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 545,
+        "endOffset": 552,
+        "startLine": 14,
+        "startColumn": 14,
+        "endLine": 14,
+        "endColumn": 21
+      }
+    },
+    {
+      "inventoryId": "color-69ceef7e678409e9d11b",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#dc9656",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 564,
+        "endOffset": 571,
+        "startLine": 14,
+        "startColumn": 33,
+        "endLine": 14,
+        "endColumn": 40
+      }
+    },
+    {
+      "inventoryId": "color-026e4956541997f3208d",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#f7ca88",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 583,
+        "endOffset": 590,
+        "startLine": 14,
+        "startColumn": 52,
+        "endLine": 14,
+        "endColumn": 59
+      }
+    },
+    {
+      "inventoryId": "color-11596153a5df03d99ee3",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#a1b56c",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 602,
+        "endOffset": 609,
+        "startLine": 14,
+        "startColumn": 71,
+        "endLine": 14,
+        "endColumn": 78
+      }
+    },
+    {
+      "inventoryId": "color-1c40555600c0d217c3fd",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#86c1b9",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 625,
+        "endOffset": 632,
+        "startLine": 15,
+        "startColumn": 14,
+        "endLine": 15,
+        "endColumn": 21
+      }
+    },
+    {
+      "inventoryId": "color-19ad4fa49adee0b61ef5",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#7cafc2",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 644,
+        "endOffset": 651,
+        "startLine": 15,
+        "startColumn": 33,
+        "endLine": 15,
+        "endColumn": 40
+      }
+    },
+    {
+      "inventoryId": "color-b50334f6c57220847b9f",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#ba8baf",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 663,
+        "endOffset": 670,
+        "startLine": 15,
+        "startColumn": 52,
+        "endLine": 15,
+        "endColumn": 59
+      }
+    },
+    {
+      "inventoryId": "color-0abe0696affd61cf417f",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#a16946",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 682,
+        "endOffset": 689,
+        "startLine": 15,
+        "startColumn": 71,
+        "endLine": 15,
+        "endColumn": 78
+      }
+    },
+    {
+      "inventoryId": "color-9f4e31a12fec00117ee0",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#101010",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 807,
+        "endOffset": 814,
+        "startLine": 19,
+        "startColumn": 22,
+        "endLine": 19,
+        "endColumn": 29
+      }
+    },
+    {
+      "inventoryId": "color-3dc81df37338afc68e2c",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#181818",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 836,
+        "endOffset": 843,
+        "startLine": 19,
+        "startColumn": 51,
+        "endLine": 19,
+        "endColumn": 58
+      }
+    },
+    {
+      "inventoryId": "color-d196ed0e240a8cfc3e74",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#282828",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 860,
+        "endOffset": 867,
+        "startLine": 19,
+        "startColumn": 75,
+        "endLine": 19,
+        "endColumn": 82
+      }
+    },
+    {
+      "inventoryId": "color-402d7e733e7d76ad1529",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#585858",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 879,
+        "endOffset": 886,
+        "startLine": 19,
+        "startColumn": 94,
+        "endLine": 19,
+        "endColumn": 101
+      }
+    },
+    {
+      "inventoryId": "color-7e260ee8335c1a9e6b2f",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#b8b8b8",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 905,
+        "endOffset": 912,
+        "startLine": 20,
+        "startColumn": 17,
+        "endLine": 20,
+        "endColumn": 24
+      }
+    },
+    {
+      "inventoryId": "color-72fc6752e645544fd31b",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#d8d8d8",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 926,
+        "endOffset": 933,
+        "startLine": 20,
+        "startColumn": 38,
+        "endLine": 20,
+        "endColumn": 45
+      }
+    },
+    {
+      "inventoryId": "color-ae4891c43a7b6d4a509b",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#e8e8e8",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 949,
+        "endOffset": 956,
+        "startLine": 20,
+        "startColumn": 61,
+        "endLine": 20,
+        "endColumn": 68
+      }
+    },
+    {
+      "inventoryId": "color-aaa7bd7820fb0b6aa9dd",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#f8f8f8",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 981,
+        "endOffset": 988,
+        "startLine": 20,
+        "startColumn": 93,
+        "endLine": 20,
+        "endColumn": 100
+      }
+    },
+    {
+      "inventoryId": "color-3bfe2c9daa3da6c185ed",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#ab4642",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1004,
+        "endOffset": 1011,
+        "startLine": 21,
+        "startColumn": 14,
+        "endLine": 21,
+        "endColumn": 21
+      }
+    },
+    {
+      "inventoryId": "color-2acb0938290e4c8aafc7",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#dc9656",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1023,
+        "endOffset": 1030,
+        "startLine": 21,
+        "startColumn": 33,
+        "endLine": 21,
+        "endColumn": 40
+      }
+    },
+    {
+      "inventoryId": "color-77ad31951fa17c28c6b8",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#f7ca88",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1043,
+        "endOffset": 1050,
+        "startLine": 21,
+        "startColumn": 53,
+        "endLine": 21,
+        "endColumn": 60
+      }
+    },
+    {
+      "inventoryId": "color-2483ab4259880307b6bc",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#a1b56c",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1063,
+        "endOffset": 1070,
+        "startLine": 21,
+        "startColumn": 73,
+        "endLine": 21,
+        "endColumn": 80
+      }
+    },
+    {
+      "inventoryId": "color-b682b8a7b90b727e47ec",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#86c1b9",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1080,
+        "endOffset": 1087,
+        "startLine": 21,
+        "startColumn": 90,
+        "endLine": 21,
+        "endColumn": 97
+      }
+    },
+    {
+      "inventoryId": "color-79c1a407d79418ad7e82",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#7cafc2",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1103,
+        "endOffset": 1110,
+        "startLine": 22,
+        "startColumn": 14,
+        "endLine": 22,
+        "endColumn": 21
+      }
+    },
+    {
+      "inventoryId": "color-365cc463bb90ae642d5c",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#ba8baf",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1131,
+        "endOffset": 1138,
+        "startLine": 22,
+        "startColumn": 42,
+        "endLine": 22,
+        "endColumn": 49
+      }
+    },
+    {
+      "inventoryId": "color-a85aa9c73406b8dca9cc",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#a16946",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1151,
+        "endOffset": 1158,
+        "startLine": 22,
+        "startColumn": 62,
+        "endLine": 22,
+        "endColumn": 69
+      }
+    },
+    {
+      "inventoryId": "color-21b87aefa20a0721c652",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#101010",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1172,
+        "endOffset": 1179,
+        "startLine": 22,
+        "startColumn": 83,
+        "endLine": 22,
+        "endColumn": 90
+      }
+    },
+    {
+      "inventoryId": "color-61482495cd428114760c",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#252525",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1201,
+        "endOffset": 1208,
+        "startLine": 23,
+        "startColumn": 20,
+        "endLine": 23,
+        "endColumn": 27
+      }
+    },
+    {
+      "inventoryId": "color-87fc81afe21d4a94a0c6",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#272d2f",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1227,
+        "endOffset": 1234,
+        "startLine": 23,
+        "startColumn": 46,
+        "endLine": 23,
+        "endColumn": 53
+      }
+    },
+    {
+      "inventoryId": "color-893b6924ccda352cd688",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#2c373b",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1249,
+        "endOffset": 1256,
+        "startLine": 23,
+        "startColumn": 68,
+        "endLine": 23,
+        "endColumn": 75
+      }
+    },
+    {
+      "inventoryId": "color-fec5d2f535382180c0d3",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#7cafc2",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1271,
+        "endOffset": 1278,
+        "startLine": 23,
+        "startColumn": 90,
+        "endLine": 23,
+        "endColumn": 97
+      }
+    },
+    {
+      "inventoryId": "color-db6a125aadef2658d284",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#171717",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1301,
+        "endOffset": 1308,
+        "startLine": 24,
+        "startColumn": 21,
+        "endLine": 24,
+        "endColumn": 28
+      }
+    },
+    {
+      "inventoryId": "color-26106e3f0ec6f6551313",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#464646",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1323,
+        "endOffset": 1330,
+        "startLine": 24,
+        "startColumn": 43,
+        "endLine": 24,
+        "endColumn": 50
+      }
+    },
+    {
+      "inventoryId": "color-5d2ca71f01f73891587e",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#1f1f1f",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "variant",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 1343,
+        "endOffset": 1350,
+        "startLine": 24,
+        "startColumn": 63,
+        "endLine": 24,
+        "endColumn": 70
+      }
+    },
+    {
+      "inventoryId": "color-37cafc11b43d0f0a0d96",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#101010",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2828,
+        "endOffset": 2835,
+        "startLine": 60,
+        "startColumn": 81,
+        "endLine": 60,
+        "endColumn": 88
+      }
+    },
+    {
+      "inventoryId": "color-5bafc6619fab69809f02",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#7cafc2",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 2922,
+        "endOffset": 2929,
+        "startLine": 61,
+        "startColumn": 85,
+        "endLine": 61,
+        "endColumn": 92
+      }
+    },
+    {
+      "inventoryId": "color-a0dbb7133ea0e852fd47",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#ab4642",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 3658,
+        "endOffset": 3665,
+        "startLine": 72,
+        "startColumn": 81,
+        "endLine": 72,
+        "endColumn": 88
+      }
+    },
+    {
+      "inventoryId": "color-59d2d4beef758b10f7bb",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#101010",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 4095,
+        "endOffset": 4102,
+        "startLine": 81,
+        "startColumn": 49,
+        "endLine": 81,
+        "endColumn": 56
+      }
+    },
+    {
+      "inventoryId": "color-8dbc46dadb40c73a190f",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#a16946",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 4153,
+        "endOffset": 4160,
+        "startLine": 82,
+        "startColumn": 49,
+        "endLine": 82,
+        "endColumn": 56
+      }
+    },
+    {
+      "inventoryId": "color-2d02bff26c236511bbf1",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#f8f8f8",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 4232,
+        "endOffset": 4239,
+        "startLine": 83,
+        "startColumn": 70,
+        "endLine": 83,
+        "endColumn": 77
+      }
+    },
+    {
+      "inventoryId": "color-cd10d98fc0c097aaa132",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#101010",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 4299,
+        "endOffset": 4306,
+        "startLine": 84,
+        "startColumn": 58,
+        "endLine": 84,
+        "endColumn": 65
+      }
+    },
+    {
+      "inventoryId": "color-b47f6e864effcb16d272",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#101010",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 4356,
+        "endOffset": 4363,
+        "startLine": 85,
+        "startColumn": 48,
+        "endLine": 85,
+        "endColumn": 55
+      }
+    },
+    {
+      "inventoryId": "color-e6632761affe48d85491",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#f7ca88",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 4430,
+        "endOffset": 4437,
+        "startLine": 86,
+        "startColumn": 65,
+        "endLine": 86,
+        "endColumn": 72
+      }
+    },
+    {
+      "inventoryId": "color-0e85dddc7402875c7fa6",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#81c995",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 4655,
+        "endOffset": 4662,
+        "startLine": 92,
+        "startColumn": 41,
+        "endLine": 92,
+        "endColumn": 48
+      }
+    },
+    {
+      "inventoryId": "color-a2154b91605bab381830",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#f28b82",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 4666,
+        "endOffset": 4673,
+        "startLine": 92,
+        "startColumn": 52,
+        "endLine": 92,
+        "endColumn": 59
+      }
+    },
+    {
+      "inventoryId": "color-090f6bd2c20a7497a7bb",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#f28b82",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 4717,
+        "endOffset": 4724,
+        "startLine": 93,
+        "startColumn": 41,
+        "endLine": 93,
+        "endColumn": 48
+      }
+    },
+    {
+      "inventoryId": "color-d6cde0c0574f338e3012",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#81c995",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 4728,
+        "endOffset": 4735,
+        "startLine": 93,
+        "startColumn": 52,
+        "endLine": 93,
+        "endColumn": 59
+      }
+    },
+    {
+      "inventoryId": "color-dcd6a162912193b969fd",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#a1b56c",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 4775,
+        "endOffset": 4782,
+        "startLine": 94,
+        "startColumn": 37,
+        "endLine": 94,
+        "endColumn": 44
+      }
+    },
+    {
+      "inventoryId": "color-e2966519a8656b156355",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#ab4642",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 4786,
+        "endOffset": 4793,
+        "startLine": 94,
+        "startColumn": 48,
+        "endLine": 94,
+        "endColumn": 55
+      }
+    },
+    {
+      "inventoryId": "color-60775fbf0a44cee954c6",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#ab4642",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 4833,
+        "endOffset": 4840,
+        "startLine": 95,
+        "startColumn": 37,
+        "endLine": 95,
+        "endColumn": 44
+      }
+    },
+    {
+      "inventoryId": "color-a1f40872378506776a76",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#a1b56c",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 4844,
+        "endOffset": 4851,
+        "startLine": 95,
+        "startColumn": 48,
+        "endLine": 95,
+        "endColumn": 55
+      }
+    },
+    {
+      "inventoryId": "color-b9121353657323549fd0",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#f28b82",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 6224,
+        "endOffset": 6231,
+        "startLine": 118,
+        "startColumn": 33,
+        "endLine": 118,
+        "endColumn": 40
+      }
+    },
+    {
+      "inventoryId": "color-56720e162f1dab4eaca1",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#a1b56c",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 6360,
+        "endOffset": 6367,
+        "startLine": 121,
+        "startColumn": 75,
+        "endLine": 121,
+        "endColumn": 82
+      }
+    },
+    {
+      "inventoryId": "color-7630d25589c509453ddc",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#81c995",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 6372,
+        "endOffset": 6379,
+        "startLine": 121,
+        "startColumn": 87,
+        "endLine": 121,
+        "endColumn": 94
+      }
+    },
+    {
+      "inventoryId": "color-a98e03fd3c881bcf3cd5",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#282828",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 6694,
+        "endOffset": 6701,
+        "startLine": 129,
+        "startColumn": 33,
+        "endLine": 129,
+        "endColumn": 40
+      }
+    },
+    {
+      "inventoryId": "color-0e1bcdf4826e9dc71cee",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#464646",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 6724,
+        "endOffset": 6731,
+        "startLine": 129,
+        "startColumn": 63,
+        "endLine": 129,
+        "endColumn": 70
+      }
+    },
+    {
+      "inventoryId": "color-858a3961f285c598753e",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#b8b8b8",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 6765,
+        "endOffset": 6772,
+        "startLine": 130,
+        "startColumn": 32,
+        "endLine": 130,
+        "endColumn": 39
+      }
+    },
+    {
+      "inventoryId": "color-dc710957b06d74742eaa",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#585858",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 6802,
+        "endOffset": 6809,
+        "startLine": 130,
+        "startColumn": 69,
+        "endLine": 130,
+        "endColumn": 76
+      }
+    },
+    {
+      "inventoryId": "color-6dd697d8a7fe81b4f05c",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#d8d8d8",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 6843,
+        "endOffset": 6850,
+        "startLine": 131,
+        "startColumn": 32,
+        "endLine": 131,
+        "endColumn": 39
+      }
+    },
+    {
+      "inventoryId": "color-b21c4565417734d2091a",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#2c373b",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 6878,
+        "endOffset": 6885,
+        "startLine": 131,
+        "startColumn": 67,
+        "endLine": 131,
+        "endColumn": 74
+      }
+    },
+    {
+      "inventoryId": "color-3390a25bc204bd23e867",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#ffffff",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 9617,
+        "endOffset": 9624,
+        "startLine": 188,
+        "startColumn": 38,
+        "endLine": 188,
+        "endColumn": 45
+      }
+    },
+    {
+      "inventoryId": "color-fc442b20c6cae383dd36",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#101010",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 12000,
+        "endOffset": 12007,
+        "startLine": 231,
+        "startColumn": 82,
+        "endLine": 231,
+        "endColumn": 89
+      }
+    },
+    {
+      "inventoryId": "color-53e4a01e69673d050fe1",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#ab4642",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 14899,
+        "endOffset": 14906,
+        "startLine": 283,
+        "startColumn": 85,
+        "endLine": 283,
+        "endColumn": 92
+      }
+    },
+    {
+      "inventoryId": "color-b1be9849015ede39b037",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#222222",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "changed",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 15588,
+        "endOffset": 15595,
+        "startLine": 298,
+        "startColumn": 53,
+        "endLine": 298,
+        "endColumn": 60
+      }
+    },
+    {
+      "inventoryId": "color-427a02dd3742b664705e",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#222222",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": "changed",
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 15655,
+        "endOffset": 15662,
+        "startLine": 299,
+        "startColumn": 47,
+        "endLine": 299,
+        "endColumn": 54
+      }
+    },
+    {
+      "inventoryId": "color-cccb2b2bbb6db5e047e9",
+      "path": "ui/src/theme/themeRuntime.spec.ts",
+      "sourceText": "#222222",
+      "sourceClass": "test",
+      "syntaxKind": "typescript-color-literal",
+      "ownerHint": null,
+      "role": "color-consumer",
+      "span": {
+        "startOffset": 16021,
+        "endOffset": 16028,
+        "startLine": 304,
+        "startColumn": 81,
+        "endLine": 304,
+        "endColumn": 88
+      }
+    }
+  ]
+}

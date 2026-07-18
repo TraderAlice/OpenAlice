@@ -3264,11 +3264,11 @@
       "runtimeWorkItemCount": 62,
       "capturedAtCommit": "working-tree",
       "staticManifest": {
-        "path": ".artifacts/theme-color-audit/static-manifest.json",
+        "path": "docs/theme-color-migration-18-static-manifest.json",
         "sha256": "fd94fe95a58ab3eca9c3eaf29b4181d8881ff6b00683475f45d32d7571cdff6b"
       },
       "runtimeWorklist": {
-        "path": ".artifacts/theme-color-audit/runtime-worklist.json",
+        "path": "docs/theme-color-migration-18-runtime-worklist.json",
         "sha256": "416c81cd8943902920f8f0bbe73dbfea0944dba06f61daf12ef45a76e79ea992"
       }
     }
