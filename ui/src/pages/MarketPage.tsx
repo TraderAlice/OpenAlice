@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowUpRight, CalendarDays, Globe2, TrendingUp } from 'lucide-react'
+import { Activity, ArrowRightLeft, ArrowUpRight, CalendarDays, Globe2, Landmark, TrendingUp } from 'lucide-react'
 import { BoardMeta } from '../components/market/BoardMeta'
 import { PageHeader } from '../components/PageHeader'
 import { SearchBox } from '../components/market/SearchBox'
@@ -28,6 +28,53 @@ export function MarketPage() {
       <PageHeader title="Market" description="Search assets and view price history." />
       <div className="flex-1 flex flex-col gap-6 px-4 md:px-8 py-4 min-h-0 overflow-y-auto">
         <SearchBox />
+
+        <section className="relative overflow-hidden rounded-xl border border-success/25 bg-success/5 p-4 md:p-5">
+          <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,var(--success-muted),transparent_56%)]" />
+          <div className="relative flex flex-col gap-4">
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between lg:gap-8">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-success">FX desk</p>
+                <h2 className="mt-1 text-[17px] font-semibold text-foreground">From spot to carry and macro — in one pair view.</h2>
+                <p className="mt-1 max-w-2xl text-[12px] leading-relaxed text-muted-foreground">
+                  Open a major pair for price risk, rate and inflation divergence, indicative forwards, and a manual exposure scenario. No broker or bank-account connection required.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {FX_MAJORS.map((pair) => (
+                  <button
+                    key={pair}
+                    type="button"
+                    onClick={() => openOrFocus({ kind: 'market-detail', params: { assetClass: 'currency', symbol: pair } })}
+                    className="min-h-8 rounded-md border border-success/25 bg-background/75 px-2.5 font-mono text-[11px] font-semibold text-foreground transition-[border-color,background-color,transform] hover:-translate-y-0.5 hover:border-success/55 hover:bg-background"
+                  >
+                    {pair.slice(0, 3)}/{pair.slice(3)}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <FxDeskEntry
+                icon={<Globe2 size={15} />}
+                title="Cross-country macro"
+                description="Rates, inflation and growth momentum by currency economy."
+                onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'global-macro' } })}
+              />
+              <FxDeskEntry
+                icon={<Activity size={15} />}
+                title="US regime"
+                description="Dollar, Treasury curve, inflation and labor inputs."
+                onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'macro' } })}
+              />
+              <FxDeskEntry
+                icon={<Landmark size={15} />}
+                title="Fed policy"
+                description="Balance sheet, dealer positioning and FOMC documents."
+                onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'fed' } })}
+              />
+            </div>
+          </div>
+        </section>
 
         {/* S&P 500 valuation strip — the market-level regime read. */}
         <div className="flex flex-col gap-2">
@@ -101,6 +148,33 @@ export function MarketPage() {
         </section>
       </div>
     </div>
+  )
+}
+
+const FX_MAJORS = ['EURUSD', 'USDJPY', 'GBPUSD', 'USDCNH'] as const
+
+function FxDeskEntry({ icon, title, description, onClick }: {
+  icon: ReactNode
+  title: string
+  description: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex min-h-[58px] items-center gap-3 rounded-lg border border-border/70 bg-background/65 px-3 py-2 text-left transition-colors hover:border-success/35 hover:bg-background"
+    >
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-success/10 text-success">
+        {icon}
+      </span>
+      <span className="min-w-0">
+        <span className="flex items-center gap-1 text-[12px] font-semibold text-foreground">
+          {title}<ArrowRightLeft size={11} className="text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+        </span>
+        <span className="mt-0.5 block truncate text-[10px] text-muted-foreground">{description}</span>
+      </span>
+    </button>
   )
 }
 

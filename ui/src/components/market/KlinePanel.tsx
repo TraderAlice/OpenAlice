@@ -15,25 +15,25 @@ import { readSemanticColor } from '../../theme/semanticColors'
 import { useEffectivePalette, useEffectiveTheme } from '../../theme/useEffectiveTheme'
 import { Skeleton } from '../StateViews'
 
-type Interval = '1m' | '5m' | '1h' | '1d'
-type Timeframe = '1D' | '5D' | '1M' | '3M' | '1Y' | '5Y' | 'All'
+export type KlineInterval = '1m' | '5m' | '1h' | '1d'
+export type KlineTimeframe = '1D' | '5D' | '1M' | '3M' | '1Y' | '5Y' | 'All'
 
-const INTERVALS: Interval[] = ['1m', '5m', '1h', '1d']
-const TIMEFRAMES: Timeframe[] = ['1D', '5D', '1M', '3M', '1Y', '5Y', 'All']
-const DEFAULT_INTERVAL: Interval = '1d'
-const DEFAULT_RANGE: Timeframe = '1Y'
+const INTERVALS: KlineInterval[] = ['1m', '5m', '1h', '1d']
+const TIMEFRAMES: KlineTimeframe[] = ['1D', '5D', '1M', '3M', '1Y', '5Y', 'All']
+const DEFAULT_INTERVAL: KlineInterval = '1d'
+const DEFAULT_RANGE: KlineTimeframe = '1Y'
 
-function parseInterval(s: string | null): Interval {
-  return (INTERVALS as string[]).includes(s ?? '') ? (s as Interval) : DEFAULT_INTERVAL
+function parseInterval(s: string | null): KlineInterval {
+  return (INTERVALS as string[]).includes(s ?? '') ? (s as KlineInterval) : DEFAULT_INTERVAL
 }
 
-function parseTimeframe(s: string | null): Timeframe {
-  return (TIMEFRAMES as string[]).includes(s ?? '') ? (s as Timeframe) : DEFAULT_RANGE
+function parseTimeframe(s: string | null): KlineTimeframe {
+  return (TIMEFRAMES as string[]).includes(s ?? '') ? (s as KlineTimeframe) : DEFAULT_RANGE
 }
 
-const INTRADAY: ReadonlySet<Interval> = new Set(['1m', '5m', '1h'])
+const INTRADAY: ReadonlySet<KlineInterval> = new Set(['1m', '5m', '1h'])
 
-function daysForTimeframe(tf: Timeframe): number | null {
+function daysForTimeframe(tf: KlineTimeframe): number | null {
   switch (tf) {
     case '1D': return 1
     case '5D': return 5
@@ -57,15 +57,27 @@ function toUTCTimestamp(s: string): UTCTimestamp {
   return Math.floor(new Date(iso).getTime() / 1000) as UTCTimestamp
 }
 
+export interface KlineSnapshot {
+  bars: HistoricalBar[] | null
+  meta: BarMeta | null
+  loading: boolean
+  error: string | null
+  interval: KlineInterval
+  timeframe: KlineTimeframe
+}
+
 interface Props {
   selection: { symbol: string; assetClass: AssetClass } | null
   /** Explicit provider identity from the focused market tab. This cannot rely
    * only on React Router state: tab switches project their URL with
    * history.replaceState, which intentionally does not notify the router. */
   source?: string
+  /** Read-only mirror of the displayed series for sibling analysis panels.
+   *  This avoids a second bar request on bespoke detail pages. */
+  onSnapshot?: (snapshot: KlineSnapshot) => void
 }
 
-export function KlinePanel({ selection, source }: Props) {
+export function KlinePanel({ selection, source, onSnapshot }: Props) {
   const effectiveTheme = useEffectiveTheme()
   const effectivePalette = useEffectivePalette()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -75,10 +87,12 @@ export function KlinePanel({ selection, source }: Props) {
   // it. Unlike interval/range, source comes from the focused tab spec. Router
   // search state can be stale after history.replaceState-based tab switches.
   const requestedBarId = source ?? null
+  const selectionSymbol = selection?.symbol ?? null
+  const selectionAssetClass = selection?.assetClass ?? null
 
   // Local setter named `selectInterval` rather than `setInterval` so it
   // doesn't shadow the global timer function we use for polling below.
-  const selectInterval = (iv: Interval) => {
+  const selectInterval = (iv: KlineInterval) => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev)
       if (iv === DEFAULT_INTERVAL) next.delete('interval')
@@ -86,7 +100,7 @@ export function KlinePanel({ selection, source }: Props) {
       return next
     }, { replace: true })
   }
-  const setTf = (t: Timeframe) => {
+  const setTf = (t: KlineTimeframe) => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev)
       if (t === DEFAULT_RANGE) next.delete('range')
@@ -104,10 +118,23 @@ export function KlinePanel({ selection, source }: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  useEffect(() => {
+    onSnapshot?.({ bars, meta, loading, error, interval, timeframe: tf })
+  }, [bars, meta, loading, error, interval, tf, onSnapshot])
+
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const candleRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
   const volumeRef = useRef<ISeriesApi<'Histogram'> | null>(null)
+
+  // A focused market tab can change identity without remounting this panel.
+  // Never let the previous pair's last close leak into sibling analytics while
+  // the new source is loading.
+  useEffect(() => {
+    setBars(null)
+    setMeta(null)
+    setError(null)
+  }, [selectionSymbol, selectionAssetClass, requestedBarId])
 
   // Canvas renderers cannot resolve CSS variables themselves. Rebuild on a
   // concrete theme change and read the same semantic card used by DOM/SVG UI.
@@ -166,29 +193,29 @@ export function KlinePanel({ selection, source }: Props) {
   useEffect(() => {
     setSelectedBarId(requestedBarId)
     setCandidates([])
-    if (!selection) return
+    if (!selectionSymbol || !selectionAssetClass) return
     let cancelled = false
-    barsApi.searchSources(selection.symbol, 12)
+    barsApi.searchSources(selectionSymbol, 12)
       .then((r) => {
         if (cancelled) return
-        const selectedSymbol = selection.symbol.trim().toLowerCase()
+        const selectedSymbol = selectionSymbol.trim().toLowerCase()
         // Federated search is intentionally fuzzy across asset classes. The
         // chart picker is not: it may switch providers for the current asset,
         // but must never offer similarly named instruments (e.g. GOLD stock
         // and gold-miner equities on the commodity/gold chart).
         setCandidates(r.candidates.filter((candidate) =>
           candidate.symbol.trim().toLowerCase() === selectedSymbol &&
-          (candidate.assetClass === selection.assetClass || candidate.assetClass === 'unknown'),
+          (candidate.assetClass === selectionAssetClass || candidate.assetClass === 'unknown'),
         ))
       })
       .catch(() => { if (!cancelled) setCandidates([]) })
     return () => { cancelled = true }
-  }, [selection, requestedBarId])
+  }, [selectionSymbol, selectionAssetClass, requestedBarId])
 
   // Fetch bars: an explicitly-picked source (barId) or the vendor default
   // (symbol+assetClass). Re-polls so a long-open tab doesn't show stale bars.
   useEffect(() => {
-    if (!selection) { setBars(null); setMeta(null); setError(null); return }
+    if (!selectionSymbol || !selectionAssetClass) { setBars(null); setMeta(null); setError(null); return }
     let cancelled = false
     const run = (isInitial: boolean) => {
       if (isInitial) setLoading(true)
@@ -201,9 +228,9 @@ export function KlinePanel({ selection, source }: Props) {
       // this extra routing hint.
       if (selectedBarId) {
         params.barId = selectedBarId
-        params.assetClass = selection.assetClass
+        params.assetClass = selectionAssetClass
       }
-      else { params.symbol = selection.symbol; params.assetClass = selection.assetClass }
+      else { params.symbol = selectionSymbol; params.assetClass = selectionAssetClass }
       if (days != null) params.start = startDateFromToday(days)
 
       barsApi.bars(params)
@@ -229,7 +256,7 @@ export function KlinePanel({ selection, source }: Props) {
     const pollMs = INTRADAY.has(interval) ? 60_000 : 300_000
     const timer = setInterval(() => run(false), pollMs)
     return () => { cancelled = true; clearInterval(timer) }
-  }, [selection, selectedBarId, interval, tf])
+  }, [selectionSymbol, selectionAssetClass, selectedBarId, interval, tf])
 
   // Push bars into chart and fit.
   useEffect(() => {
@@ -260,9 +287,9 @@ export function KlinePanel({ selection, source }: Props) {
   }, [bars, effectiveTheme, effectivePalette])
 
   const title = useMemo(() => {
-    if (!selection) return 'Select a symbol'
-    return `${selection.symbol} · ${selection.assetClass}`
-  }, [selection])
+    if (!selectionSymbol || !selectionAssetClass) return 'Select a symbol'
+    return `${selectionSymbol} · ${selectionAssetClass}`
+  }, [selectionSymbol, selectionAssetClass])
 
   // Source options for the picker — always include the currently-shown provider
   // (even if it wasn't in the search results), so the dropdown reflects reality.

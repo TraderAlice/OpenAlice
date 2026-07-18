@@ -1,6 +1,7 @@
 import { PageHeader } from '../components/PageHeader'
 import { SearchBox } from '../components/market/SearchBox'
 import { EquityDetail } from './market/EquityDetail'
+import { CurrencyDetail } from './market/CurrencyDetail'
 import { GenericDetail } from './market/GenericDetail'
 import { useWatchlist } from '../tabs/watchlist-store'
 import type { ViewSpec } from '../tabs/types'
@@ -16,13 +17,17 @@ export function MarketDetailPage({ spec }: MarketDetailPageProps) {
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
         title={symbol}
-        description={`${assetClass} · price history`}
+        description={assetClass === 'currency'
+          ? 'FX workbench · spot, carry, macro divergence and manual scenarios'
+          : `${assetClass} · price history`}
         right={<PinButton assetClass={assetClass} symbol={symbol} />}
       />
       <div className="flex-1 flex flex-col gap-3 px-4 md:px-8 py-4 min-h-0 overflow-y-auto">
         <SearchBox />
         {assetClass === 'equity' ? (
           <EquityDetail symbol={symbol} source={source} />
+        ) : assetClass === 'currency' ? (
+          <CurrencyDetail symbol={symbol} source={source} />
         ) : (
           <GenericDetail symbol={symbol} assetClass={assetClass} source={source} />
         )}

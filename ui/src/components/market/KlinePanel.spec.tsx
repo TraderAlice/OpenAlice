@@ -168,4 +168,39 @@ describe('KlinePanel source routing', () => {
     })
     expect(mocks.bars).not.toHaveBeenCalledWith(expect.objectContaining({ barId: 'yfinance|gold' }))
   })
+
+  it('publishes the displayed bars to a sibling analysis panel without another request', async () => {
+    const onSnapshot = vi.fn()
+    mocks.bars.mockResolvedValue(response('EURUSD', 'yfinance|EURUSD'))
+
+    const view = render(
+      <MemoryRouter initialEntries={['/market/currency/EURUSD']}>
+        <KlinePanel
+          selection={{ symbol: 'EURUSD', assetClass: 'currency' }}
+          source="yfinance|EURUSD"
+          onSnapshot={onSnapshot}
+        />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => {
+      expect(onSnapshot).toHaveBeenCalledWith(expect.objectContaining({
+        bars: expect.arrayContaining([expect.objectContaining({ close: 1.5 })]),
+        meta: expect.objectContaining({ barId: 'yfinance|EURUSD' }),
+      }))
+    })
+    // CurrencyDetail mirrors snapshots into parent state. That parent render
+    // recreates the selection object; primitive effect dependencies must keep
+    // it from becoming a request loop.
+    view.rerender(
+      <MemoryRouter initialEntries={['/market/currency/EURUSD']}>
+        <KlinePanel
+          selection={{ symbol: 'EURUSD', assetClass: 'currency' }}
+          source="yfinance|EURUSD"
+          onSnapshot={onSnapshot}
+        />
+      </MemoryRouter>,
+    )
+    expect(mocks.bars).toHaveBeenCalledTimes(1)
+  })
 })

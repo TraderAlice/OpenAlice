@@ -530,6 +530,9 @@ importers:
       '@xterm/xterm':
         specifier: 6.1.0-beta.287
         version: 6.1.0-beta.287(patch_hash=9c1de9931d86864923ff53bc9d64474a86478085ac81ea4e432648c7e23d702c)
+      decimal.js:
+        specifier: ^10.6.0
+        version: 10.6.0
       dompurify:
         specifier: ^3.4.0
         version: 3.4.1

@@ -9,6 +9,12 @@ import type { BarSourceCandidate, BarMeta } from '../../api/market'
 import type { MoversBoard, MoverRow, CalendarBoard, MacroBoard, MacroSeriesCard, TermStructureBoard, ValuationStrip, GlobalMacroBoard, ShippingBoard, FedBoard } from '../../api/reference'
 
 const AAPL = 'AAPL'
+const DEMO_FX: Record<string, { name: string; spot: number; aliases: string[] }> = {
+  EURUSD: { name: 'Euro / U.S. Dollar', spot: 1.0842, aliases: ['EUR', 'EURO'] },
+  USDJPY: { name: 'U.S. Dollar / Japanese Yen', spot: 157.35, aliases: ['JPY', 'YEN'] },
+  GBPUSD: { name: 'British Pound / U.S. Dollar', spot: 1.2915, aliases: ['GBP', 'POUND', 'STERLING'] },
+  USDCNH: { name: 'U.S. Dollar / Offshore Renminbi', spot: 7.185, aliases: ['CNH', 'RMB', 'RENMINBI', 'YUAN'] },
+}
 
 function symbolFromUrl(url: string): string {
   return (new URL(url).searchParams.get('symbol') ?? '').toUpperCase()
@@ -56,10 +62,19 @@ export const marketHandlers = [
         { barId: 'yfinance|AAPL', source: 'vendor', sourceId: 'yfinance', symbol: 'AAPL', name: 'Apple Inc.', assetClass: 'equity', label: 'AAPL', barCapability: 'delayed' },
         { barId: 'alpaca-paper|AAPL', source: 'uta', sourceId: 'alpaca-paper', symbol: 'AAPL', name: 'Apple Inc.', assetClass: 'equity', label: 'AAPL', barCapability: 'iex' },
       ]
-    } else if (q.includes('EUR') || q.includes('EURO')) {
-      candidates = [
-        { barId: 'yfinance|EURUSD', source: 'vendor', sourceId: 'yfinance', symbol: 'EURUSD', name: 'Euro / U.S. Dollar', assetClass: 'currency', label: 'EURUSD', barCapability: 'delayed' },
-      ]
+    } else if (Object.entries(DEMO_FX).some(([symbol, fx]) => q.includes(symbol) || fx.aliases.some((alias) => q.includes(alias)))) {
+      candidates = Object.entries(DEMO_FX)
+        .filter(([symbol, fx]) => q.includes(symbol) || fx.aliases.some((alias) => q.includes(alias)))
+        .map(([symbol, fx]) => ({
+          barId: `yfinance|${symbol}`,
+          source: 'vendor' as const,
+          sourceId: 'yfinance',
+          symbol,
+          name: fx.name,
+          assetClass: 'currency' as const,
+          label: symbol,
+          barCapability: 'delayed' as const,
+        }))
     } else if (q.includes('GOLD') || q.includes('XAU') || q.includes('黄金')) {
       candidates = [
         { barId: 'yfinance|gold', source: 'vendor', sourceId: 'yfinance', symbol: 'gold', name: 'Gold', assetClass: 'commodity', label: 'gold', barCapability: 'delayed' },
@@ -79,7 +94,7 @@ export const marketHandlers = [
     const knownSources: Record<string, { symbol: string; assetClass: string }> = {
       'yfinance|AAPL': { symbol: 'AAPL', assetClass: 'equity' },
       'alpaca-paper|AAPL': { symbol: 'AAPL', assetClass: 'equity' },
-      'yfinance|EURUSD': { symbol: 'EURUSD', assetClass: 'currency' },
+      ...Object.fromEntries(Object.keys(DEMO_FX).map((symbol) => [`yfinance|${symbol}`, { symbol, assetClass: 'currency' }])),
       'yfinance|gold': { symbol: 'gold', assetClass: 'commodity' },
       'eastmoney|1.600519': { symbol: '1.600519', assetClass: 'equity' },
     }
@@ -90,7 +105,32 @@ export const marketHandlers = [
     if (barId && !barId.startsWith('alpaca-paper|') && assetClass !== selected.assetClass) {
       return HttpResponse.json({ results: null, meta: null, error: `Vendor barId needs assetClass=${selected.assetClass}.` })
     }
-    const results = demoMarketAAPL.historical.results
+    const rawResults = demoMarketAAPL.historical.results ?? []
+    const targetSpot = DEMO_FX[selected.symbol]?.spot
+    const results = targetSpot == null
+      ? rawResults
+      : (() => {
+          const last = Math.max(1, rawResults.length - 1)
+          const factor = (index: number) => 1
+            + (index - last) * 0.00012
+            + Math.sin(index / 4) * 0.007
+            + Math.sin(index / 1.7) * 0.003
+          const anchor = factor(last)
+          const closeAt = (index: number) => targetSpot * factor(index) / anchor
+          return rawResults.map((bar, index) => {
+            const close = closeAt(index)
+            const open = index === 0 ? close * 0.9996 : closeAt(index - 1)
+            const band = close * 0.0012
+            return {
+              ...bar,
+              open,
+              high: Math.max(open, close) + band,
+              low: Math.min(open, close) - band,
+              close,
+              volume: null,
+            }
+          })
+        })()
     const sourceId = barId ? barId.split('|')[0] : 'yfinance'
     const meta: BarMeta = {
       symbol: selected.symbol, from: results[0]?.date ?? '', to: results[results.length - 1]?.date ?? '', bars: results.length,
