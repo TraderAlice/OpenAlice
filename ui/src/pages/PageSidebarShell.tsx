@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { PageSidebarLayout } from '../components/PageSidebarLayout'
+import { PageSidebarLayout, type PageSidebarControls } from '../components/PageSidebarLayout'
 
 type NavTitleKey =
   | 'nav.item.tracked'
@@ -16,9 +16,10 @@ interface PageSidebarShellProps {
   storageKey: string
   titleKey: NavTitleKey
   defaultWidth: number
-  sidebar: ReactNode
+  sidebar: ReactNode | ((controls: PageSidebarControls) => ReactNode)
   actions?: ReactNode
   children: ReactNode
+  desktopMinWidth?: number
 }
 
 export function PageSidebarShell({
@@ -28,6 +29,7 @@ export function PageSidebarShell({
   sidebar,
   actions,
   children,
+  desktopMinWidth,
 }: PageSidebarShellProps) {
   const { t } = useTranslation()
   return (
@@ -37,6 +39,7 @@ export function PageSidebarShell({
       defaultWidth={defaultWidth}
       actions={actions}
       sidebar={sidebar}
+      desktopMinWidth={desktopMinWidth}
     >
       {children}
     </PageSidebarLayout>

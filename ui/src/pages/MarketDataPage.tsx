@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { api, type AppConfig } from '../api'
 import { SaveIndicator } from '../components/SaveIndicator'
-import { ConfigSection, Field, inputClass } from '../components/form'
+import { ConfigSection, Field, SettingsScrollArea, inputClass } from '../components/form'
 import { Toggle } from '../components/Toggle'
 import { useConfigPage } from '../hooks/useConfigPage'
 import { PageHeader } from '../components/PageHeader'
@@ -248,7 +248,7 @@ export function MarketDataPage() {
         }
       />
 
-      <div className="flex-1 overflow-y-auto px-4 md:px-8 py-5">
+      <SettingsScrollArea className="px-4 py-5 md:px-8">
         <div className={`max-w-[880px] mx-auto ${!enabled ? 'opacity-40 pointer-events-none' : ''}`}>
           <HubCard
             hub={hub}
@@ -272,7 +272,7 @@ export function MarketDataPage() {
           />
         </div>
         {loadError && <p className="text-[13px] text-destructive mt-4 max-w-[880px] mx-auto">Failed to load configuration.</p>}
-      </div>
+      </SettingsScrollArea>
     </div>
   )
 }
@@ -546,7 +546,7 @@ function KeyProvidersSection({
                   >
                     <Field label={name} description={hint}>
                       <p className="text-[12px] text-muted-foreground/70 mb-2">{desc}</p>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                         <input
                           className={inputClass}
                           type="password"

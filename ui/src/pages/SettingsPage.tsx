@@ -3,7 +3,7 @@ import { api, type AppConfig } from '../api'
 import type { ToolInfo } from '../api/tools'
 import { Toggle } from '../components/Toggle'
 import { SaveIndicator } from '../components/SaveIndicator'
-import { ConfigSection, Field, inputClass } from '../components/form'
+import { ConfigSection, Field, SettingsScrollArea, inputClass } from '../components/form'
 import { useAutoSave } from '../hooks/useAutoSave'
 import { PageHeader } from '../components/PageHeader'
 import { PageLoading, EmptyState } from '../components/StateViews'
@@ -57,7 +57,7 @@ function AppearanceSection() {
         </div>
       </div>
 
-      <div className="grid gap-5 border-b border-border/60 py-5 lg:grid-cols-2">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,20rem),1fr))] gap-5 border-b border-border/60 py-5">
         <PalettePicker
           title={t('settings.appearance.dayPalette')}
           description={t('settings.appearance.dayPaletteDescription')}
@@ -109,7 +109,7 @@ function PalettePicker<T extends ThemePaletteId>({
     <div>
       <span className="text-sm font-medium text-foreground">{title}</span>
       <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">{description}</p>
-      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+      <div className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(min(100%,10rem),1fr))] gap-2">
         {palettes.map((palette) => (
           <button
             key={palette.id}
@@ -125,7 +125,7 @@ function PalettePicker<T extends ThemePaletteId>({
           >
             <span className="flex items-start justify-between gap-2">
               <span className="min-w-0">
-                <span className="block truncate text-[12px] font-semibold">{t(palette.labelKey)}</span>
+                <span className="block break-words text-[12px] font-semibold">{t(palette.labelKey)}</span>
                 <span className="mt-0.5 block text-[10px] leading-snug text-muted-foreground">
                   {t(palette.descriptionKey)}
                 </span>
@@ -171,7 +171,7 @@ function LanguageSection() {
   const setLocale = useSetLocale()
   return (
     <ConfigSection title={t('settings.language.title')} description={t('settings.language.description')}>
-      <div className="flex gap-2 py-1">
+      <div className="flex flex-wrap gap-2 py-1">
         {(['en', 'zh', 'ja', 'zh-Hant'] as const).map((l) => (
           <button
             key={l}
@@ -470,30 +470,28 @@ function SettingsSection() {
   if (!config) return <PageLoading />
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="max-w-[880px] mx-auto">
-        {/* Appearance */}
-        <AppearanceSection />
+    <div className="mx-auto w-full max-w-[1100px]">
+      {/* Appearance */}
+      <AppearanceSection />
 
-        {/* Language */}
-        <LanguageSection />
+      {/* Language */}
+      <LanguageSection />
 
-        {/* Complete OpenAlice home + runtime lock boundary */}
-        <DataHomeSection />
+      {/* Complete OpenAlice home + runtime lock boundary */}
+      <DataHomeSection />
 
-        {/* Windows-only workspace shell */}
-        <WorkspaceShellSection />
+      {/* Windows-only workspace shell */}
+      <WorkspaceShellSection />
 
-        {/* Persona */}
-        <ConfigSection title={t('settings.persona.title')} description={t('settings.persona.description')}>
-          <PersonaEditor />
-        </ConfigSection>
+      {/* Persona */}
+      <ConfigSection title={t('settings.persona.title')} description={t('settings.persona.description')}>
+        <PersonaEditor />
+      </ConfigSection>
 
-        {/* Compaction */}
-        <ConfigSection title={t('settings.compaction.title')} description={t('settings.compaction.description')}>
-          <CompactionForm config={config} />
-        </ConfigSection>
-      </div>
+      {/* Compaction */}
+      <ConfigSection title={t('settings.compaction.title')} description={t('settings.compaction.description')}>
+        <CompactionForm config={config} />
+      </ConfigSection>
     </div>
   )
 }
@@ -695,13 +693,13 @@ function ToolsSection() {
   }, [])
 
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div className="mx-auto w-full max-w-[1100px]">
       {!loaded ? (
         <PageLoading />
       ) : groups.length === 0 ? (
         <EmptyState title={t('settings.tools.emptyTitle')} description={t('settings.tools.emptyDescription')} />
       ) : (
-        <div className="max-w-[880px] mx-auto">
+        <div>
           <div className="flex items-center justify-between mb-4">
             <p className="text-[13px] text-muted-foreground">
               {t('settings.tools.summary', { tools: inventory.length, groups: groups.length })}
@@ -853,11 +851,9 @@ export function SettingsPage() {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col min-h-0 px-4 md:px-8 py-6">
-        <div className="flex-1 min-h-0">
-          {tab === 'settings' ? <SettingsSection /> : <ToolsSection />}
-        </div>
-      </div>
+      <SettingsScrollArea className="px-4 py-6 md:px-8">
+        {tab === 'settings' ? <SettingsSection /> : <ToolsSection />}
+      </SettingsScrollArea>
     </div>
   )
 }

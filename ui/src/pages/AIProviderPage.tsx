@@ -24,7 +24,7 @@ import type {
 } from '../api/config'
 import { PageHeader } from '../components/PageHeader'
 import { PageLoading, Skeleton } from '../components/StateViews'
-import { inputClass } from '../components/form'
+import { SettingsScrollArea, inputClass } from '../components/form'
 import { CredentialModal } from '../components/credentials/CredentialModal'
 import {
   AGENT_LABELS,
@@ -132,8 +132,8 @@ export function AIProviderPage() {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader title="AI Provider" description="Provider accounts and model defaults Alice can inject into workspaces." />
-      <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6">
-        <div className="max-w-[1100px] min-w-0 mx-auto grid gap-6 lg:grid-cols-2">
+      <SettingsScrollArea className="px-4 py-6 md:px-8">
+        <div className="mx-auto grid min-w-0 max-w-[1100px] gap-6 2xl:grid-cols-2">
           {/* ============== Credentials ============== */}
           <section className="min-w-0">
             <div className="rounded-lg border border-border/50 bg-secondary/50 px-4 py-3 mb-4">
@@ -249,7 +249,7 @@ export function AIProviderPage() {
 
         {/* ============== Default workspace credentials ============== */}
         <WorkspaceDefaultsSection credentials={credentials} presets={presets} />
-      </div>
+      </SettingsScrollArea>
 
       {modal && (
         <CredentialModal

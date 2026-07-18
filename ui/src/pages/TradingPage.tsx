@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { AlertTriangle } from 'lucide-react'
-import { inputClass } from '../components/form'
+import { SettingsScrollArea, inputClass } from '../components/form'
 import { Skeleton } from '../components/StateViews'
 import { Toggle } from '../components/Toggle'
 import { useTradingConfig } from '../hooks/useTradingConfig'
@@ -187,14 +187,14 @@ export function KeylessDataSourcesRow({ ccxtPack, onPackInstalled }: {
 
   return (
     <div className="px-4 py-3 border border-border rounded-lg">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col items-start gap-3 sm:flex-row sm:justify-between">
         <div className="min-w-0">
           <div className="text-[12px] font-medium text-foreground">Public crypto data sources</div>
           <div className="text-[11px] text-muted-foreground leading-relaxed mt-0.5">
             Optional keyless K-line feeds. Disabled by default; enabled sources appear as read-only broker-style bar IDs.
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
           {msg && <span className="text-[11px] text-muted-foreground">{msg}</span>}
           {ccxtPack && !ccxtPack.installed && (
             <button className="btn-secondary" disabled={installing} onClick={() => { void install() }}>
@@ -203,7 +203,7 @@ export function KeylessDataSourcesRow({ ccxtPack, onPackInstalled }: {
           )}
         </div>
       </div>
-      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+      <div className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(min(100%,10rem),1fr))] gap-2">
         {KEYLESS_DATA_SOURCE_OPTIONS.map((source) => {
           const checked = runtimeConfig.keylessDataSources.includes(source.id)
           return (
@@ -405,7 +405,7 @@ export function TradingPage() {
         live={tc.utas.length > 0 ? { lastUpdated } : undefined}
       />
 
-      <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5">
+      <SettingsScrollArea className="px-4 py-5 md:px-6">
         <div className="max-w-[820px] mx-auto space-y-4">
           {serviceStatus?.available === false && <TradingServiceOfflineBanner status={serviceStatus} />}
           <MissingBrokerPacksNotice packs={brokerPacks} onInstalled={updateBrokerPack} />
@@ -441,7 +441,7 @@ export function TradingPage() {
           />
           {tc.utas.length > 0 && <ExternalOrderMonitoringRow />}
         </div>
-      </div>
+      </SettingsScrollArea>
 
       {showAdd && (
         <CreateUTADialog
@@ -493,7 +493,7 @@ function PageShell({ subtitle, children }: { subtitle: string; children?: React.
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader title="Trading" description={subtitle} />
-      <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5">{children}</div>
+      <SettingsScrollArea className="px-4 py-5 md:px-6">{children}</SettingsScrollArea>
     </div>
   )
 }
@@ -517,7 +517,7 @@ function TradingServiceOfflineBanner({ status }: { status: TradingServiceStatus 
 
 function EmptyState({ onAdd }: { onAdd: () => void }) {
   return (
-    <div className="rounded-xl border border-dashed border-border p-12 text-center">
+    <div className="rounded-xl border border-dashed border-border p-6 text-center sm:p-12">
       <h3 className="text-[16px] font-semibold text-foreground mb-2">No UTAs configured</h3>
       <p className="text-[13px] text-muted-foreground mb-6 max-w-[320px] mx-auto leading-relaxed">
         Connect a crypto exchange or brokerage to start automated trading.

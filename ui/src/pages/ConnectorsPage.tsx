@@ -3,7 +3,7 @@ import { Bot, CheckCircle2, CircleAlert, Link2, Power, Send, ShieldCheck } from 
 import { api, type ConnectorDefinition, type ConnectorHealth, type PublicConnectorConfig } from '../api'
 import { PageHeader } from '../components/PageHeader'
 import { SaveIndicator } from '../components/SaveIndicator'
-import { ConfigSection, Field, inputClass } from '../components/form'
+import { ConfigSection, Field, SettingsScrollArea, inputClass } from '../components/form'
 import { useAutoSave } from '../hooks/useAutoSave'
 import {
   getConnectorSetupState,
@@ -150,7 +150,7 @@ export function ConnectorsPage() {
         right={<SaveIndicator status={status} onRetry={retry} />}
       />
 
-      <div className="flex-1 overflow-y-auto px-4 md:px-8 py-5">
+      <SettingsScrollArea className="px-4 py-5 md:px-8">
         <div className="max-w-[920px] mx-auto">
           {config && (
             <>
@@ -206,7 +206,7 @@ export function ConnectorsPage() {
                                 onChange={(event) => updateSetting(definition.id, field.key, event.target.checked)}
                               />
                             ) : (
-                              <div className="flex gap-2">
+                              <div className="flex flex-col gap-2 sm:flex-row">
                                 <input
                                   className={inputClass}
                                   type={field.kind === 'secret' ? 'password' : field.kind}
@@ -277,7 +277,7 @@ export function ConnectorsPage() {
           {testError && <p className="mt-4 text-[13px] text-destructive">{testError}</p>}
           {loadError && <p className="text-[13px] text-destructive">Failed to load connector settings.</p>}
         </div>
-      </div>
+      </SettingsScrollArea>
     </div>
   )
 }

@@ -9,7 +9,7 @@
 
 import { useConfigPage } from '../hooks/useConfigPage'
 import { SaveIndicator } from '../components/SaveIndicator'
-import { ConfigSection, Field, inputClass } from '../components/form'
+import { ConfigSection, Field, SettingsScrollArea, inputClass } from '../components/form'
 import { PageHeader } from '../components/PageHeader'
 import type { AppConfig, McpConfig } from '../api'
 
@@ -27,7 +27,7 @@ export function MCPPage() {
         right={<SaveIndicator status={status} onRetry={retry} />}
       />
 
-      <div className="flex-1 overflow-y-auto px-4 md:px-8 py-5">
+      <SettingsScrollArea className="px-4 py-5 md:px-8">
         {config && (
           <div className="max-w-[880px] mx-auto">
             <ConfigSection
@@ -57,7 +57,7 @@ export function MCPPage() {
           </div>
         )}
         {loadError && <p className="text-[13px] text-destructive">Failed to load configuration.</p>}
-      </div>
+      </SettingsScrollArea>
     </div>
   )
 }

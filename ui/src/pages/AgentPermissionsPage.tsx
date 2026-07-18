@@ -8,6 +8,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { PageHeader } from '../components/PageHeader'
 import { PageLoading } from '../components/StateViews'
 import { Toggle } from '../components/Toggle'
+import { SettingsScrollArea } from '../components/form'
 import { ensureTradingModePolling, useTradingMode } from '../live/trading-mode'
 
 const MODE_META: Record<TradingMode, {
@@ -48,7 +49,7 @@ export function AgentPermissionsPage() {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader title={t('settings.agentPermissions.title')} />
-      <div className="flex-1 overflow-y-auto">
+      <SettingsScrollArea>
         <div className="mx-auto w-full max-w-[980px] px-4 md:px-6">
           <TradingModeSection />
           <PermissionSection
@@ -58,7 +59,7 @@ export function AgentPermissionsPage() {
             <AiTradingToggle config={config} setConfig={setConfig} />
           </PermissionSection>
         </div>
-      </div>
+      </SettingsScrollArea>
     </div>
   )
 }

@@ -44,8 +44,8 @@ function responsiveMaxWidth(containerWidth: number): number {
   return Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, proportional, reserveMain))
 }
 
-function useIsDesktop(): boolean {
-  const query = '(min-width: 768px)'
+function useIsDesktop(minWidth: number): boolean {
+  const query = `(min-width: ${minWidth}px)`
   const [matches, setMatches] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia(query).matches : true,
   )
@@ -56,7 +56,7 @@ function useIsDesktop(): boolean {
     setMatches(mq.matches)
     mq.addEventListener('change', handler)
     return () => mq.removeEventListener('change', handler)
-  }, [])
+  }, [query])
 
   return matches
 }
@@ -68,6 +68,8 @@ interface PageSidebarLayoutProps {
   sidebar: ReactNode | ((controls: PageSidebarControls) => ReactNode)
   children: ReactNode
   defaultWidth?: number
+  /** Keep a page-specific navigator in a drawer below this viewport width. */
+  desktopMinWidth?: number
 }
 
 export interface PageSidebarControls {
@@ -87,9 +89,10 @@ export function PageSidebarLayout({
   sidebar,
   children,
   defaultWidth = 260,
+  desktopMinWidth = 768,
 }: PageSidebarLayoutProps) {
   const { t } = useTranslation()
-  const isDesktop = useIsDesktop()
+  const isDesktop = useIsDesktop(desktopMinWidth)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(() => readStoredCollapsed(storageKey))

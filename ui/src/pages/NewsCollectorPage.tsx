@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { type AppConfig, type NewsCollectorConfig, type NewsCollectorFeed } from '../api'
 import { SaveIndicator } from '../components/SaveIndicator'
-import { ConfigSection, Field, inputClass } from '../components/form'
+import { ConfigSection, Field, SettingsScrollArea, inputClass } from '../components/form'
 import { Toggle } from '../components/Toggle'
 import { useConfigPage } from '../hooks/useConfigPage'
 import { PageHeader } from '../components/PageHeader'
@@ -26,49 +26,47 @@ function CollectorSettings() {
   const enabled = cfg.enabled !== false
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="max-w-[880px] mx-auto">
-        <div className="flex items-center justify-end gap-3 mb-4">
-          <SaveIndicator status={status} onRetry={retry} />
-          <Toggle size="sm" checked={enabled} onChange={(v) => updateConfigImmediate({ enabled: v })} />
-        </div>
-
-        <div className={`${!enabled ? 'opacity-40 pointer-events-none' : ''}`}>
-          {/* Collection Settings */}
-          <ConfigSection
-            title="Collection Settings"
-            description="Control how often articles are fetched and how long they are retained in the archive."
-          >
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Fetch interval (min)">
-                <input
-                  className={inputClass}
-                  type="number"
-                  min={1}
-                  value={cfg.intervalMinutes}
-                  onChange={(e) => updateConfig({ intervalMinutes: Number(e.target.value) || 10 })}
-                />
-              </Field>
-              <Field label="Retention (days)">
-                <input
-                  className={inputClass}
-                  type="number"
-                  min={1}
-                  value={cfg.retentionDays}
-                  onChange={(e) => updateConfig({ retentionDays: Number(e.target.value) || 7 })}
-                />
-              </Field>
-            </div>
-          </ConfigSection>
-
-          {/* RSS Feeds */}
-          <FeedsSection
-            feeds={cfg.feeds}
-            onChange={(feeds) => updateConfigImmediate({ feeds })}
-          />
-        </div>
-        {loadError && <p className="text-[13px] text-destructive mt-4">Failed to load configuration.</p>}
+    <div className="mx-auto w-full max-w-[880px]">
+      <div className="mb-4 flex items-center justify-end gap-3">
+        <SaveIndicator status={status} onRetry={retry} />
+        <Toggle size="sm" checked={enabled} onChange={(v) => updateConfigImmediate({ enabled: v })} />
       </div>
+
+      <div className={`${!enabled ? 'opacity-40 pointer-events-none' : ''}`}>
+        {/* Collection Settings */}
+        <ConfigSection
+          title="Collection Settings"
+          description="Control how often articles are fetched and how long they are retained in the archive."
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Fetch interval (min)">
+              <input
+                className={inputClass}
+                type="number"
+                min={1}
+                value={cfg.intervalMinutes}
+                onChange={(e) => updateConfig({ intervalMinutes: Number(e.target.value) || 10 })}
+              />
+            </Field>
+            <Field label="Retention (days)">
+              <input
+                className={inputClass}
+                type="number"
+                min={1}
+                value={cfg.retentionDays}
+                onChange={(e) => updateConfig({ retentionDays: Number(e.target.value) || 7 })}
+              />
+            </Field>
+          </div>
+        </ConfigSection>
+
+        {/* RSS Feeds */}
+        <FeedsSection
+          feeds={cfg.feeds}
+          onChange={(feeds) => updateConfigImmediate({ feeds })}
+        />
+      </div>
+      {loadError && <p className="mt-4 text-[13px] text-destructive">Failed to load configuration.</p>}
     </div>
   )
 }
@@ -203,9 +201,9 @@ export function NewsCollectorPage() {
         description="Configure RSS feeds and collection settings."
       />
 
-      <div className="flex-1 flex flex-col min-h-0 px-4 md:px-8 py-5">
+      <SettingsScrollArea className="px-4 py-5 md:px-8">
         <CollectorSettings />
-      </div>
+      </SettingsScrollArea>
     </div>
   )
 }

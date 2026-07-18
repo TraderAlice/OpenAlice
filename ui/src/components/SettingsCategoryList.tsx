@@ -21,7 +21,7 @@ const CATEGORIES = [
  * focuses) the corresponding tab. Active highlight is driven by the
  * currently-focused tab's spec, not by sidebar selection.
  */
-export function SettingsCategoryList() {
+export function SettingsCategoryList({ onSelect }: { onSelect?: () => void }) {
   const { t } = useTranslation()
   const focused = useWorkspace((state) => getFocusedTab(state)?.spec)
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
@@ -37,7 +37,10 @@ export function SettingsCategoryList() {
             label={t(item.labelKey)}
             active={active}
             icon={<item.Icon size={14} strokeWidth={1.75} className="text-muted-foreground/70" aria-hidden />}
-            onClick={() => openOrFocus({ kind: 'settings', params: { category: item.category } })}
+            onClick={() => {
+              openOrFocus({ kind: 'settings', params: { category: item.category } })
+              onSelect?.()
+            }}
           />
         )
       })}
