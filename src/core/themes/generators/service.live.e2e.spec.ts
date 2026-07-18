@@ -92,7 +92,7 @@ live('installed theme generators', () => {
       generator: 'hellwal', detectionId: detection.detectionId, name: 'Rejected live Hellwal',
       modes: ['dark'], darkOffset: -0.1, brightOffset: 0.5,
     }, image)
-    await expect(run).rejects.toMatchObject<Partial<ThemeGenerationError>>({ code: 'invalid_parameters' })
+    await expect(run).rejects.toMatchObject({ code: 'invalid_parameters' } satisfies Partial<ThemeGenerationError>)
     expect(await readdir(home)).toEqual([])
   })
 })
