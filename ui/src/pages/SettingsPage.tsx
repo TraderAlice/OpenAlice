@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { Moon, RotateCcw, Sun } from 'lucide-react'
 import { api, type AppConfig } from '../api'
 import type { ToolInfo } from '../api/tools'
 import { Toggle } from '../components/Toggle'
@@ -11,12 +12,26 @@ import { useTranslation } from 'react-i18next'
 import { useLocale, useSetLocale, LOCALE_LABELS } from '../i18n/useLocale'
 import { useEditorTabsPref } from '../live/editor-tabs-pref'
 import { preferencesApi, type WorkspaceShellStatus } from '../api/preferences'
-import { THEME_PALETTES, type ThemePaletteDefinition, type ThemePaletteId } from '../theme/palettes'
+import {
+  DEFAULT_DAY_PALETTE,
+  DEFAULT_NIGHT_PALETTE,
+  THEME_PALETTES,
+  type ThemePaletteDefinition,
+  type ThemePaletteId,
+  type ThemePreferenceSlot,
+} from '../theme/palettes'
 import { useThemeStore, type AppTheme } from '../theme/store'
+import { useEffectivePreferenceSlot } from '../theme/useEffectiveTheme'
 
 // ==================== Appearance ====================
 
-function AppearanceSection() {
+type PaletteLibraryFilter = 'recommended' | 'all'
+
+function paletteDefinition(id: ThemePaletteId): ThemePaletteDefinition {
+  return THEME_PALETTES.find((palette) => palette.id === id)!
+}
+
+export function AppearanceSection() {
   const { t } = useTranslation()
   const showEditorTabs = useEditorTabsPref((s) => s.showEditorTabs)
   const setShowEditorTabs = useEditorTabsPref((s) => s.setShowEditorTabs)
@@ -26,7 +41,39 @@ function AppearanceSection() {
   const setTheme = useThemeStore((s) => s.setTheme)
   const setDayPalette = useThemeStore((s) => s.setDayPalette)
   const setNightPalette = useThemeStore((s) => s.setNightPalette)
+  const effectiveSlot = useEffectivePreferenceSlot()
+  const [editingSlot, setEditingSlot] = useState<ThemePreferenceSlot>(effectiveSlot)
+  const [paletteFilter, setPaletteFilter] = useState<PaletteLibraryFilter>('recommended')
   const modes: readonly AppTheme[] = ['auto', 'day', 'night']
+  const activePalette = effectiveSlot === 'day' ? dayPalette : nightPalette
+  const activePaletteDefinition = paletteDefinition(activePalette)
+  const editingPalette = editingSlot === 'day' ? dayPalette : nightPalette
+  const recommendedAppearance = editingSlot === 'day' ? 'light' : 'dark'
+  const visiblePalettes = paletteFilter === 'recommended'
+    ? THEME_PALETTES.filter((palette) => palette.appearance === recommendedAppearance)
+    : THEME_PALETTES
+  const isDefaultPair = dayPalette === DEFAULT_DAY_PALETTE && nightPalette === DEFAULT_NIGHT_PALETTE
+
+  useEffect(() => {
+    setEditingSlot(effectiveSlot)
+  }, [effectiveSlot, theme])
+
+  const chooseSlot = (slot: ThemePreferenceSlot) => {
+    setEditingSlot(slot)
+    setPaletteFilter('recommended')
+  }
+
+  const choosePalette = (palette: ThemePaletteId) => {
+    if (editingSlot === 'day') setDayPalette(palette)
+    else setNightPalette(palette)
+  }
+
+  const resetPair = () => {
+    setDayPalette(DEFAULT_DAY_PALETTE)
+    setNightPalette(DEFAULT_NIGHT_PALETTE)
+    setPaletteFilter('recommended')
+  }
+
   return (
     <ConfigSection title={t('settings.appearance.title')} description={t('settings.appearance.description')}>
       <div className="border-b border-border/60 pb-5">
@@ -43,9 +90,12 @@ function AppearanceSection() {
             <button
               key={mode}
               type="button"
-              onClick={() => setTheme(mode)}
+              onClick={() => {
+                setTheme(mode)
+                if (mode !== 'auto') chooseSlot(mode)
+              }}
               aria-pressed={theme === mode}
-              className={`rounded-md border px-3 py-1.5 text-[12px] font-medium transition-colors ${
+              className={`oa-pressable rounded-md border px-3 py-1.5 text-[12px] font-medium transition-colors ${
                 theme === mode
                   ? 'border-primary bg-primary-muted text-primary'
                   : 'border-border bg-background text-muted-foreground hover:text-foreground'
@@ -55,23 +105,105 @@ function AppearanceSection() {
             </button>
           ))}
         </div>
+        <div
+          data-palette-preview={activePalette}
+          className="mt-3 inline-flex max-w-full items-center gap-2 rounded-md border px-2.5 py-1.5 text-[11px]"
+          aria-live="polite"
+        >
+          <span className="h-2 w-2 shrink-0 rounded-full bg-primary" aria-hidden />
+          <span className="truncate">
+            {t('settings.appearance.currentPalette', {
+              slot: t(`theme.mode.${effectiveSlot}`),
+              palette: t(activePaletteDefinition.labelKey),
+            })}
+          </span>
+          {theme === 'auto' && (
+            <span className="oa-palette-preview-muted shrink-0">
+              · {t('settings.appearance.followsSystem')}
+            </span>
+          )}
+        </div>
       </div>
 
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,20rem),1fr))] gap-5 border-b border-border/60 py-5">
-        <PalettePicker
-          title={t('settings.appearance.dayPalette')}
-          description={t('settings.appearance.dayPaletteDescription')}
-          palettes={THEME_PALETTES}
-          selected={dayPalette}
-          onSelect={setDayPalette}
-        />
-        <PalettePicker
-          title={t('settings.appearance.nightPalette')}
-          description={t('settings.appearance.nightPaletteDescription')}
-          palettes={THEME_PALETTES}
-          selected={nightPalette}
-          onSelect={setNightPalette}
-        />
+      <div className="border-b border-border/60 py-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <span className="text-sm font-medium text-foreground">
+              {t('settings.appearance.themePair')}
+            </span>
+            <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
+              {t('settings.appearance.themePairDescription')}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={resetPair}
+            disabled={isDefaultPair}
+            className="oa-pressable inline-flex min-h-8 items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-[11px] text-muted-foreground hover:text-foreground disabled:cursor-default disabled:opacity-45"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            {t('settings.appearance.resetPair')}
+          </button>
+        </div>
+
+        <div className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(min(100%,17rem),1fr))] gap-3">
+          <PaletteSlotCard
+            slot="day"
+            palette={paletteDefinition(dayPalette)}
+            active={effectiveSlot === 'day'}
+            editing={editingSlot === 'day'}
+            onSelect={() => chooseSlot('day')}
+          />
+          <PaletteSlotCard
+            slot="night"
+            palette={paletteDefinition(nightPalette)}
+            active={effectiveSlot === 'night'}
+            editing={editingSlot === 'night'}
+            onSelect={() => chooseSlot('night')}
+          />
+        </div>
+
+        <div className="mt-4 rounded-xl border border-border/70 bg-secondary/35 p-3 sm:p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <span className="text-sm font-medium text-foreground">
+                {t('settings.appearance.choosePalette', { slot: t(`theme.mode.${editingSlot}`) })}
+              </span>
+              <p className="mt-0.5 max-w-2xl text-[11px] leading-relaxed text-muted-foreground">
+                {t('settings.appearance.paletteLibraryDescription')}
+              </p>
+            </div>
+            <div
+              className="inline-flex rounded-md border border-border bg-background p-0.5"
+              role="group"
+              aria-label={t('settings.appearance.paletteFilter')}
+            >
+              {(['recommended', 'all'] as const).map((filter) => (
+                <button
+                  key={filter}
+                  type="button"
+                  onClick={() => setPaletteFilter(filter)}
+                  aria-pressed={paletteFilter === filter}
+                  className={`rounded px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                    paletteFilter === filter
+                      ? 'bg-primary-muted text-primary'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {t(`settings.appearance.paletteFilterOption.${filter}`)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <PalettePicker
+            palettes={visiblePalettes}
+            selected={editingPalette}
+            dayPalette={dayPalette}
+            nightPalette={nightPalette}
+            onSelect={choosePalette}
+          />
+        </div>
       </div>
 
       <div className="flex items-center justify-between gap-4 py-1">
@@ -91,80 +223,149 @@ function AppearanceSection() {
   )
 }
 
-function PalettePicker({
-  title,
-  description,
-  palettes,
-  selected,
+function PaletteSlotCard({
+  slot,
+  palette,
+  active,
+  editing,
   onSelect,
 }: {
-  title: string
-  description: string
+  slot: ThemePreferenceSlot
+  palette: ThemePaletteDefinition
+  active: boolean
+  editing: boolean
+  onSelect: () => void
+}) {
+  const { t } = useTranslation()
+  const Icon = slot === 'day' ? Sun : Moon
+  return (
+    <button
+      type="button"
+      data-palette-preview={palette.id}
+      data-selected={editing}
+      aria-pressed={editing}
+      aria-label={t('settings.appearance.editPaletteSlot', {
+        slot: t(`theme.mode.${slot}`),
+        palette: t(palette.labelKey),
+      })}
+      onClick={onSelect}
+      className="oa-palette-preview oa-pressable min-w-0 rounded-xl border p-3 text-left shadow-sm transition-[border-color,box-shadow,transform]"
+    >
+      <span className="flex min-w-0 items-start justify-between gap-3">
+        <span className="min-w-0">
+          <span className="flex items-center gap-1.5 text-[11px] font-medium">
+            <Icon className="h-3.5 w-3.5" />
+            {t(`theme.mode.${slot}`)}
+          </span>
+          <span className="mt-1 block truncate text-[14px] font-semibold">{t(palette.labelKey)}</span>
+          <span className="oa-palette-preview-muted mt-0.5 block text-[10.5px] leading-snug">
+            {t(palette.descriptionKey)}
+          </span>
+        </span>
+        <span className="flex shrink-0 flex-col items-end gap-1">
+          {active && (
+            <span className="rounded-full bg-primary px-2 py-0.5 text-[9px] font-semibold text-primary-foreground">
+              {t('settings.appearance.activeSlot')}
+            </span>
+          )}
+          {editing && (
+            <span className="rounded-full border border-primary/35 bg-primary/10 px-2 py-0.5 text-[9px] font-semibold text-primary">
+              {t('settings.appearance.editingSlot')}
+            </span>
+          )}
+        </span>
+      </span>
+      <span className="mt-3 flex items-center gap-1.5" aria-hidden>
+        <span className="h-2.5 flex-1 rounded-sm bg-primary" />
+        <span className="h-2.5 flex-1 rounded-sm bg-success" />
+        <span className="h-2.5 flex-1 rounded-sm bg-warning" />
+        <span className="h-2.5 flex-1 rounded-sm bg-destructive" />
+        <span className="h-2.5 flex-1 rounded-sm bg-ai-action" />
+      </span>
+    </button>
+  )
+}
+
+function PalettePicker({
+  palettes,
+  selected,
+  dayPalette,
+  nightPalette,
+  onSelect,
+}: {
   palettes: readonly ThemePaletteDefinition[]
   selected: ThemePaletteId
+  dayPalette: ThemePaletteId
+  nightPalette: ThemePaletteId
   onSelect: (palette: ThemePaletteId) => void
 }) {
   const { t } = useTranslation()
   return (
-    <div>
-      <span className="text-sm font-medium text-foreground">{title}</span>
-      <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">{description}</p>
-      <div className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(min(100%,10rem),1fr))] gap-2">
-        {palettes.map((palette) => (
-          <button
-            key={palette.id}
-            type="button"
-            data-palette-preview={palette.id}
-            data-selected={selected === palette.id}
-            onClick={() => onSelect(palette.id)}
-            aria-pressed={selected === palette.id}
-            className="oa-palette-preview min-w-0 rounded-lg border p-3 text-left shadow-sm transition-all"
+    <div className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(min(100%,11.5rem),1fr))] gap-2">
+      {palettes.map((palette) => (
+        <button
+          key={palette.id}
+          type="button"
+          data-palette-preview={palette.id}
+          data-selected={selected === palette.id}
+          onClick={() => onSelect(palette.id)}
+          aria-pressed={selected === palette.id}
+          aria-label={t('settings.appearance.choosePaletteOption', { palette: t(palette.labelKey) })}
+          className="oa-palette-preview oa-pressable min-w-0 rounded-lg border p-3 text-left shadow-sm transition-[border-color,box-shadow,transform]"
+        >
+          <span className="flex items-start justify-between gap-2">
+            <span className="min-w-0">
+              <span className="block break-words text-[12px] font-semibold">{t(palette.labelKey)}</span>
+              <span className="oa-palette-preview-muted mt-0.5 block text-[10px] leading-snug">
+                {t(palette.descriptionKey)}
+              </span>
+            </span>
+            <span className="oa-palette-preview-indicator mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full border" aria-hidden />
+          </span>
+
+          <span className="oa-palette-preview-shell mt-3 flex h-9 overflow-hidden rounded border" aria-hidden>
+            <span className="oa-palette-preview-sidebar flex w-5 shrink-0 items-center justify-center border-r">
+              <span className="oa-palette-preview-sidebar-dot h-1.5 w-1.5 rounded-full" />
+            </span>
+            <span className="oa-palette-preview-canvas flex min-w-0 flex-1 flex-col justify-center gap-1.5 px-2">
+              <span className="oa-palette-preview-primary-line h-1.5 w-1/2 rounded-full" />
+              <span className="flex gap-1">
+                <span className="oa-palette-preview-muted-line h-1 flex-1 rounded-full" />
+                <span className="oa-palette-preview-muted-line h-1 w-1/4 rounded-full" />
+              </span>
+            </span>
+          </span>
+
+          <span className="mt-2 flex items-center gap-1.5" aria-hidden>
+            <span className="h-3 flex-1 rounded-sm" style={{ background: 'var(--primary)' }} />
+            <span className="h-3 flex-1 rounded-sm" style={{ background: 'var(--success)' }} />
+            <span className="h-3 flex-1 rounded-sm" style={{ background: 'var(--warning)' }} />
+            <span className="h-3 flex-1 rounded-sm" style={{ background: 'var(--destructive)' }} />
+            <span className="h-3 flex-1 rounded-sm" style={{ background: 'var(--ai-action)' }} />
+          </span>
+          <span
+            className="oa-palette-preview-terminal mt-2 flex h-5 items-center gap-1 rounded border px-1.5"
+            aria-hidden
           >
-            <span className="flex items-start justify-between gap-2">
-              <span className="min-w-0">
-                <span className="block break-words text-[12px] font-semibold">{t(palette.labelKey)}</span>
-                <span className="oa-palette-preview-muted mt-0.5 block text-[10px] leading-snug">
-                  {t(palette.descriptionKey)}
-                </span>
-              </span>
-              <span className="oa-palette-preview-indicator mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full border" aria-hidden />
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--terminal-red)' }} />
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--terminal-yellow)' }} />
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--terminal-green)' }} />
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--terminal-cyan)' }} />
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--terminal-blue)' }} />
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--terminal-magenta)' }} />
+            <span className="oa-palette-preview-terminal-line ml-1 h-px flex-1" />
+          </span>
+          {(palette.id === dayPalette || palette.id === nightPalette) && (
+            <span className="oa-palette-preview-muted mt-2 block text-[9.5px] font-medium">
+              {palette.id === dayPalette && palette.id === nightPalette
+                ? t('settings.appearance.usedForBoth')
+                : palette.id === dayPalette
+                  ? t('settings.appearance.usedForDay')
+                  : t('settings.appearance.usedForNight')}
             </span>
-
-            <span className="oa-palette-preview-shell mt-3 flex h-9 overflow-hidden rounded border" aria-hidden>
-              <span className="oa-palette-preview-sidebar flex w-5 shrink-0 items-center justify-center border-r">
-                <span className="oa-palette-preview-sidebar-dot h-1.5 w-1.5 rounded-full" />
-              </span>
-              <span className="oa-palette-preview-canvas flex min-w-0 flex-1 flex-col justify-center gap-1.5 px-2">
-                <span className="oa-palette-preview-primary-line h-1.5 w-1/2 rounded-full" />
-                <span className="flex gap-1">
-                  <span className="oa-palette-preview-muted-line h-1 flex-1 rounded-full" />
-                  <span className="oa-palette-preview-muted-line h-1 w-1/4 rounded-full" />
-                </span>
-              </span>
-            </span>
-
-            <span className="mt-2 flex items-center gap-1.5" aria-hidden>
-              <span className="h-3 flex-1 rounded-sm" style={{ background: 'var(--primary)' }} />
-              <span className="h-3 flex-1 rounded-sm" style={{ background: 'var(--success)' }} />
-              <span className="h-3 flex-1 rounded-sm" style={{ background: 'var(--warning)' }} />
-              <span className="h-3 flex-1 rounded-sm" style={{ background: 'var(--destructive)' }} />
-              <span className="h-3 flex-1 rounded-sm" style={{ background: 'var(--ai-action)' }} />
-            </span>
-            <span
-              className="oa-palette-preview-terminal mt-2 flex h-5 items-center gap-1 rounded border px-1.5"
-              aria-hidden
-            >
-              <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--terminal-red)' }} />
-              <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--terminal-yellow)' }} />
-              <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--terminal-green)' }} />
-              <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--terminal-cyan)' }} />
-              <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--terminal-blue)' }} />
-              <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--terminal-magenta)' }} />
-              <span className="oa-palette-preview-terminal-line ml-1 h-px flex-1" />
-            </span>
-          </button>
-        ))}
-      </div>
+          )}
+        </button>
+      ))}
     </div>
   )
 }
