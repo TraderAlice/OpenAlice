@@ -242,6 +242,9 @@ describe('GET /credentials — Quick Chat launch metadata', () => {
       expect.objectContaining({
         slug: 'google-1',
         resolvedModel: 'gemini-3.1-flash-lite',
+        resolvedReasoning: true,
+        resolvedReasoningEffort: 'minimal',
+        resolvedReasoningMode: 'adaptive',
       }),
     ]);
   });
@@ -274,6 +277,7 @@ describe('GET /credentials — Quick Chat launch metadata', () => {
       model: 'gemini-3.5-flash',
       contextWindow: 512_000,
       wireShape: 'google-generative-ai',
+      reasoningMode: 'adaptive',
       reasoningEffort: 'medium',
     });
   });
@@ -331,6 +335,7 @@ describe('GET /credentials — Quick Chat launch metadata', () => {
         model: 'MiniMax-M2.5',
         contextWindow: null,
         wireShape: 'anthropic',
+        reasoningMode: 'adaptive',
         interactiveSetupStatus: 'workspace-trust-required',
       },
     });
@@ -373,6 +378,7 @@ describe('GET /credentials — Quick Chat launch metadata', () => {
         model: 'gemini-3.5-flash',
         contextWindow: 512_000,
         wireShape: 'google-generative-ai',
+        reasoningMode: 'adaptive',
       },
     });
     expect(readiness.status).toBe(200);

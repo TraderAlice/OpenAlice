@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import {
   AlertTriangle,
   Bot,
+  BrainCircuit,
   Check,
   ChevronDown,
   Code2,
@@ -217,6 +218,19 @@ export function AgentLaunchDetails({
         ? t('chatLanding.adjustWorkspaceAi')
         : t('chatLanding.configureWorkspaceAi')
       : t('chatLanding.providerSettings')
+    const reasoningLabel = config.aiDetails.reasoningEffort
+      ? t('chatLanding.reasoningEffortSummary', { effort: config.aiDetails.reasoningEffort })
+      : config.aiDetails.reasoningMode === 'required'
+        ? t('chatLanding.reasoningRequiredSummary')
+        : config.aiDetails.reasoningMode === 'adaptive'
+          ? t('chatLanding.reasoningAdaptiveSummary')
+          : config.aiDetails.reasoningMode === 'none' || config.aiDetails.reasoning === false
+            ? t('chatLanding.reasoningDisabledSummary')
+            : config.aiDetails.reasoning === true
+              ? t('chatLanding.reasoningEnabledSummary')
+              : config.aiDetails.reasoningMode === 'optional'
+                ? t('chatLanding.reasoningOptionalSummary')
+                : t('chatLanding.reasoningRuntimeSummary')
     summary = (
       <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] text-muted-foreground">
         <span className={workspaceSaved ? 'text-success' : 'text-primary'}>
@@ -230,6 +244,14 @@ export function AgentLaunchDetails({
         >
           <Cpu className="h-3 w-3 shrink-0" />
           <span className="truncate font-mono text-foreground/80">{model}</span>
+        </span>
+        <span aria-hidden className="text-muted-foreground/40">·</span>
+        <span
+          className="inline-flex shrink-0 items-center gap-1"
+          aria-label={reasoningLabel}
+        >
+          <BrainCircuit className="h-3 w-3" />
+          {reasoningLabel}
         </span>
         {config.aiDetails.contextWindow !== null && (
           <>

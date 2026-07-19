@@ -126,6 +126,9 @@ beforeEach(async () => {
     authType: 'api-key',
     wires: { 'google-generative-ai': 'https://generativelanguage.googleapis.com/v1beta' },
     resolvedModel: 'gemini-3.1-flash-lite',
+    resolvedReasoning: true,
+    resolvedReasoningEffort: 'minimal',
+    resolvedReasoningMode: 'adaptive',
   }])
   mocks.detectWorkspaceCredential.mockResolvedValue({
     configured: true,
@@ -133,6 +136,9 @@ beforeEach(async () => {
     model: 'gemini-3.1-flash-lite',
     contextWindow: 256_000,
     wireShape: 'google-generative-ai',
+    reasoning: true,
+    reasoningEffort: 'minimal',
+    reasoningMode: 'adaptive',
   })
   mocks.getAgentReadiness.mockResolvedValue({
     agents: {
@@ -204,6 +210,7 @@ describe('ChatLandingPage AI source disclosure', () => {
 
     expect(await screen.findByText('Saved in this workspace')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Adjust workspace AI' })).toBeTruthy()
+    expect(screen.getByLabelText('minimal reasoning')).toBeTruthy()
   })
 
   it('labels a vault fallback as a pending write instead of existing Workspace config', async () => {
@@ -234,6 +241,46 @@ describe('ChatLandingPage AI source disclosure', () => {
 
     expect(await screen.findByText('Will write to this workspace when you send')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Configure workspace AI' })).toBeTruthy()
+    expect(screen.getByLabelText('minimal reasoning')).toBeTruthy()
+  })
+
+  it('shows a required reasoning policy when the provider has no effort tiers', async () => {
+    mocks.listAgentCredentials.mockResolvedValue([{
+      slug: 'kimi-1',
+      vendor: 'kimi',
+      authType: 'api-key',
+      wires: { 'openai-chat': 'https://api.moonshot.ai/v1' },
+      resolvedModel: 'kimi-k2.7-code',
+      resolvedReasoning: true,
+      resolvedReasoningMode: 'required',
+    }])
+    mocks.detectWorkspaceCredential.mockResolvedValue({
+      configured: false,
+      slug: null,
+      model: null,
+      contextWindow: null,
+      wireShape: null,
+    })
+    mocks.getAgentReadiness.mockResolvedValue({
+      agents: {
+        pi: {
+          agent: 'pi',
+          ready: true,
+          requiresCredential: true,
+          source: 'launcher-vault',
+          hasWorkspaceConfig: false,
+          hasUsableWorkspaceConfig: false,
+          detectedCredentialSlug: null,
+          compatibleCredentialSlugs: ['kimi-1'],
+          injectableCredentialSlugs: ['kimi-1'],
+        },
+      },
+    })
+
+    render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
+
+    expect(await screen.findByLabelText('Reasoning always on')).toBeTruthy()
+    expect(screen.getByLabelText('Model kimi-k2.7-code')).toBeTruthy()
   })
 
   it('replaces a transient provider choice with the Workspace config saved in Settings', async () => {
