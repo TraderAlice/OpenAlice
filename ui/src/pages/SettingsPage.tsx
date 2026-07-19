@@ -22,6 +22,7 @@ import {
 } from '../theme/palettes'
 import { useThemeStore, type AppTheme } from '../theme/store'
 import { useEffectivePreferenceSlot } from '../theme/useEffectiveTheme'
+import { AboutOpenAliceSection } from '../components/settings/AboutOpenAliceSection'
 
 // ==================== Appearance ====================
 
@@ -699,6 +700,9 @@ function SettingsSection() {
       <ConfigSection title={t('settings.compaction.title')} description={t('settings.compaction.description')}>
         <CompactionForm config={config} />
       </ConfigSection>
+
+      {/* Runtime version + manual update entry point */}
+      <AboutOpenAliceSection />
     </div>
   )
 }

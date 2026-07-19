@@ -125,6 +125,7 @@ const api = {
   },
   updater: {
     getStatus: () => ipcRenderer.invoke('openalice:updater:get-status'),
+    checkForUpdates: () => ipcRenderer.invoke('openalice:updater:check-for-updates'),
     onStatus: (cb: (status: UpdaterStatus) => void) => {
       updaterListeners.add(cb)
       return () => updaterListeners.delete(cb)

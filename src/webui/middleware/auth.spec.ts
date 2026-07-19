@@ -46,6 +46,7 @@ function makeApp(opts: Parameters<typeof createAuthMiddleware>[0]) {
   app.get('/api/trading/uta', (c) => c.json({ utas: [] }))
   app.post('/api/trading/uta/x/wallet/push', (c) => c.json({ ok: true }))
   app.get('/api/version', (c) => c.json({ ok: true }))
+  app.post('/api/version/check', (c) => c.json({ ok: true }))
   app.post('/api/auth/login', (c) => c.json({ ok: true }))
   return app
 }
@@ -166,6 +167,14 @@ describe('auth middleware — playbook 01 (auth bypass)', () => {
     const app = makeApp({ trustedProxies: [], csrfTrustedOrigins: [] })
     const res = await app.request('/api/version', undefined, envWithIp('203.0.113.5'))
     expect(res.status).toBe(200)
+  })
+
+  it('forced version refresh remains behind the authenticated API gate', async () => {
+    const app = makeApp({ trustedProxies: [], csrfTrustedOrigins: [] })
+    const res = await app.request('/api/version/check', {
+      method: 'POST',
+    }, envWithIp('203.0.113.5'))
+    expect(res.status).toBe(401)
   })
 
   it('public route /api/auth/login accessible without cookie', async () => {

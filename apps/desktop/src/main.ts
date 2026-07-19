@@ -402,7 +402,7 @@ async function runRendererOnboardingSmoke(win: BrowserWindow): Promise<void> {
     const credentialPrimary = () => document.querySelector('[data-testid="credential-modal-primary"]')
 
     await waitFor('Electron preload bridge', () => Boolean(
-      window.openAlice?.runtime && window.openAlice?.pty && window.openAlice?.dataHome
+      window.openAlice?.runtime && window.openAlice?.pty && window.openAlice?.dataHome && window.openAlice?.updater
     ))
 
     const runtimeInfo = await window.openAlice.runtime.info()
@@ -921,7 +921,7 @@ app.whenReady().then(async () => {
     console.log(`[renderer] ${sourceId}:${line} ${message}`)
   })
   win.webContents.on('did-finish-load', () => {
-    void win.webContents.executeJavaScript('Boolean(window.openAlice?.pty && window.openAlice?.runtime && window.openAlice?.dataHome && window.openAlice?.keyboard)', true)
+    void win.webContents.executeJavaScript('Boolean(window.openAlice?.pty && window.openAlice?.runtime && window.openAlice?.dataHome && window.openAlice?.keyboard && window.openAlice?.updater)', true)
       .then((ready) => {
         console.log(`[guardian] renderer bridge → ${ready ? 'ready' : 'missing'}`)
         if (ready && process.env['OPENALICE_ELECTRON_SMOKE_PTY'] === '1') {

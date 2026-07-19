@@ -408,6 +408,24 @@ git excludes.
 
 ## Packaging Invariants
 
+### Version and update surface
+
+**Settings → General → About OpenAlice** is the user-facing source for the
+running version and update state on every distribution surface. The passive
+read uses `GET /api/version`, whose GitHub release lookup is cached. An
+explicit **Check for updates** uses the authenticated
+`POST /api/version/check` route to bypass that cache without exposing a public
+rate-limit bypass.
+
+Packaged Electron also invokes the existing `electron-updater` check through
+the narrow preload bridge. That check starts the native download path when an
+eligible release exists; download progress and the ready-to-restart action are
+projected into the same Settings card. Electron development and unsigned
+directory packages may not have updater metadata, so the native check reports
+that it is unsupported and the shared version route remains the non-installing
+fallback. The top-level update banner and downloaded-update prompt remain
+secondary notifications over the same backend and updater state.
+
 Keep these true together:
 
 - `vendor/**` remains in the Electron builder file list.

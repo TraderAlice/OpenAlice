@@ -55,6 +55,10 @@ interface Window {
         | { phase: 'error'; message: string }
         | null
       >
+      checkForUpdates(): Promise<
+        | { supported: true }
+        | { supported: false; reason: 'not-packaged' | 'missing-config' }
+      >
       onStatus(cb: (status:
         | { phase: 'available'; version?: string; releaseUrl?: string }
         | { phase: 'downloading'; version?: string; percent?: number }
