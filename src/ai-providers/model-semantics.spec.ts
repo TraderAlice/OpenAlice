@@ -39,6 +39,15 @@ describe('model semantics registry', () => {
     expect(describeModelSemantics(semantics)).toBe('Reasoning optional · thinking default on')
   })
 
+  it('keeps supported legacy MiniMax M2.5 workspaces reasoning-aware', () => {
+    expect(resolveModelSemantics('minimax', 'MiniMax-M2.5')).toEqual({
+      contextWindow: 204_800,
+      reasoning: { mode: 'adaptive', interleaved: true },
+    })
+    expect(resolveModelSemantics('minimax', 'MiniMax-M2.5-highspeed'))
+      .toEqual(resolveModelSemantics('minimax', 'MiniMax-M2.5'))
+  })
+
   it('registers every built-in vendor injection default', () => {
     for (const [vendor, model] of Object.entries(DEFAULT_MODEL_BY_VENDOR)) {
       expect(resolveModelSemantics(vendor, model), `${vendor}/${model}`).not.toBeNull()

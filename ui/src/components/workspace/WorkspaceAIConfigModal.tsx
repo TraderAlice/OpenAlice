@@ -271,13 +271,42 @@ export function WorkspaceAIConfigModal({
 
   const form = { claude: claudeForm, codex: codexForm, opencode: opencodeForm, pi: piForm }[tab]
   const setForm = { claude: setClaudeForm, codex: setCodexForm, opencode: setOpencodeForm, pi: setPiForm }[tab]
+  const formCredentialByKey = useMemo(() => credentials.find((credential) => (
+    !!credential.apiKey && credential.apiKey === form.apiKey.trim()
+  )) ?? null, [credentials, form.apiKey])
   const formCredentialVendor = useMemo(() => {
     const selected = credentials.find((credential) => credential.slug === pickedCredential)
-    const matchedByKey = credentials.find((credential) => (
-      !!credential.apiKey && credential.apiKey === form.apiKey.trim()
-    ))
-    return selected?.vendor ?? matchedByKey?.vendor ?? null
-  }, [credentials, form.apiKey, pickedCredential])
+    return selected?.vendor ?? formCredentialByKey?.vendor ?? null
+  }, [credentials, formCredentialByKey, pickedCredential])
+  const formWireOptions = useMemo(() => {
+    if (tab !== 'opencode' && tab !== 'pi') return []
+    return formCredentialByKey?.vendor === 'minimax'
+      ? agentWireShapes(formCredentialByKey.wires, tab, formCredentialByKey.vendor)
+      : AGENT_WIRE_PREFERENCE[tab] ?? []
+  }, [formCredentialByKey, tab])
+
+  useEffect(() => {
+    if (
+      (tab !== 'opencode' && tab !== 'pi') ||
+      formCredentialByKey?.vendor !== 'minimax'
+    ) return
+    if (formWireOptions.includes(form.wireShape)) return
+    const repaired = pickAgentWire(
+      formCredentialByKey.wires,
+      tab,
+      form.wireShape,
+      formCredentialByKey.vendor,
+    )
+    if (!repaired || repaired.shape === form.wireShape) return
+    setForm({
+      ...form,
+      wireShape: repaired.shape,
+      baseUrl: repaired.baseUrl,
+      ...(repaired.shape === 'anthropic'
+        ? { authMode: anthropicAuthModeForBaseUrl(repaired.baseUrl) }
+        : {}),
+    })
+  }, [form, formCredentialByKey, formWireOptions, setForm, tab])
   // Model-id suggestions for the current field: infer the provider vendor from
   // the matched vault credential first, then its entered baseUrl (api.z.ai →
   // glm, …), with the tab as fallback. Official endpoints may intentionally be
@@ -343,7 +372,7 @@ export function WorkspaceAIConfigModal({
     if (!cred) return
     // Pick the wire this tab's agent speaks from the credential's capabilities.
     // (The picker only lists compatible credentials, so this is non-null.)
-    const picked = pickAgentWire(cred.wires, tab, pickedWireShape || undefined)
+    const picked = pickAgentWire(cred.wires, tab, pickedWireShape || undefined, cred.vendor)
     if (!picked) return
     // Prefer the model this credential last used. A newly-created credential
     // falls back to the catalog's explicit default, not list order: catalogs
@@ -684,10 +713,10 @@ export function WorkspaceAIConfigModal({
               // Only credentials that declare a wire THIS agent speaks. Codex is
               // Responses-only, so most credentials won't list here — the funnel
               // toward pi/opencode is by design.
-              const compatible = credentials.filter((c) => pickAgentWire(c.wires, tab))
+              const compatible = credentials.filter((c) => pickAgentWire(c.wires, tab, undefined, c.vendor))
               const selectedCredential = compatible.find((c) => c.slug === pickedCredential)
               const selectedWireOptions = selectedCredential
-                ? agentWireShapes(selectedCredential.wires, tab)
+                ? agentWireShapes(selectedCredential.wires, tab, selectedCredential.vendor)
                 : []
               return (
                 <>
@@ -699,7 +728,7 @@ export function WorkspaceAIConfigModal({
                         const slug = e.target.value
                         const cred = compatible.find((candidate) => candidate.slug === slug)
                         setPickedCredential(slug)
-                        setPickedWireShape(cred ? (agentWireShapes(cred.wires, tab)[0] ?? '') : '')
+                        setPickedWireShape(cred ? (agentWireShapes(cred.wires, tab, cred.vendor)[0] ?? '') : '')
                       }}
                       className={inputClass + ' flex-1'}
                       disabled={compatible.length === 0}
@@ -710,7 +739,7 @@ export function WorkspaceAIConfigModal({
                           : t('workspaceSettings.ai.selectCredential')}
                       </option>
                       {compatible.map((cred) => {
-                        const shapes = agentWireShapes(cred.wires, tab)
+                        const shapes = agentWireShapes(cred.wires, tab, cred.vendor)
                         return (
                           <option key={cred.slug} value={cred.slug}>
                             {(cred.label?.trim() || cred.slug)}{shapes.length > 1 ? ` · ${t('workspaceSettings.ai.protocolCount', { count: shapes.length })}` : ''}
@@ -771,7 +800,7 @@ export function WorkspaceAIConfigModal({
                 }}
                 className={inputClass}
               >
-                {(AGENT_WIRE_PREFERENCE[tab] ?? []).map((shape) => (
+                {formWireOptions.map((shape) => (
                   <option key={shape} value={shape}>{WIRE_SHAPE_GUIDANCE[shape]}</option>
                 ))}
               </select>

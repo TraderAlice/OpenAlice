@@ -78,7 +78,8 @@ const GEMINI_3_CONTEXT = 1_048_576
  * - OpenAI model/reasoning guides: https://developers.openai.com/api/docs/guides/latest-model
  * - Anthropic extended/adaptive thinking: https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking
  * - Gemini thinking: https://ai.google.dev/gemini-api/docs/generate-content/thinking
- * - MiniMax text models: https://platform.minimax.io/docs/guides/text-generation
+ * - MiniMax Anthropic API: https://platform.minimax.io/docs/api-reference/text-anthropic-api
+ * - MiniMax OpenAI `reasoning_split`: https://platform.minimax.io/docs/api-reference/text-openai-api
  * - Kimi thinking models: https://platform.kimi.ai/docs/guide/use-kimi-k2-thinking-model
  * - DeepSeek thinking: https://api-docs.deepseek.com/guides/thinking_mode
  * - LongCat Chat API: https://longcat.chat/platform/docs/api/chat.html
@@ -202,6 +203,18 @@ export const MODEL_SEMANTICS_BY_VENDOR: Registry = {
       reasoning: { mode: 'adaptive', interleaved: true },
     },
     'MiniMax-M2.7': {
+      contextWindow: 204_800,
+      reasoning: { mode: 'adaptive', interleaved: true },
+    },
+    'MiniMax-M2.7-highspeed': {
+      contextWindow: 204_800,
+      reasoning: { mode: 'adaptive', interleaved: true },
+    },
+    'MiniMax-M2.5': {
+      contextWindow: 204_800,
+      reasoning: { mode: 'adaptive', interleaved: true },
+    },
+    'MiniMax-M2.5-highspeed': {
       contextWindow: 204_800,
       reasoning: { mode: 'adaptive', interleaved: true },
     },

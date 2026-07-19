@@ -41,6 +41,52 @@ export const AGENT_WIRE_PREFERENCE: Record<string, CredentialWireShape[]> = {
   pi: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'],
 }
 
+/**
+ * Provider-specific support inside an agent's wire set.
+ *
+ * MiniMax is the deliberate exception to the generic OpenAI-compatible set:
+ * its Anthropic endpoint is the documented coding-agent path and returns
+ * native thinking blocks. The OpenAI endpoint requires `reasoning_split` and
+ * returns an array-shaped `reasoning_details` extension that Pi and opencode's
+ * generic OpenAI transports do not parse losslessly. Do not expose a protocol
+ * choice that silently turns reasoning into visible `<think>` text or drops it.
+ */
+export function agentWirePreference(
+  agentId: string,
+  vendor?: string | null,
+): CredentialWireShape[] {
+  const preference = AGENT_WIRE_PREFERENCE[agentId]
+    ?? ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses']
+  if (vendor !== 'minimax' || (agentId !== 'opencode' && agentId !== 'pi')) return preference
+  return ['anthropic']
+}
+
+function inferredMinimaxAnthropicEndpoint(
+  wires: Partial<Record<CredentialWireShape, string>>,
+): string | undefined {
+  const chatEndpoint = wires['openai-chat']?.trim()
+  if (!chatEndpoint) return undefined
+  try {
+    const url = new URL(chatEndpoint)
+    if (url.hostname !== 'api.minimax.io' && url.hostname !== 'api.minimaxi.com') return undefined
+    return `${url.origin}/anthropic`
+  } catch {
+    return undefined
+  }
+}
+
+function wireEndpoint(
+  wires: Partial<Record<CredentialWireShape, string>>,
+  shape: CredentialWireShape,
+  vendor?: string | null,
+): string | undefined {
+  if (Object.prototype.hasOwnProperty.call(wires, shape)) return wires[shape] ?? ''
+  if (vendor === 'minimax' && shape === 'anthropic') {
+    return inferredMinimaxAnthropicEndpoint(wires)
+  }
+  return undefined
+}
+
 // Modern coding models are commonly sold as long-context runtimes. Pi defaults
 // unknown custom models to 128k and opencode defaults unknown limits to 0, so
 // new OpenAlice injections state the assumption explicitly while keeping the
@@ -59,7 +105,7 @@ export function compatibleCredentials(
   agentId: string,
 ): Array<[string, Credential]> {
   return Object.entries(credentials).filter(
-    ([, cred]) => pickAgentWire(credentialWires(cred), agentId) !== null,
+    ([, cred]) => pickAgentWire(credentialWires(cred), agentId, undefined, cred.vendor) !== null,
   )
 }
 
@@ -96,15 +142,30 @@ export function pickAgentWire(
   wires: Partial<Record<CredentialWireShape, string>>,
   agentId: string,
   requestedShape?: CredentialWireShape,
+  vendor?: string | null,
 ): { shape: CredentialWireShape; baseUrl: string } | null {
-  const pref = AGENT_WIRE_PREFERENCE[agentId]
-    ?? ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses']
+  const pref = agentWirePreference(agentId, vendor)
   if (requestedShape !== undefined) {
-    if (!pref.includes(requestedShape) || !(requestedShape in wires)) return null
-    return { shape: requestedShape, baseUrl: wires[requestedShape] ?? '' }
+    const requestedEndpoint = wireEndpoint(wires, requestedShape, vendor)
+    if (pref.includes(requestedShape) && requestedEndpoint !== undefined) {
+      return { shape: requestedShape, baseUrl: requestedEndpoint }
+    }
+    // Heal Workspace defaults saved before MiniMax's native-thinking boundary
+    // was registered. This is intentionally narrower than a generic fallback:
+    // other explicit protocol mismatches remain loud incompatibilities.
+    if (
+      vendor === 'minimax' &&
+      (agentId === 'opencode' || agentId === 'pi') &&
+      requestedShape === 'openai-chat' &&
+      wireEndpoint(wires, 'anthropic', vendor) !== undefined
+    ) {
+      return { shape: 'anthropic', baseUrl: wireEndpoint(wires, 'anthropic', vendor)! }
+    }
+    return null
   }
   for (const shape of pref) {
-    if (shape in wires) return { shape, baseUrl: wires[shape] ?? '' }
+    const endpoint = wireEndpoint(wires, shape, vendor)
+    if (endpoint !== undefined) return { shape, baseUrl: endpoint }
   }
   return null
 }
@@ -138,7 +199,7 @@ export function credentialToWorkspaceAiCred(
   overrides: CredentialInjectionOverrides = {},
 ): WorkspaceAiCred | null {
   const wires = credentialWires(credential as Credential)
-  const picked = pickAgentWire(wires, agentId, overrides.wireShape)
+  const picked = pickAgentWire(wires, agentId, overrides.wireShape, credential.vendor)
   if (!picked) return null
 
   const cred: WorkspaceAiCred = {

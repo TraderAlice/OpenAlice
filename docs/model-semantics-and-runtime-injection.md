@@ -80,6 +80,17 @@ back to the Agent's native behavior. A model that documents only a thinking
 switch (for example LongCat 2.0) keeps `defaultEnabled` separate and never
 receives a fabricated effort tier.
 
+Wire selection normally follows the same rule: an explicit Workspace or
+creation-default protocol wins. A registered runtime incompatibility is the
+narrow exception. MiniMax's OpenAI Chat endpoint only separates thinking when
+`reasoning_split` is set, then returns it through the array-shaped
+`reasoning_details` extension. Pi and opencode's generic OpenAI transports do
+not consume that extension losslessly. Their own native MiniMax registrations,
+Models.dev, and MiniMax's AI SDK provider all choose the Anthropic-compatible
+path instead. OpenAlice therefore exposes only the Anthropic MiniMax wire to Pi
+and opencode; an old saved MiniMax OpenAI default is repaired to Anthropic on
+the next apply/injection so native thinking blocks and multi-turn replay survive.
+
 The native fields are deliberately runtime-owned projections of the same
 resolved value:
 

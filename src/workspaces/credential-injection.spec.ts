@@ -90,16 +90,44 @@ describe('credentialToWorkspaceAiCred', () => {
         expect(cred.apiKey).toBe('k')
         expect(cred.baseUrl).toBe('https://gw.example.com/v1')
       })
+
+      it(`${agent}: defaults MiniMax to its Anthropic coding-agent wire`, () => {
+        const cred = credentialToWorkspaceAiCred(minimaxIntl, agent, { model: 'MiniMax-M2.5' })!
+        expect(cred).toMatchObject({
+          wireShape: 'anthropic',
+          baseUrl: 'https://api.minimax.io/anthropic',
+          authMode: 'bearer',
+          contextWindow: 204_800,
+          reasoning: true,
+        })
+      })
+
+      it(`${agent}: upgrades an old official MiniMax OpenAI-only credential`, () => {
+        const legacyOpenAIOnly: Credential = {
+          vendor: 'minimax',
+          authType: 'api-key',
+          apiKey: 'old-mm-key',
+          wires: { 'openai-chat': 'https://api.minimaxi.com/v1' },
+        }
+        expect(credentialToWorkspaceAiCred(legacyOpenAIOnly, agent, {
+          model: 'MiniMax-M2.5',
+          wireShape: 'openai-chat',
+        })).toMatchObject({
+          wireShape: 'anthropic',
+          baseUrl: 'https://api.minimaxi.com/anthropic',
+          authMode: 'bearer',
+        })
+      })
     }
   })
 
-  it('honors an explicit compatible wire and rejects an incompatible one', () => {
+  it('repairs legacy MiniMax OpenAI selections and rejects other incompatible wires', () => {
     for (const agent of ['opencode', 'pi']) {
-      const anthropic = credentialToWorkspaceAiCred(minimaxIntl, agent, {
+      const repaired = credentialToWorkspaceAiCred(minimaxIntl, agent, {
         model: 'MiniMax-M3',
-        wireShape: 'anthropic',
+        wireShape: 'openai-chat',
       })!
-      expect(anthropic).toMatchObject({
+      expect(repaired).toMatchObject({
         wireShape: 'anthropic',
         baseUrl: 'https://api.minimax.io/anthropic',
         authMode: 'bearer',

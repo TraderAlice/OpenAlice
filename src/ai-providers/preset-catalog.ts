@@ -236,7 +236,7 @@ export const MINIMAX: PresetDef = {
   description: 'MiniMax models via Claude Agent SDK (Anthropic-compatible)',
   category: 'third-party',
   defaultName: 'MiniMax',
-  hint: 'China console: minimaxi.com — International console: minimax.io. API keys are region-locked. MiniMax authenticates via Authorization: Bearer; the international endpoint (api.minimax.io) rejects x-api-key.',
+  hint: 'China console: minimaxi.com — International console: minimax.io. API keys are region-locked. Pi and opencode use MiniMax\'s Anthropic-compatible endpoint so thinking stays in native reasoning blocks; the OpenAI-compatible reasoning_details extension is not losslessly supported by their generic transports.',
   zodSchema: z.object({
     backend: z.literal('agent-sdk'),
     loginMethod: z.literal('api-key'),
@@ -265,7 +265,7 @@ export const MINIMAX: PresetDef = {
     apiKeyLabel: 'MiniMax API key',
     apiKeyHelp: 'Use the API key issued by the MiniMax platform selected above. China and International keys are not interchangeable.',
     modelHelp: 'MiniMax model IDs are case-sensitive. Pick a suggestion or paste the exact model ID shown by the selected platform.',
-    regionHelp: 'Choose the platform that issued this key. OpenAlice will store both supported API protocols for that region.',
+    regionHelp: 'Choose the platform that issued this key. OpenAlice stores both provider endpoints, while current coding runtimes use the Anthropic-compatible path for complete reasoning capture and replay.',
   },
   writeOnlyFields: ['apiKey'],
 }

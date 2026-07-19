@@ -329,7 +329,7 @@ function WorkspaceDefaultsSection({ credentials, presets }: { credentials: Crede
     const nextDefaults = { ...data.defaults }
     if (slug) {
       const cred = credentials.find((candidate) => candidate.slug === slug)
-      const wireShape = cred ? agentWireShapes(cred.wires, agentId)[0] : undefined
+      const wireShape = cred ? agentWireShapes(cred.wires, agentId, cred.vendor)[0] : undefined
       nextDefaults[agentId] = { credentialSlug: slug, ...(wireShape ? { wireShape } : {}) }
     } else {
       delete nextDefaults[agentId]
@@ -380,7 +380,9 @@ function WorkspaceDefaultsSection({ credentials, presets }: { credentials: Crede
     const options = data?.compatibleByAgent[agent.id] ?? []
     const current = data?.defaults[agent.id]?.credentialSlug ?? ''
     const selectedCredential = credentials.find((candidate) => candidate.slug === current)
-    const wireShapes = selectedCredential ? agentWireShapes(selectedCredential.wires, agent.id) : []
+    const wireShapes = selectedCredential
+      ? agentWireShapes(selectedCredential.wires, agent.id, selectedCredential.vendor)
+      : []
     const configuredWire = data?.defaults[agent.id]?.wireShape
     const selectedWire = configuredWire && wireShapes.includes(configuredWire)
       ? configuredWire

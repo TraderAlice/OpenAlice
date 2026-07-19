@@ -18,6 +18,7 @@ import { opencodeAdapter } from './opencode.js';
 import { piAdapter, syncPiProjectTrust, syncPiWindowsShellPath } from './pi.js';
 import { migrateLegacyPiAgentDir, piWorkspaceProviderId } from './pi-config.js';
 import { prepareAgentRuntimeWorkspace } from '../cli-adapter.js';
+import { credentialToWorkspaceAiCred } from '../credential-injection.js';
 
 let dir: string;
 
@@ -494,6 +495,35 @@ describe('opencodeAdapter AI-config', () => {
       wireShape: 'anthropic',
       authMode: 'bearer',
     });
+  });
+
+  it('writes the automatic MiniMax opencode binding through native Anthropic thinking blocks', async () => {
+    const cred = credentialToWorkspaceAiCred({
+      vendor: 'minimax',
+      apiKey: 'mm-key',
+      wires: {
+        anthropic: 'https://api.minimax.io/anthropic',
+        'openai-chat': 'https://api.minimax.io/v1',
+      },
+    }, 'opencode', { model: 'MiniMax-M2.5' })!;
+
+    await opencodeAdapter.writeAiConfig!(dir, cred);
+    const config = JSON.parse(await read('opencode.json'));
+    expect(config.provider.workspace).toMatchObject({
+      npm: '@ai-sdk/anthropic',
+      options: {
+        baseURL: 'https://api.minimax.io/anthropic',
+        headers: { Authorization: 'Bearer mm-key' },
+      },
+      models: {
+        'MiniMax-M2.5': {
+          name: 'MiniMax-M2.5',
+          reasoning: true,
+          limit: { context: 204_800, output: 16_384 },
+        },
+      },
+    });
+    expect(config.model).toBe('workspace/MiniMax-M2.5');
   });
 
   it('reset (empty cred) deletes opencode.json', async () => {

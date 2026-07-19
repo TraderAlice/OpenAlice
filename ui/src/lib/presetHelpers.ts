@@ -72,19 +72,71 @@ export const AGENT_WIRE_PREFERENCE: Record<string, WireShape[]> = {
   pi: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'],
 }
 
+/** Keep provider-aware runtime support aligned with the backend injector. */
+export function agentWirePreference(agentId: string, vendor?: string | null): WireShape[] {
+  const preference = AGENT_WIRE_PREFERENCE[agentId] ?? SHAPE_ORDER
+  if (vendor !== 'minimax' || (agentId !== 'opencode' && agentId !== 'pi')) return preference
+  // MiniMax OpenAI Chat emits its separated thinking as the non-standard
+  // `reasoning_details[]` extension. Neither runtime's generic OpenAI adapter
+  // consumes it losslessly; both runtimes' native MiniMax integrations use the
+  // Anthropic endpoint instead.
+  return ['anthropic']
+}
+
+function inferredMinimaxAnthropicEndpoint(
+  wires: Partial<Record<WireShape, string>>,
+): string | undefined {
+  const chatEndpoint = wires['openai-chat']?.trim()
+  if (!chatEndpoint) return undefined
+  try {
+    const url = new URL(chatEndpoint)
+    if (url.hostname !== 'api.minimax.io' && url.hostname !== 'api.minimaxi.com') return undefined
+    return `${url.origin}/anthropic`
+  } catch {
+    return undefined
+  }
+}
+
+function wireEndpoint(
+  wires: Partial<Record<WireShape, string>>,
+  shape: WireShape,
+  vendor?: string | null,
+): string | undefined {
+  if (Object.prototype.hasOwnProperty.call(wires, shape)) return wires[shape] ?? ''
+  if (vendor === 'minimax' && shape === 'anthropic') {
+    return inferredMinimaxAnthropicEndpoint(wires)
+  }
+  return undefined
+}
+
 /** Pick the wire an agent should use from a credential's capabilities (null = none compatible). */
 export function pickAgentWire(
   wires: Partial<Record<WireShape, string>>,
   agentId: string,
   requestedShape?: WireShape,
+  vendor?: string | null,
 ): { shape: WireShape; baseUrl: string } | null {
-  const pref = AGENT_WIRE_PREFERENCE[agentId] ?? SHAPE_ORDER
+  const pref = agentWirePreference(agentId, vendor)
   if (requestedShape !== undefined) {
-    if (!pref.includes(requestedShape) || !(requestedShape in wires)) return null
-    return { shape: requestedShape, baseUrl: wires[requestedShape] ?? '' }
+    const requestedEndpoint = wireEndpoint(wires, requestedShape, vendor)
+    if (pref.includes(requestedShape) && requestedEndpoint !== undefined) {
+      return { shape: requestedShape, baseUrl: requestedEndpoint }
+    }
+    // Transparently repair an old MiniMax OpenAI default when the credential
+    // still carries the native Anthropic endpoint.
+    if (
+      vendor === 'minimax' &&
+      (agentId === 'opencode' || agentId === 'pi') &&
+      requestedShape === 'openai-chat' &&
+      wireEndpoint(wires, 'anthropic', vendor) !== undefined
+    ) {
+      return { shape: 'anthropic', baseUrl: wireEndpoint(wires, 'anthropic', vendor)! }
+    }
+    return null
   }
   for (const shape of pref) {
-    if (shape in wires) return { shape, baseUrl: wires[shape] ?? '' }
+    const endpoint = wireEndpoint(wires, shape, vendor)
+    if (endpoint !== undefined) return { shape, baseUrl: endpoint }
   }
   return null
 }
@@ -93,9 +145,10 @@ export function pickAgentWire(
 export function agentWireShapes(
   wires: Partial<Record<WireShape, string>>,
   agentId: string,
+  vendor?: string | null,
 ): WireShape[] {
-  const pref = AGENT_WIRE_PREFERENCE[agentId] ?? SHAPE_ORDER
-  return pref.filter((shape) => shape in wires)
+  const pref = agentWirePreference(agentId, vendor)
+  return pref.filter((shape) => wireEndpoint(wires, shape, vendor) !== undefined)
 }
 
 /** Agent runtimes that can consume at least one declared wire shape. */

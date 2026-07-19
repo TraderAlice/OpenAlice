@@ -76,6 +76,39 @@ beforeEach(async () => {
 afterEach(cleanup)
 
 describe('WorkspaceAIConfigModal local model metadata', () => {
+  it('repairs a saved MiniMax OpenAI wire and removes the lossy protocol choice', async () => {
+    const minimaxPi = {
+      ...savedPi,
+      baseUrl: 'https://api.minimax.io/v1',
+      model: 'MiniMax-M2.5',
+    }
+    mocks.getAgentConfig.mockReset().mockResolvedValue({
+      claude: null,
+      codex: null,
+      opencode: null,
+      pi: minimaxPi,
+    })
+    mocks.listCredentials.mockResolvedValue([{
+      slug: 'minimax-test',
+      vendor: 'minimax',
+      authType: 'api-key',
+      wires: {
+        anthropic: 'https://api.minimax.io/anthropic',
+        'openai-chat': 'https://api.minimax.io/v1',
+      },
+      apiKey: 'secret',
+    }])
+
+    render(
+      <WorkspaceAIConfigModal wsId="chat-1" initialSection="ai" initialAgent="pi" onClose={vi.fn()} />,
+    )
+
+    const protocol = await screen.findByRole('combobox', { name: 'Pi API 协议' }) as HTMLSelectElement
+    await screen.findByRole('button', { name: '测试' })
+    expect(protocol.value).toBe('anthropic')
+    expect(Array.from(protocol.options).map((option) => option.value)).toEqual(['anthropic'])
+  })
+
   it('shows LongCat\'s real thinking default without inventing an effort selector', async () => {
     mocks.getAgentConfig.mockReset().mockResolvedValue({
       claude: null,
