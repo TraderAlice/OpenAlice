@@ -46,6 +46,12 @@ describe('WorkspaceAIConfigModal Pi model capability mapping', () => {
     expect(formToConfig(form, 'pi').reasoning).toBeUndefined()
   })
 
+  it('omits context when the model registry or native runtime should decide', () => {
+    const form = configToForm(null, 'opencode')
+    expect(form.contextWindow).toBeNull()
+    expect(formToConfig(form, 'opencode').contextWindow).toBeUndefined()
+  })
+
   it('does not invalidate a connection test for local context or reasoning metadata', () => {
     const saved = {
       baseUrl: 'https://provider.test/v1',

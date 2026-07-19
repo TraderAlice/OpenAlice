@@ -9,7 +9,6 @@ import { exec as gitExec } from 'dugite';
 import {
   readCredentials,
   readWorkspaceCredentialDefaults,
-  readWorkspaceDefaultContextWindow,
 } from '@/core/config.js';
 
 import { prepareAgentRuntimeWorkspace, type AdapterRegistry } from './cli-adapter.js';
@@ -261,10 +260,7 @@ export class WorkspaceCreator {
     // a miss (disabled agent, dangling slug, incompatible wire) warns + skips,
     // the workspace stays usable.
     try {
-      const [userDefaults, defaultContextWindow] = await Promise.all([
-        readWorkspaceCredentialDefaults(),
-        readWorkspaceDefaultContextWindow(),
-      ]);
+      const userDefaults = await readWorkspaceCredentialDefaults();
       const effective: Record<string, AgentCredentialDecl> = {
         ...userDefaults,
         ...(template.agentCredentials ?? {}),
@@ -278,7 +274,6 @@ export class WorkspaceCreator {
           adapterRegistry: this.opts.adapterRegistry,
           credentials,
           logger: log,
-          defaultContextWindow,
         });
       }
     } catch (err) {

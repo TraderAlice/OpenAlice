@@ -1956,6 +1956,9 @@ export function createWorkspaceRoutes(
           wires: credentialWires(cred), // shape → endpoint; the modal picks one per agent
           ...(cred.lastModel ? { lastModel: cred.lastModel } : {}),
           ...(resolvedModel ? { resolvedModel } : {}),
+          ...(typeof projected?.contextWindow === 'number'
+            ? { resolvedContextWindow: projected.contextWindow }
+            : {}),
           ...(typeof projected?.reasoning === 'boolean'
             ? { resolvedReasoning: projected.reasoning }
             : {}),

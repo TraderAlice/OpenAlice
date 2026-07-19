@@ -245,7 +245,7 @@ describe('WorkspaceAIConfigModal local model metadata', () => {
 
     const effort = await screen.findByRole('combobox', { name: 'Pi 思考强度' })
     expect((effort as HTMLSelectElement).value).toBe('')
-    expect(screen.getByText('运行时默认（提供方未公布）')).toBeTruthy()
+    expect((effort as HTMLSelectElement).selectedOptions[0]?.textContent).toBe('运行时默认（提供方未公布）')
   })
 
   it('saves a context-only change directly without probing the provider again', async () => {

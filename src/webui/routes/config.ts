@@ -4,13 +4,11 @@ import {
   readCredentials, addCredential, deleteCredential, writeCredential, resolveCredential,
   credentialWires,
   readWorkspaceCredentialDefaults, writeWorkspaceCreationDefaults,
-  readWorkspaceDefaultContextWindow, workspaceContextWindowSchema,
   readIssueDefaultAgent, writeIssueDefaultAgent,
   readWorkspaceDefaultAgent, writeWorkspaceDefaultAgent,
   credentialVendorEnum, credentialWireShapeEnum,
   type ConfigSection, type Credential, type CredentialWireShape,
   type WorkspaceCredentialDefault,
-  type WorkspaceContextWindow,
 } from '../../core/config.js'
 import { compatibleCredentials, pickAgentWire, resolveInjectionModel } from '../../workspaces/credential-injection.js'
 
@@ -240,16 +238,15 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
    */
   app.get('/workspace-credential-defaults', async (c) => {
     try {
-      const [defaults, creds, contextWindow] = await Promise.all([
+      const [defaults, creds] = await Promise.all([
         readWorkspaceCredentialDefaults(),
         readCredentials(),
-        readWorkspaceDefaultContextWindow(),
       ])
       const compatibleByAgent: Record<string, string[]> = {}
       for (const agent of DEFAULTABLE_AGENTS) {
         compatibleByAgent[agent] = compatibleCredentials(creds, agent).map(([slug]) => slug)
       }
-      return c.json({ defaults, compatibleByAgent, contextWindow })
+      return c.json({ defaults, compatibleByAgent })
     } catch (err) {
       return c.json({ error: String(err) }, 500)
     }
@@ -264,11 +261,7 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
     try {
       const body = await c.req.json<{
         defaults?: Record<string, WorkspaceCredentialDefault>
-        contextWindow?: WorkspaceContextWindow
       }>()
-      const contextWindow = workspaceContextWindowSchema.parse(
-        body.contextWindow ?? await readWorkspaceDefaultContextWindow(),
-      )
       const credentials = await readCredentials()
       const incoming = body.defaults ?? {}
       const next: Record<string, WorkspaceCredentialDefault> = {}
@@ -293,10 +286,20 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
             credential?.vendor,
             selectedModel,
           )?.reasoning
+          if (def.contextWindow !== undefined && (
+            typeof def.contextWindow !== 'number' ||
+            !Number.isFinite(def.contextWindow) ||
+            def.contextWindow <= 0
+          )) {
+            return c.json({ error: `Invalid context window for ${agent}` }, 400)
+          }
           next[agent] = {
             credentialSlug: def.credentialSlug,
             ...(typeof def.model === 'string' && def.model ? { model: def.model } : {}),
             ...(parsedWire.success ? { wireShape: parsedWire.data } : {}),
+            ...((agent === 'pi' || agent === 'opencode') && def.contextWindow !== undefined
+              ? { contextWindow: def.contextWindow }
+              : {}),
             ...((agent === 'pi' || agent === 'opencode') &&
               !reasoningIsRegistered &&
               typeof selectedModel === 'string' &&
@@ -306,8 +309,8 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
           }
         }
       }
-      await writeWorkspaceCreationDefaults(next, contextWindow)
-      return c.json({ defaults: next, contextWindow })
+      await writeWorkspaceCreationDefaults(next)
+      return c.json({ defaults: next })
     } catch (err) {
       return c.json({ error: String(err) }, 400)
     }

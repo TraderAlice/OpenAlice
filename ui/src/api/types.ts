@@ -200,7 +200,6 @@ export interface AppConfig {
   aiProvider: AIProviderConfig
   engine: Record<string, unknown>
   agent: { allowAiTrading: boolean; claudeCode: Record<string, unknown> }
-  compaction: { maxContextTokens: number; maxOutputTokens: number }
   trading: {
     mode?: TradingMode
     observeExternalOrdersEvery: string

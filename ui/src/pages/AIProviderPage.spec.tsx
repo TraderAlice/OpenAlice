@@ -45,11 +45,9 @@ beforeEach(async () => {
   mocks.getWorkspaceCredentialDefaults.mockResolvedValue({
     defaults: {},
     compatibleByAgent: { pi: ['google-1'], opencode: ['google-1'] },
-    contextWindow: 256_000,
   })
-  mocks.setWorkspaceCredentialDefaults.mockImplementation(async (defaults, contextWindow) => ({
+  mocks.setWorkspaceCredentialDefaults.mockImplementation(async (defaults) => ({
     defaults,
-    contextWindow,
   }))
 })
 
@@ -78,7 +76,6 @@ describe('AIProviderPage defaults', () => {
 
     await waitFor(() => expect(mocks.setWorkspaceCredentialDefaults).toHaveBeenCalledWith(
       { pi: { credentialSlug: 'google-1', wireShape: 'google-generative-ai' } },
-      256_000,
     ))
     expect(await screen.findByText('已保存')).toBeTruthy()
   })

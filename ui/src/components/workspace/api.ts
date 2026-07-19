@@ -1202,6 +1202,8 @@ export interface SavedCredential {
   readonly lastModel?: string;
   /** Model injection resolves right now (lastModel, then the vendor default). */
   readonly resolvedModel?: string;
+  /** Registered or explicitly model-scoped context limit projected for this runtime. */
+  readonly resolvedContextWindow?: number;
   /** Registered reasoning metadata this runtime would receive on injection. */
   readonly resolvedReasoning?: boolean;
   readonly resolvedReasoningEffort?: ModelReasoningEffort;

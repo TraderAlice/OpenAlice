@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import { configApi, type WorkspaceContextWindow, type WorkspaceCredentialDefault } from '../api/config'
+import { configApi, type WorkspaceCredentialDefault } from '../api/config'
 import type { ModelReasoningEffort, ModelReasoningMode } from '../api'
 import { preferencesApi, type QuickChatPreferences } from '../api/preferences'
 import {
@@ -23,7 +23,6 @@ import {
   type WorkspaceAgentConfigChangedDetail,
 } from '../lib/workspaceAiEvents'
 
-const DEFAULT_CONTEXT_WINDOW: WorkspaceContextWindow = 256_000
 const AGENT_LAUNCH_PREFERENCES_CHANGED_EVENT = 'openalice:agent-launch-preferences-changed'
 
 export interface AgentLaunchAiDetails {
@@ -120,11 +119,10 @@ export function resolveAgentLaunchAiDetails(
   effectiveCredential: string | null,
   credential: Pick<
     SavedCredential,
-    'slug' | 'resolvedModel' | 'resolvedReasoning' | 'resolvedReasoningEffort' | 'resolvedReasoningMode'
+    'slug' | 'resolvedModel' | 'resolvedContextWindow' | 'resolvedReasoning' | 'resolvedReasoningEffort' | 'resolvedReasoningMode'
   > | null,
   detected: WorkspaceCredentialDetection | null,
   creationDefault: WorkspaceCredentialDefault | undefined,
-  defaultContextWindow: number,
   hasWorkspace: boolean,
 ): AgentLaunchAiDetails | null {
   // Claude/Codex retain native login fallback and never receive an ad-hoc
@@ -169,7 +167,7 @@ export function resolveAgentLaunchAiDetails(
   )) {
     return {
       model: detected.model,
-      contextWindow: detected.contextWindow ?? defaultContextWindow,
+      contextWindow: detected.contextWindow,
       ...workspaceReasoningDetails(detected),
       source: 'workspace',
     }
@@ -178,7 +176,7 @@ export function resolveAgentLaunchAiDetails(
   if (hasWorkspace && detected?.slug === effectiveCredential) {
     return {
       model: detected.model ?? credential.resolvedModel ?? null,
-      contextWindow: detected.contextWindow ?? defaultContextWindow,
+      contextWindow: detected.contextWindow ?? credential.resolvedContextWindow ?? null,
       ...workspaceReasoningDetails(detected),
       source: 'workspace',
     }
@@ -188,7 +186,7 @@ export function resolveAgentLaunchAiDetails(
     : undefined
   return {
     model: creationModel ?? credential.resolvedModel ?? null,
-    contextWindow: defaultContextWindow,
+    contextWindow: creationDefault?.contextWindow ?? credential.resolvedContextWindow ?? null,
     ...injectedReasoningDetails(credential),
     source: 'new-injection',
   }
@@ -344,7 +342,6 @@ export function useAgentLaunchConfig({
     agentReadiness: AgentCredentialReadiness | null
   } | null>(null)
   const [workspaceCredentialDefaults, setWorkspaceCredentialDefaults] = useState<Record<string, WorkspaceCredentialDefault>>({})
-  const [workspaceDefaultContextWindow, setWorkspaceDefaultContextWindow] = useState<WorkspaceContextWindow>(DEFAULT_CONTEXT_WINDOW)
   const [agentConfigRevision, setAgentConfigRevision] = useState(0)
 
   const effectiveAgent = resolveAgentRuntime(agents, selectedAgentId, defaultAgent, runtimeReadiness)
@@ -409,7 +406,6 @@ export function useAgentLaunchConfig({
         .then((defaults) => {
           if (!live) return
           setWorkspaceCredentialDefaults(defaults.defaults)
-          setWorkspaceDefaultContextWindow(defaults.contextWindow)
         })
         .catch(() => undefined)
     }
@@ -490,7 +486,6 @@ export function useAgentLaunchConfig({
     credential,
     detectedCredential,
     effectiveAgent ? workspaceCredentialDefaults[effectiveAgent] : undefined,
-    workspaceDefaultContextWindow,
     hasWorkspace,
   )
   const noCredentials = needsCredential &&

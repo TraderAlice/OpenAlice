@@ -81,14 +81,19 @@ describe('credentialToWorkspaceAiCred', () => {
 
   describe('opencode / pi → supports selectable provider wires', () => {
     for (const agent of ['opencode', 'pi']) {
-      it(`${agent}: picks openai-chat, sets neither authMode nor wireApi`, () => {
+      it(`${agent}: leaves an unknown model's context to the native runtime`, () => {
         const cred = credentialToWorkspaceAiCred(chatOnlyGateway, agent, { model: 'some-model' })!
         expect(cred.wireShape).toBe('openai-chat')
         expect(cred.authMode).toBeUndefined()
         expect(cred.wireApi).toBeUndefined()
-        expect(cred.contextWindow).toBe(256_000)
+        expect(cred.contextWindow).toBeUndefined()
         expect(cred.apiKey).toBe('k')
         expect(cred.baseUrl).toBe('https://gw.example.com/v1')
+      })
+
+      it(`${agent}: uses the complete registered context instead of a cross-model cap`, () => {
+        const cred = credentialToWorkspaceAiCred(openaiKey, agent, { model: 'gpt-5.6' })!
+        expect(cred.contextWindow).toBe(1_050_000)
       })
 
       it(`${agent}: defaults MiniMax to its Anthropic coding-agent wire`, () => {

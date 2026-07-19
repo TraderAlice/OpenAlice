@@ -148,7 +148,6 @@ export const configKeysHandlers = [
       aiProvider: { apiKeys: {}, profiles: {}, activeProfile: '' },
       engine: {},
       agent: { allowAiTrading: false, claudeCode: {} },
-      compaction: { maxContextTokens: 0, maxOutputTokens: 0 },
       snapshot: { enabled: false, every: '1h' },
       trading: { observeExternalOrdersEvery: '15m' },
       mcp: { enabled: false, port: 47332 },
@@ -192,14 +191,12 @@ export const configKeysHandlers = [
         opencode: ['anthropic-1', 'openai-1'],
         pi: ['anthropic-1', 'openai-1'],
       },
-      contextWindow: 256_000,
     }),
   ),
   http.put('/api/config/workspace-credential-defaults', async ({ request }) => {
-    const body = (await request.json().catch(() => ({}))) as { defaults?: unknown; contextWindow?: unknown }
+    const body = (await request.json().catch(() => ({}))) as { defaults?: unknown }
     return HttpResponse.json({
       defaults: body.defaults ?? {},
-      contextWindow: typeof body.contextWindow === 'number' ? body.contextWindow : 256_000,
     })
   }),
 

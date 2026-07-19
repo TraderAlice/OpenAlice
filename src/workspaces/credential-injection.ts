@@ -18,7 +18,6 @@
 import { resolveAnthropicAuthMode } from '@/core/credential-inference.js'
 import {
   credentialWires,
-  DEFAULT_WORKSPACE_CONTEXT_WINDOW,
   type Credential,
   type CredentialWireShape,
 } from '@/core/config.js'
@@ -86,12 +85,6 @@ function wireEndpoint(
   }
   return undefined
 }
-
-// Modern coding models are commonly sold as long-context runtimes. Pi defaults
-// unknown custom models to 128k and opencode defaults unknown limits to 0, so
-// new OpenAlice injections state the assumption explicitly while keeping the
-// field overridable from the workspace config UI.
-export const DEFAULT_CONTEXT_WINDOW = DEFAULT_WORKSPACE_CONTEXT_WINDOW
 
 /**
  * The subset of a credential vault an agent can actually be driven by: those
@@ -175,7 +168,7 @@ export interface CredentialInjectionOverrides {
   model?: string
   /** Explicit protocol when a credential exposes several agent-compatible wires. */
   wireShape?: CredentialWireShape
-  /** Context window to write for custom-model runtimes; defaults to 256K for opencode/Pi. */
+  /** Explicit model-specific context preference for custom-model runtimes. */
   contextWindow?: number | null
   /** Unknown-model override for Pi/opencode. Registered model facts win. */
   reasoning?: boolean | null
@@ -212,7 +205,8 @@ export function credentialToWorkspaceAiCred(
   }
 
   if (agentId === 'opencode' || agentId === 'pi') {
-    cred.contextWindow = overrides.contextWindow ?? DEFAULT_CONTEXT_WINDOW
+    const explicitContextWindow = positiveNumber(overrides.contextWindow)
+    if (explicitContextWindow !== null) cred.contextWindow = explicitContextWindow
     if (typeof overrides.reasoning === 'boolean') cred.reasoning = overrides.reasoning
   }
   if (overrides.reasoningEffort) cred.reasoningEffort = overrides.reasoningEffort
@@ -290,7 +284,6 @@ export async function injectWorkspaceCredentials(opts: {
   readonly adapterRegistry: AdapterRegistry
   readonly credentials: Record<string, Credential>
   readonly logger: Logger
-  readonly defaultContextWindow?: number
 }): Promise<void> {
   const { dir, agents, agentCredentials, adapterRegistry, credentials, logger } = opts
   for (const [agentId, decl] of Object.entries(agentCredentials)) {
@@ -322,9 +315,7 @@ export async function injectWorkspaceCredentials(opts: {
       ...(decl.wireShape !== undefined ? { wireShape: decl.wireShape } : {}),
       ...(decl.contextWindow !== undefined
         ? { contextWindow: decl.contextWindow }
-        : opts.defaultContextWindow !== undefined
-          ? { contextWindow: opts.defaultContextWindow }
-          : {}),
+        : {}),
       ...(reasoningMatchesModel ? { reasoning: decl.reasoning } : {}),
       ...(decl.authMode !== undefined ? { authMode: decl.authMode } : {}),
       ...(decl.wireApi !== undefined ? { wireApi: decl.wireApi } : {}),

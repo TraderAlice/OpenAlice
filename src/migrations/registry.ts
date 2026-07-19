@@ -14,7 +14,7 @@
  * deletion + Workspace pivot turned the pre-0.40 data shapes over completely, so
  * pre-0.40 installs rebuild `data/` rather than migrate. The framework stays for
  * future upgrades. Numbering continues FORWARD from the highest id ever shipped
- * (next: 0023) — never reuse a retired id, since existing installs' journals
+ * (next: 0026) — never reuse a retired id, since existing installs' journals
  * recorded the old ones.
  */
 
@@ -36,6 +36,7 @@ import { migration as migration_0021_workspace_departure_catalog } from './0021_
 import { migration as migration_0022_connector_service_config } from './0022_connector_service_config/index.js'
 import { migration as migration_0023_google_native_credentials } from './0023_google_native_credentials/index.js'
 import { migration as migration_0024_pi_native_workspace_config } from './0024_pi_native_workspace_config/index.js'
+import { migration as migration_0025_retire_global_compaction_config } from './0025_retire_global_compaction_config/index.js'
 
 export const REGISTRY: Migration[] = [
   migration_0008_disable_targetless_cron_jobs,
@@ -55,4 +56,5 @@ export const REGISTRY: Migration[] = [
   migration_0022_connector_service_config,
   migration_0023_google_native_credentials,
   migration_0024_pi_native_workspace_config,
+  migration_0025_retire_global_compaction_config,
 ]

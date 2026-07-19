@@ -1,7 +1,5 @@
 import {
-  DEFAULT_WORKSPACE_CONTEXT_WINDOW,
   readCredentials,
-  readWorkspaceDefaultContextWindow,
   setCredentialLastModel,
   type Credential,
 } from '@/core/config.js'
@@ -81,14 +79,12 @@ export function isUsableWorkspaceAiCred(agentId: string, cred: WorkspaceAiCred |
 function injectableCredentials(
   credentials: Record<string, Credential>,
   agentId: string,
-  contextWindow = DEFAULT_WORKSPACE_CONTEXT_WINDOW,
 ): Array<[string, Credential, WorkspaceAiCred]> {
   const out: Array<[string, Credential, WorkspaceAiCred]> = []
   for (const [slug, credential] of compatibleCredentials(credentials, agentId)) {
     const model = resolveInjectionModel(credential)
     const wsCred = credentialToWorkspaceAiCred(credential, agentId, {
       ...(model ? { model } : {}),
-      contextWindow,
     })
     if (wsCred && isUsableWorkspaceAiCred(agentId, wsCred)) out.push([slug, credential, wsCred])
   }
@@ -215,13 +211,10 @@ export async function ensureAgentCredentialReady(opts: {
     throw new AgentCredentialError(agentId, `agent "${agentId}" cannot accept an injected AI credential`)
   }
 
-  const [credentials, contextWindow] = await Promise.all([
-    readCredentials(),
-    readWorkspaceDefaultContextWindow(),
-  ])
+  const credentials = await readCredentials()
   const cfg = await readWorkspaceConfig(meta, adapter)
   const compatible = compatibleCredentials(credentials, agentId)
-  const injectable = injectableCredentials(credentials, agentId, contextWindow)
+  const injectable = injectableCredentials(credentials, agentId)
   const injectableMap = new Map(injectable.map(([slug, credential, wsCred]) => [slug, { credential, wsCred }]))
   const detectedCredentialSlug = matchCredentialByApiKey(credentials, cfg?.apiKey)
   const picked = pickedCredentialSlug && injectableMap.has(pickedCredentialSlug) ? pickedCredentialSlug : null

@@ -173,7 +173,6 @@ beforeEach(async () => {
   mocks.getWorkspaceCredentialDefaults.mockResolvedValue({
     defaults: {},
     compatibleByAgent: {},
-    contextWindow: 256_000,
   })
   mocks.getQuickChat.mockResolvedValue({ lastCredentialByAgent: {}, recentChatWorkspaceId: null })
   mocks.rememberQuickChatCredential.mockResolvedValue(undefined)

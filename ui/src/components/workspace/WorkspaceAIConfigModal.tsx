@@ -76,7 +76,6 @@ const inputClass =
   'w-full bg-secondary border border-border rounded-md px-3 py-2 text-[13px] text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary'
 
 const TAB_LABEL: Record<Tab, string> = { claude: 'Claude Code', codex: 'Codex', opencode: 'opencode', pi: 'Pi' }
-const DEFAULT_CONTEXT_WINDOW = 256_000
 const CONTEXT_WINDOW_OPTIONS = [
   { value: 128_000, label: '128K' },
   { value: 256_000, label: '256K' },
@@ -88,7 +87,8 @@ export interface FormState {
   baseUrl: string
   apiKey: string
   model: string
-  contextWindow: number
+  /** Null lets registered model semantics or the native runtime decide. */
+  contextWindow: number | null
   /** null = let registry/runtime decide; boolean = unknown-model override. */
   reasoning: boolean | null
   /** null = fill from the registered model default when one is known. */
@@ -115,7 +115,7 @@ const EMPTY_FORM: FormState = {
   baseUrl: '',
   apiKey: '',
   model: '',
-  contextWindow: DEFAULT_CONTEXT_WINDOW,
+  contextWindow: null,
   reasoning: null,
   reasoningEffort: null,
   wireShape: 'anthropic',
@@ -123,9 +123,14 @@ const EMPTY_FORM: FormState = {
   authMode: 'x-api-key',
 }
 
-function normalizeContextWindow(value: number | null | undefined): number {
-  if (typeof value !== 'number') return DEFAULT_CONTEXT_WINDOW
-  return CONTEXT_WINDOW_OPTIONS.some((o) => o.value === value) ? value : DEFAULT_CONTEXT_WINDOW
+function normalizeContextWindow(value: number | null | undefined): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null
+}
+
+function formatContextWindow(value: number): string {
+  if (value >= 1_000_000) return `${Number((value / 1_000_000).toFixed(2))}M`
+  if (value >= 1_000) return `${Number((value / 1_000).toFixed(1))}K`
+  return String(value)
 }
 
 export function configToForm(cfg: AgentConfig | null, tab: Tab): FormState {
@@ -154,7 +159,7 @@ export function formToConfig(form: FormState, agent: AgentId): AgentConfig {
   if (agent === 'opencode' || agent === 'pi') {
     return {
       ...cfg,
-      contextWindow: form.contextWindow,
+      ...(form.contextWindow !== null ? { contextWindow: form.contextWindow } : {}),
       ...(typeof form.reasoning === 'boolean' ? { reasoning: form.reasoning } : {}),
       ...(form.wireShape === 'anthropic' ? { authMode: form.authMode } : {}),
     }
@@ -385,6 +390,7 @@ export function WorkspaceAIConfigModal({
       baseUrl: picked.baseUrl,
       apiKey: cred.apiKey ?? '',
       model: defaultModel,
+      contextWindow: null,
       reasoning: null,
       reasoningEffort: null,
       wireShape: picked.shape,
@@ -885,6 +891,7 @@ export function WorkspaceAIConfigModal({
               onChange={(v) => setForm({
                 ...form,
                 model: v,
+                contextWindow: v === form.model ? form.contextWindow : null,
                 reasoning: v === form.model ? form.reasoning : null,
                 reasoningEffort: v === form.model ? form.reasoningEffort : null,
               })}
@@ -995,10 +1002,20 @@ export function WorkspaceAIConfigModal({
               <label className="block text-xs font-medium text-muted-foreground mb-1">{t('workspaceSettings.ai.contextWindow')}</label>
               <select
                 aria-label={t('workspaceSettings.ai.contextWindowLabel', { agent: TAB_LABEL[tab] })}
-                value={form.contextWindow}
-                onChange={(e) => setForm({ ...form, contextWindow: Number(e.target.value) })}
+                value={form.contextWindow ?? ''}
+                onChange={(e) => setForm({
+                  ...form,
+                  contextWindow: e.target.value ? Number(e.target.value) : null,
+                })}
                 className={inputClass}
               >
+                <option value="">
+                  {selectedModelSemantics?.contextWindow
+                    ? t('workspaceSettings.ai.contextAutomatic', {
+                      limit: formatContextWindow(selectedModelSemantics.contextWindow),
+                    })
+                    : t('workspaceSettings.ai.runtimeDefaultOption')}
+                </option>
                 {CONTEXT_WINDOW_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}

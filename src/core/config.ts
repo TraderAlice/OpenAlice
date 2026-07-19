@@ -184,21 +184,14 @@ export const workspaceCredentialDefaultSchema = z.object({
   model: z.string().optional(),
   /** Optional explicit protocol when a credential exposes more than one wire. */
   wireShape: credentialWireShapeEnum.optional(),
+  /** Optional model-specific context preference for Pi/opencode. */
+  contextWindow: z.number().positive().optional(),
   /** Unknown-model reasoning override for Pi/opencode; known models auto-resolve. */
   reasoning: z.boolean().optional(),
   /** Model id the unknown-model override was decided for. */
   reasoningModel: z.string().optional(),
 })
 export type WorkspaceCredentialDefault = z.infer<typeof workspaceCredentialDefaultSchema>
-
-export const DEFAULT_WORKSPACE_CONTEXT_WINDOW = 256_000
-export const workspaceContextWindowSchema = z.union([
-  z.literal(128_000),
-  z.literal(256_000),
-  z.literal(512_000),
-  z.literal(1_000_000),
-])
-export type WorkspaceContextWindow = z.infer<typeof workspaceContextWindowSchema>
 
 export const aiProviderSchema = z.object({
   apiKeys: apiKeysSchema.default({}),
@@ -218,12 +211,6 @@ export const aiProviderSchema = z.object({
    * `credentials`; a dangling slug is loud-skipped at injection, never fatal.
    */
   workspaceCredentialDefaults: z.record(z.string(), workspaceCredentialDefaultSchema).default({}),
-  /**
-   * Context limit written into newly injected opencode/Pi custom models. Keep
-   * the default below the common 256K price-tier boundary; users can opt into
-   * a larger window explicitly without changing existing workspaces.
-   */
-  workspaceDefaultContextWindow: workspaceContextWindowSchema.default(DEFAULT_WORKSPACE_CONTEXT_WINDOW),
   /**
    * User-level default runtime for new interactive workspace sessions. This is
    * intentionally separate from workspace identity (`agents[]`) and from
@@ -351,13 +338,6 @@ const marketDataSchema = z.object({
     enabled: z.boolean().default(true),
     baseUrl: z.string().default('https://traderhub.openalice.ai'),
   }).default({ enabled: true, baseUrl: 'https://traderhub.openalice.ai' }),
-})
-
-const compactionSchema = z.object({
-  maxContextTokens: z.number().default(200_000),
-  maxOutputTokens: z.number().default(20_000),
-  autoCompactBuffer: z.number().default(13_000),
-  microcompactKeepRecent: z.number().default(3),
 })
 
 /** MCP server config — exports OpenAlice's ToolCenter to MCP clients. */
@@ -489,7 +469,6 @@ export type Config = {
   crypto: z.infer<typeof cryptoSchema>
   securities: z.infer<typeof securitiesSchema>
   marketData: z.infer<typeof marketDataSchema>
-  compaction: z.infer<typeof compactionSchema>
   aiProvider: z.infer<typeof aiProviderSchema>
   snapshot: z.infer<typeof snapshotSchema>
   trading: z.infer<typeof tradingSchema>
@@ -538,7 +517,7 @@ async function loadConfigUnlocked(): Promise<Config> {
   // is pending. See src/migrations/INDEX.md for the full list.
   await runMigrations()
 
-  const files = ['engine.json', 'agent.json', 'crypto.json', 'securities.json', 'market-data.json', 'compaction.json', 'ai-provider-manager.json', 'snapshot.json', 'mcp.json', 'ports.json', 'news.json', 'tools.json', 'trading.json'] as const
+  const files = ['engine.json', 'agent.json', 'crypto.json', 'securities.json', 'market-data.json', 'ai-provider-manager.json', 'snapshot.json', 'mcp.json', 'ports.json', 'news.json', 'tools.json', 'trading.json'] as const
   const raws = await Promise.all(files.map((f) => loadJsonFile(f)))
 
   const config: Config = {
@@ -547,14 +526,13 @@ async function loadConfigUnlocked(): Promise<Config> {
     crypto:        await parseAndSeed(files[2], cryptoSchema, raws[2]),
     securities:    await parseAndSeed(files[3], securitiesSchema, raws[3]),
     marketData:    await applyGlobalProviderKeys(await parseAndSeed(files[4], marketDataSchema, raws[4])),
-    compaction:    await parseAndSeed(files[5], compactionSchema, raws[5]),
-    aiProvider:    await parseAndSeed(files[6], aiProviderSchema, raws[6]),
-    snapshot:      await parseAndSeed(files[7], snapshotSchema, raws[7]),
-    mcp:           await parseAndSeed(files[8], mcpSchema, raws[8]),
-    ports:         await parseAndSeed(files[9], portsSchema, raws[9]),
-    news:          await parseAndSeed(files[10], newsCollectorSchema, raws[10]),
-    tools:         await parseAndSeed(files[11], toolsSchema, raws[11]),
-    trading:       await parseAndSeed(files[12], tradingSchema, raws[12]),
+    aiProvider:    await parseAndSeed(files[5], aiProviderSchema, raws[5]),
+    snapshot:      await parseAndSeed(files[6], snapshotSchema, raws[6]),
+    mcp:           await parseAndSeed(files[7], mcpSchema, raws[7]),
+    ports:         await parseAndSeed(files[8], portsSchema, raws[8]),
+    news:          await parseAndSeed(files[9], newsCollectorSchema, raws[9]),
+    tools:         await parseAndSeed(files[10], toolsSchema, raws[10]),
+    trading:       await parseAndSeed(files[11], tradingSchema, raws[11]),
   }
 
   // Spawn-time-fixed channel: when guardian (Electron main) spawns the
@@ -1006,24 +984,9 @@ export async function writeWorkspaceCredentialDefaults(
   await writeFile(resolve(CONFIG_DIR, 'ai-provider-manager.json'), JSON.stringify(config, null, 2) + '\n')
 }
 
-export async function readWorkspaceDefaultContextWindow(): Promise<WorkspaceContextWindow> {
-  const config = await readAIProviderConfig()
-  return config.workspaceDefaultContextWindow
-}
-
-export async function writeWorkspaceDefaultContextWindow(
-  contextWindow: WorkspaceContextWindow,
-): Promise<void> {
-  const config = await readAIProviderConfig()
-  config.workspaceDefaultContextWindow = workspaceContextWindowSchema.parse(contextWindow)
-  await mkdir(CONFIG_DIR, { recursive: true })
-  await writeFile(resolve(CONFIG_DIR, 'ai-provider-manager.json'), JSON.stringify(config, null, 2) + '\n')
-}
-
-/** Atomically replace the two defaults that seed newly created Workspaces. */
+/** Replace the per-agent defaults that seed newly created Workspaces. */
 export async function writeWorkspaceCreationDefaults(
   defaults: Record<string, WorkspaceCredentialDefault>,
-  contextWindow: WorkspaceContextWindow,
 ): Promise<void> {
   const config = await readAIProviderConfig()
   const cleaned: Record<string, WorkspaceCredentialDefault> = {}
@@ -1032,7 +995,6 @@ export async function writeWorkspaceCreationDefaults(
     if (parsed.credentialSlug) cleaned[agentId] = parsed
   }
   config.workspaceCredentialDefaults = cleaned
-  config.workspaceDefaultContextWindow = workspaceContextWindowSchema.parse(contextWindow)
   await mkdir(CONFIG_DIR, { recursive: true })
   await writeFile(resolve(CONFIG_DIR, 'ai-provider-manager.json'), JSON.stringify(config, null, 2) + '\n')
 }
@@ -1071,7 +1033,6 @@ const sectionSchemas: Record<ConfigSection, z.ZodTypeAny> = {
   crypto: cryptoSchema,
   securities: securitiesSchema,
   marketData: marketDataSchema,
-  compaction: compactionSchema,
   aiProvider: aiProviderSchema,
   snapshot: snapshotSchema,
   trading: tradingSchema,
@@ -1087,7 +1048,6 @@ const sectionFiles: Record<ConfigSection, string> = {
   crypto: 'crypto.json',
   securities: 'securities.json',
   marketData: 'market-data.json',
-  compaction: 'compaction.json',
   aiProvider: 'ai-provider-manager.json',
   snapshot: 'snapshot.json',
   trading: 'trading.json',

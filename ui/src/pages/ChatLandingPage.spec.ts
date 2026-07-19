@@ -226,7 +226,11 @@ describe('resolveExplicitLoginBackedCredential', () => {
 })
 
 describe('resolveAgentLaunchAiDetails', () => {
-  const credential = { slug: 'google-1', resolvedModel: 'gemini-3.5-flash' }
+  const credential = {
+    slug: 'google-1',
+    resolvedModel: 'gemini-3.5-flash',
+    resolvedContextWindow: 1_048_576,
+  }
 
   it('shows the effective model and context already written in the target workspace', () => {
     expect(resolveAgentLaunchAiDetails(
@@ -241,7 +245,6 @@ describe('resolveAgentLaunchAiDetails', () => {
         wireShape: 'google-generative-ai',
       },
       { credentialSlug: 'google-1', model: 'gemini-3.1-pro-preview' },
-      512_000,
       true,
     )).toEqual({
       model: 'gemini-3.1-flash-lite',
@@ -250,7 +253,7 @@ describe('resolveAgentLaunchAiDetails', () => {
     })
   })
 
-  it('shows the selected credential model and global context for a replacement injection', () => {
+  it('shows the selected model registry context for a replacement injection', () => {
     expect(resolveAgentLaunchAiDetails(
       true,
       'google-1',
@@ -263,11 +266,10 @@ describe('resolveAgentLaunchAiDetails', () => {
         wireShape: 'openai-chat',
       },
       undefined,
-      256_000,
       true,
     )).toEqual({
       model: 'gemini-3.5-flash',
-      contextWindow: 256_000,
+      contextWindow: 1_048_576,
       source: 'new-injection',
     })
   })
@@ -290,11 +292,10 @@ describe('resolveAgentLaunchAiDetails', () => {
         wireShape: 'openai-chat',
       },
       undefined,
-      256_000,
       true,
     )).toEqual({
       model: 'gemini-3.5-flash',
-      contextWindow: 256_000,
+      contextWindow: 1_048_576,
       reasoning: true,
       reasoningEffort: 'minimal',
       reasoningMode: 'adaptive',
@@ -318,7 +319,6 @@ describe('resolveAgentLaunchAiDetails', () => {
         reasoningMode: 'adaptive',
       },
       undefined,
-      256_000,
       true,
     )).toEqual({
       model: 'gemini-3.5-flash',
@@ -336,8 +336,7 @@ describe('resolveAgentLaunchAiDetails', () => {
       'google-1',
       credential,
       null,
-      { credentialSlug: 'google-1', model: 'gemini-3.1-pro-preview' },
-      512_000,
+      { credentialSlug: 'google-1', model: 'gemini-3.1-pro-preview', contextWindow: 512_000 },
       false,
     )).toEqual({
       model: 'gemini-3.1-pro-preview',
@@ -359,7 +358,6 @@ describe('resolveAgentLaunchAiDetails', () => {
         wireShape: 'openai-chat',
       },
       undefined,
-      256_000,
       true,
     )).toEqual({
       model: 'local-manual-model',
@@ -381,7 +379,6 @@ describe('resolveAgentLaunchAiDetails', () => {
         wireShape: 'anthropic',
       },
       { credentialSlug: 'minimax-1', model: 'MiniMax-M2.5' },
-      256_000,
       true,
     )).toEqual({
       model: 'MiniMax-M2.5',
@@ -403,7 +400,6 @@ describe('resolveAgentLaunchAiDetails', () => {
         wireShape: null,
       },
       undefined,
-      256_000,
       true,
     )).toBeNull()
   })
@@ -415,7 +411,6 @@ describe('resolveAgentLaunchAiDetails', () => {
       { slug: 'minimax-1', resolvedModel: 'MiniMax-M2.5' },
       null,
       { credentialSlug: 'minimax-1', model: 'MiniMax-M2.5' },
-      256_000,
       false,
     )).toEqual({
       model: 'MiniMax-M2.5',

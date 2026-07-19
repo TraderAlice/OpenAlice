@@ -696,45 +696,9 @@ function SettingsSection() {
         <PersonaEditor />
       </ConfigSection>
 
-      {/* Compaction */}
-      <ConfigSection title={t('settings.compaction.title')} description={t('settings.compaction.description')}>
-        <CompactionForm config={config} />
-      </ConfigSection>
-
       {/* Runtime version + manual update entry point */}
       <AboutOpenAliceSection />
     </div>
-  )
-}
-
-// ==================== Compaction Form ====================
-
-function CompactionForm({ config }: { config: AppConfig }) {
-  const { t } = useTranslation()
-  const [ctx, setCtx] = useState(String(config.compaction?.maxContextTokens || ''))
-  const [out, setOut] = useState(String(config.compaction?.maxOutputTokens || ''))
-
-  const data = useMemo(
-    () => ({ maxContextTokens: Number(ctx), maxOutputTokens: Number(out) }),
-    [ctx, out],
-  )
-
-  const save = useCallback(async (d: { maxContextTokens: number; maxOutputTokens: number }) => {
-    await api.config.updateSection('compaction', d)
-  }, [])
-
-  const { status, retry } = useAutoSave({ data, save })
-
-  return (
-    <>
-      <Field label={t('settings.compaction.maxContextTokens')}>
-        <input className={inputClass} type="number" step={1000} value={ctx} onChange={(e) => setCtx(e.target.value)} />
-      </Field>
-      <Field label={t('settings.compaction.maxOutputTokens')}>
-        <input className={inputClass} type="number" step={1000} value={out} onChange={(e) => setOut(e.target.value)} />
-      </Field>
-      <SaveIndicator status={status} onRetry={retry} />
-    </>
   )
 }
 

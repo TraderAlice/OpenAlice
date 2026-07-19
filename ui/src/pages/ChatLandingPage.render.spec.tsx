@@ -176,7 +176,6 @@ beforeEach(async () => {
   mocks.getWorkspaceCredentialDefaults.mockResolvedValue({
     defaults: {},
     compatibleByAgent: { pi: ['google-1'] },
-    contextWindow: 256_000,
   })
   mocks.getQuickChat.mockResolvedValue({
     lastCredentialByAgent: {},

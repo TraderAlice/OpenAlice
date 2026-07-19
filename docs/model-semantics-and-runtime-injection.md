@@ -99,6 +99,17 @@ resolved value:
 - Claude Code: project `effortLevel` (only values Claude can persist);
 - Codex: project `model_reasoning_effort`.
 
+Context-window and output limits follow the same ownership boundary. Registered
+model semantics provide known limits; an explicit Workspace preference may
+override the context registration for runtimes that support it; otherwise the
+native Agent fallback wins. Alice must not add a global context/output ceiling
+or run a parallel automatic compactor. Creation defaults may keep an explicit
+context preference only inside the selected agent/model binding; there is no
+cross-model context default. The retired `compaction.json` contract and
+`workspaceDefaultContextWindow` field are removed by migration
+`0025_retire_global_compaction_config`. Native Agent compaction events remain
+observable UI state, not an Alice policy layer.
+
 ## Registry Ownership
 
 `src/ai-providers/model-semantics.ts` is the curated, offline semantic registry.

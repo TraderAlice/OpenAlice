@@ -19,7 +19,6 @@ import { useTranslation } from 'react-i18next'
 import { api, type Preset, type WireShape } from '../api'
 import type {
   CredentialSummary,
-  WorkspaceContextWindow,
   WorkspaceCredentialDefault,
   WorkspaceCredentialDefaultsResponse,
 } from '../api/config'
@@ -288,7 +287,7 @@ function WorkspaceDefaultsSection({ credentials, presets }: { credentials: Crede
   const reload = () =>
     api.config.getWorkspaceCredentialDefaults()
       .then(setData)
-      .catch(() => setData({ defaults: {}, compatibleByAgent: {}, contextWindow: 256_000 }))
+      .catch(() => setData({ defaults: {}, compatibleByAgent: {} }))
 
   // Re-derive when the vault changes (a deleted cred drops from compatible lists,
   // and the backend also clears any default that pointed at it).
@@ -301,15 +300,14 @@ function WorkspaceDefaultsSection({ credentials, presets }: { credentials: Crede
 
   const persist = async (
     nextDefaults: Record<string, WorkspaceCredentialDefault>,
-    contextWindow: WorkspaceContextWindow,
   ) => {
     if (!data) return
     const revision = ++saveRevision.current
     setSaveStatus('saving'); setError('')
-    setData({ ...data, defaults: nextDefaults, contextWindow }) // optimistic
+    setData({ ...data, defaults: nextDefaults }) // optimistic
     try {
-      const res = await api.config.setWorkspaceCredentialDefaults(nextDefaults, contextWindow)
-      setData((d) => (d ? { ...d, defaults: res.defaults, contextWindow: res.contextWindow } : d))
+      const res = await api.config.setWorkspaceCredentialDefaults(nextDefaults)
+      setData((d) => (d ? { ...d, defaults: res.defaults } : d))
       notifyWorkspaceDefaultsChanged()
       if (saveRevision.current === revision) {
         setSaveStatus('saved')
@@ -334,7 +332,7 @@ function WorkspaceDefaultsSection({ credentials, presets }: { credentials: Crede
     } else {
       delete nextDefaults[agentId]
     }
-    await persist(nextDefaults, data.contextWindow)
+    await persist(nextDefaults)
   }
 
   const setAgentWire = async (agentId: string, wireShape: WireShape) => {
@@ -344,12 +342,7 @@ function WorkspaceDefaultsSection({ credentials, presets }: { credentials: Crede
     await persist({
       ...data.defaults,
       [agentId]: { ...current, wireShape },
-    }, data.contextWindow)
-  }
-
-  const setContextWindow = async (contextWindow: WorkspaceContextWindow) => {
-    if (!data) return
-    await persist(data.defaults, contextWindow)
+    })
   }
 
   const setReasoningOverride = async (
@@ -373,7 +366,7 @@ function WorkspaceDefaultsSection({ credentials, presets }: { credentials: Crede
           ? { reasoning, reasoningModel: modelId }
           : {}),
       },
-    }, data.contextWindow)
+    })
   }
 
   const renderAgent = (agent: { id: string; name: string }, note?: string) => {
@@ -497,27 +490,6 @@ function WorkspaceDefaultsSection({ credentials, presets }: { credentials: Crede
         </div>
       ) : (
         <div className="space-y-2.5">
-          <div className="flex flex-col gap-3 rounded-lg border border-border bg-background px-4 py-3 sm:flex-row sm:items-center">
-            <div className="min-w-0 flex-1">
-              <div className="text-[13px] font-medium text-foreground">{t('aiProvider.defaultContext')}</div>
-              <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
-                {t('aiProvider.contextDescription')}
-              </p>
-            </div>
-            <select
-              aria-label={t('aiProvider.contextWindowLabel')}
-              className={inputClass + ' w-full sm:w-[160px]'}
-              value={data.contextWindow}
-              disabled={saving}
-              onChange={(e) => void setContextWindow(Number(e.target.value) as WorkspaceContextWindow)}
-            >
-              <option value={128_000}>128K</option>
-              <option value={256_000}>256K</option>
-              <option value={512_000}>512K</option>
-              <option value={1_000_000}>1M</option>
-            </select>
-          </div>
-
           {PRIMARY_DEFAULT_AGENTS.map((a) => renderAgent(a))}
 
           <button
