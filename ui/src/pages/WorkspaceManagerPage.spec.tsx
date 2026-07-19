@@ -207,7 +207,7 @@ describe('WorkspaceManagerPage runtime selection', () => {
 
     const picker = await screen.findByRole('button', { name: 'Select agent' })
     expect(picker.textContent).toContain('Codex')
-    expect(screen.getByText('Model and context are managed by Codex')).toBeTruthy()
+    expect(screen.getByText('Model, reasoning, and context are managed by Codex')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Configure workspace AI' }))
     expect(mocks.openAgentConfig).toHaveBeenCalledWith('workspace-manager', 'codex', 'ai')
     fireEvent.click(picker)

@@ -272,6 +272,64 @@ describe('resolveAgentLaunchAiDetails', () => {
     })
   })
 
+  it('shows the registered reasoning preview that a replacement injection will write', () => {
+    expect(resolveAgentLaunchAiDetails(
+      true,
+      'google-1',
+      {
+        ...credential,
+        resolvedReasoning: true,
+        resolvedReasoningEffort: 'minimal',
+        resolvedReasoningMode: 'adaptive',
+      },
+      {
+        configured: true,
+        slug: 'openai-1',
+        model: 'gpt-5.5',
+        contextWindow: 1_000_000,
+        wireShape: 'openai-chat',
+      },
+      undefined,
+      256_000,
+      true,
+    )).toEqual({
+      model: 'gemini-3.5-flash',
+      contextWindow: 256_000,
+      reasoning: true,
+      reasoningEffort: 'minimal',
+      reasoningMode: 'adaptive',
+      source: 'new-injection',
+    })
+  })
+
+  it('keeps the Workspace reasoning policy next to its persisted effort', () => {
+    expect(resolveAgentLaunchAiDetails(
+      true,
+      'google-1',
+      credential,
+      {
+        configured: true,
+        slug: 'google-1',
+        model: 'gemini-3.5-flash',
+        contextWindow: 256_000,
+        wireShape: 'google-generative-ai',
+        reasoning: true,
+        reasoningEffort: 'medium',
+        reasoningMode: 'adaptive',
+      },
+      undefined,
+      256_000,
+      true,
+    )).toEqual({
+      model: 'gemini-3.5-flash',
+      contextWindow: 256_000,
+      reasoning: true,
+      reasoningEffort: 'medium',
+      reasoningMode: 'adaptive',
+      source: 'workspace',
+    })
+  })
+
   it('shows the configured creation model before the first workspace exists', () => {
     expect(resolveAgentLaunchAiDetails(
       true,

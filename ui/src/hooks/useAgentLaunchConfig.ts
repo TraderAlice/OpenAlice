@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { configApi, type WorkspaceContextWindow, type WorkspaceCredentialDefault } from '../api/config'
+import type { ModelReasoningEffort, ModelReasoningMode } from '../api'
 import { preferencesApi, type QuickChatPreferences } from '../api/preferences'
 import {
   detectWorkspaceCredential,
@@ -29,7 +30,38 @@ export interface AgentLaunchAiDetails {
   readonly model: string | null
   /** Null when the native runtime owns the limit and its project config does not declare one. */
   readonly contextWindow: number | null
+  readonly reasoning?: boolean
+  readonly reasoningEffort?: ModelReasoningEffort
+  readonly reasoningMode?: ModelReasoningMode
   readonly source: 'workspace' | 'new-injection'
+}
+
+function workspaceReasoningDetails(detected: WorkspaceCredentialDetection): Pick<
+  AgentLaunchAiDetails,
+  'reasoning' | 'reasoningEffort' | 'reasoningMode'
+> {
+  return {
+    ...(typeof detected.reasoning === 'boolean' ? { reasoning: detected.reasoning } : {}),
+    ...(detected.reasoningEffort ? { reasoningEffort: detected.reasoningEffort } : {}),
+    ...(detected.reasoningMode ? { reasoningMode: detected.reasoningMode } : {}),
+  }
+}
+
+function injectedReasoningDetails(credential: Pick<
+  SavedCredential,
+  'resolvedReasoning' | 'resolvedReasoningEffort' | 'resolvedReasoningMode'
+>): Pick<AgentLaunchAiDetails, 'reasoning' | 'reasoningEffort' | 'reasoningMode'> {
+  return {
+    ...(typeof credential.resolvedReasoning === 'boolean'
+      ? { reasoning: credential.resolvedReasoning }
+      : {}),
+    ...(credential.resolvedReasoningEffort
+      ? { reasoningEffort: credential.resolvedReasoningEffort }
+      : {}),
+    ...(credential.resolvedReasoningMode
+      ? { reasoningMode: credential.resolvedReasoningMode }
+      : {}),
+  }
 }
 
 /** Resolve the visible credential without allowing global defaults to flash
@@ -86,7 +118,10 @@ export function resolveAgentLaunchCredentialSlug(
 export function resolveAgentLaunchAiDetails(
   needsCredential: boolean,
   effectiveCredential: string | null,
-  credential: Pick<SavedCredential, 'slug' | 'resolvedModel'> | null,
+  credential: Pick<
+    SavedCredential,
+    'slug' | 'resolvedModel' | 'resolvedReasoning' | 'resolvedReasoningEffort' | 'resolvedReasoningMode'
+  > | null,
   detected: WorkspaceCredentialDetection | null,
   creationDefault: WorkspaceCredentialDefault | undefined,
   defaultContextWindow: number,
@@ -106,6 +141,7 @@ export function resolveAgentLaunchAiDetails(
             : null
         ),
         contextWindow: detected.contextWindow,
+        ...workspaceReasoningDetails(detected),
         source: 'workspace',
       }
     }
@@ -117,6 +153,7 @@ export function resolveAgentLaunchAiDetails(
       return {
         model: creationDefault.model ?? credential.resolvedModel ?? null,
         contextWindow: null,
+        ...injectedReasoningDetails(credential),
         source: 'new-injection',
       }
     }
@@ -133,6 +170,7 @@ export function resolveAgentLaunchAiDetails(
     return {
       model: detected.model,
       contextWindow: detected.contextWindow ?? defaultContextWindow,
+      ...workspaceReasoningDetails(detected),
       source: 'workspace',
     }
   }
@@ -141,6 +179,7 @@ export function resolveAgentLaunchAiDetails(
     return {
       model: detected.model ?? credential.resolvedModel ?? null,
       contextWindow: detected.contextWindow ?? defaultContextWindow,
+      ...workspaceReasoningDetails(detected),
       source: 'workspace',
     }
   }
@@ -150,6 +189,7 @@ export function resolveAgentLaunchAiDetails(
   return {
     model: creationModel ?? credential.resolvedModel ?? null,
     contextWindow: defaultContextWindow,
+    ...injectedReasoningDetails(credential),
     source: 'new-injection',
   }
 }

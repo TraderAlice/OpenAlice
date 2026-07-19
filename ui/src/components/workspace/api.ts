@@ -4,7 +4,7 @@
  * server from the SessionPool).
  */
 
-import type { ModelReasoningEffort, WireShape } from '../../api'
+import type { ModelReasoningEffort, ModelReasoningMode, WireShape } from '../../api'
 
 export interface Workspace {
   readonly id: string;
@@ -1202,6 +1202,10 @@ export interface SavedCredential {
   readonly lastModel?: string;
   /** Model injection resolves right now (lastModel, then the vendor default). */
   readonly resolvedModel?: string;
+  /** Registered reasoning metadata this runtime would receive on injection. */
+  readonly resolvedReasoning?: boolean;
+  readonly resolvedReasoningEffort?: ModelReasoningEffort;
+  readonly resolvedReasoningMode?: ModelReasoningMode;
   /** Omitted in the per-agent (`?agent=`) listing — only the unfiltered list returns it. */
   readonly apiKey?: string | null;
 }
@@ -1231,6 +1235,7 @@ export interface WorkspaceCredentialDetection {
   readonly wireShape: WireShape | null;
   readonly reasoning?: boolean | null;
   readonly reasoningEffort?: ModelReasoningEffort | null;
+  readonly reasoningMode?: ModelReasoningMode | null;
   readonly interactiveSetupStatus?:
     | 'ready'
     | 'runtime-onboarding-required'
@@ -1253,6 +1258,7 @@ export async function detectWorkspaceCredential(
     wireShape: null,
     reasoning: null,
     reasoningEffort: null,
+    reasoningMode: null,
   };
   return (await res.json()) as WorkspaceCredentialDetection;
 }

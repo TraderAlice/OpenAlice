@@ -39,9 +39,11 @@ import { inferCredentialVendor, resolveAnthropicAuthMode } from '../../core/cred
 import {
   applyRegisteredModelSemantics,
   compatibleCredentials,
+  credentialToWorkspaceAiCred,
   matchCredentialByApiKey,
   resolveInjectionModel,
 } from '../../workspaces/credential-injection.js';
+import { resolveModelSemantics, type ModelReasoningMode } from '../../ai-providers/model-semantics.js';
 import {
   AgentCredentialError,
   ensureAgentCredentialReady,
@@ -596,12 +598,20 @@ export function createWorkspaceRoutes(
     wireShape: WireShape | null;
     reasoning: boolean | null;
     reasoningEffort: WorkspaceAiCred['reasoningEffort'];
+    reasoningMode: ModelReasoningMode | null;
   } | null> => {
     const adapter = svc.adapters.get(agentId);
     if (!adapter?.readAiConfig) return null;
     const cfg = await adapter.readAiConfig(meta.dir).catch(() => null);
     if (!cfg) return null;
     const slug = matchCredentialByApiKey(credentials, cfg.apiKey);
+    const vendor = slug
+      ? credentials[slug]?.vendor
+      : inferCredentialVendor({
+          agent: agentId,
+          baseUrl: cfg.baseUrl ?? undefined,
+          wireShape: cfg.wireShape ?? undefined,
+        });
     return {
       slug,
       model: cfg.model ?? null,
@@ -609,6 +619,7 @@ export function createWorkspaceRoutes(
       wireShape: cfg.wireShape ?? null,
       reasoning: cfg.reasoning ?? null,
       reasoningEffort: cfg.reasoningEffort ?? null,
+      reasoningMode: resolveModelSemantics(vendor, cfg.model)?.reasoning?.mode ?? null,
     };
   };
 
@@ -1933,6 +1944,10 @@ export function createWorkspaceRoutes(
       const entries = agent ? compatibleCredentials(credentials, agent) : Object.entries(credentials);
       const list = entries.map(([slug, cred]) => {
         const resolvedModel = resolveInjectionModel(cred);
+        const projected = agent && resolvedModel
+          ? credentialToWorkspaceAiCred(cred, agent, { model: resolvedModel })
+          : null;
+        const reasoningMode = resolveModelSemantics(cred.vendor, resolvedModel)?.reasoning?.mode;
         return {
           slug,
           vendor: cred.vendor,
@@ -1941,6 +1956,13 @@ export function createWorkspaceRoutes(
           wires: credentialWires(cred), // shape → endpoint; the modal picks one per agent
           ...(cred.lastModel ? { lastModel: cred.lastModel } : {}),
           ...(resolvedModel ? { resolvedModel } : {}),
+          ...(typeof projected?.reasoning === 'boolean'
+            ? { resolvedReasoning: projected.reasoning }
+            : {}),
+          ...(projected?.reasoningEffort
+            ? { resolvedReasoningEffort: projected.reasoningEffort }
+            : {}),
+          ...(reasoningMode ? { resolvedReasoningMode: reasoningMode } : {}),
           ...(agent ? {} : { apiKey: cred.apiKey ?? null }),
         };
       });
@@ -2029,6 +2051,7 @@ export function createWorkspaceRoutes(
         wireShape: detected?.wireShape ?? null,
         ...(typeof detected?.reasoning === 'boolean' ? { reasoning: detected.reasoning } : {}),
         ...(detected?.reasoningEffort ? { reasoningEffort: detected.reasoningEffort } : {}),
+        ...(detected?.reasoningMode ? { reasoningMode: detected.reasoningMode } : {}),
         ...(interactiveSetupStatus !== null ? { interactiveSetupStatus } : {}),
       });
     } catch (err) {
