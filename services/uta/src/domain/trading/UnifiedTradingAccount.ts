@@ -9,7 +9,7 @@
 
 import Decimal from 'decimal.js'
 import { Contract, Order, ContractDescription, ContractDetails, UNSET_DECIMAL, UNSET_INTEGER, UNSET_DOUBLE } from '@traderalice/ibkr'
-import { BrokerError, type IBroker, type AccountInfo, type Position, type OpenOrder, type PlaceOrderResult, type Quote, type MarketClock, type AccountCapabilities, type BrokerHealth, type BrokerHealthInfo, type UTAReach, type UTATier, type TpSlParams, type Bar, type BarParams, type ExpandContractFilters, type ContractExpansion, type SubAccountRef } from './brokers/types.js'
+import { BrokerError, type IBroker, type AccountInfo, type Position, type OpenOrder, type PlaceOrderResult, type Quote, type MarketClock, type AccountCapabilities, type BrokerHealth, type BrokerHealthInfo, type BrokerConnectionStateEvent, type UTAReach, type UTATier, type TpSlParams, type Bar, type BarParams, type ExpandContractFilters, type ContractExpansion, type SubAccountRef } from './brokers/types.js'
 
 const REACH_RANK: Record<UTAReach, number> = { down: 0, connected: 1, readable: 2 }
 import { TradingGit } from './git/TradingGit.js'
@@ -152,6 +152,7 @@ export class UnifiedTradingAccount {
     this._onHealthChange = options.onHealthChange
     this._onPostPush = options.onPostPush
     this._onPostReject = options.onPostReject
+    this.broker.setConnectionStateListener?.((event) => this._onBrokerConnectionState(event))
 
     // Wire internals
     this._getState = async (): Promise<GitState> => {
@@ -323,6 +324,30 @@ export class UnifiedTradingAccount {
     this._lastFailureAt = new Date()
   }
 
+  /** A broker heartbeat knows more than passive failure counting: once the
+   * transport is explicitly dead, serving a green health badge is unsafe.
+   * Recovery still has to pass the normal capability ladder before the UTA is
+   * marked healthy again. */
+  private _onBrokerConnectionState(event: BrokerConnectionStateEvent): void {
+    if (event.state === 'alive') return
+    if (event.state === 'restored') {
+      this.nudgeRecovery()
+      return
+    }
+    if (this._disabled) return
+
+    this._currentReach = 'down'
+    this._consecutiveFailures = UnifiedTradingAccount.OFFLINE_THRESHOLD
+    this._lastError = event.error ?? 'Broker transport reported a dead connection'
+    this._lastFailureAt = new Date()
+
+    // During the initial handshake, _connect owns the transition into recovery
+    // and will emit the first settled health snapshot.
+    if (this._connecting) return
+    if (!this._recovering) this._startRecovery()
+    else this._emitHealthChange()
+  }
+
   /** Initial broker connection — fire-and-forget from constructor. */
   private async _connect(): Promise<void> {
     // Timed + logged: the connect duration is the cold-start cost this whole
@@ -420,8 +445,8 @@ export class UnifiedTradingAccount {
     if (this._recoveryTimer) {
       clearTimeout(this._recoveryTimer)
       this._recoveryTimer = undefined
-      this._recovering = false
     }
+    this._recovering = false
     if (prev !== this.health) this._emitHealthChange()
   }
 
@@ -440,7 +465,7 @@ export class UnifiedTradingAccount {
   nudgeRecovery(): void {
     if (!this._recovering || this._disabled) return
     if (this._recoveryTimer) clearTimeout(this._recoveryTimer)
-    this._scheduleRecoveryAttempt(0)
+    this._scheduleRecoveryAttempt(0, 0)
   }
 
   private _startRecovery(): void {
@@ -451,12 +476,13 @@ export class UnifiedTradingAccount {
     this._scheduleRecoveryAttempt(0)
   }
 
-  private _scheduleRecoveryAttempt(attempt: number): void {
-    const delay = Math.min(
+  private _scheduleRecoveryAttempt(attempt: number, delayOverride?: number): void {
+    const delay = delayOverride ?? Math.min(
       UnifiedTradingAccount.RECOVERY_BASE_MS * 2 ** attempt,
       UnifiedTradingAccount.RECOVERY_MAX_MS,
     )
     this._recoveryTimer = setTimeout(async () => {
+      this._recoveryTimer = undefined
       this._currentReach = await this._attemptReach()
       if (this._disabled) {
         this._recovering = false
@@ -1178,6 +1204,7 @@ export class UnifiedTradingAccount {
   // ==================== Lifecycle ====================
 
   async close(): Promise<void> {
+    this.broker.setConnectionStateListener?.(null)
     if (this._recoveryTimer) {
       clearTimeout(this._recoveryTimer)
       this._recoveryTimer = undefined

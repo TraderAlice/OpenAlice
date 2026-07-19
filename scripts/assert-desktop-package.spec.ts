@@ -64,6 +64,7 @@ describe('assertDesktopPackage', () => {
       const appRoot = join(root, 'mac-arm64/OpenAlice.app/Contents/Resources/app')
       writeBasePackage(appRoot, { ...piManifest(), ...searchToolsManifest('darwin-arm64') })
       writeSearchToolFiles(appRoot, 'darwin-arm64')
+      writePackageFile(appRoot, 'node_modules/dugite/git/bin/git')
 
       const result = assertDesktopPackage({ packageRoot: root, repoRoot: root, arch: 'arm64' })
 
@@ -125,12 +126,45 @@ describe('assertDesktopPackage', () => {
     }
   })
 
+  it('rejects dugite embedded Git in Windows packages', () => {
+    const root = mkdtempSync(join(tmpdir(), 'openalice-package-win-dugite-git-'))
+    try {
+      const appRoot = join(root, 'win-unpacked/resources/app')
+      writeBasePackage(appRoot, {
+        ...piManifest(),
+        ...searchToolsManifest('win32-x64', true),
+        git: {
+          'win32-x64': {
+            version: '2.55.0.2',
+            path: 'vendor/git/win32-x64',
+            gitBin: 'cmd/git.exe',
+            shellPath: 'bin/bash.exe',
+            shPath: 'bin/sh.exe',
+          },
+        },
+      })
+      writePackageFile(appRoot, 'vendor/git/win32-x64/cmd/git.exe')
+      writePackageFile(appRoot, 'vendor/git/win32-x64/bin/bash.exe')
+      writePackageFile(appRoot, 'vendor/git/win32-x64/bin/sh.exe')
+      writeSearchToolFiles(appRoot, 'win32-x64', true)
+      writePackageFile(appRoot, 'node_modules/dugite/git/cmd/git.exe')
+
+      const result = assertDesktopPackage({ packageRoot: root, repoRoot: root, arch: 'x64' })
+
+      expect(result.ok).toBe(false)
+      expect(result.errors.join('\n')).toContain('dugite\'s embedded Git payload is forbidden')
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
   it('rejects optional broker SDKs bundled into the desktop app', () => {
     const root = mkdtempSync(join(tmpdir(), 'openalice-package-broker-sdk-'))
     try {
       const appRoot = join(root, 'mac-arm64/OpenAlice.app/Contents/Resources/app')
       writeBasePackage(appRoot, { ...piManifest(), ...searchToolsManifest('darwin-arm64') })
       writeSearchToolFiles(appRoot, 'darwin-arm64')
+      writePackageFile(appRoot, 'node_modules/dugite/git/bin/git')
       writePackageFile(appRoot, 'node_modules/.pnpm/ccxt@4.5.38/package.json')
       writePackageFile(appRoot, 'node_modules/longbridge/package.json')
 

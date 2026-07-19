@@ -36,7 +36,7 @@ export interface BarRef {
 /** Split a barId on the FIRST `|` (nativeKey may itself contain separators). */
 export function parseBarId(barId: string): BarRef | null {
   const idx = barId.indexOf('|')
-  if (idx <= 0) return null
+  if (idx <= 0 || idx === barId.length - 1) return null
   return { sourceId: barId.slice(0, idx), nativeSymbol: barId.slice(idx + 1) }
 }
 

@@ -3,7 +3,7 @@ import { Bot, CheckCircle2, CircleAlert, Link2, Power, Send, ShieldCheck } from 
 import { api, type ConnectorDefinition, type ConnectorHealth, type PublicConnectorConfig } from '../api'
 import { PageHeader } from '../components/PageHeader'
 import { SaveIndicator } from '../components/SaveIndicator'
-import { ConfigSection, Field, inputClass } from '../components/form'
+import { ConfigSection, Field, SettingsScrollArea, inputClass } from '../components/form'
 import { useAutoSave } from '../hooks/useAutoSave'
 import {
   getConnectorSetupState,
@@ -150,7 +150,7 @@ export function ConnectorsPage() {
         right={<SaveIndicator status={status} onRetry={retry} />}
       />
 
-      <div className="flex-1 overflow-y-auto px-4 md:px-8 py-5">
+      <SettingsScrollArea className="px-4 py-5 md:px-8">
         <div className="max-w-[920px] mx-auto">
           {config && (
             <>
@@ -158,7 +158,7 @@ export function ConnectorsPage() {
                 title="Connector Service"
                 description="Independent, Guardian-managed process. Starting a bot below turns this on automatically; this switch is the global kill switch."
               >
-                <label className="flex items-start gap-3 rounded-xl border border-border/70 bg-bg-secondary/35 px-4 py-3">
+                <label className="flex items-start gap-3 rounded-xl border border-border/70 bg-secondary/35 px-4 py-3">
                   <input
                     className="mt-1"
                     type="checkbox"
@@ -166,8 +166,8 @@ export function ConnectorsPage() {
                     onChange={(event) => setConfig({ ...config, serviceEnabled: event.target.checked })}
                   />
                   <span>
-                    <span className="block text-[13px] font-medium text-text">Run external notification connectors</span>
-                    <span className="block mt-0.5 text-[12px] text-text-muted/70">Turning this off stops every bot. Local Inbox remains the source of truth.</span>
+                    <span className="block text-[13px] font-medium text-foreground">Run external notification connectors</span>
+                    <span className="block mt-0.5 text-[12px] text-muted-foreground/70">Turning this off stops every bot. Local Inbox remains the source of truth.</span>
                   </span>
                 </label>
                 <HealthLine health={health} />
@@ -206,7 +206,7 @@ export function ConnectorsPage() {
                                 onChange={(event) => updateSetting(definition.id, field.key, event.target.checked)}
                               />
                             ) : (
-                              <div className="flex gap-2">
+                              <div className="flex flex-col gap-2 sm:flex-row">
                                 <input
                                   className={inputClass}
                                   type={field.kind === 'secret' ? 'password' : field.kind}
@@ -222,7 +222,7 @@ export function ConnectorsPage() {
                                 {field.kind === 'secret' && configured && (
                                   <button
                                     type="button"
-                                    className="shrink-0 rounded-lg border border-border px-3 text-[12px] text-text-muted hover:text-red"
+                                    className="shrink-0 rounded-lg border border-border px-3 text-[12px] text-muted-foreground hover:text-destructive"
                                     onClick={() => setConfig((current) => {
                                       if (!current) return current
                                       const currentAdapter = current.adapters[definition.id]!
@@ -251,7 +251,7 @@ export function ConnectorsPage() {
                       <div className="flex flex-wrap items-center gap-3 border-t border-border/70 pt-4">
                         <button
                           type="button"
-                          className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-[13px] text-text hover:border-accent/50 disabled:opacity-50"
+                          className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-[13px] text-foreground hover:border-primary/50 disabled:opacity-50"
                           disabled={setup.stage !== 'linked' || runtime?.status !== 'healthy' || testing !== null}
                           onClick={() => void test(definition.id)}
                         >
@@ -259,14 +259,14 @@ export function ConnectorsPage() {
                           {testing === definition.id ? 'Sending…' : 'Send test'}
                         </button>
                         {runtime && (
-                          <span className={`text-[12px] ${runtime.status === 'healthy' ? 'text-green' : runtime.status === 'degraded' ? 'text-red' : 'text-text-muted'}`}>
+                          <span className={`text-[12px] ${runtime.status === 'healthy' ? 'text-success' : runtime.status === 'degraded' ? 'text-destructive' : 'text-muted-foreground'}`}>
                             {runtime.status.replace('_', ' ')}{runtime.owner ? ` · owner ${runtime.owner}` : ''}
                           </span>
                         )}
                       </div>
-                      {runtime?.lastError && <p className="text-[12px] text-red">{runtime.lastError}</p>}
+                      {runtime?.lastError && <p className="text-[12px] text-destructive">{runtime.lastError}</p>}
                       {lastProbe?.connectorId === definition.id && (
-                        <p className="text-[12px] text-green">Sent probe <code>{lastProbe.probeId}</code>. Confirm this ID in the private chat.</p>
+                        <p className="text-[12px] text-success">Sent probe <code>{lastProbe.probeId}</code>. Confirm this ID in the private chat.</p>
                       )}
                     </div>
                   </ConfigSection>
@@ -274,10 +274,10 @@ export function ConnectorsPage() {
               })}
             </>
           )}
-          {testError && <p className="mt-4 text-[13px] text-red">{testError}</p>}
-          {loadError && <p className="text-[13px] text-red">Failed to load connector settings.</p>}
+          {testError && <p className="mt-4 text-[13px] text-destructive">{testError}</p>}
+          {loadError && <p className="text-[13px] text-destructive">Failed to load connector settings.</p>}
         </div>
-      </div>
+      </SettingsScrollArea>
     </div>
   )
 }
@@ -309,16 +309,16 @@ function SetupStatePanel({
           <Icon size={18} className={`mt-0.5 shrink-0 ${presentation.iconClass}`} />
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-[13px] font-semibold text-text">{presentation.title}</p>
+              <p className="text-[13px] font-semibold text-foreground">{presentation.title}</p>
               <span className="rounded-full border border-current/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
                 {presentation.badge}
               </span>
             </div>
-            <p className="mt-1 max-w-[620px] text-[12px] leading-5 text-text-muted">{presentation.description}</p>
+            <p className="mt-1 max-w-[620px] text-[12px] leading-5 text-muted-foreground">{presentation.description}</p>
             {setup.stage === 'awaiting_link' && (
-              <ol className="mt-3 space-y-1 text-[12px] text-text">
+              <ol className="mt-3 space-y-1 text-[12px] text-foreground">
                 <li>1. Open your private chat with the {definition.label} bot.</li>
-                <li>2. Send <code className="rounded bg-bg px-1.5 py-0.5 font-mono text-accent">{command}</code>.</li>
+                <li>2. Send <code className="rounded bg-background px-1.5 py-0.5 font-mono text-primary">{command}</code>.</li>
                 <li>3. Keep this page open; it will detect the linked owner automatically.</li>
               </ol>
             )}
@@ -328,7 +328,7 @@ function SetupStatePanel({
           {(setup.stage === 'ready_to_link' || setup.stage === 'linked_offline') && (
             <button
               type="button"
-              className="oa-pressable inline-flex items-center gap-2 rounded-lg bg-accent px-3 py-2 text-[12px] font-medium text-white hover:bg-accent/90 disabled:opacity-50"
+              className="oa-pressable inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-[12px] font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
               disabled={saving}
               onClick={onStart}
             >
@@ -339,7 +339,7 @@ function SetupStatePanel({
           {running && (
             <button
               type="button"
-              className="oa-pressable inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-[12px] text-text-muted hover:text-text disabled:opacity-50"
+              className="oa-pressable inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-[12px] text-muted-foreground hover:text-foreground disabled:opacity-50"
               disabled={saving}
               onClick={onStop}
             >
@@ -372,8 +372,8 @@ function setupPresentation(
         badge: 'Step 1 · credentials',
         description: 'Add the required bot credentials below. OpenAlice seals secrets locally and never returns them to the browser.',
         icon: Bot,
-        iconClass: 'text-text-muted',
-        container: 'border-border bg-bg-secondary/35',
+        iconClass: 'text-muted-foreground',
+        container: 'border-border bg-secondary/35',
       }
     case 'ready_to_link':
       return {
@@ -381,8 +381,8 @@ function setupPresentation(
         badge: 'Step 2 · not linked',
         description: `Credentials are saved. Start the bot so it can receive ${command} from your private ${label} chat.`,
         icon: Link2,
-        iconClass: 'text-accent',
-        container: 'border-accent/25 bg-accent/5',
+        iconClass: 'text-primary',
+        container: 'border-primary/25 bg-primary/5',
       }
     case 'starting':
       return {
@@ -390,8 +390,8 @@ function setupPresentation(
         badge: 'Starting',
         description: `OpenAlice is starting the ${label} adapter. The ${command} instructions will appear as soon as it is online.`,
         icon: Power,
-        iconClass: 'text-yellow-500',
-        container: 'border-yellow-400/25 bg-yellow-400/5',
+        iconClass: 'text-warning',
+        container: 'border-warning/25 bg-warning/5',
       }
     case 'awaiting_link':
       return {
@@ -399,8 +399,8 @@ function setupPresentation(
         badge: 'Waiting for /link',
         description: `The ${label} bot is running, but no owner is linked yet. Complete the three steps below.`,
         icon: Link2,
-        iconClass: 'text-yellow-500',
-        container: 'border-yellow-400/30 bg-yellow-400/5',
+        iconClass: 'text-warning',
+        container: 'border-warning/30 bg-warning/5',
       }
     case 'linked':
       return {
@@ -408,8 +408,8 @@ function setupPresentation(
         badge: 'Ready',
         description: `The ${label} bot is online${runtime?.owner ? ` for owner ${runtime.owner}` : ''} and can deliver Inbox notifications.`,
         icon: CheckCircle2,
-        iconClass: 'text-green',
-        container: 'border-green/25 bg-green/5',
+        iconClass: 'text-success',
+        container: 'border-success/25 bg-success/5',
       }
     case 'linked_offline':
       return {
@@ -417,8 +417,8 @@ function setupPresentation(
         badge: 'Offline',
         description: `The saved ${label} owner remains linked. Start the connector when you want external Inbox delivery.`,
         icon: Power,
-        iconClass: 'text-text-muted',
-        container: 'border-border bg-bg-secondary/35',
+        iconClass: 'text-muted-foreground',
+        container: 'border-border bg-secondary/35',
       }
     case 'error':
       return {
@@ -426,25 +426,25 @@ function setupPresentation(
         badge: 'Unavailable',
         description: runtime?.lastError ?? runtime?.detail ?? `The ${label} adapter could not start. Check the credentials and Connector logs.`,
         icon: CircleAlert,
-        iconClass: 'text-red',
-        container: 'border-red/30 bg-red/5',
+        iconClass: 'text-destructive',
+        container: 'border-destructive/30 bg-destructive/5',
       }
   }
 }
 
 function HealthLine({ health }: { health: ConnectorHealth | null }) {
   if (!health || health.status === 'disabled') {
-    return <p className="mt-3 flex items-center gap-2 text-[12px] text-text-muted"><ShieldCheck size={14} /> Service stopped</p>
+    return <p className="mt-3 flex items-center gap-2 text-[12px] text-muted-foreground"><ShieldCheck size={14} /> Service stopped</p>
   }
   if (health.status === 'healthy') {
-    return <p className="mt-3 flex items-center gap-2 text-[12px] text-green"><ShieldCheck size={14} /> Service online</p>
+    return <p className="mt-3 flex items-center gap-2 text-[12px] text-success"><ShieldCheck size={14} /> Service online</p>
   }
   return (
-    <div className="mt-3 text-[12px] text-red">
+    <div className="mt-3 text-[12px] text-destructive">
       <p className="flex items-center gap-2">
         <CircleAlert size={14} /> Connector Service unavailable. Alice and Inbox remain online.
       </p>
-      {health.lastError && <p className="ml-[22px] mt-1 text-text-muted/70">{health.lastError}</p>}
+      {health.lastError && <p className="ml-[22px] mt-1 text-muted-foreground/70">{health.lastError}</p>}
     </div>
   )
 }

@@ -20,7 +20,49 @@ import {
 import { NO_VALID_ID } from '../const.js'
 import { PROTOBUF_MSG_IDS } from '../common.js'
 import * as errors from '../errors.js'
-import { ClientException, isAsciiPrintable, currentTimeMillis } from '../utils.js'
+import { BadMessage, ClientException, isAsciiPrintable, currentTimeMillis } from '../utils.js'
+
+export type InboundFrame =
+  | { kind: 'text'; msgId: number; payload: Buffer }
+  | { kind: 'protobuf'; msgId: number; payload: Buffer }
+
+const PROTOBUF_MSG_ID = 200
+
+/**
+ * Remove the wire envelope from one complete inbound message.
+ *
+ * The decoder always receives the message id out-of-band and text fields that
+ * begin at the payload's first field (normally a message version or request
+ * id). This mirrors ibapi/client.py's run loop for both legacy and v201+
+ * framing.
+ */
+export function decodeInboundFrame(serverVersion: number, msgBuf: Buffer): InboundFrame {
+  let wireMsgId: number
+  let payload: Buffer
+
+  if (serverVersion >= MIN_SERVER_VER_PROTOBUF) {
+    if (msgBuf.length < 4) {
+      throw new BadMessage('missing binary message id')
+    }
+    wireMsgId = msgBuf.readUInt32BE(0)
+    payload = msgBuf.subarray(4)
+  } else {
+    const nullIdx = msgBuf.indexOf(0)
+    if (nullIdx < 0) {
+      throw new BadMessage('missing text message id delimiter')
+    }
+    wireMsgId = Number.parseInt(msgBuf.subarray(0, nullIdx).toString('utf-8'), 10)
+    if (!Number.isFinite(wireMsgId)) {
+      throw new BadMessage('invalid text message id')
+    }
+    payload = msgBuf.subarray(nullIdx + 1)
+  }
+
+  if (wireMsgId > PROTOBUF_MSG_ID) {
+    return { kind: 'protobuf', msgId: wireMsgId - PROTOBUF_MSG_ID, payload }
+  }
+  return { kind: 'text', msgId: wireMsgId, payload }
+}
 
 export class EClient {
   static readonly DISCONNECTED = 0
@@ -46,6 +88,7 @@ export class EClient {
   }
 
   reset(): void {
+    this.decoder = null
     this.conn = null
     this.host = null
     this.port = null
@@ -161,6 +204,8 @@ export class EClient {
       // Start reader
       this.reader = new EReader(this.conn, (msgBuf: Buffer) => {
         this.onMessage(msgBuf)
+      }, (error: unknown) => {
+        this.handleReaderError(error)
       })
       this.reader.start()
 
@@ -240,39 +285,77 @@ export class EClient {
   private onMessage(msgBuf: Buffer): void {
     if (!this.decoder) return
 
-    const PROTOBUF_MSG_ID = 200
-    let msgId: number
-    let payload: Buffer
-
-    if (this.serverVersion() >= MIN_SERVER_VER_PROTOBUF) {
-      // v201+: first 4 bytes are binary msgId
-      msgId = msgBuf.readUInt32BE(0)
-      payload = msgBuf.subarray(4)
-    } else {
-      // Legacy: first \0-delimited field is the text msgId
-      const nullIdx = msgBuf.indexOf(0)
-      if (nullIdx < 0) return
-      msgId = parseInt(msgBuf.subarray(0, nullIdx).toString('utf-8'), 10)
-      payload = msgBuf.subarray(nullIdx + 1)
+    let frame: InboundFrame
+    try {
+      frame = decodeInboundFrame(this.serverVersion(), msgBuf)
+    } catch (error) {
+      if (error instanceof BadMessage) {
+        this.wrapper.error(
+          NO_VALID_ID,
+          currentTimeMillis(),
+          errors.BAD_MESSAGE.code(),
+          `${errors.BAD_MESSAGE.msg()} envelope`,
+          '',
+        )
+      }
+      throw error
     }
 
-    if (msgId > PROTOBUF_MSG_ID) {
-      // Protobuf message
-      msgId -= PROTOBUF_MSG_ID
-      this.decoder.processProtoBuf(payload, msgId)
+    if (frame.kind === 'protobuf') {
+      this.decoder.processProtoBuf(frame.payload, frame.msgId)
     } else {
-      // Text message — split into fields and dispatch
-      const fields = readFields(payload)
-      this.decoder.interpret(fields, msgId)
+      this.decoder.interpret(frame.msgId, readFields(frame.payload))
     }
+  }
+
+  /**
+   * Contain an inbound decoder failure to this broker connection.
+   *
+   * BadMessage is already reported by Decoder with safe framing metadata. Any
+   * other exception gets a generic error so arbitrary broker payloads or
+   * account fields are never copied into logs.
+   */
+  private handleReaderError(error: unknown): void {
+    if (!(error instanceof BadMessage)) {
+      this.wrapper.error(
+        NO_VALID_ID,
+        currentTimeMillis(),
+        errors.BAD_MESSAGE.code(),
+        `${errors.BAD_MESSAGE.msg()} reader failure`,
+        '',
+      )
+    }
+
+    const conn = this.conn
+    this.reset()
+    conn?.disconnect()
   }
 
   private waitForHandshake(): Promise<{ serverVersion: number; connTime: string }> {
     return new Promise((resolve, reject) => {
+      const conn = this.conn
+      const socket = conn?.socket
+      if (!conn || !socket) {
+        reject(new Error('Connection closed before handshake started'))
+        return
+      }
+
       let buf: Buffer = Buffer.alloc(0)
+      let timer: ReturnType<typeof setTimeout> | undefined
+
+      const cleanup = () => {
+        if (timer) clearTimeout(timer)
+        conn.removeListener('data', onData)
+        socket.removeListener('close', onClose)
+      }
+
+      const onClose = () => {
+        cleanup()
+        reject(new Error('Connection closed during handshake'))
+      }
 
       const onData = () => {
-        const incoming = this.conn!.consumeBuffer()
+        const incoming = conn.consumeBuffer()
         if (incoming.length === 0) return
 
         buf = Buffer.concat([buf, incoming])
@@ -281,8 +364,7 @@ export class EClient {
           buf = rest
           const fields = readFields(msg)
           if (fields.length >= 2) {
-            clearTimeout(timer)
-            this.conn!.removeListener('data', onData)
+            cleanup()
             resolve({
               serverVersion: parseInt(fields[0], 10),
               connTime: fields[1],
@@ -291,11 +373,12 @@ export class EClient {
         }
       }
 
-      this.conn!.on('data', onData)
+      conn.on('data', onData)
+      socket.once('close', onClose)
 
       // Timeout after 10 seconds
-      const timer = setTimeout(() => {
-        this.conn?.removeListener('data', onData)
+      timer = setTimeout(() => {
+        cleanup()
         reject(new Error('Handshake timeout'))
       }, 10000)
     })

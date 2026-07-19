@@ -25,7 +25,7 @@ Understanding which channel we use (and don't use) is critical for debugging pri
 - **Callback**: `updatePortfolio(contract, position, marketPrice, marketValue, avgCost, unrealizedPnL, realizedPnL, accountName)`
 - **Behavior**: TWS internally decides when to push updates. During regular trading hours, updates come every few seconds. During after-hours and overnight, updates slow down or stop entirely.
 - **Coverage**: Only positions in the account. No quote data for contracts you don't hold.
-- **Current usage**: `getPositions()` and `getAccount()` both rely on this channel via `downloadAccount()`.
+- **Current usage**: This is the durable position cache. `getPositions()` overlays short-lived snapshot midpoints for `OPT`/`FOP` rows when bid+ask are available; all other rows and failed snapshots retain these broker values. `getAccount()` uses the account-level `NetLiquidation` tag whenever IBKR supplied it.
 
 ### `reqMktData` — snapshot mode (what `getQuote()` uses)
 
@@ -34,6 +34,8 @@ Understanding which channel we use (and don't use) is critical for debugging pri
 - **Behavior**: One-time batch of current market data. Auto-cancels after `tickSnapshotEnd`.
 - **Coverage**: Any contract, including ones you don't hold. Includes overnight session data from Blue Ocean ATS.
 - **Limitation**: Counts against TWS market data line limit (~100 concurrent). Snapshot mode is short-lived so typically not a problem.
+- **Entitlement boundary**: OpenAlice always sends `regulatorySnapshot=false`; it never opts the account into per-request paid US regulatory snapshots. Ordinary live snapshots still need the corresponding market-data entitlement. Free delayed data may be returned after `reqMarketDataType(3)`; otherwise the option overlay falls back to `updatePortfolio()` without failing the account read.
+- **Timing**: IBKR documents `tickSnapshotEnd()` at about 11 seconds. Ordinary quotes wait for that end marker with a 12.5 second timeout. Option mark refreshes may resolve earlier once both positive bid and ask ticks arrive.
 
 ### `reqMktData` — streaming mode (not currently used)
 
@@ -81,13 +83,18 @@ The `@traderalice/ibkr` Connection class is a Node port of Python's `Connection`
 
 The `close` event handler checks `if (this.socket === null) return` to avoid double-calling `connectionClosed()` when `disconnect()` already handled cleanup.
 
-Upper layers (UTA health system) detect the disconnect via `connectionClosed()` → health degrades → auto-recovery attempts reconnection.
+Known-dead transport state reaches UTA through an explicit connection-state listener:
+
+1. `connectionClosed()`, connectivity error 1100, or a failed 45-second heartbeat marks the bridge dead.
+2. UTA moves directly to `offline` and starts recovery instead of waiting for passive cached-read failures.
+3. Error 1101/1102 nudges recovery immediately but does not mark the account alive; reconnect plus a private account read must still pass.
+4. Place/modify/cancel performs a coalesced `reqCurrentTime` round-trip on the same socket immediately before transmission. A timeout marks the bridge dead and no order bytes are sent.
 
 ## Known Limitations
 
-1. **`getPositions()` price staleness**: Prices come from `updatePortfolio()` which TWS controls. During overnight hours, prices freeze even though the market has activity on Blue Ocean ATS. Future improvement: call `getQuote()` per position to refresh prices.
+1. **Non-option position price staleness**: Stocks, futures, FX, warrants, and bonds still use `updatePortfolio()` marks. Only `OPT`/`FOP` rows receive the bounded snapshot-midpoint overlay.
 
-2. **`getAccount()` netLiq reconstruction**: TWS's account-level `NetLiquidation` tag is cached server-side. We reconstruct it from `cash + Σ(position.marketValue)` for accuracy. But since position prices can be stale (see #1), the reconstructed netLiq inherits that staleness.
+2. **Option market-data entitlement**: Without a live or delayed quote permission, option positions deliberately keep the cached `updatePortfolio()` mark. A short negative cache prevents polling loops from repeatedly issuing a request that the account cannot satisfy.
 
 3. **Single account**: Current implementation assumes one account per TWS connection. Multi-account setups (Financial Advisor accounts) would need `reqAccountUpdatesMulti` instead.
 

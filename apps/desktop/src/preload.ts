@@ -111,6 +111,9 @@ const api = {
   runtime: {
     info: () => ipcRenderer.invoke('openalice:runtime:info'),
   },
+  keyboard: {
+    getInputSourceId: () => ipcRenderer.invoke('openalice:keyboard:get-input-source-id'),
+  },
   dataHome: {
     getStatus: () => ipcRenderer.invoke('openalice:data-home:get-status'),
     chooseAndRestart: () => ipcRenderer.invoke('openalice:data-home:choose-and-restart'),
@@ -122,6 +125,7 @@ const api = {
   },
   updater: {
     getStatus: () => ipcRenderer.invoke('openalice:updater:get-status'),
+    checkForUpdates: () => ipcRenderer.invoke('openalice:updater:check-for-updates'),
     onStatus: (cb: (status: UpdaterStatus) => void) => {
       updaterListeners.add(cb)
       return () => updaterListeners.delete(cb)
@@ -159,6 +163,9 @@ const api = {
     },
     resize: (connectionId: string, cols: number, rows: number) => {
       ipcRenderer.send('openalice:pty:client-message', { connectionId, type: 'resize', cols, rows })
+    },
+    control: (connectionId: string, data: string) => {
+      ipcRenderer.send('openalice:pty:client-message', { connectionId, type: 'control', data })
     },
     close: (connectionId: string) => {
       ipcRenderer.send('openalice:pty:client-close', { connectionId })

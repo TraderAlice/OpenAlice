@@ -10,16 +10,16 @@ import { SidebarSectionHeader } from './SidebarSectionHeader'
 import { Spinner } from './StateViews'
 
 const ASSET_CLASS_COLORS: Record<string, string> = {
-  equity: 'bg-accent/15 text-accent',
-  crypto: 'bg-amber-500/15 text-amber-400',
-  currency: 'bg-green/15 text-green',
-  commodity: 'bg-purple-500/15 text-purple-400',
-  unknown: 'bg-bg-tertiary text-text-muted',
+  equity: 'bg-primary/15 text-primary',
+  crypto: 'bg-warning/15 text-warning',
+  currency: 'bg-success/15 text-success',
+  commodity: 'bg-ai-action/15 text-ai-action',
+  unknown: 'bg-muted text-muted-foreground',
 }
 
 const CAPABILITY_COLOR: Record<string, string> = {
-  realtime: 'text-green', iex: 'text-accent', delayed: 'text-text-muted',
-  subscription: 'text-amber-700 dark:text-amber-300', free: 'text-text-muted',
+  realtime: 'text-success', iex: 'text-primary', delayed: 'text-muted-foreground',
+  subscription: 'text-warning', free: 'text-muted-foreground',
 }
 
 /** A crypto venue's "AAPL" is synthetic — the route segment still needs a valid
@@ -70,7 +70,7 @@ export function MarketSidebar() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t('market.searchPlaceholder')}
-          className="w-full px-2.5 py-1.5 bg-bg text-text border border-border/70 rounded-md text-[13px] outline-none focus:border-accent"
+          className="w-full px-2.5 py-1.5 bg-background text-foreground border border-border/70 rounded-md text-[13px] outline-none focus:border-primary"
         />
       </div>
 
@@ -134,13 +134,13 @@ export function MarketSidebar() {
               {t('market.searchResults')}{loading ? ` (${t('common.searching')})` : results.length ? ` (${results.length})` : ''}
             </SidebarSectionHeader>
             {loading && (
-              <div className="flex items-center gap-2 px-3 py-2 text-[12px] text-text-muted">
+              <div className="flex items-center gap-2 px-3 py-2 text-[12px] text-muted-foreground">
                 <Spinner size="sm" />
                 <span>{t('common.searching')}</span>
               </div>
             )}
             {!loading && results.length === 0 && (
-              <p className="px-3 py-2 text-[12px] leading-relaxed text-text-muted">{t('market.noMatches')}</p>
+              <p className="px-3 py-2 text-[12px] leading-relaxed text-muted-foreground">{t('market.noMatches')}</p>
             )}
             {results.map((c) => (
               <SidebarRow
@@ -148,7 +148,7 @@ export function MarketSidebar() {
                 label={
                   <span className="flex items-center gap-1.5 min-w-0">
                     <span className="font-mono font-semibold shrink-0">{c.symbol}</span>
-                    {c.name && <span className="text-text-muted truncate">{c.name}</span>}
+                    {c.name && <span className="text-muted-foreground truncate">{c.name}</span>}
                   </span>
                 }
                 active={isFocusedDetail(routeAssetClass(c.assetClass), c.symbol, c.barId)}
@@ -162,7 +162,7 @@ export function MarketSidebar() {
         {/* Watchlist */}
         <SidebarSectionHeader>{t('market.watchlist')}{watchlist.length ? ` (${watchlist.length})` : ''}</SidebarSectionHeader>
         {watchlist.length === 0 ? (
-          <p className="px-3 py-2 text-[12px] leading-relaxed text-text-muted">
+          <p className="px-3 py-2 text-[12px] leading-relaxed text-muted-foreground">
             {t('market.emptyWatchlistHint')}
           </p>
         ) : (
@@ -186,7 +186,7 @@ export function MarketSidebar() {
                       e.stopPropagation()
                       removeFromWatchlist(entry.assetClass, entry.symbol)
                     }}
-                    className="flex h-4 w-4 items-center justify-center rounded text-text-muted opacity-0 hover:bg-bg-tertiary hover:text-text group-hover:opacity-100"
+                    className="flex h-4 w-4 items-center justify-center rounded text-muted-foreground opacity-0 hover:bg-muted hover:text-foreground group-hover:opacity-100"
                     aria-label={t('market.removeFromWatchlist', { symbol: entry.symbol })}
                   >
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -218,9 +218,9 @@ function SourceTrail({ c }: { c: BarSourceCandidate }) {
   // crushed. (Asset class is shown in the wider main search box, not here.)
   return (
     <span className="flex items-center gap-1 shrink-0" title={`${c.barId}${c.barCapability ? ` · ${c.barCapability}` : ''}`}>
-      <span className="text-[10px] text-text/75 font-medium truncate max-w-[96px]">{c.sourceId}</span>
+      <span className="text-[10px] text-foreground/75 font-medium truncate max-w-[96px]">{c.sourceId}</span>
       {c.barCapability && (
-        <span className={`text-[9px] ${CAPABILITY_COLOR[c.barCapability] ?? 'text-text-muted'}`}>{c.barCapability}</span>
+        <span className={`text-[9px] ${CAPABILITY_COLOR[c.barCapability] ?? 'text-muted-foreground'}`}>{c.barCapability}</span>
       )}
     </span>
   )

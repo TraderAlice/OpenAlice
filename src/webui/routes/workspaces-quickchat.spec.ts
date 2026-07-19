@@ -13,7 +13,6 @@ import { createWorkspaceRoutes } from './workspaces.js';
 import {
   readCredentials,
   readWorkspaceDefaultAgent,
-  readWorkspaceDefaultContextWindow,
   setCredentialLastModel,
   type Credential,
 } from '../../core/config.js';
@@ -29,7 +28,6 @@ vi.mock('../../core/config.js', async (importActual) => {
     ...actual,
     readCredentials: vi.fn(),
     readWorkspaceDefaultAgent: vi.fn(async () => null),
-    readWorkspaceDefaultContextWindow: vi.fn(async () => 256_000),
     setCredentialLastModel: vi.fn(async () => {}),
   };
 });
@@ -42,6 +40,8 @@ function build(opts: {
   workspaces?: any[];
   sessionsByWorkspace?: Record<string, any[]>;
   recentChatWorkspaceId?: string | null;
+  claudeConfig?: WorkspaceAiCred | null;
+  claudeInteractiveSetupStatus?: 'ready' | 'runtime-onboarding-required' | 'workspace-trust-required' | 'unknown';
   opencodeConfig?: WorkspaceAiCred | null;
   opencodeRuntimeSource?: 'global-config' | 'global-login' | 'managed-runtime';
   runtimeWorkspace?: any;
@@ -60,7 +60,12 @@ function build(opts: {
     writeAiConfig: vi.fn(async () => {}),
     readAiConfig: vi.fn(async () => opts.opencodeConfig ?? null),
   };
-  const claude = { id: 'claude', namePrefix: 'c' };
+  const claude = {
+    id: 'claude',
+    namePrefix: 'c',
+    readAiConfig: vi.fn(async () => opts.claudeConfig ?? null),
+    readInteractiveSetupStatus: vi.fn(async () => opts.claudeInteractiveSetupStatus ?? 'ready'),
+  };
   const shell = { id: 'shell', kind: 'utility', namePrefix: 'sh' };
   const adapters: Record<string, any> = { opencode, claude, shell };
   const spawn = vi.fn((_wsId: string, ctx: any) => ({
@@ -71,6 +76,7 @@ function build(opts: {
     agentSessionId: null,
     startedAt: 1,
   }));
+  const setTerminalViewAttributes = vi.fn(() => true);
   const creator = { create: vi.fn(async () => ({ ok: true as const, workspace: META })) };
   const registry = {
     list: () => opts.workspaces ?? [],
@@ -113,7 +119,7 @@ function build(opts: {
     adapters: { get: (id: string) => adapters[id] },
     sessionRegistry,
     resumeRegistry,
-    pool: { spawn, get: vi.fn(() => undefined) },
+    pool: { spawn, get: vi.fn(() => undefined), setTerminalViewAttributes },
     publicMeta: vi.fn(async () => META),
     config: { launcherRepoRoot: '/repo' },
     getAgentRuntimeReadiness: vi.fn(() => ({
@@ -147,7 +153,7 @@ function build(opts: {
     })),
     rememberRecentChatWorkspace,
   });
-  return { app, opencode, spawn, creator, rememberRecentChatWorkspace };
+  return { app, opencode, spawn, creator, rememberRecentChatWorkspace, setTerminalViewAttributes };
 }
 
 async function quickChat(app: any, body: unknown) {
@@ -176,8 +182,42 @@ async function spawnSession(app: any, body: unknown) {
 beforeEach(() => {
   vi.mocked(readCredentials).mockReset();
   vi.mocked(readWorkspaceDefaultAgent).mockResolvedValue(null);
-  vi.mocked(readWorkspaceDefaultContextWindow).mockResolvedValue(256_000);
   vi.mocked(setCredentialLastModel).mockClear();
+});
+
+describe('PUT /terminal-view-attributes', () => {
+  it('validates and publishes the renderer palette to the session pool', async () => {
+    const { app, setTerminalViewAttributes } = build();
+    const attributes = {
+      foreground: [1, 2, 3],
+      background: [4, 5, 6],
+      cursor: [7, 8, 9],
+      ansi: Array.from({ length: 256 }, () => [0, 0, 0]),
+      colorSchemeMode: 'dark',
+      cursorStyle: 'block',
+      cursorBlink: true,
+    };
+    const response = await app.request('/terminal-view-attributes', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(attributes),
+    });
+
+    expect(response.status).toBe(200);
+    expect(setTerminalViewAttributes).toHaveBeenCalledWith(attributes);
+  });
+
+  it('rejects incomplete palettes', async () => {
+    const { app, setTerminalViewAttributes } = build();
+    const response = await app.request('/terminal-view-attributes', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ foreground: [1, 2, 3], ansi: [] }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(setTerminalViewAttributes).not.toHaveBeenCalled();
+  });
 });
 
 describe('GET /credentials — Quick Chat launch metadata', () => {
@@ -199,6 +239,9 @@ describe('GET /credentials — Quick Chat launch metadata', () => {
       expect.objectContaining({
         slug: 'google-1',
         resolvedModel: 'gemini-3.1-flash-lite',
+        resolvedReasoning: true,
+        resolvedReasoningEffort: 'minimal',
+        resolvedReasoningMode: 'adaptive',
       }),
     ]);
   });
@@ -218,6 +261,7 @@ describe('GET /credentials — Quick Chat launch metadata', () => {
         model: 'gemini-3.5-flash',
         contextWindow: 512_000,
         wireShape: 'google-generative-ai',
+        reasoningEffort: 'medium',
       },
     });
 
@@ -225,10 +269,72 @@ describe('GET /credentials — Quick Chat launch metadata', () => {
 
     expect(result.status).toBe(200);
     expect(result.body).toEqual({
+      configured: true,
       slug: 'google-1',
       model: 'gemini-3.5-flash',
       contextWindow: 512_000,
       wireShape: 'google-generative-ai',
+      reasoningMode: 'adaptive',
+      reasoningEffort: 'medium',
+    });
+  });
+
+  it('keeps hand-edited Workspace config visible when no vault key matches', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({});
+    const { app } = build({
+      opencodeConfig: {
+        apiKey: 'hand-edited-key',
+        model: 'local-manual-model',
+        contextWindow: 128_000,
+        wireShape: 'openai-chat',
+      },
+    });
+
+    const result = await get(app, '/ws-1/agent-config/opencode/credential');
+
+    expect(result).toEqual({
+      status: 200,
+      body: {
+        configured: true,
+        slug: null,
+        model: 'local-manual-model',
+        contextWindow: 128_000,
+        wireShape: 'openai-chat',
+      },
+    });
+  });
+
+  it('returns Claude project metadata and its native interactive setup gate', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({
+      'minimax-1': {
+        vendor: 'minimax',
+        authType: 'api-key',
+        apiKey: 'minimax-test-key',
+        wires: { anthropic: 'https://api.example.test/anthropic' },
+      },
+    });
+    const { app } = build({
+      claudeConfig: {
+        apiKey: 'minimax-test-key',
+        model: 'MiniMax-M2.5',
+        wireShape: 'anthropic',
+      },
+      claudeInteractiveSetupStatus: 'workspace-trust-required',
+    });
+
+    const result = await get(app, '/ws-1/agent-config/claude/credential');
+
+    expect(result).toEqual({
+      status: 200,
+      body: {
+        configured: true,
+        slug: 'minimax-1',
+        model: 'MiniMax-M2.5',
+        contextWindow: null,
+        wireShape: 'anthropic',
+        reasoningMode: 'adaptive',
+        interactiveSetupStatus: 'workspace-trust-required',
+      },
     });
   });
 
@@ -264,10 +370,12 @@ describe('GET /credentials — Quick Chat launch metadata', () => {
     expect(credential).toEqual({
       status: 200,
       body: {
+        configured: true,
         slug: 'google-1',
         model: 'gemini-3.5-flash',
         contextWindow: 512_000,
         wireShape: 'google-generative-ai',
+        reasoningMode: 'adaptive',
       },
     });
     expect(readiness.status).toBe(200);
@@ -305,7 +413,11 @@ describe('GET /credentials — Quick Chat launch metadata', () => {
     });
 
     expect(response.status).toBe(200);
-    expect(opencode.writeAiConfig).toHaveBeenCalledWith('/manager', config);
+    expect(opencode.writeAiConfig).toHaveBeenCalledWith('/manager', {
+      ...config,
+      reasoning: true,
+      reasoningEffort: 'medium',
+    });
   });
 });
 
@@ -331,7 +443,8 @@ describe('POST /quick-chat — loginless credential injection', () => {
     expect(cred.apiKey).toBe('sk-oa');
     expect(cred.wireShape).toBe('openai-chat');
     expect(cred.model).toBe('gpt-5.6'); // current vendor recommendation — no lastModel yet
-    expect(cred.contextWindow).toBe(256_000);
+    expect(cred.contextWindow).toBe(1_050_000);
+    expect(cred.reasoning).toBe(true);
     // model remembered on the cred for next time
     expect(vi.mocked(setCredentialLastModel)).toHaveBeenCalledWith('openai-1', 'gpt-5.6');
     expect(spawn).toHaveBeenCalledOnce();
@@ -459,24 +572,6 @@ describe('POST /quick-chat — loginless credential injection', () => {
     expect(creator.create).not.toHaveBeenCalled(); // reused, not created
     expect(spawn).toHaveBeenCalledOnce();
     expect((spawn.mock.calls[0] as any[])[0]).toBe('ws-1'); // spawned into the target
-  });
-
-  it('passes a concrete terminal theme hint into the spawned session', async () => {
-    const { app, spawn } = build();
-    const r = await quickChat(app, { prompt: 'hi', agent: 'claude', terminalTheme: 'light' });
-
-    expect(r.status).toBe(201);
-    expect(spawn).toHaveBeenCalledOnce();
-    expect((spawn.mock.calls[0] as any[])[1].terminalTheme).toBe('light');
-  });
-
-  it('rejects UI-only terminal theme preferences at the HTTP boundary', async () => {
-    const { app, spawn } = build();
-    const r = await quickChat(app, { prompt: 'hi', agent: 'claude', terminalTheme: 'follow' });
-
-    expect(r.status).toBe(400);
-    expect(r.body.message).toBe('terminalTheme must be "light" or "dark"');
-    expect(spawn).not.toHaveBeenCalled();
   });
 
   it('omitted agent ignores shell at agents[0] and uses the first agent runtime', async () => {

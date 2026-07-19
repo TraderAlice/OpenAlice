@@ -29,6 +29,7 @@ import {
   useAgentLaunchConfig,
   useAgentLaunchPreferences,
 } from '../hooks/useAgentLaunchConfig'
+import { isWorkspaceAiAgent } from '../lib/agentRuntime'
 
 export { resolveAgentRuntime as resolveChatAgent } from '../lib/agentRuntime'
 export {
@@ -137,10 +138,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
   }
 
   const adjustQuickChatAi = () => {
-    if (
-      credentialWorkspace &&
-      (effectiveAgent === 'opencode' || effectiveAgent === 'pi')
-    ) {
+    if (credentialWorkspace && isWorkspaceAiAgent(effectiveAgent)) {
       openAgentConfig(credentialWorkspace.id, effectiveAgent, 'ai')
       return
     }
@@ -235,26 +233,26 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
   }
 
   return (
-    <div className="relative h-full w-full overflow-auto bg-bg flex flex-col items-center justify-center px-4 py-6 md:px-6 md:py-10">
+    <div className="relative h-full w-full overflow-auto bg-background flex flex-col items-center justify-center px-4 py-6 md:px-6 md:py-10">
       {/* Ask-Alice backdrop — full-bleed, responsive-only layers (gradient wash
           + faint grid). The #302 mock's %-positioned circle / diagonal bars were
           dropped: they drift on portrait and read as pixel-placed art, not a
           responsive surface. pointer-events-none so it never intercepts clicks. */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-overlay to-transparent" />
-        <div className="absolute inset-x-0 bottom-0 h-[38%] bg-gradient-to-t from-overlay-strong to-transparent" />
-        <div className="absolute inset-0 opacity-[0.06] [background-image:linear-gradient(to_right,var(--color-text)_1px,transparent_1px),linear-gradient(to_bottom,var(--color-text)_1px,transparent_1px)] [background-size:96px_96px]" />
+        <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-accent to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 h-[38%] bg-gradient-to-t from-accent-strong to-transparent" />
+        <div className="absolute inset-0 opacity-[0.06] [background-image:linear-gradient(to_right,var(--foreground)_1px,transparent_1px),linear-gradient(to_bottom,var(--foreground)_1px,transparent_1px)] [background-size:96px_96px]" />
       </div>
 
       <div className="relative z-10 w-full max-w-2xl flex flex-col gap-4 md:gap-5">
         <div className="text-center space-y-1.5">
           {targetWs ? (
             <>
-              <h1 className="text-xl md:text-2xl font-semibold text-text">
+              <h1 className="text-xl md:text-2xl font-semibold text-foreground">
                 {t('chatLanding.targetHeading')}
               </h1>
               <div className="flex items-center justify-center gap-2 pt-1">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/10 pl-2.5 pr-1.5 py-1 text-[12.5px] font-medium text-accent">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 pl-2.5 pr-1.5 py-1 text-[12.5px] font-medium text-primary">
                   <LayoutGrid className="w-3.5 h-3.5 shrink-0" />
                   {targetWs.tag}
                   <button
@@ -262,7 +260,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
                     onClick={() => openOrFocus({ kind: 'chat-landing', params: {} })}
                     aria-label={t('chatLanding.clearTarget')}
                     title={t('chatLanding.clearTarget')}
-                    className="oa-icon-action ml-0.5 rounded-full p-0.5 text-accent/70 hover:text-accent hover:bg-accent/20 transition-colors"
+                    className="oa-icon-action ml-0.5 rounded-full p-0.5 text-primary/70 hover:text-primary hover:bg-primary/20 transition-colors"
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -271,17 +269,17 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
             </>
           ) : (
             <>
-              <h1 className="text-[19px] md:text-2xl font-semibold text-text leading-tight">{t('chatLanding.heading')}</h1>
-              <p className="text-[13px] md:text-sm text-text-muted leading-relaxed">{t('chatLanding.subheading')}</p>
+              <h1 className="text-[19px] md:text-2xl font-semibold text-foreground leading-tight">{t('chatLanding.heading')}</h1>
+              <p className="text-[13px] md:text-sm text-muted-foreground leading-relaxed">{t('chatLanding.subheading')}</p>
             </>
           )}
         </div>
 
         <div
-          className={`rounded-xl px-3 pb-2 pt-3 shadow-[0_18px_50px_-40px_var(--color-text)] transition-[border-color,box-shadow] md:rounded-2xl ${
+          className={`rounded-xl px-3 pb-2 pt-3 shadow-[0_18px_50px_-40px_var(--foreground)] transition-[border-color,box-shadow] md:rounded-2xl ${
             targetWs
-              ? 'bg-accent/[0.04] border border-accent/45 ring-1 ring-accent/15 focus-within:border-accent/70'
-              : 'border border-border/80 bg-bg-secondary/70 focus-within:border-accent/60 focus-within:shadow-[0_20px_55px_-38px_var(--color-accent)]'
+              ? 'bg-primary/[0.04] border border-primary/45 ring-1 ring-primary/15 focus-within:border-primary/70'
+              : 'border border-border/80 bg-secondary/70 focus-within:border-primary/60 focus-within:shadow-[0_20px_55px_-38px_var(--primary)]'
           }`}
         >
           <textarea
@@ -292,7 +290,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
             placeholder={t('chatLanding.placeholder')}
             rows={3}
             autoFocus
-            className="w-full max-h-[40vh] min-h-[92px] resize-none bg-transparent px-2 py-1.5 text-[15px] text-text outline-none placeholder:text-text-muted/70 md:min-h-[72px]"
+            className="w-full max-h-[40vh] min-h-[92px] resize-none bg-transparent px-2 py-1.5 text-[15px] text-foreground outline-none placeholder:text-muted-foreground/70 md:min-h-[72px]"
           />
           <div className="flex flex-col gap-2 px-1 pt-1 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -307,7 +305,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
                   aria-haspopup="menu"
                   aria-expanded={workspaceMenuOpen}
                   aria-label={t('chatLanding.selectWorkspace')}
-                  className="oa-pressable inline-flex min-h-8 max-w-[220px] items-center gap-1.5 rounded-md bg-bg-tertiary px-2.5 py-1 text-[11px] text-text-muted hover:text-text disabled:cursor-default"
+                  className="oa-pressable inline-flex min-h-8 max-w-[220px] items-center gap-1.5 rounded-md bg-muted px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground disabled:cursor-default"
                 >
                   <MessageSquare className="w-3 h-3 shrink-0" />
                   <span className="truncate">
@@ -322,7 +320,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
                 {workspaceMenuOpen && targetWs === undefined && chatWorkspaceOptions.length > 0 && (
                   <div
                     role="menu"
-                    className="oa-popover-enter absolute bottom-full left-0 z-10 mb-1 max-h-[min(24rem,calc(100vh-8rem))] min-w-[220px] max-w-[320px] overflow-y-auto overscroll-contain rounded-lg border border-border/70 bg-bg-secondary py-1 shadow-lg [scrollbar-gutter:stable]"
+                    className="oa-popover-enter absolute bottom-full left-0 z-10 mb-1 max-h-[min(24rem,calc(100vh-8rem))] min-w-[220px] max-w-[320px] overflow-y-auto overscroll-contain rounded-lg border border-border/70 bg-secondary py-1 shadow-lg [scrollbar-gutter:stable]"
                   >
                     {chatWorkspaceOptions.map((workspace) => {
                       const active = workspace.id === workspaceTarget?.id
@@ -337,7 +335,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
                             launchConfig.resetCredentialSelection()
                             setWorkspaceMenuOpen(false)
                           }}
-                          className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] transition-colors hover:bg-bg-tertiary ${active ? 'text-accent' : 'text-text'}`}
+                          className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] transition-colors hover:bg-muted ${active ? 'text-primary' : 'text-foreground'}`}
                         >
                           <LayoutGrid className="w-3.5 h-3.5 shrink-0" />
                           <span className="min-w-0 flex-1 truncate">{workspaceDisplayTitle(workspace)}</span>
@@ -361,7 +359,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
                 disabled
                 title={t('chatLanding.attachSoon')}
                 aria-label={t('chatLanding.attach')}
-                className="w-10 h-10 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-text-muted/50 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="w-10 h-10 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-muted-foreground/50 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Paperclip className="w-4 h-4" />
               </button>
@@ -371,7 +369,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
                 disabled={!canSend}
                 title={t('chatLanding.send')}
                 aria-label={t('chatLanding.send')}
-                className="oa-icon-action w-10 h-10 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center bg-accent text-white transition-colors hover:bg-accent/90 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="oa-icon-action w-10 h-10 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {launching ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowUp className="w-4 h-4" />}
               </button>
@@ -385,25 +383,25 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
           />
         </div>
 
-        {error !== null && <div className="text-[12px] text-red px-1">{error}</div>}
+        {error !== null && <div className="text-[12px] text-destructive px-1">{error}</div>}
 
         {/* Runtime guidance. A normal packaged build should expose managed Pi;
             no-runtime is now an abnormal setup/debug state, not a prompt to
             make a fresh user install a CLI. */}
         {launchConfig.agentsKnown && !launchConfig.anyInstalled ? (
-          <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-[12px] space-y-1.5">
-            <div className="font-medium text-text">{t('chatLanding.noAgentsTitle')}</div>
-            <p className="text-text-muted">{t('chatLanding.noAgentsBody')}</p>
+          <div className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2.5 text-[12px] space-y-1.5">
+            <div className="font-medium text-foreground">{t('chatLanding.noAgentsTitle')}</div>
+            <p className="text-muted-foreground">{t('chatLanding.noAgentsBody')}</p>
           </div>
         ) : launchConfig.selectedMissing && selectedInfo ? (
-          <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-[12px] space-y-1.5">
-            <p className="text-text-muted">
+          <div className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2.5 text-[12px] space-y-1.5">
+            <p className="text-muted-foreground">
               {t('chatLanding.agentMissing', { name: selectedInfo.displayName })}
             </p>
             {installHint?.cmd && (
               <div className="flex items-center gap-2">
-                <span className="text-text-muted">{t('chatLanding.installLabel')}</span>
-                <code className="font-mono text-[11px] text-text bg-bg-tertiary rounded px-2 py-1 select-all">
+                <span className="text-muted-foreground">{t('chatLanding.installLabel')}</span>
+                <code className="font-mono text-[11px] text-foreground bg-muted rounded px-2 py-1 select-all">
                   {installHint.cmd}
                 </code>
               </div>
@@ -413,7 +411,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
                 href={installHint.url}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-block text-accent hover:underline"
+                className="inline-block text-primary hover:underline"
               >
                 {t('chatLanding.installDocs')} ↗
               </a>
@@ -424,14 +422,14 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
         {/* Loginless runtime has no provider configured — the conversion
             dead-end. Guide the user to set one up instead of a silent failure. */}
         {launchConfig.noCredentials && selectedInfo && (
-          <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-[12px] space-y-1.5">
-            <p className="text-text-muted">
+          <div className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2.5 text-[12px] space-y-1.5">
+            <p className="text-muted-foreground">
               {t('chatLanding.noCredBody', { name: selectedInfo.displayName })}
             </p>
             <button
               type="button"
               onClick={goConfigureProvider}
-              className="inline-flex items-center gap-1.5 text-accent hover:underline"
+              className="inline-flex items-center gap-1.5 text-primary hover:underline"
             >
               <KeyRound className="w-3 h-3" />
               {t('chatLanding.configureProvider')} ↗
@@ -442,7 +440,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
         {/* The selected cred differs from the one today's workspace already uses
             — sending switches it. A notice, not a block (the user chose it). */}
         {launchConfig.willOverwriteCredential && launchConfig.credential && (
-          <div className="rounded-lg border border-border/60 bg-bg-secondary/60 px-3 py-2 text-[12px] text-text-muted">
+          <div className="rounded-lg border border-border/60 bg-secondary/60 px-3 py-2 text-[12px] text-muted-foreground">
             {t('chatLanding.credOverwrite', {
               from: launchConfig.detectedCredential?.slug ?? '',
               to: launchConfig.credential.slug,
@@ -452,14 +450,14 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
 
         <div className="relative -mx-4 md:mx-0">
           <div className="scrollbar-hide flex items-center gap-2 overflow-x-auto px-4 pb-1 pr-14 md:flex-wrap md:overflow-visible md:px-1 md:pr-1 md:pb-0">
-            <span className="shrink-0 text-[11px] font-medium text-text-muted">{t('chatLanding.examplesLabel')}</span>
+            <span className="shrink-0 text-[11px] font-medium text-muted-foreground">{t('chatLanding.examplesLabel')}</span>
             {[t('chatLanding.ex1'), t('chatLanding.ex2'), t('chatLanding.ex3')].map((ex) => (
               <button
                 key={ex}
                 type="button"
                 onClick={() => useExample(ex)}
                 disabled={launching}
-                className="min-h-8 shrink-0 rounded-full border border-border/70 bg-bg-secondary/75 px-3 py-1 text-[12px] text-text-muted transition-colors hover:border-accent/50 hover:bg-bg-secondary hover:text-text disabled:opacity-40"
+                className="min-h-8 shrink-0 rounded-full border border-border/70 bg-secondary/75 px-3 py-1 text-[12px] text-muted-foreground transition-colors hover:border-primary/50 hover:bg-secondary hover:text-foreground disabled:opacity-40"
               >
                 {ex}
               </button>

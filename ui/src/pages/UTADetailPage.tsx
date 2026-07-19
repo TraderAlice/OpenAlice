@@ -205,10 +205,10 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
         live={{ lastUpdated }}
         description={
           <>
-            <Link to="/trading" className="text-text-muted hover:text-text">← Trading</Link>
-            <span className="mx-2 text-text-muted/40">·</span>
-            <span className="font-mono text-text-muted">{uta.id}</span>
-            <span className="mx-2 text-text-muted/40">·</span>
+            <Link to="/trading" className="text-muted-foreground hover:text-foreground">← Trading</Link>
+            <span className="mx-2 text-muted-foreground/40">·</span>
+            <span className="font-mono text-muted-foreground">{uta.id}</span>
+            <span className="mx-2 text-muted-foreground/40">·</span>
             <HealthBadge health={health} size="sm" />
           </>
         }
@@ -232,7 +232,7 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
             <button
               onClick={() => setOrderMode({ kind: 'place' })}
               disabled={isDisabled}
-              className="px-3 py-1.5 text-xs font-medium rounded-md bg-accent text-bg hover:bg-accent/90 disabled:opacity-40 transition-all active:scale-[0.98] cursor-pointer"
+              className="px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 transition-all active:scale-[0.98] cursor-pointer"
             >
               + Place Order
             </button>
@@ -243,7 +243,7 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
       <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5">
         <div className="max-w-[1240px] mx-auto">
           {dataError && (
-            <div className="rounded-md border border-red/30 bg-red/5 px-3 py-2 text-[12px] text-red mb-4">
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-[12px] text-destructive mb-4">
               Failed to load live data: {dataError}
             </div>
           )}
@@ -333,7 +333,7 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
 function Shell({ title, children }: { title: string; children?: React.ReactNode }) {
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <PageHeader title={title} description={<Link to="/trading" className="text-text-muted hover:text-text">← Trading</Link>} />
+      <PageHeader title={title} description={<Link to="/trading" className="text-muted-foreground hover:text-foreground">← Trading</Link>} />
       <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5">
         <div className="max-w-[720px] mx-auto">{children}</div>
       </div>
@@ -353,7 +353,7 @@ function SubAccountSelector({ subAccounts, selected, onSelect }: {
 }) {
   const pill = (active: boolean) =>
     `px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-      active ? 'bg-accent text-white' : 'text-text-muted hover:text-text hover:bg-surface-hover'
+      active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-accent'
     }`
   return (
     <div className="flex items-center gap-1 p-1 rounded-lg bg-surface border border-border">
@@ -390,7 +390,7 @@ function UTADetailMainSkeleton() {
     <div className="space-y-5" aria-hidden="true">
       <Skeleton className="h-[220px] w-full rounded-lg" />
       <div className="rounded-lg border border-border overflow-hidden">
-        <div className="px-4 py-2.5 border-b border-border bg-bg-secondary">
+        <div className="px-4 py-2.5 border-b border-border bg-secondary">
           <Skeleton className="h-3 w-28" />
         </div>
         <div className="divide-y divide-border">
@@ -417,7 +417,7 @@ function AccountPanel({ account, positions, delta24h, clock, connecting }: {
 }) {
   if (!account) {
     return (
-      <div className="border border-border rounded-lg bg-bg-secondary p-4">
+      <div className="border border-border rounded-lg bg-secondary p-4">
         {clock != null && (
           <div className="text-[12px] mb-3"><MarketClockChip clock={clock} /></div>
         )}
@@ -425,7 +425,7 @@ function AccountPanel({ account, positions, delta24h, clock, connecting }: {
             reads as progress, where a bare "Loading…" that lingers 30s reads
             as a stall. Skeleton rows below stand in for the metric list so the
             panel has shape instead of a single line of text. */}
-        <p className={`text-[12px] mb-3.5 ${connecting ? 'text-accent' : 'text-text-muted'}`}>
+        <p className={`text-[12px] mb-3.5 ${connecting ? 'text-primary' : 'text-muted-foreground'}`}>
           {connecting ? 'Connecting to broker…' : 'Loading account info…'}
         </p>
         <div className="space-y-3.5" aria-hidden="true">
@@ -474,7 +474,7 @@ function AccountPanel({ account, positions, delta24h, clock, connecting }: {
     : null
 
   return (
-    <div className="border border-border rounded-lg bg-bg-secondary p-4">
+    <div className="border border-border rounded-lg bg-secondary p-4">
       {clock != null && (
         <div className="text-[12px] mb-3"><MarketClockChip clock={clock} /></div>
       )}
@@ -497,12 +497,12 @@ function AccountPanel({ account, positions, delta24h, clock, connecting }: {
         {utilizationPct != null && (
           <div className="py-2">
             <div className="flex items-baseline justify-between gap-3">
-              <span className="text-[11px] uppercase tracking-wide text-text-muted">Utilization</span>
-              <span className="text-[13px] font-medium tabular-nums text-text">{utilizationPct.toFixed(1)}%</span>
+              <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Utilization</span>
+              <span className="text-[13px] font-medium tabular-nums text-foreground">{utilizationPct.toFixed(1)}%</span>
             </div>
-            <div className="mt-1.5 h-[2px] rounded-full bg-bg-tertiary overflow-hidden">
+            <div className="mt-1.5 h-[2px] rounded-full bg-muted overflow-hidden">
               <div
-                className="h-full rounded-full bg-accent"
+                className="h-full rounded-full bg-primary"
                 style={{ width: `${Math.min(100, Math.max(0, utilizationPct))}%` }}
               />
             </div>
@@ -546,10 +546,10 @@ function AccountRow({ label, value, sign }: {
   value: React.ReactNode
   sign?: 'up' | 'down' | 'flat'
 }) {
-  const valueColor = sign === 'up' ? 'text-green' : sign === 'down' ? 'text-red' : 'text-text'
+  const valueColor = sign === 'up' ? 'text-success' : sign === 'down' ? 'text-destructive' : 'text-foreground'
   return (
     <div className="flex items-baseline justify-between gap-3 py-2">
-      <span className="text-[11px] uppercase tracking-wide text-text-muted">{label}</span>
+      <span className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</span>
       <span className={`text-[13px] font-medium tabular-nums text-right ${valueColor}`}>{value}</span>
     </div>
   )
@@ -561,7 +561,7 @@ function Section({ title, action, children }: { title: string; action?: React.Re
   return (
     <section>
       <div className="flex items-center justify-between mb-2.5">
-        <h3 className="text-[13px] font-semibold text-text-muted uppercase tracking-wide">{title}</h3>
+        <h3 className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wide">{title}</h3>
         {action}
       </div>
       {children}
@@ -592,7 +592,7 @@ function PositionsSection({ positions, onCloseClick }: {
   if (positions.length === 0) {
     return (
       <Section title="Positions (0)">
-        <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-text-muted">
+        <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-muted-foreground">
           No open positions.
         </div>
       </Section>
@@ -606,7 +606,7 @@ function PositionsSection({ positions, onCloseClick }: {
       <div className="border border-border rounded-lg overflow-x-auto">
         <table className="w-full text-[13px]">
           <thead>
-            <tr className="bg-bg-secondary text-text-muted text-left">
+            <tr className="bg-secondary text-muted-foreground text-left">
               <th className="px-3 py-2 font-medium">Contract</th>
               <th className="px-3 py-2 font-medium">Side</th>
               <th className="px-3 py-2 font-medium text-right">Qty</th>
@@ -625,20 +625,20 @@ function PositionsSection({ positions, onCloseClick }: {
 
               return (
                 <Fragment key={g.class}>
-                  <tr className="bg-bg-tertiary/40 border-t border-border">
+                  <tr className="bg-muted/40 border-t border-border">
                     <td colSpan={cols} className="px-3 py-1.5">
                       <div className="flex items-center justify-between text-[12px]">
                         <div className="flex items-center gap-2">
-                          <span className="font-semibold text-text">{assetClassLabel(g.class)}</span>
-                          <span className="text-text-muted/60">·</span>
-                          <span className="text-text-muted">{g.positions.length} position{g.positions.length > 1 ? 's' : ''}</span>
+                          <span className="font-semibold text-foreground">{assetClassLabel(g.class)}</span>
+                          <span className="text-muted-foreground/60">·</span>
+                          <span className="text-muted-foreground">{g.positions.length} position{g.positions.length > 1 ? 's' : ''}</span>
                           {!groupCcy && (
-                            <span className="text-text-muted/60 text-[11px]">mixed ccy</span>
+                            <span className="text-muted-foreground/60 text-[11px]">mixed ccy</span>
                           )}
                         </div>
                         <div className="flex items-center gap-3 tabular-nums">
-                          <span className="text-text">{groupCcy ? fmt(sumValue, groupCcy) : `$${sumValue.toLocaleString(getIntlLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</span>
-                          <span className={sumPnl >= 0 ? 'text-green' : 'text-red'}>
+                          <span className="text-foreground">{groupCcy ? fmt(sumValue, groupCcy) : `$${sumValue.toLocaleString(getIntlLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</span>
+                          <span className={sumPnl >= 0 ? 'text-success' : 'text-destructive'}>
                             {groupCcy ? fmtPnl(sumPnl, groupCcy) : `${sumPnl >= 0 ? '+' : ''}${sumPnl.toLocaleString(getIntlLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                           </span>
                         </div>
@@ -665,28 +665,28 @@ function PositionRow({ position: p, onClose }: { position: Position; onClose: ()
   const pct = cost > 0 ? (pnl / cost) * 100 : 0
 
   return (
-    <tr className="border-t border-border hover:bg-bg-tertiary/30 transition-colors">
+    <tr className="border-t border-border hover:bg-muted/30 transition-colors">
       <td className="px-3 py-2">
         <ContractCell contract={p.contract} />
       </td>
       <td className="px-3 py-2">
-        <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${p.side === 'long' ? 'bg-green/15 text-green' : 'bg-red/15 text-red'}`}>
+        <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${p.side === 'long' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
           {p.side}
         </span>
       </td>
-      <td className="px-3 py-2 text-right text-text tabular-nums">{fmtNum(p.quantity)}</td>
-      <td className="px-3 py-2 text-right text-text-muted tabular-nums">
-        {fmt(p.avgCost, ccy)} <span className="text-text-muted/40">→</span> <span className="text-text">{fmt(p.marketPrice, ccy)}</span>
+      <td className="px-3 py-2 text-right text-foreground tabular-nums">{fmtNum(p.quantity)}</td>
+      <td className="px-3 py-2 text-right text-muted-foreground tabular-nums">
+        {fmt(p.avgCost, ccy)} <span className="text-muted-foreground/40">→</span> <span className="text-foreground">{fmt(p.marketPrice, ccy)}</span>
       </td>
-      <td className="px-3 py-2 text-right text-text tabular-nums">{fmt(p.marketValue, ccy)}</td>
-      <td className={`px-3 py-2 text-right font-medium tabular-nums ${pnl >= 0 ? 'text-green' : 'text-red'}`}>
+      <td className="px-3 py-2 text-right text-foreground tabular-nums">{fmt(p.marketValue, ccy)}</td>
+      <td className={`px-3 py-2 text-right font-medium tabular-nums ${pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
         <div>{fmtPnl(pnl, ccy)}</div>
         <div className="text-[11px] font-normal opacity-80">{fmtPctSigned(pct)}</div>
       </td>
       <td className="px-3 py-2 text-right">
         <button
           onClick={onClose}
-          className="text-[11px] text-text-muted hover:text-red transition-colors"
+          className="text-[11px] text-muted-foreground hover:text-destructive transition-colors"
         >
           Close
         </button>
@@ -700,7 +700,7 @@ function PositionRow({ position: p, onClose }: { position: Position; onClose: ()
 type MarketClockState = { isOpen: boolean; nextOpen?: string; nextClose?: string } | 'error' | null
 
 function MarketClockChip({ clock }: { clock: NonNullable<MarketClockState> }) {
-  let dotClass = 'bg-green'
+  let dotClass = 'bg-success'
   let label = '24/7'
 
   if (clock !== 'error') {
@@ -715,7 +715,7 @@ function MarketClockChip({ clock }: { clock: NonNullable<MarketClockState> }) {
         label = 'Market Open'
       }
     } else {
-      dotClass = 'bg-text-muted/50'
+      dotClass = 'bg-muted-foreground/50'
       const opens = clock.nextOpen ? new Date(clock.nextOpen) : null
       if (opens && !Number.isNaN(opens.getTime())) {
         const mins = Math.max(0, Math.round((opens.getTime() - Date.now()) / 60_000))
@@ -729,7 +729,7 @@ function MarketClockChip({ clock }: { clock: NonNullable<MarketClockState> }) {
   }
 
   return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-text-muted">
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-muted-foreground">
       <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotClass}`} aria-hidden />
       {label}
     </span>
@@ -793,8 +793,8 @@ function OrdersArea({ utaId, openOrders }: { utaId: string; openOrders: unknown[
               onClick={() => setTab(t.id)}
               className={`px-2 py-0.5 text-[11px] rounded transition-colors ${
                 tab === t.id
-                  ? 'bg-accent/15 text-accent font-medium'
-                  : 'text-text-muted hover:text-text hover:bg-bg-tertiary'
+                  ? 'bg-primary/15 text-primary font-medium'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
               }`}
             >
               {t.label}
@@ -814,7 +814,7 @@ function OpenOrdersTable({ orders }: { orders: unknown[] }) {
   const rows = orders as OpenOrderRow[]
   if (rows.length === 0) {
     return (
-      <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-text-muted">
+      <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-muted-foreground">
         No open orders.
       </div>
     )
@@ -823,7 +823,7 @@ function OpenOrdersTable({ orders }: { orders: unknown[] }) {
     <div className="border border-border rounded-lg overflow-x-auto">
       <table className="w-full text-[13px]">
         <thead>
-          <tr className="bg-bg-secondary text-text-muted text-left">
+          <tr className="bg-secondary text-muted-foreground text-left">
             <th className="px-3 py-2 font-medium">Order ID</th>
             <th className="px-3 py-2 font-medium">Contract</th>
             <th className="px-3 py-2 font-medium">Action</th>
@@ -836,16 +836,16 @@ function OpenOrdersTable({ orders }: { orders: unknown[] }) {
         <tbody>
           {rows.map((o, i) => (
             <tr key={i} className="border-t border-border">
-              <td className="px-3 py-2 font-mono text-text-muted text-[11px]">{String(o.orderId ?? '—')}</td>
-              <td className="px-3 py-2 font-mono text-text" title={o.contract?.aliceId}>
+              <td className="px-3 py-2 font-mono text-muted-foreground text-[11px]">{String(o.orderId ?? '—')}</td>
+              <td className="px-3 py-2 font-mono text-foreground" title={o.contract?.aliceId}>
                 {o.contract?.symbol ?? o.contract?.localSymbol ?? o.contract?.aliceId ?? '?'}
               </td>
-              <td className={`px-3 py-2 font-medium ${o.order?.action === 'BUY' ? 'text-green' : o.order?.action === 'SELL' ? 'text-red' : 'text-text'}`}>{o.order?.action ?? '—'}</td>
-              <td className="px-3 py-2 text-text-muted">{o.order?.orderType ?? '—'}</td>
-              <td className="px-3 py-2 text-right text-text tabular-nums">{String(o.order?.totalQuantity ?? '')}</td>
-              <td className="px-3 py-2 text-right text-text-muted tabular-nums">{o.order?.lmtPrice != null && !isUnsetDecimal(o.order.lmtPrice) ? String(o.order.lmtPrice) : '—'}</td>
+              <td className={`px-3 py-2 font-medium ${o.order?.action === 'BUY' ? 'text-success' : o.order?.action === 'SELL' ? 'text-destructive' : 'text-foreground'}`}>{o.order?.action ?? '—'}</td>
+              <td className="px-3 py-2 text-muted-foreground">{o.order?.orderType ?? '—'}</td>
+              <td className="px-3 py-2 text-right text-foreground tabular-nums">{String(o.order?.totalQuantity ?? '')}</td>
+              <td className="px-3 py-2 text-right text-muted-foreground tabular-nums">{o.order?.lmtPrice != null && !isUnsetDecimal(o.order.lmtPrice) ? String(o.order.lmtPrice) : '—'}</td>
               <td className="px-3 py-2">
-                <span className="text-[11px] text-text-muted">{o.orderState?.status ?? 'Unknown'}</span>
+                <span className="text-[11px] text-muted-foreground">{o.orderState?.status ?? 'Unknown'}</span>
               </td>
             </tr>
           ))}
@@ -858,16 +858,16 @@ function OpenOrdersTable({ orders }: { orders: unknown[] }) {
 // ==================== Order History tab ====================
 
 const ORDER_STATUS_STYLES: Record<OrderHistoryStatus, string> = {
-  filled: 'bg-green/15 text-green',
-  cancelled: 'bg-bg-tertiary text-text-muted',
-  rejected: 'bg-red/15 text-red',
-  'user-rejected': 'bg-red/15 text-red',
-  submitted: 'bg-accent/15 text-accent',
+  filled: 'bg-success/15 text-success',
+  cancelled: 'bg-muted text-muted-foreground',
+  rejected: 'bg-destructive/15 text-destructive',
+  'user-rejected': 'bg-destructive/15 text-destructive',
+  submitted: 'bg-primary/15 text-primary',
 }
 
 function OrderStatusBadge({ status }: { status: OrderHistoryStatus }) {
   return (
-    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${ORDER_STATUS_STYLES[status] ?? 'bg-bg-tertiary text-text-muted'}`}>
+    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${ORDER_STATUS_STYLES[status] ?? 'bg-muted text-muted-foreground'}`}>
       {status}
     </span>
   )
@@ -875,7 +875,7 @@ function OrderStatusBadge({ status }: { status: OrderHistoryStatus }) {
 
 function SideBadge({ side }: { side: 'BUY' | 'SELL' }) {
   return (
-    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${side === 'BUY' ? 'bg-green/15 text-green' : 'bg-red/15 text-red'}`}>
+    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${side === 'BUY' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
       {side}
     </span>
   )
@@ -883,7 +883,7 @@ function SideBadge({ side }: { side: 'BUY' | 'SELL' }) {
 
 function SourceChip({ label }: { label: string }) {
   return (
-    <span className="text-[10px] px-1.5 rounded bg-bg-tertiary text-text-muted">
+    <span className="text-[10px] px-1.5 rounded bg-muted text-muted-foreground">
       {label}
     </span>
   )
@@ -894,14 +894,14 @@ function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | null }) {
 
   if (orders == null) {
     return (
-      <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-text-muted">
+      <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-muted-foreground">
         Loading order history…
       </div>
     )
   }
   if (orders.length === 0) {
     return (
-      <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-text-muted">
+      <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-muted-foreground">
         No order history yet.
       </div>
     )
@@ -910,7 +910,7 @@ function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | null }) {
     <div className="border border-border rounded-lg overflow-x-auto">
       <table className="w-full text-[13px]">
         <thead>
-          <tr className="bg-bg-secondary text-text-muted text-left">
+          <tr className="bg-secondary text-muted-foreground text-left">
             <th className="px-3 py-2 font-medium">Time</th>
             <th className="px-3 py-2 font-medium">Contract</th>
             <th className="px-3 py-2 font-medium">Side</th>
@@ -925,16 +925,16 @@ function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | null }) {
           {orders.map((o, i) => (
             <Fragment key={`${o.commitHash}-${i}`}>
               <tr
-                className="border-t border-border hover:bg-bg-tertiary/30 transition-colors cursor-pointer"
+                className="border-t border-border hover:bg-muted/30 transition-colors cursor-pointer"
                 onClick={() => setExpanded(prev => prev === i ? null : i)}
               >
-                <td className="px-3 py-2 text-text-muted tabular-nums whitespace-nowrap">{formatHistoryTime(o.timestamp)}</td>
+                <td className="px-3 py-2 text-muted-foreground tabular-nums whitespace-nowrap">{formatHistoryTime(o.timestamp)}</td>
                 <td className="px-3 py-2"><ContractCell contract={o.contract} /></td>
                 <td className="px-3 py-2"><SideBadge side={o.side} /></td>
-                <td className="px-3 py-2 text-text-muted">{o.orderType ?? '—'}</td>
-                <td className="px-3 py-2 text-right text-text tabular-nums">{o.quantity != null ? fmtNum(o.quantity) : '—'}</td>
-                <td className="px-3 py-2 text-right text-text-muted tabular-nums">{o.limitPrice ?? '—'}</td>
-                <td className="px-3 py-2 text-right text-text tabular-nums">
+                <td className="px-3 py-2 text-muted-foreground">{o.orderType ?? '—'}</td>
+                <td className="px-3 py-2 text-right text-foreground tabular-nums">{o.quantity != null ? fmtNum(o.quantity) : '—'}</td>
+                <td className="px-3 py-2 text-right text-muted-foreground tabular-nums">{o.limitPrice ?? '—'}</td>
+                <td className="px-3 py-2 text-right text-foreground tabular-nums">
                   {o.avgFillPrice ? `${o.avgFillPrice}${o.filledQty ? ` × ${o.filledQty}` : ''}` : '—'}
                 </td>
                 <td className="px-3 py-2">
@@ -945,12 +945,12 @@ function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | null }) {
                 </td>
               </tr>
               {expanded === i && (
-                <tr className="border-t border-border bg-bg-tertiary/20">
-                  <td colSpan={8} className="px-3 py-2 text-[11px] text-text-muted">
+                <tr className="border-t border-border bg-muted/20">
+                  <td colSpan={8} className="px-3 py-2 text-[11px] text-muted-foreground">
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
                       <span className="font-mono">{o.commitHash}</span>
                       <span>{o.message}</span>
-                      {o.error && <span className="text-red">{o.error}</span>}
+                      {o.error && <span className="text-destructive">{o.error}</span>}
                       {o.resolvedAt && <span>resolved {formatHistoryTime(o.resolvedAt)}</span>}
                     </div>
                   </td>
@@ -969,14 +969,14 @@ function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | null }) {
 function TradeHistoryTable({ trades }: { trades: TradeHistoryEntry[] | null }) {
   if (trades == null) {
     return (
-      <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-text-muted">
+      <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-muted-foreground">
         Loading trade history…
       </div>
     )
   }
   if (trades.length === 0) {
     return (
-      <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-text-muted">
+      <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-muted-foreground">
         No trades yet.
       </div>
     )
@@ -985,7 +985,7 @@ function TradeHistoryTable({ trades }: { trades: TradeHistoryEntry[] | null }) {
     <div className="border border-border rounded-lg overflow-x-auto">
       <table className="w-full text-[13px]">
         <thead>
-          <tr className="bg-bg-secondary text-text-muted text-left">
+          <tr className="bg-secondary text-muted-foreground text-left">
             <th className="px-3 py-2 font-medium">Time</th>
             <th className="px-3 py-2 font-medium">Contract</th>
             <th className="px-3 py-2 font-medium">Side</th>
@@ -997,13 +997,13 @@ function TradeHistoryTable({ trades }: { trades: TradeHistoryEntry[] | null }) {
         </thead>
         <tbody>
           {trades.map((t, i) => (
-            <tr key={`${t.commitHash}-${i}`} className="border-t border-border hover:bg-bg-tertiary/30 transition-colors">
-              <td className="px-3 py-2 text-text-muted tabular-nums whitespace-nowrap">{formatHistoryTime(t.timestamp)}</td>
+            <tr key={`${t.commitHash}-${i}`} className="border-t border-border hover:bg-muted/30 transition-colors">
+              <td className="px-3 py-2 text-muted-foreground tabular-nums whitespace-nowrap">{formatHistoryTime(t.timestamp)}</td>
               <td className="px-3 py-2"><ContractCell contract={t.contract} /></td>
               <td className="px-3 py-2"><SideBadge side={t.side} /></td>
-              <td className="px-3 py-2 text-right text-text tabular-nums">{fmtNum(t.quantity)}</td>
-              <td className="px-3 py-2 text-right text-text tabular-nums">{t.price}</td>
-              <td className="px-3 py-2 text-right text-text tabular-nums">{fmt(t.value, t.contract.currency)}</td>
+              <td className="px-3 py-2 text-right text-foreground tabular-nums">{fmtNum(t.quantity)}</td>
+              <td className="px-3 py-2 text-right text-foreground tabular-nums">{t.price}</td>
+              <td className="px-3 py-2 text-right text-foreground tabular-nums">{fmt(t.value, t.contract.currency)}</td>
               <td className="px-3 py-2 text-right">
                 {t.source !== 'order' && (
                   <SourceChip label={t.source === 'external' ? 'External' : 'Reconcile'} />

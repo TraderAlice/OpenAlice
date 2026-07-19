@@ -75,7 +75,7 @@ export function buildSpawnEnv(
   const out: { [key: string]: string } = {};
   for (const [k, v] of Object.entries(parent)) {
     if (typeof v !== 'string') continue;
-    if (shouldStrip(k)) continue;
+    if (shouldStrip(k, v)) continue;
     out[k] = v;
   }
   // Announce ourselves honestly so well-behaved TUI apps can detect us.
@@ -163,7 +163,12 @@ export function buildCliPath(env: NodeJS.ProcessEnv = process.env): string {
   return out.join(delimiter);
 }
 
-function shouldStrip(name: string): boolean {
+function shouldStrip(name: string, value: string): boolean {
   if (STRIP_EXACT.has(name)) return true;
+  // Parent shells and launchers often export these style switches globally.
+  // Do not let a parent process's logging preference disable color in a fresh
+  // terminal emulator. User shell startup files may still set these again.
+  if (name === 'NO_COLOR') return true;
+  if ((name === 'FORCE_COLOR' || name === 'CLICOLOR') && value === '0') return true;
   return STRIP_PREFIXES.some((p) => name.startsWith(p));
 }

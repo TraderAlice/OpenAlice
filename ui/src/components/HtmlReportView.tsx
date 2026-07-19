@@ -104,13 +104,13 @@ export function HtmlReportView({ path, content }: { path: string; content: strin
   const srcDoc = useMemo(() => createSandboxedHtmlReportDocument(content), [content])
 
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-white shadow-sm">
+    <div className="overflow-hidden rounded-lg border border-border bg-report-canvas shadow-sm">
       <iframe
         title={`HTML report: ${path}`}
         sandbox=""
         referrerPolicy="no-referrer"
         srcDoc={srcDoc}
-        className="block h-[min(70vh,720px)] min-h-[420px] w-full border-0 bg-white"
+        className="block h-[min(70vh,720px)] min-h-[420px] w-full border-0 bg-report-canvas"
       />
     </div>
   )

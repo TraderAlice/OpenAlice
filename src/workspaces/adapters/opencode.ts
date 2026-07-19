@@ -1,17 +1,67 @@
 import { execFile } from 'node:child_process';
-import { rm } from 'node:fs/promises';
+import { statSync } from 'node:fs';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
 import type { CliAdapter, OnDiskSession, SpawnContext, WorkspaceAiCred } from '../cli-adapter.js';
+import { isModelReasoningEffort } from '../../ai-providers/model-semantics.js';
 import { readWorkspaceFile, writeWorkspaceFile } from '../file-service.js';
 import type { HeadlessOutputEvent } from '../headless-output.js';
+import { resetOwnedJsonConfig, writeOwnedJsonConfig } from './owned-json-config.js';
 
 const execFileAsync = promisify(execFile);
 
 const OPENCODE_CONFIG_PATH = 'opencode.json';
+const OPENCODE_TUI_CONFIG_PATH = 'tui.json';
+const OPENCODE_TUI_CONFIGC_PATH = 'tui.jsonc';
+const OPENCODE_BINDING_STATE_PATH = '.opencode/openalice-provider.json';
 const OPENCODE_PROVIDER_NAME = 'workspace';
+const OPENCODE_SYSTEM_THEME = 'system';
+const OPENCODE_OWNED_PATHS = [
+  ['$schema'],
+  ['provider', OPENCODE_PROVIDER_NAME],
+  ['model'],
+] as const;
 const DEFAULT_OUTPUT_TOKENS = 16_384;
+
+function modelEffortOptions(cred: WorkspaceAiCred): Record<string, unknown> | null {
+  const effort = cred.reasoningEffort;
+  if (!effort) return null;
+  if (cred.wireShape === 'anthropic') {
+    if (effort === 'none') return { thinking: { type: 'disabled' } };
+    // Current Claude adaptive models require the thinking mode alongside
+    // output effort. Other Anthropic-compatible providers such as GLM expose
+    // effort directly and can reject Claude-specific thinking objects.
+    const id = cred.model?.toLowerCase() ?? '';
+    return id.includes('claude') || id.includes('fable')
+      ? { thinking: { type: 'adaptive' }, effort }
+      : { effort };
+  }
+  if (cred.wireShape === 'google-generative-ai') {
+    return { thinkingConfig: { includeThoughts: effort !== 'none', thinkingLevel: effort } };
+  }
+  return { reasoningEffort: effort };
+}
+
+function readModelEffort(
+  options: Record<string, unknown>,
+  wireShape: NonNullable<WorkspaceAiCred['wireShape']>,
+): WorkspaceAiCred['reasoningEffort'] {
+  if (wireShape === 'anthropic') {
+    const thinking = options['thinking'];
+    if (thinking && typeof thinking === 'object' && (thinking as Record<string, unknown>)['type'] === 'disabled') {
+      return 'none';
+    }
+    return isModelReasoningEffort(options['effort']) ? options['effort'] : undefined;
+  }
+  if (wireShape === 'google-generative-ai') {
+    const thinking = options['thinkingConfig'];
+    if (!thinking || typeof thinking !== 'object') return undefined;
+    const level = (thinking as Record<string, unknown>)['thinkingLevel'];
+    return isModelReasoningEffort(level) ? level : undefined;
+  }
+  return isModelReasoningEffort(options['reasoningEffort']) ? options['reasoningEffort'] : undefined;
+}
 // opencode's `@ai-sdk/openai-compatible` SDK is statically bundled into the
 // binary (no runtime `npm install`) and speaks `/v1/chat/completions` — the
 // right shape for OpenAI-compatible + Chinese gateways (DeepSeek/Qwen/Kimi/
@@ -22,6 +72,59 @@ const OPENCODE_SDK_NPM = '@ai-sdk/openai-compatible';
 
 function positiveNumber(value: number | null | undefined): number | null {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function parseJsonRecord(raw: string | null): Record<string, unknown> | null {
+  if (raw === null) return {};
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+async function ensureOpenCodeTuiConfigExcluded(cwd: string): Promise<void> {
+  // OpenAlice workspaces are Git repositories, but adapter tests and external
+  // callers may prepare a plain directory. Do not manufacture a partial .git.
+  try {
+    if (!statSync(join(cwd, '.git')).isDirectory()) return;
+  } catch {
+    return;
+  }
+  const path = '.git/info/exclude';
+  const current = await readWorkspaceFile(cwd, path) ?? '';
+  if (current.split(/\r?\n/).includes(OPENCODE_TUI_CONFIG_PATH)) return;
+  const separator = current.length === 0 || current.endsWith('\n') ? '' : '\n';
+  await writeWorkspaceFile(cwd, path, `${current}${separator}${OPENCODE_TUI_CONFIG_PATH}\n`);
+}
+
+/**
+ * Select OpenCode's native terminal-derived theme for OpenAlice workspaces.
+ * The dedicated tui.json layer is supported by OpenCode 1.16+ and has higher
+ * precedence than global TUI settings. Existing native project configuration,
+ * including the legacy opencode.json theme that OpenCode migrates itself,
+ * remains user-owned.
+ */
+export async function syncOpenCodeWorkspaceTheme(cwd: string): Promise<boolean> {
+  await ensureOpenCodeTuiConfigExcluded(cwd);
+
+  // A JSONC project file is user-owned. Avoid creating a competing tui.json
+  // because OpenCode accepts both and their same-directory ordering is native.
+  if (await readWorkspaceFile(cwd, OPENCODE_TUI_CONFIGC_PATH) !== null) return false;
+
+  const tui = parseJsonRecord(await readWorkspaceFile(cwd, OPENCODE_TUI_CONFIG_PATH));
+  if (tui === null || Object.prototype.hasOwnProperty.call(tui, 'theme')) return false;
+
+  const legacy = parseJsonRecord(await readWorkspaceFile(cwd, OPENCODE_CONFIG_PATH));
+  if (legacy === null || Object.prototype.hasOwnProperty.call(legacy, 'theme')) return false;
+
+  tui['$schema'] ??= 'https://opencode.ai/tui.json';
+  tui['theme'] = OPENCODE_SYSTEM_THEME;
+  await writeWorkspaceFile(cwd, OPENCODE_TUI_CONFIG_PATH, `${JSON.stringify(tui, null, 2)}\n`);
+  return true;
 }
 
 /**
@@ -44,8 +147,14 @@ function positiveNumber(value: number | null | undefined): number | null {
  *   - Provider override: `opencode.json` `provider.<name>` with a custom
  *     `baseURL` + `apiKey` + a top-level default `model = "<provider>/<id>"`.
  *     Key written directly into the workspace file (same trust model as codex's
- *     `.codex/env.json`). Reset deletes the file → opencode falls back to its
- *     global auth.
+ *     `.codex/env.json`). OpenAlice owns only `provider.workspace`, the matching
+ *     top-level model, and its schema marker; unrelated opencode config survives
+ *     both writes and reset.
+ *
+ *   - Terminal appearance: the shared runtime lifecycle selects OpenCode's
+ *     native `system` TUI theme through `tui.json` only when the project has
+ *     no explicit TUI/legacy theme config. OpenCode then derives its palette
+ *     from the terminal and handles mode 2031 updates itself.
  *
  *   - Hermetic spawn: `OPENCODE_DISABLE_{MODELS_FETCH,AUTOUPDATE,LSP_DOWNLOAD}`
  *     pinned in `composeEnv` so a trading workbench never phones home at spawn
@@ -85,6 +194,12 @@ export const opencodeAdapter: CliAdapter = {
     // `opencode --session <id>` (composeCommand) resumes by id.
     transcriptDiscovery: 'subprocess',
     headless: true,
+  },
+
+  lifecycle: {
+    async prepareWorkspace({ cwd }): Promise<void> {
+      await syncOpenCodeWorkspaceTheme(cwd);
+    },
   },
 
   composeCommand(_base: readonly string[], ctx: SpawnContext): readonly string[] {
@@ -220,9 +335,13 @@ export const opencodeAdapter: CliAdapter = {
   async writeAiConfig(cwd: string, cred: WorkspaceAiCred): Promise<void> {
     const hasProvider = !!(cred.baseUrl || cred.apiKey || cred.model);
     if (!hasProvider) {
-      // Reset: delete the workspace opencode.json so opencode falls back to its
-      // global auth/config. No empty stub left behind.
-      await rm(join(cwd, OPENCODE_CONFIG_PATH), { force: true });
+      await resetOwnedJsonConfig({
+        cwd,
+        configPath: OPENCODE_CONFIG_PATH,
+        statePath: OPENCODE_BINDING_STATE_PATH,
+        label: 'opencode project config',
+        legacyOwnedPaths: OPENCODE_OWNED_PATHS,
+      });
       return;
     }
 
@@ -253,6 +372,9 @@ export const opencodeAdapter: CliAdapter = {
     };
     if (cred.model) {
       const model: Record<string, unknown> = { name: cred.model };
+      if (typeof cred.reasoning === 'boolean') model['reasoning'] = cred.reasoning;
+      const effortOptions = modelEffortOptions(cred);
+      if (effortOptions) model['options'] = effortOptions;
       const contextWindow = positiveNumber(cred.contextWindow);
       if (contextWindow !== null) {
         // opencode treats missing custom-model limits as 0, which disables its
@@ -263,15 +385,24 @@ export const opencodeAdapter: CliAdapter = {
       provider['models'] = { [cred.model]: model };
     }
 
-    const config: Record<string, unknown> = {
-      $schema: 'https://opencode.ai/config.json',
-      provider: { [OPENCODE_PROVIDER_NAME]: provider },
-    };
     // Top-level default model is "<provider>/<id>" so opencode resolves the
-    // workspace provider without a UI model picker.
-    if (cred.model) config['model'] = `${OPENCODE_PROVIDER_NAME}/${cred.model}`;
-
-    await writeWorkspaceFile(cwd, OPENCODE_CONFIG_PATH, JSON.stringify(config, null, 2) + '\n');
+    // workspace provider without a UI model picker. The reversible state keeps
+    // any pre-existing provider/model/options and restores them on reset.
+    await writeOwnedJsonConfig({
+      cwd,
+      configPath: OPENCODE_CONFIG_PATH,
+      statePath: OPENCODE_BINDING_STATE_PATH,
+      label: 'opencode project config',
+      entries: [
+        { path: ['$schema'], present: true, value: 'https://opencode.ai/config.json' },
+        { path: ['provider', OPENCODE_PROVIDER_NAME], present: true, value: provider },
+        {
+          path: ['model'],
+          present: !!cred.model,
+          value: cred.model ? `${OPENCODE_PROVIDER_NAME}/${cred.model}` : undefined,
+        },
+      ],
+    });
   },
 
   async readAiConfig(cwd: string): Promise<WorkspaceAiCred | null> {
@@ -306,6 +437,9 @@ export const opencodeAdapter: CliAdapter = {
     const modelConfig = model ? models[model] : undefined;
     const limit = (modelConfig?.['limit'] ?? {}) as Record<string, unknown>;
     const contextWindow = positiveNumber(limit['context'] as number | null | undefined);
+    const reasoning = typeof modelConfig?.['reasoning'] === 'boolean'
+      ? modelConfig['reasoning']
+      : undefined;
     if (baseUrl === null && apiKey === null && model === null) return null;
     // Reverse the npm package back to the wire shape.
     const npm = typeof ws['npm'] === 'string' ? (ws['npm'] as string) : '';
@@ -313,6 +447,10 @@ export const opencodeAdapter: CliAdapter = {
       : npm === '@ai-sdk/google' ? 'google-generative-ai' as const
       : npm === '@ai-sdk/openai' ? 'openai-responses' as const
       : 'openai-chat' as const;
+    const modelOptions = modelConfig?.['options'];
+    const reasoningEffort = modelOptions && typeof modelOptions === 'object'
+      ? readModelEffort(modelOptions as Record<string, unknown>, wireShape)
+      : undefined;
     return {
       baseUrl,
       apiKey,
@@ -320,6 +458,8 @@ export const opencodeAdapter: CliAdapter = {
       wireShape,
       ...(wireShape === 'anthropic' ? { authMode: bearerKey ? 'bearer' as const : 'x-api-key' as const } : {}),
       ...(contextWindow ? { contextWindow } : {}),
+      ...(reasoning !== undefined ? { reasoning } : {}),
+      ...(reasoningEffort !== undefined ? { reasoningEffort } : {}),
     };
   },
 

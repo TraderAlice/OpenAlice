@@ -45,7 +45,7 @@ function build(
     id: 'claude',
     capabilities: { headless: true },
     composeHeadlessCommand: () => [],
-    bootstrap: vi.fn(async () => {}),
+    lifecycle: { prepareWorkspace: vi.fn(async () => {}) },
   };
   const meta = opts.meta ?? { id: 'ws-1', dir: '/w', agents: ['claude'] };
   const adapters = opts.adapters ?? { claude };
@@ -555,7 +555,7 @@ describe('POST /:id/headless/:taskId/session', () => {
       id: 'codex',
       namePrefix: 'x',
       capabilities: { resumeById: true, resumeLast: true },
-      bootstrap: vi.fn(async () => {}),
+      lifecycle: { prepareWorkspace: vi.fn(async () => {}) },
     };
     const task = opts.task ?? {
       taskId: 'run-1',
@@ -793,7 +793,7 @@ describe('WebPi surface routes', () => {
       capabilities: { resumeById: true },
       readAiConfig: vi.fn(async () => ({ baseUrl: 'https://example.test', apiKey: 'test', model: 'model' })),
       writeAiConfig: vi.fn(async () => undefined),
-      bootstrap: vi.fn(async () => order.push('bootstrap')),
+      lifecycle: { prepareWorkspace: vi.fn(async () => { order.push('prepare-workspace'); }) },
     };
     const webPi = {
       get: vi.fn(() => snapshot),
@@ -827,7 +827,7 @@ describe('WebPi surface routes', () => {
     const result = await post(app, `/ws-1/sessions/${TOKEN}/webpi/open`);
     expect(result.status).toBe(200);
     expect(result.body.snapshot).toMatchObject({ resumeId: 'resume-webpi', phase: 'idle' });
-    expect(order).toEqual(['bootstrap', 'terminal-stopped', 'webpi-started']);
+    expect(order).toEqual(['prepare-workspace', 'terminal-stopped', 'webpi-started']);
     expect(svc.startWebPiSession).toHaveBeenCalledOnce();
   });
 
@@ -937,7 +937,7 @@ describe('Workspace manager surface routes', () => {
       id: 'pi',
       namePrefix: 'p',
       capabilities: { resumeById: true },
-      bootstrap: vi.fn(async () => undefined),
+      lifecycle: { prepareWorkspace: vi.fn(async () => undefined) },
     };
     const snapshot = {
       recordId: 'pi-manager-test',
@@ -1039,7 +1039,7 @@ describe('Workspace manager surface routes', () => {
       id: 'codex',
       namePrefix: 'x',
       capabilities: { resumeById: true },
-      bootstrap: vi.fn(async () => undefined),
+      lifecycle: { prepareWorkspace: vi.fn(async () => undefined) },
     };
     let spawnedContext: any = null;
     let liveSession: any = null;

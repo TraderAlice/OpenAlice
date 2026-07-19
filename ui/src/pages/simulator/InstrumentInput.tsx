@@ -11,9 +11,9 @@ import type { InstrumentDraft, SecType } from './instruments'
 import { SEC_TYPES } from './instruments'
 
 const inputClass =
-  'px-2 py-1 bg-bg text-text border border-border rounded text-sm outline-none transition-colors focus:border-accent'
+  'px-2 py-1 bg-background text-foreground border border-border rounded text-sm outline-none transition-colors focus:border-primary'
 const inputClassMono =
-  'px-2 py-1 bg-bg text-text border border-border rounded font-mono text-xs outline-none transition-colors focus:border-accent'
+  'px-2 py-1 bg-background text-foreground border border-border rounded font-mono text-xs outline-none transition-colors focus:border-primary'
 
 export function InstrumentInput({ draft, onChange, knownSymbols }: {
   draft: InstrumentDraft

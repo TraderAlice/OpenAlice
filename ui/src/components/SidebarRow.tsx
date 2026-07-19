@@ -10,7 +10,7 @@ interface SidebarRowProps {
   /**
    * Optional leading glyph (shrink-0), e.g. an entity-type icon. Pass the
    * fully-styled node — the row doesn't impose a size or colour so callers
-   * keep control (e.g. `<TrendingUp size={13} className="text-text-muted/70" />`).
+   * keep control (e.g. `<TrendingUp size={13} className="text-muted-foreground/70" />`).
    */
   icon?: ReactNode
   /**
@@ -53,16 +53,16 @@ export function SidebarRow({ label, active = false, onClick, icon, trail, title,
           onClick()
         }
       }}
-      className={`oa-nav-row group relative flex min-h-10 items-center gap-1.5 px-3 py-2 text-[13px] cursor-pointer outline-none focus-visible:bg-bg-tertiary/70 ${
+      className={`oa-nav-row group relative flex min-h-10 items-center gap-1.5 px-3 py-2 text-[13px] cursor-pointer outline-none focus-visible:bg-muted/70 ${
         active
-          ? 'bg-bg-tertiary text-text'
-          : 'text-text hover:bg-bg-tertiary/50'
+          ? 'bg-muted text-foreground'
+          : 'text-foreground hover:bg-muted/50'
       } ${dim ? 'opacity-60' : ''}`}
     >
       {active && (
         <span
           aria-hidden="true"
-          className="absolute left-0 top-0 bottom-0 w-[2px] bg-accent"
+          className="absolute left-0 top-0 bottom-0 w-[2px] bg-primary"
         />
       )}
       {icon && <span className="shrink-0 flex items-center">{icon}</span>}

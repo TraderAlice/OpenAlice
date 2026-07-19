@@ -5,7 +5,7 @@ import type { AgentInfo, TemplateInfo } from './api'
 
 /**
  * Catalog card for a workspace template. Mirrors the visual idiom of
- * OverviewCard (border + rounded-lg + bg-bg-secondary + hover) so the
+ * OverviewCard (border + rounded-lg + bg-secondary + hover) so the
  * Workspaces activity feels like one design system. Click → opens the
  * detail tab where the README and spawn form live.
  */
@@ -49,25 +49,25 @@ export function TemplateCard({ template: t, agents, onOpen }: Props) {
     <button
       type="button"
       onClick={onOpen}
-      className="group rounded-lg border border-border bg-bg-secondary hover:bg-bg-tertiary/40 hover:border-border/80 transition-colors cursor-pointer p-4 flex flex-col gap-3 text-left"
+      className="group rounded-lg border border-border bg-secondary hover:bg-muted/40 hover:border-border/80 transition-colors cursor-pointer p-4 flex flex-col gap-3 text-left"
     >
       <div className="flex items-start gap-2.5">
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2">
-            <h3 className="text-[14px] font-semibold text-text truncate" title={t.name}>
+            <h3 className="text-[14px] font-semibold text-foreground truncate" title={t.name}>
               {title}
             </h3>
-            <span className="text-[11px] font-mono text-text-muted tabular-nums">
+            <span className="text-[11px] font-mono text-muted-foreground tabular-nums">
               v{t.version}
             </span>
             {t.community && (
-              <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border border-border text-text-muted">
+              <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border border-border text-muted-foreground">
                 {tr('templates.communityBadge')}
               </span>
             )}
           </div>
           {t.description && (
-            <p className="text-[12px] text-text-muted line-clamp-3 mt-1">
+            <p className="text-[12px] text-muted-foreground line-clamp-3 mt-1">
               {t.description}
             </p>
           )}
@@ -75,10 +75,10 @@ export function TemplateCard({ template: t, agents, onOpen }: Props) {
       </div>
 
       <div className="border-t border-border pt-3 flex items-center gap-3 flex-wrap">
-        <div className="text-[10px] uppercase tracking-wider text-text-muted/70">
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground/70">
           {tr('templates.agentsLabel')}
         </div>
-        <div className="flex items-center gap-2 text-text-muted flex-wrap">
+        <div className="flex items-center gap-2 text-muted-foreground flex-wrap">
           {agents.map((a) => {
             // Backend PATH-probes each runtime; dim the ones not installed on
             // this host so the catalog hints at what needs setting up.

@@ -15,6 +15,7 @@ import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
 import Decimal from 'decimal.js'
 import { Contract, Order } from '@traderalice/ibkr'
 import { getTestAccounts, filterByProvider } from './setup.js'
+import { contractEvidence, recordLivePaperEvidence } from './live-paper-evidence.js'
 import type { IBroker } from '../../brokers/types.js'
 import '../../contract-ext.js'
 
@@ -115,6 +116,97 @@ describe('IbkrBroker — currency tracking', () => {
   })
 })
 
+// ==================== Canonical conId routing (any time) ====================
+
+describe('IbkrBroker — canonical conId routing', () => {
+  beforeEach(({ skip }) => { if (!broker) skip('no IBKR paper account') })
+
+  it('validates a polluted USD.CHF conId as a what-if order and leaves no state delta', async () => {
+    expect(broker!.getOpenOrders).toBeDefined()
+
+    const clean = new Contract()
+    clean.conId = 12087820
+    const details = await broker!.getContractDetails(clean)
+    expect(details?.contract).toBeDefined()
+    expect(details!.contract.secType).toBe('CASH')
+    expect(details!.contract.exchange).toBe('IDEALPRO')
+    expect(details!.contract.currency).toBe('CHF')
+
+    const positionsBefore = await broker!.getPositions()
+    const ordersBefore = await broker!.getOpenOrders!()
+    const baselineOrderIds = new Set(ordersBefore.map(order => order.orderId))
+    const baselinePositions = positionsBefore
+      .map(position => `${position.contract.conId}|${position.contract.localSymbol}|${position.side}|${position.quantity}`)
+      .sort()
+    const evidencePath = await recordLivePaperEvidence({
+      scenario: 'ibkr-usd-chf-canonical-routing',
+      phase: 'baseline',
+      contract: contractEvidence(details!.contract),
+      baseline: { positions: positionsBefore.length, openOrders: ordersBefore.length },
+    })
+
+    // Recreate the historical UTA failure shape. conId is the identity; the
+    // other fields are deliberately wrong and must not reach TWS.
+    const polluted = new Contract()
+    polluted.conId = 12087820
+    polluted.symbol = 'USDCHF'
+    polluted.secType = 'STK'
+    polluted.exchange = 'SMART'
+    polluted.currency = 'USD'
+
+    const order = new Order()
+    order.action = 'BUY'
+    order.orderType = 'MKT'
+    order.totalQuantity = new Decimal('25000')
+    order.tif = 'DAY'
+    order.whatIf = true
+
+    let result: Awaited<ReturnType<IBroker['placeOrder']>> | undefined
+    try {
+      result = await broker!.placeOrder(polluted, order)
+      await recordLivePaperEvidence({
+        scenario: 'ibkr-usd-chf-canonical-routing',
+        phase: 'what-if-result',
+        contract: contractEvidence(details!.contract),
+        request: contractEvidence(polluted),
+        result: {
+          success: result.success,
+          status: result.orderState?.status,
+          error: result.error,
+        },
+      })
+      expect(result.success, result.error).toBe(true)
+    } finally {
+      // whatIf should never become an open order. If venue behavior changes,
+      // cancel any order introduced by this test before asserting the baseline.
+      const afterAttempt = await broker!.getOpenOrders!()
+      const introduced = afterAttempt.filter(order => !baselineOrderIds.has(order.orderId))
+      for (const open of introduced) await broker!.cancelOrder(open.orderId)
+
+      const positionsAfter = await broker!.getPositions()
+      const ordersAfter = await broker!.getOpenOrders!()
+      const finalPositions = positionsAfter
+        .map(position => `${position.contract.conId}|${position.contract.localSymbol}|${position.side}|${position.quantity}`)
+        .sort()
+      const finalOrderIds = ordersAfter.map(order => order.orderId).sort()
+      const matchesBaseline =
+        JSON.stringify(finalPositions) === JSON.stringify(baselinePositions) &&
+        JSON.stringify(finalOrderIds) === JSON.stringify([...baselineOrderIds].sort())
+      await recordLivePaperEvidence({
+        scenario: 'ibkr-usd-chf-canonical-routing',
+        phase: 'cleanup',
+        cleanup: {
+          positions: positionsAfter.length,
+          openOrders: ordersAfter.length,
+          matchesBaseline,
+        },
+      })
+      console.log(`  live-paper evidence: ${evidencePath}`)
+      expect(matchesBaseline).toBe(true)
+    }
+  }, 30_000)
+})
+
 // ==================== Order lifecycle (any time — limit orders accepted outside market hours) ====================
 
 describe('IbkrBroker — order lifecycle', () => {
@@ -135,26 +227,34 @@ describe('IbkrBroker — order lifecycle', () => {
     order.totalQuantity = new Decimal('1')
     order.tif = 'GTC'
 
-    const placed = await broker!.placeOrder(contract, order)
-    console.log(`  placeOrder LMT: success=${placed.success}, orderId=${placed.orderId}, status=${placed.orderState?.status}`)
-    expect(placed.success).toBe(true)
-    expect(placed.orderId).toBeDefined()
+    let orderId: string | undefined
+    try {
+      const placed = await broker!.placeOrder(contract, order)
+      orderId = placed.orderId
+      console.log(`  placeOrder LMT: success=${placed.success}, orderId=${placed.orderId}, status=${placed.orderState?.status}`)
+      expect(placed.success).toBe(true)
+      expect(orderId).toBeDefined()
 
-    // Query order
-    await new Promise(r => setTimeout(r, 1000))
-    const detail = await broker!.getOrder(placed.orderId!)
-    console.log(`  getOrder: status=${detail?.orderState.status}`)
-    expect(detail).not.toBeNull()
+      // Query order
+      await new Promise(r => setTimeout(r, 1000))
+      const detail = await broker!.getOrder(orderId!)
+      console.log(`  getOrder: status=${detail?.orderState.status}`)
+      expect(detail).not.toBeNull()
 
-    // Batch query
-    const orders = await broker!.getOrders([placed.orderId!])
-    console.log(`  getOrders: ${orders.length} results`)
-    expect(orders.length).toBe(1)
+      // Batch query
+      const orders = await broker!.getOrders([orderId!])
+      console.log(`  getOrders: ${orders.length} results`)
+      expect(orders.length).toBe(1)
 
-    // Cancel
-    const cancelled = await broker!.cancelOrder(placed.orderId!)
-    console.log(`  cancelOrder: success=${cancelled.success}, status=${cancelled.orderState?.status}`)
-    expect(cancelled.success).toBe(true)
+      const cancelled = await broker!.cancelOrder(orderId!)
+      console.log(`  cancelOrder: success=${cancelled.success}, status=${cancelled.orderState?.status}`)
+      expect(cancelled.success).toBe(true)
+    } finally {
+      if (orderId) {
+        const stillOpen = (await broker!.getOpenOrders!()).some(open => open.orderId === orderId)
+        if (stillOpen) await broker!.cancelOrder(orderId)
+      }
+    }
   }, 30_000)
 })
 
@@ -175,9 +275,9 @@ describe('IbkrBroker — fill + position (market hours)', () => {
 
     try {
       const quote = await broker!.getQuote(contract)
-      expect(quote.last).toBeGreaterThan(0)
-      expect(quote.bid).toBeGreaterThan(0)
-      expect(quote.ask).toBeGreaterThan(0)
+      expect(Number(quote.last)).toBeGreaterThan(0)
+      expect(Number(quote.bid)).toBeGreaterThan(0)
+      expect(Number(quote.ask)).toBeGreaterThan(0)
       console.log(`  AAPL: last=$${quote.last}, bid=$${quote.bid}, ask=$${quote.ask}, vol=${quote.volume}`)
     } catch (err: any) {
       // TWS paper frequently times out on snapshot market data requests
@@ -189,62 +289,69 @@ describe('IbkrBroker — fill + position (market hours)', () => {
     }
   })
 
-  it('places market buy 1 AAPL → success with numeric orderId', async () => {
+  it('places, queries, and closes only the AAPL quantity created by this test', async () => {
     const contract = new Contract()
     contract.symbol = 'AAPL'
     contract.secType = 'STK'
     contract.exchange = 'SMART'
     contract.currency = 'USD'
 
-    const order = new Order()
-    order.action = 'BUY'
-    order.orderType = 'MKT'
-    order.totalQuantity = new Decimal('1')
-    order.tif = 'DAY'
+    const positionsBefore = await broker!.getPositions()
+    const initialQty = positionsBefore.find(position => position.contract.symbol === 'AAPL')?.quantity ?? new Decimal(0)
+    const ordersBefore = await broker!.getOpenOrders!()
+    const baselineOrderIds = new Set(ordersBefore.map(open => open.orderId))
+    let entryOrderId: string | undefined
 
-    const result = await broker!.placeOrder(contract, order)
-    console.log(`  placeOrder: success=${result.success}, orderId=${result.orderId}, status=${result.orderState?.status}`)
+    const currentAaplQty = async (): Promise<Decimal> => {
+      const positions = await broker!.getPositions()
+      return positions.find(position => position.contract.symbol === 'AAPL')?.quantity ?? new Decimal(0)
+    }
+    const waitForQty = async (expected: Decimal): Promise<Decimal> => {
+      let current = await currentAaplQty()
+      for (let i = 0; i < 15 && !current.equals(expected); i += 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        current = await currentAaplQty()
+      }
+      return current
+    }
 
-    expect(result.success).toBe(true)
-    expect(result.orderId).toBeDefined()
-  }, 15_000)
+    try {
+      const order = new Order()
+      order.action = 'BUY'
+      order.orderType = 'MKT'
+      order.totalQuantity = new Decimal('1')
+      order.tif = 'DAY'
 
-  it('queries order by ID after place', async () => {
-    const contract = new Contract()
-    contract.symbol = 'AAPL'
-    contract.secType = 'STK'
-    contract.exchange = 'SMART'
-    contract.currency = 'USD'
+      const placed = await broker!.placeOrder(contract, order)
+      entryOrderId = placed.orderId
+      console.log(`  placeOrder: success=${placed.success}, orderId=${placed.orderId}, status=${placed.orderState?.status}`)
+      expect(placed.success, placed.error).toBe(true)
+      expect(entryOrderId).toBeDefined()
 
-    const order = new Order()
-    order.action = 'BUY'
-    order.orderType = 'MKT'
-    order.totalQuantity = new Decimal('1')
-    order.tif = 'DAY'
+      const filledQty = await waitForQty(initialQty.plus(1))
+      expect(filledQty.equals(initialQty.plus(1))).toBe(true)
+      const detail = await broker!.getOrder(entryOrderId!)
+      expect(detail).not.toBeNull()
+    } finally {
+      const openAfterAttempt = await broker!.getOpenOrders!()
+      for (const open of openAfterAttempt.filter(order => !baselineOrderIds.has(order.orderId))) {
+        await broker!.cancelOrder(open.orderId)
+      }
 
-    const placed = await broker!.placeOrder(contract, order)
-    expect(placed.orderId).toBeDefined()
+      // Cancel first, then close only the filled delta introduced by this test.
+      const afterEntry = await currentAaplQty()
+      const createdQty = afterEntry.minus(initialQty)
+      if (createdQty.greaterThan(0)) {
+        const closed = await broker!.closePosition(contract, createdQty)
+        expect(closed.success, closed.error).toBe(true)
+      } else if (createdQty.lessThan(0)) {
+        throw new Error(`AAPL position moved below its baseline during E2E: ${afterEntry} < ${initialQty}`)
+      }
 
-    await new Promise(r => setTimeout(r, 3000))
-
-    const detail = await broker!.getOrder(placed.orderId!)
-    console.log(`  getOrder: status=${detail?.orderState.status}`)
-
-    expect(detail).not.toBeNull()
-  }, 20_000)
-
-  it('closes AAPL position', async () => {
-    // Wait for TWS to update positions after preceding buy
-    await new Promise(r => setTimeout(r, 3000))
-
-    const contract = new Contract()
-    contract.symbol = 'AAPL'
-    contract.secType = 'STK'
-    contract.exchange = 'SMART'
-    contract.currency = 'USD'
-
-    const result = await broker!.closePosition(contract)
-    console.log(`  closePosition: success=${result.success}, error=${result.error}`)
-    expect(result.success).toBe(true)
-  }, 20_000)
+      const cleanedQty = await waitForQty(initialQty)
+      expect(cleanedQty.equals(initialQty)).toBe(true)
+      const finalOrderIds = (await broker!.getOpenOrders!()).map(open => open.orderId).sort()
+      expect(finalOrderIds).toEqual([...baselineOrderIds].sort())
+    }
+  }, 60_000)
 })

@@ -12,6 +12,10 @@ type UpdaterStatus = {
   message?: string
 }
 
+type UpdateCheckResult =
+  | { supported: true }
+  | { supported: false; reason: 'not-packaged' | 'missing-config' }
+
 export interface AutoUpdateHooks {
   beforeInstall: () => Promise<void>
 }
@@ -19,6 +23,11 @@ export interface AutoUpdateHooks {
 export function configureAutoUpdate(win: BrowserWindow, hooks: AutoUpdateHooks): void {
   let downloadedVersion: string | null = null
   let latestStatus: UpdaterStatus | null = null
+  let activeCheck: Promise<UpdateCheckResult> | null = null
+  const capability = resolveAutoUpdateCapability({
+    isPackaged: app.isPackaged,
+    resourcesPath: process.resourcesPath,
+  })
 
   const releaseUrlFor = (version: string): string =>
     `https://github.com/TraderAlice/OpenAlice/releases/tag/v${version}`
@@ -29,8 +38,31 @@ export function configureAutoUpdate(win: BrowserWindow, hooks: AutoUpdateHooks):
     win.webContents.send('openalice:updater:status', status)
   }
 
+  const checkForUpdates = (): Promise<UpdateCheckResult> => {
+    if (!capability.enabled) {
+      return Promise.resolve({ supported: false, reason: capability.reason })
+    }
+    if (activeCheck) return activeCheck
+    activeCheck = autoUpdater.checkForUpdates()
+      .then(() => ({ supported: true as const }))
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err)
+        if (latestStatus?.phase !== 'error' || latestStatus.message !== message) {
+          sendStatus({ phase: 'error', message })
+        }
+        return { supported: true as const }
+      })
+      .finally(() => {
+        activeCheck = null
+      })
+    return activeCheck
+  }
+
   ipcMain.removeHandler('openalice:updater:get-status')
   ipcMain.handle('openalice:updater:get-status', () => latestStatus)
+
+  ipcMain.removeHandler('openalice:updater:check-for-updates')
+  ipcMain.handle('openalice:updater:check-for-updates', () => checkForUpdates())
 
   ipcMain.removeHandler('openalice:updater:install-and-restart')
   ipcMain.handle('openalice:updater:install-and-restart', async () => {
@@ -53,10 +85,6 @@ export function configureAutoUpdate(win: BrowserWindow, hooks: AutoUpdateHooks):
 
   // Keep the renderer IPC contract stable in dev and non-updatable directory
   // packages. Only the updater engine itself depends on packaged metadata.
-  const capability = resolveAutoUpdateCapability({
-    isPackaged: app.isPackaged,
-    resourcesPath: process.resourcesPath,
-  })
   if (!capability.enabled) {
     if (capability.reason === 'missing-config') {
       console.info(`[updater] disabled: update metadata not found at ${capability.configPath}`)
@@ -72,6 +100,7 @@ export function configureAutoUpdate(win: BrowserWindow, hooks: AutoUpdateHooks):
 
   autoUpdater.on('error', (err) => {
     console.error('[updater] update check failed:', err)
+    sendStatus({ phase: 'error', message: err instanceof Error ? err.message : String(err) })
   })
 
   autoUpdater.on('update-available', (info) => {
@@ -96,7 +125,7 @@ export function configureAutoUpdate(win: BrowserWindow, hooks: AutoUpdateHooks):
   // electron-updater emits the same rejection through its `error` event
   // before rethrowing it from this promise. The event handler above owns the
   // diagnostic; consume the promise rejection so one failure is logged once.
-  void autoUpdater.checkForUpdates().catch(() => {})
+  void checkForUpdates()
 }
 
 export function channelForVersion(version: string, platform: NodeJS.Platform, arch: string): string {

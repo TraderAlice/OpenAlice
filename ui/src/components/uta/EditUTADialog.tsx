@@ -77,14 +77,14 @@ export function EditUTADialog({ uta, preset, health, onSave, onDelete, onViewInP
       {/* Header */}
       <div className="shrink-0 flex items-center justify-between px-6 py-4 border-b border-border">
         <div className="flex items-center gap-3 min-w-0">
-          <h3 className="text-[14px] font-semibold text-text truncate">{uta.id}</h3>
+          <h3 className="text-[14px] font-semibold text-foreground truncate">{uta.id}</h3>
           <HealthBadge health={health} size="md" />
         </div>
         <div className="flex items-center gap-3 shrink-0">
           {onViewInPortfolio && (
             <button
               onClick={onViewInPortfolio}
-              className="text-[11px] text-text-muted hover:text-text inline-flex items-center gap-1 transition-colors"
+              className="text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1 transition-colors"
               title="See this account's positions and equity in Portfolio"
             >
               View in Portfolio
@@ -93,7 +93,7 @@ export function EditUTADialog({ uta, preset, health, onSave, onDelete, onViewInP
               </svg>
             </button>
           )}
-          <button onClick={onClose} className="text-text-muted hover:text-text p-1 transition-colors">
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1 transition-colors">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M18 6L6 18M6 6l12 12" />
             </svg>
@@ -105,13 +105,13 @@ export function EditUTADialog({ uta, preset, health, onSave, onDelete, onViewInP
       <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
         <Section title="Configuration">
           <div className="mb-3">
-            <span className="text-[12px] text-text-muted">Type</span>
-            <span className="ml-2 text-[12px] font-medium text-text">{preset?.label ?? uta.presetId}</span>
+            <span className="text-[12px] text-muted-foreground">Type</span>
+            <span className="ml-2 text-[12px] font-medium text-foreground">{preset?.label ?? uta.presetId}</span>
           </div>
           <div className="mb-3 flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2.5">
             <div className="min-w-0">
-              <div className="text-[12px] font-medium text-text">Read-only account</div>
-              <div className="text-[11px] text-text-muted leading-relaxed">
+              <div className="text-[12px] font-medium text-foreground">Read-only account</div>
+              <div className="text-[11px] text-muted-foreground leading-relaxed">
                 Allow analysis reads; block broker-side order changes.
               </div>
             </div>
@@ -119,8 +119,8 @@ export function EditUTADialog({ uta, preset, health, onSave, onDelete, onViewInP
           </div>
           <div className="mb-3 flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2.5">
             <div className="min-w-0">
-              <div className="text-[12px] font-medium text-text">Use as data source</div>
-              <div className="text-[11px] text-text-muted leading-relaxed">
+              <div className="text-[12px] font-medium text-foreground">Use as data source</div>
+              <div className="text-[11px] text-muted-foreground leading-relaxed">
                 Include this UTA in K-line and contract discovery.
               </div>
             </div>
@@ -135,7 +135,7 @@ export function EditUTADialog({ uta, preset, health, onSave, onDelete, onViewInP
           {hasSensitive && (
             <button
               onClick={() => setShowKeys(!showKeys)}
-              className="text-[11px] text-text-muted hover:text-text transition-colors mt-2"
+              className="text-[11px] text-muted-foreground hover:text-foreground transition-colors mt-2"
             >
               {showKeys ? 'Hide secrets' : 'Show secrets'}
             </button>
@@ -146,7 +146,7 @@ export function EditUTADialog({ uta, preset, health, onSave, onDelete, onViewInP
         <div>
           <button
             onClick={() => setGuardsOpen(!guardsOpen)}
-            className="flex items-center gap-1.5 text-[13px] font-semibold text-text-muted uppercase tracking-wide"
+            className="flex items-center gap-1.5 text-[13px] font-semibold text-muted-foreground uppercase tracking-wide"
           >
             <svg
               width="12" height="12" viewBox="0 0 24 24"
@@ -186,9 +186,9 @@ export function EditUTADialog({ uta, preset, health, onSave, onDelete, onViewInP
               setDraft(updated)
               await onSave(updated)
             }} />
-            <span className="text-[12px] text-text-muted">{draft.enabled !== false ? 'Enabled' : 'Disabled'}</span>
+            <span className="text-[12px] text-muted-foreground">{draft.enabled !== false ? 'Enabled' : 'Disabled'}</span>
           </label>
-          {msg && <span className="text-[12px] text-text-muted">{msg}</span>}
+          {msg && <span className="text-[12px] text-muted-foreground">{msg}</span>}
         </div>
         <div className="flex-1" />
         <DeleteButton label="Delete UTA" onConfirm={onDelete} />

@@ -19,12 +19,12 @@ export function Toggle({ checked, onChange, size = 'md', ariaLabel, disabled = f
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className={`relative rounded-full transition-colors ${track} ${disabled ? 'cursor-not-allowed opacity-40' : 'cursor-pointer'} ${
-        checked ? 'bg-accent' : 'bg-bg-tertiary'
+        checked ? 'bg-primary' : 'bg-muted'
       }`}
     >
       <span
         className={`absolute rounded-full transition-all ${thumb} ${
-          checked ? `${translate} bg-white` : 'bg-text-muted'
+          checked ? `${translate} bg-primary-foreground` : 'bg-muted-foreground'
         }`}
       />
     </button>

@@ -8,6 +8,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { PageHeader } from '../components/PageHeader'
 import { PageLoading } from '../components/StateViews'
 import { Toggle } from '../components/Toggle'
+import { SettingsScrollArea } from '../components/form'
 import { ensureTradingModePolling, useTradingMode } from '../live/trading-mode'
 
 const MODE_META: Record<TradingMode, {
@@ -48,7 +49,7 @@ export function AgentPermissionsPage() {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader title={t('settings.agentPermissions.title')} />
-      <div className="flex-1 overflow-y-auto">
+      <SettingsScrollArea>
         <div className="mx-auto w-full max-w-[980px] px-4 md:px-6">
           <TradingModeSection />
           <PermissionSection
@@ -58,7 +59,7 @@ export function AgentPermissionsPage() {
             <AiTradingToggle config={config} setConfig={setConfig} />
           </PermissionSection>
         </div>
-      </div>
+      </SettingsScrollArea>
     </div>
   )
 }
@@ -75,9 +76,9 @@ function PermissionSection({
   return (
     <div className="grid min-w-0 grid-cols-1 gap-4 border-b border-border/60 py-6 last:border-b-0 xl:grid-cols-[260px_minmax(0,1fr)] xl:gap-10">
       <div className="min-w-0 xl:pt-0.5">
-        <h3 className="text-[14px] font-semibold text-text">{title}</h3>
+        <h3 className="text-[14px] font-semibold text-foreground">{title}</h3>
         {description && (
-          <p className="mt-1.5 max-w-[42rem] text-[13px] leading-relaxed text-text-muted/70">{description}</p>
+          <p className="mt-1.5 max-w-[42rem] text-[13px] leading-relaxed text-muted-foreground/70">{description}</p>
         )}
       </div>
       <div className="min-w-0">{children}</div>
@@ -115,19 +116,19 @@ function TradingModeSection() {
               }}
               className={`flex min-h-[82px] items-start gap-3 rounded-lg border px-3.5 py-3 text-left transition-[border-color,background-color] ${
                 active
-                  ? 'border-accent/50 bg-accent/10 text-text'
-                  : 'border-border bg-bg text-text-muted hover:border-accent/40 hover:bg-bg-tertiary hover:text-text'
+                  ? 'border-primary/50 bg-primary/10 text-foreground'
+                  : 'border-border bg-background text-muted-foreground hover:border-primary/40 hover:bg-muted hover:text-foreground'
               } ${disabled ? 'cursor-default opacity-70' : ''}`}
             >
-              <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-md ${active ? 'bg-accent/15 text-accent' : 'bg-bg-tertiary text-text-muted'}`}>
+              <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-md ${active ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'}`}>
                 <meta.Icon size={16} strokeWidth={1.8} aria-hidden />
               </span>
               <span className="min-w-0">
                 <span className="block text-[13px] font-semibold">{t(meta.labelKey)}</span>
-                <span className="mt-1 block text-[12px] leading-relaxed text-text-muted">{t(meta.descriptionKey)}</span>
+                <span className="mt-1 block text-[12px] leading-relaxed text-muted-foreground">{t(meta.descriptionKey)}</span>
                 {saving === mode && (
-                  <span className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-accent">
-                    <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" aria-hidden />
+                  <span className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-primary">
+                    <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" aria-hidden />
                     {t('settings.agentPermissions.mode.saving')}
                   </span>
                 )}
@@ -136,13 +137,13 @@ function TradingModeSection() {
           )
         })}
       </div>
-      <div className="mt-3 text-[11px] leading-relaxed text-text-muted/70">
+      <div className="mt-3 text-[11px] leading-relaxed text-muted-foreground/70">
         {status.envLocked
           ? t('settings.agentPermissions.mode.envLocked')
           : t('settings.agentPermissions.mode.source', { source: status.modeSource })}
       </div>
       {error && (
-        <div className="mt-2 rounded-md border border-red/30 bg-red/5 px-3 py-2 text-[12px] text-red leading-relaxed">
+        <div className="mt-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-[12px] text-destructive leading-relaxed">
           {error}
         </div>
       )}
@@ -184,20 +185,20 @@ function AiTradingToggle({
     <>
       <div className="flex items-center justify-between gap-4 py-1">
         <div className="min-w-0 flex-1">
-          <span className="text-sm font-medium text-text">{t('settings.agent.allowAiTrading')}</span>
-          <p className="text-[12px] text-text-muted mt-0.5 leading-relaxed">
+          <span className="text-sm font-medium text-foreground">{t('settings.agent.allowAiTrading')}</span>
+          <p className="text-[12px] text-muted-foreground mt-0.5 leading-relaxed">
             {enabled ? t('settings.agent.allowAiTradingOn') : t('settings.agent.allowAiTradingOff')}
           </p>
         </div>
         <Toggle checked={enabled} onChange={onToggle} />
       </div>
       {enabled && (
-        <div className="mt-2 rounded-md border border-red/30 bg-red/5 px-3 py-2 text-[12px] text-red leading-relaxed">
+        <div className="mt-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-[12px] text-destructive leading-relaxed">
           {t('settings.agent.allowAiTradingWarning')}
         </div>
       )}
       {enabled && mode !== 'pro' && (
-        <div className="mt-2 rounded-md border border-yellow-400/30 bg-yellow-400/5 px-3 py-2 text-[12px] text-text-muted leading-relaxed">
+        <div className="mt-2 rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-[12px] text-muted-foreground leading-relaxed">
           {t('settings.agentPermissions.aiPush.proOnly')}
         </div>
       )}

@@ -116,7 +116,7 @@ export function InboxPage({ visible }: InboxPageProps) {
         ) : entries.length === 0 ? (
           <EmptyState />
         ) : !selected ? (
-          <div className="px-6 py-8 text-text-muted text-sm">
+          <div className="px-6 py-8 text-muted-foreground text-sm">
             {t('inbox.selectFromSidebar')}
           </div>
         ) : (
@@ -148,12 +148,12 @@ function EmptyState() {
   const { t } = useTranslation()
   return (
     <div className="px-6 py-16 text-center max-w-[520px] mx-auto">
-      <div className="text-[15px] text-text mb-2">{t('inbox.noMessages')}</div>
-      <p className="text-[13px] text-text-muted leading-relaxed">
+      <div className="text-[15px] text-foreground mb-2">{t('inbox.noMessages')}</div>
+      <p className="text-[13px] text-muted-foreground leading-relaxed">
         Workspaces push updates here as they work — finished analysis,
         blocked tasks, questions back to you. An agent surfaces one by
         calling the
-        <code className="mx-1 px-1 py-0.5 rounded bg-bg-tertiary text-[11px]">inbox_push</code>
+        <code className="mx-1 px-1 py-0.5 rounded bg-muted text-[11px]">inbox_push</code>
         tool from inside its workspace. Nothing to read yet.
       </p>
     </div>
@@ -275,7 +275,7 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <span
                 className={`text-[14px] font-semibold ${
-                  wsAlive ? 'text-text' : 'text-text-muted/70 line-through'
+                  wsAlive ? 'text-foreground' : 'text-muted-foreground/70 line-through'
                 }`}
                 title={wsAlive ? undefined : t('inbox.workspaceNotExists')}
               >
@@ -283,10 +283,10 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
               </span>
               {senderLabel && (
                 <span
-                  className="inline-flex min-w-0 items-center gap-1.5 text-[11px] text-text-muted/75"
+                  className="inline-flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground/75"
                   title={t('inbox.senderIdentityTitle', { sender: senderLabel })}
                 >
-                  <ChevronRight size={11} className="shrink-0 text-text-muted/35" aria-hidden />
+                  <ChevronRight size={11} className="shrink-0 text-muted-foreground/35" aria-hidden />
                   {origin?.kind === 'interactive'
                     ? <Terminal size={12} strokeWidth={1.75} className="shrink-0" aria-hidden />
                     : <Bot size={12} strokeWidth={1.75} className="shrink-0" aria-hidden />}
@@ -298,16 +298,16 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
                   type="button"
                   onClick={openIssue}
                   title={t('inbox.fromIssueTitle', { issue: issueId })}
-                  className="oa-pressable inline-flex min-w-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-text-muted/75 hover:bg-accent/10 hover:text-accent"
+                  className="oa-pressable inline-flex min-w-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground/75 hover:bg-primary/10 hover:text-primary"
                 >
                   <ListChecks size={12} strokeWidth={1.75} className="shrink-0" />
                   <span className="max-w-[220px] truncate">{t('inbox.fromIssue', { issue: issueTitle ?? issueId })}</span>
                 </button>
               )}
             </div>
-            <div className="mt-1.5 text-[11px] tabular-nums text-text-muted/55">
+            <div className="mt-1.5 text-[11px] tabular-nums text-muted-foreground/55">
               {formatAbsolute(entry.ts)}
-              <span className="mx-1.5 text-text-muted/30">·</span>
+              <span className="mx-1.5 text-muted-foreground/30">·</span>
               {formatRelativeTime(entry.ts)}
             </div>
           </div>
@@ -317,7 +317,7 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
                 type="button"
                 onClick={() => void continueOrigin()}
                 disabled={continuing}
-                className="oa-pressable inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-bg px-2 text-[11px] font-medium text-text-muted hover:border-accent/35 hover:text-accent disabled:cursor-not-allowed disabled:opacity-45 sm:px-2.5"
+                className="oa-pressable inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-background px-2 text-[11px] font-medium text-muted-foreground hover:border-primary/35 hover:text-primary disabled:cursor-not-allowed disabled:opacity-45 sm:px-2.5"
                 title={canContinueOrigin ? t('inbox.openConversation') : t('inbox.openWorkspace')}
                 aria-label={canContinueOrigin ? t('inbox.openConversation') : t('inbox.openWorkspace')}
               >
@@ -339,7 +339,7 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
             <button
               type="button"
               onClick={onDelete}
-              className="oa-pressable inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-muted/45 hover:bg-red/10 hover:text-red"
+              className="oa-pressable inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground/45 hover:bg-destructive/10 hover:text-destructive"
               title={t('inbox.deleteEntryTitle')}
               aria-label={t('inbox.deleteEntryAriaLabel')}
             >
@@ -348,26 +348,26 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
           </div>
         </div>
       </header>
-      {continueError && <div className="-mt-3 mb-5 text-[12px] text-red">{continueError}</div>}
+      {continueError && <div className="-mt-3 mb-5 text-[12px] text-destructive">{continueError}</div>}
 
       {/* The sender's message is the Inbox asset's primary content. */}
       {hasComments && (
-        <div className="text-[15px] leading-relaxed text-text/90">
+        <div className="text-[15px] leading-relaxed text-foreground/90">
           <MarkdownContent
             text={entry.comments!}
             strikethrough={false}
             codeSpanWikilinks
-            className="leading-relaxed text-text/90"
+            className="leading-relaxed text-foreground/90"
           />
         </div>
       )}
 
       {hasDocs && (
         <section className={hasComments ? 'mt-7' : ''}>
-          <div className="mb-2.5 flex items-center gap-2 text-[11px] font-medium uppercase tracking-wider text-text-muted/55">
+          <div className="mb-2.5 flex items-center gap-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/55">
             <Paperclip size={12} aria-hidden />
             {t('inbox.documentsSection')}
-            <span className="font-normal tabular-nums text-text-muted/40">{entry.docs!.length}</span>
+            <span className="font-normal tabular-nums text-muted-foreground/40">{entry.docs!.length}</span>
           </div>
           <div className="space-y-2">
             {entry.docs!.map((doc) => (
@@ -390,7 +390,7 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
           ask={askInbox}
         />
       ) : (
-        <div className="mt-8 border-t border-border/50 pt-4 text-[12px] italic text-text-muted/60">
+        <div className="mt-8 border-t border-border/50 pt-4 text-[12px] italic text-muted-foreground/60">
           {t('inbox.cannotReplyWorkspaceGone')}
         </div>
       )}
@@ -466,7 +466,7 @@ export function InboxAttachment({
 
   return (
     <div
-      className={`group overflow-hidden rounded-xl border bg-bg/55 transition-colors ${expanded ? 'border-accent/25' : 'border-border hover:border-text-muted/35'}`}
+      className={`group overflow-hidden rounded-xl border bg-background/55 transition-colors ${expanded ? 'border-primary/25' : 'border-border hover:border-muted-foreground/35'}`}
       title={doc.revision ? t('inbox.docRevisionTitle', { revision: doc.revision }) : undefined}
     >
       <div className="flex min-w-0 items-center gap-1">
@@ -477,26 +477,26 @@ export function InboxAttachment({
           aria-label={t(expanded ? 'inbox.docCollapseAria' : 'inbox.docExpandAria', { name })}
           className="oa-pressable flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left"
         >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-bg-tertiary/70 text-text-muted/70">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted/70 text-muted-foreground/70">
             {isHtml
               ? <FileCode2 size={15} strokeWidth={1.75} aria-hidden />
               : <FileText size={15} strokeWidth={1.75} aria-hidden />}
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[12px] font-medium text-text/90">{name}</span>
-            <span className="mt-0.5 block truncate font-mono text-[10px] text-text-muted/50">
+            <span className="block truncate text-[12px] font-medium text-foreground/90">{name}</span>
+            <span className="mt-0.5 block truncate font-mono text-[10px] text-muted-foreground/50">
               {directory || t('inbox.workspaceRoot')}
             </span>
           </span>
-          <span className="hidden shrink-0 items-center gap-1.5 text-[10px] text-text-muted/50 sm:flex">
+          <span className="hidden shrink-0 items-center gap-1.5 text-[10px] text-muted-foreground/50 sm:flex">
             <span>{fileKind}</span>
-            {size && <><span className="text-text-muted/25">·</span><span>{size}</span></>}
+            {size && <><span className="text-muted-foreground/25">·</span><span>{size}</span></>}
           </span>
           <ChevronDown
             size={14}
             strokeWidth={1.75}
             aria-hidden
-            className={`shrink-0 text-text-muted/50 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+            className={`shrink-0 text-muted-foreground/50 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
           />
         </button>
         {isMarkdownPath(doc.path) && (
@@ -507,7 +507,7 @@ export function InboxAttachment({
               disabled={!markdownActionsAvailable}
               title={copied ? t('inbox.docCopiedMarkdown') : t('inbox.docCopyMarkdown')}
               aria-label={copied ? t('inbox.docCopiedMarkdown') : t('inbox.docCopyMarkdown')}
-              className="oa-pressable inline-flex h-7 w-7 items-center justify-center rounded-md text-text-muted/55 hover:bg-bg-tertiary hover:text-accent disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-text-muted/55"
+              className="oa-pressable inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/55 hover:bg-muted hover:text-primary disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted-foreground/55"
             >
               {copied ? <Check size={14} strokeWidth={2} /> : <Copy size={14} strokeWidth={1.75} />}
             </button>
@@ -517,7 +517,7 @@ export function InboxAttachment({
               disabled={!markdownActionsAvailable}
               title={t('inbox.docDownloadMarkdown')}
               aria-label={t('inbox.docDownloadMarkdown')}
-              className="oa-pressable inline-flex h-7 w-7 items-center justify-center rounded-md text-text-muted/55 hover:bg-bg-tertiary hover:text-accent disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-text-muted/55"
+              className="oa-pressable inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/55 hover:bg-muted hover:text-primary disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted-foreground/55"
             >
               <Download size={14} strokeWidth={1.75} />
             </button>
@@ -525,9 +525,9 @@ export function InboxAttachment({
         )}
       </div>
       {expanded && (
-        <div className="oa-disclosure-enter border-t border-border/60 bg-bg px-3 py-3 sm:px-4">
+        <div className="oa-disclosure-enter border-t border-border/60 bg-background px-3 py-3 sm:px-4">
           {result === null ? (
-            <div className="py-3 text-center text-[12px] text-text-muted">{t('common.loading')}</div>
+            <div className="py-3 text-center text-[12px] text-muted-foreground">{t('common.loading')}</div>
           ) : (
             <FileContentView path={doc.path} result={result} />
           )}

@@ -67,13 +67,13 @@ export function CreateSimulatorSection({ onCreated }: {
     >
       <div className="flex items-center gap-2 flex-wrap">
         <input
-          className="px-2 py-1 bg-bg text-text border border-border rounded text-sm outline-none transition-colors focus:border-accent w-48"
+          className="px-2 py-1 bg-background text-foreground border border-border rounded text-sm outline-none transition-colors focus:border-primary w-48"
           placeholder="name (e.g. simulator)"
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
         <input
-          className="px-2 py-1 bg-bg text-text border border-border rounded font-mono text-xs outline-none transition-colors focus:border-accent w-32"
+          className="px-2 py-1 bg-background text-foreground border border-border rounded font-mono text-xs outline-none transition-colors focus:border-primary w-32"
           placeholder="cash (USD)"
           value={cash}
           onChange={(e) => setCash(e.target.value)}

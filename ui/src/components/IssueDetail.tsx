@@ -40,10 +40,10 @@ import { CenteredLoading } from './StateViews'
 // Run-status pill tints — mirrors AutomationRunsSection's STATUS_STYLE so the
 // Issue's independent operational history stays consistent with Automation.
 const RUN_STATUS_STYLE: Record<HeadlessTaskStatus, string> = {
-  running: 'bg-blue-500/15 text-blue-400',
-  done: 'bg-emerald-500/15 text-emerald-400',
-  failed: 'bg-red-500/15 text-red-400',
-  interrupted: 'bg-amber-500/15 text-amber-400',
+  running: 'bg-info/15 text-info',
+  done: 'bg-success/15 text-success',
+  failed: 'bg-destructive/15 text-destructive',
+  interrupted: 'bg-warning/15 text-warning',
 }
 
 // Dropdown ordering for the editable Properties rail. Mirrors the board's
@@ -54,7 +54,7 @@ const PRIORITY_OPTIONS: IssuePriority[] = ['urgent', 'high', 'medium', 'low', 'n
 // Shared compact control styling for the rail's selects / inline input — the
 // settings `inputClass`, trimmed for the narrow rail.
 const railControl =
-  'min-w-0 flex-1 rounded-md border border-border bg-bg px-2 py-1 text-[13px] text-text outline-none transition-colors focus:border-accent/60 focus:shadow-[0_0_0_1px_var(--color-accent-dim)] disabled:cursor-not-allowed disabled:opacity-50'
+  'min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1 text-[13px] text-foreground outline-none transition-colors focus:border-primary/60 focus:shadow-[0_0_0_1px_var(--primary-muted)] disabled:cursor-not-allowed disabled:opacity-50'
 
 const CONFIGURABLE_AGENTS: readonly AgentId[] = ['claude', 'codex', 'opencode', 'pi']
 
@@ -75,8 +75,8 @@ function fmtDuration(ms?: number): string {
 function PropRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex items-start justify-between gap-3 py-2">
-      <span className="shrink-0 text-xs text-muted">{label}</span>
-      <div className="min-w-0 text-right text-[13px] text-text">{children}</div>
+      <span className="shrink-0 text-xs text-muted-foreground">{label}</span>
+      <div className="min-w-0 text-right text-[13px] text-foreground">{children}</div>
     </div>
   )
 }
@@ -85,7 +85,7 @@ function PropRow({ label, children }: { label: string; children: ReactNode }) {
 function EditRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3 py-2">
-      <span className="shrink-0 text-xs text-muted">{label}</span>
+      <span className="shrink-0 text-xs text-muted-foreground">{label}</span>
       <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5">{children}</div>
     </div>
   )
@@ -210,7 +210,7 @@ function AgentEditor({
         }}
         title={canConfigure ? `Configure ${effectiveAgent}` : 'No configurable runtime selected'}
         aria-label={canConfigure ? `Configure ${effectiveAgent}` : 'No configurable runtime selected'}
-        className="shrink-0 rounded-md border border-border bg-bg px-2 py-1 text-muted transition-colors hover:border-accent/50 hover:text-text disabled:cursor-not-allowed disabled:opacity-40"
+        className="shrink-0 rounded-md border border-border bg-background px-2 py-1 text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
       >
         <Settings size={14} aria-hidden />
       </button>
@@ -228,9 +228,9 @@ function PropertySection({
   children: ReactNode
 }) {
   return (
-    <section className="rounded-lg border border-border bg-bg p-3">
-      <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted/70">{title}</h3>
-      {description && <p className="mt-1 text-[11px] leading-snug text-muted">{description}</p>}
+    <section className="rounded-lg border border-border bg-background p-3">
+      <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">{title}</h3>
+      {description && <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{description}</p>}
       <div className="mt-2 divide-y divide-border/60">{children}</div>
     </section>
   )
@@ -343,13 +343,13 @@ function PropertiesRail({
             </EditRow>
           )}
           {agentNeedsCredential && (
-            <p className="py-2 text-right text-[11px] leading-snug text-amber-400">AI credential missing.</p>
+            <p className="py-2 text-right text-[11px] leading-snug text-warning">AI credential missing.</p>
           )}
           {issue.automationHealth && (
             <PropRow label="Health">
               <div className="flex flex-col items-end gap-1">
                 <AutomationHealthPill health={issue.automationHealth} />
-                <span className="max-w-44 text-[11px] leading-snug text-muted">
+                <span className="max-w-44 text-[11px] leading-snug text-muted-foreground">
                   {issue.automationHealth.message}
                 </span>
                 {canRetry && (
@@ -357,7 +357,7 @@ function PropertiesRail({
                     type="button"
                     disabled={retrying}
                     onClick={onRetry}
-                    className="oa-pressable mt-1 inline-flex items-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-[11px] font-medium text-amber-400 transition-colors hover:border-amber-500/60 hover:bg-amber-500/15 disabled:cursor-wait disabled:opacity-50"
+                    className="oa-pressable mt-1 inline-flex items-center gap-1.5 rounded-md border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-[11px] font-medium text-warning transition-colors hover:border-warning/60 hover:bg-warning/15 disabled:cursor-wait disabled:opacity-50"
                   >
                     <RotateCcw size={12} aria-hidden />
                     {retrying ? 'Retrying…' : 'Retry now'}
@@ -367,15 +367,15 @@ function PropertiesRail({
             </PropRow>
           )}
           <PropRow label="Last run">
-            {issue.lastFiredAtMs ? formatRelativeTime(issue.lastFiredAtMs) : <span className="text-muted">never</span>}
+            {issue.lastFiredAtMs ? formatRelativeTime(issue.lastFiredAtMs) : <span className="text-muted-foreground">never</span>}
           </PropRow>
           <PropRow label="Next run">
-            {issue.nextDueAtMs ? formatRelativeTime(issue.nextDueAtMs) : <span className="text-muted">—</span>}
+            {issue.nextDueAtMs ? formatRelativeTime(issue.nextDueAtMs) : <span className="text-muted-foreground">—</span>}
           </PropRow>
           </>
         )}
       </PropertySection>
-      {error && <p className="mt-2 text-[11px] leading-snug text-red-400">{error}</p>}
+      {error && <p className="mt-2 text-[11px] leading-snug text-destructive">{error}</p>}
     </aside>
   )
 }
@@ -420,7 +420,7 @@ function CommentComposer({
   }, [text, sending, wsId, id, onPosted])
 
   return (
-    <div className="rounded-xl border border-border bg-bg px-3 py-3 shadow-sm transition-colors focus-within:border-accent/45">
+    <div className="rounded-xl border border-border bg-background px-3 py-3 shadow-sm transition-colors focus-within:border-primary/45">
       <textarea
         rows={3}
         value={text}
@@ -433,13 +433,13 @@ function CommentComposer({
             void submit()
           }
         }}
-        className="min-h-20 w-full resize-y bg-transparent px-1 py-1 text-[13px] leading-relaxed text-text outline-none placeholder:text-muted/60 disabled:opacity-50"
+        className="min-h-20 w-full resize-y bg-transparent px-1 py-1 text-[13px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/60 disabled:opacity-50"
       />
-      {error && <p className="mt-1.5 text-xs text-red-400">{error}</p>}
+      {error && <p className="mt-1.5 text-xs text-destructive">{error}</p>}
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-2">
-        <p className="min-w-0 flex-1 basis-full break-words text-[11px] leading-snug text-muted sm:basis-auto">
+        <p className="min-w-0 flex-1 basis-full break-words text-[11px] leading-snug text-muted-foreground sm:basis-auto">
           {ownerResumeId
-            ? <>The assigned Session <span className="font-mono text-text/75">@{ownerResumeId}</span> will reply here.</>
+            ? <>The assigned Session <span className="font-mono text-foreground/75">@{ownerResumeId}</span> will reply here.</>
             : assignee === '@new'
               ? 'The first scheduled run will assign a Session; until then this is a timeline note.'
               : 'No fixed Session owner — this comment is recorded as a timeline note.'}
@@ -448,7 +448,7 @@ function CommentComposer({
           type="button"
           onClick={() => void submit()}
           disabled={sending || text.trim().length === 0}
-          className="oa-pressable rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-bg transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40"
+          className="oa-pressable rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {sending ? 'Sending…' : ownerResumeId ? 'Comment & notify' : 'Comment'}
         </button>
@@ -471,8 +471,8 @@ function WhatEditor({
   return (
     <section className="mt-4 border-t border-border/60 pt-4">
       <div className="mb-2">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted/80">What</h2>
-        <p className="mt-1 text-[11px] leading-snug text-muted/65">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/80">What</h2>
+        <p className="mt-1 text-[11px] leading-snug text-muted-foreground/65">
           {scheduled ? 'This exact markdown is sent to the agent on every scheduled run.' : 'The canonical markdown definition of this work item.'}
         </p>
       </div>
@@ -488,40 +488,40 @@ function RunRow({ run, onOpen }: { run: IssueRunRecord; onOpen: (run: IssueRunRe
     ? 'interrupted'
     : run.status
   return (
-    <li className="min-w-0 overflow-hidden rounded-lg border border-border bg-bg-secondary px-3 py-2.5">
+    <li className="min-w-0 overflow-hidden rounded-lg border border-border bg-secondary px-3 py-2.5">
       <div className="flex flex-wrap items-center gap-2">
         <span
           className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-medium ${RUN_STATUS_STYLE[displayStatus]}`}
         >
           {displayStatus}
         </span>
-        <span className="text-xs text-muted">{run.agent}</span>
-        <span className="ml-auto text-xs text-muted" title={new Date(run.startedAt).toLocaleString()}>
+        <span className="text-xs text-muted-foreground">{run.agent}</span>
+        <span className="ml-auto text-xs text-muted-foreground" title={new Date(run.startedAt).toLocaleString()}>
           {formatRelativeTime(run.startedAt)}
         </span>
-        <span className="text-xs text-muted/70">· {fmtDuration(run.durationMs)}</span>
+        <span className="text-xs text-muted-foreground/70">· {fmtDuration(run.durationMs)}</span>
         <button
           type="button"
           onClick={() => onOpen(run)}
           disabled={!run.resumable || run.status === 'running'}
           title={run.resumable ? 'Open the Session behind this run' : 'This run did not capture a resumable Session'}
-          className="rounded-md border border-border px-2 py-1 text-[11px] text-muted transition-colors hover:border-accent/50 hover:text-text disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
         >
           Open conversation
         </button>
       </div>
       {run.prompt && (
-        <p className="mt-1.5 line-clamp-2 text-[12px] leading-snug text-text/80" title={run.prompt}>
+        <p className="mt-1.5 line-clamp-2 text-[12px] leading-snug text-foreground/80" title={run.prompt}>
           {run.prompt}
         </p>
       )}
       {run.output?.assistantPreview && (
-        <p className="mt-1.5 line-clamp-2 border-l-2 border-accent/25 pl-2 text-[12px] leading-snug text-muted" title={run.output.assistantPreview}>
+        <p className="mt-1.5 line-clamp-2 border-l-2 border-primary/25 pl-2 text-[12px] leading-snug text-muted-foreground" title={run.output.assistantPreview}>
           {run.output.assistantPreview}
         </p>
       )}
       {run.output && (run.output.toolCalls > 0 || run.output.toolFailures > 0) && (
-        <p className={`mt-1 text-[11px] ${run.output.toolFailures > 0 ? 'text-red-400' : 'text-muted/60'}`}>
+        <p className={`mt-1 text-[11px] ${run.output.toolFailures > 0 ? 'text-destructive' : 'text-muted-foreground/60'}`}>
           {run.output.toolCalls} tool {run.output.toolCalls === 1 ? 'call' : 'calls'}
           {run.output.toolFailures > 0 ? ` · ${run.output.toolFailures} failed` : ''}
         </p>
@@ -529,20 +529,20 @@ function RunRow({ run, onOpen }: { run: IssueRunRecord; onOpen: (run: IssueRunRe
       {run.failure && (
         <div className={`mt-2 rounded-md border px-2.5 py-2 ${
           run.failure.kind === 'system_paused' || run.failure.kind === 'launcher_restarted'
-            ? 'border-amber-500/25 bg-amber-500/10'
-            : 'border-red-500/25 bg-red-500/10'
+            ? 'border-warning/25 bg-warning/10'
+            : 'border-destructive/25 bg-destructive/10'
         }`}>
           <p className={`text-[12px] font-medium ${
             run.failure.kind === 'system_paused' || run.failure.kind === 'launcher_restarted'
-              ? 'text-amber-400'
-              : 'text-red-400'
+              ? 'text-warning'
+              : 'text-destructive'
           }`}>
             {run.failure.title}
           </p>
-          <p className="mt-0.5 text-[11px] leading-snug text-muted">{run.failure.message}</p>
+          <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{run.failure.message}</p>
         </div>
       )}
-      {run.error && <p className="mt-1 text-[12px] text-red-400">{run.error}</p>}
+      {run.error && <p className="mt-1 text-[12px] text-destructive">{run.error}</p>}
     </li>
   )
 }
@@ -566,7 +566,7 @@ function InboxReportsSection({
   if (reports.length === 0) return null
   return (
     <section className="mt-8">
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted/70">Inbox reports</h3>
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">Inbox reports</h3>
       <ul className="space-y-2">
         {reports.map((entry) => (
           <li key={entry.id}>
@@ -574,14 +574,14 @@ function InboxReportsSection({
               type="button"
               onClick={() => onOpen(entry.id)}
               title="Open in Inbox"
-              className="group flex w-full items-center gap-2.5 rounded-lg border border-border bg-bg-secondary px-3 py-2.5 text-left transition-colors hover:border-accent/40 hover:bg-bg-tertiary"
+              className="group flex w-full items-center gap-2.5 rounded-lg border border-border bg-secondary px-3 py-2.5 text-left transition-colors hover:border-primary/40 hover:bg-muted"
             >
-              <Inbox size={14} className="shrink-0 text-muted/70 transition-colors group-hover:text-accent" aria-hidden />
-              <span className="min-w-0 flex-1 truncate text-[12px] text-text/80">
+              <Inbox size={14} className="shrink-0 text-muted-foreground/70 transition-colors group-hover:text-primary" aria-hidden />
+              <span className="min-w-0 flex-1 truncate text-[12px] text-foreground/80">
                 {previewForEntry(entry) || '(empty push)'}
               </span>
               <span
-                className="ml-auto shrink-0 text-xs text-muted"
+                className="ml-auto shrink-0 text-xs text-muted-foreground"
                 title={new Date(entry.ts).toLocaleString()}
               >
                 {formatRelativeTime(entry.ts)}
@@ -685,11 +685,11 @@ function IssueActivity({
   return (
     <section className="mt-8">
       <div className="mb-3 flex items-baseline justify-between gap-3 border-t border-border/60 pt-5">
-        <h2 className="text-sm font-semibold text-text">Activity</h2>
-        <span className="hidden text-[11px] text-muted sm:inline">Changes and conversation</span>
+        <h2 className="text-sm font-semibold text-foreground">Activity</h2>
+        <span className="hidden text-[11px] text-muted-foreground sm:inline">Changes and conversation</span>
       </div>
       {activity.length === 0 ? (
-        <p className="mb-3 rounded-lg border border-dashed border-border px-4 py-4 text-center text-xs text-muted">
+        <p className="mb-3 rounded-lg border border-dashed border-border px-4 py-4 text-center text-xs text-muted-foreground">
           No changes or comments have been recorded yet.
         </p>
       ) : (
@@ -700,25 +700,25 @@ function IssueActivity({
               const delivery = comment.delivery
               return (
                 <li key={`comment:${comment.id}`} className="relative pl-8">
-                  <span className="absolute left-[3px] top-3 z-10 grid h-[18px] w-[18px] place-items-center rounded-full border border-border bg-bg text-accent">
+                  <span className="absolute left-[3px] top-3 z-10 grid h-[18px] w-[18px] place-items-center rounded-full border border-border bg-background text-primary">
                     <MessageSquare size={10} aria-hidden />
                   </span>
-                  <article className={`rounded-xl border bg-bg-secondary px-4 py-3 ${comment.replyTo ? 'ml-3 border-accent/25' : 'border-border'}`}>
-                    <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted">
-                      <span className="font-medium text-text/85">{comment.author}</span>
-                      {comment.replyTo && <span className="rounded bg-bg-tertiary px-1.5 py-0.5">reply</span>}
+                  <article className={`rounded-xl border bg-secondary px-4 py-3 ${comment.replyTo ? 'ml-3 border-primary/25' : 'border-border'}`}>
+                    <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+                      <span className="font-medium text-foreground/85">{comment.author}</span>
+                      {comment.replyTo && <span className="rounded bg-muted px-1.5 py-0.5">reply</span>}
                       <time className="ml-auto" dateTime={comment.at} title={new Date(comment.at).toLocaleString()}>
                         {formatRelativeTime(item.at)}
                       </time>
                     </div>
                     <MarkdownContent text={comment.markdown} />
                     {delivery?.state === 'pending' && (
-                      <p className="mt-3 border-t border-border/60 pt-2 text-[11px] text-muted">
-                        Waiting for <span className="font-mono text-text/75">@{delivery.targetResumeId}</span> to reply…
+                      <p className="mt-3 border-t border-border/60 pt-2 text-[11px] text-muted-foreground">
+                        Waiting for <span className="font-mono text-foreground/75">@{delivery.targetResumeId}</span> to reply…
                       </p>
                     )}
                     {delivery?.state === 'failed' && (
-                      <p className="mt-3 rounded-md border border-amber-500/25 bg-amber-500/10 px-2.5 py-2 text-[11px] leading-snug text-amber-400">
+                      <p className="mt-3 rounded-md border border-warning/25 bg-warning/10 px-2.5 py-2 text-[11px] leading-snug text-warning">
                         The comment is saved, but the owner could not be reached: {delivery.error}
                       </p>
                     )}
@@ -738,17 +738,17 @@ function IssueActivity({
                   : unknownOriginLabel(origin.reason)
             return (
               <li key={`provenance:${record.id}`} className="relative flex min-w-0 items-start gap-2.5 py-1 pl-8">
-                <span className="absolute left-[3px] top-2 z-10 grid h-[18px] w-[18px] place-items-center rounded-full border border-border bg-bg text-muted">
+                <span className="absolute left-[3px] top-2 z-10 grid h-[18px] w-[18px] place-items-center rounded-full border border-border bg-background text-muted-foreground">
                   <History size={10} aria-hidden />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[12px] text-muted">
-                    <span className="font-medium text-text/80">{originLabel}</span>{' '}
+                  <p className="text-[12px] text-muted-foreground">
+                    <span className="font-medium text-foreground/80">{originLabel}</span>{' '}
                     {PROVENANCE_ACTION_LABEL[record.action]} ·{' '}
                     <span title={new Date(record.at).toLocaleString()}>{formatRelativeTime(record.at)}</span>
                   </p>
                   {record.mutation && (
-                    <ul className="mt-1 space-y-0.5 text-[11px] leading-relaxed text-muted/80">
+                    <ul className="mt-1 space-y-0.5 text-[11px] leading-relaxed text-muted-foreground/80">
                       {record.mutation.fields.map((change) => (
                         <li key={change.field}>{mutationSummary(change)}</li>
                       ))}
@@ -760,7 +760,7 @@ function IssueActivity({
                     type="button"
                     onClick={() => void continueSession(record)}
                     disabled={continuingId !== null}
-                    className="oa-pressable shrink-0 rounded-md border border-border px-2 py-1 text-[11px] text-muted transition-colors hover:border-accent/50 hover:text-text disabled:cursor-wait disabled:opacity-50"
+                    className="oa-pressable shrink-0 rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground disabled:cursor-wait disabled:opacity-50"
                   >
                     {continuingId === record.id ? 'Opening…' : 'Continue'}
                   </button>
@@ -770,7 +770,7 @@ function IssueActivity({
           })}
         </ul>
       )}
-      {continueError && <p className="mt-2 text-xs text-red-400">Could not continue Session: {continueError}</p>}
+      {continueError && <p className="mt-2 text-xs text-destructive">Could not continue Session: {continueError}</p>}
       <CommentComposer
         wsId={wsId}
         id={issueId}
@@ -793,13 +793,13 @@ function RunsSection({
   if (runs.length === 0) return null
   const visible = expanded ? runs : runs.slice(0, 4)
   return (
-    <section className="mt-8 rounded-xl border border-border bg-bg-secondary/45 px-3 py-3 sm:px-4">
+    <section className="mt-8 rounded-xl border border-border bg-secondary/45 px-3 py-3 sm:px-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-text">Runs</h2>
-          <p className="mt-0.5 text-[11px] text-muted">Operational execution history</p>
+          <h2 className="text-sm font-semibold text-foreground">Runs</h2>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">Operational execution history</p>
         </div>
-        <span className="rounded-full bg-bg-tertiary px-2 py-0.5 text-[11px] text-muted">{runs.length}</span>
+        <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">{runs.length}</span>
       </div>
       <ul className="space-y-2">
         {visible.map((run) => <RunRow key={run.taskId} run={run} onOpen={onOpen} />)}
@@ -808,7 +808,7 @@ function RunsSection({
         <button
           type="button"
           onClick={() => setExpanded((value) => !value)}
-          className="oa-pressable mt-3 w-full rounded-md px-3 py-2 text-xs text-muted transition-colors hover:bg-bg-tertiary hover:text-text"
+          className="oa-pressable mt-3 w-full rounded-md px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
           {expanded ? 'Show recent runs' : `Show ${runs.length - 4} more runs`}
         </button>
@@ -842,26 +842,26 @@ function WikilinkPicker({
     <div
       role="presentation"
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-backdrop p-4"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm rounded-lg border border-border bg-bg-secondary p-4 shadow-xl"
+        className="w-full max-w-sm rounded-lg border border-border bg-secondary p-4 shadow-xl"
       >
         <div className="mb-1 flex items-start justify-between gap-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted/70">
-            <span className="font-mono normal-case text-text">[[{resolution.name}]]</span> matches several
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
+            <span className="font-mono normal-case text-foreground">[[{resolution.name}]]</span> matches several
           </h3>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="-mr-1 -mt-0.5 shrink-0 rounded p-0.5 text-muted transition-colors hover:text-text"
+            className="-mr-1 -mt-0.5 shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
           >
             <X size={14} />
           </button>
         </div>
-        <p className="mb-3 text-[12px] leading-snug text-muted">
+        <p className="mb-3 text-[12px] leading-snug text-muted-foreground">
           This name is a global handle pointing at more than one thing — pick the one you meant.
         </p>
         <ul className="space-y-1.5">
@@ -871,13 +871,13 @@ function WikilinkPicker({
                 type="button"
                 onClick={() => onEntity(resolution.entity!.name)}
                 title={`Open tracked entity ${resolution.entity.name}`}
-                className="group flex w-full items-center gap-2.5 rounded-lg border border-border bg-bg-tertiary/30 px-3 py-2 text-left transition-colors hover:border-accent/40 hover:bg-bg-tertiary"
+                className="group flex w-full items-center gap-2.5 rounded-lg border border-border bg-muted/30 px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-muted"
               >
-                <EntityIcon size={14} className="shrink-0 text-muted/70 transition-colors group-hover:text-accent" aria-hidden />
-                <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-text">
+                <EntityIcon size={14} className="shrink-0 text-muted-foreground/70 transition-colors group-hover:text-primary" aria-hidden />
+                <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-foreground">
                   {resolution.entity.name}
                 </span>
-                <span className="shrink-0 rounded-full bg-bg-tertiary px-2 py-0.5 text-[11px] uppercase tracking-wide text-muted">
+                <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] uppercase tracking-wide text-muted-foreground">
                   {resolution.entity.type}
                 </span>
               </button>
@@ -889,12 +889,12 @@ function WikilinkPicker({
                 type="button"
                 onClick={() => onIssue(iss)}
                 title={`Open ${iss.id} in ${iss.wsTag}`}
-                className="group flex w-full items-center gap-2.5 rounded-lg border border-border bg-bg-tertiary/30 px-3 py-2 text-left transition-colors hover:border-accent/40 hover:bg-bg-tertiary"
+                className="group flex w-full items-center gap-2.5 rounded-lg border border-border bg-muted/30 px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-muted"
               >
-                <ListChecks size={14} className="shrink-0 text-muted/70 transition-colors group-hover:text-accent" aria-hidden />
-                <span className="min-w-0 flex-1 truncate text-[12px] text-text">{iss.title}</span>
+                <ListChecks size={14} className="shrink-0 text-muted-foreground/70 transition-colors group-hover:text-primary" aria-hidden />
+                <span className="min-w-0 flex-1 truncate text-[12px] text-foreground">{iss.title}</span>
                 <span
-                  className="shrink-0 rounded-full bg-bg-tertiary px-2 py-0.5 text-[11px] text-muted"
+                  className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground"
                   title={`Workspace: ${iss.wsTag} (${iss.wsId.slice(0, 8)})`}
                 >
                   {iss.wsTag}
@@ -1091,7 +1091,7 @@ export function IssueDetail({
         setSidebar('issue')
         openOrFocus({ kind: 'issue', params: {} })
       }}
-      className="mb-4 inline-flex items-center gap-1.5 text-xs text-muted transition-colors hover:text-text"
+      className="mb-4 inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
     >
       <ArrowLeft size={13} /> {backLabel}
     </button>
@@ -1108,10 +1108,10 @@ export function IssueDetail({
         {loading ? (
           <CenteredLoading />
         ) : (
-          <div className="rounded-lg border border-border bg-bg-secondary px-6 py-12 text-center">
-            <ListChecks size={24} className="mx-auto text-muted/50" />
-            <p className="mt-3 text-sm text-red-400">Failed to load issue: {error}</p>
-            <p className="mt-1 font-mono text-xs text-muted/70">
+          <div className="rounded-lg border border-border bg-secondary px-6 py-12 text-center">
+            <ListChecks size={24} className="mx-auto text-muted-foreground/50" />
+            <p className="mt-3 text-sm text-destructive">Failed to load issue: {error}</p>
+            <p className="mt-1 font-mono text-xs text-muted-foreground/70">
               {wsId.slice(0, 8)} / {id}
             </p>
           </div>
@@ -1147,10 +1147,10 @@ export function IssueDetail({
       <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
         <main className="min-w-0 lg:col-start-1 lg:row-start-1">
           <div className="mb-1 flex items-center gap-2">
-            <span className="font-mono text-[11px] text-muted/70">{id}</span>
+            <span className="font-mono text-[11px] text-muted-foreground/70">{id}</span>
             {issue.when && <CadencePill when={issue.when} />}
           </div>
-          <h1 className="text-xl font-semibold text-text">{issue.title}</h1>
+          <h1 className="text-xl font-semibold text-foreground">{issue.title}</h1>
           <WhatEditor
             key={`${wsId}:${id}`}
             value={issue.what}

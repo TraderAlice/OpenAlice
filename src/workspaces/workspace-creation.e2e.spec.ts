@@ -8,7 +8,7 @@
 
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -130,6 +130,11 @@ describe('chat workspace create: bootstrap → inject → commit', () => {
     // working tree is clean (injected files were committed, not left dangling)
     const status = await run('git', ['-C', dir, 'status', '--porcelain']);
     expect(status.trim()).toBe('');
+
+    const excludes = await readFile(join(dir, '.git/info/exclude'), 'utf8');
+    expect(excludes).toContain('.claude/openalice-provider.json\n');
+    expect(excludes).toContain('.opencode/openalice-provider.json\n');
+    expect(excludes).toContain('tui.json\n');
   });
 });
 

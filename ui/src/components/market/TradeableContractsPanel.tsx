@@ -52,13 +52,13 @@ export function TradeableContractsPanel({ symbol, assetClass }: Props) {
 
   return (
     <Card title="Tradeable on configured brokers" info={info}>
-      {loading && <div className="text-[12px] text-text-muted">Searching brokers…</div>}
-      {error && !loading && <div className="text-[12px] text-red">{error}</div>}
+      {loading && <div className="text-[12px] text-muted-foreground">Searching brokers…</div>}
+      {error && !loading && <div className="text-[12px] text-destructive">{error}</div>}
 
       {!loading && !error && utasConfigured === 0 && (
-        <div className="text-[12px] text-text-muted">
+        <div className="text-[12px] text-muted-foreground">
           No trading accounts configured.{' '}
-          <Link to="/trading" className="text-accent hover:underline">
+          <Link to="/trading" className="text-primary hover:underline">
             Add one in Trading
           </Link>
           {' '}to see matching contracts here.
@@ -66,7 +66,7 @@ export function TradeableContractsPanel({ symbol, assetClass }: Props) {
       )}
 
       {!loading && !error && utasConfigured !== 0 && hits && hits.length === 0 && (
-        <div className="text-[12px] text-text-muted">
+        <div className="text-[12px] text-muted-foreground">
           No tradeable contracts matching <span className="font-mono">{symbol}</span> on your configured brokers.
         </div>
       )}
@@ -86,7 +86,7 @@ export function TradeableContractsPanel({ symbol, assetClass }: Props) {
             {overflow && (
               <button
                 onClick={() => setExpanded((v) => !v)}
-                className="mt-2 text-[11px] text-text-muted/70 hover:text-accent transition-colors cursor-pointer"
+                className="mt-2 text-[11px] text-muted-foreground/70 hover:text-primary transition-colors cursor-pointer"
               >
                 {expanded ? `Show fewer` : `Show ${hidden} more (${sorted.length} total)`}
               </button>
@@ -134,22 +134,22 @@ function ContractRow({ hit }: { hit: ContractSearchHit }) {
     ? `/uta/${encodeURIComponent(hit.source)}?aliceId=${encodeURIComponent(aliceId)}`
     : null
   return (
-    <li className="px-3 py-2 flex items-baseline gap-3 text-[12px] hover:bg-bg-tertiary/40 transition-colors">
-      <span className="font-mono font-semibold text-text">{c.symbol ?? '—'}</span>
+    <li className="px-3 py-2 flex items-baseline gap-3 text-[12px] hover:bg-muted/40 transition-colors">
+      <span className="font-mono font-semibold text-foreground">{c.symbol ?? '—'}</span>
       {c.secType && (
-        <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-bg-tertiary text-text-muted font-medium">
+        <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">
           {c.secType}
         </span>
       )}
-      <span className="text-text-muted/70 truncate flex-1">
+      <span className="text-muted-foreground/70 truncate flex-1">
         {[c.description || c.localSymbol, c.primaryExchange ?? c.exchange, c.currency]
           .filter(Boolean)
           .join(' · ')}
       </span>
-      <span className="text-[10px] text-text-muted/60 shrink-0">{hit.source}</span>
+      <span className="text-[10px] text-muted-foreground/60 shrink-0">{hit.source}</span>
       {aliceId && (
         <code
-          className="text-[10px] font-mono text-text-muted truncate max-w-[260px]"
+          className="text-[10px] font-mono text-muted-foreground truncate max-w-[260px]"
           title={aliceId}
         >
           {aliceId}
@@ -158,7 +158,7 @@ function ContractRow({ hit }: { hit: ContractSearchHit }) {
       {orderHref && (
         <Link
           to={orderHref}
-          className="text-[11px] text-accent hover:underline shrink-0"
+          className="text-[11px] text-primary hover:underline shrink-0"
           title="Open order entry on the UTA"
         >
           Order →

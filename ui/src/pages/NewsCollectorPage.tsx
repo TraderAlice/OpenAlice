@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { type AppConfig, type NewsCollectorConfig, type NewsCollectorFeed } from '../api'
 import { SaveIndicator } from '../components/SaveIndicator'
-import { ConfigSection, Field, inputClass } from '../components/form'
+import { ConfigSection, Field, SettingsScrollArea, inputClass } from '../components/form'
 import { Toggle } from '../components/Toggle'
 import { useConfigPage } from '../hooks/useConfigPage'
 import { PageHeader } from '../components/PageHeader'
@@ -26,49 +26,47 @@ function CollectorSettings() {
   const enabled = cfg.enabled !== false
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="max-w-[880px] mx-auto">
-        <div className="flex items-center justify-end gap-3 mb-4">
-          <SaveIndicator status={status} onRetry={retry} />
-          <Toggle size="sm" checked={enabled} onChange={(v) => updateConfigImmediate({ enabled: v })} />
-        </div>
-
-        <div className={`${!enabled ? 'opacity-40 pointer-events-none' : ''}`}>
-          {/* Collection Settings */}
-          <ConfigSection
-            title="Collection Settings"
-            description="Control how often articles are fetched and how long they are retained in the archive."
-          >
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Fetch interval (min)">
-                <input
-                  className={inputClass}
-                  type="number"
-                  min={1}
-                  value={cfg.intervalMinutes}
-                  onChange={(e) => updateConfig({ intervalMinutes: Number(e.target.value) || 10 })}
-                />
-              </Field>
-              <Field label="Retention (days)">
-                <input
-                  className={inputClass}
-                  type="number"
-                  min={1}
-                  value={cfg.retentionDays}
-                  onChange={(e) => updateConfig({ retentionDays: Number(e.target.value) || 7 })}
-                />
-              </Field>
-            </div>
-          </ConfigSection>
-
-          {/* RSS Feeds */}
-          <FeedsSection
-            feeds={cfg.feeds}
-            onChange={(feeds) => updateConfigImmediate({ feeds })}
-          />
-        </div>
-        {loadError && <p className="text-[13px] text-red mt-4">Failed to load configuration.</p>}
+    <div className="mx-auto w-full max-w-[880px]">
+      <div className="mb-4 flex items-center justify-end gap-3">
+        <SaveIndicator status={status} onRetry={retry} />
+        <Toggle size="sm" checked={enabled} onChange={(v) => updateConfigImmediate({ enabled: v })} />
       </div>
+
+      <div className={`${!enabled ? 'opacity-40 pointer-events-none' : ''}`}>
+        {/* Collection Settings */}
+        <ConfigSection
+          title="Collection Settings"
+          description="Control how often articles are fetched and how long they are retained in the archive."
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Fetch interval (min)">
+              <input
+                className={inputClass}
+                type="number"
+                min={1}
+                value={cfg.intervalMinutes}
+                onChange={(e) => updateConfig({ intervalMinutes: Number(e.target.value) || 10 })}
+              />
+            </Field>
+            <Field label="Retention (days)">
+              <input
+                className={inputClass}
+                type="number"
+                min={1}
+                value={cfg.retentionDays}
+                onChange={(e) => updateConfig({ retentionDays: Number(e.target.value) || 7 })}
+              />
+            </Field>
+          </div>
+        </ConfigSection>
+
+        {/* RSS Feeds */}
+        <FeedsSection
+          feeds={cfg.feeds}
+          onChange={(feeds) => updateConfigImmediate({ feeds })}
+        />
+      </div>
+      {loadError && <p className="mt-4 text-[13px] text-destructive">Failed to load configuration.</p>}
     </div>
   )
 }
@@ -136,21 +134,21 @@ function FeedsSection({
                   onChange={(v) => setEnabled(i, v)}
                 />
                 <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-medium text-text truncate">{feed.name}</p>
+                  <p className="text-[13px] font-medium text-foreground truncate">{feed.name}</p>
                   {feed.description && (
-                    <p className="text-[12px] text-text-muted/80 truncate">{feed.description}</p>
+                    <p className="text-[12px] text-muted-foreground/80 truncate">{feed.description}</p>
                   )}
-                  <p className="text-[11px] text-text-muted/60 truncate mt-0.5">{feed.url}</p>
+                  <p className="text-[11px] text-muted-foreground/60 truncate mt-0.5">{feed.url}</p>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-[11px] text-text-muted/50">source: {feed.source}</span>
+                    <span className="text-[11px] text-muted-foreground/50">source: {feed.source}</span>
                     {feed.categories && feed.categories.length > 0 && (
-                      <span className="text-[11px] text-text-muted/50">• {feed.categories.join(', ')}</span>
+                      <span className="text-[11px] text-muted-foreground/50">• {feed.categories.join(', ')}</span>
                     )}
                   </div>
                 </div>
                 <button
                   onClick={() => removeFeed(i)}
-                  className="shrink-0 text-text-muted hover:text-red transition-colors p-1"
+                  className="shrink-0 text-muted-foreground hover:text-destructive transition-colors p-1"
                   title="Remove feed"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -166,7 +164,7 @@ function FeedsSection({
 
       {/* Add feed form */}
       <div className="border border-border/40 rounded-lg p-4 space-y-3">
-        <p className="text-[13px] font-medium text-text-muted">Add Feed</p>
+        <p className="text-[13px] font-medium text-muted-foreground">Add Feed</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Name">
             <input className={inputClass} value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. CoinDesk" />
@@ -203,9 +201,9 @@ export function NewsCollectorPage() {
         description="Configure RSS feeds and collection settings."
       />
 
-      <div className="flex-1 flex flex-col min-h-0 px-4 md:px-8 py-5">
+      <SettingsScrollArea className="px-4 py-5 md:px-8">
         <CollectorSettings />
-      </div>
+      </SettingsScrollArea>
     </div>
   )
 }

@@ -1,7 +1,13 @@
 import { http, HttpResponse } from 'msw'
 import { demoChatWorkspace, demoWorkspaces, demoTemplates } from '../fixtures/workspaces'
 import { demoWorkspaceFiles } from '../fixtures/inbox'
-import type { DepartedWorkspace, WorkspaceMetadataPatch } from '../../components/workspace/api'
+import type {
+  AgentConfig,
+  AgentConfigBundle,
+  AgentId,
+  DepartedWorkspace,
+  WorkspaceMetadataPatch,
+} from '../../components/workspace/api'
 
 const demoManagerSession = {
   id: 'demo-manager-session',
@@ -19,6 +25,21 @@ const demoManagerSession = {
 }
 
 let demoManagerMessages: unknown[] = []
+
+// Demo mutations live only for the current MSW worker lifetime. Keeping agent
+// config state here lets the real Settings -> save event -> Quick Start refresh
+// path be exercised without touching a user's Workspace files.
+const demoAgentConfigs = new Map<string, Partial<Record<AgentId, AgentConfig>>>()
+
+function demoAgentConfigBundle(workspaceId: string): AgentConfigBundle {
+  const saved = demoAgentConfigs.get(workspaceId)
+  return {
+    claude: saved?.claude ?? null,
+    codex: saved?.codex ?? null,
+    opencode: saved?.opencode ?? null,
+    pi: saved?.pi ?? null,
+  }
+}
 
 function demoManagerSnapshot() {
   return {
@@ -153,6 +174,8 @@ const demoTemplateUpgradePlan = (workspaceId: string) => ({
 })
 
 export const workspacesHandlers = [
+  http.put('/api/workspaces/terminal-view-attributes', () =>
+    HttpResponse.json({ ok: true, changed: true })),
   http.get('/api/workspaces', () => HttpResponse.json({ workspaces: demoWorkspaces })),
   http.get('/api/workspaces/manager', () => HttpResponse.json({
     manager: {
@@ -453,8 +476,8 @@ export const workspacesHandlers = [
   http.get('/api/workspaces/credentials', () =>
     HttpResponse.json({
       credentials: [
-        { slug: 'openai-1', vendor: 'openai', label: 'OpenAI', authType: 'api-key', wires: { 'openai-chat': '' }, lastModel: 'gpt-5.6', resolvedModel: 'gpt-5.6', apiKey: null },
-        { slug: 'minimax-1', vendor: 'minimax', label: 'MiniMax', authType: 'api-key', wires: { 'openai-chat': '' }, lastModel: 'MiniMax-M2.1', resolvedModel: 'MiniMax-M2.1', apiKey: null },
+        { slug: 'openai-1', vendor: 'openai', label: 'OpenAI', authType: 'api-key', wires: { 'openai-chat': 'https://api.openai.com/v1' }, lastModel: 'gpt-5.6', resolvedModel: 'gpt-5.6', apiKey: 'demo-openai-key-not-secret' },
+        { slug: 'minimax-1', vendor: 'minimax', label: 'MiniMax', authType: 'api-key', wires: { 'openai-chat': 'https://api.minimax.io/v1' }, lastModel: 'MiniMax-M2.1', resolvedModel: 'MiniMax-M2.1', apiKey: 'demo-minimax-key-not-secret' },
       ],
     }),
   ),
@@ -597,7 +620,17 @@ export const workspacesHandlers = [
   }),
   http.post('/api/workspaces/:id/sessions/:sid/pause', () => HttpResponse.json(true)),
   http.post('/api/workspaces/:id/sessions/:sid/resume', () => HttpResponse.json(null)),
-  http.delete('/api/workspaces/:id/sessions/:sid', () => HttpResponse.json(true)),
+  http.delete('/api/workspaces/:id/sessions/:sid', ({ params }) => {
+    const workspaceIndex = demoWorkspaces.findIndex((candidate) => candidate.id === String(params.id))
+    const workspace = demoWorkspaces[workspaceIndex]
+    if (workspace) {
+      demoWorkspaces[workspaceIndex] = {
+        ...workspace,
+        sessions: workspace.sessions.filter((session) => session.id !== String(params.sid)),
+      }
+    }
+    return HttpResponse.json(true)
+  }),
   http.get('/api/workspaces/:id/sessions/:sid/diagnostics', () =>
     HttpResponse.json({ status: 'demo' }),
   ),
@@ -617,7 +650,8 @@ export const workspacesHandlers = [
   http.post('/api/workspaces/:id/sessions/:sid/webpi/abort', () =>
     HttpResponse.json({ snapshot: demoManagerSnapshot() })),
 
-  http.get('/api/workspaces/:id/agent-config', () => HttpResponse.json({})),
+  http.get('/api/workspaces/:id/agent-config', ({ params }) =>
+    HttpResponse.json(demoAgentConfigBundle(String(params.id)))),
   http.get('/api/workspaces/:id/agent-readiness', () =>
     HttpResponse.json({
       agents: {
@@ -668,12 +702,37 @@ export const workspacesHandlers = [
       },
     }),
   ),
-  // Credential detection — demo workspaces have no on-disk config, so report
-  // none (no overwrite notice; the picker defaults to the first compatible).
-  http.get('/api/workspaces/:id/agent-config/:agent/credential', () =>
-    HttpResponse.json({ slug: null, model: null, contextWindow: null, wireShape: null }),
-  ),
-  http.put('/api/workspaces/:id/agent-config/:agent', () => HttpResponse.json({ ok: true })),
+  http.get('/api/workspaces/:id/agent-config/:agent/credential', ({ params }) => {
+    const workspaceId = String(params.id)
+    const agent = String(params.agent) as AgentId
+    const config = demoAgentConfigs.get(workspaceId)?.[agent]
+    const configured = Boolean(config?.baseUrl && config.apiKey && config.model)
+    const baseUrl = config?.baseUrl ?? ''
+    const slug = baseUrl.includes('api.openai.com')
+      ? 'openai-1'
+      : baseUrl.includes('api.minimax.io')
+        ? 'minimax-1'
+        : null
+    return HttpResponse.json({
+      configured,
+      slug: configured ? slug : null,
+      model: configured ? config?.model ?? null : null,
+      contextWindow: configured ? config?.contextWindow ?? null : null,
+      wireShape: configured ? config?.wireShape ?? null : null,
+      reasoning: configured ? config?.reasoning ?? null : null,
+      reasoningEffort: configured ? config?.reasoningEffort ?? null : null,
+    })
+  }),
+  http.put('/api/workspaces/:id/agent-config/:agent', async ({ params, request }) => {
+    const workspaceId = String(params.id)
+    const agent = String(params.agent) as AgentId
+    const config = await request.json() as AgentConfig
+    demoAgentConfigs.set(workspaceId, {
+      ...demoAgentConfigs.get(workspaceId),
+      [agent]: config,
+    })
+    return HttpResponse.json({ ok: true })
+  }),
   http.post('/api/workspaces/:id/agent-config/:agent/test', () =>
     HttpResponse.json({ ok: true, response: 'Demo mode — test is stubbed.' }),
   ),

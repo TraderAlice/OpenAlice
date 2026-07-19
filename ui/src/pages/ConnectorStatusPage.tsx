@@ -47,13 +47,13 @@ export function ConnectorStatusPage() {
         right={(
           <div className="flex items-center gap-2">
             {lastUpdated && (
-              <span className="hidden text-[11px] text-text-muted/60 sm:inline">
+              <span className="hidden text-[11px] text-muted-foreground/60 sm:inline">
                 Updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
             )}
             <button
               type="button"
-              className="oa-pressable inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-[13px] text-text-muted hover:text-text hover:border-accent/50 disabled:opacity-50"
+              className="oa-pressable inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-[13px] text-muted-foreground hover:text-foreground hover:border-primary/50 disabled:opacity-50"
               disabled={refreshing}
               onClick={() => void load(true)}
             >
@@ -62,7 +62,7 @@ export function ConnectorStatusPage() {
             </button>
             <button
               type="button"
-              className="oa-pressable inline-flex items-center gap-2 rounded-lg bg-accent px-3 py-2 text-[13px] font-medium text-white hover:bg-accent/90"
+              className="oa-pressable inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-[13px] font-medium text-primary-foreground hover:bg-primary/90"
               onClick={configure}
             >
               <Settings2 size={14} />
@@ -81,11 +81,11 @@ export function ConnectorStatusPage() {
           ) : null}
 
           {error && (
-            <div className="flex gap-3 rounded-xl border border-red/30 bg-red/5 px-4 py-3 text-[13px] text-red" role="alert">
+            <div className="flex gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-[13px] text-destructive" role="alert">
               <CircleAlert size={17} className="mt-0.5 shrink-0" />
               <div>
                 <p className="font-medium">Could not read Connector status.</p>
-                <p className="mt-0.5 text-text-muted">{error}</p>
+                <p className="mt-0.5 text-muted-foreground">{error}</p>
               </div>
             </div>
           )}
@@ -110,29 +110,29 @@ function ConnectorOverview({
 
   return (
     <>
-      <section className="oa-status-surface rounded-2xl border border-border bg-bg-secondary/35 p-5 md:p-6">
+      <section className="oa-status-surface rounded-2xl border border-border bg-secondary/35 p-5 md:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex min-w-0 gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-bg text-text-muted">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-background text-muted-foreground">
               <Plug size={19} />
             </div>
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-[15px] font-semibold text-text">Connector Service</h3>
+                <h3 className="text-[15px] font-semibold text-foreground">Connector Service</h3>
                 <StatusBadge tone={service.tone}>{service.label}</StatusBadge>
               </div>
-              <p className="mt-1 max-w-[660px] text-[13px] leading-5 text-text-muted">
+              <p className="mt-1 max-w-[660px] text-[13px] leading-5 text-muted-foreground">
                 {service.description}
               </p>
             </div>
           </div>
-          <div className="text-right text-[11px] text-text-muted/70">
+          <div className="text-right text-[11px] text-muted-foreground/70">
             {snapshot.health.checkedAt && <p>Checked {formatDate(snapshot.health.checkedAt)}</p>}
             {snapshot.health.latencyMs !== undefined && <p className="mt-0.5">{snapshot.health.latencyMs} ms</p>}
           </div>
         </div>
         {snapshot.health.lastError && (
-          <div className="mt-4 rounded-lg border border-red/20 bg-red/5 px-3 py-2 text-[12px] text-red">
+          <div className="mt-4 rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-[12px] text-destructive">
             {snapshot.health.lastError}
           </div>
         )}
@@ -141,8 +141,8 @@ function ConnectorOverview({
       <section>
         <div className="mb-3 flex items-end justify-between gap-3">
           <div>
-            <h3 className="text-[13px] font-semibold uppercase tracking-[0.08em] text-text">Delivery connectors</h3>
-            <p className="mt-1 text-[12px] text-text-muted">Each connector delivers to one private owner chat.</p>
+            <h3 className="text-[13px] font-semibold uppercase tracking-[0.08em] text-foreground">Delivery connectors</h3>
+            <p className="mt-1 text-[12px] text-muted-foreground">Each connector delivers to one private owner chat.</p>
           </div>
         </div>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -166,31 +166,31 @@ function ConnectorOverview({
             })
 
             return (
-              <article key={definition.id} className="oa-status-surface rounded-2xl border border-border bg-bg-secondary/25 p-5">
+              <article key={definition.id} className="oa-status-surface rounded-2xl border border-border bg-secondary/25 p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h4 className="text-[15px] font-semibold text-text">{definition.label}</h4>
+                      <h4 className="text-[15px] font-semibold text-foreground">{definition.label}</h4>
                       <StatusBadge tone={presentation.tone}>{presentation.label}</StatusBadge>
                     </div>
-                    <p className="mt-1 text-[12px] leading-5 text-text-muted">{definition.description}</p>
+                    <p className="mt-1 text-[12px] leading-5 text-muted-foreground">{definition.description}</p>
                   </div>
                   <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${presentation.dot}`} aria-hidden />
                 </div>
 
                 <dl className="mt-5 grid grid-cols-[112px_1fr] gap-x-3 gap-y-2 border-t border-border/70 pt-4 text-[12px]">
-                  <dt className="text-text-muted">Configuration</dt>
-                  <dd className="text-text">{configured ? 'Ready' : 'Needs setup'}</dd>
-                  <dt className="text-text-muted">Delivery</dt>
-                  <dd className="text-text">{config.enabled ? 'Enabled' : 'Disabled'}</dd>
-                  <dt className="text-text-muted">Owner</dt>
-                  <dd className="truncate text-text" title={runtime?.owner}>{runtime?.owner ?? 'Not linked'}</dd>
-                  <dt className="text-text-muted">Last success</dt>
-                  <dd className="text-text">{runtime?.lastSuccessAt ? formatDate(runtime.lastSuccessAt) : 'No delivery yet'}</dd>
+                  <dt className="text-muted-foreground">Configuration</dt>
+                  <dd className="text-foreground">{configured ? 'Ready' : 'Needs setup'}</dd>
+                  <dt className="text-muted-foreground">Delivery</dt>
+                  <dd className="text-foreground">{config.enabled ? 'Enabled' : 'Disabled'}</dd>
+                  <dt className="text-muted-foreground">Owner</dt>
+                  <dd className="truncate text-foreground" title={runtime?.owner}>{runtime?.owner ?? 'Not linked'}</dd>
+                  <dt className="text-muted-foreground">Last success</dt>
+                  <dd className="text-foreground">{runtime?.lastSuccessAt ? formatDate(runtime.lastSuccessAt) : 'No delivery yet'}</dd>
                 </dl>
 
                 {(runtime?.detail || runtime?.lastError) && (
-                  <p className={`mt-4 rounded-lg px-3 py-2 text-[12px] ${runtime.lastError ? 'bg-red/5 text-red' : 'bg-bg-tertiary/55 text-text-muted'}`}>
+                  <p className={`mt-4 rounded-lg px-3 py-2 text-[12px] ${runtime.lastError ? 'bg-destructive/5 text-destructive' : 'bg-muted/55 text-muted-foreground'}`}>
                     {runtime.lastError ?? runtime.detail}
                   </p>
                 )}
@@ -198,7 +198,7 @@ function ConnectorOverview({
                 {!configured && (
                   <button
                     type="button"
-                    className="mt-4 inline-flex items-center gap-1.5 text-[12px] font-medium text-accent hover:underline"
+                    className="mt-4 inline-flex items-center gap-1.5 text-[12px] font-medium text-primary hover:underline"
                     onClick={onConfigure}
                   >
                     Configure {definition.label}
@@ -249,29 +249,29 @@ function adapterPresentation(input: {
   runtimeStatus?: AdapterStatus
 }): { label: string; tone: StatusTone; dot: string } {
   if (!input.serviceEnabled || !input.adapterEnabled) {
-    return { label: 'Off', tone: 'neutral', dot: 'bg-text-muted/30' }
+    return { label: 'Off', tone: 'neutral', dot: 'bg-muted-foreground/30' }
   }
   if (!input.configured) {
-    return { label: 'Needs setup', tone: 'warning', dot: 'bg-yellow-400' }
+    return { label: 'Needs setup', tone: 'warning', dot: 'bg-warning' }
   }
   if (input.runtimeStatus === 'healthy') {
-    return { label: 'Connected', tone: 'healthy', dot: 'bg-green' }
+    return { label: 'Connected', tone: 'healthy', dot: 'bg-success' }
   }
   if (input.runtimeStatus === 'awaiting_link') {
-    return { label: 'Waiting for /link', tone: 'warning', dot: 'bg-yellow-400' }
+    return { label: 'Waiting for /link', tone: 'warning', dot: 'bg-warning' }
   }
   if (input.runtimeStatus === 'degraded' || input.runtimeStatus === 'stopped') {
-    return { label: 'Needs attention', tone: 'danger', dot: 'bg-red' }
+    return { label: 'Needs attention', tone: 'danger', dot: 'bg-destructive' }
   }
-  return { label: 'Starting', tone: 'warning', dot: 'bg-yellow-400' }
+  return { label: 'Starting', tone: 'warning', dot: 'bg-warning' }
 }
 
 function StatusBadge({ tone, children }: { tone: StatusTone; children: string }) {
   const styles: Record<StatusTone, string> = {
-    healthy: 'border-green/20 bg-green/10 text-green',
-    warning: 'border-yellow-400/25 bg-yellow-400/10 text-yellow-600 dark:text-yellow-300',
-    danger: 'border-red/25 bg-red/10 text-red',
-    neutral: 'border-border bg-bg-tertiary text-text-muted',
+    healthy: 'border-success/20 bg-success/10 text-success',
+    warning: 'border-warning/25 bg-warning/10 text-warning',
+    danger: 'border-destructive/25 bg-destructive/10 text-destructive',
+    neutral: 'border-border bg-muted text-muted-foreground',
   }
   return (
     <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${styles[tone]}`}>

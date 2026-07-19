@@ -178,12 +178,12 @@ export function ContractCell({ contract }: { contract: ContractLike }) {
   const { name, meta } = contractSecondaryParts(contract)
   return (
     <div className="min-w-0">
-      <div className="text-[13px] text-text font-medium leading-tight">{contractPrimary(contract)}</div>
+      <div className="text-[13px] text-foreground font-medium leading-tight">{contractPrimary(contract)}</div>
       {(name || meta) && (
         <div className="text-[11px] leading-tight mt-0.5">
-          {name && <span className="text-text-muted">{name}</span>}
-          {name && meta && <span className="text-text-muted opacity-40"> · </span>}
-          {meta && <span className="text-text-muted opacity-60">{meta}</span>}
+          {name && <span className="text-muted-foreground">{name}</span>}
+          {name && meta && <span className="text-muted-foreground opacity-40"> · </span>}
+          {meta && <span className="text-muted-foreground opacity-60">{meta}</span>}
         </div>
       )}
     </div>

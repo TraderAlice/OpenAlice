@@ -10,6 +10,7 @@ import {
   type Workspace,
 } from '../components/workspace/api'
 import { i18n } from '../i18n'
+import { ToastProvider } from '../components/Toast'
 import { useWorkspaces } from './workspaces-context'
 import { WorkspacesProvider } from './WorkspacesContext'
 
@@ -28,6 +29,7 @@ const mocks = vi.hoisted(() => ({
   resumeSession: vi.fn(),
   openWebPiSession: vi.fn(),
   deleteSession: vi.fn(),
+  getWorkspaceState: vi.fn(),
 }))
 
 vi.mock('../tabs/store', () => {
@@ -37,7 +39,7 @@ vi.mock('../tabs/store', () => {
       closeTab: mocks.closeTab,
       setSidebar: mocks.setSidebar,
     }),
-    { getState: () => ({ tabs: {} }) },
+    { getState: () => mocks.getWorkspaceState() },
   )
   return { useWorkspace }
 })
@@ -60,8 +62,13 @@ vi.mock('../components/workspace/api', async (importOriginal) => {
   }
 })
 
-vi.mock('../components/workspace/terminalTheme', () => ({
-  useResolvedTerminalThemeVariant: () => 'dark',
+vi.mock('../components/workspace/terminalAppearance', () => ({
+  useTerminalAppearance: () => ({
+    mode: 'dark',
+    theme: {},
+    viewAttributes: { foreground: [255, 255, 255], background: [0, 0, 0] },
+  }),
+  publishTerminalViewAttributes: vi.fn().mockResolvedValue(true),
 }))
 
 vi.mock('../components/workspace/WorkspaceAIConfigModal', () => ({
@@ -153,6 +160,15 @@ function ManagerProbe() {
   )
 }
 
+function SessionDeleteProbe() {
+  const { requestDeleteSession } = useWorkspaces()
+  return (
+    <button type="button" onClick={() => requestDeleteSession('research-desk', 'pi-headless-follow-up')}>
+      Delete focused session
+    </button>
+  )
+}
+
 beforeEach(async () => {
   vi.clearAllMocks()
   await i18n.changeLanguage('en')
@@ -167,6 +183,15 @@ beforeEach(async () => {
   mocks.resumeSession.mockResolvedValue(null)
   mocks.openWebPiSession.mockResolvedValue({ pid: 43, startedAt: 3 })
   mocks.deleteSession.mockResolvedValue(true)
+  mocks.getWorkspaceState.mockReturnValue({
+    tabs: {},
+    tree: {
+      kind: 'leaf',
+      group: { id: 'g1', tabIds: [], activeTabId: null },
+    },
+    focusedGroupId: 'g1',
+    selectedSidebar: 'chat',
+  })
 })
 
 afterEach(cleanup)
@@ -174,9 +199,11 @@ afterEach(cleanup)
 describe('WorkspacesProvider conversation routing', () => {
   it('opens a materialized headless Session on the Ask Alice surface', async () => {
     render(
-      <WorkspacesProvider>
-        <Probe />
-      </WorkspacesProvider>,
+      <ToastProvider>
+        <WorkspacesProvider>
+          <Probe />
+        </WorkspacesProvider>
+      </ToastProvider>,
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
@@ -195,9 +222,11 @@ describe('WorkspacesProvider conversation routing', () => {
   it('routes Manager lifecycle actions through the separate launcher-owned state', async () => {
     mocks.resumeSession.mockResolvedValue({ pid: 42, startedAt: 2 })
     render(
-      <WorkspacesProvider>
-        <ManagerProbe />
-      </WorkspacesProvider>,
+      <ToastProvider>
+        <WorkspacesProvider>
+          <ManagerProbe />
+        </WorkspacesProvider>
+      </ToastProvider>,
     )
 
     expect(await screen.findByText('Coordinate release owners')).toBeTruthy()
@@ -227,5 +256,44 @@ describe('WorkspacesProvider conversation routing', () => {
       MANAGER_WORKSPACE_ID,
       'opencode-manager-session',
     ))
+  })
+
+  it('lands a deleted focused Session on its Workspace Session library', async () => {
+    const focusedSession = materializedSession()
+    mocks.listWorkspaces.mockResolvedValue([{ ...workspace(), sessions: [focusedSession] }])
+    mocks.getWorkspaceState.mockReturnValue({
+      tabs: {
+        'session-tab': {
+          id: 'session-tab',
+          spec: {
+            kind: 'workspace',
+            params: { wsId: 'research-desk', sessionId: focusedSession.id, source: 'chat' },
+          },
+        },
+      },
+      tree: {
+        kind: 'leaf',
+        group: { id: 'g1', tabIds: ['session-tab'], activeTabId: 'session-tab' },
+      },
+      focusedGroupId: 'g1',
+      selectedSidebar: 'chat',
+    })
+
+    render(
+      <ToastProvider>
+        <WorkspacesProvider>
+          <SessionDeleteProbe />
+        </WorkspacesProvider>
+      </ToastProvider>,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete focused session' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }))
+
+    await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'workspace',
+      params: { wsId: 'research-desk', source: 'chat' },
+    }))
+    expect(mocks.closeTab).toHaveBeenCalledWith('session-tab')
   })
 })

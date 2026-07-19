@@ -25,7 +25,6 @@ import { useWorkspaces } from '../contexts/workspaces-context'
 import { useWorkspace } from '../tabs/store'
 import { WorkspaceView } from '../components/workspace/WorkspaceView'
 import { WorkspaceFilesToggle } from '../components/workspace/WorkspaceFilesToggle'
-import { keyMapForAgent } from '../components/workspace/terminalInput'
 import type { ViewSpec } from '../tabs/types'
 
 interface Props {
@@ -46,7 +45,6 @@ export function WorkspacePage({ spec, visible }: Props) {
   const activeRecord = sessionId
     ? sessions.find((s) => s.id === sessionId) ?? null
     : null
-  const keyMap = keyMapForAgent(activeRecord?.agent)
   const defaultAgentEnabled =
     ctx.defaultAgent !== null &&
     workspace?.agents.includes(ctx.defaultAgent) === true &&
@@ -84,7 +82,7 @@ export function WorkspacePage({ spec, visible }: Props) {
 
   if (!workspace) {
     return (
-      <div className="workspaces-root flex flex-col items-center justify-center h-full text-text-muted text-sm">
+      <div className="workspaces-root flex flex-col items-center justify-center h-full text-muted-foreground text-sm">
         {t('workspace.notFound')}
       </div>
     )
@@ -100,8 +98,8 @@ export function WorkspacePage({ spec, visible }: Props) {
       {/* OpenAlice-side header bar above the launcher's WorkspaceView. The
        *  launcher component itself is byte-faithful; we add the AI-provider
        *  affordance here. */}
-      <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-bg-secondary/30 shrink-0">
-        <span className="text-[12px] text-text-muted font-medium">{workspace.tag}</span>
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-secondary/30 shrink-0">
+        <span className="text-[12px] text-muted-foreground font-medium">{workspace.tag}</span>
         <div className="flex items-center gap-1">
           {activeRecord?.agent === 'pi' && activeRecord.state === 'running' && (
             <button
@@ -113,7 +111,7 @@ export function WorkspacePage({ spec, visible }: Props) {
                   void ctx.openWebPiSession(wsId, activeRecord.id, source)
                 }
               }}
-              className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] text-text-muted hover:text-text hover:bg-bg-tertiary transition-colors"
+              className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
               title={(activeRecord.surface ?? 'terminal') === 'webpi' ? 'Open this Pi Session in the terminal' : 'Open this Pi Session in WebPi'}
             >
               {(activeRecord.surface ?? 'terminal') === 'webpi'
@@ -126,7 +124,7 @@ export function WorkspacePage({ spec, visible }: Props) {
           <button
             type="button"
             onClick={() => ctx.openAgentConfig(wsId)}
-            className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] text-text-muted hover:text-text hover:bg-bg-tertiary transition-colors"
+            className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             title={t('workspace.configure')}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -145,7 +143,6 @@ export function WorkspacePage({ spec, visible }: Props) {
           activeRecord={activeRecord}
           sessions={workspace.sessions}
           label={workspace.tag}
-          keyMap={keyMap}
           onSpawnFresh={spawnDefault}
           onResume={(id) => void ctx.resumeSession(wsId, id, source)}
           onOpenWebPi={(id) => void ctx.openWebPiSession(wsId, id, source)}

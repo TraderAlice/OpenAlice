@@ -14,10 +14,16 @@ export class EReader {
   private conn: Connection
   private buf: Buffer = Buffer.alloc(0)
   private onMessage: (msg: Buffer) => void
+  private onError?: (error: unknown) => void
 
-  constructor(conn: Connection, onMessage: (msg: Buffer) => void) {
+  constructor(
+    conn: Connection,
+    onMessage: (msg: Buffer) => void,
+    onError?: (error: unknown) => void,
+  ) {
     this.conn = conn
     this.onMessage = onMessage
+    this.onError = onError
   }
 
   /**
@@ -44,7 +50,17 @@ export class EReader {
       const [size, msg, rest] = readMsg(this.buf)
       if (msg.length > 0) {
         this.buf = rest
-        this.onMessage(msg)
+        try {
+          this.onMessage(msg)
+        } catch (error) {
+          // A decoder failure means field alignment is no longer trustworthy.
+          // Drop every buffered successor and let the client replace this
+          // connection instead of continuing from an uncertain boundary.
+          this.buf = Buffer.alloc(0)
+          if (!this.onError) throw error
+          this.onError(error)
+          break
+        }
       } else {
         // Incomplete message — wait for more data
         break

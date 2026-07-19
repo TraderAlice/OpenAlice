@@ -1,0 +1,721 @@
+/*
+ * OpenAlice semantic color cards.
+ *
+ * Every card defines the same Orca/shadcn-compatible core plus the smallest
+ * useful OpenAlice superset: product state, terminal, chart, and sidebar
+ * semantics. Components only consume these names. `data-palette` chooses the
+ * active card; `data-palette-preview` renders the exact same card in Settings.
+ */
+
+:root,
+:root[data-palette="paper"],
+[data-palette-preview="paper"] {
+  color-scheme: light;
+
+  --background: #fbfaf6;
+  --foreground: #1c2a41;
+  --card: #fffdf8;
+  --card-foreground: #1c2a41;
+  --popover: #fffdf8;
+  --popover-foreground: #1c2a41;
+  --primary: #2f62b0;
+  --primary-foreground: #fffdf8;
+  --secondary: #f1ede4;
+  --secondary-foreground: #1c2a41;
+  --muted: #e4dccb;
+  --muted-foreground: #5e6573;
+  --accent: rgba(28, 42, 65, 0.045);
+  --accent-foreground: #1c2a41;
+  --destructive: #be4138;
+  --destructive-foreground: #fffdf8;
+  --border: #d8d2c4;
+  --input: #d8d2c4;
+  --ring: #2f62b0;
+
+  --accent-strong: rgba(28, 42, 65, 0.075);
+  --primary-muted: rgba(47, 98, 176, 0.14);
+  --success: #2e8b6f;
+  --success-foreground: #fffdf8;
+  --warning: #986700;
+  --warning-foreground: #fffdf8;
+  --warning-background: #fbf1d6;
+  --warning-border: #c99a2e;
+  --info: #2f62b0;
+  --info-foreground: #fffdf8;
+  --ai-action: #6b5bc2;
+  --ai-action-foreground: #fffdf8;
+  --backdrop: rgba(11, 12, 14, 0.5);
+  --code-background: rgba(28, 42, 65, 0.07);
+  --report-canvas: #ffffff;
+  --shadow-color: #1c2a41;
+
+  --terminal-background: #fbfaf6;
+  --terminal-foreground: #1c2a41;
+  --terminal-cursor: #2f62b0;
+  --terminal-cursor-accent: #fffdf8;
+  --terminal-selection-background: rgba(47, 98, 176, 0.22);
+  --terminal-selection-foreground: #fffdf8;
+  --terminal-black: #1c2a41;
+  --terminal-red: #cf222e;
+  --terminal-green: #116329;
+  --terminal-yellow: #7a4d05;
+  --terminal-blue: #0969da;
+  --terminal-magenta: #8250df;
+  --terminal-cyan: #1b7c83;
+  --terminal-white: #6e7781;
+  --terminal-bright-black: #57606a;
+  --terminal-bright-red: #a40e26;
+  --terminal-bright-green: #1a7f37;
+  --terminal-bright-yellow: #633c01;
+  --terminal-bright-blue: #218bff;
+  --terminal-bright-magenta: #a475f9;
+  --terminal-bright-cyan: #3192aa;
+  --terminal-bright-white: #24292f;
+
+  --chart-1: #2f62b0;
+  --chart-2: #2e8b6f;
+  --chart-3: #986700;
+  --chart-4: #6b5bc2;
+  --chart-5: #1b7c83;
+  --chart-positive: #2e8b6f;
+  --chart-negative: #be4138;
+  --chart-positive-muted: rgba(46, 139, 111, 0.33);
+  --chart-negative-muted: rgba(190, 65, 56, 0.33);
+  --chart-axis: #5e6573;
+  --chart-grid: #d8d2c4;
+
+  --sidebar: #f1ede4;
+  --sidebar-foreground: #1c2a41;
+  --sidebar-primary: #2f62b0;
+  --sidebar-primary-foreground: #fffdf8;
+  --sidebar-accent: #e4dccb;
+  --sidebar-accent-foreground: #1c2a41;
+  --sidebar-border: #d8d2c4;
+  --sidebar-ring: #2f62b0;
+
+  --app-background-wash: radial-gradient(
+    circle at 50% 24%,
+    rgba(47, 98, 176, 0.045),
+    transparent 38rem
+  );
+}
+
+:root[data-palette="porcelain"],
+[data-palette-preview="porcelain"] {
+  color-scheme: light;
+
+  --background: #f5f7fb;
+  --foreground: #172238;
+  --card: #ffffff;
+  --card-foreground: #172238;
+  --popover: #ffffff;
+  --popover-foreground: #172238;
+  --primary: #315fb5;
+  --primary-foreground: #ffffff;
+  --secondary: #e9eef7;
+  --secondary-foreground: #172238;
+  --muted: #dbe3ef;
+  --muted-foreground: #667085;
+  --accent: rgba(49, 95, 181, 0.055);
+  --accent-foreground: #172238;
+  --destructive: #c43d4b;
+  --destructive-foreground: #ffffff;
+  --border: #cfd8e6;
+  --input: #cfd8e6;
+  --ring: #315fb5;
+
+  --accent-strong: rgba(49, 95, 181, 0.1);
+  --primary-muted: rgba(49, 95, 181, 0.14);
+  --success: #16836b;
+  --success-foreground: #ffffff;
+  --warning: #8a5a00;
+  --warning-foreground: #ffffff;
+  --warning-background: #fff3cf;
+  --warning-border: #d3a640;
+  --info: #315fb5;
+  --info-foreground: #ffffff;
+  --ai-action: #7655c7;
+  --ai-action-foreground: #ffffff;
+  --backdrop: rgba(7, 17, 31, 0.48);
+  --code-background: rgba(49, 95, 181, 0.075);
+  --report-canvas: #ffffff;
+  --shadow-color: #172238;
+
+  --terminal-background: #f8faff;
+  --terminal-foreground: #172238;
+  --terminal-cursor: #315fb5;
+  --terminal-cursor-accent: #ffffff;
+  --terminal-selection-background: rgba(49, 95, 181, 0.22);
+  --terminal-selection-foreground: #ffffff;
+  --terminal-black: #172238;
+  --terminal-red: #c43d4b;
+  --terminal-green: #16836b;
+  --terminal-yellow: #8a5a00;
+  --terminal-blue: #315fb5;
+  --terminal-magenta: #7655c7;
+  --terminal-cyan: #147d91;
+  --terminal-white: #667085;
+  --terminal-bright-black: #526079;
+  --terminal-bright-red: #a52f3d;
+  --terminal-bright-green: #0d725c;
+  --terminal-bright-yellow: #704900;
+  --terminal-bright-blue: #4778d1;
+  --terminal-bright-magenta: #8d70d8;
+  --terminal-bright-cyan: #258da1;
+  --terminal-bright-white: #28364d;
+
+  --chart-1: #315fb5;
+  --chart-2: #16836b;
+  --chart-3: #8a5a00;
+  --chart-4: #7655c7;
+  --chart-5: #147d91;
+  --chart-positive: #16836b;
+  --chart-negative: #c43d4b;
+  --chart-positive-muted: rgba(22, 131, 107, 0.3);
+  --chart-negative-muted: rgba(196, 61, 75, 0.3);
+  --chart-axis: #667085;
+  --chart-grid: #cfd8e6;
+
+  --sidebar: #e9eef7;
+  --sidebar-foreground: #172238;
+  --sidebar-primary: #315fb5;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #dbe3ef;
+  --sidebar-accent-foreground: #172238;
+  --sidebar-border: #cfd8e6;
+  --sidebar-ring: #315fb5;
+
+  --app-background-wash: radial-gradient(
+    circle at 50% 22%,
+    rgba(49, 95, 181, 0.06),
+    transparent 40rem
+  );
+}
+
+:root[data-palette="linen"],
+[data-palette-preview="linen"] {
+  color-scheme: light;
+
+  --background: #f6f0e6;
+  --foreground: #342c27;
+  --card: #fffaf1;
+  --card-foreground: #342c27;
+  --popover: #fffaf1;
+  --popover-foreground: #342c27;
+  --primary: #9a4f3d;
+  --primary-foreground: #fffaf1;
+  --secondary: #ece2d3;
+  --secondary-foreground: #342c27;
+  --muted: #ddd0bd;
+  --muted-foreground: #73675d;
+  --accent: rgba(154, 79, 61, 0.07);
+  --accent-foreground: #342c27;
+  --destructive: #b83c38;
+  --destructive-foreground: #fffaf1;
+  --border: #d2c2ad;
+  --input: #d2c2ad;
+  --ring: #9a4f3d;
+
+  --accent-strong: rgba(154, 79, 61, 0.12);
+  --primary-muted: rgba(154, 79, 61, 0.15);
+  --success: #427354;
+  --success-foreground: #fffaf1;
+  --warning: #956118;
+  --warning-foreground: #fffaf1;
+  --warning-background: #f5e6c5;
+  --warning-border: #bd8b36;
+  --info: #4f6f8f;
+  --info-foreground: #fffaf1;
+  --ai-action: #7c5e8f;
+  --ai-action-foreground: #fffaf1;
+  --backdrop: rgba(35, 26, 22, 0.5);
+  --code-background: rgba(52, 44, 39, 0.075);
+  --report-canvas: #ffffff;
+  --shadow-color: #342c27;
+
+  --terminal-background: #f8f1e6;
+  --terminal-foreground: #352d28;
+  --terminal-cursor: #9a4f3d;
+  --terminal-cursor-accent: #fffaf1;
+  --terminal-selection-background: rgba(154, 79, 61, 0.24);
+  --terminal-selection-foreground: #342c27;
+  --terminal-black: #342c27;
+  --terminal-red: #b83c38;
+  --terminal-green: #427354;
+  --terminal-yellow: #956118;
+  --terminal-blue: #4f6f8f;
+  --terminal-magenta: #7c5e8f;
+  --terminal-cyan: #3e7772;
+  --terminal-white: #786b60;
+  --terminal-bright-black: #5f554d;
+  --terminal-bright-red: #9d302f;
+  --terminal-bright-green: #32684a;
+  --terminal-bright-yellow: #784b0d;
+  --terminal-bright-blue: #365a79;
+  --terminal-bright-magenta: #674b7b;
+  --terminal-bright-cyan: #286762;
+  --terminal-bright-white: #221d1a;
+
+  --chart-1: #9a4f3d;
+  --chart-2: #427354;
+  --chart-3: #956118;
+  --chart-4: #7c5e8f;
+  --chart-5: #3e7772;
+  --chart-positive: #427354;
+  --chart-negative: #b83c38;
+  --chart-positive-muted: rgba(66, 115, 84, 0.3);
+  --chart-negative-muted: rgba(184, 60, 56, 0.3);
+  --chart-axis: #73675d;
+  --chart-grid: #d2c2ad;
+
+  --sidebar: #ece2d3;
+  --sidebar-foreground: #342c27;
+  --sidebar-primary: #9a4f3d;
+  --sidebar-primary-foreground: #fffaf1;
+  --sidebar-accent: #ddd0bd;
+  --sidebar-accent-foreground: #342c27;
+  --sidebar-border: #d2c2ad;
+  --sidebar-ring: #9a4f3d;
+
+  --app-background-wash: radial-gradient(
+    circle at 50% 22%,
+    rgba(154, 79, 61, 0.055),
+    transparent 38rem
+  );
+}
+
+:root[data-palette="graphite"],
+[data-palette-preview="graphite"] {
+  color-scheme: dark;
+
+  --background: #0b0c0e;
+  --foreground: #dfe1e6;
+  --card: #141519;
+  --card-foreground: #dfe1e6;
+  --popover: #141519;
+  --popover-foreground: #dfe1e6;
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+  --secondary: #0e0f12;
+  --secondary-foreground: #dfe1e6;
+  --muted: #1a1b21;
+  --muted-foreground: #8f929b;
+  --accent: rgba(255, 255, 255, 0.04);
+  --accent-foreground: #dfe1e6;
+  --destructive: #e5484d;
+  --destructive-foreground: #ffffff;
+  --border: #24262c;
+  --input: #24262c;
+  --ring: #3b82f6;
+
+  --accent-strong: rgba(255, 255, 255, 0.07);
+  --primary-muted: rgba(59, 130, 246, 0.16);
+  --success: #23b99a;
+  --success-foreground: #07130f;
+  --warning: #f0b95b;
+  --warning-foreground: #1d1610;
+  --warning-background: #1d1610;
+  --warning-border: #8a5b2f;
+  --info: #79c0ff;
+  --info-foreground: #07111c;
+  --ai-action: #8f72ff;
+  --ai-action-foreground: #ffffff;
+  --backdrop: rgba(0, 0, 0, 0.5);
+  --code-background: rgba(0, 0, 0, 0.3);
+  --report-canvas: #ffffff;
+  --shadow-color: #000000;
+
+  --terminal-background: #0b0c0e;
+  --terminal-foreground: #dfe1e6;
+  --terminal-cursor: #23b99a;
+  --terminal-cursor-accent: #0b0c0e;
+  --terminal-selection-background: rgba(59, 130, 246, 0.32);
+  --terminal-selection-foreground: #ffffff;
+  --terminal-black: #484f58;
+  --terminal-red: #ff7b72;
+  --terminal-green: #7ee787;
+  --terminal-yellow: #d29922;
+  --terminal-blue: #79c0ff;
+  --terminal-magenta: #d2a8ff;
+  --terminal-cyan: #a5d6ff;
+  --terminal-white: #dfe1e6;
+  --terminal-bright-black: #6e7681;
+  --terminal-bright-red: #ffa198;
+  --terminal-bright-green: #56d364;
+  --terminal-bright-yellow: #e3b341;
+  --terminal-bright-blue: #a5d6ff;
+  --terminal-bright-magenta: #d2a8ff;
+  --terminal-bright-cyan: #b6e3ff;
+  --terminal-bright-white: #f0f6fc;
+
+  --chart-1: #79c0ff;
+  --chart-2: #23b99a;
+  --chart-3: #f0b95b;
+  --chart-4: #8f72ff;
+  --chart-5: #a5d6ff;
+  --chart-positive: #23b99a;
+  --chart-negative: #e5484d;
+  --chart-positive-muted: rgba(35, 185, 154, 0.33);
+  --chart-negative-muted: rgba(229, 72, 77, 0.33);
+  --chart-axis: #8f929b;
+  --chart-grid: #24262c;
+
+  --sidebar: #0e0f12;
+  --sidebar-foreground: #dfe1e6;
+  --sidebar-primary: #3b82f6;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #1a1b21;
+  --sidebar-accent-foreground: #dfe1e6;
+  --sidebar-border: #24262c;
+  --sidebar-ring: #3b82f6;
+
+  --app-background-wash: radial-gradient(
+    circle at 50% 28%,
+    rgba(255, 255, 255, 0.02),
+    transparent 34rem
+  );
+}
+
+:root[data-palette="midnight"],
+[data-palette-preview="midnight"] {
+  color-scheme: dark;
+
+  --background: #07111f;
+  --foreground: #d9e4f2;
+  --card: #0c1828;
+  --card-foreground: #d9e4f2;
+  --popover: #0c1828;
+  --popover-foreground: #d9e4f2;
+  --primary: #5aa2ff;
+  --primary-foreground: #06101d;
+  --secondary: #0a1524;
+  --secondary-foreground: #d9e4f2;
+  --muted: #122238;
+  --muted-foreground: #8ca0b8;
+  --accent: rgba(132, 183, 255, 0.07);
+  --accent-foreground: #d9e4f2;
+  --destructive: #ff6b75;
+  --destructive-foreground: #19070b;
+  --border: #1c3049;
+  --input: #1c3049;
+  --ring: #5aa2ff;
+
+  --accent-strong: rgba(132, 183, 255, 0.12);
+  --primary-muted: rgba(90, 162, 255, 0.18);
+  --success: #35c9a5;
+  --success-foreground: #03140f;
+  --warning: #f4c36a;
+  --warning-foreground: #211506;
+  --warning-background: #21180c;
+  --warning-border: #8f6630;
+  --info: #7dc4ff;
+  --info-foreground: #06101d;
+  --ai-action: #aa8cff;
+  --ai-action-foreground: #120b24;
+  --backdrop: rgba(1, 5, 11, 0.62);
+  --code-background: rgba(2, 8, 16, 0.42);
+  --report-canvas: #ffffff;
+  --shadow-color: #000713;
+
+  --terminal-background: #050b14;
+  --terminal-foreground: #d8e7f5;
+  --terminal-cursor: #5aa2ff;
+  --terminal-cursor-accent: #050b14;
+  --terminal-selection-background: rgba(90, 162, 255, 0.34);
+  --terminal-selection-foreground: #ffffff;
+  --terminal-black: #1c3049;
+  --terminal-red: #ff7b84;
+  --terminal-green: #58d6b7;
+  --terminal-yellow: #f4c36a;
+  --terminal-blue: #7dc4ff;
+  --terminal-magenta: #c0a8ff;
+  --terminal-cyan: #72d3e7;
+  --terminal-white: #d8e7f5;
+  --terminal-bright-black: #49627f;
+  --terminal-bright-red: #ff9ba2;
+  --terminal-bright-green: #78e3c8;
+  --terminal-bright-yellow: #f8d58f;
+  --terminal-bright-blue: #a8d7ff;
+  --terminal-bright-magenta: #d4c3ff;
+  --terminal-bright-cyan: #9be2ef;
+  --terminal-bright-white: #f3f8fd;
+
+  --chart-1: #7dc4ff;
+  --chart-2: #35c9a5;
+  --chart-3: #f4c36a;
+  --chart-4: #aa8cff;
+  --chart-5: #72d3e7;
+  --chart-positive: #35c9a5;
+  --chart-negative: #ff6b75;
+  --chart-positive-muted: rgba(53, 201, 165, 0.34);
+  --chart-negative-muted: rgba(255, 107, 117, 0.34);
+  --chart-axis: #8ca0b8;
+  --chart-grid: #1c3049;
+
+  --sidebar: #081321;
+  --sidebar-foreground: #d9e4f2;
+  --sidebar-primary: #5aa2ff;
+  --sidebar-primary-foreground: #06101d;
+  --sidebar-accent: #122238;
+  --sidebar-accent-foreground: #d9e4f2;
+  --sidebar-border: #1c3049;
+  --sidebar-ring: #5aa2ff;
+
+  --app-background-wash: radial-gradient(
+    circle at 50% 24%,
+    rgba(90, 162, 255, 0.065),
+    transparent 38rem
+  );
+}
+
+:root[data-palette="moss"],
+[data-palette-preview="moss"] {
+  color-scheme: dark;
+
+  --background: #0e1512;
+  --foreground: #d8e2d8;
+  --card: #151e19;
+  --card-foreground: #d8e2d8;
+  --popover: #151e19;
+  --popover-foreground: #d8e2d8;
+  --primary: #8fbe78;
+  --primary-foreground: #0c140f;
+  --secondary: #111a16;
+  --secondary-foreground: #d8e2d8;
+  --muted: #1d2922;
+  --muted-foreground: #91a093;
+  --accent: rgba(143, 190, 120, 0.075);
+  --accent-foreground: #d8e2d8;
+  --destructive: #e07a6f;
+  --destructive-foreground: #1c0b09;
+  --border: #2a3930;
+  --input: #2a3930;
+  --ring: #8fbe78;
+
+  --accent-strong: rgba(143, 190, 120, 0.13);
+  --primary-muted: rgba(143, 190, 120, 0.17);
+  --success: #7fc59a;
+  --success-foreground: #09150e;
+  --warning: #d6ad62;
+  --warning-foreground: #1d1609;
+  --warning-background: #211b0f;
+  --warning-border: #806633;
+  --info: #81b4c4;
+  --info-foreground: #071417;
+  --ai-action: #b49ad1;
+  --ai-action-foreground: #160f20;
+  --backdrop: rgba(3, 8, 5, 0.62);
+  --code-background: rgba(2, 7, 4, 0.4);
+  --report-canvas: #ffffff;
+  --shadow-color: #020604;
+
+  --terminal-background: #0b120f;
+  --terminal-foreground: #dce7dc;
+  --terminal-cursor: #8fbe78;
+  --terminal-cursor-accent: #0b120f;
+  --terminal-selection-background: rgba(143, 190, 120, 0.3);
+  --terminal-selection-foreground: #f2f7f1;
+  --terminal-black: #33433a;
+  --terminal-red: #e07a6f;
+  --terminal-green: #8ccf9f;
+  --terminal-yellow: #d6ad62;
+  --terminal-blue: #81b4c4;
+  --terminal-magenta: #b49ad1;
+  --terminal-cyan: #75c3b2;
+  --terminal-white: #dce7dc;
+  --terminal-bright-black: #607166;
+  --terminal-bright-red: #ef9a90;
+  --terminal-bright-green: #a9dfb8;
+  --terminal-bright-yellow: #e6c681;
+  --terminal-bright-blue: #a3cad5;
+  --terminal-bright-magenta: #cbb7df;
+  --terminal-bright-cyan: #98d7ca;
+  --terminal-bright-white: #f3f7f2;
+
+  --chart-1: #8fbe78;
+  --chart-2: #7fc59a;
+  --chart-3: #d6ad62;
+  --chart-4: #b49ad1;
+  --chart-5: #81b4c4;
+  --chart-positive: #7fc59a;
+  --chart-negative: #e07a6f;
+  --chart-positive-muted: rgba(127, 197, 154, 0.33);
+  --chart-negative-muted: rgba(224, 122, 111, 0.33);
+  --chart-axis: #91a093;
+  --chart-grid: #2a3930;
+
+  --sidebar: #111a16;
+  --sidebar-foreground: #d8e2d8;
+  --sidebar-primary: #8fbe78;
+  --sidebar-primary-foreground: #0c140f;
+  --sidebar-accent: #1d2922;
+  --sidebar-accent-foreground: #d8e2d8;
+  --sidebar-border: #2a3930;
+  --sidebar-ring: #8fbe78;
+
+  --app-background-wash: radial-gradient(
+    circle at 50% 26%,
+    rgba(143, 190, 120, 0.055),
+    transparent 38rem
+  );
+}
+
+:root[data-palette="iris"],
+[data-palette-preview="iris"] {
+  color-scheme: dark;
+
+  --background: #11101a;
+  --foreground: #e7e2f2;
+  --card: #191724;
+  --card-foreground: #e7e2f2;
+  --popover: #191724;
+  --popover-foreground: #e7e2f2;
+  --primary: #9b8cff;
+  --primary-foreground: #120f22;
+  --secondary: #15131f;
+  --secondary-foreground: #e7e2f2;
+  --muted: #242136;
+  --muted-foreground: #9b96ad;
+  --accent: rgba(155, 140, 255, 0.08);
+  --accent-foreground: #e7e2f2;
+  --destructive: #f1768e;
+  --destructive-foreground: #210b12;
+  --border: #322e46;
+  --input: #322e46;
+  --ring: #9b8cff;
+
+  --accent-strong: rgba(155, 140, 255, 0.14);
+  --primary-muted: rgba(155, 140, 255, 0.18);
+  --success: #64c7a4;
+  --success-foreground: #081510;
+  --warning: #e0b76d;
+  --warning-foreground: #201607;
+  --warning-background: #221a0d;
+  --warning-border: #84652e;
+  --info: #82b8ff;
+  --info-foreground: #081426;
+  --ai-action: #d28cff;
+  --ai-action-foreground: #1c0c27;
+  --backdrop: rgba(5, 3, 12, 0.64);
+  --code-background: rgba(4, 3, 10, 0.42);
+  --report-canvas: #ffffff;
+  --shadow-color: #05030c;
+
+  --terminal-background: #0d0c15;
+  --terminal-foreground: #e8e4f3;
+  --terminal-cursor: #9b8cff;
+  --terminal-cursor-accent: #0d0c15;
+  --terminal-selection-background: rgba(155, 140, 255, 0.32);
+  --terminal-selection-foreground: #ffffff;
+  --terminal-black: #353147;
+  --terminal-red: #f1768e;
+  --terminal-green: #6fd2ad;
+  --terminal-yellow: #e0b76d;
+  --terminal-blue: #82b8ff;
+  --terminal-magenta: #d49aff;
+  --terminal-cyan: #69c8d7;
+  --terminal-white: #e8e4f3;
+  --terminal-bright-black: #68627c;
+  --terminal-bright-red: #ff9aab;
+  --terminal-bright-green: #91e0c1;
+  --terminal-bright-yellow: #edcc8f;
+  --terminal-bright-blue: #a8cdff;
+  --terminal-bright-magenta: #e3b8ff;
+  --terminal-bright-cyan: #90dbe6;
+  --terminal-bright-white: #faf8ff;
+
+  --chart-1: #9b8cff;
+  --chart-2: #64c7a4;
+  --chart-3: #e0b76d;
+  --chart-4: #d28cff;
+  --chart-5: #69c8d7;
+  --chart-positive: #64c7a4;
+  --chart-negative: #f1768e;
+  --chart-positive-muted: rgba(100, 199, 164, 0.34);
+  --chart-negative-muted: rgba(241, 118, 142, 0.34);
+  --chart-axis: #9b96ad;
+  --chart-grid: #322e46;
+
+  --sidebar: #15131f;
+  --sidebar-foreground: #e7e2f2;
+  --sidebar-primary: #9b8cff;
+  --sidebar-primary-foreground: #120f22;
+  --sidebar-accent: #242136;
+  --sidebar-accent-foreground: #e7e2f2;
+  --sidebar-border: #322e46;
+  --sidebar-ring: #9b8cff;
+
+  --app-background-wash: radial-gradient(
+    circle at 50% 24%,
+    rgba(155, 140, 255, 0.065),
+    transparent 38rem
+  );
+}
+
+/* Palette cards are miniature, isolated product surfaces. Keep their chrome
+ * bound directly to the preview card's variables so the active app palette
+ * cannot make all four choices look alike. */
+[data-palette-preview] {
+  background: var(--background);
+  color: var(--foreground);
+  border-color: var(--border);
+}
+
+[data-palette-preview]:hover {
+  border-color: color-mix(in srgb, var(--primary) 60%, var(--border));
+}
+
+[data-palette-preview][data-selected="true"] {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 25%, transparent);
+}
+
+[data-palette-preview] .oa-palette-preview-muted {
+  color: var(--muted-foreground);
+}
+
+[data-palette-preview] .oa-palette-preview-indicator {
+  background: var(--muted);
+  border-color: var(--border);
+}
+
+[data-palette-preview][data-selected="true"] .oa-palette-preview-indicator {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+[data-palette-preview] .oa-palette-preview-shell,
+[data-palette-preview] .oa-palette-preview-terminal {
+  border-color: var(--border);
+}
+
+[data-palette-preview] .oa-palette-preview-shell {
+  background: var(--card);
+}
+
+[data-palette-preview] .oa-palette-preview-sidebar {
+  background: var(--sidebar);
+  border-color: var(--sidebar-border);
+}
+
+[data-palette-preview] .oa-palette-preview-sidebar-dot,
+[data-palette-preview] .oa-palette-preview-primary-line {
+  background: var(--primary);
+}
+
+[data-palette-preview] .oa-palette-preview-canvas {
+  background: var(--background);
+}
+
+[data-palette-preview] .oa-palette-preview-muted-line {
+  background: var(--muted);
+}
+
+[data-palette-preview] .oa-palette-preview-terminal {
+  background: var(--terminal-background);
+  color: var(--terminal-foreground);
+}
+
+[data-palette-preview] .oa-palette-preview-terminal-line {
+  background: color-mix(in srgb, var(--terminal-foreground) 35%, transparent);
+}

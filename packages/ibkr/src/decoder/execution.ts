@@ -123,7 +123,6 @@ export function applyExecutionHandlers(decoder: Decoder): void {
 
   // IN.EXECUTION_DATA (11)
   decoder.registerText(IN.EXECUTION_DATA, (d, fields) => {
-    decodeInt(fields) // msgId
     let version = d.serverVersion
 
     if (d.serverVersion < MIN_SERVER_VER_LAST_LIQUIDITY) {
@@ -198,7 +197,6 @@ export function applyExecutionHandlers(decoder: Decoder): void {
 
   // IN.EXECUTION_DATA_END (55)
   decoder.registerText(IN.EXECUTION_DATA_END, (d, fields) => {
-    decodeInt(fields) // msgId
     decodeInt(fields) // version
     const reqId = decodeInt(fields)
     d.wrapper.execDetailsEnd(reqId)
@@ -206,7 +204,6 @@ export function applyExecutionHandlers(decoder: Decoder): void {
 
   // IN.COMMISSION_AND_FEES_REPORT (59)
   decoder.registerText(IN.COMMISSION_AND_FEES_REPORT, (d, fields) => {
-    decodeInt(fields) // msgId
     decodeInt(fields) // version
 
     const report = new CommissionAndFeesReport()

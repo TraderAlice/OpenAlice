@@ -83,6 +83,14 @@ describe('Dockerfile runtime contract', () => {
     expect(dockerfile).toContain(`corepack prepare pnpm@${pnpmVersion} --activate`)
   })
 
+  it('copies pnpm patch files before the frozen dependency install', () => {
+    const patchCopy = dockerfile.indexOf('COPY patches/ patches/')
+    const install = dockerfile.indexOf('RUN pnpm install --frozen-lockfile')
+
+    expect(patchCopy).toBeGreaterThan(-1)
+    expect(install).toBeGreaterThan(patchCopy)
+  })
+
   it('installs the complete sibling-based Workspace CLI set for login shells', () => {
     expect(dockerfile).toContain('COPY --from=build /src/src/workspaces/cli/bin')
     expect(dockerfile).toContain('/usr/local/bin/openalice-cli.cjs')

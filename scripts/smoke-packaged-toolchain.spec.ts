@@ -101,6 +101,7 @@ describe('buildPackagedToolchainSmokePlan', () => {
         'managed Pi resolves packaged fd/rg without download',
         'workspace CLI payload through packaged Electron Node',
         'managed git.exe',
+        'dugite JS wrapper routes Git operations through managed PortableGit',
         'managed bash.exe',
         'managed sh.exe can resolve git and bash on PATH',
         'Workspace CLI launcher through managed Git Bash',
@@ -108,11 +109,15 @@ describe('buildPackagedToolchainSmokePlan', () => {
       ])
       expect(plan.commands[2].command.replaceAll('\\', '/')).toContain('vendor/tools/win32-x64/bin/fd.exe')
       expect(plan.commands[6].command.replaceAll('\\', '/')).toContain('vendor/git/win32-x64/cmd/git.exe')
-      expect(plan.commands[8].env?.PATH.replaceAll('\\', '/')).toContain('vendor/git/win32-x64/mingw64/bin')
-      expect(plan.commands[8].env?.PATH.replaceAll('\\', '/')).toContain('vendor/tools/win32-x64/bin')
-      expect(plan.commands[9].env?.OPENALICE_MANAGED_PI_NODE_PATH.replaceAll('\\', '/'))
+      expect(plan.commands[7].env?.LOCAL_GIT_DIRECTORY.replaceAll('\\', '/'))
+        .toContain('vendor/git/win32-x64')
+      expect(plan.commands[7].args.join('\n').replaceAll('\\', '/').replaceAll('//', '/'))
+        .toContain('node_modules/dugite/build/lib/index.js')
+      expect(plan.commands[9].env?.PATH.replaceAll('\\', '/')).toContain('vendor/git/win32-x64/mingw64/bin')
+      expect(plan.commands[9].env?.PATH.replaceAll('\\', '/')).toContain('vendor/tools/win32-x64/bin')
+      expect(plan.commands[10].env?.OPENALICE_MANAGED_PI_NODE_PATH.replaceAll('\\', '/'))
         .toContain('win-unpacked/OpenAlice.exe')
-      expect(plan.commands[10].env?.OPENALICE_TOOL_URL).toBe('/cli')
+      expect(plan.commands[11].env?.OPENALICE_TOOL_URL).toBe('/cli')
     } finally {
       rmSync(root, { recursive: true, force: true })
     }

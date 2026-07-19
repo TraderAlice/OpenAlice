@@ -72,18 +72,18 @@ export function DesktopUpdatePrompt() {
   return (
     <Dialog onClose={busy ? () => {} : () => setStatus(null)} width="w-[480px]">
       <div className="px-5 py-4 border-b border-border flex items-center gap-3">
-        <div className="h-9 w-9 rounded-lg border border-accent/30 bg-accent-dim/30 text-accent flex items-center justify-center shrink-0">
+        <div className="h-9 w-9 rounded-lg border border-primary/30 bg-primary-muted/30 text-primary flex items-center justify-center shrink-0">
           <Download size={18} strokeWidth={1.8} />
         </div>
         <div className="min-w-0 flex-1">
-          <h2 className="text-[15px] font-semibold text-text leading-snug">Update ready</h2>
-          <p className="text-[12px] text-text-muted truncate">OpenAlice v{status.version}</p>
+          <h2 className="text-[15px] font-semibold text-foreground leading-snug">Update ready</h2>
+          <p className="text-[12px] text-muted-foreground truncate">OpenAlice v{status.version}</p>
         </div>
         <button
           type="button"
           onClick={() => setStatus(null)}
           disabled={busy}
-          className="h-8 w-8 rounded-md text-text-muted hover:text-text hover:bg-bg-tertiary disabled:opacity-40 flex items-center justify-center transition-colors"
+          className="h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-40 flex items-center justify-center transition-colors"
           aria-label="Close update prompt"
         >
           <X size={16} />
@@ -91,14 +91,14 @@ export function DesktopUpdatePrompt() {
       </div>
 
       <div className="px-5 py-4 space-y-3">
-        <p className="text-[13px] leading-relaxed text-text">
+        <p className="text-[13px] leading-relaxed text-foreground">
           The update has been downloaded and is ready to install.
         </p>
-        <p className="text-[12px] leading-relaxed text-text-muted">
+        <p className="text-[12px] leading-relaxed text-muted-foreground">
           Restarting will stop Alice and UTA gracefully, then reopen OpenAlice on the new version.
         </p>
         {error && (
-          <div className="rounded-lg border border-red/30 bg-red/10 px-3 py-2 text-[12px] leading-relaxed text-red">
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-[12px] leading-relaxed text-destructive">
             {error}
           </div>
         )}

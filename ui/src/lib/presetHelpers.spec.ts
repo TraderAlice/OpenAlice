@@ -4,7 +4,9 @@ import {
   agentWireShapes,
   anthropicAuthModeForBaseUrl,
   baseUrlToVendor,
+  describeModelSemantics,
   pickAgentWire,
+  presetModel,
   savedCredentialModel,
 } from './presetHelpers'
 import type { Preset } from '../api'
@@ -33,6 +35,17 @@ const modelPreset: Preset = {
       },
     },
   },
+  models: [
+    { id: 'newest-first', label: 'Newest' },
+    {
+      id: 'stable-default',
+      label: 'Stable default',
+      semantics: {
+        contextWindow: 1_000_000,
+        reasoning: { mode: 'adaptive', defaultEffort: 'high', interleaved: true },
+      },
+    },
+  ],
 }
 
 describe('agent wire selection', () => {
@@ -41,8 +54,27 @@ describe('agent wire selection', () => {
     expect(agentWireShapes(multiWire, 'opencode')).toEqual(['openai-chat', 'anthropic'])
   })
 
-  it('honors an explicit compatible protocol and rejects an incompatible one', () => {
+  it('only exposes MiniMax Anthropic to coding CLIs without changing generic providers', () => {
+    expect(agentWireShapes(multiWire, 'pi', 'minimax')).toEqual(['anthropic'])
+    expect(agentWireShapes(multiWire, 'opencode', 'minimax')).toEqual(['anthropic'])
+    expect(pickAgentWire(multiWire, 'opencode', undefined, 'minimax')?.shape).toBe('anthropic')
+  })
+
+  it('derives the native endpoint for an old official MiniMax OpenAI-only credential', () => {
+    const oldCredential = { 'openai-chat': 'https://api.minimaxi.com/v1' } as const
+    expect(agentWireShapes(oldCredential, 'pi', 'minimax')).toEqual(['anthropic'])
+    expect(pickAgentWire(oldCredential, 'pi', 'openai-chat', 'minimax')).toEqual({
+      shape: 'anthropic',
+      baseUrl: 'https://api.minimaxi.com/anthropic',
+    })
+  })
+
+  it('repairs an old MiniMax OpenAI default and rejects other incompatible protocols', () => {
     expect(pickAgentWire(multiWire, 'pi', 'anthropic')).toEqual({
+      shape: 'anthropic',
+      baseUrl: 'https://provider.example/anthropic',
+    })
+    expect(pickAgentWire(multiWire, 'pi', 'openai-chat', 'minimax')).toEqual({
       shape: 'anthropic',
       baseUrl: 'https://provider.example/anthropic',
     })
@@ -70,5 +102,12 @@ describe('saved credential model selection', () => {
 
   it('uses the explicit catalog default instead of the first suggestion', () => {
     expect(savedCredentialModel({}, modelPreset)).toBe('stable-default')
+  })
+
+  it('resolves and describes exact rich model semantics', () => {
+    const semantics = presetModel(modelPreset, 'stable-default')?.semantics
+    expect(describeModelSemantics(semantics))
+      .toBe('Adaptive reasoning · default effort: high · interleaved thinking · 1M context')
+    expect(presetModel(modelPreset, 'free-typed-model')).toBeNull()
   })
 })

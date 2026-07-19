@@ -17,11 +17,11 @@ interface SidebarProps {
  */
 export function Sidebar({ title, actions, children, leading }: SidebarProps) {
   return (
-    <aside className="flex h-full w-full flex-col bg-bg-secondary">
+    <aside className="flex h-full w-full flex-col bg-secondary">
       <div className="flex items-center justify-between px-4 h-10 shrink-0 gap-2 border-b border-border/60">
         <div className="flex items-center gap-1.5 min-w-0">
           {leading}
-          <h2 className="text-[13px] font-semibold text-text truncate">{title}</h2>
+          <h2 className="text-[13px] font-semibold text-foreground truncate">{title}</h2>
         </div>
         {actions && <div className="flex items-center gap-0.5 shrink-0">{actions}</div>}
       </div>

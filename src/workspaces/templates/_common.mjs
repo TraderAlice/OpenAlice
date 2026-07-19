@@ -58,18 +58,27 @@ export function copyReadme(outDir, templateRoot = process.env.AQ_TEMPLATE_ROOT) 
 
 const DEFAULT_EXCLUDES = [
   '.claude/settings.local.json',
+  '.claude/openalice-provider.json',
   '.codex/auth.json',
   '.codex/env.json',
   '.codex/config.toml',
   'opencode.json',
+  'tui.json',
+  '.opencode/openalice-provider.json',
+  '.pi/settings.json',
+  '.pi/openalice-provider.json',
+  // Pre-#662 compatibility: never commit an old redirected Pi agent home
+  // before the runtime migration has reconciled and removed it.
   '.pi-agent/',
 ]
 
 /**
  * Append defensive entries to `<outDir>/.git/info/exclude` (per-clone,
- * untracked). Each can carry a per-workspace API key once a provider is
- * configured, so they must never reach a commit. `extra` paths are appended
- * too. Caller must have run `git init`/`clone` first (`.git/` must exist).
+ * untracked). Most can carry a per-workspace API key; Pi's local files carry
+ * provider selection and reversible injection metadata while the key remains
+ * in Pi's user model registry. None should reach a commit. `extra` paths are
+ * appended too. Caller must have run `git init`/`clone` first (`.git/` must
+ * exist).
  */
 export function setupGitExcludes(outDir, ...extra) {
   if (!existsSync(join(outDir, '.git'))) {

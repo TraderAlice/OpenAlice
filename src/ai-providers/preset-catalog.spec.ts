@@ -114,4 +114,16 @@ describe('credential form catalog', () => {
       expect(DEFAULT_MODEL_BY_VENDOR[vendor], presetId).toBe(properties['model']?.['default']);
     }
   });
+
+  it('serializes rich semantics beside the backwards-compatible model oneOf', () => {
+    const openai = BUILTIN_PRESETS.find((preset) => preset.id === 'codex-api')!;
+    expect(openai.models?.find((model) => model.id === 'gpt-5.6')?.semantics).toMatchObject({
+      contextWindow: 1_050_000,
+      reasoning: { mode: 'optional', defaultEffort: 'medium' },
+    });
+    const properties = openai.schema['properties'] as Record<string, Record<string, unknown>>;
+    expect(properties['model']?.['oneOf']).toEqual(expect.arrayContaining([
+      expect.objectContaining({ const: 'gpt-5.6' }),
+    ]));
+  });
 });

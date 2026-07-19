@@ -160,7 +160,6 @@ export function applyMiscHandlers(decoder: Decoder): void {
 
   // --- IN.ERR_MSG (4) ---
   decoder.registerText(IN.ERR_MSG, (d, fields) => {
-    decodeInt(fields) // msgId
     if (d.serverVersion < MIN_SERVER_VER_ERROR_TIME) {
       decodeInt(fields) // version
     }
@@ -180,7 +179,6 @@ export function applyMiscHandlers(decoder: Decoder): void {
 
   // --- IN.CURRENT_TIME (49) ---
   decoder.registerText(IN.CURRENT_TIME, (d, fields) => {
-    decodeInt(fields) // msgId
     decodeInt(fields) // version
     const time = decodeInt(fields)
     d.wrapper.currentTime(time)
@@ -188,14 +186,12 @@ export function applyMiscHandlers(decoder: Decoder): void {
 
   // --- IN.CURRENT_TIME_IN_MILLIS (109) ---
   decoder.registerText(IN.CURRENT_TIME_IN_MILLIS, (d, fields) => {
-    decodeInt(fields) // msgId
     const timeInMillis = decodeInt(fields)
     d.wrapper.currentTimeInMillis(timeInMillis)
   })
 
   // --- IN.NEWS_BULLETINS (14) ---
   decoder.registerText(IN.NEWS_BULLETINS, (d, fields) => {
-    decodeInt(fields) // msgId
     decodeInt(fields) // version
     const msgId = decodeInt(fields)
     const msgType = decodeInt(fields)
@@ -206,7 +202,6 @@ export function applyMiscHandlers(decoder: Decoder): void {
 
   // --- IN.RECEIVE_FA (16) ---
   decoder.registerText(IN.RECEIVE_FA, (d, fields) => {
-    decodeInt(fields) // msgId
     decodeInt(fields) // version
     const faDataType = decodeInt(fields)
     const xml = decodeStr(fields)
@@ -215,7 +210,6 @@ export function applyMiscHandlers(decoder: Decoder): void {
 
   // --- IN.SCANNER_PARAMETERS (19) ---
   decoder.registerText(IN.SCANNER_PARAMETERS, (d, fields) => {
-    decodeInt(fields) // msgId
     decodeInt(fields) // version
     const xml = decodeStr(fields)
     d.wrapper.scannerParameters(xml)
@@ -223,7 +217,6 @@ export function applyMiscHandlers(decoder: Decoder): void {
 
   // --- IN.SCANNER_DATA (20) ---
   decoder.registerText(IN.SCANNER_DATA, (d, fields) => {
-    decodeInt(fields) // msgId
     decodeInt(fields) // version
     const reqId = decodeInt(fields)
 
@@ -261,7 +254,6 @@ export function applyMiscHandlers(decoder: Decoder): void {
 
   // --- IN.FUNDAMENTAL_DATA (51) ---
   decoder.registerText(IN.FUNDAMENTAL_DATA, (d, fields) => {
-    decodeInt(fields) // msgId
     decodeInt(fields) // version
     const reqId = decodeInt(fields)
     const data = decodeStr(fields)
@@ -270,7 +262,6 @@ export function applyMiscHandlers(decoder: Decoder): void {
 
   // --- IN.NEWS_PROVIDERS (85) ---
   decoder.registerText(IN.NEWS_PROVIDERS, (d, fields) => {
-    decodeInt(fields) // msgId
     const newsProviders: NewsProvider[] = []
     const nNewsProviders = decodeInt(fields)
     if (nNewsProviders > 0) {
@@ -286,7 +277,6 @@ export function applyMiscHandlers(decoder: Decoder): void {
 
   // --- IN.NEWS_ARTICLE (83) ---
   decoder.registerText(IN.NEWS_ARTICLE, (d, fields) => {
-    decodeInt(fields) // msgId
     const reqId = decodeInt(fields)
     const articleType = decodeInt(fields)
     const articleText = decodeStr(fields)
@@ -295,7 +285,6 @@ export function applyMiscHandlers(decoder: Decoder): void {
 
   // --- IN.TICK_NEWS (84) ---
   decoder.registerText(IN.TICK_NEWS, (d, fields) => {
-    decodeInt(fields) // msgId
     const tickerId = decodeInt(fields)
     const timeStamp = decodeInt(fields)
     const providerCode = decodeStr(fields)
@@ -307,7 +296,6 @@ export function applyMiscHandlers(decoder: Decoder): void {
 
   // --- IN.HISTORICAL_NEWS (86) ---
   decoder.registerText(IN.HISTORICAL_NEWS, (d, fields) => {
-    decodeInt(fields) // msgId
     const requestId = decodeInt(fields)
     const time = decodeStr(fields)
     const providerCode = decodeStr(fields)
@@ -318,7 +306,6 @@ export function applyMiscHandlers(decoder: Decoder): void {
 
   // --- IN.HISTORICAL_NEWS_END (87) ---
   decoder.registerText(IN.HISTORICAL_NEWS_END, (d, fields) => {
-    decodeInt(fields) // msgId
     const reqId = decodeInt(fields)
     const hasMore = decodeBool(fields)
     d.wrapper.historicalNewsEnd(reqId, hasMore)
@@ -326,7 +313,6 @@ export function applyMiscHandlers(decoder: Decoder): void {
 
   // --- IN.SECURITY_DEFINITION_OPTION_PARAMETER (75) ---
   decoder.registerText(IN.SECURITY_DEFINITION_OPTION_PARAMETER, (d, fields) => {
-    decodeInt(fields) // msgId
     const reqId = decodeInt(fields)
     const exchange = decodeStr(fields)
     const underlyingConId = decodeInt(fields)
@@ -353,14 +339,12 @@ export function applyMiscHandlers(decoder: Decoder): void {
 
   // --- IN.SECURITY_DEFINITION_OPTION_PARAMETER_END (76) ---
   decoder.registerText(IN.SECURITY_DEFINITION_OPTION_PARAMETER_END, (d, fields) => {
-    decodeInt(fields) // msgId
     const reqId = decodeInt(fields)
     d.wrapper.securityDefinitionOptionParameterEnd(reqId)
   })
 
   // --- IN.SOFT_DOLLAR_TIERS (77) ---
   decoder.registerText(IN.SOFT_DOLLAR_TIERS, (d, fields) => {
-    decodeInt(fields) // msgId
     const reqId = decodeInt(fields)
     const nTiers = decodeInt(fields)
 
@@ -378,7 +362,6 @@ export function applyMiscHandlers(decoder: Decoder): void {
 
   // --- IN.FAMILY_CODES (78) ---
   decoder.registerText(IN.FAMILY_CODES, (d, fields) => {
-    decodeInt(fields) // msgId
     const nFamilyCodes = decodeInt(fields)
     const familyCodes: FamilyCode[] = []
     for (let i = 0; i < nFamilyCodes; i++) {
@@ -392,7 +375,6 @@ export function applyMiscHandlers(decoder: Decoder): void {
 
   // --- IN.SMART_COMPONENTS (82) ---
   decoder.registerText(IN.SMART_COMPONENTS, (d, fields) => {
-    decodeInt(fields) // msgId
     const reqId = decodeInt(fields)
     const n = decodeInt(fields)
 
@@ -410,7 +392,6 @@ export function applyMiscHandlers(decoder: Decoder): void {
 
   // --- IN.MKT_DEPTH_EXCHANGES (80) ---
   decoder.registerText(IN.MKT_DEPTH_EXCHANGES, (d, fields) => {
-    decodeInt(fields) // msgId
     const depthMktDataDescriptions: DepthMktDataDescription[] = []
     const nDepthMktDataDescriptions = decodeInt(fields)
 
@@ -435,7 +416,6 @@ export function applyMiscHandlers(decoder: Decoder): void {
 
   // --- IN.VERIFY_MESSAGE_API (65) ---
   decoder.registerText(IN.VERIFY_MESSAGE_API, (d, fields) => {
-    decodeInt(fields) // msgId
     decodeInt(fields) // version
     const apiData = decodeStr(fields)
     d.wrapper.verifyMessageAPI(apiData)
@@ -443,7 +423,6 @@ export function applyMiscHandlers(decoder: Decoder): void {
 
   // --- IN.VERIFY_COMPLETED (66) ---
   decoder.registerText(IN.VERIFY_COMPLETED, (d, fields) => {
-    decodeInt(fields) // msgId
     decodeInt(fields) // version
     const isSuccessful = decodeBool(fields)
     const errorText = decodeStr(fields)
@@ -452,7 +431,6 @@ export function applyMiscHandlers(decoder: Decoder): void {
 
   // --- IN.VERIFY_AND_AUTH_MESSAGE_API (69) ---
   decoder.registerText(IN.VERIFY_AND_AUTH_MESSAGE_API, (d, fields) => {
-    decodeInt(fields) // msgId
     decodeInt(fields) // version
     const apiData = decodeStr(fields)
     const xyzChallenge = decodeStr(fields)
@@ -461,7 +439,6 @@ export function applyMiscHandlers(decoder: Decoder): void {
 
   // --- IN.VERIFY_AND_AUTH_COMPLETED (70) ---
   decoder.registerText(IN.VERIFY_AND_AUTH_COMPLETED, (d, fields) => {
-    decodeInt(fields) // msgId
     decodeInt(fields) // version
     const isSuccessful = decodeBool(fields)
     const errorText = decodeStr(fields)
@@ -470,7 +447,6 @@ export function applyMiscHandlers(decoder: Decoder): void {
 
   // --- IN.DISPLAY_GROUP_LIST (67) ---
   decoder.registerText(IN.DISPLAY_GROUP_LIST, (d, fields) => {
-    decodeInt(fields) // msgId
     decodeInt(fields) // version
     const reqId = decodeInt(fields)
     const groups = decodeStr(fields)
@@ -479,7 +455,6 @@ export function applyMiscHandlers(decoder: Decoder): void {
 
   // --- IN.DISPLAY_GROUP_UPDATED (68) ---
   decoder.registerText(IN.DISPLAY_GROUP_UPDATED, (d, fields) => {
-    decodeInt(fields) // msgId
     decodeInt(fields) // version
     const reqId = decodeInt(fields)
     const contractInfo = decodeStr(fields)
@@ -488,7 +463,6 @@ export function applyMiscHandlers(decoder: Decoder): void {
 
   // --- IN.WSH_META_DATA (104) ---
   decoder.registerText(IN.WSH_META_DATA, (d, fields) => {
-    decodeInt(fields) // msgId
     const reqId = decodeInt(fields)
     const dataJson = decodeStr(fields)
     d.wrapper.wshMetaData(reqId, dataJson)
@@ -496,7 +470,6 @@ export function applyMiscHandlers(decoder: Decoder): void {
 
   // --- IN.WSH_EVENT_DATA (105) ---
   decoder.registerText(IN.WSH_EVENT_DATA, (d, fields) => {
-    decodeInt(fields) // msgId
     const reqId = decodeInt(fields)
     const dataJson = decodeStr(fields)
     d.wrapper.wshEventData(reqId, dataJson)
@@ -504,7 +477,6 @@ export function applyMiscHandlers(decoder: Decoder): void {
 
   // --- IN.USER_INFO (107) ---
   decoder.registerText(IN.USER_INFO, (d, fields) => {
-    decodeInt(fields) // msgId
     const reqId = decodeInt(fields)
     const whiteBrandingId = decodeStr(fields)
     d.wrapper.userInfo(reqId, whiteBrandingId)
@@ -512,7 +484,6 @@ export function applyMiscHandlers(decoder: Decoder): void {
 
   // --- IN.REPLACE_FA_END (103) ---
   decoder.registerText(IN.REPLACE_FA_END, (d, fields) => {
-    decodeInt(fields) // msgId
     const reqId = decodeInt(fields)
     const text = decodeStr(fields)
     d.wrapper.replaceFAEnd(reqId, text)

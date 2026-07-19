@@ -429,7 +429,6 @@ export function applyOrderHandlers(decoder: Decoder): void {
   // IN.ORDER_STATUS (3) — text
   // -----------------------------------------------------------------------
   decoder.registerText(IN.ORDER_STATUS, (d, fields) => {
-    decodeInt(fields) // msgId
     if (d.serverVersion < MIN_SERVER_VER_MARKET_CAP_PRICE) {
       decodeInt(fields) // version
     }
@@ -490,8 +489,6 @@ export function applyOrderHandlers(decoder: Decoder): void {
   // IN.OPEN_ORDER (5) — text
   // -----------------------------------------------------------------------
   decoder.registerText(IN.OPEN_ORDER, (d, fields) => {
-    decodeInt(fields) // msgId
-
     const order = new Order()
     const contract = new Contract()
     const orderState = new OrderState()
@@ -612,7 +609,6 @@ export function applyOrderHandlers(decoder: Decoder): void {
   // IN.OPEN_ORDER_END (53) — text
   // -----------------------------------------------------------------------
   decoder.registerText(IN.OPEN_ORDER_END, (d, fields) => {
-    decodeInt(fields) // msgId
     decodeInt(fields) // version
     d.wrapper.openOrderEnd()
   })
@@ -629,7 +625,6 @@ export function applyOrderHandlers(decoder: Decoder): void {
   // IN.ORDER_BOUND (100) — text
   // -----------------------------------------------------------------------
   decoder.registerText(IN.ORDER_BOUND, (d, fields) => {
-    decodeInt(fields) // msgId
     const permId = decodeInt(fields)
     const clientId = decodeInt(fields)
     const orderId = decodeInt(fields)
@@ -654,8 +649,6 @@ export function applyOrderHandlers(decoder: Decoder): void {
   // IN.COMPLETED_ORDER (101) — text
   // -----------------------------------------------------------------------
   decoder.registerText(IN.COMPLETED_ORDER, (d, fields) => {
-    decodeInt(fields) // msgId
-
     const order = new Order()
     const contract = new Contract()
     const orderState = new OrderState()
@@ -756,7 +749,6 @@ export function applyOrderHandlers(decoder: Decoder): void {
   // IN.COMPLETED_ORDERS_END (102) — text
   // -----------------------------------------------------------------------
   decoder.registerText(IN.COMPLETED_ORDERS_END, (d, fields) => {
-    decodeInt(fields) // msgId
     d.wrapper.completedOrdersEnd()
   })
 
@@ -772,7 +764,6 @@ export function applyOrderHandlers(decoder: Decoder): void {
   // IN.NEXT_VALID_ID (9) — text
   // -----------------------------------------------------------------------
   decoder.registerText(IN.NEXT_VALID_ID, (d, fields) => {
-    decodeInt(fields) // msgId
     decodeInt(fields) // version
     const orderId = decodeInt(fields)
     d.wrapper.nextValidId(orderId)
@@ -786,4 +777,3 @@ export function applyOrderHandlers(decoder: Decoder): void {
     d.wrapper.nextValidId(proto.orderId ?? 0)
   })
 }
-

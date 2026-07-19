@@ -13,7 +13,7 @@ import { Section } from '../../components/form'
 import { simulatorApi, type SimulatorState } from '../../api/simulator'
 
 const inputClass =
-  'w-full px-2 py-1 bg-bg text-text border border-border rounded font-mono text-xs outline-none transition-colors focus:border-accent'
+  'w-full px-2 py-1 bg-background text-foreground border border-border rounded font-mono text-xs outline-none transition-colors focus:border-primary'
 
 const FLASH_MS = 500
 
@@ -103,7 +103,7 @@ export function MarkPrices({ utaId, state, run, loading }: {
   const flashClass = (key: string): string => {
     const f = flashes[key]
     if (!f) return ''
-    return f === 'up' ? 'bg-green/10' : 'bg-red/10'
+    return f === 'up' ? 'bg-success/10' : 'bg-destructive/10'
   }
 
   return (
@@ -113,11 +113,11 @@ export function MarkPrices({ utaId, state, run, loading }: {
     >
       <div className="space-y-1">
         {state.markPrices.length === 0 ? (
-          <p className="text-xs text-text-muted">No prices set yet — add one below.</p>
+          <p className="text-xs text-muted-foreground">No prices set yet — add one below.</p>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-text-muted text-xs">
+              <tr className="text-left text-muted-foreground text-xs">
                 <th className="pb-1 pr-3">Symbol</th>
                 <th className="pb-1 pr-3 w-40">Price</th>
                 <th className="pb-1 text-right">Quick</th>
@@ -127,7 +127,7 @@ export function MarkPrices({ utaId, state, run, loading }: {
               {state.markPrices.map((m) => (
                 <tr
                   key={m.nativeKey}
-                  className={`text-text transition-colors duration-500 ${flashClass(m.nativeKey)}`}
+                  className={`text-foreground transition-colors duration-500 ${flashClass(m.nativeKey)}`}
                 >
                   <td className="py-1 pr-3 font-mono text-xs">{m.nativeKey}</td>
                   <td className="py-1 pr-3">

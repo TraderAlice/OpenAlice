@@ -18,8 +18,8 @@ export function Dialog({ onClose, width, children }: {
   return (
     // z-[60] keeps dialogs above the mobile nav drawers (z-50).
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <div className="oa-dialog-backdrop absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className={`oa-dialog-surface relative ${width || 'w-full sm:w-[560px]'} max-w-[95vw] max-h-[85vh] bg-bg rounded-xl border border-border shadow-2xl flex flex-col overflow-hidden`}>
+      <div className="oa-dialog-backdrop absolute inset-0 bg-backdrop" onClick={onClose} />
+      <div className={`oa-dialog-surface relative ${width || 'w-full sm:w-[560px]'} max-w-[95vw] max-h-[85vh] bg-background rounded-xl border border-border shadow-2xl flex flex-col overflow-hidden`}>
         {children}
       </div>
     </div>

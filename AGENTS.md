@@ -203,6 +203,7 @@ Read the relevant guide before editing its subsystem:
 - [[docs/workspace-absorb.md]] — [Workspace Absorb](docs/workspace-absorb.md): directional
   Workspace consolidation, file collisions, archived source identity, and recovery.
 - [[docs/uta-live-testing.md]] — [UTA live testing](docs/uta-live-testing.md): broker/trading acceptance loops.
+- [[docs/ibkr-wire-protocol.md]] — [IBKR wire protocol](docs/ibkr-wire-protocol.md): TWS/Gateway inbound framing and decoder failure isolation.
 - [[docs/workspace-issues-and-scheduling.md]] — [Workspace issues and scheduling](docs/workspace-issues-and-scheduling.md): Issue board, schedules, headless runs, and Inbox delivery.
 - [[docs/conversation-provenance.md]] — [Workspace Session and artifact provenance](docs/conversation-provenance.md): `resumeId` identity, artifact trails, Issue responsibility, and the provenance-before-collaboration delivery order.
 - [[docs/event-system.md]] — [Event-system retirement note](docs/event-system.md): removed Alice event-bus scheduler; UTA journal utility only.

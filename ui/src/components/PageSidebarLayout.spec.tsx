@@ -92,4 +92,29 @@ describe('PageSidebarLayout', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Select message' }))
     expect(drawer.getAttribute('data-state')).toBe('closed')
   })
+
+  it('keeps a page navigator in the drawer below its custom desktop breakpoint', () => {
+    render(
+      <PageSidebarLayout
+        storageKey="settings"
+        title="Settings"
+        desktopMinWidth={960}
+        sidebar={({ closeMobileDrawer }) => (
+          <button type="button" onClick={closeMobileDrawer}>Select General</button>
+        )}
+      >
+        <div>Settings content</div>
+      </PageSidebarLayout>,
+    )
+
+    expect(window.matchMedia).toHaveBeenCalledWith('(min-width: 960px)')
+    const drawer = screen.getByTestId('page-sidebar-drawer')
+    expect(drawer.getAttribute('data-state')).toBe('closed')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Settings' }))
+    expect(drawer.getAttribute('data-state')).toBe('open')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Select General' }))
+    expect(drawer.getAttribute('data-state')).toBe('closed')
+  })
 })

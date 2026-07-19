@@ -1,8 +1,9 @@
 /**
  * Unified session store — JSONL format compatible with Claude Code.
  *
- * Both engine.ask() (Vercel AI SDK) and Claude Code CLI read/write to
- * the same session file under data/sessions/{sessionId}.jsonl.
+ * Historical Alice sessions used this store before Workspace-native Agent
+ * CLIs became the model-loop owners. The reader remains for compatibility
+ * with those durable JSONL records.
  *
  * Claude Code format (per line):
  *   { type: "user",      message: { role: "user",      content: ... }, uuid, parentUuid, sessionId, timestamp, ... }
@@ -12,7 +13,7 @@
  * We store a compatible subset:
  *   - type, message, uuid, parentUuid, sessionId, timestamp  (required)
  *   - cwd, provider  (our extensions)
- *   - subtype, compactMetadata, isCompactSummary  (compaction)
+ *   - subtype, compactMetadata, isCompactSummary  (legacy compaction records)
  *
  * The converter can extract ModelMessage[] for Vercel AI SDK from this format.
  */
@@ -20,7 +21,6 @@
 import { randomUUID } from 'node:crypto'
 import { readFile, appendFile, mkdir } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { getActiveEntries } from './compaction.js'
 import { dataPath } from '@/core/paths.js'
 
 // ==================== Types ====================
@@ -55,6 +55,20 @@ export type ContentBlock =
   | { type: 'image'; url: string }
   | { type: 'tool_use'; id: string; name: string; input: unknown }
   | { type: 'tool_result'; tool_use_id: string; content: string }
+
+/**
+ * Preserve the read semantics of historical compacted JSONL sessions without
+ * retaining Alice's retired in-process compaction policy. Native Agent CLIs
+ * own context-window management for all new Workspace sessions.
+ */
+function getActiveEntries(entries: SessionEntry[]): SessionEntry[] {
+  for (let i = entries.length - 1; i >= 0; i--) {
+    if (entries[i].type === 'system' && entries[i].subtype === 'compact_boundary') {
+      return entries.slice(i)
+    }
+  }
+  return entries
+}
 
 // ==================== Session Store Interface ====================
 
@@ -146,7 +160,7 @@ export class SessionStore implements ISessionStore {
     return getActiveEntries(all)
   }
 
-  /** Append a pre-built entry directly (used by compaction for boundary/summary). */
+  /** Append a pre-built entry directly (including historical boundary records). */
   async appendRaw(entry: SessionEntry): Promise<void> {
     await mkdir(dirname(this.filePath), { recursive: true })
     await appendFile(this.filePath, JSON.stringify(entry) + '\n')
@@ -377,8 +391,8 @@ export function toModelMessages(entries: SessionEntry[]): SDKModelMessage[] {
   }
 
   // Sanitize: remove tool-call entries that have no matching tool-result.
-  // This can happen when compaction truncates between a tool_use and its result,
-  // or when a session was interrupted mid-tool-call.
+  // This can happen in a historical compacted record, or when a session was
+  // interrupted mid-tool-call.
   return sanitizeToolMessages(messages)
 }
 
@@ -482,7 +496,7 @@ export type ResponsesInputItem =
  * Convert session entries → OpenAI Responses API input items.
  *
  * Similar to toModelMessages() but targets the Responses API format.
- * Handles orphaned tool calls (compaction truncation) by stripping
+ * Handles orphaned tool calls (historical truncation or interruption) by stripping
  * function_call items that have no matching function_call_output.
  */
 export function toResponsesInput(entries: SessionEntry[]): ResponsesInputItem[] {

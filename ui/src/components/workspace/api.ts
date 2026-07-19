@@ -4,8 +4,7 @@
  * server from the SessionPool).
  */
 
-import type { WireShape } from '../../api'
-import type { TerminalThemeVariant } from './terminalTheme'
+import type { ModelReasoningEffort, ModelReasoningMode, WireShape } from '../../api'
 
 export interface Workspace {
   readonly id: string;
@@ -43,7 +42,7 @@ export interface Workspace {
   /**
    * Whether the workspace has UI-saved AI provider overrides for each
    * agent. claude = `.claude/settings.local.json` exists; codex = `.codex/`
-   * dir; opencode = `opencode.json`; pi = `.pi-agent/` dir. Surfaced in the
+   * dir; opencode = `opencode.json`; pi = `.pi/settings.json`. Surfaced in the
    * Overview dashboard.
    */
   readonly agentOverride?: {
@@ -614,8 +613,6 @@ export interface SpawnOptions {
    * the adapter's interactive `composeCommand`; ignored when `resume` is set.
    */
   readonly initialPrompt?: string;
-  /** Concrete renderer theme at spawn time; gives TUIs an env hint. */
-  readonly terminalTheme?: TerminalThemeVariant;
 }
 
 export interface WorkspaceSessionDirectoryEntry {
@@ -659,7 +656,6 @@ export async function spawnSession(
   if (opts.resumeId !== undefined) body['resumeId'] = opts.resumeId;
   if (opts.agent !== undefined) body['agent'] = opts.agent;
   if (opts.initialPrompt !== undefined) body['initialPrompt'] = opts.initialPrompt;
-  if (opts.terminalTheme !== undefined) body['terminalTheme'] = opts.terminalTheme;
   const res = await fetch(
     `/api/workspaces/${encodeURIComponent(id)}/sessions/spawn`,
     {
@@ -786,13 +782,11 @@ export async function quickChat(
   agent?: string,
   credentialSlug?: string,
   targetWsId?: string,
-  terminalTheme?: TerminalThemeVariant,
 ): Promise<QuickChatResult> {
   const body: Record<string, unknown> = { prompt };
   if (agent !== undefined) body['agent'] = agent;
   if (credentialSlug !== undefined) body['credentialSlug'] = credentialSlug;
   if (targetWsId !== undefined) body['targetWsId'] = targetWsId;
-  if (terminalTheme !== undefined) body['terminalTheme'] = terminalTheme;
   const res = await fetch('/api/workspaces/quick-chat', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -822,21 +816,10 @@ export async function pauseSession(wsId: string, sessionId: string): Promise<boo
 export async function resumeSession(
   wsId: string,
   sessionId: string,
-  terminalTheme?: TerminalThemeVariant,
 ): Promise<SpawnedSession | null> {
-  const body: Record<string, unknown> = {};
-  if (terminalTheme !== undefined) body['terminalTheme'] = terminalTheme;
   const res = await fetch(
     `/api/workspaces/${encodeURIComponent(wsId)}/sessions/${encodeURIComponent(sessionId)}/resume`,
-    {
-      method: 'POST',
-      ...(Object.keys(body).length > 0
-        ? {
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify(body),
-          }
-        : {}),
-    },
+    { method: 'POST' },
   );
   if (!res.ok) return null;
   return (await res.json()) as SpawnedSession;
@@ -1154,6 +1137,10 @@ export interface AgentConfig {
   readonly model: string | null;
   /** Optional custom-model context window for opencode/Pi provider overrides. */
   readonly contextWindow?: number | null;
+  /** Pi/opencode custom-model reasoning capability when explicitly registered. */
+  readonly reasoning?: boolean | null;
+  /** Workspace-local reasoning effort projected into the runtime's native field. */
+  readonly reasoningEffort?: ModelReasoningEffort | null;
   /** Wire protocol the endpoint speaks — drives how the adapter is configured. */
   readonly wireShape?: WireShape | null;
   /** Codex only — wire format for the upstream API. */
@@ -1215,6 +1202,12 @@ export interface SavedCredential {
   readonly lastModel?: string;
   /** Model injection resolves right now (lastModel, then the vendor default). */
   readonly resolvedModel?: string;
+  /** Registered or explicitly model-scoped context limit projected for this runtime. */
+  readonly resolvedContextWindow?: number;
+  /** Registered reasoning metadata this runtime would receive on injection. */
+  readonly resolvedReasoning?: boolean;
+  readonly resolvedReasoningEffort?: ModelReasoningEffort;
+  readonly resolvedReasoningMode?: ModelReasoningMode;
   /** Omitted in the per-agent (`?agent=`) listing — only the unfiltered list returns it. */
   readonly apiKey?: string | null;
 }
@@ -1236,10 +1229,20 @@ export async function listAgentCredentials(agent: string): Promise<SavedCredenti
 
 /** Which vault credential a workspace's agent is currently configured with (null = none/hand-edited). */
 export interface WorkspaceCredentialDetection {
+  /** True when the runtime has any usable native Workspace config, even when its key is hand-edited. */
+  readonly configured: boolean;
   readonly slug: string | null;
   readonly model: string | null;
   readonly contextWindow: number | null;
   readonly wireShape: WireShape | null;
+  readonly reasoning?: boolean | null;
+  readonly reasoningEffort?: ModelReasoningEffort | null;
+  readonly reasoningMode?: ModelReasoningMode | null;
+  readonly interactiveSetupStatus?:
+    | 'ready'
+    | 'runtime-onboarding-required'
+    | 'workspace-trust-required'
+    | 'unknown';
 }
 
 export async function detectWorkspaceCredential(
@@ -1249,7 +1252,16 @@ export async function detectWorkspaceCredential(
   const res = await fetch(
     `/api/workspaces/${encodeURIComponent(wsId)}/agent-config/${encodeURIComponent(agent)}/credential`,
   );
-  if (!res.ok) return { slug: null, model: null, contextWindow: null, wireShape: null };
+  if (!res.ok) return {
+    configured: false,
+    slug: null,
+    model: null,
+    contextWindow: null,
+    wireShape: null,
+    reasoning: null,
+    reasoningEffort: null,
+    reasoningMode: null,
+  };
   return (await res.json()) as WorkspaceCredentialDetection;
 }
 

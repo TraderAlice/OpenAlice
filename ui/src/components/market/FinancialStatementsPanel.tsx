@@ -123,7 +123,7 @@ export function FinancialStatementsPanel({ symbol }: Props) {
               onClick={() => setTab(t.key)}
               className={`px-2.5 py-1 text-[12px] transition-colors cursor-pointer ${
                 i > 0 ? 'border-l border-border' : ''
-              } ${tab === t.key ? 'bg-bg-tertiary text-text' : 'text-text-muted hover:text-text'}`}
+              } ${tab === t.key ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
             >
               {t.label}
             </button>
@@ -135,7 +135,7 @@ export function FinancialStatementsPanel({ symbol }: Props) {
         <table aria-hidden="true" className="w-full text-[12px] border-collapse">
           <thead>
             <tr className="border-b border-border/60">
-              <th className="text-left px-3 py-2 sticky left-0 bg-bg-secondary/30">
+              <th className="text-left px-3 py-2 sticky left-0 bg-secondary/30">
                 <Skeleton className="h-3 w-10 rounded" />
               </th>
               {Array.from({ length: 4 }).map((_, i) => (
@@ -161,18 +161,18 @@ export function FinancialStatementsPanel({ symbol }: Props) {
           </tbody>
         </table>
       )}
-      {entry?.error && <div className="p-3 text-[12px] text-red">{entry.error}</div>}
+      {entry?.error && <div className="p-3 text-[12px] text-destructive">{entry.error}</div>}
       {!entry?.error && rows.length === 0 && !loading && (
-        <div className="p-3 text-[12px] text-text-muted">No data.</div>
+        <div className="p-3 text-[12px] text-muted-foreground">No data.</div>
       )}
       {rows.length > 0 && (
         <table className="w-full text-[12px] border-collapse">
           <thead>
             <tr className="border-b border-border/60">
-              <th className="text-left font-medium text-text-muted/70 px-3 py-2 sticky left-0 bg-bg-secondary/30">Item</th>
+              <th className="text-left font-medium text-muted-foreground/70 px-3 py-2 sticky left-0 bg-secondary/30">Item</th>
               {rows.map((row) => (
                 <th key={String(row.period_ending ?? row.filing_date)}
-                    className="text-right font-medium text-text-muted/70 px-3 py-2 whitespace-nowrap">
+                    className="text-right font-medium text-muted-foreground/70 px-3 py-2 whitespace-nowrap">
                   {periodLabel(row)}
                 </th>
               ))}
@@ -181,7 +181,7 @@ export function FinancialStatementsPanel({ symbol }: Props) {
           <tbody>
             {rowDefs.map((r) => (
               <tr key={r.key} className="border-b border-border/30 last:border-b-0">
-                <td className={`px-3 py-1.5 ${r.indent ? 'pl-6 text-text-muted' : 'text-text'}`}>
+                <td className={`px-3 py-1.5 ${r.indent ? 'pl-6 text-muted-foreground' : 'text-foreground'}`}>
                   {r.label}
                 </td>
                 {rows.map((row) => (

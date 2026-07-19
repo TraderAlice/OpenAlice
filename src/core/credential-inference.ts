@@ -10,9 +10,10 @@
  * those migrations + the in-process provider stack at the 0.40 baseline.)
  */
 
-import type { CredentialVendor } from './config.js'
+import type { CredentialVendor, CredentialWireShape } from './config.js'
 
 const VENDORS_BY_BASEURL: Array<[RegExp, CredentialVendor]> = [
+  [/generativelanguage\.googleapis\.com/i, 'google'],
   [/bigmodel\.cn|z\.ai/i, 'glm'],
   [/minimaxi\.com|minimax\.io/i, 'minimax'],
   [/moonshot\.cn|moonshot\.ai/i, 'kimi'],
@@ -29,11 +30,19 @@ const VENDORS_BY_BASEURL: Array<[RegExp, CredentialVendor]> = [
  * OpenAI-compatible against arbitrary endpoints, so an unrecognized baseUrl
  * falls back to 'custom' rather than guessing a first-party vendor.
  */
-export function inferCredentialVendor(opts: { agent?: string; baseUrl?: string }): CredentialVendor {
+export function inferCredentialVendor(opts: {
+  agent?: string
+  baseUrl?: string
+  wireShape?: CredentialWireShape
+}): CredentialVendor {
   const baseUrl = opts.baseUrl ?? ''
   for (const [pattern, vendor] of VENDORS_BY_BASEURL) {
     if (pattern.test(baseUrl)) return vendor
   }
+  // Google's native wire is vendor-specific even when its official base URL is
+  // represented as empty/default. The other wire shapes are compatibility
+  // protocols shared by many vendors and cannot identify one safely.
+  if (opts.wireShape === 'google-generative-ai') return 'google'
   if (opts.agent === 'claude') return 'anthropic'
   if (opts.agent === 'codex') return 'openai'
   return 'custom'

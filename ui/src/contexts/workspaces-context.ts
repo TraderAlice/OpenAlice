@@ -10,7 +10,7 @@ import type {
 } from '../components/workspace/api'
 import type { WorkspaceSource } from '../tabs/types'
 
-export type SpawnOpts = Omit<SpawnOptions, 'terminalTheme'>
+export type SpawnOpts = SpawnOptions
 
 export interface WorkspacesContextValue {
   readonly workspaces: readonly Workspace[]

@@ -22,8 +22,8 @@ export function SchemaFormFields({ fields, formData, setField, showSecrets }: {
               <label key={f.key} className="flex items-start gap-2 cursor-pointer select-none">
                 <Toggle size="sm" checked={value === 'true'} onChange={(v) => setField(f.key, v ? 'true' : 'false')} />
                 <span>
-                  <span className="text-[13px] text-text">{f.title}</span>
-                  {f.description && <p className="text-[11px] text-text-muted/60 mt-0.5">{f.description}</p>}
+                  <span className="text-[13px] text-foreground">{f.title}</span>
+                  {f.description && <p className="text-[11px] text-muted-foreground/60 mt-0.5">{f.description}</p>}
                 </span>
               </label>
             )
@@ -33,7 +33,7 @@ export function SchemaFormFields({ fields, formData, setField, showSecrets }: {
                 <select className={inputClass} value={value} onChange={(e) => setField(f.key, e.target.value)}>
                   {f.options?.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
-                {f.description && <p className="text-[11px] text-text-muted/60 mt-1">{f.description}</p>}
+                {f.description && <p className="text-[11px] text-muted-foreground/60 mt-1">{f.description}</p>}
               </Field>
             )
           case 'password':
@@ -46,7 +46,7 @@ export function SchemaFormFields({ fields, formData, setField, showSecrets }: {
                   onChange={(e) => setField(f.key, e.target.value)}
                   placeholder={f.required ? 'Required' : ''}
                 />
-                {f.description && <p className="text-[11px] text-text-muted/60 mt-1">{f.description}</p>}
+                {f.description && <p className="text-[11px] text-muted-foreground/60 mt-1">{f.description}</p>}
               </Field>
             )
           case 'text':
@@ -60,7 +60,7 @@ export function SchemaFormFields({ fields, formData, setField, showSecrets }: {
                   onChange={(e) => setField(f.key, e.target.value)}
                   placeholder={f.required ? 'Required' : ''}
                 />
-                {f.description && <p className="text-[11px] text-text-muted/60 mt-1">{f.description}</p>}
+                {f.description && <p className="text-[11px] text-muted-foreground/60 mt-1">{f.description}</p>}
               </Field>
             )
         }

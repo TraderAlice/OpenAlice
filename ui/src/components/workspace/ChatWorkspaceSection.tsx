@@ -40,6 +40,7 @@ import { useReorderMotion } from './useReorderMotion'
 import { preferencesApi } from '../../api/preferences'
 
 const CHAT_TEMPLATE = 'chat'
+const CHAT_SIDEBAR_SESSION_LIMIT = 6
 
 function nextChatWorkspaceTag(workspaces: readonly Workspace[]): string {
   const tags = new Set(workspaces.map((workspace) => workspace.tag))
@@ -94,9 +95,9 @@ export function ChatWorkspaceSection(): ReactElement | null {
         <button
           type="button"
           onClick={() => openOrFocus({ kind: 'chat-landing', params: {} })}
-          className="oa-pressable flex w-full items-center gap-2 rounded-lg border border-accent/25 bg-accent/10 px-3 py-2.5 text-left text-[13px] font-medium text-text hover:border-accent/45 hover:bg-accent/15"
+          className="oa-pressable flex w-full items-center gap-2 rounded-lg border border-primary/25 bg-primary/10 px-3 py-2.5 text-left text-[13px] font-medium text-foreground hover:border-primary/45 hover:bg-primary/15"
         >
-          <MessageSquarePlus size={15} strokeWidth={2.15} className="shrink-0 text-accent" />
+          <MessageSquarePlus size={15} strokeWidth={2.15} className="shrink-0 text-primary" />
           <span>{t('chat.newChat')}</span>
         </button>
       </div>
@@ -123,7 +124,7 @@ export function ChatWorkspaceSection(): ReactElement | null {
       />
 
       <div className="px-3 pb-1 pt-1.5">
-        <span className="min-w-0 truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-text-muted/60">
+        <span className="min-w-0 truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60">
           {t('nav.item.workspaces')}
         </span>
       </div>
@@ -131,7 +132,7 @@ export function ChatWorkspaceSection(): ReactElement | null {
         <button
           type="button"
           onClick={() => setShowCreate(true)}
-          className="oa-pressable flex w-full items-center gap-2 rounded-lg border border-border/70 bg-bg-secondary/45 px-3 py-2 text-left text-[12px] font-medium text-text-muted hover:border-border hover:bg-bg-tertiary hover:text-text"
+          className="oa-pressable flex w-full items-center gap-2 rounded-lg border border-border/70 bg-secondary/45 px-3 py-2 text-left text-[12px] font-medium text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground"
           title={t('chat.newWorkspace')}
           aria-label={t('chat.newWorkspace')}
         >
@@ -176,18 +177,18 @@ export function ChatWorkspaceSection(): ReactElement | null {
         )}
         {ctx.hasLoaded && chatWorkspaces.length === 0 && !showListError && (
           <li className="px-3 py-2.5">
-            <p className="text-[12px] text-text-muted/60">{t('chat.noChatWorkspacesYet')}</p>
+            <p className="text-[12px] text-muted-foreground/60">{t('chat.noChatWorkspacesYet')}</p>
             <button
               type="button"
               onClick={() => setShowCreate(true)}
-              className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-medium text-text-muted transition-colors hover:text-text"
+              className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
               <PanelsTopLeft size={13} strokeWidth={2} />
               <span>{t('chat.newWorkspace')}</span>
             </button>
           </li>
         )}
-        {showListError && <li className="px-3 py-1 text-[11px] text-red">{ctx.listError}</li>}
+        {showListError && <li className="px-3 py-1 text-[11px] text-destructive">{ctx.listError}</li>}
         {chatWorkspaces.map((w) => (
           <ChatWorkspaceRow
             key={w.id}
@@ -211,6 +212,10 @@ export function ChatWorkspaceSection(): ReactElement | null {
             onConfigure={() => ctx.openAgentConfig(w.id)}
             onDelete={() => setPendingDelete(w)}
             onSpawn={() => openOrFocus({ kind: 'chat-landing', params: { targetWsId: w.id } })}
+            onBrowseSessions={() => {
+              rememberChatWorkspace(w.id)
+              openOrFocus({ kind: 'workspace', params: { wsId: w.id, source: 'chat' } })
+            }}
           />
         ))}
       </ul>
@@ -260,8 +265,8 @@ function ManagerWorkspaceRow(props: ManagerWorkspaceRowProps): ReactElement {
       <div
         className={`group relative flex w-full items-center overflow-hidden rounded-lg border transition-colors ${
           props.isFocused
-            ? 'border-accent/35 bg-accent/10 text-text'
-            : 'border-border/70 bg-bg-secondary/45 text-text hover:border-accent/25 hover:bg-bg-tertiary'
+            ? 'border-primary/35 bg-primary/10 text-foreground'
+            : 'border-border/70 bg-secondary/45 text-foreground hover:border-primary/25 hover:bg-muted'
         }`}
       >
         <span className="pointer-events-none absolute inset-y-0 right-0 w-20 bg-gradient-to-l from-accent/[0.07] to-transparent" />
@@ -269,7 +274,7 @@ function ManagerWorkspaceRow(props: ManagerWorkspaceRowProps): ReactElement {
           type="button"
           onClick={() => setExpanded((current) => !current)}
           disabled={sessions.length === 0}
-          className="oa-icon-action relative ml-1 flex h-8 w-6 shrink-0 items-center justify-center rounded text-text-muted/55 hover:text-text disabled:cursor-default disabled:opacity-30"
+          className="oa-icon-action relative ml-1 flex h-8 w-6 shrink-0 items-center justify-center rounded text-muted-foreground/55 hover:text-foreground disabled:cursor-default disabled:opacity-30"
           aria-label={expanded ? t('chat.collapseSessions') : t('chat.expandSessions')}
           title={expanded ? t('chat.collapseSessions') : t('chat.expandSessions')}
         >
@@ -283,18 +288,18 @@ function ManagerWorkspaceRow(props: ManagerWorkspaceRowProps): ReactElement {
           aria-label={t('workspaceManager.title')}
           className="oa-pressable relative flex min-w-0 flex-1 items-center gap-2.5 py-2.5 pl-1 pr-3 text-left"
         >
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent transition-transform group-hover:scale-105">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-transform group-hover:scale-105">
             <Network size={14} strokeWidth={2.1} />
           </span>
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[12px] font-semibold">{t('workspaceManager.title')}</span>
-            <span className="mt-0.5 block truncate text-[10px] text-text-muted">{t('workspaceManager.sidebarDescription')}</span>
+            <span className="mt-0.5 block truncate text-[10px] text-muted-foreground">{t('workspaceManager.sidebarDescription')}</span>
           </span>
           {!props.loaded ? (
-            <span aria-hidden className="h-2.5 w-4 animate-pulse rounded bg-text-muted/15" />
+            <span aria-hidden className="h-2.5 w-4 animate-pulse rounded bg-muted-foreground/15" />
           ) : sessions.length > 0 ? (
-            <span className="inline-flex shrink-0 items-center gap-1.5 text-[10px] tabular-nums text-text-muted/55">
-              <span className={`h-1.5 w-1.5 rounded-full ${hasRunning ? 'bg-green' : 'bg-text-muted/35'}`} />
+            <span className="inline-flex shrink-0 items-center gap-1.5 text-[10px] tabular-nums text-muted-foreground/55">
+              <span className={`h-1.5 w-1.5 rounded-full ${hasRunning ? 'bg-success' : 'bg-muted-foreground/35'}`} />
               {sessions.length}
             </span>
           ) : null}
@@ -334,6 +339,8 @@ interface ChatWorkspaceRowProps {
   onDelete: () => void
   /** Spawn a fresh agent session in THIS workspace (and open it). */
   onSpawn: () => void
+  /** Open the scalable Workspace-level Session directory. */
+  onBrowseSessions: () => void
 }
 
 function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
@@ -348,25 +355,26 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
     () => orderSessionsForSidebar(w.sessions),
     [w.sessions],
   )
+  const visibleSessions = orderedSessions.slice(0, CHAT_SIDEBAR_SESSION_LIMIT)
   const sessionListRef = useReorderMotion<HTMLDivElement>(
-    orderedSessions.map((session) => session.id),
+    visibleSessions.map((session) => session.id),
   )
 
   const statusClass = hasRunning
-    ? 'bg-green'
+    ? 'bg-success'
     : w.sessions.length > 0
-      ? 'bg-text-muted/40'
+      ? 'bg-muted-foreground/40'
       : 'border border-border'
 
   return (
     <li className="group relative" data-reorder-id={w.id}>
       <div
         className={`flex items-center gap-1 pl-2 pr-2 py-1 text-[13px] cursor-pointer transition-colors ${
-          isSelected ? 'bg-bg-tertiary text-text' : 'text-text hover:bg-bg-tertiary/50'
+          isSelected ? 'bg-muted text-foreground' : 'text-foreground hover:bg-muted/50'
         }`}
       >
         {isSelected && (
-          <span aria-hidden="true" className="absolute left-0 top-0 bottom-0 w-[2px] bg-accent" />
+          <span aria-hidden="true" className="absolute left-0 top-0 bottom-0 w-[2px] bg-primary" />
         )}
         <button
           type="button"
@@ -374,7 +382,7 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
             e.stopPropagation()
             setExpanded((v) => !v)
           }}
-          className="w-4 h-5 flex items-center justify-center text-text-muted/50 hover:text-text shrink-0"
+          className="w-4 h-5 flex items-center justify-center text-muted-foreground/50 hover:text-foreground shrink-0"
           aria-label={expanded ? t('chat.collapseSessions') : t('chat.expandSessions')}
           title={expanded ? t('chat.collapseSessions') : t('chat.expandSessions')}
         >
@@ -395,13 +403,13 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
               {props.label}
             </span>
             {subtitle && (
-              <span className="block truncate text-[11px] leading-3 text-text-muted/65" title={subtitle}>
+              <span className="block truncate text-[11px] leading-3 text-muted-foreground/65" title={subtitle}>
                 {subtitle}
               </span>
             )}
           </span>
           {w.sessions.length > 0 && (
-            <span className="text-[11px] text-text-muted/45 tabular-nums shrink-0">
+            <span className="text-[11px] text-muted-foreground/45 tabular-nums shrink-0">
               {w.sessions.length}
             </span>
           )}
@@ -415,7 +423,7 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
             e.stopPropagation()
             props.onSpawn()
           }}
-          className="oa-icon-action shrink-0 w-5 h-5 rounded flex items-center justify-center text-text-muted/50 hover:text-text hover:bg-bg-secondary transition-colors"
+          className="oa-icon-action shrink-0 w-5 h-5 rounded flex items-center justify-center text-muted-foreground/50 hover:text-foreground hover:bg-secondary transition-colors"
           title={t('chat.newSession')}
           aria-label={t('chat.newSession')}
         >
@@ -428,7 +436,7 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
               e.stopPropagation()
               props.onConfigure()
             }}
-            className="oa-icon-action w-5 h-5 rounded flex items-center justify-center text-text-muted hover:text-text hover:bg-bg-secondary"
+            className="oa-icon-action w-5 h-5 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary"
             title={t('workspace.configure')}
             aria-label={t('workspace.configure')}
           >
@@ -440,7 +448,7 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
               e.stopPropagation()
               props.onDelete()
             }}
-            className="oa-icon-action w-5 h-5 rounded flex items-center justify-center text-text-muted hover:text-red hover:bg-red/10"
+            className="oa-icon-action w-5 h-5 rounded flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10"
             title={t('chat.deleteWorkspace')}
             aria-label={t('chat.deleteWorkspace')}
           >
@@ -450,7 +458,7 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
       </div>
       {expanded && orderedSessions.length > 0 && (
         <div ref={sessionListRef} className="oa-disclosure-enter ml-[18px] border-l border-border/50">
-          {orderedSessions.map((s) => (
+          {visibleSessions.map((s) => (
             <SessionRow
               key={s.id}
               reorderId={s.id}
@@ -462,6 +470,15 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
               onDelete={() => props.onDeleteSession(s.id)}
             />
           ))}
+          {orderedSessions.length > visibleSessions.length && (
+            <button
+              type="button"
+              onClick={props.onBrowseSessions}
+              className="oa-pressable ml-2 my-1 flex min-h-7 items-center rounded-md px-2 text-[10.5px] font-medium text-primary hover:bg-primary/10"
+            >
+              {t('chat.viewAllSessions', { count: orderedSessions.length })}
+            </button>
+          )}
         </div>
       )}
     </li>

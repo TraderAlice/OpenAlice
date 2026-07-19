@@ -6,11 +6,11 @@
  * the retired event-bus webhook route is not part of the architecture.
  */
 
-const CODE = 'rounded bg-black/30 px-1 py-0.5 font-mono text-[12px] text-text/90'
+const CODE = 'rounded bg-code-background px-1 py-0.5 font-mono text-[12px] text-foreground/90'
 
 function Block({ children }: { children: string }) {
   return (
-    <pre className="overflow-auto rounded bg-black/30 p-3 text-[12px] leading-snug text-muted whitespace-pre-wrap">
+    <pre className="overflow-auto rounded bg-code-background p-3 text-[12px] leading-snug text-muted-foreground whitespace-pre-wrap">
       {children}
     </pre>
   )
@@ -20,19 +20,19 @@ export function AutomationApiSection() {
   return (
     <div className="max-w-prose mx-auto space-y-6 text-sm leading-relaxed">
       <section className="space-y-2">
-        <h2 className="text-base font-semibold text-text">Workspace automation</h2>
-        <p className="text-muted">
+        <h2 className="text-base font-semibold text-foreground">Workspace automation</h2>
+        <p className="text-muted-foreground">
           Automation is just a workspace run with no human attached: the same
           workspace, the same tools, spawned <em>headless</em> on a trigger. A run
-          reaches you through the <span className="text-text">Inbox</span> — there
+          reaches you through the <span className="text-foreground">Inbox</span> — there
           is no other output channel. There are two ways a run starts.
         </p>
       </section>
 
       <section className="space-y-2">
-        <h3 className="font-semibold text-text">1 · Self-scheduled (the workspace declares it)</h3>
-        <p className="text-muted">
-          A workspace declares its work as <strong className="text-text">one
+        <h3 className="font-semibold text-foreground">1 · Self-scheduled (the workspace declares it)</h3>
+        <p className="text-muted-foreground">
+          A workspace declares its work as <strong className="text-foreground">one
           markdown file per issue</strong> under{' '}
           <code className={CODE}>.alice/issues/&lt;id&gt;.md</code> in its own
           checkout (the filename stem is the issue id). Each file is YAML
@@ -58,7 +58,7 @@ Every trading morning before the open, assemble the pre-market picture for
 the watchlist — movers, gaps, and overnight headlines that move the thesis.
 Write research/premarket.md, then run alice-workspace inbox push --doc
 research/premarket.md --comments "Pre-market brief".`}</Block>
-        <ul className="ml-4 list-disc space-y-1 text-muted">
+        <ul className="ml-4 list-disc space-y-1 text-muted-foreground">
           <li>
             <code className={CODE}>title</code>: a short human title for the issue — required, surfaced
             on the Issue board and the Inbox.
@@ -90,8 +90,8 @@ research/premarket.md --comments "Pre-market brief".`}</Block>
       </section>
 
       <section className="space-y-2">
-        <h3 className="font-semibold text-text">2 · External trigger (POST a run)</h3>
-        <p className="text-muted">Trigger a one-off headless run in a specific workspace over HTTP:</p>
+        <h3 className="font-semibold text-foreground">2 · External trigger (POST a run)</h3>
+        <p className="text-muted-foreground">Trigger a one-off headless run in a specific workspace over HTTP:</p>
         <Block>{`POST /api/workspaces/:id/headless
 {
   "prompt": "<the instruction for the run>",
@@ -102,16 +102,16 @@ research/premarket.md --comments "Pre-market brief".`}</Block>
 
   202  { "taskId": "..." }     // accepted, runs in the background (default)
   429                          // headless concurrency cap reached, retry later`}</Block>
-        <p className="text-muted">
+        <p className="text-muted-foreground">
           This is the seam for an external system (a webhook bridge, a cron on
           another host) to drive a workspace. Every run is recorded under{' '}
-          <span className="text-text">Runs</span>.
+          <span className="text-foreground">Runs</span>.
         </p>
       </section>
 
       <section className="space-y-2">
-        <h3 className="font-semibold text-text">Reporting back</h3>
-        <p className="text-muted">
+        <h3 className="font-semibold text-foreground">Reporting back</h3>
+        <p className="text-muted-foreground">
           A headless run has no UI. It surfaces results by pushing to the Inbox
           (the <code className={CODE}>alice-workspace inbox push</code> CLI, on every
           workspace's PATH). A run that produces a deliverable but never pushes

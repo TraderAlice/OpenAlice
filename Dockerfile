@@ -21,6 +21,7 @@ RUN corepack enable && corepack prepare pnpm@11.7.0 --activate
 # because the root postinstall hook (`fix-pty-perms.mjs`) runs at the end
 # of `pnpm install` and must already exist on disk.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
+COPY patches/ patches/
 COPY scripts/fix-pty-perms.mjs ./scripts/fix-pty-perms.mjs
 COPY packages/cli/package.json packages/cli/
 COPY packages/guardian-runtime/package.json packages/guardian-runtime/

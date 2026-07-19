@@ -19,6 +19,10 @@ describe('inferCredentialVendor', () => {
     expect(inferCredentialVendor({ agent: 'codex' })).toBe('openai')
   })
 
+  it('recognizes the vendor-specific Google wire without a base URL', () => {
+    expect(inferCredentialVendor({ agent: 'opencode', wireShape: 'google-generative-ai' })).toBe('google')
+  })
+
   it('opencode/pi against an arbitrary endpoint → custom (no first-party guess)', () => {
     expect(inferCredentialVendor({ agent: 'opencode', baseUrl: 'https://gw.example.com/v1' })).toBe('custom')
     expect(inferCredentialVendor({ agent: 'pi' })).toBe('custom')

@@ -36,3 +36,11 @@ overrides:
   rollup: ^4.59.0
   vitest>vite: ^7.3.5
   '@vitest/mocker>vite': ^7.3.5
+
+patchedDependencies:
+  # Adapted from stablyai/orca@ab0f220. See THIRD_PARTY_NOTICES.md.
+  '@xterm/addon-serialize@0.15.0-beta.287': patches/@xterm__addon-serialize@0.15.0-beta.287.patch
+  # Adapted from stablyai/orca@1b331f2. See THIRD_PARTY_NOTICES.md.
+  '@xterm/addon-webgl@0.20.0-beta.286': patches/@xterm__addon-webgl@0.20.0-beta.286.patch
+  # Adapted from stablyai/orca@ab0f220. See THIRD_PARTY_NOTICES.md.
+  '@xterm/xterm@6.1.0-beta.287': patches/@xterm__xterm@6.1.0-beta.287.patch

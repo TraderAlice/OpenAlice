@@ -165,6 +165,7 @@ suggestion, or implementation proposal changes the product, it gets credited.
   <a href="https://github.com/JasonWang1124"><img src="https://github.com/JasonWang1124.png" width="56" height="56" alt="@JasonWang1124" /></a>
   <a href="https://github.com/bakabird"><img src="https://github.com/bakabird.png" width="56" height="56" alt="@bakabird" /></a>
   <a href="https://github.com/rudyll"><img src="https://github.com/rudyll.png" width="56" height="56" alt="@rudyll" /></a>
+  <a href="https://github.com/jalilsedna"><img src="https://github.com/jalilsedna.png" width="56" height="56" alt="@jalilsedna" /></a>
 </p>
 
 **See the full list and what each person shaped**: [CONTRIBUTORS.md](./CONTRIBUTORS.md)

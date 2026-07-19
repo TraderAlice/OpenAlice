@@ -103,7 +103,7 @@ export function ActivityBar({
     <>
       {/* Backdrop — mobile only */}
       <div
-        className={`fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity duration-200 ${
+        className={`fixed inset-0 bg-backdrop z-40 md:hidden transition-opacity duration-200 ${
           open ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         onClick={onClose}
@@ -114,7 +114,7 @@ export function ActivityBar({
       <aside
         className={`
           w-[280px] ${compactRail ? 'md:w-[60px]' : narrowRail ? 'md:w-[152px]' : 'md:w-[188px]'} h-full flex flex-col shrink-0
-          bg-bg-tertiary
+          bg-muted
           border-r border-border/80
           fixed z-50 top-0 left-0 transition-[transform,width] duration-200
           ${open ? 'translate-x-0' : '-translate-x-full'}
@@ -127,10 +127,10 @@ export function ActivityBar({
           <img
             src="/alice.ico"
             alt="Alice"
-            className={`${denseRail ? 'h-6 w-6 md:h-5 md:w-5' : 'h-6 w-6'} shrink-0 rounded-full ring-1 ring-border shadow-[0_0_14px_var(--color-accent-dim)]`}
+            className={`${denseRail ? 'h-6 w-6 md:h-5 md:w-5' : 'h-6 w-6'} shrink-0 rounded-full ring-1 ring-border shadow-[0_0_14px_var(--primary-muted)]`}
             draggable={false}
           />
-          <h1 className={`min-w-0 flex-1 truncate text-[15px] font-semibold text-text ${compactRail ? 'md:hidden' : ''}`}>OpenAlice</h1>
+          <h1 className={`min-w-0 flex-1 truncate text-[15px] font-semibold text-foreground ${compactRail ? 'md:hidden' : ''}`}>OpenAlice</h1>
         </div>
 
         {/* Navigation */}
@@ -200,13 +200,13 @@ export function ActivityBar({
                                 : `min-h-[34px] ${narrowRail ? 'gap-2 px-2.5' : 'gap-3 px-3'} py-1.5 text-[13px]`
                           } ${
                             isActive
-                              ? 'bg-accent-dim text-text'
-                              : 'text-text-muted hover:text-text hover:bg-overlay'
+                              ? 'bg-primary-muted text-foreground'
+                              : 'text-muted-foreground hover:text-foreground hover:bg-accent'
                           }`}
                         >
                           {/* Active indicator — left vertical bar */}
                           <span
-                            className={`absolute left-0 ${denseRail ? 'top-1.5 bottom-1.5 md:top-0.5 md:bottom-0.5' : 'top-1.5 bottom-1.5'} w-[2px] rounded-r-full bg-accent transition-opacity duration-150 ${
+                            className={`absolute left-0 ${denseRail ? 'top-1.5 bottom-1.5 md:top-0.5 md:bottom-0.5' : 'top-1.5 bottom-1.5'} w-[2px] rounded-r-full bg-primary transition-opacity duration-150 ${
                               isActive ? 'opacity-100' : 'opacity-0'
                             }`}
                             aria-hidden
@@ -218,7 +218,7 @@ export function ActivityBar({
                           {item.page === 'inbox' && unreadInbox > 0 && (
                             <span
                               aria-label={t('nav.unread', { count: unreadInbox })}
-                              className={`shrink-0 min-w-[18px] h-[18px] px-1.5 rounded-full bg-red text-[10px] font-semibold text-white tabular-nums flex items-center justify-center ${
+                              className={`shrink-0 min-w-[18px] h-[18px] px-1.5 rounded-full bg-destructive text-[10px] font-semibold text-destructive-foreground tabular-nums flex items-center justify-center ${
                                 compactRail ? 'md:absolute md:-right-1 md:-top-1 md:h-4 md:min-w-4 md:px-1 md:text-[9px]' : ''
                               }`}
                             >
@@ -228,7 +228,7 @@ export function ActivityBar({
                           {item.page === 'trading-as-git' && pendingPush > 0 && (
                             <span
                               aria-label={t('nav.pendingPush', { count: pendingPush })}
-                              className={`shrink-0 min-w-[18px] h-[18px] px-1.5 rounded-full bg-red text-[10px] font-semibold text-white tabular-nums flex items-center justify-center ${
+                              className={`shrink-0 min-w-[18px] h-[18px] px-1.5 rounded-full bg-destructive text-[10px] font-semibold text-destructive-foreground tabular-nums flex items-center justify-center ${
                                 compactRail ? 'md:absolute md:-right-1 md:-top-1 md:h-4 md:min-w-4 md:px-1 md:text-[9px]' : ''
                               }`}
                             >
@@ -254,7 +254,7 @@ export function ActivityBar({
               onClick={() => setRailCollapsed(!railCollapsed)}
               title={t(railCollapsed ? 'nav.expandRail' : 'nav.collapseRail')}
               aria-label={t(railCollapsed ? 'nav.expandRail' : 'nav.collapseRail')}
-              className={`oa-icon-action hidden ${denseRail ? 'h-9 w-9 md:h-[26px] md:w-[26px]' : 'h-9 w-9'} shrink-0 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-overlay hover:text-text md:flex`}
+              className={`oa-icon-action hidden ${denseRail ? 'h-9 w-9 md:h-[26px] md:w-[26px]' : 'h-9 w-9'} shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground md:flex`}
             >
               {railCollapsed
                 ? <PanelLeftOpen size={denseRail ? 14 : 17} strokeWidth={1.75} aria-hidden />
@@ -306,7 +306,7 @@ function SectionHeader({
         <button
           type="button"
           onClick={onToggleCollapse}
-          className="flex min-h-7 flex-1 items-center gap-1.5 py-1 text-left text-[12px] font-semibold text-text-muted transition-colors hover:text-text"
+          className="flex min-h-7 flex-1 items-center gap-1.5 py-1 text-left text-[12px] font-semibold text-muted-foreground transition-colors hover:text-foreground"
           aria-expanded={!isCollapsed}
           aria-controls={controlsId}
           title={label}
@@ -326,7 +326,7 @@ function SectionHeader({
             type="button"
             onClick={() => setHintOpen((o) => !o)}
             className={`flex min-h-7 min-w-7 items-center justify-center p-0.5 transition-colors ${
-              hintOpen ? 'text-text-muted' : 'text-text-muted/50 hover:text-text-muted'
+              hintOpen ? 'text-muted-foreground' : 'text-muted-foreground/50 hover:text-muted-foreground'
             }`}
             aria-label={t('nav.about', { label })}
             aria-expanded={hintOpen}
@@ -336,7 +336,7 @@ function SectionHeader({
         )}
       </div>
       {showItems && description && hintOpen && (
-        <p className="oa-disclosure-enter mb-2 px-3 text-[11px] leading-relaxed text-text-muted">
+        <p className="oa-disclosure-enter mb-2 px-3 text-[11px] leading-relaxed text-muted-foreground">
           {description}
         </p>
       )}

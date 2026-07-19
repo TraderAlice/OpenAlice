@@ -2,12 +2,17 @@ import * as pty from 'node-pty';
 import type { WebSocket } from 'ws';
 
 import type { Logger } from './logger.js';
+import { HeadlessTerminalSnapshot } from './headless-terminal-snapshot.js';
 import {
   isClientControlMessage,
   type ServerControlMessage,
 } from './protocol.js';
 import { ReplayBuffer } from './replay-buffer.js';
 import { resolveLaunchCommand } from './win-command.js';
+import {
+  terminalColorSchemeUpdateSequence,
+  type TerminalViewAttributes,
+} from './terminal-view-attributes.js';
 
 export interface PersistentSessionOptions {
   /** The workspace this session belongs to (for routing, logging, cwd context). */
@@ -26,6 +31,8 @@ export interface PersistentSessionOptions {
   readonly highWatermarkBytes: number;
   readonly lowWatermarkBytes: number;
   readonly onDisposed: () => void;
+  readonly initialTerminalViewAttributes?: TerminalViewAttributes;
+  readonly onTerminalViewAttributes?: (attributes: TerminalViewAttributes) => void;
   /**
    * V3.S5 — bytes prepended to the ReplayBuffer before the PTY spawns. Used
    * by shell resume: the prior session's scrollback is pushed back into the
@@ -62,16 +69,16 @@ const RESPAWN_WINDOW_LIMIT = 3;
 /**
  * A PTY whose lifetime is decoupled from any single WebSocket.
  *
- * The session owns the child process, a `ReplayBuffer` of recent output, and
- * (at most one at a time, for v1) an attached WebSocket. On `attach`, any
- * prior client is kicked, the replacement socket starts listening, the replay
- * tail is shipped as a binary frame, then an `attached` text frame tells the
- * client where the seq starts. Listening before replay is load-bearing: a
- * terminal emulator can synchronously answer capability queries in replayed
- * TUI startup bytes (OpenCode does this), and those replies are PTY stdin.
+ * The session owns the child process, a raw `ReplayBuffer`, a headless xterm
+ * mirror, and (at most one at a time, for v1) an attached WebSocket. On cold
+ * attach, the replacement receives an ANSI snapshot of the authoritative
+ * current screen; hot attach still receives the requested raw byte tail.
+ * Listening before either replay is load-bearing for hot raw replays, whose
+ * terminal queries can synchronously produce PTY stdin replies.
  *
  * Output flow:
- *   pty.onData → buffer.append(buf) → if ws is attached, ws.send(buf, binary)
+ *   pty.onData → buffer.append(buf) + headless.write(buf)
+ *             → if ws is attached, ws.send(buf, binary)
  * Cursor heartbeats (text `cursor` messages) are emitted every
  * CURSOR_BYTES_INTERVAL bytes of output or CURSOR_TICK_MS of idle time, so
  * the client can persist `lastSeq` and request a tight replay window on
@@ -80,6 +87,8 @@ const RESPAWN_WINDOW_LIMIT = 3;
 export class PersistentSession {
   private term: pty.IPty;
   private readonly buffer: ReplayBuffer;
+  private readonly headless: HeadlessTerminalSnapshot;
+  private terminalViewAttributes: TerminalViewAttributes | null = null;
   private readonly opts: PersistentSessionOptions;
   private readonly log: Logger;
   private ws: WebSocket | null = null;
@@ -127,6 +136,21 @@ export class PersistentSession {
     }
     this.currentCols = clamp(opts.initialCols, 1, MAX_DIM);
     this.currentRows = clamp(opts.initialRows, 1, MAX_DIM);
+
+    this.headless = new HeadlessTerminalSnapshot({
+      cols: this.currentCols,
+      rows: this.currentRows,
+      onQueryReply: (reply) => this.onHeadlessQueryReply(reply),
+    });
+    if (opts.initialTerminalViewAttributes) {
+      this.terminalViewAttributes = opts.initialTerminalViewAttributes;
+      this.headless.setTerminalViewAttributes(opts.initialTerminalViewAttributes);
+    }
+    if (opts.initialReplayBytes && opts.initialReplayBytes.length > 0) {
+      // Seed visual state from persisted shell scrollback, but never answer
+      // old queries replayed from a prior PTY lifetime.
+      this.headless.write(opts.initialReplayBytes);
+    }
 
     this.term = this.spawnChild();
     this.log.info('session.spawned', {
@@ -363,16 +387,28 @@ export class PersistentSession {
     // query-driven TUIs such as OpenCode remain alive behind a blank screen.
     this.wireWs(ws);
 
-    // Compute replay window. Cold attach (since=undefined) replays the full
-    // buffer — without that, a fresh browser tab on a workspace where the
-    // agent is already idle would just see a black void instead of the prompt
-    // and recent output. Hot attach (since=N) only fills in what was missed.
+    // Compute replay window. A cold attach restores the headless emulator's
+    // current screen instead of replaying every historical TUI redraw. The raw
+    // ring remains authoritative for hot attach and as a snapshot fallback.
     const requested = since ?? 0;
     const slice = this.buffer.since(requested);
     const scrollbackTruncated = since !== undefined && slice.effectiveSeq > since;
+    let replayBytes = slice.bytes;
+    let replayKind: 'snapshot' | 'raw' = 'raw';
+    if (since === undefined) {
+      try {
+        const snapshot = this.headless.snapshot();
+        if (snapshot !== null) {
+          replayBytes = Buffer.from(snapshot, 'utf8');
+          replayKind = 'snapshot';
+        }
+      } catch (err) {
+        this.log.warn('session.snapshot_failed', { err });
+      }
+    }
 
-    if (slice.bytes.length > 0) {
-      ws.send(slice.bytes, { binary: true });
+    if (replayBytes.length > 0) {
+      ws.send(replayBytes, { binary: true });
     }
     const attached: ServerControlMessage = {
       type: 'attached',
@@ -384,6 +420,8 @@ export class PersistentSession {
       replayFromSeq: slice.effectiveSeq,
       seq: slice.tailSeq,
       scrollbackTruncated,
+      kittyKeyboardFlags: this.headless.getKittyKeyboardFlags(),
+      colorSchemeUpdatesSubscribed: this.headless.getColorSchemeUpdatesSubscribed(),
     };
     ws.send(JSON.stringify(attached));
     this.lastCursorSeq = slice.tailSeq;
@@ -393,7 +431,9 @@ export class PersistentSession {
     this.log.event('session.attached', {
       since: since ?? null,
       replayFromSeq: slice.effectiveSeq,
-      replayBytes: slice.bytes.length,
+      replayBytes: replayBytes.length,
+      rawReplayBytes: slice.bytes.length,
+      replayKind,
       scrollbackTruncated,
       controller: this.controller,
     });
@@ -436,6 +476,7 @@ export class PersistentSession {
     } catch {
       // already dead
     }
+    this.headless.dispose();
     const ws = this.ws;
     if (ws !== null) {
       this.unwireWs(ws);
@@ -457,6 +498,11 @@ export class PersistentSession {
     this.buffer.append(buf);
 
     const ws = this.ws;
+    this.headless.write(buf, {
+      // The renderer owns replies while attached. When no renderer can see
+      // this output, the headless mirror is the sole terminal-query authority.
+      forwardQueryReplies: ws === null || ws.readyState !== ws.OPEN,
+    });
     if (ws !== null) {
       ws.send(buf, { binary: true }, (err) => {
         if (err) {
@@ -501,6 +547,17 @@ export class PersistentSession {
     }
   }
 
+  private onHeadlessQueryReply(reply: string): void {
+    if (this.disposed) return;
+    const ws = this.ws;
+    if (ws !== null && ws.readyState === ws.OPEN) return;
+    try {
+      this.term.write(reply);
+    } catch (err) {
+      this.log.warn('session.headless_reply_error', { err });
+    }
+  }
+
   private onWsMessage(ws: WebSocket, raw: unknown, isBinary: boolean): void {
     if (this.disposed) return;
     if (this.ws !== ws) return; // stale (this ws was kicked)
@@ -531,6 +588,8 @@ export class PersistentSession {
 
     if (parsed.type === 'resize') {
       this.resize(parsed.cols, parsed.rows);
+    } else if (parsed.type === 'terminal-view-attributes') {
+      this.opts.onTerminalViewAttributes?.(parsed.attributes);
     }
     // `attach` mid-stream is ignored — the initial attach already happened.
   }
@@ -564,10 +623,31 @@ export class PersistentSession {
     const r = clamp(Math.floor(rows), 1, MAX_DIM);
     this.currentCols = c;
     this.currentRows = r;
+    this.headless.resize(c, r);
     try {
       this.term.resize(c, r);
     } catch {
       // PTY may be dying; ignore.
+    }
+  }
+
+  setTerminalViewAttributes(attributes: TerminalViewAttributes): void {
+    const previous = this.terminalViewAttributes;
+    this.terminalViewAttributes = attributes;
+    this.headless.setTerminalViewAttributes(attributes);
+    if (
+      previous
+      && previous.colorSchemeMode !== attributes.colorSchemeMode
+      && this.headless.getColorSchemeUpdatesSubscribed()
+      && (this.ws === null || this.ws.readyState !== this.ws.OPEN)
+    ) {
+      // No renderer is present to perform the DEC mode 2031 push. Keep the
+      // hidden TUI in sync from the same renderer-authored app-global value.
+      try {
+        this.term.write(terminalColorSchemeUpdateSequence(attributes.colorSchemeMode));
+      } catch (err) {
+        this.log.warn('session.color_scheme_update_error', { err });
+      }
     }
   }
 

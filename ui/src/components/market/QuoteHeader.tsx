@@ -42,22 +42,22 @@ export function QuoteHeader({ symbol }: Props) {
   const loading = !quote && !error
 
   return (
-    <div className="flex flex-wrap items-end gap-x-6 gap-y-2 px-4 py-3 border border-border rounded bg-bg-secondary/30">
+    <div className="flex flex-wrap items-end gap-x-6 gap-y-2 px-4 py-3 border border-border rounded bg-secondary/30">
       <div className="flex flex-col min-w-0">
         <div className="flex items-baseline gap-2 min-w-0">
-          <span className="text-[20px] font-semibold text-text tracking-tight">{symbol}</span>
+          <span className="text-[20px] font-semibold text-foreground tracking-tight">{symbol}</span>
           {loading ? (
             <Skeleton className="h-3.5 w-28 rounded" />
           ) : (
             <>
-              {name && <span className="text-[13px] text-text-muted truncate">{name}</span>}
+              {name && <span className="text-[13px] text-muted-foreground truncate">{name}</span>}
               {exchange && (
-                <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-bg-tertiary text-text-muted font-medium">
+                <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">
                   {exchange}
                 </span>
               )}
               {provider && (
-                <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-bg-tertiary text-text-muted font-medium">
+                <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">
                   {provider}
                 </span>
               )}
@@ -65,7 +65,7 @@ export function QuoteHeader({ symbol }: Props) {
           )}
         </div>
         <div className="flex items-baseline gap-3 mt-1">
-          <span className="text-[22px] font-mono font-semibold text-text">
+          <span className="text-[22px] font-mono font-semibold text-foreground">
             {loading ? (
               <Skeleton className="inline-block h-6 w-28 rounded align-baseline" />
             ) : (
@@ -77,7 +77,7 @@ export function QuoteHeader({ symbol }: Props) {
           ) : (
             change != null &&
             changePct != null && (
-              <span className={`text-[13px] font-medium ${up ? 'text-green' : 'text-red'}`}>
+              <span className={`text-[13px] font-medium ${up ? 'text-success' : 'text-destructive'}`}>
                 {up ? '+' : ''}{fmtNumber(change)} ({up ? '+' : ''}{fmtPercent(changePct)})
               </span>
             )
@@ -100,7 +100,7 @@ export function QuoteHeader({ symbol }: Props) {
         <Field label="MA200"     value={fmtNumber(quote?.ma200)}       loading={loading} />
       </dl>
 
-      {error && <div className="w-full text-[11px] text-red">{error}</div>}
+      {error && <div className="w-full text-[11px] text-destructive">{error}</div>}
     </div>
   )
 }
@@ -108,8 +108,8 @@ export function QuoteHeader({ symbol }: Props) {
 function Field({ label, value, loading }: { label: string; value: string; loading?: boolean }) {
   return (
     <div className="flex flex-col min-w-0">
-      <dt className="text-text-muted/60 uppercase tracking-wide">{label}</dt>
-      <dd className="font-mono text-text truncate">
+      <dt className="text-muted-foreground/60 uppercase tracking-wide">{label}</dt>
+      <dd className="font-mono text-foreground truncate">
         {loading ? <Skeleton className="h-3 w-12 rounded mt-0.5" /> : value}
       </dd>
     </div>

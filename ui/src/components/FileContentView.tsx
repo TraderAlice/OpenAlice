@@ -38,7 +38,7 @@ function DocBody({ path, content }: { path: string; content: string }): ReactEle
   }
   // Plain-text fallback (.txt, .log, no extension, code files…)
   return (
-    <pre className="text-[12px] text-text whitespace-pre-wrap font-mono leading-relaxed">
+    <pre className="text-[12px] text-foreground whitespace-pre-wrap font-mono leading-relaxed">
       {content}
     </pre>
   )
@@ -61,5 +61,5 @@ function DocTombstone({ result }: { result: ReadFileResult }): ReactElement {
         return ''
     }
   })()
-  return <div className="text-[12px] text-text-muted italic">{message}</div>
+  return <div className="text-[12px] text-muted-foreground italic">{message}</div>
 }

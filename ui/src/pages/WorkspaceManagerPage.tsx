@@ -28,9 +28,9 @@ import { WebPiView } from '../components/workspace/WebPiView'
 import { ResumeCta } from '../components/workspace/ResumeCta'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { useAgentLaunchConfig, useAgentLaunchPreferences } from '../hooks/useAgentLaunchConfig'
+import { isWorkspaceAiAgent } from '../lib/agentRuntime'
 import { useWorkspace } from '../tabs/store'
 import type { ViewSpec } from '../tabs/types'
-import { keyMapForAgent } from '../components/workspace/terminalInput'
 
 type ManagerSpec = Extract<ViewSpec, { kind: 'workspace-manager' }>
 
@@ -128,7 +128,7 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
   }
 
   const adjustManagerAi = () => {
-    if (effectiveAgent === 'opencode' || effectiveAgent === 'pi') {
+    if (isWorkspaceAiAgent(effectiveAgent)) {
       openAgentConfig(MANAGER_WORKSPACE_ID, effectiveAgent, 'ai')
       return
     }
@@ -137,27 +137,27 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
 
   if (sessionId && session) {
     return (
-      <div className="workspaces-root flex h-full min-h-0 flex-col bg-bg">
-        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-border bg-bg-secondary/35 px-3 py-2 md:px-4">
+      <div className="workspaces-root flex h-full min-h-0 flex-col bg-background">
+        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-border bg-secondary/35 px-3 py-2 md:px-4">
           <div className="flex min-w-0 items-center gap-2.5">
             <button
               type="button"
               onClick={() => openOrFocus({ kind: 'workspace-manager', params: {} })}
-              className="oa-icon-action rounded-md p-1.5 text-text-muted hover:bg-bg-tertiary hover:text-text"
+              className="oa-icon-action rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
               title={t('workspaceManager.back')}
               aria-label={t('workspaceManager.back')}
             >
               <ArrowLeft size={15} />
             </button>
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent/12 text-accent">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/12 text-primary">
               <Network size={15} />
             </span>
             <div className="min-w-0">
-              <div className="truncate text-[12px] font-semibold text-text">{t('workspaceManager.title')}</div>
-              <div className="truncate text-[10px] text-text-muted">{session.title ?? session.name}</div>
+              <div className="truncate text-[12px] font-semibold text-foreground">{t('workspaceManager.title')}</div>
+              <div className="truncate text-[10px] text-muted-foreground">{session.title ?? session.name}</div>
             </div>
           </div>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-bg px-2 py-1 text-[10px] font-medium text-text-muted">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background px-2 py-1 text-[10px] font-medium text-muted-foreground">
             <Bot size={11} /> {runtimeLabel(session.agent, agents)} · {session.surface === 'webpi' ? 'WebPi' : 'TUI'}
           </span>
         </header>
@@ -181,7 +181,6 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
               sessionId={sessionId}
               renderer={session.agent === 'opencode' ? 'dom' : 'auto'}
               label={`${t('workspaceManager.title')} · ${session.name}`}
-              keyMap={keyMapForAgent(session.agent)}
               onSessionLost={() => void refreshWorkspaceManager()}
             />
           )}
@@ -191,23 +190,23 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
   }
 
   return (
-    <div className="relative h-full overflow-y-auto bg-bg">
+    <div className="relative h-full overflow-y-auto bg-background">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-accent/[0.07] to-transparent" />
-        <div className="absolute -right-24 top-12 h-72 w-72 rounded-full border border-accent/10" />
-        <div className="absolute -right-8 top-28 h-44 w-44 rounded-full border border-accent/10" />
+        <div className="absolute -right-24 top-12 h-72 w-72 rounded-full border border-primary/10" />
+        <div className="absolute -right-8 top-28 h-44 w-44 rounded-full border border-primary/10" />
       </div>
 
       <div className="workspace-manager-layout relative mx-auto flex min-h-full w-full max-w-5xl flex-col px-4 py-6 md:px-8 md:py-10">
         <div className="workspace-manager-hero mb-7 flex flex-col gap-5">
           <div className="max-w-2xl">
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent/[0.07] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-accent">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/[0.07] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-primary">
               <Network size={12} /> {t('workspaceManager.eyebrow')}
             </div>
-            <h1 className="text-2xl font-semibold leading-tight text-text md:text-4xl">
+            <h1 className="text-2xl font-semibold leading-tight text-foreground md:text-4xl">
               {t('workspaceManager.heading')}
             </h1>
-            <p className="mt-3 max-w-xl text-[13px] leading-relaxed text-text-muted md:text-[15px]">
+            <p className="mt-3 max-w-xl text-[13px] leading-relaxed text-muted-foreground md:text-[15px]">
               {t('workspaceManager.subheading')}
             </p>
           </div>
@@ -216,14 +215,14 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
           </div>
         </div>
 
-        <section className="rounded-2xl border border-border/80 bg-bg-secondary/60 p-3 shadow-[0_24px_70px_-58px_var(--color-text)] md:p-4">
+        <section className="rounded-2xl border border-border/80 bg-secondary/60 p-3 shadow-[0_24px_70px_-58px_var(--foreground)] md:p-4">
           <textarea
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={onKeyDown}
             placeholder={t('workspaceManager.placeholder')}
             rows={4}
-            className="min-h-28 w-full resize-none bg-transparent px-1 py-1 text-[14px] leading-relaxed text-text outline-none placeholder:text-text-muted/55 md:text-[15px]"
+            className="min-h-28 w-full resize-none bg-transparent px-1 py-1 text-[14px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/55 md:text-[15px]"
           />
           <div className="workspace-manager-composer-footer mt-3 flex flex-col gap-2 border-t border-border/60 pt-3">
             <div className="workspace-manager-composer-actions flex min-w-0 flex-col gap-2">
@@ -238,7 +237,7 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
                 type="button"
                 onClick={() => void submit()}
                 disabled={!draft.trim() || launching || !launchConfig.credentialSelectionReady}
-                className="oa-pressable inline-flex min-h-9 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-[12px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-45"
+                className="oa-pressable inline-flex min-h-9 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-[12px] font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-45"
               >
                 {launching ? <Loader2 size={14} className="animate-spin" /> : <ArrowUp size={14} />}
                 {launching ? t('workspaceManager.launching') : t('workspaceManager.send')}
@@ -254,13 +253,13 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
         </section>
 
         {(error ?? workspaceManagerError) && (
-          <div className="mt-3 rounded-lg border border-red/25 bg-red/10 px-3 py-2 text-[12px] text-red">
+          <div className="mt-3 rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-[12px] text-destructive">
             {error ?? workspaceManagerError}
           </div>
         )}
 
         <section className="workspace-manager-suggestions-section mt-7 min-w-0">
-          <h2 className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-text-muted/70">
+          <h2 className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">
             {t('workspaceManager.suggestions')}
           </h2>
           <div className="workspace-manager-suggestions grid min-w-0 gap-2">
@@ -271,17 +270,17 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
                   key={suggestion}
                   type="button"
                   onClick={() => setDraft(suggestion)}
-                  className="oa-pressable group flex items-start gap-3 rounded-xl border border-border/70 bg-bg-secondary/45 p-3 text-left hover:border-accent/30 hover:bg-bg-secondary"
+                  className="oa-pressable group flex items-start gap-3 rounded-xl border border-border/70 bg-secondary/45 p-3 text-left hover:border-primary/30 hover:bg-secondary"
                 >
-                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-bg-tertiary text-text-muted group-hover:text-accent">
+                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:text-primary">
                     <Icon size={14} />
                   </span>
-                  <span className="text-[12px] leading-relaxed text-text-muted group-hover:text-text">{suggestion}</span>
+                  <span className="text-[12px] leading-relaxed text-muted-foreground group-hover:text-foreground">{suggestion}</span>
                 </button>
               )
             })}
           </div>
-          <p className="mt-3 text-[11px] leading-relaxed text-text-muted/65">{t('workspaceManager.guardrail')}</p>
+          <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground/65">{t('workspaceManager.guardrail')}</p>
         </section>
       </div>
     </div>
@@ -294,11 +293,11 @@ function runtimeLabel(agentId: string, agents: readonly { id: string; displayNam
 
 function ManagerStat({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-border/70 bg-bg-secondary/55 px-3 py-2.5">
-      <div className="flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.11em] text-text-muted/60">
+    <div className="rounded-xl border border-border/70 bg-secondary/55 px-3 py-2.5">
+      <div className="flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.11em] text-muted-foreground/60">
         <Icon size={11} /> {label}
       </div>
-      <div className="mt-1.5 truncate text-[13px] font-semibold text-text">{value}</div>
+      <div className="mt-1.5 truncate text-[13px] font-semibold text-foreground">{value}</div>
     </div>
   )
 }

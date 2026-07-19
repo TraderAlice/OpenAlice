@@ -121,10 +121,10 @@ jobs:
       - name: Build optional Broker Packs
         run: pnpm broker-packs:build
 
-      # Fail loud if dugite's postinstall was skipped (e.g. dropped from
-      # pnpm.onlyBuiltDependencies) — otherwise node_modules/dugite/git/ is
-      # silently empty and workspace creation breaks at runtime, not build.
+      # macOS still uses dugite's embedded Git. Windows keeps only dugite's JS
+      # wrapper and routes it to managed PortableGit in the packaged smoke.
       - name: Verify bundled git (dugite) was fetched
+        if: runner.os == 'macOS'
         run: |
           node -e "const{existsSync}=require('fs');const{dirname,join}=require('path');const g=join(dirname(require.resolve('dugite/package.json')),'git');if(!existsSync(g)){console.error('dugite embedded git MISSING at '+g);process.exit(1)}console.log('dugite embedded git OK '+g)"
 

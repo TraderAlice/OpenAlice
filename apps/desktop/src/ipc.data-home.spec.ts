@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   handlers: new Map<string, (...args: unknown[]) => unknown>(),
+  readKeyboardInputSourceId: vi.fn(async () => 'com.tencent.inputmethod.wetype.pinyin'),
 }))
 
 vi.mock('electron', () => ({
@@ -11,6 +12,10 @@ vi.mock('electron', () => ({
     }),
     on: vi.fn(),
   },
+}))
+
+vi.mock('./keyboard-input-source.js', () => ({
+  readKeyboardInputSourceId: mocks.readKeyboardInputSourceId,
 }))
 
 import {
@@ -56,6 +61,14 @@ beforeEach(() => {
 })
 
 describe('OpenAlice data-home IPC', () => {
+  it('exposes the bounded keyboard input-source probe', async () => {
+    register()
+
+    await expect(mocks.handlers.get('openalice:keyboard:get-input-source-id')?.(null))
+      .resolves.toBe('com.tencent.inputmethod.wetype.pinyin')
+    expect(mocks.readKeyboardInputSourceId).toHaveBeenCalledOnce()
+  })
+
   it('exposes only the bounded data-home operations', async () => {
     const controller = register()
 

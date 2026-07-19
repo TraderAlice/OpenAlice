@@ -1,18 +1,8 @@
 .workspaces-root {
-  /* Alias the local palette to the global theme tokens so the whole
-     Workspaces surface (session view + sidebar) follows light / dark.
-     `color-scheme` is inherited from :root (per-theme), not pinned dark.
-     The terminal itself is themed separately (xterm ITheme in Terminal.tsx).
-     Remaining hardcoded semantic chips (agent badges, status pills) are
-     tracked in ANG-110. */
-  --bg: var(--color-bg);
-  --panel: var(--color-bg-secondary);
-  --sidebar: var(--color-bg-secondary);
-  --border: var(--color-border);
-  --fg-dim: var(--color-text-muted);
-  --fg: var(--color-text);
-  --accent: var(--color-accent);
-  --danger: var(--color-red);
+  /* Workspaces consumes the same semantic palette as the rest of the app.
+     The terminal canvas remains separately themed through xterm ITheme. */
+  color: var(--foreground);
+  background: var(--background);
 }
 
 .app {
@@ -37,7 +27,7 @@
   overflow: hidden;
   border: 1px dashed var(--border);
   border-radius: 8px;
-  background: var(--panel);
+  background: var(--secondary);
 }
 
 /* Faux-TUI backdrop ------------------------------------------------------- */
@@ -51,8 +41,8 @@
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 13px;
   line-height: 1.6;
-  color: var(--fg);
-  background: var(--panel);
+  color: var(--foreground);
+  background: var(--secondary);
   /* Blur softens individual characters into "text-shaped bands"; the
    * brightness drop pushes it visually to the back layer so the Resume
    * card pops. opacity helps tune presence without crushing color. */
@@ -74,14 +64,14 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #28c840;
+  background: var(--success);
 }
 .resume-tui-titlebar-title {
   flex: 1 1 auto;
   font-weight: 600;
 }
 .resume-tui-titlebar-pid {
-  color: var(--fg-dim);
+  color: var(--muted-foreground);
   font-size: 12px;
 }
 
@@ -90,29 +80,29 @@
   margin: 0 0 14px;
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: var(--color-overlay);
+  background: var(--accent);
 }
 .resume-tui-meta-strong {
   font-weight: 600;
 }
 .resume-tui-meta-dim {
-  color: var(--fg-dim);
+  color: var(--muted-foreground);
 }
 
 .resume-tui-prompt {
   display: flex;
   gap: 10px;
-  background: var(--color-overlay);
+  background: var(--accent);
   padding: 8px 14px;
   margin: 6px 0;
   border-radius: 4px;
 }
 .resume-tui-chev {
-  color: var(--fg-dim);
+  color: var(--muted-foreground);
   flex-shrink: 0;
 }
 .resume-tui-prompt-text {
-  color: var(--fg);
+  color: var(--foreground);
 }
 
 .resume-tui-response {
@@ -122,7 +112,7 @@
   margin: 4px 0;
 }
 .resume-tui-bullet {
-  color: var(--fg);
+  color: var(--foreground);
   flex-shrink: 0;
 }
 .resume-tui-response-body {
@@ -130,7 +120,7 @@
 }
 
 .resume-tui-status {
-  color: var(--fg-dim);
+  color: var(--muted-foreground);
   font-style: italic;
   padding-left: 14px;
   margin: 2px 0 12px;
@@ -149,7 +139,7 @@
   display: inline-block;
   width: 8px;
   height: 14px;
-  background: var(--fg);
+  background: var(--foreground);
   opacity: 0.7;
 }
 
@@ -158,7 +148,7 @@
   justify-content: space-between;
   padding: 6px 14px 0;
   font-size: 12px;
-  color: var(--fg-dim);
+  color: var(--muted-foreground);
 }
 
 /* Foreground Resume card ------------------------------------------------- */
@@ -172,9 +162,9 @@
   /* Subtle vignette pushes the eye to center, where the card lives. */
   background: radial-gradient(
     ellipse at center,
-    rgba(0, 0, 0, 0) 0%,
-    rgba(0, 0, 0, 0.35) 60%,
-    rgba(0, 0, 0, 0.55) 100%
+    transparent 0%,
+    color-mix(in srgb, var(--shadow-color) 35%, transparent) 60%,
+    color-mix(in srgb, var(--shadow-color) 55%, transparent) 100%
   );
 }
 
@@ -186,10 +176,10 @@
   padding: 24px 28px;
   min-width: 320px;
   max-width: 420px;
-  background: var(--bg);
+  background: var(--background);
   border: 1px solid var(--border);
   border-radius: 10px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 8px 32px color-mix(in srgb, var(--shadow-color) 40%, transparent);
 }
 
 .resume-cta-card-header {
@@ -214,12 +204,12 @@
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 16px;
   font-weight: 600;
-  color: var(--fg);
+  color: var(--foreground);
 }
 
 .resume-cta-state {
   font-size: 11px;
-  color: var(--fg-dim);
+  color: var(--muted-foreground);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -235,11 +225,11 @@
   font-size: 12px;
 }
 .resume-cta-meta dt {
-  color: var(--fg-dim);
+  color: var(--muted-foreground);
   margin: 0;
 }
 .resume-cta-meta dd {
-  color: var(--fg);
+  color: var(--foreground);
   margin: 0;
   font-variant-numeric: tabular-nums;
 }
@@ -253,8 +243,8 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: var(--accent);
-  color: var(--bg);
+  background: var(--primary);
+  color: var(--primary-foreground);
   border: 0;
   padding: 10px 20px;
   border-radius: 6px;
@@ -284,7 +274,7 @@
 
 .resume-cta-hint {
   margin: 0;
-  color: var(--fg-dim);
+  color: var(--muted-foreground);
   font-size: 11px;
   font-style: italic;
   text-align: center;
@@ -302,12 +292,12 @@
 .empty-pane {
   margin: auto;
   text-align: center;
-  color: var(--fg-dim);
+  color: var(--muted-foreground);
 }
 .empty-pane h2 {
   font-weight: 500;
   margin-bottom: 4px;
-  color: var(--fg);
+  color: var(--foreground);
 }
 
 /* ── Workspace view (terminal + side panels) ──────────────────────────────── */
@@ -344,8 +334,8 @@
     inset: 0 0 0 auto;
     width: min(360px, 100%);
     z-index: 10;
-    background: var(--color-bg);
-    box-shadow: -18px 0 36px -28px rgba(0, 0, 0, 0.65);
+    background: var(--background);
+    box-shadow: -18px 0 36px -28px color-mix(in srgb, var(--shadow-color) 65%, transparent);
   }
 }
 
@@ -381,167 +371,365 @@
   z-index: -1;
 }
 
-/* ── "No session pinned" CTA (shown when sessionId is null) ──────────────── */
+/* ── Workspace Session library (shown when no Session is pinned) ──────────── */
 
-.workspace-cta {
+.workspace-session-library {
+  display: flex;
   flex: 1 1 auto;
-  display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  border: 1px dashed var(--border);
-  border-radius: 8px;
-  background: var(--panel);
-  padding: 24px;
+  width: min(820px, 100%);
+  min-height: 0;
+  margin: 0 auto;
+  padding: clamp(22px, 4vw, 44px) clamp(18px, 4vw, 40px) 24px;
 }
 
-.workspace-cta-text {
-  margin: 0;
-  color: var(--fg-dim);
-  font-size: 13px;
+.workspace-session-library-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 18px;
 }
 
-.workspace-cta-btn {
-  background: var(--accent);
-  color: var(--bg);
-  border: 0;
-  padding: 8px 18px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.workspace-cta-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.workspace-cta-hint {
-  margin: 0;
-  color: var(--fg-dim);
-  font-size: 11px;
-}
-.workspace-cta-hint kbd {
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  background: var(--color-overlay-strong);
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  padding: 0 4px;
-  font-size: 10px;
-}
-
-/* Empty state with session list. Rendered in the main pane when no
-   session is pinned AND the workspace has 1+ existing sessions.
-   Pushes "Continue an existing session" over "Start a new one" since
-   inbox jumps almost always want continuity, not fresh spawn. */
-.workspace-empty-state {
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  padding: 32px 24px;
-  overflow-y: auto;
-}
-.workspace-empty-heading {
-  margin: 0 0 6px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--fg);
-  letter-spacing: 0.2px;
-}
-.workspace-empty-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: 100%;
-  max-width: 520px;
-}
-.workspace-empty-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  transition: border-color 0.12s, background 0.12s;
-}
-.workspace-empty-card:hover {
-  border-color: var(--accent);
-  background: var(--panel);
-}
-.workspace-empty-card-meta {
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 auto;
+.workspace-session-library-copy {
   min-width: 0;
 }
-.workspace-empty-card-name {
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--fg);
-}
-.workspace-empty-card-state {
-  font-size: 10px;
-  color: var(--fg-dim);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-.workspace-empty-card-btn {
-  display: inline-flex;
+
+.workspace-session-library-title-line {
+  display: flex;
   align-items: center;
-  gap: 6px;
-  background: var(--accent);
-  color: var(--bg);
-  border: 0;
-  padding: 6px 12px;
-  border-radius: 5px;
+  gap: 8px;
+}
+
+.workspace-session-library-title-line h2 {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.workspace-session-library-count,
+.workspace-session-filter-count {
+  font-variant-numeric: tabular-nums;
+}
+
+.workspace-session-library-count {
+  display: inline-flex;
+  min-width: 22px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--secondary);
+  color: var(--muted-foreground);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.workspace-session-library-copy p {
+  margin: 5px 0 0;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.workspace-session-new {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 7px 12px;
+  border: 1px solid var(--primary);
+  border-radius: 7px;
+  background: var(--primary);
+  color: var(--primary-foreground);
   font-size: 12px;
   font-weight: 600;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: filter 0.12s;
 }
-.workspace-empty-card-btn:hover {
-  filter: brightness(1.1);
-}
-.workspace-empty-divider {
+
+.workspace-session-toolbar {
   display: flex;
   align-items: center;
   gap: 10px;
-  width: 100%;
-  max-width: 520px;
-  margin: 6px 0 2px;
-  color: var(--fg-dim);
-  font-size: 11px;
+  padding: 11px;
+  border: 1px solid var(--border);
+  border-bottom: 0;
+  border-radius: 9px 9px 0 0;
+  background: color-mix(in srgb, var(--secondary) 68%, transparent);
 }
-.workspace-empty-divider::before,
-.workspace-empty-divider::after {
-  content: "";
-  flex: 1 1 auto;
-  height: 1px;
-  background: var(--border);
-}
-.workspace-empty-secondary-btn {
-  background: transparent;
-  color: var(--fg-dim);
-  border: 1px dashed var(--border);
-  padding: 6px 14px;
+
+.workspace-session-search {
+  display: flex;
+  flex: 1 1 230px;
+  min-width: 150px;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
   border-radius: 6px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: color 0.12s, border-color 0.12s;
+  background: var(--background);
+  color: var(--muted-foreground);
 }
-.workspace-empty-secondary-btn:hover {
-  color: var(--fg);
-  border-color: var(--fg-dim);
+
+.workspace-session-search:focus-within {
+  border-color: color-mix(in srgb, var(--primary) 65%, var(--border));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 10%, transparent);
+}
+
+.workspace-session-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-size: 12px;
+}
+
+.workspace-session-search input::placeholder {
+  color: var(--muted-foreground);
+  opacity: 0.75;
+}
+
+.workspace-session-filters {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--muted) 70%, transparent);
+}
+
+.workspace-session-filters button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 26px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: 10.5px;
+}
+
+.workspace-session-filters button[aria-pressed="true"] {
+  background: var(--background);
+  color: var(--foreground);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--foreground) 10%, transparent);
+}
+
+.workspace-session-filter-count {
+  color: var(--muted-foreground);
+  opacity: 0.7;
+}
+
+.workspace-session-results {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 0 0 9px 9px;
+  background: var(--background);
+}
+
+.workspace-session-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.workspace-session-list > li + li {
+  border-top: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
+}
+
+.workspace-session-row {
+  display: grid;
+  width: 100%;
+  min-height: 60px;
+  grid-template-columns: 28px minmax(0, 1fr) auto 18px;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 13px;
+  border: 0;
+  background: transparent;
+  color: var(--foreground);
+  text-align: left;
+}
+
+.workspace-session-row:hover,
+.workspace-session-row:focus-visible {
+  background: color-mix(in srgb, var(--primary) 6%, var(--secondary));
+}
+
+.workspace-session-row:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--primary) 70%, transparent);
+  outline-offset: -2px;
+}
+
+.workspace-session-agent {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.workspace-session-row-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.workspace-session-row-title {
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 12.5px;
+  font-weight: 590;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-session-row-meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  color: var(--muted-foreground);
+  font-size: 10px;
+  line-height: 1.2;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.workspace-session-row-meta > span + span::before {
+  content: "·";
+  margin-right: 6px;
+  color: color-mix(in srgb, var(--muted-foreground) 48%, transparent);
+}
+
+.workspace-session-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted-foreground);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.workspace-session-state > span {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--muted-foreground);
+}
+
+.workspace-session-state.is-running {
+  border-color: color-mix(in srgb, var(--success) 32%, var(--border));
+  color: var(--success);
+}
+
+.workspace-session-state.is-running > span {
+  background: var(--success);
+}
+
+.workspace-session-open-icon {
+  color: var(--muted-foreground);
+  opacity: 0.45;
+}
+
+.workspace-session-row:hover .workspace-session-open-icon,
+.workspace-session-row:focus-visible .workspace-session-open-icon {
+  color: var(--primary);
+  opacity: 1;
+}
+
+.workspace-session-zero,
+.workspace-session-no-results {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 180px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px dashed var(--border);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--secondary) 54%, transparent);
+  color: var(--muted-foreground);
+  text-align: center;
+}
+
+.workspace-session-no-results {
+  min-height: 140px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.workspace-session-zero p,
+.workspace-session-no-results p {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 550;
+}
+
+.workspace-session-zero span,
+.workspace-session-no-results span {
+  font-size: 10.5px;
+}
+
+@container (max-width: 680px) {
+  .workspace-session-library {
+    padding: 18px 12px 14px;
+  }
+
+  .workspace-session-library-header,
+  .workspace-session-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .workspace-session-new {
+    justify-content: center;
+  }
+
+  .workspace-session-search {
+    flex-basis: auto;
+  }
+
+  .workspace-session-filters {
+    align-self: flex-start;
+  }
+
+  .workspace-session-row {
+    grid-template-columns: 28px minmax(0, 1fr) 16px;
+  }
+
+  .workspace-session-state {
+    display: none;
+  }
 }
 
 .workspace-side {
@@ -566,7 +754,7 @@
 .panel {
   display: flex;
   flex-direction: column;
-  background: var(--panel);
+  background: var(--secondary);
   border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
@@ -578,10 +766,10 @@
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: linear-gradient(180deg, var(--color-bg-tertiary), var(--color-bg-secondary));
+  background: linear-gradient(180deg, var(--muted), var(--secondary));
   border-bottom: 1px solid var(--border);
   font-size: 11px;
-  color: var(--fg-dim);
+  color: var(--muted-foreground);
   user-select: none;
   flex: 0 0 auto;
 }
@@ -602,14 +790,14 @@
   background: none;
   border: 0;
   border-radius: 3px;
-  color: var(--fg-dim);
+  color: var(--muted-foreground);
   cursor: pointer;
   flex: 0 0 auto;
   transition: background 0.12s, color 0.12s;
 }
 .panel-collapse:hover {
-  background: var(--color-overlay-strong);
-  color: var(--fg);
+  background: var(--accent-strong);
+  color: var(--foreground);
 }
 
 .panel-collapse-chev {
@@ -623,25 +811,25 @@
   text-transform: uppercase;
   letter-spacing: 0.6px;
   font-weight: 600;
-  color: var(--fg);
+  color: var(--foreground);
 }
 
 .panel-pill {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 11px;
-  background: rgba(121, 192, 255, 0.12);
-  color: var(--accent);
+  background: color-mix(in srgb, var(--info) 12%, transparent);
+  color: var(--info);
   padding: 2px 8px;
   border-radius: 10px;
 }
 .panel-pill-dirty {
-  background: rgba(210, 153, 34, 0.16);
-  color: #d29922;
+  background: color-mix(in srgb, var(--warning) 16%, transparent);
+  color: var(--warning);
 }
 
 .panel-error {
   padding: 8px 12px;
-  color: var(--danger);
+  color: var(--destructive);
   font-size: 12px;
   border-bottom: 1px solid var(--border);
 }
@@ -649,7 +837,7 @@
 .panel-empty {
   padding: 12px;
   text-align: center;
-  color: var(--fg-dim);
+  color: var(--muted-foreground);
   font-size: 12px;
 }
 
@@ -688,48 +876,48 @@
   border: 1px solid transparent;
 }
 .git-status-badge.is-untracked {
-  background: rgba(110, 118, 129, 0.18);
-  color: var(--fg-dim);
-  border-color: rgba(110, 118, 129, 0.25);
+  background: color-mix(in srgb, var(--muted-foreground) 18%, transparent);
+  color: var(--muted-foreground);
+  border-color: color-mix(in srgb, var(--muted-foreground) 25%, transparent);
 }
 .git-status-badge.is-modified {
-  background: rgba(210, 153, 34, 0.16);
-  color: #d29922;
-  border-color: rgba(210, 153, 34, 0.25);
+  background: color-mix(in srgb, var(--warning) 16%, transparent);
+  color: var(--warning);
+  border-color: color-mix(in srgb, var(--warning) 25%, transparent);
 }
 .git-status-badge.is-staged {
-  background: rgba(126, 231, 135, 0.16);
-  color: #7ee787;
-  border-color: rgba(126, 231, 135, 0.25);
+  background: color-mix(in srgb, var(--success) 16%, transparent);
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 25%, transparent);
 }
 .git-status-badge.is-deleted {
-  background: rgba(255, 123, 114, 0.16);
-  color: var(--danger);
-  border-color: rgba(255, 123, 114, 0.28);
+  background: color-mix(in srgb, var(--destructive) 16%, transparent);
+  color: var(--destructive);
+  border-color: color-mix(in srgb, var(--destructive) 28%, transparent);
 }
 .git-status-badge.is-renamed {
-  background: rgba(121, 192, 255, 0.16);
-  color: var(--accent);
-  border-color: rgba(121, 192, 255, 0.25);
+  background: color-mix(in srgb, var(--info) 16%, transparent);
+  color: var(--info);
+  border-color: color-mix(in srgb, var(--info) 25%, transparent);
 }
 .git-status-badge.is-conflict {
-  background: rgba(255, 123, 114, 0.22);
-  color: #ff7b72;
-  border-color: rgba(255, 123, 114, 0.4);
+  background: color-mix(in srgb, var(--destructive) 22%, transparent);
+  color: var(--destructive);
+  border-color: color-mix(in srgb, var(--destructive) 40%, transparent);
   font-weight: 600;
 }
 .git-status-badge.is-ignored {
-  background: rgba(110, 118, 129, 0.10);
-  color: var(--fg-dim);
+  background: color-mix(in srgb, var(--muted-foreground) 10%, transparent);
+  color: var(--muted-foreground);
   opacity: 0.7;
 }
 .git-status-badge.is-unknown {
-  background: rgba(110, 118, 129, 0.10);
-  color: var(--fg-dim);
+  background: color-mix(in srgb, var(--muted-foreground) 10%, transparent);
+  color: var(--muted-foreground);
 }
 
 .git-status-path {
-  color: var(--fg);
+  color: var(--foreground);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -755,19 +943,19 @@
   align-items: baseline;
 }
 .git-log-row:hover {
-  background: var(--color-overlay);
+  background: var(--accent);
 }
 
 .git-log-hash {
-  color: var(--accent);
+  color: var(--primary);
 }
 .git-log-time {
-  color: var(--fg-dim);
+  color: var(--muted-foreground);
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
 .git-log-subject {
-  color: var(--fg);
+  color: var(--foreground);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -788,17 +976,17 @@
 .files-crumb {
   background: none;
   border: 0;
-  color: var(--accent);
+  color: var(--primary);
   padding: 2px 4px;
   cursor: pointer;
   font: inherit;
 }
 .files-crumb:disabled {
-  color: var(--fg);
+  color: var(--foreground);
   cursor: default;
 }
 .files-crumb-sep {
-  color: var(--fg-dim);
+  color: var(--muted-foreground);
 }
 
 .files-list {
@@ -825,26 +1013,26 @@
 }
 .files-row.files-dir:hover,
 .files-row.files-symlink:hover {
-  background: var(--color-overlay);
+  background: var(--accent);
 }
 
 .files-icon {
   text-align: center;
   font-size: 11px;
-  color: var(--fg-dim);
+  color: var(--muted-foreground);
 }
 .files-name {
-  color: var(--fg);
+  color: var(--foreground);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .files-row.files-dir .files-name,
 .files-row.files-symlink .files-name {
-  color: var(--accent);
+  color: var(--primary);
 }
 .files-meta {
-  color: var(--fg-dim);
+  color: var(--muted-foreground);
   font-variant-numeric: tabular-nums;
   font-size: 11px;
 }
@@ -862,8 +1050,8 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
-  background: var(--panel);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  background: var(--secondary);
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--shadow-color) 35%, transparent);
 }
 
 .terminal-header {
@@ -873,10 +1061,10 @@
   overflow: hidden;
   gap: 10px;
   padding: 8px 12px;
-  background: linear-gradient(180deg, var(--color-bg-tertiary), var(--color-bg-secondary));
+  background: linear-gradient(180deg, var(--muted), var(--secondary));
   border-bottom: 1px solid var(--border);
   font-size: 12px;
-  color: var(--fg-dim);
+  color: var(--muted-foreground);
   user-select: none;
 }
 
@@ -885,7 +1073,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--fg);
+  color: var(--foreground);
   font-weight: 600;
   letter-spacing: 0.2px;
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
@@ -905,50 +1093,15 @@
   padding: 0 8px;
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: var(--color-bg-secondary);
-  color: var(--fg);
+  background: var(--secondary);
+  color: var(--foreground);
   font-size: 11px;
   line-height: 22px;
 }
 
 .terminal-header-action:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.terminal-theme-switch {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  height: 24px;
-  padding: 2px;
-  gap: 1px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--color-bg-secondary);
-}
-
-.terminal-theme-option {
-  width: 22px;
-  height: 18px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-radius: 4px;
-  color: var(--fg-dim);
-  background: transparent;
-  cursor: pointer;
-}
-
-.terminal-theme-option:hover {
-  color: var(--fg);
-  background: var(--color-overlay);
-}
-
-.terminal-theme-option.active {
-  color: var(--accent);
-  background: var(--color-overlay-strong);
+  border-color: var(--primary);
+  color: var(--primary);
 }
 
 .status-dot {
@@ -964,7 +1117,7 @@
   min-height: 0;
   padding: 8px 8px 4px;
   overflow: hidden;
-  background: var(--bg);
+  background: var(--background);
 }
 
 .terminal-host {
@@ -1001,8 +1154,8 @@
 }
 
 .resume-cta-btn.is-webpi {
-  background: color-mix(in srgb, var(--color-accent) 13%, var(--color-bg-secondary));
-  color: var(--color-text);
+  background: color-mix(in srgb, var(--primary) 13%, var(--secondary));
+  color: var(--foreground);
 }
 
 /* WebPi is deliberately a surface inside the existing terminal slot. */
@@ -1013,10 +1166,10 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  color: var(--color-text);
+  color: var(--foreground);
   background:
-    radial-gradient(circle at 50% -20%, color-mix(in srgb, var(--color-accent) 8%, transparent), transparent 38%),
-    var(--color-bg);
+    radial-gradient(circle at 50% -20%, color-mix(in srgb, var(--primary) 8%, transparent), transparent 38%),
+    var(--background);
 }
 
 .webpi-header {
@@ -1026,16 +1179,16 @@
   justify-content: space-between;
   gap: 16px;
   padding: 10px 18px;
-  border-bottom: 1px solid var(--color-border);
-  background: color-mix(in srgb, var(--color-bg-secondary) 72%, transparent);
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--secondary) 72%, transparent);
 }
 
 .webpi-title { font-size: 13px; font-weight: 650; }
-.webpi-title span { margin-left: 7px; color: var(--color-text-muted); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; }
-.webpi-subtitle { margin-top: 2px; color: var(--color-text-muted); font-size: 10px; }
-.webpi-phase { display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px; border: 1px solid var(--color-border); border-radius: 999px; color: var(--color-text-muted); font-size: 10px; text-transform: capitalize; }
-.webpi-phase.is-working, .webpi-phase.is-retrying, .webpi-phase.is-compacting { color: var(--color-accent); }
-.webpi-phase.is-failed { color: var(--color-danger, #d65c5c); }
+.webpi-title span { margin-left: 7px; color: var(--muted-foreground); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; }
+.webpi-subtitle { margin-top: 2px; color: var(--muted-foreground); font-size: 10px; }
+.webpi-phase { display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted-foreground); font-size: 10px; text-transform: capitalize; }
+.webpi-phase.is-working, .webpi-phase.is-retrying, .webpi-phase.is-compacting { color: var(--primary); }
+.webpi-phase.is-failed { color: var(--destructive); }
 
 .webpi-messages {
   flex: 1;
@@ -1045,29 +1198,29 @@
   scrollbar-gutter: stable;
 }
 
-.webpi-empty { padding: 12vh 16px; text-align: center; color: var(--color-text-muted); font-size: 13px; }
+.webpi-empty { padding: 12vh 16px; text-align: center; color: var(--muted-foreground); font-size: 13px; }
 .webpi-message { display: flex; align-items: flex-start; margin: 0 0 26px; }
 .webpi-message.is-user { justify-content: flex-end; margin-left: 12%; }
 .webpi-message-body { flex: 1; min-width: 0; font-size: 13px; line-height: 1.65; }
-.webpi-message.is-user .webpi-message-body { flex: 0 1 auto; max-width: min(88%, 760px); padding: 10px 13px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-bg-secondary); }
+.webpi-message.is-user .webpi-message-body { flex: 0 1 auto; max-width: min(88%, 760px); padding: 10px 13px; border: 1px solid var(--border); border-radius: 12px; background: var(--secondary); }
 .webpi-message.is-turn .webpi-message-body { display: grid; gap: 12px; }
-.webpi-progress-text { color: color-mix(in srgb, var(--color-text) 88%, var(--color-text-muted)); }
-.webpi-final-text { color: var(--color-text); }
+.webpi-progress-text { color: color-mix(in srgb, var(--foreground) 88%, var(--muted-foreground)); }
+.webpi-final-text { color: var(--foreground); }
 .webpi-content-parts > * + * { margin-top: 9px; }
-.webpi-detail { padding: 6px 9px; border-left: 2px solid var(--color-border); color: var(--color-text-muted); font-size: 11px; }
+.webpi-detail { padding: 6px 9px; border-left: 2px solid var(--border); color: var(--muted-foreground); font-size: 11px; }
 .webpi-detail summary { cursor: pointer; user-select: none; font-weight: 600; }
 .webpi-detail pre, .webpi-unknown { margin-top: 6px; max-height: 220px; overflow: auto; white-space: pre-wrap; font: 10px/1.5 var(--font-mono, monospace); }
 
 .webpi-activity {
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--color-border) 88%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
   border-radius: 10px;
-  background: color-mix(in srgb, var(--color-bg-secondary) 54%, transparent);
+  background: color-mix(in srgb, var(--secondary) 54%, transparent);
   transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
 }
-.webpi-activity:hover { border-color: color-mix(in srgb, var(--color-accent) 24%, var(--color-border)); }
-.webpi-activity[open] { background: color-mix(in srgb, var(--color-bg-secondary) 72%, transparent); box-shadow: 0 8px 24px color-mix(in srgb, #000 5%, transparent); }
-.webpi-activity.is-error { border-color: color-mix(in srgb, #d65c5c 48%, var(--color-border)); }
+.webpi-activity:hover { border-color: color-mix(in srgb, var(--primary) 24%, var(--border)); }
+.webpi-activity[open] { background: color-mix(in srgb, var(--secondary) 72%, transparent); box-shadow: 0 8px 24px color-mix(in srgb, var(--shadow-color) 5%, transparent); }
+.webpi-activity.is-error { border-color: color-mix(in srgb, var(--destructive) 48%, var(--border)); }
 .webpi-activity > summary,
 .webpi-tool-step > summary,
 .webpi-reasoning > summary {
@@ -1084,58 +1237,58 @@
   align-items: center;
   gap: 8px;
   padding: 7px 10px;
-  color: var(--color-text-muted);
+  color: var(--muted-foreground);
   font-size: 11px;
 }
-.webpi-activity-status { width: 18px; height: 18px; flex: 0 0 18px; display: grid; place-items: center; border-radius: 6px; color: color-mix(in srgb, var(--color-text-muted) 82%, transparent); background: color-mix(in srgb, var(--color-border) 42%, transparent); }
-.webpi-activity.is-running .webpi-activity-status { color: var(--color-accent); background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
-.webpi-activity.is-error .webpi-activity-status { color: #d65c5c; background: color-mix(in srgb, #d65c5c 10%, transparent); }
-.webpi-activity-title { flex: 0 0 auto; color: color-mix(in srgb, var(--color-text) 88%, var(--color-text-muted)); font-weight: 650; }
+.webpi-activity-status { width: 18px; height: 18px; flex: 0 0 18px; display: grid; place-items: center; border-radius: 6px; color: color-mix(in srgb, var(--muted-foreground) 82%, transparent); background: color-mix(in srgb, var(--border) 42%, transparent); }
+.webpi-activity.is-running .webpi-activity-status { color: var(--primary); background: color-mix(in srgb, var(--primary) 10%, transparent); }
+.webpi-activity.is-error .webpi-activity-status { color: var(--destructive); background: color-mix(in srgb, var(--destructive) 10%, transparent); }
+.webpi-activity-title { flex: 0 0 auto; color: color-mix(in srgb, var(--foreground) 88%, var(--muted-foreground)); font-weight: 650; }
 .webpi-activity-meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 10px/1.4 var(--font-mono, monospace); }
 .webpi-disclosure { flex: 0 0 auto; margin-left: auto; transition: transform 150ms ease; }
 .webpi-activity[open] > summary .webpi-disclosure,
 .webpi-tool-step[open] > summary .webpi-disclosure { transform: rotate(90deg); }
-.webpi-activity-body { border-top: 1px solid color-mix(in srgb, var(--color-border) 84%, transparent); padding: 3px 10px 7px; }
+.webpi-activity-body { border-top: 1px solid color-mix(in srgb, var(--border) 84%, transparent); padding: 3px 10px 7px; }
 .webpi-activity[open] > .webpi-activity-body,
 .webpi-tool-step[open] > .webpi-step-detail { animation: webpi-detail-reveal 150ms ease-out both; }
 
-.webpi-tool-step { border-bottom: 1px solid color-mix(in srgb, var(--color-border) 68%, transparent); }
+.webpi-tool-step { border-bottom: 1px solid color-mix(in srgb, var(--border) 68%, transparent); }
 .webpi-tool-step:last-of-type { border-bottom: 0; }
-.webpi-tool-step > summary { min-height: 38px; display: grid; grid-template-columns: 18px minmax(58px, auto) minmax(0, 1fr) auto 14px; align-items: center; gap: 8px; padding: 6px 1px; color: var(--color-text-muted); }
-.webpi-tool-step > summary:hover { color: var(--color-text); }
-.webpi-step-status { width: 18px; height: 18px; display: grid; place-items: center; color: color-mix(in srgb, var(--color-text-muted) 70%, transparent); }
-.webpi-tool-step.is-running .webpi-step-status { color: var(--color-accent); }
-.webpi-tool-step.is-failed .webpi-step-status { color: #d65c5c; }
-.webpi-tool-step > summary code { overflow: hidden; color: color-mix(in srgb, var(--color-text) 90%, var(--color-text-muted)); font: 600 10px/1.4 var(--font-mono, monospace); text-overflow: ellipsis; }
+.webpi-tool-step > summary { min-height: 38px; display: grid; grid-template-columns: 18px minmax(58px, auto) minmax(0, 1fr) auto 14px; align-items: center; gap: 8px; padding: 6px 1px; color: var(--muted-foreground); }
+.webpi-tool-step > summary:hover { color: var(--foreground); }
+.webpi-step-status { width: 18px; height: 18px; display: grid; place-items: center; color: color-mix(in srgb, var(--muted-foreground) 70%, transparent); }
+.webpi-tool-step.is-running .webpi-step-status { color: var(--primary); }
+.webpi-tool-step.is-failed .webpi-step-status { color: var(--destructive); }
+.webpi-tool-step > summary code { overflow: hidden; color: color-mix(in srgb, var(--foreground) 90%, var(--muted-foreground)); font: 600 10px/1.4 var(--font-mono, monospace); text-overflow: ellipsis; }
 .webpi-step-summary { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
-.webpi-step-size { white-space: nowrap; color: color-mix(in srgb, var(--color-text-muted) 72%, transparent); font: 9px/1.4 var(--font-mono, monospace); }
+.webpi-step-size { white-space: nowrap; color: color-mix(in srgb, var(--muted-foreground) 72%, transparent); font: 9px/1.4 var(--font-mono, monospace); }
 .webpi-tool-step > summary .webpi-disclosure { margin-left: 0; }
-.webpi-step-detail { display: grid; gap: 9px; margin: 0 0 8px 26px; padding: 9px 10px; border: 1px solid color-mix(in srgb, var(--color-border) 76%, transparent); border-radius: 8px; background: color-mix(in srgb, var(--color-bg) 64%, transparent); }
+.webpi-step-detail { display: grid; gap: 9px; margin: 0 0 8px 26px; padding: 9px 10px; border: 1px solid color-mix(in srgb, var(--border) 76%, transparent); border-radius: 8px; background: color-mix(in srgb, var(--background) 64%, transparent); }
 .webpi-step-detail section { min-width: 0; }
-.webpi-step-detail h4 { margin: 0 0 5px; color: var(--color-text-muted); font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-.webpi-step-detail pre { max-height: 230px; margin: 0; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: color-mix(in srgb, var(--color-text) 88%, var(--color-text-muted)); font: 10px/1.5 var(--font-mono, monospace); }
+.webpi-step-detail h4 { margin: 0 0 5px; color: var(--muted-foreground); font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.webpi-step-detail pre { max-height: 230px; margin: 0; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: color-mix(in srgb, var(--foreground) 88%, var(--muted-foreground)); font: 10px/1.5 var(--font-mono, monospace); }
 .webpi-step-result { max-height: 320px; overflow: auto; font-size: 11px; }
 
-.webpi-reasoning { color: var(--color-text-muted); }
+.webpi-reasoning { color: var(--muted-foreground); }
 .webpi-reasoning > summary { width: fit-content; padding: 7px 1px; font-size: 10px; font-weight: 600; }
-.webpi-reasoning > summary:hover { color: var(--color-text); }
-.webpi-reasoning-notes { display: grid; gap: 8px; margin: 0 0 7px; padding: 8px 10px; border-left: 2px solid color-mix(in srgb, var(--color-accent) 24%, var(--color-border)); color: color-mix(in srgb, var(--color-text) 82%, var(--color-text-muted)); font-size: 10px; }
+.webpi-reasoning > summary:hover { color: var(--foreground); }
+.webpi-reasoning-notes { display: grid; gap: 8px; margin: 0 0 7px; padding: 8px 10px; border-left: 2px solid color-mix(in srgb, var(--primary) 24%, var(--border)); color: color-mix(in srgb, var(--foreground) 82%, var(--muted-foreground)); font-size: 10px; }
 .webpi-reasoning pre { max-height: 220px; margin: 0 0 7px; overflow: auto; white-space: pre-wrap; font: 10px/1.5 var(--font-mono, monospace); }
 
-.webpi-error { display: grid; gap: 7px; margin: 20px 0; padding: 13px; border: 1px solid color-mix(in srgb, #d65c5c 50%, var(--color-border)); border-radius: 10px; color: #d65c5c; font-size: 12px; }
-.webpi-error button { width: fit-content; color: var(--color-text); text-decoration: underline; }
-.webpi-compaction-status { display: flex; align-items: flex-start; gap: 9px; margin: 0 max(18px, calc((100% - 760px) / 2)) 10px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--color-accent) 34%, var(--color-border)); border-radius: 10px; color: var(--color-accent); background: color-mix(in srgb, var(--color-accent) 7%, var(--color-bg-secondary)); }
+.webpi-error { display: grid; gap: 7px; margin: 20px 0; padding: 13px; border: 1px solid color-mix(in srgb, var(--destructive) 50%, var(--border)); border-radius: 10px; color: var(--destructive); font-size: 12px; }
+.webpi-error button { width: fit-content; color: var(--foreground); text-decoration: underline; }
+.webpi-compaction-status { display: flex; align-items: flex-start; gap: 9px; margin: 0 max(18px, calc((100% - 760px) / 2)) 10px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--primary) 34%, var(--border)); border-radius: 10px; color: var(--primary); background: color-mix(in srgb, var(--primary) 7%, var(--secondary)); }
 .webpi-compaction-status > svg { flex: 0 0 auto; margin-top: 2px; }
 .webpi-compaction-status > div { display: grid; gap: 2px; min-width: 0; }
-.webpi-compaction-status strong { color: var(--color-text); font-size: 11px; font-weight: 650; }
-.webpi-compaction-status span { color: var(--color-text-muted); font-size: 10px; line-height: 1.45; }
-.webpi-composer-wrap { padding: 10px max(18px, calc((100% - 760px) / 2)) 14px; border-top: 1px solid var(--color-border); background: color-mix(in srgb, var(--color-bg) 88%, transparent); }
-.webpi-composer { display: flex; align-items: flex-end; gap: 8px; padding: 9px 10px 9px 13px; border: 1px solid var(--color-border); border-radius: 14px; background: var(--color-bg-secondary); box-shadow: 0 6px 24px color-mix(in srgb, #000 9%, transparent); }
-.webpi-composer:focus-within { border-color: color-mix(in srgb, var(--color-accent) 60%, var(--color-border)); }
-.webpi-composer textarea { flex: 1; min-height: 25px; max-height: 150px; resize: none; border: 0; outline: 0; color: var(--color-text); background: transparent; font: inherit; font-size: 13px; line-height: 1.6; }
-.webpi-send { width: 30px; height: 30px; flex: 0 0 30px; display: grid; place-items: center; border-radius: 9px; color: white; background: var(--color-accent); }
+.webpi-compaction-status strong { color: var(--foreground); font-size: 11px; font-weight: 650; }
+.webpi-compaction-status span { color: var(--muted-foreground); font-size: 10px; line-height: 1.45; }
+.webpi-composer-wrap { padding: 10px max(18px, calc((100% - 760px) / 2)) 14px; border-top: 1px solid var(--border); background: color-mix(in srgb, var(--background) 88%, transparent); }
+.webpi-composer { display: flex; align-items: flex-end; gap: 8px; padding: 9px 10px 9px 13px; border: 1px solid var(--border); border-radius: 14px; background: var(--secondary); box-shadow: 0 6px 24px color-mix(in srgb, var(--shadow-color) 9%, transparent); }
+.webpi-composer:focus-within { border-color: color-mix(in srgb, var(--primary) 60%, var(--border)); }
+.webpi-composer textarea { flex: 1; min-height: 25px; max-height: 150px; resize: none; border: 0; outline: 0; color: var(--foreground); background: transparent; font: inherit; font-size: 13px; line-height: 1.6; }
+.webpi-send { width: 30px; height: 30px; flex: 0 0 30px; display: grid; place-items: center; border-radius: 9px; color: var(--primary-foreground); background: var(--primary); }
 .webpi-send:disabled { opacity: .35; }
-.webpi-composer-hint { padding: 5px 3px 0; text-align: right; color: var(--color-text-muted); font-size: 9px; }
+.webpi-composer-hint { padding: 5px 3px 0; text-align: right; color: var(--muted-foreground); font-size: 9px; }
 
 @keyframes webpi-detail-reveal {
   from { opacity: 0; transform: translateY(-3px); }

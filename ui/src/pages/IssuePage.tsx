@@ -24,7 +24,7 @@ export function IssuePage() {
             onClick={() => openOrFocus({ kind: 'settings', params: { category: 'issues' } })}
             title="Issue settings"
             aria-label="Issue settings"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-bg-secondary text-muted transition-colors hover:border-accent/50 hover:text-text"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-secondary text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
           >
             <Settings size={15} aria-hidden />
           </button>

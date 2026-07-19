@@ -117,6 +117,7 @@ export function buildPackagedToolchainSmokePlan(packageResult) {
     const gitExe = join(gitRoot, git.gitBin)
     const bashExe = join(gitRoot, git.shellPath)
     const shExe = join(gitRoot, git.shPath)
+    const dugiteEntry = join(packageResult.appRoot, 'node_modules', 'dugite', 'build', 'lib', 'index.js')
     const workspaceCliDir = join(packageResult.appRoot, 'src', 'workspaces', 'cli', 'bin')
     const toolchainPath = (Array.isArray(git.toolchainPaths) ? git.toolchainPaths : ['cmd', 'bin', 'usr/bin'])
       .map((entry) => join(gitRoot, entry))
@@ -135,6 +136,44 @@ export function buildPackagedToolchainSmokePlan(packageResult) {
       command: gitExe,
       args: ['--version'],
       expectStdout: /^git version /m,
+    })
+    const dugiteProbe = `
+const { mkdtempSync, rmSync, writeFileSync } = require('node:fs')
+const { tmpdir } = require('node:os')
+const { join } = require('node:path')
+const { exec } = require(${JSON.stringify(dugiteEntry)})
+const root = mkdtempSync(join(tmpdir(), 'openalice-dugite-portable-git-'))
+const run = async (args) => {
+  const result = await exec(args, root)
+  if (result.exitCode !== 0) {
+    throw new Error('git ' + args.join(' ') + ' failed: ' + String(result.stderr).slice(0, 500))
+  }
+  return result
+}
+;(async () => {
+  try {
+    await run(['init', '-q'])
+    writeFileSync(join(root, 'smoke.txt'), 'portable git through dugite\\n')
+    await run(['add', 'smoke.txt'])
+    await run(['-c', 'user.email=smoke@openalice.local', '-c', 'user.name=OpenAlice Smoke', 'commit', '-q', '-m', 'smoke'])
+    const status = await run(['status', '--porcelain'])
+    if (status.stdout.trim()) throw new Error('git status was not clean: ' + status.stdout)
+    const version = await run(['--version'])
+    console.log('OPENALICE_DUGITE_PORTABLE_GIT_OK ' + version.stdout.trim())
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})().catch((error) => { console.error(error); process.exit(1) })
+`.trim()
+    commands.push({
+      label: 'dugite JS wrapper routes Git operations through managed PortableGit',
+      command: electron,
+      args: ['-e', dugiteProbe],
+      env: {
+        ELECTRON_RUN_AS_NODE: '1',
+        LOCAL_GIT_DIRECTORY: gitRoot,
+      },
+      expectStdout: /OPENALICE_DUGITE_PORTABLE_GIT_OK git version /,
     })
     commands.push({
       label: 'managed bash.exe',

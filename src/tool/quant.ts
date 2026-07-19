@@ -18,7 +18,7 @@ export function createQuantTools(deps: CalcDeps) {
       description: `Find K-line sources for a symbol — returns barIds to paste into calculateQuant's bars(...).
 
 Federates connected brokers, user-enabled keyless data sources (binance-readonly, …), AND vendors (fmp, yfinance).
-Candidates come back freshest-first. Each carries:
+Candidates come back relevance-first, then freshest within the same match quality. Each carries:
   - barId: use directly, e.g. bars("<barId>", "1d", count=250).
     · broker barIds ("accountId|symbol") need NO asset= in bars().
     · vendor barIds ("provider|symbol") need asset="equity|crypto|currency|commodity".

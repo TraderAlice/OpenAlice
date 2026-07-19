@@ -69,10 +69,10 @@ const STATE_LABEL: Record<Readiness, string> = {
 }
 
 const STATE_STYLE: Record<Readiness, string> = {
-  ready: 'border-green/25 bg-green/10 text-green',
-  attention: 'border-red/25 bg-red/10 text-red',
-  optional: 'border-border bg-bg-tertiary/60 text-text-muted',
-  locked: 'border-border bg-bg-secondary text-text-muted',
+  ready: 'border-success/25 bg-success/10 text-success',
+  attention: 'border-destructive/25 bg-destructive/10 text-destructive',
+  optional: 'border-border bg-muted/60 text-muted-foreground',
+  locked: 'border-border bg-secondary text-muted-foreground',
 }
 
 export function OnboardingDesignPage() {
@@ -132,24 +132,24 @@ export function OnboardingDesignPage() {
         {loading ? (
           <CenteredLoading label="Loading setup state..." />
         ) : error ? (
-          <div className="rounded-lg border border-red/30 bg-red/10 px-4 py-3 text-[13px] text-red">
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-[13px] text-destructive">
             {error}
           </div>
         ) : (
           <>
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div className="min-w-0">
-                <div className="text-[11px] font-medium uppercase tracking-wide text-text-muted">
+                <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Setup checklist
                 </div>
-                <h1 className="mt-1 text-[24px] font-semibold leading-tight text-text">
+                <h1 className="mt-1 text-[24px] font-semibold leading-tight text-foreground">
                   Bring Alice online one layer at a time.
                 </h1>
-                <p className="mt-2 max-w-[680px] text-[13px] leading-relaxed text-text-muted">
+                <p className="mt-2 max-w-[680px] text-[13px] leading-relaxed text-muted-foreground">
                   Start with an agent runtime and AI access. Add UTA only when you want broker-aware analysis or trading workflows.
                 </p>
               </div>
-              <div className="flex flex-wrap items-center gap-2 text-[11px] text-text-muted">
+              <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
                 <StatusChip>{model.tradingModeLabel}</StatusChip>
                 <StatusChip>{model.installedAgentCount}/{model.agentCount} runtimes</StatusChip>
                 <StatusChip>{model.utaCount} UTA</StatusChip>
@@ -159,15 +159,15 @@ export function OnboardingDesignPage() {
             <StatusBand model={model} />
 
             <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
-              <section className="min-w-0 rounded-lg border border-border bg-bg-secondary/50">
+              <section className="min-w-0 rounded-lg border border-border bg-secondary/50">
                 <div className="border-b border-border px-4 py-3">
                   <div className="flex items-start gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-accent-dim text-accent">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary-muted text-primary">
                       <TerminalSquare className="h-4 w-4" />
                     </div>
                     <div className="min-w-0">
-                      <h2 className="text-[16px] font-semibold text-text">Setup path</h2>
-                      <p className="mt-1 text-[12px] leading-relaxed text-text-muted">
+                      <h2 className="text-[16px] font-semibold text-foreground">Setup path</h2>
+                      <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
                         The first incomplete item is the next useful action.
                       </p>
                     </div>
@@ -190,8 +190,8 @@ export function OnboardingDesignPage() {
 
               <aside className="min-w-0 space-y-5">
                 <CapabilityPanel model={model} />
-                <div className="rounded-lg border border-border bg-bg-secondary/50 px-4 py-4">
-                  <div className="text-[11px] font-medium uppercase tracking-wide text-text-muted">
+                <div className="rounded-lg border border-border bg-secondary/50 px-4 py-4">
+                  <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                     Shortcuts
                   </div>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
@@ -370,7 +370,7 @@ export function buildOnboardingModel(input: {
 
 function StatusBand({ model }: { model: ReturnType<typeof buildOnboardingModel> }) {
   return (
-    <div className="border-y border-border bg-bg-secondary/35">
+    <div className="border-y border-border bg-secondary/35">
       <div className="grid grid-cols-2 divide-x divide-y divide-border lg:grid-cols-4 lg:divide-y-0">
         <StatusMetric label="Setup" value={`${model.readyCount}/${model.steps.length}`} sub="ready checks" />
         <StatusMetric label="Mode" value={model.tradingModeLabel} sub="global trading capability" />
@@ -384,24 +384,24 @@ function StatusBand({ model }: { model: ReturnType<typeof buildOnboardingModel> 
 function StatusMetric({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
     <div className="min-w-0 px-3 py-3">
-      <div className="text-[10px] uppercase tracking-wide text-text-muted">{label}</div>
-      <div className="mt-1 truncate text-[14px] font-semibold text-text">{value}</div>
-      <div className="mt-0.5 truncate text-[11px] text-text-muted">{sub}</div>
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="mt-1 truncate text-[14px] font-semibold text-foreground">{value}</div>
+      <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{sub}</div>
     </div>
   )
 }
 
 function CapabilityPanel({ model }: { model: ReturnType<typeof buildOnboardingModel> }) {
   return (
-    <section className="min-w-0 rounded-lg border border-border bg-bg-secondary/50">
+    <section className="min-w-0 rounded-lg border border-border bg-secondary/50">
       <div className="border-b border-border px-4 py-3">
         <div className="flex items-start gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-accent-dim text-accent">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary-muted text-primary">
             <Compass className="h-4 w-4" />
           </div>
           <div className="min-w-0">
-            <h2 className="text-[16px] font-semibold text-text">Capability map</h2>
-            <p className="mt-1 text-[12px] leading-relaxed text-text-muted">
+            <h2 className="text-[16px] font-semibold text-foreground">Capability map</h2>
+            <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
               Shows what is usable in the current mode.
             </p>
           </div>
@@ -412,12 +412,12 @@ function CapabilityPanel({ model }: { model: ReturnType<typeof buildOnboardingMo
           const Icon = capability.icon
           return (
             <div key={capability.id} className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] gap-3 py-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-bg-tertiary text-text-muted">
+              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted text-muted-foreground">
                 <Icon className="h-4 w-4" />
               </div>
               <div className="min-w-0">
-                <div className="truncate text-[13px] font-semibold text-text">{capability.label}</div>
-                <div className="mt-0.5 text-[12px] leading-relaxed text-text-muted">{capability.detail}</div>
+                <div className="truncate text-[13px] font-semibold text-foreground">{capability.label}</div>
+                <div className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">{capability.detail}</div>
               </div>
               <StateDot state={capability.state} />
             </div>
@@ -441,21 +441,21 @@ function StepRow({
   return (
     <div className="min-w-0 border-b border-border/70 py-4 last:border-b-0">
       <div className="flex min-w-0 items-start gap-3">
-        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-bg-tertiary text-[12px] font-semibold text-text-muted">
+        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-[12px] font-semibold text-muted-foreground">
           {index}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <Icon className="h-3.5 w-3.5 shrink-0 text-text-muted" />
-            <div className="min-w-0 text-[14px] font-semibold text-text">{step.title}</div>
+            <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <div className="min-w-0 text-[14px] font-semibold text-foreground">{step.title}</div>
             <StateBadge state={step.state} />
           </div>
-          <p className="mt-1 text-[12px] leading-relaxed text-text-muted">{step.body}</p>
+          <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">{step.body}</p>
         </div>
         <button
           type="button"
           onClick={() => onAction(step.target)}
-          className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-bg text-text-muted transition-colors hover:border-accent/50 hover:text-accent"
+          className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary"
           aria-label={step.action}
           title={step.action}
         >
@@ -478,7 +478,7 @@ function PrimaryAction({
     <button
       type="button"
       onClick={() => onAction(step.target)}
-      className="flex w-full items-center justify-between gap-3 rounded-lg bg-accent px-3 py-2.5 text-left text-white transition-colors hover:bg-accent/90"
+      className="flex w-full items-center justify-between gap-3 rounded-lg bg-primary px-3 py-2.5 text-left text-primary-foreground transition-colors hover:bg-primary/90"
     >
       <span className="min-w-0 truncate text-[13px] font-semibold">{step.action}</span>
       <ArrowRight className="h-4 w-4 shrink-0" />
@@ -491,7 +491,7 @@ function SmallAction({ icon, label, onClick }: { icon: ReactNode; label: string;
     <button
       type="button"
       onClick={onClick}
-      className="flex min-h-9 min-w-0 items-center justify-center gap-2 rounded-md border border-border bg-bg px-3 py-2 text-[12px] font-medium text-text-muted transition-colors hover:border-accent/50 hover:text-accent"
+      className="flex min-h-9 min-w-0 items-center justify-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-[12px] font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary"
     >
       {icon}
       <span className="truncate">{label}</span>
@@ -524,7 +524,7 @@ function StateDot({ state }: { state: Readiness }) {
 
 function StatusChip({ children }: { children: ReactNode }) {
   return (
-    <span className="rounded-md border border-border bg-bg-secondary px-2 py-1">
+    <span className="rounded-md border border-border bg-secondary px-2 py-1">
       {children}
     </span>
   )

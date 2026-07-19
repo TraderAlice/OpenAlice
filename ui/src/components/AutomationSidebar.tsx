@@ -31,7 +31,7 @@ export function AutomationSidebar() {
       key={item.section}
       label={t(item.labelKey)}
       active={activeSection === item.section}
-      icon={<item.Icon size={14} strokeWidth={2} className="text-text-muted/70" aria-hidden />}
+      icon={<item.Icon size={14} strokeWidth={2} className="text-muted-foreground/70" aria-hidden />}
       onClick={() => openOrFocus({ kind: 'automation', params: { section: item.section } })}
     />
   )

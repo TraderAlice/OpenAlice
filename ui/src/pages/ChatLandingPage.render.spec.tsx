@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, render, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { WorkspacesContextValue } from '../contexts/workspaces-context'
@@ -126,12 +126,19 @@ beforeEach(async () => {
     authType: 'api-key',
     wires: { 'google-generative-ai': 'https://generativelanguage.googleapis.com/v1beta' },
     resolvedModel: 'gemini-3.1-flash-lite',
+    resolvedReasoning: true,
+    resolvedReasoningEffort: 'minimal',
+    resolvedReasoningMode: 'adaptive',
   }])
   mocks.detectWorkspaceCredential.mockResolvedValue({
+    configured: true,
     slug: 'google-1',
     model: 'gemini-3.1-flash-lite',
     contextWindow: 256_000,
     wireShape: 'google-generative-ai',
+    reasoning: true,
+    reasoningEffort: 'minimal',
+    reasoningMode: 'adaptive',
   })
   mocks.getAgentReadiness.mockResolvedValue({
     agents: {
@@ -169,7 +176,6 @@ beforeEach(async () => {
   mocks.getWorkspaceCredentialDefaults.mockResolvedValue({
     defaults: {},
     compatibleByAgent: { pi: ['google-1'] },
-    contextWindow: 256_000,
   })
   mocks.getQuickChat.mockResolvedValue({
     lastCredentialByAgent: {},
@@ -194,5 +200,126 @@ describe('ChatLandingPage polling stability', () => {
 
     expect(mocks.detectWorkspaceCredential).toHaveBeenCalledTimes(1)
     expect(mocks.getAgentReadiness).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('ChatLandingPage AI source disclosure', () => {
+  it('labels an existing Workspace-local provider as already saved', async () => {
+    render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
+
+    expect(await screen.findByText('Saved in this workspace')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Adjust workspace AI' })).toBeTruthy()
+    expect(screen.getByLabelText('minimal reasoning')).toBeTruthy()
+  })
+
+  it('labels a vault fallback as a pending write instead of existing Workspace config', async () => {
+    mocks.detectWorkspaceCredential.mockResolvedValue({
+      configured: false,
+      slug: null,
+      model: null,
+      contextWindow: null,
+      wireShape: null,
+    })
+    mocks.getAgentReadiness.mockResolvedValue({
+      agents: {
+        pi: {
+          agent: 'pi',
+          ready: true,
+          requiresCredential: true,
+          source: 'launcher-vault',
+          hasWorkspaceConfig: false,
+          hasUsableWorkspaceConfig: false,
+          detectedCredentialSlug: null,
+          compatibleCredentialSlugs: ['google-1'],
+          injectableCredentialSlugs: ['google-1'],
+        },
+      },
+    })
+
+    render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
+
+    expect(await screen.findByText('Will write to this workspace when you send')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Configure workspace AI' })).toBeTruthy()
+    expect(screen.getByLabelText('minimal reasoning')).toBeTruthy()
+  })
+
+  it('shows a required reasoning policy when the provider has no effort tiers', async () => {
+    mocks.listAgentCredentials.mockResolvedValue([{
+      slug: 'kimi-1',
+      vendor: 'kimi',
+      authType: 'api-key',
+      wires: { 'openai-chat': 'https://api.moonshot.ai/v1' },
+      resolvedModel: 'kimi-k2.7-code',
+      resolvedReasoning: true,
+      resolvedReasoningMode: 'required',
+    }])
+    mocks.detectWorkspaceCredential.mockResolvedValue({
+      configured: false,
+      slug: null,
+      model: null,
+      contextWindow: null,
+      wireShape: null,
+    })
+    mocks.getAgentReadiness.mockResolvedValue({
+      agents: {
+        pi: {
+          agent: 'pi',
+          ready: true,
+          requiresCredential: true,
+          source: 'launcher-vault',
+          hasWorkspaceConfig: false,
+          hasUsableWorkspaceConfig: false,
+          detectedCredentialSlug: null,
+          compatibleCredentialSlugs: ['kimi-1'],
+          injectableCredentialSlugs: ['kimi-1'],
+        },
+      },
+    })
+
+    render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
+
+    expect(await screen.findByLabelText('Reasoning always on')).toBeTruthy()
+    expect(screen.getByLabelText('Model kimi-k2.7-code')).toBeTruthy()
+  })
+
+  it('replaces a transient provider choice with the Workspace config saved in Settings', async () => {
+    mocks.listAgentCredentials.mockResolvedValue([
+      {
+        slug: 'google-1',
+        vendor: 'google',
+        authType: 'api-key',
+        wires: { 'google-generative-ai': 'https://generativelanguage.googleapis.com/v1beta' },
+        resolvedModel: 'gemini-3.1-flash-lite',
+      },
+      {
+        slug: 'deepseek-1',
+        vendor: 'deepseek',
+        authType: 'api-key',
+        wires: { 'openai-chat': 'https://api.deepseek.com/v1' },
+        resolvedModel: 'deepseek-v3.2',
+      },
+    ])
+
+    render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
+
+    expect(await screen.findByLabelText('Model gemini-3.1-flash-lite')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'AI provider' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /deepseek-1/ }))
+    expect(await screen.findByLabelText('Model deepseek-v3.2')).toBeTruthy()
+
+    mocks.detectWorkspaceCredential.mockResolvedValue({
+      configured: true,
+      slug: 'google-1',
+      model: 'gemini-3.1-pro-preview',
+      contextWindow: 512_000,
+      wireShape: 'google-generative-ai',
+    })
+    window.dispatchEvent(new CustomEvent('openalice:workspace-agent-config-changed', {
+      detail: { wsId: 'chat-1', agent: 'pi' },
+    }))
+
+    expect(await screen.findByLabelText('Model gemini-3.1-pro-preview')).toBeTruthy()
+    expect(screen.queryByLabelText('Model deepseek-v3.2')).toBeNull()
+    expect(mocks.detectWorkspaceCredential).toHaveBeenCalledTimes(2)
   })
 })

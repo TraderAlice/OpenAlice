@@ -157,8 +157,8 @@ export function WorkspaceListPage() {
 
   if (workspaces.length === 0 && departed.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-text-muted px-6">
-        <h2 className="text-lg font-medium text-text mb-2">{t('workspace.emptyTitle')}</h2>
+      <div className="flex flex-col items-center justify-center h-full text-muted-foreground px-6">
+        <h2 className="text-lg font-medium text-foreground mb-2">{t('workspace.emptyTitle')}</h2>
         <p className="text-sm max-w-md text-center">
           {t('workspace.emptyBody')}
         </p>
@@ -170,8 +170,8 @@ export function WorkspaceListPage() {
     <div className="h-full overflow-y-auto">
       <div className="max-w-5xl mx-auto px-6 py-6">
         <div className="mb-6 flex items-baseline justify-between gap-4">
-          <h2 className="text-[18px] font-semibold text-text">{t('workspace.overviewTitle')}</h2>
-          <span className="text-[12px] text-text-muted">
+          <h2 className="text-[18px] font-semibold text-foreground">{t('workspace.overviewTitle')}</h2>
+          <span className="text-[12px] text-muted-foreground">
             {t(workspaces.length === 1 ? 'workspace.workspaceSingular' : 'workspace.workspacePlural', {
               count: workspaces.length,
             })}
@@ -182,10 +182,10 @@ export function WorkspaceListPage() {
           {sections.map((sec) => (
             <section key={sec.key}>
               <div className="mb-3 flex items-baseline gap-2">
-                <h3 className="text-[12px] font-semibold text-text/85 uppercase tracking-wider">
+                <h3 className="text-[12px] font-semibold text-foreground/85 uppercase tracking-wider">
                   {sec.title}
                 </h3>
-                <span className="text-[11px] text-text-muted">· {sec.workspaces.length}</span>
+                <span className="text-[11px] text-muted-foreground">· {sec.workspaces.length}</span>
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {sec.workspaces.map((w) => (
@@ -213,12 +213,12 @@ export function WorkspaceListPage() {
           {(departed.length > 0 || departedError) && (
             <section className="border-t border-border pt-6">
               <div className="mb-3 flex items-baseline gap-2">
-                <h3 className="text-[12px] font-semibold uppercase tracking-wider text-text/85">
+                <h3 className="text-[12px] font-semibold uppercase tracking-wider text-foreground/85">
                   Departed Workspaces
                 </h3>
-                <span className="text-[11px] text-text-muted">· {departed.length}</span>
+                <span className="text-[11px] text-muted-foreground">· {departed.length}</span>
               </div>
-              <p className="mb-3 max-w-2xl text-[12px] leading-relaxed text-text-muted">
+              <p className="mb-3 max-w-2xl text-[12px] leading-relaxed text-muted-foreground">
                 Offboarded desks are outside the active Workspace directory. Restore returns the exact checkout and Session signatures; purge removes files but keeps the historical tombstone.
               </p>
               {departedError && (
@@ -230,25 +230,25 @@ export function WorkspaceListPage() {
                 {departed.map((workspace) => {
                   const purged = workspace.lifecycle === 'purged' || workspace.lifecycle === 'purging'
                   return (
-                    <article key={workspace.id} className="rounded-lg border border-border bg-bg-secondary/35 p-4">
+                    <article key={workspace.id} className="rounded-lg border border-border bg-secondary/35 p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="truncate text-[14px] font-medium text-text">{workspace.tag}</div>
-                          <div className="mt-0.5 font-mono text-[10px] text-text-muted">{workspace.id}</div>
+                          <div className="truncate text-[14px] font-medium text-foreground">{workspace.tag}</div>
+                          <div className="mt-0.5 font-mono text-[10px] text-muted-foreground">{workspace.id}</div>
                         </div>
-                        <span className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wide text-text-muted">
+                        <span className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
                           {workspace.lifecycle}
                         </span>
                       </div>
-                      <p className="mt-3 line-clamp-2 text-[12px] leading-relaxed text-text-muted">
+                      <p className="mt-3 line-clamp-2 text-[12px] leading-relaxed text-muted-foreground">
                         {workspace.reason ?? 'No departure reason recorded.'}
                       </p>
                       {workspace.absorbedIntoWorkspaceId && (
-                        <div className="mt-3 flex items-center gap-2 rounded-md border border-accent/20 bg-accent/6 px-2.5 py-2 text-[11px] text-text-muted">
-                          <GitMerge size={13} className="shrink-0 text-accent" />
+                        <div className="mt-3 flex items-center gap-2 rounded-md border border-primary/20 bg-primary/6 px-2.5 py-2 text-[11px] text-muted-foreground">
+                          <GitMerge size={13} className="shrink-0 text-primary" />
                           <span>
                             Working files reviewed into{' '}
-                            <strong className="font-medium text-text">
+                            <strong className="font-medium text-foreground">
                               {workspaces.find((candidate) => candidate.id === workspace.absorbedIntoWorkspaceId)?.displayName
                                 ?? workspaces.find((candidate) => candidate.id === workspace.absorbedIntoWorkspaceId)?.tag
                                 ?? workspace.absorbedIntoWorkspaceId}
@@ -257,7 +257,7 @@ export function WorkspaceListPage() {
                           </span>
                         </div>
                       )}
-                      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-text-muted">
+                      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
                         <span>{workspace.handoff?.resumeIds.length ?? 0} Sessions</span>
                         <span>{workspace.handoff?.openIssueIds.length ?? 0} open Issues</span>
                         {workspace.legacyImported && <span>legacy import</span>}

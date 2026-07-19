@@ -30,9 +30,9 @@ export function LiveIndicator({ lastUpdated, hideDot, className }: LiveIndicator
   const ago = lastUpdated ? formatRelativeTime(lastUpdated) : '—'
 
   return (
-    <span className={`inline-flex items-center gap-1.5 text-[11px] text-text-muted ${className ?? ''}`}>
+    <span className={`inline-flex items-center gap-1.5 text-[11px] text-muted-foreground ${className ?? ''}`}>
       {!hideDot && (
-        <span className="relative inline-block w-1.5 h-1.5 rounded-full bg-green live-pulse" aria-hidden />
+        <span className="relative inline-block w-1.5 h-1.5 rounded-full bg-success live-pulse" aria-hidden />
       )}
       <span className="tabular-nums">updated {ago}</span>
     </span>

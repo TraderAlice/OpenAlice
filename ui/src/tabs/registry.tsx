@@ -292,7 +292,8 @@ const settingsModule: ViewModule<'settings'> = {
       storageKey="settings"
       titleKey="nav.item.settings"
       defaultWidth={220}
-      sidebar={<SettingsCategoryList />}
+      desktopMinWidth={960}
+      sidebar={({ closeMobileDrawer }) => <SettingsCategoryList onSelect={closeMobileDrawer} />}
     >
       <SettingsRouter {...props} />
     </PageSidebarShell>

@@ -45,8 +45,8 @@ export function TemplateCatalogPage() {
 
   if (official.length + community.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-text-muted px-6">
-        <h2 className="text-lg font-medium text-text mb-2">{t('templates.emptyTitle')}</h2>
+      <div className="flex flex-col items-center justify-center h-full text-muted-foreground px-6">
+        <h2 className="text-lg font-medium text-foreground mb-2">{t('templates.emptyTitle')}</h2>
         <p className="text-sm max-w-md text-center">
           {t('templates.emptyBody')}
         </p>
@@ -73,8 +73,8 @@ export function TemplateCatalogPage() {
     <div className="h-full overflow-y-auto">
       <div className="max-w-5xl mx-auto px-6 py-6">
         <div className="mb-6">
-          <h2 className="text-[18px] font-semibold text-text">{t('templates.catalogTitle')}</h2>
-          <p className="text-[12px] text-text-muted mt-1 max-w-2xl">
+          <h2 className="text-[18px] font-semibold text-foreground">{t('templates.catalogTitle')}</h2>
+          <p className="text-[12px] text-muted-foreground mt-1 max-w-2xl">
             {t('templates.catalogDescription')}
           </p>
         </div>
@@ -84,8 +84,8 @@ export function TemplateCatalogPage() {
         {community.length > 0 && (
           <div className="mt-8">
             <div className="mb-4">
-              <h3 className="text-[14px] font-semibold text-text">{t('templates.communityTitle')}</h3>
-              <p className="text-[12px] text-text-muted mt-1 max-w-2xl">
+              <h3 className="text-[14px] font-semibold text-foreground">{t('templates.communityTitle')}</h3>
+              <p className="text-[12px] text-muted-foreground mt-1 max-w-2xl">
                 {t('templates.communityDescription')}
               </p>
             </div>

@@ -57,7 +57,7 @@ export function ProfilePanel({ symbol }: Props) {
           <Skeleton className="h-3 w-44 rounded" />
         </div>
       )}
-      {error && !loading && <div className="text-[12px] text-red">{error}</div>}
+      {error && !loading && <div className="text-[12px] text-destructive">{error}</div>}
       {!loading && !error && profile && (
         <div className="flex flex-col gap-3 text-[12px]">
           <dl className="grid grid-cols-[90px_1fr] gap-y-1 gap-x-3">
@@ -68,16 +68,16 @@ export function ProfilePanel({ symbol }: Props) {
             <KV label="HQ"        value={hq} />
             <KV
               label="Website"
-              value={website ? <a className="text-accent hover:underline break-all" href={website} target="_blank" rel="noreferrer">{website.replace(/^https?:\/\//, '')}</a> : undefined}
+              value={website ? <a className="text-primary hover:underline break-all" href={website} target="_blank" rel="noreferrer">{website.replace(/^https?:\/\//, '')}</a> : undefined}
             />
           </dl>
           {desc && (
-            <p className="text-text-muted/80 leading-[1.55] line-clamp-[8]">{desc}</p>
+            <p className="text-muted-foreground/80 leading-[1.55] line-clamp-[8]">{desc}</p>
           )}
         </div>
       )}
       {!loading && !error && !profile && (
-        <div className="text-[12px] text-text-muted">No profile data.</div>
+        <div className="text-[12px] text-muted-foreground">No profile data.</div>
       )}
     </Card>
   )
@@ -86,8 +86,8 @@ export function ProfilePanel({ symbol }: Props) {
 function KV({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <>
-      <dt className="text-text-muted/60">{label}</dt>
-      <dd className="text-text truncate">{value ?? <span className="text-text-muted/50">—</span>}</dd>
+      <dt className="text-muted-foreground/60">{label}</dt>
+      <dd className="text-foreground truncate">{value ?? <span className="text-muted-foreground/50">—</span>}</dd>
     </>
   )
 }

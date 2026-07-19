@@ -18,11 +18,11 @@
 import { resolveAnthropicAuthMode } from '@/core/credential-inference.js'
 import {
   credentialWires,
-  DEFAULT_WORKSPACE_CONTEXT_WINDOW,
   type Credential,
   type CredentialWireShape,
 } from '@/core/config.js'
 import { DEFAULT_MODEL_BY_VENDOR } from '@/ai-providers/preset-catalog.js'
+import { modelSupportsReasoning, resolveModelSemantics } from '@/ai-providers/model-semantics.js'
 import type { AdapterRegistry, WorkspaceAiCred } from './cli-adapter.js'
 import type { Logger } from './logger.js'
 import type { AgentCredentialDecl } from './template-registry.js'
@@ -40,11 +40,51 @@ export const AGENT_WIRE_PREFERENCE: Record<string, CredentialWireShape[]> = {
   pi: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'],
 }
 
-// Modern coding models are commonly sold as long-context runtimes. Pi defaults
-// unknown custom models to 128k and opencode defaults unknown limits to 0, so
-// new OpenAlice injections state the assumption explicitly while keeping the
-// field overridable from the workspace config UI.
-export const DEFAULT_CONTEXT_WINDOW = DEFAULT_WORKSPACE_CONTEXT_WINDOW
+/**
+ * Provider-specific support inside an agent's wire set.
+ *
+ * MiniMax is the deliberate exception to the generic OpenAI-compatible set:
+ * its Anthropic endpoint is the documented coding-agent path and returns
+ * native thinking blocks. The OpenAI endpoint requires `reasoning_split` and
+ * returns an array-shaped `reasoning_details` extension that Pi and opencode's
+ * generic OpenAI transports do not parse losslessly. Do not expose a protocol
+ * choice that silently turns reasoning into visible `<think>` text or drops it.
+ */
+export function agentWirePreference(
+  agentId: string,
+  vendor?: string | null,
+): CredentialWireShape[] {
+  const preference = AGENT_WIRE_PREFERENCE[agentId]
+    ?? ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses']
+  if (vendor !== 'minimax' || (agentId !== 'opencode' && agentId !== 'pi')) return preference
+  return ['anthropic']
+}
+
+function inferredMinimaxAnthropicEndpoint(
+  wires: Partial<Record<CredentialWireShape, string>>,
+): string | undefined {
+  const chatEndpoint = wires['openai-chat']?.trim()
+  if (!chatEndpoint) return undefined
+  try {
+    const url = new URL(chatEndpoint)
+    if (url.hostname !== 'api.minimax.io' && url.hostname !== 'api.minimaxi.com') return undefined
+    return `${url.origin}/anthropic`
+  } catch {
+    return undefined
+  }
+}
+
+function wireEndpoint(
+  wires: Partial<Record<CredentialWireShape, string>>,
+  shape: CredentialWireShape,
+  vendor?: string | null,
+): string | undefined {
+  if (Object.prototype.hasOwnProperty.call(wires, shape)) return wires[shape] ?? ''
+  if (vendor === 'minimax' && shape === 'anthropic') {
+    return inferredMinimaxAnthropicEndpoint(wires)
+  }
+  return undefined
+}
 
 /**
  * The subset of a credential vault an agent can actually be driven by: those
@@ -58,7 +98,7 @@ export function compatibleCredentials(
   agentId: string,
 ): Array<[string, Credential]> {
   return Object.entries(credentials).filter(
-    ([, cred]) => pickAgentWire(credentialWires(cred), agentId) !== null,
+    ([, cred]) => pickAgentWire(credentialWires(cred), agentId, undefined, cred.vendor) !== null,
   )
 }
 
@@ -95,15 +135,30 @@ export function pickAgentWire(
   wires: Partial<Record<CredentialWireShape, string>>,
   agentId: string,
   requestedShape?: CredentialWireShape,
+  vendor?: string | null,
 ): { shape: CredentialWireShape; baseUrl: string } | null {
-  const pref = AGENT_WIRE_PREFERENCE[agentId]
-    ?? ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses']
+  const pref = agentWirePreference(agentId, vendor)
   if (requestedShape !== undefined) {
-    if (!pref.includes(requestedShape) || !(requestedShape in wires)) return null
-    return { shape: requestedShape, baseUrl: wires[requestedShape] ?? '' }
+    const requestedEndpoint = wireEndpoint(wires, requestedShape, vendor)
+    if (pref.includes(requestedShape) && requestedEndpoint !== undefined) {
+      return { shape: requestedShape, baseUrl: requestedEndpoint }
+    }
+    // Heal Workspace defaults saved before MiniMax's native-thinking boundary
+    // was registered. This is intentionally narrower than a generic fallback:
+    // other explicit protocol mismatches remain loud incompatibilities.
+    if (
+      vendor === 'minimax' &&
+      (agentId === 'opencode' || agentId === 'pi') &&
+      requestedShape === 'openai-chat' &&
+      wireEndpoint(wires, 'anthropic', vendor) !== undefined
+    ) {
+      return { shape: 'anthropic', baseUrl: wireEndpoint(wires, 'anthropic', vendor)! }
+    }
+    return null
   }
   for (const shape of pref) {
-    if (shape in wires) return { shape, baseUrl: wires[shape] ?? '' }
+    const endpoint = wireEndpoint(wires, shape, vendor)
+    if (endpoint !== undefined) return { shape, baseUrl: endpoint }
   }
   return null
 }
@@ -113,8 +168,12 @@ export interface CredentialInjectionOverrides {
   model?: string
   /** Explicit protocol when a credential exposes several agent-compatible wires. */
   wireShape?: CredentialWireShape
-  /** Context window to write for custom-model runtimes; defaults to 256K for opencode/Pi. */
+  /** Explicit model-specific context preference for custom-model runtimes. */
   contextWindow?: number | null
+  /** Unknown-model override for Pi/opencode. Registered model facts win. */
+  reasoning?: boolean | null
+  /** Explicit effort override. Known model defaults are filled by the registry. */
+  reasoningEffort?: WorkspaceAiCred['reasoningEffort']
   /** Anthropic wire only — which header carries the key. Defaults via baseUrl heuristic. */
   authMode?: 'x-api-key' | 'bearer'
   /** Codex only — Responses vs Chat Completions. Adapter defaults to 'chat'. */
@@ -128,12 +187,12 @@ export interface CredentialInjectionOverrides {
  * (caller must surface this — never silently inject a wrong shape).
  */
 export function credentialToWorkspaceAiCred(
-  credential: Pick<Credential, 'apiKey' | 'baseUrl' | 'wireShape' | 'wires'>,
+  credential: Pick<Credential, 'vendor' | 'apiKey' | 'baseUrl' | 'wireShape' | 'wires'>,
   agentId: string,
   overrides: CredentialInjectionOverrides = {},
 ): WorkspaceAiCred | null {
   const wires = credentialWires(credential as Credential)
-  const picked = pickAgentWire(wires, agentId, overrides.wireShape)
+  const picked = pickAgentWire(wires, agentId, overrides.wireShape, credential.vendor)
   if (!picked) return null
 
   const cred: WorkspaceAiCred = {
@@ -146,8 +205,11 @@ export function credentialToWorkspaceAiCred(
   }
 
   if (agentId === 'opencode' || agentId === 'pi') {
-    cred.contextWindow = overrides.contextWindow ?? DEFAULT_CONTEXT_WINDOW
+    const explicitContextWindow = positiveNumber(overrides.contextWindow)
+    if (explicitContextWindow !== null) cred.contextWindow = explicitContextWindow
+    if (typeof overrides.reasoning === 'boolean') cred.reasoning = overrides.reasoning
   }
+  if (overrides.reasoningEffort) cred.reasoningEffort = overrides.reasoningEffort
 
   if (picked.shape === 'anthropic') {
     cred.authMode = resolveAnthropicAuthMode({
@@ -159,7 +221,46 @@ export function credentialToWorkspaceAiCred(
     if (overrides.wireApi) cred.wireApi = overrides.wireApi
   }
 
-  return cred
+  return applyRegisteredModelSemantics(cred, agentId, credential.vendor)
+}
+
+/**
+ * Project verified model facts into runtimes that register custom models.
+ *
+ * Known reasoning capability always wins over a stale/manual bit. Unknown
+ * models retain an explicit override (or omit the field and let the runtime
+ * fall back). A configured context window remains a user policy, but it is
+ * capped at the provider-advertised maximum so we never claim an impossible
+ * limit to Pi/opencode.
+ */
+export function applyRegisteredModelSemantics(
+  cred: WorkspaceAiCred,
+  agentId: string,
+  vendor: string | null | undefined,
+): WorkspaceAiCred {
+  const semantics = resolveModelSemantics(vendor, cred.model)
+  if (!semantics) return cred
+
+  const next: WorkspaceAiCred = { ...cred }
+  if (agentId === 'opencode' || agentId === 'pi') {
+    const registeredContext = positiveNumber(semantics.contextWindow)
+    const configuredContext = positiveNumber(cred.contextWindow)
+    if (registeredContext !== null) {
+      next.contextWindow = configuredContext === null
+        ? registeredContext
+        : Math.min(configuredContext, registeredContext)
+    }
+    const reasoning = modelSupportsReasoning(semantics)
+    if (reasoning !== null) next.reasoning = reasoning
+  }
+  if (!next.reasoningEffort && semantics.reasoning?.defaultEffort) {
+    next.reasoningEffort = semantics.reasoning.defaultEffort
+  }
+  return next
+}
+
+function positiveNumber(value: number | null | undefined): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null
 }
 
 /**
@@ -168,7 +269,8 @@ export function credentialToWorkspaceAiCred(
  *
  * MUST run AFTER the launcher's initial commit: `writeAiConfig` writes the
  * secret into `.claude/settings.local.json` / `.codex/env.json` / `opencode.json`
- * / `.pi-agent/`, which `_common.sh`'s `setup_git_excludes` keeps out of git —
+ * / Pi's global models plus `.pi/settings.json`, which `_common.sh`'s
+ * `setup_git_excludes` keeps out of git —
  * but only post-commit are we certain the key never lands in the initial commit.
  *
  * Every miss (agent not enabled, no adapter, credential slug absent) is a loud
@@ -182,7 +284,6 @@ export async function injectWorkspaceCredentials(opts: {
   readonly adapterRegistry: AdapterRegistry
   readonly credentials: Record<string, Credential>
   readonly logger: Logger
-  readonly defaultContextWindow?: number
 }): Promise<void> {
   const { dir, agents, agentCredentials, adapterRegistry, credentials, logger } = opts
   for (const [agentId, decl] of Object.entries(agentCredentials)) {
@@ -202,14 +303,20 @@ export async function injectWorkspaceCredentials(opts: {
       })
       continue
     }
+    const selectedModel = decl.model ?? resolveInjectionModel(credential)
+    const reasoningMatchesModel = typeof decl.reasoning === 'boolean' && (
+      decl.reasoningModel === selectedModel ||
+      // Backward compatibility: an explicit model and override already form a
+      // stable pair even in config written before reasoningModel existed.
+      (decl.reasoningModel === undefined && decl.model === selectedModel)
+    )
     const wsCred = credentialToWorkspaceAiCred(credential, agentId, {
-      ...(decl.model !== undefined ? { model: decl.model } : {}),
+      ...(selectedModel !== null ? { model: selectedModel } : {}),
       ...(decl.wireShape !== undefined ? { wireShape: decl.wireShape } : {}),
       ...(decl.contextWindow !== undefined
         ? { contextWindow: decl.contextWindow }
-        : opts.defaultContextWindow !== undefined
-          ? { contextWindow: opts.defaultContextWindow }
-          : {}),
+        : {}),
+      ...(reasoningMatchesModel ? { reasoning: decl.reasoning } : {}),
       ...(decl.authMode !== undefined ? { authMode: decl.authMode } : {}),
       ...(decl.wireApi !== undefined ? { wireApi: decl.wireApi } : {}),
     })
@@ -224,7 +331,7 @@ export async function injectWorkspaceCredentials(opts: {
     }
     await adapter.writeAiConfig(dir, wsCred)
     logger.info('workspace.cred_injected', {
-      agentId, credentialSlug: decl.credentialSlug, ...(decl.model ? { model: decl.model } : {}),
+      agentId, credentialSlug: decl.credentialSlug, ...(selectedModel ? { model: selectedModel } : {}),
     })
   }
 }

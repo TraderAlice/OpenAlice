@@ -40,13 +40,13 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-bg px-4">
+    <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-[400px] rounded-lg border border-border bg-surface px-6 py-7 shadow-sm">
-        <h1 className="text-[18px] font-semibold text-text mb-1">{t('auth.heading')}</h1>
-        <p className="text-[12px] text-text-muted leading-relaxed mb-5">
+        <h1 className="text-[18px] font-semibold text-foreground mb-1">{t('auth.heading')}</h1>
+        <p className="text-[12px] text-muted-foreground leading-relaxed mb-5">
           {t('auth.instruction')}
           {' '}
-          <span className="text-text-faint">
+          <span className="text-foreground-faint">
             Find it in the backend logs after <code className="font-mono">pnpm dev</code> /
             {' '}<code className="font-mono">docker run</code>, or rotate via
             {' '}<code className="font-mono">rm data/config/auth.json</code> and restart.
@@ -55,7 +55,7 @@ export function LoginPage() {
 
         <form onSubmit={onSubmit} className="space-y-3">
           <div>
-            <label className="block text-[11px] uppercase tracking-wide text-text-muted mb-1">
+            <label className="block text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
               {t('auth.adminTokenLabel')}
             </label>
             <input
@@ -65,7 +65,7 @@ export function LoginPage() {
               value={token}
               onChange={(e) => setToken(e.target.value)}
               disabled={busy}
-              className="w-full rounded border border-border bg-bg px-2.5 py-1.5 text-[13px] font-mono text-text focus:outline-none focus:border-accent disabled:opacity-60"
+              className="w-full rounded border border-border bg-background px-2.5 py-1.5 text-[13px] font-mono text-foreground focus:outline-none focus:border-primary disabled:opacity-60"
               placeholder="xKUT78dNUcRVDwoyDsUUROqffPJV8-..."
             />
           </div>
@@ -92,15 +92,15 @@ export function LoginPage() {
 export function NoTokenPage() {
   const { t } = useTranslation()
   return (
-    <div className="min-h-screen flex items-center justify-center bg-bg px-4">
+    <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-[460px] rounded-lg border border-border bg-surface px-6 py-7">
-        <h1 className="text-[18px] font-semibold text-text mb-2">{t('auth.noTokenHeading')}</h1>
-        <p className="text-[13px] text-text leading-relaxed mb-3">
+        <h1 className="text-[18px] font-semibold text-foreground mb-2">{t('auth.noTokenHeading')}</h1>
+        <p className="text-[13px] text-foreground leading-relaxed mb-3">
           The backend did not generate <code className="font-mono">data/config/auth.json</code>.
           This usually means bootstrap was skipped via <code className="font-mono">OPENALICE_DISABLE_AUTH=1</code>,
           or the file was created empty.
         </p>
-        <p className="text-[12px] text-text-muted leading-relaxed">
+        <p className="text-[12px] text-muted-foreground leading-relaxed">
           Stop the backend, delete <code className="font-mono">data/config/auth.json</code> if it exists,
           unset <code className="font-mono">OPENALICE_DISABLE_AUTH</code>, and restart. The first-run
           token will be printed to stdout.

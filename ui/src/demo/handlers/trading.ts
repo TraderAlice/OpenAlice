@@ -46,7 +46,7 @@ function utaId(params: { id?: string | readonly string[] }): string {
 const demoBrokerPresets = [
   {
     id: 'alpaca', label: 'Alpaca', description: 'US equities with paper-trading support.',
-    category: 'recommended', defaultName: 'Alpaca', badge: 'AP', badgeColor: 'text-emerald-400',
+    category: 'recommended', defaultName: 'Alpaca', badge: 'AP', badgeColor: 'text-success',
     engine: 'alpaca', guardCategory: 'securities', subtitleFields: [],
     schema: {
       type: 'object',
@@ -60,7 +60,7 @@ const demoBrokerPresets = [
   },
   {
     id: 'okx', label: 'OKX', description: 'OKX Unified Trading Account.',
-    category: 'crypto', defaultName: 'OKX', badge: 'OK', badgeColor: 'text-sky-400',
+    category: 'crypto', defaultName: 'OKX', badge: 'OK', badgeColor: 'text-info',
     engine: 'ccxt', guardCategory: 'crypto', subtitleFields: [],
     schema: {
       type: 'object',
