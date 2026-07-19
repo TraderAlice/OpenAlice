@@ -1108,6 +1108,38 @@ describe('UTA — health tracking', () => {
     expect(uta.getHealthInfo().recovering).toBe(false)
   })
 
+  it('moves offline immediately on a broker transport-dead event and retries when transport is restored', async () => {
+    const broker = new MockBroker()
+    let connectionListener: (event: { state: 'alive' | 'dead' | 'restored'; error?: string }) => void = () => {
+      throw new Error('connection-state listener was not registered')
+    }
+    ;(broker as unknown as { setConnectionStateListener: unknown }).setConnectionStateListener = (
+      listener: typeof connectionListener | null,
+    ) => { if (listener) connectionListener = listener }
+    const { uta } = createUTA(broker)
+    await flush()
+    expect(broker.callCount('init')).toBe(1)
+
+    connectionListener({ state: 'dead', error: 'silent half-open detected' })
+    expect(uta.health).toBe('offline')
+    expect(uta.reach).toBe('down')
+    expect(uta.getHealthInfo()).toMatchObject({
+      consecutiveFailures: 6,
+      recovering: true,
+      lastError: 'silent half-open detected',
+    })
+
+    // 1101/1102 is only a nudge: the broker must still pass init+account read
+    // before health can become green again. The nudge bypasses recovery backoff.
+    connectionListener({ state: 'restored' })
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(broker.callCount('init')).toBe(2)
+    expect(uta.health).toBe('healthy')
+    expect(uta.getHealthInfo().recovering).toBe(false)
+    await uta.close()
+  })
+
   it('transitions healthy → degraded after 3 consecutive failures', async () => {
     const broker = new MockBroker()
     const { uta } = createUTA(broker)

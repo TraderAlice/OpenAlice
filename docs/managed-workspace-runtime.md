@@ -4,7 +4,8 @@ This guide owns the packaged-desktop runtime contract for Workspace agents.
 Read it before changing desktop packaging, agent discovery, Pi launch behavior,
 the Windows shell/toolchain, or the `OPENALICE_MANAGED_*` environment keys.
 
-Related guides: [[docs/project-structure.md]] and
+Related guides: [[docs/project-structure.md]],
+[[docs/model-semantics-and-runtime-injection.md]], and
 [[docs/development-workflow.md]].
 
 ## Product Contract
@@ -81,14 +82,36 @@ higher-price tiers implicitly. Changing these settings never rewrites an
 existing Workspace; that Workspace's settings modal remains the explicit
 override surface.
 
+Credential access and model semantics are separate inputs. Known model ids
+resolve reasoning behavior and advertised limits from the offline registry;
+the injector caps the selected context policy at the model maximum and leaves
+effort to the native runtime. Only unknown/free-typed models expose an advanced
+reasoning override, and creation defaults bind that assertion to the exact
+model id so it cannot leak across a later model change. Follow
+[[docs/model-semantics-and-runtime-injection.md]] for the full contract.
+
 Quick Chat must summarize the launch configuration behind its credential pill:
-the effective model ID and context limit are visible before Send. For an
-existing Workspace these values come from its CLI-native config; selecting a
-different credential previews the model that credential will inject and the
-global context default. The adjacent adjustment action opens that Workspace's
-AI injector when a target exists, and falls back to AI Provider settings before
-the first Workspace has been created. Saving the Workspace modal refreshes this
-summary without requiring a page reload.
+the effective model ID and every context limit actually declared by the native
+project config are visible before Send. For an existing Workspace these values
+come from its CLI-native config; selecting a different Pi/opencode credential
+previews the model that credential will inject and the global context default.
+Claude Code and Codex Workspace overrides show their model but omit context
+because those native project files do not declare one. The adjacent adjustment
+action opens that Workspace's AI injector for all four runtimes, and falls back
+to AI Provider settings before the first Workspace has been created. Saving the
+Workspace modal refreshes this summary without requiring a page reload.
+Their default remains the CLI's own global login and configuration: Alice never
+chooses the first compatible vault credential simply because one exists. Only
+an explicit Workspace binding or creation default opts into injection.
+
+Claude Code can place global onboarding and per-project trust screens before an
+interactive seeded prompt even after the same Workspace passes a headless
+provider probe. Its current CLI exposes authentication status but no supported
+status/accept command for these two gates. OpenAlice therefore reads only the
+existing completion booleans in Claude's native state and displays an advisory
+before launch. It never writes those booleans, substitutes a private config
+directory, or treats the advisory as a provider-readiness failure. An unknown
+or changed native state shape fails open and leaves Claude in control.
 
 Provider model catalogs are curated suggestions, not allowlists. Keep the
 free-text model field so a newly released or project-specific model remains
@@ -169,9 +192,11 @@ Source/dev falls back to `node` from the contributor environment. Keep the publi
 JavaScript directly makes behavior depend on the host Node version and the
 nearest `package.json` module type.
 
-The Windows package currently retains dugite's embedded Git payload as well as
-PortableGit. This duplication is intentional until all Workspace Git call
-sites have moved behind an OpenAlice-owned wrapper.
+The Windows package retains dugite's JavaScript execution wrapper but excludes
+its embedded Git payload. `LOCAL_GIT_DIRECTORY` routes every dugite call to the
+same pinned PortableGit tree that supplies Workspace Bash. macOS continues to
+ship dugite's embedded Git because its packaged path does not need a separate
+managed Unix shell payload.
 
 ### Windows workspace shell preference
 
@@ -198,10 +223,11 @@ or deleted, the setting is reported as invalid and process launch fails
 explicitly; OpenAlice does not silently fall back to Auto.
 
 During Windows Pi bootstrap, OpenAlice mirrors the resolved global shell into
-the Workspace's `.pi-agent/settings.json`. This also backfills existing
+the Workspace's `.pi/settings.json`. This also backfills existing
 Workspaces created before the global preference existed, while preserving all
-other Pi-owned settings. The Pi file is a derived compatibility cache; the
-machine-local preference remains the source of truth.
+other Pi-owned project settings. OpenAlice records the prior value so reset can
+restore it. The Pi file is a derived compatibility cache; the machine-local
+preference remains the source of truth.
 
 ## Packaging and Runtime Flow
 
@@ -263,9 +289,14 @@ remain at the OpenAlice/UTA boundary.
 - `src/workspaces/spawn-env.ts` places OpenAlice's CLI shims first, followed by
   managed toolchain directories and host fallbacks. On Windows it also
   canonicalizes `Path`/`PATH` so Pi's nested shell keeps the injected entries.
+- `CliAdapter.lifecycle.prepareWorkspace` is the common, idempotent runtime
+  preparation hook. Workspace creation and every real TUI, Web, headless,
+  readiness, or probe launch use the same hook instead of inventing
+  surface-specific adapter setup.
 - `src/workspaces/adapters/pi.ts` launches the npm runtime as
-  `[managedPiNodePath, managedPiPath, ...args]` and writes the managed shell
-  path into `.pi-agent/settings.json` during Windows Workspace bootstrap.
+  `[managedPiNodePath, managedPiPath, ...args]`; its lifecycle implementation
+  reconciles trust, legacy config, the managed Windows shell, and the native Pi
+  automatic theme pair.
 
 The packaged Electron managed npm runtime is not added to `PATH` as a fake
 `pi` binary; the Pi adapter owns its explicit launch command. The curl
@@ -292,14 +323,43 @@ Pi project trust follows the runtime boundary:
   belong to the contributor. A curl-installed CLI Runtime has an explicit
   managed Pi path and therefore follows the pinned managed approval contract.
 
+Pi terminal appearance follows the same boundary used by Orca:
+
+- when a Workspace has no explicit Pi project theme, runtime preparation writes
+  Pi's built-in `light/dark` automatic pair to `.pi/settings.json`;
+- a Pi project theme already present in that file is user-owned and remains
+  unchanged on later launches;
+- OpenAlice supplies the terminal palette and light/dark facts through xterm,
+  OSC/DSR queries, and mode 2031. Pi remains responsible for its own TUI theme;
+  OpenAlice does not generate or inject palette-specific Pi themes.
+
+Codex and OpenCode use that terminal boundary differently:
+
+- Codex natively probes OSC 10/11 at startup and derives its contrast-sensitive
+  TUI colors from the reported foreground and background. It needs no project
+  theme injection; OpenAlice's shared visible/headless terminal responders are
+  the complete Orca-aligned integration. Codex does not currently consume mode
+  2031 palette updates after startup, so relaunch a running Codex TUI after
+  switching between light and dark appearances.
+- OpenCode can consume the same terminal palette and mode 2031 updates, but its
+  native default is the fixed `opencode` theme. When a Workspace has no native
+  TUI config or legacy explicit theme, runtime preparation writes
+  `{ "theme": "system" }` to the dedicated `tui.json` project layer.
+- Existing `tui.json`, `tui.jsonc`, and legacy project theme choices remain
+  user-owned. OpenAlice does not generate an OpenCode palette or mix TUI
+  settings into the provider-owned `opencode.json` surface.
+
 Do not add external-Pi version probing or upgrade UX to preserve flags used by
 the packaged runtime. Compatibility for the packaged app is maintained by
 pinning and upgrading the bundled Pi with the OpenAlice release.
 
-When a Workspace has a `.pi-agent/` provider override, its trust file lives in
-that redirected agent directory. Otherwise OpenAlice updates Pi's normal agent
-directory; it must not create `.pi-agent/` solely for trust because doing so
-would hide the user's global Pi settings and extensions.
+OpenAlice always updates trust in Pi's normal user agent directory (or an
+explicit user-provided `PI_CODING_AGENT_DIR`). Provider overrides do not change
+that directory: OpenAlice adds a namespaced provider to its `models.json` and
+uses the native Workspace `.pi/settings.json` layer to select it. This keeps
+Pi's global settings, packages, auth, resources, trust, and sessions visible.
+An old Workspace `.pi-agent/` tree is migrated into this native layout before
+launch and removed only after its configuration and session data are preserved.
 
 ### Codex interactive permissions
 
@@ -333,27 +393,54 @@ OpenAlice copies Workspace skills into two canonical project paths:
 - `.claude/skills/` for Claude Code;
 - `.agents/skills/` for Codex, current Pi, and compatible shared-skill readers.
 
-Pi's provider state lives separately under `.pi-agent/`. Do not restore a
-duplicate `.pi/skills/` copy: current Pi discovers the shared
-`.agents/skills/` tree from the Workspace working directory.
+Pi's provider definition lives in its normal user `models.json`; the Workspace
+stores provider/model selection, the automatic terminal theme default, and
+OpenAlice rollback metadata under `.pi/`. Do not restore a duplicate
+`.pi/skills/` copy: current Pi discovers the shared `.agents/skills/` tree from
+the Workspace working directory.
+
+Provider injection into shared native JSON config is node-owned, not
+file-owned. Claude Code's `.claude/settings.local.json` and opencode's
+`opencode.json` preserve unknown/user keys and use their adjacent OpenAlice
+rollback sidecars for conflict-aware reset. Keep all native provider config and
+rollback paths, plus OpenCode's generated `tui.json`, in `_common.mjs`'s local
+git excludes.
 
 ## Packaging Invariants
+
+### Version and update surface
+
+**Settings → General → About OpenAlice** is the user-facing source for the
+running version and update state on every distribution surface. The passive
+read uses `GET /api/version`, whose GitHub release lookup is cached. An
+explicit **Check for updates** uses the authenticated
+`POST /api/version/check` route to bypass that cache without exposing a public
+rate-limit bypass.
+
+Packaged Electron also invokes the existing `electron-updater` check through
+the narrow preload bridge. That check starts the native download path when an
+eligible release exists; download progress and the ready-to-restart action are
+projected into the same Settings card. Electron development and unsigned
+directory packages may not have updater metadata, so the native check reports
+that it is unsupported and the shared version route remains the non-installing
+fallback. The top-level update banner and downloaded-update prompt remain
+secondary notifications over the same backend and updater state.
 
 Keep these true together:
 
 - `vendor/**` remains in the Electron builder file list.
 - `asar` remains disabled while packaged scripts and binaries are executed
   from the resource tree.
-- `dugite` remains in `pnpm.onlyBuiltDependencies` until its embedded payload
-  is deliberately removed; skipping its postinstall silently produces an
-  incomplete package.
+- `dugite` remains in `pnpm.onlyBuiltDependencies` because macOS packages use
+  its embedded Git. The Windows builder excludes `node_modules/dugite/git/**`,
+  keeps the JS wrapper, and must route it through managed PortableGit.
 - Pi and PortableGit versions, download URLs, and checksums remain pinned in
   `scripts/vendor-managed-runtime.mjs`.
 - Managed `fd` and `ripgrep` versions, release URLs, checksums, binaries, and
   license files remain pinned together in `scripts/vendor-managed-runtime.mjs`.
 - Pi remains network-capable. The managed search tools prevent its normal
-  startup probe from downloading a separate copy into each redirected
-  `PI_CODING_AGENT_DIR`; they do not force `PI_OFFLINE` or patch Pi itself.
+  startup probe from downloading redundant copies into its user agent
+  directory; they do not force `PI_OFFLINE` or patch Pi itself.
 - Every packaged Workspace CLI includes the shared `openalice-cli.cjs` payload,
   its POSIX launcher, and its Windows `.cmd` twin; packaged smoke must execute
   the payload through Electron Node.
@@ -383,6 +470,10 @@ contract:
    that invokes `alice-workspace issue create`. The smoke accepts the run only
    when structured assistant output is decoded and the created issue is visible
    from the external `/api/issues` surface.
+
+The focused Windows toolchain smoke additionally loads the packaged dugite JS
+wrapper with no embedded dugite Git present, then performs a real
+`init`/`add`/`commit`/`status` cycle through managed PortableGit.
 
 The second assertion deliberately uses an observable Workspace side effect,
 not a model claiming that a command succeeded. The run emits a versioned JSON
@@ -475,10 +566,11 @@ A release-facing change should also verify a clean-machine flow:
 
 ## Known Follow-up
 
-PortableGit and dugite's embedded Git are still duplicated on Windows. The
-next cleanup is to introduce an OpenAlice-owned Git execution wrapper, migrate
-Workspace/template call sites to it, and remove dugite only after macOS and
-Windows packaged smokes remain green.
+OpenAlice still imports dugite directly at several Workspace and template call
+sites. A future OpenAlice-owned Git execution wrapper can centralize timeouts,
+errors, and environment policy and eventually replace the dugite dependency.
+That refactor is no longer required to keep duplicate Git binaries out of the
+Windows package.
 
 That cleanup must not weaken the first-run contract: install OpenAlice,
 configure a credential, open a Workspace, and let Alice work.

@@ -9,7 +9,10 @@ import {
   type PersistentSessionOptions,
 } from './persistent-session.js';
 import type { TranscriptWatcher } from './transcript-watcher.js';
-import type { TerminalThemeVariant } from './terminal-theme.js';
+import {
+  terminalViewAttributesEqual,
+  type TerminalViewAttributes,
+} from './terminal-view-attributes.js';
 
 /**
  * Per-attach context the factory uses to compose a fresh PersistentSession.
@@ -33,12 +36,6 @@ export interface SessionFactoryContext {
    * `SpawnContext.initialPrompt`.
    */
   readonly initialPrompt?: string;
-  /**
-   * Concrete terminal renderer theme for this interactive spawn. Used only as a
-   * process-start hint for TUIs; changing the frontend theme later does not
-   * mutate an already-running process environment.
-   */
-  readonly terminalTheme?: TerminalThemeVariant;
 }
 
 /**
@@ -80,6 +77,7 @@ export class SessionPool {
   private readonly sessions = new Map<string, PersistentSession>();
   private readonly byWs = new Map<string, Set<string>>();
   private readonly adapterFor = new Map<string, CliAdapter>();
+  private terminalViewAttributes: TerminalViewAttributes | null = null;
 
   constructor(
     private readonly configFactory: SessionConfigFactory,
@@ -96,6 +94,10 @@ export class SessionPool {
       wsId,
       recordId,
       name: factoryCtx.recordName,
+      ...(this.terminalViewAttributes
+        ? { initialTerminalViewAttributes: this.terminalViewAttributes }
+        : {}),
+      onTerminalViewAttributes: (attributes) => this.setTerminalViewAttributes(attributes),
       onDisposed: () => this.onSessionDisposed(wsId, recordId),
     });
 
@@ -169,6 +171,19 @@ export class SessionPool {
 
   size(): number {
     return this.sessions.size;
+  }
+
+  /** App-global renderer truth used by every hidden headless terminal. */
+  setTerminalViewAttributes(attributes: TerminalViewAttributes): boolean {
+    if (
+      this.terminalViewAttributes
+      && terminalViewAttributesEqual(this.terminalViewAttributes, attributes)
+    ) return false;
+    this.terminalViewAttributes = attributes;
+    for (const session of this.sessions.values()) {
+      session.setTerminalViewAttributes(attributes);
+    }
+    return true;
   }
 
   /** Dispose ONE session by id. Returns false if not found. */

@@ -37,6 +37,9 @@ interface Window {
         appHome: string
       }>
     }
+    readonly keyboard: {
+      getInputSourceId(): Promise<string | null>
+    }
     readonly dataHome: {
       getStatus(): Promise<OpenAliceDataHomeStatus>
       chooseAndRestart(): Promise<OpenAliceDataHomeActionResult>
@@ -51,6 +54,10 @@ interface Window {
         | { phase: 'downloaded'; version: string; releaseUrl: string }
         | { phase: 'error'; message: string }
         | null
+      >
+      checkForUpdates(): Promise<
+        | { supported: true }
+        | { supported: false; reason: 'not-packaged' | 'missing-config' }
       >
       onStatus(cb: (status:
         | { phase: 'available'; version?: string; releaseUrl?: string }
@@ -92,6 +99,7 @@ interface Window {
       }): string
       send(connectionId: string, data: Uint8Array): void
       resize(connectionId: string, cols: number, rows: number): void
+      control(connectionId: string, data: string): void
       close(connectionId: string): void
       onMessage(
         connectionId: string,

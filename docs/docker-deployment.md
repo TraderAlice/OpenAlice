@@ -6,7 +6,10 @@ remote-host safety boundary, and container smoke requirements. It complements
 External notification setup is owned by [[docs/connector-service.md]].
 For private source-backed browser access over SSH, start with
 [[docs/remote-quickstart.md]]; its authoritative lifecycle and transport
-contract is owned by [[docs/remote-access.md]].
+contract is owned by [[docs/remote-access.md]]. Docker and managed remote are
+parallel first-class deployment surfaces: Docker owns an image, volume,
+healthcheck, and container lifecycle, while managed remote prepares an existing
+SSH host without requiring it to adopt Docker.
 
 ## Topology
 

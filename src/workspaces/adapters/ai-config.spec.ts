@@ -8,7 +8,7 @@
 import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -16,6 +16,9 @@ import { claudeAdapter } from './claude.js';
 import { codexAdapter } from './codex.js';
 import { opencodeAdapter } from './opencode.js';
 import { piAdapter, syncPiProjectTrust, syncPiWindowsShellPath } from './pi.js';
+import { migrateLegacyPiAgentDir, piWorkspaceProviderId } from './pi-config.js';
+import { prepareAgentRuntimeWorkspace } from '../cli-adapter.js';
+import { credentialToWorkspaceAiCred } from '../credential-injection.js';
 
 let dir: string;
 
@@ -79,6 +82,59 @@ describe('claudeAdapter AI-config', () => {
     expect(existsSync(join(dir, '.claude/settings.local.json'))).toBe(false);
   });
 
+  it('preserves unrelated Claude settings and restores prior provider nodes on reset', async () => {
+    await mkdir(join(dir, '.claude'), { recursive: true });
+    await writeFile(join(dir, '.claude/settings.local.json'), JSON.stringify({
+      permissions: { allow: ['Bash(git:*)'] },
+      env: { USER_SETTING: 'keep', ANTHROPIC_BASE_URL: 'https://before.test' },
+      model: 'before-model',
+    }, null, 2));
+
+    await claudeAdapter.writeAiConfig!(dir, {
+      baseUrl: 'https://after.test', apiKey: 'after-key', model: 'after-model', authMode: 'bearer',
+    });
+    expect(JSON.parse(await read('.claude/settings.local.json'))).toMatchObject({
+      permissions: { allow: ['Bash(git:*)'] },
+      env: {
+        USER_SETTING: 'keep',
+        ANTHROPIC_BASE_URL: 'https://after.test',
+        ANTHROPIC_AUTH_TOKEN: 'after-key',
+      },
+      model: 'after-model',
+    });
+
+    await claudeAdapter.writeAiConfig!(dir, {});
+    expect(JSON.parse(await read('.claude/settings.local.json'))).toEqual({
+      permissions: { allow: ['Bash(git:*)'] },
+      env: { USER_SETTING: 'keep', ANTHROPIC_BASE_URL: 'https://before.test' },
+      model: 'before-model',
+    });
+    expect(existsSync(join(dir, '.claude/openalice-provider.json'))).toBe(false);
+  });
+
+  it('does not undo a user edit made after Claude provider injection', async () => {
+    await claudeAdapter.writeAiConfig!(dir, { model: 'injected-model' });
+    const settings = JSON.parse(await read('.claude/settings.local.json'));
+    settings.model = 'user-edited-model';
+    settings.permissions = { deny: ['Read(.env)'] };
+    await writeFile(join(dir, '.claude/settings.local.json'), JSON.stringify(settings, null, 2));
+
+    await claudeAdapter.writeAiConfig!(dir, {});
+    expect(JSON.parse(await read('.claude/settings.local.json'))).toEqual({
+      model: 'user-edited-model',
+      permissions: { deny: ['Read(.env)'] },
+    });
+  });
+
+  it('does not recreate Claude config that the user deleted after injection', async () => {
+    await claudeAdapter.writeAiConfig!(dir, { model: 'injected-model' });
+    await rm(join(dir, '.claude/settings.local.json'));
+
+    await claudeAdapter.writeAiConfig!(dir, {});
+    expect(existsSync(join(dir, '.claude/settings.local.json'))).toBe(false);
+    expect(existsSync(join(dir, '.claude/openalice-provider.json'))).toBe(false);
+  });
+
   it('round-trips through readAiConfig', async () => {
     await claudeAdapter.writeAiConfig!(dir, {
       baseUrl: 'https://api.test/v1', apiKey: 'sk-123', model: 'claude-x', authMode: 'bearer',
@@ -86,6 +142,31 @@ describe('claudeAdapter AI-config', () => {
     expect(await claudeAdapter.readAiConfig!(dir)).toEqual({
       baseUrl: 'https://api.test/v1', apiKey: 'sk-123', model: 'claude-x', authMode: 'bearer', wireShape: 'anthropic',
     });
+  });
+
+  it('round-trips Claude Code effort and restores the prior project value on reset', async () => {
+    await mkdir(join(dir, '.claude'), { recursive: true });
+    await writeFile(join(dir, '.claude/settings.local.json'), JSON.stringify({ effortLevel: 'low' }));
+    await claudeAdapter.writeAiConfig!(dir, { model: 'claude-x', reasoningEffort: 'high' });
+    expect(JSON.parse(await read('.claude/settings.local.json'))).toMatchObject({
+      model: 'claude-x',
+      effortLevel: 'high',
+    });
+    expect(await claudeAdapter.readAiConfig!(dir)).toMatchObject({ reasoningEffort: 'high' });
+    await claudeAdapter.writeAiConfig!(dir, {});
+    expect(JSON.parse(await read('.claude/settings.local.json'))).toEqual({ effortLevel: 'low' });
+  });
+
+  it('rejects effort values Claude Code cannot persist in project settings', async () => {
+    await expect(claudeAdapter.writeAiConfig!(dir, { model: 'claude-x', reasoningEffort: 'max' }))
+      .rejects.toThrow(/cannot persist project effort max/);
+  });
+
+  it('does not claim a user effortLevel when resetting config from a pre-effort release', async () => {
+    await mkdir(join(dir, '.claude'), { recursive: true });
+    await writeFile(join(dir, '.claude/settings.local.json'), JSON.stringify({ effortLevel: 'xhigh' }));
+    await claudeAdapter.writeAiConfig!(dir, {});
+    expect(JSON.parse(await read('.claude/settings.local.json'))).toEqual({ effortLevel: 'xhigh' });
   });
 
   it('readAiConfig returns null when no file exists', async () => {
@@ -195,6 +276,14 @@ describe('codexAdapter AI-config', () => {
     });
   });
 
+  it('writes and round-trips model_reasoning_effort', async () => {
+    await codexAdapter.writeAiConfig!(dir, {
+      baseUrl: 'https://oai.test/v1', model: 'gpt-x', reasoningEffort: 'medium',
+    });
+    expect(await read('.codex/config.toml')).toContain('model_reasoning_effort = "medium"\n');
+    expect(await codexAdapter.readAiConfig!(dir)).toMatchObject({ reasoningEffort: 'medium' });
+  });
+
   it('readAiConfig returns null when no files exist', async () => {
     expect(await codexAdapter.readAiConfig!(dir)).toBeNull();
   });
@@ -219,6 +308,83 @@ describe('codexAdapter AI-config', () => {
 
 describe('opencodeAdapter AI-config', () => {
   const mcpEnv = { OPENALICE_MCP_URL: 'http://127.0.0.1:47332/mcp', AQ_WS_ID: 'ws-abc' };
+
+  it('prepares OpenCode to derive its theme from the terminal palette', async () => {
+    await mkdir(join(dir, '.git/info'), { recursive: true });
+    await writeFile(join(dir, '.git/info/exclude'), 'existing.local\n');
+
+    await prepareAgentRuntimeWorkspace(opencodeAdapter, {
+      wsId: 'ws-abc',
+      cwd: dir,
+      launcherRepoRoot: '/repo',
+    });
+    await prepareAgentRuntimeWorkspace(opencodeAdapter, {
+      wsId: 'ws-abc',
+      cwd: dir,
+      launcherRepoRoot: '/repo',
+    });
+
+    expect(JSON.parse(await read('tui.json'))).toEqual({
+      $schema: 'https://opencode.ai/tui.json',
+      theme: 'system',
+    });
+    expect((await read('.git/info/exclude')).split(/\r?\n/).filter((line) => line === 'tui.json'))
+      .toEqual(['tui.json']);
+  });
+
+  it('preserves an explicit OpenCode project theme and sibling TUI settings', async () => {
+    await writeFile(join(dir, 'tui.json'), JSON.stringify({ theme: 'catppuccin', scroll_speed: 2 }));
+
+    await prepareAgentRuntimeWorkspace(opencodeAdapter, {
+      wsId: 'ws-abc',
+      cwd: dir,
+      launcherRepoRoot: '/repo',
+    });
+
+    expect(JSON.parse(await read('tui.json'))).toEqual({ theme: 'catppuccin', scroll_speed: 2 });
+  });
+
+  it('adds the system theme without replacing sibling TUI settings', async () => {
+    await writeFile(join(dir, 'tui.json'), JSON.stringify({ scroll_speed: 2 }));
+
+    await prepareAgentRuntimeWorkspace(opencodeAdapter, {
+      wsId: 'ws-abc',
+      cwd: dir,
+      launcherRepoRoot: '/repo',
+    });
+
+    expect(JSON.parse(await read('tui.json'))).toEqual({
+      scroll_speed: 2,
+      $schema: 'https://opencode.ai/tui.json',
+      theme: 'system',
+    });
+  });
+
+  it('leaves a legacy OpenCode theme in provider config for native migration', async () => {
+    await writeFile(join(dir, 'opencode.json'), JSON.stringify({ theme: 'system', share: 'disabled' }));
+
+    await prepareAgentRuntimeWorkspace(opencodeAdapter, {
+      wsId: 'ws-abc',
+      cwd: dir,
+      launcherRepoRoot: '/repo',
+    });
+
+    expect(existsSync(join(dir, 'tui.json'))).toBe(false);
+    expect(JSON.parse(await read('opencode.json'))).toEqual({ theme: 'system', share: 'disabled' });
+  });
+
+  it('leaves JSONC TUI configuration to OpenCode', async () => {
+    await writeFile(join(dir, 'tui.jsonc'), '{ // user-owned\n  "scroll_speed": 2\n}\n');
+
+    await prepareAgentRuntimeWorkspace(opencodeAdapter, {
+      wsId: 'ws-abc',
+      cwd: dir,
+      launcherRepoRoot: '/repo',
+    });
+
+    expect(existsSync(join(dir, 'tui.json'))).toBe(false);
+    expect(await read('tui.jsonc')).toBe('{ // user-owned\n  "scroll_speed": 2\n}\n');
+  });
 
   it('keeps OpenAlice MCP out of opencode env even when an MCP URL is present', () => {
     const env = opencodeAdapter.composeEnv!({ cwd: dir, env: mcpEnv });
@@ -264,6 +430,43 @@ describe('opencodeAdapter AI-config', () => {
     });
   });
 
+  it.each([true, false])('round-trips opencode reasoning=%s', async (reasoning) => {
+    await opencodeAdapter.writeAiConfig!(dir, {
+      baseUrl: 'https://cn.test/v1',
+      model: 'reasoning-model',
+      contextWindow: 256_000,
+      reasoning,
+    });
+    expect(JSON.parse(await read('opencode.json')).provider.workspace.models['reasoning-model'])
+      .toMatchObject({ reasoning });
+    expect(await opencodeAdapter.readAiConfig!(dir)).toMatchObject({ reasoning });
+  });
+
+  it.each([
+    ['openai-chat', 'medium', { reasoningEffort: 'medium' }],
+    ['anthropic', 'high', { effort: 'high' }],
+    ['google-generative-ai', 'low', { thinkingConfig: { includeThoughts: true, thinkingLevel: 'low' } }],
+  ] as const)('projects %s effort into model options and round-trips it', async (wireShape, reasoningEffort, options) => {
+    await opencodeAdapter.writeAiConfig!(dir, {
+      baseUrl: 'https://provider.test', model: 'reasoning-model', wireShape, reasoningEffort,
+    });
+    expect(JSON.parse(await read('opencode.json')).provider.workspace.models['reasoning-model'].options)
+      .toEqual(options);
+    expect(await opencodeAdapter.readAiConfig!(dir)).toMatchObject({ reasoningEffort });
+  });
+
+  it('enables adaptive thinking when projecting effort for a current Claude model', async () => {
+    await opencodeAdapter.writeAiConfig!(dir, {
+      baseUrl: 'https://api.anthropic.com',
+      model: 'claude-sonnet-4-6',
+      wireShape: 'anthropic',
+      reasoningEffort: 'high',
+    });
+    expect(JSON.parse(await read('opencode.json')).provider.workspace.models['claude-sonnet-4-6'].options)
+      .toEqual({ thinking: { type: 'adaptive' }, effort: 'high' });
+    expect(await opencodeAdapter.readAiConfig!(dir)).toMatchObject({ reasoningEffort: 'high' });
+  });
+
   it('honors wireShape — Anthropic, Google, and OpenAI Responses use their native SDKs', async () => {
     await opencodeAdapter.writeAiConfig!(dir, { baseUrl: 'https://x/anthropic', apiKey: 'k', model: 'glm-5.1', wireShape: 'anthropic' });
     expect(JSON.parse(await read('opencode.json')).provider.workspace.npm).toBe('@ai-sdk/anthropic');
@@ -294,10 +497,71 @@ describe('opencodeAdapter AI-config', () => {
     });
   });
 
+  it('writes the automatic MiniMax opencode binding through native Anthropic thinking blocks', async () => {
+    const cred = credentialToWorkspaceAiCred({
+      vendor: 'minimax',
+      apiKey: 'mm-key',
+      wires: {
+        anthropic: 'https://api.minimax.io/anthropic',
+        'openai-chat': 'https://api.minimax.io/v1',
+      },
+    }, 'opencode', { model: 'MiniMax-M2.5' })!;
+
+    await opencodeAdapter.writeAiConfig!(dir, cred);
+    const config = JSON.parse(await read('opencode.json'));
+    expect(config.provider.workspace).toMatchObject({
+      npm: '@ai-sdk/anthropic',
+      options: {
+        baseURL: 'https://api.minimax.io/anthropic',
+        headers: { Authorization: 'Bearer mm-key' },
+      },
+      models: {
+        'MiniMax-M2.5': {
+          name: 'MiniMax-M2.5',
+          reasoning: true,
+          limit: { context: 204_800, output: 16_384 },
+        },
+      },
+    });
+    expect(config.model).toBe('workspace/MiniMax-M2.5');
+  });
+
   it('reset (empty cred) deletes opencode.json', async () => {
     await opencodeAdapter.writeAiConfig!(dir, { baseUrl: 'u', model: 'm' });
     await opencodeAdapter.writeAiConfig!(dir, {});
     expect(existsSync(join(dir, 'opencode.json'))).toBe(false);
+  });
+
+  it('preserves unrelated opencode config and restores the previous provider/model on reset', async () => {
+    await writeFile(join(dir, 'opencode.json'), JSON.stringify({
+      $schema: 'https://example.test/custom-schema.json',
+      theme: 'system',
+      provider: {
+        other: { npm: '@ai-sdk/other' },
+        workspace: { npm: '@ai-sdk/legacy', name: 'User workspace provider' },
+      },
+      model: 'other/old-model',
+    }, null, 2));
+
+    await opencodeAdapter.writeAiConfig!(dir, {
+      baseUrl: 'https://provider.test/v1', apiKey: 'key', model: 'new-model', reasoning: true,
+    });
+    const injected = JSON.parse(await read('opencode.json'));
+    expect(injected.theme).toBe('system');
+    expect(injected.provider.other).toEqual({ npm: '@ai-sdk/other' });
+    expect(injected.provider.workspace.models['new-model'].reasoning).toBe(true);
+
+    await opencodeAdapter.writeAiConfig!(dir, {});
+    expect(JSON.parse(await read('opencode.json'))).toEqual({
+      $schema: 'https://example.test/custom-schema.json',
+      theme: 'system',
+      provider: {
+        other: { npm: '@ai-sdk/other' },
+        workspace: { npm: '@ai-sdk/legacy', name: 'User workspace provider' },
+      },
+      model: 'other/old-model',
+    });
+    expect(existsSync(join(dir, '.opencode/openalice-provider.json'))).toBe(false);
   });
 
   it('round-trips through readAiConfig (strips the provider/ prefix off model)', async () => {
@@ -431,6 +695,54 @@ describe('composeHeadlessCommand (one-shot headless argv, prompt placed per-CLI)
 
 describe('piAdapter AI-config', () => {
   const mcpEnv = { OPENALICE_MCP_URL: 'http://127.0.0.1:47332/mcp', AQ_WS_ID: 'ws-abc' };
+  let previousPiAgentDir: string | undefined;
+
+  beforeEach(() => {
+    previousPiAgentDir = process.env['PI_CODING_AGENT_DIR'];
+    process.env['PI_CODING_AGENT_DIR'] = join(dir, 'pi-user-agent');
+  });
+
+  afterEach(() => {
+    if (previousPiAgentDir === undefined) delete process.env['PI_CODING_AGENT_DIR'];
+    else process.env['PI_CODING_AGENT_DIR'] = previousPiAgentDir;
+  });
+
+  const readGlobalModels = async (): Promise<Record<string, any>> =>
+    JSON.parse(await readFile(join(dir, 'pi-user-agent', 'models.json'), 'utf8')) as Record<string, any>;
+
+  const readWorkspaceProvider = async (): Promise<Record<string, any>> => {
+    const models = await readGlobalModels();
+    return models['providers'][piWorkspaceProviderId(dir)] as Record<string, any>;
+  };
+
+  it('prepares Pi to follow the terminal light/dark mode by default', async () => {
+    await mkdir(join(dir, '.pi'), { recursive: true });
+    await writeFile(join(dir, '.pi/settings.json'), JSON.stringify({ quietStartup: true }));
+
+    await prepareAgentRuntimeWorkspace(piAdapter, {
+      wsId: 'ws-abc',
+      cwd: dir,
+      launcherRepoRoot: '/repo',
+    });
+
+    expect(JSON.parse(await read('.pi/settings.json'))).toEqual({
+      quietStartup: true,
+      theme: 'light/dark',
+    });
+  });
+
+  it('preserves an explicit Pi project theme on later lifecycle runs', async () => {
+    await mkdir(join(dir, '.pi'), { recursive: true });
+    await writeFile(join(dir, '.pi/settings.json'), JSON.stringify({ theme: 'dark' }));
+
+    await prepareAgentRuntimeWorkspace(piAdapter, {
+      wsId: 'ws-abc',
+      cwd: dir,
+      launcherRepoRoot: '/repo',
+    });
+
+    expect(JSON.parse(await read('.pi/settings.json'))).toEqual({ theme: 'dark' });
+  });
 
   it('records a new OpenAlice workspace in Pi global trust without forcing agent-dir redirection', async () => {
     const home = join(dir, 'home');
@@ -443,11 +755,15 @@ describe('piAdapter AI-config', () => {
     expect(piAdapter.composeEnv!({ cwd: dir, env: { HOME: home } })).toEqual({});
   });
 
-  it('writes trust beside a workspace provider and preserves an explicit parent refusal', async () => {
+  it('ignores a legacy workspace agent dir for trust and preserves an explicit parent refusal', async () => {
     await mkdir(join(dir, '.pi-agent'), { recursive: true });
-    await syncPiProjectTrust(dir, { HOME: join(dir, 'unused-home') });
+    const providerHome = join(dir, 'provider-home');
+    await syncPiProjectTrust(dir, { HOME: providerHome });
     const canonicalDir = await realpath(dir);
-    expect(JSON.parse(await read('.pi-agent/trust.json'))).toEqual({ [canonicalDir]: true });
+    expect(JSON.parse(await readFile(join(providerHome, '.pi/agent/trust.json'), 'utf8'))).toEqual({
+      [canonicalDir]: true,
+    });
+    expect(existsSync(join(dir, '.pi-agent/trust.json'))).toBe(false);
 
     const parent = dirname(canonicalDir);
     const refused = join(dir, 'refused');
@@ -546,37 +862,43 @@ describe('piAdapter AI-config', () => {
     ]);
   });
 
-  it('composeEnv leaves Pi startup networking to the base env and redirects only in override mode', async () => {
-    // No .pi-agent yet → no redirect.
+  it('composeEnv leaves Pi startup networking and the native agent-dir fallback untouched', async () => {
     const before = piAdapter.composeEnv!({ cwd: dir, env: mcpEnv });
     expect(before['PI_OFFLINE']).toBeUndefined();
     expect(before['PI_CODING_AGENT_DIR']).toBeUndefined();
-    // After writing a provider override, the agent dir is redirected.
     await piAdapter.writeAiConfig!(dir, { baseUrl: 'https://cn.test/v1', apiKey: 'sk-p', model: 'deepseek-chat' });
-    const after = piAdapter.composeEnv!({ cwd: dir, env: mcpEnv });
-    expect(after['PI_CODING_AGENT_DIR']).toBe(join(dir, '.pi-agent'));
+    expect(piAdapter.composeEnv!({ cwd: dir, env: mcpEnv })).toEqual({});
   });
 
-  it('writes a custom openai-completions provider to .pi-agent/{models,settings}.json', async () => {
+  it('writes the provider globally and selects it through native project settings', async () => {
     await piAdapter.writeAiConfig!(dir, {
       baseUrl: 'https://cn.test/v1', apiKey: 'sk-p', model: 'deepseek-chat',
     });
-    expect(JSON.parse(await read('.pi-agent/models.json'))).toEqual({
-      providers: {
-        workspace: {
-          name: 'OpenAlice workspace provider',
-          api: 'openai-completions',
-          baseUrl: 'https://cn.test/v1',
-          apiKey: 'sk-p',
-          models: [{ id: 'deepseek-chat' }],
-        },
-      },
+    expect(await readWorkspaceProvider()).toEqual({
+      name: `OpenAlice workspace provider (${basename(dir)})`,
+      api: 'openai-completions',
+      baseUrl: 'https://cn.test/v1',
+      apiKey: 'sk-p',
+      models: [{ id: 'deepseek-chat' }],
     });
-    const settings = JSON.parse(await read('.pi-agent/settings.json'));
-    expect(settings.defaultProvider).toBe('workspace');
+    const settings = JSON.parse(await read('.pi/settings.json'));
+    expect(settings.defaultProvider).toBe(piWorkspaceProviderId(dir));
     expect(settings.defaultModel).toBe('deepseek-chat');
     if (process.platform === 'win32') expect(settings.shellPath).toMatch(/bash\.exe$/i);
     else expect(settings.shellPath).toBeUndefined();
+    expect(existsSync(join(dir, '.pi-agent'))).toBe(false);
+  });
+
+  it('serializes concurrent Workspace providers without dropping either global entry', async () => {
+    const other = join(dir, 'second-workspace');
+    await mkdir(other, { recursive: true });
+    await Promise.all([
+      piAdapter.writeAiConfig!(dir, { baseUrl: 'https://one/v1', model: 'one' }),
+      piAdapter.writeAiConfig!(other, { baseUrl: 'https://two/v1', model: 'two' }),
+    ]);
+    const providers = (await readGlobalModels())['providers'];
+    expect(providers[piWorkspaceProviderId(dir)].models).toEqual([{ id: 'one' }]);
+    expect(providers[piWorkspaceProviderId(other)].models).toEqual([{ id: 'two' }]);
   });
 
   it('writes managed shellPath into Pi settings when the runtime profile provides one', async () => {
@@ -588,8 +910,8 @@ describe('piAdapter AI-config', () => {
       await piAdapter.writeAiConfig!(dir, {
         baseUrl: 'https://cn.test/v1', apiKey: 'sk-p', model: 'deepseek-chat',
       });
-      expect(JSON.parse(await read('.pi-agent/settings.json'))).toEqual({
-        defaultProvider: 'workspace',
+      expect(JSON.parse(await read('.pi/settings.json'))).toEqual({
+        defaultProvider: piWorkspaceProviderId(dir),
         defaultModel: 'deepseek-chat',
         shellPath,
       });
@@ -600,18 +922,20 @@ describe('piAdapter AI-config', () => {
   });
 
   it('backfills the Windows shell path without overwriting Pi-owned settings', async () => {
-    await mkdir(join(dir, '.pi-agent'), { recursive: true });
-    await writeFile(join(dir, '.pi-agent', 'settings.json'), JSON.stringify({
-      defaultProvider: 'workspace',
-      theme: 'light',
-    }));
+    await piAdapter.writeAiConfig!(dir, { baseUrl: 'https://x/v1', model: 'm' });
+    const settingsPath = join(dir, '.pi', 'settings.json');
+    const settings = JSON.parse(await readFile(settingsPath, 'utf8')) as Record<string, unknown>;
+    delete settings['shellPath'];
+    settings['theme'] = 'light';
+    await writeFile(settingsPath, JSON.stringify(settings));
     const customPath = 'D:\\PortableGit\\bin\\bash.exe';
     const before = process.env['OPENALICE_WORKSPACE_SHELL_PATH'];
     process.env['OPENALICE_WORKSPACE_SHELL_PATH'] = customPath;
     try {
       await syncPiWindowsShellPath(dir, 'win32');
-      expect(JSON.parse(await read('.pi-agent/settings.json'))).toEqual({
-        defaultProvider: 'workspace',
+      expect(JSON.parse(await read('.pi/settings.json'))).toEqual({
+        defaultProvider: piWorkspaceProviderId(dir),
+        defaultModel: 'm',
         theme: 'light',
         shellPath: customPath,
       });
@@ -625,19 +949,54 @@ describe('piAdapter AI-config', () => {
     await piAdapter.writeAiConfig!(dir, {
       baseUrl: 'https://cn.test/v1', apiKey: 'sk-p', model: 'deepseek-chat', contextWindow: 1_000_000,
     });
-    expect(JSON.parse(await read('.pi-agent/models.json')).providers.workspace.models).toEqual([
+    expect((await readWorkspaceProvider())['models']).toEqual([
       { id: 'deepseek-chat', contextWindow: 1_000_000 },
     ]);
   });
 
+  it.each([true, false])('round-trips Pi reasoning=%s without changing global Pi defaults', async (reasoning) => {
+    const globalSettingsPath = join(dir, 'pi-user-agent', 'settings.json');
+    await mkdir(dirname(globalSettingsPath), { recursive: true });
+    await writeFile(globalSettingsPath, JSON.stringify({ defaultProvider: 'user', thinkingLevel: 'high' }));
+    await piAdapter.writeAiConfig!(dir, {
+      baseUrl: 'https://cn.test/v1', model: 'reasoning-model', reasoning,
+    });
+    expect((await readWorkspaceProvider())['models']).toEqual([{ id: 'reasoning-model', reasoning }]);
+    expect(await piAdapter.readAiConfig!(dir)).toMatchObject({ reasoning });
+    expect(JSON.parse(await readFile(globalSettingsPath, 'utf8'))).toEqual({
+      defaultProvider: 'user',
+      thinkingLevel: 'high',
+    });
+  });
+
+  it('round-trips Pi effort through project defaultThinkingLevel and restores the prior value', async () => {
+    await mkdir(join(dir, '.pi'), { recursive: true });
+    await writeFile(join(dir, '.pi/settings.json'), JSON.stringify({ defaultThinkingLevel: 'low', theme: 'dark' }));
+    await piAdapter.writeAiConfig!(dir, {
+      baseUrl: 'https://cn.test/v1', model: 'reasoning-model', reasoningEffort: 'high',
+    });
+    expect(JSON.parse(await read('.pi/settings.json'))).toMatchObject({ defaultThinkingLevel: 'high' });
+    expect(await piAdapter.readAiConfig!(dir)).toMatchObject({ reasoningEffort: 'high' });
+    await piAdapter.writeAiConfig!(dir, {});
+    expect(JSON.parse(await read('.pi/settings.json'))).toEqual({ defaultThinkingLevel: 'low', theme: 'dark' });
+  });
+
+  it('maps registry effort none to Pi\'s native off level', async () => {
+    await piAdapter.writeAiConfig!(dir, {
+      baseUrl: 'https://cn.test/v1', model: 'reasoning-model', reasoningEffort: 'none',
+    });
+    expect(JSON.parse(await read('.pi/settings.json')).defaultThinkingLevel).toBe('off');
+    expect(await piAdapter.readAiConfig!(dir)).toMatchObject({ reasoningEffort: 'none' });
+  });
+
   it('honors wireShape — Anthropic, Google, and OpenAI Responses use native Pi APIs', async () => {
     await piAdapter.writeAiConfig!(dir, { baseUrl: 'https://x/anthropic', apiKey: 'k', model: 'glm-5.1', wireShape: 'anthropic' });
-    expect(JSON.parse(await read('.pi-agent/models.json')).providers.workspace.api).toBe('anthropic-messages');
+    expect((await readWorkspaceProvider())['api']).toBe('anthropic-messages');
     await piAdapter.writeAiConfig!(dir, { baseUrl: 'https://x/google', apiKey: 'AQ.k', model: 'gemini', wireShape: 'google-generative-ai' });
-    expect(JSON.parse(await read('.pi-agent/models.json')).providers.workspace.api).toBe('google-generative-ai');
+    expect((await readWorkspaceProvider())['api']).toBe('google-generative-ai');
     expect((await piAdapter.readAiConfig!(dir))?.wireShape).toBe('google-generative-ai');
     await piAdapter.writeAiConfig!(dir, { baseUrl: 'https://x/v1', apiKey: 'k', model: 'gpt-5.5', wireShape: 'openai-responses' });
-    expect(JSON.parse(await read('.pi-agent/models.json')).providers.workspace.api).toBe('openai-responses');
+    expect((await readWorkspaceProvider())['api']).toBe('openai-responses');
   });
 
   it('writes Anthropic bearer auth without a conflicting apiKey and round-trips it', async () => {
@@ -648,7 +1007,7 @@ describe('piAdapter AI-config', () => {
       wireShape: 'anthropic',
       authMode: 'bearer',
     });
-    const provider = JSON.parse(await read('.pi-agent/models.json')).providers.workspace;
+    const provider = await readWorkspaceProvider();
     expect(provider.apiKey).toBeUndefined();
     expect(provider.headers).toEqual({ Authorization: 'Bearer mm-key' });
     expect(await piAdapter.readAiConfig!(dir)).toMatchObject({
@@ -658,10 +1017,47 @@ describe('piAdapter AI-config', () => {
     });
   });
 
-  it('reset (empty cred) tears down the entire .pi-agent/ directory', async () => {
+  it('reset restores prior project defaults and removes only the OpenAlice provider', async () => {
+    await mkdir(join(dir, '.pi'), { recursive: true });
+    await writeFile(join(dir, '.pi/settings.json'), JSON.stringify({
+      defaultProvider: 'user-provider',
+      defaultModel: 'user-model',
+      theme: 'dark',
+    }));
+    const globalModelsPath = join(dir, 'pi-user-agent', 'models.json');
+    await mkdir(dirname(globalModelsPath), { recursive: true });
+    await writeFile(globalModelsPath, JSON.stringify({
+      providers: { user: { name: 'User provider', api: 'openai-completions' } },
+      customField: true,
+    }));
     await piAdapter.writeAiConfig!(dir, { baseUrl: 'u', model: 'm' });
     await piAdapter.writeAiConfig!(dir, {});
-    expect(existsSync(join(dir, '.pi-agent'))).toBe(false);
+    expect(JSON.parse(await read('.pi/settings.json'))).toEqual({
+      defaultProvider: 'user-provider',
+      defaultModel: 'user-model',
+      theme: 'dark',
+    });
+    expect(await readGlobalModels()).toEqual({
+      providers: { user: { name: 'User provider', api: 'openai-completions' } },
+      customField: true,
+    });
+    expect(existsSync(join(dir, '.pi/openalice-provider.json'))).toBe(false);
+  });
+
+  it('Pi reset leaves project selections edited after injection in place', async () => {
+    await piAdapter.writeAiConfig!(dir, { baseUrl: 'u', model: 'injected-model' });
+    const settingsPath = join(dir, '.pi/settings.json');
+    const settings = JSON.parse(await read('.pi/settings.json'));
+    settings.defaultProvider = 'user-provider';
+    settings.defaultModel = 'user-model';
+    await writeFile(settingsPath, JSON.stringify(settings));
+
+    await piAdapter.writeAiConfig!(dir, {});
+    expect(JSON.parse(await read('.pi/settings.json'))).toEqual({
+      defaultProvider: 'user-provider',
+      defaultModel: 'user-model',
+    });
+    expect(existsSync(join(dir, '.pi/openalice-provider.json'))).toBe(false);
   });
 
   it('round-trips through readAiConfig', async () => {
@@ -675,5 +1071,61 @@ describe('piAdapter AI-config', () => {
 
   it('readAiConfig returns null when no file exists', async () => {
     expect(await piAdapter.readAiConfig!(dir)).toBeNull();
+  });
+
+  it('preserves malformed Pi-owned global models instead of overwriting it', async () => {
+    const modelsPath = join(dir, 'pi-user-agent', 'models.json');
+    await mkdir(dirname(modelsPath), { recursive: true });
+    await writeFile(modelsPath, '{ user is repairing this');
+    await expect(piAdapter.writeAiConfig!(dir, { baseUrl: 'u', model: 'm' }))
+      .rejects.toThrow(/not valid JSON/);
+    expect(await readFile(modelsPath, 'utf8')).toBe('{ user is repairing this');
+  });
+
+  it('migrates legacy provider, settings, auth, trust, packages, and sessions without hiding user state', async () => {
+    const legacy = join(dir, '.pi-agent');
+    await mkdir(join(legacy, 'sessions', 'workspace-session'), { recursive: true });
+    await mkdir(join(legacy, 'packages', 'legacy-package'), { recursive: true });
+    await writeFile(join(legacy, 'models.json'), JSON.stringify({
+      providers: {
+        workspace: {
+          name: 'OpenAlice workspace provider',
+          api: 'openai-completions',
+          baseUrl: 'https://legacy/v1',
+          apiKey: 'legacy-key',
+          models: [{ id: 'legacy-model', reasoning: true }],
+        },
+        legacyUser: { name: 'Legacy user provider', api: 'openai-completions' },
+      },
+    }));
+    await writeFile(join(legacy, 'settings.json'), JSON.stringify({ defaultProvider: 'workspace', theme: 'legacy' }));
+    await writeFile(join(legacy, 'auth.json'), JSON.stringify({ legacyUser: { type: 'api_key', key: 'legacy-auth' } }));
+    await writeFile(join(legacy, 'trust.json'), JSON.stringify({ '/legacy': false }));
+    await writeFile(join(legacy, 'sessions', 'workspace-session', 'turn.jsonl'), '{}\n');
+    await writeFile(join(legacy, 'packages', 'legacy-package', 'package.json'), '{}\n');
+
+    const globalDir = join(dir, 'pi-user-agent');
+    await mkdir(globalDir, { recursive: true });
+    await writeFile(join(globalDir, 'settings.json'), JSON.stringify({ theme: 'user', thinkingLevel: 'high' }));
+    await writeFile(join(globalDir, 'auth.json'), JSON.stringify({ existing: { type: 'api_key', key: 'keep' } }));
+
+    await expect(migrateLegacyPiAgentDir(dir)).resolves.toBe(true);
+    expect(existsSync(legacy)).toBe(false);
+    expect(await readFile(join(globalDir, 'sessions', 'workspace-session', 'turn.jsonl'), 'utf8')).toBe('{}\n');
+    expect(await readFile(join(globalDir, 'packages', 'legacy-package', 'package.json'), 'utf8')).toBe('{}\n');
+    expect(JSON.parse(await readFile(join(globalDir, 'settings.json'), 'utf8'))).toEqual({
+      theme: 'user', thinkingLevel: 'high',
+    });
+    expect(JSON.parse(await readFile(join(globalDir, 'auth.json'), 'utf8'))).toEqual({
+      legacyUser: { type: 'api_key', key: 'legacy-auth' },
+      existing: { type: 'api_key', key: 'keep' },
+    });
+    expect(JSON.parse(await readFile(join(globalDir, 'trust.json'), 'utf8'))).toEqual({ '/legacy': false });
+    expect(await piAdapter.readAiConfig!(dir)).toMatchObject({
+      baseUrl: 'https://legacy/v1',
+      apiKey: 'legacy-key',
+      model: 'legacy-model',
+      reasoning: true,
+    });
   });
 });

@@ -8,13 +8,18 @@ import {
   buildRemoteArtifactsProbeCommand,
   buildRemoteBuildToolsProbeCommand,
   buildRemoteCheckoutProbeCommand,
+  buildRemoteCloneCommand,
+  buildRemoteControlProbeCommand,
   buildRemoteInstallCommand,
   buildRemoteServerStartCommand,
   buildRemoteServerStopCommand,
+  buildRemoteSourceUpdateCommand,
+  buildRemoteSourceUpdateProbeCommand,
   buildRemoteSshArgs,
   connectRemote,
   createRemotePlan,
   parseRemoteArgs,
+  probeRemoteHost,
   readRememberedRemotePort,
   runSshCommand,
 } from './remote.mjs'
@@ -56,6 +61,7 @@ describe('OpenAlice managed remote connector', () => {
       assumeYes: true,
       planOnly: true,
       takeover: true,
+      mode: 'connect',
     })
   })
 
@@ -64,11 +70,14 @@ describe('OpenAlice managed remote connector', () => {
     expect(() => parseRemoteArgs(['host name'])).toThrow('unsupported characters')
     expect(() => parseRemoteArgs(['host', '--app-dir', '~/OpenAlice'])).toThrow('absolute path')
     expect(() => parseRemoteArgs(['host', '--branch', 'dev'])).toThrow('Unknown option')
+    expect(() => parseRemoteArgs(['host', '--status', '--stop'])).toThrow('cannot be used together')
+    expect(() => parseRemoteArgs(['host', '--stop', '--takeover'])).toThrow('cannot be combined')
   })
 
   it('builds a remote installer command from local provenance, not remote flags', () => {
     const command = buildRemoteInstallCommand(masterInstallSource)
     expect(command).toContain('OPENALICE_INSTALL_URL=')
+    expect(command).toContain('OPENALICE_INSTALL_CONTEXT=remote')
     expect(command).toContain("--branch 'master'")
     expect(command).not.toContain('--version')
   })
@@ -180,18 +189,76 @@ describe('OpenAlice managed remote connector', () => {
     expect(plan.blocker).toContain('22.19.0')
   })
 
-  it('blocks a missing checkout before proposing system-package changes', () => {
+  it('plans a managed clone instead of making the user prepare a checkout over raw SSH', () => {
     const plan = createRemotePlan(parseRemoteArgs(['host', '--app-dir', '/srv/missing']), {
       ...missingRemote(),
+      sourceCheckoutState: 'absent',
       sourceCheckoutPresent: false,
       runtimeBuildToolsMissing: ['python3'],
     })
-    expect(plan.blocker).toContain('Clone it first')
-    expect(plan.installRuntimeDeps).toBe(false)
+    expect(plan.blocker).toBe('')
+    expect(plan.cloneSource).toBe(true)
+    expect(plan.installRuntimeDeps).toBe(true)
     expect(plan.mutations).toEqual([
       'install remote OpenAlice CLI',
       'install managed Pi 0.80.6',
+      'install source Runtime build tools',
+      'clone OpenAlice source (branch master)',
+      'start remote OpenAlice Server',
     ])
+  })
+
+  it('selects a private managed checkout when --app-dir is omitted', () => {
+    const remote = {
+      ...missingRemote(),
+      managedAppDir: '/home/alice/.openalice/sources/branch-master-12345678/OpenAlice',
+      sourceCheckoutState: 'absent',
+      sourceCheckoutPresent: false,
+    }
+    const plan = createRemotePlan(parseRemoteArgs(['host']), remote)
+    expect(plan.sourceMode).toBe('managed')
+    expect(plan.serverAppDir).toBe(remote.managedAppDir)
+    expect(plan.cloneSource).toBe(true)
+    expect(plan.mutations).toContain('clone OpenAlice source (branch master)')
+  })
+
+  it('refuses to overwrite an occupied non-OpenAlice source path', () => {
+    const plan = createRemotePlan(parseRemoteArgs(['host', '--app-dir', '/srv/existing']), {
+      ...missingRemote(),
+      sourceCheckoutState: 'invalid',
+      sourceCheckoutPresent: false,
+    })
+    expect(plan.blocker).toContain('exists but is not an OpenAlice source checkout')
+    expect(plan.cloneSource).toBe(false)
+  })
+
+  it('updates a matching-version remote CLI when its installed payload differs', () => {
+    const remote = compatibleRemote()
+    remote.cliContentIdentity = '1111111111111111'
+    const plan = createRemotePlan(parseRemoteArgs(['host']), remote, {
+      contentIdentity: '2222222222222222',
+    })
+    expect(plan.cliMatchesLocal).toBe(false)
+    expect(plan.mutations).toEqual([
+      'update remote OpenAlice CLI',
+    ])
+  })
+
+  it('plans a safe rebuild when the managed branch checkout has advanced', () => {
+    const remote = managedUpdateRemote()
+    const plan = createRemotePlan(parseRemoteArgs(['host']), remote)
+    expect(plan.updateSource).toBe(true)
+    expect(plan.rebuildSource).toBe(true)
+    expect(plan.restartServer).toBe(true)
+    expect(plan.mutations).toEqual([
+      'update managed OpenAlice source (branch master)',
+      'restart remote OpenAlice Server with updated source',
+    ])
+
+    remote.sourceDirty = true
+    const dirty = createRemotePlan(parseRemoteArgs(['host']), remote)
+    expect(dirty.blocker).toContain('tracked local changes')
+    expect(dirty.updateSource).toBe(false)
   })
 
   it('uses the detected Server port and blocks an explicit mismatch', () => {
@@ -237,6 +304,74 @@ describe('OpenAlice managed remote connector', () => {
     expect(runRemote).not.toHaveBeenCalled()
     expect(connectTunnel).not.toHaveBeenCalled()
     expect(stdout.write).toHaveBeenCalledWith(expect.stringContaining('No remote files or processes were changed'))
+  })
+
+  it('reports managed remote status without opening a tunnel or changing the host', async () => {
+    const runRemote = vi.fn()
+    const connectTunnel = vi.fn()
+    const stdout = { write: vi.fn() }
+    await expect(connectRemote(parseRemoteArgs(['host', '--status']), {
+      probeRemote: async () => compatibleRemote(),
+      runRemote,
+      connectTunnel,
+      stdout,
+    })).resolves.toBe(0)
+    expect(runRemote).not.toHaveBeenCalled()
+    expect(connectTunnel).not.toHaveBeenCalled()
+    expect(stdout.write).toHaveBeenCalledWith(expect.stringContaining('Runtime: running (cli-server)'))
+  })
+
+  it('uses one lightweight SSH probe for status and stop control', async () => {
+    const runRemote = vi.fn(async (_options, command) => {
+      expect(command).toContain('server status --json')
+      expect(command).toContain("--home '/data/openalice'")
+      return [
+        'cli=/home/alice/.openalice/bin/openalice',
+        'version=0.2.0',
+        'identity=' + JSON.stringify({
+          version: '0.2.0',
+          installSource: masterInstallSource,
+          contentIdentity: '1234567890abcdef',
+        }),
+        'status=' + JSON.stringify(compatibleRemote().status),
+        '',
+      ].join('\n')
+    })
+    const remote = await probeRemoteHost(parseRemoteArgs([
+      'host',
+      '--home', '/data/openalice',
+      '--status',
+    ]), { runRemote })
+
+    expect(runRemote).toHaveBeenCalledOnce()
+    expect(remote).toEqual(expect.objectContaining({
+      cliPath: '/home/alice/.openalice/bin/openalice',
+      cliVersion: '0.2.0',
+      cliContentIdentity: '1234567890abcdef',
+      cliCompatible: true,
+      status: expect.objectContaining({ class: 'running' }),
+    }))
+    expect(buildRemoteControlProbeCommand(parseRemoteArgs(['host', '--stop'])))
+      .toContain('server status --json')
+  })
+
+  it('stops a managed remote Server without requiring a raw SSH command', async () => {
+    const probeRemote = vi.fn()
+      .mockResolvedValueOnce(compatibleRemote())
+      .mockResolvedValueOnce(compatibleRemote({ class: 'absent', state: 'absent', owner: null, endpoints: {} }))
+    const runRemote = vi.fn(async () => 'OpenAlice Server stopped\n')
+    const connectTunnel = vi.fn()
+    const stdout = { write: vi.fn() }
+    await expect(connectRemote(parseRemoteArgs(['host', '--stop']), {
+      probeRemote,
+      runRemote,
+      connectTunnel,
+      stdout,
+    })).resolves.toBe(0)
+    expect(runRemote).toHaveBeenCalledOnce()
+    expect(runRemote.mock.calls[0][1]).toContain('server stop')
+    expect(connectTunnel).not.toHaveBeenCalled()
+    expect(stdout.write).toHaveBeenCalledWith('OpenAlice Server is stopped on host.\n')
   })
 
   it('default-no leaves a missing remote Runtime unchanged', async () => {
@@ -297,6 +432,54 @@ describe('OpenAlice managed remote connector', () => {
     }), expect.any(Object))
   })
 
+  it('installs, clones a managed checkout, starts, and connects without manual SSH setup', async () => {
+    const options = parseRemoteArgs(['host', '--yes', '--no-open'])
+    const appDir = '/home/alice/.openalice/sources/version-remote-smoke/OpenAlice'
+    const initial = { ...missingRemote(), managedAppDir: appDir, sourceCheckoutState: 'absent', sourceCheckoutPresent: false }
+    const installed = {
+      ...compatibleRemote({ class: 'absent', state: 'absent', owner: null, endpoints: {} }),
+      managedAppDir: appDir,
+      sourceCheckoutState: 'absent',
+      sourceCheckoutPresent: false,
+      sourceArtifactsReady: null,
+    }
+    const cloned = {
+      ...installed,
+      sourceCheckoutState: 'present',
+      sourceCheckoutPresent: true,
+      sourceArtifactsReady: true,
+    }
+    const running = {
+      ...compatibleRemote(),
+      managedAppDir: appDir,
+      sourceCheckoutState: 'present',
+      sourceCheckoutPresent: true,
+      sourceArtifactsReady: true,
+    }
+    const probeRemote = vi.fn()
+      .mockResolvedValueOnce(initial)
+      .mockResolvedValueOnce(installed)
+      .mockResolvedValueOnce(cloned)
+      .mockResolvedValueOnce(running)
+    const runRemote = vi.fn(async () => '')
+    const connectTunnel = vi.fn(async () => 0)
+
+    await expect(connectRemote(options, {
+      probeRemote,
+      runRemote,
+      connectTunnel,
+      installSource: masterInstallSource,
+      repositoryUrl: 'https://example.test/OpenAlice.git',
+      stdout: { write: vi.fn() },
+    })).resolves.toBe(0)
+
+    expect(runRemote).toHaveBeenCalledTimes(3)
+    expect(runRemote.mock.calls[0][1]).toContain('openalice-install')
+    expect(runRemote.mock.calls[1][1]).toContain("git clone --branch 'master' --single-branch 'https://example.test/OpenAlice.git'")
+    expect(runRemote.mock.calls[2][1]).toContain(`--app-dir '${appDir}'`)
+    expect(connectTunnel).toHaveBeenCalledOnce()
+  })
+
   it('continues when an interrupted installer or Server start actually completed remotely', async () => {
     const options = parseRemoteArgs(['host', '--app-dir', '/srv/OpenAlice', '--yes', '--no-open'])
     const probeRemote = vi.fn()
@@ -317,6 +500,33 @@ describe('OpenAlice managed remote connector', () => {
 
     expect(stdout.write).toHaveBeenCalledWith(expect.stringContaining('remote install completed before the disconnect'))
     expect(stdout.write).toHaveBeenCalledWith(expect.stringContaining('remote Server became ready before the disconnect'))
+  })
+
+  it('stops, fast-forwards, rebuilds, and reconnects when a managed branch advances', async () => {
+    const options = parseRemoteArgs(['host', '--yes', '--no-open'])
+    const absentBeforeUpdate = managedUpdateRemote({ class: 'absent', state: 'absent', owner: null, endpoints: {} })
+    const absentAfterUpdate = { ...absentBeforeUpdate, sourceUpdateAvailable: false }
+    const runningAfterUpdate = { ...managedUpdateRemote(), sourceUpdateAvailable: false }
+    const probeRemote = vi.fn()
+      .mockResolvedValueOnce(managedUpdateRemote())
+      .mockResolvedValueOnce(absentBeforeUpdate)
+      .mockResolvedValueOnce(absentAfterUpdate)
+      .mockResolvedValueOnce(runningAfterUpdate)
+    const runRemote = vi.fn(async () => '')
+    const connectTunnel = vi.fn(async () => 0)
+
+    await expect(connectRemote(options, {
+      probeRemote,
+      runRemote,
+      connectTunnel,
+      stdout: { write: vi.fn() },
+    })).resolves.toBe(0)
+
+    expect(runRemote).toHaveBeenCalledTimes(3)
+    expect(runRemote.mock.calls[0][1]).toContain('server stop')
+    expect(runRemote.mock.calls[1][1]).toContain('merge --ff-only FETCH_HEAD')
+    expect(runRemote.mock.calls[2][1]).toContain('--rebuild')
+    expect(connectTunnel).toHaveBeenCalledOnce()
   })
 
   it('installs Pi, gracefully restarts an existing CLI Server, and reconnects', async () => {
@@ -383,26 +593,33 @@ describe('OpenAlice managed remote connector', () => {
       .mockImplementationOnce(() => commandChild({ code: 0, stdout: 'ready\n' }))
     const sleep = vi.fn(async () => undefined)
 
+    const stdout = { write: vi.fn() }
+    const stderr = { write: vi.fn() }
     await expect(runSshCommand(parseRemoteArgs(['host']), 'printf ready', {
       spawnProcess,
       sleep,
-      stdout: { write: vi.fn() },
-      stderr: { write: vi.fn() },
+      stdout,
+      stderr,
     })).resolves.toBe('ready\n')
     expect(spawnProcess).toHaveBeenCalledTimes(3)
     expect(sleep).toHaveBeenNthCalledWith(1, 750)
     expect(sleep).toHaveBeenNthCalledWith(2, 1500)
+    expect(stdout.write).toHaveBeenCalledWith('Connection interrupted; retrying (1 of 2)...\n')
+    expect(stderr.write).not.toHaveBeenCalled()
   })
 
   it('does not retry an ordinary remote command failure', async () => {
     const spawnProcess = vi.fn(() => commandChild({ code: 1, stderr: 'remote command rejected\n' }))
+    const stderr = { write: vi.fn() }
     await expect(runSshCommand(parseRemoteArgs(['host']), 'exit 1', {
       spawnProcess,
       sleep: vi.fn(async () => undefined),
       stdout: { write: vi.fn() },
-      stderr: { write: vi.fn() },
+      stderr,
     })).rejects.toThrow('Remote SSH command failed')
     expect(spawnProcess).toHaveBeenCalledOnce()
+    expect(stderr.write).toHaveBeenCalledOnce()
+    expect(stderr.write).toHaveBeenCalledWith('remote command rejected\n')
   })
 
   it('re-plans after install and never replaces a newly discovered owner implicitly', async () => {
@@ -435,8 +652,16 @@ describe('OpenAlice managed remote connector', () => {
     expect(probe).toContain("root='/srv/Alice'\\''s source'")
     expect(probe).toContain('test -f "$root/dist/main.js"')
     expect(buildRemoteCheckoutProbeCommand("/srv/Alice's source"))
-      .toContain("'/srv/Alice'\\''s source/package.json'")
+      .toContain("root='/srv/Alice'\\''s source'")
     expect(buildRemoteBuildToolsProbeCommand()).toContain("printf 'cxx\\n'")
+    const clone = buildRemoteCloneCommand("/srv/Alice's source", masterInstallSource)
+    expect(clone).toContain("root='/srv/Alice'\\''s source'")
+    expect(clone).toContain("--branch 'master' --single-branch")
+    expect(clone).toContain('mv "$tmp" "$root"')
+    const updateProbe = buildRemoteSourceUpdateProbeCommand('/srv/OpenAlice', masterInstallSource)
+    expect(updateProbe).toContain("'refs/heads/master'")
+    const update = buildRemoteSourceUpdateCommand('/srv/OpenAlice', masterInstallSource)
+    expect(update).toContain('merge --ff-only FETCH_HEAD')
   })
 })
 
@@ -462,6 +687,7 @@ function missingRemote() {
     piVersion: null,
     piCompatible: false,
     sourceCheckoutPresent: true,
+    sourceCheckoutState: 'present',
     sourceArtifactsReady: false,
     runtimeBuildToolsMissing: ['git', 'python3', 'make', 'cxx'],
     cliPath: null,
@@ -481,6 +707,7 @@ function compatibleRemote(statusOverrides = {}) {
     piVersion: '0.80.6',
     piCompatible: true,
     sourceCheckoutPresent: null,
+    sourceCheckoutState: null,
     sourceArtifactsReady: null,
     runtimeBuildToolsMissing: [],
     cliPath: '/home/alice/.openalice/bin/openalice',
@@ -498,5 +725,17 @@ function compatibleRemote(statusOverrides = {}) {
       capabilities: ['runtime.stop'],
       ...statusOverrides,
     },
+  }
+}
+
+function managedUpdateRemote(statusOverrides = {}) {
+  return {
+    ...compatibleRemote(statusOverrides),
+    managedAppDir: '/home/alice/.openalice/sources/branch-master-12345678/OpenAlice',
+    sourceCheckoutState: 'present',
+    sourceCheckoutPresent: true,
+    sourceArtifactsReady: true,
+    sourceUpdateAvailable: true,
+    sourceDirty: false,
   }
 }

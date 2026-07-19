@@ -102,6 +102,7 @@ export async function connectSsh(options, dependencies = {}) {
     stdio: ['inherit', 'ignore', 'inherit'],
     windowsHide: true,
   })
+  const tunnelLifetime = holdTunnel(ssh)
 
   let ready = false
   const earlyFailure = new Promise((_, reject) => {
@@ -122,7 +123,7 @@ export async function connectSsh(options, dependencies = {}) {
     stdout.write('The SSH tunnel stays active until this command exits. Press Ctrl+C to close it.\n')
     if (options.onReady) await options.onReady({ localPort, localUrl })
     if (options.openBrowser) await launchBrowser(localUrl)
-    return await holdTunnel(ssh)
+    return await tunnelLifetime
   } catch (error) {
     ssh.kill('SIGTERM')
     throw error

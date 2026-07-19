@@ -76,10 +76,19 @@ describe('UTAManagerSDK — data-source participation', () => {
           asVendor: false,
           capabilities: { supportedSecTypes: [], supportedOrderTypes: [], historicalBars: { supported: true, quality: 'realtime' } },
         }),
+        summary('custom-bars', 'trading', {
+          capabilities: { supportedSecTypes: [], supportedOrderTypes: [], historicalBars: { supported: true } },
+        }),
+        summary('disabled-bars', 'trading', {
+          capabilities: { supportedSecTypes: [], supportedOrderTypes: [], historicalBars: { supported: false, quality: 'delayed' } },
+        }),
       ]),
     })
 
-    await expect(m.getBarCapabilities()).resolves.toEqual({ 'alpaca-paper': 'iex' })
+    await expect(m.getBarCapabilities()).resolves.toEqual({
+      'alpaca-paper': 'iex',
+      'custom-bars': 'realtime',
+    })
   })
 })
 

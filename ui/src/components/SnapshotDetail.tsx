@@ -14,20 +14,20 @@ export function SnapshotDetail({ snapshot, onClose }: SnapshotDetailProps) {
   const a = snapshot.account
 
   return (
-    <div className="border border-accent/30 rounded-lg bg-bg-secondary overflow-hidden">
+    <div className="border border-primary/30 rounded-lg bg-secondary overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-accent/5 border-b border-border">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-primary/5 border-b border-border">
         <div className="flex items-center gap-2">
           <HealthDot health={snapshot.health} />
-          <span className="text-[13px] text-text font-medium">
+          <span className="text-[13px] text-foreground font-medium">
             {new Date(snapshot.timestamp).toLocaleString()}
           </span>
           <TriggerBadge trigger={snapshot.trigger} />
-          <span className="text-[11px] text-text-muted">{snapshot.accountId}</span>
+          <span className="text-[11px] text-muted-foreground">{snapshot.accountId}</span>
         </div>
         <button
           onClick={onClose}
-          className="text-text-muted hover:text-text text-[13px] px-1.5 transition-colors"
+          className="text-muted-foreground hover:text-foreground text-[13px] px-1.5 transition-colors"
         >
           &times;
         </button>
@@ -44,13 +44,13 @@ export function SnapshotDetail({ snapshot, onClose }: SnapshotDetailProps) {
       {/* Positions */}
       {snapshot.positions.length > 0 && (
         <div className="px-4 pb-3">
-          <p className="text-[11px] text-text-muted uppercase tracking-wide mb-1.5">
+          <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-1.5">
             Positions ({snapshot.positions.length})
           </p>
           <div className="border border-border rounded overflow-x-auto">
             <table className="w-full text-[12px]">
               <thead>
-                <tr className="bg-bg text-text-muted text-left">
+                <tr className="bg-background text-muted-foreground text-left">
                   <th className="px-2.5 py-1.5 font-medium">Symbol</th>
                   <th className="px-2.5 py-1.5 font-medium text-center">Ccy</th>
                   <th className="px-2.5 py-1.5 font-medium text-right">Qty</th>
@@ -66,17 +66,17 @@ export function SnapshotDetail({ snapshot, onClose }: SnapshotDetailProps) {
                   return (
                     <tr key={i} className="border-t border-border">
                       <td className="px-2.5 py-1.5">
-                        <span className="font-medium text-text">{symbolFromAliceId(p.aliceId)}</span>
-                        <span className={`ml-1.5 text-[10px] px-1 py-0.5 rounded font-medium ${p.side === 'long' ? 'bg-green/15 text-green' : 'bg-red/15 text-red'}`}>
+                        <span className="font-medium text-foreground">{symbolFromAliceId(p.aliceId)}</span>
+                        <span className={`ml-1.5 text-[10px] px-1 py-0.5 rounded font-medium ${p.side === 'long' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
                           {p.side}
                         </span>
                       </td>
-                      <td className="px-2.5 py-1.5 text-right text-text tabular-nums">{p.quantity}</td>
-                      <td className="px-2.5 py-1.5 text-center text-text-muted text-[10px] tabular-nums">{p.currency}</td>
-                      <td className="px-2.5 py-1.5 text-right text-text-muted tabular-nums">{fmtStr(p.avgCost, p.currency)}</td>
-                      <td className="px-2.5 py-1.5 text-right text-text tabular-nums">{fmtStr(p.marketPrice, p.currency)}</td>
-                      <td className="px-2.5 py-1.5 text-right text-text tabular-nums">{fmtStr(p.marketValue, p.currency)}</td>
-                      <td className={`px-2.5 py-1.5 text-right font-medium tabular-nums ${pnl >= 0 ? 'text-green' : 'text-red'}`}>
+                      <td className="px-2.5 py-1.5 text-right text-foreground tabular-nums">{p.quantity}</td>
+                      <td className="px-2.5 py-1.5 text-center text-muted-foreground text-[10px] tabular-nums">{p.currency}</td>
+                      <td className="px-2.5 py-1.5 text-right text-muted-foreground tabular-nums">{fmtStr(p.avgCost, p.currency)}</td>
+                      <td className="px-2.5 py-1.5 text-right text-foreground tabular-nums">{fmtStr(p.marketPrice, p.currency)}</td>
+                      <td className="px-2.5 py-1.5 text-right text-foreground tabular-nums">{fmtStr(p.marketValue, p.currency)}</td>
+                      <td className={`px-2.5 py-1.5 text-right font-medium tabular-nums ${pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
                         {fmtPnlStr(p.unrealizedPnL, p.currency)}
                       </td>
                     </tr>
@@ -91,16 +91,16 @@ export function SnapshotDetail({ snapshot, onClose }: SnapshotDetailProps) {
       {/* Open Orders */}
       {snapshot.openOrders.length > 0 && (
         <div className="px-4 pb-3">
-          <p className="text-[11px] text-text-muted uppercase tracking-wide mb-1.5">
+          <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-1.5">
             Open Orders ({snapshot.openOrders.length})
           </p>
           <div className="space-y-1">
             {snapshot.openOrders.map((o, i) => (
-              <div key={i} className="flex items-center gap-2 text-[12px] px-2.5 py-1.5 border border-border rounded bg-bg">
-                <span className={`font-medium ${o.action === 'BUY' ? 'text-green' : 'text-red'}`}>{o.action}</span>
-                <span className="text-text">{symbolFromAliceId(o.aliceId)}</span>
-                <span className="text-text-muted">{o.totalQuantity} @ {o.orderType}</span>
-                <span className="text-accent text-[10px]">{o.status}</span>
+              <div key={i} className="flex items-center gap-2 text-[12px] px-2.5 py-1.5 border border-border rounded bg-background">
+                <span className={`font-medium ${o.action === 'BUY' ? 'text-success' : 'text-destructive'}`}>{o.action}</span>
+                <span className="text-foreground">{symbolFromAliceId(o.aliceId)}</span>
+                <span className="text-muted-foreground">{o.totalQuantity} @ {o.orderType}</span>
+                <span className="text-primary text-[10px]">{o.status}</span>
               </div>
             ))}
           </div>
@@ -110,7 +110,7 @@ export function SnapshotDetail({ snapshot, onClose }: SnapshotDetailProps) {
       {/* Empty state */}
       {snapshot.positions.length === 0 && snapshot.openOrders.length === 0 && (
         <div className="px-4 pb-3">
-          <p className="text-[12px] text-text-muted">No positions or orders at this time.</p>
+          <p className="text-[12px] text-muted-foreground">No positions or orders at this time.</p>
         </div>
       )}
     </div>
@@ -120,10 +120,10 @@ export function SnapshotDetail({ snapshot, onClose }: SnapshotDetailProps) {
 // ==================== Sub-components ====================
 
 function HealthDot({ health }: { health: string }) {
-  const color = health === 'healthy' ? 'bg-green'
-    : health === 'degraded' ? 'bg-yellow-400'
-    : health === 'disabled' ? 'bg-text-muted/40'
-    : 'bg-red'
+  const color = health === 'healthy' ? 'bg-success'
+    : health === 'degraded' ? 'bg-warning'
+    : health === 'disabled' ? 'bg-muted-foreground/40'
+    : 'bg-destructive'
   return <div className={`w-1.5 h-1.5 rounded-full ${color}`} />
 }
 
@@ -132,17 +132,17 @@ function TriggerBadge({ trigger }: { trigger: string }) {
     : trigger === 'post-reject' ? 'reject'
     : trigger
   return (
-    <span className="text-[10px] px-1.5 py-0.5 rounded bg-bg-tertiary text-text-muted">
+    <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
       {label}
     </span>
   )
 }
 
 function MetricItem({ label, value, pnl }: { label: string; value: string; pnl?: number }) {
-  const color = pnl == null ? 'text-text' : pnl >= 0 ? 'text-green' : 'text-red'
+  const color = pnl == null ? 'text-foreground' : pnl >= 0 ? 'text-success' : 'text-destructive'
   return (
     <div>
-      <p className="text-[10px] text-text-muted uppercase tracking-wide">{label}</p>
+      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</p>
       <p className={`text-[16px] font-bold tabular-nums ${color}`}>{value}</p>
     </div>
   )

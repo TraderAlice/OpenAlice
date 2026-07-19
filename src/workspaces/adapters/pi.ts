@@ -1,34 +1,25 @@
 import { existsSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { mkdir, readFile, realpath, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, realpath, rename, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 
 import { runtimeProfileFromEnv } from '@/core/runtime-profile.js';
 import { resolveBashPath } from '@/core/shell-resolver.js';
 
 import type { CliAdapter, SpawnContext, WorkspaceAiCred } from '../cli-adapter.js';
-import { readWorkspaceFile, writeWorkspaceFile } from '../file-service.js';
 import type { HeadlessOutputEvent } from '../headless-output.js';
+import {
+  migrateLegacyPiAgentDir,
+  PI_BINDING_STATE_PATH,
+  readPiWorkspaceConfig,
+  resolvePiAgentDir,
+  syncPiWorkspaceTheme,
+  syncPiWorkspaceShellPath,
+  writePiWorkspaceConfig,
+} from './pi-config.js';
 
-// Pi's per-workspace provider override. `models.json` is read from Pi's AGENT
-// DIR, which has NO project-local layer — so we redirect the whole agent dir to
-// `<cwd>/.pi-agent` via PI_CODING_AGENT_DIR (composeEnv) and drop models.json
-// there. This does not affect project-resource discovery rooted at `cwd`: Pi
-// officially discovers shared project skills from `<cwd>/.agents/skills`
-// (walking ancestors to the repo root), so OpenAlice can use the same canonical
-// copy as Codex without maintaining a duplicate `<cwd>/.pi/skills` tree.
-// Verified against Pi 0.78.1 and the bundled 0.80.6.
-const PI_AGENT_DIR = '.pi-agent';
-const PI_MODELS_PATH = `${PI_AGENT_DIR}/models.json`;
-const PI_SETTINGS_PATH = `${PI_AGENT_DIR}/settings.json`;
-const PI_PROVIDER_NAME = 'workspace';
 const PI_TRUST_FILENAME = 'trust.json';
 
 let piTrustWriteQueue: Promise<void> = Promise.resolve();
-
-function positiveNumber(value: number | null | undefined): number | null {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
-}
 
 function piCommandHead(env: Readonly<Record<string, string | undefined>>): readonly string[] {
   const profile = runtimeProfileFromEnv(env);
@@ -42,29 +33,11 @@ export async function syncPiWindowsShellPath(
   platform: NodeJS.Platform = process.platform,
 ): Promise<void> {
   if (platform !== 'win32') return;
-  const agentDir = join(cwd, PI_AGENT_DIR);
-  if (!existsSync(agentDir)) return;
+  if (!existsSync(join(cwd, PI_BINDING_STATE_PATH))) return;
   const shellPath = resolveBashPath(process.env, 'win32');
   if (!shellPath) return;
 
-  const raw = await readWorkspaceFile(cwd, PI_SETTINGS_PATH);
-  let settings: Record<string, unknown> = {};
-  if (raw !== null) {
-    try {
-      const parsed = JSON.parse(raw) as unknown;
-      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return;
-      settings = parsed as Record<string, unknown>;
-    } catch {
-      // Pi owns this file too; do not overwrite a malformed/user-edited file.
-      return;
-    }
-  }
-  if (settings['shellPath'] === shellPath) return;
-  await writeWorkspaceFile(
-    cwd,
-    PI_SETTINGS_PATH,
-    JSON.stringify({ ...settings, shellPath }, null, 2) + '\n',
-  );
+  await syncPiWorkspaceShellPath(cwd, shellPath).catch(() => undefined);
 }
 
 /**
@@ -75,23 +48,16 @@ export async function syncPiWindowsShellPath(
  * process starts, while preserving any explicit trust/no-trust decision the
  * user already saved for this directory or one of its parents.
  *
- * Pi uses the redirected `.pi-agent` directory whenever a Workspace credential
- * is installed; without that override it uses the user's normal agent dir.
- * Writing to the directory Pi will actually read avoids creating `.pi-agent`
- * just for trust (which would accidentally hide the user's global Pi config).
+ * Trust is always written to Pi's real user agent directory. Workspace provider
+ * selection lives in `.pi/settings.json`; it must never replace the global
+ * agent directory that owns packages, settings, auth, and sessions.
  */
 export async function syncPiProjectTrust(
   cwd: string,
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<void> {
   const run = async (): Promise<void> => {
-    const workspaceAgentDir = join(cwd, PI_AGENT_DIR);
-    const configuredAgentDir = env['PI_CODING_AGENT_DIR']?.trim();
-    const agentDir = existsSync(workspaceAgentDir)
-      ? workspaceAgentDir
-      : configuredAgentDir
-        ? resolve(configuredAgentDir)
-        : join(resolve(env['HOME']?.trim() || homedir()), '.pi', 'agent');
+    const agentDir = resolvePiAgentDir(env);
     const trustPath = join(agentDir, PI_TRUST_FILENAME);
     const canonicalCwd = await realpath(cwd).catch(() => resolve(cwd));
     const trust = await readPiTrustFile(trustPath);
@@ -189,13 +155,12 @@ function piHeadlessApproveArgs(env: Readonly<Record<string, string | undefined>>
  * `.pi/extensions/openalice-bridge.ts` MCP bridge was removed when the launcher
  * went CLI-only. See memory feedback_cli_injection_over_mcp_bridge.
  *
- * PROVIDER override: Pi has no `--base-url` flag and `models.json` has no
- * project layer, so per-workspace provider config goes through the redirected
- * agent dir holding `models.json` (+ `settings.json` pinning the default
- * provider/model). Reset deletes `.pi-agent/` → Pi falls back to the user's
- * global `~/.pi/agent`. v1 writes `api: "openai-completions"` (Chat Completions
- * — covers OpenAI-compatible + CN/local gateways); openai-responses /
- * anthropic-messages are future, add when a case appears.
+ * PROVIDER override: Pi has no project-local `models.json`, so OpenAlice adds a
+ * namespaced provider to Pi's real user agent directory and selects it through
+ * the native `<cwd>/.pi/settings.json` project layer. This preserves Pi's own
+ * global settings, packages, auth, resources, sessions, and fallback behavior.
+ * Reset restores the pre-injection project defaults and removes only the
+ * OpenAlice-owned provider node.
  *
  * RESUME is first-class by-id (claude-level), via launcher-ASSIGNED id rather
  * than disk harvesting: `--session-id <id>` is create-or-reopen
@@ -203,8 +168,8 @@ function piHeadlessApproveArgs(env: Readonly<Record<string, string | undefined>>
  * `composeCommand` emits `--session-id <uuid>`, and the launcher persists it as
  * `resumeHint` at spawn (capability `assignsSessionId`). Reattach then resumes
  * BY ID. This sidesteps pi's lazy transcript write (file only appears after the
- * first assistant turn) and the PI_CODING_AGENT_DIR redirect — neither matters
- * when the launcher already knows the id. transcriptDiscovery stays 'none'.
+ * first assistant turn) because the launcher already knows the id.
+ * transcriptDiscovery stays 'none'.
  */
 export const piAdapter: CliAdapter = {
   id: 'pi',
@@ -219,26 +184,30 @@ export const piAdapter: CliAdapter = {
     transcriptDiscovery: 'none',
     // pi `--session-id <id>` is create-or-reopen, so the launcher mints the id
     // at spawn and records it immediately — by-id resume with no disk-watching,
-    // immune to pi's lazy transcript write + the PI_CODING_AGENT_DIR redirect.
+    // immune to pi's lazy transcript write.
     assignsSessionId: true,
     headless: true,
   },
 
-  // Reconcile the derived Pi cache on every Windows launch so workspaces made
-  // before the global shell setting existed pick it up without requiring a
-  // credential rewrite. The helper returns before I/O on every other OS.
-  async bootstrap({ cwd }): Promise<void> {
-    await syncPiWindowsShellPath(cwd);
-    await syncPiProjectTrust(cwd);
+  lifecycle: {
+    // Reconcile launcher-managed Pi project defaults before every surface
+    // starts. Each operation is idempotent and preserves explicit Pi-owned
+    // project choices.
+    async prepareWorkspace({ cwd }): Promise<void> {
+      await migrateLegacyPiAgentDir(cwd);
+      await syncPiWorkspaceTheme(cwd);
+      await syncPiWindowsShellPath(cwd);
+      await syncPiProjectTrust(cwd);
+    },
   },
 
   composeCommand(_base: readonly string[], ctx: SpawnContext): readonly string[] {
     // Tools come from the CLI-injection path (alice on PATH + shared
     // .agents/skills), not flags — so the command head is just the binary + a
     // resume flag (if any).
-    // `bootstrap()` records trust for this OpenAlice-managed Workspace before
-    // every launch. Keeping argv free of `--approve` preserves compatibility
-    // with external Pi 0.78.x runtimes that predate the flag.
+    // The runtime lifecycle records trust for this OpenAlice-managed Workspace
+    // before every launch. Keeping argv free of `--approve` preserves
+    // compatibility with external Pi 0.78.x runtimes that predate the flag.
     const head = [...piCommandHead(ctx.env)];
     // Quick-chat seed: `pi [--session-id <id>] <messages…>` opens the
     // interactive TUI seeded with that first message. UNLIKE the other adapters,
@@ -410,120 +379,25 @@ export const piAdapter: CliAdapter = {
       !line.startsWith('{"type":"tool_execution_update"');
   },
 
-  composeEnv(ctx: SpawnContext): Record<string, string> {
+  composeEnv(_ctx: SpawnContext): Record<string, string> {
     // Do not force PI_OFFLINE. OpenAlice is a networked product and Pi may
     // download missing runtime tools during startup. A user or launcher can
     // still opt into Pi's offline behavior by setting PI_OFFLINE in the base
     // process environment, which composeSpawnInputs preserves.
-    const env: Record<string, string> = {};
-    // Override mode only: redirect the agent dir to the workspace's models.json.
-    // Absent ⇒ unset ⇒ Pi uses the user's global ~/.pi/agent (its normal state).
-    const piAgentDir = join(ctx.cwd, PI_AGENT_DIR);
-    if (existsSync(piAgentDir)) {
-      env['PI_CODING_AGENT_DIR'] = piAgentDir;
-    }
-    return env;
+    // In particular, never inject PI_CODING_AGENT_DIR: Pi's normal project
+    // settings layer selects the Workspace provider while its user agent dir
+    // continues to own packages, auth, settings, resources, and sessions.
+    return {};
   },
 
   async writeAiConfig(cwd: string, cred: WorkspaceAiCred): Promise<void> {
-    const hasProvider = !!(cred.baseUrl || cred.apiKey || cred.model);
-    if (!hasProvider) {
-      // Reset: drop the redirected agent dir → Pi falls back to global config.
-      await rm(join(cwd, PI_AGENT_DIR), { recursive: true, force: true });
-      return;
-    }
-
-    // Pi's `api` field is the wire shape: anthropic-messages /
-    // google-generative-ai / openai-responses / openai-completions.
-    const api = cred.wireShape === 'anthropic' ? 'anthropic-messages'
-      : cred.wireShape === 'google-generative-ai' ? 'google-generative-ai'
-      : cred.wireShape === 'openai-responses' ? 'openai-responses'
-      : 'openai-completions';
-    const provider: Record<string, unknown> = {
-      name: 'OpenAlice workspace provider',
-      api,
-    };
-    if (cred.baseUrl) provider['baseUrl'] = cred.baseUrl;
-    // Key written directly into the workspace file (same trust model as codex's
-    // .codex/env.json / opencode's opencode.json).
-    if (cred.apiKey) {
-      if (cred.wireShape === 'anthropic' && cred.authMode === 'bearer') {
-        // Pi supports literal provider headers. Store only Authorization so its
-        // Anthropic transport does not also synthesize x-api-key from apiKey.
-        provider['headers'] = { Authorization: `Bearer ${cred.apiKey}` };
-      } else {
-        provider['apiKey'] = cred.apiKey;
-      }
-    }
-    // Pi's custom model registry otherwise falls back to 128k. OpenAlice writes
-    // the context window when known so long-context models do not compact early.
-    if (cred.model) {
-      const model: Record<string, unknown> = { id: cred.model };
-      const contextWindow = positiveNumber(cred.contextWindow);
-      if (contextWindow !== null) model['contextWindow'] = contextWindow;
-      provider['models'] = [model];
-    }
-
-    await writeWorkspaceFile(
-      cwd,
-      PI_MODELS_PATH,
-      JSON.stringify({ providers: { [PI_PROVIDER_NAME]: provider } }, null, 2) + '\n',
-    );
-
-    // Pin the default provider/model so spawns use the workspace provider
-    // without --provider/--model. Lives in the SAME .pi-agent dir so reset
-    // (rm .pi-agent) tears both down together.
-    const settings: Record<string, unknown> = { defaultProvider: PI_PROVIDER_NAME };
-    if (cred.model) settings['defaultModel'] = cred.model;
-    // Windows has one installation-wide workspace-shell decision (managed Git
-    // Bash, auto-detected Git for Windows, or an explicit user override). Pi's
-    // settings file is a derived cache, refreshed whenever its workspace AI
-    // config is reconciled. Non-Windows behavior stays exactly as before.
     const shellPath = process.platform === 'win32'
       ? resolveBashPath(process.env, 'win32')
       : runtimeProfileFromEnv().managedShellPath;
-    if (shellPath) settings['shellPath'] = shellPath;
-    await writeWorkspaceFile(cwd, PI_SETTINGS_PATH, JSON.stringify(settings, null, 2) + '\n');
+    await writePiWorkspaceConfig(cwd, cred, { shellPath });
   },
 
   async readAiConfig(cwd: string): Promise<WorkspaceAiCred | null> {
-    const raw = await readWorkspaceFile(cwd, PI_MODELS_PATH);
-    if (raw === null) return null;
-    let parsed: Record<string, unknown>;
-    try {
-      parsed = JSON.parse(raw) as Record<string, unknown>;
-    } catch {
-      return null;
-    }
-    const providers = (parsed['providers'] ?? {}) as Record<string, unknown>;
-    const p = (providers[PI_PROVIDER_NAME] ?? {}) as Record<string, unknown>;
-    const baseUrl = typeof p['baseUrl'] === 'string' ? (p['baseUrl'] as string) : null;
-    const headers = (p['headers'] ?? {}) as Record<string, unknown>;
-    const authorization = typeof headers['Authorization'] === 'string'
-      ? headers['Authorization']
-      : typeof headers['authorization'] === 'string'
-        ? headers['authorization']
-        : null;
-    const bearerKey = authorization?.match(/^Bearer\s+(.+)$/i)?.[1] ?? null;
-    const apiKey = typeof p['apiKey'] === 'string' ? (p['apiKey'] as string) : bearerKey;
-    const models = Array.isArray(p['models']) ? (p['models'] as Array<Record<string, unknown>>) : [];
-    const first = models[0];
-    const model = first && typeof first['id'] === 'string' ? (first['id'] as string) : null;
-    const contextWindow = first && positiveNumber(first['contextWindow'] as number | null | undefined);
-    if (baseUrl === null && apiKey === null && model === null) return null;
-    // Reverse the `api` field back to the wire shape.
-    const api = p['api'];
-    const wireShape = api === 'anthropic-messages' ? 'anthropic' as const
-      : api === 'google-generative-ai' ? 'google-generative-ai' as const
-      : api === 'openai-responses' ? 'openai-responses' as const
-      : 'openai-chat' as const;
-    return {
-      baseUrl,
-      apiKey,
-      model,
-      wireShape,
-      ...(wireShape === 'anthropic' ? { authMode: bearerKey ? 'bearer' as const : 'x-api-key' as const } : {}),
-      ...(contextWindow ? { contextWindow } : {}),
-    };
+    return readPiWorkspaceConfig(cwd);
   },
 };

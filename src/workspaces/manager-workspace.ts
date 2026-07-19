@@ -10,13 +10,16 @@ import type { WorkspaceMeta } from './workspace-registry.js'
 export const MANAGER_WORKSPACE_ID = 'workspace-manager'
 export const MANAGER_WORKSPACE_TAG = 'Workspace Manager'
 
-export function createManagerWorkspaceMeta(launcherRoot: string): WorkspaceMeta {
+export function createManagerWorkspaceMeta(
+  launcherRoot: string,
+  agentIds: readonly string[],
+): WorkspaceMeta {
   return {
     id: MANAGER_WORKSPACE_ID,
     tag: MANAGER_WORKSPACE_TAG,
     dir: join(launcherRoot, 'workspaces'),
     createdAt: new Date(0).toISOString(),
-    agents: ['pi'],
+    agents: [...agentIds],
   }
 }
 
@@ -46,6 +49,16 @@ Operating contract:
 - Departed Workspaces are intentionally outside this directory. Do not treat an absent desk as deleted or unknown without checking lifecycle state through OpenAlice.
 
 Your job is to keep the floor legible: who owns what, what is scheduled, what is stale, what should be consolidated, and what requires the human's decision.`
+
+/**
+ * Pi's structured WebPi surface can append the manager contract as a system
+ * prompt. Native TUIs do not share one portable system-prompt flag, so their
+ * fresh interactive seed carries the same contract together with the user's
+ * request. The visible Session title remains the original request.
+ */
+export function managerTerminalPrompt(prompt: string): string {
+  return `${MANAGER_SYSTEM_PROMPT}\n\nUser request:\n${prompt}`
+}
 
 export function managerSkillPath(launcherRepoRoot: string): string {
   return join(launcherRepoRoot, 'default', 'skills', 'workspace-manager')

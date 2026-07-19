@@ -3,7 +3,7 @@
 import { readFileSync, realpathSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
-import { readInstallSource } from '../src/install-source.mjs'
+import { installedContentIdentity, readInstallSource } from '../src/install-source.mjs'
 import { formatLocalStartHelp, parseLocalStartArgs, startLocal } from '../src/local-start.mjs'
 import { connectRemote, formatRemoteHelp, parseRemoteArgs } from '../src/remote.mjs'
 import { formatServerHelp, parseServerArgs, runServerCommand } from '../src/server.mjs'
@@ -19,6 +19,7 @@ export async function main(argv = process.argv.slice(2)) {
     process.stdout.write(`${JSON.stringify({
       version: readVersion(),
       installSource: await readInstallSource(),
+      contentIdentity: installedContentIdentity(),
     })}\n`)
     return 0
   }

@@ -65,26 +65,26 @@ export function WorkspaceOffboardingDialog({
   return (
     <Dialog onClose={busy ? () => {} : onClose} width="w-[560px]">
       <div className="border-b border-border px-5 py-4">
-        <h2 className="text-[15px] font-semibold text-text">{t('workspace.offboardTitle')}</h2>
-        <p className="mt-1 text-[12px] text-text-muted">
+        <h2 className="text-[15px] font-semibold text-foreground">{t('workspace.offboardTitle')}</h2>
+        <p className="mt-1 text-[12px] text-muted-foreground">
           {t('workspace.offboardDescription', { workspace: workspaceDisplayTitle(workspace) })}
         </p>
       </div>
 
       <div className="max-h-[65vh] space-y-4 overflow-y-auto px-5 py-4">
-        {!assessment && !error && <p className="text-[13px] text-text-muted">{t('workspace.offboardLoading')}</p>}
+        {!assessment && !error && <p className="text-[13px] text-muted-foreground">{t('workspace.offboardLoading')}</p>}
 
         {assessment && (
           <>
             {assessment.blockers.length > 0 && (
-              <div className="rounded-lg border border-red/30 bg-red/5 px-3 py-2.5 text-[12px] text-red">
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-[12px] text-destructive">
                 <div className="font-semibold">{t('workspace.offboardBlocked')}</div>
                 {assessment.blockers.map((blocker) => <div key={blocker} className="mt-1">{blocker}</div>)}
               </div>
             )}
 
             <div>
-              <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-text-muted/70">
+              <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">
                 {t('workspace.offboardHandoffSnapshot')}
               </div>
               <div className="grid grid-cols-2 gap-2 text-[12px] sm:grid-cols-3">
@@ -100,29 +100,29 @@ export function WorkspaceOffboardingDialog({
         )}
 
         <label className="block">
-          <span className="mb-1.5 block text-[12px] font-medium text-text">{t('workspace.offboardReason')}</span>
+          <span className="mb-1.5 block text-[12px] font-medium text-foreground">{t('workspace.offboardReason')}</span>
           <input
             value={reason}
             onChange={(event) => setReason(event.target.value)}
             disabled={busy}
-            className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-[13px] text-text outline-none transition-colors placeholder:text-text-muted/50 focus:border-accent"
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none transition-colors placeholder:text-muted-foreground/50 focus:border-primary"
             placeholder={t('workspace.offboardReasonPlaceholder')}
           />
         </label>
 
         <label className="block">
-          <span className="mb-1.5 block text-[12px] font-medium text-text">{t('workspace.offboardNotes')}</span>
+          <span className="mb-1.5 block text-[12px] font-medium text-foreground">{t('workspace.offboardNotes')}</span>
           <textarea
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
             disabled={busy}
             rows={4}
-            className="w-full resize-y rounded-lg border border-border bg-bg px-3 py-2 text-[13px] text-text outline-none transition-colors placeholder:text-text-muted/50 focus:border-accent"
+            className="w-full resize-y rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none transition-colors placeholder:text-muted-foreground/50 focus:border-primary"
             placeholder={t('workspace.offboardNotesPlaceholder')}
           />
         </label>
 
-        {error && <p className="text-[12px] text-red">{error}</p>}
+        {error && <p className="text-[12px] text-destructive">{error}</p>}
       </div>
 
       <div className="flex justify-end gap-2 border-t border-border px-5 py-3">
@@ -144,9 +144,9 @@ export function WorkspaceOffboardingDialog({
 
 function Snapshot({ label, value }: { label: string; value: number }): ReactElement {
   return (
-    <div className="rounded-lg border border-border/70 bg-bg-secondary/45 px-3 py-2">
-      <div className="text-[16px] font-semibold text-text">{value}</div>
-      <div className="mt-0.5 truncate text-[10px] text-text-muted">{label}</div>
+    <div className="rounded-lg border border-border/70 bg-secondary/45 px-3 py-2">
+      <div className="text-[16px] font-semibold text-foreground">{value}</div>
+      <div className="mt-0.5 truncate text-[10px] text-muted-foreground">{label}</div>
     </div>
   )
 }

@@ -28,19 +28,19 @@ export function EventLog({ events }: { events: SimulatorEvent[] }) {
       description="Every simulator action issued through this panel, newest first. Useful for retracing steps after a surprising state change."
     >
       {events.length === 0 ? (
-        <p className="text-xs text-text-muted">No actions yet.</p>
+        <p className="text-xs text-muted-foreground">No actions yet.</p>
       ) : (
         <>
           <table className="w-full text-sm">
             <tbody>
               {visible.map((ev) => (
-                <tr key={ev.id} className="text-text">
-                  <td className="py-0.5 pr-3 font-mono text-[11px] text-text-muted/80 w-20">{formatTime(ev.ts)}</td>
-                  <td className="py-0.5 pr-3 text-text-muted/60 text-[11px] w-20">{formatRelativeTime(ev.ts)}</td>
+                <tr key={ev.id} className="text-foreground">
+                  <td className="py-0.5 pr-3 font-mono text-[11px] text-muted-foreground/80 w-20">{formatTime(ev.ts)}</td>
+                  <td className="py-0.5 pr-3 text-muted-foreground/60 text-[11px] w-20">{formatRelativeTime(ev.ts)}</td>
                   <td className="py-0.5 pr-3">
-                    <span className={ev.status === 'err' ? 'text-red' : 'text-text'}>{ev.label}</span>
+                    <span className={ev.status === 'err' ? 'text-destructive' : 'text-foreground'}>{ev.label}</span>
                     {ev.detail && (
-                      <span className="ml-2 text-[11px] text-red/80" title={ev.detail}>
+                      <span className="ml-2 text-[11px] text-destructive/80" title={ev.detail}>
                         {ev.detail.slice(0, 60)}{ev.detail.length > 60 ? '…' : ''}
                       </span>
                     )}
@@ -53,7 +53,7 @@ export function EventLog({ events }: { events: SimulatorEvent[] }) {
           {events.length > COLLAPSED_COUNT && (
             <button
               onClick={() => setExpanded(!expanded)}
-              className="mt-2 text-[11px] text-text-muted hover:text-text transition-colors"
+              className="mt-2 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
             >
               {expanded ? `Collapse (${COLLAPSED_COUNT})` : `Show all (${events.length})`}
             </button>

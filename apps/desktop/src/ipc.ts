@@ -3,6 +3,7 @@ import type { ChildProcess, Serializable } from 'node:child_process'
 import { lstat, readFile, readdir, realpath, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { isAbsolute, join, normalize, resolve, sep } from 'node:path'
+import { readKeyboardInputSourceId } from './keyboard-input-source.js'
 
 interface WorkspaceMeta {
   readonly id: string
@@ -184,6 +185,8 @@ export function registerOpenAliceIpc(opts: OpenAliceIpcOptions): void {
     appHome: opts.appHome,
   }))
 
+  ipcMain.handle('openalice:keyboard:get-input-source-id', () => readKeyboardInputSourceId())
+
   ipcMain.handle('openalice:data-home:get-status', () => opts.dataHome.getStatus())
   ipcMain.handle('openalice:data-home:choose-and-restart', () => opts.dataHome.chooseAndRestart())
   ipcMain.handle('openalice:data-home:use-recent-and-restart', (_event, path: unknown) => {
@@ -308,6 +311,13 @@ export function registerOpenAliceIpc(opts: OpenAliceIpcOptions): void {
         connectionId,
         binary: false,
         data: JSON.stringify({ type: 'resize', cols: body['cols'], rows: body['rows'] }),
+      })
+    } else if (body['type'] === 'control' && typeof body['data'] === 'string') {
+      child.send({
+        type: MSG_PTY_CLIENT,
+        connectionId,
+        binary: false,
+        data: body['data'],
       })
     }
   })

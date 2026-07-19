@@ -33,7 +33,7 @@ function formatDuration(ms: number): string {
 }
 
 function statusColor(status: string): string {
-  return status === 'error' ? 'text-red' : 'text-green'
+  return status === 'error' ? 'text-destructive' : 'text-success'
 }
 
 /** Try to pretty-print JSON output, fall back to raw string. */
@@ -119,7 +119,7 @@ function ToolCallLogSection() {
         <select
           value={nameFilter}
           onChange={(e) => handleNameChange(e.target.value)}
-          className="bg-bg-tertiary text-text text-sm rounded-md border border-border px-2 py-1.5 outline-none focus:border-accent"
+          className="bg-muted text-foreground text-sm rounded-md border border-border px-2 py-1.5 outline-none focus:border-primary"
         >
           <option value="">All tools</option>
           {toolNames.map((n) => (
@@ -131,14 +131,14 @@ function ToolCallLogSection() {
           onClick={() => setPaused(!paused)}
           className={`text-xs px-3 py-1.5 rounded-md border transition-colors ${
             paused
-              ? 'border-notification-border text-notification-border hover:bg-notification-bg'
-              : 'border-border text-text-muted hover:bg-bg-tertiary'
+              ? 'border-warning-border text-warning hover:bg-warning-background'
+              : 'border-border text-muted-foreground hover:bg-muted'
           }`}
         >
           {paused ? 'Resume' : 'Pause'}
         </button>
 
-        <span className="text-xs text-text-muted ml-auto">
+        <span className="text-xs text-muted-foreground ml-auto">
           {total > 0
             ? `Page ${page} of ${totalPages} \u00b7 ${total} calls`
             : '0 calls'
@@ -150,16 +150,16 @@ function ToolCallLogSection() {
       {/* Table */}
       <div
         ref={containerRef}
-        className="flex-1 min-h-0 bg-bg rounded-lg border border-border overflow-y-auto font-mono text-xs"
+        className="flex-1 min-h-0 bg-background rounded-lg border border-border overflow-y-auto font-mono text-xs"
       >
         {loading && entries.length === 0 ? (
           <LogRowsSkeleton />
         ) : entries.length === 0 ? (
-          <div className="px-4 py-8 text-center text-text-muted">No tool calls yet</div>
+          <div className="px-4 py-8 text-center text-muted-foreground">No tool calls yet</div>
         ) : (
           <table className="w-full">
-            <thead className="sticky top-0 bg-bg-secondary">
-              <tr className="text-text-muted text-left">
+            <thead className="sticky top-0 bg-secondary">
+              <tr className="text-muted-foreground text-left">
                 <th className="px-3 py-2 w-12">#</th>
                 <th className="px-3 py-2 w-36">Time</th>
                 <th className="px-3 py-2 w-48">Tool</th>
@@ -183,31 +183,31 @@ function ToolCallLogSection() {
           <button
             onClick={() => goToPage(1)}
             disabled={page <= 1 || loading}
-            className="text-xs px-2 py-1 rounded border border-border text-text-muted hover:text-text hover:bg-bg-tertiary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            className="text-xs px-2 py-1 rounded border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
           >
             &laquo;&laquo;
           </button>
           <button
             onClick={() => goToPage(page - 1)}
             disabled={page <= 1 || loading}
-            className="text-xs px-2 py-1 rounded border border-border text-text-muted hover:text-text hover:bg-bg-tertiary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            className="text-xs px-2 py-1 rounded border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
           >
             &laquo;
           </button>
-          <span className="text-xs text-text-muted px-2">
+          <span className="text-xs text-muted-foreground px-2">
             {page} / {totalPages}
           </span>
           <button
             onClick={() => goToPage(page + 1)}
             disabled={page >= totalPages || loading}
-            className="text-xs px-2 py-1 rounded border border-border text-text-muted hover:text-text hover:bg-bg-tertiary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            className="text-xs px-2 py-1 rounded border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
           >
             &raquo;
           </button>
           <button
             onClick={() => goToPage(totalPages)}
             disabled={page >= totalPages || loading}
-            className="text-xs px-2 py-1 rounded border border-border text-text-muted hover:text-text hover:bg-bg-tertiary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            className="text-xs px-2 py-1 rounded border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
           >
             &raquo;&raquo;
           </button>
@@ -225,31 +225,31 @@ function ToolCallRow({ record }: { record: ToolCallRecord }) {
   return (
     <>
       <tr
-        className="border-t border-border/50 hover:bg-bg-tertiary/30 transition-colors cursor-pointer"
+        className="border-t border-border/50 hover:bg-muted/30 transition-colors cursor-pointer"
         onClick={() => setExpanded(!expanded)}
       >
-        <td className="px-3 py-1.5 text-text-muted">{record.seq}</td>
-        <td className="px-3 py-1.5 text-text-muted whitespace-nowrap">{formatDateTime(record.timestamp)}</td>
-        <td className="px-3 py-1.5 text-accent">{record.name}</td>
-        <td className="px-3 py-1.5 text-right text-text-muted">{formatDuration(record.durationMs)}</td>
+        <td className="px-3 py-1.5 text-muted-foreground">{record.seq}</td>
+        <td className="px-3 py-1.5 text-muted-foreground whitespace-nowrap">{formatDateTime(record.timestamp)}</td>
+        <td className="px-3 py-1.5 text-primary">{record.name}</td>
+        <td className="px-3 py-1.5 text-right text-muted-foreground">{formatDuration(record.durationMs)}</td>
         <td className={`px-3 py-1.5 text-center ${statusColor(record.status)}`}>{record.status}</td>
-        <td className="px-3 py-1.5 text-text-muted truncate max-w-0">
+        <td className="px-3 py-1.5 text-muted-foreground truncate max-w-0">
           {inputPreview}
-          <span className="ml-1 text-accent">{expanded ? '\u25be' : '\u25b8'}</span>
+          <span className="ml-1 text-primary">{expanded ? '\u25be' : '\u25b8'}</span>
         </td>
       </tr>
       {expanded && (
         <tr className="border-t border-border/30">
           <td colSpan={6} className="px-3 py-2 space-y-2">
             <div>
-              <span className="text-text-muted text-[11px] uppercase tracking-wide">Input</span>
-              <pre className="text-text-muted whitespace-pre-wrap break-all bg-bg-tertiary rounded p-2 text-[11px] mt-1">
+              <span className="text-muted-foreground text-[11px] uppercase tracking-wide">Input</span>
+              <pre className="text-muted-foreground whitespace-pre-wrap break-all bg-muted rounded p-2 text-[11px] mt-1">
                 {JSON.stringify(record.input, null, 2)}
               </pre>
             </div>
             <div>
-              <span className="text-text-muted text-[11px] uppercase tracking-wide">Output</span>
-              <pre className="text-text-muted whitespace-pre-wrap break-all bg-bg-tertiary rounded p-2 text-[11px] mt-1 max-h-64 overflow-y-auto">
+              <span className="text-muted-foreground text-[11px] uppercase tracking-wide">Output</span>
+              <pre className="text-muted-foreground whitespace-pre-wrap break-all bg-muted rounded p-2 text-[11px] mt-1 max-h-64 overflow-y-auto">
                 {formatOutput(record.output)}
               </pre>
             </div>

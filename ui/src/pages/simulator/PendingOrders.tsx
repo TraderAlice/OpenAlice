@@ -9,7 +9,7 @@ import { Section } from '../../components/form'
 import { simulatorApi, type SimulatorState } from '../../api/simulator'
 
 const inputClass =
-  'w-full px-2 py-1 bg-bg text-text border border-border rounded font-mono text-xs outline-none transition-colors focus:border-accent'
+  'w-full px-2 py-1 bg-background text-foreground border border-border rounded font-mono text-xs outline-none transition-colors focus:border-primary'
 
 export function PendingOrders({ utaId, state, run, loading }: {
   utaId: string
@@ -34,11 +34,11 @@ export function PendingOrders({ utaId, state, run, loading }: {
       description="Submitted limit/stop orders waiting on a price trigger or manual fill."
     >
       {state.pendingOrders.length === 0 ? (
-        <p className="text-xs text-text-muted">No pending orders.</p>
+        <p className="text-xs text-muted-foreground">No pending orders.</p>
       ) : (
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-text-muted text-xs">
+            <tr className="text-left text-muted-foreground text-xs">
               <th className="pb-1 pr-3">Order</th>
               <th className="pb-1 pr-3">Symbol</th>
               <th className="pb-1 pr-3">Side</th>
@@ -61,14 +61,14 @@ export function PendingOrders({ utaId, state, run, loading }: {
               const distancePct = distance != null && trigger ? Math.abs(distance) / Number(trigger) : null
               const closeToFire = distancePct != null && distancePct < 0.01
               return (
-                <tr key={o.orderId} className="text-text">
+                <tr key={o.orderId} className="text-foreground">
                   <td className="py-1 pr-3 font-mono text-[11px]">{o.orderId}</td>
                   <td className="py-1 pr-3">{o.symbol}</td>
                   <td className="py-1 pr-3">{o.action}</td>
                   <td className="py-1 pr-3">{o.orderType}</td>
                   <td className="py-1 pr-3 font-mono text-xs text-right">{o.totalQuantity}</td>
                   <td className="py-1 pr-3 font-mono text-xs text-right">{trigger ?? '—'}</td>
-                  <td className={`py-1 pr-3 font-mono text-xs text-right ${closeToFire ? 'text-yellow-400' : 'text-text-muted'}`}>
+                  <td className={`py-1 pr-3 font-mono text-xs text-right ${closeToFire ? 'text-warning' : 'text-muted-foreground'}`}>
                     {distance == null ? '—' : `${distance >= 0 ? '+' : ''}${distance.toFixed(2)}`}
                   </td>
                   <td className="py-1 pr-3">

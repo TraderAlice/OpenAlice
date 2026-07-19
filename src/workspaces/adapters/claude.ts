@@ -1,14 +1,36 @@
-import { rm } from 'node:fs/promises';
+import { readFile, realpath } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-import type { CliAdapter, SpawnContext, WorkspaceAiCred } from '../cli-adapter.js';
-import { readWorkspaceFile, writeWorkspaceFile } from '../file-service.js';
+import type {
+  AgentInteractiveSetupStatus,
+  CliAdapter,
+  SpawnContext,
+  WorkspaceAiCred,
+} from '../cli-adapter.js';
+import { readWorkspaceFile } from '../file-service.js';
+import type { ModelReasoningEffort } from '../../ai-providers/model-semantics.js';
 import type { HeadlessOutputEvent } from '../headless-output.js';
+import { resetOwnedJsonConfig, writeOwnedJsonConfig } from './owned-json-config.js';
 
 const SESSION_FILE_RE = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/i;
 
 const CLAUDE_SETTINGS_PATH = '.claude/settings.local.json';
+const CLAUDE_BINDING_STATE_PATH = '.claude/openalice-provider.json';
+const CLAUDE_OWNED_PATHS = [
+  ['env', 'ANTHROPIC_BASE_URL'],
+  ['env', 'ANTHROPIC_API_KEY'],
+  ['env', 'ANTHROPIC_AUTH_TOKEN'],
+  ['model'],
+] as const;
+
+const CLAUDE_PROJECT_EFFORTS = new Set<ModelReasoningEffort>(['low', 'medium', 'high', 'xhigh']);
+
+function claudeProjectEffort(value: unknown): ModelReasoningEffort | null {
+  return typeof value === 'string' && CLAUDE_PROJECT_EFFORTS.has(value as ModelReasoningEffort)
+    ? value as ModelReasoningEffort
+    : null;
+}
 
 /**
  * Claude Code parks project-scoped `.mcp.json` servers at "⏸ Pending
@@ -16,8 +38,8 @@ const CLAUDE_SETTINGS_PATH = '.claude/settings.local.json';
  * approves them — and every workspace dir is a fresh project key, so an
  * interactive session would re-prompt on every new workspace. Inject the
  * auto-trust setting at spawn instead of writing it into
- * `.claude/settings.local.json`, whose lifecycle `writeAiConfig` owns (the
- * file is deleted wholesale on AI-config reset). Headless `-p` connects to
+ * `.claude/settings.local.json`; `writeAiConfig` owns only its provider/env
+ * nodes and preserves unrelated project settings. Headless `-p` connects to
  * project servers without approval today (verified on 2.1.170), but gets the
  * same flag so automation doesn't silently lose MCP if a future version
  * closes that gap.
@@ -36,6 +58,69 @@ const HEADLESS_ALLOWED_TOOLS = [
   'Bash(traderhub:*)',
 ].join(',');
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Claude Code has two native gates that can consume the first interactive
+ * screen before a seeded prompt: global onboarding and per-project trust.
+ * Current Claude Code exposes no status/accept command for either gate, so we
+ * read only the small booleans it already owns in `~/.claude.json`.
+ *
+ * This deliberately remains advisory and fail-open. The private file is never
+ * changed, and an unfamiliar/corrupt shape returns `unknown` rather than
+ * blocking launch or guessing that setup is complete.
+ */
+export async function readClaudeInteractiveSetupStatus(
+  cwd: string,
+  homeDir = homedir(),
+): Promise<AgentInteractiveSetupStatus> {
+  let parsed: unknown;
+  try {
+    const raw = await readFile(join(homeDir, '.claude.json'), 'utf8');
+    parsed = JSON.parse(raw) as unknown;
+  } catch (error) {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      (error as { code?: string }).code === 'ENOENT'
+    ) {
+      return 'runtime-onboarding-required';
+    }
+    return 'unknown';
+  }
+
+  if (!isRecord(parsed)) return 'unknown';
+  const onboarding = parsed['hasCompletedOnboarding'];
+  if (onboarding === false || onboarding === undefined) {
+    return 'runtime-onboarding-required';
+  }
+  if (onboarding !== true) return 'unknown';
+
+  const projects = parsed['projects'];
+  if (projects === undefined) return 'workspace-trust-required';
+  if (!isRecord(projects)) return 'unknown';
+  const resolvedCwd = resolve(cwd);
+  const physicalCwd = await realpath(resolvedCwd).catch(() => resolvedCwd);
+  let projectSeen = false;
+  const trusted = [resolvedCwd, physicalCwd].some((candidate) => {
+    const project = projects[candidate];
+    if (project !== undefined) projectSeen = true;
+    return isRecord(project) && project['hasTrustDialogAccepted'] === true;
+  });
+  if (!trusted && projectSeen) {
+    const project = projects[resolvedCwd] ?? projects[physicalCwd];
+    if (!isRecord(project)) return 'unknown';
+    const accepted = project['hasTrustDialogAccepted'];
+    if (accepted !== undefined && typeof accepted !== 'boolean') return 'unknown';
+  }
+  return trusted
+    ? 'ready'
+    : 'workspace-trust-required';
+}
+
 /** dashed-cwd convention used by Claude Code's project store. */
 function projectKey(workspaceDir: string): string {
   const abs = resolve(workspaceDir);
@@ -48,8 +133,7 @@ function projectKey(workspaceDir: string): string {
  * is the verbatim move of `index.ts:composeCommand` from before refactor).
  *
  * MCP wiring for claude is handled by the template's `.mcp.json` (the launcher
- * still does the placeholder-substitution at spawn-env-build time). v2.M4
- * generalizes that into `bootstrap()` here.
+ * still does the placeholder-substitution at spawn-env-build time).
  */
 export const claudeAdapter: CliAdapter = {
   id: 'claude',
@@ -74,6 +158,8 @@ export const claudeAdapter: CliAdapter = {
     transcriptDiscovery: 'fs-watch',
     headless: true,
   },
+
+  readInteractiveSetupStatus: readClaudeInteractiveSetupStatus,
 
   composeCommand(base: readonly string[], ctx: SpawnContext): readonly string[] {
     const cmd = [...base, '--settings', AUTOTRUST_SETTINGS];
@@ -211,28 +297,45 @@ export const claudeAdapter: CliAdapter = {
   async writeAiConfig(cwd: string, cred: WorkspaceAiCred): Promise<void> {
     const hasAny = cred.baseUrl || cred.apiKey || cred.model;
     if (!hasAny) {
-      // Reset: delete the settings file so claude falls back to its global
-      // OAuth / settings. We don't leave an empty `{}` behind — workspace
-      // files exist only when there's an actual override.
-      const filePath = join(cwd, CLAUDE_SETTINGS_PATH);
-      await rm(filePath, { force: true });
+      await resetOwnedJsonConfig({
+        cwd,
+        configPath: CLAUDE_SETTINGS_PATH,
+        statePath: CLAUDE_BINDING_STATE_PATH,
+        label: 'Claude project settings',
+        legacyOwnedPaths: CLAUDE_OWNED_PATHS,
+      });
       return;
     }
-    const out: Record<string, unknown> = {};
-    const env: Record<string, string> = {};
-    if (cred.baseUrl) env['ANTHROPIC_BASE_URL'] = cred.baseUrl;
-    // Write the key into exactly one env var. Bearer-mode gateways (MiniMax
-    // international, proxy front-ends) read ANTHROPIC_AUTH_TOKEN → the CLI sends
-    // `Authorization: Bearer`. Default x-api-key mode uses ANTHROPIC_API_KEY.
-    // Never write both: Claude Code warns on dual-set, and the two headers
-    // together can be rejected as ambiguous auth.
-    if (cred.apiKey) {
-      if (cred.authMode === 'bearer') env['ANTHROPIC_AUTH_TOKEN'] = cred.apiKey;
-      else env['ANTHROPIC_API_KEY'] = cred.apiKey;
+    if (cred.reasoningEffort && !claudeProjectEffort(cred.reasoningEffort)) {
+      throw new Error(`Claude Code cannot persist project effort ${cred.reasoningEffort}`);
     }
-    if (Object.keys(env).length > 0) out['env'] = env;
-    if (cred.model) out['model'] = cred.model;
-    await writeWorkspaceFile(cwd, CLAUDE_SETTINGS_PATH, JSON.stringify(out, null, 2) + '\n');
+    // Write the key into exactly one env var. Bearer-mode gateways read
+    // ANTHROPIC_AUTH_TOKEN; x-api-key mode reads ANTHROPIC_API_KEY. Those
+    // provider paths plus effortLevel are the OpenAlice ownership boundary —
+    // permissions and every unknown project setting remain untouched and reset
+    // reversibly. effortLevel is sidecar-owned only; it is intentionally absent
+    // from the legacy fallback because older OpenAlice versions never wrote it.
+    await writeOwnedJsonConfig({
+      cwd,
+      configPath: CLAUDE_SETTINGS_PATH,
+      statePath: CLAUDE_BINDING_STATE_PATH,
+      label: 'Claude project settings',
+      entries: [
+        { path: ['env', 'ANTHROPIC_BASE_URL'], present: !!cred.baseUrl, value: cred.baseUrl },
+        {
+          path: ['env', 'ANTHROPIC_API_KEY'],
+          present: !!cred.apiKey && cred.authMode !== 'bearer',
+          value: cred.apiKey,
+        },
+        {
+          path: ['env', 'ANTHROPIC_AUTH_TOKEN'],
+          present: !!cred.apiKey && cred.authMode === 'bearer',
+          value: cred.apiKey,
+        },
+        { path: ['model'], present: !!cred.model, value: cred.model },
+        { path: ['effortLevel'], present: !!cred.reasoningEffort, value: cred.reasoningEffort },
+      ],
+    });
   },
 
   async readAiConfig(cwd: string): Promise<WorkspaceAiCred | null> {
@@ -254,9 +357,17 @@ export const claudeAdapter: CliAdapter = {
     const authMode: 'x-api-key' | 'bearer' = authToken !== null ? 'bearer' : 'x-api-key';
     const apiKey = authToken ?? xApiKey;
     const model = typeof parsed['model'] === 'string' ? (parsed['model'] as string) : null;
-    if (baseUrl === null && apiKey === null && model === null) return null;
+    const reasoningEffort = claudeProjectEffort(parsed['effortLevel']);
+    if (baseUrl === null && apiKey === null && model === null && reasoningEffort === null) return null;
     // Claude Code is anthropic-only.
-    return { baseUrl, apiKey, model, authMode, wireShape: 'anthropic' };
+    return {
+      baseUrl,
+      apiKey,
+      model,
+      authMode,
+      wireShape: 'anthropic',
+      ...(reasoningEffort ? { reasoningEffort } : {}),
+    };
   },
 
   transcriptDir(cwd: string): string {

@@ -3,6 +3,7 @@ export type DesignVariantLayout =
   | 'mode-ladder'
   | 'goal-picker'
   | 'quiet-checklist'
+  | 'semantic-colors'
 
 export interface DesignVariant {
   id: string
@@ -29,6 +30,42 @@ export interface DesignProject {
 }
 
 export const designProjects: DesignProject[] = [
+  {
+    slug: 'semantic-colors',
+    title: 'Semantic color system',
+    eyebrow: 'Living color card',
+    status: 'Current implementation',
+    updatedAt: '2026-07-18',
+    context: {
+      why: 'OpenAlice used separate physical color names, Tailwind palette shades, chart literals, and Workspace aliases. This project renders the shared semantic contract that now drives the product UI without requiring a component library.',
+      goals: [
+        'Keep the core CSS vocabulary aligned with Orca and shadcn.',
+        'Ship two light and two dark cards with user-selected day and night pairings.',
+        'Make every palette change visible on one real product route and in xterm.',
+        'Keep trading, status, AI, and chart extensions explicit and small.',
+        'Give reviewers a fast contrast and hierarchy smoke test.',
+      ],
+      constraints: [
+        'The route consumes the real CSS variables; it must not duplicate palette values.',
+        'Product UI and xterm read the selected semantic CSS card; the renderer remains the only terminal color authority.',
+        'Product components must not select Tailwind palette shades directly.',
+      ],
+      openQuestions: [
+        'Which product extensions can reuse terminal-compatible roles before earning a separate semantic token?',
+        'How should future imported terminal palettes map into a complete shared card without silently recoloring product-only roles?',
+      ],
+    },
+    variants: [
+      {
+        id: 'A',
+        name: 'Current semantic palettes',
+        summary: 'The active card, product extensions, terminal roles, and representative component states.',
+        intent: 'Use this route while adjusting palette.css so all four cards and common semantic pairings can be judged together.',
+        risk: 'A color card cannot replace route-level visual review for dense trading and Workspace surfaces.',
+        layout: 'semantic-colors',
+      },
+    ],
+  },
   {
     slug: 'first-run-onboarding',
     title: 'First-run onboarding',

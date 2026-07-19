@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "capturedOn": "2026-07-17",
+  "source": "IBKR paper TWS reqContractDetails",
+  "cases": [
+    {
+      "name": "aapl-stock",
+      "canonical": {
+        "conId": 265598,
+        "symbol": "AAPL",
+        "localSymbol": "AAPL",
+        "secType": "STK",
+        "exchange": "SMART",
+        "primaryExchange": "NASDAQ",
+        "currency": "USD",
+        "tradingClass": "NMS",
+        "multiplier": ""
+      }
+    },
+    {
+      "name": "usd-chf-cash",
+      "canonical": {
+        "conId": 12087820,
+        "symbol": "USD",
+        "localSymbol": "USD.CHF",
+        "secType": "CASH",
+        "exchange": "IDEALPRO",
+        "primaryExchange": "",
+        "currency": "CHF",
+        "tradingClass": "USD.CHF",
+        "multiplier": ""
+      }
+    },
+    {
+      "name": "sehk-700-stock",
+      "canonical": {
+        "conId": 152791428,
+        "symbol": "700",
+        "localSymbol": "700",
+        "secType": "STK",
+        "exchange": "SEHK",
+        "primaryExchange": "SEHK",
+        "currency": "HKD",
+        "tradingClass": "700",
+        "multiplier": ""
+      }
+    }
+  ]
+}

@@ -50,8 +50,10 @@ The commands are intentionally asymmetric:
 # Ordinary product E2E: safe for routine local development and CI.
 pnpm test:e2e
 
-# One explicitly selected account-trading spec.
-OPENALICE_UTA_LIVE_PAPER=1 pnpm test:uta:live-paper -- \
+# One explicitly selected account-trading spec. Invoke Vitest directly so
+# pnpm does not forward a literal `--` that defeats Vitest's file filter.
+OPENALICE_UTA_LIVE_PAPER=1 pnpm exec vitest run \
+  --config vitest.uta-live.config.ts \
   services/uta/src/domain/trading/__test__/e2e/uta-bybit.e2e.spec.ts
 
 # Full configured demo/paper account suite. Use only for a deliberate sweep.
@@ -82,6 +84,24 @@ query the venue again, cancel new open orders, close only positions created by
 the test, reject leftover Alice staging, and confirm the account returned to
 its baseline. If that cannot be proven, stop the development lane and report
 the account as requiring manual cleanup.
+
+IBKR routing smoke uses
+`services/uta/src/domain/trading/__test__/e2e/live-paper-evidence.ts` to append
+a small JSONL run record under ignored `data/uta-live-paper-runs/` by default.
+Set `OPENALICE_UTA_LIVE_RECORD_DIR` to choose another local destination. The
+record format deliberately excludes account ids, balances, credentials, and
+position payloads. When live contract data should become an offline regression
+input, manually review and copy only stable canonical contract fields into a
+tracked fixture; never make a test overwrite tracked fixtures directly.
+
+When selecting a test by name, keep the same direct invocation pattern:
+
+```bash
+OPENALICE_UTA_LIVE_PAPER=1 pnpm exec vitest run \
+  --config vitest.uta-live.config.ts \
+  services/uta/src/domain/trading/__test__/e2e/ibkr-paper.e2e.spec.ts \
+  -t 'canonical conId routing'
+```
 
 ## Ground rules
 
@@ -134,6 +154,45 @@ files under `data/` (gitignored), run with
 `NODE_OPTIONS='--conditions=openalice-source' npx tsx data/<file>.mts`,
 importing `readUTAsConfig` + `createBroker` by absolute/relative path.
 Delete after use.
+
+## IBKR half-open and option-mark acceptance
+
+These two read-only checks cover the failure modes from issues #294 and #314.
+They do not authorize an order submission and are safe to run with the UTA and
+Gateway both configured read-only.
+
+### Silent half-open recovery
+
+Freeze the Gateway process/container without closing its TCP socket (for a
+Docker Gateway, `docker pause <container>` is deterministic). Always install a
+shell trap or otherwise guarantee `docker unpause <container>` on exit.
+
+Acceptance:
+
+1. Before the drop, `/api/trading/uta` reports `healthy/readable` and account
+   reads succeed.
+2. Within the heartbeat interval plus timeout (currently at most about 50s),
+   UTA moves directly to `offline/down`; it must not require six caller-driven
+   cache-read failures.
+3. While dead, account/position reads refuse rather than serving stale cache.
+4. After unpause, recovery reconnects and passes a private account read before
+   returning to `healthy/readable`.
+5. The unit-level write boundary separately proves place/modify/cancel performs
+   `reqCurrentTime` before the client send and never calls the send method when
+   that probe times out. Do not submit a live order merely to test this gate.
+
+### Option position mark overlay
+
+With an `OPT` or `FOP` paper position and an entitled or delayed quote:
+
+1. Positive snapshot bid+ask produces midpoint `(bid + ask) / 2`.
+2. `marketValue` and `unrealizedPnL` are recomputed through
+   `derivePositionMath`, including quantity, side, and contract multiplier.
+3. The broker-owned `updatePortfolio()` cache is not mutated.
+4. Missing entitlement, incomplete bid/ask, or timeout returns the cached row;
+   it must not fail the whole portfolio read.
+5. Requests use `regulatorySnapshot=false`; this acceptance must never opt the
+   account into paid per-request regulatory snapshots.
 
 ## Scenario catalog
 

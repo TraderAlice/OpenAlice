@@ -1,29 +1,51 @@
-import { useSyncExternalStore } from 'react'
+import { useCallback, useMemo, useSyncExternalStore } from 'react'
 
 import { useThemeStore } from './store'
+import {
+  paletteAppearance,
+  resolveEffectiveSlot,
+  type ThemePaletteId,
+  type ThemePreferenceSlot,
+} from './palettes'
 
-const mq = window.matchMedia('(prefers-color-scheme: dark)')
+/**
+ * Resolve which preference slot is active. Auto follows the OS; a palette's
+ * own light/dark appearance does not influence slot selection.
+ */
+export function useEffectivePreferenceSlot(): ThemePreferenceSlot {
+  const theme = useThemeStore((s) => s.theme)
+  const mediaQuery = useMemo(
+    () => typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia('(prefers-color-scheme: dark)')
+      : null,
+    [],
+  )
+  const subscribeSystem = useCallback((callback: () => void) => {
+    mediaQuery?.addEventListener('change', callback)
+    return () => mediaQuery?.removeEventListener('change', callback)
+  }, [mediaQuery])
+  const getSystemDark = useCallback(() => mediaQuery?.matches ?? false, [mediaQuery])
+  const systemDark = useSyncExternalStore(
+    subscribeSystem,
+    getSystemDark,
+    () => true,
+  )
+  return resolveEffectiveSlot(theme, systemDark)
+}
 
-function subscribeSystem(cb: () => void): () => void {
-  mq.addEventListener('change', cb)
-  return () => mq.removeEventListener('change', cb)
+/** The concrete semantic card selected for the currently active slot. */
+export function useEffectivePalette(): ThemePaletteId {
+  const slot = useEffectivePreferenceSlot()
+  const dayPalette = useThemeStore((s) => s.dayPalette)
+  const nightPalette = useThemeStore((s) => s.nightPalette)
+  return slot === 'night' ? nightPalette : dayPalette
 }
 
 /**
- * Resolve the preference (`light | dark | auto`) to a concrete `'light' | 'dark'`
- * — `auto` follows the OS. Use this for the rare surfaces that need the actual
- * value in JS rather than via CSS: notably the xterm terminal, whose palette is
- * a JS object, not a CSS variable. CSS-driven surfaces should just read the
- * `--color-*` tokens (which already resolve `data-theme` + prefers-color-scheme).
+ * Resolve the active card's intrinsic appearance. Use this for JS surfaces
+ * such as xterm and chart redraws; assigning Midnight to Day must still report
+ * a dark color scheme to the shell.
  */
 export function useEffectiveTheme(): 'light' | 'dark' {
-  const theme = useThemeStore((s) => s.theme)
-  const systemDark = useSyncExternalStore(
-    subscribeSystem,
-    () => mq.matches,
-    () => true,
-  )
-  if (theme === 'light') return 'light'
-  if (theme === 'dark') return 'dark'
-  return systemDark ? 'dark' : 'light'
+  return paletteAppearance(useEffectivePalette())
 }

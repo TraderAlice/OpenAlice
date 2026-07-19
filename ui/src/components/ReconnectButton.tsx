@@ -39,8 +39,8 @@ export function ReconnectButton({ accountId }: { accountId: string }) {
       >
         {status === 'loading' ? 'Connecting...' : 'Reconnect'}
       </button>
-      {status === 'success' && <span className="text-[12px] text-green">{message}</span>}
-      {status === 'error' && <span className="text-[12px] text-red">{message}</span>}
+      {status === 'success' && <span className="text-[12px] text-success">{message}</span>}
+      {status === 'error' && <span className="text-[12px] text-destructive">{message}</span>}
     </div>
   )
 }

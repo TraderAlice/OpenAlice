@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Bot } from 'lucide-react'
 
-import { ConfigSection, Field, inputClass } from '../components/form'
+import { ConfigSection, Field, SettingsScrollArea, inputClass } from '../components/form'
 import { PageHeader } from '../components/PageHeader'
 import { SaveIndicator } from '../components/SaveIndicator'
 import { useWorkspaces } from '../contexts/workspaces-context'
@@ -35,7 +35,7 @@ export function IssueSettingsPage() {
         title="Issue Settings"
         description="Defaults for scheduled issue runs and issue-owned headless work."
       />
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 md:px-8">
+      <SettingsScrollArea className="px-4 py-6 md:px-8">
         <div className="mx-auto max-w-[880px]">
           <ConfigSection
             title="Default agent runtime"
@@ -54,7 +54,7 @@ export function IssueSettingsPage() {
                   <Bot
                     size={14}
                     aria-hidden
-                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-muted/60"
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/60"
                   />
                   <select
                     value={issueDefaultAgent ?? ''}
@@ -75,7 +75,7 @@ export function IssueSettingsPage() {
             </Field>
           </ConfigSection>
         </div>
-      </div>
+      </SettingsScrollArea>
     </div>
   )
 }

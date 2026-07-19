@@ -50,7 +50,9 @@ When explicitly selected,
 it can also install missing Linux Git/Python/make/C++ tools needed to build the
 source Runtime. It does not clone OpenAlice, write application state, install
 Electron, configure a provider credential, or start a service without separate
-consent. The curl entry targets macOS, Linux, WSL, and Git Bash; native Windows
+consent. Managed `openalice remote` can separately plan and clone a private
+remote checkout after installation; that orchestration belongs to
+[[docs/remote-access.md]]. The curl entry targets macOS, Linux, WSL, and Git Bash; native Windows
 desktop distribution remains the signed Electron installer. The complete
 consent, update, filesystem, PATH, authenticity, and test contract lives in
 [[docs/cli-installer.md]].
@@ -142,9 +144,10 @@ It refuses to guess at an unreachable PID or silently stop an Electron-owned
 Runtime. Exact status classes, control fields, recovery rules, and the managed
 SSH composition live in [[docs/remote-access.md]].
 
-The detached path is still source-backed: the checkout supplies the built
-Runtime while the installed CLI supplies lifecycle and transport control. A
-future standalone bundle changes preparation, not these ownership semantics.
+The detached path is still source-backed: a user-owned or remote-managed
+checkout supplies the built Runtime while the installed CLI supplies lifecycle
+and transport control. A future standalone bundle changes preparation, not
+these ownership semantics.
 
 ## Dependency Bootstrap Direction
 

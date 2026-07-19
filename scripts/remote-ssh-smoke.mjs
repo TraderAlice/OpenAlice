@@ -94,23 +94,23 @@ try {
     OPENALICE_REMOTE_TEST_INSTALL_SELECTOR_KIND: 'version',
     OPENALICE_REMOTE_TEST_INSTALL_SELECTOR_VALUE: 'remote-smoke',
     OPENALICE_REMOTE_TEST_INSTALL_BASE_URL: 'http://127.0.0.1:18080/packages/cli/',
+    OPENALICE_REMOTE_TEST_REPOSITORY_URL: 'file:///fixture/OpenAlice',
   }
   await waitForSsh(remoteTarget, smokeEnv)
 
   console.log('[remote-ssh-smoke] checking read-only missing-host plan')
   const initialPlan = run(process.execPath, [
     cliEntry, 'remote', remoteTarget,
-    '--app-dir', '/fixture/OpenAlice',
     '--plan', '--no-open',
   ], { cwd: repoRoot, env: smokeEnv })
   requireText(initialPlan, 'install remote OpenAlice CLI')
   requireText(initialPlan, 'install managed Pi 0.80.6')
+  requireText(initialPlan, 'clone OpenAlice source (version remote-smoke)')
   requireText(initialPlan, 'start remote OpenAlice Server')
   run('ssh', [remoteTarget, 'test ! -x "$HOME/.openalice/bin/openalice"'], { env: smokeEnv })
 
   console.log('[remote-ssh-smoke] applying install/start and opening first tunnel')
   const firstTunnelUrl = await attachAndProbe(remoteTarget, smokeEnv, [
-    '--app-dir', '/fixture/OpenAlice',
     '--yes', '--no-open', '--wait', '30',
   ])
   const running = remoteJson(remoteTarget, smokeEnv, '"$HOME/.openalice/bin/openalice" server status --json')
@@ -119,6 +119,11 @@ try {
   }
   const piVersion = run('ssh', [remoteTarget, '"$HOME/.openalice/bin/pi" --version'], { env: smokeEnv }).trim()
   if (piVersion !== '0.80.6') throw new Error(`Remote managed Pi version mismatch: ${piVersion}`)
+  const launchRoot = running.owner?.launchRoot
+  if (typeof launchRoot !== 'string' || !launchRoot.includes('/.openalice/sources/')) {
+    throw new Error(`Remote Server did not use a managed checkout: ${JSON.stringify(launchRoot)}`)
+  }
+  run('ssh', [remoteTarget, `test -d ${shellQuote(join(launchRoot, '.git'))}`], { env: smokeEnv })
 
   console.log('[remote-ssh-smoke] repairing a legacy CLI Server with its managed Pi launcher missing')
   run('ssh', [remoteTarget, 'rm -f "$HOME/.openalice/bin/pi" "$HOME/.openalice/bin/pi.cmd"'], { env: smokeEnv })
@@ -140,7 +145,10 @@ try {
   }
 
   console.log('[remote-ssh-smoke] stopping the remote Server through its control endpoint')
-  run('ssh', [remoteTarget, '"$HOME/.openalice/bin/openalice" server stop --wait 15'], { env: smokeEnv })
+  const statusOutput = run(process.execPath, [cliEntry, 'remote', remoteTarget, '--status'], { cwd: repoRoot, env: smokeEnv })
+  requireText(statusOutput, 'Runtime: running (cli-server)')
+  const stopOutput = run(process.execPath, [cliEntry, 'remote', remoteTarget, '--stop', '--wait', '15'], { cwd: repoRoot, env: smokeEnv })
+  requireText(stopOutput, 'OpenAlice Server is stopped')
   const absent = remoteJson(remoteTarget, smokeEnv, '"$HOME/.openalice/bin/openalice" server status --json')
   if (absent.class !== 'absent') throw new Error(`Remote Server did not stop cleanly: ${JSON.stringify(absent)}`)
 

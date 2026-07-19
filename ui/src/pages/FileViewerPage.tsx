@@ -49,21 +49,21 @@ export function FileViewerPage({ spec }: Props) {
 
   return (
     <div className="h-full flex flex-col min-h-0">
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-bg-secondary/30 shrink-0">
+      <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-secondary/30 shrink-0">
         <button
           type="button"
           onClick={openWorkspace}
-          className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-border bg-bg px-2 text-[12px] font-medium text-text-muted transition-colors hover:bg-bg-tertiary hover:text-text"
+          className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-border bg-background px-2 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           title={`Back to ${tag}`}
         >
           <ArrowLeft size={14} strokeWidth={1.8} aria-hidden />
           <span className="hidden sm:inline">Back</span>
         </button>
-        <FileText size={13} strokeWidth={1.75} className="shrink-0 text-text-muted/70" aria-hidden />
-        <span className="font-mono text-[12px] text-text truncate" title={path}>
+        <FileText size={13} strokeWidth={1.75} className="shrink-0 text-muted-foreground/70" aria-hidden />
+        <span className="font-mono text-[12px] text-foreground truncate" title={path}>
           {path}
         </span>
-        <span className="ml-auto shrink-0 text-[11px] text-text-muted/60">{tag}</span>
+        <span className="ml-auto shrink-0 text-[11px] text-muted-foreground/60">{tag}</span>
       </div>
       <div className="flex-1 overflow-y-auto min-h-0">
         <div className="max-w-[820px] mx-auto px-6 py-6">

@@ -36,8 +36,8 @@ function webglDisabled(): boolean {
  * xterm keeps/reverts to its built-in DOM renderer in both cases, which is
  * also what happens automatically on a later context loss.
  */
-export function attachWebglRenderer(term: Terminal): WebglAddon | null {
-  if (webglDisabled()) return null;
+export function attachWebglRenderer(term: Terminal, forceDom = false): WebglAddon | null {
+  if (forceDom || webglDisabled()) return null;
   let webgl: WebglAddon | null = null;
   try {
     webgl = new WebglAddon();

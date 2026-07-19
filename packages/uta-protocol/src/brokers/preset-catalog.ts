@@ -128,7 +128,7 @@ export const BINANCE_PRESET: BrokerPresetDef = {
   hint: '**Demo Trading** is Binance\'s risk-free simulator — virtual funds, spot + futures in one place. It runs on isolated demo servers, so prices and fills are simulated and can differ from live. Generate a dedicated Demo API key at demo.binance.com → API Management; your live keys are rejected here (and demo keys are rejected on live).\n\n**Live** places real orders on real money — grant trade-only permissions and never enable withdrawals.',
   defaultName: 'binance-main',
   badge: 'BN',
-  badgeColor: 'text-yellow-400',
+  badgeColor: 'text-warning',
   engine: 'ccxt',
   guardCategory: 'crypto',
   modes: [
@@ -161,7 +161,7 @@ export const OKX_PRESET: BrokerPresetDef = {
   hint: 'Demo Trading uses the same domain as live but routes orders to a simulated matching engine. **You must generate a separate set of API keys from OKX\'s demo trading mode** — your live API keys will be rejected in demo. Live keys give the bot real money access; double-check trade-only permissions and never enable withdrawals.',
   defaultName: 'okx-main',
   badge: 'OKX',
-  badgeColor: 'text-accent',
+  badgeColor: 'text-primary',
   engine: 'ccxt',
   guardCategory: 'crypto',
   modes: [
@@ -196,7 +196,7 @@ export const BYBIT_PRESET: BrokerPresetDef = {
   hint: 'Bybit ships **two** non-live environments: Testnet (separate domain api-testnet.bybit.com, fake market data, fake matching) and Demo Trading (production domain, **real** market data, simulated matching). Each requires its own API keys generated in the matching environment.',
   defaultName: 'bybit-main',
   badge: 'BY',
-  badgeColor: 'text-accent',
+  badgeColor: 'text-primary',
   engine: 'ccxt',
   guardCategory: 'crypto',
   modes: [
@@ -231,7 +231,7 @@ export const HYPERLIQUID_PRESET: BrokerPresetDef = {
   hint: 'Hyperliquid authenticates via wallet signatures. Generate a **dedicated API wallet** at app.hyperliquid.xyz/API and use its private key here — never paste your main wallet\'s key. The wallet address can be either the main wallet (vault owner) or the API wallet itself.',
   defaultName: 'hyperliquid-main',
   badge: 'HL',
-  badgeColor: 'text-accent',
+  badgeColor: 'text-primary',
   engine: 'ccxt',
   guardCategory: 'crypto',
   modes: [
@@ -264,7 +264,7 @@ export const BITGET_PRESET: BrokerPresetDef = {
   hint: 'Bitget requires API key + secret + passphrase (set when creating the key). Demo Trading routes orders to a simulated environment using the production domain.',
   defaultName: 'bitget-main',
   badge: 'BG',
-  badgeColor: 'text-accent',
+  badgeColor: 'text-primary',
   engine: 'ccxt',
   guardCategory: 'crypto',
   modes: [
@@ -299,7 +299,7 @@ export const CCXT_CUSTOM_PRESET: BrokerPresetDef = {
   hint: 'This preset exposes every CCXT credential field. Use it only for exchanges without a dedicated preset. Read the exchange\'s CCXT page (docs.ccxt.com) to know which fields it actually requires — sandbox/demoTrading semantics vary per exchange.',
   defaultName: 'ccxt-custom',
   badge: 'CC',
-  badgeColor: 'text-text-muted',
+  badgeColor: 'text-muted-foreground',
   engine: 'ccxt',
   guardCategory: 'crypto',
   zodSchema: z.object({
@@ -342,7 +342,7 @@ export const ALPACA_PRESET: BrokerPresetDef = {
   hint: 'Paper and Live use **separate** API keys — generate from the matching dashboard at alpaca.markets. Paper is free and unlimited; Live places real orders on real money.',
   defaultName: 'alpaca-paper',
   badge: 'AL',
-  badgeColor: 'text-green',
+  badgeColor: 'text-success',
   engine: 'alpaca',
   guardCategory: 'securities',
   modes: [
@@ -374,7 +374,7 @@ export const IBKR_PRESET: BrokerPresetDef = {
   hint: 'IBKR auth happens via your TWS/Gateway login — no API keys here. Make sure TWS is running and "Enable ActiveX and Socket Clients" is on (File → Global Configuration → API → Settings). Default ports: 7496 (live) / 7497 (paper). For IB Gateway: 4001 (live) / 4002 (paper).',
   defaultName: 'ibkr',
   badge: 'IB',
-  badgeColor: 'text-orange-400',
+  badgeColor: 'text-warning',
   engine: 'ibkr',
   guardCategory: 'securities',
   zodSchema: z.object({
@@ -405,7 +405,7 @@ export const LONGBRIDGE_PRESET: BrokerPresetDef = {
   hint: 'Longbridge uses **appKey + appSecret + accessToken** from open.longbridge.com. The access token is long-lived (~90 days) but **does not auto-refresh** — when it expires you must regenerate it in the LB dashboard and update this config. Paper and live use separate credentials; generate from the matching environment.',
   defaultName: 'longbridge-main',
   badge: 'LB',
-  badgeColor: 'text-accent',
+  badgeColor: 'text-primary',
   engine: 'longbridge',
   guardCategory: 'securities',
   modes: [
@@ -447,7 +447,7 @@ export const LEVERUP_PRESET: BrokerPresetDef = {
 Paste the **private key of the authorized wallet** below. LeverUp's team confirmed a main wallet works directly here — anything pasted below has full control over its funds. Use a wallet whose balance you're comfortable with this app touching.`,
   defaultName: 'leverup-main',
   badge: 'LU',
-  badgeColor: 'text-accent',
+  badgeColor: 'text-primary',
   engine: 'leverup',
   guardCategory: 'crypto',
   modes: [
@@ -477,7 +477,7 @@ export const SIMULATOR_PRESET: BrokerPresetDef = {
   hint: 'For UI/AI repro testing only. Positions and orders live in process memory; **everything is wiped on dev server restart**. Connect via the Dev → Simulator panel to inject prices, manually撮合 limit orders, and simulate external transfers / off-platform trades.',
   defaultName: 'simulator',
   badge: 'SM',
-  badgeColor: 'text-text-muted',
+  badgeColor: 'text-muted-foreground',
   engine: 'mock',
   guardCategory: 'crypto',
   zodSchema: z.object({

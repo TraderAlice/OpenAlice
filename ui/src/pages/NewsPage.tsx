@@ -26,39 +26,39 @@ function ArticleRow({ article }: { article: NewsArticle }) {
 
   return (
     <div
-      className="px-4 py-3 hover:bg-bg-tertiary/30 transition-colors cursor-pointer"
+      className="px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer"
       onClick={() => setExpanded(!expanded)}
     >
       {/* Header row */}
       <div className="flex items-start gap-2">
         <div className="flex-1 min-w-0">
-          <p className="text-[13px] font-medium text-text leading-snug">{article.title}</p>
+          <p className="text-[13px] font-medium text-foreground leading-snug">{article.title}</p>
           <div className="flex items-center gap-2 mt-1">
             {article.source && (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-accent/10 text-accent">
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/10 text-primary">
                 {article.source}
               </span>
             )}
-            <span className="text-[11px] text-text-muted">{formatRelativeTime(article.time)}</span>
+            <span className="text-[11px] text-muted-foreground">{formatRelativeTime(article.time)}</span>
             {article.categories && (
-              <span className="text-[11px] text-text-muted/50 truncate">{article.categories}</span>
+              <span className="text-[11px] text-muted-foreground/50 truncate">{article.categories}</span>
             )}
           </div>
         </div>
-        <span className="text-text-muted text-xs shrink-0 mt-0.5">{expanded ? '▾' : '▸'}</span>
+        <span className="text-muted-foreground text-xs shrink-0 mt-0.5">{expanded ? '▾' : '▸'}</span>
       </div>
 
       {/* Preview / Expanded */}
       {expanded ? (
         <div className="mt-2 space-y-2">
-          <p className="text-[12px] text-text-muted/80 leading-relaxed whitespace-pre-wrap">{article.content}</p>
+          <p className="text-[12px] text-muted-foreground/80 leading-relaxed whitespace-pre-wrap">{article.content}</p>
           {article.link && (
             <a
               href={article.link}
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="inline-flex items-center gap-1 text-[12px] text-accent hover:underline"
+              className="inline-flex items-center gap-1 text-[12px] text-primary hover:underline"
             >
               {t('news.openOriginal')}
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -71,7 +71,7 @@ function ArticleRow({ article }: { article: NewsArticle }) {
         </div>
       ) : (
         article.content && (
-          <p className="mt-1 text-[12px] text-text-muted/50 truncate">{contentPreview}</p>
+          <p className="mt-1 text-[12px] text-muted-foreground/50 truncate">{contentPreview}</p>
         )
       )}
     </div>
@@ -132,7 +132,7 @@ export function NewsPage() {
             <select
               value={lookback}
               onChange={(e) => setLookback(e.target.value)}
-              className="bg-bg-tertiary text-text text-sm rounded-md border border-border px-2 py-1.5 outline-none focus:border-accent"
+              className="bg-muted text-foreground text-sm rounded-md border border-border px-2 py-1.5 outline-none focus:border-primary"
             >
               {LOOKBACK_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>{t(o.labelKey)}</option>
@@ -142,7 +142,7 @@ export function NewsPage() {
             <select
               value={sourceFilter}
               onChange={(e) => setSourceFilter(e.target.value)}
-              className="bg-bg-tertiary text-text text-sm rounded-md border border-border px-2 py-1.5 outline-none focus:border-accent"
+              className="bg-muted text-foreground text-sm rounded-md border border-border px-2 py-1.5 outline-none focus:border-primary"
             >
               <option value="">{t('news.allSources')}</option>
               {sources.map((s) => (
@@ -150,13 +150,13 @@ export function NewsPage() {
               ))}
             </select>
 
-            <span className="text-xs text-text-muted ml-auto">
+            <span className="text-xs text-muted-foreground ml-auto">
               {t('news.articleCount', { count: articles.length })}
             </span>
           </div>
 
           {/* Article list */}
-          <div className="flex-1 min-h-0 overflow-y-auto rounded-lg border border-border bg-bg">
+          <div className="flex-1 min-h-0 overflow-y-auto rounded-lg border border-border bg-background">
             {loading && articles.length === 0 ? (
               <div className="divide-y divide-border/50">
                 {Array.from({ length: 6 }).map((_, i) => (

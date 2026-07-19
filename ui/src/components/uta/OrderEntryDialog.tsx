@@ -78,8 +78,8 @@ function Header({ mode, onClose }: { mode: OrderEntryMode; onClose: () => void }
   const title = mode.kind === 'place' ? 'Place Order' : 'Close Position'
   return (
     <div className="shrink-0 px-6 py-4 border-b border-border flex items-center justify-between">
-      <h3 className="text-[14px] font-semibold text-text">{title}</h3>
-      <button onClick={onClose} className="text-text-muted hover:text-text p-1 transition-colors">
+      <h3 className="text-[14px] font-semibold text-foreground">{title}</h3>
+      <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1 transition-colors">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
           <path d="M18 6L6 18M6 6l12 12" />
         </svg>
@@ -116,7 +116,7 @@ function WalletPicker({ subAccounts, value, onChange }: {
       <select className={inputClass} value={value} onChange={(e) => onChange(e.target.value)}>
         {subAccounts.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
       </select>
-      <p className="text-[11px] text-text-muted/60 mt-1">This venue has separate wallets; the order routes to the one you pick.</p>
+      <p className="text-[11px] text-muted-foreground/60 mt-1">This venue has separate wallets; the order routes to the one you pick.</p>
     </Field>
   )
 }
@@ -209,7 +209,7 @@ function PlaceForm({ initialAliceId, ...p }: SharedFormProps & { initialAliceId?
           placeholder="0.001"
           inputMode="decimal"
         />
-        <p className="text-[11px] text-text-muted/60 mt-1">Numeric string — preserved at full precision through to the broker (no float roundtrip).</p>
+        <p className="text-[11px] text-muted-foreground/60 mt-1">Numeric string — preserved at full precision through to the broker (no float roundtrip).</p>
       </Field>
 
       {orderType === 'LMT' && (
@@ -226,7 +226,7 @@ function PlaceForm({ initialAliceId, ...p }: SharedFormProps & { initialAliceId?
 
       <button
         onClick={() => setShowAdvanced(!showAdvanced)}
-        className="text-[11px] text-text-muted hover:text-text transition-colors"
+        className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
       >
         {showAdvanced ? '▾ Hide advanced' : '▸ Show advanced (cash qty, TIF)'}
       </button>
@@ -240,7 +240,7 @@ function PlaceForm({ initialAliceId, ...p }: SharedFormProps & { initialAliceId?
               placeholder="50"
               inputMode="decimal"
             />
-            <p className="text-[11px] text-text-muted/60 mt-1">USDT-equivalent notional. Overrides Quantity if both are set.</p>
+            <p className="text-[11px] text-muted-foreground/60 mt-1">USDT-equivalent notional. Overrides Quantity if both are set.</p>
           </Field>
           <Field label="Time in Force">
             <select className={inputClass} value={tif} onChange={(e) => setTif(e.target.value)}>
@@ -260,7 +260,7 @@ function PlaceForm({ initialAliceId, ...p }: SharedFormProps & { initialAliceId?
             placeholder="Why are you placing this order?"
             autoFocus
           />
-          <p className="text-[11px] text-text-muted/60 mt-1">Goes into the trading-as-git commit log alongside the order. Required, even for manual entries.</p>
+          <p className="text-[11px] text-muted-foreground/60 mt-1">Goes into the trading-as-git commit log alongside the order. Required, even for manual entries.</p>
         </Field>
       </div>
 
@@ -316,9 +316,9 @@ function CloseForm({ aliceId, initialQty, symbol, ...p }: SharedFormProps & { al
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md border border-border bg-bg-secondary/50 px-3 py-2.5 space-y-1">
-        <div className="text-[11px] text-text-muted uppercase tracking-wide">Closing</div>
-        <div className="font-mono text-[13px] text-text">{aliceId}</div>
+      <div className="rounded-md border border-border bg-secondary/50 px-3 py-2.5 space-y-1">
+        <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Closing</div>
+        <div className="font-mono text-[13px] text-foreground">{aliceId}</div>
       </div>
 
       <WalletPicker subAccounts={p.subAccounts} value={subAccountId} onChange={setSubAccountId} />
@@ -331,7 +331,7 @@ function CloseForm({ aliceId, initialQty, symbol, ...p }: SharedFormProps & { al
           placeholder="(empty = full position)"
           inputMode="decimal"
         />
-        <p className="text-[11px] text-text-muted/60 mt-1">Defaults to current position size. Override for partial close. Empty = close entire position.</p>
+        <p className="text-[11px] text-muted-foreground/60 mt-1">Defaults to current position size. Override for partial close. Empty = close entire position.</p>
       </Field>
 
       <Field label="Commit Message — required">
@@ -369,22 +369,22 @@ function PushResultPanel({ result }: { result: WalletPushResult }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
-        <span className={`w-2 h-2 rounded-full shrink-0 ${fullySubmitted ? 'bg-green' : 'bg-yellow-400'}`} />
-        <span className={`text-[13px] font-medium ${fullySubmitted ? 'text-green' : 'text-yellow-400'}`}>
+        <span className={`w-2 h-2 rounded-full shrink-0 ${fullySubmitted ? 'bg-success' : 'bg-warning'}`} />
+        <span className={`text-[13px] font-medium ${fullySubmitted ? 'text-success' : 'text-warning'}`}>
           {fullySubmitted
             ? `${totalSubmitted} operation${totalSubmitted > 1 ? 's' : ''} submitted to broker`
             : `${totalSubmitted} submitted, ${totalRejected} rejected`}
         </span>
       </div>
 
-      <div className="rounded-md border border-border bg-bg-secondary/50 px-3 py-2.5 space-y-1.5">
+      <div className="rounded-md border border-border bg-secondary/50 px-3 py-2.5 space-y-1.5">
         <div className="flex justify-between text-[12px]">
-          <span className="text-text-muted">Commit hash</span>
-          <span className="font-mono text-text">{result.hash}</span>
+          <span className="text-muted-foreground">Commit hash</span>
+          <span className="font-mono text-foreground">{result.hash}</span>
         </div>
         <div className="text-[12px]">
-          <span className="text-text-muted">Message:</span>
-          <span className="ml-2 text-text">{result.message}</span>
+          <span className="text-muted-foreground">Message:</span>
+          <span className="ml-2 text-foreground">{result.message}</span>
         </div>
       </div>
 
@@ -395,9 +395,9 @@ function PushResultPanel({ result }: { result: WalletPushResult }) {
         <OpTable title="Rejected" rows={result.rejected} kind="rejected" />
       )}
 
-      <p className="text-[11px] text-text-muted leading-relaxed">
-        Status <strong className="text-text">Submitted</strong> means the broker accepted the order — fills happen async.
-        Refresh the positions / orders panels in a moment to see the order transition to <strong className="text-text">Filled</strong>.
+      <p className="text-[11px] text-muted-foreground leading-relaxed">
+        Status <strong className="text-foreground">Submitted</strong> means the broker accepted the order — fills happen async.
+        Refresh the positions / orders panels in a moment to see the order transition to <strong className="text-foreground">Filled</strong>.
       </p>
     </div>
   )
@@ -414,11 +414,11 @@ interface OpRow {
 function OpTable({ title, rows, kind }: { title: string; rows: OpRow[]; kind: 'submitted' | 'rejected' }) {
   return (
     <div>
-      <p className="text-[11px] font-medium text-text-muted uppercase tracking-wide mb-1.5">{title} ({rows.length})</p>
+      <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">{title} ({rows.length})</p>
       <div className="rounded-md border border-border overflow-hidden">
         <table className="w-full text-[12px]">
           <thead>
-            <tr className="bg-bg-tertiary/30 text-text-muted">
+            <tr className="bg-muted/30 text-muted-foreground">
               <th className="text-left px-2.5 py-1.5 font-medium">Action</th>
               <th className="text-left px-2.5 py-1.5 font-medium">Order ID</th>
               <th className="text-left px-2.5 py-1.5 font-medium">Status / Error</th>
@@ -427,9 +427,9 @@ function OpTable({ title, rows, kind }: { title: string; rows: OpRow[]; kind: 's
           <tbody>
             {rows.map((r, i) => (
               <tr key={i} className="border-t border-border">
-                <td className="px-2.5 py-1.5 text-text">{r.action}</td>
-                <td className="px-2.5 py-1.5 font-mono text-text-muted text-[11px]">{r.orderId ?? '—'}</td>
-                <td className={`px-2.5 py-1.5 ${kind === 'rejected' ? 'text-red' : 'text-text'}`}>
+                <td className="px-2.5 py-1.5 text-foreground">{r.action}</td>
+                <td className="px-2.5 py-1.5 font-mono text-muted-foreground text-[11px]">{r.orderId ?? '—'}</td>
+                <td className={`px-2.5 py-1.5 ${kind === 'rejected' ? 'text-destructive' : 'text-foreground'}`}>
                   {kind === 'rejected' ? (r.error ?? r.status) : r.status}
                 </td>
               </tr>
@@ -445,14 +445,14 @@ function OpTable({ title, rows, kind }: { title: string; rows: OpRow[]; kind: 's
 
 function ErrorPanel({ message, phase }: { message: string; phase?: string }) {
   return (
-    <div className="rounded-md border border-red/30 bg-red/5 px-3 py-2.5">
+    <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2.5">
       <div className="flex items-center gap-2 mb-1">
-        <span className="w-2 h-2 rounded-full bg-red shrink-0" />
-        <span className="text-[12px] font-medium text-red">
+        <span className="w-2 h-2 rounded-full bg-destructive shrink-0" />
+        <span className="text-[12px] font-medium text-destructive">
           {phase ? `Failed at ${phase} step` : 'Failed'}
         </span>
       </div>
-      <p className="text-[12px] text-text whitespace-pre-wrap">{message}</p>
+      <p className="text-[12px] text-foreground whitespace-pre-wrap">{message}</p>
     </div>
   )
 }
@@ -472,8 +472,8 @@ function Segmented({ value, options, onChange }: {
           onClick={() => onChange(o.id)}
           className={`px-3 py-1.5 text-[12px] font-medium transition-colors ${
             value === o.id
-              ? 'bg-accent/15 text-accent'
-              : 'text-text-muted hover:text-text hover:bg-bg-tertiary/30'
+              ? 'bg-primary/15 text-primary'
+              : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
           }`}
         >
           {o.label ?? o.id}

@@ -5,5 +5,8 @@
 *.sh text eol=lf
 src/workspaces/cli/bin/* text eol=lf
 
+# Unified diffs use a single leading space to encode blank context lines.
+patches/*.patch text eol=lf -whitespace
+
 # Native Windows launchers are consumed by cmd.exe.
 *.cmd text eol=crlf

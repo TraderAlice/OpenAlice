@@ -10,16 +10,16 @@ export function EmptyEditor() {
       <img
         src="/alice.ico"
         alt="OpenAlice"
-        className="w-16 h-16 rounded-2xl ring-1 ring-accent/25 shadow-[0_0_18px_var(--color-accent-dim)]"
+        className="w-16 h-16 rounded-2xl ring-1 ring-primary/25 shadow-[0_0_18px_var(--primary-muted)]"
         draggable={false}
       />
       <div className="space-y-2 max-w-md">
-        <h2 className="text-base font-semibold text-text">OpenAlice</h2>
-        <p className="text-[13px] text-text-muted leading-relaxed">
+        <h2 className="text-base font-semibold text-foreground">OpenAlice</h2>
+        <p className="text-[13px] text-muted-foreground leading-relaxed">
           Click an icon on the activity bar to open its sidebar, then pick something from the sidebar to open it as a tab.
         </p>
-        <p className="text-[12px] text-text-muted/70 leading-relaxed">
-          First time here? Open <span className="text-text">Settings → AI Provider</span> to configure a model, then jump back to <span className="text-text">Chat</span>.
+        <p className="text-[12px] text-muted-foreground/70 leading-relaxed">
+          First time here? Open <span className="text-foreground">Settings → AI Provider</span> to configure a model, then jump back to <span className="text-foreground">Chat</span>.
         </p>
       </div>
     </div>

@@ -76,8 +76,8 @@ export function TemplateDetailPage({ spec }: Props) {
 
   if (!template) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-text-muted px-6">
-        <h2 className="text-lg font-medium text-text mb-2">{t('templates.notFoundTitle')}</h2>
+      <div className="flex flex-col items-center justify-center h-full text-muted-foreground px-6">
+        <h2 className="text-lg font-medium text-foreground mb-2">{t('templates.notFoundTitle')}</h2>
         <p className="text-sm">{t('templates.notFoundBody', { name: templateName })}</p>
       </div>
     )
@@ -97,36 +97,36 @@ export function TemplateDetailPage({ spec }: Props) {
         <div className="mb-5 flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-baseline gap-2.5 flex-wrap">
-              <h2 className="text-[20px] font-semibold text-text truncate">{title}</h2>
-              <span className="text-[12px] font-mono text-text-muted tabular-nums shrink-0">
+              <h2 className="text-[20px] font-semibold text-foreground truncate">{title}</h2>
+              <span className="text-[12px] font-mono text-muted-foreground tabular-nums shrink-0">
                 v{template.version}
               </span>
               {template.community && (
-                <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border border-border text-text-muted shrink-0">
+                <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border border-border text-muted-foreground shrink-0">
                   {t('templates.communityBadge')}
                 </span>
               )}
             </div>
             {template.description && (
-              <p className="text-[12px] text-text-muted mt-1.5 max-w-2xl leading-relaxed">
+              <p className="text-[12px] text-muted-foreground mt-1.5 max-w-2xl leading-relaxed">
                 {template.description}
               </p>
             )}
             <div className="flex items-center gap-3 mt-2.5 flex-wrap">
-              <span className="text-[10px] uppercase tracking-wider text-text-muted/70">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground/70">
                 {t('templates.agentsLabel')}
               </span>
               <div className="flex items-center gap-2 flex-wrap">
                 {agents.map((a) => (
                   <span
                     key={a.id}
-                    className="text-[11px] font-mono text-text-muted px-1.5 py-0.5 rounded bg-bg-tertiary"
+                    className="text-[11px] font-mono text-muted-foreground px-1.5 py-0.5 rounded bg-muted"
                   >
                     {a.id}
                   </span>
                 ))}
               </div>
-              <span className="text-[11px] font-mono text-text-muted/60">
+              <span className="text-[11px] font-mono text-muted-foreground/60">
                 {template.name}
               </span>
             </div>
@@ -141,18 +141,18 @@ export function TemplateDetailPage({ spec }: Props) {
         </div>
 
         {/* README body — the template's starting-shape doc */}
-        <div className="text-[10px] uppercase tracking-wider text-text-muted/70 mb-2">
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground/70 mb-2">
           {t('templates.readmeLabel')}
         </div>
-        <div className="rounded-lg border border-border bg-bg-secondary px-6 py-5">
+        <div className="rounded-lg border border-border bg-secondary px-6 py-5">
           {readme === null && !readmeMissing && readmeError === null && (
-            <p className="text-[12px] text-text-muted italic">{t('templates.loadingReadme')}</p>
+            <p className="text-[12px] text-muted-foreground italic">{t('templates.loadingReadme')}</p>
           )}
           {readmeMissing && (
-            <p className="text-[12px] text-text-muted italic">{t('templates.noReadme')}</p>
+            <p className="text-[12px] text-muted-foreground italic">{t('templates.noReadme')}</p>
           )}
           {readmeError && (
-            <p className="text-[12px] text-text-muted italic">{readmeError}</p>
+            <p className="text-[12px] text-muted-foreground italic">{readmeError}</p>
           )}
           {readmeBody && (
             <MarkdownContent text={readmeBody} className="text-[13px] leading-relaxed" />

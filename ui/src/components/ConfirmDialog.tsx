@@ -51,9 +51,9 @@ export function ConfirmDialog({
   return (
     <Dialog onClose={busy ? () => {} : onClose} width="w-[440px]">
       <div className="px-5 py-4 border-b border-border">
-        <h2 className="text-[15px] font-semibold text-text">{title}</h2>
+        <h2 className="text-[15px] font-semibold text-foreground">{title}</h2>
       </div>
-      <div className="px-5 py-4 text-[13px] text-text leading-relaxed">
+      <div className="px-5 py-4 text-[13px] text-foreground leading-relaxed">
         {message}
       </div>
       <div className="px-5 py-3 border-t border-border flex justify-end gap-2">

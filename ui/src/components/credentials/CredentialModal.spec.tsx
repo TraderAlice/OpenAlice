@@ -1,8 +1,9 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { Preset } from '../../api/types'
 import { api } from '../../api'
+import { i18n } from '../../i18n'
 import { CredentialModal } from './CredentialModal'
 
 vi.mock('../../api', () => ({
@@ -136,6 +137,10 @@ function setup() {
   fireEvent.change(screen.getByPlaceholderText('Enter API key'), { target: { value: 'sk-test' } })
   return { onClose, onSaved }
 }
+
+beforeEach(async () => {
+  await i18n.changeLanguage('en')
+})
 
 afterEach(() => {
   cleanup()

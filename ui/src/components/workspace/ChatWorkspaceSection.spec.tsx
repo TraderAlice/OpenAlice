@@ -1,12 +1,25 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { WorkspacesContext, type WorkspacesContextValue } from '../../contexts/workspaces-context'
 import { i18n } from '../../i18n'
-import type { TemplateInfo, Workspace } from './api'
+import {
+  MANAGER_WORKSPACE_ID,
+  type ManagerWorkspaceSnapshot,
+  type SessionRecord,
+  type TemplateInfo,
+  type Workspace,
+} from './api'
 import { ChatWorkspaceSection } from './ChatWorkspaceSection'
 
-const { openOrFocus } = vi.hoisted(() => ({ openOrFocus: vi.fn() }))
+const actions = vi.hoisted(() => ({
+  openOrFocus: vi.fn(),
+  pauseSession: vi.fn(async () => undefined),
+  resumeSession: vi.fn(async () => undefined),
+  openWebPiSession: vi.fn(async () => undefined),
+  requestDeleteSession: vi.fn(),
+}))
+const { openOrFocus } = actions
 
 vi.mock('../../tabs/store', () => ({
   useWorkspace: (selector: (state: { openOrFocus: typeof openOrFocus }) => unknown) =>
@@ -34,7 +47,27 @@ const chatWorkspace: Workspace = {
   sessions: [],
 }
 
-function workspaceContext(workspaces: readonly Workspace[]): WorkspacesContextValue {
+function chatSession(index: number): SessionRecord {
+  return {
+    id: `chat-session-${index}`,
+    resumeId: `chat-resume-${index}`,
+    wsId: chatWorkspace.id,
+    agent: 'pi',
+    name: `p${index}`,
+    createdAt: `2026-07-${String(index).padStart(2, '0')}T00:00:00.000Z`,
+    lastActiveAt: `2026-07-${String(index).padStart(2, '0')}T12:00:00.000Z`,
+    state: 'paused',
+    surface: 'terminal',
+    pid: null,
+    startedAt: null,
+    title: `Conversation ${index}`,
+  }
+}
+
+function workspaceContext(
+  workspaces: readonly Workspace[],
+  workspaceManager: ManagerWorkspaceSnapshot | null = null,
+): WorkspacesContextValue {
   return {
     workspaces,
     templates: [chatTemplate],
@@ -42,34 +75,42 @@ function workspaceContext(workspaces: readonly Workspace[]): WorkspacesContextVa
     defaultAgent: 'pi',
     issueDefaultAgent: null,
     listError: null,
+    workspaceManager,
+    workspaceManagerLoaded: true,
+    workspaceManagerError: null,
     hasLoaded: true,
     templatesLoaded: true,
     refresh: vi.fn(),
+    refreshWorkspaceManager: vi.fn(async () => undefined),
+    quickStartWorkspaceManager: vi.fn(async () => { throw new Error('not used') }),
     spawn: vi.fn(async () => undefined),
     openHeadlessRun: vi.fn(async () => undefined),
     setDefaultAgent: vi.fn(async () => undefined),
     setIssueDefaultAgent: vi.fn(async () => undefined),
     quickChat: vi.fn(async () => 'session-1'),
-    pauseSession: vi.fn(async () => undefined),
-    resumeSession: vi.fn(async () => undefined),
-    openWebPiSession: vi.fn(async () => undefined),
-    requestDeleteSession: vi.fn(),
+    pauseSession: actions.pauseSession,
+    resumeSession: actions.resumeSession,
+    openWebPiSession: actions.openWebPiSession,
+    requestDeleteSession: actions.requestDeleteSession,
     openAgentConfig: vi.fn(),
     saveWorkspaceMetadata: vi.fn(async () => undefined),
     renameWorkspace: vi.fn(async () => undefined),
   }
 }
 
-function renderSection(workspaces: readonly Workspace[] = [chatWorkspace]) {
+function renderSection(
+  workspaces: readonly Workspace[] = [chatWorkspace],
+  workspaceManager: ManagerWorkspaceSnapshot | null = null,
+) {
   return render(
-    <WorkspacesContext.Provider value={workspaceContext(workspaces)}>
+    <WorkspacesContext.Provider value={workspaceContext(workspaces, workspaceManager)}>
       <ChatWorkspaceSection />
     </WorkspacesContext.Provider>,
   )
 }
 
 beforeEach(async () => {
-  openOrFocus.mockReset()
+  for (const mock of Object.values(actions)) mock.mockClear()
   await i18n.changeLanguage('en')
 })
 
@@ -115,5 +156,90 @@ describe('ChatWorkspaceSection actions', () => {
 
     expect(screen.getByText(i18n.t('chat.noChatWorkspacesYet'))).toBeTruthy()
     expect(screen.getAllByRole('button', { name: 'New workspace' })).toHaveLength(2)
+  })
+
+  it('bounds expanded Workspace history and routes the full catalog to the Session library', () => {
+    const sessions = Array.from({ length: 9 }, (_, index) => chatSession(index + 1))
+    renderSection([{ ...chatWorkspace, sessions }])
+
+    expect(screen.getAllByRole('button', { name: /^Conversation/ })).toHaveLength(6)
+    expect(screen.queryByRole('button', { name: 'Conversation 3' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'View all 9 sessions' }))
+    expect(openOrFocus).toHaveBeenCalledWith({
+      kind: 'workspace',
+      params: { wsId: chatWorkspace.id, source: 'chat' },
+    })
+  })
+
+  it('owns Manager Session navigation and lifecycle actions under the Manager entry', () => {
+    const manager: ManagerWorkspaceSnapshot = {
+      id: MANAGER_WORKSPACE_ID,
+      tag: 'Workspace Manager',
+      activeWorkspaceCount: 2,
+      sessions: [
+        {
+          id: 'manager-opencode',
+          wsId: MANAGER_WORKSPACE_ID,
+          agent: 'opencode',
+          name: 'o1',
+          createdAt: '2026-07-16T00:00:00.000Z',
+          lastActiveAt: '2026-07-16T00:02:00.000Z',
+          state: 'running',
+          surface: 'terminal',
+          resumeId: 'resume-opencode',
+          pid: 42,
+          startedAt: 1,
+          title: 'Inspect the floor',
+        },
+        {
+          id: 'manager-pi',
+          wsId: MANAGER_WORKSPACE_ID,
+          agent: 'pi',
+          name: 'p1',
+          createdAt: '2026-07-16T00:00:00.000Z',
+          lastActiveAt: '2026-07-16T00:01:00.000Z',
+          state: 'paused',
+          surface: 'webpi',
+          resumeId: 'resume-pi',
+          pid: null,
+          startedAt: null,
+          title: 'Coordinate owners',
+        },
+      ],
+    }
+
+    renderSection([], manager)
+
+    const managerButton = screen.getByRole('button', { name: 'Workspace Manager' })
+    const managerSection = managerButton.parentElement?.parentElement
+    expect(managerSection).toBeTruthy()
+    const managerUi = within(managerSection as HTMLElement)
+
+    expect(managerUi.queryByRole('button', { name: 'Inspect the floor' })).toBeNull()
+    fireEvent.click(managerUi.getByRole('button', { name: 'Expand sessions' }))
+
+    const runningSession = managerUi.getByRole('button', { name: 'Inspect the floor' })
+    const pausedSession = managerUi.getByRole('button', { name: 'Coordinate owners' })
+
+    fireEvent.click(runningSession)
+    expect(openOrFocus).toHaveBeenCalledWith({
+      kind: 'workspace-manager',
+      params: { sessionId: 'manager-opencode' },
+    })
+
+    fireEvent.click(managerUi.getByRole('button', { name: 'Stop this session' }))
+    expect(actions.pauseSession).toHaveBeenCalledWith(MANAGER_WORKSPACE_ID, 'manager-opencode')
+
+    fireEvent.click(managerUi.getByRole('button', { name: 'Resume this session' }))
+    expect(actions.openWebPiSession).toHaveBeenCalledWith(MANAGER_WORKSPACE_ID, 'manager-pi')
+
+    const pausedRow = pausedSession.parentElement
+    expect(pausedRow).toBeTruthy()
+    fireEvent.click(within(pausedRow as HTMLElement).getByRole('button', { name: 'Delete this session' }))
+    expect(actions.requestDeleteSession).toHaveBeenCalledWith(MANAGER_WORKSPACE_ID, 'manager-pi')
+
+    fireEvent.click(managerUi.getByRole('button', { name: 'Collapse sessions' }))
+    expect(managerUi.queryByRole('button', { name: 'Inspect the floor' })).toBeNull()
   })
 })

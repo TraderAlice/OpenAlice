@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
+import { basename, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const CLI_VERSION = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version
 
@@ -19,6 +21,11 @@ export async function readInstallSource(options = {}) {
     if (error?.code === 'ENOENT') return cloneInstallSource(DEFAULT_INSTALL_SOURCE)
     throw error
   }
+}
+
+export function installedContentIdentity(moduleUrl = import.meta.url) {
+  const releaseDirectory = basename(dirname(dirname(fileURLToPath(moduleUrl))))
+  return /-([a-f0-9]{16})$/.exec(releaseDirectory)?.[1] ?? null
 }
 
 export function normalizeInstallSource(value, fallback = DEFAULT_INSTALL_SOURCE) {

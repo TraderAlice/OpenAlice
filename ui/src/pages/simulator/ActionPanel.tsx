@@ -19,9 +19,9 @@ import { InstrumentInput } from './InstrumentInput'
 import { buildInstrument, type InstrumentDraft } from './instruments'
 
 const inputClass =
-  'px-2 py-1 bg-bg text-text border border-border rounded text-sm outline-none transition-colors focus:border-accent'
+  'px-2 py-1 bg-background text-foreground border border-border rounded text-sm outline-none transition-colors focus:border-primary'
 const inputClassMono =
-  'px-2 py-1 bg-bg text-text border border-border rounded font-mono text-xs outline-none transition-colors focus:border-accent'
+  'px-2 py-1 bg-background text-foreground border border-border rounded font-mono text-xs outline-none transition-colors focus:border-primary'
 
 type TabId = 'tick' | 'deposit' | 'trade' | 'order'
 
@@ -47,7 +47,7 @@ export function ActionPanel({ utaId, state, run, loading }: {
   }, [state])
 
   return (
-    <div className="sticky bottom-0 -mx-4 md:-mx-6 px-4 md:px-6 py-3 bg-bg-secondary/95 backdrop-blur border-t border-border z-10">
+    <div className="sticky bottom-0 -mx-4 md:-mx-6 px-4 md:px-6 py-3 bg-secondary/95 backdrop-blur border-t border-border z-10">
       {/* Tab strip */}
       <div className="flex items-center gap-1 mb-3" role="tablist">
         {TABS.map((t, i) => (
@@ -59,11 +59,11 @@ export function ActionPanel({ utaId, state, run, loading }: {
             onClick={() => setTab(t.id)}
             className={`px-2.5 py-1 text-xs rounded transition-colors ${
               tab === t.id
-                ? 'bg-accent/20 text-accent font-medium'
-                : 'text-text-muted hover:text-text hover:bg-bg-tertiary/50'
+                ? 'bg-primary/20 text-primary font-medium'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
             }`}
           >
-            <span className="text-[10px] text-text-muted/60 mr-1.5">{i + 1}</span>
+            <span className="text-[10px] text-muted-foreground/60 mr-1.5">{i + 1}</span>
             {t.label}
           </button>
         ))}
@@ -111,12 +111,12 @@ function QuickTickTab({ utaId, knownKeys, run, loading }: {
   return (
     <div className="flex items-center gap-2 flex-wrap">
       <KeySelect value={key} onChange={setKey} options={knownKeys} placeholder="symbol" />
-      <span className="text-text-muted text-xs">Δ</span>
+      <span className="text-muted-foreground text-xs">Δ</span>
       <button disabled={loading || !key} onClick={() => tick(-5)} className="btn-secondary-sm">−5%</button>
       <button disabled={loading || !key} onClick={() => tick(-1)} className="btn-secondary-sm">−1%</button>
       <button disabled={loading || !key} onClick={() => tick(1)} className="btn-secondary-sm">+1%</button>
       <button disabled={loading || !key} onClick={() => tick(5)} className="btn-secondary-sm">+5%</button>
-      <span className="text-text-muted/60 text-xs px-1">|</span>
+      <span className="text-muted-foreground/60 text-xs px-1">|</span>
       <input
         className={`${inputClassMono} w-32`}
         placeholder="set exact"
@@ -179,11 +179,11 @@ function DepositTab({ utaId, knownKeys, run, loading }: {
         <div className="flex rounded overflow-hidden border border-border">
           <button
             onClick={() => setMode('in')}
-            className={`px-2 py-1 text-xs ${mode === 'in' ? 'bg-green/20 text-green' : 'text-text-muted hover:text-text'}`}
+            className={`px-2 py-1 text-xs ${mode === 'in' ? 'bg-success/20 text-success' : 'text-muted-foreground hover:text-foreground'}`}
           >Deposit</button>
           <button
             onClick={() => setMode('out')}
-            className={`px-2 py-1 text-xs ${mode === 'out' ? 'bg-red/20 text-red' : 'text-text-muted hover:text-text'}`}
+            className={`px-2 py-1 text-xs ${mode === 'out' ? 'bg-destructive/20 text-destructive' : 'text-muted-foreground hover:text-foreground'}`}
           >Withdraw</button>
         </div>
 
@@ -202,8 +202,8 @@ function DepositTab({ utaId, knownKeys, run, loading }: {
               onClick={submitDeposit}
               className="btn-primary-sm"
             >Deposit</button>
-            {draftOk && <span className="text-[11px] text-text-muted/70 font-mono">→ {draftOk.nativeKey}</span>}
-            {draftError && draft.symbol && <span className="text-[11px] text-yellow-400">{draftError}</span>}
+            {draftOk && <span className="text-[11px] text-muted-foreground/70 font-mono">→ {draftOk.nativeKey}</span>}
+            {draftError && draft.symbol && <span className="text-[11px] text-warning">{draftError}</span>}
           </>
         ) : (
           <>
@@ -223,7 +223,7 @@ function DepositTab({ utaId, knownKeys, run, loading }: {
           </>
         )}
 
-        <span className="text-[11px] text-text-muted ml-auto">Cash unchanged. Triggers UTA reconcile pipeline.</span>
+        <span className="text-[11px] text-muted-foreground ml-auto">Cash unchanged. Triggers UTA reconcile pipeline.</span>
       </div>
     </div>
   )
@@ -268,20 +268,20 @@ function TradeTab({ utaId, run, loading }: {
       <div className="flex rounded overflow-hidden border border-border">
         <button
           onClick={() => setSide('BUY')}
-          className={`px-2 py-1 text-xs ${side === 'BUY' ? 'bg-green/20 text-green' : 'text-text-muted hover:text-text'}`}
+          className={`px-2 py-1 text-xs ${side === 'BUY' ? 'bg-success/20 text-success' : 'text-muted-foreground hover:text-foreground'}`}
         >BUY</button>
         <button
           onClick={() => setSide('SELL')}
-          className={`px-2 py-1 text-xs ${side === 'SELL' ? 'bg-red/20 text-red' : 'text-text-muted hover:text-text'}`}
+          className={`px-2 py-1 text-xs ${side === 'SELL' ? 'bg-destructive/20 text-destructive' : 'text-muted-foreground hover:text-foreground'}`}
         >SELL</button>
       </div>
       <InstrumentInput draft={draft} onChange={setDraft} />
       <input className={`${inputClassMono} w-24`} placeholder="qty" value={qty} onChange={(e) => setQty(e.target.value)} />
       <input className={`${inputClassMono} w-24`} placeholder="price" value={price} onChange={(e) => setPrice(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} />
       <button disabled={loading || !draftOk || !qty || !price} onClick={submit} className="btn-primary-sm">Submit</button>
-      {draftOk && <span className="text-[11px] text-text-muted/70 font-mono">→ {draftOk.nativeKey}</span>}
-      {draftError && draft.symbol && <span className="text-[11px] text-yellow-400">{draftError}</span>}
-      <span className="text-[11px] text-text-muted ml-auto">Cash {side === 'BUY' ? '−' : '+'} qty × price.</span>
+      {draftOk && <span className="text-[11px] text-muted-foreground/70 font-mono">→ {draftOk.nativeKey}</span>}
+      {draftError && draft.symbol && <span className="text-[11px] text-warning">{draftError}</span>}
+      <span className="text-[11px] text-muted-foreground ml-auto">Cash {side === 'BUY' ? '−' : '+'} qty × price.</span>
     </div>
   )
 }
@@ -327,8 +327,8 @@ function OrderTab({ utaId, knownKeys, run, loading }: {
   return (
     <div className="flex items-center gap-2 flex-wrap">
       <div className="flex rounded overflow-hidden border border-border">
-        <button onClick={() => setSide('BUY')} className={`px-2 py-1 text-xs ${side === 'BUY' ? 'bg-green/20 text-green' : 'text-text-muted hover:text-text'}`}>BUY</button>
-        <button onClick={() => setSide('SELL')} className={`px-2 py-1 text-xs ${side === 'SELL' ? 'bg-red/20 text-red' : 'text-text-muted hover:text-text'}`}>SELL</button>
+        <button onClick={() => setSide('BUY')} className={`px-2 py-1 text-xs ${side === 'BUY' ? 'bg-success/20 text-success' : 'text-muted-foreground hover:text-foreground'}`}>BUY</button>
+        <button onClick={() => setSide('SELL')} className={`px-2 py-1 text-xs ${side === 'SELL' ? 'bg-destructive/20 text-destructive' : 'text-muted-foreground hover:text-foreground'}`}>SELL</button>
       </div>
       <select value={orderType} onChange={(e) => setOrderType(e.target.value as 'MKT' | 'LMT')} className={`${inputClass} w-20`}>
         <option value="MKT">MKT</option>
@@ -340,7 +340,7 @@ function OrderTab({ utaId, knownKeys, run, loading }: {
         <input className={`${inputClassMono} w-28`} placeholder="limit price" value={lmtPrice} onChange={(e) => setLmtPrice(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} />
       )}
       <button disabled={loading || !key || !qty || (orderType === 'LMT' && !lmtPrice)} onClick={submit} className="btn-primary-sm">Place</button>
-      <span className="text-[11px] text-text-muted">Stage → commit → push via Alice's trading pipeline.</span>
+      <span className="text-[11px] text-muted-foreground">Stage → commit → push via Alice's trading pipeline.</span>
     </div>
   )
 }

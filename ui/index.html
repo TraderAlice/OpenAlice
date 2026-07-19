@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="auto">
+<html lang="en" data-theme="auto" data-palette="paper" data-day-palette="paper" data-night-palette="graphite">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
@@ -7,22 +7,40 @@
     <title>OpenAlice</title>
     <meta name="color-scheme" content="light dark" />
     <script>
-      // No-flash theme: mirror the persisted preference onto <html data-theme>
-      // before first paint. Source of truth is the zustand theme store
-      // (openalice.theme.v1); ui/src/theme re-applies + self-heals on boot.
+      // No-flash theme: resolve the persisted preference + universal palette slots
+      // before first paint. ui/src/theme re-applies and self-heals on boot.
       (function () {
         try {
           var raw = localStorage.getItem('openalice.theme.v1');
-          var t = raw ? (JSON.parse(raw).state || {}).theme : 'auto';
-          document.documentElement.dataset.theme =
-            t === 'light' || t === 'dark' ? t : 'auto';
+          var state = raw ? (JSON.parse(raw).state || {}) : {};
+          var storedTheme = state.theme;
+          var t = storedTheme === 'day' || storedTheme === 'night' || storedTheme === 'auto'
+            ? storedTheme
+            : storedTheme === 'light' ? 'day' : storedTheme === 'dark' ? 'night' : 'auto';
+          var palettes = ['paper', 'porcelain', 'linen', 'graphite', 'midnight', 'moss', 'iris'];
+          var storedDay = palettes.indexOf(state.dayPalette) >= 0 ? state.dayPalette : state.lightPalette;
+          var storedNight = palettes.indexOf(state.nightPalette) >= 0 ? state.nightPalette : state.darkPalette;
+          var day = palettes.indexOf(storedDay) >= 0 ? storedDay : 'paper';
+          var night = palettes.indexOf(storedNight) >= 0 ? storedNight : 'graphite';
+          var effective = t === 'auto'
+            ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'night' : 'day')
+            : t;
+          var root = document.documentElement;
+          root.dataset.theme = t;
+          root.dataset.dayPalette = day;
+          root.dataset.nightPalette = night;
+          root.dataset.palette = effective === 'night' ? night : day;
         } catch (e) {
-          document.documentElement.dataset.theme = 'auto';
+          var root = document.documentElement;
+          root.dataset.theme = 'auto';
+          root.dataset.dayPalette = 'paper';
+          root.dataset.nightPalette = 'graphite';
+          root.dataset.palette = 'paper';
         }
       })();
     </script>
   </head>
-  <body class="h-full bg-bg text-text">
+  <body class="h-full bg-background text-foreground">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

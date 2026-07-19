@@ -24,7 +24,6 @@ function fakeAdapter(id = 'pi'): CliAdapter {
     kind: 'agent',
     capabilities: { headless: true },
     composeHeadlessCommand: () => [id],
-    bootstrap: vi.fn(async () => undefined),
   } as unknown as CliAdapter
 }
 

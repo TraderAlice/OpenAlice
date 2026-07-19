@@ -28,12 +28,17 @@ import { useTranslation } from 'react-i18next'
 import '../components/workspace/workspaces.css'
 
 import { ConfirmDialog } from '../components/ConfirmDialog'
-import { useResolvedTerminalThemeVariant } from '../components/workspace/terminalTheme'
+import { useToast } from '../components/Toast'
+import {
+  publishTerminalViewAttributes,
+  useTerminalAppearance,
+} from '../components/workspace/terminalAppearance'
 import { WorkspaceAIConfigModal } from '../components/workspace/WorkspaceAIConfigModal'
 import {
   deleteSession as apiDeleteSession,
   type AgentId,
   getIssueDefaultAgent,
+  getWorkspaceManager,
   getWorkspaceDefaultAgent,
   listAgents,
   listTemplates,
@@ -42,12 +47,16 @@ import {
   openResumeSession,
   pauseSession as apiPauseSession,
   quickChat as apiQuickChat,
+  quickStartWorkspaceManager as apiQuickStartWorkspaceManager,
   resumeSession as apiResumeSession,
   setIssueDefaultAgent as apiSetIssueDefaultAgent,
   setWorkspaceDefaultAgent as apiSetWorkspaceDefaultAgent,
   spawnSession,
   updateWorkspaceMetadata,
   type AgentInfo,
+  MANAGER_WORKSPACE_ID,
+  type ManagerQuickStartResult,
+  type ManagerWorkspaceSnapshot,
   type SessionRecord,
   type TemplateInfo,
   type Workspace,
@@ -55,6 +64,7 @@ import {
 import { useWorkspace } from '../tabs/store'
 import type { WorkspaceSource } from '../tabs/types'
 import { WorkspacesContext, type SpawnOpts } from './workspaces-context'
+import { reconcileWorkspaceList } from './workspace-list-reconcile'
 
 const LIST_POLL_MS = 3000
 
@@ -66,6 +76,9 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
   const [defaultAgent, setDefaultAgentState] = useState<string | null>(null)
   const [issueDefaultAgent, setIssueDefaultAgentState] = useState<string | null>(null)
   const [listError, setListError] = useState<string | null>(null)
+  const [workspaceManager, setWorkspaceManager] = useState<ManagerWorkspaceSnapshot | null>(null)
+  const [workspaceManagerLoaded, setWorkspaceManagerLoaded] = useState(false)
+  const [workspaceManagerError, setWorkspaceManagerError] = useState<string | null>(null)
   // Don't reconcile orphan tabs until we've successfully fetched the
   // workspaces list at least once — otherwise the initial `[]` looks like
   // "every workspace was just deleted" and a deep-linked workspace URL
@@ -82,15 +95,27 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
   } | null>(null)
   const [pendingSessionDelete, setPendingSessionDelete] = useState<{ wsId: string; sessionId: string } | null>(null)
   const { t } = useTranslation()
-  const terminalTheme = useResolvedTerminalThemeVariant()
+  const toast = useToast()
+  const terminalAppearance = useTerminalAppearance()
+
+  const ensureTerminalAppearancePublished = useCallback(async (): Promise<void> => {
+    try {
+      await publishTerminalViewAttributes(terminalAppearance.viewAttributes)
+    } catch (err) {
+      // A missing push means hidden queries stay silent; never fall back to a
+      // fabricated palette or block the rest of the product from starting.
+      console.warn('workspaces.terminal_appearance_publish_failed', err)
+    }
+  }, [terminalAppearance.viewAttributes])
 
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const closeTab = useWorkspace((s) => s.closeTab)
+  const setSidebar = useWorkspace((s) => s.setSidebar)
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
       const list = await listWorkspaces()
-      setWorkspaces(list)
+      setWorkspaces((current) => reconcileWorkspaceList(current, list))
       setHasLoaded(true)
       setListError(null)
     } catch (err) {
@@ -98,11 +123,32 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const refreshWorkspaceManager = useCallback(async (): Promise<void> => {
+    try {
+      setWorkspaceManager(await getWorkspaceManager())
+      setWorkspaceManagerError(null)
+    } catch (err) {
+      setWorkspaceManagerError((err as Error).message)
+    } finally {
+      setWorkspaceManagerLoaded(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    void ensureTerminalAppearancePublished()
+  }, [ensureTerminalAppearancePublished])
+
   useEffect(() => {
     void refresh()
     const id = setInterval(() => void refresh(), LIST_POLL_MS)
     return () => clearInterval(id)
   }, [refresh])
+
+  useEffect(() => {
+    void refreshWorkspaceManager()
+    const id = setInterval(() => void refreshWorkspaceManager(), LIST_POLL_MS)
+    return () => clearInterval(id)
+  }, [refreshWorkspaceManager])
 
   useEffect(() => {
     void listTemplates()
@@ -141,10 +187,27 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     }
   }, [hasLoaded, workspaces, closeTab])
 
+  // Manager Sessions use the same tab lifecycle but are intentionally absent
+  // from the business Workspace list above. Reconcile them against their own
+  // launcher-owned snapshot so a deleted Manager conversation cannot leave a
+  // dangling terminal tab.
+  useEffect(() => {
+    if (!workspaceManagerLoaded || workspaceManager === null) return
+    const validSessions = new Set(workspaceManager.sessions.map((session) => session.id))
+    const tabsSnap = useWorkspace.getState().tabs
+    for (const tabId of Object.keys(tabsSnap)) {
+      const tab = tabsSnap[tabId]
+      if (!tab || tab.spec.kind !== 'workspace-manager') continue
+      const sessionId = tab.spec.params.sessionId
+      if (sessionId && !validSessions.has(sessionId)) closeTab(tabId)
+    }
+  }, [closeTab, workspaceManager, workspaceManagerLoaded])
+
   const spawn = useCallback(
     async (wsId: string, opts: SpawnOpts = {}, source?: WorkspaceSource): Promise<void> => {
       try {
-        const sess = await spawnSession(wsId, { ...opts, terminalTheme })
+        await ensureTerminalAppearancePublished()
+        const sess = await spawnSession(wsId, opts)
         const nowIso = new Date().toISOString()
         const newRecord: SessionRecord = {
           id: sess.sessionId,
@@ -178,7 +241,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         console.error('workspaces.spawn_failed', { wsId, opts, err })
       }
     },
-    [refresh, openOrFocus, terminalTheme],
+    [ensureTerminalAppearancePublished, refresh, openOrFocus],
   )
 
   const setDefaultAgent = useCallback(async (agent: string | null): Promise<void> => {
@@ -195,7 +258,8 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
       const { session } = await openResumeSession(wsId, resumeId, opts)
       let nextSession = session
       if (session.state === 'paused') {
-        const resumed = await apiResumeSession(wsId, session.id, terminalTheme)
+        await ensureTerminalAppearancePublished()
+        const resumed = await apiResumeSession(wsId, session.id)
         if (resumed) {
           nextSession = {
             ...session,
@@ -222,10 +286,16 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
             : workspace,
         ),
       )
-      openOrFocus({ kind: 'workspace', params: { wsId, sessionId: nextSession.id } })
+      // A resumed headless conversation is user-facing Chat, even though its
+      // durable Session still belongs to a Workspace underneath.
+      setSidebar('chat')
+      openOrFocus({
+        kind: 'workspace',
+        params: { wsId, sessionId: nextSession.id, source: 'chat' },
+      })
       void refresh()
     },
-    [openOrFocus, refresh, terminalTheme],
+    [ensureTerminalAppearancePublished, openOrFocus, refresh, setSidebar],
   )
 
   const setIssueDefaultAgent = useCallback(async (agent: string | null): Promise<void> => {
@@ -235,7 +305,8 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
 
   const quickChat = useCallback(
     async (prompt: string, agent?: string, credentialSlug?: string, targetWsId?: string): Promise<string> => {
-      const { workspace, session } = await apiQuickChat(prompt, agent, credentialSlug, targetWsId, terminalTheme)
+      await ensureTerminalAppearancePublished()
+      const { workspace, session } = await apiQuickChat(prompt, agent, credentialSlug, targetWsId)
       const nowIso = new Date().toISOString()
       const newRecord: SessionRecord = {
         id: session.sessionId,
@@ -275,71 +346,97 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
       void refresh()
       return workspace.id
     },
-    [refresh, openOrFocus, terminalTheme],
+    [ensureTerminalAppearancePublished, refresh, openOrFocus],
   )
+
+  const quickStartWorkspaceManager = useCallback(async (
+    prompt: string,
+    agent: string,
+    credentialSlug?: string,
+  ): Promise<ManagerQuickStartResult> => {
+    const result = await apiQuickStartWorkspaceManager(prompt, agent, credentialSlug)
+    setWorkspaceManager(result.manager)
+    setWorkspaceManagerLoaded(true)
+    setWorkspaceManagerError(null)
+    return result
+  }, [])
 
   const pauseSession = useCallback(
     async (wsId: string, sessionId: string): Promise<void> => {
-      setWorkspaces((prev) =>
-        patchSession(prev, wsId, sessionId, {
-          state: 'paused',
-          pid: null,
-          startedAt: null,
-          lastActiveAt: new Date().toISOString(),
-        }),
-      )
+      const patch = {
+        state: 'paused' as const,
+        pid: null,
+        startedAt: null,
+        lastActiveAt: new Date().toISOString(),
+      }
+      if (wsId === MANAGER_WORKSPACE_ID) {
+        setWorkspaceManager((current) => patchManagerSession(current, sessionId, patch))
+      } else {
+        setWorkspaces((prev) => patchSession(prev, wsId, sessionId, patch))
+      }
       await apiPauseSession(wsId, sessionId)
-      void refresh()
+      if (wsId === MANAGER_WORKSPACE_ID) void refreshWorkspaceManager()
+      else void refresh()
     },
-    [refresh],
+    [refresh, refreshWorkspaceManager],
   )
 
   const resumeSession = useCallback(
     async (wsId: string, sessionId: string, source?: WorkspaceSource): Promise<void> => {
-      const resp = await apiResumeSession(wsId, sessionId, terminalTheme)
+      await ensureTerminalAppearancePublished()
+      const resp = await apiResumeSession(wsId, sessionId)
       if (resp) {
-        setWorkspaces((prev) =>
-          patchSession(prev, wsId, sessionId, {
-            state: 'running',
-            surface: 'terminal',
-            pid: resp.pid,
-            startedAt: resp.startedAt,
-            lastActiveAt: new Date().toISOString(),
-          }),
-        )
+        const patch = {
+          state: 'running' as const,
+          surface: 'terminal' as const,
+          pid: resp.pid,
+          startedAt: resp.startedAt,
+          lastActiveAt: new Date().toISOString(),
+        }
+        if (wsId === MANAGER_WORKSPACE_ID) {
+          setWorkspaceManager((current) => patchManagerSession(current, sessionId, patch))
+        } else {
+          setWorkspaces((prev) => patchSession(prev, wsId, sessionId, patch))
+        }
       }
-      openOrFocus({
-        kind: 'workspace',
-        params: {
-          wsId,
-          sessionId,
-          ...(source ? { source } : {}),
-        },
-      })
-      void refresh()
+      if (wsId === MANAGER_WORKSPACE_ID) {
+        openOrFocus({ kind: 'workspace-manager', params: { sessionId } })
+        void refreshWorkspaceManager()
+      } else {
+        openOrFocus({
+          kind: 'workspace',
+          params: { wsId, sessionId, ...(source ? { source } : {}) },
+        })
+        void refresh()
+      }
     },
-    [refresh, openOrFocus, terminalTheme],
+    [ensureTerminalAppearancePublished, refresh, refreshWorkspaceManager, openOrFocus],
   )
 
   const openWebPiSession = useCallback(
     async (wsId: string, sessionId: string, source?: WorkspaceSource): Promise<void> => {
       const snapshot = await apiOpenWebPiSession(wsId, sessionId)
-      setWorkspaces((prev) =>
-        patchSession(prev, wsId, sessionId, {
-          state: 'running',
-          surface: 'webpi',
-          pid: snapshot.pid,
-          startedAt: snapshot.startedAt,
-          lastActiveAt: new Date().toISOString(),
-        }),
-      )
-      openOrFocus({
-        kind: 'workspace',
-        params: { wsId, sessionId, ...(source ? { source } : {}) },
-      })
-      void refresh()
+      const patch = {
+        state: 'running' as const,
+        surface: 'webpi' as const,
+        pid: snapshot.pid,
+        startedAt: snapshot.startedAt,
+        lastActiveAt: new Date().toISOString(),
+      }
+      if (wsId === MANAGER_WORKSPACE_ID) {
+        setWorkspaceManager((current) => patchManagerSession(current, sessionId, patch))
+        openOrFocus({ kind: 'workspace-manager', params: { sessionId } })
+        void refreshWorkspaceManager()
+      } else {
+        setWorkspaces((prev) => patchSession(prev, wsId, sessionId, patch))
+        openOrFocus({
+          kind: 'workspace',
+          params: { wsId, sessionId, ...(source ? { source } : {}) },
+        })
+        void refresh()
+      }
     },
-    [openOrFocus, refresh],
+    [openOrFocus, refresh, refreshWorkspaceManager],
   )
 
   const saveWorkspaceMetadata = useCallback(
@@ -363,25 +460,64 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
 
   const deleteSession = useCallback(
     async (wsId: string, sessionId: string): Promise<void> => {
+      const workspaceState = useWorkspace.getState()
+      const focusedGroup = workspaceState.tree.kind === 'leaf' ? workspaceState.tree.group : null
+      const focusedTab = focusedGroup?.activeTabId
+        ? workspaceState.tabs[focusedGroup.activeTabId] ?? null
+        : null
+      const focusedOwnsSession = focusedTab?.spec.kind === 'workspace'
+        ? focusedTab.spec.params.wsId === wsId && focusedTab.spec.params.sessionId === sessionId
+        : focusedTab?.spec.kind === 'workspace-manager'
+          ? wsId === MANAGER_WORKSPACE_ID && focusedTab.spec.params.sessionId === sessionId
+          : false
+
+      // Deleting the Session currently on screen has a deterministic landing:
+      // its Workspace-level Session library. Open/focus that hub before closing
+      // the pinned tab so closeTab's neighbour rule cannot send the user to an
+      // unrelated editor.
+      if (focusedOwnsSession) {
+        if (wsId === MANAGER_WORKSPACE_ID) {
+          openOrFocus({ kind: 'workspace-manager', params: {} })
+        } else {
+          const source = focusedTab?.spec.kind === 'workspace'
+            ? focusedTab.spec.params.source
+            : undefined
+          openOrFocus({
+            kind: 'workspace',
+            params: { wsId, ...(source ? { source } : {}) },
+          })
+        }
+      }
+
       // Optimistic remove.
-      setWorkspaces((prev) =>
-        prev.map((w) =>
-          w.id === wsId ? { ...w, sessions: w.sessions.filter((s) => s.id !== sessionId) } : w,
-        ),
-      )
+      if (wsId === MANAGER_WORKSPACE_ID) {
+        setWorkspaceManager((current) => removeManagerSession(current, sessionId))
+      } else {
+        setWorkspaces((prev) =>
+          prev.map((w) =>
+            w.id === wsId ? { ...w, sessions: w.sessions.filter((s) => s.id !== sessionId) } : w,
+          ),
+        )
+      }
       // Close any tab pinned to this session immediately (don't wait for the
       // reconcile effect — gives instant UI feedback).
-      const tabsSnap = useWorkspace.getState().tabs
+      const tabsSnap = workspaceState.tabs
       for (const tabId of Object.keys(tabsSnap)) {
         const tab = tabsSnap[tabId]
-        if (tab && tab.spec.kind === 'workspace' && tab.spec.params.sessionId === sessionId) {
+        const ownsSession = tab?.spec.kind === 'workspace'
+          ? tab.spec.params.wsId === wsId && tab.spec.params.sessionId === sessionId
+          : tab?.spec.kind === 'workspace-manager'
+            ? wsId === MANAGER_WORKSPACE_ID && tab.spec.params.sessionId === sessionId
+            : false
+        if (ownsSession) {
           closeTab(tabId)
         }
       }
       await apiDeleteSession(wsId, sessionId)
-      void refresh()
+      if (wsId === MANAGER_WORKSPACE_ID) void refreshWorkspaceManager()
+      else void refresh()
     },
-    [refresh, closeTab],
+    [refresh, refreshWorkspaceManager, closeTab, openOrFocus],
   )
 
   // Public delete = confirm first (the × sits next to the open-conversation hit
@@ -391,8 +527,10 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const pendingDeleteSession = pendingSessionDelete
-    ? (workspaces.find((w) => w.id === pendingSessionDelete.wsId)?.sessions
-        .find((s) => s.id === pendingSessionDelete.sessionId) ?? null)
+    ? (pendingSessionDelete.wsId === MANAGER_WORKSPACE_ID
+        ? workspaceManager?.sessions.find((s) => s.id === pendingSessionDelete.sessionId) ?? null
+        : workspaces.find((w) => w.id === pendingSessionDelete.wsId)?.sessions
+            .find((s) => s.id === pendingSessionDelete.sessionId) ?? null)
     : null
   const pendingDeleteLabel =
     pendingDeleteSession?.title?.trim() || pendingDeleteSession?.name || ''
@@ -406,9 +544,14 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         defaultAgent,
         issueDefaultAgent,
         listError,
+        workspaceManager,
+        workspaceManagerLoaded,
+        workspaceManagerError,
         hasLoaded,
         templatesLoaded,
         refresh,
+        refreshWorkspaceManager,
+        quickStartWorkspaceManager,
         spawn,
         openHeadlessRun,
         setDefaultAgent,
@@ -434,6 +577,18 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
           wsId={configuringAgentTarget.wsId}
           initialAgent={configuringAgentTarget.agent}
           initialSection={configuringAgentTarget.section ?? (configuringAgentTarget.agent ? 'ai' : 'general')}
+          onAiSaved={({ model, runtimeLabel, workspaceLabel }) => {
+            toast.success(model
+              ? t('workspaceSettings.ai.savedModelToast', {
+                  model,
+                  runtime: runtimeLabel,
+                  workspace: workspaceLabel,
+                })
+              : t('workspaceSettings.ai.savedConfigToast', {
+                  runtime: runtimeLabel,
+                  workspace: workspaceLabel,
+                }))
+          }}
           onClose={() => setConfiguringAgentTarget(null)}
         />
       )}
@@ -466,4 +621,29 @@ function patchSession(
       ? { ...w, sessions: w.sessions.map((s) => (s.id === sessionId ? { ...s, ...patch } : s)) }
       : w,
   )
+}
+
+function patchManagerSession(
+  manager: ManagerWorkspaceSnapshot | null,
+  sessionId: string,
+  patch: Partial<SessionRecord>,
+): ManagerWorkspaceSnapshot | null {
+  if (manager === null) return null
+  return {
+    ...manager,
+    sessions: manager.sessions.map((session) => (
+      session.id === sessionId ? { ...session, ...patch } : session
+    )),
+  }
+}
+
+function removeManagerSession(
+  manager: ManagerWorkspaceSnapshot | null,
+  sessionId: string,
+): ManagerWorkspaceSnapshot | null {
+  if (manager === null) return null
+  return {
+    ...manager,
+    sessions: manager.sessions.filter((session) => session.id !== sessionId),
+  }
 }

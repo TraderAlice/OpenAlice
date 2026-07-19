@@ -121,7 +121,6 @@ function decodeHistoricalTickLastProto(proto: HistoricalTickLastProtoMsg): Histo
 // ----------------------------------------------------------------
 
 function processHistoricalDataMsg(d: Decoder, fields: Iterator<string>): void {
-  decodeInt(fields) // msgId
   if (d.serverVersion < MIN_SERVER_VER_SYNT_REALTIME_BARS) {
     decodeInt(fields) // version
   }
@@ -162,7 +161,6 @@ function processHistoricalDataMsg(d: Decoder, fields: Iterator<string>): void {
 }
 
 function processHistoricalDataEndMsg(d: Decoder, fields: Iterator<string>): void {
-  decodeInt(fields) // msgId
   const reqId = decodeInt(fields)
   const startDateStr = decodeStr(fields)
   const endDateStr = decodeStr(fields)
@@ -171,7 +169,6 @@ function processHistoricalDataEndMsg(d: Decoder, fields: Iterator<string>): void
 }
 
 function processHistoricalDataUpdateMsg(d: Decoder, fields: Iterator<string>): void {
-  decodeInt(fields) // msgId
   const reqId = decodeInt(fields)
   const bar = new BarData()
   bar.barCount = decodeInt(fields)
@@ -186,7 +183,6 @@ function processHistoricalDataUpdateMsg(d: Decoder, fields: Iterator<string>): v
 }
 
 function processRealTimeBarMsg(d: Decoder, fields: Iterator<string>): void {
-  decodeInt(fields) // msgId
   decodeInt(fields) // version
   const reqId = decodeInt(fields)
 
@@ -207,14 +203,12 @@ function processRealTimeBarMsg(d: Decoder, fields: Iterator<string>): void {
 }
 
 function processHeadTimestamp(d: Decoder, fields: Iterator<string>): void {
-  decodeInt(fields) // msgId
   const reqId = decodeInt(fields)
   const headTimestamp = decodeStr(fields)
   d.wrapper.headTimestamp(reqId, headTimestamp)
 }
 
 function processHistogramData(d: Decoder, fields: Iterator<string>): void {
-  decodeInt(fields) // msgId
   const reqId = decodeInt(fields)
   const numPoints = decodeInt(fields)
 
@@ -230,7 +224,6 @@ function processHistogramData(d: Decoder, fields: Iterator<string>): void {
 }
 
 function processHistoricalTicks(d: Decoder, fields: Iterator<string>): void {
-  decodeInt(fields) // msgId
   const reqId = decodeInt(fields)
   const tickCount = decodeInt(fields)
 
@@ -251,7 +244,6 @@ function processHistoricalTicks(d: Decoder, fields: Iterator<string>): void {
 }
 
 function processHistoricalTicksBidAsk(d: Decoder, fields: Iterator<string>): void {
-  decodeInt(fields) // msgId
   const reqId = decodeInt(fields)
   const tickCount = decodeInt(fields)
 
@@ -278,7 +270,6 @@ function processHistoricalTicksBidAsk(d: Decoder, fields: Iterator<string>): voi
 }
 
 function processHistoricalTicksLast(d: Decoder, fields: Iterator<string>): void {
-  decodeInt(fields) // msgId
   const reqId = decodeInt(fields)
   const tickCount = decodeInt(fields)
 
@@ -305,7 +296,6 @@ function processHistoricalTicksLast(d: Decoder, fields: Iterator<string>): void 
 }
 
 function processTickByTickMsg(d: Decoder, fields: Iterator<string>): void {
-  decodeInt(fields) // msgId
   const reqId = decodeInt(fields)
   const tickType = decodeInt(fields)
   const time = decodeInt(fields)
@@ -350,7 +340,6 @@ function processTickByTickMsg(d: Decoder, fields: Iterator<string>): void {
 }
 
 function processHistoricalSchedule(d: Decoder, fields: Iterator<string>): void {
-  decodeInt(fields) // msgId
   const reqId = decodeInt(fields)
   const startDateTime = decodeStr(fields)
   const endDateTime = decodeStr(fields)

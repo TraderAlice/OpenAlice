@@ -12,6 +12,8 @@ import Decimal from 'decimal.js'
 import { EClient, DefaultEWrapper, type ContractDetails, type Contract, type Order, type OrderState } from '../../src/index.js'
 import { isTwsAvailable, TWS_HOST, TWS_PORT } from '../helpers/tws.js'
 
+const TWS_CLIENT_ID = Number.parseInt(process.env.TWS_CLIENT_ID ?? '0', 10)
+
 // --- Collected results from TWS callbacks ---
 export const results = {
   serverVersion: 0,
@@ -90,7 +92,7 @@ export const client = new EClient(new E2EWrapper())
 export const available = await isTwsAvailable()
 
 if (available) {
-  await client.connect(TWS_HOST, TWS_PORT, 0)
+  await client.connect(TWS_HOST, TWS_PORT, TWS_CLIENT_ID)
   // Wait for initial messages (nextValidId, managedAccounts, etc.)
   await sleep(2000)
 }

@@ -580,15 +580,15 @@ export function FirstRunGuide() {
   }
 
   return (
-    <div className="fixed inset-0 z-[70] overflow-hidden bg-bg text-text" data-testid="first-run-guide">
+    <div className="fixed inset-0 z-[70] overflow-hidden bg-background text-foreground" data-testid="first-run-guide">
       <div className="flex h-full min-h-0 flex-col px-4 py-4 sm:px-6 lg:px-8">
         <div className="mx-auto flex h-full min-h-0 w-full max-w-[980px] flex-col">
           <header className="relative shrink-0 border-b border-border pb-4 pr-12">
             <div className="min-w-0">
-              <div className="text-[11px] font-medium uppercase tracking-wide text-text-muted">
+              <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 {t('firstRunGuide.header.setup')}
               </div>
-              <div className="mt-1 text-[15px] font-semibold leading-snug text-text sm:text-[16px]">
+              <div className="mt-1 text-[15px] font-semibold leading-snug text-foreground sm:text-[16px]">
                 {t('firstRunGuide.header.subtitle')}
               </div>
             </div>
@@ -597,7 +597,7 @@ export function FirstRunGuide() {
                 type="button"
                 onClick={() => close()}
                 aria-label={t('firstRunGuide.header.close')}
-                className="absolute right-0 top-0 flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-overlay hover:text-text"
+                className="absolute right-0 top-0 flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -616,23 +616,23 @@ export function FirstRunGuide() {
                 {activeStep.key === 'finish' && (
                   <CompletionMark />
                 )}
-                <div className="text-[11px] font-medium uppercase tracking-wide text-text-muted">
+                <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   {activeStep.eyebrow}
                 </div>
-                <h1 className="oa-onboarding-title mt-3 max-w-[660px] text-[28px] font-semibold leading-tight text-text sm:mt-4 sm:text-[38px] lg:text-[44px]">
+                <h1 className="oa-onboarding-title mt-3 max-w-[660px] text-[28px] font-semibold leading-tight text-foreground sm:mt-4 sm:text-[38px] lg:text-[44px]">
                   {activeStep.title}
                 </h1>
-                <p className="mt-3 max-w-[610px] text-[14px] leading-6 text-text-muted sm:mt-4 sm:text-[15px]">
+                <p className="mt-3 max-w-[610px] text-[14px] leading-6 text-muted-foreground sm:mt-4 sm:text-[15px]">
                   {activeStep.body}
                 </p>
               </div>
 
               <aside className="min-w-0 border-t border-border pt-4 md:border-l md:border-t-0 md:pl-5 md:pt-0 lg:pl-6">
-                <div className="text-[11px] font-medium uppercase tracking-wide text-text-muted">
+                <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   {activeStep.panelTitle}
                 </div>
                 {activeStep.panelBody && (
-                  <p className="mt-2 text-[13px] leading-relaxed text-text-muted">
+                  <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
                     {activeStep.panelBody}
                   </p>
                 )}
@@ -680,10 +680,10 @@ export function FirstRunGuide() {
                         disabled={locked}
                         className={`h-2.5 rounded-full transition-all ${
                           index === activeStepIndex
-                            ? 'w-8 bg-accent'
+                            ? 'w-8 bg-primary'
                             : locked
-                              ? 'w-2.5 cursor-default bg-bg-tertiary/50 opacity-60'
-                              : 'w-2.5 bg-bg-tertiary hover:bg-text-muted/50'
+                              ? 'w-2.5 cursor-default bg-muted/50 opacity-60'
+                              : 'w-2.5 bg-muted hover:bg-muted-foreground/50'
                         }`}
                         aria-label={`Go to ${step.navLabel}`}
                         aria-current={index === activeStepIndex ? 'step' : undefined}
@@ -691,7 +691,7 @@ export function FirstRunGuide() {
                     )
                   })}
                 </div>
-                <div className="min-w-0 text-[11px] font-medium uppercase tracking-wide text-text-muted">
+                <div className="min-w-0 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   {t('firstRunGuide.common.step', {
                     current: activeStepIndex + 1,
                     total: steps.length,
@@ -705,7 +705,7 @@ export function FirstRunGuide() {
                   type="button"
                   onClick={() => goToStep(activeStepIndex - 1)}
                   disabled={activeStepIndex === 0}
-                  className="rounded-md border border-border bg-bg px-3 py-2 text-[13px] font-medium text-text-muted transition-colors hover:border-accent/50 hover:text-accent disabled:cursor-default disabled:opacity-40 disabled:hover:border-border disabled:hover:text-text-muted"
+                  className="rounded-md border border-border bg-background px-3 py-2 text-[13px] font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary disabled:cursor-default disabled:opacity-40 disabled:hover:border-border disabled:hover:text-muted-foreground"
                 >
                   {t('firstRunGuide.common.back')}
                 </button>
@@ -715,7 +715,7 @@ export function FirstRunGuide() {
                   disabled={primaryDisabled}
                   data-testid="first-run-guide-primary"
                   data-onboarding-action={primaryAction}
-                  className="flex min-w-0 items-center justify-center gap-2 rounded-md bg-accent px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-accent/90 disabled:cursor-default disabled:opacity-60 disabled:hover:bg-accent"
+                  className="flex min-w-0 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-default disabled:opacity-60 disabled:hover:bg-primary"
                 >
                   <span className="min-w-0 truncate">{activeStep.primary}</span>
                   <ArrowRight className="h-4 w-4 shrink-0" />
@@ -725,7 +725,7 @@ export function FirstRunGuide() {
                     type="button"
                     onClick={runSecondary}
                     data-testid="first-run-guide-secondary"
-                    className="col-span-2 rounded-md px-3 py-2 text-[12px] font-medium text-text-muted transition-colors hover:bg-overlay hover:text-text sm:col-span-1"
+                    className="col-span-2 rounded-md px-3 py-2 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground sm:col-span-1"
                   >
                     {activeStep.secondary}
                   </button>
@@ -820,30 +820,30 @@ function LanguageChoices({
             onClick={() => onSelect(option)}
             className={`grid min-w-0 w-full grid-cols-[auto_minmax(0,1fr)_auto] gap-3 rounded-md border px-3 py-3 text-left transition-[border-color,background-color,color,transform] ${
               active
-                ? 'border-accent/55 bg-accent/10 text-text'
-                : 'border-border bg-bg text-text-muted hover:border-accent/35 hover:bg-bg-tertiary hover:text-text'
+                ? 'border-primary/55 bg-primary/10 text-foreground'
+                : 'border-border bg-background text-muted-foreground hover:border-primary/35 hover:bg-muted hover:text-foreground'
             } active:scale-[0.99]`}
           >
             <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${
-              active ? 'bg-accent/15 text-accent' : 'bg-bg-tertiary text-text-muted'
+              active ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'
             }`}>
               <Languages className="h-4 w-4" />
             </span>
             <span className="min-w-0">
-              <span className="block text-[13px] font-semibold text-text">{LOCALE_LABELS[option]}</span>
-              <span className="mt-0.5 block text-[12px] leading-relaxed text-text-muted">
+              <span className="block text-[13px] font-semibold text-foreground">{LOCALE_LABELS[option]}</span>
+              <span className="mt-0.5 block text-[12px] leading-relaxed text-muted-foreground">
                 {description}
               </span>
               <span className={`mt-1.5 inline-flex text-[11px] font-medium ${
-                active ? 'text-accent' : 'text-text-muted/70'
+                active ? 'text-primary' : 'text-muted-foreground/70'
               }`}>
                 {active ? t('firstRunGuide.language.current') : t('firstRunGuide.language.choose')}
               </span>
             </span>
             {active ? (
-              <CheckCircle2 className="mt-1.5 h-4 w-4 shrink-0 text-green" />
+              <CheckCircle2 className="mt-1.5 h-4 w-4 shrink-0 text-success" />
             ) : (
-              <Circle className="mt-1.5 h-4 w-4 shrink-0 text-text-muted" />
+              <Circle className="mt-1.5 h-4 w-4 shrink-0 text-muted-foreground" />
             )}
           </button>
         )
@@ -865,18 +865,18 @@ function StatusRow({
 }) {
   const ToneIcon = tone === 'attention' ? AlertTriangle : CheckCircle2
   const toneClass = tone === 'ready'
-    ? 'text-green'
+    ? 'text-success'
     : tone === 'attention'
-      ? 'text-red'
-      : 'text-text-muted'
+      ? 'text-destructive'
+      : 'text-muted-foreground'
   return (
     <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] gap-3 py-2.5 sm:py-3">
-      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-bg-tertiary text-text-muted">
+      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
         {icon}
       </div>
       <div className="min-w-0">
-        <div className="text-[12px] font-medium text-text">{label}</div>
-        <div className="mt-0.5 text-[12px] leading-relaxed text-text-muted">{value}</div>
+        <div className="text-[12px] font-medium text-foreground">{label}</div>
+        <div className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">{value}</div>
       </div>
       <ToneIcon className={`mt-1 h-4 w-4 shrink-0 ${toneClass}`} />
     </div>
@@ -890,7 +890,7 @@ function CompletionMark() {
       <span className="oa-onboarding-completion-line oa-onboarding-completion-line-b" />
       <span className="oa-onboarding-completion-line oa-onboarding-completion-line-c" />
       <div className="oa-onboarding-completion-ring">
-        <CheckCircle2 className="h-9 w-9 text-green" strokeWidth={1.8} />
+        <CheckCircle2 className="h-9 w-9 text-success" strokeWidth={1.8} />
       </div>
     </div>
   )
@@ -938,7 +938,7 @@ function TradingModeChoices({
   const disabled = envLocked || saving !== null
   return (
     <div className="mt-4 sm:mt-5">
-      <div className="mb-3 inline-flex items-center gap-2 rounded-md border border-accent/25 bg-accent/10 px-2.5 py-1.5 text-[11px] font-medium text-accent">
+      <div className="mb-3 inline-flex items-center gap-2 rounded-md border border-primary/25 bg-primary/10 px-2.5 py-1.5 text-[11px] font-medium text-primary">
         <MousePointerClick className="h-3.5 w-3.5" />
         {t('firstRunGuide.tradingChoices.badge')}
       </div>
@@ -955,53 +955,53 @@ function TradingModeChoices({
               onClick={() => onSelect(choice.mode)}
               className={`grid min-w-0 w-full grid-cols-[auto_minmax(0,1fr)_auto] gap-3 rounded-md border px-3 py-3 text-left transition-[border-color,background-color,color,transform] ${
                 active
-                  ? 'border-accent/55 bg-accent/10 text-text'
-                  : 'border-border bg-bg text-text-muted hover:border-accent/35 hover:bg-bg-tertiary hover:text-text'
+                  ? 'border-primary/55 bg-primary/10 text-foreground'
+                  : 'border-border bg-background text-muted-foreground hover:border-primary/35 hover:bg-muted hover:text-foreground'
               } ${disabled ? 'cursor-default opacity-75' : 'cursor-pointer active:scale-[0.99]'}`}
             >
               <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${
-                active ? 'bg-accent/15 text-accent' : 'bg-bg-tertiary text-text-muted'
+                active ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'
               }`}>
                 {choice.icon}
               </span>
               <span className="min-w-0">
                 <span className="block text-[12px] font-medium">{choice.label}</span>
-                <span className="mt-0.5 block text-[12px] leading-relaxed text-text-muted">
+                <span className="mt-0.5 block text-[12px] leading-relaxed text-muted-foreground">
                   {choice.description}
                 </span>
                 {isSaving && (
-                  <span className="mt-1.5 inline-flex items-center gap-1.5 text-[11px] text-accent">
-                    <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" aria-hidden />
+                  <span className="mt-1.5 inline-flex items-center gap-1.5 text-[11px] text-primary">
+                    <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" aria-hidden />
                     {t('firstRunGuide.common.saving')}
                   </span>
                 )}
                 {!isSaving && (
                   <span className={`mt-1.5 inline-flex text-[11px] font-medium ${
-                    active ? 'text-accent' : 'text-text-muted/70'
+                    active ? 'text-primary' : 'text-muted-foreground/70'
                   }`}>
                     {active ? t('firstRunGuide.common.selected') : t('firstRunGuide.common.chooseThisOption')}
                   </span>
                 )}
               </span>
               {active ? (
-                <CheckCircle2 className="mt-1.5 h-4 w-4 shrink-0 text-green" />
+                <CheckCircle2 className="mt-1.5 h-4 w-4 shrink-0 text-success" />
               ) : (
-                <Circle className="mt-1.5 h-4 w-4 shrink-0 text-text-muted" />
+                <Circle className="mt-1.5 h-4 w-4 shrink-0 text-muted-foreground" />
               )}
             </button>
           )
         })}
       </div>
       {envLocked && (
-        <div className="mt-3 text-[11px] leading-relaxed text-text-muted/70">
+        <div className="mt-3 text-[11px] leading-relaxed text-muted-foreground/70">
           <span className="inline-flex items-center gap-1.5">
-            <AlertTriangle className="h-3.5 w-3.5 text-yellow-500" />
+            <AlertTriangle className="h-3.5 w-3.5 text-warning" />
             {t('firstRunGuide.tradingChoices.envLocked')}
           </span>
         </div>
       )}
       {error && (
-        <div className="mt-2 rounded-md border border-red/30 bg-red/5 px-3 py-2 text-[12px] leading-relaxed text-red">
+        <div className="mt-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-[12px] leading-relaxed text-destructive">
           {error}
         </div>
       )}
@@ -1032,12 +1032,12 @@ function RuntimeScanTable({
   return (
     <div className="mt-4 sm:mt-5">
       {error && (
-        <div className="mb-3 break-words rounded-md border border-red/25 bg-red/5 px-3 py-2 text-[12px] leading-relaxed text-red">
+        <div className="mb-3 break-words rounded-md border border-destructive/25 bg-destructive/5 px-3 py-2 text-[12px] leading-relaxed text-destructive">
           {error}
         </div>
       )}
       <div className="overflow-hidden border-y border-border">
-      <div className="hidden border-b border-border py-2 text-[10px] font-medium uppercase tracking-wide text-text-muted sm:grid sm:grid-cols-[minmax(0,1fr)_72px_minmax(112px,140px)] sm:gap-3">
+      <div className="hidden border-b border-border py-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground sm:grid sm:grid-cols-[minmax(0,1fr)_72px_minmax(112px,140px)] sm:gap-3">
           <span>{t('firstRunGuide.ai.runtime')}</span>
           <span>{t('firstRunGuide.ai.cli')}</span>
           <span>{t('firstRunGuide.ai.readyProbe')}</span>
@@ -1045,10 +1045,10 @@ function RuntimeScanTable({
       {rows.map((row) => {
         const tone: RowTone = row.chainReady ? 'ready' : row.installed ? 'attention' : 'muted'
         const toneClass = tone === 'ready'
-          ? 'text-green'
+          ? 'text-success'
           : tone === 'attention'
-            ? 'text-red'
-            : 'text-text-muted'
+            ? 'text-destructive'
+            : 'text-muted-foreground'
         const cliText = row.installed ? t('firstRunGuide.ai.installed') : t('firstRunGuide.ai.missing')
         const accessText = row.chainReady
           ? t('firstRunGuide.ai.ready')
@@ -1072,16 +1072,16 @@ function RuntimeScanTable({
             data-testid="runtime-scan-row"
           >
             <div className="min-w-0">
-              <div className="font-medium text-text">{row.displayName}</div>
-              <div className="mt-0.5 text-[10.5px] text-text-muted">
+              <div className="font-medium text-foreground">{row.displayName}</div>
+              <div className="mt-0.5 text-[10.5px] text-muted-foreground">
                 {row.loginRuntime ? t('firstRunGuide.ai.loginOrKey') : t('firstRunGuide.ai.aiKey')}
               </div>
               <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 sm:hidden">
-                <span className={row.installed ? 'text-green' : 'text-text-muted'}>{cliText}</span>
+                <span className={row.installed ? 'text-success' : 'text-muted-foreground'}>{cliText}</span>
                 <span className={toneClass}>{accessText}</span>
               </div>
             </div>
-            <div className={`hidden sm:block ${row.installed ? 'text-green' : 'text-text-muted'}`}>
+            <div className={`hidden sm:block ${row.installed ? 'text-success' : 'text-muted-foreground'}`}>
               {cliText}
             </div>
             <div className={`hidden sm:block ${toneClass}`}>

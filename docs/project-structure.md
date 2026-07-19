@@ -5,6 +5,7 @@ and persistent-state layout. Update it when a top-level subsystem moves or a
 new long-lived process, package, or state root is introduced.
 
 Related guides: [[docs/managed-workspace-runtime.md]],
+[[docs/model-semantics-and-runtime-injection.md]],
 [[docs/cli-installer.md]], [[docs/local-runtime.md]], [[docs/broker-packs.md]],
 [[docs/data-locations.md]],
 [[docs/docker-deployment.md]],
@@ -99,8 +100,10 @@ docs/                          owner guides and contributor documentation
 
 The model execution loop is not in `src/ai-providers/`. Native coding-agent
 CLIs own their model loops. Alice's provider catalog describes credential and
-wire suggestions; Workspace credential injection translates a selected
-credential into the target CLI's local configuration.
+wire suggestions plus curated model semantics; Workspace credential injection
+combines credential access, model selection, and those semantics before each
+adapter projects the result into the target CLI's native configuration. Follow
+[[docs/model-semantics-and-runtime-injection.md]] for that boundary.
 
 ## Workspace Architecture
 
@@ -117,6 +120,10 @@ Chat uses that boundary deliberately:
   `data/preferences.json`. A missing or stale pointer falls back to the most
   recently active Chat Workspace; only a user with no Chat Workspace gets a
   new stable starter workspace.
+- Chat navigation treats a Workspace as a potentially large conversation
+  container. Its sidebar disclosure is a bounded recent/running preview; the
+  Workspace page is the searchable, lifecycle-filtered catalog for the full
+  Session history. Do not render an unbounded Session tree in the shell.
 
 Do not reintroduce date-based automatic Chat Workspaces. A date is not a
 context boundary, and new daily repositories strand files, issues, git history,
@@ -170,7 +177,21 @@ for built-in templates. `bootstrap.sh` remains only as a third-party fallback.
 Workspace tools are exposed as CLI shims on `PATH`. The `alice*` and
 `traderhub` skills teach the native agents how to call those shims. Shared
 project skills are copied to `.agents/skills/` and Claude-specific discovery to
-`.claude/skills/`; Pi provider state lives separately under `.pi-agent/`.
+`.claude/skills/`. Pi keeps providers in its normal user agent directory and
+selects a Workspace provider through `.pi/settings.json`; the shared runtime
+lifecycle also gives Workspaces without an explicit Pi theme the native
+`light/dark` automatic pair. OpenAlice never redirects Pi away from its native
+global packages, settings, auth, or sessions and never replaces an explicit Pi
+project theme.
+OpenCode keeps provider configuration in `opencode.json` and TUI configuration
+in its native `tui.json` project layer. The runtime lifecycle selects the
+native `system` theme only when the project has no explicit OpenCode TUI or
+legacy theme config. Codex needs no project theme setting: it derives its
+palette directly from the terminal's OSC 10/11 replies.
+Claude Code and opencode keep reversible OpenAlice ownership metadata in
+`.claude/openalice-provider.json` and `.opencode/openalice-provider.json` so
+provider reset preserves unrelated native settings. Those files are sensitive
+and excluded from the Workspace repository.
 
 ## Alice and UTA Boundary
 

@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promise
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 
 import { HeadlessTaskRegistry } from './headless-task-registry.js'
 import type { Logger } from './logger.js'
@@ -11,7 +11,7 @@ import { ResumeRegistry } from './resume-registry.js'
 import { ScrollbackStore } from './scrollback-store.js'
 import type { SessionPool } from './session-pool.js'
 import { SessionRegistry } from './session-registry.js'
-import { WorkspaceCatalog } from './workspace-catalog.js'
+import { WorkspaceCatalog, type WorkspaceCatalogRecord } from './workspace-catalog.js'
 import { WorkspaceLifecycleManager } from './workspace-lifecycle.js'
 import { WorkspaceOperationGuard } from './workspace-operation-guard.js'
 import { WorkspaceRegistry, type WorkspaceMeta } from './workspace-registry.js'
@@ -29,6 +29,7 @@ let sessions: SessionRegistry
 let tasks: HeadlessTaskRegistry
 let lifecycle: WorkspaceLifecycleManager
 let operationGuard: WorkspaceOperationGuard
+let cleanupWorkspaceState: Mock<(record: WorkspaceCatalogRecord, cwd: string) => Promise<void>>
 
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'workspace-lifecycle-'))
@@ -80,6 +81,9 @@ beforeEach(async () => {
     disposeToken: () => false,
   } as unknown as SessionPool
   operationGuard = new WorkspaceOperationGuard()
+  cleanupWorkspaceState = vi.fn(async (_record, cwd: string) => {
+    expect(existsSync(cwd)).toBe(true)
+  })
   lifecycle = new WorkspaceLifecycleManager({
     launcherRoot: root,
     registry,
@@ -90,6 +94,7 @@ beforeEach(async () => {
     headlessTasks: tasks,
     pool,
     operationGuard,
+    cleanupWorkspaceState,
     logger: noopLogger,
   })
 })
@@ -152,6 +157,8 @@ describe('WorkspaceLifecycleManager', () => {
     expect((await lifecycle.purge(workspace.id)).ok).toBe(true)
     expect(catalog.get(workspace.id)?.lifecycle).toBe('purged')
     expect(existsSync(join(root, 'departed-workspaces', workspace.id))).toBe(false)
+    expect(cleanupWorkspaceState).toHaveBeenCalledOnce()
+    expect(cleanupWorkspaceState.mock.calls[0]?.[1]).toBe(join(root, 'departed-workspaces', workspace.id))
     expect(sessions.listFor(workspace.id)).toEqual([])
     expect(resumes.get('resume-calm-owner')?.lifecycle).toBe('retired')
   })

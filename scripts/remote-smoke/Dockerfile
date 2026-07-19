@@ -1,7 +1,7 @@
 FROM node:22-bookworm-slim
 
 RUN DEBIAN_FRONTEND=noninteractive apt-get update \
-  && apt-get install -y --no-install-recommends bash ca-certificates curl openssh-server \
+  && apt-get install -y --no-install-recommends bash ca-certificates curl git g++ make openssh-server python3 \
   && rm -rf /var/lib/apt/lists/* \
   && useradd --create-home --shell /bin/bash --uid 10001 smoke \
   && passwd --delete smoke \
@@ -33,6 +33,13 @@ RUN mkdir -p \
     /fixture/OpenAlice/services/uta/dist/uta.js \
     /fixture/OpenAlice/services/connector/dist/connector.cjs \
     /fixture/OpenAlice/packages/guardian-runtime/dist/index.js \
+    /fixture/OpenAlice/node_modules/.keep \
+  && git -C /fixture/OpenAlice init --initial-branch=main \
+  && git -C /fixture/OpenAlice config user.email smoke@openalice.local \
+  && git -C /fixture/OpenAlice config user.name 'OpenAlice Smoke' \
+  && git -C /fixture/OpenAlice add --force . \
+  && git -C /fixture/OpenAlice commit -m 'remote smoke fixture' \
+  && git -C /fixture/OpenAlice tag remote-smoke \
   && chmod +x /fixture/entrypoint.sh /fixture/fake-npm.sh \
   && chown -R smoke:smoke /fixture/OpenAlice /home/smoke
 

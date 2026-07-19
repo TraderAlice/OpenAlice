@@ -27,7 +27,7 @@ const brokerPreset: BrokerPreset = {
   category: 'recommended',
   defaultName: 'OKX',
   badge: 'OK',
-  badgeColor: 'text-text-muted',
+  badgeColor: 'text-muted-foreground',
   engine: 'ccxt',
   guardCategory: 'crypto',
   subtitleFields: [],

@@ -197,7 +197,7 @@ export function CreateUTADialog({
       type="button"
       onClick={() => { void escapeAction.onClick() }}
       disabled={escapeAction.disabled}
-      className="rounded-md px-3 py-2 text-[12px] font-medium text-text-muted transition-colors hover:bg-overlay hover:text-text disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-text-muted"
+      className="rounded-md px-3 py-2 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
     >
       {escapeAction.label}
     </button>
@@ -207,10 +207,10 @@ export function CreateUTADialog({
     <Dialog onClose={onClose}>
       <div className="shrink-0 px-6 py-4 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-3 min-w-0">
-          <h3 className="text-[14px] font-semibold text-text truncate">{headerLabel}</h3>
+          <h3 className="text-[14px] font-semibold text-foreground truncate">{headerLabel}</h3>
           <StepDots current={step} />
         </div>
-        <button onClick={onClose} className="text-text-muted hover:text-text p-1 transition-colors" aria-label="Close broker setup">
+        <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1 transition-colors" aria-label="Close broker setup">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M18 6L6 18M6 6l12 12" />
           </svg>
@@ -244,8 +244,8 @@ export function CreateUTADialog({
               </Field>
               <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2.5">
                 <div className="min-w-0">
-                  <div className="text-[12px] font-medium text-text">Read-only account</div>
-                  <div className="text-[11px] text-text-muted leading-relaxed">
+                  <div className="text-[12px] font-medium text-foreground">Read-only account</div>
+                  <div className="text-[11px] text-muted-foreground leading-relaxed">
                     Allow analysis reads; block broker-side order changes.
                   </div>
                 </div>
@@ -253,8 +253,8 @@ export function CreateUTADialog({
               </div>
               <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2.5">
                 <div className="min-w-0">
-                  <div className="text-[12px] font-medium text-text">Use as data source</div>
-                  <div className="text-[11px] text-text-muted leading-relaxed">
+                  <div className="text-[12px] font-medium text-foreground">Use as data source</div>
+                  <div className="text-[11px] text-muted-foreground leading-relaxed">
                     Include this connector in K-line and contract discovery.
                   </div>
                 </div>
@@ -269,12 +269,12 @@ export function CreateUTADialog({
               {hasSensitive && (
                 <button
                   onClick={() => setShowSecrets(!showSecrets)}
-                  className="text-[11px] text-text-muted hover:text-text transition-colors"
+                  className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
                 >
                   {showSecrets ? 'Hide secrets' : 'Show secrets'}
                 </button>
               )}
-              {error && <p className="text-[12px] text-red">{error}</p>}
+              {error && <p className="text-[12px] text-destructive">{error}</p>}
             </div>
           </div>
         )}
@@ -305,10 +305,10 @@ export function CreateUTADialog({
           {escapeButton}
         </div>
         <div className="flex shrink-0 items-center justify-end">
-          {step === 'pick' && <span className="text-[11px] text-text-muted">Pick a platform to continue</span>}
+          {step === 'pick' && <span className="text-[11px] text-muted-foreground">Pick a platform to continue</span>}
           {step === 'install' && (
             packStatuses === null ? (
-              <span className="text-[11px] text-text-muted">Checking installed support…</span>
+              <span className="text-[11px] text-muted-foreground">Checking installed support…</span>
             ) : (
               <button onClick={() => { void handleInstallPack() }} disabled={installingPack} className="btn-primary">
                 {installingPack ? 'Installing…' : packStatus?.source === 'broken' ? 'Repair support' : `Install ${preset?.label ?? 'broker'} support`}
@@ -330,7 +330,7 @@ export function CreateUTADialog({
                 {saving ? 'Saving...' : 'Save connector'}
               </button>
             ) : (
-              <span className="text-[11px] text-text-muted">Fix the config and try again</span>
+              <span className="text-[11px] text-muted-foreground">Fix the config and try again</span>
             )
           )}
         </div>
@@ -341,7 +341,7 @@ export function CreateUTADialog({
 
 function PickerSectionHeader({ title }: { title: string }) {
   return (
-    <p className="text-[11px] font-medium text-text-muted uppercase tracking-wide">
+    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
       {title}
     </p>
   )
@@ -355,7 +355,7 @@ function StepDots({ current }: { current: WizardStep }) {
         <span
           key={s}
           className={`w-1.5 h-1.5 rounded-full transition-colors ${
-            s === current ? 'bg-accent' : 'bg-border'
+            s === current ? 'bg-primary' : 'bg-border'
           }`}
         />
       ))}
@@ -370,36 +370,36 @@ function BrokerPackInstallPanel({ preset, status, error }: {
 }) {
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-border bg-bg-secondary/40 px-4 py-4">
+      <div className="rounded-lg border border-border bg-secondary/40 px-4 py-4">
         <div className="flex items-start gap-3">
           <span className={`mt-0.5 flex h-8 w-8 items-center justify-center rounded-md text-[11px] font-semibold ${preset.badgeColor} ${preset.badgeColor.replace('text-', 'bg-')}/10`}>
             {preset.badge}
           </span>
           <div className="min-w-0">
-            <div className="text-[13px] font-medium text-text">Install {preset.label} support</div>
-            <p className="mt-1 text-[12px] leading-relaxed text-text-muted">
+            <div className="text-[13px] font-medium text-foreground">Install {preset.label} support</div>
+            <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
               OpenAlice installs broker integrations separately so the desktop app stays small and unused SDKs never load at startup.
             </p>
           </div>
         </div>
       </div>
-      <div className="rounded-md border border-border px-3 py-2.5 text-[11px] leading-relaxed text-text-muted">
+      <div className="rounded-md border border-border px-3 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
         The downloaded pack is matched to this OpenAlice version and operating system, checksum-verified, then activated atomically. Your account credentials are requested only after installation.
       </div>
-      {status?.reason && <p className="text-[12px] text-yellow-400">{status.reason}</p>}
-      {error && <p className="text-[12px] text-red">{error}</p>}
+      {status?.reason && <p className="text-[12px] text-warning">{status.reason}</p>}
+      {error && <p className="text-[12px] text-destructive">{error}</p>}
     </div>
   )
 }
 
 function HintBlock({ text }: { text: string }) {
   return (
-    <div className="rounded-md border border-border bg-bg-secondary/50 px-3 py-2.5 space-y-2">
+    <div className="rounded-md border border-border bg-secondary/50 px-3 py-2.5 space-y-2">
       {text.trim().split('\n\n').map((para, i) => (
-        <p key={i} className="text-[12px] text-text-muted leading-relaxed">
+        <p key={i} className="text-[12px] text-muted-foreground leading-relaxed">
           {para.split(/(\*\*[^*]+\*\*)/).map((seg, j) =>
             seg.startsWith('**') && seg.endsWith('**')
-              ? <strong key={j} className="text-text">{seg.slice(2, -2)}</strong>
+              ? <strong key={j} className="text-foreground">{seg.slice(2, -2)}</strong>
               : <span key={j}>{seg}</span>
           )}
         </p>
@@ -415,21 +415,21 @@ function BrokerConflictPanel({ existing, onOpenExisting }: {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <span className="w-2 h-2 rounded-full bg-yellow-400 shrink-0" />
-        <span className="text-[13px] font-medium text-text">Broker already configured</span>
+        <span className="w-2 h-2 rounded-full bg-warning shrink-0" />
+        <span className="text-[13px] font-medium text-foreground">Broker already configured</span>
       </div>
-      <div className="rounded-md border border-yellow-400/30 bg-yellow-400/5 px-3 py-2.5">
-        <p className="text-[12px] text-text leading-relaxed">
+      <div className="rounded-md border border-warning/30 bg-warning/5 px-3 py-2.5">
+        <p className="text-[12px] text-foreground leading-relaxed">
           Another broker connector already exists for this broker (same identity-defining credentials).
           Re-using the same key from a separate account would double-count its positions in
           aggregate views.
         </p>
-        <p className="text-[12px] text-text-muted leading-relaxed mt-2">
-          Existing: <strong className="text-text">{existing.label}</strong> <span className="font-mono text-text-muted/70">({existing.id})</span>
+        <p className="text-[12px] text-muted-foreground leading-relaxed mt-2">
+          Existing: <strong className="text-foreground">{existing.label}</strong> <span className="font-mono text-muted-foreground/70">({existing.id})</span>
         </p>
       </div>
-      <p className="text-[11px] text-text-muted">
-        Click <strong className="text-text">Open existing</strong> to use it, or <strong className="text-text">← Back</strong> to point this connector at a different account.
+      <p className="text-[11px] text-muted-foreground">
+        Click <strong className="text-foreground">Open existing</strong> to use it, or <strong className="text-foreground">← Back</strong> to point this connector at a different account.
       </p>
       <button onClick={onOpenExisting} className="btn-secondary w-full">Open existing connector</button>
     </div>
@@ -441,14 +441,14 @@ function TestResultPanel({ result, utaId }: { result: TestConnectionResult; utaI
     return (
       <div className="space-y-3">
         <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-red shrink-0" />
-          <span className="text-[13px] font-medium text-red">Connection failed</span>
+          <span className="w-2 h-2 rounded-full bg-destructive shrink-0" />
+          <span className="text-[13px] font-medium text-destructive">Connection failed</span>
         </div>
-        <div className="rounded-md border border-red/30 bg-red/5 px-3 py-2.5">
-          <p className="text-[12px] text-text leading-relaxed whitespace-pre-wrap">{result.error ?? 'Unknown error'}</p>
+        <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2.5">
+          <p className="text-[12px] text-foreground leading-relaxed whitespace-pre-wrap">{result.error ?? 'Unknown error'}</p>
         </div>
-        <p className="text-[11px] text-text-muted">
-          Click <strong className="text-text">← Back</strong> to fix the configuration and try again.
+        <p className="text-[11px] text-muted-foreground">
+          Click <strong className="text-foreground">← Back</strong> to fix the configuration and try again.
         </p>
       </div>
     )
@@ -462,40 +462,40 @@ function TestResultPanel({ result, utaId }: { result: TestConnectionResult; utaI
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
-        <span className="w-2 h-2 rounded-full bg-green shrink-0" />
-        <span className="text-[13px] font-medium text-green">Connected as {utaId}</span>
+        <span className="w-2 h-2 rounded-full bg-success shrink-0" />
+        <span className="text-[13px] font-medium text-success">Connected as {utaId}</span>
       </div>
 
       {acct && (
-        <div className="rounded-md border border-border bg-bg-secondary/50 px-3 py-2.5 space-y-1">
+        <div className="rounded-md border border-border bg-secondary/50 px-3 py-2.5 space-y-1">
           <div className="flex justify-between text-[12px]">
-            <span className="text-text-muted">Net Liquidation</span>
-            <span className="text-text font-medium">{acct.baseCurrency} {acct.netLiquidation}</span>
+            <span className="text-muted-foreground">Net Liquidation</span>
+            <span className="text-foreground font-medium">{acct.baseCurrency} {acct.netLiquidation}</span>
           </div>
           <div className="flex justify-between text-[12px]">
-            <span className="text-text-muted">Cash</span>
-            <span className="text-text">{acct.baseCurrency} {acct.totalCashValue}</span>
+            <span className="text-muted-foreground">Cash</span>
+            <span className="text-foreground">{acct.baseCurrency} {acct.totalCashValue}</span>
           </div>
           {acct.unrealizedPnL !== '0' && (
             <div className="flex justify-between text-[12px]">
-              <span className="text-text-muted">Unrealized P&L</span>
-              <span className="text-text">{acct.baseCurrency} {acct.unrealizedPnL}</span>
+              <span className="text-muted-foreground">Unrealized P&L</span>
+              <span className="text-foreground">{acct.baseCurrency} {acct.unrealizedPnL}</span>
             </div>
           )}
         </div>
       )}
 
       <div>
-        <p className="text-[12px] font-medium text-text-muted uppercase tracking-wide mb-2">
+        <p className="text-[12px] font-medium text-muted-foreground uppercase tracking-wide mb-2">
           Positions ({positions.length})
         </p>
         {positions.length === 0 ? (
-          <p className="text-[12px] text-text-muted">No open positions — connection works, account is empty.</p>
+          <p className="text-[12px] text-muted-foreground">No open positions — connection works, account is empty.</p>
         ) : (
           <div className="rounded-md border border-border overflow-hidden">
             <table className="w-full text-[11px]">
               <thead>
-                <tr className="bg-bg-tertiary/30 text-text-muted">
+                <tr className="bg-muted/30 text-muted-foreground">
                   <th className="text-left px-2.5 py-1.5 font-medium">Contract</th>
                   <th className="text-left px-2.5 py-1.5 font-medium">Side</th>
                   <th className="text-right px-2.5 py-1.5 font-medium">Qty</th>
@@ -505,16 +505,16 @@ function TestResultPanel({ result, utaId }: { result: TestConnectionResult; utaI
               <tbody>
                 {visiblePositions.map((p, i) => (
                   <tr key={i} className="border-t border-border">
-                    <td className="px-2.5 py-1.5 text-text font-mono" title={p.contract.aliceId}>{p.contract.symbol ?? p.contract.localSymbol ?? p.contract.aliceId ?? '?'}</td>
-                    <td className="px-2.5 py-1.5 text-text-muted">{p.side}</td>
-                    <td className="px-2.5 py-1.5 text-right text-text">{p.quantity}</td>
-                    <td className="px-2.5 py-1.5 text-right text-text">{p.currency} {p.marketValue}</td>
+                    <td className="px-2.5 py-1.5 text-foreground font-mono" title={p.contract.aliceId}>{p.contract.symbol ?? p.contract.localSymbol ?? p.contract.aliceId ?? '?'}</td>
+                    <td className="px-2.5 py-1.5 text-muted-foreground">{p.side}</td>
+                    <td className="px-2.5 py-1.5 text-right text-foreground">{p.quantity}</td>
+                    <td className="px-2.5 py-1.5 text-right text-foreground">{p.currency} {p.marketValue}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
             {moreCount > 0 && (
-              <div className="px-2.5 py-1.5 border-t border-border text-[11px] text-text-muted bg-bg-tertiary/20">
+              <div className="px-2.5 py-1.5 border-t border-border text-[11px] text-muted-foreground bg-muted/20">
                 +{moreCount} more
               </div>
             )}

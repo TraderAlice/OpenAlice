@@ -1,33 +1,34 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowLeft,
   ArrowUp,
   Bot,
   Building2,
-  ChevronRight,
   ClipboardCheck,
   GitMerge,
-  KeyRound,
   Loader2,
   Network,
   RefreshCw,
   UsersRound,
   type LucideIcon,
 } from 'lucide-react'
+import '@xterm/xterm/css/xterm.css'
 
-import { preferencesApi } from '../api/preferences'
-import type { QuickChatPreferences } from '../api/preferences'
 import {
-  getWorkspaceManager,
-  listAgentCredentials,
   MANAGER_WORKSPACE_ID,
-  openWebPiSession,
-  quickStartWorkspaceManager,
-  type ManagerWorkspaceSnapshot,
-  type SavedCredential,
 } from '../components/workspace/api'
+import {
+  AgentLaunchDetails,
+  AgentLaunchSelectors,
+  type AgentLaunchSelectorsHandle,
+} from '../components/workspace/AgentLaunchControls'
+import { TerminalView } from '../components/workspace/Terminal'
 import { WebPiView } from '../components/workspace/WebPiView'
+import { ResumeCta } from '../components/workspace/ResumeCta'
+import { useWorkspaces } from '../contexts/workspaces-context'
+import { useAgentLaunchConfig, useAgentLaunchPreferences } from '../hooks/useAgentLaunchConfig'
+import { isWorkspaceAiAgent } from '../lib/agentRuntime'
 import { useWorkspace } from '../tabs/store'
 import type { ViewSpec } from '../tabs/types'
 
@@ -37,60 +38,42 @@ const SUGGESTION_ICONS = [ClipboardCheck, UsersRound, GitMerge, RefreshCw] as co
 
 export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
   const { t } = useTranslation()
+  const {
+    agents,
+    defaultAgent,
+    setDefaultAgent,
+    openAgentConfig,
+    workspaceManager: manager,
+    workspaceManagerLoaded,
+    workspaceManagerError,
+    refreshWorkspaceManager,
+    quickStartWorkspaceManager,
+    resumeSession,
+    openWebPiSession,
+  } = useWorkspaces()
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
-  const [manager, setManager] = useState<ManagerWorkspaceSnapshot | null>(null)
-  const [credentials, setCredentials] = useState<SavedCredential[] | null>(null)
-  const [credentialSlug, setCredentialSlug] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
-  const [loading, setLoading] = useState(true)
   const [launching, setLaunching] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const openingRef = useRef<string | null>(null)
+  const launchSelectorsRef = useRef<AgentLaunchSelectorsHandle>(null)
+  const loading = !workspaceManagerLoaded
 
-  const refresh = useCallback(async (): Promise<void> => {
-    try {
-      setManager(await getWorkspaceManager())
-      setError(null)
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : t('workspaceManager.loadError'))
-    } finally {
-      setLoading(false)
-    }
-  }, [t])
-
-  useEffect(() => {
-    void refresh()
-    void Promise.all([
-      listAgentCredentials('pi').catch(() => []),
-      preferencesApi.getQuickChat().catch((): QuickChatPreferences => ({ lastCredentialByAgent: {}, recentChatWorkspaceId: null })),
-    ]).then(([available, preferences]) => {
-      setCredentials(available)
-      const remembered = preferences.lastCredentialByAgent.pi
-      setCredentialSlug(
-        remembered && available.some((credential) => credential.slug === remembered)
-          ? remembered
-          : available[0]?.slug ?? null,
-      )
-    })
-  }, [refresh])
+  const runtimeAgents = useMemo(() => agents.filter((agent) => agent.kind !== 'utility'), [agents])
+  const launchPreferences = useAgentLaunchPreferences()
+  const launchConfig = useAgentLaunchConfig({
+    agents: runtimeAgents,
+    defaultAgent,
+    setDefaultAgent,
+    preferences: launchPreferences,
+    workspaceId: MANAGER_WORKSPACE_ID,
+    hasWorkspace: true,
+  })
+  const effectiveAgent = launchConfig.effectiveAgent
 
   const sessionId = spec.params.sessionId
   const session = sessionId
     ? manager?.sessions.find((candidate) => candidate.id === sessionId) ?? null
     : null
-
-  // A manager conversation is always a WebPi conversation. After a backend
-  // restart its durable record is paused; opening the URL resumes that exact
-  // Pi session with the manager system contract re-applied.
-  useEffect(() => {
-    if (!sessionId || !session || openingRef.current === sessionId) return
-    if (session.state === 'running' && session.surface === 'webpi') return
-    openingRef.current = sessionId
-    void openWebPiSession(MANAGER_WORKSPACE_ID, sessionId)
-      .then(() => refresh())
-      .catch((cause) => setError(cause instanceof Error ? cause.message : t('workspaceManager.resumeError')))
-      .finally(() => { openingRef.current = null })
-  }, [refresh, session, sessionId, t])
 
   const suggestions = useMemo(() => [
     t('workspaceManager.suggestionAudit'),
@@ -102,12 +85,28 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
   const submit = async (): Promise<void> => {
     const prompt = draft.trim()
     if (!prompt || launching) return
-    if (credentials?.length && !credentialSlug) return
+    if (!launchConfig.credentialSelectionReady) return
+    if (!effectiveAgent) {
+      launchSelectorsRef.current?.openAgentMenu()
+      return
+    }
     setLaunching(true)
     setError(null)
     try {
-      const result = await quickStartWorkspaceManager(prompt, credentialSlug ?? undefined)
-      setManager(result.manager)
+      const runtimeRow = await launchConfig.checkSelectedRuntime()
+      if (runtimeRow?.ready !== true) {
+        if (runtimeRow?.repairTarget === 'ai-provider' || launchConfig.needsProviderSetup) {
+          openOrFocus({ kind: 'settings', params: { category: 'ai-provider' } })
+          return
+        }
+        setError(runtimeRow?.message ?? t('chatLanding.runtimeNotReady'))
+        return
+      }
+      const result = await quickStartWorkspaceManager(
+        prompt,
+        effectiveAgent,
+        launchConfig.launchCredentialSlug,
+      )
       setDraft('')
       openOrFocus({ kind: 'workspace-manager', params: { sessionId: result.session.id } })
     } catch (cause) {
@@ -124,194 +123,181 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
     }
   }
 
+  const goConfigureProvider = () => {
+    openOrFocus({ kind: 'settings', params: { category: 'ai-provider' } })
+  }
+
+  const adjustManagerAi = () => {
+    if (isWorkspaceAiAgent(effectiveAgent)) {
+      openAgentConfig(MANAGER_WORKSPACE_ID, effectiveAgent, 'ai')
+      return
+    }
+    goConfigureProvider()
+  }
+
   if (sessionId && session) {
     return (
-      <div className="flex h-full min-h-0 flex-col bg-bg">
-        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-border bg-bg-secondary/35 px-3 py-2 md:px-4">
+      <div className="workspaces-root flex h-full min-h-0 flex-col bg-background">
+        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-border bg-secondary/35 px-3 py-2 md:px-4">
           <div className="flex min-w-0 items-center gap-2.5">
             <button
               type="button"
               onClick={() => openOrFocus({ kind: 'workspace-manager', params: {} })}
-              className="oa-icon-action rounded-md p-1.5 text-text-muted hover:bg-bg-tertiary hover:text-text"
+              className="oa-icon-action rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
               title={t('workspaceManager.back')}
               aria-label={t('workspaceManager.back')}
             >
               <ArrowLeft size={15} />
             </button>
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent/12 text-accent">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/12 text-primary">
               <Network size={15} />
             </span>
             <div className="min-w-0">
-              <div className="truncate text-[12px] font-semibold text-text">{t('workspaceManager.title')}</div>
-              <div className="truncate text-[10px] text-text-muted">{session.title ?? session.name}</div>
+              <div className="truncate text-[12px] font-semibold text-foreground">{t('workspaceManager.title')}</div>
+              <div className="truncate text-[10px] text-muted-foreground">{session.title ?? session.name}</div>
             </div>
           </div>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-bg px-2 py-1 text-[10px] font-medium text-text-muted">
-            <Bot size={11} /> Pi · WebPi
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background px-2 py-1 text-[10px] font-medium text-muted-foreground">
+            <Bot size={11} /> {runtimeLabel(session.agent, agents)} · {session.surface === 'webpi' ? 'WebPi' : 'TUI'}
           </span>
         </header>
-        <div className="min-h-0 flex-1 p-2 md:p-3">
-          <WebPiView
-            wsId={MANAGER_WORKSPACE_ID}
-            sessionId={sessionId}
-            label={t('workspaceManager.title')}
-            onSessionLost={() => void refresh()}
-          />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-2 md:p-3">
+          {session.state === 'paused' ? (
+            <ResumeCta
+              record={session}
+              onResume={() => void resumeSession(MANAGER_WORKSPACE_ID, session.id)}
+              onOpenWebPi={() => void openWebPiSession(MANAGER_WORKSPACE_ID, session.id)}
+            />
+          ) : session.agent === 'pi' && session.surface === 'webpi' ? (
+            <WebPiView
+              wsId={MANAGER_WORKSPACE_ID}
+              sessionId={sessionId}
+              label={t('workspaceManager.title')}
+              onSessionLost={() => void refreshWorkspaceManager()}
+            />
+          ) : (
+            <TerminalView
+              wsId={MANAGER_WORKSPACE_ID}
+              sessionId={sessionId}
+              renderer={session.agent === 'opencode' ? 'dom' : 'auto'}
+              label={`${t('workspaceManager.title')} · ${session.name}`}
+              onSessionLost={() => void refreshWorkspaceManager()}
+            />
+          )}
         </div>
       </div>
     )
   }
 
   return (
-    <div className="relative h-full overflow-y-auto bg-bg">
+    <div className="relative h-full overflow-y-auto bg-background">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-accent/[0.07] to-transparent" />
-        <div className="absolute -right-24 top-12 h-72 w-72 rounded-full border border-accent/10" />
-        <div className="absolute -right-8 top-28 h-44 w-44 rounded-full border border-accent/10" />
+        <div className="absolute -right-24 top-12 h-72 w-72 rounded-full border border-primary/10" />
+        <div className="absolute -right-8 top-28 h-44 w-44 rounded-full border border-primary/10" />
       </div>
 
       <div className="workspace-manager-layout relative mx-auto flex min-h-full w-full max-w-5xl flex-col px-4 py-6 md:px-8 md:py-10">
         <div className="workspace-manager-hero mb-7 flex flex-col gap-5">
           <div className="max-w-2xl">
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent/[0.07] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-accent">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/[0.07] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-primary">
               <Network size={12} /> {t('workspaceManager.eyebrow')}
             </div>
-            <h1 className="text-2xl font-semibold leading-tight text-text md:text-4xl">
+            <h1 className="text-2xl font-semibold leading-tight text-foreground md:text-4xl">
               {t('workspaceManager.heading')}
             </h1>
-            <p className="mt-3 max-w-xl text-[13px] leading-relaxed text-text-muted md:text-[15px]">
+            <p className="mt-3 max-w-xl text-[13px] leading-relaxed text-muted-foreground md:text-[15px]">
               {t('workspaceManager.subheading')}
             </p>
           </div>
-          <div className="workspace-manager-stats grid grid-cols-2 gap-2">
+          <div className="workspace-manager-stats grid max-w-56 grid-cols-1 gap-2">
             <ManagerStat icon={Building2} label={t('workspaceManager.scope')} value={loading ? '—' : String(manager?.activeWorkspaceCount ?? 0)} />
-            <ManagerStat icon={Bot} label={t('workspaceManager.runtime')} value="Pi · WebPi" />
           </div>
         </div>
 
-        <section className="rounded-2xl border border-border/80 bg-bg-secondary/60 p-3 shadow-[0_24px_70px_-58px_var(--color-text)] md:p-4">
+        <section className="rounded-2xl border border-border/80 bg-secondary/60 p-3 shadow-[0_24px_70px_-58px_var(--foreground)] md:p-4">
           <textarea
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={onKeyDown}
             placeholder={t('workspaceManager.placeholder')}
             rows={4}
-            className="min-h-28 w-full resize-none bg-transparent px-1 py-1 text-[14px] leading-relaxed text-text outline-none placeholder:text-text-muted/55 md:text-[15px]"
+            className="min-h-28 w-full resize-none bg-transparent px-1 py-1 text-[14px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/55 md:text-[15px]"
           />
           <div className="workspace-manager-composer-footer mt-3 flex flex-col gap-2 border-t border-border/60 pt-3">
-            <div className="flex min-w-0 items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-md bg-bg-tertiary px-2.5 py-1.5 text-[11px] text-text-muted">
-                <Bot size={12} /> Pi · WebPi
-              </span>
-              {credentials && credentials.length > 0 ? (
-                <label className="relative inline-flex min-w-0 items-center gap-1.5 rounded-md bg-bg-tertiary px-2.5 py-1.5 text-[11px] text-text-muted">
-                  <KeyRound size={12} className="shrink-0" />
-                  <select
-                    aria-label={t('workspaceManager.credential')}
-                    value={credentialSlug ?? ''}
-                    onChange={(event) => {
-                      const next = event.target.value || null
-                      setCredentialSlug(next)
-                      void preferencesApi.rememberQuickChatCredential('pi', next).catch(() => undefined)
-                    }}
-                    className="max-w-44 appearance-none truncate bg-transparent pr-3 text-text outline-none"
-                  >
-                    {credentials.map((credential) => (
-                      <option key={credential.slug} value={credential.slug}>
-                        {credential.label?.trim() || credential.slug}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ) : credentials ? (
-                <button
-                  type="button"
-                  onClick={() => openOrFocus({ kind: 'settings', params: { category: 'ai-provider' } })}
-                  className="oa-pressable inline-flex items-center gap-1.5 rounded-md bg-amber-500/10 px-2.5 py-1.5 text-[11px] text-amber-600 dark:text-amber-400"
-                >
-                  <KeyRound size={12} /> {t('workspaceManager.configureCredential')}
-                </button>
-              ) : null}
+            <div className="workspace-manager-composer-actions flex min-w-0 flex-col gap-2">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <AgentLaunchSelectors
+                  ref={launchSelectorsRef}
+                  config={launchConfig}
+                  onConfigureProvider={goConfigureProvider}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => void submit()}
+                disabled={!draft.trim() || launching || !launchConfig.credentialSelectionReady}
+                className="oa-pressable inline-flex min-h-9 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-[12px] font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                {launching ? <Loader2 size={14} className="animate-spin" /> : <ArrowUp size={14} />}
+                {launching ? t('workspaceManager.launching') : t('workspaceManager.send')}
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => void submit()}
-              disabled={!draft.trim() || launching || credentials === null || (credentials.length > 0 && !credentialSlug)}
-              className="oa-pressable inline-flex min-h-9 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-[12px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-45"
-            >
-              {launching ? <Loader2 size={14} className="animate-spin" /> : <ArrowUp size={14} />}
-              {launching ? t('workspaceManager.launching') : t('workspaceManager.send')}
-            </button>
+            <AgentLaunchDetails
+              config={launchConfig}
+              hasWorkspaceTarget
+              onAdjustAi={adjustManagerAi}
+              className="border-t border-border/45 pt-2"
+            />
           </div>
         </section>
 
-        {error && (
-          <div className="mt-3 rounded-lg border border-red/25 bg-red/10 px-3 py-2 text-[12px] text-red">{error}</div>
+        {(error ?? workspaceManagerError) && (
+          <div className="mt-3 rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-[12px] text-destructive">
+            {error ?? workspaceManagerError}
+          </div>
         )}
 
-        <div className="workspace-manager-support-grid mt-7 grid min-w-0 gap-6">
-          <section className="workspace-manager-suggestions-section min-w-0">
-            <h2 className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-text-muted/70">
-              {t('workspaceManager.suggestions')}
-            </h2>
-            <div className="workspace-manager-suggestions grid min-w-0 gap-2">
-              {suggestions.map((suggestion, index) => {
-                const Icon = SUGGESTION_ICONS[index] ?? Network
-                return (
-                  <button
-                    key={suggestion}
-                    type="button"
-                    onClick={() => setDraft(suggestion)}
-                    className="oa-pressable group flex items-start gap-3 rounded-xl border border-border/70 bg-bg-secondary/45 p-3 text-left hover:border-accent/30 hover:bg-bg-secondary"
-                  >
-                    <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-bg-tertiary text-text-muted group-hover:text-accent">
-                      <Icon size={14} />
-                    </span>
-                    <span className="text-[12px] leading-relaxed text-text-muted group-hover:text-text">{suggestion}</span>
-                  </button>
-                )
-              })}
-            </div>
-            <p className="mt-3 text-[11px] leading-relaxed text-text-muted/65">{t('workspaceManager.guardrail')}</p>
-          </section>
-
-          <section className="min-w-0">
-            <h2 className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-text-muted/70">
-              {t('workspaceManager.recent')}
-            </h2>
-            <div className="overflow-hidden rounded-xl border border-border/70 bg-bg-secondary/35">
-              {manager?.sessions.length ? manager.sessions.slice(0, 5).map((record) => (
+        <section className="workspace-manager-suggestions-section mt-7 min-w-0">
+          <h2 className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">
+            {t('workspaceManager.suggestions')}
+          </h2>
+          <div className="workspace-manager-suggestions grid min-w-0 gap-2">
+            {suggestions.map((suggestion, index) => {
+              const Icon = SUGGESTION_ICONS[index] ?? Network
+              return (
                 <button
-                  key={record.id}
+                  key={suggestion}
                   type="button"
-                  onClick={() => openOrFocus({ kind: 'workspace-manager', params: { sessionId: record.id } })}
-                  className="oa-pressable flex w-full items-center gap-3 border-b border-border/55 px-3 py-2.5 text-left last:border-b-0 hover:bg-bg-tertiary/65"
+                  onClick={() => setDraft(suggestion)}
+                  className="oa-pressable group flex items-start gap-3 rounded-xl border border-border/70 bg-secondary/45 p-3 text-left hover:border-primary/30 hover:bg-secondary"
                 >
-                  <span className={`h-2 w-2 shrink-0 rounded-full ${record.state === 'running' ? 'bg-green' : 'bg-text-muted/30'}`} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[12px] font-medium text-text">{record.title ?? record.name}</span>
-                    <span className="mt-0.5 block text-[10px] text-text-muted">{new Date(record.lastActiveAt).toLocaleString()}</span>
+                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:text-primary">
+                    <Icon size={14} />
                   </span>
-                  <ChevronRight size={14} className="shrink-0 text-text-muted/50" />
+                  <span className="text-[12px] leading-relaxed text-muted-foreground group-hover:text-foreground">{suggestion}</span>
                 </button>
-              )) : (
-                <p className="px-3 py-5 text-center text-[11px] text-text-muted/60">{t('workspaceManager.noRecent')}</p>
-              )}
-            </div>
-          </section>
-        </div>
+              )
+            })}
+          </div>
+          <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground/65">{t('workspaceManager.guardrail')}</p>
+        </section>
       </div>
     </div>
   )
 }
 
+function runtimeLabel(agentId: string, agents: readonly { id: string; displayName: string }[]): string {
+  return agents.find((agent) => agent.id === agentId)?.displayName ?? agentId
+}
+
 function ManagerStat({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-border/70 bg-bg-secondary/55 px-3 py-2.5">
-      <div className="flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.11em] text-text-muted/60">
+    <div className="rounded-xl border border-border/70 bg-secondary/55 px-3 py-2.5">
+      <div className="flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.11em] text-muted-foreground/60">
         <Icon size={11} /> {label}
       </div>
-      <div className="mt-1.5 truncate text-[13px] font-semibold text-text">{value}</div>
+      <div className="mt-1.5 truncate text-[13px] font-semibold text-foreground">{value}</div>
     </div>
   )
 }

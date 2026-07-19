@@ -48,9 +48,9 @@ export function UpdateBanner() {
   }
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2 bg-accent-dim/30 border-b border-accent/40 text-[12px] text-text">
+    <div className="flex items-center gap-3 px-4 py-2 bg-primary-muted/30 border-b border-primary/40 text-[12px] text-foreground">
       <span className="shrink-0">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-accent">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
           <polyline points="7 10 12 15 17 10" />
           <line x1="12" y1="15" x2="12" y2="3" />
@@ -58,18 +58,18 @@ export function UpdateBanner() {
       </span>
       <span className="flex-1 min-w-0 truncate">
         <span className="font-semibold">v{info.latest}</span> available
-        {' '}<span className="text-text-muted hidden sm:inline">(you have v{info.current})</span>
+        {' '}<span className="text-muted-foreground hidden sm:inline">(you have v{info.current})</span>
         {info.publishedAt && (
-          <span className="text-text-muted hidden lg:inline"> · released {info.publishedAt.slice(0, 10)}</span>
+          <span className="text-muted-foreground hidden lg:inline"> · released {info.publishedAt.slice(0, 10)}</span>
         )}
       </span>
       {runtimeMode === 'electron-packaged' ? (
-        <span className="text-text-muted shrink-0 hidden md:inline">
+        <span className="text-muted-foreground shrink-0 hidden md:inline">
           Desktop updater will prompt when the download is ready
         </span>
       ) : (
-        <span className="text-text-muted shrink-0 hidden md:inline">
-          Run <code className="text-accent bg-bg-tertiary px-1 rounded">git pull &amp;&amp; pnpm build</code> to update
+        <span className="text-muted-foreground shrink-0 hidden md:inline">
+          Run <code className="text-primary bg-muted px-1 rounded">git pull &amp;&amp; pnpm build</code> to update
         </span>
       )}
       {info.releaseUrl && (
@@ -77,7 +77,7 @@ export function UpdateBanner() {
           href={info.releaseUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-accent hover:underline shrink-0"
+          className="text-primary hover:underline shrink-0"
         >
           <span className="hidden sm:inline">Release notes</span>
           <span className="sm:hidden">Notes</span>
@@ -86,7 +86,7 @@ export function UpdateBanner() {
       )}
       <button
         onClick={handleSkip}
-        className="text-text-muted hover:text-text shrink-0 text-[11px]"
+        className="text-muted-foreground hover:text-foreground shrink-0 text-[11px]"
         title="Don't show this update again"
       >
         <span className="hidden sm:inline">Skip this version</span>
@@ -94,7 +94,7 @@ export function UpdateBanner() {
       </button>
       <button
         onClick={handleDismiss}
-        className="text-text-muted hover:text-text shrink-0"
+        className="text-muted-foreground hover:text-foreground shrink-0"
         title="Dismiss until next reload"
         aria-label="Dismiss"
       >

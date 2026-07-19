@@ -9,10 +9,9 @@ import { exec as gitExec } from 'dugite';
 import {
   readCredentials,
   readWorkspaceCredentialDefaults,
-  readWorkspaceDefaultContextWindow,
 } from '@/core/config.js';
 
-import type { AdapterRegistry } from './cli-adapter.js';
+import { prepareAgentRuntimeWorkspace, type AdapterRegistry } from './cli-adapter.js';
 import { injectWorkspaceContext } from './context-injector.js';
 import { injectWorkspaceCredentials } from './credential-injection.js';
 import type { Logger } from './logger.js';
@@ -234,21 +233,20 @@ export class WorkspaceCreator {
       };
     }
 
-    // Per-adapter technical bootstrap (MCP wiring, trust entries, …). Each
-    // adapter is responsible for idempotency. We log but don't fail the
-    // workspace create on a single adapter's bootstrap failure — the user
-    // can still use it manually, the launcher just won't have prepped it.
+    // Run the same per-runtime preparation hook used before later process
+    // launches. Hooks are idempotent. A single adapter failure does not fail
+    // Workspace creation; another enabled runtime can still be used.
     for (const a of agents) {
       const adapter = this.opts.adapterRegistry.get(a);
-      if (!adapter?.bootstrap) continue;
+      if (!adapter) continue;
       try {
-        await adapter.bootstrap({
+        await prepareAgentRuntimeWorkspace(adapter, {
           wsId: id,
           cwd: dir,
           launcherRepoRoot: this.opts.bootstrapEnv.launcherRepoRoot,
         });
       } catch (err) {
-        log.warn('adapter.bootstrap_failed', { agent: a, err });
+        log.warn('adapter.prepare_workspace_failed', { agent: a, err });
       }
     }
 
@@ -262,10 +260,7 @@ export class WorkspaceCreator {
     // a miss (disabled agent, dangling slug, incompatible wire) warns + skips,
     // the workspace stays usable.
     try {
-      const [userDefaults, defaultContextWindow] = await Promise.all([
-        readWorkspaceCredentialDefaults(),
-        readWorkspaceDefaultContextWindow(),
-      ]);
+      const userDefaults = await readWorkspaceCredentialDefaults();
       const effective: Record<string, AgentCredentialDecl> = {
         ...userDefaults,
         ...(template.agentCredentials ?? {}),
@@ -279,7 +274,6 @@ export class WorkspaceCreator {
           adapterRegistry: this.opts.adapterRegistry,
           credentials,
           logger: log,
-          defaultContextWindow,
         });
       }
     } catch (err) {

@@ -13,6 +13,11 @@
  *   (e.g. claude exited but session will respawn it)
  */
 
+import {
+  validateTerminalViewAttributes,
+  type TerminalViewAttributes,
+} from './terminal-view-attributes.js';
+
 // ── client → server ─────────────────────────────────────────────────────────
 
 export interface AttachMessage {
@@ -30,7 +35,12 @@ export interface ResizeMessage {
   readonly rows: number;
 }
 
-export type ClientControlMessage = AttachMessage | ResizeMessage;
+export interface TerminalViewAttributesMessage {
+  readonly type: 'terminal-view-attributes';
+  readonly attributes: TerminalViewAttributes;
+}
+
+export type ClientControlMessage = AttachMessage | ResizeMessage | TerminalViewAttributesMessage;
 
 // ── server → client ─────────────────────────────────────────────────────────
 
@@ -49,6 +59,10 @@ export interface AttachedMessage {
   readonly seq: number;
   /** True if `since` in attach was older than the buffer's headSeq. */
   readonly scrollbackTruncated: boolean;
+  /** Kitty keyboard flags omitted by xterm's ANSI serializer. */
+  readonly kittyKeyboardFlags: number;
+  /** Whether the live TUI subscribed to Contour/Kitty color-scheme updates. */
+  readonly colorSchemeUpdatesSubscribed: boolean;
 }
 
 export interface CursorMessage {
@@ -100,6 +114,12 @@ export function isClientControlMessage(value: unknown): value is ClientControlMe
   }
   if (v['type'] === 'resize') {
     return isPositiveInt(v['cols']) && isPositiveInt(v['rows']);
+  }
+  if (v['type'] === 'terminal-view-attributes') {
+    const attributes = validateTerminalViewAttributes(v['attributes']);
+    if (!attributes) return false;
+    v['attributes'] = attributes;
+    return true;
   }
   return false;
 }

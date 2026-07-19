@@ -74,7 +74,6 @@ export function applyAccountHandlers(decoder: Decoder): void {
   // ===========================================================================
 
   decoder.registerText(IN.ACCT_VALUE, (d, fields) => {
-    decodeInt(fields) // msgId
     decodeInt(fields) // version
     const key = decodeStr(fields)
     const val = decodeStr(fields)
@@ -97,7 +96,6 @@ export function applyAccountHandlers(decoder: Decoder): void {
   // ===========================================================================
 
   decoder.registerText(IN.PORTFOLIO_VALUE, (d, fields) => {
-    decodeInt(fields) // msgId
     const version = decodeInt(fields)
 
     const contract = new Contract()
@@ -162,7 +160,6 @@ export function applyAccountHandlers(decoder: Decoder): void {
   // ===========================================================================
 
   decoder.registerText(IN.ACCT_UPDATE_TIME, (d, fields) => {
-    decodeInt(fields) // msgId
     decodeInt(fields) // version
     const timeStamp = decodeStr(fields)
     d.wrapper.updateAccountTime(timeStamp)
@@ -179,7 +176,6 @@ export function applyAccountHandlers(decoder: Decoder): void {
   // ===========================================================================
 
   decoder.registerText(IN.ACCT_DOWNLOAD_END, (d, fields) => {
-    decodeInt(fields) // msgId
     decodeInt(fields) // version
     const accountName = decodeStr(fields)
     d.wrapper.accountDownloadEnd(accountName)
@@ -196,7 +192,6 @@ export function applyAccountHandlers(decoder: Decoder): void {
   // ===========================================================================
 
   decoder.registerText(IN.MANAGED_ACCTS, (d, fields) => {
-    decodeInt(fields) // msgId
     decodeInt(fields) // version
     const accountsList = decodeStr(fields)
     d.wrapper.managedAccounts(accountsList)
@@ -212,7 +207,6 @@ export function applyAccountHandlers(decoder: Decoder): void {
   // ===========================================================================
 
   decoder.registerText(IN.POSITION_DATA, (d, fields) => {
-    decodeInt(fields) // msgId
     const version = decodeInt(fields)
 
     const account = decodeStr(fields)
@@ -260,7 +254,6 @@ export function applyAccountHandlers(decoder: Decoder): void {
   // ===========================================================================
 
   decoder.registerText(IN.POSITION_END, (d, fields) => {
-    decodeInt(fields) // msgId
     decodeInt(fields) // version
     d.wrapper.positionEnd()
   })
@@ -275,7 +268,6 @@ export function applyAccountHandlers(decoder: Decoder): void {
   // ===========================================================================
 
   decoder.registerText(IN.ACCOUNT_SUMMARY, (d, fields) => {
-    decodeInt(fields) // msgId
     decodeInt(fields) // version
     const reqId = decodeInt(fields)
     const account = decodeStr(fields)
@@ -300,7 +292,6 @@ export function applyAccountHandlers(decoder: Decoder): void {
   // ===========================================================================
 
   decoder.registerText(IN.ACCOUNT_SUMMARY_END, (d, fields) => {
-    decodeInt(fields) // msgId
     decodeInt(fields) // version
     const reqId = decodeInt(fields)
     d.wrapper.accountSummaryEnd(reqId)
@@ -317,7 +308,6 @@ export function applyAccountHandlers(decoder: Decoder): void {
   // ===========================================================================
 
   decoder.registerText(IN.POSITION_MULTI, (d, fields) => {
-    decodeInt(fields) // msgId
     decodeInt(fields) // version
     const reqId = decodeInt(fields)
     const account = decodeStr(fields)
@@ -362,7 +352,6 @@ export function applyAccountHandlers(decoder: Decoder): void {
   // ===========================================================================
 
   decoder.registerText(IN.POSITION_MULTI_END, (d, fields) => {
-    decodeInt(fields) // msgId
     decodeInt(fields) // version
     const reqId = decodeInt(fields)
     d.wrapper.positionMultiEnd(reqId)
@@ -379,7 +368,6 @@ export function applyAccountHandlers(decoder: Decoder): void {
   // ===========================================================================
 
   decoder.registerText(IN.ACCOUNT_UPDATE_MULTI, (d, fields) => {
-    decodeInt(fields) // msgId
     decodeInt(fields) // version
     const reqId = decodeInt(fields)
     const account = decodeStr(fields)
@@ -406,7 +394,6 @@ export function applyAccountHandlers(decoder: Decoder): void {
   // ===========================================================================
 
   decoder.registerText(IN.ACCOUNT_UPDATE_MULTI_END, (d, fields) => {
-    decodeInt(fields) // msgId
     decodeInt(fields) // version
     const reqId = decodeInt(fields)
     d.wrapper.accountUpdateMultiEnd(reqId)
@@ -423,7 +410,6 @@ export function applyAccountHandlers(decoder: Decoder): void {
   // ===========================================================================
 
   decoder.registerText(IN.PNL, (d, fields) => {
-    decodeInt(fields) // msgId
     const reqId = decodeInt(fields)
     const dailyPnL = decodeFloat(fields)
     let unrealizedPnL: number | null = null
@@ -454,7 +440,6 @@ export function applyAccountHandlers(decoder: Decoder): void {
   // ===========================================================================
 
   decoder.registerText(IN.PNL_SINGLE, (d, fields) => {
-    decodeInt(fields) // msgId
     const reqId = decodeInt(fields)
     const pos = decodeDecimal(fields)
     const dailyPnL = decodeFloat(fields)

@@ -411,6 +411,19 @@ export interface BrokerHealthInfo {
   disabled: boolean
 }
 
+/**
+ * Optional transport signal from a broker adapter to its owning UTA.
+ *
+ * `dead` is authoritative and must take health offline immediately. `restored`
+ * is only a hint to retry now (IBKR 1101/1102); it is not proof that private
+ * account reads work again. `alive` is emitted only after the adapter has
+ * completed its own reconnect/readiness handshake.
+ */
+export interface BrokerConnectionStateEvent {
+  state: 'alive' | 'dead' | 'restored'
+  error?: string
+}
+
 // ==================== Account capabilities ====================
 
 /**
@@ -477,6 +490,11 @@ export interface IBroker<TMeta = unknown> {
 
   init(): Promise<void>
   close(): Promise<void>
+
+  /** Optional push signal for transports with an active heartbeat. */
+  setConnectionStateListener?(
+    listener: ((event: BrokerConnectionStateEvent) => void) | null,
+  ): void
 
   // ---- Contract search (IBKR: reqMatchingSymbols + reqContractDetails) ----
 

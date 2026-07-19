@@ -30,7 +30,7 @@ export function DevCategoryList() {
             key={item.tab}
             label={'label' in item ? item.label : t(item.labelKey)}
             active={active}
-            icon={<item.Icon size={14} strokeWidth={1.75} className="text-text-muted/70" aria-hidden />}
+            icon={<item.Icon size={14} strokeWidth={1.75} className="text-muted-foreground/70" aria-hidden />}
             onClick={() => openOrFocus({ kind: 'dev', params: { tab: item.tab } })}
           />
         )

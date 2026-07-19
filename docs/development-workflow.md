@@ -9,9 +9,15 @@ Canonical startup rules: [[AGENTS.md]]. Guide index: [[docs/README.md]].
 
 ## Branch Lanes
 
-- `dev` is the integration lane for routine development.
-- `master` is the stable/user-facing lane and the default GitHub branch.
-- Release automation runs from `master`.
+- `dev` is the integration lane for routine development and an independently
+  testable preview environment. Merged installer changes are exercised through
+  the mutable `raw/.../dev/install` endpoint with a matching `--branch dev`
+  payload selector.
+- `master` is the stable/user-facing lane and the default GitHub branch. A
+  `dev` to `master` merge is a versioned release event, not another integration
+  step.
+- Release automation runs from `master` and derives public artifacts from the
+  accepted release tag. It is the only path that updates stable CDN aliases.
 - `archive/dev-pre-beta6` is a historical snapshot; do not modify or delete it.
 - `local` is a legacy shared-worktree branch. It is not the default workflow;
   audit its unmerged commits before deciding whether to retain or retire it.
@@ -139,6 +145,11 @@ delivery lane:
   informs review but does not grant merge authority.
 - A push to `dev` runs the focused Ubuntu Guardian/full-stack smoke instead of
   repeating the PR's complete build, test, and cross-platform jobs.
+- Installer or distributed-CLI PRs run deterministic clean-container install
+  and managed-SSH acceptance against the checked-out tree. After merge, the
+  `dev` push separately downloads `raw/.../dev/install` into a clean container,
+  installs `--branch dev`, and verifies the live preview channel's provenance,
+  commands, server control surface, and idempotent reuse.
 - A push to `master` always runs the complete matrix.
 - Once this workflow version reaches the default `master` branch, the scheduled
   validation checks out current `dev` and runs the complete matrix, providing a
@@ -223,7 +234,10 @@ ownership.
 
 ## Promotion: `dev` to `master`
 
-Promotion is a human-directed stability decision.
+Promotion is a human-directed, versioned release decision. Do not merge
+unreleased follow-up work to `master` merely to make a public alias catch up;
+finish and test it in the active `dev` environment, then include it in the next
+release.
 
 ```bash
 git fetch origin
@@ -236,11 +250,20 @@ Before merging a promotion:
 
 - run the normal build/test gates against the full promotion delta;
 - add entry-path, trading, runtime, or package smokes required by included work;
-- follow [[docs/cli-installer.md]] and run `pnpm test:install:docker` locally
-  when the release publishes the CLI bootstrap installer; this manual gate is
-  intentionally not a PR CI job;
-- confirm release metadata/version intent;
+- follow [[docs/cli-installer.md]]; require the checkout installer/remote jobs
+  and the post-merge live dev-channel job to be green, and walk the interactive
+  installer locally when its human-facing flow changed;
+- confirm the new release version, notes, and tag intent; the release workflow
+  must see a version whose tag does not already exist;
 - confirm CI and release workflow triggers still match the branch policy.
+
+The release workflow repeats the deterministic installer and managed-remote
+acceptance against the exact master candidate before it can create the tag and
+GitHub Release. It then creates the versioned installer from that tag, mirrors
+the same bytes to `download.openalice.ai/install`, writes the manifest checksum,
+and verifies both CDN objects. A manual `mirror_tag` run is recovery-only: it
+checks out that existing tag and may reproduce its bytes, but must never source
+an installer from current `master`.
 
 Do not delete `dev` after promotion. After a master hotfix, propagate the fix
 back to `dev` immediately so a later promotion cannot revert it.
@@ -257,8 +280,9 @@ git switch -c hotfix/<short-description>
 ```
 
 Keep the change minimal, run focused checks plus relevant smoke coverage, open
-a PR to `master`, and then merge or cherry-pick the resulting fix back into
-`dev`.
+a PR to `master`, give it a patch release version, and then merge or cherry-pick
+the resulting fix back into `dev`. An emergency path may be smaller, but it is
+still a release and must not silently mutate an existing versioned artifact.
 
 ## External Pull Requests
 

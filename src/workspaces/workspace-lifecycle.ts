@@ -52,6 +52,8 @@ export interface WorkspaceLifecycleManagerDeps {
   isWorkspaceHeadlessActive?: (workspaceId: string) => boolean
   /** Serializes checkout-wide mutations with Template Upgrade and Merge. */
   operationGuard?: WorkspaceOperationGuard
+  /** Remove runtime state projected outside a checkout before its final purge. */
+  cleanupWorkspaceState?: (record: WorkspaceCatalogRecord, cwd: string) => Promise<void>
   logger: Logger
 }
 
@@ -293,7 +295,10 @@ export class WorkspaceLifecycleManager {
       return { ok: false, code: 'already_purged', message: 'workspace files were already purged' }
     }
     await this.deps.catalog.beginPurging(id)
-    if (record.departedDir) await rm(record.departedDir, { recursive: true, force: true })
+    if (record.departedDir) {
+      await this.deps.cleanupWorkspaceState?.(record, record.departedDir)
+      await rm(record.departedDir, { recursive: true, force: true })
+    }
     await this.deps.sessionRegistry.removeAllFor(id)
     await this.deps.scrollbackStore.removeAllFor(id)
     const purged = await this.deps.catalog.markPurged(id)
@@ -350,7 +355,10 @@ export class WorkspaceLifecycleManager {
       return
     }
     if (record.lifecycle === 'purging') {
-      if (record.departedDir) await rm(record.departedDir, { recursive: true, force: true })
+      if (record.departedDir) {
+        await this.deps.cleanupWorkspaceState?.(record, record.departedDir)
+        await rm(record.departedDir, { recursive: true, force: true })
+      }
       await this.deps.sessionRegistry.removeAllFor(record.id)
       await this.deps.scrollbackStore.removeAllFor(record.id)
       await this.deps.catalog.markPurged(record.id)

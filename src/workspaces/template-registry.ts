@@ -19,6 +19,10 @@ export interface AgentCredentialDecl {
   readonly wireShape?: CredentialWireShape;
   /** Explicit custom-model context limit for opencode/Pi. */
   readonly contextWindow?: number;
+  /** Unknown-model reasoning override for Pi/opencode; known models auto-resolve. */
+  readonly reasoning?: boolean;
+  /** Model id the unknown-model override was decided for. */
+  readonly reasoningModel?: string;
   /** Claude only. */
   readonly authMode?: 'x-api-key' | 'bearer';
   /** Codex only. */
@@ -351,6 +355,12 @@ function parseAgentCredentials(raw: unknown): Record<string, AgentCredentialDecl
     }
     if (typeof v['contextWindow'] === 'number' && Number.isFinite(v['contextWindow']) && v['contextWindow'] > 0) {
       (decl as { contextWindow?: number }).contextWindow = v['contextWindow'];
+    }
+    if (typeof v['reasoning'] === 'boolean') {
+      (decl as { reasoning?: boolean }).reasoning = v['reasoning'];
+    }
+    if (typeof v['reasoningModel'] === 'string' && v['reasoningModel'].length > 0) {
+      (decl as { reasoningModel?: string }).reasoningModel = v['reasoningModel'];
     }
     if (v['authMode'] === 'x-api-key' || v['authMode'] === 'bearer') {
       (decl as { authMode?: 'x-api-key' | 'bearer' }).authMode = v['authMode'];

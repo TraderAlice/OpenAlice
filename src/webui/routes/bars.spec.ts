@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { createBarsRoutes } from './bars.js'
 import type { EngineContext } from '../../core/types.js'
 
@@ -30,12 +30,26 @@ describe('bars routes', () => {
     expect((await res.json()).candidates).toEqual([])
   })
 
-  it('GET / by barId returns bars + meta (explicit provider)', async () => {
-    const res = await createBarsRoutes(mkCtx()).request('/?barId=yfinance|AAPL&interval=1d')
+  it('GET /search clamps the requested limit before service dispatch', async () => {
+    const searchBarSources = vi.fn(async () => [])
+    const res = await createBarsRoutes(mkCtx({ searchBarSources })).request('/search?query=AAPL&limit=999')
+
+    expect(res.status).toBe(200)
+    expect(searchBarSources).toHaveBeenCalledWith('AAPL', { limit: 100 })
+  })
+
+  it('GET / by vendor barId forwards the asset class required for routing', async () => {
+    const ctx = mkCtx()
+    const getBars = vi.spyOn(ctx.barService, 'getBars')
+    const res = await createBarsRoutes(ctx).request('/?barId=yfinance|AAPL&assetClass=equity&interval=1d')
     const body = await res.json()
     expect(body.results).toHaveLength(1)
     expect(body.meta.sourceId).toBe('yfinance')
     expect(body.meta.barId).toBe('yfinance|AAPL')
+    expect(getBars).toHaveBeenCalledWith(
+      { barId: 'yfinance|AAPL', assetClass: 'equity' },
+      { interval: '1d' },
+    )
   })
 
   it('GET / without barId or symbol → 400', async () => {

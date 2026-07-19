@@ -41,6 +41,7 @@ import {
   resolveCredential,
   deleteCredential,
   credentialSchema,
+  validSections,
 } from './config.js'
 
 const mockReadFile = vi.mocked(readFile)
@@ -163,6 +164,10 @@ describe('readMarketDataConfig', () => {
 // ==================== writeConfigSection ====================
 
 describe('writeConfigSection', () => {
+  it('does not expose the retired global compaction policy', () => {
+    expect(validSections).not.toContain('compaction')
+  })
+
   it('validates and writes a section to the correct file', async () => {
     const result = await writeConfigSection('tools', { disabled: ['foo'] })
 

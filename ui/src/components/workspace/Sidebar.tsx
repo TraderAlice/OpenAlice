@@ -136,7 +136,7 @@ export function Sidebar(props: SidebarProps): ReactElement {
         <button
           type="button"
           onClick={() => setShowCreate(true)}
-          className="oa-pressable w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-border/60 bg-bg-tertiary/30 text-[13px] font-medium text-text-muted hover:text-text hover:border-accent/50 hover:bg-bg-tertiary/60"
+          className="oa-pressable w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-border/60 bg-muted/30 text-[13px] font-medium text-muted-foreground hover:text-foreground hover:border-primary/50 hover:bg-muted/60"
         >
           <Plus size={15} strokeWidth={2.25} className="shrink-0" />
           <span className="truncate">{t('workspace.newWorkspace')}</span>
@@ -197,9 +197,9 @@ export function Sidebar(props: SidebarProps): ReactElement {
         </div>
       )}
       {props.hasLoaded && props.workspaces.length === 0 && !showListError && (
-        <div className="px-3 py-2 text-[12px] text-text-muted/60">{t('workspace.emptySidebar')}</div>
+        <div className="px-3 py-2 text-[12px] text-muted-foreground/60">{t('workspace.emptySidebar')}</div>
       )}
-      {showListError && <div className="px-3 py-2 text-[12px] text-red">{props.listError}</div>}
+      {showListError && <div className="px-3 py-2 text-[12px] text-destructive">{props.listError}</div>}
 
       <div ref={workspaceListRef} className="flex flex-col mt-0.5">
         {orderedWorkspaces.map((w) => (
@@ -246,11 +246,11 @@ function NavRow({
       onClick={onClick}
       title={title}
       className={`oa-nav-row relative flex items-center gap-2.5 w-full px-3 py-1.5 text-[13px] text-left ${
-        active ? 'bg-bg-tertiary text-text' : 'text-text hover:bg-bg-tertiary/50'
+        active ? 'bg-muted text-foreground' : 'text-foreground hover:bg-muted/50'
       }`}
     >
-      {active && <span aria-hidden="true" className="absolute left-0 top-0 bottom-0 w-[2px] bg-accent" />}
-      <Icon size={14} strokeWidth={2} className="shrink-0 text-text-muted/70" aria-hidden="true" />
+      {active && <span aria-hidden="true" className="absolute left-0 top-0 bottom-0 w-[2px] bg-primary" />}
+      <Icon size={14} strokeWidth={2} className="shrink-0 text-muted-foreground/70" aria-hidden="true" />
       <span className="truncate">{label}</span>
     </button>
   );
@@ -312,8 +312,8 @@ function AgentBadgeGlyph({ agentId }: { agentId: string }): ReactElement {
 
 /** Hover-revealed square action button used for the per-row controls. */
 function rowAction(danger = false): string {
-  return `oa-icon-action shrink-0 w-5 h-5 rounded flex items-center justify-center text-text-muted/70 transition-colors ${
-    danger ? 'hover:text-red hover:bg-red/10' : 'hover:text-text hover:bg-bg-secondary'
+  return `oa-icon-action shrink-0 w-5 h-5 rounded flex items-center justify-center text-muted-foreground/70 transition-colors ${
+    danger ? 'hover:text-destructive hover:bg-destructive/10' : 'hover:text-foreground hover:bg-secondary'
   }`;
 }
 
@@ -386,19 +386,19 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
   const chooserTitle = t('workspace.chooseAgent');
 
   const statusClass = hasRunning
-    ? 'bg-green'
+    ? 'bg-success'
     : w.sessions.length > 0
-      ? 'bg-text-muted/40'
+      ? 'bg-muted-foreground/40'
       : 'border border-border';
 
   return (
     <div data-reorder-id={props.reorderId}>
       <div
         className={`group relative flex items-center gap-1 pl-3 pr-2 py-1.5 text-[12px] transition-colors ${
-          isSelected ? 'bg-bg-tertiary text-text' : 'text-text hover:bg-bg-tertiary/50'
+          isSelected ? 'bg-muted text-foreground' : 'text-foreground hover:bg-muted/50'
         }`}
       >
-        {isSelected && <span aria-hidden="true" className="absolute left-0 top-0 bottom-0 w-[2px] bg-accent" />}
+        {isSelected && <span aria-hidden="true" className="absolute left-0 top-0 bottom-0 w-[2px] bg-primary" />}
         <button
           type="button"
           onClick={() => props.onSelectWorkspace(w.id)}
@@ -410,7 +410,7 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
             title={hasRunning ? t('workspace.runningCount', { count: runningCount }) : t('workspace.idle')}
           />
           <span className="truncate font-medium">{label}</span>
-          <span className="text-[10px] text-text-muted/50 tabular-nums shrink-0">{formatRelativeTime(w.createdAt)}</span>
+          <span className="text-[10px] text-muted-foreground/50 tabular-nums shrink-0">{formatRelativeTime(w.createdAt)}</span>
         </button>
         {props.onRenameWorkspace && (
           <button
@@ -458,7 +458,7 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
               <ul
                 ref={menuRef}
                 role="menu"
-                className="oa-popover-enter absolute right-0 top-full mt-1 min-w-[170px] py-1 bg-bg-secondary border border-border/70 rounded-lg shadow-lg z-10"
+                className="oa-popover-enter absolute right-0 top-full mt-1 min-w-[170px] py-1 bg-secondary border border-border/70 rounded-lg shadow-lg z-10"
               >
                 {runtimeAgents.map((agent) => (
                   <li key={agent.id}>
@@ -466,12 +466,12 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
                       type="button"
                       role="menuitem"
                       aria-label={`${agent.displayName} (${agentPrefix(agent.id)})`}
-                      className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] text-left text-text transition-colors hover:bg-bg-tertiary"
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] text-left text-foreground transition-colors hover:bg-muted"
                       onClick={() => onMenuPick(agent.id)}
                     >
-                      <Plus size={12} strokeWidth={2.25} className="shrink-0 text-text-muted" />
+                      <Plus size={12} strokeWidth={2.25} className="shrink-0 text-muted-foreground" />
                       <span className="flex-1 truncate">{agent.displayName}</span>
-                      <span className="text-[10px] font-mono text-text-muted/60">{agentPrefix(agent.id)}</span>
+                      <span className="text-[10px] font-mono text-muted-foreground/60">{agentPrefix(agent.id)}</span>
                     </button>
                   </li>
                 ))}
@@ -484,12 +484,12 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
                       type="button"
                       role="menuitem"
                       aria-label={`${agent.displayName} (${agentPrefix(agent.id)})`}
-                      className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] text-left text-text-muted transition-colors hover:bg-bg-tertiary hover:text-text"
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] text-left text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                       onClick={() => onMenuPick(agent.id)}
                     >
-                      <Terminal size={12} strokeWidth={2.25} className="shrink-0 text-text-muted" />
+                      <Terminal size={12} strokeWidth={2.25} className="shrink-0 text-muted-foreground" />
                       <span className="flex-1 truncate">{agent.displayName}</span>
-                      <span className="text-[10px] font-mono text-text-muted/60">{agentPrefix(agent.id)}</span>
+                      <span className="text-[10px] font-mono text-muted-foreground/60">{agentPrefix(agent.id)}</span>
                     </button>
                   </li>
                 ))}
@@ -550,10 +550,10 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
 
 /** status → token-driven dot colour. */
 const HEADLESS_DOT_CLASS: Record<HeadlessTaskRecord['status'], string> = {
-  running: 'bg-accent',
-  done: 'bg-text-muted/40',
-  failed: 'bg-red',
-  interrupted: 'bg-yellow',
+  running: 'bg-primary',
+  done: 'bg-muted-foreground/40',
+  failed: 'bg-destructive',
+  interrupted: 'bg-warning',
 };
 
 /**
@@ -585,12 +585,12 @@ function HeadlessGroup(props: {
             ? t('workspace.headlessRunning', { count: runningCount })
             : t('workspace.headlessAutomation')
         }
-        className="group flex items-center gap-1 w-full pl-3 pr-2 py-1 text-[10px] font-medium uppercase tracking-wider text-text-muted/60 hover:text-text-muted transition-colors select-none"
+        className="group flex items-center gap-1 w-full pl-3 pr-2 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60 hover:text-muted-foreground transition-colors select-none"
       >
         {open ? <ChevronDown size={11} strokeWidth={2.25} aria-hidden="true" /> : <ChevronRight size={11} strokeWidth={2.25} aria-hidden="true" />}
         <span>{t('workspace.headless')}</span>
-        <span className="text-text-muted/45 tabular-nums">{props.tasks.length}</span>
-        {runningCount > 0 && <span className="ml-0.5 w-1.5 h-1.5 rounded-full bg-accent" />}
+        <span className="text-muted-foreground/45 tabular-nums">{props.tasks.length}</span>
+        {runningCount > 0 && <span className="ml-0.5 w-1.5 h-1.5 rounded-full bg-primary" />}
       </button>
       {open && (
         <div className="oa-disclosure-enter ml-[7px] border-l border-border/50">
@@ -617,10 +617,10 @@ function HeadlessTaskRow(props: {
   return (
     <div className="group flex items-center gap-1.5 pl-3 pr-2 py-1 text-[11px]" title={titleParts.join('\n')}>
       <span className={`shrink-0 w-1.5 h-1.5 rounded-full ${HEADLESS_DOT_CLASS[task.status]}`} aria-label={task.status} />
-      <span className="shrink-0 flex items-center justify-center w-3.5 text-text-muted/50">
+      <span className="shrink-0 flex items-center justify-center w-3.5 text-muted-foreground/50">
         <AgentBadgeGlyph agentId={task.agent} />
       </span>
-      <span className="flex-1 truncate text-text-muted">{task.prompt}</span>
+      <span className="flex-1 truncate text-muted-foreground">{task.prompt}</span>
       {openable && (
         <button
           type="button"
@@ -666,20 +666,20 @@ export function SessionRow(props: SessionRowProps): ReactElement {
     <div
       data-reorder-id={props.reorderId}
       className={`group relative flex items-center gap-1.5 pl-3 pr-2 py-1.5 text-[12px] transition-colors ${
-        props.isActive ? 'bg-bg-tertiary' : 'hover:bg-bg-tertiary/50'
+        props.isActive ? 'bg-muted' : 'hover:bg-muted/50'
       }`}
     >
-      {props.isActive && <span aria-hidden="true" className="absolute left-0 top-0 bottom-0 w-[2px] bg-accent" />}
+      {props.isActive && <span aria-hidden="true" className="absolute left-0 top-0 bottom-0 w-[2px] bg-primary" />}
       <button
         type="button"
         className="flex-1 min-w-0 flex items-center gap-1.5 text-left"
         onClick={props.onSelect}
         title={tooltip}
       >
-        <span className={`shrink-0 flex items-center justify-center w-3.5 ${isPaused ? 'text-text-muted/40' : 'text-text-muted/70'}`}>
+        <span className={`shrink-0 flex items-center justify-center w-3.5 ${isPaused ? 'text-muted-foreground/40' : 'text-muted-foreground/70'}`}>
           <AgentBadgeGlyph agentId={s.agent} />
         </span>
-        <span className={`truncate ${isPaused ? 'text-text-muted' : 'text-text'}`}>{display}</span>
+        <span className={`truncate ${isPaused ? 'text-muted-foreground' : 'text-foreground'}`}>{display}</span>
       </button>
       {/* Right-aligned, always-visible state-as-action: a running session shows
           STOP (■, click to pause it); a paused one shows PLAY (▶, click to

@@ -9,6 +9,12 @@ import type { BarSourceCandidate, BarMeta } from '../../api/market'
 import type { MoversBoard, MoverRow, CalendarBoard, MacroBoard, MacroSeriesCard, TermStructureBoard, ValuationStrip, GlobalMacroBoard, ShippingBoard, FedBoard } from '../../api/reference'
 
 const AAPL = 'AAPL'
+const DEMO_FX: Record<string, { name: string; spot: number; aliases: string[] }> = {
+  EURUSD: { name: 'Euro / U.S. Dollar', spot: 1.0842, aliases: ['EUR', 'EURO'] },
+  USDJPY: { name: 'U.S. Dollar / Japanese Yen', spot: 157.35, aliases: ['JPY', 'YEN'] },
+  GBPUSD: { name: 'British Pound / U.S. Dollar', spot: 1.2915, aliases: ['GBP', 'POUND', 'STERLING'] },
+  USDCNH: { name: 'U.S. Dollar / Offshore Renminbi', spot: 7.185, aliases: ['CNH', 'RMB', 'RENMINBI', 'YUAN'] },
+}
 
 function symbolFromUrl(url: string): string {
   return (new URL(url).searchParams.get('symbol') ?? '').toUpperCase()
@@ -45,28 +51,90 @@ export const marketHandlers = [
   http.get('/api/reference/fed', () => HttpResponse.json(demoFed)),
 
   // ---- federated bars (multi-source K-lines) ----
-  // AAPL has two demo sources so the source picker is exercised.
+  // Cover the provider/asset-class combinations that have historically broken
+  // at the UI → bar-service boundary. AAPL has two sources so the picker is
+  // exercised; the other rows validate vendor-native namespaces.
   http.get('/api/bars/search', ({ request }) => {
     const q = (new URL(request.url).searchParams.get('query') ?? '').toUpperCase()
-    if (!q.includes('AAPL') && !q.includes('APPLE')) return HttpResponse.json({ candidates: [], count: 0 })
-    const candidates: BarSourceCandidate[] = [
-      { barId: 'yfinance|AAPL', source: 'vendor', sourceId: 'yfinance', symbol: 'AAPL', name: 'Apple Inc.', assetClass: 'equity', label: 'AAPL', barCapability: 'delayed' },
-      { barId: 'alpaca-paper|AAPL', source: 'uta', sourceId: 'alpaca-paper', symbol: 'AAPL', name: 'Apple Inc.', assetClass: 'equity', label: 'AAPL', barCapability: 'iex' },
-    ]
+    let candidates: BarSourceCandidate[] = []
+    if (q.includes('AAPL') || q.includes('APPLE')) {
+      candidates = [
+        { barId: 'yfinance|AAPL', source: 'vendor', sourceId: 'yfinance', symbol: 'AAPL', name: 'Apple Inc.', assetClass: 'equity', label: 'AAPL', barCapability: 'delayed' },
+        { barId: 'alpaca-paper|AAPL', source: 'uta', sourceId: 'alpaca-paper', symbol: 'AAPL', name: 'Apple Inc.', assetClass: 'equity', label: 'AAPL', barCapability: 'iex' },
+      ]
+    } else if (Object.entries(DEMO_FX).some(([symbol, fx]) => q.includes(symbol) || fx.aliases.some((alias) => q.includes(alias)))) {
+      candidates = Object.entries(DEMO_FX)
+        .filter(([symbol, fx]) => q.includes(symbol) || fx.aliases.some((alias) => q.includes(alias)))
+        .map(([symbol, fx]) => ({
+          barId: `yfinance|${symbol}`,
+          source: 'vendor' as const,
+          sourceId: 'yfinance',
+          symbol,
+          name: fx.name,
+          assetClass: 'currency' as const,
+          label: symbol,
+          barCapability: 'delayed' as const,
+        }))
+    } else if (q.includes('GOLD') || q.includes('XAU') || q.includes('黄金')) {
+      candidates = [
+        { barId: 'yfinance|gold', source: 'vendor', sourceId: 'yfinance', symbol: 'gold', name: 'Gold', assetClass: 'commodity', label: 'gold', barCapability: 'delayed' },
+      ]
+    } else if (q.includes('600519') || q.includes('茅台')) {
+      candidates = [
+        { barId: 'eastmoney|1.600519', source: 'vendor', sourceId: 'eastmoney', symbol: '1.600519', name: '贵州茅台', assetClass: 'equity', label: '1.600519', barCapability: 'delayed' },
+      ]
+    }
     return HttpResponse.json({ candidates, count: candidates.length })
   }),
   http.get('/api/bars', ({ request }) => {
     const url = new URL(request.url)
     const barId = url.searchParams.get('barId')
-    const symbol = (url.searchParams.get('symbol') ?? '').toUpperCase()
-    if (!(barId?.includes('AAPL') || symbol === AAPL)) {
+    const assetClass = url.searchParams.get('assetClass')
+    const fallbackSymbol = url.searchParams.get('symbol') ?? ''
+    const knownSources: Record<string, { symbol: string; assetClass: string }> = {
+      'yfinance|AAPL': { symbol: 'AAPL', assetClass: 'equity' },
+      'alpaca-paper|AAPL': { symbol: 'AAPL', assetClass: 'equity' },
+      ...Object.fromEntries(Object.keys(DEMO_FX).map((symbol) => [`yfinance|${symbol}`, { symbol, assetClass: 'currency' }])),
+      'yfinance|gold': { symbol: 'gold', assetClass: 'commodity' },
+      'eastmoney|1.600519': { symbol: '1.600519', assetClass: 'equity' },
+    }
+    const selected = barId ? knownSources[barId] : Object.values(knownSources).find((row) => row.symbol === fallbackSymbol)
+    if (!selected) {
       return HttpResponse.json({ results: null, meta: null, error: 'No demo data for this symbol.' })
     }
-    const results = demoMarketAAPL.historical.results
+    if (barId && !barId.startsWith('alpaca-paper|') && assetClass !== selected.assetClass) {
+      return HttpResponse.json({ results: null, meta: null, error: `Vendor barId needs assetClass=${selected.assetClass}.` })
+    }
+    const rawResults = demoMarketAAPL.historical.results ?? []
+    const targetSpot = DEMO_FX[selected.symbol]?.spot
+    const results = targetSpot == null
+      ? rawResults
+      : (() => {
+          const last = Math.max(1, rawResults.length - 1)
+          const factor = (index: number) => 1
+            + (index - last) * 0.00012
+            + Math.sin(index / 4) * 0.007
+            + Math.sin(index / 1.7) * 0.003
+          const anchor = factor(last)
+          const closeAt = (index: number) => targetSpot * factor(index) / anchor
+          return rawResults.map((bar, index) => {
+            const close = closeAt(index)
+            const open = index === 0 ? close * 0.9996 : closeAt(index - 1)
+            const band = close * 0.0012
+            return {
+              ...bar,
+              open,
+              high: Math.max(open, close) + band,
+              low: Math.min(open, close) - band,
+              close,
+              volume: null,
+            }
+          })
+        })()
     const sourceId = barId ? barId.split('|')[0] : 'yfinance'
     const meta: BarMeta = {
-      symbol: 'AAPL', from: results[0]?.date ?? '', to: results[results.length - 1]?.date ?? '', bars: results.length,
-      source: sourceId === 'alpaca-paper' ? 'uta' : 'vendor', sourceId, barId: barId ?? `${sourceId}|AAPL`,
+      symbol: selected.symbol, from: results[0]?.date ?? '', to: results[results.length - 1]?.date ?? '', bars: results.length,
+      source: sourceId === 'alpaca-paper' ? 'uta' : 'vendor', sourceId, barId: barId ?? `${sourceId}|${selected.symbol}`,
       provider: sourceId, barCapability: sourceId === 'alpaca-paper' ? 'iex' : 'delayed',
     }
     return HttpResponse.json({ results, meta })

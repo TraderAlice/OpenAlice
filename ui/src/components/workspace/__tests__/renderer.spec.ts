@@ -52,6 +52,13 @@ describe('attachWebglRenderer', () => {
     expect(term.loadAddon).not.toHaveBeenCalled()
   })
 
+  it('lets OpenTUI callers force the DOM renderer without mutating preferences', () => {
+    const term = fakeTerm()
+    expect(attachWebglRenderer(term, true)).toBeNull()
+    expect(constructed).toBe(0)
+    expect(term.loadAddon).not.toHaveBeenCalled()
+  })
+
   it('any other flag value keeps the WebGL default', () => {
     localStorage.setItem('openalice.terminal.renderer', 'webgl')
     expect(attachWebglRenderer(fakeTerm())).not.toBeNull()

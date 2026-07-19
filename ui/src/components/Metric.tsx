@@ -43,7 +43,7 @@ export function Metric({ label, value, delta, valueSign, size = 'md', className 
 
   return (
     <div className={className}>
-      <p className="text-[11px] text-text-muted uppercase tracking-wide">{label}</p>
+      <p className="text-[11px] text-muted-foreground uppercase tracking-wide">{label}</p>
       <p className={valueClass}>{value}</p>
       {delta && (
         <p className={`text-[12px] tabular-nums mt-0.5 ${signColor(delta.sign)}`}>
@@ -55,9 +55,9 @@ export function Metric({ label, value, delta, valueSign, size = 'md', className 
 }
 
 function signColor(sign?: MetricSign): string {
-  if (sign === 'up') return 'text-green'
-  if (sign === 'down') return 'text-red'
-  return 'text-text'
+  if (sign === 'up') return 'text-success'
+  if (sign === 'down') return 'text-destructive'
+  return 'text-foreground'
 }
 
 function arrowFor(sign: MetricSign): string {

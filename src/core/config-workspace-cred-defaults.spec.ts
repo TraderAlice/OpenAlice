@@ -40,20 +40,27 @@ describe('workspace credential defaults', () => {
   it('round-trips a per-agent map and keeps the optional model and wire', async () => {
     const config = await loadConfigModule()
     await config.writeWorkspaceCredentialDefaults({
-      opencode: { credentialSlug: 'openai-1', model: 'gpt-5.5', wireShape: 'openai-responses' },
+      opencode: {
+        credentialSlug: 'openai-1',
+        model: 'private-model',
+        wireShape: 'openai-responses',
+        contextWindow: 512_000,
+        reasoning: false,
+        reasoningModel: 'private-model',
+      },
       pi: { credentialSlug: 'anthropic-1' },
     })
     expect(await config.readWorkspaceCredentialDefaults()).toEqual({
-      opencode: { credentialSlug: 'openai-1', model: 'gpt-5.5', wireShape: 'openai-responses' },
+      opencode: {
+        credentialSlug: 'openai-1',
+        model: 'private-model',
+        wireShape: 'openai-responses',
+        contextWindow: 512_000,
+        reasoning: false,
+        reasoningModel: 'private-model',
+      },
       pi: { credentialSlug: 'anthropic-1' },
     })
-  })
-
-  it('defaults new workspace context to 256K and round-trips an explicit tier', async () => {
-    const config = await loadConfigModule()
-    expect(await config.readWorkspaceDefaultContextWindow()).toBe(256_000)
-    await config.writeWorkspaceDefaultContextWindow(512_000)
-    expect(await config.readWorkspaceDefaultContextWindow()).toBe(512_000)
   })
 
   it('drops entries with an empty credentialSlug (the "don\'t seed" choice)', async () => {

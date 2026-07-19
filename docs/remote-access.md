@@ -23,13 +23,13 @@ The repository now contains the source-backed Stage 0 through Stage 2 path:
 - `openalice server run|start|status|stop` provides a browserless foreground or
   detached Runtime lifecycle backed by Guardian's local control endpoint;
 - `openalice remote <target>` probes, plans, installs the ordinary CLI when
-  approved, installs missing Linux source-build tools when the checkout needs
-  preparation, starts or reuses the remote Server, and opens the same loopback
-  tunnel;
+  approved, installs missing Linux source-build tools, atomically creates or
+  fast-forwards a managed checkout when needed, starts or reuses the remote
+  Server, and opens the same loopback tunnel;
 - Electron remains a complete local desktop distribution.
 
-These commands are still source-backed preview behavior on the `dev` lane, not
-a standalone headless release. The clean Docker SSH acceptance covers the
+These commands are source-backed behavior distributed by the selected CLI
+lane, not a standalone headless release. The clean Docker SSH acceptance covers the
 management and tunnel loop; real long-latency Agent TUI measurements remain a
 separate release observation rather than a reason to invent a new terminal
 protocol preemptively.
@@ -94,8 +94,9 @@ protocol is deferred until the local/server boundary is stable.
 8. `--takeover` remains the only command-line authority to replace another
    recorded Guardian owner.
 9. Remote bootstrap reuses the invoking local CLI's recorded ordinary
-   installer source and selector. It does not carry a second SSH-only installer
-   or upload the full OpenAlice Runtime through SSH.
+   installer source, selector, and installed content identity. It does not
+   carry a second SSH-only installer or upload the full OpenAlice Runtime
+   through SSH. A missing managed checkout clones directly on the remote host.
 10. Shared Runtime facts use presentation-neutral names and versioned schemas.
     Browser layout, Electron chrome, modal state, and other client UI state do
     not become server truth.
@@ -184,25 +185,30 @@ explicit takeover decision.
 ### Managed remote command
 
 ```bash
-openalice remote <target> --app-dir <remote-checkout>
+openalice remote <target>
 ```
 
 `openalice remote` is orchestration around the same Server and SSH contracts:
 
 1. verify ordinary SSH connectivity and host-key policy;
-2. detect remote platform and an installed `openalice` CLI;
-3. probe `openalice server status --json` and protocol compatibility;
-4. compare the remote CLI version and recorded installer source/selector with
-   the invoking local CLI;
-5. if CLI install or update is required, show the exact matching plan and ask
+2. detect remote platform, home, and an installed `openalice` CLI;
+3. select the explicit `--app-dir` or a selector-specific managed checkout
+   beneath remote `OPENALICE_HOME`;
+4. probe `openalice server status --json`, source state, and protocol
+   compatibility;
+5. compare the remote CLI version, installer source/selector, and immutable
+   installed content identity with the invoking local CLI;
+6. if CLI install or update is required, show the exact matching plan and ask
    separately before calling the normal installer on the remote host;
-6. re-probe and re-plan after installation so a newly visible owner can block
+7. re-probe and re-plan after installation so a newly visible owner can block
    or require a second explicit takeover decision;
-7. run `openalice server start --app-dir ...` remotely and wait for readiness;
-8. create the same loopback tunnel used by `openalice ssh`;
-9. reuse the last successful local port for this target and remote home when it
+8. clone a missing managed checkout atomically, or fast-forward a clean managed
+   branch checkout and rebuild after the plan names that update;
+9. run `openalice server start --app-dir ...` remotely and wait for readiness;
+10. create the same loopback tunnel used by `openalice ssh`;
+11. reuse the last successful local port for this target and remote home when it
    is available, so an existing browser tab can reconnect to the same origin;
-10. open or print the local URL and stay in the foreground to own only the
+12. open or print the local URL and stay in the foreground to own only the
     tunnel.
 
 When reusing a healthy Server, `remote` takes the loopback web port from the
@@ -210,21 +216,25 @@ versioned status response. An explicitly supplied `--remote-port` must match
 that owner; a mismatch is reported before opening a misleading tunnel.
 
 Closing `openalice remote` closes the tunnel but leaves the detached remote
-Server running. Stop is explicit:
+Server running. Status and stop remain explicit but do not require users to
+compose raw SSH commands:
 
 ```bash
-ssh <target> '"$HOME/.openalice/bin/openalice" server stop'
+openalice remote <target> --status
+openalice remote <target> --stop
 ```
 
-A later convenience subcommand may issue that same remote command, but it must
-not conflate “disconnect” with “stop my remote work.”
+Neither command conflates “disconnect” with “stop my remote work.”
 
-The source-backed phase requires `--app-dir` unless the remote CLI already has
-a previously validated Runtime source or standalone bundle recorded for that
-home. It must not scan arbitrary remote directories or clone a repository
-without a separate visible plan. A future headless release bundle can remove
-the source-checkout requirement without changing the command or lifecycle
-contract.
+When `--app-dir` is absent, the source-backed phase selects a private managed
+checkout beneath the remote home. A missing checkout is cloned only after the
+visible plan is approved. A clean managed branch checkout is compared with its
+selected upstream; an available fast-forward is planned together with a Server
+restart and rebuild. Tracked changes block that update. An explicit
+`--app-dir` is user-owned: it may be cloned when wholly absent, but existing
+source is never fetched, switched, reset, or overwritten. A future headless
+release bundle can remove the source-checkout requirement without changing the
+command or lifecycle contract.
 
 `--yes` may approve the displayed install/update/start plan for automation, but
 it never implies `--takeover`. Non-interactive execution without a sufficient
@@ -382,6 +392,8 @@ protocol is required.
   verification;
 - preserve interactive SSH authentication when a terminal is available;
 - use keepalives without overriding stronger user config;
+- buffer transient command stderr while retrying, so provider control-plane
+  noise is shown only if the connection ultimately fails;
 - exit clearly when the local port cannot bind or the remote forward fails;
 - for managed `openalice remote`, prefer the last successful per-target local
   port so the old browser origin can recover after a tunnel reconnect, and
@@ -520,11 +532,13 @@ Managed bootstrap uses a plan/apply split.
 The read-only plan reports:
 
 - SSH target and resolved remote platform/architecture;
-- detected OpenAlice CLI path, version, and whether its version/install source
-  match the invoking local CLI;
+- detected OpenAlice CLI path, version, and whether its install source and
+  content identity match the invoking local CLI;
 - control protocol compatibility;
 - Server state and source/bundle root;
 - whether the selected source checkout already has complete Runtime artifacts;
+- whether source will be cloned, is user-owned, or has a safe managed
+  fast-forward available;
 - missing Git, Python 3, make, or C++ tools and the package-manager action that
   would provide them;
 - proposed install/update/start actions;
@@ -548,18 +562,25 @@ Apply rules:
    effect-specific confirmation;
 8. owner conflict: fail unless the user separately passed `--takeover`;
 9. non-interactive mode: require flags that cover every proposed mutation.
+10. missing managed source: clone to a temporary sibling and rename only after
+    a complete checkout succeeds;
+11. managed branch advanced: refuse tracked changes, stop a self-owned Server,
+    fast-forward only, rebuild, and restart; never reset user work;
+12. explicit `--app-dir`: preserve existing Git state and never manage updates.
 
 Remote SSH commands retry a small allowlist of transport failures (connection
 reset/timeout/close, key-verifier service interruption, and SSH identification
-exchange failures). Arbitrary remote command failures are never retried. After
+exchange failures). Stderr from retryable attempts remains buffered; users see
+one neutral retry line, and raw diagnostics appear only after a final failure.
+Arbitrary remote command failures are never retried. After
 an approved installer or Server-start action loses its SSH transport, managed
 remote re-probes the versioned state: it continues only when the intended CLI
 or Server is already present and compatible, otherwise it returns the original
 failure. Source preparation uses compact phase output and suppresses successful
 package/build chatter; a failed phase still includes a bounded diagnostic tail.
 
-The local orchestrator compares protocol ranges, CLI version, and install
-source; human version strings alone are insufficient. It may tolerate a newer
+The local orchestrator compares protocol ranges, CLI version, install source,
+and immutable content identity; human version strings alone are insufficient. It may tolerate a newer
 compatible Runtime, but its remote control CLI must match the invoking local
 CLI. The managed command exposes no independent branch/version selector. Test
 fixtures may replace the installer URL and payload base through test-only
@@ -613,6 +634,8 @@ Runtime model.
 - `openalice remote` plan/apply orchestration;
 - probe and bootstrap the existing CLI plus pinned managed Pi with explicit
   consent;
+- choose, atomically clone, and safely fast-forward selector-specific managed
+  source without requiring manual SSH setup;
 - when an older healthy CLI Server lacks managed Pi, infer its recorded source
   root, install Pi, stop that self-owned Server through `runtime.stop`, and
   restart it so the Guardian tree inherits the managed runtime;
@@ -681,6 +704,35 @@ browser, SSH tunnel, remote PTY, remote Pi process, and provider round trip.
 This validates the functional Pi path; representative 20/80/150 ms network
 shaping remains a separate latency observation.
 
+A 2026-07-16 persistent-volume Railway service then exercised the stable
+`master` installer through ordinary OpenSSH. Cold bootstrap, source build,
+detached readiness, tunnel HTTP/auth, disconnect persistence, idempotent plan,
+and same-container restart recovery all passed. A full Railway redeploy kept
+the checkout, build artifacts, and `OPENALICE_HOME` on the volume while
+correctly dropping the container-local CLI and Pi, which managed remote then
+reinstalled from `https://openalice.ai/install` without rebuilding the source
+Runtime.
+
+The same persistent service later validated the no-path managed-source flow:
+the laptop supplied only the SSH target and a volume-backed `--home`.
+`openalice remote` selected and atomically cloned the stable `master`
+checkout beneath that home, built it, reached the real `/api/version` and
+`/api/auth/status` routes through the tunnel, and left the Server alive after
+disconnect. A naturally occurring Railway key-verifier interruption appeared
+only as the neutral retry line and the operation recovered. Bundling
+`--status` into one control probe reduced the same Railway status operation
+from roughly 24 seconds and many SSH sessions to roughly 2 seconds and one SSH
+session.
+
+The redeploy also confirmed the cross-machine safety boundary. The reattached
+volume still named the removed container as Guardian and Alice owner; ordinary
+start refused it, and explicit `--takeover` still refused to signal or reclaim
+an owner from another machine. After Railway independently reported the old
+deployment as removed, the operator quarantined all three foreign lock records
+before starting the new owner. This is an operational recovery observation,
+not automatic cross-machine failover: heartbeat expiry alone must never grant
+permission to reclaim a shared volume.
+
 ### Stage 3 — terminal transport optimization
 
 - build only if Stage 2 measurements justify it;
@@ -732,11 +784,14 @@ shaping remains a separate latency observation.
 | missing remote CLI, interactive | shows plan; default no leaves host unchanged |
 | missing remote CLI, non-interactive | fails unless explicit approval is present |
 | incompatible running Server | explains process impact before update/restart |
-| remote source missing | fails with actionable `--app-dir` guidance; no surprise clone |
+| managed remote source missing | plan names the exact clone destination and selector; default no leaves it absent |
+| explicit source path missing | plan may clone only that exact path; an occupied non-OpenAlice path is refused |
+| managed branch advanced | clean checkout fast-forwards, rebuilds, and restarts; tracked changes block without overwrite |
 | source artifacts missing, build tools missing | plan names the tools and normal installer command; default no leaves packages untouched |
 | source artifacts complete, compiler missing | reuse artifacts without an unnecessary package-manager mutation |
 | tunnel disconnect | local command exits; remote Server and work continue |
 | reconnect | same local port is preferred; same Runtime, browser origin, and live terminal are reachable; a busy port falls back visibly |
+| status and stop | user-facing commands require no raw SSH; status uses one bundled control probe and stop verifies structured shutdown |
 | transient SSH loss after apply | retry known transport faults; re-probe completed install/start state before deciding failure |
 | host-key failure | fails without disabling verification |
 | SSH agent/passphrase path | preserves normal OpenSSH interaction |
@@ -791,6 +846,8 @@ behavior.
 - simultaneous writable control from multiple clients;
 - replacing Electron with a browser wrapper;
 - replacing Shell or native Agent TUIs with Pi/WebPi;
-- silently cloning OpenAlice or installing optional additional Agent CLIs on a
-  remote host; pinned managed Pi is part of the visible baseline plan;
+- scanning arbitrary remote directories or silently cloning OpenAlice; managed
+  clone/update is restricted to the displayed destination and explicit plan;
+- installing optional additional Agent CLIs on a remote host; pinned managed
+  Pi is part of the visible baseline plan;
 - moving broker credentials, account state, or trading writes out of UTA.

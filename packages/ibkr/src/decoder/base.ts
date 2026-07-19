@@ -37,12 +37,13 @@ export class Decoder {
 
   /**
    * Dispatch a text-protocol message.
+   *
+   * `msgId` belongs to the wire envelope and has already been consumed by the
+   * client. `fields` must begin at the first payload field (usually a message
+   * version, request id, or business value), exactly as in the official API.
    * Mirrors: ibapi/decoder.py interpret()
    */
-  interpret(fields: string[], msgId?: number): void {
-    if (msgId === undefined) {
-      msgId = parseInt(fields[0] || '0', 10)
-    }
+  interpret(msgId: number, fields: readonly string[]): void {
     if (msgId === 0) return
 
     const handler = this.msgId2textHandler.get(msgId)
@@ -57,7 +58,9 @@ export class Decoder {
       if (e instanceof BadMessage) {
         this.wrapper.error(
           NO_VALID_ID, currentTimeMillis(),
-          BAD_MESSAGE.code(), BAD_MESSAGE.msg() + fields.join(','), '',
+          BAD_MESSAGE.code(),
+          `${BAD_MESSAGE.msg()} text msgId=${msgId}, fieldCount=${fields.length}`,
+          '',
         )
       }
       throw e

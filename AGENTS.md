@@ -56,8 +56,13 @@ for current ownership and entry points.
 ## Delivery and Branch Policy
 
 - `dev` is the integration lane. Routine PRs target `dev`.
+- `dev` is also the active preview channel: installer work must pass against
+  both the checked-out tree and the matching `raw/.../dev/install` +
+  `--branch dev` network path before promotion.
 - `master` is the stable/user-facing lane. Only human-directed promotions from
   `dev` and explicit emergency hotfixes target `master`.
+- A merge to `master` is a versioned release event, not a post-release staging
+  step. Stable CDN aliases are updated only from the resulting tag.
 - Do not commit directly to `master`. Avoid direct commits to `dev` unless the
   maintainer explicitly requests integration work.
 - Never force-push or delete `master` or `dev`.
@@ -198,6 +203,7 @@ Read the relevant guide before editing its subsystem:
 - [[docs/workspace-absorb.md]] — [Workspace Absorb](docs/workspace-absorb.md): directional
   Workspace consolidation, file collisions, archived source identity, and recovery.
 - [[docs/uta-live-testing.md]] — [UTA live testing](docs/uta-live-testing.md): broker/trading acceptance loops.
+- [[docs/ibkr-wire-protocol.md]] — [IBKR wire protocol](docs/ibkr-wire-protocol.md): TWS/Gateway inbound framing and decoder failure isolation.
 - [[docs/workspace-issues-and-scheduling.md]] — [Workspace issues and scheduling](docs/workspace-issues-and-scheduling.md): Issue board, schedules, headless runs, and Inbox delivery.
 - [[docs/conversation-provenance.md]] — [Workspace Session and artifact provenance](docs/conversation-provenance.md): `resumeId` identity, artifact trails, Issue responsibility, and the provenance-before-collaboration delivery order.
 - [[docs/event-system.md]] — [Event-system retirement note](docs/event-system.md): removed Alice event-bus scheduler; UTA journal utility only.

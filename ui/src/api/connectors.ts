@@ -59,8 +59,8 @@ export interface ConnectorSettingsSnapshot {
 }
 
 export const connectorsApi = {
-  load(): Promise<ConnectorSettingsSnapshot> {
-    return fetchJson('/api/connectors')
+  async load(): Promise<ConnectorSettingsSnapshot> {
+    return decodeConnectorSettingsSnapshot(await fetchJson<unknown>('/api/connectors'))
   },
   save(config: PublicConnectorConfig): Promise<{ config: PublicConnectorConfig }> {
     return fetchJson('/api/connectors', {
@@ -72,4 +72,93 @@ export const connectorsApi = {
   test(id: string): Promise<{ ok: boolean; probeId: string }> {
     return fetchJson(`/api/connectors/${encodeURIComponent(id)}/test`, { method: 'POST' })
   },
+}
+
+export function decodeConnectorSettingsSnapshot(value: unknown): ConnectorSettingsSnapshot {
+  if (!isRecord(value)
+    || !Array.isArray(value.definitions)
+    || !value.definitions.every(isConnectorDefinition)
+    || !isPublicConnectorConfig(value.config)
+    || !isConnectorHealth(value.health)) {
+    throw new Error('Invalid Connector settings response.')
+  }
+  return value as unknown as ConnectorSettingsSnapshot
+}
+
+function isConnectorDefinition(value: unknown): boolean {
+  return isRecord(value)
+    && typeof value.id === 'string'
+    && typeof value.label === 'string'
+    && typeof value.description === 'string'
+    && Array.isArray(value.fields)
+    && value.fields.every((field) => isRecord(field)
+      && typeof field.key === 'string'
+      && typeof field.label === 'string'
+      && isOneOf(field.kind, ['text', 'secret', 'number', 'boolean'])
+      && typeof field.required === 'boolean'
+      && isOptionalString(field.description)
+      && isOptionalString(field.placeholder)
+      && isOptionalString(field.learnedBy))
+    && Array.isArray(value.commands)
+    && value.commands.every((command) => isRecord(command)
+      && typeof command.name === 'string'
+      && typeof command.description === 'string')
+}
+
+function isPublicConnectorConfig(value: unknown): boolean {
+  return isRecord(value)
+    && typeof value.serviceEnabled === 'boolean'
+    && isRecord(value.adapters)
+    && Object.values(value.adapters).every((adapter) => isRecord(adapter)
+      && typeof adapter.enabled === 'boolean'
+      && isRecord(adapter.settings)
+      && Object.values(adapter.settings).every(isSettingValue)
+      && Array.isArray(adapter.configuredSecrets)
+      && adapter.configuredSecrets.every((key) => typeof key === 'string'))
+}
+
+function isConnectorHealth(value: unknown): boolean {
+  if (!isRecord(value)
+    || typeof value.enabled !== 'boolean'
+    || !isOneOf(value.status, ['disabled', 'healthy', 'degraded'])
+    || !isOptionalString(value.checkedAt)
+    || !isOptionalNumber(value.latencyMs)
+    || !isOptionalString(value.reason)
+    || !isOptionalString(value.lastAttemptAt)
+    || !isOptionalString(value.lastSuccessAt)
+    || !isOptionalString(value.lastError)) return false
+  if (value.service === undefined) return true
+  return isRecord(value.service)
+    && isOneOf(value.service.status, ['healthy', 'degraded'])
+    && typeof value.service.startedAt === 'string'
+    && Array.isArray(value.service.adapters)
+    && value.service.adapters.every((adapter) => isRecord(adapter)
+      && typeof adapter.id === 'string'
+      && typeof adapter.enabled === 'boolean'
+      && isOneOf(adapter.status, ['disabled', 'starting', 'awaiting_link', 'healthy', 'degraded', 'stopped'])
+      && isOptionalString(adapter.detail)
+      && isOptionalString(adapter.owner)
+      && isOptionalString(adapter.lastAttemptAt)
+      && isOptionalString(adapter.lastSuccessAt)
+      && isOptionalString(adapter.lastError))
+}
+
+function isSettingValue(value: unknown): value is string | number | boolean {
+  return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function isOptionalString(value: unknown): boolean {
+  return value === undefined || typeof value === 'string'
+}
+
+function isOptionalNumber(value: unknown): boolean {
+  return value === undefined || typeof value === 'number'
+}
+
+function isOneOf(value: unknown, options: readonly string[]): value is string {
+  return typeof value === 'string' && options.includes(value)
 }

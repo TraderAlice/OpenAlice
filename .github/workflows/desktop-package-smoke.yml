@@ -113,10 +113,10 @@ jobs:
         run: pnpm broker-packs:build
         timeout-minutes: 10
 
-      # Keep this until the Windows managed Git runtime fully replaces dugite's
-      # embedded payload. It catches a skipped dugite postinstall before a
-      # package artifact reaches a tester.
+      # macOS still uses dugite's embedded Git. Windows keeps only dugite's JS
+      # wrapper and routes it to managed PortableGit in the packaged smoke.
       - name: Verify bundled git (dugite) was fetched
+        if: runner.os == 'macOS'
         shell: bash
         run: |
           node -e "const{existsSync}=require('fs');const{dirname,join}=require('path');const g=join(dirname(require.resolve('dugite/package.json')),'git');if(!existsSync(g)){console.error('dugite embedded git MISSING at '+g);process.exit(1)}console.log('dugite embedded git OK '+g)"

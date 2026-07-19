@@ -32,7 +32,7 @@ export function SegmentedControl<T extends string>({
     <div
       role="group"
       aria-label={ariaLabel}
-      className={`scrollbar-hide flex w-fit max-w-full items-center gap-0.5 overflow-x-auto rounded-lg border border-border/70 bg-bg-tertiary/60 p-0.5 ${className}`}
+      className={`scrollbar-hide flex w-fit max-w-full items-center gap-0.5 overflow-x-auto rounded-lg border border-border/70 bg-muted/60 p-0.5 ${className}`}
     >
       {options.map((option) => {
         const active = option.value === value
@@ -47,8 +47,8 @@ export function SegmentedControl<T extends string>({
               compact ? 'min-h-6 px-2 text-[10px]' : 'min-h-7 px-2.5 text-[11px]'
             } ${
               active
-                ? 'bg-bg text-accent shadow-sm ring-1 ring-border/60'
-                : 'text-text-muted hover:bg-overlay hover:text-text'
+                ? 'bg-background text-primary shadow-sm ring-1 ring-border/60'
+                : 'text-muted-foreground hover:bg-accent hover:text-foreground'
             }`}
           >
             {option.label}

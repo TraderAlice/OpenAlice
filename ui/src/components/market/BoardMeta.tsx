@@ -20,11 +20,11 @@ export function BoardMeta({ meta, extra }: { meta: ReferenceMeta; extra?: string
     meta.cachedAt ? `cached: ${meta.cachedAt}` : null,
   ].filter(Boolean).join(' · ')
   return (
-    <span className="text-text-muted" title={detail}>
+    <span className="text-muted-foreground" title={detail}>
       {extra && <> · {extra}</>}
       {' · '}{sourceWord}
       {meta.stale && (
-        <span className="ml-1.5 rounded bg-amber-500/15 px-1 py-px text-[9px] uppercase tracking-wide text-amber-700 dark:text-amber-300">stale</span>
+        <span className="ml-1.5 rounded bg-warning/15 px-1 py-px text-[9px] uppercase tracking-wide text-warning">stale</span>
       )}
     </span>
   )

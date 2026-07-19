@@ -78,7 +78,7 @@ export function ContextMenu({ anchor, items, onClose }: ContextMenuProps) {
         top: pos.y,
         zIndex: 60,
       }}
-      className="oa-popover-enter min-w-[180px] py-1 bg-bg-secondary border border-border rounded-md shadow-xl"
+      className="oa-popover-enter min-w-[180px] py-1 bg-secondary border border-border rounded-md shadow-xl"
     >
       {items.map((item, i) => {
         if (item.kind === 'separator') {
@@ -86,8 +86,8 @@ export function ContextMenu({ anchor, items, onClose }: ContextMenuProps) {
         }
         const disabled = item.disabled === true
         const colorClass = item.danger
-          ? 'text-red hover:bg-red/10'
-          : 'text-text hover:bg-bg-tertiary'
+          ? 'text-destructive hover:bg-destructive/10'
+          : 'text-foreground hover:bg-muted'
         return (
           <button
             key={`item-${i}`}

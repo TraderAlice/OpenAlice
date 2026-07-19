@@ -1,6 +1,6 @@
 {
   "name": "open-alice",
-  "version": "0.81.0-beta",
+  "version": "0.83.0-beta",
   "description": "File-based trading agent engine",
   "type": "module",
   "main": "dist/electron/main.js",
@@ -11,6 +11,7 @@
     "docker:build": "docker build --tag openalice:local .",
     "docker:smoke": "node scripts/docker-runtime-smoke.mjs",
     "test:install:docker": "node scripts/install-docker-smoke.mjs",
+    "test:install:dev-channel": "node scripts/install-channel-smoke.mjs",
     "test:remote:docker": "node scripts/remote-ssh-smoke.mjs",
     "prebuild": "tsx scripts/build-migration-index.ts",
     "build": "turbo run build && tsup src/main.ts --format esm --dts",
@@ -71,6 +72,8 @@
     "@traderalice/ibkr": "workspace:*",
     "@traderalice/opentypebb": "workspace:*",
     "@traderalice/uta-protocol": "workspace:*",
+    "@xterm/addon-serialize": "0.15.0-beta.287",
+    "@xterm/headless": "6.1.0-beta.287",
     "ai": "^6.0.86",
     "chardet": "2.2.0",
     "cron-parser": "^5.6.1",
@@ -131,7 +134,10 @@
       "target": [
         "nsis"
       ],
-      "icon": "apps/desktop/build/icon.ico"
+      "icon": "apps/desktop/build/icon.ico",
+      "files": [
+        "!node_modules/dugite/git/**"
+      ]
     },
     "nsis": {
       "oneClick": false,

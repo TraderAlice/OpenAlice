@@ -14,6 +14,13 @@ export const demoCredentialPresets = [
       apiKeyHelp: 'Use a key from Anthropic Console. Claude Pro/Max is a separate Claude Code login.',
       modelHelp: 'Choose an Anthropic API model ID, or paste another exact ID.',
     },
+    models: [
+      { id: 'claude-fable-5', label: 'Claude Fable 5 (Highest capability)', semantics: { contextWindow: 1_000_000, reasoning: { mode: 'required', efforts: ['low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'high' } } },
+      { id: 'claude-opus-4-8', label: 'Claude Opus 4.8 (Complex agents)', semantics: { contextWindow: 1_000_000, reasoning: { mode: 'adaptive', efforts: ['low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'high', interleaved: true } } },
+      { id: 'claude-sonnet-5', label: 'Claude Sonnet 5 (Balanced)', semantics: { contextWindow: 1_000_000, reasoning: { mode: 'adaptive', efforts: ['low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'high', interleaved: true } } },
+      { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5 (Fastest)', semantics: { contextWindow: 200_000, reasoning: { mode: 'optional', interleaved: true } } },
+      { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6 (Previous generation)', semantics: { contextWindow: 1_000_000, reasoning: { mode: 'adaptive', efforts: ['low', 'medium', 'high', 'max'], defaultEffort: 'high', interleaved: true } } },
+    ],
     schema: {
       type: 'object',
       properties: {
@@ -45,6 +52,13 @@ export const demoCredentialPresets = [
       apiKeyHelp: 'Use an OpenAI Platform API key. A ChatGPT subscription is a separate Codex CLI login.',
       modelHelp: 'Choose a model enabled for this API project, or paste another exact ID.',
     },
+    models: [
+      { id: 'gpt-5.6', label: 'GPT 5.6 (Sol alias)', semantics: { contextWindow: 1_050_000, maxOutputTokens: 128_000, reasoning: { mode: 'optional', efforts: ['none', 'low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'medium' } } },
+      { id: 'gpt-5.6-terra', label: 'GPT 5.6 Terra (Balanced)', semantics: { contextWindow: 1_050_000, maxOutputTokens: 128_000, reasoning: { mode: 'optional', efforts: ['none', 'low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'medium' } } },
+      { id: 'gpt-5.6-luna', label: 'GPT 5.6 Luna (Cost-efficient)', semantics: { contextWindow: 1_050_000, maxOutputTokens: 128_000, reasoning: { mode: 'optional', efforts: ['none', 'low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'medium' } } },
+      { id: 'gpt-5.5', label: 'GPT 5.5 (Previous generation)', semantics: { contextWindow: 1_050_000, maxOutputTokens: 128_000, reasoning: { mode: 'optional', efforts: ['none', 'low', 'medium', 'high', 'xhigh'], defaultEffort: 'medium' } } },
+      { id: 'gpt-5.4', label: 'GPT 5.4 (Previous generation)', semantics: { contextWindow: 1_050_000, maxOutputTokens: 128_000, reasoning: { mode: 'optional', efforts: ['none', 'low', 'medium', 'high', 'xhigh'], defaultEffort: 'none' } } },
+    ],
     schema: {
       type: 'object',
       properties: {
@@ -77,6 +91,14 @@ export const demoCredentialPresets = [
       apiKeyHelp: 'Use a Gemini API key from Google AI Studio. AQ and AIza keys are supported.',
       modelHelp: 'Choose a Gemini model exposed by Google’s native API.',
     },
+    models: [
+      { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash (Stable)', semantics: { contextWindow: 1_048_576, maxOutputTokens: 65_536, reasoning: { mode: 'adaptive', efforts: ['minimal', 'low', 'medium', 'high'], defaultEffort: 'medium' } } },
+      { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro (Preview, paid)', semantics: { contextWindow: 1_048_576, maxOutputTokens: 65_536, reasoning: { mode: 'adaptive', efforts: ['low', 'medium', 'high'], defaultEffort: 'high' } } },
+      { id: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash-Lite (Stable)', semantics: { contextWindow: 1_048_576, maxOutputTokens: 65_536, reasoning: { mode: 'adaptive', efforts: ['minimal', 'low', 'medium', 'high'], defaultEffort: 'minimal' } } },
+      { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (Previous generation)', semantics: { contextWindow: 1_048_576, reasoning: { mode: 'required' } } },
+      { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (Previous generation)', semantics: { contextWindow: 1_048_576, reasoning: { mode: 'optional' } } },
+      { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite (Previous generation)', semantics: { contextWindow: 1_048_576, reasoning: { mode: 'optional' } } },
+    ],
     schema: {
       type: 'object',
       properties: {
@@ -126,7 +148,6 @@ export const configKeysHandlers = [
       aiProvider: { apiKeys: {}, profiles: {}, activeProfile: '' },
       engine: {},
       agent: { allowAiTrading: false, claudeCode: {} },
-      compaction: { maxContextTokens: 0, maxOutputTokens: 0 },
       snapshot: { enabled: false, every: '1h' },
       trading: { observeExternalOrdersEvery: '15m' },
       mcp: { enabled: false, port: 47332 },
@@ -170,14 +191,12 @@ export const configKeysHandlers = [
         opencode: ['anthropic-1', 'openai-1'],
         pi: ['anthropic-1', 'openai-1'],
       },
-      contextWindow: 256_000,
     }),
   ),
   http.put('/api/config/workspace-credential-defaults', async ({ request }) => {
-    const body = (await request.json().catch(() => ({}))) as { defaults?: unknown; contextWindow?: unknown }
+    const body = (await request.json().catch(() => ({}))) as { defaults?: unknown }
     return HttpResponse.json({
       defaults: body.defaults ?? {},
-      contextWindow: typeof body.contextWindow === 'number' ? body.contextWindow : 256_000,
     })
   }),
 

@@ -63,7 +63,7 @@ describe('buildSpawnEnv', () => {
     }
   })
 
-  it('strips launcher-owned tool/MCP env from the parent and only trusts extras', () => {
+  it('strips launcher-owned tool/MCP and stale terminal color env from the parent', () => {
     const out = buildSpawnEnv(
       {
         OPENALICE_MCP_URL: 'http://stale/mcp',
@@ -76,16 +76,14 @@ describe('buildSpawnEnv', () => {
       {
         OPENALICE_TOOL_URL: '/cli',
         OPENALICE_TOOL_SOCKET: '/tmp/current.sock',
-        OPENALICE_TERMINAL_THEME: 'dark',
-        COLORFGBG: '15;0',
       },
     )
     expect(out['OPENALICE_MCP_URL']).toBeUndefined()
     expect(out['OPENCODE_CONFIG_CONTENT']).toBeUndefined()
     expect(out['OPENALICE_TOOL_URL']).toBe('/cli')
     expect(out['OPENALICE_TOOL_SOCKET']).toBe('/tmp/current.sock')
-    expect(out['OPENALICE_TERMINAL_THEME']).toBe('dark')
-    expect(out['COLORFGBG']).toBe('15;0')
+    expect(out['OPENALICE_TERMINAL_THEME']).toBeUndefined()
+    expect(out['COLORFGBG']).toBeUndefined()
   })
 
   it('defaults terminal locale to UTF-8 without overriding explicit locale', () => {
@@ -98,6 +96,29 @@ describe('buildSpawnEnv', () => {
 
     const lcAll = buildSpawnEnv({ LC_ALL: 'C.UTF-8' })
     expect(lcAll['LC_CTYPE']).toBeUndefined()
+  })
+
+  it('drops inherited color-disable switches without erasing explicit color preferences', () => {
+    const inherited = buildSpawnEnv({
+      NO_COLOR: '1',
+      FORCE_COLOR: '0',
+      CLICOLOR: '0',
+    })
+    expect(inherited['NO_COLOR']).toBeUndefined()
+    expect(inherited['FORCE_COLOR']).toBeUndefined()
+    expect(inherited['CLICOLOR']).toBeUndefined()
+
+    const enabled = buildSpawnEnv({ FORCE_COLOR: '3', CLICOLOR: '1' })
+    expect(enabled['FORCE_COLOR']).toBe('3')
+    expect(enabled['CLICOLOR']).toBe('1')
+
+    const explicit = buildSpawnEnv(
+      { NO_COLOR: '1', FORCE_COLOR: '0', CLICOLOR: '0' },
+      { FORCE_COLOR: '2', CLICOLOR: '1' },
+    )
+    expect(explicit['NO_COLOR']).toBeUndefined()
+    expect(explicit['FORCE_COLOR']).toBe('2')
+    expect(explicit['CLICOLOR']).toBe('1')
   })
 
   it.skipIf(process.platform === 'win32')('adds common user CLI bins missing from GUI app PATH', () => {

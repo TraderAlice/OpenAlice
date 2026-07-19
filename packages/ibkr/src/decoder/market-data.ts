@@ -36,7 +36,6 @@ export function applyMarketDataHandlers(decoder: Decoder): void {
 
   // IN.TICK_PRICE (1)
   decoder.registerText(IN.TICK_PRICE, (d, fields) => {
-    decodeInt(fields) // msgId
     decodeInt(fields) // version
 
     const reqId = decodeInt(fields)
@@ -82,7 +81,6 @@ export function applyMarketDataHandlers(decoder: Decoder): void {
 
   // IN.TICK_SIZE (2)
   decoder.registerText(IN.TICK_SIZE, (d, fields) => {
-    decodeInt(fields) // msgId
     decodeInt(fields) // version
 
     const reqId = decodeInt(fields)
@@ -96,7 +94,6 @@ export function applyMarketDataHandlers(decoder: Decoder): void {
 
   // IN.TICK_OPTION_COMPUTATION (21)
   decoder.registerText(IN.TICK_OPTION_COMPUTATION, (d, fields) => {
-    decodeInt(fields) // msgId
     let version = d.serverVersion
     let tickAttrib = 0
     let optPrice: number | null = null
@@ -156,7 +153,6 @@ export function applyMarketDataHandlers(decoder: Decoder): void {
 
   // IN.TICK_GENERIC (45)
   decoder.registerText(IN.TICK_GENERIC, (d, fields) => {
-    decodeInt(fields) // msgId
     decodeInt(fields) // version
     const reqId = decodeInt(fields)
     const tickType = decodeInt(fields)
@@ -166,7 +162,6 @@ export function applyMarketDataHandlers(decoder: Decoder): void {
 
   // IN.TICK_STRING (46)
   decoder.registerText(IN.TICK_STRING, (d, fields) => {
-    decodeInt(fields) // msgId
     decodeInt(fields) // version
     const reqId = decodeInt(fields)
     const tickType = decodeInt(fields)
@@ -176,7 +171,6 @@ export function applyMarketDataHandlers(decoder: Decoder): void {
 
   // IN.TICK_EFP (47) — text only, no proto
   decoder.registerText(IN.TICK_EFP, (d, fields) => {
-    decodeInt(fields) // msgId
     decodeInt(fields) // version
     const reqId = decodeInt(fields)
     const tickType = decodeInt(fields)
@@ -196,7 +190,6 @@ export function applyMarketDataHandlers(decoder: Decoder): void {
 
   // IN.TICK_SNAPSHOT_END (57)
   decoder.registerText(IN.TICK_SNAPSHOT_END, (d, fields) => {
-    decodeInt(fields) // msgId
     decodeInt(fields) // version
     const reqId = decodeInt(fields)
     d.wrapper.tickSnapshotEnd(reqId)
@@ -204,7 +197,6 @@ export function applyMarketDataHandlers(decoder: Decoder): void {
 
   // IN.MARKET_DATA_TYPE (58)
   decoder.registerText(IN.MARKET_DATA_TYPE, (d, fields) => {
-    decodeInt(fields) // msgId (version)
     decodeInt(fields) // version
     const reqId = decodeInt(fields)
     const marketDataType = decodeInt(fields)
@@ -213,7 +205,6 @@ export function applyMarketDataHandlers(decoder: Decoder): void {
 
   // IN.TICK_REQ_PARAMS (81)
   decoder.registerText(IN.TICK_REQ_PARAMS, (d, fields) => {
-    decodeInt(fields) // msgId
     const tickerId = decodeInt(fields)
     const minTick = decodeFloat(fields)
     const bboExchange = decodeStr(fields)
@@ -223,7 +214,6 @@ export function applyMarketDataHandlers(decoder: Decoder): void {
 
   // IN.MARKET_DEPTH (12)
   decoder.registerText(IN.MARKET_DEPTH, (d, fields) => {
-    decodeInt(fields) // msgId
     decodeInt(fields) // version
     const reqId = decodeInt(fields)
 
@@ -238,7 +228,6 @@ export function applyMarketDataHandlers(decoder: Decoder): void {
 
   // IN.MARKET_DEPTH_L2 (13)
   decoder.registerText(IN.MARKET_DEPTH_L2, (d, fields) => {
-    decodeInt(fields) // msgId
     decodeInt(fields) // version
     const reqId = decodeInt(fields)
 
@@ -261,7 +250,6 @@ export function applyMarketDataHandlers(decoder: Decoder): void {
 
   // IN.REROUTE_MKT_DATA_REQ (91)
   decoder.registerText(IN.REROUTE_MKT_DATA_REQ, (d, fields) => {
-    decodeInt(fields) // msgId
     const reqId = decodeInt(fields)
     const conId = decodeInt(fields)
     const exchange = decodeStr(fields)
@@ -270,7 +258,6 @@ export function applyMarketDataHandlers(decoder: Decoder): void {
 
   // IN.REROUTE_MKT_DEPTH_REQ (92)
   decoder.registerText(IN.REROUTE_MKT_DEPTH_REQ, (d, fields) => {
-    decodeInt(fields) // msgId
     const reqId = decodeInt(fields)
     const conId = decodeInt(fields)
     const exchange = decodeStr(fields)

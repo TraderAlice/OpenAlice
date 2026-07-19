@@ -105,11 +105,11 @@ function SnapshotsTab() {
       <div className="max-w-[900px] space-y-4">
         {/* Account selector */}
         <div className="flex items-center gap-3">
-          <label className="text-[13px] text-text-muted">Account:</label>
+          <label className="text-[13px] text-muted-foreground">Account:</label>
           <select
             value={selectedAccount}
             onChange={e => setSelectedAccount(e.target.value)}
-            className="text-[13px] px-2 py-1.5 rounded-md border border-border bg-bg text-text"
+            className="text-[13px] px-2 py-1.5 rounded-md border border-border bg-background text-foreground"
           >
             {accounts.map(a => (
               <option key={a.id} value={a.id}>{a.label} ({a.id})</option>
@@ -117,11 +117,11 @@ function SnapshotsTab() {
           </select>
           <button
             onClick={loadSnapshots}
-            className="text-[13px] px-2.5 py-1.5 rounded-md border border-border hover:bg-bg-tertiary transition-colors text-text-muted"
+            className="text-[13px] px-2.5 py-1.5 rounded-md border border-border hover:bg-muted transition-colors text-muted-foreground"
           >
             Refresh
           </button>
-          <span className="text-[11px] text-text-muted/50">{snapshots.length} snapshots</span>
+          <span className="text-[11px] text-muted-foreground/50">{snapshots.length} snapshots</span>
         </div>
 
         {/* Snapshots table */}
@@ -133,7 +133,7 @@ function SnapshotsTab() {
           <div className="border border-border rounded-lg overflow-hidden">
             <table className="w-full text-[13px]">
               <thead>
-                <tr className="bg-bg-secondary text-text-muted text-left text-[11px] uppercase tracking-wide">
+                <tr className="bg-secondary text-muted-foreground text-left text-[11px] uppercase tracking-wide">
                   <th className="px-3 py-2 font-medium">Timestamp</th>
                   <th className="px-3 py-2 font-medium">Trigger</th>
                   <th className="px-3 py-2 font-medium text-center">Health</th>
@@ -168,41 +168,41 @@ function SnapshotRow({ snapshot: s, expanded, onToggle, onDelete }: {
   onDelete: () => void
 }) {
   const [confirming, setConfirming] = useState(false)
-  const healthColor = s.health === 'healthy' ? 'bg-green' : s.health === 'degraded' ? 'bg-yellow-400' : 'bg-red'
+  const healthColor = s.health === 'healthy' ? 'bg-success' : s.health === 'degraded' ? 'bg-warning' : 'bg-destructive'
 
   return (
     <>
       <tr
-        className="border-t border-border hover:bg-bg-tertiary/30 transition-colors cursor-pointer"
+        className="border-t border-border hover:bg-muted/30 transition-colors cursor-pointer"
         onClick={onToggle}
       >
-        <td className="px-3 py-2 font-mono text-[11px] text-text">
+        <td className="px-3 py-2 font-mono text-[11px] text-foreground">
           {new Date(s.timestamp).toLocaleString()}
         </td>
         <td className="px-3 py-2">
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-bg-tertiary text-text-muted">{s.trigger}</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{s.trigger}</span>
         </td>
         <td className="px-3 py-2 text-center">
           <div className={`w-2 h-2 rounded-full ${healthColor} mx-auto`} />
         </td>
-        <td className="px-3 py-2 text-right text-text">{s.positions.length}</td>
-        <td className="px-3 py-2 text-right text-text tabular-nums">
+        <td className="px-3 py-2 text-right text-foreground">{s.positions.length}</td>
+        <td className="px-3 py-2 text-right text-foreground tabular-nums">
           ${Number(s.account.netLiquidation).toLocaleString(getIntlLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </td>
         <td className="px-3 py-2 text-right" onClick={e => e.stopPropagation()}>
           {confirming ? (
             <div className="flex gap-1 justify-end">
-              <button onClick={onDelete} className="text-[11px] px-2 py-0.5 rounded bg-red/15 text-red hover:bg-red/25 transition-colors">
+              <button onClick={onDelete} className="text-[11px] px-2 py-0.5 rounded bg-destructive/15 text-destructive hover:bg-destructive/25 transition-colors">
                 Confirm
               </button>
-              <button onClick={() => setConfirming(false)} className="text-[11px] px-2 py-0.5 rounded bg-bg-tertiary text-text-muted hover:bg-bg-tertiary/80 transition-colors">
+              <button onClick={() => setConfirming(false)} className="text-[11px] px-2 py-0.5 rounded bg-muted text-muted-foreground hover:bg-muted/80 transition-colors">
                 Cancel
               </button>
             </div>
           ) : (
             <button
               onClick={() => setConfirming(true)}
-              className="text-[11px] px-2 py-0.5 rounded text-text-muted hover:text-red hover:bg-red/10 transition-colors"
+              className="text-[11px] px-2 py-0.5 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
             >
               Delete
             </button>
@@ -211,19 +211,19 @@ function SnapshotRow({ snapshot: s, expanded, onToggle, onDelete }: {
       </tr>
       {expanded && (
         <tr className="border-t border-border/50">
-          <td colSpan={6} className="px-3 py-3 bg-bg-secondary/50">
+          <td colSpan={6} className="px-3 py-3 bg-secondary/50">
             <div className="space-y-2">
               {/* Account metrics */}
               <div className="flex gap-4 text-[11px]">
-                <span className="text-text-muted">Cash: <span className="text-text">${Number(s.account.totalCashValue).toLocaleString(getIntlLocale(), { minimumFractionDigits: 2 })}</span></span>
-                <span className="text-text-muted">Unrealized PnL: <span className={Number(s.account.unrealizedPnL) >= 0 ? 'text-green' : 'text-red'}>{Number(s.account.unrealizedPnL) >= 0 ? '+' : ''}${Number(s.account.unrealizedPnL).toLocaleString(getIntlLocale(), { minimumFractionDigits: 2 })}</span></span>
-                {s.account.baseCurrency && <span className="text-text-muted">Base: <span className="text-text">{s.account.baseCurrency}</span></span>}
+                <span className="text-muted-foreground">Cash: <span className="text-foreground">${Number(s.account.totalCashValue).toLocaleString(getIntlLocale(), { minimumFractionDigits: 2 })}</span></span>
+                <span className="text-muted-foreground">Unrealized PnL: <span className={Number(s.account.unrealizedPnL) >= 0 ? 'text-success' : 'text-destructive'}>{Number(s.account.unrealizedPnL) >= 0 ? '+' : ''}${Number(s.account.unrealizedPnL).toLocaleString(getIntlLocale(), { minimumFractionDigits: 2 })}</span></span>
+                {s.account.baseCurrency && <span className="text-muted-foreground">Base: <span className="text-foreground">{s.account.baseCurrency}</span></span>}
               </div>
               {/* Positions detail */}
               {s.positions.length > 0 && (
                 <table className="w-full text-[11px]">
                   <thead>
-                    <tr className="text-text-muted text-left">
+                    <tr className="text-muted-foreground text-left">
                       <th className="pr-3 pb-1 font-medium">Symbol</th>
                       <th className="pr-3 pb-1 font-medium text-center">Ccy</th>
                       <th className="pr-3 pb-1 font-medium text-right">Qty</th>
@@ -238,14 +238,14 @@ function SnapshotRow({ snapshot: s, expanded, onToggle, onDelete }: {
                       const sym = p.aliceId.split('|').pop() ?? p.aliceId
                       const pnl = Number(p.unrealizedPnL)
                       return (
-                        <tr key={j} className="text-text">
+                        <tr key={j} className="text-foreground">
                           <td className="pr-3 py-0.5 font-medium">{sym}</td>
-                          <td className="pr-3 py-0.5 text-center text-text-muted">{p.currency}</td>
+                          <td className="pr-3 py-0.5 text-center text-muted-foreground">{p.currency}</td>
                           <td className="pr-3 py-0.5 text-right tabular-nums">{p.quantity}</td>
-                          <td className="pr-3 py-0.5 text-right tabular-nums text-text-muted">{Number(p.avgCost).toFixed(2)}</td>
+                          <td className="pr-3 py-0.5 text-right tabular-nums text-muted-foreground">{Number(p.avgCost).toFixed(2)}</td>
                           <td className="pr-3 py-0.5 text-right tabular-nums">{Number(p.marketPrice).toFixed(2)}</td>
                           <td className="pr-3 py-0.5 text-right tabular-nums">{Number(p.marketValue).toFixed(2)}</td>
-                          <td className={`pr-3 py-0.5 text-right tabular-nums font-medium ${pnl >= 0 ? 'text-green' : 'text-red'}`}>
+                          <td className={`pr-3 py-0.5 text-right tabular-nums font-medium ${pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
                             {pnl >= 0 ? '+' : ''}{pnl.toFixed(2)}
                           </td>
                         </tr>
@@ -255,7 +255,7 @@ function SnapshotRow({ snapshot: s, expanded, onToggle, onDelete }: {
                 </table>
               )}
               {s.positions.length === 0 && (
-                <p className="text-[11px] text-text-muted">No positions in this snapshot.</p>
+                <p className="text-[11px] text-muted-foreground">No positions in this snapshot.</p>
               )}
             </div>
           </td>
@@ -331,7 +331,7 @@ function ToolsTab() {
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             placeholder="Filter tools..."
-            className="w-full px-2.5 py-1.5 bg-bg text-text border border-border rounded-md text-xs outline-none focus:border-accent"
+            className="w-full px-2.5 py-1.5 bg-background text-foreground border border-border rounded-md text-xs outline-none focus:border-primary"
           />
         </div>
         <div className="flex-1 overflow-y-auto px-1 pb-3">
@@ -339,11 +339,11 @@ function ToolsTab() {
             <div key={group} className="mb-1">
               <button
                 onClick={() => toggleGroup(group)}
-                className="w-full flex items-center gap-1.5 px-2 py-1 text-xs text-text-muted hover:text-text transition-colors"
+                className="w-full flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
               >
                 <span className="text-[10px]">{expandedGroups.has(group) ? '\u25BC' : '\u25B6'}</span>
                 <span className="font-semibold uppercase tracking-wider">{group}</span>
-                <span className="text-text-muted/50">({tools.length})</span>
+                <span className="text-muted-foreground/50">({tools.length})</span>
               </button>
               {expandedGroups.has(group) && (
                 <div className="ml-2">
@@ -353,8 +353,8 @@ function ToolsTab() {
                       onClick={() => selectTool(t.name)}
                       className={`w-full text-left px-2 py-1 text-xs rounded transition-colors ${
                         selected === t.name
-                          ? 'bg-accent/10 text-accent'
-                          : 'text-text hover:bg-bg-tertiary/50'
+                          ? 'bg-primary/10 text-primary'
+                          : 'text-foreground hover:bg-muted/50'
                       }`}
                     >
                       {t.name}
@@ -370,7 +370,7 @@ function ToolsTab() {
       {/* Right: Detail + Execute + Result (independent scroll) */}
       <div className="flex-1 overflow-y-auto min-h-0 px-5 py-4">
         {!selected ? (
-          <div className="flex items-center justify-center h-full text-text-muted text-sm">
+          <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
             Select a tool from the left panel.
           </div>
         ) : loadingDetail ? (
@@ -378,7 +378,7 @@ function ToolsTab() {
         ) : detail ? (
           <ToolExecutePanel detail={detail} result={result} onResult={setResult} />
         ) : (
-          <p className="text-sm text-text-muted">Failed to load tool details.</p>
+          <p className="text-sm text-muted-foreground">Failed to load tool details.</p>
         )}
       </div>
     </div>
@@ -472,27 +472,27 @@ function ToolExecutePanel({ detail, result, onResult }: ToolExecutePanelProps) {
     <div className="space-y-5">
       {/* Header */}
       <div>
-        <h2 className="text-base font-semibold text-text">{detail.name}</h2>
-        {detail.group && <span className="text-xs text-text-muted uppercase tracking-wider">{detail.group}</span>}
-        <p className="text-sm text-text-muted mt-1">{detail.description}</p>
+        <h2 className="text-base font-semibold text-foreground">{detail.name}</h2>
+        {detail.group && <span className="text-xs text-muted-foreground uppercase tracking-wider">{detail.group}</span>}
+        <p className="text-sm text-muted-foreground mt-1">{detail.description}</p>
       </div>
 
       {/* Input form */}
       {properties.length > 0 && (
         <div className="space-y-3">
-          <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider">Input</h3>
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Input</h3>
           {properties.map((prop) => (
             <div key={prop.key}>
-              <label className="flex items-center gap-1.5 text-[13px] text-text mb-1">
+              <label className="flex items-center gap-1.5 text-[13px] text-foreground mb-1">
                 <span className="font-mono">{prop.key}</span>
-                <span className="text-[10px] text-text-muted/60">{prop.type}</span>
-                {prop.required && <span className="text-[10px] text-accent/70">required</span>}
+                <span className="text-[10px] text-muted-foreground/60">{prop.type}</span>
+                {prop.required && <span className="text-[10px] text-primary/70">required</span>}
               </label>
               {prop.type === 'boolean' ? (
                 <select
                   value={inputs[prop.key] ?? ''}
                   onChange={(e) => setInputs((prev) => ({ ...prev, [prop.key]: e.target.value }))}
-                  className="px-2.5 py-1.5 bg-bg text-text border border-border rounded-md text-xs outline-none focus:border-accent"
+                  className="px-2.5 py-1.5 bg-background text-foreground border border-border rounded-md text-xs outline-none focus:border-primary"
                 >
                   <option value="">-</option>
                   <option value="true">true</option>
@@ -504,11 +504,11 @@ function ToolExecutePanel({ detail, result, onResult }: ToolExecutePanelProps) {
                   value={inputs[prop.key] ?? ''}
                   onChange={(e) => setInputs((prev) => ({ ...prev, [prop.key]: e.target.value }))}
                   placeholder={prop.description || prop.key}
-                  className="w-full px-2.5 py-1.5 bg-bg text-text border border-border rounded-md text-xs font-mono outline-none focus:border-accent"
+                  className="w-full px-2.5 py-1.5 bg-background text-foreground border border-border rounded-md text-xs font-mono outline-none focus:border-primary"
                 />
               )}
               {prop.description && (
-                <p className="text-[11px] text-text-muted/60 mt-0.5">{prop.description}</p>
+                <p className="text-[11px] text-muted-foreground/60 mt-0.5">{prop.description}</p>
               )}
             </div>
           ))}
@@ -528,12 +528,12 @@ function ToolExecutePanel({ detail, result, onResult }: ToolExecutePanelProps) {
       {result && result.name === detail.name && (
         <div className="mt-4">
           <div className="flex items-center gap-2 mb-2">
-            <span className={`text-xs font-semibold ${result.data.isError ? 'text-red' : 'text-green'}`}>
+            <span className={`text-xs font-semibold ${result.data.isError ? 'text-destructive' : 'text-success'}`}>
               {result.data.isError ? 'ERROR' : 'OK'}
             </span>
-            <span className="text-xs text-text-muted">{result.durationMs}ms</span>
+            <span className="text-xs text-muted-foreground">{result.durationMs}ms</span>
           </div>
-          <pre className="bg-bg border border-border/60 rounded-lg p-3 text-xs font-mono text-text overflow-x-auto max-h-[400px] overflow-y-auto whitespace-pre-wrap">
+          <pre className="bg-background border border-border/60 rounded-lg p-3 text-xs font-mono text-foreground overflow-x-auto max-h-[400px] overflow-y-auto whitespace-pre-wrap">
             {result.data.content.map((c) => c.text ?? JSON.stringify(c)).join('\n')}
           </pre>
         </div>

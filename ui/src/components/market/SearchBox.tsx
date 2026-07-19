@@ -4,19 +4,19 @@ import { type BarSourceCandidate, type AssetClass } from '../../api/market'
 import { useAssetSearch } from './useAssetSearch'
 
 const ASSET_CLASS_COLORS: Record<string, string> = {
-  equity: 'bg-accent/15 text-accent',
-  crypto: 'bg-amber-500/15 text-amber-400',
-  currency: 'bg-green/15 text-green',
-  commodity: 'bg-purple-500/15 text-purple-400',
-  unknown: 'bg-bg-tertiary text-text-muted',
+  equity: 'bg-primary/15 text-primary',
+  crypto: 'bg-warning/15 text-warning',
+  currency: 'bg-success/15 text-success',
+  commodity: 'bg-ai-action/15 text-ai-action',
+  unknown: 'bg-muted text-muted-foreground',
 }
 
 const CAPABILITY_COLOR: Record<string, string> = {
-  realtime: 'text-green',
-  iex: 'text-accent',
-  delayed: 'text-text-muted',
-  subscription: 'text-amber-400',
-  free: 'text-text-muted',
+  realtime: 'text-success',
+  iex: 'text-primary',
+  delayed: 'text-muted-foreground',
+  subscription: 'text-warning',
+  free: 'text-muted-foreground',
 }
 
 export function SearchBox() {
@@ -75,7 +75,7 @@ export function SearchBox() {
   return (
     <div ref={containerRef} className="relative">
       <input
-        className="w-full px-3 py-2 text-[14px] bg-bg-secondary border border-border rounded-md focus:outline-none focus:border-accent placeholder:text-text-muted/50"
+        className="w-full px-3 py-2 text-[14px] bg-secondary border border-border rounded-md focus:outline-none focus:border-primary placeholder:text-muted-foreground/50"
         placeholder="Search assets — AAPL, bitcoin, EUR, gold…"
         value={query}
         onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
@@ -83,12 +83,12 @@ export function SearchBox() {
         onKeyDown={onKey}
       />
       {open && query.trim() && (
-        <div className="absolute z-20 mt-1 w-full bg-bg-secondary border border-border rounded-md shadow-lg max-h-[360px] overflow-y-auto">
+        <div className="absolute z-20 mt-1 w-full bg-secondary border border-border rounded-md shadow-lg max-h-[360px] overflow-y-auto">
           {loading && results.length === 0 && (
-            <div className="px-3 py-2 text-[13px] text-text-muted">Searching…</div>
+            <div className="px-3 py-2 text-[13px] text-muted-foreground">Searching…</div>
           )}
           {!loading && results.length === 0 && (
-            <div className="px-3 py-2 text-[13px] text-text-muted">No matches</div>
+            <div className="px-3 py-2 text-[13px] text-muted-foreground">No matches</div>
           )}
           {results.map((r, i) => (
             <button
@@ -96,18 +96,18 @@ export function SearchBox() {
               onClick={() => handleSelect(r)}
               onMouseEnter={() => setHighlight(i)}
               className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[13px] cursor-pointer transition-colors ${
-                i === highlight ? 'bg-bg-tertiary' : ''
+                i === highlight ? 'bg-muted' : ''
               }`}
             >
-              <span className="font-mono font-semibold text-text shrink-0">{r.symbol}</span>
+              <span className="font-mono font-semibold text-foreground shrink-0">{r.symbol}</span>
               {r.name && (
-                <span className="text-text-muted truncate flex-1 min-w-0">— {r.name}</span>
+                <span className="text-muted-foreground truncate flex-1 min-w-0">— {r.name}</span>
               )}
               {/* Explicit provider — this is how same-symbol sources are disambiguated. */}
-              <span className="ml-auto flex items-center gap-1 shrink-0 text-[11px] text-text-muted">
-                <span className="font-medium text-text/80">{r.sourceId}</span>
+              <span className="ml-auto flex items-center gap-1 shrink-0 text-[11px] text-muted-foreground">
+                <span className="font-medium text-foreground/80">{r.sourceId}</span>
                 {r.barCapability && (
-                  <span className={CAPABILITY_COLOR[r.barCapability] ?? 'text-text-muted'}>· {r.barCapability}</span>
+                  <span className={CAPABILITY_COLOR[r.barCapability] ?? 'text-muted-foreground'}>· {r.barCapability}</span>
                 )}
               </span>
               <span className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded font-medium shrink-0 ${ASSET_CLASS_COLORS[r.assetClass] ?? ASSET_CLASS_COLORS.unknown}`}>

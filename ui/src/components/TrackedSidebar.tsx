@@ -50,9 +50,9 @@ export function TrackedSidebar() {
 
   if (entities.length === 0) {
     return (
-      <div className="px-3 py-4 text-[12px] text-text-muted/70 leading-relaxed">
+      <div className="px-3 py-4 text-[12px] text-muted-foreground/70 leading-relaxed">
         {t('tracked.nothingTrackedYet')}
-        <div className="mt-1 text-text-muted/50">
+        <div className="mt-1 text-muted-foreground/50">
           Agents register assets &amp; topics with the{' '}
           <code className="text-[11px]">entity_upsert</code> tool, then link to them with{' '}
           <code className="text-[11px]">[[name]]</code> in their notes.
@@ -107,7 +107,7 @@ export function TrackedSidebar() {
 
 function SectionCount({ count }: { count: number }) {
   return (
-    <span className="rounded-full bg-bg-tertiary px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-text-muted/65">
+    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground/65">
       {count}
     </span>
   )
@@ -140,13 +140,13 @@ function TrackedEntityRow({
       }}
       className={`group relative mb-0.5 grid min-h-[38px] grid-cols-[24px_minmax(0,1fr)_auto] items-center gap-2 rounded-md px-2.5 py-1.5 outline-none transition-colors ${
         active
-          ? 'bg-accent-dim text-text shadow-[inset_2px_0_0_var(--color-accent)]'
-          : 'text-text-muted hover:bg-overlay hover:text-text focus-visible:bg-overlay'
+          ? 'bg-primary-muted text-foreground shadow-[inset_2px_0_0_var(--primary)]'
+          : 'text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:bg-accent'
       }`}
     >
       <span
         className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
-          active ? 'bg-bg/60 text-accent' : 'bg-bg-tertiary/55 text-text-muted/70 group-hover:text-text-muted'
+          active ? 'bg-background/60 text-primary' : 'bg-muted/55 text-muted-foreground/70 group-hover:text-muted-foreground'
         }`}
         aria-hidden
       >
@@ -156,15 +156,15 @@ function TrackedEntityRow({
       <span className="min-w-0">
         {display.prefix ? (
           <span className="flex min-w-0 items-baseline gap-1.5">
-            <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-text-muted/55">
+            <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/55">
               {display.prefix}
             </span>
-            <span className={`truncate text-[12.5px] ${active ? 'font-semibold text-text' : 'font-medium'}`}>
+            <span className={`truncate text-[12.5px] ${active ? 'font-semibold text-foreground' : 'font-medium'}`}>
               {display.rest}
             </span>
           </span>
         ) : (
-          <span className={`block truncate text-[12.5px] ${active ? 'font-semibold text-text' : 'font-medium'}`}>
+          <span className={`block truncate text-[12.5px] ${active ? 'font-semibold text-foreground' : 'font-medium'}`}>
             {display.rest}
           </span>
         )}
@@ -173,7 +173,7 @@ function TrackedEntityRow({
       {entity.backlinkCount > 0 && (
         <span
           className={`min-w-[20px] rounded-full px-1.5 py-0.5 text-center text-[10px] font-medium tabular-nums ${
-            active ? 'bg-bg/75 text-text-muted' : 'bg-bg-tertiary/70 text-text-muted/65'
+            active ? 'bg-background/75 text-muted-foreground' : 'bg-muted/70 text-muted-foreground/65'
           }`}
           title={t('tracked.backlinksTooltip', { count: entity.backlinkCount })}
         >

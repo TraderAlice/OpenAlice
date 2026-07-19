@@ -43,9 +43,9 @@ export interface CreateWorkspaceFormProps {
 }
 
 const FIELD =
-  'w-full px-3 py-2 text-[13px] bg-bg border border-border rounded text-text focus:outline-none focus:border-accent'
-const LABEL = 'block text-[11px] uppercase tracking-wider text-text-muted/70'
-const HINT = 'text-[11px] text-text-muted/70'
+  'w-full px-3 py-2 text-[13px] bg-background border border-border rounded text-foreground focus:outline-none focus:border-primary'
+const LABEL = 'block text-[11px] uppercase tracking-wider text-muted-foreground/70'
+const HINT = 'text-[11px] text-muted-foreground/70'
 
 export function CreateWorkspaceForm(props: CreateWorkspaceFormProps): ReactElement {
   const { t } = useTranslation()
@@ -149,12 +149,12 @@ export function CreateWorkspaceForm(props: CreateWorkspaceFormProps): ReactEleme
           spellCheck={false}
           autoCorrect="off"
           autoCapitalize="off"
-          className={`${FIELD} font-mono placeholder:text-text-muted/50`}
+          className={`${FIELD} font-mono placeholder:text-muted-foreground/50`}
         />
         <p className={HINT}>{TAG_HINT}</p>
       </div>
 
-      {create.error && <div className="text-[12px] text-red">{create.error}</div>}
+      {create.error && <div className="text-[12px] text-destructive">{create.error}</div>}
 
       <div className="flex items-center justify-end gap-2 pt-1">
         {onCancel && (
@@ -162,7 +162,7 @@ export function CreateWorkspaceForm(props: CreateWorkspaceFormProps): ReactEleme
             type="button"
             onClick={onCancel}
             disabled={create.creating}
-            className="px-3 py-2 text-[13px] rounded text-text-muted hover:text-text hover:bg-bg-secondary"
+            className="px-3 py-2 text-[13px] rounded text-muted-foreground hover:text-foreground hover:bg-secondary"
           >
             {t('createWorkspace.cancel')}
           </button>

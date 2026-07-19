@@ -47,13 +47,13 @@ export function PortfolioSidebar() {
         </SidebarSectionHeader>
 
         {lite ? (
-          <p className="px-3 py-2 text-[12px] leading-relaxed text-text-muted">
+          <p className="px-3 py-2 text-[12px] leading-relaxed text-muted-foreground">
             Account drill-down is unavailable in Lite mode.
           </p>
         ) : loading ? (
           <SidebarRowsSkeleton rows={3} />
         ) : utas.length === 0 ? (
-          <p className="px-3 py-2 text-[12px] leading-relaxed text-text-muted">
+          <p className="px-3 py-2 text-[12px] leading-relaxed text-muted-foreground">
             {t('portfolio.noAccountsYet')}
           </p>
         ) : (
@@ -71,7 +71,7 @@ export function PortfolioSidebar() {
                 }
                 trail={
                   !uta.enabled ? (
-                    <span className="text-[10px] uppercase tracking-wide text-text-muted">{t('common.off')}</span>
+                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('common.off')}</span>
                   ) : undefined
                 }
               />

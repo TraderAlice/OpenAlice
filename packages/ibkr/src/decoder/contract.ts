@@ -281,7 +281,6 @@ function decodeContractDetailsFromProto(
 // ---------------------------------------------------------------------------
 
 function processContractDataMsg(d: Decoder, fields: Iterator<string>): void {
-  decodeInt(fields) // msgId
   let version = 8
   if (d.serverVersion < MIN_SERVER_VER_SIZE_RULES) {
     version = decodeInt(fields)
@@ -432,7 +431,6 @@ function processContractDataMsg(d: Decoder, fields: Iterator<string>): void {
 }
 
 function processBondContractDataMsg(d: Decoder, fields: Iterator<string>): void {
-  decodeInt(fields) // msgId
   let version = 6
   if (d.serverVersion < MIN_SERVER_VER_SIZE_RULES) {
     version = decodeInt(fields)
@@ -518,14 +516,12 @@ function processBondContractDataMsg(d: Decoder, fields: Iterator<string>): void 
 }
 
 function processContractDataEndMsg(d: Decoder, fields: Iterator<string>): void {
-  decodeInt(fields) // msgId
   decodeInt(fields) // version
   const reqId = decodeInt(fields)
   d.wrapper.contractDetailsEnd(reqId)
 }
 
 function processSymbolSamplesMsg(d: Decoder, fields: Iterator<string>): void {
-  decodeInt(fields) // msgId
   const reqId = decodeInt(fields)
   const nContractDescriptions = decodeInt(fields)
   const contractDescriptions: ContractDescription[] = []
@@ -554,7 +550,6 @@ function processSymbolSamplesMsg(d: Decoder, fields: Iterator<string>): void {
 }
 
 function processDeltaNeutralValidationMsg(d: Decoder, fields: Iterator<string>): void {
-  decodeInt(fields) // msgId
   decodeInt(fields) // version
   const reqId = decodeInt(fields)
 
@@ -567,7 +562,6 @@ function processDeltaNeutralValidationMsg(d: Decoder, fields: Iterator<string>):
 }
 
 function processMarketRuleMsg(d: Decoder, fields: Iterator<string>): void {
-  decodeInt(fields) // msgId
   const marketRuleId = decodeInt(fields)
 
   const nPriceIncrements = decodeInt(fields)

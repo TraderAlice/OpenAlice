@@ -2,12 +2,13 @@ import { describe, expect, it } from 'vitest'
 
 import {
   formatContextWindow,
-  resolveChatAgent,
-  resolveChatCredential,
-  resolveChatWorkspaceTarget,
-  resolveQuickChatAiDetails,
-  resolveQuickChatCredentialSlug,
-} from './ChatLandingPage'
+  resolveAgentCredential,
+  resolveExplicitLoginBackedCredential,
+  resolveAgentLaunchAiDetails,
+  resolveAgentLaunchCredentialSlug,
+} from '../hooks/useAgentLaunchConfig'
+import { resolveAgentRuntime } from '../lib/agentRuntime'
+import { resolveChatWorkspaceTarget } from './ChatLandingPage'
 import type { AgentRuntimeReadinessSnapshot, Workspace } from '../components/workspace/api'
 
 const agents = [
@@ -92,15 +93,15 @@ describe('resolveChatWorkspaceTarget', () => {
 
 describe('resolveChatAgent', () => {
   it('keeps an explicit valid choice ahead of saved and detected defaults', () => {
-    expect(resolveChatAgent(agents, 'codex', 'claude', readiness('claude'))).toBe('codex')
+    expect(resolveAgentRuntime(agents, 'codex', 'claude', readiness('claude'))).toBe('codex')
   })
 
   it('uses the saved default when there is no explicit choice', () => {
-    expect(resolveChatAgent(agents, null, 'claude', readiness('codex'))).toBe('claude')
+    expect(resolveAgentRuntime(agents, null, 'claude', readiness('codex'))).toBe('claude')
   })
 
   it('uses a verified runtime when no preference exists', () => {
-    expect(resolveChatAgent(agents, null, null, readiness('codex'))).toBe('codex')
+    expect(resolveAgentRuntime(agents, null, null, readiness('codex'))).toBe('codex')
   })
 
   it('uses the only installed runtime while readiness is still stale', () => {
@@ -109,36 +110,36 @@ describe('resolveChatAgent', () => {
       { id: 'codex', installed: false },
       { id: 'pi', installed: true },
     ]
-    expect(resolveChatAgent(freshInstall, null, null, null)).toBe('pi')
+    expect(resolveAgentRuntime(freshInstall, null, null, null)).toBe('pi')
   })
 
   it('does not guess when several runtimes are installed and none is ready', () => {
-    expect(resolveChatAgent(agents, null, null, null)).toBeNull()
+    expect(resolveAgentRuntime(agents, null, null, null)).toBeNull()
   })
 
   it('ignores choices that are unavailable in the target workspace', () => {
-    expect(resolveChatAgent([{ id: 'pi', installed: true }], 'codex', 'claude', null)).toBe('pi')
+    expect(resolveAgentRuntime([{ id: 'pi', installed: true }], 'codex', 'claude', null)).toBe('pi')
   })
 })
 
-describe('resolveChatCredential', () => {
+describe('resolveAgentCredential', () => {
   const credentials = [{ slug: 'saved-a' }, { slug: 'saved-b' }]
 
   it('keeps an explicit provider choice', () => {
-    expect(resolveChatCredential(credentials, 'saved-b', 'saved-a', true)).toBe('saved-b')
+    expect(resolveAgentCredential(credentials, 'saved-b', 'saved-a', true)).toBe('saved-b')
   })
 
   it('shows the detected provider even when workspace config is already ready', () => {
-    expect(resolveChatCredential(credentials, null, 'saved-a', true)).toBe('saved-a')
+    expect(resolveAgentCredential(credentials, null, 'saved-a', true)).toBe('saved-a')
   })
 
   it('falls back to the first credential only when workspace config needs one', () => {
-    expect(resolveChatCredential(credentials, null, null, false)).toBe('saved-a')
-    expect(resolveChatCredential(credentials, null, null, true)).toBeNull()
+    expect(resolveAgentCredential(credentials, null, null, false)).toBe('saved-a')
+    expect(resolveAgentCredential(credentials, null, null, true)).toBeNull()
   })
 
   it('uses a configured workspace default before the remembered quick-chat choice', () => {
-    expect(resolveChatCredential(
+    expect(resolveAgentCredential(
       credentials,
       null,
       null,
@@ -149,7 +150,7 @@ describe('resolveChatCredential', () => {
   })
 
   it('uses the remembered quick-chat choice before the first credential', () => {
-    expect(resolveChatCredential(
+    expect(resolveAgentCredential(
       credentials,
       null,
       null,
@@ -160,7 +161,7 @@ describe('resolveChatCredential', () => {
   })
 
   it('keeps the workspace credential ahead of global defaults and history', () => {
-    expect(resolveChatCredential(
+    expect(resolveAgentCredential(
       credentials,
       null,
       'saved-b',
@@ -171,7 +172,7 @@ describe('resolveChatCredential', () => {
   })
 
   it('does not expose a global fallback while workspace detection is pending', () => {
-    expect(resolveChatCredential(
+    expect(resolveAgentCredential(
       credentials,
       null,
       null,
@@ -182,37 +183,68 @@ describe('resolveChatCredential', () => {
     )).toBeNull()
   })
 
+  it('does not expose the first vault credential while remembered preferences are pending', () => {
+    expect(resolveAgentCredential(
+      credentials,
+      null,
+      null,
+      false,
+      null,
+      null,
+      true,
+      false,
+    )).toBeNull()
+  })
+
   it('does not claim a deleted credential is available', () => {
-    expect(resolveChatCredential(credentials, null, 'missing', true)).toBeNull()
-    expect(resolveChatCredential(credentials, 'missing', null, false, null, 'saved-b')).toBe('saved-b')
+    expect(resolveAgentCredential(credentials, null, 'missing', true)).toBeNull()
+    expect(resolveAgentCredential(credentials, 'missing', null, false, null, 'saved-b')).toBe('saved-b')
   })
 })
 
-describe('resolveQuickChatCredentialSlug', () => {
+describe('resolveAgentLaunchCredentialSlug', () => {
   it('passes a resolved OpenCode/Pi credential even when runtime readiness came from global config', () => {
-    expect(resolveQuickChatCredentialSlug(true, 'meituan-longcat')).toBe('meituan-longcat')
+    expect(resolveAgentLaunchCredentialSlug(true, 'meituan-longcat')).toBe('meituan-longcat')
   })
 
   it('does not send credentials to login-backed runtimes', () => {
-    expect(resolveQuickChatCredentialSlug(false, 'meituan-longcat')).toBeUndefined()
+    expect(resolveAgentLaunchCredentialSlug(false, 'meituan-longcat')).toBeUndefined()
   })
 })
 
-describe('resolveQuickChatAiDetails', () => {
-  const credential = { slug: 'google-1', resolvedModel: 'gemini-3.5-flash' }
+describe('resolveExplicitLoginBackedCredential', () => {
+  const credentials = [{ slug: 'anthropic-1' }, { slug: 'openai-1' }]
+
+  it('keeps Claude/Codex on native global state when no Workspace override is explicit', () => {
+    expect(resolveExplicitLoginBackedCredential(credentials, null)).toBeNull()
+  })
+
+  it('resolves an explicit Workspace override without falling back to another vault entry', () => {
+    expect(resolveExplicitLoginBackedCredential(credentials, 'openai-1')).toBe('openai-1')
+    expect(resolveExplicitLoginBackedCredential(credentials, 'deleted-entry')).toBeNull()
+  })
+})
+
+describe('resolveAgentLaunchAiDetails', () => {
+  const credential = {
+    slug: 'google-1',
+    resolvedModel: 'gemini-3.5-flash',
+    resolvedContextWindow: 1_048_576,
+  }
 
   it('shows the effective model and context already written in the target workspace', () => {
-    expect(resolveQuickChatAiDetails(
+    expect(resolveAgentLaunchAiDetails(
+      true,
       'google-1',
       credential,
       {
+        configured: true,
         slug: 'google-1',
         model: 'gemini-3.1-flash-lite',
         contextWindow: 256_000,
         wireShape: 'google-generative-ai',
       },
       { credentialSlug: 'google-1', model: 'gemini-3.1-pro-preview' },
-      512_000,
       true,
     )).toEqual({
       model: 'gemini-3.1-flash-lite',
@@ -221,37 +253,168 @@ describe('resolveQuickChatAiDetails', () => {
     })
   })
 
-  it('shows the selected credential model and global context for a replacement injection', () => {
-    expect(resolveQuickChatAiDetails(
+  it('shows the selected model registry context for a replacement injection', () => {
+    expect(resolveAgentLaunchAiDetails(
+      true,
       'google-1',
       credential,
       {
+        configured: true,
         slug: 'openai-1',
         model: 'gpt-5.5',
         contextWindow: 1_000_000,
         wireShape: 'openai-chat',
       },
       undefined,
-      256_000,
       true,
     )).toEqual({
       model: 'gemini-3.5-flash',
-      contextWindow: 256_000,
+      contextWindow: 1_048_576,
       source: 'new-injection',
     })
   })
 
+  it('shows the registered reasoning preview that a replacement injection will write', () => {
+    expect(resolveAgentLaunchAiDetails(
+      true,
+      'google-1',
+      {
+        ...credential,
+        resolvedReasoning: true,
+        resolvedReasoningEffort: 'minimal',
+        resolvedReasoningMode: 'adaptive',
+      },
+      {
+        configured: true,
+        slug: 'openai-1',
+        model: 'gpt-5.5',
+        contextWindow: 1_000_000,
+        wireShape: 'openai-chat',
+      },
+      undefined,
+      true,
+    )).toEqual({
+      model: 'gemini-3.5-flash',
+      contextWindow: 1_048_576,
+      reasoning: true,
+      reasoningEffort: 'minimal',
+      reasoningMode: 'adaptive',
+      source: 'new-injection',
+    })
+  })
+
+  it('keeps the Workspace reasoning policy next to its persisted effort', () => {
+    expect(resolveAgentLaunchAiDetails(
+      true,
+      'google-1',
+      credential,
+      {
+        configured: true,
+        slug: 'google-1',
+        model: 'gemini-3.5-flash',
+        contextWindow: 256_000,
+        wireShape: 'google-generative-ai',
+        reasoning: true,
+        reasoningEffort: 'medium',
+        reasoningMode: 'adaptive',
+      },
+      undefined,
+      true,
+    )).toEqual({
+      model: 'gemini-3.5-flash',
+      contextWindow: 256_000,
+      reasoning: true,
+      reasoningEffort: 'medium',
+      reasoningMode: 'adaptive',
+      source: 'workspace',
+    })
+  })
+
   it('shows the configured creation model before the first workspace exists', () => {
-    expect(resolveQuickChatAiDetails(
+    expect(resolveAgentLaunchAiDetails(
+      true,
       'google-1',
       credential,
       null,
-      { credentialSlug: 'google-1', model: 'gemini-3.1-pro-preview' },
-      512_000,
+      { credentialSlug: 'google-1', model: 'gemini-3.1-pro-preview', contextWindow: 512_000 },
       false,
     )).toEqual({
       model: 'gemini-3.1-pro-preview',
       contextWindow: 512_000,
+      source: 'new-injection',
+    })
+  })
+
+  it('shows a usable hand-edited workspace config without a vault credential', () => {
+    expect(resolveAgentLaunchAiDetails(
+      true,
+      null,
+      null,
+      {
+        configured: true,
+        slug: null,
+        model: 'local-manual-model',
+        contextWindow: 128_000,
+        wireShape: 'openai-chat',
+      },
+      undefined,
+      true,
+    )).toEqual({
+      model: 'local-manual-model',
+      contextWindow: 128_000,
+      source: 'workspace',
+    })
+  })
+
+  it('shows a login-backed Workspace override without fabricating a context limit', () => {
+    expect(resolveAgentLaunchAiDetails(
+      false,
+      'minimax-1',
+      { slug: 'minimax-1', resolvedModel: 'MiniMax-M2.5' },
+      {
+        configured: true,
+        slug: 'minimax-1',
+        model: 'MiniMax-M2.5',
+        contextWindow: null,
+        wireShape: 'anthropic',
+      },
+      { credentialSlug: 'minimax-1', model: 'MiniMax-M2.5' },
+      true,
+    )).toEqual({
+      model: 'MiniMax-M2.5',
+      contextWindow: null,
+      source: 'workspace',
+    })
+  })
+
+  it('keeps native login fallback visible when no login-backed Workspace override exists', () => {
+    expect(resolveAgentLaunchAiDetails(
+      false,
+      'minimax-1',
+      { slug: 'minimax-1', resolvedModel: 'MiniMax-M2.5' },
+      {
+        configured: false,
+        slug: null,
+        model: null,
+        contextWindow: null,
+        wireShape: null,
+      },
+      undefined,
+      true,
+    )).toBeNull()
+  })
+
+  it('previews a login-backed creation default without claiming a runtime context limit', () => {
+    expect(resolveAgentLaunchAiDetails(
+      false,
+      'minimax-1',
+      { slug: 'minimax-1', resolvedModel: 'MiniMax-M2.5' },
+      null,
+      { credentialSlug: 'minimax-1', model: 'MiniMax-M2.5' },
+      false,
+    )).toEqual({
+      model: 'MiniMax-M2.5',
+      contextWindow: null,
       source: 'new-injection',
     })
   })

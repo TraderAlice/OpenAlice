@@ -138,8 +138,9 @@ export class UTAManagerSDK {
     const out: Record<string, 'realtime' | 'iex' | 'delayed' | 'subscription'> = {}
     for (const u of all) {
       if (u.asVendor === false) continue
-      const q = u.capabilities.historicalBars?.quality
-      if (q) out[u.id] = q
+      const historical = u.capabilities.historicalBars
+      if (!historical?.supported) continue
+      out[u.id] = historical.quality ?? 'realtime'
     }
     return out
   }

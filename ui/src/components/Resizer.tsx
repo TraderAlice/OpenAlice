@@ -91,7 +91,7 @@ export function Resizer({ direction, onResize, onReset, className = '' }: Resize
     <div
       role="separator"
       aria-orientation={direction === 'horizontal' ? 'vertical' : 'horizontal'}
-      className={`${cursorClass} hover:bg-accent/40 active:bg-accent/60 transition-colors ${className}`}
+      className={`${cursorClass} hover:bg-primary/40 active:bg-primary/60 transition-colors ${className}`}
       onPointerDown={handleDown}
       onPointerMove={handleMove}
       onPointerUp={handleUp}

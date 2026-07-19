@@ -110,7 +110,7 @@ export function GuardsSection({ guards, guardTypes, description, onChange, onCha
         description={description}
       >
         {guards.length === 0 && (
-          <p className="text-[12px] text-text-muted/60 mb-3">
+          <p className="text-[12px] text-muted-foreground/60 mb-3">
             No guards configured. All trades will pass through unchecked.
           </p>
         )}
@@ -120,18 +120,18 @@ export function GuardsSection({ guards, guardTypes, description, onChange, onCha
             const meta = guardTypes.find((t) => t.type === guard.type)
             const isEditing = editingIdx === idx
             return (
-              <div key={idx} className="border border-border rounded-lg bg-bg-secondary">
+              <div key={idx} className="border border-border rounded-lg bg-secondary">
                 {/* Header row */}
                 <div className="flex items-center gap-2 px-3 py-2">
                   <button
                     onClick={() => setEditingIdx(isEditing ? null : idx)}
-                    className="text-[10px] text-text-muted w-4"
+                    className="text-[10px] text-muted-foreground w-4"
                   >
                     {isEditing ? '▼' : '▶'}
                   </button>
-                  <span className="text-[13px] font-medium text-text flex-1">
+                  <span className="text-[13px] font-medium text-foreground flex-1">
                     {meta?.label || guard.type}
-                    <span className="text-text-muted font-normal ml-2 text-[12px]">
+                    <span className="text-muted-foreground font-normal ml-2 text-[12px]">
                       {guardSummary(guard)}
                     </span>
                   </span>
@@ -139,7 +139,7 @@ export function GuardsSection({ guards, guardTypes, description, onChange, onCha
                     <button
                       onClick={() => moveGuard(idx, -1)}
                       disabled={idx === 0}
-                      className="text-text-muted hover:text-text disabled:opacity-25 p-1 text-[11px]"
+                      className="text-muted-foreground hover:text-foreground disabled:opacity-25 p-1 text-[11px]"
                       title="Move up"
                     >
                       ▲
@@ -147,14 +147,14 @@ export function GuardsSection({ guards, guardTypes, description, onChange, onCha
                     <button
                       onClick={() => moveGuard(idx, 1)}
                       disabled={idx === guards.length - 1}
-                      className="text-text-muted hover:text-text disabled:opacity-25 p-1 text-[11px]"
+                      className="text-muted-foreground hover:text-foreground disabled:opacity-25 p-1 text-[11px]"
                       title="Move down"
                     >
                       ▼
                     </button>
                     <button
                       onClick={() => removeGuard(idx)}
-                      className="text-text-muted hover:text-red p-1 ml-1 text-[13px]"
+                      className="text-muted-foreground hover:text-destructive p-1 ml-1 text-[13px]"
                       title="Remove"
                     >
                       ×
@@ -165,7 +165,7 @@ export function GuardsSection({ guards, guardTypes, description, onChange, onCha
                 {/* Editor */}
                 {isEditing && (
                   <div className="px-3 pb-3 pt-1 border-t border-border">
-                    {meta && <p className="text-[11px] text-text-muted/60 mb-2">{meta.desc}</p>}
+                    {meta && <p className="text-[11px] text-muted-foreground/60 mb-2">{meta.desc}</p>}
                     <GuardOptionsEditor
                       type={guard.type}
                       options={guard.options}
@@ -204,7 +204,7 @@ function AddGuardButton({
     return (
       <button
         onClick={() => setOpen(true)}
-        className="border border-dashed border-border rounded-lg px-3 py-2 text-[12px] text-text-muted hover:text-text hover:border-text-muted transition-colors w-full text-left"
+        className="border border-dashed border-border rounded-lg px-3 py-2 text-[12px] text-muted-foreground hover:text-foreground hover:border-muted-foreground transition-colors w-full text-left"
       >
         + Add Guard
       </button>
@@ -212,19 +212,19 @@ function AddGuardButton({
   }
 
   return (
-    <div className="border border-border rounded-lg bg-bg-secondary p-3 space-y-1.5">
-      <p className="text-[11px] text-text-muted mb-1.5">Select a guard type:</p>
+    <div className="border border-border rounded-lg bg-secondary p-3 space-y-1.5">
+      <p className="text-[11px] text-muted-foreground mb-1.5">Select a guard type:</p>
       {types.map(({ type, label, desc }) => (
         <button
           key={type}
           onClick={() => { onAdd(type); setOpen(false) }}
-          className="block w-full text-left px-2.5 py-2 rounded-md hover:bg-bg-tertiary transition-colors"
+          className="block w-full text-left px-2.5 py-2 rounded-md hover:bg-muted transition-colors"
         >
-          <span className="text-[13px] text-text font-medium">{label}</span>
-          <span className="block text-[11px] text-text-muted/60">{desc}</span>
+          <span className="text-[13px] text-foreground font-medium">{label}</span>
+          <span className="block text-[11px] text-muted-foreground/60">{desc}</span>
         </button>
       ))}
-      <button onClick={() => setOpen(false)} className="text-[11px] text-text-muted hover:text-text mt-1">
+      <button onClick={() => setOpen(false)} className="text-[11px] text-muted-foreground hover:text-foreground mt-1">
         Cancel
       </button>
     </div>
@@ -273,7 +273,7 @@ function MaxPositionSizeEditor({ options, onChange }: EditorProps) {
         value={pct}
         onChange={(e) => onChange({ ...options, maxPercentOfEquity: Number(e.target.value) })}
       />
-      <p className="text-[10px] text-text-muted/60 mt-1">
+      <p className="text-[10px] text-muted-foreground/60 mt-1">
         Rejects orders where estimated position value exceeds this % of account equity.
       </p>
     </Field>
@@ -292,7 +292,7 @@ function MaxLeverageEditor({ options, onChange }: EditorProps) {
         value={lev}
         onChange={(e) => onChange({ ...options, maxLeverage: Number(e.target.value) })}
       />
-      <p className="text-[10px] text-text-muted/60 mt-1">
+      <p className="text-[10px] text-muted-foreground/60 mt-1">
         Rejects orders and leverage adjustments exceeding this limit.
       </p>
     </Field>
@@ -311,7 +311,7 @@ function CooldownEditor({ options, onChange }: EditorProps) {
         value={seconds}
         onChange={(e) => onChange({ ...options, minIntervalMs: Number(e.target.value) * 1000 })}
       />
-      <p className="text-[10px] text-text-muted/60 mt-1">
+      <p className="text-[10px] text-muted-foreground/60 mt-1">
         Minimum seconds between trades on the same symbol.
       </p>
     </Field>
@@ -334,7 +334,7 @@ function SymbolWhitelistEditor({ options, onChange }: EditorProps) {
           onChange({ ...options, symbols: parsed })
         }}
       />
-      <p className="text-[10px] text-text-muted/60 mt-1">
+      <p className="text-[10px] text-muted-foreground/60 mt-1">
         Comma-separated list of symbols allowed for trading.
       </p>
     </Field>
@@ -358,12 +358,12 @@ function GenericEditor({ options, onChange }: EditorProps) {
   return (
     <Field label="Options (JSON)">
       <textarea
-        className={`${inputClass} min-h-[80px] font-mono text-[12px] ${parseError ? 'border-red' : ''}`}
+        className={`${inputClass} min-h-[80px] font-mono text-[12px] ${parseError ? 'border-destructive' : ''}`}
         value={raw}
         onChange={(e) => setRaw(e.target.value)}
         onBlur={handleBlur}
       />
-      {parseError && <p className="text-[10px] text-red mt-1">Invalid JSON</p>}
+      {parseError && <p className="text-[10px] text-destructive mt-1">Invalid JSON</p>}
     </Field>
   )
 }

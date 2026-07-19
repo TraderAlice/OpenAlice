@@ -30,7 +30,12 @@ import { codexAdapter } from './adapters/codex.js';
 import { opencodeAdapter } from './adapters/opencode.js';
 import { piAdapter } from './adapters/pi.js';
 import { shellAdapter } from './adapters/shell.js';
-import { AdapterRegistry, isAgentRuntime, type CliAdapter } from './cli-adapter.js';
+import {
+  AdapterRegistry,
+  isAgentRuntime,
+  prepareAgentRuntimeWorkspace,
+  type CliAdapter,
+} from './cli-adapter.js';
 import { loadConfig, type ServerConfig } from './config.js';
 import { ensureAgentCredentialReady } from './agent-credential-readiness.js';
 import { logger as launcherLogger } from './logger.js';
@@ -182,7 +187,6 @@ import { ScrollbackStore } from './scrollback-store.js';
 import { SessionPool, type SessionFactoryContext } from './session-pool.js';
 import { SessionRegistry, type SessionRecord } from './session-registry.js';
 import { buildCliPath, buildSpawnEnv } from './spawn-env.js';
-import { terminalThemeEnv } from './terminal-theme.js';
 import { TemplateRegistry } from './template-registry.js';
 import { TemplateUpgradeManager } from './template-upgrade.js';
 import { WorkspaceOperationGuard } from './workspace-operation-guard.js';
@@ -419,14 +423,10 @@ export function resumeFromRecord(
 export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions): Promise<WorkspaceService> {
   const config = loadConfig({ webPort: opts.webPort });
   const inboxStore = opts.inboxStore;
-  const managerWorkspace = createManagerWorkspaceMeta(config.launcherRoot);
-  await mkdir(managerWorkspace.dir, { recursive: true });
   const registry = await WorkspaceRegistry.load(
     `${config.launcherRoot}/workspaces.json`,
     launcherLogger.child({ scope: 'registry' }),
   );
-  const resolveRuntimeWorkspace = (workspaceId: string): WorkspaceMeta | undefined =>
-    workspaceId === managerWorkspace.id ? managerWorkspace : registry.get(workspaceId);
   const catalog = await WorkspaceCatalog.load(
     join(config.launcherRoot, 'state', 'workspace-catalog.json'),
     registry.list(),
@@ -617,6 +617,13 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   adapters.register(opencodeAdapter);
   adapters.register(piAdapter);
   adapters.register(shellAdapter);
+  const managerWorkspace = createManagerWorkspaceMeta(
+    config.launcherRoot,
+    adapters.list().filter(isAgentRuntime).map((adapter) => adapter.id),
+  );
+  await mkdir(managerWorkspace.dir, { recursive: true });
+  const resolveRuntimeWorkspace = (workspaceId: string): WorkspaceMeta | undefined =>
+    workspaceId === managerWorkspace.id ? managerWorkspace : registry.get(workspaceId);
   const runtimeReadinessCache = new Map<string, AgentRuntimeReadinessRow>();
 
   const creator = new WorkspaceCreator({
@@ -854,13 +861,11 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
 
   const prepareRuntimeReadinessWorkspace = async (adapter: CliAdapter): Promise<WorkspaceMeta> => {
     const workspace = await resolveRuntimeReadinessWorkspace();
-    if (adapter.bootstrap) {
-      await adapter.bootstrap({
-        wsId: workspace.id,
-        cwd: workspace.dir,
-        launcherRepoRoot: config.launcherRepoRoot,
-      });
-    }
+    await prepareAgentRuntimeWorkspace(adapter, {
+      wsId: workspace.id,
+      cwd: workspace.dir,
+      launcherRepoRoot: config.launcherRepoRoot,
+    });
     return workspace;
   };
 
@@ -1127,6 +1132,11 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         adapter,
         logger: launcherLogger,
       });
+      await prepareAgentRuntimeWorkspace(adapter, {
+        wsId: ws.id,
+        cwd: ws.dir,
+        launcherRepoRoot: config.launcherRepoRoot,
+      });
       const { command, cwd, env, transcriptDir } = composeSpawnInputs(ws, adapter, resume);
       return await runHeadlessProbe({
         command,
@@ -1180,6 +1190,11 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         agentId: adapter.id,
         adapter,
         logger: launcherLogger,
+      });
+      await prepareAgentRuntimeWorkspace(adapter, {
+        wsId: ws.id,
+        cwd: ws.dir,
+        launcherRepoRoot: config.launcherRepoRoot,
       });
       if (catalog.get(ws.id)?.lifecycle !== 'active') {
         throw new Error(`workspace stopped accepting work before spawn: ${ws.id}`);
@@ -1867,7 +1882,6 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         // `alice` shim forwards it as the `x-openalice-session` header, resolved
         // server-side against the session registry — agent never sees it.
         {
-          ...terminalThemeEnv(ctx.terminalTheme),
           AQ_SESSION_ID: ctx.recordId,
           ...(productSession?.resumeId ? {
             OPENALICE_RESUME_ID: productSession.resumeId,
@@ -2032,6 +2046,10 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     webPi,
     isWorkspaceHeadlessActive: (id) => headlessActivity.has(id),
     operationGuard: workspaceOperationGuard,
+    cleanupWorkspaceState: async (_record, cwd) => {
+      if (!existsSync(join(cwd, '.pi', 'openalice-provider.json')) && !existsSync(join(cwd, '.pi-agent'))) return;
+      await piAdapter.writeAiConfig?.(cwd, {});
+    },
     logger: launcherLogger.child({ scope: 'workspace-lifecycle' }),
   });
   await lifecycle.recover();
@@ -2102,7 +2120,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       claude: existsSync(join(w.dir, '.claude', 'settings.local.json')),
       codex: existsSync(join(w.dir, '.codex')),
       opencode: existsSync(join(w.dir, 'opencode.json')),
-      pi: existsSync(join(w.dir, '.pi-agent')),
+      pi: existsSync(join(w.dir, '.pi', 'openalice-provider.json')),
     };
     // Version lineage + upgrade hint. Applied template state, not mutable
     // README frontmatter, is authoritative: changing a document is not the

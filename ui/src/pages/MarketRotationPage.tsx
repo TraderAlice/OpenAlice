@@ -11,17 +11,17 @@ import { PageHeader } from '../components/PageHeader'
 import { CenteredLoading } from '../components/StateViews'
 import { marketApi, type SectorRotationResult, type SectorRotationRow } from '../api/market'
 
-const GREEN = 'var(--color-green)'
-const RED = 'var(--color-red)'
-const MUTED = '#7d8590'
+const GREEN = 'var(--success)'
+const RED = 'var(--destructive)'
+const MUTED = 'var(--chart-axis)'
 const REFRESH_MS = 5 * 60 * 1000
 
 function pct(x: number | null | undefined, places = 1): string {
   return x == null ? '—' : `${(x * 100).toFixed(places)}%`
 }
 function signColor(x: number | null | undefined): string {
-  if (x == null) return 'text-text-muted'
-  return x > 0 ? 'text-green' : x < 0 ? 'text-red' : 'text-text-muted'
+  if (x == null) return 'text-muted-foreground'
+  return x > 0 ? 'text-success' : x < 0 ? 'text-destructive' : 'text-muted-foreground'
 }
 function dotColor(score: number | null): string {
   if (score == null) return MUTED
@@ -84,7 +84,7 @@ export function MarketRotationPage() {
         description={
           <>
             {t('market.rotationSubtitle')}
-            {data && <><span className="text-text-muted/50"> · {t('market.asOf')} {data.asOf}</span>{data.meta && <BoardMeta meta={data.meta} />}</>}
+            {data && <><span className="text-muted-foreground/50"> · {t('market.asOf')} {data.asOf}</span>{data.meta && <BoardMeta meta={data.meta} />}</>}
           </>
         }
         live={{ lastUpdated: updatedAt }}
@@ -92,15 +92,15 @@ export function MarketRotationPage() {
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 flex flex-col gap-6 min-h-0">
         {loading && !data && <CenteredLoading label={t('common.loading')} />}
         {error && (
-          <div className="text-[13px] text-red border border-red/30 rounded-md px-3 py-2 bg-red/5">{error}</div>
+          <div className="text-[13px] text-destructive border border-destructive/30 rounded-md px-3 py-2 bg-destructive/5">{error}</div>
         )}
 
         {data && (
           <>
             <QuadrantChart points={points} t={t} />
             <RotationTable rows={data.sectors} benchmarkSymbol={data.benchmark.symbol} t={t} />
-            <p className="max-w-3xl break-words text-[11px] leading-relaxed text-text-muted/70">
-              <span className="font-semibold text-text-muted">{t('market.rotationMethodology')}: </span>
+            <p className="max-w-3xl break-words text-[11px] leading-relaxed text-muted-foreground/70">
+              <span className="font-semibold text-muted-foreground">{t('market.rotationMethodology')}: </span>
               {data.methodology}
             </p>
           </>
@@ -115,10 +115,10 @@ function QuadrantChart({ points, t }: { points: Point[]; t: TFunction }) {
     <div className="relative">
       {/* Quadrant corner labels */}
       <div className="pointer-events-none absolute inset-0 z-10">
-        <CornerLabel className="top-1 right-2 text-green/70" text={t('market.quadRotatingIn')} />
-        <CornerLabel className="top-1 left-12 text-text-muted/60" text={t('market.quadImproving')} />
-        <CornerLabel className="bottom-7 right-2 text-text-muted/60" text={t('market.quadWeakening')} />
-        <CornerLabel className="bottom-7 left-12 text-red/70" text={t('market.quadRotatingOut')} />
+        <CornerLabel className="top-1 right-2 text-success/70" text={t('market.quadRotatingIn')} />
+        <CornerLabel className="top-1 left-12 text-muted-foreground/60" text={t('market.quadImproving')} />
+        <CornerLabel className="bottom-7 right-2 text-muted-foreground/60" text={t('market.quadWeakening')} />
+        <CornerLabel className="bottom-7 left-12 text-destructive/70" text={t('market.quadRotatingOut')} />
       </div>
       <MeasuredChartFrame className="h-[420px] w-full">
         {({ width, height }) => (
@@ -146,7 +146,7 @@ function QuadrantChart({ points, t }: { points: Point[]; t: TFunction }) {
           </ScatterChart>
         )}
       </MeasuredChartFrame>
-      <div className="flex justify-between px-8 -mt-1 text-[10px] text-text-muted/50">
+      <div className="flex justify-between px-8 -mt-1 text-[10px] text-muted-foreground/50">
         <span>{t('market.axisRelStrength')} →</span>
         <span>↑ {t('market.axisVolumeShare')}</span>
       </div>
@@ -162,13 +162,13 @@ function PointTooltip({ active, payload, t }: { active?: boolean; payload?: Arra
   if (!active || !payload?.length) return null
   const p = payload[0].payload
   return (
-    <div className="rounded-md border border-border bg-bg-secondary px-2.5 py-1.5 text-[11px] shadow-lg">
-      <div className="font-mono font-semibold text-text">{p.symbol} <span className="text-text-muted font-sans font-normal">{p.sector}</span></div>
+    <div className="rounded-md border border-border bg-secondary px-2.5 py-1.5 text-[11px] shadow-lg">
+      <div className="font-mono font-semibold text-foreground">{p.symbol} <span className="text-muted-foreground font-sans font-normal">{p.sector}</span></div>
       <div className="mt-0.5 grid grid-cols-[auto_auto] gap-x-3 gap-y-0.5">
-        <span className="text-text-muted">{t('market.colScore')}</span><span className={signColor(p.score)}>{p.score ?? '—'}</span>
-        <span className="text-text-muted">{t('market.axisRelStrength')}</span><span className={signColor(p.x)}>{p.x.toFixed(1)}%</span>
-        <span className="text-text-muted">{t('market.axisVolumeShare')}</span><span className={signColor(p.y)}>{p.y.toFixed(2)}%</span>
-        <span className="text-text-muted">{t('market.colRvol')}</span><span className="text-text">{p.rvol ?? '—'}</span>
+        <span className="text-muted-foreground">{t('market.colScore')}</span><span className={signColor(p.score)}>{p.score ?? '—'}</span>
+        <span className="text-muted-foreground">{t('market.axisRelStrength')}</span><span className={signColor(p.x)}>{p.x.toFixed(1)}%</span>
+        <span className="text-muted-foreground">{t('market.axisVolumeShare')}</span><span className={signColor(p.y)}>{p.y.toFixed(2)}%</span>
+        <span className="text-muted-foreground">{t('market.colRvol')}</span><span className="text-foreground">{p.rvol ?? '—'}</span>
       </div>
     </div>
   )
@@ -180,7 +180,7 @@ function RotationTable({ rows, benchmarkSymbol, t }: { rows: SectorRotationRow[]
       {/* Keep the market columns readable; narrow screens scroll instead of compressing headers together. */}
       <table className="w-full min-w-[820px] border-collapse text-[12px]" data-testid="sector-rotation-table">
         <thead>
-          <tr className="whitespace-nowrap border-b border-border text-left text-text-muted/70">
+          <tr className="whitespace-nowrap border-b border-border text-left text-muted-foreground/70">
             <th className="w-[220px] py-1.5 pr-3 font-medium">{t('market.colSector')}</th>
             <th className="w-[72px] py-1.5 px-3 font-medium text-right">{t('market.colScore')}</th>
             <th className="w-[64px] py-1.5 px-3 font-medium text-right">1W</th>
@@ -193,17 +193,17 @@ function RotationTable({ rows, benchmarkSymbol, t }: { rows: SectorRotationRow[]
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.symbol} className="whitespace-nowrap border-b border-border/50 hover:bg-bg-secondary/40">
+            <tr key={r.symbol} className="whitespace-nowrap border-b border-border/50 hover:bg-secondary/40">
               <td className="py-1.5 pr-3">
-                <span className="font-mono font-semibold text-text">{r.symbol}</span>
-                <span className="ml-2 text-text-muted">{r.sector}</span>
+                <span className="font-mono font-semibold text-foreground">{r.symbol}</span>
+                <span className="ml-2 text-muted-foreground">{r.sector}</span>
               </td>
               <td className={`py-1.5 px-3 text-right font-mono ${signColor(r.rotation_score)}`}>{r.rotation_score ?? '—'}</td>
               <td className={`py-1.5 px-3 text-right ${signColor(r.returns['1W'])}`}>{pct(r.returns['1W'])}</td>
               <td className={`py-1.5 px-3 text-right ${signColor(r.returns['1M'])}`}>{pct(r.returns['1M'])}</td>
               <td className={`py-1.5 px-3 text-right ${signColor(r.returns['3M'])}`}>{pct(r.returns['3M'])}</td>
               <td className={`py-1.5 px-3 text-right ${signColor(r.rel_strength['1M'])}`}>{pct(r.rel_strength['1M'])}</td>
-              <td className="py-1.5 px-3 text-right text-text">{r.rvol ?? '—'}</td>
+              <td className="py-1.5 px-3 text-right text-foreground">{r.rvol ?? '—'}</td>
               <td className={`py-1.5 pl-3 text-right ${signColor(r.dv_share_change)}`}>{pct(r.dv_share_change, 2)}</td>
             </tr>
           ))}

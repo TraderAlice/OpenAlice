@@ -42,7 +42,15 @@ EClient  ──send──►  TWS/IB Gateway  ──respond──►  Decoder  �
 
 ### Dual Protocol
 
-TWS v201+ uses protobuf for most messages. Older versions use a text protocol (`\0`-delimited fields). Both are fully implemented. The protocol is negotiated at handshake — you don't need to think about it.
+Current TWS/Gateway versions can mix protobuf messages with the text protocol
+(`\0`-delimited fields); older versions use text only. Both paths are
+implemented and selected from the negotiated server version and message id.
+
+The message id is a wire-envelope field and is removed by `EClient` before a
+text payload reaches `Decoder.interpret()`. Decoder handlers begin at the first
+payload field; they must not read or reconstruct the message id. See the
+[IBKR wire protocol owner guide](../../docs/ibkr-wire-protocol.md) before
+changing framing or text handlers.
 
 ## Project Structure
 
@@ -101,12 +109,17 @@ Java/C++ sources are in `.gitignore` (available locally after extracting the TWS
 ## Testing
 
 ```bash
-pnpm test          # Unit tests (56 tests, no external deps)
+pnpm test          # Unit tests (no external dependencies)
 pnpm test:e2e      # Integration tests (needs TWS/IB Gateway running)
 pnpm test:all      # Both
 ```
 
 E2e tests share a single TWS connection via `tests/e2e/setup.ts`. If TWS is not running, e2e tests skip automatically.
+
+Text-decoder changes must include payload-only fixtures for the touched handler
+category plus framing and malformed-message recovery coverage. Run the
+[owner-guide verification ladder](../../docs/ibkr-wire-protocol.md#verification-ladder)
+before live broker acceptance.
 
 ### TWS Ports
 
@@ -115,7 +128,8 @@ E2e tests share a single TWS connection via `tests/e2e/setup.ts`. If TWS is not 
 | Paper | 7497 | 4002 |
 | Live | 7496 | 4001 |
 
-Configure via env: `TWS_HOST=127.0.0.1 TWS_PORT=7497`
+Configure via env: `TWS_HOST=127.0.0.1 TWS_PORT=7497 TWS_CLIENT_ID=91`.
+Use a client id that does not collide with a running UTA connection.
 
 ## Protobuf Generation
 

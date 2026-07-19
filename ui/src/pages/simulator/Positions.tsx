@@ -34,11 +34,11 @@ export function Positions({ state }: { state: SimulatorState }) {
       description="Read-only — mutate via mark price moves, order fills, or external events."
     >
       {state.positions.length === 0 ? (
-        <p className="text-xs text-text-muted">No positions.</p>
+        <p className="text-xs text-muted-foreground">No positions.</p>
       ) : (
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-text-muted text-xs">
+            <tr className="text-left text-muted-foreground text-xs">
               <th className="pb-1 pr-3">Position</th>
               <th className="pb-1 pr-3 text-right">Qty</th>
               <th className="pb-1 pr-3 text-right">Avg Cost</th>
@@ -57,29 +57,29 @@ export function Positions({ state }: { state: SimulatorState }) {
               const pnl = mark && Number.isFinite(qty) && Number.isFinite(avg)
                 ? (Number(mark) - avg) * qty * mult * (p.side === 'long' ? 1 : -1)
                 : null
-              const pnlClass = pnl == null ? 'text-text-muted' : pnl > 0 ? 'text-green' : pnl < 0 ? 'text-red' : 'text-text'
+              const pnlClass = pnl == null ? 'text-muted-foreground' : pnl > 0 ? 'text-success' : pnl < 0 ? 'text-destructive' : 'text-foreground'
               return (
-                <tr key={p.nativeKey} className="text-text">
+                <tr key={p.nativeKey} className="text-foreground">
                   <td className="py-1 pr-3">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-medium text-text">{describePosition(p)}</span>
+                      <span className="font-medium text-foreground">{describePosition(p)}</span>
                       {p.secType && (
-                        <span className="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded bg-bg-tertiary text-text-muted/80">{p.secType}</span>
+                        <span className="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded bg-muted text-muted-foreground/80">{p.secType}</span>
                       )}
-                      <span className={`text-[10px] px-1 py-0.5 rounded font-medium ${p.side === 'long' ? 'bg-green/15 text-green' : 'bg-red/15 text-red'}`}>
+                      <span className={`text-[10px] px-1 py-0.5 rounded font-medium ${p.side === 'long' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
                         {p.side}
                       </span>
                       {p.multiplier && p.multiplier !== '1' && (
-                        <span className="text-[9px] text-text-muted/60" title={`Each contract = ${p.multiplier} units`}>×{p.multiplier}</span>
+                        <span className="text-[9px] text-muted-foreground/60" title={`Each contract = ${p.multiplier} units`}>×{p.multiplier}</span>
                       )}
                       {p.avgCostSource === 'wallet' && (
-                        <span className="text-[9px] text-text-muted/60" title="Cost basis derived from UTA reconcile pipeline (wallet-source position)">wallet</span>
+                        <span className="text-[9px] text-muted-foreground/60" title="Cost basis derived from UTA reconcile pipeline (wallet-source position)">wallet</span>
                       )}
                     </div>
                   </td>
                   <td className="py-1 pr-3 font-mono text-xs text-right">{p.quantity}</td>
                   <td className="py-1 pr-3 font-mono text-xs text-right">{p.avgCost}</td>
-                  <td className="py-1 pr-3 font-mono text-xs text-right text-text-muted">{mark ?? '—'}</td>
+                  <td className="py-1 pr-3 font-mono text-xs text-right text-muted-foreground">{mark ?? '—'}</td>
                   <td className={`py-1 font-mono text-xs text-right transition-colors duration-300 ${pnlClass}`}>
                     {pnl == null ? '—' : `${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}`}
                   </td>

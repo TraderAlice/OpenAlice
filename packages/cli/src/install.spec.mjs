@@ -77,12 +77,22 @@ describe.skipIf(process.platform === 'win32')('OpenAlice CLI installer', { timeo
     const installRoot = join(home, '.openalice')
     const installer = join(repositoryRoot, 'install')
 
-    await execFileAsync('bash', [installer,
+    const installed = await execFileAsync('bash', [installer,
       '--source', repositoryRoot,
       '--install-dir', installRoot,
       '--no-modify-path',
       '--yes',
-    ], { env: installerEnv(home) })
+    ], {
+      env: {
+        ...installerEnv(home),
+        OPENALICE_INSTALL_CONTEXT: 'remote',
+      },
+    })
+
+    expect(installed.stdout).toContain('Remote Runtime CLI installer')
+    expect(installed.stdout).not.toContain('then run locally in your browser')
+    expect(installed.stdout).toContain('Returning to the approved remote setup plan')
+    expect(installed.stdout).not.toContain('Next: launch from an OpenAlice checkout')
 
     const versionInfo = await execFileAsync(join(installRoot, 'bin', 'openalice'), ['version', '--json'])
     expect(JSON.parse(versionInfo.stdout).installSource).toMatchObject({
@@ -123,6 +133,7 @@ describe.skipIf(process.platform === 'win32')('OpenAlice CLI installer', { timeo
     const versionInfo = await execFileAsync(join(installRoot, 'bin', 'openalice'), ['version', '--json'])
     expect(JSON.parse(versionInfo.stdout)).toEqual({
       version: '0.2.0',
+      contentIdentity: releases[0].slice(-16),
       installSource: {
         schemaVersion: 1,
         repository: 'TraderAlice/OpenAlice',

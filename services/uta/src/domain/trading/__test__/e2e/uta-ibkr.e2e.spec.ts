@@ -10,6 +10,7 @@
 
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
 import { getTestAccounts, filterByProvider } from './setup.js'
+import { contractEvidence, recordLivePaperEvidence } from './live-paper-evidence.js'
 import { UnifiedTradingAccount } from '../../UnifiedTradingAccount.js'
 import type { IBroker } from '../../brokers/types.js'
 import '../../contract-ext.js'
@@ -29,6 +30,63 @@ beforeAll(async () => {
   marketOpen = clock.isOpen
   console.log(`UTA IBKR: market ${marketOpen ? 'OPEN' : 'CLOSED'}`)
 }, 60_000)
+
+// ==================== FX identity → staging contract (any time) ====================
+
+describe('UTA — IBKR FX identity staging', () => {
+  beforeEach(({ skip }) => { if (!uta) skip('no IBKR paper account') })
+
+  it('round-trips an FX leaf as conId identity while keeping symbol display-only', async () => {
+    const results = await broker!.searchContracts('USD.CHF')
+    const leaf = results.find(result =>
+      result.contract.conId > 0 &&
+      result.contract.secType === 'CASH' &&
+      result.contract.currency === 'CHF',
+    )
+    expect(leaf, 'USD.CHF leaf not returned by IBKR search').toBeDefined()
+
+    const nativeKey = broker!.getNativeKey(leaf!.contract)
+    const aliceId = `${uta!.id}|${nativeKey}`
+    let committed = false
+    try {
+      const staged = uta!.stagePlaceOrder({
+        aliceId,
+        symbol: 'USDCHF',
+        action: 'BUY',
+        orderType: 'LMT',
+        lmtPrice: '0.1',
+        totalQuantity: '25000',
+        tif: 'DAY',
+      })
+      expect(staged.staged).toBe(true)
+
+      const operation = uta!.status().staged[0]
+      expect(operation.action).toBe('placeOrder')
+      if (operation.action !== 'placeOrder') throw new Error('expected staged placeOrder')
+      expect(operation.contract.conId).toBe(leaf!.contract.conId)
+      expect(operation.contract.symbol).toBe('USDCHF')
+      expect(operation.contract.exchange).toBe('')
+      expect(operation.contract.currency).toBe('')
+
+      const commit = uta!.commit('e2e: verify USD.CHF conId staging boundary')
+      expect(commit.prepared).toBe(true)
+      committed = true
+      await recordLivePaperEvidence({
+        scenario: 'uta-ibkr-usd-chf-identity-staging',
+        phase: 'prepared-not-pushed',
+        contract: contractEvidence(leaf!.contract),
+        request: contractEvidence(operation.contract),
+        note: 'UTA carries conId identity plus display symbol; IbkrBroker resolves canonical routing at push.',
+      })
+    } finally {
+      if (committed || uta!.status().staged.length > 0) {
+        await uta!.reject('e2e: staging-boundary smoke cleanup')
+      }
+      expect(uta!.status().staged).toHaveLength(0)
+      expect(uta!.status().pendingHash).toBeNull()
+    }
+  }, 30_000)
+})
 
 // ==================== Order lifecycle (any time) ====================
 

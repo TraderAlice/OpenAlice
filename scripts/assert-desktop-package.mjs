@@ -34,6 +34,8 @@ export const BASE_REQUIRED_FILES = [
   'src/workspaces/cli/bin/alice-uta.cmd',
   'src/workspaces/templates/_common.mjs',
   'src/workspaces/templates/chat/bootstrap.mjs',
+  'node_modules/dugite/package.json',
+  'node_modules/dugite/build/lib/index.js',
   'vendor/manifest.json',
   'vendor/pi/package.json',
   'vendor/pi/node_modules/@earendil-works/pi-coding-agent/dist/cli.js',
@@ -124,6 +126,13 @@ export function assertDesktopPackage(options = {}) {
   }
 
   if (platform === 'win32') {
+    const embeddedDugiteGit = join(appRoot, 'node_modules', 'dugite', 'git')
+    if (existsSync(embeddedDugiteGit)) {
+      errors.push(
+        '[desktop-package] Windows must use managed PortableGit; dugite\'s embedded Git payload is forbidden',
+      )
+    }
+
     const git = manifest?.git?.[platformArch]
     if (!git) {
       errors.push(`[desktop-package] expected manifest.git.${platformArch} for Windows managed Git Bash`)
@@ -171,7 +180,9 @@ function platformRequiredFiles(platform, platformArch) {
         `vendor/git/${platformArch}/bin/bash.exe`,
         `vendor/git/${platformArch}/bin/sh.exe`,
       ]
-    : []
+    : platform === 'darwin'
+      ? ['node_modules/dugite/git/bin/git']
+      : []
   return [...searchTools, ...git]
 }
 

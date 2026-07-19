@@ -21,6 +21,15 @@ ASSUME_YES=0
 PLAN_ONLY=0
 WITH_RUNTIME_DEPS=0
 INSTALL_ROOT="${OPENALICE_INSTALL_DIR:-${HOME}/.openalice}"
+INSTALL_CONTEXT="${OPENALICE_INSTALL_CONTEXT:-local}"
+
+case "$INSTALL_CONTEXT" in
+  local|remote) ;;
+  *)
+    printf 'Error: OPENALICE_INSTALL_CONTEXT must be local or remote.\n' >&2
+    exit 1
+    ;;
+esac
 
 BOLD=""
 DIM=""
@@ -483,8 +492,13 @@ if [[ -e "$BIN_DIR/openalice" || -e "$BIN_DIR/openalice.cmd" ]]; then
 fi
 
 printf '\n%bOpenAlice%b\n' "${BOLD}${CYAN}" "$RESET"
-printf '%bLocal Runtime CLI installer%b\n\n' "$BOLD" "$RESET"
-printf 'Install the OpenAlice command and its ready-to-use Pi agent, then run locally in your browser.\n'
+if [[ "$INSTALL_CONTEXT" == "remote" ]]; then
+  printf '%bRemote Runtime CLI installer%b\n\n' "$BOLD" "$RESET"
+  printf 'Install the matching OpenAlice command and ready-to-use Pi agent on this SSH host.\n'
+else
+  printf '%bLocal Runtime CLI installer%b\n\n' "$BOLD" "$RESET"
+  printf 'Install the OpenAlice command and its ready-to-use Pi agent, then run locally in your browser.\n'
+fi
 printf '%bPi stays inside the OpenAlice install root. System build tools are optional and listed before consent; your checkout, Electron app, credentials, and services otherwise stay untouched.%b\n' "$DIM" "$RESET"
 
 step 1 "Checking your system"
@@ -869,7 +883,11 @@ if [[ -n "$existing_command" && "$existing_command" != "$BIN_DIR/openalice" ]]; 
 fi
 
 checkout=""
-checkout="$(find_openalice_checkout 2>/dev/null || true)"
+if [[ "$INSTALL_CONTEXT" == "remote" ]]; then
+  printf '\nReturning to the approved remote setup plan.\n\n'
+else
+  checkout="$(find_openalice_checkout 2>/dev/null || true)"
+fi
 if [[ -n "$checkout" ]]; then
   printf '\n%bReady to launch%b\n' "$BOLD" "$RESET"
   printf '  Checkout     %s\n' "$checkout"
@@ -886,7 +904,7 @@ if [[ -n "$checkout" ]]; then
     fi
   fi
   printf '\nStart it when you are ready:\n  cd %q\n  %s\n\n' "$checkout" "$BIN_DIR/openalice"
-else
+elif [[ "$INSTALL_CONTEXT" != "remote" ]]; then
   printf '\n%bNext: launch from an OpenAlice checkout%b\n' "$BOLD" "$RESET"
   printf '  git clone https://github.com/TraderAlice/OpenAlice.git\n'
   printf '  cd OpenAlice\n'

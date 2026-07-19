@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   readCredentials,
-  readWorkspaceDefaultContextWindow,
   setCredentialLastModel,
   type Credential,
 } from '@/core/config.js';
@@ -19,7 +18,6 @@ vi.mock('@/core/config.js', async (importActual) => {
   return {
     ...actual,
     readCredentials: vi.fn(),
-    readWorkspaceDefaultContextWindow: vi.fn(async () => 256_000),
     setCredentialLastModel: vi.fn(async () => {}),
   };
 });
@@ -58,7 +56,6 @@ function adapter(id: string, cfg: WorkspaceAiCred | null = null) {
 
 beforeEach(() => {
   vi.mocked(readCredentials).mockReset();
-  vi.mocked(readWorkspaceDefaultContextWindow).mockResolvedValue(256_000);
   vi.mocked(setCredentialLastModel).mockClear();
 });
 
@@ -129,7 +126,7 @@ describe('agent credential readiness', () => {
       apiKey: 'sk-oa',
       model: 'gpt-5.6',
       wireShape: 'openai-chat',
-      contextWindow: 256_000,
+      contextWindow: 1_050_000,
     }));
     expect(vi.mocked(setCredentialLastModel)).toHaveBeenCalledWith('openai-1', 'gpt-5.6');
   });

@@ -67,11 +67,20 @@ upstream content.
 
 The script requires Node.js 22.19.0 or newer, matching the pinned Pi runtime's
 engine floor. With no selector, it targets the stable `master` branch.
-Development dogfooding must opt into `--branch dev` explicitly:
+
+The independently active development channel deliberately uses GitHub's raw
+branch endpoint rather than the release CDN. Both layers must select `dev`:
 
 ```bash
-curl -fsSL https://openalice.ai/install | bash -s -- --branch dev
+curl -fsSL https://raw.githubusercontent.com/TraderAlice/OpenAlice/dev/install \
+  | bash -s -- --branch dev
 ```
+
+That command tests the current dev installer script and the current dev CLI
+payload together. Running the stable `https://openalice.ai/install` script with
+`--branch dev` can be useful as a compatibility probe, but it does not prove
+that changes to `dev/install` work. The raw endpoint is mutable preview
+infrastructure for maintainers, not a user-facing release mirror.
 
 `--version` selects a tag or commit, and the two selectors are mutually
 exclusive. The default install root is `~/.openalice`, and the downloaded
@@ -96,10 +105,14 @@ runs `npm ci --omit=dev --ignore-scripts` in the staged release.
 - `packages/cli/src/install.spec.mjs` — plan, consent, PTY, layout, and live-lock
   contract tests.
 - `scripts/install-docker-smoke.mjs` — local Docker acceptance runner.
+- `scripts/install-channel-smoke.mjs` — clean-host acceptance for the live raw
+  dev installer and matching dev payload.
 - `scripts/remote-ssh-smoke.mjs` — local clean-host Server/SSH acceptance
   runner; its product contract belongs to [[docs/remote-access.md]].
 - `scripts/install-smoke/` — clean user, local HTTP fixture, automated smoke,
   manual playground, exact Pi release assets, and an offline npm fixture.
+- `.github/workflows/cli-installer-smoke.yml` — checkout acceptance on relevant
+  PRs and live raw-channel acceptance after installer changes merge to `dev`.
 - `docs/local-runtime.md` — behavior after the installed command starts a
   source-backed localhost Runtime.
 - `docs/reference/install-script/README.md` — Claude Code and Codex research;
@@ -249,9 +262,13 @@ Before a release becomes visible, the installer:
    install files with SHA-256 and uses the first 16 hex characters as its
    content identity.
 
-That metadata is also returned by `openalice version --json`. Managed
-`openalice remote` uses it to invoke the same ordinary installer source and
-selector on a remote host. `remote` has no independent branch/version option.
+That metadata is returned by `openalice version --json` together with the
+16-character identity derived from the immutable installed release directory.
+Managed `openalice remote` compares both provenance and content identity before
+deciding that a remote CLI matches, then invokes the same ordinary installer
+source and selector when it does not. This catches changed payload bytes even
+when the CLI semantic version and branch name are unchanged. `remote` has no
+independent branch/version option.
 
 The resulting directory is:
 
@@ -302,13 +319,15 @@ With the default installer and Runtime roots:
 │   ├── dev-<content-id>/   # only after an explicit --branch dev install
 │   └── <older-ref-or-content>/
 ├── .cli-install.lock/       # present only while an installer owns it
+├── sources/                 # selector-specific managed remote checkouts
 ├── data/                    # application state, not installer debris
 ├── workspaces/              # user work, not installer debris
 ├── provider-keys.json       # sensitive user state
 └── sealing.key              # sensitive machine-bound key
 ```
 
-The installer root and Runtime `OPENALICE_HOME` independently default to
+`sources/` is created by approved managed-remote orchestration, not by the
+installer itself. The installer root and Runtime `OPENALICE_HOME` independently default to
 `~/.openalice`. The installer does not read an `OPENALICE_HOME` override, and
 `openalice start` does not infer Runtime home from the CLI's install location.
 Either override may therefore diverge intentionally. Their default co-location
@@ -383,12 +402,16 @@ Environment inputs:
 | `OPENALICE_PI_RELEASE_BASE_URL` | Override the pinned Pi release-asset base for installer tests |
 | `OPENALICE_PI_SOURCE_DIR` | Read the exact Pi manifest/lock assets from a local fixture |
 | `OPENALICE_NPM_BIN` | Use a single alternate npm executable in installer tests |
+| `OPENALICE_INSTALL_CONTEXT` | Internal managed-remote context; returns control without local checkout/start guidance |
 | `NO_COLOR` | Disable installer color output |
 | `HOME`, `SHELL`, `PATH`, `TERM` | Standard environment used for paths, profile detection, conflicts, and color |
 
-The three Pi overrides, `OPENALICE_INSTALL_URL`, and
-`OPENALICE_INSTALL_BASE_URL` are distributor/test seams, not user-facing
-branch selectors. The same pinned SHA-256 checks still apply to local Pi
+The Pi overrides, `OPENALICE_INSTALL_URL`, and `OPENALICE_INSTALL_BASE_URL`
+are distributor/test seams, not user-facing branch selectors. Managed remote
+sets `OPENALICE_INSTALL_CONTEXT=remote` only after the user approves its outer
+plan; the installer still owns its normal transaction and prints a
+remote-appropriate heading, then returns instead of suggesting a second manual
+clone or local start. The same pinned SHA-256 checks still apply to local Pi
 assets. A real mirror design must define equivalent authenticity and version
 semantics before becoming public API.
 
@@ -426,7 +449,8 @@ after that trust chain is added.
 ### Fast local feedback
 
 ```bash
-bash -n install scripts/install-smoke/run.sh scripts/install-smoke/interactive.sh
+bash -n install scripts/install-smoke/run.sh scripts/install-smoke/interactive.sh \
+  scripts/install-channel-smoke/run.sh
 pnpm -F @traderalice/openalice-cli test
 ```
 
@@ -468,12 +492,41 @@ It verifies:
   the resulting commands;
 - installed `server status --json` execution and inclusion of every reachable
   Server/remote module;
+- installed content identity in `openalice version --json`, so same-version
+  remote payload drift is detectable;
 - runnable OpenAlice/Pi shell and CMD launchers plus managed-Pi env injection;
 - idempotent managed PATH configuration;
 - identical-release reuse;
 - ref switching without deleting the prior release.
 
-This is a local pre-release gate. It is intentionally not delegated to PR CI.
+Relevant PRs run this deterministic acceptance in CI against the exact checkout.
+The same workflow runs `pnpm test:remote:docker` in a separate clean SSH fixture
+so installer changes cannot pass while managed remote is broken.
+
+### Live dev-channel acceptance
+
+```bash
+pnpm test:install:dev-channel
+```
+
+This smoke builds an empty non-root container but copies no OpenAlice installer
+or CLI payload into it. It downloads
+`https://raw.githubusercontent.com/TraderAlice/OpenAlice/dev/install`, installs
+the matching `--branch dev` payload through the real network path, and verifies:
+
+- the response is the Bash installer and passes syntax validation;
+- `--plan` selects dev without writing the install root;
+- the complete OpenAlice CLI and managed Pi transaction succeeds;
+- installed provenance records the raw dev URL and branch selector;
+- the CLI version, Pi version, and `server status --json` execute;
+- an identical second install reuses the same content identity and immutable
+  release directory.
+
+The workflow runs this job after relevant changes merge to `dev`. PR checks use
+the checkout fixtures instead, because the raw dev URL correctly continues to
+represent the previously merged branch until the PR lands. A network failure is
+reported separately from deterministic checkout acceptance rather than being
+hidden by a local fixture.
 
 ### Manual interaction review
 
@@ -530,18 +583,25 @@ Before publishing or promoting a change that affects the installer:
    asset hashes, lockfile engine floor, and root/CLI Node engines. Do not
    accidentally advertise mutable `dev` as a stable release.
 3. Run the fast installer tests and the full repository-required checks.
-4. Run `pnpm test:install:docker` locally.
-5. Walk `pnpm test:install:docker --interactive` as a human.
+4. Require checkout install and managed-remote CI acceptance to pass, then
+   require the post-merge `pnpm test:install:dev-channel` result for current
+   `dev` to be green.
+5. Walk `pnpm test:install:docker --interactive` as a human when prompts,
+   progress, PATH guidance, or next steps changed.
 6. Exercise the installed CLI from `--source`; include the localhost handoff if
    the payload or start boundary changed.
-7. Verify the versioned installer asset, R2 `install` alias, manifest checksum,
-   and main-site proxy. State the remaining archive/signature gap explicitly.
+7. Treat the `dev` to `master` merge as the release event. The release workflow
+   repeats checkout acceptance before publication, creates the installer from
+   the accepted tag, then verifies the versioned asset, R2 `install` alias,
+   manifest checksum, and main-site proxy. State the remaining
+   archive/signature gap explicitly.
 8. Keep Electron signing and notarization in the Electron release lane; the CLI
    preview must not read those secrets.
 
-For a `dev` to `master` promotion that publishes installer behavior, the local
-Docker installer smoke remains a required manual gate under
-[[docs/development-workflow.md]].
+Do not refresh the stable installer from an unreleased `master` commit. A
+manual release mirror may only reproduce the exact bytes owned by its requested
+tag; new installer behavior stays on the live dev channel until the next
+versioned promotion under [[docs/development-workflow.md]].
 
 ## Troubleshooting
 
@@ -555,6 +615,7 @@ Docker installer smoke remains a required manual gate under
 | Pi asset SHA-256 check fails | Stop. The pinned release metadata and downloaded asset disagree; do not bypass the check |
 | A `.damaged.<pid>` directory appears | A content-addressed release no longer matched its identity; preserve it for diagnosis while the validated replacement becomes active |
 | CLI installs but localhost startup fails | Installation succeeded; continue with [[docs/local-runtime.md]] and Guardian/runtime diagnostics |
+| Remote install succeeds and then prints no clone command | Managed remote set the installer context and is continuing with its already-approved source plan |
 | Native PowerShell/CMD bootstrap is unavailable | Use the complete Electron installer, WSL, or Git Bash until a reviewed native bootstrap exists |
 
 ## Design Decisions and Next Steps

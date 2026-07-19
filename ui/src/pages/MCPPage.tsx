@@ -9,7 +9,7 @@
 
 import { useConfigPage } from '../hooks/useConfigPage'
 import { SaveIndicator } from '../components/SaveIndicator'
-import { ConfigSection, Field, inputClass } from '../components/form'
+import { ConfigSection, Field, SettingsScrollArea, inputClass } from '../components/form'
 import { PageHeader } from '../components/PageHeader'
 import type { AppConfig, McpConfig } from '../api'
 
@@ -27,7 +27,7 @@ export function MCPPage() {
         right={<SaveIndicator status={status} onRetry={retry} />}
       />
 
-      <div className="flex-1 overflow-y-auto px-4 md:px-8 py-5">
+      <SettingsScrollArea className="px-4 py-5 md:px-8">
         {config && (
           <div className="max-w-[880px] mx-auto">
             <ConfigSection
@@ -35,7 +35,7 @@ export function MCPPage() {
               description="Disabled by default. Enable only when you intentionally want another local MCP client to call OpenAlice."
             >
               <Field label="Enabled">
-                <label className="inline-flex items-center gap-2 text-[13px] text-text">
+                <label className="inline-flex items-center gap-2 text-[13px] text-foreground">
                   <input
                     type="checkbox"
                     checked={config.enabled}
@@ -56,8 +56,8 @@ export function MCPPage() {
             </ConfigSection>
           </div>
         )}
-        {loadError && <p className="text-[13px] text-red">Failed to load configuration.</p>}
-      </div>
+        {loadError && <p className="text-[13px] text-destructive">Failed to load configuration.</p>}
+      </SettingsScrollArea>
     </div>
   )
 }

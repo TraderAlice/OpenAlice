@@ -20,7 +20,7 @@ function ReconnectNotice() {
     <div
       role="status"
       aria-live="polite"
-      className="fixed left-1/2 top-4 z-[80] flex -translate-x-1/2 items-center gap-2 rounded-lg border border-border bg-bg-secondary/95 px-3 py-2 text-[12px] text-text-muted shadow-lg backdrop-blur-sm"
+      className="fixed left-1/2 top-4 z-[80] flex -translate-x-1/2 items-center gap-2 rounded-lg border border-border bg-secondary/95 px-3 py-2 text-[12px] text-muted-foreground shadow-lg backdrop-blur-sm"
     >
       <Spinner size="sm" />
       <span>{t('auth.reconnecting')}</span>
@@ -34,7 +34,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   if (state === 'loading') {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-bg text-[12px] text-text-muted">
+      <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-background text-[12px] text-muted-foreground">
         <Spinner />
         {backendUnavailable && <span role="status">{t('auth.reconnecting')}</span>}
       </div>

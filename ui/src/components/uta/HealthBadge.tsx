@@ -8,7 +8,7 @@ export function HealthBadge({ health, size = 'sm' }: { health?: BrokerHealthInfo
   const textSize = size === 'md' ? 'text-[12px]' : 'text-[11px]'
   const dotSize = size === 'md' ? 'w-2 h-2' : 'w-1.5 h-1.5'
 
-  if (!health) return <span className="text-text-muted/40">—</span>
+  if (!health) return <span className="text-muted-foreground/40">—</span>
 
   const pill = (color: string, dot: string, label: string, title?: string, pulse = false) => (
     <span className={`inline-flex items-center gap-1.5 ${textSize} ${color}`} title={title}>
@@ -17,31 +17,31 @@ export function HealthBadge({ health, size = 'sm' }: { health?: BrokerHealthInfo
     </span>
   )
 
-  if (health.disabled) return pill('text-text-muted', 'bg-text-muted/40', 'Disabled', health.lastError)
+  if (health.disabled) return pill('text-muted-foreground', 'bg-muted-foreground/40', 'Disabled', health.lastError)
 
   // Initial broker connect still in flight. `status` is optimistically 'healthy'
   // during this window, so this must be checked BEFORE the switch — otherwise a
   // cold-starting account misleadingly reads "Connected" while its data is still
   // loading. Pulses to signal work-in-progress, not a steady state.
-  if (health.connecting) return pill('text-accent', 'bg-accent', 'Connecting...', health.lastError, true)
+  if (health.connecting) return pill('text-primary', 'bg-primary', 'Connecting...', health.lastError, true)
 
   switch (health.status) {
     case 'healthy':
       // At target reach. The label tells the user the account's role.
       return pill(
-        'text-green',
-        'bg-green',
+        'text-success',
+        'bg-success',
         health.tier === 'data' ? 'Data source' : health.tier === 'account' ? 'Connected · read-only' : 'Connected',
       )
     case 'degraded':
       // Reachable but below target — e.g. transport up but account-read failing.
       return pill(
-        'text-yellow-400',
-        'bg-yellow-400',
+        'text-warning',
+        'bg-warning',
         health.reach === 'connected' ? 'No account access' : 'Unstable',
         health.lastError,
       )
     case 'offline':
-      return pill('text-red', 'bg-red', health.recovering ? 'Reconnecting...' : 'Offline', health.lastError, true)
+      return pill('text-destructive', 'bg-destructive', health.recovering ? 'Reconnecting...' : 'Offline', health.lastError, true)
   }
 }

@@ -241,11 +241,6 @@ export function createWorkspaceConversationControl(
         throw new Error(`agent runtime has no headless mode: ${agentId}`)
       }
 
-      await adapter.bootstrap?.({
-        wsId: meta.id,
-        cwd: meta.dir,
-        launcherRepoRoot: svc.config.launcherRepoRoot,
-      })
       const prompt = resolution.mode === 'exact'
         ? input.prompt
         : reconstructionPrompt(input.target, input.prompt, Boolean(continuingOrigin))

@@ -24,10 +24,10 @@ import { useWorkspaces } from '../contexts/workspaces-context'
 import { formatRelativeTime } from '../lib/intl'
 
 const STATUS_STYLE: Record<HeadlessTaskStatus, string> = {
-  running: 'bg-blue-500/15 text-blue-400',
-  done: 'bg-emerald-500/15 text-emerald-400',
-  failed: 'bg-red-500/15 text-red-400',
-  interrupted: 'bg-amber-500/15 text-amber-400',
+  running: 'bg-info/15 text-info',
+  done: 'bg-success/15 text-success',
+  failed: 'bg-destructive/15 text-destructive',
+  interrupted: 'bg-warning/15 text-warning',
 }
 
 const RUNS_PAGE_SIZE = 25
@@ -52,15 +52,15 @@ function formatValue(value: unknown): string {
 function ToolBlock({ block }: { block: Extract<HeadlessMessageBlock, { type: 'tool' }> }) {
   const hasDetails = block.input !== undefined || block.output !== undefined
   const statusClass = block.status === 'failed'
-    ? 'text-red-400'
+    ? 'text-destructive'
     : block.status === 'completed'
-      ? 'text-emerald-400'
-      : 'text-blue-400'
+      ? 'text-success'
+      : 'text-info'
   return (
-    <details className="group/tool rounded-lg border border-border/60 bg-bg-secondary/35" open={block.status === 'failed'}>
+    <details className="group/tool rounded-lg border border-border/60 bg-secondary/35" open={block.status === 'failed'}>
       <summary className={`flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-xs ${statusClass}`}>
         <Wrench size={13} className="shrink-0" />
-        <span className="min-w-0 flex-1 truncate font-medium text-text">{block.name}</span>
+        <span className="min-w-0 flex-1 truncate font-medium text-foreground">{block.name}</span>
         <span className="shrink-0 uppercase tracking-wide">{block.status}</span>
         {hasDetails && <ChevronRight size={12} className="shrink-0 transition-transform group-open/tool:rotate-90" />}
       </summary>
@@ -68,16 +68,16 @@ function ToolBlock({ block }: { block: Extract<HeadlessMessageBlock, { type: 'to
         <div className="space-y-2 border-t border-border/50 px-3 py-2">
           {block.input !== undefined && (
             <div>
-              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-text-muted/70">Input</div>
-              <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words text-[11px] leading-relaxed text-text-muted">
+              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Input</div>
+              <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words text-[11px] leading-relaxed text-muted-foreground">
                 {formatValue(block.input)}
               </pre>
             </div>
           )}
           {block.output !== undefined && (
             <div>
-              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-text-muted/70">Output</div>
-              <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words text-[11px] leading-relaxed text-text-muted">
+              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Output</div>
+              <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words text-[11px] leading-relaxed text-muted-foreground">
                 {formatValue(block.output)}
               </pre>
             </div>
@@ -116,8 +116,8 @@ function RunOutput({ task }: { task: HeadlessTaskRecord }) {
     }
   }, [task.taskId, running])
 
-  if (error) return <div className="text-xs text-red-400">Output unavailable: {error}</div>
-  if (!output) return <div className="text-xs text-text-muted">Loading structured output…</div>
+  if (error) return <div className="text-xs text-destructive">Output unavailable: {error}</div>
+  if (!output) return <div className="text-xs text-muted-foreground">Loading structured output…</div>
 
   const tools = output.structured.blocks.filter(
     (block): block is Extract<HeadlessMessageBlock, { type: 'tool' }> => block.type === 'tool',
@@ -128,15 +128,15 @@ function RunOutput({ task }: { task: HeadlessTaskRecord }) {
 
   return (
     <div className="space-y-3">
-      <section className="rounded-lg border border-border/70 bg-bg-secondary/25 p-3">
-        <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-text-muted">
+      <section className="rounded-lg border border-border/70 bg-secondary/25 p-3">
+        <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
           <MessageSquareText size={14} />
           Reply
         </div>
         {output.structured.assistantText ? (
           <MarkdownContent text={output.structured.assistantText} className="text-[13px] leading-relaxed" />
         ) : (
-          <p className="text-xs text-text-muted">
+          <p className="text-xs text-muted-foreground">
             {running ? 'Waiting for an assistant reply…' : 'This run produced no assistant reply.'}
           </p>
         )}
@@ -144,44 +144,44 @@ function RunOutput({ task }: { task: HeadlessTaskRecord }) {
 
       {(tools.length > 0 || errors.length > 0) && (
         <section>
-          <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-text-muted">
+          <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
             <Wrench size={13} />
             Activity · {tools.length} tool{tools.length === 1 ? '' : 's'}
           </div>
           <div className="space-y-1.5">
             {tools.map((block) => <ToolBlock key={block.id} block={block} />)}
             {errors.map((block, index) => (
-              <div key={`${block.message}-${index}`} className="flex gap-2 rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-2 text-xs text-red-400">
+              <div key={`${block.message}-${index}`} className="flex gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
                 <CircleAlert size={13} className="mt-0.5 shrink-0" />
                 <span className="whitespace-pre-wrap break-words">{block.message}</span>
               </div>
             ))}
           </div>
           {output.structured.truncated && (
-            <p className="mt-2 text-[11px] text-amber-400">Earlier activity was truncated; runtime diagnostics remain available below.</p>
+            <p className="mt-2 text-[11px] text-warning">Earlier activity was truncated; runtime diagnostics remain available below.</p>
           )}
         </section>
       )}
 
       <details className="rounded-lg border border-border/60">
-        <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-xs text-text-muted hover:text-text">
+        <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-xs text-muted-foreground hover:text-foreground">
           <TerminalSquare size={13} />
           Runtime diagnostics
         </summary>
         <div className="space-y-2 border-t border-border/50 p-2">
           {output.stdout && (
-            <pre className="max-h-64 overflow-auto rounded bg-black/30 p-2 text-[11px] leading-snug text-text-muted whitespace-pre-wrap break-all">
+            <pre className="max-h-64 overflow-auto rounded bg-code-background p-2 text-[11px] leading-snug text-muted-foreground whitespace-pre-wrap break-all">
               {output.stdout.truncated ? '… (tail)\n' : ''}
               {output.stdout.text || '(empty)'}
             </pre>
           )}
           {output.stderr && output.stderr.text.length > 0 && (
-            <pre className="max-h-32 overflow-auto rounded bg-red-950/20 p-2 text-[11px] leading-snug text-red-300/80 whitespace-pre-wrap break-all">
+            <pre className="max-h-32 overflow-auto rounded bg-destructive/20 p-2 text-[11px] leading-snug text-destructive/80 whitespace-pre-wrap break-all">
               {output.stderr.truncated ? '… (tail)\n' : ''}
               {output.stderr.text}
             </pre>
           )}
-          {!output.stdout && !output.stderr && <div className="text-xs text-text-muted">No runtime diagnostics for this run.</div>}
+          {!output.stdout && !output.stderr && <div className="text-xs text-muted-foreground">No runtime diagnostics for this run.</div>}
         </div>
       </details>
     </div>
@@ -190,10 +190,10 @@ function RunOutput({ task }: { task: HeadlessTaskRecord }) {
 
 function SummaryCard({ label, value, detail }: { label: string; value: string; detail: string }) {
   return (
-    <div className="rounded-lg border border-border/60 bg-bg-secondary/25 px-3 py-2">
-      <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-text-muted/70">{label}</div>
-      <div className="mt-0.5 text-lg font-semibold text-text">{value}</div>
-      <div className="text-[11px] text-text-muted">{detail}</div>
+    <div className="rounded-lg border border-border/60 bg-secondary/25 px-3 py-2">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">{label}</div>
+      <div className="mt-0.5 text-lg font-semibold text-foreground">{value}</div>
+      <div className="text-[11px] text-muted-foreground">{detail}</div>
     </div>
   )
 }
@@ -280,7 +280,7 @@ export function AutomationRunsSection() {
     }
   }
 
-  if (error && !snapshot) return <div className="text-sm text-red-400">Failed to load runs: {error}</div>
+  if (error && !snapshot) return <div className="text-sm text-destructive">Failed to load runs: {error}</div>
   if (!snapshot) {
     return (
       <div className="space-y-3" aria-hidden="true">
@@ -309,13 +309,13 @@ export function AutomationRunsSection() {
       </div>
 
       {snapshot.tasks.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border p-5 text-sm text-text-muted">
+        <div className="rounded-lg border border-dashed border-border p-5 text-sm text-muted-foreground">
           No headless runs yet. Dispatch one with <code className="text-xs">POST /api/workspaces/:id/headless</code>.
         </div>
       ) : (
         <div className="space-y-2">
           {error && (
-            <div className="rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-2 text-xs text-red-400">
+            <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
               Refresh failed: {error}
             </div>
           )}
@@ -331,23 +331,23 @@ export function AutomationRunsSection() {
               <article
                 key={task.taskId}
                 data-task-id={task.taskId}
-                className="overflow-hidden rounded-xl border border-border/70 bg-bg-secondary/15"
+                className="overflow-hidden rounded-xl border border-border/70 bg-secondary/15"
               >
                 <button
                   type="button"
                   onClick={() => toggle(task.taskId)}
-                  className="flex w-full items-start gap-3 px-3 py-3 text-left hover:bg-bg-tertiary/35"
+                  className="flex w-full items-start gap-3 px-3 py-3 text-left hover:bg-muted/35"
                   aria-expanded={isExpanded}
                 >
                   <span className={`mt-0.5 inline-flex rounded px-1.5 py-0.5 text-[11px] font-medium ${STATUS_STYLE[task.status]}`}>
                     {task.status}
                   </span>
-                  <Bot size={15} className="mt-0.5 shrink-0 text-text-muted" />
+                  <Bot size={15} className="mt-0.5 shrink-0 text-muted-foreground" />
                   <span className="min-w-0 flex-1">
-                    <span className="block max-h-10 overflow-hidden text-[13px] leading-5 text-text">
+                    <span className="block max-h-10 overflow-hidden text-[13px] leading-5 text-foreground">
                       {task.prompt}
                     </span>
-                    <span className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-text-muted">
+                    <span className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
                       <span>{task.agent}</span>
                       <span className="font-mono">{task.wsId.slice(0, 8)}</span>
                       <span>{formatRelativeTime(task.startedAt)}</span>
@@ -355,21 +355,21 @@ export function AutomationRunsSection() {
                       <span>{toolSummary}</span>
                     </span>
                   </span>
-                  {isExpanded ? <ChevronDown size={15} className="mt-0.5 shrink-0 text-text-muted" /> : <ChevronRight size={15} className="mt-0.5 shrink-0 text-text-muted" />}
+                  {isExpanded ? <ChevronDown size={15} className="mt-0.5 shrink-0 text-muted-foreground" /> : <ChevronRight size={15} className="mt-0.5 shrink-0 text-muted-foreground" />}
                 </button>
 
                 {isExpanded && (
                   <div className="space-y-3 border-t border-border/60 px-3 py-3">
-                    <details className="rounded-lg border border-border/60 bg-bg-secondary/25">
-                      <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-text-muted hover:text-text">
+                    <details className="rounded-lg border border-border/60 bg-secondary/25">
+                      <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground">
                         Task instructions
                       </summary>
-                      <pre className="max-h-64 overflow-auto border-t border-border/50 px-3 py-2 whitespace-pre-wrap break-words text-[11px] leading-relaxed text-text-muted">
+                      <pre className="max-h-64 overflow-auto border-t border-border/50 px-3 py-2 whitespace-pre-wrap break-words text-[11px] leading-relaxed text-muted-foreground">
                         {task.prompt}
                       </pre>
                     </details>
                     {task.error && (
-                      <div className="flex gap-2 rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-2 text-xs text-red-400">
+                      <div className="flex gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
                         <CircleAlert size={13} className="mt-0.5 shrink-0" />
                         {task.error}
                       </div>
@@ -377,7 +377,7 @@ export function AutomationRunsSection() {
                     {openable && (
                       <button
                         type="button"
-                        className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-emerald-400 hover:bg-emerald-500/10"
+                        className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-success hover:bg-success/10"
                         title="Resume this run's conversation in an interactive session"
                         onClick={() => {
                           void openHeadlessRun(task.wsId, task.resumeId, {
@@ -402,11 +402,11 @@ export function AutomationRunsSection() {
                 data-testid="runs-load-more"
                 disabled={loadingMore}
                 onClick={() => void loadMore()}
-                className="rounded-lg border border-border bg-bg-secondary/35 px-4 py-2 text-xs font-medium text-text hover:bg-bg-tertiary disabled:cursor-wait disabled:opacity-60"
+                className="rounded-lg border border-border bg-secondary/35 px-4 py-2 text-xs font-medium text-foreground hover:bg-muted disabled:cursor-wait disabled:opacity-60"
               >
                 {loadingMore ? 'Loading older runs…' : `Load ${Math.min(RUNS_PAGE_SIZE, snapshot.page.total - snapshot.tasks.length)} older runs`}
               </button>
-              <span className="text-[11px] text-text-muted">
+              <span className="text-[11px] text-muted-foreground">
                 {snapshot.tasks.length} of {snapshot.page.total} loaded
               </span>
             </div>

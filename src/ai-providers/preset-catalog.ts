@@ -8,12 +8,22 @@
  */
 
 import { z } from 'zod'
+import { resolveModelSemantics, type ModelSemantics } from './model-semantics.js'
 
 // ==================== Types ====================
 
 export interface ModelOption {
   id: string
   label: string
+  /** Registered facts for this exact vendor/model pair. Absent means unknown. */
+  semantics?: ModelSemantics
+}
+
+function withModelSemantics(vendor: string, models: ModelOption[]): ModelOption[] {
+  return models.map((model) => {
+    const semantics = resolveModelSemantics(vendor, model.id)
+    return semantics ? { ...model, semantics } : model
+  })
 }
 
 /**
@@ -87,14 +97,14 @@ export const CLAUDE_OAUTH: PresetDef = {
     loginMethod: z.literal('claudeai'),
     model: z.string().default('default').describe('Model'),
   }),
-  models: [
+  models: withModelSemantics('anthropic', [
     { id: 'default', label: 'Default (Recommended for your account)' },
     { id: 'best', label: 'Best (Most capable available)' },
     { id: 'opus', label: 'Opus (Latest available)' },
     { id: 'sonnet', label: 'Sonnet (Latest available)' },
     { id: 'haiku', label: 'Haiku (Fastest available)' },
     { id: 'opusplan', label: 'Opus planning → Sonnet execution' },
-  ],
+  ]),
 }
 
 export const CLAUDE_API: PresetDef = {
@@ -110,13 +120,13 @@ export const CLAUDE_API: PresetDef = {
     model: z.string().default('claude-opus-4-8').describe('Model'),
     apiKey: z.string().min(1).describe('Anthropic API key'),
   }),
-  models: [
+  models: withModelSemantics('anthropic', [
     { id: 'claude-fable-5', label: 'Claude Fable 5 (Highest capability)' },
     { id: 'claude-opus-4-8', label: 'Claude Opus 4.8 (Complex agents)' },
     { id: 'claude-sonnet-5', label: 'Claude Sonnet 5 (Balanced)' },
     { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5 (Fastest)' },
     { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6 (Previous generation)' },
-  ],
+  ]),
   regions: [{ id: 'official', label: 'Official (api.anthropic.com)', wires: { anthropic: '' } }],
   setup: {
     apiKeyLabel: 'Anthropic API key',
@@ -141,13 +151,13 @@ export const CODEX_OAUTH: PresetDef = {
     loginMethod: z.literal('codex-oauth'),
     model: z.string().default('gpt-5.6').describe('Model'),
   }),
-  models: [
+  models: withModelSemantics('openai', [
     { id: 'gpt-5.6', label: 'GPT 5.6 (Power · Sol)' },
     { id: 'gpt-5.6-terra', label: 'GPT 5.6 Terra (Balanced)' },
     { id: 'gpt-5.6-luna', label: 'GPT 5.6 Luna (Fastest)' },
     { id: 'gpt-5.5', label: 'GPT 5.5 (Previous generation)' },
     { id: 'gpt-5.4', label: 'GPT 5.4 (Previous generation)' },
-  ],
+  ]),
 }
 
 export const CODEX_API: PresetDef = {
@@ -162,13 +172,13 @@ export const CODEX_API: PresetDef = {
     model: z.string().default('gpt-5.6').describe('Model'),
     apiKey: z.string().min(1).describe('OpenAI API key'),
   }),
-  models: [
+  models: withModelSemantics('openai', [
     { id: 'gpt-5.6', label: 'GPT 5.6 (Sol alias)' },
     { id: 'gpt-5.6-terra', label: 'GPT 5.6 Terra (Balanced)' },
     { id: 'gpt-5.6-luna', label: 'GPT 5.6 Luna (Cost-efficient)' },
     { id: 'gpt-5.5', label: 'GPT 5.5 (Previous generation)' },
     { id: 'gpt-5.4', label: 'GPT 5.4 (Previous generation)' },
-  ],
+  ]),
   // Same key + base; the shape is how you call it. Responses is OpenAI's
   // current API (what codex speaks); Chat Completions is the legacy shape
   // opencode/pi use.
@@ -197,14 +207,14 @@ export const GEMINI: PresetDef = {
     model: z.string().default('gemini-3.1-flash-lite').describe('Model'),
     apiKey: z.string().min(1).describe('Google AI API key'),
   }),
-  models: [
+  models: withModelSemantics('google', [
     { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash (Stable)' },
     { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro (Preview, paid)' },
     { id: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash-Lite (Stable)' },
     { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (Previous generation)' },
     { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (Previous generation)' },
     { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite (Previous generation)' },
-  ],
+  ]),
   // Google is moving newly-created keys from legacy AIza traffic keys to AQ
   // authorization keys. The native wire sends x-goog-api-key and works for
   // both formats; the OpenAI-compatibility layer's Bearer auth does not.
@@ -226,7 +236,7 @@ export const MINIMAX: PresetDef = {
   description: 'MiniMax models via Claude Agent SDK (Anthropic-compatible)',
   category: 'third-party',
   defaultName: 'MiniMax',
-  hint: 'China console: minimaxi.com — International console: minimax.io. API keys are region-locked. MiniMax authenticates via Authorization: Bearer; the international endpoint (api.minimax.io) rejects x-api-key.',
+  hint: 'China console: minimaxi.com — International console: minimax.io. API keys are region-locked. Pi and opencode use MiniMax\'s Anthropic-compatible endpoint so thinking stays in native reasoning blocks; the OpenAI-compatible reasoning_details extension is not losslessly supported by their generic transports.',
   zodSchema: z.object({
     backend: z.literal('agent-sdk'),
     loginMethod: z.literal('api-key'),
@@ -247,15 +257,15 @@ export const MINIMAX: PresetDef = {
       anthropic: 'https://api.minimax.io/anthropic', 'openai-chat': 'https://api.minimax.io/v1',
     } },
   ],
-  models: [
+  models: withModelSemantics('minimax', [
     { id: 'MiniMax-M3', label: 'MiniMax M3' },
     { id: 'MiniMax-M2.7', label: 'MiniMax M2.7' },
-  ],
+  ]),
   setup: {
     apiKeyLabel: 'MiniMax API key',
     apiKeyHelp: 'Use the API key issued by the MiniMax platform selected above. China and International keys are not interchangeable.',
     modelHelp: 'MiniMax model IDs are case-sensitive. Pick a suggestion or paste the exact model ID shown by the selected platform.',
-    regionHelp: 'Choose the platform that issued this key. OpenAlice will store both supported API protocols for that region.',
+    regionHelp: 'Choose the platform that issued this key. OpenAlice stores both provider endpoints, while current coding runtimes use the Anthropic-compatible path for complete reasoning capture and replay.',
   },
   writeOnlyFields: ['apiKey'],
 }
@@ -284,9 +294,9 @@ export const GLM: PresetDef = {
       anthropic: 'https://api.z.ai/api/anthropic', 'openai-chat': 'https://api.z.ai/api/paas/v4',
     } },
   ],
-  models: [
+  models: withModelSemantics('glm', [
     { id: 'glm-5.2', label: 'GLM 5.2' },
-  ],
+  ]),
   setup: {
     apiKeyLabel: 'GLM API key',
     apiKeyHelp: 'Use the API key issued by the Zhipu platform selected above. China and International keys are region-bound.',
@@ -325,10 +335,10 @@ export const KIMI: PresetDef = {
       anthropic: 'https://api.moonshot.ai/anthropic', 'openai-chat': 'https://api.moonshot.ai/v1',
     } },
   ],
-  models: [
+  models: withModelSemantics('kimi', [
     { id: 'kimi-k2.7-code', label: 'Kimi K2.7 Code' },
     { id: 'kimi-k2.6', label: 'Kimi K2.6' },
-  ],
+  ]),
   setup: {
     apiKeyLabel: 'Moonshot API key',
     apiKeyHelp: 'Use the API key issued by the Moonshot platform selected above. China and International keys are region-bound.',
@@ -359,9 +369,9 @@ export const DEEPSEEK: PresetDef = {
       anthropic: 'https://api.deepseek.com/anthropic', 'openai-chat': 'https://api.deepseek.com',
     } },
   ],
-  models: [
+  models: withModelSemantics('deepseek', [
     { id: 'deepseek-v4-pro', label: 'DeepSeek V4 Pro (flagship)' },
-  ],
+  ]),
   setup: {
     apiKeyLabel: 'DeepSeek API key',
     apiKeyHelp: 'Use a key from the DeepSeek API platform. This is separate from a consumer chat account.',
@@ -394,9 +404,9 @@ export const LONGCAT: PresetDef = {
       anthropic: 'https://api.longcat.chat/anthropic',
     } },
   ],
-  models: [
+  models: withModelSemantics('longcat', [
     { id: 'LongCat-2.0', label: 'LongCat 2.0' },
-  ],
+  ]),
   setup: {
     apiKeyLabel: 'LongCat API key',
     apiKeyHelp: 'Use a key accepted by api.longcat.chat. OpenAlice stores both LongCat-compatible protocol endpoints with this credential.',

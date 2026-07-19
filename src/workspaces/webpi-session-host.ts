@@ -175,7 +175,7 @@ class LiveWebPiSession {
     })
     this.logger.info('webpi.started', { pid: this.child.pid ?? null, command: this.input.command })
     await this.refresh()
-    this.phase = this.state?.['isStreaming'] === true ? 'working' : 'idle'
+    this.phase = phaseFromRpcState(this.state)
     this.bump()
   }
 
@@ -391,6 +391,11 @@ function defaultSpawnProcess(input: StartWebPiInput): RpcProcess {
     stdio: ['pipe', 'pipe', 'pipe'],
     windowsHide: true,
   })
+}
+
+function phaseFromRpcState(state: JsonObject | null): WebPiSnapshot['phase'] {
+  if (state?.['isCompacting'] === true) return 'compacting'
+  return state?.['isStreaming'] === true ? 'working' : 'idle'
 }
 
 function isObject(value: unknown): value is JsonObject {

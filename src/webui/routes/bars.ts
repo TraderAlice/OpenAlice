@@ -21,7 +21,8 @@ export function createBarsRoutes(ctx: EngineContext): Hono {
   // each with source/sourceId/assetClass/label/barCapability for the picker.
   app.get('/search', async (c) => {
     const query = (c.req.query('query') ?? '').trim()
-    const limit = Number(c.req.query('limit') ?? 20)
+    const requestedLimit = Number(c.req.query('limit') ?? 20)
+    const limit = Math.max(1, Math.min(100, Number.isFinite(requestedLimit) ? Math.floor(requestedLimit) : 20))
     if (!query) return c.json({ candidates: [], count: 0 })
     const candidates = await ctx.barService.searchBarSources(query, { limit })
     return c.json({ candidates, count: candidates.length })
