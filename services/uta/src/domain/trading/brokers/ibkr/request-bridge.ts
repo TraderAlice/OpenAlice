@@ -91,6 +91,7 @@ export class RequestBridge extends DefaultEWrapper {
   // ---- Connection handshake ----
   private connectResolve: (() => void) | null = null
   private connectReject: ((err: Error) => void) | null = null
+  private connectTimer: ReturnType<typeof setTimeout> | null = null
 
   // ---- Current time request ----
   private currentTimePending: PendingRequest<number> | null = null
@@ -136,18 +137,62 @@ export class RequestBridge extends DefaultEWrapper {
   ): Promise<void> {
     this.client_ = client
 
-    const promise = new Promise<void>((resolve, reject) => {
+    if (this.connectReject) {
+      this.rejectConnect(new BrokerError('NETWORK', 'Previous TWS/Gateway connection attempt was superseded'))
+    }
+
+    const handshake = new Promise<void>((resolve, reject) => {
       this.connectResolve = resolve
       this.connectReject = reject
-      setTimeout(() => {
-        this.connectResolve = null
-        this.connectReject = null
-        reject(new BrokerError('NETWORK', `Connection to TWS/Gateway timed out after ${timeoutMs}ms`))
+      this.connectTimer = setTimeout(() => {
+        this.rejectConnect(
+          new BrokerError('NETWORK', `Connection to TWS/Gateway timed out after ${timeoutMs}ms`),
+        )
       }, timeoutMs)
     })
 
-    await client.connect(host, port, clientId)
-    return promise
+    // Observe both promises from the moment the socket attempt starts. TWS can
+    // accept TCP and close before EClient.connect() finishes its own protocol
+    // handshake; leaving `handshake` unobserved during that window turns the
+    // normal rejection from connectionClosed() into a process-fatal unhandled
+    // rejection on Node 22.
+    const observedHandshake = handshake.catch((error: unknown) => {
+      // Also make the bridge timeout authoritative. Without this teardown, a
+      // custom short timeout could reject while EClient's independent 10s
+      // protocol timer kept the socket attempt alive in the background.
+      try { client.disconnect() } catch { /* best-effort teardown */ }
+      throw error
+    })
+    const [transportResult, handshakeResult] = await Promise.allSettled([
+      client.connect(host, port, clientId),
+      observedHandshake,
+    ])
+
+    const failure = handshakeResult.status === 'rejected'
+      ? handshakeResult.reason
+      : transportResult.status === 'rejected'
+        ? transportResult.reason
+        : null
+    if (failure !== null) {
+      this.clearConnectWaiter()
+      // A failed handshake must leave no half-connected EClient for the UTA
+      // recovery loop to mistake for a successful reconnect.
+      try { client.disconnect() } catch { /* best-effort teardown */ }
+      throw failure
+    }
+  }
+
+  private clearConnectWaiter(): void {
+    if (this.connectTimer) clearTimeout(this.connectTimer)
+    this.connectTimer = null
+    this.connectResolve = null
+    this.connectReject = null
+  }
+
+  private rejectConnect(error: Error): void {
+    const reject = this.connectReject
+    this.clearConnectWaiter()
+    reject?.(error)
   }
 
   // ---- Mode A: reqId-based requests ----
@@ -401,11 +446,9 @@ export class RequestBridge extends DefaultEWrapper {
   override nextValidId(orderId: number): void {
     this.nextOrderId_ = orderId
     // Resolve the connect promise (TWS is ready)
-    if (this.connectResolve) {
-      this.connectResolve()
-      this.connectResolve = null
-      this.connectReject = null
-    }
+    const resolve = this.connectResolve
+    this.clearConnectWaiter()
+    resolve?.()
   }
 
   override managedAccounts(accountsList: string): void {
@@ -436,9 +479,7 @@ export class RequestBridge extends DefaultEWrapper {
     this.rejectAll(new BrokerError('NETWORK', 'Connection to TWS/Gateway lost'))
 
     if (this.connectReject) {
-      this.connectReject(new BrokerError('NETWORK', 'Connection to TWS/Gateway closed during handshake'))
-      this.connectResolve = null
-      this.connectReject = null
+      this.rejectConnect(new BrokerError('NETWORK', 'Connection to TWS/Gateway closed during handshake'))
     }
   }
 

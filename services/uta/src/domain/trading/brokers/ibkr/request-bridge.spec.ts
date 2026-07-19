@@ -1,6 +1,8 @@
+import { createServer, type Socket } from 'node:net'
+
 import { describe, it, expect, vi } from 'vitest'
 import Decimal from 'decimal.js'
-import { Contract, NO_VALID_ID, TickTypeEnum } from '@traderalice/ibkr'
+import { Contract, EClient, makeField, makeMsg, NO_VALID_ID, TickTypeEnum } from '@traderalice/ibkr'
 import { RequestBridge } from './request-bridge.js'
 
 function stk(conId: number, symbol: string): Contract {
@@ -15,6 +17,100 @@ function stk(conId: number, symbol: string): Contract {
 function pushUpdate(b: RequestBridge, contract: Contract, qty: number, avgCost = '100'): void {
   b.updatePortfolio(contract, new Decimal(qty), '101', String(qty * 101), avgCost, '1', '0', 'DU1')
 }
+
+describe('RequestBridge — connection handshake', () => {
+  it('still completes the normal serverVersion → nextValidId handshake', async () => {
+    const server = createServer((socket) => {
+      let stage: 'greeting' | 'start-api' | 'done' = 'greeting'
+      socket.on('data', () => {
+        if (stage === 'greeting') {
+          stage = 'start-api'
+          const payload = Buffer.from(`222\0${new Date(0).toISOString()}\0`, 'utf8')
+          const header = Buffer.alloc(4)
+          header.writeUInt32BE(payload.length)
+          socket.write(Buffer.concat([header, payload]))
+          return
+        }
+        if (stage === 'start-api') {
+          stage = 'done'
+          socket.write(makeMsg(9, true, makeField(1) + makeField(700)))
+        }
+      })
+    })
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject)
+      server.listen(0, '127.0.0.1', resolve)
+    })
+
+    const bridge = new RequestBridge()
+    const client = new EClient(bridge)
+    try {
+      const address = server.address()
+      if (address === null || typeof address === 'string') throw new Error('test server has no TCP port')
+      await expect(bridge.waitForConnect(client, '127.0.0.1', address.port, 19, 1_000))
+        .resolves.toBeUndefined()
+      expect(client.isConnected()).toBe(true)
+      expect(bridge.getNextOrderId()).toBe(700)
+    } finally {
+      client.disconnect()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  })
+
+  it('contains a server-side handshake close as a normal rejected connect', async () => {
+    const server = createServer((socket) => {
+      socket.once('data', () => socket.destroy())
+    })
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject)
+      server.listen(0, '127.0.0.1', resolve)
+    })
+
+    try {
+      const address = server.address()
+      if (address === null || typeof address === 'string') throw new Error('test server has no TCP port')
+      const bridge = new RequestBridge()
+      const client = new EClient(bridge)
+
+      const startedAt = Date.now()
+      await expect(bridge.waitForConnect(client, '127.0.0.1', address.port, 19, 1_000))
+        .rejects.toThrow('Connection to TWS/Gateway closed during handshake')
+      expect(Date.now() - startedAt).toBeLessThan(1_000)
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  }, 3_000)
+
+  it('tears down a silent handshake when the bridge timeout expires', async () => {
+    const sockets = new Set<Socket>()
+    const server = createServer((socket) => {
+      sockets.add(socket)
+      socket.once('close', () => sockets.delete(socket))
+      socket.resume()
+      // Accept and consume the greeting, but deliberately never answer.
+    })
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject)
+      server.listen(0, '127.0.0.1', resolve)
+    })
+
+    try {
+      const address = server.address()
+      if (address === null || typeof address === 'string') throw new Error('test server has no TCP port')
+      const bridge = new RequestBridge()
+      const client = new EClient(bridge)
+
+      const startedAt = Date.now()
+      await expect(bridge.waitForConnect(client, '127.0.0.1', address.port, 19, 50))
+        .rejects.toThrow('timed out after 50ms')
+      expect(Date.now() - startedAt).toBeLessThan(500)
+      expect(client.isConnected()).toBe(false)
+    } finally {
+      for (const socket of sockets) socket.destroy()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  })
+})
 
 describe('RequestBridge — error routing', () => {
   it('routes 10xxx errors into the pending request (no silent timeout)', async () => {

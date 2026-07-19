@@ -333,10 +333,29 @@ export class EClient {
 
   private waitForHandshake(): Promise<{ serverVersion: number; connTime: string }> {
     return new Promise((resolve, reject) => {
+      const conn = this.conn
+      const socket = conn?.socket
+      if (!conn || !socket) {
+        reject(new Error('Connection closed before handshake started'))
+        return
+      }
+
       let buf: Buffer = Buffer.alloc(0)
+      let timer: ReturnType<typeof setTimeout> | undefined
+
+      const cleanup = () => {
+        if (timer) clearTimeout(timer)
+        conn.removeListener('data', onData)
+        socket.removeListener('close', onClose)
+      }
+
+      const onClose = () => {
+        cleanup()
+        reject(new Error('Connection closed during handshake'))
+      }
 
       const onData = () => {
-        const incoming = this.conn!.consumeBuffer()
+        const incoming = conn.consumeBuffer()
         if (incoming.length === 0) return
 
         buf = Buffer.concat([buf, incoming])
@@ -345,8 +364,7 @@ export class EClient {
           buf = rest
           const fields = readFields(msg)
           if (fields.length >= 2) {
-            clearTimeout(timer)
-            this.conn!.removeListener('data', onData)
+            cleanup()
             resolve({
               serverVersion: parseInt(fields[0], 10),
               connTime: fields[1],
@@ -355,11 +373,12 @@ export class EClient {
         }
       }
 
-      this.conn!.on('data', onData)
+      conn.on('data', onData)
+      socket.once('close', onClose)
 
       // Timeout after 10 seconds
-      const timer = setTimeout(() => {
-        this.conn?.removeListener('data', onData)
+      timer = setTimeout(() => {
+        cleanup()
         reject(new Error('Handshake timeout'))
       }, 10000)
     })

@@ -57,6 +57,14 @@ Continuing with the next buffered frame risks accepting shifted values. Letting
 the exception escape the socket callback crashes the UTA process. Both are
 incorrect.
 
+The same containment rule applies before framing begins. A socket close during
+the API handshake is an ordinary account-level connection failure: the bridge
+must observe its `nextValidId` waiter from the instant the transport attempt
+starts, the client must stop waiting as soon as that socket closes, and the UTA
+must remain alive with that account reported as `offline/down`. A failed broker
+must never escape as a process-level unhandled rejection or take other accounts
+offline with it.
+
 ## Verification ladder
 
 Work on this boundary must proceed from narrow to broad:
