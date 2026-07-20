@@ -585,6 +585,8 @@ export interface SpawnedSession {
   readonly agent: string;
   readonly resumeId: string;
   readonly title: string | null;
+  /** Optional launch surface. Older servers omit it and therefore remain TUI-first. */
+  readonly surface?: 'terminal' | 'webpi';
 }
 
 export interface WebPiSnapshot {

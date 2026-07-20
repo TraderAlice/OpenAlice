@@ -200,7 +200,7 @@ export const configKeysHandlers = [
     })
   }),
 
-  http.get('/api/config/workspace-default-agent', () => HttpResponse.json({ agent: 'claude' })),
+  http.get('/api/config/workspace-default-agent', () => HttpResponse.json({ agent: 'pi' })),
   http.put('/api/config/workspace-default-agent', async ({ request }) => {
     const body = (await request.json().catch(() => ({}))) as { agent?: unknown }
     return HttpResponse.json({ agent: typeof body.agent === 'string' ? body.agent : null })

@@ -17,7 +17,9 @@ export function DemoTerminalStub({ label }: DemoTerminalStubProps): ReactElement
         <div className="text-sm leading-relaxed text-muted-foreground">
           In a real OpenAlice install, this pane is a live PTY running{' '}
           <span className="text-foreground">Claude Code</span>,{' '}
-          <span className="text-foreground">Codex</span>, or{' '}
+          <span className="text-foreground">Codex</span>,{' '}
+          <span className="text-foreground">opencode</span>,{' '}
+          <span className="text-foreground">Pi</span>, or{' '}
           <span className="text-foreground">shell</span> — the AI agent drives it directly: reads files, runs commands, reports back.
         </div>
         <div className="text-xs text-muted-foreground/70">
