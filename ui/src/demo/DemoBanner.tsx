@@ -8,10 +8,10 @@ export function DemoBanner(): ReactElement {
         Demo
       </span>
       <span className="min-w-0 flex-1 truncate font-medium text-muted-foreground sm:hidden">
-        Snapshot data · Read-only
+        Snapshot data · Simulated AI
       </span>
       <span className="hidden min-w-0 flex-1 truncate text-muted-foreground sm:block">
-        You&apos;re looking at a snapshot of OpenAlice with recorded data. Mutations don&apos;t persist; the agent terminal is replayed.
+        You&apos;re looking at a snapshot of OpenAlice with recorded data. Mutations don&apos;t persist; WebPi replies are simulated.
       </span>
       <a
         href="https://github.com/TraderAlice/OpenAlice"

@@ -12,11 +12,12 @@ const demoSession: SessionRecord = {
   id: DEMO_SESSION_ID,
   resumeId: 'demo-resume-main',
   wsId: DEMO_WORKSPACE_ID,
-  agent: 'claude',
-  name: 'c1',
+  agent: 'pi',
+  name: 'p1',
   createdAt: new Date().toISOString(),
   lastActiveAt: new Date().toISOString(),
   state: 'running',
+  surface: 'webpi',
   pid: 0,
   startedAt: Date.now(),
   title: "What jumped out from Apple's Q1 earnings?",
@@ -32,15 +33,15 @@ export const demoWorkspace: Workspace = {
   spawnedFromVersion: '0.1.0',
   currentVersion: '0.1.0',
   upgradeAvailable: { from: '0.1.0', to: '0.2.0' },
-  agents: ['claude'],
+  agents: ['pi'],
   sessions: [demoSession],
   agentOverride: { claude: false, codex: false, opencode: false, pi: false },
 }
 
 // Chat workspace — populates the Chat activity sidebar (which filters
-// `template === 'chat'`). No transcript registered, so its session pane
-// falls back to DemoTerminalStub — that's the right "this is a live PTY
-// in real OpenAlice" placeholder for demo mode.
+// `template === 'chat'`). Its featured Session uses the real WebPi renderer
+// over recorded native Pi messages; the remaining rows keep the multi-runtime
+// history visible.
 export const DEMO_CHAT_WORKSPACE_ID = 'demo-chat-ws'
 export const DEMO_CHAT_SESSION_ID = 'demo-chat-session'
 
@@ -52,11 +53,12 @@ const demoChatSessions: SessionRecord[] = [
     id: DEMO_CHAT_SESSION_ID,
     resumeId: 'demo-resume-chat',
     wsId: DEMO_CHAT_WORKSPACE_ID,
-    agent: 'claude',
-    name: 'c1',
+    agent: 'pi',
+    name: 'p1',
     createdAt: new Date().toISOString(),
     lastActiveAt: new Date().toISOString(),
     state: 'running',
+    surface: 'webpi',
     pid: 0,
     startedAt: Date.now(),
     title: "What's moving in semiconductors today?",
@@ -92,7 +94,7 @@ const demoChatSessions: SessionRecord[] = [
     resumeId: 'demo-resume-p1',
     wsId: DEMO_CHAT_WORKSPACE_ID,
     agent: 'pi',
-    name: 'p1',
+    name: 'p2',
     createdAt: new Date().toISOString(),
     lastActiveAt: new Date().toISOString(),
     state: 'paused',
@@ -128,7 +130,7 @@ export const chatTemplate: TemplateInfo = {
   description:
     "General-purpose Alice workspace — Alice's full tool surface (market/research data + trading) via the alice*/traderhub CLIs on PATH.",
   groupOrder: 10,
-  defaultAgents: ['claude', 'codex'],
+  defaultAgents: ['pi'],
   version: '0.2.0',
   hasReadme: false,
 }

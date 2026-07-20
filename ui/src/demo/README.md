@@ -1,4 +1,4 @@
-# `ui/src/demo/` — Stage 1 Demo Mode
+# `ui/src/demo/` — Demo Mode
 
 Runs the UI with no backend by intercepting `fetch` / `EventSource` via MSW.
 Gated by `import.meta.env.VITE_DEMO_MODE`; tree-shaken in production builds.
@@ -15,8 +15,11 @@ Gated by `import.meta.env.VITE_DEMO_MODE`; tree-shaken in production builds.
   last in `handlers/index.ts`.
 - `fixtures/` — typed const exports. Only non-trivial shapes get their own
   file; empty arrays / nulls live inline in handlers.
-- `DemoTerminalStub.tsx` — rendered by `TerminalView` when the env flag is on
-  (Terminal.tsx has a 1-line early-return guard).
+- `fixtures/webpi.ts` — recorded native Pi messages for the featured Sessions.
+  The normal `WebPiView` renders them; demo mode replaces only the HTTP
+  transport and never forks the conversation UI.
+- `DemoTerminalReplay.tsx` / `DemoTerminalStub.tsx` — legacy TUI preview and
+  fallback for the non-Pi runtime rows retained in the demo.
 
 ## Running
 
@@ -31,7 +34,6 @@ Walk the `[demo] unmocked …` console.warn output from `catchAll` to find
 endpoints that need real handlers. Then:
 
 - Rich fixtures (multiple UTAs, varied positions, P&L, workspace sessions).
-- Scripted SSE timelines for events + chat (multi-turn convos, tool calls).
-- WebSocket PTY replay — waits for MSW v2 WS GA (currently `next` tag).
-- In-memory mutation persistence (create-then-reload survives).
-- Persistent "Demo Mode" UI banner.
+- Scripted timelines for the remaining event-driven surfaces.
+- Richer multi-turn WebPi recordings and explicit scenario selection.
+- In-memory mutation coverage beyond Quick Chat (create-then-reload survives).

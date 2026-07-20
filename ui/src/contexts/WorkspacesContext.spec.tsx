@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => ({
   pauseSession: vi.fn(),
   resumeSession: vi.fn(),
   openWebPiSession: vi.fn(),
+  quickChat: vi.fn(),
   deleteSession: vi.fn(),
   getWorkspaceState: vi.fn(),
 }))
@@ -58,6 +59,7 @@ vi.mock('../components/workspace/api', async (importOriginal) => {
     pauseSession: mocks.pauseSession,
     resumeSession: mocks.resumeSession,
     openWebPiSession: mocks.openWebPiSession,
+    quickChat: mocks.quickChat,
     deleteSession: mocks.deleteSession,
   }
 })
@@ -169,6 +171,20 @@ function SessionDeleteProbe() {
   )
 }
 
+function QuickChatProbe() {
+  const { hasLoaded, quickChat, workspaces } = useWorkspaces()
+  const newest = workspaces.flatMap((candidate) => candidate.sessions).at(-1)
+  return (
+    <div>
+      <span>{hasLoaded ? 'Ready' : 'Loading'}</span>
+      <span>{newest?.surface ?? 'No surface'}</span>
+      <button type="button" onClick={() => void quickChat('Show me the tape.', 'pi', 'demo-key', 'research-desk')}>
+        Start quick chat
+      </button>
+    </div>
+  )
+}
+
 beforeEach(async () => {
   vi.clearAllMocks()
   await i18n.changeLanguage('en')
@@ -182,6 +198,20 @@ beforeEach(async () => {
   mocks.pauseSession.mockResolvedValue(true)
   mocks.resumeSession.mockResolvedValue(null)
   mocks.openWebPiSession.mockResolvedValue({ pid: 43, startedAt: 3 })
+  mocks.quickChat.mockResolvedValue({
+    workspace: workspace(),
+    session: {
+      sessionId: 'pi-demo-chat',
+      wsId: 'research-desk',
+      agent: 'pi',
+      name: 'p1',
+      pid: 44,
+      startedAt: 4,
+      resumeId: 'resume-pi-demo-chat',
+      title: 'Show me the tape.',
+      surface: 'webpi',
+    },
+  })
   mocks.deleteSession.mockResolvedValue(true)
   mocks.getWorkspaceState.mockReturnValue({
     tabs: {},
@@ -197,6 +227,29 @@ beforeEach(async () => {
 afterEach(cleanup)
 
 describe('WorkspacesProvider conversation routing', () => {
+  it('adopts an explicit WebPi surface returned by quick-chat', async () => {
+    mocks.listWorkspaces
+      .mockResolvedValueOnce([workspace()])
+      .mockImplementation(() => new Promise(() => undefined))
+
+    render(
+      <ToastProvider>
+        <WorkspacesProvider>
+          <QuickChatProbe />
+        </WorkspacesProvider>
+      </ToastProvider>,
+    )
+
+    expect(await screen.findByText('Ready')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Start quick chat' }))
+
+    expect(await screen.findByText('webpi')).toBeTruthy()
+    expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'workspace',
+      params: { wsId: 'research-desk', sessionId: 'pi-demo-chat', source: 'chat' },
+    })
+  })
+
   it('opens a materialized headless Session on the Ask Alice surface', async () => {
     render(
       <ToastProvider>
