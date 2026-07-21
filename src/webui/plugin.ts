@@ -20,6 +20,7 @@ import { createToolsRoutes } from './routes/tools.js'
 import { createAgentStatusRoutes } from './routes/agent-status.js'
 import { createPersonaRoutes } from './routes/persona.js'
 import { createNewsRoutes } from './routes/news.js'
+import { createResearchRoutes } from './routes/research.js'
 import { createMarketRoutes } from './routes/market.js'
 import { createBarsRoutes } from './routes/bars.js'
 import { createReferenceRoutes } from './routes/reference.js'
@@ -233,6 +234,7 @@ export class WebPlugin implements Plugin {
     app.route('/api/tools', createToolsRoutes(ctx.toolCenter))
     app.route('/api/agent-status', createAgentStatusRoutes(ctx))
     app.route('/api/news', createNewsRoutes(ctx))
+    app.route('/api/research', createResearchRoutes(ctx))
     app.route('/api/market', createMarketRoutes(ctx))
     app.route('/api/bars', createBarsRoutes(ctx))
     app.route('/api/reference', createReferenceRoutes(ctx))

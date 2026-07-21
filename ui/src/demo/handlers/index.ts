@@ -14,6 +14,7 @@ import { agentStatusHandlers } from './agentStatus'
 import { newsListHandlers } from './newsList'
 import { devMiscHandlers } from './devMisc'
 import { headlessHandlers } from './headless'
+import { researchHandlers } from './research'
 import { preferencesHandlers } from './preferences'
 import { inquiryHandlers } from './inquiries'
 import { connectorsHandlers } from './connectors'
@@ -39,6 +40,7 @@ export const handlers = [
   ...newsListHandlers,
   ...devMiscHandlers,
   ...headlessHandlers,
+  ...researchHandlers,
   ...preferencesHandlers,
   ...inquiryHandlers,
   ...connectorsHandlers,

@@ -1,5 +1,5 @@
 import { readFile, writeFile, mkdir } from 'fs/promises'
-import { dirname } from 'path'
+import { dirname, join } from 'path'
 import {
   acquireOpenAliceRuntimeLocks,
   takeoverRequested,
@@ -69,6 +69,10 @@ import { provenanceShowFactory } from './tool/provenance-show.js'
 import { conversationToolFactories } from './tool/conversation.js'
 import { artifactConversationToolFactories } from './tool/conversation-artifacts.js'
 import { createToolCallLog } from './core/tool-call-log.js'
+import { createJmbMt5DecisionScheduler } from './task/mt5-decision-scheduler.js'
+import { createJmbMt5OutcomeImporter, importReconciledExecutionOutcomes } from './task/mt5-outcome-importer.js'
+import { DEFAULT_JMB_DEMO_INSTRUMENTS, runDemoDecisionCycle } from './domain/mt5/demo-decision-service.js'
+import { resolveJmbMt5Roots } from './domain/mt5/local-paths.js'
 import { NewsCollectorStore, NewsCollector } from './domain/news/index.js'
 import { createNewsArchiveTools } from './tool/news.js'
 
@@ -409,6 +413,23 @@ async function main() {
     console.log(`plugin started: ${plugin.name}`)
   }
 
+  const mt5DecisionScheduler = createJmbMt5DecisionScheduler({
+    runCycle: async () => runDemoDecisionCycle({ roots: resolveJmbMt5Roots() }),
+  })
+  await mt5DecisionScheduler.start()
+
+  const mt5Roots = resolveJmbMt5Roots()
+  const mt5OutcomeImporter = createJmbMt5OutcomeImporter({
+    runCycle: async () => importReconciledExecutionOutcomes({
+      executionRoot: mt5Roots.executionRoot,
+      learningRoot: join(mt5Roots.researchRoot, 'mt5-execution-learning'),
+      instruments: DEFAULT_JMB_DEMO_INSTRUMENTS
+        .filter((instrument) => instrument.symbol === 'XAUUSD')
+        .map(({ broker, server, symbol }) => ({ broker, server, symbol })),
+    }),
+  })
+  await mt5OutcomeImporter.start()
+
   console.log('engine: started')
 
   // Broker catalog refresh, snapshot scheduling, and broker close-on-
@@ -419,6 +440,8 @@ async function main() {
   let stopped = false
   const shutdown = async () => {
     stopped = true
+    mt5OutcomeImporter.stop()
+    mt5DecisionScheduler.stop()
     newsCollector?.stop()
     for (const plugin of [...corePlugins, ...optionalPlugins.values()]) {
       await plugin.stop()
