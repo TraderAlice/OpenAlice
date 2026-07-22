@@ -31,6 +31,7 @@ const packageNames: Record<InstallableBrokerEngine, string> = {
   ibkr: '@traderalice/uta-broker-ibkr',
   leverup: '@traderalice/uta-broker-leverup',
   longbridge: '@traderalice/uta-broker-longbridge',
+  snaptrade: '@traderalice/uta-broker-snaptrade',
 }
 
 await rm(outDir, { recursive: true, force: true })

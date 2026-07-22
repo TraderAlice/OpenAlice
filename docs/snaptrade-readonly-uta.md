@@ -42,8 +42,10 @@ workflow.
 The pack maps these SnapTrade reads into `IBroker`:
 
 - account balances and buying power;
-- equity and option positions, including quantity, cost basis, price, currency,
-  multiplier, and option contract metadata;
+- stock-like equity positions (stocks, ETFs, ADRs, CEFs, and mutual funds),
+  including fractional quantity, cost basis, price, and currency. Options,
+  futures, crypto, and cash-equivalent instruments loud-refuse until their
+  dedicated contract mappings are implemented;
 - recent/open orders and single-order lookup;
 - connection status and `data_freshness_mode`.
 
