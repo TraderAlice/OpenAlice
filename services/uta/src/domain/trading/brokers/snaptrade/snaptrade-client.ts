@@ -1,5 +1,5 @@
 import { createHmac } from 'node:crypto'
-import type { SnapTradeConnection, SnapTradePositionResponse } from './snaptrade-read-model.js'
+import type { SnapTradeBalance, SnapTradeConnection, SnapTradeOrder, SnapTradePositionResponse } from './snaptrade-read-model.js'
 
 export interface SnapTradePersonalCredentials {
   clientId: string
@@ -54,6 +54,15 @@ export class SnapTradeClient {
   async getAllAccountPositions(accountId: string): Promise<SnapTradePositionResponse> {
     if (!accountId) throw new Error('SnapTrade accountId is required')
     return this.get<SnapTradePositionResponse>(`/accounts/${encodeURIComponent(accountId)}/positions/all`)
+  }
+
+  async getAccountBalances(accountId: string): Promise<SnapTradeBalance[]> {
+    return this.get<SnapTradeBalance[]>(`/accounts/${requiredPathSegment(accountId, 'accountId')}/balances`)
+  }
+
+  async getAccountOrders(accountId: string, days = 30): Promise<SnapTradeOrder[]> {
+    if (!Number.isInteger(days) || days < 1 || days > 90) throw new Error('SnapTrade order lookback must be an integer from 1 to 90 days')
+    return this.get<SnapTradeOrder[]>(`/accounts/${requiredPathSegment(accountId, 'accountId')}/orders`, [['days', String(days)]])
   }
 
   async request<T>(path: string, options: SnapTradeRequestOptions = {}): Promise<T> {
@@ -120,4 +129,9 @@ function sortKeys(value: unknown): unknown {
 
 function isNonEmptyObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length > 0
+}
+
+function requiredPathSegment(value: string, label: string): string {
+  if (!value) throw new Error(`SnapTrade ${label} is required`)
+  return encodeURIComponent(value)
 }

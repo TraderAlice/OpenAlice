@@ -15,6 +15,22 @@ export interface SnapTradePositionResponse {
   data_freshness?: { as_of?: string }
 }
 
+export interface SnapTradeBalance {
+  currency: { code: string }
+  cash: number | null
+  buying_power: number | null
+}
+
+export interface SnapTradeOrder {
+  brokerage_order_id: string
+  status: string
+  open_quantity: string | null
+  total_quantity: string | null
+  order_type: string | null
+  time_in_force: string
+  universal_symbol?: { symbol: string; raw_symbol?: string | null } | null
+}
+
 export interface SnapTradeRawPosition {
   instrument: {
     id: string
