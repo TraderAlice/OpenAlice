@@ -42,4 +42,20 @@ describe('SnapTradeClient', () => {
       requestId: 'request-123',
     }))
   })
+
+  it('uses only read endpoints for connection discovery and position reads', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ results: [] }), { status: 200 }))
+    const client = new SnapTradeClient({ clientId: 'client', consumerKey: 'secret' }, fetchImpl, () => 1_700_000_000_000)
+
+    await client.listConnections()
+    await client.getAllAccountPositions('account/id')
+
+    expect(fetchImpl.mock.calls.map(([url]) => String(url))).toEqual([
+      'https://api.snaptrade.com/authorizations?clientId=client&timestamp=1700000000',
+      'https://api.snaptrade.com/accounts/account%2Fid/positions/all?clientId=client&timestamp=1700000000',
+    ])
+    expect(fetchImpl.mock.calls.map(([, init]) => (init as RequestInit).method)).toEqual(['GET', 'GET'])
+  })
 })

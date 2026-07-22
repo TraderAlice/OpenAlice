@@ -1,4 +1,5 @@
 import { createHmac } from 'node:crypto'
+import type { SnapTradeConnection, SnapTradePositionResponse } from './snaptrade-read-model.js'
 
 export interface SnapTradePersonalCredentials {
   clientId: string
@@ -42,6 +43,17 @@ export class SnapTradeClient {
 
   async get<T>(path: string, query: readonly [string, string][] = []): Promise<T> {
     return this.request<T>(path, { method: 'GET', query })
+  }
+
+  /** List provider connections for this Personal key. Never registers a user. */
+  async listConnections(): Promise<SnapTradeConnection[]> {
+    return this.get<SnapTradeConnection[]>('/authorizations')
+  }
+
+  /** Read the unified v2 position endpoint for one immutable SnapTrade account. */
+  async getAllAccountPositions(accountId: string): Promise<SnapTradePositionResponse> {
+    if (!accountId) throw new Error('SnapTrade accountId is required')
+    return this.get<SnapTradePositionResponse>(`/accounts/${encodeURIComponent(accountId)}/positions/all`)
   }
 
   async request<T>(path: string, options: SnapTradeRequestOptions = {}): Promise<T> {
