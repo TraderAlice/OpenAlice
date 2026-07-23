@@ -1,8 +1,10 @@
 # Issue Model and Effort Overrides
 
-Status: In progress
+Status: Completed
 
 Related issues: #706, #710
+
+Delivered by: #715
 
 Owner guides: [[docs/model-semantics-and-runtime-injection.md]],
 [[docs/workspace-issues-and-scheduling.md]],
@@ -102,7 +104,7 @@ Not in scope:
 - [x] Run the proportional Electron/workspace smoke required by the final
   touched runtime surface.
 - [x] Update this plan and owner guides to match delivered behavior.
-- [ ] Publish and merge a serial PR to `dev`, then move this plan to Completed.
+- [x] Publish and merge a serial PR to `dev`, then move this plan to Completed.
 
 ## Completion Criteria
 
