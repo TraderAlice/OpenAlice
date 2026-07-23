@@ -396,6 +396,31 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  packages/uta-broker-snaptrade:
+    dependencies:
+      '@traderalice/ibkr':
+        specifier: workspace:*
+        version: link:../ibkr
+      '@traderalice/uta-protocol':
+        specifier: workspace:*
+        version: link:../uta-protocol
+      decimal.js:
+        specifier: ^10.6.0
+        version: 10.6.0
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
+    devDependencies:
+      '@types/node':
+        specifier: ^22.13.4
+        version: 22.19.15
+      tsup:
+        specifier: ^8.5.1
+        version: 8.5.1(jiti@2.6.1)(postcss@8.5.10)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.9.0)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   packages/uta-protocol:
     dependencies:
       '@traderalice/ibkr':
