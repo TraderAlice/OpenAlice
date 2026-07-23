@@ -26,7 +26,7 @@
  */
 
 import { computeNextRun, type Schedule } from '../../core/schedule-expr.js'
-import type { CliAdapter } from '../cli-adapter.js'
+import type { CliAdapter, HeadlessRunOverrides } from '../cli-adapter.js'
 import type { Logger } from '../logger.js'
 import type { WorkspaceMeta, WorkspaceRegistry } from '../workspace-registry.js'
 import type { HeadlessTaskTrigger } from '../headless-task-registry.js'
@@ -91,6 +91,10 @@ export interface ScheduleScannerDeps {
     trigger?: HeadlessTaskTrigger,
     /** Product Session to continue. Omitted means allocate a fresh Session. */
     resumeId?: string,
+    /** Optional reverse-link metadata; scheduler leaves this absent. */
+    inquiry?: undefined,
+    /** One-run model/effort selection inherited from Issue frontmatter. */
+    overrides?: HeadlessRunOverrides,
   ) => Promise<{ taskId: string; resumeId: string }>
   /** Persist @new -> exact @resumeId after the first fresh dispatch. */
   claimFreshSession?: (input: {
@@ -176,6 +180,7 @@ export class ScheduleScanner {
       issue.id,
       issueFirePrompt(issue),
       issue.agent,
+      issueRunOverrides(issue),
       issueAssigneeResumeId(issue.assignee) ?? undefined,
       issueAssigneeClaimsFirstSession(issue.assignee),
       true,
@@ -265,6 +270,7 @@ export class ScheduleScanner {
           issue.id,
           issueFirePrompt(issue),
           issue.agent,
+          issueRunOverrides(issue),
           issueAssigneeResumeId(issue.assignee) ?? undefined,
           issueAssigneeClaimsFirstSession(issue.assignee),
           nowMs,
@@ -288,6 +294,7 @@ export class ScheduleScanner {
     taskId: string,
     what: string,
     agentId: string | undefined,
+    overrides: HeadlessRunOverrides | undefined,
     resumeId: string | undefined,
     claimFreshSession: boolean,
     nowMs: number,
@@ -298,6 +305,7 @@ export class ScheduleScanner {
         taskId,
         what,
         agentId,
+        overrides,
         resumeId,
         claimFreshSession,
       )
@@ -325,6 +333,7 @@ export class ScheduleScanner {
     issueId: string,
     what: string,
     agentId?: string,
+    overrides?: HeadlessRunOverrides,
     resumeId?: string,
     claimFreshSession = false,
     manual = false,
@@ -357,21 +366,43 @@ export class ScheduleScanner {
         issueId,
       }
       const result = resumeId
-        ? await this.deps.dispatch(
-            executionWorkspace,
-            adapter,
-            what,
-            SCHEDULED_ISSUE_RUN_TIMEOUT_MS,
-            trigger,
-            resumeId,
-          )
-        : await this.deps.dispatch(
-            executionWorkspace,
-            adapter,
-            what,
-            SCHEDULED_ISSUE_RUN_TIMEOUT_MS,
-            trigger,
-          )
+        ? overrides
+          ? await this.deps.dispatch(
+              executionWorkspace,
+              adapter,
+              what,
+              SCHEDULED_ISSUE_RUN_TIMEOUT_MS,
+              trigger,
+              resumeId,
+              undefined,
+              overrides,
+            )
+          : await this.deps.dispatch(
+              executionWorkspace,
+              adapter,
+              what,
+              SCHEDULED_ISSUE_RUN_TIMEOUT_MS,
+              trigger,
+              resumeId,
+            )
+        : overrides
+          ? await this.deps.dispatch(
+              executionWorkspace,
+              adapter,
+              what,
+              SCHEDULED_ISSUE_RUN_TIMEOUT_MS,
+              trigger,
+              undefined,
+              undefined,
+              overrides,
+            )
+          : await this.deps.dispatch(
+              executionWorkspace,
+              adapter,
+              what,
+              SCHEDULED_ISSUE_RUN_TIMEOUT_MS,
+              trigger,
+            )
       if (claimFreshSession) {
         if (!this.deps.claimFreshSession) {
           throw new Error('Issue @new ownership cannot be persisted in this runtime')
@@ -413,5 +444,13 @@ export class ScheduleScanner {
 
   private resolveResumeWorkspace(resumeId: string): WorkspaceMeta | undefined {
     return this.deps.resolveResumeWorkspace?.(resumeId)
+  }
+}
+
+function issueRunOverrides(issue: IssueRecord): HeadlessRunOverrides | undefined {
+  if (!issue.model && !issue.effort) return undefined
+  return {
+    ...(issue.model ? { model: issue.model } : {}),
+    ...(issue.effort ? { reasoningEffort: issue.effort } : {}),
   }
 }

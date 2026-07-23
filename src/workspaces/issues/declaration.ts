@@ -25,6 +25,8 @@
  *         { kind: cron, cron, timezone?: local | IANA zone }  (OPTIONAL — present iff scheduled)
  *   what: <legacy fire prompt; migrated into the markdown What body>
  *   agent: <optional adapter id for the scheduled run>
+ *   model: <optional native model id for one scheduled run>
+ *   effort: none | minimal | low | medium | high | xhigh | max
  *   ---
  *   <markdown What — the exact work definition and scheduled prompt>
  *
@@ -39,6 +41,10 @@ import { parse as parseYaml } from 'yaml'
 import { z } from 'zod'
 
 import { isValidScheduleTimezone, type Schedule } from '../../core/schedule-expr.js'
+import {
+  isModelReasoningEffort,
+  type ModelReasoningEffort,
+} from '../../ai-providers/model-semantics.js'
 import {
   HUMAN_ASSIGNEE,
   NEW_ASSIGNEE,
@@ -126,6 +132,13 @@ export const issueFrontmatterSchema = z.object({
   /** Runtime override for Workspace-owned scheduled work. A Session owner
    * already carries its runtime identity and therefore cannot set this. */
   agent: z.string().min(1).optional(),
+  /** One-run model selection. Provider routing and authentication remain
+   * inherited from the Workspace/native login. */
+  model: z.string().min(1).optional(),
+  /** One-run reasoning effort, projected through the selected native CLI. */
+  effort: z.custom<ModelReasoningEffort>(isModelReasoningEffort, {
+    message: 'effort must be none, minimal, low, medium, high, xhigh, or max',
+  }).optional(),
   /** Migration 0018 removes the former parallel ownership field. Keeping a
    * `never` key makes stale files fail loudly instead of being silently read. */
   execution: z.never().optional(),
@@ -144,12 +157,15 @@ export const issueFrontmatterSchema = z.object({
       message: '@new needs a schedule so its first run can claim a Session',
     })
   }
-  if (issueAssigneeResumeId(value.assignee) && value.agent) {
-    ctx.addIssue({
-      code: 'custom',
-      path: ['agent'],
-      message: 'session assignee owns its runtime; remove the agent override',
-    })
+  if (issueAssigneeResumeId(value.assignee)) {
+    for (const field of ['agent', 'model', 'effort'] as const) {
+      if (!value[field]) continue
+      ctx.addIssue({
+        code: 'custom',
+        path: [field],
+        message: `session assignee owns its runtime; remove the ${field} override`,
+      })
+    }
   }
 })
 type IssueFrontmatterFile = z.infer<typeof issueFrontmatterSchema>

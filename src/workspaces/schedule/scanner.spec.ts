@@ -69,6 +69,8 @@ interface IssueSpec {
   status?: string
   priority?: string
   agent?: string
+  model?: string
+  effort?: string
   assignee?: string
   body?: string
 }
@@ -80,6 +82,8 @@ function issueMd(spec: IssueSpec): string {
   if (spec.priority) lines.push(`priority: ${spec.priority}`)
   if (spec.what) lines.push(`what: ${spec.what}`)
   if (spec.agent) lines.push(`agent: ${spec.agent}`)
+  if (spec.model) lines.push(`model: ${spec.model}`)
+  if (spec.effort) lines.push(`effort: ${spec.effort}`)
   if (spec.assignee) lines.push(`assignee: ${JSON.stringify(spec.assignee)}`)
   if (spec.when) {
     const w = spec.when
@@ -185,6 +189,30 @@ describe('ScheduleScanner', () => {
       kind: 'issue', workspaceId: 'w1', issueId: 't1',
     })
     expect(markers.get('w1', 't1')).toBe(NOW)
+  })
+
+  it('passes Issue model and effort as one-run dispatch overrides', async () => {
+    const ws = await makeWs('w1', [{
+      id: 'tuned',
+      title: 'tuned run',
+      when: { kind: 'every', every: '30m' },
+      what: 'go',
+      agent: 'claude',
+      model: 'claude-opus-4-8',
+      effort: 'high',
+    }])
+    const { scanner, dispatch } = scannerFor([ws])
+    await scanner.scan()
+    expect(dispatch).toHaveBeenCalledWith(
+      ws,
+      headlessAdapter,
+      'go',
+      expect.any(Number),
+      { kind: 'issue', workspaceId: 'w1', issueId: 'tuned' },
+      undefined,
+      undefined,
+      { model: 'claude-opus-4-8', reasoningEffort: 'high' },
+    )
   })
 
   it('passes one exact resumeId through adapter resolution and dispatch', async () => {

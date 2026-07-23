@@ -1,4 +1,10 @@
-import type { IssueComment, IssueDetail, IssuePriority, IssueRunRecord, IssueSnapshot, IssueStatus } from '../../api/issues'
+import type {
+  IssueComment,
+  IssueDetail,
+  IssuePatch,
+  IssueRunRecord,
+  IssueSnapshot,
+} from '../../api/issues'
 import { demoInboxEntries } from './inbox'
 
 // GET /api/issues aggregates every workspace's declared issues by SCANNING
@@ -491,13 +497,20 @@ const demoIssueComments: Record<string, IssueComment[]> = {}
 export function demoIssueUpdate(
   wsId: string,
   id: string,
-  patch: { status?: IssueStatus; priority?: IssuePriority; assignee?: string; agent?: string | null; what?: string },
+  patch: IssuePatch,
 ): IssueDetail | null {
   const boardIssue = findBoardIssue(wsId, id)
   if (!boardIssue) return null
   if (patch.status !== undefined) boardIssue.status = patch.status
   if (patch.priority !== undefined) boardIssue.priority = patch.priority
-  if (patch.assignee !== undefined) boardIssue.assignee = patch.assignee
+  if (patch.assignee !== undefined) {
+    boardIssue.assignee = patch.assignee
+    if (patch.assignee.startsWith('@resume-')) {
+      delete boardIssue.agent
+      delete boardIssue.model
+      delete boardIssue.effort
+    }
+  }
   if (patch.what !== undefined) {
     const key = `${wsId}/${id}`
     const existing = demoIssueExtras[key]
@@ -519,6 +532,14 @@ export function demoIssueUpdate(
     } else if (patch.agent !== null) {
       demoIssueExtras[key] = { body: `${boardIssue.title}\n\n(No description.)`, agent: patch.agent, runs: [] }
     }
+  }
+  if (patch.model !== undefined) {
+    if (patch.model === null) delete boardIssue.model
+    else boardIssue.model = patch.model
+  }
+  if (patch.effort !== undefined) {
+    if (patch.effort === null) delete boardIssue.effort
+    else boardIssue.effort = patch.effort
   }
   return demoIssueDetail(wsId, id)
 }

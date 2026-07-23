@@ -85,6 +85,20 @@ describe('HeadlessTaskRegistry', () => {
     expect(reg2.get(fired.taskId)?.trigger?.issueId).toBe('daily-scan')
   })
 
+  it('persists requested one-run model and effort', async () => {
+    const reg = await HeadlessTaskRegistry.load(path, noopLogger)
+    const task = await createTask(reg, {
+      wsId: 'w1',
+      agent: 'codex',
+      model: 'gpt-5.6',
+      effort: 'high',
+      prompt: 'x',
+      startedAt: 1,
+    })
+    const reg2 = await HeadlessTaskRegistry.load(path, noopLogger)
+    expect(reg2.get(task.taskId)).toMatchObject({ model: 'gpt-5.6', effort: 'high' })
+  })
+
   it('persists and reverse-filters business inquiry subjects', async () => {
     const reg = await HeadlessTaskRegistry.load(path, noopLogger)
     const inbox = await createTask(reg, {

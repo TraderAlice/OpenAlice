@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 import type {
   AgentInteractiveSetupStatus,
   CliAdapter,
+  HeadlessRunOverrides,
   SpawnContext,
   WorkspaceAiCred,
 } from '../cli-adapter.js';
@@ -25,6 +26,7 @@ const CLAUDE_OWNED_PATHS = [
 ] as const;
 
 const CLAUDE_PROJECT_EFFORTS = new Set<ModelReasoningEffort>(['low', 'medium', 'high', 'xhigh']);
+const CLAUDE_RUN_EFFORTS = new Set<ModelReasoningEffort>(['low', 'medium', 'high', 'max']);
 
 function claudeProjectEffort(value: unknown): ModelReasoningEffort | null {
   return typeof value === 'string' && CLAUDE_PROJECT_EFFORTS.has(value as ModelReasoningEffort)
@@ -190,14 +192,24 @@ export const claudeAdapter: CliAdapter = {
   // progress in the task log AND every event carries `session_id`, so the
   // run's identity is captured from line 1 instead of parsed out of a final
   // result blob (verified 2.1.x, 2026-06-11).
-  composeHeadlessCommand(base: readonly string[], ctx: SpawnContext, prompt: string): readonly string[] {
+  composeHeadlessCommand(
+    base: readonly string[],
+    ctx: SpawnContext,
+    prompt: string,
+    overrides?: HeadlessRunOverrides,
+  ): readonly string[] {
     if (ctx.resume === 'last') {
       throw new Error('claude headless: resume requires a concrete resumeId mapping')
+    }
+    if (overrides?.reasoningEffort && !CLAUDE_RUN_EFFORTS.has(overrides.reasoningEffort)) {
+      throw new Error(`Claude Code cannot use one-run effort ${overrides.reasoningEffort}`)
     }
     return [
       ...base,
       '--settings', AUTOTRUST_SETTINGS,
       '--allowedTools', HEADLESS_ALLOWED_TOOLS,
+      ...(overrides?.model ? ['--model', overrides.model] : []),
+      ...(overrides?.reasoningEffort ? ['--effort', overrides.reasoningEffort] : []),
       ...(ctx.resume ? ['--resume', ctx.resume.sessionId] : []),
       '-p', '--output-format', 'stream-json', '--verbose',
       '--', prompt,
@@ -295,7 +307,7 @@ export const claudeAdapter: CliAdapter = {
   },
 
   async writeAiConfig(cwd: string, cred: WorkspaceAiCred): Promise<void> {
-    const hasAny = cred.baseUrl || cred.apiKey || cred.model;
+    const hasAny = cred.baseUrl || cred.apiKey || cred.model || cred.reasoningEffort;
     if (!hasAny) {
       await resetOwnedJsonConfig({
         cwd,

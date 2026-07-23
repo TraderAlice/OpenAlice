@@ -12,6 +12,7 @@
  */
 
 import type { InboxEntry } from '../../core/inbox-store.js'
+import type { ModelReasoningEffort } from '../../ai-providers/model-semantics.js'
 import {
   ACTIVITY_UPDATE_COALESCE_MS,
   artifactOriginsMatch,
@@ -41,6 +42,8 @@ export interface IssuesSnapshotIssue {
   assignee: string
   /** Adapter id for the scheduled fire (frontmatter `agent`), if set. */
   agent?: string
+  model?: string
+  effort?: ModelReasoningEffort
   /** Present iff the issue self-schedules. */
   when?: Schedule
   /** When the scanner last fired this issue (epoch ms); only for scheduled issues. */
@@ -138,6 +141,8 @@ export interface BoardRow {
   assignee: string
   /** Adapter id for the scheduled fire override, if set. */
   agent?: string
+  model?: string
+  effort?: ModelReasoningEffort
   /** True iff the issue self-schedules (snapshot `when` present). */
   scheduled: boolean
   /** Live scheduler/worker health for scheduled rows. */
@@ -178,6 +183,8 @@ export function flattenBoardRows(snapshot: IssuesSnapshot): {
         priority: issue.priority,
         assignee: issue.assignee,
         ...(issue.agent ? { agent: issue.agent } : {}),
+        ...(issue.model ? { model: issue.model } : {}),
+        ...(issue.effort ? { effort: issue.effort } : {}),
         scheduled: issue.when !== undefined,
         ...(issue.automationHealth ? { automationHealth: issue.automationHealth } : {}),
         workspace: { wsId: ws.wsId, tag: ws.tag },
@@ -304,6 +311,8 @@ export interface IssueRunRecord {
   wsId: string
   issueId?: string
   agent: string
+  model?: string
+  effort?: ModelReasoningEffort
   prompt: string
   status: HeadlessTaskStatus
   startedAt: number
@@ -332,6 +341,8 @@ export function issueRunRecord(task: HeadlessTaskRecord, resumable: boolean): Is
     wsId: task.wsId,
     ...(task.trigger?.kind === 'issue' ? { issueId: task.trigger.issueId } : {}),
     agent: task.agent,
+    ...(task.model ? { model: task.model } : {}),
+    ...(task.effort ? { effort: task.effort } : {}),
     prompt: task.prompt,
     status: task.status,
     startedAt: task.startedAt,
@@ -401,6 +412,8 @@ export function detailIssue(
     assignee: issue.assignee,
     ...(issue.when ? { when: issue.when } : {}),
     ...(issue.agent ? { agent: issue.agent } : {}),
+    ...(issue.model ? { model: issue.model } : {}),
+    ...(issue.effort ? { effort: issue.effort } : {}),
     ...(markers ? {
       lastFiredAtMs: markers.lastFiredAtMs,
       nextDueAtMs: markers.nextDueAtMs,
@@ -423,6 +436,8 @@ export function snapshotBoardIssue(
     priority: issue.priority,
     assignee: issue.assignee,
     ...(issue.agent ? { agent: issue.agent } : {}),
+    ...(issue.model ? { model: issue.model } : {}),
+    ...(issue.effort ? { effort: issue.effort } : {}),
     ...(issue.when ? { when: issue.when } : {}),
     ...(markers ? {
       lastFiredAtMs: markers.lastFiredAtMs,

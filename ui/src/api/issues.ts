@@ -3,6 +3,7 @@ import type { Entity } from './entities'
 import type { HeadlessTaskRecord } from './headless'
 import type { InboxEntry } from './inbox'
 import type { ScheduleWhen } from './schedule'
+import type { ModelReasoningEffort } from './types'
 
 /**
  * Issue board — the canonical client shape for GET /api/issues.
@@ -113,6 +114,10 @@ export interface IssueListItem {
   assignee: string
   /** Adapter id for the scheduled fire override, if set. */
   agent?: string
+  /** Native model id for the scheduled fire override, if set. */
+  model?: string
+  /** Native reasoning effort for the scheduled fire override, if set. */
+  effort?: ModelReasoningEffort
   /** Present iff the issue is scheduled (shares the core Schedule union). */
   when?: ScheduleWhen
   /** Scanner last-fired marker (epoch ms) — scheduled issues only. */
@@ -203,6 +208,10 @@ export interface IssueDetailIssue {
   when?: ScheduleWhen
   /** Adapter id for the scheduled fire (frontmatter `agent`), if set. */
   agent?: string
+  /** Native model id for the scheduled fire (frontmatter `model`), if set. */
+  model?: string
+  /** Native reasoning effort for the scheduled fire (frontmatter `effort`), if set. */
+  effort?: ModelReasoningEffort
   /** Scanner last-fired marker (epoch ms) — scheduled issues only. */
   lastFiredAtMs?: number | null
   /** Computed next fire (epoch ms) — scheduled issues only. */
@@ -232,6 +241,16 @@ export interface IssueDetail {
   activity?: IssueActivityRecord[]
 }
 
+export interface IssuePatch {
+  status?: IssueStatus
+  priority?: IssuePriority
+  assignee?: string
+  agent?: string | null
+  model?: string | null
+  effort?: ModelReasoningEffort | null
+  what?: string
+}
+
 export const issuesApi = {
   /** Read-only board: every workspace's issues, scanned across all workspaces. */
   async get(): Promise<IssueSnapshot> {
@@ -258,15 +277,15 @@ export const issuesApi = {
 
   /**
    * Human write path: patch one issue's editable fields (any subset of
-   * status / priority / assignee / agent / what). `agent: null` clears the scheduled
-   * runtime override so the workspace default applies. Returns the SAME detail
+   * status / priority / assignee / agent / model / effort / what). Null runtime
+   * fields clear their one-run overrides so Workspace/native defaults apply. Returns the SAME detail
    * shape as `getDetail` so the caller can apply it directly (refetch-free).
    * Working-tree write on the server, no commit.
    */
   async update(
     wsId: string,
     id: string,
-    patch: { status?: IssueStatus; priority?: IssuePriority; assignee?: string; agent?: string | null; what?: string },
+    patch: IssuePatch,
   ): Promise<IssueDetail> {
     return fetchJson<IssueDetail>(
       `/api/issues/${encodeURIComponent(wsId)}/${encodeURIComponent(id)}`,

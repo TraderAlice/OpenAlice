@@ -76,6 +76,35 @@ beforeEach(async () => {
 afterEach(cleanup)
 
 describe('WorkspaceAIConfigModal local model metadata', () => {
+  it('saves a Codex native-login model without requiring an API probe', async () => {
+    mocks.getAgentConfig.mockReset().mockResolvedValue({
+      claude: null,
+      codex: null,
+      opencode: null,
+      pi: null,
+    })
+
+    render(
+      <WorkspaceAIConfigModal wsId="chat-1" initialSection="ai" initialAgent="codex" onClose={vi.fn()} />,
+    )
+
+    fireEvent.change(await screen.findByPlaceholderText('gpt-5.5'), {
+      target: { value: 'gpt-5.6' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+
+    await waitFor(() => expect(mocks.saveAgentConfig).toHaveBeenCalledWith(
+      'chat-1',
+      'codex',
+      expect.objectContaining({
+        baseUrl: null,
+        apiKey: null,
+        model: 'gpt-5.6',
+      }),
+    ))
+    expect(mocks.testAgentConfig).not.toHaveBeenCalled()
+  })
+
   it('repairs a saved MiniMax OpenAI wire and removes the lossy protocol choice', async () => {
     const minimaxPi = {
       ...savedPi,
