@@ -35,6 +35,7 @@ import {
   isAgentRuntime,
   prepareAgentRuntimeWorkspace,
   type CliAdapter,
+  type HeadlessRunOverrides,
 } from './cli-adapter.js';
 import { loadConfig, type ServerConfig } from './config.js';
 import { ensureAgentCredentialReady } from './agent-credential-readiness.js';
@@ -344,6 +345,8 @@ export interface WorkspaceService {
     resumeId?: string,
     /** Optional Inbox/Issue reverse link for a user-initiated inquiry. */
     inquiry?: HeadlessTaskInquiry,
+    /** Explicit one-run model/effort; authentication remains Workspace-owned. */
+    overrides?: HeadlessRunOverrides,
   ): Promise<{ taskId: string; resumeId: string }>;
   /** Read-only scheduling projection of every workspace's `.alice/issues/`
    *  directory (scheduled issues only) + each task's last-fired marker and
@@ -1168,6 +1171,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       resumeId?: string;
       resume?: SessionFactoryContext['resume'];
       onSessionId?: (id: string) => void;
+      overrides?: HeadlessRunOverrides;
     } = {},
   ): Promise<HeadlessTaskResult> => {
     const operationLease = workspaceOperationGuard.acquire(ws.id, 'headless-run');
@@ -1222,6 +1226,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         config.command,
         { cwd, env, ...(opts.resume !== undefined ? { resume: opts.resume } : {}) },
         prompt,
+        opts.overrides,
       );
       const logPaths = opts.taskId ? headlessLogPaths(headlessLogsDir, opts.taskId) : null;
       const activityLease = headlessActivity.begin({
@@ -1284,6 +1289,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     trigger?: HeadlessTaskTrigger,
     resumeId?: string,
     inquiry?: HeadlessTaskInquiry,
+    overrides?: HeadlessRunOverrides,
   ): Promise<{ taskId: string; resumeId: string }> => {
     if (catalog.get(ws.id)?.lifecycle !== 'active') {
       throw new Error(`workspace is not active: ${ws.id}`);
@@ -1345,6 +1351,8 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       rec = await headlessTasks.create({
         wsId: ws.id,
         agent: adapter.id,
+        ...(overrides?.model ? { model: overrides.model } : {}),
+        ...(overrides?.reasoningEffort ? { effort: overrides.reasoningEffort } : {}),
         prompt,
         startedAt: Date.now(),
         resumeId: identity.resumeId,
@@ -1371,6 +1379,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       taskId: rec.taskId,
       resumeId: rec.resumeId,
       ...(nativeResume ? { resume: nativeResume } : {}),
+      ...(overrides ? { overrides } : {}),
       onSessionId: (id) => {
         void Promise.all([
           headlessTasks.setAgentSessionId(rec.taskId, id),

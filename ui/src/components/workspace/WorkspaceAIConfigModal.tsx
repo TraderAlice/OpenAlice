@@ -199,6 +199,16 @@ export function connectionFieldsChanged(
   form: FormState,
   tab: Tab,
 ): boolean {
+  // Codex and Claude Code can inherit their native login while a project file
+  // selects only model/effort. With no OpenAlice-managed endpoint or key there
+  // is no credential-bearing HTTP connection for this modal to probe.
+  if (
+    (tab === 'codex' || tab === 'claude') &&
+    !form.baseUrl.trim() &&
+    !form.apiKey.trim()
+  ) {
+    return false
+  }
   return testKey(configToForm(saved, tab)) !== testKey(form)
 }
 
@@ -463,8 +473,9 @@ export function WorkspaceAIConfigModal({
     window.dispatchEvent(new CustomEvent('openalice:credentials-changed'))
   }
 
-  const canTest =
-    !!form.baseUrl.trim() && !!form.apiKey.trim() && !!form.model.trim()
+  // Official endpoints may be omitted; the backend probe resolves them from
+  // the selected wire shape. Managed credentials still require key + model.
+  const canTest = !!form.apiKey.trim() && !!form.model.trim()
 
   const stableTag = workspace?.tag || wsId
   const savedDisplayName = workspace?.displayName ?? ''
@@ -1151,9 +1162,9 @@ export function WorkspaceAIConfigModal({
             >
               {t('common.cancel')}
             </button>
-            {/* Single primary CTA that walks the connection gate. Transport,
-                auth, or model changes show Test first; local runtime metadata
-                changes can be saved directly. */}
+            {/* Single primary CTA that walks the connection gate. Managed
+                transport/auth/model changes show Test first; native-login
+                model/effort and local runtime metadata save directly. */}
             {needsTest ? (
               <button
                 onClick={handleTest}

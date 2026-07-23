@@ -1,4 +1,5 @@
 import { fetchJson } from './client'
+import type { ModelReasoningEffort } from './types'
 
 export type HeadlessTaskStatus = 'running' | 'done' | 'failed' | 'interrupted'
 
@@ -13,6 +14,8 @@ export interface HeadlessTaskRecord {
    * Session executes an Issue owned by another Workspace. */
   trigger?: { kind: 'issue'; workspaceId: string; issueId: string }
   agent: string
+  model?: string
+  effort?: ModelReasoningEffort
   prompt: string
   status: HeadlessTaskStatus
   startedAt: number

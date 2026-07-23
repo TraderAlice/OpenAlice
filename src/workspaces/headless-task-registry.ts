@@ -17,6 +17,7 @@ import { randomBytes } from 'node:crypto'
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 
+import type { ModelReasoningEffort } from '../ai-providers/model-semantics.js'
 import type { Logger } from './logger.js'
 
 export type HeadlessTaskStatus = 'running' | 'done' | 'failed' | 'interrupted'
@@ -95,6 +96,9 @@ export interface HeadlessTaskRecord {
   /** Durable reverse link for Inbox/Issue follow-up UI. */
   readonly inquiry?: HeadlessTaskInquiry
   readonly agent: string
+  /** Explicit one-run selections requested by the dispatching Issue. */
+  readonly model?: string
+  readonly effort?: ModelReasoningEffort
   /** The task prompt (the run's instruction) — shown collapsible in the panel. */
   readonly prompt: string
   status: HeadlessTaskStatus
@@ -176,6 +180,8 @@ export class HeadlessTaskRegistry {
   async create(input: {
     wsId: string
     agent: string
+    model?: string
+    effort?: ModelReasoningEffort
     prompt: string
     startedAt: number
     /** Product identity allocated by ResumeRegistry; reused across continued turns. */
@@ -195,6 +201,8 @@ export class HeadlessTaskRegistry {
       ...(input.parentTaskId ? { parentTaskId: input.parentTaskId } : {}),
       wsId: input.wsId,
       agent: input.agent,
+      ...(input.model ? { model: input.model } : {}),
+      ...(input.effort ? { effort: input.effort } : {}),
       prompt: input.prompt,
       status: 'running',
       startedAt: input.startedAt,
