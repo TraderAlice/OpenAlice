@@ -538,10 +538,15 @@ export class AlpacaBroker implements IBroker {
     const symbol = resolveSymbol(contract)
     if (!symbol) throw new BrokerError('EXCHANGE', 'Cannot resolve contract to Alpaca symbol')
     const timeframe = ALPACA_TIMEFRAME[params.interval]
+    const limit = params.limit == null ? undefined : Math.max(1, Math.floor(params.limit))
     const baseOpts: Record<string, unknown> = { timeframe, adjustment: 'all' }
     if (params.start) baseOpts.start = params.start.toISOString()
     if (params.end) baseOpts.end = params.end.toISOString()
-    if (params.limit) baseOpts.limit = params.limit
+    // Alpaca applies limit to the FIRST rows after start. For a bounded Alice
+    // request, drain the window and tail-slice locally so BarParams.limit keeps
+    // its "most recent N" contract. Preserve the direct limit-only call shape
+    // for callers that provide no explicit bounds.
+    if (limit && !params.start && !params.end) baseOpts.limit = limit
 
     const drain = async (feed: 'sip' | 'iex'): Promise<Bar[]> => {
       const bars: Bar[] = []
@@ -560,6 +565,7 @@ export class AlpacaBroker implements IBroker {
     }
 
     try {
+      let bars: Bar[]
       // SIP = the full consolidated tape (the right feed for history/backtest —
       // real volume, real closes). The free tier can't query the last ~15 min of
       // SIP, so a window that reaches "now" 403s; fall back to IEX (free
@@ -567,16 +573,18 @@ export class AlpacaBroker implements IBroker {
       // request degrades to thinner data instead of dying. (Alpaca's OWN data
       // endpoint serves both feeds; this never touches a third-party vendor.)
       try {
-        return await drain('sip')
+        bars = await drain('sip')
       } catch (err) {
         if (isRecentSipDenied(err)) {
           console.warn(
             `AlpacaBroker[${this.id}]: SIP denied recent data for ${symbol} (${timeframe}) — falling back to IEX (thinner tape). Free tier can't query the last ~15min of SIP.`,
           )
-          return await drain('iex')
+          bars = await drain('iex')
+        } else {
+          throw err
         }
-        throw err
       }
+      return limit == null ? bars : bars.slice(-limit)
     } catch (err) {
       throw BrokerError.from(err)
     }

@@ -209,12 +209,10 @@ describe('getBars — UTA branch', () => {
     expect(bars.map((b) => b.date)).toEqual(['2026-02-17', '2026-06-25']) // date-only, no time, no DST flip
   })
 
-  it('count-only request becomes a START WINDOW, not a broker `limit` (alpaca count-anchoring bug)', async () => {
-    // A count-only request must reach the broker as a start-bounded window — NOT
-    // as `limit: count` with no start. Alpaca's getBarsV2 anchors `limit` to a
-    // default start and returns the FIRST N bars ascending, so `1d count=60`
-    // collapsed to a single in-progress daily bar. We over-fetch a window and
-    // tail-slice instead. Regression guard for the 2026-06-25 repro.
+  it('count-only request carries both a bounded window and a tail limit', async () => {
+    // The synthesized start bounds broker work; limit means "most-recent N"
+    // according to BarParams. Each adapter owns translating that semantic to
+    // upstream APIs that otherwise return the first N rows from `start`.
     const getHistorical = vi.fn(async (_ref: unknown, params: { start?: Date; limit?: number }) => {
       void params
       return WIRE
@@ -227,8 +225,8 @@ describe('getBars — UTA branch', () => {
     const svc = createBarService(makeDeps({ utaManager }))
     await svc.getBars({ barId: 'alpaca-paper|AAPL' }, { interval: '1d', count: 60 })
     const params = getHistorical.mock.calls[0][1]
-    expect(params.start).toBeInstanceOf(Date)       // count → synthesized start window
-    expect(params.limit).toBeUndefined()            // count is NOT forwarded as limit
+    expect(params.start).toBeInstanceOf(Date)
+    expect(params.limit).toBe(60)
   })
 })
 

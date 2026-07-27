@@ -1490,7 +1490,75 @@ describe('CcxtBroker — getHistorical', () => {
       { timestamp: new Date(1700000000000), open: '60000', high: '61000', low: '59000', close: '60500', volume: '1234.5' },
       { timestamp: new Date(1700086400000), open: '60500', high: '62000', low: '60000', close: '61800', volume: '2000' },
     ])
-    expect((acc as any).exchange.fetchOHLCV).toHaveBeenCalledWith('BTC/USDT:USDT', '1d', undefined, 2)
+    expect((acc as any).exchange.fetchOHLCV).toHaveBeenCalledWith(
+      'BTC/USDT:USDT',
+      '1d',
+      expect.any(Number),
+      3,
+    )
+  })
+
+  it.each([
+    ['1m', 30],
+    ['15m', 450],
+    ['1h', 90],
+    ['4h', 360],
+    ['1d', 730],
+  ] as const)('anchors a bounded %s limit at the latest page, not the stale window start', async (interval, staleDays) => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-25T12:00:00Z'))
+    try {
+      const acc = makeAccount()
+      setInitialized(acc, { 'BTC/USDT:USDT': makeSwapMarket('BTC', 'USDT', 'BTC/USDT:USDT') })
+      const step = ({ '1m': 60_000, '15m': 15 * 60_000, '1h': 60 * 60_000, '4h': 4 * 60 * 60_000, '1d': 24 * 60 * 60_000 } as const)[interval]
+      const latest = Date.now()
+      ;(acc as any).exchange.fetchOHLCV = vi.fn(async (_symbol: string, _timeframe: string, since?: number, limit?: number) => {
+        // Real venues align an arbitrary `since` to the next candle boundary.
+        const first = since == null
+          ? latest - step * ((limit ?? 500) - 1)
+          : Math.ceil(since / step) * step
+        return Array.from({ length: limit ?? 500 }, (_, index) => {
+          const ts = first + index * step
+          return [ts, 1, 2, 0.5, 1.5, 10]
+        })
+      })
+      const contract = new Contract()
+      contract.localSymbol = 'BTC/USDT:USDT'
+      const start = new Date(Date.now() - staleDays * 24 * 60 * 60_000)
+
+      const bars = await acc.getHistorical(contract, { interval, start, limit: 50 })
+
+      expect(bars).toHaveLength(50)
+      expect(bars.at(-1)?.timestamp).toEqual(new Date(Math.floor(latest / step) * step))
+      expect((acc as any).exchange.fetchOHLCV).toHaveBeenCalledWith(
+        'BTC/USDT:USDT',
+        interval,
+        latest - step * 51 + 1,
+        51,
+      )
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('enforces an explicit end bound before tail truncation', async () => {
+    const acc = makeAccount()
+    setInitialized(acc, { 'BTC/USDT:USDT': makeSwapMarket('BTC', 'USDT', 'BTC/USDT:USDT') })
+    const end = new Date('2026-07-20T00:00:00Z')
+    ;(acc as any).exchange.fetchOHLCV = vi.fn().mockResolvedValue([
+      [end.getTime() - 60_000, 1, 2, 0.5, 1.5, 10],
+      [end.getTime(), 2, 3, 1, 2.5, 20],
+      [end.getTime() + 60_000, 3, 4, 2, 3.5, 30],
+    ])
+    const contract = new Contract()
+    contract.localSymbol = 'BTC/USDT:USDT'
+
+    const bars = await acc.getHistorical(contract, { interval: '1m', end, limit: 2 })
+
+    expect(bars.map((bar) => bar.timestamp)).toEqual([
+      new Date(end.getTime() - 60_000),
+      end,
+    ])
   })
 
   it('loud-refuses an interval the exchange does not support', async () => {
