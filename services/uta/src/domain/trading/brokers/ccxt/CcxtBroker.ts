@@ -56,6 +56,17 @@ import {
  *  — one plain fetchBalance() covers everything, so no selector is ever needed. */
 const UNIFIED_SUBACCOUNT: CcxtSubAccountDef = { id: 'default', label: 'Account', kind: 'unified', walletTypes: [] }
 
+const BAR_INTERVAL_MS: Record<BarParams['interval'], number> = {
+  '1m': 60_000,
+  '5m': 5 * 60_000,
+  '15m': 15 * 60_000,
+  '30m': 30 * 60_000,
+  '1h': 60 * 60_000,
+  '4h': 4 * 60 * 60_000,
+  '1d': 24 * 60 * 60_000,
+  '1w': 7 * 24 * 60 * 60_000,
+}
+
 /**
  * Pull leveraged-derivative risk metadata (leverage / liquidation price /
  * margin mode) off a raw CCXT position. Returns `undefined` when the venue
@@ -1214,9 +1225,29 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
       throw new BrokerError('EXCHANGE', `${this.exchangeName} does not support the ${params.interval} interval`)
     }
     try {
-      const since = params.start ? params.start.getTime() : undefined
-      const rows = await this.exchange.fetchOHLCV(ccxtSymbol, timeframe, since, params.limit)
-      return (rows as number[][]).map(([ts, o, h, l, c, v]) => ({
+      const limit = params.limit == null ? undefined : Math.max(1, Math.floor(params.limit))
+      const lowerBound = params.start?.getTime()
+      const upperBound = params.end?.getTime() ?? Date.now()
+      // CCXT exchanges return the FIRST `limit` rows at/after `since`. Alice's
+      // BarParams contract is the opposite: limit truncates to the MOST RECENT
+      // rows in the requested window. Anchor `since` immediately before that
+      // trailing window so one exchange page contains the latest bars instead
+      // of an ancient first page (issue #717). Ask for one extra interval:
+      // venues differ on whether the in-progress candle is visible, and an
+      // exact N-interval window otherwise returns only N-1 completed candles.
+      const queryLimit = limit == null ? undefined : limit + 1
+      const trailingSince = limit == null
+        ? undefined
+        : upperBound - BAR_INTERVAL_MS[params.interval] * queryLimit! + 1
+      const since = trailingSince == null
+        ? lowerBound
+        : Math.max(lowerBound ?? Number.NEGATIVE_INFINITY, trailingSince)
+      const rows = await this.exchange.fetchOHLCV(ccxtSymbol, timeframe, since, queryLimit)
+      const bounded = (rows as number[][]).filter(([ts]) =>
+        (lowerBound == null || ts >= lowerBound) && ts <= upperBound,
+      )
+      const selected = limit == null ? bounded : bounded.slice(-limit)
+      return selected.map(([ts, o, h, l, c, v]) => ({
         timestamp: new Date(ts),
         open: String(o), high: String(h), low: String(l), close: String(c),
         volume: String(v ?? 0),
