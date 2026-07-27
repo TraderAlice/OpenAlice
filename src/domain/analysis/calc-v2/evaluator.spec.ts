@@ -48,7 +48,7 @@ describe('calc-v2 evaluator', () => {
   it('reports source(s) in dataRange keyed by barId', async () => {
     const r = await run(`s = bars("yfinance|AAPL","1d",asset="equity")\nsma(s.close, 2)`, mockBars([1, 2, 3]))
     expect(Object.keys(r.dataRange!)).toEqual(['yfinance|AAPL'])
-    expect(r.dataRange!['yfinance|AAPL']).toMatchObject({ source: 'vendor', sourceId: 'yfinance', barCapability: 'delayed' })
+    expect(r.dataRange!['yfinance|AAPL']).toMatchObject({ source: 'vendor', sourceId: 'yfinance', barCapability: 'delayed', interval: '1d' })
   })
 
   it('insufficient-bars when the period exceeds available bars', async () => {
@@ -190,6 +190,67 @@ describe('calc-v2 evaluator', () => {
     expect(off.dates).toBeUndefined() // off by default
     const on = await runScript(`s = bars("x","1d",asset="equity")\ns.close[-1]`, { barService: svc }, 4, { withDates: true })
     expect(on.dates?.['yfinance|AAPL']).toEqual(['2024-01-01', '2024-01-02', '2024-01-03', '2024-01-04', '2024-01-05'])
+  })
+
+  it('keys provenance by barId@interval when one barId is fetched at multiple intervals', async () => {
+    const svc = {
+      searchBarSources: async () => [],
+      getBars: async (_ref: unknown, opts: GetBarsOpts): Promise<BarsResult> => {
+        const bars = [1, 2].map((close, index) => ({
+          date: `${opts.interval}-date-${index + 1}`,
+          open: close,
+          high: close,
+          low: close,
+          close,
+          volume: 1,
+        }))
+        return {
+          bars,
+          meta: {
+            symbol: 'BTC',
+            from: bars[0].date,
+            to: bars[1].date,
+            bars: bars.length,
+            source: 'uta',
+            sourceId: 'binance-readonly',
+            barId: 'binance-readonly|BTC/USDT:USDT',
+            barCapability: 'realtime',
+          },
+        }
+      },
+    } as BarService
+    const result = await runScript(
+      `h1 = bars("binance-readonly|BTC/USDT:USDT","1h",count=2)
+h4 = bars("binance-readonly|BTC/USDT:USDT","4h",count=2)
+{ "1h": h1.close[-1], "4h": h4.close[-1] }`,
+      { barService: svc },
+      4,
+      { withDates: true },
+    )
+
+    expect(Object.keys(result.dataRange!)).toEqual([
+      'binance-readonly|BTC/USDT:USDT@1h',
+      'binance-readonly|BTC/USDT:USDT@4h',
+    ])
+    expect(result.dataRange?.['binance-readonly|BTC/USDT:USDT@1h']).toMatchObject({ interval: '1h', to: '1h-date-2' })
+    expect(result.dataRange?.['binance-readonly|BTC/USDT:USDT@4h']).toMatchObject({ interval: '4h', to: '4h-date-2' })
+    expect(result.dates?.['binance-readonly|BTC/USDT:USDT@1h']).toEqual(['1h-date-1', '1h-date-2'])
+    expect(result.dates?.['binance-readonly|BTC/USDT:USDT@4h']).toEqual(['4h-date-1', '4h-date-2'])
+    expect(result.dates?.['binance-readonly|BTC/USDT:USDT']).toBeUndefined()
+  })
+
+  it('keeps one barId provenance key when the same interval is fetched repeatedly', async () => {
+    const result = await runScript(
+      `a = bars("yfinance|AAPL","1d",asset="equity")
+b = bars("yfinance|AAPL","1d",asset="equity")
+a.close[-1] + b.close[-1]`,
+      { barService: mockBars([1, 2, 3]) },
+      4,
+      { withDates: true },
+    )
+
+    expect(Object.keys(result.dataRange!)).toEqual(['yfinance|AAPL'])
+    expect(Object.keys(result.dates!)).toEqual(['yfinance|AAPL'])
   })
 
   it('a panel entry can be an indicator record (nested)', async () => {

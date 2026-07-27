@@ -31,6 +31,8 @@ export interface DataSourceMeta {
   sourceId?: string
   /** "{sourceId}|{nativeSymbol}" — 操作命名空间的唯一句柄。 */
   barId?: string
+  /** 本次序列的 K 线周期；quant 多周期溯源用它区分相同 barId。 */
+  interval?: string
   /** vendor 路径报的是请求 provider(SDK 执行器不回传响应 provider)。 */
   provider?: string
   /** 数据档位:free|delayed|subscription|iex|realtime。 */
