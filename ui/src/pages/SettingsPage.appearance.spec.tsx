@@ -37,9 +37,21 @@ afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
   localStorage.removeItem('openalice.theme.v1')
+  localStorage.removeItem('openalice.editor-tabs.v1')
 })
 
 describe('AppearanceSection palette pair editor', () => {
+  it('does not expose the retired editor tab strip preference', () => {
+    localStorage.setItem('openalice.editor-tabs.v1', JSON.stringify({
+      state: { showEditorTabs: true },
+      version: 1,
+    }))
+
+    render(<AppearanceSection />)
+
+    expect(screen.queryByText('Show editor tabs')).toBeNull()
+  })
+
   it('shows the active slot and one recommended palette library at a time', () => {
     render(<AppearanceSection />)
 

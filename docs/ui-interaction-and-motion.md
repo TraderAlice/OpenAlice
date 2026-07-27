@@ -63,6 +63,14 @@ Animate `transform` and `opacity` for movement; use short color/border/box-shado
 transitions for feedback. Do not add permanent `will-change` to large lists or
 page containers.
 
+Navigation continuity is a component-lifetime concern before it is an animation
+concern. Views that belong to one product area and share a local navigator must
+declare the same `shell` in `ui/src/tabs/registry.tsx`; `TabHost` keeps that
+shell mounted while replacing the active-only view content. Do not wrap every
+drill-in in a fresh copy of the same shell or mask the resulting remount with a
+transition. Session terminals and other heavy page content remain active-only
+unless their own lifecycle explicitly requires otherwise.
+
 Keyboard focus is not a motion effect. Interactive controls still require a
 clear `focus-visible` treatment, meaningful labels, and sensible tab order.
 

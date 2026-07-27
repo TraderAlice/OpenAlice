@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useWorkspace } from '../tabs/store'
 import { type Tab } from '../tabs/types'
-import { getView } from '../tabs/registry'
-import { TabStrip } from './TabStrip'
+import { getView, getViewShell } from '../tabs/registry'
 import { EmptyEditor } from './EmptyEditor'
+import { ChatPageShell } from '../pages/ChatPageShell'
 
 /**
  * Main content host.
@@ -25,25 +25,34 @@ export function TabHost() {
   )
   const tabsMap = useWorkspace((state) => state.tabs)
   const isDesktop = useIsDesktop()
+  const activeTab = activeTabId ? tabsMap[activeTabId] ?? null : null
+  const activeView = activeTab ? getView(activeTab.spec.kind) : null
+  const activeUsesPersistentFrame = activeView?.lifecycle === 'keep-mounted' && isDesktop
+  const persistentTabs = isDesktop
+    ? tabIds
+      .map((id) => tabsMap[id])
+      .filter((tab): tab is Tab => tab != null && getView(tab.spec.kind).lifecycle === 'keep-mounted')
+    : []
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <TabStrip />
       <div className="relative min-h-0 min-w-0 flex-1">
         {tabIds.length === 0 ? (
           <EmptyEditor />
         ) : (
-          tabIds.map((id) => {
-            const tab = tabsMap[id]
-            if (!tab) return null
-            const isActive = id === activeTabId
-            const view = getView(tab.spec.kind)
-            const keepMounted = view.lifecycle === 'keep-mounted'
-            // Mobile: only render the active tab to avoid blowing memory and
-            // because we don't even have a strip to switch tabs from.
-            if (!isActive && (!isDesktop || !keepMounted)) return null
-            return <TabFrame key={id} tab={tab} visible={isActive} />
-          })
+          <>
+            {/* Active-only views share one unkeyed slot. Moving between two
+                views with the same product shell replaces only the content;
+                the shell (notably Ask Alice's navigator) stays mounted. */}
+            {activeTab && !activeUsesPersistentFrame && (
+              <TabFrame tab={activeTab} visible />
+            )}
+            {/* Desktop keep-mounted views retain their keyed frame across
+                focus changes. Mobile still renders only its active view. */}
+            {persistentTabs.map((tab) => (
+              <TabFrame key={tab.id} tab={tab} visible={tab.id === activeTabId} />
+            ))}
+          </>
         )}
       </div>
     </div>
@@ -53,6 +62,7 @@ export function TabHost() {
 /** One mounted view frame. Hidden frames exist only for keep-mounted views. */
 function TabFrame({ tab, visible }: { tab: Tab; visible: boolean }) {
   const view = getView(tab.spec.kind)
+  const shell = getViewShell(tab.spec)
   // Cast: each ViewModule has a Component constrained to its spec kind. The
   // map lookup loses that narrowing; the runtime type matches by construction.
   const Component = view.Component as React.ComponentType<{ spec: typeof tab.spec; visible: boolean }>
@@ -71,7 +81,13 @@ function TabFrame({ tab, visible }: { tab: Tab; visible: boolean }) {
       // React 19 supports it as a JSX attribute.
       inert={!visible}
     >
-      <Component spec={tab.spec} visible={visible} />
+      {shell === 'chat' ? (
+        <ChatPageShell>
+          <Component key={tab.id} spec={tab.spec} visible={visible} />
+        </ChatPageShell>
+      ) : (
+        <Component key={tab.id} spec={tab.spec} visible={visible} />
+      )}
     </div>
   )
 }

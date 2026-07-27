@@ -40,6 +40,7 @@ export function UrlAdopter() {
         <Route path="/chat" element={<AdoptStatic spec={{ kind: 'chat-landing', params: {} }} />} />
         <Route path="/chat/manager" element={<AdoptStatic spec={{ kind: 'workspace-manager', params: {} }} />} />
         <Route path="/chat/manager/s/:sessionId" element={<AdoptWorkspaceManager />} />
+        <Route path="/chat/workspaces/:wsId/view/:path" element={<AdoptChatFileViewer />} />
         <Route path="/chat/workspaces/:wsId" element={<AdoptChatWorkspace />} />
         <Route path="/chat/workspaces/:wsId/s/:sessionId" element={<AdoptChatWorkspace />} />
         <Route path="/chat/:channelId" element={<Navigate to="/inbox" replace />} />
@@ -243,10 +244,43 @@ function AdoptTemplateDetail() {
 
 function AdoptFileViewer() {
   const { wsId, path } = useParams<{ wsId: string; path: string }>()
+  const [search] = useSearchParams()
   if (!wsId || !path) return <Navigate to="/workspaces" replace />
+  const returnSessionId = search.get('sessionId') ?? undefined
   // `path` arrives already URL-decoded by react-router (toUrl encodes it as
   // a single segment), so it may contain slashes — pass through verbatim.
-  return <AdoptStatic spec={{ kind: 'file-viewer', params: { wsId, path } }} />
+  return (
+    <AdoptStatic
+      spec={{
+        kind: 'file-viewer',
+        params: {
+          wsId,
+          path,
+          ...(returnSessionId ? { returnSessionId } : {}),
+        },
+      }}
+    />
+  )
+}
+
+function AdoptChatFileViewer() {
+  const { wsId, path } = useParams<{ wsId: string; path: string }>()
+  const [search] = useSearchParams()
+  if (!wsId || !path) return <Navigate to="/chat" replace />
+  const returnSessionId = search.get('sessionId') ?? undefined
+  return (
+    <AdoptStatic
+      spec={{
+        kind: 'file-viewer',
+        params: {
+          wsId,
+          path,
+          source: 'chat',
+          ...(returnSessionId ? { returnSessionId } : {}),
+        },
+      }}
+    />
+  )
 }
 
 function AdoptDesignProject() {
@@ -277,10 +311,10 @@ function specToSection(spec: ViewSpec): ActivitySection {
     case 'chat-landing':       return 'chat'
     case 'workspace-manager':  return 'chat'
     case 'workspace':          return spec.params.source === 'chat' ? 'chat' : 'workspaces'
+    case 'file-viewer':        return spec.params.source === 'chat' ? 'chat' : 'workspaces'
     case 'workspace-list':
     case 'template-catalog':
-    case 'template-detail':
-    case 'file-viewer':        return 'workspaces'
+    case 'template-detail':    return 'workspaces'
     case 'trading-as-git':     return 'trading-as-git'
     case 'connectors':         return 'connectors'
     case 'portfolio':

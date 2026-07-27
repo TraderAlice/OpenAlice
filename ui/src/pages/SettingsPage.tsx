@@ -10,7 +10,6 @@ import { PageHeader } from '../components/PageHeader'
 import { PageLoading, EmptyState } from '../components/StateViews'
 import { useTranslation } from 'react-i18next'
 import { useLocale, useSetLocale, LOCALE_LABELS } from '../i18n/useLocale'
-import { useEditorTabsPref } from '../live/editor-tabs-pref'
 import { preferencesApi, type WorkspaceShellStatus } from '../api/preferences'
 import {
   DEFAULT_DAY_PALETTE,
@@ -34,8 +33,6 @@ function paletteDefinition(id: ThemePaletteId): ThemePaletteDefinition {
 
 export function AppearanceSection() {
   const { t } = useTranslation()
-  const showEditorTabs = useEditorTabsPref((s) => s.showEditorTabs)
-  const setShowEditorTabs = useEditorTabsPref((s) => s.setShowEditorTabs)
   const theme = useThemeStore((s) => s.theme)
   const dayPalette = useThemeStore((s) => s.dayPalette)
   const nightPalette = useThemeStore((s) => s.nightPalette)
@@ -207,19 +204,6 @@ export function AppearanceSection() {
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-4 py-1">
-        <div className="flex-1">
-          <span className="text-sm font-medium text-foreground">
-            {t('settings.appearance.showEditorTabs')}
-          </span>
-          <p className="text-[12px] text-muted-foreground mt-0.5 leading-relaxed">
-            {showEditorTabs
-              ? t('settings.appearance.showEditorTabsOn')
-              : t('settings.appearance.showEditorTabsOff')}
-          </p>
-        </div>
-        <Toggle checked={showEditorTabs} onChange={setShowEditorTabs} />
-      </div>
     </ConfigSection>
   )
 }

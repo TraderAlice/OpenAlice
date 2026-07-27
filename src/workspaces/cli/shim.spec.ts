@@ -156,6 +156,8 @@ describe('CLI launchers and payload', () => {
                 accountId: { type: 'string' },
                 await: { type: 'boolean' },
                 taskId: { type: 'array', items: { type: 'string' } },
+                docs: { type: 'array', items: { type: 'object' } },
+                metadataFilter: { type: 'object' },
               },
             },
           },
@@ -194,10 +196,15 @@ describe('CLI launchers and payload', () => {
       expect(help.stdout).toContain('--task-id <value> (repeatable)')
       expect(help.stdout).not.toContain('--task-id <array>')
       expect(help.stdout).not.toContain('--issueId')
+      expect(help.stdout).toContain('--doc <value> (repeatable)')
+      expect(help.stdout).not.toContain('--docs')
+      expect(help.stdout).toContain('--meta <key=value> (repeatable)')
+      expect(help.stdout).not.toContain('--metadata-filter')
 
       await runCli('alice-workspace', [
         'provenance', 'show', '--issue-id', 'audit', '--account-id', 'alpaca-paper', '--await',
         '--task-id', 'run-a', '--task-id', 'run-b',
+        '--doc', 'research/a.md', '--meta', 'ticker=AAPL',
       ], env)
       expect(invocation).toEqual({
         tool: 'provenance_show',
@@ -206,8 +213,100 @@ describe('CLI launchers and payload', () => {
           accountId: 'alpaca-paper',
           await: true,
           taskId: ['run-a', 'run-b'],
+          docs: [{ path: 'research/a.md' }],
+          metadataFilter: { ticker: 'AAPL' },
         },
       })
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('turns common UTA command mistakes into executable recovery guidance', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'openalice-cli-shim-uta-recovery-'))
+    const socketPath = process.platform === 'win32'
+      ? `\\\\.\\pipe\\openalice-cli-shim-uta-recovery-${process.pid}-${Date.now()}`
+      : join(dir, 'tools.sock')
+    let invocations = 0
+    const manifest = {
+      description: 'UTA test manifest',
+      groups: {
+        account: {
+          portfolio: {
+            tool: 'getPortfolio',
+            description: 'Query portfolio',
+            schema: {
+              type: 'object',
+              properties: {
+                source: { type: 'string' },
+                symbol: { type: 'string' },
+                subAccountId: { type: 'string' },
+              },
+            },
+          },
+        },
+        contract: {
+          search: {
+            tool: 'searchContracts',
+            description: 'Search contracts',
+            schema: {
+              type: 'object',
+              properties: {
+                pattern: { type: 'string' },
+                assetClass: { type: 'string' },
+                source: { type: 'string' },
+              },
+              required: ['pattern'],
+            },
+          },
+          quote: {
+            tool: 'getQuote',
+            description: 'Quote a contract',
+            schema: {
+              type: 'object',
+              properties: {
+                aliceId: { type: 'string' },
+                source: { type: 'string' },
+              },
+              required: ['aliceId'],
+            },
+          },
+        },
+      },
+    }
+    const server = createServer((req, res) => {
+      if (req.method === 'POST') invocations++
+      res.writeHead(200, { 'content-type': 'application/json' })
+      res.end(JSON.stringify(manifest))
+    })
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject)
+      server.listen(socketPath, resolve)
+    })
+    const env = {
+      ...process.env,
+      AQ_WS_ID: 'ws1',
+      OPENALICE_TOOL_SOCKET: socketPath,
+      OPENALICE_TOOL_URL: '/cli',
+    }
+    try {
+      await expect(runCli('alice-uta', ['positions', 'alpaca-paper'], env)).rejects.toMatchObject({
+        stderr: expect.stringContaining('To list positions, run `alice-uta account portfolio --help`.'),
+      })
+      await expect(runCli('alice-uta', ['account', 'portfolio', '--account', 'alpaca-paper'], env)).rejects.toMatchObject({
+        stderr: expect.stringContaining('Use `--source <account-id>`'),
+      })
+      await expect(runCli('alice-uta', ['contract', 'search', '--query', 'SPY'], env)).rejects.toMatchObject({
+        stderr: expect.stringContaining('Contract search uses `--pattern <symbol-or-keyword>`.'),
+      })
+      await expect(runCli('alice-uta', ['contract', 'quote', '--symbols', 'SPY,QQQ'], env)).rejects.toMatchObject({
+        stderr: expect.stringContaining('Quote accepts one `--alice-id`'),
+      })
+      await expect(runCli('alice-uta', ['account', 'portfolio', 'alpaca-paper'], env)).rejects.toMatchObject({
+        stderr: expect.stringContaining('unexpected positional argument "alpaca-paper"'),
+      })
+      expect(invocations).toBe(0)
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()))
       await rm(dir, { recursive: true, force: true })

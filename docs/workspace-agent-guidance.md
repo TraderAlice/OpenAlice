@@ -36,7 +36,7 @@ One concept has one primary owner:
 | Issue file shape, ownership, schedules, headless delivery | `self-scheduling` |
 | Low-frequency market/fundamental/macro data | `traderhub` |
 | Quantitative K-line panels and source choice | `alice-analysis` |
-| Broker state and trading writes | `alice-uta` |
+| Broker accounts/contracts/quotes and trading writes | `alice-uta` |
 
 Other instructions may route to that owner but should not copy its manual.
 
@@ -45,8 +45,10 @@ Other instructions may route to that owner but should not copy its manual.
 The CLI manifest and tool results are the final authority for verbs, flags, and
 validation. Durable Workspaces can carry old skill snapshots, so errors should
 be self-correcting: say what boundary was crossed and name the next appropriate
-command. A bare validation failure that forces the agent to guess is a product
-bug.
+command. Reject unknown flags and positional arguments before invocation, show
+the accepted flags, and give a semantic recovery command for common old or
+guessed routes. A bare validation failure that forces the agent to guess is a
+product bug.
 
 Use the real shim in the verification loop; direct tool calls do not exercise
 argv parsing or manifest help.

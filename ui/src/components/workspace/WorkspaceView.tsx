@@ -11,11 +11,14 @@ import { TerminalView } from './Terminal';
 import { WebPiView } from './WebPiView';
 import { useIsDesktop } from '../../live/use-is-desktop';
 import { useWorkspaceSidePanels } from '../../live/workspace-side-panels';
+import type { WorkspaceSource } from '../../tabs/types';
 
 export interface WorkspaceViewProps {
   readonly wsId: string;
   /** Pinned record id, or null = no session pinned (empty pane). */
   readonly sessionId: string | null;
+  /** Product area that owns this Workspace view (for provenance-aware drill-ins). */
+  readonly source?: WorkspaceSource;
   /** Resolved record matching `sessionId`. null if `sessionId` is null OR the record was just deleted. */
   readonly activeRecord: SessionRecord | null;
   /**
@@ -125,7 +128,13 @@ export function WorkspaceView(props: WorkspaceViewProps): ReactElement {
       </div>
       {showAside && (
         <aside className="workspace-side">
-          {showFiles && <FilesPanel wsId={props.wsId} />}
+          {showFiles && (
+            <FilesPanel
+              wsId={props.wsId}
+              sessionId={props.sessionId}
+              {...(props.source ? { source: props.source } : {})}
+            />
+          )}
         </aside>
       )}
     </div>

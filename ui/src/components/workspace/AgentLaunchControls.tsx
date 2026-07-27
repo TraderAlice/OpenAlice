@@ -9,6 +9,7 @@ import {
   Code2,
   Cpu,
   Gauge,
+  Info,
   KeyRound,
   Settings2,
   Sparkles,
@@ -205,14 +206,10 @@ export function AgentLaunchDetails({
   if (hasWorkspaceTarget && !config.workspaceConfigResolved) return null
 
   let summary: ReactNode = null
+  let pendingWriteNotice: ReactNode = null
   if (config.aiDetails) {
     const model = config.aiDetails.model ?? t('chatLanding.runtimeDefaultModel')
     const workspaceSaved = config.aiDetails.source === 'workspace'
-    const sourceLabel = workspaceSaved
-      ? t('chatLanding.workspaceAiSaved')
-      : hasWorkspaceTarget
-        ? t('chatLanding.workspaceAiWillInject')
-        : t('chatLanding.newWorkspaceAiWillSeed')
     const actionLabel = hasWorkspaceTarget
       ? workspaceSaved
         ? t('chatLanding.adjustWorkspaceAi')
@@ -233,10 +230,6 @@ export function AgentLaunchDetails({
                 : t('chatLanding.reasoningRuntimeSummary')
     summary = (
       <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] text-muted-foreground">
-        <span className={workspaceSaved ? 'text-success' : 'text-primary'}>
-          {sourceLabel}
-        </span>
-        <span aria-hidden className="text-muted-foreground/40">·</span>
         <span
           className="inline-flex min-w-0 max-w-full items-center gap-1"
           aria-label={t('chatLanding.modelSummary', { model })}
@@ -281,6 +274,21 @@ export function AgentLaunchDetails({
         </button>
       </div>
     )
+    if (!workspaceSaved) {
+      pendingWriteNotice = (
+        <div
+          role="status"
+          className="flex min-w-0 items-start gap-1.5 rounded-md bg-primary/[0.06] px-2 py-1.5 text-[10.5px] leading-relaxed text-primary"
+        >
+          <Info className="mt-0.5 h-3 w-3 shrink-0" />
+          <span>
+            {hasWorkspaceTarget
+              ? t('chatLanding.workspaceAiWillInject')
+              : t('chatLanding.newWorkspaceAiWillSeed')}
+          </span>
+        </div>
+      )
+    }
   } else if (config.selectedAgent && (!config.needsCredential || config.selectedRuntimeUsesGlobalConfig)) {
     summary = (
       <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[10.5px] text-muted-foreground">
@@ -311,10 +319,11 @@ export function AgentLaunchDetails({
       ? t('chatLanding.claudeWorkspaceTrustRequired')
       : null
 
-  if (summary === null && setupNotice === null) return null
+  if (summary === null && pendingWriteNotice === null && setupNotice === null) return null
   return (
     <div className={`flex min-w-0 flex-col gap-1.5 ${className}`}>
       {summary}
+      {pendingWriteNotice}
       {setupNotice !== null && (
         <div
           role="status"

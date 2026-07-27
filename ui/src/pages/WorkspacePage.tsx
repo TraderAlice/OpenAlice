@@ -140,6 +140,7 @@ export function WorkspacePage({ spec, visible }: Props) {
         <WorkspaceView
           wsId={wsId}
           sessionId={sessionId}
+          {...(source ? { source } : {})}
           activeRecord={activeRecord}
           sessions={workspace.sessions}
           label={workspace.tag}

@@ -155,6 +155,11 @@ resolved launch value as if it were already on disk. A launch surface
 distinguishes a Workspace-local binding from a credential that will be written
 only when the next session starts. Creation defaults are also explicitly
 creation-time policy: changing one never rewrites an existing Workspace.
+Stable Workspace ownership stays implicit so provenance does not displace the
+effective model, reasoning, and context values. When Send will write or replace
+runtime configuration, that pending side effect is disclosed on its own line;
+successful explicit saves use transient confirmation instead of a permanent
+success state.
 This disclosure applies to all four supported Agent runtimes. Claude Code and
 Codex use their native global login and global runtime configuration by default.
 Merely storing a compatible credential in Alice never selects or injects it;

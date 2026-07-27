@@ -121,8 +121,8 @@ export function ActivityBar({
           md:static md:translate-x-0 md:z-auto
         `}
       >
-        {/* Branding — h-10 to line up with the Sidebar header + TabStrip
-            (all three top surfaces share the 40px header rhythm). */}
+        {/* Branding — h-10 to line up with the Sidebar header and preserve
+            the shell's 40px header rhythm. */}
         <div className={`${denseRail ? 'h-10 mb-2 md:h-7 md:mb-0.5' : 'h-10 mb-2'} flex items-center shrink-0 ${compactRail ? 'justify-center px-0' : narrowRail ? 'pl-[18px] pr-3 gap-2' : 'pl-[22px] pr-4 gap-2.5'}`}>
           <img
             src="/alice.ico"

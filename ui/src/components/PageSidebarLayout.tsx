@@ -7,6 +7,7 @@ const MIN_WIDTH = 200
 const MAX_WIDTH = 420
 const MAIN_PANE_MIN_WIDTH = 500
 const COLLAPSED_WIDTH = 44
+const RESIZE_HANDLE_WIDTH = 10
 
 function clampWidth(value: unknown, fallback: number): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
@@ -195,9 +196,40 @@ export function PageSidebarLayout({
   if (isDesktop) {
     return (
       <div ref={rootRef} className="flex h-full min-h-0 w-full overflow-hidden">
-        {collapsed ? (
+        <div
+          data-testid="page-sidebar-desktop"
+          data-state={collapsed ? 'collapsed' : 'expanded'}
+          className="relative h-full min-h-0 shrink-0 overflow-hidden border-r border-border/80 bg-secondary transition-[width] duration-[var(--motion-slow)] [transition-timing-function:var(--motion-ease-out)] motion-reduce:transition-none"
+          style={{ width: collapsed ? COLLAPSED_WIDTH : width + RESIZE_HANDLE_WIDTH }}
+        >
+          <div
+            data-testid="page-sidebar-expanded"
+            aria-hidden={collapsed}
+            inert={collapsed ? true : undefined}
+            className={`absolute inset-y-0 left-0 flex transition-opacity duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-standard)] motion-reduce:delay-0 motion-reduce:transition-none ${
+              collapsed
+                ? 'pointer-events-none opacity-0'
+                : 'opacity-100 delay-[60ms]'
+            }`}
+            style={{ width: width + RESIZE_HANDLE_WIDTH }}
+          >
+            <div
+              className="h-full min-h-0 shrink-0"
+              style={{ width }}
+            >
+              {sidebarPanel}
+            </div>
+            <ResizeHandle width={width} maxWidth={maxWidth} onPointerDown={beginResize} />
+          </div>
           <aside
-            className="flex h-full shrink-0 flex-col items-center border-r border-border/80 bg-secondary py-1.5"
+            data-testid="page-sidebar-collapsed"
+            aria-hidden={!collapsed}
+            inert={!collapsed ? true : undefined}
+            className={`absolute inset-y-0 left-0 flex shrink-0 flex-col items-center bg-secondary py-1.5 transition-opacity duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-standard)] motion-reduce:delay-0 motion-reduce:transition-none ${
+              collapsed
+                ? 'opacity-100 delay-[80ms]'
+                : 'pointer-events-none opacity-0'
+            }`}
             style={{ width: COLLAPSED_WIDTH }}
           >
             <button
@@ -216,17 +248,7 @@ export function PageSidebarLayout({
               {title}
             </span>
           </aside>
-        ) : (
-          <>
-            <div
-              className="h-full min-h-0 shrink-0"
-              style={{ width }}
-            >
-              {sidebarPanel}
-            </div>
-            <ResizeHandle width={width} maxWidth={maxWidth} onPointerDown={beginResize} />
-          </>
-        )}
+        </div>
         <div className="min-h-0 min-w-0 flex flex-1 flex-col">
           {children}
         </div>

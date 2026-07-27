@@ -204,10 +204,12 @@ describe('ChatLandingPage polling stability', () => {
 })
 
 describe('ChatLandingPage AI source disclosure', () => {
-  it('labels an existing Workspace-local provider as already saved', async () => {
+  it('keeps an existing Workspace source implicit so the model leads the metadata row', async () => {
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
-    expect(await screen.findByText('Saved in this workspace')).toBeTruthy()
+    expect(await screen.findByLabelText('Model gemini-3.1-flash-lite')).toBeTruthy()
+    expect(screen.queryByText('Saved in this workspace')).toBeNull()
+    expect(screen.queryByText(/Sending will configure this workspace/)).toBeNull()
     expect(screen.getByRole('button', { name: 'Adjust workspace AI' })).toBeTruthy()
     expect(screen.getByLabelText('minimal reasoning')).toBeTruthy()
   })
@@ -238,7 +240,8 @@ describe('ChatLandingPage AI source disclosure', () => {
 
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
-    expect(await screen.findByText('Will write to this workspace when you send')).toBeTruthy()
+    expect(await screen.findByText('Sending will configure this workspace with the selected AI provider.')).toBeTruthy()
+    expect(screen.getByLabelText('Model gemini-3.1-flash-lite')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Configure workspace AI' })).toBeTruthy()
     expect(screen.getByLabelText('minimal reasoning')).toBeTruthy()
   })

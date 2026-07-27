@@ -25,10 +25,10 @@ function typeOut(text: string, perCharMs = 30): void {
 
 add(0, '\x1b[2J\x1b[H')
 add(80, '\x1b[1;36m╭───────────────────────────────╮\x1b[0m\r\n')
-add(40, '\x1b[1;36m│\x1b[0m  \x1b[1mClaude Code\x1b[0m \x1b[2m· workspace aapl-q1\x1b[0m  \x1b[1;36m│\x1b[0m\r\n')
+add(40, '\x1b[1;36m│\x1b[0m  \x1b[1mPi\x1b[0m \x1b[2m· workspace aapl-q1\x1b[0m           \x1b[1;36m│\x1b[0m\r\n')
 add(40, '\x1b[1;36m╰───────────────────────────────╯\x1b[0m\r\n')
 add(600, '\r\n')
-add(0, "Hi! I'm Claude.\r\n\r\n")
+add(0, "Hi! I'm Pi.\r\n\r\n")
 
 // User prompt
 add(1200, '\x1b[1;32m❯\x1b[0m ')

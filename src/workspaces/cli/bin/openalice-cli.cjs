@@ -65,19 +65,31 @@ async function main() {
 
   const m = await manifest(base)
   const groupCmds = m.groups[group]
-  if (!groupCmds) fail(`unknown group "${group}". Run \`${BIN}\` to list groups.`)
+  if (!groupCmds) {
+    const recovery = commandRecoveryHint(group)
+    fail(
+      `unknown group "${group}". Run \`${BIN}\` to list groups.` +
+        (recovery ? `\n${recovery}` : ''),
+    )
+  }
 
   // `<bin> <group>` / `<bin> <group> --help` -> verb listing
   if (!verb || (wantsHelp && !m.groups[group][verb])) return printVerbs(group, groupCmds)
 
   const cmd = groupCmds[verb]
-  if (!cmd) fail(`unknown command "${group} ${verb}". Run \`${BIN} ${group}\` to list verbs.`)
+  if (!cmd) {
+    const recovery = commandRecoveryHint(group, verb)
+    fail(
+      `unknown command "${group} ${verb}". Run \`${BIN} ${group}\` to list verbs.` +
+        (recovery ? `\n${recovery}` : ''),
+    )
+  }
 
   // `alice <group> <verb> --help` -> flag listing
   if (wantsHelp) return printVerbHelp(group, verb, cmd)
 
   // Run it.
-  const args = parseFlags(argv.slice(argv.indexOf(verb) + 1), cmd.schema)
+  const args = parseFlags(argv.slice(argv.indexOf(verb) + 1), cmd.schema, { group, verb })
   const res = await invoke(base, cmd.tool, args)
   process.stdout.write(res.endsWith('\n') ? res : res + '\n')
 }
@@ -186,14 +198,19 @@ async function fetchSocketJson(socketPath, path, opts) {
 
 // ---- flag parsing ---------------------------------------------------------
 
-function parseFlags(tokens, schema) {
+function parseFlags(tokens, schema, command) {
   const args = {}
   const meta = {}
   const docs = []
   const properties = (schema && schema.properties) || {}
   for (let i = 0; i < tokens.length; i++) {
     let tok = tokens[i]
-    if (!tok.startsWith('--')) continue
+    if (!tok.startsWith('--')) {
+      fail(
+        `unexpected positional argument "${tok}" for \`${BIN} ${command.group} ${command.verb}\`. ` +
+          `Use named flags; run \`${BIN} ${command.group} ${command.verb} --help\` before retrying.`,
+      )
+    }
     tok = tok.slice(2)
     let key, val
     const eq = tok.indexOf('=')
@@ -226,6 +243,21 @@ function parseFlags(tokens, schema) {
         ? camelKey
         : key
     const propertySchema = properties[schemaKey]
+    const supportedAlias =
+      (schemaKey === 'meta' && Object.prototype.hasOwnProperty.call(properties, 'metadataFilter')) ||
+      (schemaKey === 'doc' && Object.prototype.hasOwnProperty.call(properties, 'docs'))
+    if (!propertySchema && !supportedAlias) {
+      const available = Object.keys(properties).map(shellFlagName)
+      const accepted = available.length > 0
+        ? `Accepted flags: ${available.map((name) => `--${name}`).join(', ')}.`
+        : 'This command accepts no flags.'
+      const recovery = flagRecoveryHint(command.group, command.verb, key)
+      fail(
+        `unknown flag "--${key}" for \`${BIN} ${command.group} ${command.verb}\`. ${accepted}\n` +
+          (recovery ? `${recovery}\n` : '') +
+          `Run \`${BIN} ${command.group} ${command.verb} --help\` before retrying.`,
+      )
+    }
     if (propertySchema && propertySchema.type === 'boolean' && typeof val === 'string') {
       if (val === 'true') val = true
       else if (val === 'false') val = false
@@ -287,9 +319,13 @@ function printVerbHelp(group, verb, cmd) {
   out('Flags:')
   for (const n of names) {
     const p = props[n] || {}
+    if (n === 'metadataFilter') {
+      out(`  --meta <key=value> (repeatable)   ${firstLine(p.description || '')}`)
+      continue
+    }
     const type = p.type || (p.enum ? 'enum' : '')
     const req = required.has(n) ? ' (required)' : ''
-    const flag = n.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()
+    const flag = shellFlagName(n)
     const valueHint = type === 'array'
       ? ' <value>'
       : type && type !== 'boolean'
@@ -301,6 +337,40 @@ function printVerbHelp(group, verb, cmd) {
 }
 
 // ---- util -----------------------------------------------------------------
+
+function commandRecoveryHint(group, verb) {
+  if (BIN !== 'alice-uta') return ''
+  if (group === 'positions' || group === 'portfolio' || (group === 'position' && verb === 'list')) {
+    return 'To list positions, run `alice-uta account portfolio --help`.'
+  }
+  if (group === 'quote') {
+    return 'Quotes live under `contract`: search first, then run `alice-uta contract quote --help`.'
+  }
+  if (group === 'orders') {
+    return 'Order reads and writes live under `order`; run `alice-uta order` to list verbs.'
+  }
+  return ''
+}
+
+function flagRecoveryHint(group, verb, flag) {
+  if (BIN !== 'alice-uta') return ''
+  if (flag === 'account') {
+    return 'Use `--source <account-id>`; obtain the id from `alice-uta account list`.'
+  }
+  if (group === 'contract' && verb === 'search' && (flag === 'query' || flag === 'symbol')) {
+    return 'Contract search uses `--pattern <symbol-or-keyword>`.'
+  }
+  if (group === 'contract' && verb === 'quote' && (flag === 'symbols' || flag === 'symbol')) {
+    return 'Quote accepts one `--alice-id` from `alice-uta contract search` at a time; repeat it for multiple contracts.'
+  }
+  return ''
+}
+
+function shellFlagName(name) {
+  if (name === 'docs') return 'doc'
+  if (name === 'metadataFilter') return 'meta'
+  return name.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()
+}
 
 function firstLine(s) {
   return (s || '').split('\n')[0]

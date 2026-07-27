@@ -5,11 +5,14 @@ import type { ReactElement } from 'react';
 import { listFiles, type DirListing, type FileEntry } from './api';
 import { Skeleton } from '../StateViews';
 import { useWorkspace } from '../../tabs/store';
+import type { WorkspaceSource } from '../../tabs/types';
 
 const POLL_MS = 5000;
 
 interface FilesPanelProps {
   readonly wsId: string;
+  readonly sessionId: string | null;
+  readonly source?: WorkspaceSource;
 }
 
 export function FilesPanel(props: FilesPanelProps): ReactElement {
@@ -56,7 +59,15 @@ export function FilesPanel(props: FilesPanelProps): ReactElement {
     if (entry.kind === 'file') {
       // Open the file in the dedicated viewer tab (VS Code-style).
       const rel = path ? `${path}/${entry.name}` : entry.name;
-      openOrFocus({ kind: 'file-viewer', params: { wsId: props.wsId, path: rel } });
+      openOrFocus({
+        kind: 'file-viewer',
+        params: {
+          wsId: props.wsId,
+          path: rel,
+          ...(props.source ? { source: props.source } : {}),
+          ...(props.sessionId ? { returnSessionId: props.sessionId } : {}),
+        },
+      });
     }
   };
 
@@ -142,4 +153,3 @@ function formatSize(n: number): string {
   if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)}M`;
   return `${(n / (1024 * 1024 * 1024)).toFixed(1)}G`;
 }
-

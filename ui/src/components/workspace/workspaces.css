@@ -1161,11 +1161,14 @@
 /* WebPi is deliberately a surface inside the existing terminal slot. */
 .webpi-shell {
   width: 100%;
+  max-width: 100%;
   height: 100%;
+  min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  container: webpi / inline-size;
   color: var(--foreground);
   background:
     radial-gradient(circle at 50% -20%, color-mix(in srgb, var(--primary) 8%, transparent), transparent 38%),
@@ -1173,6 +1176,8 @@
 }
 
 .webpi-header {
+  width: 100%;
+  min-width: 0;
   min-height: 58px;
   display: flex;
   align-items: center;
@@ -1183,6 +1188,7 @@
   background: color-mix(in srgb, var(--secondary) 72%, transparent);
 }
 
+.webpi-header > div:first-child { min-width: 0; }
 .webpi-title { font-size: 13px; font-weight: 650; }
 .webpi-title span { margin-left: 7px; color: var(--muted-foreground); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; }
 .webpi-subtitle { margin-top: 2px; color: var(--muted-foreground); font-size: 10px; }
@@ -1192,20 +1198,62 @@
 
 .webpi-messages {
   flex: 1;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 26px max(18px, calc((100% - 760px) / 2));
   scrollbar-gutter: stable;
 }
 
 .webpi-empty { padding: 12vh 16px; text-align: center; color: var(--muted-foreground); font-size: 13px; }
-.webpi-message { display: flex; align-items: flex-start; margin: 0 0 26px; }
+.webpi-message { max-width: 100%; min-width: 0; display: flex; align-items: flex-start; margin: 0 0 26px; }
 .webpi-message.is-user { justify-content: flex-end; margin-left: 12%; }
 .webpi-message-body { flex: 1; min-width: 0; font-size: 13px; line-height: 1.65; }
 .webpi-message.is-user .webpi-message-body { flex: 0 1 auto; max-width: min(88%, 760px); padding: 10px 13px; border: 1px solid var(--border); border-radius: 12px; background: var(--secondary); }
 .webpi-message.is-turn .webpi-message-body { display: grid; gap: 12px; }
+.webpi-message-body > *,
+.webpi-progress-text,
+.webpi-final-text,
+.webpi-content-parts,
+.webpi-detail,
+.webpi-activity,
+.webpi-reasoning {
+  min-width: 0;
+  max-width: 100%;
+}
 .webpi-progress-text { color: color-mix(in srgb, var(--foreground) 88%, var(--muted-foreground)); }
 .webpi-final-text { color: var(--foreground); }
+.webpi-message-body .markdown-content {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.webpi-message-body .code-block-wrapper {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+.webpi-message-body .code-block-wrapper .code-header > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.webpi-message-body .code-block-wrapper pre {
+  width: 100%;
+  max-width: 100%;
+  overscroll-behavior-inline: contain;
+}
+.webpi-message-body .markdown-content table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
 .webpi-content-parts > * + * { margin-top: 9px; }
 .webpi-detail { padding: 6px 9px; border-left: 2px solid var(--border); color: var(--muted-foreground); font-size: 11px; }
 .webpi-detail summary { cursor: pointer; user-select: none; font-weight: 600; }
@@ -1282,10 +1330,10 @@
 .webpi-compaction-status > div { display: grid; gap: 2px; min-width: 0; }
 .webpi-compaction-status strong { color: var(--foreground); font-size: 11px; font-weight: 650; }
 .webpi-compaction-status span { color: var(--muted-foreground); font-size: 10px; line-height: 1.45; }
-.webpi-composer-wrap { padding: 10px max(18px, calc((100% - 760px) / 2)) 14px; border-top: 1px solid var(--border); background: color-mix(in srgb, var(--background) 88%, transparent); }
-.webpi-composer { display: flex; align-items: flex-end; gap: 8px; padding: 9px 10px 9px 13px; border: 1px solid var(--border); border-radius: 14px; background: var(--secondary); box-shadow: 0 6px 24px color-mix(in srgb, var(--shadow-color) 9%, transparent); }
+.webpi-composer-wrap { width: 100%; max-width: 100%; min-width: 0; padding: 10px max(18px, calc((100% - 760px) / 2)) 14px; border-top: 1px solid var(--border); background: color-mix(in srgb, var(--background) 88%, transparent); }
+.webpi-composer { width: 100%; max-width: 100%; min-width: 0; display: flex; align-items: flex-end; gap: 8px; padding: 9px 10px 9px 13px; border: 1px solid var(--border); border-radius: 14px; background: var(--secondary); box-shadow: 0 6px 24px color-mix(in srgb, var(--shadow-color) 9%, transparent); }
 .webpi-composer:focus-within { border-color: color-mix(in srgb, var(--primary) 60%, var(--border)); }
-.webpi-composer textarea { flex: 1; min-height: 25px; max-height: 150px; resize: none; border: 0; outline: 0; color: var(--foreground); background: transparent; font: inherit; font-size: 13px; line-height: 1.6; }
+.webpi-composer textarea { width: 100%; min-width: 0; flex: 1; min-height: 25px; max-height: 150px; resize: none; border: 0; outline: 0; color: var(--foreground); background: transparent; font: inherit; font-size: 13px; line-height: 1.6; }
 .webpi-send { width: 30px; height: 30px; flex: 0 0 30px; display: grid; place-items: center; border-radius: 9px; color: var(--primary-foreground); background: var(--primary); }
 .webpi-send:disabled { opacity: .35; }
 .webpi-composer-hint { padding: 5px 3px 0; text-align: right; color: var(--muted-foreground); font-size: 9px; }
@@ -1300,12 +1348,30 @@
   .webpi-tool-step[open] > .webpi-step-detail { animation: none; }
 }
 
-@media (max-width: 720px) {
+/* WebPi shares the viewport with the global rail and Workspace sidebar. Its
+ * responsive state must therefore follow the surface's real inline size, not
+ * the browser viewport. */
+@container webpi (max-width: 720px) {
   .webpi-messages, .webpi-composer-wrap { padding-left: 12px; padding-right: 12px; }
   .webpi-compaction-status { margin-left: 12px; margin-right: 12px; }
   .webpi-message.is-user { margin-left: 0; }
   .webpi-tool-step > summary { grid-template-columns: 18px minmax(52px, auto) minmax(0, 1fr) 14px; }
   .webpi-step-size { display: none; }
   .webpi-step-detail { margin-left: 0; }
+}
+
+@container webpi (max-width: 460px) {
+  .webpi-header { min-height: 54px; gap: 8px; padding: 9px 12px; }
+  .webpi-title,
+  .webpi-subtitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .webpi-title span { display: block; margin: 1px 0 0; }
+  .webpi-subtitle { display: none; }
+  .webpi-messages { padding-top: 18px; }
+  .webpi-message { margin-bottom: 20px; }
+  .webpi-activity > summary { gap: 6px; padding-inline: 8px; }
+  .webpi-composer-hint { text-align: left; }
+}
+
+@media (max-width: 720px) {
   .resume-cta-actions { flex-direction: column; }
 }

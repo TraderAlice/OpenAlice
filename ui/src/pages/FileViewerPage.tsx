@@ -24,7 +24,7 @@ interface Props {
 }
 
 export function FileViewerPage({ spec }: Props) {
-  const { wsId, path } = spec.params
+  const { wsId, path, source, returnSessionId } = spec.params
   const { workspaces } = useWorkspaces()
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const setSidebar = useWorkspace((s) => s.setSidebar)
@@ -43,8 +43,15 @@ export function FileViewerPage({ spec }: Props) {
   }, [wsId, path])
 
   const openWorkspace = () => {
-    setSidebar('workspaces')
-    openOrFocus({ kind: 'workspace', params: { wsId } })
+    setSidebar(source === 'chat' ? 'chat' : 'workspaces')
+    openOrFocus({
+      kind: 'workspace',
+      params: {
+        wsId,
+        ...(returnSessionId ? { sessionId: returnSessionId } : {}),
+        ...(source ? { source } : {}),
+      },
+    })
   }
 
   return (

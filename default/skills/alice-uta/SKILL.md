@@ -1,23 +1,23 @@
 ---
 name: alice-uta
 description: >
-  Trading on your shell PATH via the `alice-uta` CLI — OpenAlice's trading
-  surface. These commands MUTATE real broker state, so resolve the
-  broker-native contract first and report every result. Use whenever you need
-  to place / modify / cancel an order; close a position; check an account,
-  portfolio, or order/trade history; resolve a contract or quote; or drive the
-  trading-as-git approval flow: "place a buy order for AAPL", "what's my
-  position in ETH", "close half my TSLA", "find the contract for this option",
-  "show pending trades", "approve my orders". Discover every group, verb, and
-  flag with `alice-uta --help` and `alice-uta <group> <verb> --help` — do NOT
-  guess flags.
+  Read broker accounts, portfolios, contracts, quotes, and order history, or
+  manage approved trading, through the `alice-uta` executable on the shell
+  PATH. Account/contract/history reads are safe and do not mutate broker state;
+  order writes, position-close, commit, push, reject, sync, and simulator
+  commands may change trading state. Use for "what's my position", "quote this
+  contract", "place or cancel an order", and the trading-as-git approval flow.
+  Discover current flags with `alice-uta <group> <verb> --help`; do not guess
+  aliases.
 ---
 
 # Trading — `alice-uta`
 
-Accounts, portfolio, orders, and the trading-as-git approval flow. **These
-mutate real broker state** — discover before you act, and act only on what
-the user's instructions actually cover.
+Accounts, portfolio, contracts, orders, and the trading-as-git approval flow.
+Account, portfolio, contract, quote, market-clock, and history reads do not
+mutate broker state. Order writes, position closes, approval commands, and the
+simulator can mutate trading state: inspect their live help before acting, and
+act only on what the user's instructions actually cover.
 
 ## Discover, don't guess
 
@@ -26,20 +26,40 @@ alice-uta --help                       # the groups
 alice-uta <group> <verb> --help        # a verb's flags (which are required)
 ```
 
-## Accounts & portfolio
+Read this skill before the first UTA command in a task. If a command is
+rejected, follow the CLI's suggested command or run the exact verb's `--help`
+before retrying. Do not improvise a positional account id or flags such as
+`--account`, `--query`, or `--symbols`.
+
+## Common read-only recipes
 
 ```bash
-alice-uta account list                 # registered trading accounts + capabilities
-alice-uta account info --help          # one account's detail
-alice-uta account portfolio --help     # positions for an account
+alice-uta account list
+alice-uta account info --source <account-id>
+alice-uta account portfolio                         # every trading account
+alice-uta account portfolio --source <account-id>   # one account
+alice-uta account portfolio --source <account-id> --symbol AAPL
 ```
 
-## Resolve the contract first
+`--source` takes the id returned by `account list`; it is not `--account` and
+is not a broker-native account number.
+
+Resolve a broker contract before requesting a quote. Search uses `--pattern`
+(not `--query`). Quote accepts exactly one broker-resolved `--alice-id` at a
+time; repeat the command for multiple contracts rather than inventing a
+`--symbols` flag. Quote infers its account from the `aliceId` prefix.
 
 ```bash
-alice-uta contract search --help       # find the broker-native contract
-alice-uta contract details --help      # its full identity
-alice-uta contract quote --help        # a quote
+alice-uta contract search --source <account-id> --pattern AAPL
+alice-uta contract details --source <account-id> --alice-id '<alice-id-from-search>'
+alice-uta contract quote --alice-id '<alice-id-from-search>'
+```
+
+Keep `aliceId` values quoted because they contain `|`, which a shell otherwise
+interprets as a pipe. Contract search may return a directory rather than a
+tradeable leaf; expand it before quoting or ordering:
+
+```bash
 alice-uta contract expand --help       # expand a directory-style result (chains, families)
 ```
 

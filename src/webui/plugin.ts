@@ -209,9 +209,8 @@ export class WebPlugin implements Plugin {
     }))
 
     // ==================== Mount route modules ====================
-    // /api/channels is the last surviving piece of the legacy web-chat
-    // stack — kept (vestigial) only because the surviving TabStrip reads
-    // channel titles. Slated for end-to-end removal (tracked in Linear).
+    // /api/channels remains the compatibility boundary for legacy web
+    // channels; Workspace Chat uses the Workspace APIs instead.
     app.route('/api/channels', createChannelsRoutes({ sessions, sseByChannel: this.sseByChannel }))
     app.route('/api/media', createMediaRoutes())
     app.route('/api/config', createConfigRoutes({ ctx }))

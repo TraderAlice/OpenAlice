@@ -49,7 +49,17 @@ export type ViewSpec =
   | { kind: 'tracked';             params: Record<string, never> }
   | { kind: 'chat-landing';        params: { targetWsId?: string } }
   | { kind: 'workspace-manager';   params: { sessionId?: string } }
-  | { kind: 'file-viewer';         params: { wsId: string; path: string } }
+  | {
+      kind: 'file-viewer'
+      params: {
+        wsId: string
+        path: string
+        /** Preserve the product area that opened this Workspace artifact. */
+        source?: WorkspaceSource
+        /** Exact Session materialization to restore when leaving the artifact. */
+        returnSessionId?: string
+      }
+    }
 
 export type ViewKind = ViewSpec['kind']
 

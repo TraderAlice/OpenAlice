@@ -253,8 +253,8 @@ describe('WorkspaceManagerPage runtime selection', () => {
 
     render(<WorkspaceManagerPage spec={{ kind: 'workspace-manager', params: {} }} />)
 
-    expect(await screen.findByText('Saved in this workspace')).toBeTruthy()
-    expect(screen.getByLabelText('Model MiniMax-M2.5')).toBeTruthy()
+    expect(await screen.findByLabelText('Model MiniMax-M2.5')).toBeTruthy()
+    expect(screen.queryByText('Saved in this workspace')).toBeNull()
     expect(screen.queryByText(/context$/)).toBeNull()
     expect(screen.getByRole('status').textContent).toContain('Claude Code still needs its own first-run setup')
     expect(mocks.listAgentCredentials).toHaveBeenCalledWith('claude')

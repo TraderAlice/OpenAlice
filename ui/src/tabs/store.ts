@@ -22,7 +22,6 @@ reloadOnHotUpdate('tabs/store')
  * - closeTab(id): drop the tab. If it was focused, focus the right neighbour
  *   (or left, if it was the rightmost). If the group becomes empty, leave
  *   it empty — TabHost shows the EmptyEditor view.
- * - focusTab(id): just set the focused tab. No-op if id isn't in the group.
  * - closeMatching(predicate): close every tab whose spec matches.
  *
  * Sidebar:
@@ -38,13 +37,7 @@ reloadOnHotUpdate('tabs/store')
 interface WorkspaceActions {
   openOrFocus: (spec: ViewSpec) => void
   closeTab: (id: string) => void
-  focusTab: (id: string) => void
   closeMatching: (predicate: (spec: ViewSpec) => boolean) => void
-  /** Bulk closers used by the tab context menu. All operate on the focused group. */
-  closeOthers: (id: string) => void
-  closeToRight: (id: string) => void
-  closeToLeft: (id: string) => void
-  closeAll: () => void
   setSidebar: (section: ActivitySection | null) => void
   toggleSidebar: (section: ActivitySection) => void
 }
@@ -159,16 +152,6 @@ export const useWorkspace = create<WorkspaceStore>()(
         })
       },
 
-      focusTab(id) {
-        set((state) => {
-          const group = getFocusedGroup(state)
-          if (!group) return state
-          if (!group.tabIds.includes(id)) return state
-          if (group.activeTabId === id) return state
-          return withFocusedGroup(state, (g) => ({ ...g, activeTabId: id }))
-        })
-      },
-
       closeMatching(predicate) {
         // Snapshot ids first — closeTab mutates the array we'd be iterating.
         const state = get()
@@ -181,43 +164,6 @@ export const useWorkspace = create<WorkspaceStore>()(
         for (const id of toClose) {
           get().closeTab(id)
         }
-      },
-
-      // ============= Bulk closers (for the tab context menu) =============
-      // All four delegate to closeTab so the neighbour-focus / no-fallback
-      // semantics are consistent. Snapshot ids before iterating since
-      // closeTab mutates the underlying array.
-
-      closeOthers(id) {
-        const group = getFocusedGroup(get())
-        if (!group) return
-        const toClose = group.tabIds.filter((x) => x !== id)
-        for (const tid of toClose) get().closeTab(tid)
-      },
-
-      closeToRight(id) {
-        const group = getFocusedGroup(get())
-        if (!group) return
-        const idx = group.tabIds.indexOf(id)
-        if (idx < 0) return
-        const toClose = group.tabIds.slice(idx + 1)
-        for (const tid of toClose) get().closeTab(tid)
-      },
-
-      closeToLeft(id) {
-        const group = getFocusedGroup(get())
-        if (!group) return
-        const idx = group.tabIds.indexOf(id)
-        if (idx < 0) return
-        const toClose = group.tabIds.slice(0, idx)
-        for (const tid of toClose) get().closeTab(tid)
-      },
-
-      closeAll() {
-        const group = getFocusedGroup(get())
-        if (!group) return
-        const toClose = [...group.tabIds]
-        for (const tid of toClose) get().closeTab(tid)
       },
 
       setSidebar(section) {
@@ -239,7 +185,7 @@ export const useWorkspace = create<WorkspaceStore>()(
       // traditional-chat / notifications-legacy / connectors-legacy
       // ActivitySections) were removed with the legacy chat cluster. A
       // persisted tab or selectedSidebar of a removed kind would make
-      // TabStrip call getView() on a missing kind and crash on rehydrate;
+      // TabHost call getView() on a missing kind and crash on rehydrate;
       // bumping the version drops stale persisted state (no migrate fn —
       // schema bump clears, per this store's loud-fail contract).
       // v5: the demo `/api/news` handler shape mismatch poisoned any

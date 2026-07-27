@@ -33,7 +33,6 @@ import { InboxPageShell } from '../pages/InboxPageShell'
 import { TrackedPage } from '../pages/TrackedPage'
 import { ChatLandingPage } from '../pages/ChatLandingPage'
 import { WorkspaceManagerPage } from '../pages/WorkspaceManagerPage'
-import { ChatPageShell } from '../pages/ChatPageShell'
 import { PageSidebarShell } from '../pages/PageSidebarShell'
 import { WorkspaceListPage } from '../pages/WorkspaceListPage'
 import { WorkspacePage } from '../pages/WorkspacePage'
@@ -53,8 +52,9 @@ import { getDesignProject } from '../design/projects'
  * Central registry mapping each ViewKind to its render component and URL
  * projection. Adding a new view kind means adding one entry here.
  *
- * Page-owned sidebars live here with their pages. The app shell only owns the
- * ActivityBar; each view kind decides whether it needs local navigation.
+ * Page-owned sidebars live here with their pages. Shared product shells are
+ * declared here and mounted by TabHost so adjacent views can retain one local
+ * navigator instance. The app shell itself owns only the ActivityBar.
  */
 
 export interface TitleCtx {
@@ -69,6 +69,7 @@ interface ViewProps<K extends ViewKind> {
 }
 
 export type ViewLifecycle = 'active-only' | 'keep-mounted'
+export type ViewShell = 'chat'
 
 export interface ViewModule<K extends ViewKind> {
   kind: K
@@ -86,6 +87,12 @@ export interface ViewModule<K extends ViewKind> {
    * while backgrounded.
    */
   lifecycle?: ViewLifecycle
+  /**
+   * Shared product chrome owned by TabHost rather than this individual view.
+   * Adjacent views using the same shell swap only their content, preserving
+   * the navigator instance and its rendered state.
+   */
+  shell?: ViewShell | ((spec: Extract<ViewSpec, { kind: K }>) => ViewShell | null)
   /** The actual page component. Ignores `visible` unless it needs catch-up behaviour. */
   Component: ComponentType<ViewProps<K>>
 }
@@ -383,30 +390,24 @@ const trackedModule: ViewModule<'tracked'> = {
 
 const chatLandingModule: ViewModule<'chat-landing'> = {
   kind: 'chat-landing',
+  shell: 'chat',
   title: (spec, ctx) => {
     if (!spec.params.targetWsId) return 'Ask Alice'
     const tag = ctx.workspaces?.find((w) => w.id === spec.params.targetWsId)?.tag
     return tag ? `New session · ${tag}` : 'New session'
   },
   toUrl: () => '/chat',
-  Component: ({ spec }) => (
-    <ChatPageShell>
-      <ChatLandingPage spec={spec} />
-    </ChatPageShell>
-  ),
+  Component: ({ spec }) => <ChatLandingPage spec={spec} />,
 }
 
 const workspaceManagerModule: ViewModule<'workspace-manager'> = {
   kind: 'workspace-manager',
+  shell: 'chat',
   title: () => 'Workspace Manager',
   toUrl: (spec) => spec.params.sessionId
     ? `/chat/manager/s/${encodeURIComponent(spec.params.sessionId)}`
     : '/chat/manager',
-  Component: ({ spec }) => (
-    <ChatPageShell>
-      <WorkspaceManagerPage spec={spec} />
-    </ChatPageShell>
-  ),
+  Component: ({ spec }) => <WorkspaceManagerPage spec={spec} />,
 }
 
 const workspaceListModule: ViewModule<'workspace-list'> = {
@@ -427,6 +428,7 @@ const workspaceListModule: ViewModule<'workspace-list'> = {
 
 const workspaceModule: ViewModule<'workspace'> = {
   kind: 'workspace',
+  shell: (spec) => spec.params.source === 'chat' ? 'chat' : null,
   title: (spec, ctx) => {
     const ws = ctx.workspaces?.find((w) => w.id === spec.params.wsId)
     const tag = ws?.tag ?? spec.params.wsId.slice(0, 8)
@@ -446,11 +448,7 @@ const workspaceModule: ViewModule<'workspace'> = {
   },
   Component: (props) =>
     props.spec.params.source === 'chat'
-      ? (
-        <ChatPageShell>
-          <WorkspacePage {...props} />
-        </ChatPageShell>
-      )
+      ? <WorkspacePage {...props} />
       : (
         <PageSidebarShell
           storageKey="workspaces"
@@ -497,20 +495,30 @@ const templateDetailModule: ViewModule<'template-detail'> = {
 
 const fileViewerModule: ViewModule<'file-viewer'> = {
   kind: 'file-viewer',
+  shell: (spec) => spec.params.source === 'chat' ? 'chat' : null,
   // Tab title = file basename; path itself shows in the page header.
   title: (spec) => spec.params.path.split('/').filter(Boolean).pop() ?? spec.params.path,
-  toUrl: (spec) =>
-    `/workspaces/${encodeURIComponent(spec.params.wsId)}/view/${encodeURIComponent(spec.params.path)}`,
-  Component: ({ spec }) => (
-    <PageSidebarShell
-      storageKey="workspaces"
-      titleKey="nav.item.workspaces"
-      defaultWidth={300}
-      sidebar={<WorkspacesSidebar />}
-    >
-      <FileViewerPage spec={spec} />
-    </PageSidebarShell>
-  ),
+  toUrl: (spec) => {
+    const base = spec.params.source === 'chat'
+      ? `/chat/workspaces/${encodeURIComponent(spec.params.wsId)}`
+      : `/workspaces/${encodeURIComponent(spec.params.wsId)}`
+    const query = spec.params.returnSessionId
+      ? `?sessionId=${encodeURIComponent(spec.params.returnSessionId)}`
+      : ''
+    return `${base}/view/${encodeURIComponent(spec.params.path)}${query}`
+  },
+  Component: ({ spec }) => spec.params.source === 'chat'
+    ? <FileViewerPage spec={spec} />
+    : (
+      <PageSidebarShell
+        storageKey="workspaces"
+        titleKey="nav.item.workspaces"
+        defaultWidth={300}
+        sidebar={<WorkspacesSidebar />}
+      >
+        <FileViewerPage spec={spec} />
+      </PageSidebarShell>
+    ),
 }
 
 // ==================== Aggregate ====================
@@ -547,4 +555,13 @@ const VIEWS = {
 /** Untyped lookup — narrow at the call site by inspecting `spec.kind`. */
 export function getView<K extends ViewKind>(kind: K): ViewModule<K> {
   return VIEWS[kind] as unknown as ViewModule<K>
+}
+
+/** Resolve shared product chrome without leaking per-kind generic narrowing to TabHost. */
+export function getViewShell(spec: ViewSpec): ViewShell | null {
+  const shell = (getView(spec.kind) as unknown as {
+    shell?: ViewShell | ((candidate: ViewSpec) => ViewShell | null)
+  }).shell
+  if (typeof shell === 'function') return shell(spec)
+  return shell ?? null
 }

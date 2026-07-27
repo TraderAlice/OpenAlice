@@ -125,6 +125,21 @@ describe('injectWorkspaceContext — skills', () => {
     expect(existsSync(join(dir, '.pi/skills'))).toBe(false);
   });
 
+  it('gives every runtime copyable UTA read recipes', async () => {
+    await injectWorkspaceContext({
+      template: makeTemplate({ injectTools: true }),
+      wsId: 'ws-abc',
+      dir,
+    });
+    for (const root of ['.claude/skills', '.agents/skills']) {
+      const skill = await read(`${root}/alice-uta/SKILL.md`);
+      expect(skill).toContain('alice-uta account portfolio --source <account-id>');
+      expect(skill).toContain('alice-uta contract search --source <account-id> --pattern AAPL');
+      expect(skill).toContain("alice-uta contract quote --alice-id '<alice-id-from-search>'");
+      expect(skill).toContain('`--symbols` flag');
+    }
+  });
+
   it('does not inject CLI playbooks when the template is not tool-bearing', async () => {
     await injectWorkspaceContext({
       template: makeTemplate({ injectTools: false, bundledSkills: ['scan-value-chain'] }),
