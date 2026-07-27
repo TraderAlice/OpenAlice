@@ -1,8 +1,10 @@
 # Windows Headless Launch Hardening
 
-Status: Active
+Status: Completed
 
 Related report: Discord scheduled-Issue Windows startup failures (`exitCode: -1`)
+
+Delivered by: #719
 
 Owner guides: [[docs/managed-workspace-runtime.md]],
 [[docs/workspace-issues-and-scheduling.md]],
@@ -57,7 +59,7 @@ still advances only its own scheduled occurrence.
 - [x] Run focused Windows command, headless, Issue, scanner, and desktop tests.
 - [x] Run `npx tsc --noEmit`, desktop TypeScript, and `pnpm test`.
 - [x] Run `pnpm electron:smoke:workspace`.
-- [ ] Publish and merge a serial PR to `dev`; inspect trailing Windows package
+- [x] Publish and merge a serial PR to `dev`; inspect trailing Windows package
   smoke and repair any completed failure.
 
 ## Completion Criteria
