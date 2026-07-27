@@ -89,7 +89,8 @@ it.**
 4. **Map the index to dates when you need the path in a quant script.** Most
    reads are covered by snapshot; when you must compute over the series and want
    the date axis, add `--dates` to `alice analysis quant` (it returns
-   `dates[barId]` so you can map a dumped value back to its day).
+   `dates[barId]` for one interval, or `dates["barId@interval"]` when the same
+   barId appears at multiple intervals, so you can map each value to its day).
 
 ## Write it down honestly
 

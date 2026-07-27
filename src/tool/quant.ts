@@ -91,12 +91,17 @@ on failure. Most kinds are script problems — read the error and fix the script
 pinpoints the problem). The exception is kind:"data-source": the K-line fetch itself
 failed (vendor rate-limited/blocked this client, network down, or a bad barId) — that
 is NOT a script bug. Do not rewrite the expression; follow the suggestion (retry later,
-switch source, or fix the barId), and tell the user if data is simply unavailable.`,
+switch source, or fix the barId), and tell the user if data is simply unavailable.
+
+With dates enabled, a single interval keeps the compact dates[barId] /
+dataRange[barId] keys. If the same barId is fetched at multiple intervals, both
+maps use explicit "barId@interval" keys (for example "...@1h" and "...@4h");
+each dataRange entry also carries interval.`,
 
       inputSchema: z.object({
         script: z.string().describe('The quant script (let-bindings + a final result expression).'),
         precision: z.number().int().min(0).max(10).optional().describe('Decimal places (default 4).'),
-        dates: z.stringbool().optional().describe('Opt-in: also return each source\'s date axis (dates[barId] = ["YYYY-MM-DD", …]) so a dumped series can be mapped to dates. Off by default. For a full dated snapshot, prefer marketSnapshot.'),
+        dates: z.stringbool().optional().describe('Opt-in: return each series date axis. Single-interval scripts use dates[barId]; repeated barIds at multiple intervals use dates["barId@interval"]. Off by default. For a full dated snapshot, prefer marketSnapshot.'),
       }).meta({ examples: [{ script: 's = bars("yfinance|AAPL", "1d", count=250, asset="equity")\nsma(s.close, 50)' }] }),
       execute: async ({ script, precision, dates }) => {
         return runScript(script, deps, precision ?? 4, { withDates: dates ?? false })
