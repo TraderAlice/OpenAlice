@@ -2,6 +2,10 @@ import { fetchJson } from './client'
 import type { ModelReasoningEffort } from './types'
 
 export type HeadlessTaskStatus = 'running' | 'done' | 'failed' | 'interrupted'
+export type HeadlessLaunchErrorCode =
+  | 'unsupported_windows_batch_shim'
+  | 'executable_not_found'
+  | 'spawn_failed'
 
 export interface HeadlessTaskRecord {
   taskId: string
@@ -21,6 +25,9 @@ export interface HeadlessTaskRecord {
   startedAt: number
   finishedAt?: number
   durationMs?: number
+  /** False means the Agent process never reached Node's spawn event. */
+  processStarted?: boolean
+  launchErrorCode?: HeadlessLaunchErrorCode
   exitCode?: number | null
   signal?: string | null
   killed?: boolean

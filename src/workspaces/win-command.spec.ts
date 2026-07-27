@@ -1,10 +1,14 @@
+import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { resolveBashPath } from '../core/shell-resolver.js';
+import { runHeadlessTask } from './headless-task.js';
 import { resolveLaunchCommand, resolveStockNpmShim } from './win-command.js';
+import type { Logger } from './logger.js';
 
 // A fake Windows PATHEXT — order intentionally puts .CMD before .EXE to prove
 // the resolver prefers a real executable regardless of PATHEXT ordering.
@@ -12,6 +16,16 @@ const PATHEXT = '.CMD;.EXE;.BAT;.PS1';
 
 let dir: string;
 let env: NodeJS.ProcessEnv;
+
+const noopLogger = {
+  info() {},
+  warn() {},
+  error() {},
+  debug() {},
+  child() {
+    return noopLogger;
+  },
+} as unknown as Logger;
 
 async function touch(name: string): Promise<void> {
   await writeFile(join(dir, name), '');
@@ -35,20 +49,22 @@ afterEach(async () => {
 describe('resolveLaunchCommand', () => {
   it('is the identity function off win32', () => {
     const r = resolveLaunchCommand(['pi', '--continue'], { platform: 'linux', env });
-    expect(r).toEqual({ argv: ['pi', '--continue'], viaShell: false });
+    expect(r).toEqual({ argv: ['pi', '--continue'], viaShell: false, mode: 'direct' });
   });
 
   it('win32: a native .exe resolves to its full path, run directly', async () => {
     await touch('codex.exe');
     const r = resolveLaunchCommand(['codex', 'exec'], { platform: 'win32', env });
     expect(r.viaShell).toBe(false);
+    expect(r.mode).toBe('direct');
     expect(r.argv).toEqual([join(dir, 'codex.exe'), 'exec']);
   });
 
-  it('win32: a .cmd npm shim is wrapped through cmd.exe', async () => {
+  it('win32: a batch-only .cmd shim retains the restricted cmd.exe fallback', async () => {
     await touch('pi.cmd');
     const r = resolveLaunchCommand(['pi', '--session-id', 'abc'], { platform: 'win32', env });
     expect(r.viaShell).toBe(true);
+    expect(r.mode).toBe('cmd-shim');
     expect(r.argv).toEqual([
       'C:\\Windows\\System32\\cmd.exe',
       '/d',
@@ -70,6 +86,23 @@ describe('resolveLaunchCommand', () => {
     expect(r).toEqual({
       argv: [nodeExecPath, join(dir, 'node_modules', 'pkg', 'cli.js'), '-p', 'a & b'],
       viaShell: false,
+      mode: 'node-shim',
+    });
+  });
+
+  it('win32: runs an unknown batch shim through its extensionless sibling and Bash', async () => {
+    await touch('pi.cmd');
+    await touch('pi');
+    await touch('bash.exe');
+    const prompt = 'a & b | c < d > e ^ f %PATH% !wow! "quoted" 中文\nnext';
+    const r = resolveLaunchCommand(['pi', '-p', prompt], {
+      platform: 'win32',
+      env: { ...env, OPENALICE_MANAGED_SHELL_PATH: join(dir, 'bash.exe') },
+    });
+    expect(r).toEqual({
+      argv: [join(dir, 'bash.exe'), join(dir, 'pi').replace(/\\/g, '/'), '-p', prompt],
+      viaShell: false,
+      mode: 'bash-shim',
     });
   });
 
@@ -102,6 +135,7 @@ describe('resolveLaunchCommand', () => {
     );
     const r = resolveLaunchCommand(['pi', '-p', 'hello'], { platform: 'win32', env });
     expect(r.viaShell).toBe(true);
+    expect(r.mode).toBe('cmd-shim');
   });
 
   it('win32: prefers .exe over a .cmd shim when both exist', async () => {
@@ -109,23 +143,48 @@ describe('resolveLaunchCommand', () => {
     await touch('opencode.exe');
     const r = resolveLaunchCommand(['opencode', 'run'], { platform: 'win32', env });
     expect(r.viaShell).toBe(false);
+    expect(r.mode).toBe('direct');
     expect(r.argv).toEqual([join(dir, 'opencode.exe'), 'run']);
   });
 
   it('win32: an unresolved name passes through unchanged (fails loudly later)', () => {
     const r = resolveLaunchCommand(['nope', '--x'], { platform: 'win32', env });
-    expect(r).toEqual({ argv: ['nope', '--x'], viaShell: false });
+    expect(r).toEqual({ argv: ['nope', '--x'], viaShell: false, mode: 'direct' });
   });
 
-  it('win32: a name with an explicit extension is trusted, not re-resolved', async () => {
-    await touch('pi.cmd');
-    const r = resolveLaunchCommand(['pi.cmd', '-p'], { platform: 'win32', env });
-    expect(r).toEqual({ argv: ['pi.cmd', '-p'], viaShell: false });
+  it('win32: an explicit .cmd name uses the same safe shim resolution', async () => {
+    await stockNpmShim('pi.cmd');
+    const r = resolveLaunchCommand(['pi.cmd', '-p', 'hello'], {
+      platform: 'win32',
+      env,
+      nodeExecPath: 'node.exe',
+    });
+    expect(r).toEqual({
+      argv: ['node.exe', join(dir, 'node_modules', 'pkg', 'cli.js'), '-p', 'hello'],
+      viaShell: false,
+      mode: 'node-shim',
+    });
+  });
+
+  it('win32: an explicit .cmd path uses the same Bash sibling fallback', async () => {
+    await touch('custom.cmd');
+    await touch('custom');
+    await touch('bash.exe');
+    const shim = join(dir, 'custom.cmd');
+    const r = resolveLaunchCommand([shim, 'hello & goodbye'], {
+      platform: 'win32',
+      env: { ...env, OPENALICE_MANAGED_SHELL_PATH: join(dir, 'bash.exe') },
+    });
+    expect(r).toEqual({
+      argv: [join(dir, 'bash.exe'), join(dir, 'custom').replace(/\\/g, '/'), 'hello & goodbye'],
+      viaShell: false,
+      mode: 'bash-shim',
+    });
   });
 
   it('win32: a name that is already a path is trusted as-is', () => {
     const r = resolveLaunchCommand(['C:\\tools\\pi', '-p'], { platform: 'win32', env });
-    expect(r).toEqual({ argv: ['C:\\tools\\pi', '-p'], viaShell: false });
+    expect(r).toEqual({ argv: ['C:\\tools\\pi', '-p'], viaShell: false, mode: 'direct' });
   });
 
   it('win32: searches multiple PATH entries', async () => {
@@ -157,6 +216,39 @@ describe('resolveLaunchCommand', () => {
     expect(resolveLaunchCommand([], { platform: 'win32', env })).toEqual({
       argv: [],
       viaShell: false,
+      mode: 'direct',
     });
   });
+
+  it.skipIf(process.platform !== 'win32')(
+    'win32 integration: real Git Bash preserves metacharacters as one prompt argv',
+    async () => {
+      const bash = resolveBashPath(process.env, 'win32');
+      expect(bash).toBeTruthy();
+      if (!bash) throw new Error('Git Bash is required for the Windows integration test');
+      const work = join(dir, 'space 中文');
+      await mkdir(work, { recursive: true });
+      const cmdShim = join(work, 'external-agent.cmd');
+      const posixShim = join(work, 'external-agent');
+      const sentinel = join(work, 'injected.txt');
+      await writeFile(cmdShim, '@echo off\r\nexit /b 99\r\n');
+      await writeFile(posixShim, '#!/usr/bin/env bash\nprintf %s "$1"\n');
+      const prompt =
+        `& touch "${sentinel}" | echo nope < input > output ^ %PATH% !wow! "quoted" 中文\nnext`;
+      const cleanEnv = Object.fromEntries(
+        Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined),
+      );
+      const result = await runHeadlessTask({
+        command: [cmdShim, prompt],
+        cwd: work,
+        env: { ...cleanEnv, OPENALICE_MANAGED_SHELL_PATH: bash },
+        timeoutMs: 10_000,
+        logger: noopLogger,
+      });
+      expect(result.exitCode).toBe(0);
+      expect(result.processStarted).toBe(true);
+      expect(result.stdoutTail).toBe(prompt);
+      expect(existsSync(sentinel)).toBe(false);
+    },
+  );
 });

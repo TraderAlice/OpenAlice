@@ -87,6 +87,12 @@ export interface HeadlessTaskArgs {
 export interface HeadlessTaskResult {
   readonly command: readonly string[];
   readonly cwd: string;
+  /** True only after Node confirms that the child process was created. */
+  readonly processStarted?: boolean;
+  /** Stable machine-readable reason when the agent process never started. */
+  readonly launchErrorCode?: HeadlessLaunchErrorCode;
+  /** Human-readable launch error. Absent for failures after process startup. */
+  readonly error?: string;
   readonly exitCode: number | null;
   readonly signal: NodeJS.Signals | null;
   /** True if the watchdog had to kill the process (timeout, not natural exit). */
@@ -102,6 +108,11 @@ export interface HeadlessTaskResult {
   /** Vendor-neutral reply + message/tool block timeline. */
   readonly structured: HeadlessStructuredOutput;
 }
+
+export type HeadlessLaunchErrorCode =
+  | 'unsupported_windows_batch_shim'
+  | 'executable_not_found'
+  | 'spawn_failed';
 
 /**
  * Turn process/runtime evidence into the durable task status shown to callers.
@@ -217,7 +228,7 @@ function makeStructuredOutputScanner(opts: {
 
 interface BoundedLogStream {
   write(chunk: Buffer): void
-  end(): void
+  end(): Promise<void>
 }
 
 /** Open a size-capped diagnostic stream; null (+ warn) on failure. */
@@ -242,8 +253,12 @@ async function openLogStream(path: string, logger: Logger, name: string): Promis
           ws.write(Buffer.from('\n… diagnostic log capped at 16MB; use structured output …\n'));
         }
       },
-      end() {
-        ws.end();
+      async end() {
+        if (ws.closed) return;
+        await new Promise<void>((resolve) => {
+          ws.once('close', resolve);
+          ws.end();
+        });
       },
     };
   } catch (err) {
@@ -307,6 +322,9 @@ export async function runHeadlessTask(args: HeadlessTaskArgs): Promise<HeadlessT
   let exitCode: number | null = null;
   let signal: NodeJS.Signals | null = null;
   let killed = false;
+  let processStarted = false;
+  let launchErrorCode: HeadlessLaunchErrorCode | undefined;
+  let launchError: string | undefined;
   let agentSessionId: string | null = null;
   let assistantText: string | null = null;
   const structuredOutput = new HeadlessOutputAccumulator();
@@ -314,6 +332,7 @@ export async function runHeadlessTask(args: HeadlessTaskArgs): Promise<HeadlessT
   const outSink = makeTailSink(OUTPUT_TAIL_BYTES);
   const errSink = makeTailSink(OUTPUT_TAIL_BYTES);
   let outFile: BoundedLogStream | null = null;
+  let errFile: BoundedLogStream | null = null;
   const scanner = args.extractSessionId || args.extractAssistantText || args.extractOutputEvents || args.keepDiagnosticLine
     ? makeStructuredOutputScanner({
         ...(args.extractSessionId ? { extractSessionId: args.extractSessionId } : {}),
@@ -356,47 +375,90 @@ export async function runHeadlessTask(args: HeadlessTaskArgs): Promise<HeadlessT
           : {}),
       })
     : null;
-  // win32: resolve the bare CLI name against PATH × PATHEXT. Native-exe agents
-  // (claude.exe, codex.exe) resolve to a direct path and run headless fine. But
-  // npm-shim agents (opencode, pi → a `.cmd`) would have to run through cmd.exe,
-  // and the headless PROMPT is the trailing arg — routing it through cmd.exe
-  // re-parses shell metacharacters (CVE-2024-27980 territory), a real injection
-  // surface. So shim agents stay headless-unsupported on Windows; we fail with a
-  // clear, recorded reason instead of a silent ENOENT. (Interactive launch of
-  // the same agents works — see win-command.ts / persistent-session.ts.)
-  const resolved = resolveLaunchCommand(command, { env });
-  if (resolved.viaShell && !args.allowShellShim) {
-    logger.error('headless.win32_shim_unsupported', { command: argv0 });
+  // Open logs before command resolution so a pre-process failure is observable
+  // through the same output API as a runtime failure.
+  outFile = args.stdoutFile ? await openLogStream(args.stdoutFile, logger, 'stdout') : null;
+  errFile = args.stderrFile ? await openLogStream(args.stderrFile, logger, 'stderr') : null;
+
+  const finishLaunchFailure = async (
+    code: HeadlessLaunchErrorCode,
+    message: string,
+    details: { launchMode: string; systemCode?: string },
+  ): Promise<HeadlessTaskResult> => {
+    launchErrorCode = code;
+    launchError = message;
+    const diagnostic = Buffer.from(`${message}\n`);
+    errSink.push(diagnostic);
+    errFile?.write(diagnostic);
+    logger.error('headless.launch_failed', {
+      command: commandName(argv0),
+      launchMode: details.launchMode,
+      launchErrorCode: code,
+      processStarted: false,
+      ...(details.systemCode ? { systemCode: details.systemCode } : {}),
+    });
     const structured = structuredOutput.snapshot(false);
     await structuredWriter?.finish(structured);
+    await Promise.all([outFile?.end(), errFile?.end()]);
     return {
       command,
       cwd,
+      processStarted: false,
+      launchErrorCode,
+      error: launchError,
       exitCode: -1,
       signal: null,
       killed: false,
       durationMs: Date.now() - start,
       stdoutTail: '',
-      stderrTail:
-        `win32: "${argv0}" is an npm .cmd shim; headless dispatch is unsupported ` +
-        `on Windows (routing the task prompt through cmd.exe is a shell-injection ` +
-        `surface). Native-exe agents (claude, codex) run headless; run shim agents ` +
-        `(opencode, pi) interactively instead.`,
+      stderrTail: errSink.text(),
       agentSessionId: null,
       assistantText: null,
       structured,
     };
-  }
+  };
+
+  // win32: native executables and verified npm entrypoints remain direct.
+  // Unknown npm-style batch shims use their extensionless sibling through Bash
+  // when available. Only a batch-only fallback still needs cmd.exe, which is
+  // restricted to launcher-owned prompts because cmd re-parses metacharacters.
+  const resolved = resolveLaunchCommand(command, { env, cwd });
   const [spawnFile, ...spawnArgs] = resolved.argv;
   if (!spawnFile) throw new Error('headless: empty command after resolution');
-  outFile = args.stdoutFile ? await openLogStream(args.stdoutFile, logger, 'stdout') : null;
-  const errFile = args.stderrFile ? await openLogStream(args.stderrFile, logger, 'stderr') : null;
-  const child = spawn(spawnFile, spawnArgs, {
-    cwd,
-    env: env as NodeJS.ProcessEnv,
-    stdio: ['ignore', 'pipe', 'pipe'],
+  logger.info('headless.launch_resolved', {
+    command: commandName(argv0),
+    resolvedCommand: commandName(spawnFile),
+    launchMode: resolved.mode,
   });
-  args.onChildSpawned?.(child);
+  if (resolved.viaShell && !args.allowShellShim) {
+    return finishLaunchFailure(
+      'unsupported_windows_batch_shim',
+      `Windows Agent runtime "${commandName(argv0)}" is a batch-only shim. ` +
+        `OpenAlice could not find a verified JavaScript entrypoint or an ` +
+        `extensionless sibling that can run through Workspace Bash, and will ` +
+        `not route an unattended task prompt through cmd.exe.`,
+      { launchMode: resolved.mode },
+    );
+  }
+  let child: ChildProcess;
+  try {
+    child = spawn(spawnFile, spawnArgs, {
+      cwd,
+      env: env as NodeJS.ProcessEnv,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  } catch (err) {
+    const systemCode = systemErrorCode(err);
+    return finishLaunchFailure(
+      systemCode === 'ENOENT' ? 'executable_not_found' : 'spawn_failed',
+      launchFailureMessage(commandName(argv0), err),
+      { launchMode: resolved.mode, ...(systemCode ? { systemCode } : {}) },
+    );
+  }
+  child.once('spawn', () => {
+    processStarted = true;
+    args.onChildSpawned?.(child);
+  });
   child.stdout?.on('data', (d: Buffer) => {
     if (!args.keepDiagnosticLine) {
       outSink.push(d);
@@ -413,8 +475,21 @@ export async function runHeadlessTask(args: HeadlessTaskArgs): Promise<HeadlessT
     child.once('error', (err) => {
       // e.g. ENOENT (binary not on PATH). `close` still follows `error`, so
       // wait for it to keep stdout parsing ordered with stream shutdown.
-      logger.error('headless.spawn_error', { command: argv0, err });
-      errSink.push(Buffer.from(String(err)));
+      const systemCode = systemErrorCode(err);
+      const message = launchFailureMessage(commandName(argv0), err);
+      logger.error('headless.spawn_error', {
+        command: commandName(argv0),
+        launchMode: resolved.mode,
+        processStarted,
+        ...(systemCode ? { systemCode } : {}),
+      });
+      const diagnostic = Buffer.from(`${message}\n`);
+      errSink.push(diagnostic);
+      errFile?.write(diagnostic);
+      if (!processStarted) {
+        launchErrorCode = systemCode === 'ENOENT' ? 'executable_not_found' : 'spawn_failed';
+        launchError = message;
+      }
       if (exitCode === null) exitCode = -1;
     });
     child.once('close', (code, sig) => {
@@ -451,14 +526,16 @@ export async function runHeadlessTask(args: HeadlessTaskArgs): Promise<HeadlessT
   const structured = structuredOutput.snapshot(false);
   assistantText = structured.assistantText;
   await structuredWriter?.finish(structured);
-  outFile?.end();
-  errFile?.end();
+  await Promise.all([outFile?.end(), errFile?.end()]);
   const durationMs = Date.now() - start;
   const stdoutTail = outSink.text();
   const stderrTail = errSink.text();
 
   logger.info('headless.complete', {
-    command: argv0,
+    command: commandName(argv0),
+    launchMode: resolved.mode,
+    processStarted,
+    ...(launchErrorCode ? { launchErrorCode } : {}),
     durationMs,
     exitCode,
     signal,
@@ -472,6 +549,9 @@ export async function runHeadlessTask(args: HeadlessTaskArgs): Promise<HeadlessT
   return {
     command,
     cwd,
+    processStarted,
+    ...(launchErrorCode ? { launchErrorCode } : {}),
+    ...(launchError ? { error: launchError } : {}),
     exitCode,
     signal,
     killed,
@@ -482,4 +562,22 @@ export async function runHeadlessTask(args: HeadlessTaskArgs): Promise<HeadlessT
     assistantText,
     structured,
   };
+}
+
+function commandName(value: string): string {
+  return value.split(/[\\/]/).pop() || value;
+}
+
+function systemErrorCode(error: unknown): string | undefined {
+  return error && typeof error === 'object' && 'code' in error && typeof error.code === 'string'
+    ? error.code
+    : undefined;
+}
+
+function launchFailureMessage(command: string, error: unknown): string {
+  const code = systemErrorCode(error);
+  const detail = error instanceof Error ? error.message : String(error);
+  return code === 'ENOENT'
+    ? `Agent executable "${command}" was not found. Check the selected runtime installation and Workspace PATH.`
+    : `Agent process "${command}" could not start${detail ? `: ${detail}` : '.'}`;
 }

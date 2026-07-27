@@ -380,6 +380,12 @@ async function main() {
         localCliOnWeb,
         listen: webTransport !== 'ipc',
         ...(process.env['OPENALICE_TOOL_SOCKET'] ? { cliSocketPath: process.env['OPENALICE_TOOL_SOCKET'] } : {}),
+        // The packaged Workspace acceptance exercises the real scanner without
+        // adding a minute to every host in the package matrix. This flag is
+        // owned by the smoke launcher and never changes normal cadence.
+        ...(process.env['OPENALICE_ELECTRON_SMOKE_WORKSPACE_ACCEPTANCE'] === '1'
+          ? { scheduleScannerIntervalMs: 100 }
+          : {}),
       },
       workspaceServiceRef,
     ))

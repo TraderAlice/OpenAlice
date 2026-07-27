@@ -400,6 +400,8 @@ export interface CreateWorkspaceServiceOptions {
   readonly toolSocketPath?: string;
   /** Optional MCP protocol URL. Absent when MCP is disabled. */
   readonly mcpBaseUrl?: string;
+  /** Internal test seam. Production omits this and keeps the 60-second scan. */
+  readonly scheduleScannerIntervalMs?: number;
   /** The global inbox store, so `issueDetail` can join the inbox reports an
    *  issue produced (entries stamped `origin.issueId`) in the domain layer —
    *  every surface (HTTP / CLI / MCP) gets the join, not just the route.
@@ -783,23 +785,19 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     // fresh spawn's resume to its assigned `{ sessionId }`, so a resume check
     // would wrongly drop pi's seed — the adapters self-gate where it matters).
     //
-    // SECURITY (win32): opencode/pi install as `.cmd` npm shims, so they spawn via
-    // `cmd.exe /d /c <shim> …` (resolveLaunchCommand → viaShell). A user prompt
-    // with cmd metacharacters (& | < > ^ %) would be re-parsed by cmd.exe
-    // (BatBadBut / CVE-2024-27980); the headless path refuses shim agents on win32
-    // for exactly this. We compose WITH the seed, then if the RESOLVED binary
-    // needs the shell wrap, DROP the seed and recompose unseeded (the TUI still
-    // opens, just not pre-filled). Native-exe agents (claude/codex) and all of
-    // macOS/Linux resolve viaShell:false, so this is a no-op there. Resolve the
-    // COMPOSED argv0 (the adapter's real binary), not config.command — codex/
-    // opencode/pi ignore the base and hardcode their own binary.
+    // SECURITY (win32): verified npm JS entrypoints and extensionless sibling
+    // shims run without cmd.exe, so their prompt remains a literal argv item.
+    // A batch-only fallback still resolves viaShell:true; drop a user seed in
+    // that legacy case because cmd would re-parse & | < > ^ %. The TUI still
+    // opens, just not pre-filled. Resolve the COMPOSED argv0 (the adapter's real
+    // binary), not config.command — codex/opencode/pi ignore the base.
     const compose = (withSeed: boolean): readonly string[] =>
       adapter.composeCommand(
         config.command,
         withSeed && initialPrompt ? { ...baseCtx, initialPrompt } : baseCtx,
       );
     let command = compose(true);
-    if (initialPrompt && resolveLaunchCommand(command, { env }).viaShell) {
+    if (initialPrompt && resolveLaunchCommand(command, { env, cwd: ws.dir }).viaShell) {
       launcherLogger.warn('spawn.seed_dropped_win32_shim', { wsId: ws.id, agent: adapter.id });
       command = compose(false);
     }
@@ -946,6 +944,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   const syntheticRuntimeReadinessFailure = (message: string): HeadlessTaskResult => ({
     command: [],
     cwd: config.launcherRoot,
+    processStarted: false,
+    launchErrorCode: 'spawn_failed',
+    error: message,
     exitCode: -1,
     signal: null,
     killed: false,
@@ -1240,7 +1241,12 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           cwd,
           env,
           timeoutMs,
-          logger: launcherLogger.child({ scope: 'headless', wsId: ws.id, agent: adapter.id }),
+          logger: launcherLogger.child({
+            scope: 'headless',
+            wsId: ws.id,
+            agent: adapter.id,
+            ...(opts.taskId ? { taskId: opts.taskId } : {}),
+          }),
           ...(logPaths
             ? { stdoutFile: logPaths.stdout, stderrFile: logPaths.stderr, structuredFile: logPaths.structured }
             : {}),
@@ -1397,9 +1403,12 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           status,
           finishedAt: Date.now(),
           durationMs: r.durationMs,
+          processStarted: r.processStarted,
+          ...(r.launchErrorCode ? { launchErrorCode: r.launchErrorCode } : {}),
           exitCode: r.exitCode,
           signal: r.signal,
           killed: r.killed,
+          ...(r.error ? { error: r.error } : {}),
           output: {
             hasAssistantReply: r.structured.assistantText !== null,
             ...(r.structured.assistantText
@@ -1567,6 +1576,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     observeIssues: (workspace, issues) => observeIssueRecords(workspace, issues),
     markers: scheduleMarkers,
     logger: launcherLogger.child({ scope: 'schedule' }),
+    ...(opts.scheduleScannerIntervalMs !== undefined
+      ? { intervalMs: opts.scheduleScannerIntervalMs }
+      : {}),
   });
   // Read-only aggregation for the Schedules dashboard (GET /api/schedule).
   // Walks each workspace's live declaration + the scanner's marker; the route

@@ -21,7 +21,8 @@ the durable truth after it changes.
 
 ## Active
 
-No active plans are indexed yet.
+- [[plans/windows-headless-launch.md]] — Safely launches Windows npm Agent
+  runtimes for scheduled work and makes pre-process failures observable.
 
 ## Completed
 

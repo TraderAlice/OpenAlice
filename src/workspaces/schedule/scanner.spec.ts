@@ -191,6 +191,27 @@ describe('ScheduleScanner', () => {
     expect(markers.get('w1', 't1')).toBe(NOW)
   })
 
+  it('does not repeat an occurrence after dispatch registered a run that later fails', async () => {
+    const ws = await makeWs('w1', [{
+      id: 't1',
+      title: 'i1',
+      when: { kind: 'every', every: '30m' },
+      what: 'go',
+    }])
+    // Dispatch acceptance means the durable run exists. Its asynchronous
+    // launch/result may fail later, but that is one recorded occurrence and
+    // must not turn the scanner interval into an automatic retry loop.
+    const dispatch = vi.fn(async () => ({
+      taskId: 'run-that-will-fail',
+      resumeId: 'resume-failed-run-a1b2c3',
+    }))
+    const { scanner, markers } = scannerFor([ws], { dispatch })
+    await scanner.scan()
+    await scanner.scan()
+    expect(dispatch).toHaveBeenCalledTimes(1)
+    expect(markers.get('w1', 't1')).toBe(NOW)
+  })
+
   it('passes Issue model and effort as one-run dispatch overrides', async () => {
     const ws = await makeWs('w1', [{
       id: 'tuned',

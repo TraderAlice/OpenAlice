@@ -16,17 +16,23 @@
  *
  * Fix: on win32, do the PATH × PATHEXT lookup ourselves.
  *   - resolves to a real executable (.exe/.com) → spawn that full path directly.
- *   - resolves to a batch shim (.cmd/.bat)      → spawn via `cmd.exe /d /c
- *     <shim> <args>` (CreateProcess cannot execute a batch file directly; it
- *     must go through the command interpreter).
- *   - not found, or the caller already passed a path / an explicit extension →
- *     passthrough unchanged (let it fail loudly with the original name).
+ *   - resolves to a stock npm/pnpm batch shim   → run its JS entry with Node.
+ *   - resolves to another batch shim with the usual extensionless POSIX sibling
+ *                                               → run that sibling with Bash.
+ *   - resolves to a batch-only shim             → retain the legacy cmd.exe
+ *     form for launcher-owned probes; untrusted headless callers reject it.
+ *   - not found                                 → passthrough unchanged and let
+ *     spawn report the missing executable.
  *
  * On non-Windows this is the identity function: the kernel reads shebangs and a
  * bare-name PATH lookup finds shell-script shims fine.
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, delimiter, dirname, join, relative, resolve } from 'node:path';
+
+import { resolveBashPath } from '../core/shell-resolver.js';
+
+export type LaunchMode = 'direct' | 'node-shim' | 'bash-shim' | 'cmd-shim';
 
 export interface ResolvedCommand {
   readonly argv: readonly string[];
@@ -39,46 +45,84 @@ export interface ResolvedCommand {
    * ids, so the wrap is safe there.
    */
   readonly viaShell: boolean;
+  /** Operator-safe launch strategy; never contains prompt or argument values. */
+  readonly mode: LaunchMode;
 }
 
 const DEFAULT_PATHEXT = '.COM;.EXE;.BAT;.CMD';
 
 export function resolveLaunchCommand(
   argv: readonly string[],
-  opts: { platform?: NodeJS.Platform; env?: NodeJS.ProcessEnv; nodeExecPath?: string } = {},
+  opts: {
+    platform?: NodeJS.Platform;
+    env?: NodeJS.ProcessEnv;
+    nodeExecPath?: string;
+    cwd?: string;
+  } = {},
 ): ResolvedCommand {
   const platform = opts.platform ?? process.platform;
   const env = opts.env ?? process.env;
-  if (platform !== 'win32' || argv.length === 0) return { argv, viaShell: false };
-
-  const [name, ...rest] = argv;
-  if (!name) return { argv, viaShell: false };
-  // Caller gave an explicit path or extension → trust it, don't re-resolve.
-  if (name.includes('/') || name.includes('\\') || /\.[^.\\/]+$/.test(name)) {
-    return { argv, viaShell: false };
+  if (platform !== 'win32' || argv.length === 0) {
+    return { argv, viaShell: false, mode: 'direct' };
   }
 
-  const resolved = lookupOnWindowsPath(name, env);
-  if (!resolved) return { argv, viaShell: false }; // fail loudly with original name
+  const [name, ...rest] = argv;
+  if (!name) return { argv, viaShell: false, mode: 'direct' };
 
-  const dot = resolved.lastIndexOf('.');
-  const ext = dot >= 0 ? resolved.slice(dot).toLowerCase() : '';
-  if (ext === '.cmd' || ext === '.bat') {
+  const explicitPath = name.includes('/') || name.includes('\\');
+  const explicitExt = extensionOf(name);
+  let resolved: string | null;
+  if (explicitPath) {
+    const candidate = explicitCandidate(name, opts.cwd);
+    if (!isBatchExtension(explicitExt) || !existsSync(candidate)) {
+      return { argv, viaShell: false, mode: 'direct' };
+    }
+    resolved = candidate;
+  } else if (explicitExt) {
+    if (!isBatchExtension(explicitExt)) {
+      return { argv, viaShell: false, mode: 'direct' };
+    }
+    resolved = lookupExactOnWindowsPath(name, env);
+    if (!resolved) return { argv, viaShell: false, mode: 'direct' };
+  } else {
+    resolved = lookupOnWindowsPath(name, env);
+    if (!resolved) return { argv, viaShell: false, mode: 'direct' };
+  }
+
+  const ext = extensionOf(resolved);
+  if (isBatchExtension(ext)) {
     // npm's Windows shims are small, deterministic wrappers around a JS
     // entrypoint.  Run that entrypoint directly with Node when we can prove the
     // wrapper has the stock shape.  Besides avoiding an unnecessary shell,
     // this is what makes user-controlled headless prompts safe: cmd.exe never
     // gets a chance to re-parse &, |, %, ^, and friends.
     const direct = resolveStockNpmShim(resolved, rest, opts.nodeExecPath ?? process.execPath);
-    if (direct) return { argv: direct, viaShell: false };
+    if (direct) return { argv: direct, viaShell: false, mode: 'node-shim' };
+
+    // npm-style installs also publish an extensionless POSIX shim next to the
+    // `.cmd`. Git Bash can execute that script while receiving the prompt as a
+    // separate argv item, so neither Bash nor cmd.exe evaluates prompt text.
+    const posixShim = resolved.slice(0, -ext.length);
+    const bash = resolveBashPath(env, 'win32');
+    if (existsSync(posixShim) && bash && existsSync(bash)) {
+      return {
+        argv: [bash, windowsPathForBash(posixShim), ...rest],
+        viaShell: false,
+        mode: 'bash-shim',
+      };
+    }
 
     const comspec = env['ComSpec'] || env['COMSPEC'] || 'cmd.exe';
     // /d skips any AutoRun registry command; /c runs then exits. The shim path
     // is a single arg (node-pty/Node quote it if it contains spaces); cmd's
     // default rule preserves a single quoted-executable + bare args correctly.
-    return { argv: [comspec, '/d', '/c', resolved, ...rest], viaShell: true };
+    return {
+      argv: [comspec, '/d', '/c', resolved, ...rest],
+      viaShell: true,
+      mode: 'cmd-shim',
+    };
   }
-  return { argv: [resolved, ...rest], viaShell: false };
+  return { argv: [resolved, ...rest], viaShell: false, mode: 'direct' };
 }
 
 /**
@@ -142,6 +186,34 @@ function lookupOnWindowsPath(name: string, env: NodeJS.ProcessEnv): string | nul
     }
   }
   return null;
+}
+
+function lookupExactOnWindowsPath(name: string, env: NodeJS.ProcessEnv): string | null {
+  const dirs = (env['PATH'] ?? env['Path'] ?? '').split(delimiter).filter(Boolean);
+  for (const dir of dirs) {
+    const candidate = join(dir, name);
+    if (existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
+function explicitCandidate(name: string, cwd: string | undefined): string {
+  if (!cwd || name.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(name)) return name;
+  return resolve(cwd, name);
+}
+
+function extensionOf(path: string): string {
+  const leaf = path.split(/[\\/]/).pop() ?? path;
+  const dot = leaf.lastIndexOf('.');
+  return dot >= 0 ? leaf.slice(dot).toLowerCase() : '';
+}
+
+function isBatchExtension(ext: string): boolean {
+  return ext === '.cmd' || ext === '.bat';
+}
+
+function windowsPathForBash(path: string): string {
+  return path.replace(/\\/g, '/');
 }
 
 function rank(ext: string): number {
