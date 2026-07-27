@@ -173,7 +173,11 @@ run checks X and exits silently when false.
 
 The scanner persists only last-fired markers under the launcher state root.
 Schedule semantics remain in the issue file. Markers are written after a
-successful dispatch; capacity/transient rejection stays due for retry.
+successful dispatch, meaning a durable run record was accepted. If that worker
+later fails to launch or exits unsuccessfully, the failed run remains the
+single attempt for that occurrence and the operator can use **Retry now**; the
+scanner does not turn its own tick interval into a retry storm. Capacity or
+another admission rejection that creates no run stays due for retry.
 
 The durable run record keeps the requested model and effort beside the resolved
 agent. This is selection provenance, not a claim that the provider honored an
@@ -205,6 +209,13 @@ Old runs therefore gain structured `failure.kind/title/message/retryable`
 diagnostics without migration. A killed run close to 30 minutes is a timeout;
 a killed run whose watchdog closes much later is described conservatively as a
 paused computer/launcher rather than falsely blaming the agent.
+
+Startup evidence is explicit on new run records. `processStarted` becomes true
+only after the OS child emits `spawn`; `launchErrorCode` distinguishes an
+unsupported Windows batch shim, a missing executable, and another spawn
+failure. Pre-process failures also persist their human-readable `error` and
+stderr diagnostic, so they project as `launch_error / Agent could not start`
+rather than the misleading `process_exit` used by older `exitCode: -1` records.
 
 The Issue detail offers **Retry now** only for the latest failed or interrupted
 scheduled run. Retry re-reads the live Issue and uses the same markdown What,

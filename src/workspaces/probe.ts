@@ -72,12 +72,10 @@ const KILL_GRACE_MS = 500;
 export async function runHeadlessProbe(args: HeadlessProbeArgs): Promise<HeadlessProbeResult> {
   const { command, cwd, env, transcriptDir, transcriptFileRe, prompt, timeoutMs, logger } = args;
 
-  // win32: resolve the bare CLI name to a real `.exe` or a cmd.exe-wrapped
-  // `.cmd` shim before the prompt is appended — same ConPTY limitation the
-  // interactive pool handles. Without this, probing opencode/pi on Windows
-  // ENOENTs and the agent can never be enabled. The probe prompt is a fixed
-  // launcher-internal ping (no untrusted input), so the shim wrap is safe.
-  const [argv0, ...argv1Composed] = resolveLaunchCommand(command, { env }).argv;
+  // win32: resolve the bare CLI name through the shared direct/Node/Bash shim
+  // policy. A batch-only fallback is still acceptable here because the probe
+  // prompt is fixed launcher text rather than user-controlled input.
+  const [argv0, ...argv1Composed] = resolveLaunchCommand(command, { env, cwd }).argv;
   if (!argv0) throw new Error('probe: empty command');
   const argv1 = [...argv1Composed, prompt];
 

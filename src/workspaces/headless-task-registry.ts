@@ -18,6 +18,7 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 
 import type { ModelReasoningEffort } from '../ai-providers/model-semantics.js'
+import type { HeadlessLaunchErrorCode } from './headless-task.js'
 import type { Logger } from './logger.js'
 
 export type HeadlessTaskStatus = 'running' | 'done' | 'failed' | 'interrupted'
@@ -105,6 +106,10 @@ export interface HeadlessTaskRecord {
   readonly startedAt: number
   finishedAt?: number
   durationMs?: number
+  /** Absent on historical records; false means no agent process was created. */
+  processStarted?: boolean
+  /** Stable startup failure reason. Present only when processStarted is false. */
+  launchErrorCode?: HeadlessLaunchErrorCode
   exitCode?: number | null
   signal?: string | null
   killed?: boolean
@@ -220,7 +225,16 @@ export class HeadlessTaskRegistry {
     patch: Partial<
       Pick<
         HeadlessTaskRecord,
-        'status' | 'finishedAt' | 'durationMs' | 'exitCode' | 'signal' | 'killed' | 'error' | 'output'
+        | 'status'
+        | 'finishedAt'
+        | 'durationMs'
+        | 'processStarted'
+        | 'launchErrorCode'
+        | 'exitCode'
+        | 'signal'
+        | 'killed'
+        | 'error'
+        | 'output'
       >
     >,
   ): Promise<void> {

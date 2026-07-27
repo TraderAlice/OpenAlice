@@ -318,6 +318,8 @@ export interface IssueRunRecord {
   startedAt: number
   finishedAt?: number
   durationMs?: number
+  processStarted?: boolean
+  launchErrorCode?: HeadlessTaskRecord['launchErrorCode']
   exitCode?: number | null
   signal?: string | null
   killed?: boolean
@@ -348,6 +350,8 @@ export function issueRunRecord(task: HeadlessTaskRecord, resumable: boolean): Is
     startedAt: task.startedAt,
     ...(task.finishedAt !== undefined ? { finishedAt: task.finishedAt } : {}),
     ...(task.durationMs !== undefined ? { durationMs: task.durationMs } : {}),
+    ...(task.processStarted !== undefined ? { processStarted: task.processStarted } : {}),
+    ...(task.launchErrorCode !== undefined ? { launchErrorCode: task.launchErrorCode } : {}),
     ...(task.exitCode !== undefined ? { exitCode: task.exitCode } : {}),
     ...(task.signal !== undefined ? { signal: task.signal } : {}),
     ...(task.killed !== undefined ? { killed: task.killed } : {}),

@@ -25,6 +25,8 @@ No active plans are indexed yet.
 
 ## Completed
 
+- [[plans/windows-headless-launch.md]] — Safely launches Windows npm Agent
+  runtimes for scheduled work and makes pre-process failures observable.
 - [[plans/issue-model-effort-overrides.md]] — Separated login-backed Workspace
   model defaults from provider isolation and added per-run Issue model/effort
   overrides. Delivered in PR #715; closed GitHub issues #706 and #710.

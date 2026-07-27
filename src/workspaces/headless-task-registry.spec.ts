@@ -63,6 +63,30 @@ describe('HeadlessTaskRegistry', () => {
     expect(reg.runningCount()).toBe(0)
   })
 
+  it('persists process startup evidence and typed launch failures', async () => {
+    const reg = await HeadlessTaskRegistry.load(path, noopLogger)
+    const task = await createTask(reg, {
+      wsId: 'w1',
+      agent: 'pi',
+      prompt: 'x',
+      startedAt: 1,
+    })
+    await reg.complete(task.taskId, {
+      status: 'failed',
+      finishedAt: 2,
+      processStarted: false,
+      launchErrorCode: 'unsupported_windows_batch_shim',
+      exitCode: -1,
+      error: 'batch-only shim',
+    })
+    const reloaded = await HeadlessTaskRegistry.load(path, noopLogger)
+    expect(reloaded.get(task.taskId)).toMatchObject({
+      processStarted: false,
+      launchErrorCode: 'unsupported_windows_batch_shim',
+      error: 'batch-only shim',
+    })
+  })
+
   it('list filters by wsId / status / limit', async () => {
     const reg = await HeadlessTaskRegistry.load(path, noopLogger)
     const a = await createTask(reg, { wsId: 'w1', agent: 'codex', prompt: 'x', startedAt: 1 })

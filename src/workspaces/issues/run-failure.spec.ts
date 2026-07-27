@@ -26,6 +26,11 @@ describe('issueRunFailure', () => {
       kind: 'launch_error', message: 'spawn ENOENT',
     })
     expect(issueRunFailure({ status: 'failed', exitCode: 2 })).toMatchObject({ kind: 'process_exit' })
+    expect(issueRunFailure({
+      status: 'failed',
+      processStarted: true,
+      exitCode: 7,
+    })).toMatchObject({ kind: 'process_exit' })
   })
 
   it('does not manufacture failures for running or completed runs', () => {

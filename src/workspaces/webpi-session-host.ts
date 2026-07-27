@@ -382,7 +382,7 @@ class LiveWebPiSession {
 }
 
 function defaultSpawnProcess(input: StartWebPiInput): RpcProcess {
-  const resolved = resolveLaunchCommand(input.command, { env: input.env })
+  const resolved = resolveLaunchCommand(input.command, { env: input.env, cwd: input.cwd })
   const [file, ...args] = resolved.argv
   if (!file) throw new Error('WebPi command is empty')
   return spawn(file, args, {

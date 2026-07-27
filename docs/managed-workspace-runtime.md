@@ -179,6 +179,16 @@ managed Bash path. Workspace child processes receive the PortableGit command
 directories on `PATH`, so the default packaged flow does not require Node,
 npm, Git for Windows, WSL, or a system agent CLI.
 
+User-installed npm Agent runtimes are resolved without evaluating task prompts
+as command text. Native `.exe`/`.com` binaries run directly; recognizable
+npm/pnpm `.cmd` shims are reduced to their JavaScript entrypoint and run on the
+current Node executable. Other batch shims may use their same-directory
+extensionless POSIX sibling through the resolved Workspace Bash, with the
+prompt retained as a separate argv item and `shell: false`. A batch-only shim
+has no safe unattended fallback and is rejected with
+`unsupported_windows_batch_shim`; only fixed launcher-owned readiness probes
+retain the legacy `cmd.exe` compatibility path.
+
 Workspace-facing OpenAlice commands (`alice`, `alice-workspace`, `traderhub`,
 and `alice-uta`) also do not depend on a host Node installation. Their POSIX
 and Windows launchers execute the explicit `openalice-cli.cjs` payload through
@@ -297,6 +307,12 @@ remain at the OpenAlice/UTA boundary.
   `[managedPiNodePath, managedPiPath, ...args]`; its lifecycle implementation
   reconciles trust, legacy config, the managed Windows shell, and the native Pi
   automatic theme pair.
+
+The headless runner records `processStarted` only after Node emits `spawn`.
+Failures before that event retain a typed `launchErrorCode`, a human-readable
+`error`, and a bounded stderr diagnostic. Structured launcher logs record the
+Workspace, run, Agent, launch mode, failure code, and OS error code without
+including the prompt, complete argv, credentials, or environment values.
 
 The packaged Electron managed npm runtime is not added to `PATH` as a fake
 `pi` binary; the Pi adapter owns its explicit launch command. The curl
@@ -466,10 +482,13 @@ contract:
    `alice-workspace`, `traderhub`, and `alice-uta`, loads every CLI manifest over
    the Electron tool socket, verifies Git, and creates then reads an issue with
    the real `alice-workspace` shim.
-2. The packaged managed Pi runtime performs a deterministic `bash` tool call
-   that invokes `alice-workspace issue create`. The smoke accepts the run only
-   when structured assistant output is decoded and the created issue is visible
-   from the external `/api/issues` surface.
+2. The shell creates a one-shot scheduled Issue containing metacharacters in
+   its visible What. The real `ScheduleScanner` dispatches the packaged managed
+   Pi runtime, which performs a deterministic `bash` tool call that invokes
+   `alice-workspace issue create`. The smoke accepts the run only when it is
+   process-backed, structured assistant output is decoded, the one-shot Issue
+   auto-completes, and the created side-effect Issue is visible from the
+   external `/api/issues` surface.
 
 The focused Windows toolchain smoke additionally loads the packaged dugite JS
 wrapper with no embedded dugite Git present, then performs a real
