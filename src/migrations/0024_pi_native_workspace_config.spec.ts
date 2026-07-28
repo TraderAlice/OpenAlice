@@ -41,13 +41,29 @@ async function seedLegacy(workspace: string, model: string): Promise<void> {
   await writeFile(join(legacy, 'sessions', model, 'turn.jsonl'), '{}\n')
 }
 
+async function seedSessionLink(workspace: string): Promise<boolean> {
+  try {
+    await symlink('sessions', join(workspace, '.pi-agent', 'session-link'))
+    return true
+  } catch (error) {
+    // Ordinary Windows installations cannot create symlinks without Developer
+    // Mode or elevation. Keep exercising the migration itself on those hosts;
+    // link preservation remains covered wherever the fixture can be created.
+    if (
+      process.platform === 'win32'
+      && (error as NodeJS.ErrnoException).code === 'EPERM'
+    ) return false
+    throw error
+  }
+}
+
 describe('0024 Pi native Workspace config', () => {
   it('backs up and migrates active and departed Workspaces idempotently', async () => {
     const active = join(root, 'workspaces', 'workspaces', 'chat-active')
     const departed = join(root, 'workspaces', 'departed-workspaces', 'chat-departed')
     await seedLegacy(active, 'active-model')
     await seedLegacy(departed, 'departed-model')
-    await symlink('sessions', join(active, '.pi-agent', 'session-link'))
+    const sessionLinkCreated = await seedSessionLink(active)
 
     await expect(migratePiNativeWorkspaceConfig(join(root, 'workspaces'), {
       env: { PI_CODING_AGENT_DIR: agentDir, HOME: join(root, 'home') },
@@ -60,7 +76,9 @@ describe('0024 Pi native Workspace config', () => {
     expect(existsSync(join(backupRoot, 'departed', 'chat-departed', '.pi-agent', 'models.json'))).toBe(true)
     expect(await readFile(join(agentDir, 'sessions', 'active-model', 'turn.jsonl'), 'utf8')).toBe('{}\n')
     expect(await readFile(join(agentDir, 'sessions', 'departed-model', 'turn.jsonl'), 'utf8')).toBe('{}\n')
-    expect(await readlink(join(agentDir, 'session-link'))).toBe('sessions')
+    if (sessionLinkCreated) {
+      expect(await readlink(join(agentDir, 'session-link'))).toBe('sessions')
+    }
     expect(JSON.parse(await readFile(join(agentDir, 'models.json'), 'utf8')).legacyMetadata)
       .toBe('active-model')
     expect(JSON.parse(await readFile(join(active, '.pi', 'settings.json'), 'utf8')).defaultModel)
