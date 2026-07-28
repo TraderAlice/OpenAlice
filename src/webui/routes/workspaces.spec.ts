@@ -218,21 +218,41 @@ describe('GET /:id/launch-plan', () => {
     })
   })
 
-  it('rejects missing, unknown, and disabled runtime selections', async () => {
+  it('rejects missing, unknown, and disabled agent runtimes but permits the Shell utility', async () => {
     const codex = {
       id: 'codex',
       displayName: 'Codex',
       capabilities: {},
     }
+    const shell = {
+      id: 'shell',
+      displayName: 'Shell',
+      kind: 'utility',
+      capabilities: {
+        parallelPerCwd: true,
+        resumeLast: false,
+        resumeById: false,
+        transcriptDiscovery: 'none',
+      },
+    }
     const { app } = build({ adapters: { claude: {
       id: 'claude',
       displayName: 'Claude Code',
       capabilities: { headless: true },
-    }, codex } })
+    }, codex, shell } })
 
     expect((await get(app, '/ws-1/launch-plan')).body.error).toBe('agent_required')
     expect((await get(app, '/ws-1/launch-plan?agent=ghost')).body.error).toBe('unknown_agent')
     expect((await get(app, '/ws-1/launch-plan?agent=codex')).body.error).toBe('agent_not_enabled')
+    expect(await get(app, '/ws-1/launch-plan?agent=shell')).toMatchObject({
+      status: 200,
+      body: {
+        agent: {
+          id: 'shell',
+          kind: 'utility',
+        },
+      },
+    })
   })
 
   it('redacts secret-like command assignments and following flag values', async () => {

@@ -70,7 +70,7 @@ export function WorkspaceLaunchConfigurationPanel({
   initialAgent,
 }: Props) {
   const { t } = useTranslation()
-  const runtimeIds = useMemo(() => [...new Set(agents)], [agents])
+  const runtimeIds = useMemo(() => [...new Set([...agents, 'shell'])], [agents])
   const preferred = initialAgent && runtimeIds.includes(initialAgent)
     ? initialAgent
     : runtimeIds[0] ?? ''
@@ -112,16 +112,6 @@ export function WorkspaceLaunchConfigurationPanel({
       cancelled = true
     }
   }, [refreshToken, selectedAgent, wsId])
-
-  if (runtimeIds.length === 0) {
-    return (
-      <div className="flex min-h-0 flex-1 items-center justify-center p-6">
-        <p className="text-sm text-muted-foreground">
-          {t('workspaceSettings.launch.noRuntimes')}
-        </p>
-      </div>
-    )
-  }
 
   const copyCommand = async () => {
     if (!plan) return
