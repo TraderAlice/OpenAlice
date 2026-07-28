@@ -6,6 +6,7 @@ import { newsCollectorSchema } from '../domain/news/config.js'
 import { runMigrations } from '../migrations/runner.js'
 import { dataPath } from '@/core/paths.js'
 import { withConfigBootstrapLock } from './config-bootstrap-lock.js'
+import { parseDuration } from './duration.js'
 import { isSealedEnvelope, seal, unseal } from './sealing.js'
 
 const CONFIG_DIR = dataPath('config')
@@ -353,7 +354,13 @@ const portsSchema = z.object({
 
 const snapshotSchema = z.object({
   enabled: z.boolean().default(true),
-  every: z.string().default('15m'),
+  every: z.string()
+    .transform((value) => value.trim())
+    .refine(
+      (value) => parseDuration(value) !== null,
+      'Expected a positive duration such as "15m", "1h", or "2h15m"',
+    )
+    .default('15m'),
 })
 
 export const keylessDataSourceSchema = z.enum(['binance', 'okx', 'bybit'])
