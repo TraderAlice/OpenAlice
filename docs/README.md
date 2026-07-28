@@ -50,6 +50,13 @@ vendoring third-party code. The
 pinned public-source architecture comparison behind the authoritative remote
 guide, also without vendoring third-party code.
 
+## Incident Records
+
+- [[docs/incidents/2026-07-28-broker-pack-upgrade-gap.md]] —
+  [v0.85 Broker Pack upgrade gap](incidents/2026-07-28-broker-pack-upgrade-gap.md):
+  previous-release Pack activation failed after a desktop upgrade and
+  established the N-1→N release gate.
+
 ## Maintenance Rule
 
 - Every owner guide states what it owns and points to the current load-bearing

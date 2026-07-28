@@ -6,6 +6,13 @@ import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
+// This spec starts a TypeScript child process while the monorepo suite is
+// heavily concurrent. Older supported Windows hosts can need more than 10s
+// before both accounts become observable even though the isolated path is
+// healthy. Child exits are still checked on every poll.
+const STARTUP_READINESS_TIMEOUT_MS = 30_000
+const TEST_TIMEOUT_MS = STARTUP_READINESS_TIMEOUT_MS + 10_000
+
 function listen(server: Server): Promise<number> {
   return new Promise((resolve, reject) => {
     server.once('error', reject)
@@ -95,7 +102,7 @@ describe('UTA process startup resilience', () => {
     child.stderr.on('data', (chunk: Buffer) => { output += chunk.toString('utf8') })
 
     try {
-      const deadline = Date.now() + 10_000
+      const deadline = Date.now() + STARTUP_READINESS_TIMEOUT_MS
       type ListedAccount = {
         id?: string
         health?: { status?: string; reach?: string; connecting?: boolean; recovering?: boolean; lastError?: string }
@@ -154,5 +161,5 @@ describe('UTA process startup resilience', () => {
       await closeServer(fakeTws)
       await rm(home, { recursive: true, force: true })
     }
-  }, 15_000)
+  }, TEST_TIMEOUT_MS)
 })

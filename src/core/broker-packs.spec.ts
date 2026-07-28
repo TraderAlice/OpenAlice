@@ -112,11 +112,27 @@ describe('resolveActiveBrokerPack', () => {
     await expect(resolveActiveBrokerPack('ccxt')).rejects.toThrow(/incompatible/i)
   })
 
-  it('rejects a pack built for a different OpenAlice version', async () => {
+  it('reports an API-version mismatch with the installed release version', async () => {
+    await writeActivePack({ apiVersion: 2, version: '0.84.0-beta' })
+    const {
+      BrokerPackApiVersionMismatchError,
+      resolveActiveBrokerPack,
+    } = await import('./broker-packs.js')
+
+    await expect(resolveActiveBrokerPack('ccxt')).rejects.toEqual(expect.objectContaining({
+      name: BrokerPackApiVersionMismatchError.name,
+      installedApiVersion: 2,
+      installedVersion: '0.84.0-beta',
+    }))
+  })
+
+  it('keeps an older app-version Pack loadable when its Pack API is compatible', async () => {
     await writeActivePack({ version: '0.0.0-other' })
     const { resolveActiveBrokerPack } = await import('./broker-packs.js')
 
-    await expect(resolveActiveBrokerPack('ccxt')).rejects.toThrow(/targets OpenAlice 0\.0\.0-other/i)
+    await expect(resolveActiveBrokerPack('ccxt')).resolves.toMatchObject({
+      manifest: { version: '0.0.0-other', apiVersion: 1 },
+    })
   })
 
   it('rejects an entry path that escapes the immutable release', async () => {

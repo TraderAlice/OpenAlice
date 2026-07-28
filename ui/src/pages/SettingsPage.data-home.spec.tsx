@@ -77,6 +77,7 @@ describe('DataHomeSection', () => {
     render(<DataHomeSection />)
 
     const toggle = await screen.findByRole('switch', { name: 'Ask which location to use at startup' })
+    await waitFor(() => expect(toggle).toHaveProperty('disabled', false))
     fireEvent.click(toggle)
 
     await waitFor(() => expect(bridge.setAskOnStartup).toHaveBeenCalledWith(true))
