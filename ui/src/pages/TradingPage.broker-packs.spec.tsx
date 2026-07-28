@@ -41,12 +41,28 @@ describe('MissingBrokerPacksNotice', () => {
       onInstalled={vi.fn()}
     />)
 
-    expect(screen.getByText('Optional broker support is missing')).toBeTruthy()
+    expect(screen.getByText('Broker support needs attention')).toBeTruthy()
     expect(screen.getByText('Required by Main OKX')).toBeTruthy()
     expect(screen.getByText('API version mismatch')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Repair' })).toBeTruthy()
     expect(screen.queryByText('ALPACA')).toBeNull()
     expect(screen.queryByText('IBKR')).toBeNull()
+  })
+
+  it('offers an in-place update while a compatible previous Pack remains installed', () => {
+    render(<MissingBrokerPacksNotice
+      packs={[{
+        ...missingCcxt,
+        installed: true,
+        source: 'downloaded',
+        version: '0.84.0-beta',
+        updateAvailable: true,
+      }]}
+      onInstalled={vi.fn()}
+    />)
+
+    expect(screen.getByText('Installed support is from OpenAlice 0.84.0-beta')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Update' })).toBeTruthy()
   })
 
   it('installs from the notice and reports a failed repair in place', async () => {

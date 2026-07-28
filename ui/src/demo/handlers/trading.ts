@@ -179,8 +179,8 @@ export const tradingHandlers = [
   http.get('/api/trading/config/broker-presets', () => HttpResponse.json({ presets: demoBrokerPresets })),
   http.get('/api/trading/config/broker-packs', () => HttpResponse.json({
     packs: [
-      { engine: 'mock', installed: true, source: 'builtin', version: 'demo', requiredBy: [] },
-      { engine: 'ccxt', installed: true, source: 'workspace', version: 'demo', requiredBy: [] },
+      { engine: 'mock', installed: true, source: 'builtin', version: 'demo', updateAvailable: false, requiredBy: [] },
+      { engine: 'ccxt', installed: true, source: 'workspace', version: 'demo', updateAvailable: false, requiredBy: [] },
       { engine: 'alpaca', installed: false, source: 'missing', requiredBy: [] },
       { engine: 'ibkr', installed: false, source: 'missing', requiredBy: [] },
       { engine: 'leverup', installed: false, source: 'missing', requiredBy: [] },
@@ -188,7 +188,7 @@ export const tradingHandlers = [
     ],
   })),
   http.post('/api/trading/config/broker-packs/:engine/install', ({ params }) => HttpResponse.json({
-    engine: String(params.engine), installed: true, source: 'downloaded', version: 'demo', requiredBy: [],
+    engine: String(params.engine), installed: true, source: 'downloaded', version: 'demo', updateAvailable: false, requiredBy: [],
   })),
   http.get('/api/trading/config', () => HttpResponse.json({ utas: demoUTAConfigs })),
   http.post('/api/trading/config/uta', () => HttpResponse.json(demoUTAConfig, { status: 201 })),

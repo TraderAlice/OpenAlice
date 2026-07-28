@@ -19,6 +19,7 @@
     "build:server": "turbo run build --filter=!@traderalice/desktop --filter=!./packages/uta-broker-* && tsup src/main.ts --format esm --dts",
     "build:migration-index": "tsx scripts/build-migration-index.ts",
     "broker-packs:build": "turbo run build --filter=./packages/uta-broker-* && tsx scripts/build-broker-packs.ts && pnpm broker-packs:verify",
+    "broker-packs:upgrade-smoke": "tsx scripts/broker-pack-upgrade-smoke.ts",
     "broker-packs:verify": "tsx scripts/verify-broker-packs.ts",
     "start": "node dist/main.js",
     "electron:tsc": "pnpm -F @traderalice/desktop build",

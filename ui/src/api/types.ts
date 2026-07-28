@@ -549,6 +549,7 @@ export interface BrokerPackStatus {
   installed: boolean
   source: 'builtin' | 'workspace' | 'downloaded' | 'missing' | 'broken'
   version?: string
+  updateAvailable?: boolean
   reason?: string
   requiredBy: string[]
 }

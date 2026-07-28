@@ -13,6 +13,7 @@ import {
   brokerPackActivePath,
   brokerPackEngineRoot,
   brokerPackReleasesRoot,
+  BrokerPackApiVersionMismatchError,
   resolveActiveBrokerPack,
   resolveBrokerPackRelease,
   type BrokerPackActivePointer,
@@ -36,6 +37,7 @@ export interface BrokerPackLocalStatus {
   installed: boolean
   source: 'builtin' | 'workspace' | 'downloaded' | 'missing' | 'broken'
   version?: string
+  updateAvailable?: boolean
   reason?: string
 }
 
@@ -43,8 +45,26 @@ export async function getBrokerPackLocalStatus(engine: InstallableBrokerEngine |
   if (engine === 'mock') return { engine, installed: true, source: 'builtin', version: getCurrentVersion() }
   try {
     const active = await resolveActiveBrokerPack(engine)
-    if (active) return { engine, installed: true, source: 'downloaded', version: active.manifest.version }
+    if (active) {
+      return {
+        engine,
+        installed: true,
+        source: 'downloaded',
+        version: active.manifest.version,
+        updateAvailable: active.manifest.version !== getCurrentVersion(),
+      }
+    }
   } catch (err) {
+    if (err instanceof BrokerPackApiVersionMismatchError) {
+      return {
+        engine,
+        installed: false,
+        source: 'broken',
+        version: err.installedVersion,
+        updateAvailable: true,
+        reason: err.message,
+      }
+    }
     return { engine, installed: false, source: 'broken', reason: err instanceof Error ? err.message : String(err) }
   }
   if (workspacePacksAvailable()) {
@@ -113,7 +133,13 @@ export async function installBrokerPack(engine: InstallableBrokerEngine): Promis
     const activeTmp = `${activePath}.${process.pid}.tmp`
     await writeFile(activeTmp, JSON.stringify(pointer, null, 2) + '\n')
     await rename(activeTmp, activePath)
-    return { engine, installed: true, source: 'downloaded', version: asset.version }
+    return {
+      engine,
+      installed: true,
+      source: 'downloaded',
+      version: asset.version,
+      updateAvailable: false,
+    }
   } finally {
     await rm(workRoot, { recursive: true, force: true }).catch(() => undefined)
     await rm(lock, { recursive: true, force: true }).catch(() => undefined)

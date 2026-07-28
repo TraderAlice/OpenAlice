@@ -58,6 +58,13 @@ not depend on class identity from a Pack's dependency tree; use structural
 checks such as `Decimal.isDecimal` and stable error codes instead of
 cross-package `instanceof` tests.
 
+Pack compatibility is governed by `BROKER_PACK_API_VERSION`, not by equality
+with the OpenAlice product version. `broker-pack.json#version` records which
+OpenAlice release produced the artifact and selects the matching update
+catalog; an older Pack with the supported API remains loadable while its
+replacement downloads. Increment `BROKER_PACK_API_VERSION` whenever UTA Core
+changes the exported module contract in a way an older Pack cannot satisfy.
+
 ## Installed Layout and Transaction
 
 Replaceable Pack payloads live outside portable user data:
@@ -93,6 +100,17 @@ have open. Pack directories are replaceable machine/runtime state: backup
 `data/`, credentials, and Workspaces, then reinstall Packs after moving to an
 incompatible machine.
 
+On production startup Alice reconciles only Packs that already have an active
+downloaded release. A Pack produced by another OpenAlice version continues
+serving through the supported Pack API while Alice downloads the current
+platform artifact, validates it, atomically switches `active.json`, and asks
+Guardian to restart UTA. A prior Pack with an old API is not loaded, but its
+typed incompatibility still qualifies it for automatic replacement. Missing
+Packs remain an explicit user choice; malformed or corrupt releases remain
+visible Repair cases rather than being silently trusted.
+`OPENALICE_BROKER_PACK_AUTO_UPDATE=0` is the emergency kill switch. Source
+development and test runtimes skip automatic network reconciliation.
+
 Linux catalogs may declare a minimum glibc version. The current Longbridge GNU
 artifact requires glibc 2.39, so older Ubuntu/WSL systems are rejected before
 the native module is loaded instead of crashing UTA with `ERR_DLOPEN_FAILED`.
@@ -110,6 +128,13 @@ OpenAlice-Broker-<engine>-<version>-<platform>-<arch>.tgz
 The release workflow runs this on macOS arm64, macOS x64, Windows x64, and
 Linux x64; publishes the files with the desktop release; mirrors them to the
 download CDN; and verifies every catalog and referenced archive.
+
+Before a candidate can publish, each platform runner downloads the real Broker
+Packs from the previous GitHub Release, activates them in an isolated
+`OPENALICE_HOME`, serves the current candidate catalog locally, and runs the
+production reconciliation path. The gate requires every active pointer to move
+to the candidate while every previous immutable release remains intact. A
+fresh-install-only Pack check is not sufficient for release acceptance.
 
 The build command also extracts every generated archive, verifies its catalog
 membership, size, SHA-256, package identity, entry containment, and absence of
@@ -143,13 +168,16 @@ The Trading page owns three installation entry points:
 
 - broker creation stops before credentials and offers Install/Repair when the
   chosen engine is absent;
-- existing enabled accounts show a missing-support banner with the exact
-  accounts that require each Pack;
+- existing enabled accounts show an Install, Update, or Repair banner with the
+  exact accounts that require each Pack;
 - public crypto data-source toggles require the CCXT Pack before a source can
   be enabled, while still allowing an already-enabled source to be disabled.
 
 Pack errors must be explicit and recoverable. Alice/Chat remains usable, UTA
 continues starting, and other installed broker engines remain independent.
+
+The v0.85.0-beta regression that established this contract is recorded in
+[[docs/incidents/2026-07-28-broker-pack-upgrade-gap.md]].
 
 ## Verification
 
@@ -157,6 +185,7 @@ Run the focused checks before the repository-wide gates:
 
 ```bash
 pnpm broker-packs:build
+pnpm broker-packs:upgrade-smoke
 pnpm vitest run src/services/broker-packs/installer.spec.ts \
   services/uta/src/domain/trading/brokers/registry.spec.ts \
   ui/src/components/uta/CreateUTADialog.spec.tsx
