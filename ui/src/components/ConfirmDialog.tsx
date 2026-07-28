@@ -8,6 +8,8 @@ interface ConfirmDialogProps {
   message: React.ReactNode
   /** Confirm button label. Defaults to 'Delete' for the destructive case. */
   confirmLabel?: string
+  /** Cancel button label. Defaults to 'Cancel'. */
+  cancelLabel?: string
   /** Visual treatment of the confirm button. Defaults to 'danger'. */
   variant?: 'danger' | 'primary'
   /** Called on user confirm. May be async — the button shows a busy state until it resolves. */
@@ -31,6 +33,7 @@ export function ConfirmDialog({
   title,
   message,
   confirmLabel = 'Delete',
+  cancelLabel = 'Cancel',
   variant = 'danger',
   onConfirm,
   onClose,
@@ -63,7 +66,7 @@ export function ConfirmDialog({
           disabled={busy}
           className="btn-secondary"
         >
-          Cancel
+          {cancelLabel}
         </button>
         <button
           type="button"
