@@ -57,8 +57,16 @@ They are methods, not mandatory ceremony.
 - **Need to understand an Inbox result:** use `inbox ask --id … --await`.
 - **Need the creator, owner, or one run of an Issue:** use `issue ask` with the
   corresponding target and start with `--await`.
+- **Need to delegate new work to another desk:** use `conversation ask --ws-id
+  …` with a normal coworker prompt. Omit `--await` when the peer should accept
+  the work, manage it locally, and report back later.
+- **Need a missing author's intent reconstructed:** add `--reconstruct`
+  explicitly. Ordinary peer messages must not carry reconstruction framing.
 - **Need several independent answers:** dispatch the asks concurrently, then
   collect them; do not write shell sleep loops.
+- **Need a long-running result surfaced to the user:** ask the peer to commit
+  its report and push it to Inbox. Inbox is human-facing delivery; later
+  `read`/`await`/`collect` retrieves the direct Agent reply.
 - **Need to record progress on this Workspace's own Issue:** use `issue comment`.
 - **Need to read a peer artifact:** resolve its Workspace from the Inbox entry,
   then read the referenced file. Autonomous runs never edit a peer Workspace.

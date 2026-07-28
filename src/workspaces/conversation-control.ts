@@ -8,6 +8,7 @@ import type {
   WorkspaceConversationTask,
 } from '../core/workspace-tool-center.js'
 import type { ArtifactRef, ProvenanceAction, SessionOrigin } from '../core/provenance-store.js'
+import type { AgentConversationDispatch } from './agent-conversation-log.js'
 import { isAgentRuntime } from './cli-adapter.js'
 import type { HeadlessStructuredOutput } from './headless-output.js'
 import { headlessLogPaths } from './headless-task-registry.js'
@@ -241,9 +242,21 @@ export function createWorkspaceConversationControl(
         throw new Error(`agent runtime has no headless mode: ${agentId}`)
       }
 
-      const prompt = resolution.mode === 'exact'
-        ? input.prompt
-        : reconstructionPrompt(input.target, input.prompt, Boolean(continuingOrigin))
+      const promptMode = resolution.mode === 'reconstructed' && input.reconstruct === true
+        ? 'reconstruction'
+        : 'plain'
+      const prompt = promptMode === 'reconstruction'
+        ? reconstructionPrompt(input.target, input.prompt, Boolean(continuingOrigin))
+        : input.prompt
+      const conversation: AgentConversationDispatch = {
+        source: input.source ?? { kind: 'human' },
+        requestedTarget: input.target,
+        originalPrompt: input.prompt,
+        deliveredPrompt: prompt,
+        promptMode,
+        resolution,
+        ...(input.subject ? { subject: input.subject } : {}),
+      }
       const inquiry = input.subject
         ? {
             subject: input.subject,
@@ -256,10 +269,26 @@ export function createWorkspaceConversationControl(
         : undefined
       const dispatched = inquiry
         ? await svc.dispatchHeadlessTask(
-            meta, adapter, prompt, input.timeoutMs, undefined, continuingOrigin?.resumeId, inquiry,
+            meta,
+            adapter,
+            prompt,
+            input.timeoutMs,
+            undefined,
+            continuingOrigin?.resumeId,
+            inquiry,
+            undefined,
+            conversation,
           )
         : await svc.dispatchHeadlessTask(
-            meta, adapter, prompt, input.timeoutMs, undefined, continuingOrigin?.resumeId,
+            meta,
+            adapter,
+            prompt,
+            input.timeoutMs,
+            undefined,
+            continuingOrigin?.resumeId,
+            undefined,
+            undefined,
+            conversation,
           )
       let effectiveResolution = resolution
       if (resolution.mode === 'reconstructed' && resolution.artifact && !resolution.origin) {

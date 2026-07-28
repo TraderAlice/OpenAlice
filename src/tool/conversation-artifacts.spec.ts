@@ -66,6 +66,7 @@ describe('inbox_ask', () => {
       target: { kind: 'resume', resumeId: 'resume-peer' },
       subject: { kind: 'inbox', entryId: entry.id },
       timeoutMs: 300_000,
+      source: { kind: 'workspace', workspaceId: 'ws-caller' },
     })
   })
 
@@ -81,6 +82,18 @@ describe('inbox_ask', () => {
     expect(ask).toHaveBeenCalledWith(expect.objectContaining({
       target: { kind: 'inbox', inboxEntryId: entry.id, workspaceId: 'ws-peer' },
     }))
+  })
+
+  it('forwards an explicit reconstruction request', async () => {
+    const inboxStore = createMemoryInboxStore()
+    const entry = await inboxStore.append({ workspaceId: 'ws-peer', comments: 'manual result' })
+    const ask = dispatchedAsk()
+    const tool = inboxAskFactory.build(baseContext({
+      inboxStore,
+      conversation: { ask, read: vi.fn() },
+    }))
+    await run(tool, { id: entry.id, prompt: 'reconstruct this', reconstruct: true })
+    expect(ask).toHaveBeenCalledWith(expect.objectContaining({ reconstruct: true }))
   })
 })
 

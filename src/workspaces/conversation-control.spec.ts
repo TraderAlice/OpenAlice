@@ -165,11 +165,23 @@ describe('Workspace conversation control', () => {
       resolution: { mode: 'exact', origin },
     })
     expect(dispatchHeadlessTask).toHaveBeenCalledWith(
-      workspace, adapter, 'Why did you create this?', 300_000, undefined, 'resume-peer',
+      workspace,
+      adapter,
+      'Why did you create this?',
+      300_000,
+      undefined,
+      'resume-peer',
+      undefined,
+      undefined,
+      expect.objectContaining({
+        originalPrompt: 'Why did you create this?',
+        deliveredPrompt: 'Why did you create this?',
+        promptMode: 'plain',
+      }),
     )
   })
 
-  it('labels and prompts a fresh reconstruction honestly', async () => {
+  it('keeps reconstructed provenance while delivering a plain prompt by default', async () => {
     const { svc, dispatchHeadlessTask, appendProvenance } = fakeService()
     const result = await createWorkspaceConversationControl(svc).ask({
       target: { kind: 'report', workspaceId: 'ws-peer', path: 'research/report.md' },
@@ -182,13 +194,38 @@ describe('Workspace conversation control', () => {
       resolution: { mode: 'reconstructed', reason: 'missing-origin' },
     })
     const dispatchedPrompt = (dispatchHeadlessTask.mock.calls as unknown[][])[0]?.[2]
-    expect(dispatchedPrompt).toContain('fresh worker reconstructing')
-    expect(dispatchedPrompt).toContain('not the original author')
-    expect(dispatchedPrompt).toContain('research/report.md')
+    expect(dispatchedPrompt).toBe('Why did the report reach this conclusion?')
+    const conversation = (dispatchHeadlessTask.mock.calls as unknown[][])[0]?.[8]
+    expect(conversation).toMatchObject({
+      promptMode: 'plain',
+      originalPrompt: 'Why did the report reach this conclusion?',
+      deliveredPrompt: 'Why did the report reach this conclusion?',
+    })
     expect(appendProvenance).toHaveBeenCalledWith(expect.objectContaining({
       action: 'reconstructed',
       origin: expect.objectContaining({ resumeId: 'resume-fresh' }),
     }))
+  })
+
+  it('adds reconstruction guidance only when explicitly requested', async () => {
+    const { svc, dispatchHeadlessTask } = fakeService()
+    await createWorkspaceConversationControl(svc).ask({
+      target: { kind: 'report', workspaceId: 'ws-peer', path: 'research/report.md' },
+      prompt: 'Why did the report reach this conclusion?',
+      timeoutMs: 300_000,
+      reconstruct: true,
+    })
+
+    const dispatchedPrompt = (dispatchHeadlessTask.mock.calls as unknown[][])[0]?.[2]
+    expect(dispatchedPrompt).toContain('fresh worker reconstructing')
+    expect(dispatchedPrompt).toContain('not the original author')
+    expect(dispatchedPrompt).toContain('research/report.md')
+    const conversation = (dispatchHeadlessTask.mock.calls as unknown[][])[0]?.[8]
+    expect(conversation).toMatchObject({
+      promptMode: 'reconstruction',
+      originalPrompt: 'Why did the report reach this conclusion?',
+      deliveredPrompt: expect.stringContaining('fresh worker reconstructing'),
+    })
   })
 
   it('returns unavailable without dispatching when the attributed Session cannot resume', async () => {

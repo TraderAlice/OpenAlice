@@ -8,6 +8,7 @@ import type {
   WorkspaceToolContext,
   WorkspaceToolFactory,
 } from '../core/workspace-tool-center.js'
+import { sessionOriginFromInboxOrigin } from '../core/provenance-store.js'
 import type { HeadlessMessageBlock } from '../workspaces/headless-output.js'
 import type { HeadlessInquirySubject } from '../workspaces/headless-task-registry.js'
 
@@ -24,7 +25,9 @@ export const conversationAskCommonShape = {
   timeoutMs: z.coerce.number().int().positive().max(MAX_TIMEOUT_MS).optional()
     .describe(`Headless watchdog in milliseconds (default ${DEFAULT_TIMEOUT_MS}).`),
   await: z.boolean().optional().default(false)
-    .describe('Wait server-side for the final reply; on timeout, return the taskId for later await/read.'),
+    .describe('Wait server-side for a reply needed now; omit for asynchronous delegation and use the returned taskId later.'),
+  reconstruct: z.boolean().optional().default(false)
+    .describe('Explicitly add artifact-reconstruction guidance if OpenAlice must recruit a fallback worker.'),
 }
 
 function taskProjection(task: WorkspaceConversationTask, mode: 'summary' | 'detailed') {
@@ -79,6 +82,7 @@ export async function askWorkspaceConversation(
     agent?: string
     timeoutMs?: number
     await?: boolean
+    reconstruct?: boolean
   },
 ) {
   if (!ctx.conversation) {
@@ -90,8 +94,13 @@ export async function askWorkspaceConversation(
       prompt: input.prompt,
       target: input.target,
       timeoutMs: effectiveTimeoutMs,
+      source: sessionOriginFromInboxOrigin(ctx.workspaceId, ctx.origin) ?? {
+        kind: 'workspace',
+        workspaceId: ctx.workspaceId,
+      },
       ...(input.subject ? { subject: input.subject } : {}),
       ...(input.agent ? { agent: input.agent } : {}),
+      ...(input.reconstruct ? { reconstruct: true } : {}),
     })
     if (result.status === 'unavailable') {
       return {
@@ -146,9 +155,12 @@ export const conversationAskFactory: WorkspaceToolFactory = {
         'The CLI exposes these as --resume-id, --issue-id, and --ws-id. It never requires',
         'callers to construct an internal target object.',
         '',
-        'Prefer --await for one question: the server waits without shell sleep loops.',
-        'Without --await the call returns a short taskId immediately, which lets several',
-        'questions run concurrently before conversation_await collects their replies.',
+        'Use --await when this turn needs the reply. Without it, the call returns a',
+        'short taskId immediately for delegated work or several concurrent questions;',
+        'retrieve those replies later with conversation_read/await/collect.',
+        '',
+        'Prompts are delivered unchanged by default. Use --reconstruct only when the',
+        'intent is to have a fresh worker reconstruct an artifact whose author is absent.',
       ].join('\n'),
       inputSchema: z.object({
         ...conversationAskCommonShape,
@@ -159,7 +171,16 @@ export const conversationAskFactory: WorkspaceToolFactory = {
         issueId: z.string().min(1).optional()
           .describe('Issue whose attributable Session should answer. Defaults to the current Workspace.'),
       }),
-      execute: async ({ prompt, resumeId, wsId, issueId, agent, timeoutMs, await: shouldAwait = false }) => {
+      execute: async ({
+        prompt,
+        resumeId,
+        wsId,
+        issueId,
+        agent,
+        timeoutMs,
+        await: shouldAwait = false,
+        reconstruct = false,
+      }) => {
         if (!ctx.conversation) {
           return { ok: false as const, error: 'workspace conversation control is unavailable' }
         }
@@ -186,6 +207,7 @@ export const conversationAskFactory: WorkspaceToolFactory = {
           ...(agent ? { agent } : {}),
           ...(timeoutMs ? { timeoutMs } : {}),
           await: shouldAwait,
+          reconstruct,
         })
       },
     })

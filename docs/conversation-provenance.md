@@ -507,6 +507,7 @@ The embedded generic entry point is:
 alice-workspace conversation ask --resume-id <resumeId> --prompt '<question>'
 alice-workspace conversation ask --issue-id <issueId> [--ws-id <workspaceId>] --prompt '<question>'
 alice-workspace conversation ask --ws-id <workspaceId> --prompt '<question>'
+alice-workspace conversation ask --ws-id <workspaceId> --prompt '<reconstruction request>' --reconstruct
 alice-workspace conversation await --task-id <taskId>
 alice-workspace conversation collect --task-id <taskA> --task-id <taskB>
 alice-workspace conversation read --task-id <taskId>
@@ -528,11 +529,28 @@ inside the resolver and future business-specific convenience commands; agents
 never serialize them into `conversation ask`. The ask result reports a compact
 `resolution.mode`; read returns runtime status and the latest assistant text by
 default. Full tool/message blocks are diagnostic data behind `--mode detailed`.
-For one peer, `ask --await` is the preferred path. For multiple peers, dispatch
-all asks first so their runs overlap, then server-side collect their task ids in
-one ordered result before synthesizing. A timed-out collect preserves every task;
-callers fall back to a later collect/read snapshot instead of scripting arbitrary
-sleeps.
+
+Provenance resolution and prompt semantics are separate. A fallback worker is
+still labeled `reconstructed` so it cannot impersonate a missing author, but
+OpenAlice delivers the caller's prompt unchanged unless `--reconstruct` was
+explicitly requested. The optional flag adds the reconstruction preamble; it
+does not change whom OpenAlice addresses.
+
+Choose waiting behavior from the work rather than treating every ask as a
+blocking follow-up:
+
+- use `--await` for a bounded consultation whose answer is required in the
+  current turn;
+- omit it for delegation, retain the returned `taskId`/`resumeId`, and retrieve
+  the reply later with `read` or `await`;
+- dispatch multiple independent asks before one ordered `collect`;
+- ask a long-running peer to manage its own local Issue/schedule and `inbox
+  push` the finished report when the human should be notified.
+
+Inbox is human-facing delivery. OpenAlice does not yet inject an unsolicited
+completion message into another Agent's active transcript. A timed-out collect
+preserves every task; callers fall back to a later collect/read snapshot instead
+of scripting arbitrary sleeps.
 
 The first fresh reconstruction appends a `reconstructed` occurrence to the
 artifact. Later questions about that same otherwise-unattributed artifact
@@ -548,6 +566,31 @@ pages restore follow-up history after navigation or restart without parsing
 prompts or exposing adapter-native session ids. UI requests return immediately
 after dispatch; the page polls durable task state instead of holding an
 Electron IPC request open for the model turn.
+
+### Independent conversation event log
+
+Every dispatched Workspace conversation also appends a
+`conversation.dispatched` event to
+`<launcherRoot>/state/agent-conversations.jsonl`. Completion appends a matching
+`conversation.completed` event keyed by `taskId`. The stream records:
+
+- authoritative caller Workspace/Session identity when available;
+- target Workspace, product `resumeId`, and Agent runtime;
+- requested target and exact/reconstructed resolution;
+- the original prompt, delivered prompt, and whether explicit reconstruction
+  guidance changed it;
+- terminal status, final assistant text, duration, and compact error.
+
+The file is private launcher state (`0600` where supported), not Workspace Git
+content. It can contain complete prompts and replies and must be treated as
+sensitive local conversation history. Native runtime session ids and raw tool
+blocks never enter it.
+
+`HeadlessTaskRegistry` remains execution truth and structured headless logs
+remain diagnostic truth. The independent event stream is an analysis/audit
+projection for prompt-flow studies and future visualization. A logging failure
+must not block or change message delivery, and the log is not an Agent
+notification mechanism.
 
 ## Phase 2 Feature Design Skeleton
 
@@ -593,6 +636,7 @@ shapes should point back here rather than restating the rules differently.
 | `src/workspaces/session-registry.ts` | Interactive materializations and resume indexes |
 | `src/workspaces/service.ts` | Dispatch, resume, and per-Session concurrency |
 | `src/workspaces/conversation-control.ts` | Provenance resolution plus exact/reconstructed headless dispatch |
+| `src/workspaces/agent-conversation-log.ts` | Private append-only peer-message prompt/reply event stream |
 | `src/tool/conversation.ts` | Embedded business-target ask/read CLI tools |
 | `src/webui/routes/inquiries.ts` | Human Inbox/Issue ask dispatch and durable inquiry projections |
 | `src/core/inbox-store.ts` | Immutable notification records and sender provenance |

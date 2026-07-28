@@ -26,13 +26,22 @@ export const inboxAskFactory: WorkspaceToolFactory = {
         'The entry id is enough: OpenAlice resolves server-stamped provenance. A known',
         'Session is resumed exactly. An entry without an attributable Session recruits a',
         'fresh worker only in its source Workspace and labels the answer reconstructed.',
-        'Prefer --await for one entry; dispatch several without it before collecting them.',
+        'Use --await for a reply needed now; omit it for asynchronous follow-up or',
+        'several parallel questions. Add --reconstruct only when reconstruction',
+        'guidance for an unattributed entry is explicitly intended.',
       ].join('\n'),
       inputSchema: z.object({
         id: z.string().min(1).describe('Inbox entry id returned by inbox read.'),
         ...conversationAskCommonShape,
       }),
-      execute: async ({ id, prompt, agent, timeoutMs, await: shouldAwait = false }) => {
+      execute: async ({
+        id,
+        prompt,
+        agent,
+        timeoutMs,
+        await: shouldAwait = false,
+        reconstruct = false,
+      }) => {
         try {
           const entry = await ctx.inboxStore.get(id)
           if (!entry) return { ok: false as const, error: `inbox entry not found: ${id}` }
@@ -51,6 +60,7 @@ export const inboxAskFactory: WorkspaceToolFactory = {
             ...(agent ? { agent } : {}),
             ...(timeoutMs ? { timeoutMs } : {}),
             await: shouldAwait,
+            reconstruct,
           })
           return withSubject({ kind: 'inbox', id: entry.id }, result)
         } catch (err) {
@@ -71,6 +81,7 @@ export const issueAskFactory: WorkspaceToolFactory = {
         'The Issue name resolves across the global board. Omit selectors to ask its creator;',
         'use --owner for a stable resume owner or --run-id for one exact execution Session.',
         'A duplicate Issue name returns candidates; add --ws-id only to disambiguate.',
+        'Add --reconstruct only when a fallback worker should explicitly reconstruct missing intent.',
       ].join('\n'),
       inputSchema: z.object({
         id: z.string().min(1).describe('Issue id or title, resolved across the global board.'),
@@ -90,6 +101,7 @@ export const issueAskFactory: WorkspaceToolFactory = {
         agent,
         timeoutMs,
         await: shouldAwait = false,
+        reconstruct = false,
       }) => {
         if (!ctx.board) return { ok: false as const, error: 'global issue board is unavailable' }
         const selectorCount = Number(creator) + Number(owner) + Number(Boolean(runId))
@@ -166,6 +178,7 @@ export const issueAskFactory: WorkspaceToolFactory = {
             ...(agent ? { agent } : {}),
             ...(timeoutMs ? { timeoutMs } : {}),
             await: shouldAwait,
+            reconstruct,
           })
           return withSubject({
             kind: 'issue',

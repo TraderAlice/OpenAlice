@@ -111,6 +111,10 @@ import { issueRunFailure } from './issues/run-failure.js';
 import type { IInboxStore } from '@/core/inbox-store.js';
 import { toSafeInboxOrigin } from '@/core/workspace-tool-center.js';
 import {
+  AgentConversationLog,
+  type AgentConversationDispatch,
+} from './agent-conversation-log.js';
+import {
   HeadlessTaskRegistry,
   headlessLogPaths,
   type HeadlessTaskInquiry,
@@ -464,6 +468,8 @@ export interface WorkspaceService {
     inquiry?: HeadlessTaskInquiry,
     /** Explicit one-run model/effort; authentication remains Workspace-owned. */
     overrides?: HeadlessRunOverrides,
+    /** Cross-Agent message metadata for the independent conversation log. */
+    conversation?: AgentConversationDispatch,
   ): Promise<{ taskId: string; resumeId: string }>;
   /** Read-only scheduling projection of every workspace's `.alice/issues/`
    *  directory (scheduled issues only) + each task's last-fired marker and
@@ -493,6 +499,8 @@ export interface WorkspaceService {
   resumeRegistry: ResumeRegistry;
   /** Durable product Session -> business artifact attribution index. */
   provenanceStore: ArtifactProvenanceStore;
+  /** Append-only analysis/audit projection of cross-Agent messages. */
+  agentConversationLog: AgentConversationLog;
   /** True while a headless turn owns this conversation transcript. */
   isResumeActive(resumeId: string): boolean;
   /** Atomically reserve a conversation before crossing an async spawn boundary. */
@@ -575,6 +583,10 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   const provenanceStore = await ArtifactProvenanceStore.load(
     join(config.launcherRoot, 'state', 'artifact-provenance.json'),
     launcherLogger.child({ scope: 'provenance-store' }),
+  );
+  const agentConversationLog = new AgentConversationLog(
+    join(config.launcherRoot, 'state', 'agent-conversations.jsonl'),
+    launcherLogger.child({ scope: 'agent-conversation-log' }),
   );
   const issueChangeTracker = await IssueChangeTracker.load(
     join(config.launcherRoot, 'state', 'issue-audit-snapshots.json'),
@@ -1436,6 +1448,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     resumeId?: string,
     inquiry?: HeadlessTaskInquiry,
     overrides?: HeadlessRunOverrides,
+    conversation?: AgentConversationDispatch,
   ): Promise<{ taskId: string; resumeId: string }> => {
     if (catalog.get(ws.id)?.lifecycle !== 'active') {
       throw new Error(`workspace is not active: ${ws.id}`);
@@ -1512,6 +1525,17 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         agent: adapter.id,
         latestTaskId: rec.taskId,
       });
+      if (conversation) {
+        await agentConversationLog.recordDispatch({
+          taskId: rec.taskId,
+          ...(rec.parentTaskId ? { parentTaskId: rec.parentTaskId } : {}),
+          resumeId: rec.resumeId,
+          workspaceId: ws.id,
+          agent: adapter.id,
+          startedAt: rec.startedAt,
+          conversation,
+        });
+      }
     } catch (err) {
       if (resumeId) activeResumeIds.delete(resumeId);
       throw err;
@@ -1559,6 +1583,16 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
             toolFailures: r.structured.metrics.toolFailures,
           },
         });
+        if (conversation) {
+          await agentConversationLog.recordCompletion({
+            taskId: rec.taskId,
+            status,
+            finishedAt: rec.finishedAt ?? Date.now(),
+            assistantText: r.structured.assistantText,
+            durationMs: r.durationMs,
+            ...(status !== 'done' && r.stderrTail ? { error: r.stderrTail.slice(-1000) } : {}),
+          });
+        }
         await completeIssueCommentInquiry({
           task: rec,
           status,
@@ -1619,6 +1653,15 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           finishedAt: Date.now(),
           error: message,
         });
+        if (conversation) {
+          await agentConversationLog.recordCompletion({
+            taskId: rec.taskId,
+            status: 'failed',
+            finishedAt: rec.finishedAt ?? Date.now(),
+            assistantText: null,
+            error: message,
+          });
+        }
         await completeIssueCommentInquiry({
           task: rec,
           status: 'failed',
@@ -2363,6 +2406,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     headlessTasks,
     resumeRegistry,
     provenanceStore,
+    agentConversationLog,
     isResumeActive: (resumeId) => activeResumeIds.has(resumeId),
     claimResume,
     releaseResume: (resumeId) => activeResumeIds.delete(resumeId),

@@ -17,6 +17,8 @@ function build(opts: { assignee?: string } = {}) {
     _issueId?: string,
     _resumeId?: string,
     _inquiry?: HeadlessTaskInquiry,
+    _overrides?: unknown,
+    _conversation?: unknown,
   ) => ({ taskId: 'run-new', resumeId: _resumeId ?? 'resume-new' }))
   const list = vi.fn((_filters: unknown) => [] as HeadlessTaskRecord[])
   const svc = {
@@ -73,10 +75,17 @@ describe('business inquiry routes', () => {
         question: 'Why?',
         resolution: { mode: 'exact' },
       }),
+      undefined,
+      expect.objectContaining({
+        source: { kind: 'human' },
+        originalPrompt: 'Why?',
+        deliveredPrompt: 'Why?',
+        promptMode: 'plain',
+      }),
     )
   })
 
-  it('reconstructs an unattributed Inbox entry without impersonating a sender', async () => {
+  it('keeps reconstruction provenance without changing an unattributed Inbox prompt by default', async () => {
     const { app, inboxStore, dispatchHeadlessTask } = build()
     const entry = await inboxStore.append({ workspaceId: 'ws-1', comments: 'manual note' })
     const response = await app.request(`/inbox/${entry.id}`, {
@@ -84,8 +93,26 @@ describe('business inquiry routes', () => {
     })
     expect(response.status).toBe(202)
     expect((await json(response)).resolution.mode).toBe('reconstructed')
+    expect(dispatchHeadlessTask.mock.calls[0]?.[2]).toBe('Recover context')
     expect(dispatchHeadlessTask.mock.calls[0]?.[5]).toBeUndefined()
     expect(dispatchHeadlessTask.mock.calls[0]?.[6]?.resolution).toMatchObject({ mode: 'reconstructed' })
+  })
+
+  it('adds reconstruction guidance when the UI request explicitly opts in', async () => {
+    const { app, inboxStore, dispatchHeadlessTask } = build()
+    const entry = await inboxStore.append({ workspaceId: 'ws-1', comments: 'manual note' })
+    const response = await app.request(`/inbox/${entry.id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: 'Recover context', reconstruct: true }),
+    })
+    expect(response.status).toBe(202)
+    expect(dispatchHeadlessTask.mock.calls[0]?.[2]).toContain('fresh worker reconstructing')
+    expect(dispatchHeadlessTask.mock.calls[0]?.[8]).toMatchObject({
+      source: { kind: 'human' },
+      originalPrompt: 'Recover context',
+      promptMode: 'reconstruction',
+    })
   })
 
   it('rejects Ask owner for a Workspace-owned Issue', async () => {

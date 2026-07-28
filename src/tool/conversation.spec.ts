@@ -58,7 +58,12 @@ describe('conversation_ask', () => {
     await expect(run(tool, { prompt: 'why?', wsId: 'ws-peer', issueId: 'audit' })).resolves.toMatchObject({
       ok: true, status: 'running', taskId: 'task-1', resolution: { mode: 'exact' },
     })
-    expect(ask).toHaveBeenCalledWith({ prompt: 'why?', target, timeoutMs: 300_000 })
+    expect(ask).toHaveBeenCalledWith({
+      prompt: 'why?',
+      target,
+      timeoutMs: 300_000,
+      source: { kind: 'workspace', workspaceId: 'ws-caller' },
+    })
   })
 
   it('surfaces unavailable attribution without starting another worker', async () => {
@@ -92,6 +97,60 @@ describe('conversation_ask', () => {
     })).resolves.toMatchObject({
       ok: false, error: expect.stringContaining('choose one target'),
     })
+  })
+
+  it('passes reconstruction guidance only when explicitly requested', async () => {
+    const ask = vi.fn(async () => ({
+      status: 'dispatched' as const,
+      taskId: 'task-1', resumeId: 'resume-1', workspaceId: 'ws-peer',
+      workspace: 'peer', agent: 'pi',
+      resolution: {
+        mode: 'reconstructed' as const,
+        workspaceId: 'ws-peer',
+        reason: 'explicit-workspace' as const,
+      },
+    }))
+    const tool = conversationAskFactory.build(context({
+      conversation: { ask, read: vi.fn() },
+    }))
+
+    await run(tool, {
+      prompt: 'Reconstruct the missing report.', wsId: 'ws-peer', reconstruct: true,
+    })
+    expect(ask).toHaveBeenCalledWith(expect.objectContaining({ reconstruct: true }))
+  })
+
+  it('stamps the authoritative caller Session into the dispatch', async () => {
+    const ask = vi.fn(async () => ({
+      status: 'dispatched' as const,
+      taskId: 'task-1', resumeId: 'resume-peer', workspaceId: 'ws-peer',
+      workspace: 'peer', agent: 'pi',
+      resolution: {
+        mode: 'reconstructed' as const,
+        workspaceId: 'ws-peer',
+        reason: 'explicit-workspace' as const,
+      },
+    }))
+    const tool = conversationAskFactory.build(context({
+      origin: {
+        kind: 'headless',
+        runId: 'run-caller',
+        resumeId: 'resume-caller',
+        agent: 'codex',
+      },
+      conversation: { ask, read: vi.fn() },
+    }))
+
+    await run(tool, { prompt: 'Please take this work.', wsId: 'ws-peer' })
+    expect(ask).toHaveBeenCalledWith(expect.objectContaining({
+      source: {
+        kind: 'session',
+        workspaceId: 'ws-caller',
+        resumeId: 'resume-caller',
+        agent: 'codex',
+        execution: { kind: 'headless', taskId: 'run-caller' },
+      },
+    }))
   })
 
   it('awaits a recorded task server-side and returns its final reply', async () => {

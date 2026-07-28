@@ -262,7 +262,7 @@ sealing, and Broker Packs must remain coherent.
 │   ├── workspaces/            active Workspace repositories only
 │   ├── departed-workspaces/   retained offboarded repositories
 │   ├── state/                 lifecycle catalog, Sessions, scrollback, tasks,
-│   │                          provenance, compatibility lock
+│   │                          provenance, Agent conversation log, compatibility lock
 │   └── auto-quant-mirror/     shared Auto-Quant source mirror
 ├── state/
 │   ├── guardian.lock          launcher ownership

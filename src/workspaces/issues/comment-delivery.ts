@@ -1,4 +1,7 @@
-import type { WorkspaceConversationControl } from '../../core/workspace-tool-center.js'
+import type {
+  WorkspaceConversationCaller,
+  WorkspaceConversationControl,
+} from '../../core/workspace-tool-center.js'
 import type { IProvenanceStore } from '../../core/provenance-store.js'
 import type { HeadlessTaskRecord, HeadlessTaskStatus } from '../headless-task-registry.js'
 import { sessionSignature } from '../session-signature.js'
@@ -44,6 +47,7 @@ export async function dispatchIssueCommentReply(input: {
   issue: IssueRecord
   comment: IssueComment
   authorResumeId?: string
+  source?: WorkspaceConversationCaller
 }): Promise<IssueCommentDispatchResult> {
   const targetResumeId = issueAssigneeResumeId(input.issue.assignee)
   if (!targetResumeId) return { status: 'not_requested', reason: 'no_fixed_owner' }
@@ -66,6 +70,7 @@ export async function dispatchIssueCommentReply(input: {
       prompt: issueCommentReplyPrompt(input),
       target: { kind: 'resume', resumeId: targetResumeId },
       timeoutMs: COMMENT_REPLY_TIMEOUT_MS,
+      ...(input.source ? { source: input.source } : {}),
       subject: {
         kind: 'issue',
         workspaceId: input.issueWorkspaceId,

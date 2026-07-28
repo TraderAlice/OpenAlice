@@ -312,6 +312,7 @@ export function createIssuesRoutes(svc: WorkspaceService, deps: IssueRoutesDeps 
         issueWorkspaceId: wsId,
         issue: res.issue,
         comment: res.comment,
+        source: { kind: 'human' },
       })
       if (dispatched.status !== 'not_requested') {
         const updated = await updateIssueCommentDelivery(meta.dir, id, res.comment.id, dispatched.delivery)
