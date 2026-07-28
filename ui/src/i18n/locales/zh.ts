@@ -961,6 +961,8 @@ export const zh: Resources = {
     cannotReplyWorkspaceGone: '工作区已不存在——无处回复。',
     deleteEntryTitle: '删除此条（Delete / Backspace）',
     deleteEntryAriaLabel: '删除此收件箱条目',
+    deleteConfirmTitle: '删除这条收件箱消息？',
+    deleteConfirmMessage: '这会从收件箱中永久删除此更新，但不会删除 {{workspace}} 中链接的文件。',
   },
   templates: {
     catalogTitle: '工作区模板',

@@ -972,6 +972,8 @@ export const en = {
     cannotReplyWorkspaceGone: 'Workspace no longer exists — nowhere to reply.',
     deleteEntryTitle: 'Delete this entry (Delete / Backspace)',
     deleteEntryAriaLabel: 'Delete this inbox entry',
+    deleteConfirmTitle: 'Delete Inbox entry?',
+    deleteConfirmMessage: 'This permanently removes this update from Inbox. Files linked from {{workspace}} are not deleted.',
   },
   templates: {
     catalogTitle: 'Workspace templates',

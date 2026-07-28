@@ -961,6 +961,8 @@ export const ja: Resources = {
     cannotReplyWorkspaceGone: 'ワークスペースが存在しないため、返信先がありません。',
     deleteEntryTitle: 'この項目を削除（Delete / Backspace）',
     deleteEntryAriaLabel: 'この受信トレイの項目を削除',
+    deleteConfirmTitle: '受信トレイの項目を削除しますか？',
+    deleteConfirmMessage: 'この更新を受信トレイから完全に削除します。{{workspace}} でリンクされているファイルは削除されません。',
   },
   templates: {
     catalogTitle: 'ワークスペーステンプレート',
