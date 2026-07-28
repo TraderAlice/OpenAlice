@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { type BarSourceCandidate, type AssetClass } from '../../api/market'
 import { useAssetSearch } from './useAssetSearch'
@@ -20,6 +21,7 @@ const CAPABILITY_COLOR: Record<string, string> = {
 }
 
 export function SearchBox() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [query, setQuery] = useState('')
@@ -76,7 +78,7 @@ export function SearchBox() {
     <div ref={containerRef} className="relative">
       <input
         className="w-full px-3 py-2 text-[14px] bg-secondary border border-border rounded-md focus:outline-none focus:border-primary placeholder:text-muted-foreground/50"
-        placeholder="Search assets — AAPL, bitcoin, EUR, gold…"
+        placeholder={t('market.searchInputPlaceholder')}
         value={query}
         onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
         onFocus={() => setOpen(true)}
@@ -85,10 +87,10 @@ export function SearchBox() {
       {open && query.trim() && (
         <div className="absolute z-20 mt-1 w-full bg-secondary border border-border rounded-md shadow-lg max-h-[360px] overflow-y-auto">
           {loading && results.length === 0 && (
-            <div className="px-3 py-2 text-[13px] text-muted-foreground">Searching…</div>
+            <div className="px-3 py-2 text-[13px] text-muted-foreground">{t('market.searching')}</div>
           )}
           {!loading && results.length === 0 && (
-            <div className="px-3 py-2 text-[13px] text-muted-foreground">No matches</div>
+            <div className="px-3 py-2 text-[13px] text-muted-foreground">{t('market.noMatches')}</div>
           )}
           {results.map((r, i) => (
             <button
