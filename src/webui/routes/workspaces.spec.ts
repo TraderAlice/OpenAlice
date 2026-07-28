@@ -39,6 +39,8 @@ function build(
     lifecycle?: any;
     templateUpgrades?: any;
     workspaceAbsorbs?: any;
+    availability?: Record<string, { installed: boolean; path: string | null }>;
+    spawnPlan?: any;
   } = {},
 ) {
   const claude = {
@@ -111,8 +113,27 @@ function build(
   };
   const svc = {
     registry: { get: (id: string) => (id === 'ws-1' ? meta : undefined) },
+    resolveRuntimeWorkspace: (id: string) => (id === meta.id ? meta : undefined),
     adapters: { get: (a: string) => adapters[a] },
     resolveAdapter: (_m: any, a?: string) => opts.resolveTo ?? adapters[a ?? 'claude'] ?? claude,
+    detectAgents: () => opts.availability ?? {
+      claude: { installed: true, path: '/usr/bin/claude' },
+    },
+    computeSpawnPlan: vi.fn(() => opts.spawnPlan ?? ({
+      resumeMode: 'fresh',
+      nativeSessionId: null,
+      composedCommand: ['claude', '--settings', '/w/.claude/openalice.json'],
+      resolvedCommand: ['/usr/bin/claude', '--settings', '/w/.claude/openalice.json'],
+      launchMode: 'direct',
+      spawnCwd: '/w',
+      envPWD: '/w',
+      environment: [
+        { key: 'TERM', source: 'terminal', presentation: 'value', value: 'xterm-256color' },
+        { key: 'PATH', source: 'tools', presentation: 'path-count', count: 9 },
+      ],
+      transcriptDir: '/home/alice/.claude/projects/-w',
+      projectKey: '-w',
+    })),
     config: { launcherRepoRoot: '/repo' },
     runHeadlessTask,
     dispatchHeadlessTask,
@@ -162,6 +183,87 @@ describe('GET /:id/resumes', () => {
       expect.objectContaining({ resumeId: 'resume-1', agent: 'claude', resumable: true }),
     ])
     expect(JSON.stringify(result.body)).not.toContain('agentSessionId')
+  })
+})
+
+describe('GET /:id/launch-plan', () => {
+  it('returns the safe fresh launch plan for an enabled Workspace runtime', async () => {
+    const { app } = build()
+    const result = await get(app, '/ws-1/launch-plan?agent=claude')
+
+    expect(result.status).toBe(200)
+    expect(result.body).toEqual({
+      workspace: { id: 'ws-1', tag: undefined, dir: '/w' },
+      agent: {
+        id: 'claude',
+        displayName: undefined,
+        kind: 'agent',
+        installed: true,
+        binPath: '/usr/bin/claude',
+        capabilities: { headless: true },
+      },
+      launch: {
+        intent: 'fresh',
+        mode: 'direct',
+        composedCommand: ['claude', '--settings', '/w/.claude/openalice.json'],
+        resolvedCommand: ['/usr/bin/claude', '--settings', '/w/.claude/openalice.json'],
+        cwd: '/w',
+        envPWD: '/w',
+        environment: [
+          { key: 'TERM', source: 'terminal', presentation: 'value', value: 'xterm-256color' },
+          { key: 'PATH', source: 'tools', presentation: 'path-count', count: 9 },
+        ],
+        transcriptDir: '/home/alice/.claude/projects/-w',
+      },
+    })
+  })
+
+  it('rejects missing, unknown, and disabled runtime selections', async () => {
+    const codex = {
+      id: 'codex',
+      displayName: 'Codex',
+      capabilities: {},
+    }
+    const { app } = build({ adapters: { claude: {
+      id: 'claude',
+      displayName: 'Claude Code',
+      capabilities: { headless: true },
+    }, codex } })
+
+    expect((await get(app, '/ws-1/launch-plan')).body.error).toBe('agent_required')
+    expect((await get(app, '/ws-1/launch-plan?agent=ghost')).body.error).toBe('unknown_agent')
+    expect((await get(app, '/ws-1/launch-plan?agent=codex')).body.error).toBe('agent_not_enabled')
+  })
+
+  it('redacts secret-like command assignments and following flag values', async () => {
+    const { app } = build({
+      spawnPlan: {
+        resumeMode: 'fresh',
+        nativeSessionId: null,
+        composedCommand: ['agent', '--api-key', 'secret-a', 'AUTH_TOKEN=secret-b', 'OPENALICE_WORKSPACE_KEY=secret-c'],
+        resolvedCommand: ['agent', '--api-key', 'secret-a', 'AUTH_TOKEN=secret-b', 'OPENALICE_WORKSPACE_KEY=secret-c'],
+        launchMode: 'direct',
+        spawnCwd: '/w',
+        envPWD: '/w',
+        environment: [
+          { key: 'API_KEY', source: 'adapter', presentation: 'redacted' },
+        ],
+        transcriptDir: null,
+        projectKey: null,
+      },
+    })
+    const result = await get(app, '/ws-1/launch-plan?agent=claude')
+
+    expect(result.body.launch.composedCommand).toEqual([
+      'agent',
+      '--api-key',
+      '<redacted>',
+      'AUTH_TOKEN=<redacted>',
+      'OPENALICE_WORKSPACE_KEY=<redacted>',
+    ])
+    expect(JSON.stringify(result.body)).not.toContain('secret-a')
+    expect(JSON.stringify(result.body)).not.toContain('secret-b')
+    expect(JSON.stringify(result.body)).not.toContain('secret-c')
   })
 })
 

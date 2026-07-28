@@ -533,6 +533,67 @@ export const workspacesHandlers = [
       ],
     }),
   ),
+  http.get('/api/workspaces/:id/launch-plan', ({ params, request }) => {
+    const wsId = String(params.id)
+    const workspace = demoWorkspaces.find((candidate) => candidate.id === wsId)
+    const url = new URL(request.url)
+    const agent = url.searchParams.get('agent') ?? ''
+    const displayName = {
+      claude: 'Claude Code',
+      codex: 'Codex',
+      opencode: 'opencode',
+      pi: 'Pi',
+      shell: 'Shell',
+    }[agent] ?? agent
+    const commands: Record<string, readonly string[]> = {
+      claude: ['claude', '--settings', '.claude/openalice-autotrust.json'],
+      codex: ['codex', '--sandbox', 'danger-full-access', '--ask-for-approval', 'never'],
+      opencode: ['opencode'],
+      pi: ['pi', '--session-id', 'demo-fresh-session'],
+      shell: ['/bin/zsh', '--login'],
+    }
+    const command = commands[agent] ?? [agent]
+    const capabilities = agent === 'shell'
+      ? { parallelPerCwd: true, resumeLast: false, resumeById: false, transcriptDiscovery: 'none' as const }
+      : {
+          parallelPerCwd: true,
+          resumeLast: agent !== 'claude',
+          resumeById: true,
+          transcriptDiscovery: agent === 'claude' ? 'fs-watch' as const : agent === 'pi' ? 'none' as const : 'subprocess' as const,
+          headless: true,
+        }
+    const cwd = workspace?.dir ?? `/demo/workspaces/${wsId}`
+    return HttpResponse.json({
+      workspace: { id: wsId, tag: workspace?.tag ?? wsId, dir: cwd },
+      agent: {
+        id: agent,
+        displayName,
+        kind: agent === 'shell' ? 'utility' : 'agent',
+        installed: true,
+        binPath: agent === 'shell' ? '/bin/zsh' : `/usr/local/bin/${agent}`,
+        capabilities,
+      },
+      launch: {
+        intent: 'fresh',
+        mode: 'direct',
+        composedCommand: command,
+        resolvedCommand: command,
+        cwd,
+        envPWD: cwd,
+        environment: [
+          { key: 'TERM', source: 'terminal', presentation: 'value', value: 'xterm-256color' },
+          { key: 'TERM_PROGRAM', source: 'terminal', presentation: 'value', value: 'openalice-workspaces' },
+          { key: 'PWD', source: 'workspace', presentation: 'value', value: cwd },
+          { key: 'AQ_WS_ID', source: 'workspace', presentation: 'value', value: wsId },
+          { key: 'PATH', source: 'tools', presentation: 'path-count', count: 12 },
+          { key: 'OPENALICE_TOOL_SOCKET', source: 'tools', presentation: 'configured' },
+        ],
+        transcriptDir: agent === 'shell' || agent === 'pi'
+          ? null
+          : `/demo/transcripts/${agent}/${wsId}`,
+      },
+    })
+  }),
   http.get('/api/workspaces/agent-runtime-readiness', () =>
     HttpResponse.json(demoAgentRuntimeReadiness),
   ),
