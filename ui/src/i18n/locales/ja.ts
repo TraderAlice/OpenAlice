@@ -897,6 +897,10 @@ export const ja: Resources = {
     referencedIn_one: '{{count}} 件のメモで参照',
     referencedIn_other: '{{count}} 件のメモで参照',
   },
+  fileViewer: {
+    back: '戻る',
+    backToWorkspace: '{{workspace}} に戻る',
+  },
   inbox: {
     noMessages: '受信トレイにメッセージがありません。',
     emptyHint: 'ワークスペースがステータス更新をここに送ります。',

@@ -897,6 +897,10 @@ export const zh: Resources = {
     referencedIn_one: '被 {{count}} 条笔记引用',
     referencedIn_other: '被 {{count}} 条笔记引用',
   },
+  fileViewer: {
+    back: '返回',
+    backToWorkspace: '返回 {{workspace}}',
+  },
   inbox: {
     noMessages: '收件箱为空。',
     emptyHint: '工作区会把状态更新推送到这里。',

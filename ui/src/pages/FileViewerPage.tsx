@@ -10,6 +10,7 @@
  */
 
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ArrowLeft, FileText } from 'lucide-react'
 
 import { FileContentView } from '../components/FileContentView'
@@ -24,11 +25,13 @@ interface Props {
 }
 
 export function FileViewerPage({ spec }: Props) {
+  const { t } = useTranslation()
   const { wsId, path, source, returnSessionId } = spec.params
   const { workspaces } = useWorkspaces()
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const setSidebar = useWorkspace((s) => s.setSidebar)
   const tag = workspaces.find((w) => w.id === wsId)?.tag ?? wsId.slice(0, 8)
+  const backLabel = t('fileViewer.backToWorkspace', { workspace: tag })
 
   const [result, setResult] = useState<ReadFileResult | null>(null)
   useEffect(() => {
@@ -60,11 +63,12 @@ export function FileViewerPage({ spec }: Props) {
         <button
           type="button"
           onClick={openWorkspace}
+          aria-label={backLabel}
           className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-border bg-background px-2 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          title={`Back to ${tag}`}
+          title={backLabel}
         >
           <ArrowLeft size={14} strokeWidth={1.8} aria-hidden />
-          <span className="hidden sm:inline">Back</span>
+          <span className="hidden sm:inline">{t('fileViewer.back')}</span>
         </button>
         <FileText size={13} strokeWidth={1.75} className="shrink-0 text-muted-foreground/70" aria-hidden />
         <span className="font-mono text-[12px] text-foreground truncate" title={path}>

@@ -905,6 +905,10 @@ export const zhHant: Resources = {
     referencedIn_one: '被 {{count}} 則筆記引用',
     referencedIn_other: '被 {{count}} 則筆記引用',
   },
+  fileViewer: {
+    back: '返回',
+    backToWorkspace: '返回 {{workspace}}',
+  },
   inbox: {
     noMessages: '收件匣是空的。',
     emptyHint: '工作區會將狀態更新推送到這裡。',

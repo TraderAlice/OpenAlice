@@ -908,6 +908,10 @@ export const en = {
     referencedIn_one: 'Referenced in {{count}} note',
     referencedIn_other: 'Referenced in {{count}} notes',
   },
+  fileViewer: {
+    back: 'Back',
+    backToWorkspace: 'Back to {{workspace}}',
+  },
   inbox: {
     noMessages: 'No inbox messages.',
     emptyHint: 'Workspaces will push status updates here.',
