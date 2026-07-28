@@ -210,7 +210,7 @@ export function ConnectorsPage() {
                                 <input
                                   className={inputClass}
                                   type={field.kind === 'secret' ? 'password' : field.kind}
-                                  value={field.kind === 'secret' ? '' : String(value ?? '')}
+                                  value={String(value ?? '')}
                                   placeholder={configured ? 'Configured — enter a new value to replace' : field.placeholder}
                                   autoComplete="off"
                                   onChange={(event) => updateSetting(

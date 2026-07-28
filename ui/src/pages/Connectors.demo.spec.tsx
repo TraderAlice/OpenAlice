@@ -1,5 +1,6 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { PublicConnectorConfig } from '../api'
 import { createDemoConnectorSnapshot } from '../demo/fixtures/connectors'
 import { ConnectorStatusPage } from './ConnectorStatusPage'
 import { ConnectorsPage } from './ConnectorsPage'
@@ -58,5 +59,21 @@ describe('Connector demo routes', () => {
     expect(screen.getByText('Telegram')).toBeTruthy()
     expect(screen.getByText('Application ID')).toBeTruthy()
     expect(screen.getAllByText('Bot token')).toHaveLength(2)
+  })
+
+  it('keeps the complete secret draft while the user types', async () => {
+    render(<ConnectorsPage />)
+
+    await screen.findByText('Run external notification connectors')
+    const input = screen.getAllByPlaceholderText('Stored locally and sealed')[0] as HTMLInputElement
+
+    fireEvent.change(input, { target: { value: `${input.value}a` } })
+    expect(input.value).toBe('a')
+    fireEvent.change(input, { target: { value: `${input.value}b` } })
+    expect(input.value).toBe('ab')
+
+    await waitFor(() => expect(mocks.save).toHaveBeenCalled())
+    const saved = mocks.save.mock.calls.at(-1)?.[0] as PublicConnectorConfig
+    expect(saved.adapters.discord.settings.botToken).toBe('ab')
   })
 })
