@@ -21,7 +21,9 @@ the durable truth after it changes.
 
 ## Active
 
-None.
+- [[plans/broker-pack-release-safety.md]] — Repairing the v0.85 existing-user
+  Broker Pack upgrade gap and making N-1→N reconciliation a blocking v0.86
+  release contract.
 
 ## Completed
 

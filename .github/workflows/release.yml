@@ -25,6 +25,7 @@ jobs:
       created: ${{ !github.event.inputs.mirror_tag && steps.check.outputs.exists == 'false' }}
       tag: ${{ github.event.inputs.mirror_tag || steps.version.outputs.tag }}
       prerelease: ${{ steps.version.outputs.prerelease }}
+      previous_tag: ${{ steps.version.outputs.previous_tag }}
 
     steps:
       - uses: actions/checkout@v4
@@ -37,6 +38,7 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "previous_tag=$(git describe --tags --abbrev=0 2>/dev/null || true)" >> "$GITHUB_OUTPUT"
 
           # Determine if pre-release (contains - like beta.1, rc.1)
           if [[ "$VERSION" == *-* ]]; then
@@ -120,6 +122,9 @@ jobs:
 
       - name: Build optional Broker Packs
         run: pnpm broker-packs:build
+
+      - name: Prove previous-release Broker Pack upgrade
+        run: pnpm broker-packs:upgrade-smoke -- --from "${{ needs.release.outputs.previous_tag }}"
 
       # macOS still uses dugite's embedded Git. Windows keeps only dugite's JS
       # wrapper and routes it to managed PortableGit in the packaged smoke.
@@ -263,6 +268,9 @@ jobs:
 
       - name: Build optional Broker Packs
         run: pnpm broker-packs:build
+
+      - name: Prove previous-release Broker Pack upgrade
+        run: pnpm broker-packs:upgrade-smoke -- --from "${{ needs.release.outputs.previous_tag }}"
 
       - name: Preserve Linux Broker Packs
         uses: actions/upload-artifact@v4

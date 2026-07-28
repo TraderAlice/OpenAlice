@@ -17,6 +17,7 @@ on:
       - "scripts/desktop-packaged-smoke.mjs"
       - "scripts/desktop-packaged-smoke-plan.mjs"
       - "scripts/build-broker-packs.ts"
+      - "scripts/broker-pack-upgrade-smoke.ts"
       - "scripts/guardian/**"
       - "scripts/pnpm-command.mjs"
       - "scripts/pnpm-command.spec.ts"
@@ -56,6 +57,7 @@ on:
       - "scripts/desktop-packaged-smoke.mjs"
       - "scripts/desktop-packaged-smoke-plan.mjs"
       - "scripts/build-broker-packs.ts"
+      - "scripts/broker-pack-upgrade-smoke.ts"
       - "scripts/guardian/**"
       - "scripts/pnpm-command.mjs"
       - "scripts/pnpm-command.spec.ts"
@@ -111,6 +113,11 @@ jobs:
       - name: Build optional Broker Packs on Windows
         if: runner.os == 'Windows'
         run: pnpm broker-packs:build
+        timeout-minutes: 10
+
+      - name: Prove previous-release Broker Pack upgrade on Windows
+        if: runner.os == 'Windows'
+        run: pnpm broker-packs:upgrade-smoke
         timeout-minutes: 10
 
       # macOS still uses dugite's embedded Git. Windows keeps only dugite's JS

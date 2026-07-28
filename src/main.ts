@@ -22,6 +22,7 @@ import { createUTAClient } from '@traderalice/uta-protocol'
 import { UTAManagerSDK } from './services/uta-client/index.js'
 import { waitForUTAReady } from './services/uta-supervisor/health.js'
 import { resolveUTAUrl } from './services/uta-supervisor/url.js'
+import { scheduleInstalledBrokerPackReconciliation } from './services/broker-packs/auto-updater.js'
 import {
   liteUnavailableReason,
   readonlyMutationReason,
@@ -416,6 +417,7 @@ async function main() {
   }
 
   console.log('engine: started')
+  scheduleInstalledBrokerPackReconciliation()
 
   // Broker catalog refresh, snapshot scheduling, and broker close-on-
   // shutdown all live in the UTA service after Step 6.

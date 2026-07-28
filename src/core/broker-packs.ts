@@ -6,7 +6,6 @@
 import { readFile, realpath } from 'node:fs/promises'
 import { resolve, sep } from 'node:path'
 import { runtimePath } from './paths.js'
-import { getCurrentVersion } from './version.js'
 
 export const BROKER_PACK_SCHEMA_VERSION = 1 as const
 export const BROKER_PACK_API_VERSION = 1 as const
@@ -50,6 +49,22 @@ export interface ResolvedBrokerPackRelease {
   root: string
   entry: string
   manifest: InstalledBrokerPackManifest
+}
+
+export class BrokerPackApiVersionMismatchError extends Error {
+  readonly code = 'BROKER_PACK_API_VERSION_MISMATCH'
+
+  constructor(
+    readonly engine: InstallableBrokerEngine,
+    readonly installedApiVersion: number,
+    readonly installedVersion: string,
+  ) {
+    super(
+      `Installed broker pack ${engine} uses API ${installedApiVersion}; ` +
+      `this OpenAlice runtime requires API ${BROKER_PACK_API_VERSION}`,
+    )
+    this.name = 'BrokerPackApiVersionMismatchError'
+  }
 }
 
 export function isInstallableBrokerEngine(value: string): value is InstallableBrokerEngine {
@@ -109,12 +124,6 @@ export async function resolveBrokerPackRelease(
     JSON.parse(await readFile(manifestPath, 'utf8')),
     engine,
   )
-  const currentVersion = getCurrentVersion()
-  if (manifest.version !== currentVersion) {
-    throw new Error(
-      `Installed broker pack ${engine} targets OpenAlice ${manifest.version}; ${currentVersion} is running`,
-    )
-  }
   const pkg = JSON.parse(await readFile(packagePath, 'utf8')) as { name?: unknown; version?: unknown }
   if (pkg.name !== `@traderalice/uta-broker-${engine}` || pkg.version !== manifest.version) {
     throw new Error(`Installed broker pack ${engine} has an invalid package identity`)
@@ -144,7 +153,6 @@ function parseInstalledManifest(raw: unknown, engine: InstallableBrokerEngine): 
   const row = raw as Record<string, unknown>
   if (
     row.schemaVersion !== BROKER_PACK_SCHEMA_VERSION
-    || row.apiVersion !== BROKER_PACK_API_VERSION
     || row.engine !== engine
   ) {
     throw new Error(`Installed broker pack ${engine} is incompatible with this OpenAlice runtime`)
@@ -153,6 +161,13 @@ function parseInstalledManifest(raw: unknown, engine: InstallableBrokerEngine): 
     if (typeof row[key] !== 'string' || row[key].length === 0) {
       throw new Error(`Installed broker pack ${engine} has invalid ${key}`)
     }
+  }
+  if (typeof row.apiVersion !== 'number' || row.apiVersion !== BROKER_PACK_API_VERSION) {
+    throw new BrokerPackApiVersionMismatchError(
+      engine,
+      typeof row.apiVersion === 'number' ? row.apiVersion : -1,
+      row.version as string,
+    )
   }
   return row as unknown as InstalledBrokerPackManifest
 }
