@@ -18,6 +18,7 @@ import { ArchiveRestore, GitMerge, Trash2 } from 'lucide-react'
 
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { useWorkspace } from '../tabs/store'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import { OverviewCard } from '../components/workspace/OverviewCard'
 import {
   getGitLog,
@@ -107,7 +108,11 @@ export function WorkspaceListPage() {
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const [departed, setDeparted] = useState<DepartedWorkspace[]>([])
   const [departedError, setDepartedError] = useState<string | null>(null)
-  const [lifecycleBusy, setLifecycleBusy] = useState<string | null>(null)
+  const [lifecycleBusy, setLifecycleBusy] = useState<{
+    workspaceId: string
+    action: 'restore' | 'purge'
+  } | null>(null)
+  const [pendingPurge, setPendingPurge] = useState<DepartedWorkspace | null>(null)
   const idsKey = useMemo(() => workspaces.map((w) => w.id).join(','), [workspaces])
 
   const refreshDeparted = useCallback(async () => {
@@ -214,12 +219,12 @@ export function WorkspaceListPage() {
             <section className="border-t border-border pt-6">
               <div className="mb-3 flex items-baseline gap-2">
                 <h3 className="text-[12px] font-semibold uppercase tracking-wider text-foreground/85">
-                  Departed Workspaces
+                  {t('workspace.departedTitle')}
                 </h3>
                 <span className="text-[11px] text-muted-foreground">· {departed.length}</span>
               </div>
               <p className="mb-3 max-w-2xl text-[12px] leading-relaxed text-muted-foreground">
-                Offboarded desks are outside the active Workspace directory. Restore returns the exact checkout and Session signatures; purge removes files but keeps the historical tombstone.
+                {t('workspace.departedDescription')}
               </p>
               {departedError && (
                 <div className="mb-3 rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-[12px] text-danger">
@@ -229,6 +234,16 @@ export function WorkspaceListPage() {
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                 {departed.map((workspace) => {
                   const purged = workspace.lifecycle === 'purged' || workspace.lifecycle === 'purging'
+                  const restoring = lifecycleBusy?.workspaceId === workspace.id
+                    && lifecycleBusy.action === 'restore'
+                  const lifecycleLabel = {
+                    active: t('workspace.departedLifecycle.active'),
+                    offboarding: t('workspace.departedLifecycle.offboarding'),
+                    departed: t('workspace.departedLifecycle.departed'),
+                    restoring: t('workspace.departedLifecycle.restoring'),
+                    purging: t('workspace.departedLifecycle.purging'),
+                    purged: t('workspace.departedLifecycle.purged'),
+                  }[workspace.lifecycle]
                   return (
                     <article key={workspace.id} className="rounded-lg border border-border bg-secondary/35 p-4">
                       <div className="flex items-start justify-between gap-3">
@@ -237,17 +252,17 @@ export function WorkspaceListPage() {
                           <div className="mt-0.5 font-mono text-[10px] text-muted-foreground">{workspace.id}</div>
                         </div>
                         <span className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-                          {workspace.lifecycle}
+                          {lifecycleLabel}
                         </span>
                       </div>
                       <p className="mt-3 line-clamp-2 text-[12px] leading-relaxed text-muted-foreground">
-                        {workspace.reason ?? 'No departure reason recorded.'}
+                        {workspace.reason ?? t('workspace.departedNoReason')}
                       </p>
                       {workspace.absorbedIntoWorkspaceId && (
                         <div className="mt-3 flex items-center gap-2 rounded-md border border-primary/20 bg-primary/6 px-2.5 py-2 text-[11px] text-muted-foreground">
                           <GitMerge size={13} className="shrink-0 text-primary" />
                           <span>
-                            Working files reviewed into{' '}
+                            {t('workspace.departedAbsorbedInto')}{' '}
                             <strong className="font-medium text-foreground">
                               {workspaces.find((candidate) => candidate.id === workspace.absorbedIntoWorkspaceId)?.displayName
                                 ?? workspaces.find((candidate) => candidate.id === workspace.absorbedIntoWorkspaceId)?.tag
@@ -258,42 +273,52 @@ export function WorkspaceListPage() {
                         </div>
                       )}
                       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
-                        <span>{workspace.handoff?.resumeIds.length ?? 0} Sessions</span>
-                        <span>{workspace.handoff?.openIssueIds.length ?? 0} open Issues</span>
-                        {workspace.legacyImported && <span>legacy import</span>}
+                        <span>
+                          {t(
+                            (workspace.handoff?.resumeIds.length ?? 0) === 1
+                              ? 'workspace.departedSessionSingular'
+                              : 'workspace.departedSessionPlural',
+                            { count: workspace.handoff?.resumeIds.length ?? 0 },
+                          )}
+                        </span>
+                        <span>
+                          {t(
+                            (workspace.handoff?.openIssueIds.length ?? 0) === 1
+                              ? 'workspace.departedOpenIssueSingular'
+                              : 'workspace.departedOpenIssuePlural',
+                            { count: workspace.handoff?.openIssueIds.length ?? 0 },
+                          )}
+                        </span>
+                        {workspace.legacyImported && <span>{t('workspace.departedLegacyImport')}</span>}
                       </div>
                       <div className="mt-4 flex justify-end gap-2">
                         {!purged && workspace.lifecycle === 'departed' && (
                           <button
                             type="button"
                             className="btn-secondary inline-flex items-center gap-1.5"
+                            aria-label={t('workspace.restoreWorkspaceAria', { workspace: workspace.tag })}
                             disabled={lifecycleBusy !== null}
                             onClick={() => {
-                              setLifecycleBusy(workspace.id)
+                              setLifecycleBusy({ workspaceId: workspace.id, action: 'restore' })
                               void restoreWorkspace(workspace.id)
                                 .then(async () => { refresh(); await refreshDeparted() })
                                 .catch((err) => setDepartedError((err as Error).message))
                                 .finally(() => setLifecycleBusy(null))
                             }}
                           >
-                            <ArchiveRestore size={13} /> Restore
+                            <ArchiveRestore size={13} />
+                            {restoring ? t('workspace.restoringWorkspace') : t('workspace.restoreWorkspace')}
                           </button>
                         )}
                         {!purged && workspace.lifecycle === 'departed' && (
                           <button
                             type="button"
                             className="btn-danger inline-flex items-center gap-1.5"
+                            aria-label={t('workspace.purgeFilesAria', { workspace: workspace.tag })}
                             disabled={lifecycleBusy !== null}
-                            onClick={() => {
-                              if (!window.confirm(`Permanently purge files for ${workspace.tag}? The catalog tombstone remains, but the desk cannot be restored.`)) return
-                              setLifecycleBusy(workspace.id)
-                              void purgeDepartedWorkspace(workspace.id)
-                                .then(refreshDeparted)
-                                .catch((err) => setDepartedError((err as Error).message))
-                                .finally(() => setLifecycleBusy(null))
-                            }}
+                            onClick={() => setPendingPurge(workspace)}
                           >
-                            <Trash2 size={13} /> Purge files
+                            <Trash2 size={13} /> {t('workspace.purgeFiles')}
                           </button>
                         )}
                       </div>
@@ -305,6 +330,28 @@ export function WorkspaceListPage() {
           )}
         </div>
       </div>
+      {pendingPurge && (
+        <ConfirmDialog
+          title={t('workspace.purgeConfirmTitle', { workspace: pendingPurge.tag })}
+          message={t('workspace.purgeConfirmMessage', { workspace: pendingPurge.tag })}
+          confirmLabel={t('workspace.purgeFiles')}
+          cancelLabel={t('common.cancel')}
+          workingLabel={t('workspace.purgeWorking')}
+          onConfirm={async () => {
+            setLifecycleBusy({ workspaceId: pendingPurge.id, action: 'purge' })
+            try {
+              await purgeDepartedWorkspace(pendingPurge.id)
+              await refreshDeparted()
+              setPendingPurge(null)
+            } catch (err) {
+              setDepartedError((err as Error).message)
+            } finally {
+              setLifecycleBusy(null)
+            }
+          }}
+          onClose={() => setPendingPurge(null)}
+        />
+      )}
     </div>
   )
 }
