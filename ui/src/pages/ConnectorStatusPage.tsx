@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { TFunction } from 'i18next'
 import { CircleAlert, Plug, RefreshCw, Settings2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { api, type ConnectorHealth, type ConnectorSettingsSnapshot } from '../api'
 import { PageHeader } from '../components/PageHeader'
 import { Spinner } from '../components/StateViews'
@@ -14,6 +16,7 @@ export function ConnectorStatusPage() {
   const [error, setError] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
+  const { t } = useTranslation()
 
   const load = useCallback(async (background = false) => {
     if (background) setRefreshing(true)
@@ -42,13 +45,15 @@ export function ConnectorStatusPage() {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
-        title="Connectors"
-        description="External Inbox delivery status. Connector credentials and routing stay in Settings."
+        title={t('connectorStatus.title')}
+        description={t('connectorStatus.description')}
         right={(
           <div className="flex items-center gap-2">
             {lastUpdated && (
               <span className="hidden text-[11px] text-muted-foreground/60 sm:inline">
-                Updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {t('connectorStatus.updated', {
+                  time: lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                })}
               </span>
             )}
             <button
@@ -58,7 +63,7 @@ export function ConnectorStatusPage() {
               onClick={() => void load(true)}
             >
               <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
-              Refresh
+              {t('connectorStatus.refresh')}
             </button>
             <button
               type="button"
@@ -66,7 +71,7 @@ export function ConnectorStatusPage() {
               onClick={configure}
             >
               <Settings2 size={14} />
-              Configure
+              {t('connectorStatus.configure')}
             </button>
           </div>
         )}
@@ -77,14 +82,14 @@ export function ConnectorStatusPage() {
           {loading && !snapshot ? (
             <div className="flex justify-center py-24"><Spinner /></div>
           ) : snapshot ? (
-            <ConnectorOverview snapshot={snapshot} onConfigure={configure} />
+            <ConnectorOverview snapshot={snapshot} onConfigure={configure} t={t} />
           ) : null}
 
           {error && (
             <div className="flex gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-[13px] text-destructive" role="alert">
               <CircleAlert size={17} className="mt-0.5 shrink-0" />
               <div>
-                <p className="font-medium">Could not read Connector status.</p>
+                <p className="font-medium">{t('connectorStatus.loadError')}</p>
                 <p className="mt-0.5 text-muted-foreground">{error}</p>
               </div>
             </div>
@@ -98,15 +103,17 @@ export function ConnectorStatusPage() {
 function ConnectorOverview({
   snapshot,
   onConfigure,
+  t,
 }: {
   snapshot: ConnectorSettingsSnapshot
   onConfigure: () => void
+  t: TFunction
 }) {
   const runtimeById = useMemo(
     () => new Map(snapshot.health.service?.adapters.map((adapter) => [adapter.id, adapter]) ?? []),
     [snapshot.health.service?.adapters],
   )
-  const service = servicePresentation(snapshot.health)
+  const service = servicePresentation(snapshot.health, t)
 
   return (
     <>
@@ -118,7 +125,7 @@ function ConnectorOverview({
             </div>
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-[15px] font-semibold text-foreground">Connector Service</h3>
+                <h3 className="text-[15px] font-semibold text-foreground">{t('connectorStatus.serviceTitle')}</h3>
                 <StatusBadge tone={service.tone}>{service.label}</StatusBadge>
               </div>
               <p className="mt-1 max-w-[660px] text-[13px] leading-5 text-muted-foreground">
@@ -127,7 +134,9 @@ function ConnectorOverview({
             </div>
           </div>
           <div className="text-right text-[11px] text-muted-foreground/70">
-            {snapshot.health.checkedAt && <p>Checked {formatDate(snapshot.health.checkedAt)}</p>}
+            {snapshot.health.checkedAt && (
+              <p>{t('connectorStatus.checked', { time: formatDate(snapshot.health.checkedAt) })}</p>
+            )}
             {snapshot.health.latencyMs !== undefined && <p className="mt-0.5">{snapshot.health.latencyMs} ms</p>}
           </div>
         </div>
@@ -141,8 +150,10 @@ function ConnectorOverview({
       <section>
         <div className="mb-3 flex items-end justify-between gap-3">
           <div>
-            <h3 className="text-[13px] font-semibold uppercase tracking-[0.08em] text-foreground">Delivery connectors</h3>
-            <p className="mt-1 text-[12px] text-muted-foreground">Each connector delivers to one private owner chat.</p>
+            <h3 className="text-[13px] font-semibold uppercase tracking-[0.08em] text-foreground">
+              {t('connectorStatus.deliveryTitle')}
+            </h3>
+            <p className="mt-1 text-[12px] text-muted-foreground">{t('connectorStatus.deliveryDescription')}</p>
           </div>
         </div>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -163,7 +174,7 @@ function ConnectorOverview({
               adapterEnabled: config.enabled,
               configured,
               runtimeStatus: runtime?.status,
-            })
+            }, t)
 
             return (
               <article key={definition.id} className="oa-status-surface rounded-2xl border border-border bg-secondary/25 p-5">
@@ -173,20 +184,30 @@ function ConnectorOverview({
                       <h4 className="text-[15px] font-semibold text-foreground">{definition.label}</h4>
                       <StatusBadge tone={presentation.tone}>{presentation.label}</StatusBadge>
                     </div>
-                    <p className="mt-1 text-[12px] leading-5 text-muted-foreground">{definition.description}</p>
+                    <p className="mt-1 text-[12px] leading-5 text-muted-foreground">
+                      {t('connectorStatus.adapterDescription', { name: definition.label })}
+                    </p>
                   </div>
                   <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${presentation.dot}`} aria-hidden />
                 </div>
 
                 <dl className="mt-5 grid grid-cols-[112px_1fr] gap-x-3 gap-y-2 border-t border-border/70 pt-4 text-[12px]">
-                  <dt className="text-muted-foreground">Configuration</dt>
-                  <dd className="text-foreground">{configured ? 'Ready' : 'Needs setup'}</dd>
-                  <dt className="text-muted-foreground">Delivery</dt>
-                  <dd className="text-foreground">{config.enabled ? 'Enabled' : 'Disabled'}</dd>
-                  <dt className="text-muted-foreground">Owner</dt>
-                  <dd className="truncate text-foreground" title={runtime?.owner}>{runtime?.owner ?? 'Not linked'}</dd>
-                  <dt className="text-muted-foreground">Last success</dt>
-                  <dd className="text-foreground">{runtime?.lastSuccessAt ? formatDate(runtime.lastSuccessAt) : 'No delivery yet'}</dd>
+                  <dt className="text-muted-foreground">{t('connectorStatus.configuration')}</dt>
+                  <dd className="text-foreground">
+                    {configured ? t('connectorStatus.ready') : t('connectorStatus.needsSetup')}
+                  </dd>
+                  <dt className="text-muted-foreground">{t('connectorStatus.delivery')}</dt>
+                  <dd className="text-foreground">
+                    {config.enabled ? t('connectorStatus.enabled') : t('connectorStatus.disabled')}
+                  </dd>
+                  <dt className="text-muted-foreground">{t('connectorStatus.owner')}</dt>
+                  <dd className="truncate text-foreground" title={runtime?.owner}>
+                    {runtime?.owner ?? t('connectorStatus.notLinked')}
+                  </dd>
+                  <dt className="text-muted-foreground">{t('connectorStatus.lastSuccess')}</dt>
+                  <dd className="text-foreground">
+                    {runtime?.lastSuccessAt ? formatDate(runtime.lastSuccessAt) : t('connectorStatus.noDeliveryYet')}
+                  </dd>
                 </dl>
 
                 {(runtime?.detail || runtime?.lastError) && (
@@ -201,7 +222,7 @@ function ConnectorOverview({
                     className="mt-4 inline-flex items-center gap-1.5 text-[12px] font-medium text-primary hover:underline"
                     onClick={onConfigure}
                   >
-                    Configure {definition.label}
+                    {t('connectorStatus.configureAdapter', { name: definition.label })}
                   </button>
                 )}
               </article>
@@ -213,28 +234,28 @@ function ConnectorOverview({
   )
 }
 
-function servicePresentation(health: ConnectorHealth): {
+function servicePresentation(health: ConnectorHealth, t: TFunction): {
   label: string
   description: string
   tone: StatusTone
 } {
   if (!health.enabled || health.status === 'disabled') {
     return {
-      label: 'Off',
-      description: 'External delivery is disabled. OpenAlice Inbox remains available and is still the source of truth.',
+      label: t('connectorStatus.service.off'),
+      description: t('connectorStatus.service.offDescription'),
       tone: 'neutral',
     }
   }
   if (health.status === 'healthy') {
     return {
-      label: 'Healthy',
-      description: 'The independent Connector Service is online and accepting Inbox notifications.',
+      label: t('connectorStatus.service.healthy'),
+      description: t('connectorStatus.service.healthyDescription'),
       tone: 'healthy',
     }
   }
   return {
-    label: 'Needs attention',
-    description: 'External delivery is unavailable or one of its connectors is degraded. OpenAlice work is not blocked.',
+    label: t('connectorStatus.service.needsAttention'),
+    description: t('connectorStatus.service.needsAttentionDescription'),
     tone: 'danger',
   }
 }
@@ -247,23 +268,23 @@ function adapterPresentation(input: {
   adapterEnabled: boolean
   configured: boolean
   runtimeStatus?: AdapterStatus
-}): { label: string; tone: StatusTone; dot: string } {
+}, t: TFunction): { label: string; tone: StatusTone; dot: string } {
   if (!input.serviceEnabled || !input.adapterEnabled) {
-    return { label: 'Off', tone: 'neutral', dot: 'bg-muted-foreground/30' }
+    return { label: t('connectorStatus.adapter.off'), tone: 'neutral', dot: 'bg-muted-foreground/30' }
   }
   if (!input.configured) {
-    return { label: 'Needs setup', tone: 'warning', dot: 'bg-warning' }
+    return { label: t('connectorStatus.adapter.needsSetup'), tone: 'warning', dot: 'bg-warning' }
   }
   if (input.runtimeStatus === 'healthy') {
-    return { label: 'Connected', tone: 'healthy', dot: 'bg-success' }
+    return { label: t('connectorStatus.adapter.connected'), tone: 'healthy', dot: 'bg-success' }
   }
   if (input.runtimeStatus === 'awaiting_link') {
-    return { label: 'Waiting for /link', tone: 'warning', dot: 'bg-warning' }
+    return { label: t('connectorStatus.adapter.awaitingLink'), tone: 'warning', dot: 'bg-warning' }
   }
   if (input.runtimeStatus === 'degraded' || input.runtimeStatus === 'stopped') {
-    return { label: 'Needs attention', tone: 'danger', dot: 'bg-destructive' }
+    return { label: t('connectorStatus.adapter.needsAttention'), tone: 'danger', dot: 'bg-destructive' }
   }
-  return { label: 'Starting', tone: 'warning', dot: 'bg-warning' }
+  return { label: t('connectorStatus.adapter.starting'), tone: 'warning', dot: 'bg-warning' }
 }
 
 function StatusBadge({ tone, children }: { tone: StatusTone; children: string }) {
