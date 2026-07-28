@@ -592,6 +592,19 @@ projection for prompt-flow studies and future visualization. A logging failure
 must not block or change message delivery, and the log is not an Agent
 notification mechanism.
 
+The authenticated Dev → Logs → Agent conversations view exposes a read-only
+projection of this stream. It joins dispatch and completion by `taskId`, shows
+newest conversations first, and polls only the newest page. A dispatch without
+a completion event is shown as running. Expanding a row reveals routing
+identities, the original prompt, the final reply, and the delivered prompt only
+when explicit reconstruction guidance changed it.
+
+The browser never receives the launcher log path or an arbitrary file-read
+capability. `/api/agent-conversations` returns bounded typed pages and provides
+no replay, resume, edit, or delete operation. Malformed or partially appended
+JSONL lines are ignored so an interrupted write cannot make the diagnostics
+surface unusable.
+
 ## Phase 2 Feature Design Skeleton
 
 Business convenience wrappers delegate to the same shipped resolver:
@@ -639,6 +652,8 @@ shapes should point back here rather than restating the rules differently.
 | `src/workspaces/agent-conversation-log.ts` | Private append-only peer-message prompt/reply event stream |
 | `src/tool/conversation.ts` | Embedded business-target ask/read CLI tools |
 | `src/webui/routes/inquiries.ts` | Human Inbox/Issue ask dispatch and durable inquiry projections |
+| `src/webui/routes/agent-conversations.ts` | Authenticated read-only joined conversation pages for Dev Logs |
+| `ui/src/pages/LogsPage.tsx` | Tool-call and Agent-conversation diagnostic views |
 | `src/core/inbox-store.ts` | Immutable notification records and sender provenance |
 | `src/server/inbox-origin.ts` | Server-side run/session attribution |
 | `src/workspaces/issues/declaration.ts` | Workspace-local Issue declaration |

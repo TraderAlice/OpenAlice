@@ -19,6 +19,7 @@ import { headlessApi } from './headless'
 import { preferencesApi } from './preferences'
 import { inquiriesApi } from './inquiries'
 import { connectorsApi } from './connectors'
+import { agentConversationsApi } from './agentConversations'
 export const api = {
   config: configApi,
   schedule: scheduleApi,
@@ -37,6 +38,7 @@ export const api = {
   preferences: preferencesApi,
   inquiries: inquiriesApi,
   connectors: connectorsApi,
+  agentConversations: agentConversationsApi,
 }
 
 // Re-export all types for convenience
@@ -90,3 +92,9 @@ export type {
   ConnectorSettingsSnapshot,
 } from './connectors'
 export type { ToolCallQueryResult } from './agentStatus'
+export type {
+  AgentConversationQueryResult,
+  AgentConversationRecord,
+  AgentConversationSource,
+  AgentConversationTarget,
+} from './agentConversations'

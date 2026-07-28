@@ -21,6 +21,10 @@ the durable truth after it changes.
 
 ## Active
 
+- [[plans/agent-conversation-log-ui.md]] — Adds a read-only, paginated Agent
+  collaboration view to Dev Logs without exposing launcher file paths or
+  introducing a new dispatch surface.
+
 ## Completed
 
 - [[plans/agent-conversation-semantics.md]] — Separates ordinary peer

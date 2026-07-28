@@ -11,6 +11,7 @@ import { toolsSimulatorHandlers } from './toolsSimulator'
 import { marketHandlers } from './market'
 import { configKeysHandlers } from './configKeys'
 import { agentStatusHandlers } from './agentStatus'
+import { agentConversationHandlers } from './agentConversations'
 import { newsListHandlers } from './newsList'
 import { devMiscHandlers } from './devMisc'
 import { headlessHandlers } from './headless'
@@ -36,6 +37,7 @@ export const handlers = [
   ...marketHandlers,
   ...configKeysHandlers,
   ...agentStatusHandlers,
+  ...agentConversationHandlers,
   ...newsListHandlers,
   ...devMiscHandlers,
   ...headlessHandlers,
