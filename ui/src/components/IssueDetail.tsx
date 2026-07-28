@@ -190,6 +190,7 @@ function AgentEditor({
         className={railControl}
         value={selected}
         disabled={disabled}
+        aria-label="Runtime"
         onChange={(e) => {
           const next = e.target.value
           onChange(next ? next : null)
@@ -331,6 +332,7 @@ function PropertiesRail({
             className={railControl}
             value={issue.status}
             disabled={saving}
+            aria-label="Status"
             onChange={(e) => onPatch({ status: e.target.value as IssueStatus })}
           >
             {STATUS_OPTIONS.map((s) => (
@@ -346,6 +348,7 @@ function PropertiesRail({
             className={`${railControl} capitalize`}
             value={issue.priority}
             disabled={saving}
+            aria-label="Priority"
             onChange={(e) => onPatch({ priority: e.target.value as IssuePriority })}
           >
             {PRIORITY_OPTIONS.map((p) => (
