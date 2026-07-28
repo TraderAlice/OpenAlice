@@ -12,7 +12,7 @@
  * tool blocks do not enter it.
  */
 import { randomUUID } from 'node:crypto'
-import { appendFile, mkdir } from 'node:fs/promises'
+import { appendFile, mkdir, readFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
 import type {
@@ -81,8 +81,55 @@ export type AgentConversationLogEvent =
   | AgentConversationDispatchedEvent
   | AgentConversationCompletedEvent
 
+export type AgentConversationSource =
+  | { readonly kind: 'human' }
+  | { readonly kind: 'workspace'; readonly workspaceId: string }
+  | {
+      readonly kind: 'session'
+      readonly workspaceId: string
+      readonly resumeId: string
+      readonly agent: string
+    }
+
+export interface AgentConversationRecord {
+  readonly taskId: string
+  readonly parentTaskId?: string
+  readonly dispatchedAt: number
+  readonly completedAt?: number
+  readonly status: HeadlessTaskStatus
+  readonly source: AgentConversationSource
+  readonly target: {
+    readonly workspaceId: string
+    readonly resumeId: string
+    readonly agent: string
+  }
+  readonly requestedTarget: WorkspaceConversationTarget
+  readonly resolution: {
+    readonly mode: 'exact' | 'reconstructed'
+    readonly reason?: string
+  }
+  readonly prompt: {
+    readonly original: string
+    readonly delivered: string
+    readonly mode: 'plain' | 'reconstruction'
+  }
+  readonly assistantText: string | null
+  readonly durationMs?: number
+  readonly error?: string
+}
+
+export interface AgentConversationQueryResult {
+  readonly entries: AgentConversationRecord[]
+  readonly total: number
+  readonly page: number
+  readonly pageSize: number
+  readonly totalPages: number
+}
+
 export class AgentConversationLog {
   private appendChain: Promise<void> = Promise.resolve()
+  private cachedEvents: AgentConversationLogEvent[] | null = null
+  private cacheRevision = 0
 
   constructor(
     private readonly path: string,
@@ -149,6 +196,57 @@ export class AgentConversationLog {
     })
   }
 
+  /** Read a UI-safe joined projection. Page 1 contains the newest dispatches. */
+  async query(opts: {
+    readonly page?: number
+    readonly pageSize?: number
+  } = {}): Promise<AgentConversationQueryResult> {
+    await this.appendChain
+    const page = Math.max(1, Math.floor(opts.page ?? 1))
+    const pageSize = Math.min(100, Math.max(1, Math.floor(opts.pageSize ?? 50)))
+    const events = await this.readEvents()
+    const completions = new Map<string, AgentConversationCompletedEvent>()
+    const dispatches: AgentConversationDispatchedEvent[] = []
+    for (const event of events) {
+      if (event.type === 'conversation.dispatched') {
+        dispatches.push(event)
+      } else {
+        completions.set(event.taskId, event)
+      }
+    }
+
+    const all = dispatches
+      .map((dispatch): AgentConversationRecord => {
+        const completion = completions.get(dispatch.taskId)
+        return {
+          taskId: dispatch.taskId,
+          ...(dispatch.parentTaskId ? { parentTaskId: dispatch.parentTaskId } : {}),
+          dispatchedAt: dispatch.at,
+          ...(completion ? { completedAt: completion.at } : {}),
+          status: completion?.status ?? 'running',
+          source: publicConversationSource(dispatch.source),
+          target: dispatch.target,
+          requestedTarget: dispatch.requestedTarget,
+          resolution: dispatch.resolution,
+          prompt: dispatch.prompt,
+          assistantText: completion?.assistantText ?? null,
+          ...(completion?.durationMs !== undefined ? { durationMs: completion.durationMs } : {}),
+          ...(completion?.error ? { error: completion.error } : {}),
+        }
+      })
+      .sort((a, b) => b.dispatchedAt - a.dispatchedAt)
+    const total = all.length
+    const totalPages = Math.max(1, Math.ceil(total / pageSize))
+    const start = (page - 1) * pageSize
+    return {
+      entries: all.slice(start, start + pageSize),
+      total,
+      page,
+      pageSize,
+      totalPages,
+    }
+  }
+
   private async append(event: AgentConversationLogEvent): Promise<void> {
     const next = this.appendChain.then(async () => {
       try {
@@ -157,6 +255,8 @@ export class AgentConversationLog {
           encoding: 'utf8',
           mode: 0o600,
         })
+        this.cachedEvents?.push(event)
+        this.cacheRevision += 1
       } catch (err) {
         this.logger.warn('agent_conversation_log.append_failed', {
           taskId: event.taskId,
@@ -167,5 +267,112 @@ export class AgentConversationLog {
     })
     this.appendChain = next.catch(() => undefined)
     await next
+  }
+
+  private async readEvents(): Promise<AgentConversationLogEvent[]> {
+    if (this.cachedEvents) return this.cachedEvents
+    const revisionBeforeRead = this.cacheRevision
+    let raw: string
+    try {
+      raw = await readFile(this.path, 'utf8')
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+        this.cachedEvents = []
+        return this.cachedEvents
+      }
+      throw err
+    }
+    const events: AgentConversationLogEvent[] = []
+    for (const line of raw.split('\n')) {
+      if (!line.trim()) continue
+      try {
+        const value = JSON.parse(line) as unknown
+        if (isAgentConversationLogEvent(value)) events.push(value)
+      } catch {
+        // Ignore an incomplete final append or a hand-edited malformed line.
+      }
+    }
+    if (this.cacheRevision !== revisionBeforeRead) return this.readEvents()
+    this.cachedEvents = events
+    return events
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function publicConversationSource(source: WorkspaceConversationCaller): AgentConversationSource {
+  if (source.kind !== 'session') return source
+  return {
+    kind: 'session',
+    workspaceId: source.workspaceId,
+    resumeId: source.resumeId,
+    agent: source.agent,
+  }
+}
+
+function isAgentConversationLogEvent(value: unknown): value is AgentConversationLogEvent {
+  if (!isRecord(value) || value.schemaVersion !== 1 || typeof value.taskId !== 'string') return false
+  if (value.type === 'conversation.completed') {
+    return typeof value.eventId === 'string'
+      && typeof value.at === 'number'
+      && ['running', 'done', 'failed', 'interrupted'].includes(String(value.status))
+      && (typeof value.assistantText === 'string' || value.assistantText === null)
+      && (value.durationMs === undefined || typeof value.durationMs === 'number')
+      && (value.error === undefined || typeof value.error === 'string')
+  }
+  if (value.type !== 'conversation.dispatched') return false
+  if (
+    typeof value.eventId !== 'string'
+    || typeof value.at !== 'number'
+    || !isConversationSource(value.source)
+    || !isRecord(value.target)
+    || typeof value.target.workspaceId !== 'string'
+    || typeof value.target.resumeId !== 'string'
+    || typeof value.target.agent !== 'string'
+    || !isConversationTarget(value.requestedTarget)
+    || !isRecord(value.resolution)
+    || !['exact', 'reconstructed'].includes(String(value.resolution.mode))
+    || (value.resolution.reason !== undefined && typeof value.resolution.reason !== 'string')
+    || !isRecord(value.prompt)
+    || typeof value.prompt.original !== 'string'
+    || typeof value.prompt.delivered !== 'string'
+    || !['plain', 'reconstruction'].includes(String(value.prompt.mode))
+    || (value.parentTaskId !== undefined && typeof value.parentTaskId !== 'string')
+  ) {
+    return false
+  }
+  return true
+}
+
+function isConversationSource(value: unknown): value is WorkspaceConversationCaller {
+  if (!isRecord(value)) return false
+  if (value.kind === 'human') return true
+  if (value.kind === 'workspace') return typeof value.workspaceId === 'string'
+  return value.kind === 'session'
+    && typeof value.workspaceId === 'string'
+    && typeof value.resumeId === 'string'
+    && typeof value.agent === 'string'
+}
+
+function isConversationTarget(value: unknown): value is WorkspaceConversationTarget {
+  if (!isRecord(value) || typeof value.kind !== 'string') return false
+  switch (value.kind) {
+    case 'resume':
+      return typeof value.resumeId === 'string'
+    case 'workspace':
+      return typeof value.workspaceId === 'string'
+    case 'inbox':
+      return typeof value.inboxEntryId === 'string'
+        && (value.workspaceId === undefined || typeof value.workspaceId === 'string')
+    case 'issue':
+      return typeof value.workspaceId === 'string' && typeof value.issueId === 'string'
+    case 'report':
+      return typeof value.workspaceId === 'string' && typeof value.path === 'string'
+    case 'trade-decision':
+      return typeof value.accountId === 'string' && typeof value.decisionId === 'string'
+    default:
+      return false
   }
 }
