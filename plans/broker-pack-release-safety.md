@@ -1,6 +1,6 @@
 # Broker Pack Release Safety
 
-Status: Active
+Status: Complete
 
 Related incident:
 [[docs/incidents/2026-07-28-broker-pack-upgrade-gap.md]]
@@ -45,8 +45,8 @@ safe reconciliation needed before those release cadences can be separated.
 - [x] Record the v0.85 incident and durable owner-guide contract.
 - [x] Complete focused, repository-wide, and packaged verification.
 - [x] Merge to `dev` and inspect trailing CI.
-- [ ] Prepare, promote, and publish `v0.86.0-beta`.
-- [ ] Verify GitHub Release and CDN artifacts after publication.
+- [x] Prepare, promote, and publish `v0.86.0-beta`.
+- [x] Verify GitHub Release and CDN artifacts after publication.
 
 ## Verification
 
@@ -61,6 +61,20 @@ safe reconciliation needed before those release cadences can be separated.
 - `pnpm test`
 - `pnpm electron:smoke:packaged --temp-data`
 - release matrix on macOS arm64, macOS x64, Windows x64, and Linux x64
+
+Release evidence:
+
+- GitHub Release:
+  <https://github.com/TraderAlice/OpenAlice/releases/tag/v0.86.0-beta>
+- Release workflow:
+  <https://github.com/TraderAlice/OpenAlice/actions/runs/30360097577>
+- The published tag resolves to master promotion merge `72862d38`.
+- The release contains 20 Broker Pack archives (five engines across four
+  platforms), four platform catalogs, both macOS architectures, and the
+  Windows installer.
+- The public CDN manifest advertises `0.86.0-beta`; versioned desktop
+  installers, update feeds, Broker Pack catalogs and archives, and the
+  release-owned CLI installer returned successfully after mirroring.
 
 ## Completion
 
