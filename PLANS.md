@@ -21,12 +21,11 @@ the durable truth after it changes.
 
 ## Active
 
-- [[plans/agent-conversation-log-ui.md]] — Adds a read-only, paginated Agent
-  collaboration view to Dev Logs without exposing launcher file paths or
-  introducing a new dispatch surface.
-
 ## Completed
 
+- [[plans/agent-conversation-log-ui.md]] — Adds a read-only, paginated Agent
+  collaboration view to Dev Logs without exposing launcher file paths or
+  introducing a new dispatch surface. Delivered in PR #742.
 - [[plans/agent-conversation-semantics.md]] — Separates ordinary peer
   conversation from explicit artifact reconstruction, documents synchronous
   and asynchronous delegation, and records cross-Agent exchanges in a

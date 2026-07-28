@@ -1,6 +1,8 @@
 # Agent Conversation Log UI
 
-Status: Active
+Status: Completed
+
+Delivered by PR #742.
 
 Related issues: none
 
@@ -65,7 +67,7 @@ Not in scope:
 - [x] Update the owner guide.
 - [x] Run required typechecks and tests.
 - [x] Exercise the real dev/demo route and Electron/package path.
-- [ ] Publish and merge a serial PR to `dev`.
+- [x] Publish and merge a serial PR to `dev`.
 
 ## Completion Criteria
 
