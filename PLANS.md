@@ -21,7 +21,10 @@ the durable truth after it changes.
 
 ## Active
 
-No active implementation plans.
+- [[plans/agent-conversation-semantics.md]] — Separates ordinary peer
+  conversation from explicit artifact reconstruction, documents synchronous
+  and asynchronous delegation, and records cross-Agent exchanges in a
+  dedicated local event log.
 
 ## Completed
 

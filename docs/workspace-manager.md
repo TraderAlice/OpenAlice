@@ -113,16 +113,19 @@ Drill into one selected desk with:
 alice-workspace peer path --id <workspaceId>
 alice-workspace peer sessions --id <workspaceId>
 alice-workspace conversation ask --resume-id <resumeId> --prompt "..." --await
-# Fallback only when no attributable Session exists:
-alice-workspace conversation ask --ws-id <workspaceId> --prompt "..." --await
+# Recruit a fresh coworker for new work:
+alice-workspace conversation ask --ws-id <workspaceId> --prompt "..."
+# Reconstruct missing historical intent explicitly:
+alice-workspace conversation ask --ws-id <workspaceId> --prompt "..." --reconstruct --await
 alice-workspace template upgrade --id <workspaceId>
 ```
 
 `--resume-id` continues the exact coworker and should report
-`resolution.mode: exact`. `--ws-id` recruits or reconstructs a worker whose
-answer may be useful but does not carry the historical owner's memory; the UI
-and manager must preserve that distinction instead of presenting the fallback
-as the original author.
+`resolution.mode: exact`. `--ws-id` recruits a fresh worker whose answer may be
+useful but does not carry an absent historical owner's memory. Prompts remain
+ordinary coworker messages unless `--reconstruct` explicitly requests the
+reconstruction preamble; the UI and manager must preserve the provenance
+distinction instead of presenting a fresh worker as the original author.
 
 The manager may read all peers. Existing command-level protections still apply:
 cross-Workspace mutations require an interactive manager Session, and template

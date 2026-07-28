@@ -399,6 +399,7 @@ export const issueCommentFactory: WorkspaceToolFactory = {
             issue: res.issue,
             comment: res.comment,
             ...(origin ? { authorResumeId: origin.resumeId } : {}),
+            source: origin ?? { kind: 'workspace', workspaceId: ctx.workspaceId },
           })
           if (dispatched.status !== 'not_requested') {
             const updated = await updateIssueCommentDelivery(

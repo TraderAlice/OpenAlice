@@ -316,12 +316,16 @@ assistant reply by default; diagnostic tool/message blocks require
 `--mode detailed`. New task ids are short `run-xxxxxxxx` codes; existing UUID
 task ids remain readable.
 
-Prefer `conversation ask ... --await` for a single follow-up. To question
-several independent Sessions, dispatch every ask first, then collect the tasks
-in one `conversation collect --task-id <a> --task-id <b>` call so the runs
-overlap. If server-side collection reaches its budget while a task still runs,
-use a later collect or one-shot read; agents should not manufacture shell sleep
-loops.
+Use `conversation ask ... --await` when one short follow-up is required for the
+current answer. For work delegated to another desk, omit `--await`, retain the
+returned task and Session ids, and retrieve the reply later; the peer may
+manage longer work through its own Issue/schedule and push a finished report to
+Inbox. To question several independent Sessions, dispatch every ask first, then
+collect the tasks in one `conversation collect --task-id <a> --task-id <b>`
+call so the runs overlap. If server-side collection reaches its budget while a
+task still runs, use a later collect or one-shot read; agents should not
+manufacture shell sleep loops. Add `--reconstruct` only when an unattributed
+artifact explicitly needs reconstruction guidance.
 
 The Issue detail UI treats scheduling as an intrinsic Work item capability.
 `assignee: "@new"` recruits one fresh Session on the first fire and then

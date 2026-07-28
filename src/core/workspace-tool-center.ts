@@ -66,6 +66,14 @@ export type WorkspaceConversationTarget =
       workspaceId?: string
     }
 
+/** Safe identity of whoever initiated one cross-Workspace message. Product
+ * Session origins are authoritative when the caller is an Agent. Workspace and
+ * human fallbacks keep manual/UI dispatches honest without inventing a Session. */
+export type WorkspaceConversationCaller =
+  | SessionOrigin
+  | { kind: 'workspace'; workspaceId: string }
+  | { kind: 'human' }
+
 export type WorkspaceConversationResolution =
   | {
       mode: 'exact'
@@ -130,6 +138,12 @@ export interface WorkspaceConversationControl {
     readonly timeoutMs: number
     readonly target: WorkspaceConversationTarget
     readonly agent?: string
+    /** Add the artifact-reconstruction preamble when a fresh fallback worker is
+     * required. Provenance may still resolve as reconstructed when this is
+     * false; prompt semantics and attribution are deliberately independent. */
+    readonly reconstruct?: boolean
+    /** Authoritative caller identity for the independent conversation log. */
+    readonly source?: WorkspaceConversationCaller
     /** Optional business reverse link persisted with the dispatched task. */
     readonly subject?: HeadlessInquirySubject
   }): Promise<WorkspaceConversationAskResult>

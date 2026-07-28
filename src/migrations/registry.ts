@@ -37,6 +37,7 @@ import { migration as migration_0022_connector_service_config } from './0022_con
 import { migration as migration_0023_google_native_credentials } from './0023_google_native_credentials/index.js'
 import { migration as migration_0024_pi_native_workspace_config } from './0024_pi_native_workspace_config/index.js'
 import { migration as migration_0025_retire_global_compaction_config } from './0025_retire_global_compaction_config/index.js'
+import { migration as migration_0026_agent_conversation_log } from './0026_agent_conversation_log/index.js'
 
 export const REGISTRY: Migration[] = [
   migration_0008_disable_targetless_cron_jobs,
@@ -57,4 +58,5 @@ export const REGISTRY: Migration[] = [
   migration_0023_google_native_credentials,
   migration_0024_pi_native_workspace_config,
   migration_0025_retire_global_compaction_config,
+  migration_0026_agent_conversation_log,
 ]

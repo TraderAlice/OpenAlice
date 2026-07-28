@@ -155,6 +155,7 @@ describe('CLI launchers and payload', () => {
                 issueId: { type: 'string' },
                 accountId: { type: 'string' },
                 await: { type: 'boolean' },
+                reconstruct: { type: 'boolean' },
                 taskId: { type: 'array', items: { type: 'string' } },
                 docs: { type: 'array', items: { type: 'object' } },
                 metadataFilter: { type: 'object' },
@@ -193,6 +194,8 @@ describe('CLI launchers and payload', () => {
       expect(help.stdout).toContain('--issue-id')
       expect(help.stdout).toContain('--await')
       expect(help.stdout).not.toContain('--await <boolean>')
+      expect(help.stdout).toContain('--reconstruct')
+      expect(help.stdout).not.toContain('--reconstruct <boolean>')
       expect(help.stdout).toContain('--task-id <value> (repeatable)')
       expect(help.stdout).not.toContain('--task-id <array>')
       expect(help.stdout).not.toContain('--issueId')
@@ -202,7 +205,8 @@ describe('CLI launchers and payload', () => {
       expect(help.stdout).not.toContain('--metadata-filter')
 
       await runCli('alice-workspace', [
-        'provenance', 'show', '--issue-id', 'audit', '--account-id', 'alpaca-paper', '--await',
+        'provenance', 'show', '--issue-id', 'audit', '--account-id', 'alpaca-paper',
+        '--await', '--reconstruct',
         '--task-id', 'run-a', '--task-id', 'run-b',
         '--doc', 'research/a.md', '--meta', 'ticker=AAPL',
       ], env)
@@ -212,6 +216,7 @@ describe('CLI launchers and payload', () => {
           issueId: 'audit',
           accountId: 'alpaca-paper',
           await: true,
+          reconstruct: true,
           taskId: ['run-a', 'run-b'],
           docs: [{ path: 'research/a.md' }],
           metadataFilter: { ticker: 'AAPL' },

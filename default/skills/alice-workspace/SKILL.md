@@ -20,7 +20,7 @@ Choose the verb from the intent, not from whichever object you happen to have:
 | Inspect the shared work board | `issue list` / `issue show` |
 | Ask an Issue's creator or selected historical run | `issue ask` |
 | Discuss this Workspace's own Issue; notify its fixed owner | `issue comment` |
-| Ask by a known product Session/Workspace only when no business object exists | `conversation ask` |
+| Ask or delegate by product Session/Workspace when no business object exists | `conversation ask` |
 | Bring this desk's managed instructions and skills up to date | `template upgrade` |
 | Inventory every active desk before coordinating the floor | `peer list` |
 
@@ -111,7 +111,9 @@ alice-workspace issue ask --id <issueName> --run-id <taskId> \
 alice-workspace conversation ask --resume-id <resumeId> \
   --prompt 'Explain the missing context.' --await
 alice-workspace conversation ask --ws-id <ws> \
-  --prompt 'Reconstruct why this artifact was produced.' --await
+  --prompt 'Please investigate this bounded question and report back.'
+alice-workspace conversation ask --ws-id <ws> \
+  --prompt 'Reconstruct why this unattributed artifact was produced.' --reconstruct --await
 alice-workspace conversation await --task-id <taskId>
 alice-workspace conversation collect --task-id <taskA> --task-id <taskB>
 alice-workspace conversation read --task-id <taskId>
@@ -123,13 +125,31 @@ requires a stable resume owner, while `--run-id` selects one exact run Session.
 Use the lower-level conversation command only when no business object already
 identifies whom to ask. Never construct or pass an internal target JSON object.
 
-For one question, start with `ask --await`: OpenAlice waits server-side and
-returns the final reply without making you guess a sleep duration. For several
-independent peers, issue every `ask` first without `--await` so all tasks run
-concurrently, then pass every short task id to one `conversation collect` call.
-If collect reports a task still `running`, do other useful work and collect
-again later or use one-shot `conversation read`; never build a shell `sleep`
-polling loop.
+Choose the waiting rhythm from the work:
+
+- **Short consultation needed for the current answer:** use `ask --await`.
+  OpenAlice waits server-side and returns the final reply without a guessed
+  sleep duration.
+- **Delegation that may take a while:** omit `--await`. Keep the returned
+  `taskId`/`resumeId`, continue useful work, and later use `conversation read`
+  or `conversation await`. The peer can create its own local Issue/schedule and
+  push a finished report to Inbox.
+- **Several independent peers:** dispatch every ask first without `--await`,
+  then pass the task ids to one `conversation collect` call.
+- **Human-facing completion:** ask the worker to use `inbox push` when the
+  result should surface in the user's Inbox.
+
+There is not yet an unsolicited Agent-to-Agent completion notification bus.
+Inbox reaches the human; `read`/`await`/`collect` retrieves a dispatched Agent
+reply. If collect reports a task still `running`, do other useful work and
+collect again later or use one-shot `conversation read`; never build a shell
+`sleep` polling loop.
+
+Prompts are delivered as ordinary coworker messages by default. Add
+`--reconstruct` only when the request explicitly asks a fresh fallback worker
+to reconstruct an artifact or decision whose author cannot be resumed. The
+`resolution.mode` may still say `reconstructed` for honest provenance even when
+that optional prompt guidance was not requested.
 
 Inspect `resolution.mode` on the ask result:
 
