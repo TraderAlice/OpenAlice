@@ -14,6 +14,7 @@ import type {
   DepartedWorkspace,
   SessionRecord,
   WebPiSnapshot,
+  Workspace,
   WorkspaceMetadataPatch,
 } from '../../components/workspace/api'
 
@@ -34,6 +35,18 @@ const demoManagerSession = {
 
 let demoManagerMessages: unknown[] = []
 let demoQuickChatSequence = 0
+let demoWorkspaceCreateSequence = 0
+const demoCreatedWorkspaceIds = new Set<string>()
+const DEMO_WORKSPACE_TAG_RE = /^[a-z0-9][a-z0-9_-]{0,32}$/
+
+export function resetDemoWorkspaceCreateState(): void {
+  for (const id of demoCreatedWorkspaceIds) {
+    const index = demoWorkspaces.findIndex((workspace) => workspace.id === id)
+    if (index >= 0) demoWorkspaces.splice(index, 1)
+  }
+  demoCreatedWorkspaceIds.clear()
+  demoWorkspaceCreateSequence = 0
+}
 
 function webPiKey(wsId: string, sessionId: string): string {
   return `${wsId}::${sessionId}`
@@ -291,12 +304,64 @@ export const workspacesHandlers = [
     Object.assign(workspace, { lifecycle: 'purged', purgedAt: new Date().toISOString() })
     return HttpResponse.json({ ok: true })
   }),
-  http.post('/api/workspaces', () =>
-    HttpResponse.json(
-      { ok: false, status: 400, error: { error: 'bootstrap_failed', message: 'Demo mode — workspace creation is disabled.' } },
-      { status: 400 },
-    ),
-  ),
+  http.post('/api/workspaces', async ({ request }) => {
+    const body = await request.json().catch(() => ({})) as {
+      tag?: unknown
+      template?: unknown
+    }
+    if (typeof body.tag !== 'string') {
+      return HttpResponse.json({ error: 'tag_required', message: 'Workspace tag is required.' }, { status: 400 })
+    }
+    const tag = body.tag.trim()
+    if (!DEMO_WORKSPACE_TAG_RE.test(tag)) {
+      return HttpResponse.json({
+        error: 'invalid_tag',
+        message: 'Use a-z, 0-9, "-", or "_"; start with a letter or number; maximum 33 characters.',
+      }, { status: 400 })
+    }
+    if (demoWorkspaces.some((workspace) => workspace.tag === tag)) {
+      return HttpResponse.json({
+        error: 'tag_in_use',
+        message: `A Workspace with tag "${tag}" already exists.`,
+      }, { status: 409 })
+    }
+
+    const templateName = typeof body.template === 'string' && body.template.length > 0
+      ? body.template
+      : demoTemplates[0]?.name
+    if (!templateName) {
+      return HttpResponse.json({
+        error: 'no_templates_configured',
+        message: 'No Workspace templates are available.',
+      }, { status: 500 })
+    }
+    const template = demoTemplates.find((candidate) => candidate.name === templateName)
+    if (!template) {
+      return HttpResponse.json({
+        error: 'unknown_template',
+        message: `Unknown Workspace template: ${templateName}`,
+      }, { status: 400 })
+    }
+
+    demoWorkspaceCreateSequence += 1
+    const workspace: Workspace = {
+      id: `demo-created-ws-${demoWorkspaceCreateSequence}`,
+      tag,
+      dir: `/demo/workspaces/${tag}`,
+      createdAt: new Date().toISOString(),
+      template: template.name,
+      ...(template.version
+        ? { spawnedFromVersion: template.version, currentVersion: template.version }
+        : {}),
+      upgradeAvailable: null,
+      agents: ['claude', 'codex', 'opencode', 'pi'],
+      sessions: [],
+      agentOverride: { claude: false, codex: false, opencode: false, pi: false },
+    }
+    demoWorkspaces.push(workspace)
+    demoCreatedWorkspaceIds.add(workspace.id)
+    return HttpResponse.json({ workspace }, { status: 201 })
+  }),
   http.get('/api/workspaces/:id/offboarding', ({ params }) => {
     const workspace = demoWorkspaces.find((candidate) => candidate.id === String(params.id))
     if (!workspace) return HttpResponse.json({ error: 'not_found' }, { status: 404 })
