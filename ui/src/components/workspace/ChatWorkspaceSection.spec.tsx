@@ -228,15 +228,15 @@ describe('ChatWorkspaceSection actions', () => {
       params: { sessionId: 'manager-opencode' },
     })
 
-    fireEvent.click(managerUi.getByRole('button', { name: 'Stop this session' }))
+    fireEvent.click(managerUi.getByRole('button', { name: 'Stop Inspect the floor' }))
     expect(actions.pauseSession).toHaveBeenCalledWith(MANAGER_WORKSPACE_ID, 'manager-opencode')
 
-    fireEvent.click(managerUi.getByRole('button', { name: 'Resume this session' }))
+    fireEvent.click(managerUi.getByRole('button', { name: 'Resume Coordinate owners' }))
     expect(actions.openWebPiSession).toHaveBeenCalledWith(MANAGER_WORKSPACE_ID, 'manager-pi')
 
     const pausedRow = pausedSession.parentElement
     expect(pausedRow).toBeTruthy()
-    fireEvent.click(within(pausedRow as HTMLElement).getByRole('button', { name: 'Delete this session' }))
+    fireEvent.click(within(pausedRow as HTMLElement).getByRole('button', { name: 'Delete Coordinate owners' }))
     expect(actions.requestDeleteSession).toHaveBeenCalledWith(MANAGER_WORKSPACE_ID, 'manager-pi')
 
     fireEvent.click(managerUi.getByRole('button', { name: 'Collapse sessions' }))

@@ -4,8 +4,8 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '../../i18n'
-import type { AgentInfo, Workspace } from './api'
-import { WorkspaceRow } from './Sidebar'
+import type { AgentInfo, SessionRecord, Workspace } from './api'
+import { SessionRow, WorkspaceRow } from './Sidebar'
 
 const capabilities = {
   parallelPerCwd: true,
@@ -89,5 +89,57 @@ describe('WorkspaceRow session launcher', () => {
     expect(screen.queryByRole('button', { name: 'Choose runtime for new session' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Spawn a new session…' }))
     expect(screen.getByRole('menuitem', { name: 'Shell (sh)' })).toBeTruthy()
+  })
+})
+
+describe('SessionRow actions', () => {
+  const session: SessionRecord = {
+    id: 'session-1',
+    resumeId: 'resume-1',
+    wsId: workspace.id,
+    agent: 'pi',
+    name: 'p1',
+    createdAt: '2026-07-15T00:00:00.000Z',
+    lastActiveAt: '2026-07-15T00:05:00.000Z',
+    state: 'running',
+    pid: 123,
+    startedAt: 1,
+    title: 'Review AAPL earnings',
+  }
+
+  it('names destructive and lifecycle actions for their target session', () => {
+    const onPause = vi.fn()
+    const onDelete = vi.fn()
+    const { rerender } = render(
+      <SessionRow
+        session={session}
+        isActive={false}
+        onSelect={vi.fn()}
+        onPause={onPause}
+        onResume={vi.fn()}
+        onDelete={onDelete}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Stop Review AAPL earnings' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Review AAPL earnings' }))
+    expect(onPause).toHaveBeenCalledOnce()
+    expect(onDelete).toHaveBeenCalledOnce()
+
+    const onResume = vi.fn()
+    rerender(
+      <SessionRow
+        session={{ ...session, state: 'paused', pid: null, startedAt: null, title: null }}
+        isActive={false}
+        onSelect={vi.fn()}
+        onPause={vi.fn()}
+        onResume={onResume}
+        onDelete={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Resume p1' }))
+    expect(onResume).toHaveBeenCalledOnce()
+    expect(screen.getByRole('button', { name: 'Delete p1' })).toBeTruthy()
   })
 })

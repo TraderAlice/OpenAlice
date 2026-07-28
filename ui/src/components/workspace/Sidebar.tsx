@@ -654,6 +654,9 @@ export function SessionRow(props: SessionRowProps): ReactElement {
   const isPaused = s.state === 'paused';
   // Title: the captured first message (seeded sessions), else the sticky name.
   const display = s.title?.trim() || s.name;
+  const resumeLabel = t('workspace.resumeSession', { title: display });
+  const stopLabel = t('workspace.stopSession', { title: display });
+  const deleteLabel = t('workspace.deleteSession', { title: display });
   const metaParts: string[] = [`agent ${s.agent}`];
   if (s.pid !== null) metaParts.push(`pid ${s.pid}`);
   if (s.resumeId) metaParts.push(s.resumeId);
@@ -688,8 +691,8 @@ export function SessionRow(props: SessionRowProps): ReactElement {
         <button
           type="button"
           className={rowAction()}
-          title={t('workspace.resumeSession')}
-          aria-label={t('workspace.resumeSession')}
+          title={resumeLabel}
+          aria-label={resumeLabel}
           onClick={(e) => {
             e.stopPropagation();
             props.onResume();
@@ -701,8 +704,8 @@ export function SessionRow(props: SessionRowProps): ReactElement {
         <button
           type="button"
           className={rowAction()}
-          title={t('workspace.stopSession')}
-          aria-label={t('workspace.stopSession')}
+          title={stopLabel}
+          aria-label={stopLabel}
           onClick={(e) => {
             e.stopPropagation();
             props.onPause();
@@ -714,8 +717,8 @@ export function SessionRow(props: SessionRowProps): ReactElement {
       <button
         type="button"
         className={`${rowAction(true)} opacity-0 group-hover:opacity-100 focus-visible:opacity-100`}
-        title={t('workspace.deleteSession')}
-        aria-label={t('workspace.deleteSession')}
+        title={deleteLabel}
+        aria-label={deleteLabel}
         onClick={(e) => {
           e.stopPropagation();
           props.onDelete();
