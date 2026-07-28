@@ -1,9 +1,10 @@
 import type { EntityListItem, EntityDetail } from '../../api/entities'
+import { DEMO_CHAT_WORKSPACE_ID, demoChatWorkspace } from './workspaces'
 
 /**
- * Demo tracked-entities — mirrors the real chat-jun3 power / AI-infra graph
- * so the marketing demo shows the actual shape: a few assets + the theme that
- * ties them together, each referenced across the dated rotation notes.
+ * Demo tracked-entities — mirrors the power / AI-infra graph so the marketing
+ * demo shows the actual shape: a few assets + the theme that ties them
+ * together, each referenced across the dated rotation notes.
  *
  * Backlinks now also include ISSUE NOTES. Since `.alice/issues/<id>.md` bodies
  * feed the same `[[name]]` reverse index, an entity's backlinks can point at an
@@ -38,7 +39,13 @@ export const demoEntities: EntityListItem[] = [
   },
 ]
 
-const ws = { workspaceId: 'demo-ws-1', workspaceTag: 'chat-jun3' }
+// Plain-note backlinks belong to the registered demo Chat Workspace. Keeping
+// this identity aligned makes the file viewer's provenance label and Back
+// action resolve to a real Workspace instead of a stale fixture-only id.
+const ws = {
+  workspaceId: DEMO_CHAT_WORKSPACE_ID,
+  workspaceTag: demoChatWorkspace.tag,
+}
 // Workspaces that own the demo issues (see ./issues.ts). Issue-note backlinks
 // carry the issue's wsId + a `.alice/issues/<id>.md` path so the Tracked UI can
 // route them to the issue detail rather than rendering a raw file path.
