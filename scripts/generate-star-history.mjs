@@ -2,12 +2,48 @@
 
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
+import { dirname, extname, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const DEFAULT_REPOSITORY = 'TraderAlice/OpenAlice'
 const DEFAULT_OUTPUT = 'docs/images/star-history.svg'
+const THEMES = {
+  light: {
+    backgroundStart: '#fbfffd',
+    backgroundEnd: '#f3faf7',
+    border: '#d8ebe3',
+    eyebrow: '#668176',
+    title: '#17231e',
+    metric: '#17231e',
+    label: '#6b8378',
+    axis: '#6f857b',
+    grid: '#deebe5',
+    tick: '#a8bdb4',
+    accent: '#2fa678',
+    accentSoft: '#7bd3b0',
+    areaOpacity: '0.30',
+    endpointStroke: '#fbfffd',
+    divider: '#d8e7e0',
+  },
+  dark: {
+    backgroundStart: '#101a16',
+    backgroundEnd: '#0b1310',
+    border: '#294038',
+    eyebrow: '#89a99b',
+    title: '#edf7f2',
+    metric: '#edf7f2',
+    label: '#91a89d',
+    axis: '#82998e',
+    grid: '#24372f',
+    tick: '#476257',
+    accent: '#63d6aa',
+    accentSoft: '#8ae4bf',
+    areaOpacity: '0.32',
+    endpointStroke: '#101a16',
+    divider: '#2b4037',
+  },
+}
 
 function startOfUtcDay(value) {
   const date = new Date(value)
@@ -113,10 +149,13 @@ export function renderStarHistorySvg({
   points,
   repository = DEFAULT_REPOSITORY,
   generatedAt = new Date(),
+  theme = 'light',
 }) {
   if (!Array.isArray(points) || points.length === 0) {
     throw new Error('[star-history] at least one aggregate point is required')
   }
+  const palette = THEMES[theme]
+  if (!palette) throw new Error(`[star-history] unknown theme: ${theme}`)
 
   const width = 1200
   const height = 560
@@ -143,10 +182,11 @@ export function renderStarHistorySvg({
   const yTicks = Array.from({ length: intervalCount + 1 }, (_, index) => index * axis.step)
   const dateTicks = selectDateTicks(points)
   const pointIndexByTime = new Map(points.map((point, index) => [point.date.getTime(), index]))
-  const thirtyDayBaselineIndex = Math.max(0, points.length - 31)
-  const lastThirtyDays = total - points[thirtyDayBaselineIndex].count
   const title = `${repository} star history`
-  const description = `${formatCount(total)} stars in this snapshot. ${formatCount(lastThirtyDays)} stars added in the latest 30-day window. Daily cumulative history from ${formatFullDate(points[0].date)} through ${formatFullDate(points.at(-1).date)}.`
+  const snapshotDate = points.at(-1).date
+  const snapshotMonthDay = formatDate(snapshotDate).toUpperCase()
+  const snapshotYear = String(snapshotDate.getUTCFullYear())
+  const description = `${formatCount(total)} stars in this snapshot. Daily cumulative history from ${formatFullDate(points[0].date)} through ${formatFullDate(snapshotDate)}.`
 
   const grid = yTicks
     .map((tick) => {
@@ -175,57 +215,51 @@ export function renderStarHistorySvg({
     <repository>${escapeXml(repository)}</repository>
     <generated-at>${escapeXml(generatedAt.toISOString())}</generated-at>
     <aggregation>daily cumulative active stargazers</aggregation>
+    <theme>${theme}</theme>
   </metadata>
   <defs>
     <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#101713"/>
-      <stop offset="100%" stop-color="#080b09"/>
+      <stop offset="0%" stop-color="${palette.backgroundStart}"/>
+      <stop offset="100%" stop-color="${palette.backgroundEnd}"/>
     </linearGradient>
     <linearGradient id="area" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#e3b341" stop-opacity="0.42"/>
-      <stop offset="100%" stop-color="#e3b341" stop-opacity="0"/>
+      <stop offset="0%" stop-color="${palette.accentSoft}" stop-opacity="${palette.areaOpacity}"/>
+      <stop offset="100%" stop-color="${palette.accentSoft}" stop-opacity="0"/>
     </linearGradient>
-    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="4" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
     <style>
       text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-      .eyebrow { fill: #8b9890; font-size: 15px; font-weight: 650; letter-spacing: 2.3px; }
-      .title { fill: #f2f5f3; font-size: 28px; font-weight: 720; }
-      .metric { fill: #f2f5f3; font-size: 30px; font-weight: 740; }
-      .metric-label { fill: #8b9890; font-size: 14px; font-weight: 580; letter-spacing: 0.8px; }
-      .metric-accent { fill: #e3b341; }
-      .axis-label { fill: #7e8a83; font-size: 14px; font-weight: 520; }
-      .grid { stroke: #253029; stroke-width: 1; }
-      .tick { stroke: #465249; stroke-width: 1; }
+      .eyebrow { fill: ${palette.eyebrow}; font-size: 15px; font-weight: 650; letter-spacing: 2.3px; }
+      .title { fill: ${palette.title}; font-size: 28px; font-weight: 720; }
+      .metric { fill: ${palette.metric}; font-size: 30px; font-weight: 740; }
+      .date { fill: ${palette.accent}; font-size: 25px; font-weight: 720; }
+      .metric-label { fill: ${palette.label}; font-size: 14px; font-weight: 580; letter-spacing: 0.8px; }
+      .axis-label { fill: ${palette.axis}; font-size: 14px; font-weight: 520; }
+      .grid { stroke: ${palette.grid}; stroke-width: 1; }
+      .tick { stroke: ${palette.tick}; stroke-width: 1; }
     </style>
   </defs>
 
   <rect width="${width}" height="${height}" rx="22" fill="url(#background)"/>
-  <rect x="0.75" y="0.75" width="${width - 1.5}" height="${height - 1.5}" rx="21.25" fill="none" stroke="#29342d" stroke-width="1.5"/>
+  <rect x="0.75" y="0.75" width="${width - 1.5}" height="${height - 1.5}" rx="21.25" fill="none" stroke="${palette.border}" stroke-width="1.5"/>
 
-  <path d="M 55 48 L 61 61 L 75 62.5 L 64.5 71.5 L 67.5 85 L 55 78 L 42.5 85 L 45.5 71.5 L 35 62.5 L 49 61 Z" fill="#e3b341"/>
+  <path d="M 55 48 L 61 61 L 75 62.5 L 64.5 71.5 L 67.5 85 L 55 78 L 42.5 85 L 45.5 71.5 L 35 62.5 L 49 61 Z" fill="${palette.accent}"/>
   <text x="92" y="59" class="eyebrow">OPENALICE</text>
   <text x="92" y="91" class="title">Star History</text>
 
-  <g transform="translate(758 43)">
+  <g transform="translate(782 43)">
     <text x="0" y="31" class="metric">${formatCount(total)}</text>
     <text x="0" y="56" class="metric-label">STARS AT SNAPSHOT</text>
-    <line x1="160" y1="4" x2="160" y2="61" stroke="#2d3931"/>
-    <text x="198" y="31" class="metric metric-accent">+${formatCount(lastThirtyDays)}</text>
-    <text x="198" y="56" class="metric-label">LAST 30 DAYS</text>
+    <line x1="170" y1="4" x2="170" y2="61" stroke="${palette.divider}"/>
+    <text x="207" y="31" class="date">${snapshotMonthDay}</text>
+    <text x="207" y="56" class="metric-label">${snapshotYear} · UTC SNAPSHOT</text>
   </g>
 
-  <text x="${plot.left}" y="143" class="metric-label">DAILY CUMULATIVE · THROUGH ${formatFullDate(points.at(-1).date).toUpperCase()} UTC</text>
+  <text x="${plot.left}" y="143" class="metric-label">DAILY CUMULATIVE STAR HISTORY</text>
 ${grid}
 ${xAxis}
   <path d="${areaPath}" fill="url(#area)"/>
-  <path d="${linePath}" fill="none" stroke="#e3b341" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" filter="url(#glow)"/>
-  <circle cx="${xForIndex(points.length - 1).toFixed(2)}" cy="${yForCount(total).toFixed(2)}" r="6" fill="#f6d365" stroke="#101713" stroke-width="3"/>
+  <path d="${linePath}" fill="none" stroke="${palette.accent}" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="${xForIndex(points.length - 1).toFixed(2)}" cy="${yForCount(total).toFixed(2)}" r="6" fill="${palette.accentSoft}" stroke="${palette.endpointStroke}" stroke-width="3"/>
 </svg>
 `
 }
@@ -292,6 +326,7 @@ function parseArgs(argv) {
   const values = {
     repository: DEFAULT_REPOSITORY,
     output: DEFAULT_OUTPUT,
+    darkOutput: null,
   }
 
   for (let index = 0; index < argv.length; index += 2) {
@@ -302,10 +337,17 @@ function parseArgs(argv) {
     }
     if (key === '--repository') values.repository = value
     else if (key === '--output') values.output = value
+    else if (key === '--dark-output') values.darkOutput = value
     else throw new Error(`[star-history] unknown option: ${key}`)
   }
 
   return values
+}
+
+function darkOutputPath(output) {
+  const extension = extname(output)
+  if (!extension) return `${output}-dark.svg`
+  return `${output.slice(0, -extension.length)}-dark${extension}`
 }
 
 async function main() {
@@ -321,14 +363,27 @@ async function main() {
     },
   })
   const points = aggregateStarHistory(timestamps)
-  const svg = renderStarHistorySvg({
+  const generatedAt = new Date()
+  const lightSvg = renderStarHistorySvg({
     points,
     repository: options.repository,
+    generatedAt,
+    theme: 'light',
+  })
+  const darkSvg = renderStarHistorySvg({
+    points,
+    repository: options.repository,
+    generatedAt,
+    theme: 'dark',
   })
   const outputPath = resolve(options.output)
+  const darkOutput = options.darkOutput || darkOutputPath(options.output)
+  const darkOutputResolved = resolve(darkOutput)
   mkdirSync(dirname(outputPath), { recursive: true })
-  writeFileSync(outputPath, svg)
-  console.log(`[star-history] wrote ${options.output} from ${formatCount(timestamps.length)} active stargazers`)
+  mkdirSync(dirname(darkOutputResolved), { recursive: true })
+  writeFileSync(outputPath, lightSvg)
+  writeFileSync(darkOutputResolved, darkSvg)
+  console.log(`[star-history] wrote ${options.output} and ${darkOutput} from ${formatCount(timestamps.length)} active stargazers`)
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

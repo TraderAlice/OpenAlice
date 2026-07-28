@@ -149,7 +149,10 @@ Stuck? The fastest path is usually:
 
 <p align="center">
   <a href="https://github.com/TraderAlice/OpenAlice">
-    <img src="docs/images/star-history.svg" alt="OpenAlice GitHub star history" width="900">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/images/star-history-dark.svg">
+      <img src="docs/images/star-history.svg" alt="OpenAlice GitHub star history" width="900">
+    </picture>
   </a>
 </p>
 
