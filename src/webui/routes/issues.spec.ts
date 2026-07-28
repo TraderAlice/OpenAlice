@@ -140,6 +140,14 @@ describe('PATCH /api/issues/:wsId/:id', () => {
     expect((await req(app, 'PATCH', '/ws-1/i1', { agent: 'shell' })).body.error).toBe('invalid_agent')
   })
 
+  it('400 invalid_effort for an unsupported value', async () => {
+    await createIssue(wsDir, { id: 'i1', title: 'T' })
+    const { app } = build()
+    const r = await req(app, 'PATCH', '/ws-1/i1', { effort: 'extreme' })
+    expect(r.status).toBe(400)
+    expect(r.body.error).toBe('invalid_effort')
+  })
+
   it('validates and persists explicit scheduled ownership', async () => {
     await createIssue(wsDir, { id: 'i1', title: 'T', when: { kind: 'every', every: '1h' } })
     const { app } = build()
@@ -176,7 +184,13 @@ describe('PATCH /api/issues/:wsId/:id', () => {
     await createIssue(wsDir, { id: 'i1', title: 'T', body: 'keep me' })
     const { app, appendProvenance } = build()
     const r = await req(app, 'PATCH', '/ws-1/i1', {
-      status: 'in_progress', priority: 'high', assignee: '@human', agent: 'pi', what: 'new exact work',
+      status: 'in_progress',
+      priority: 'high',
+      assignee: '@human',
+      agent: 'pi',
+      model: 'gemini-3.5-pro',
+      effort: 'high',
+      what: 'new exact work',
     })
     expect(r.status).toBe(200)
     expect(r.body.issue).toMatchObject({
@@ -185,6 +199,8 @@ describe('PATCH /api/issues/:wsId/:id', () => {
       priority: 'high',
       assignee: '@human',
       agent: 'pi',
+      model: 'gemini-3.5-pro',
+      effort: 'high',
       what: 'new exact work',
     })
     expect(Array.isArray(r.body.runs)).toBe(true)
@@ -192,6 +208,8 @@ describe('PATCH /api/issues/:wsId/:id', () => {
     const re = await readWorkspaceIssues(wsDir)
     expect(re.ok && re.issues[0].status).toBe('in_progress')
     expect(re.ok && re.issues[0].agent).toBe('pi')
+    expect(re.ok && re.issues[0].model).toBe('gemini-3.5-pro')
+    expect(re.ok && re.issues[0].effort).toBe('high')
     expect(re.ok && re.issues[0].what).toBe('new exact work')
     expect(appendProvenance).toHaveBeenCalledWith(expect.objectContaining({
       artifact: { kind: 'issue', workspaceId: 'ws-1', issueId: 'i1' },
@@ -203,6 +221,8 @@ describe('PATCH /api/issues/:wsId/:id', () => {
           { field: 'priority', before: 'none', after: 'high' },
           { field: 'assignee', before: '@workspace', after: '@human' },
           { field: 'runtime', after: 'pi' },
+          { field: 'model', after: 'gemini-3.5-pro' },
+          { field: 'effort', after: 'high' },
           { field: 'what' },
         ]),
       },

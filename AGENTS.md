@@ -9,6 +9,10 @@ Keep this file short. It contains rules that apply to every task. Detailed
 architecture and operating procedures live in the owner guides linked below.
 Current code, tests, rendered behavior, and GitHub state override stale prose.
 
+Durable subsystem truth lives under [[docs/README.md]]. Active multi-step
+implementation work lives under [[PLANS.md]]. Keep both indexes current when a
+change introduces a new owner guide or execution plan.
+
 ## Start Here
 
 ```bash
@@ -165,6 +169,26 @@ Handle in-scope findings in the current PR instead of filing an issue for work
 the same change already owns. Product-roadmap ideas still belong to the user's
 planning surface rather than being silently converted into engineering tasks.
 
+## Implementation Plans
+
+Use `plans/<topic>.md` for substantial work that spans multiple surfaces,
+increments, or sessions. [[PLANS.md]] is the compact index and lifecycle
+contract.
+
+- A plan records scope, decisions, ordered work, verification, and live
+  progress. It is not an owner guide and must link to the relevant `docs/`
+  contract instead of copying it.
+- Update the plan in the same change as meaningful progress, newly discovered
+  constraints, scope changes, or completion. Checkboxes must reflect repository
+  truth rather than intent.
+- Keep one canonical plan per initiative. Extend or supersede it explicitly
+  instead of creating parallel TODO notes.
+- Active plans stay in `plans/`; completed plans remain as a concise execution
+  record and move to the Completed section of [[PLANS.md]].
+- GitHub issues remain the external defect/deferred-work surface. Reference
+  related issues and PRs from the plan; do not use a plan to hide actionable
+  deferred findings from the issue tracker.
+
 ## Owner Guides
 
 Read the relevant guide before editing its subsystem:
@@ -176,6 +200,9 @@ Read the relevant guide before editing its subsystem:
   delivery modes, promotions, external contributions, and risk gates.
 - [[docs/managed-workspace-runtime.md]] — [Managed Workspace runtime](docs/managed-workspace-runtime.md): Electron
   packaging, managed Pi, PortableGit/Bash, runtime profiles, and Workspace PATH.
+- [[docs/model-semantics-and-runtime-injection.md]] — [Model semantics and runtime injection](docs/model-semantics-and-runtime-injection.md):
+  credential access, model/effort semantics, Workspace-local defaults, and
+  one-run native CLI overrides.
 - [[docs/broker-packs.md]] — [Broker Packs](docs/broker-packs.md): optional broker SDK
   packaging, UI installation, activation, runtime loading, and release assets.
 - [[docs/cli-installer.md]] — [CLI installer](docs/cli-installer.md): consent, installed layout,

@@ -22,7 +22,7 @@ export type ModelReasoningEffort =
   | 'xhigh'
   | 'max'
 
-export const MODEL_REASONING_EFFORTS: readonly ModelReasoningEffort[] = [
+export const MODEL_REASONING_EFFORTS = [
   'none',
   'minimal',
   'low',
@@ -30,7 +30,7 @@ export const MODEL_REASONING_EFFORTS: readonly ModelReasoningEffort[] = [
   'high',
   'xhigh',
   'max',
-]
+] as const satisfies readonly ModelReasoningEffort[]
 
 export function isModelReasoningEffort(value: unknown): value is ModelReasoningEffort {
   return typeof value === 'string' && MODEL_REASONING_EFFORTS.includes(value as ModelReasoningEffort)

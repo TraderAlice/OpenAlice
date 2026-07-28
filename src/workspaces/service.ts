@@ -11,7 +11,7 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
-import { basename, join } from 'node:path';
+import { basename, delimiter, join } from 'node:path';
 
 import { cliBinPath } from '@/core/paths.js';
 import { readCredentials, readIssueDefaultAgent, readWorkspaceDefaultAgent } from '@/core/config.js';
@@ -35,6 +35,7 @@ import {
   isAgentRuntime,
   prepareAgentRuntimeWorkspace,
   type CliAdapter,
+  type HeadlessRunOverrides,
 } from './cli-adapter.js';
 import { loadConfig, type ServerConfig } from './config.js';
 import { ensureAgentCredentialReady } from './agent-credential-readiness.js';
@@ -183,6 +184,120 @@ export class IssueRetryError extends Error {
     this.name = 'IssueRetryError';
   }
 }
+
+export type SpawnEnvironmentSource = 'terminal' | 'workspace' | 'tools' | 'adapter';
+
+export interface SpawnEnvironmentDisclosure {
+  readonly key: string;
+  readonly source: SpawnEnvironmentSource;
+  readonly presentation: 'value' | 'configured' | 'redacted' | 'path-count';
+  readonly value?: string;
+  readonly count?: number;
+}
+
+function sensitiveEnvironmentKey(key: string): boolean {
+  return /(?:API_?KEY|(?:^|_)KEY(?:_|$)|AUTH|BEARER|CREDENTIAL|PASSWORD|SECRET|TOKEN)/i.test(key);
+}
+
+function discloseEnvironmentValue(
+  key: string,
+  value: string,
+  source: SpawnEnvironmentSource,
+): SpawnEnvironmentDisclosure {
+  if (sensitiveEnvironmentKey(key)) {
+    return { key, source, presentation: 'redacted' };
+  }
+  if (key === 'PATH') {
+    return {
+      key,
+      source,
+      presentation: 'path-count',
+      count: value.split(delimiter).filter(Boolean).length,
+    };
+  }
+  if (
+    key === 'OPENALICE_TOOL_URL' ||
+    key === 'OPENALICE_TOOL_SOCKET' ||
+    key === 'OPENALICE_MCP_URL'
+  ) {
+    return { key, source, presentation: 'configured' };
+  }
+  // Adapter env may include Workspace-local, user-authored keys (Codex
+  // env.json is intentionally extensible). Only disclose values for the small
+  // set of launcher-owned, non-secret adapter settings we understand.
+  if (
+    source === 'adapter' &&
+    key !== 'CODEX_HOME' &&
+    !key.startsWith('OPENCODE_DISABLE_')
+  ) {
+    return { key, source, presentation: 'configured' };
+  }
+  return { key, source, presentation: 'value', value };
+}
+
+export function launchEnvironmentDisclosure(
+  env: Readonly<Record<string, string>>,
+  adapterEnv: Readonly<Record<string, string>>,
+): readonly SpawnEnvironmentDisclosure[] {
+  const adapterKeys = new Set(Object.keys(adapterEnv));
+  const groups: readonly {
+    source: SpawnEnvironmentSource;
+    keys: readonly string[];
+  }[] = [
+    {
+      source: 'terminal',
+      keys: [
+        'TERM',
+        'COLORTERM',
+        'TERM_PROGRAM',
+        'TERM_PROGRAM_VERSION',
+        'LANG',
+        'LC_CTYPE',
+      ],
+    },
+    {
+      source: 'workspace',
+      keys: [
+        'PWD',
+        'AQ_WS_ID',
+        'AQ_LAUNCHER_REPO_ROOT',
+        'GIT_AUTHOR_NAME',
+        'GIT_AUTHOR_EMAIL',
+        'GIT_COMMITTER_NAME',
+        'GIT_COMMITTER_EMAIL',
+      ],
+    },
+    {
+      source: 'tools',
+      keys: [
+        'PATH',
+        'OPENALICE_TOOL_URL',
+        'OPENALICE_TOOL_SOCKET',
+        'OPENALICE_MCP_URL',
+      ],
+    },
+    {
+      source: 'adapter',
+      keys: Object.keys(adapterEnv).sort(),
+    },
+  ];
+  const seen = new Set<string>();
+  const out: SpawnEnvironmentDisclosure[] = [];
+  for (const group of groups) {
+    for (const key of group.keys) {
+      if (seen.has(key)) continue;
+      const value = env[key];
+      if (value === undefined) continue;
+      seen.add(key);
+      out.push(discloseEnvironmentValue(
+        key,
+        value,
+        adapterKeys.has(key) ? 'adapter' : group.source,
+      ));
+    }
+  }
+  return out;
+}
 import { ScrollbackStore } from './scrollback-store.js';
 import { SessionPool, type SessionFactoryContext } from './session-pool.js';
 import { SessionRegistry, type SessionRecord } from './session-registry.js';
@@ -220,8 +335,11 @@ export interface SpawnPlan {
   /** Adapter-native id used only for backend diagnostics. */
   readonly nativeSessionId: string | null;
   readonly composedCommand: readonly string[];
+  readonly resolvedCommand: readonly string[];
+  readonly launchMode: 'direct' | 'node-shim' | 'bash-shim' | 'cmd-shim';
   readonly spawnCwd: string;
   readonly envPWD: string | null;
+  readonly environment: readonly SpawnEnvironmentDisclosure[];
   readonly transcriptDir: string | null;
   readonly projectKey: string | null;
 }
@@ -344,6 +462,8 @@ export interface WorkspaceService {
     resumeId?: string,
     /** Optional Inbox/Issue reverse link for a user-initiated inquiry. */
     inquiry?: HeadlessTaskInquiry,
+    /** Explicit one-run model/effort; authentication remains Workspace-owned. */
+    overrides?: HeadlessRunOverrides,
   ): Promise<{ taskId: string; resumeId: string }>;
   /** Read-only scheduling projection of every workspace's `.alice/issues/`
    *  directory (scheduled issues only) + each task's last-fired marker and
@@ -397,6 +517,8 @@ export interface CreateWorkspaceServiceOptions {
   readonly toolSocketPath?: string;
   /** Optional MCP protocol URL. Absent when MCP is disabled. */
   readonly mcpBaseUrl?: string;
+  /** Internal test seam. Production omits this and keeps the 60-second scan. */
+  readonly scheduleScannerIntervalMs?: number;
   /** The global inbox store, so `issueDetail` can join the inbox reports an
    *  issue produced (entries stamped `origin.issueId`) in the domain layer —
    *  every surface (HTTP / CLI / MCP) gets the join, not just the route.
@@ -727,8 +849,11 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     extraEnv?: Record<string, string>,
   ): {
     command: readonly string[];
+    resolvedCommand: readonly string[];
+    launchMode: SpawnPlan['launchMode'];
     cwd: string;
     env: Record<string, string>;
+    environment: readonly SpawnEnvironmentDisclosure[];
     transcriptDir: string | null;
   } => {
     const baseEnv = buildSpawnEnv(process.env, {
@@ -780,28 +905,33 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     // fresh spawn's resume to its assigned `{ sessionId }`, so a resume check
     // would wrongly drop pi's seed — the adapters self-gate where it matters).
     //
-    // SECURITY (win32): opencode/pi install as `.cmd` npm shims, so they spawn via
-    // `cmd.exe /d /c <shim> …` (resolveLaunchCommand → viaShell). A user prompt
-    // with cmd metacharacters (& | < > ^ %) would be re-parsed by cmd.exe
-    // (BatBadBut / CVE-2024-27980); the headless path refuses shim agents on win32
-    // for exactly this. We compose WITH the seed, then if the RESOLVED binary
-    // needs the shell wrap, DROP the seed and recompose unseeded (the TUI still
-    // opens, just not pre-filled). Native-exe agents (claude/codex) and all of
-    // macOS/Linux resolve viaShell:false, so this is a no-op there. Resolve the
-    // COMPOSED argv0 (the adapter's real binary), not config.command — codex/
-    // opencode/pi ignore the base and hardcode their own binary.
+    // SECURITY (win32): verified npm JS entrypoints and extensionless sibling
+    // shims run without cmd.exe, so their prompt remains a literal argv item.
+    // A batch-only fallback still resolves viaShell:true; drop a user seed in
+    // that legacy case because cmd would re-parse & | < > ^ %. The TUI still
+    // opens, just not pre-filled. Resolve the COMPOSED argv0 (the adapter's real
+    // binary), not config.command — codex/opencode/pi ignore the base.
     const compose = (withSeed: boolean): readonly string[] =>
       adapter.composeCommand(
         config.command,
         withSeed && initialPrompt ? { ...baseCtx, initialPrompt } : baseCtx,
       );
     let command = compose(true);
-    if (initialPrompt && resolveLaunchCommand(command, { env }).viaShell) {
+    if (initialPrompt && resolveLaunchCommand(command, { env, cwd: ws.dir }).viaShell) {
       launcherLogger.warn('spawn.seed_dropped_win32_shim', { wsId: ws.id, agent: adapter.id });
       command = compose(false);
     }
+    const resolved = resolveLaunchCommand(command, { env, cwd: ws.dir });
     const transcriptDir = adapter.transcriptDir ? adapter.transcriptDir(ws.dir) : null;
-    return { command, cwd: ws.dir, env, transcriptDir };
+    return {
+      command,
+      resolvedCommand: resolved.argv,
+      launchMode: resolved.mode,
+      cwd: ws.dir,
+      env,
+      environment: launchEnvironmentDisclosure(env, adapterEnv),
+      transcriptDir,
+    };
   };
 
   const getRuntimeAdapters = () => adapters.list().filter(isAgentRuntime);
@@ -943,6 +1073,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   const syntheticRuntimeReadinessFailure = (message: string): HeadlessTaskResult => ({
     command: [],
     cwd: config.launcherRoot,
+    processStarted: false,
+    launchErrorCode: 'spawn_failed',
+    error: message,
     exitCode: -1,
     signal: null,
     killed: false,
@@ -1094,13 +1227,24 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     adapter: CliAdapter,
     resume: SessionFactoryContext['resume'],
   ): SpawnPlan => {
-    const { command, cwd, env, transcriptDir } = composeSpawnInputs(ws, adapter, resume);
+    const {
+      command,
+      resolvedCommand,
+      launchMode,
+      cwd,
+      env,
+      environment,
+      transcriptDir,
+    } = composeSpawnInputs(ws, adapter, resume);
     return {
       resumeMode: resume === undefined ? 'fresh' : resume === 'last' ? 'last' : 'by-id',
       nativeSessionId: resume && resume !== 'last' ? resume.sessionId : null,
       composedCommand: command,
+      resolvedCommand,
+      launchMode,
       spawnCwd: cwd,
       envPWD: env['PWD'] ?? null,
+      environment,
       transcriptDir,
       projectKey: transcriptDir ? basename(transcriptDir) : null,
     };
@@ -1168,6 +1312,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       resumeId?: string;
       resume?: SessionFactoryContext['resume'];
       onSessionId?: (id: string) => void;
+      overrides?: HeadlessRunOverrides;
     } = {},
   ): Promise<HeadlessTaskResult> => {
     const operationLease = workspaceOperationGuard.acquire(ws.id, 'headless-run');
@@ -1222,6 +1367,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         config.command,
         { cwd, env, ...(opts.resume !== undefined ? { resume: opts.resume } : {}) },
         prompt,
+        opts.overrides,
       );
       const logPaths = opts.taskId ? headlessLogPaths(headlessLogsDir, opts.taskId) : null;
       const activityLease = headlessActivity.begin({
@@ -1235,7 +1381,12 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           cwd,
           env,
           timeoutMs,
-          logger: launcherLogger.child({ scope: 'headless', wsId: ws.id, agent: adapter.id }),
+          logger: launcherLogger.child({
+            scope: 'headless',
+            wsId: ws.id,
+            agent: adapter.id,
+            ...(opts.taskId ? { taskId: opts.taskId } : {}),
+          }),
           ...(logPaths
             ? { stdoutFile: logPaths.stdout, stderrFile: logPaths.stderr, structuredFile: logPaths.structured }
             : {}),
@@ -1284,6 +1435,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     trigger?: HeadlessTaskTrigger,
     resumeId?: string,
     inquiry?: HeadlessTaskInquiry,
+    overrides?: HeadlessRunOverrides,
   ): Promise<{ taskId: string; resumeId: string }> => {
     if (catalog.get(ws.id)?.lifecycle !== 'active') {
       throw new Error(`workspace is not active: ${ws.id}`);
@@ -1345,6 +1497,8 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       rec = await headlessTasks.create({
         wsId: ws.id,
         agent: adapter.id,
+        ...(overrides?.model ? { model: overrides.model } : {}),
+        ...(overrides?.reasoningEffort ? { effort: overrides.reasoningEffort } : {}),
         prompt,
         startedAt: Date.now(),
         resumeId: identity.resumeId,
@@ -1371,6 +1525,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       taskId: rec.taskId,
       resumeId: rec.resumeId,
       ...(nativeResume ? { resume: nativeResume } : {}),
+      ...(overrides ? { overrides } : {}),
       onSessionId: (id) => {
         void Promise.all([
           headlessTasks.setAgentSessionId(rec.taskId, id),
@@ -1388,9 +1543,12 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           status,
           finishedAt: Date.now(),
           durationMs: r.durationMs,
+          processStarted: r.processStarted,
+          ...(r.launchErrorCode ? { launchErrorCode: r.launchErrorCode } : {}),
           exitCode: r.exitCode,
           signal: r.signal,
           killed: r.killed,
+          ...(r.error ? { error: r.error } : {}),
           output: {
             hasAssistantReply: r.structured.assistantText !== null,
             ...(r.structured.assistantText
@@ -1558,6 +1716,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     observeIssues: (workspace, issues) => observeIssueRecords(workspace, issues),
     markers: scheduleMarkers,
     logger: launcherLogger.child({ scope: 'schedule' }),
+    ...(opts.scheduleScannerIntervalMs !== undefined
+      ? { intervalMs: opts.scheduleScannerIntervalMs }
+      : {}),
   });
   // Read-only aggregation for the Schedules dashboard (GET /api/schedule).
   // Walks each workspace's live declaration + the scanner's marker; the route

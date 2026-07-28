@@ -105,7 +105,8 @@ the full workflow):
   backtest one entry + one exit (`trailing_stop`/`ma_break`/`stop`/`target`/
   `hold`); returns entry/exit, returnPct, MFE/MAE.
 - **`alice analysis quant … --dates`** — opt-in date axis on a quant result
-  (`dates[barId]`), to map a dumped series back to days.
+  (`dates[barId]` for one interval; `dates["barId@interval"]` when the same
+  barId is used at multiple intervals), to map a dumped series back to days.
 
 ## Function catalog
 

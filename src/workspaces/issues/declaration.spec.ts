@@ -97,6 +97,8 @@ describe('readWorkspaceIssues', () => {
           'when: { kind: every, every: 30m }',
           'what: run the research routine',
           'agent: codex',
+          'model: gpt-5.6',
+          'effort: high',
         ].join('\n'),
         'Scan overnight movers and summarize.\n',
       ),
@@ -114,6 +116,8 @@ describe('readWorkspaceIssues', () => {
         assignee: '@workspace',
         what: 'run the research routine\n\n## Context\n\nScan overnight movers and summarize.',
         agent: 'codex',
+        model: 'gpt-5.6',
+        effort: 'high',
       })
       expect(i.when).toEqual({ kind: 'every', every: '30m' })
       expect(i.what).toBe('run the research routine\n\n## Context\n\nScan overnight movers and summarize.')
@@ -134,6 +138,21 @@ describe('readWorkspaceIssues', () => {
     const byId = Object.fromEntries(result.issues.map((issue) => [issue.id, issue]))
     expect(issueAssigneeResumeId(byId['owned'].assignee)).toBe('resume-kind-owl-abc123')
     expect(byId['legacy'].assignee).toBe('@workspace')
+  })
+
+  it('rejects every runtime override on an exact Session owner', async () => {
+    await writeIssue('owned-runtime', fm([
+      'title: Owned runtime',
+      'when: { kind: every, every: 30m }',
+      'assignee: "@resume-kind-owl-abc123"',
+      'agent: codex',
+      'model: gpt-5.6',
+      'effort: high',
+    ].join('\n')))
+    const result = await readWorkspaceIssues(dir)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.invalid[0]?.error).toMatch(/agent.*model.*effort/)
   })
 
   it('rejects retired execution declarations instead of silently keeping two owner models', async () => {

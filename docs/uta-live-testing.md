@@ -44,6 +44,22 @@ touched contract requires it.
 | New broker or new traded market type | Full applicable S1-S14 catalog for that venue | Always required before claiming support |
 | UTA health/restart/supervision without trading changes | Health and restart smoke with a broker disabled or read-only | Only if recovery of pending/open orders is part of the change |
 
+For CCXT public K-line changes, run the gated keyless freshness acceptance. It
+uses no credentials or trading endpoints, reproduces the same old start windows
+as `alice analysis bars(..., count=50)`, and asserts that Binance, OKX, and
+Bybit still return a latest bar across 1m, 15m, 1h, 4h, and 1d:
+
+```bash
+CCXT_E2E=1 pnpm exec vitest run \
+  --config vitest.e2e.config.ts \
+  services/uta/src/domain/trading/brokers/ccxt/CcxtBroker.e2e.spec.ts
+```
+
+Keep this outside ordinary CI: it is real venue evidence, but DNS, venue
+availability, geo restrictions, and public rate limits are external failure
+modes. The deterministic broker specs must model the venue's first-page
+pagination behavior so the product regression remains covered offline.
+
 The commands are intentionally asymmetric:
 
 ```bash

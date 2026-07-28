@@ -7,6 +7,7 @@ import type { InboxEntry } from '../api/inbox'
 import type {
   IssueDetail as IssueDetailData,
   IssueDetailIssue,
+  IssuePatch,
   IssueActivityRecord,
   IssuePriority,
   IssueProvenanceRecord,
@@ -15,6 +16,7 @@ import type {
   WikilinkIssueRef,
   WikilinkResolution,
 } from '../api/issues'
+import type { ModelReasoningEffort } from '../api/types'
 import {
   getAgentReadiness,
   getWorkspaceSessionDirectory,
@@ -57,9 +59,17 @@ const railControl =
   'min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1 text-[13px] text-foreground outline-none transition-colors focus:border-primary/60 focus:shadow-[0_0_0_1px_var(--primary-muted)] disabled:cursor-not-allowed disabled:opacity-50'
 
 const CONFIGURABLE_AGENTS: readonly AgentId[] = ['claude', 'codex', 'opencode', 'pi']
+const ALL_RUN_EFFORTS: readonly ModelReasoningEffort[] = [
+  'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max',
+]
 
 function isConfigurableAgent(agent: string | null | undefined): agent is AgentId {
   return CONFIGURABLE_AGENTS.includes(agent as AgentId)
+}
+
+function runEffortsForAgent(agent: string | null): readonly ModelReasoningEffort[] {
+  if (agent === 'claude') return ['low', 'medium', 'high', 'max']
+  return ALL_RUN_EFFORTS
 }
 
 function fmtDuration(ms?: number): string {
@@ -218,6 +228,40 @@ function AgentEditor({
   )
 }
 
+function ModelEditor({
+  value,
+  disabled,
+  onChange,
+}: {
+  value?: string
+  disabled?: boolean
+  onChange: (next: string | null) => void
+}) {
+  const [draft, setDraft] = useState(value ?? '')
+  useEffect(() => setDraft(value ?? ''), [value])
+  const commit = () => {
+    const next = draft.trim()
+    if (next !== (value ?? '')) onChange(next || null)
+  }
+  return (
+    <input
+      className={railControl}
+      value={draft}
+      disabled={disabled}
+      placeholder="Inherit Workspace"
+      aria-label="Run model"
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          commit()
+          event.currentTarget.blur()
+        }
+      }}
+    />
+  )
+}
+
 function PropertySection({
   title,
   description,
@@ -261,7 +305,7 @@ function PropertiesRail({
   retrying: boolean
   error: string | null
   canRetry: boolean
-  onPatch: (patch: { status?: IssueStatus; priority?: IssuePriority; assignee?: string; agent?: string | null; what?: string }) => void
+  onPatch: (patch: IssuePatch) => void
   onRetry: () => void
   onConfigureAgent: (agent: AgentId) => void
 }) {
@@ -277,6 +321,7 @@ function PropertiesRail({
   const effectiveAgent = ownerSession?.agent || issue.agent || issueDefaultInOptions || defaultInOptions || agentOptions[0]?.id || null
   const selectedReadiness = effectiveAgent ? agentReadiness[effectiveAgent] : undefined
   const agentNeedsCredential = selectedReadiness?.requiresCredential === true && !selectedReadiness.ready
+  const effortOptions = runEffortsForAgent(effectiveAgent)
   return (
     <aside className="min-w-0 w-full shrink-0 space-y-3 lg:col-start-2 lg:row-start-1 lg:row-span-2">
       <PropertySection title="Work item" description="Ownership and schedule are part of this Issue.">
@@ -337,10 +382,47 @@ function PropertiesRail({
                 options={agentOptions}
                 readiness={agentReadiness}
                 disabled={saving}
-                onChange={(agent) => onPatch({ agent })}
+                onChange={(agent) => {
+                  const nextAgent = agent || issueDefaultInOptions || defaultInOptions || agentOptions[0]?.id || null
+                  onPatch({
+                    agent,
+                    ...(issue.effort && !runEffortsForAgent(nextAgent).includes(issue.effort)
+                      ? { effort: null }
+                      : {}),
+                  })
+                }}
                 onConfigure={onConfigureAgent}
               />
             </EditRow>
+          )}
+          {!ownerResumeId && (
+            <>
+              <EditRow label="Model">
+                <ModelEditor
+                  value={issue.model}
+                  disabled={saving}
+                  onChange={(model) => onPatch({ model })}
+                />
+              </EditRow>
+              <EditRow label="Effort">
+                <select
+                  className={railControl}
+                  value={issue.effort ?? ''}
+                  disabled={saving}
+                  aria-label="Run effort"
+                  onChange={(event) => onPatch({
+                    effort: event.target.value
+                      ? event.target.value as ModelReasoningEffort
+                      : null,
+                  })}
+                >
+                  <option value="">Inherit Workspace</option>
+                  {effortOptions.map((effort) => (
+                    <option key={effort} value={effort}>{effort}</option>
+                  ))}
+                </select>
+              </EditRow>
+            </>
           )}
           {agentNeedsCredential && (
             <p className="py-2 text-right text-[11px] leading-snug text-warning">AI credential missing.</p>
@@ -496,6 +578,8 @@ function RunRow({ run, onOpen }: { run: IssueRunRecord; onOpen: (run: IssueRunRe
           {displayStatus}
         </span>
         <span className="text-xs text-muted-foreground">{run.agent}</span>
+        {run.model && <span className="text-xs text-muted-foreground">· {run.model}</span>}
+        {run.effort && <span className="text-xs text-muted-foreground">· {run.effort}</span>}
         <span className="ml-auto text-xs text-muted-foreground" title={new Date(run.startedAt).toLocaleString()}>
           {formatRelativeTime(run.startedAt)}
         </span>
@@ -612,6 +696,8 @@ const MUTATION_FIELD_LABEL: Record<string, string> = {
   assignee: 'Assignee',
   schedule: 'Schedule',
   runtime: 'Runtime',
+  model: 'Model',
+  effort: 'Effort',
   what: 'What',
 }
 
@@ -1048,7 +1134,7 @@ export function IssueDetail({
   )
 
   const onPatch = useCallback(
-    async (patch: { status?: IssueStatus; priority?: IssuePriority; assignee?: string; agent?: string | null; what?: string }): Promise<boolean> => {
+    async (patch: IssuePatch): Promise<boolean> => {
       setSaving(true)
       setActionError(null)
       try {

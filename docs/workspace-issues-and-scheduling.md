@@ -35,7 +35,9 @@ status: todo
 priority: high
 assignee: "@workspace"
 when: { kind: cron, cron: "30 8 * * 1-5", timezone: America/New_York }
-agent: pi
+agent: codex
+model: gpt-5.6
+effort: high
 ---
 
 Pull pre-market movers and overnight news, write `research/premarket.md`,
@@ -61,6 +63,18 @@ The filename stem is the stable issue id. Frontmatter:
 - `agent` — optional CLI adapter id for `@new` / `@workspace` scheduled work;
   otherwise Workspace/default resolution is used. A Session assignee already
   owns its runtime and cannot be overridden here.
+- `model` — optional native model id for this Issue's run. Omission inherits the
+  Workspace/native runtime model.
+- `effort` — optional one-run reasoning effort:
+  `none | minimal | low | medium | high | xhigh | max`. The chosen runtime must
+  expose that level; omission inherits its Workspace/native default.
+
+`agent`, `model`, and `effort` are one run-selection tuple. They never carry an
+endpoint, provider, or credential, and the scheduler expresses them as native
+CLI arguments without rewriting Workspace files. All three are forbidden when
+`assignee` is an exact `@resumeId`, because that Session owns its runtime
+conversation. `@new` may use them for its first dispatch; after it becomes an
+exact Session owner, the claim rewrite removes the tuple.
 
 Migration `0018_issue_assignee_ownership` removes the retired parallel
 `execution` field. It maps `resume` to the former `session:<resumeId>` shape and
@@ -120,14 +134,14 @@ Agents normally use:
 ```bash
 alice-workspace issue list
 alice-workspace issue show --id <id-or-title>
-alice-workspace issue create --title "..." --what "..." --when '{"kind":"every","every":"1h"}' --assignee workspace
-alice-workspace issue update --id <id> --status done
+alice-workspace issue create --title "..." --what "..." --when '{"kind":"every","every":"1h"}' --assignee @workspace --agent codex --model gpt-5.6 --effort high
+alice-workspace issue update --id <id> --model gpt-5.6 --effort high
 alice-workspace issue comment --id <id> --text "..."
 ```
 
 The CLI and MCP tools use the same implementation and write the same files.
 Direct file editing is also valid and is the clearest way to author rich What
-markdown plus `when` / `assignee` / `agent` frontmatter.
+markdown plus `when` / `assignee` / `agent` / `model` / `effort` frontmatter.
 
 `issue comment` is preferable to a generic `issue ask --owner` for normal
 collaboration because it leaves the question and answer in the Issue Activity
@@ -145,6 +159,7 @@ an attended, human-approved path and a commit in the peer repository.
   -> ScheduleScanner (~60s)
   -> due calculation from `when` + last-fired marker
   -> assignee selects a new Workspace Session or exact resumeId
+  -> optional model/effort become one-run native CLI arguments
   -> headless run of the owning Workspace
   -> native agent CLI
   -> normalized reply + message/tool blocks
@@ -158,7 +173,18 @@ run checks X and exits silently when false.
 
 The scanner persists only last-fired markers under the launcher state root.
 Schedule semantics remain in the issue file. Markers are written after a
-successful dispatch; capacity/transient rejection stays due for retry.
+successful dispatch, meaning a durable run record was accepted. If that worker
+later fails to launch or exits unsuccessfully, the failed run remains the
+single attempt for that occurrence and the operator can use **Retry now**; the
+scanner does not turn its own tick interval into a retry storm. Capacity or
+another admission rejection that creates no run stays due for retry.
+
+The durable run record keeps the requested model and effort beside the resolved
+agent. This is selection provenance, not a claim that the provider honored an
+unknown model: native CLI failure remains visible in the run result. For an
+OpenAlice-managed opencode or Pi provider, the model must already be registered
+by that Workspace; otherwise dispatch fails with an actionable message instead
+of mutating provider registration during a concurrent run.
 
 The Issue API also derives an `automationHealth` projection from these markers,
 the latest scheduled run, and the assignee's resume availability. It is not
@@ -183,6 +209,13 @@ Old runs therefore gain structured `failure.kind/title/message/retryable`
 diagnostics without migration. A killed run close to 30 minutes is a timeout;
 a killed run whose watchdog closes much later is described conservatively as a
 paused computer/launcher rather than falsely blaming the agent.
+
+Startup evidence is explicit on new run records. `processStarted` becomes true
+only after the OS child emits `spawn`; `launchErrorCode` distinguishes an
+unsupported Windows batch shim, a missing executable, and another spawn
+failure. Pre-process failures also persist their human-readable `error` and
+stderr diagnostic, so they project as `launch_error / Agent could not start`
+rather than the misleading `process_exit` used by older `exitCode: -1` records.
 
 The Issue detail offers **Retry now** only for the latest failed or interrupted
 scheduled run. Retry re-reads the live Issue and uses the same markdown What,

@@ -23,6 +23,7 @@ import { join } from 'node:path'
 
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml'
 
+import { isModelReasoningEffort, type ModelReasoningEffort } from '../../ai-providers/model-semantics.js'
 import { readWorkspaceFile, writeWorkspaceFile } from '../file-service.js'
 import {
   ISSUE_PRIORITIES,
@@ -49,6 +50,10 @@ export interface IssueFieldPatch {
   assignee?: string
   /** Runtime override for scheduled fires; null removes the override. */
   agent?: string | null
+  /** Native model id for one scheduled fire; null inherits Workspace/runtime. */
+  model?: string | null
+  /** Reasoning effort for one scheduled fire; null inherits Workspace/runtime. */
+  effort?: ModelReasoningEffort | null
   /** Canonical markdown work definition; exact scheduled prompt. */
   what?: string
 }
@@ -64,6 +69,8 @@ export interface CreateIssueInput {
   when?: unknown
   what?: string
   agent?: string
+  model?: string
+  effort?: ModelReasoningEffort
   /** @deprecated Compatibility alias for callers written before What became the
    * sole markdown document. New callers must use `what`. */
   body?: string
@@ -156,7 +163,11 @@ export async function updateIssueFields(
       return { ok: false, reason: 'invalid', error: 'assignee must be @workspace, @new, @human, @unassigned, or an exact @resumeId' }
     }
     data.assignee = assignee.data
-    if (issueAssigneeResumeId(assignee.data)) delete data.agent
+    if (issueAssigneeResumeId(assignee.data)) {
+      delete data.agent
+      delete data.model
+      delete data.effort
+    }
   }
   if (patch.agent !== undefined) {
     if (patch.agent === null) {
@@ -165,6 +176,24 @@ export async function updateIssueFields(
       const a = patch.agent.trim()
       if (a.length === 0) return { ok: false, reason: 'invalid', error: 'agent must be a non-empty string or null' }
       data.agent = a
+    }
+  }
+  if (patch.model !== undefined) {
+    if (patch.model === null) {
+      delete data.model
+    } else {
+      const model = patch.model.trim()
+      if (!model) return { ok: false, reason: 'invalid', error: 'model must be a non-empty string or null' }
+      data.model = model
+    }
+  }
+  if (patch.effort !== undefined) {
+    if (patch.effort === null) {
+      delete data.effort
+    } else if (!isModelReasoningEffort(patch.effort)) {
+      return { ok: false, reason: 'invalid', error: 'invalid effort' }
+    } else {
+      data.effort = patch.effort
     }
   }
   let what = current.issue.what
@@ -211,6 +240,8 @@ export async function createIssue(wsDir: string, input: CreateIssueInput): Promi
   if (input.assignee !== undefined) data.assignee = input.assignee
   if (input.when !== undefined) data.when = input.when
   if (input.agent !== undefined) data.agent = input.agent
+  if (input.model !== undefined) data.model = input.model
+  if (input.effort !== undefined) data.effort = input.effort
 
   const parsed = issueFrontmatterSchema.safeParse(data)
   if (!parsed.success) {

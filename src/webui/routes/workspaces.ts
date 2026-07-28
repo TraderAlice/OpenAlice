@@ -114,6 +114,29 @@ function parseSeedPrompt(
   return { prompt: trimmed };
 }
 
+function redactLaunchCommand(argv: readonly string[]): readonly string[] {
+  const sensitiveName = /(?:api[-_]?key|(?:^|[-_])key(?:[-_]|$)|auth|credential|password|secret|token)/i;
+  const out: string[] = [];
+  let redactNext = false;
+  for (const part of argv) {
+    if (redactNext) {
+      out.push('<redacted>');
+      redactNext = false;
+      continue;
+    }
+    const assignment = /^([^=]+)=(.*)$/.exec(part);
+    if (assignment && sensitiveName.test(assignment[1] ?? '')) {
+      out.push(`${assignment[1]}=<redacted>`);
+      continue;
+    }
+    out.push(part);
+    if (sensitiveName.test(part) && /^--?/.test(part)) {
+      redactNext = true;
+    }
+  }
+  return out;
+}
+
 /** Max stored length of a session title (the seed message); the row truncates further. */
 const MAX_SESSION_TITLE = 200;
 
@@ -673,6 +696,54 @@ export function createWorkspaceRoutes(
           binPath: av?.path ?? null,
         };
       }),
+    });
+  });
+
+  app.get('/:id/launch-plan', (c) => {
+    const id = c.req.param('id');
+    if (!validId(id)) return c.json({ error: 'not_found' }, 404);
+    const meta = svc.resolveRuntimeWorkspace(id);
+    if (!meta) return c.json({ error: 'workspace_not_found' }, 404);
+
+    const agentId = c.req.query('agent')?.trim();
+    if (!agentId) {
+      return c.json({ error: 'agent_required', message: 'agent query parameter is required' }, 400);
+    }
+    const adapter = svc.adapters.get(agentId);
+    if (!adapter) return c.json({ error: 'unknown_agent' }, 400);
+    if (isAgentRuntime(adapter) && !meta.agents.includes(agentId)) {
+      return c.json({
+        error: 'agent_not_enabled',
+        message: `agent "${agentId}" not enabled on this workspace`,
+      }, 400);
+    }
+
+    const availability = svc.detectAgents()[agentId];
+    const plan = svc.computeSpawnPlan(meta, adapter, undefined);
+    return c.json({
+      workspace: {
+        id: meta.id,
+        tag: meta.tag,
+        dir: meta.dir,
+      },
+      agent: {
+        id: adapter.id,
+        displayName: adapter.displayName,
+        kind: isAgentRuntime(adapter) ? 'agent' : 'utility',
+        installed: availability?.installed ?? true,
+        binPath: availability?.path ?? null,
+        capabilities: adapter.capabilities,
+      },
+      launch: {
+        intent: 'fresh',
+        mode: plan.launchMode,
+        composedCommand: redactLaunchCommand(plan.composedCommand),
+        resolvedCommand: redactLaunchCommand(plan.resolvedCommand),
+        cwd: plan.spawnCwd,
+        envPWD: plan.envPWD,
+        environment: plan.environment,
+        transcriptDir: plan.transcriptDir,
+      },
     });
   });
 

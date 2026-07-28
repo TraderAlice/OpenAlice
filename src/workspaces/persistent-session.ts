@@ -164,13 +164,12 @@ export class PersistentSession {
     if (this.opts.command.length === 0) {
       throw new Error('command must contain at least one argv element');
     }
-    // win32: resolve the bare CLI name to its real `.exe`, or wrap a `.cmd`/
-    // `.ps1` npm shim through cmd.exe — ConPTY's CreateProcess only appends
-    // `.exe`, so npm-shim CLIs (opencode, pi) otherwise never launch. No-op off
-    // Windows. The interactive command is flags + launcher/adapter-generated
-    // ids, so the shell wrap is injection-safe here. See win-command.ts.
+    // win32: resolve the bare CLI name to its real executable, verified npm JS
+    // entrypoint, or extensionless sibling through Workspace Bash. Batch-only
+    // compatibility retains cmd.exe for trusted interactive argv.
     const [argv0, ...args] = resolveLaunchCommand(this.opts.command, {
       env: this.opts.env,
+      cwd: this.opts.cwd,
     }).argv;
     if (!argv0) throw new Error('command must contain at least one argv element');
 

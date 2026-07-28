@@ -39,7 +39,13 @@ function compactDuration(ms: number): string {
 export function issueRunFailure(
   task: Pick<
     HeadlessTaskRecord,
-    'status' | 'durationMs' | 'exitCode' | 'signal' | 'killed' | 'error'
+    | 'status'
+    | 'durationMs'
+    | 'processStarted'
+    | 'exitCode'
+    | 'signal'
+    | 'killed'
+    | 'error'
   >,
   timeoutMs = SCHEDULED_ISSUE_RUN_TIMEOUT_MS,
 ): IssueRunFailure | undefined {

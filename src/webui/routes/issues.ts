@@ -26,6 +26,11 @@
  */
 import { Hono } from 'hono'
 
+import {
+  MODEL_REASONING_EFFORTS,
+  isModelReasoningEffort,
+  type ModelReasoningEffort,
+} from '../../ai-providers/model-semantics.js'
 import type { WorkspaceConversationControl } from '../../core/workspace-tool-center.js'
 import { ACTIVITY_UPDATE_COALESCE_MS } from '../../core/provenance-store.js'
 import { createWorkspaceConversationControl } from '../../workspaces/conversation-control.js'
@@ -134,7 +139,15 @@ export function createIssuesRoutes(svc: WorkspaceService, deps: IssueRoutesDeps 
 
     const body = await safeJson(c)
     const fields = body && typeof body === 'object' ? (body as Record<string, unknown>) : {}
-    const patch: { status?: IssueStatus; priority?: IssuePriority; assignee?: string; agent?: string | null; what?: string } = {}
+    const patch: {
+      status?: IssueStatus
+      priority?: IssuePriority
+      assignee?: string
+      agent?: string | null
+      model?: string | null
+      effort?: ModelReasoningEffort | null
+      what?: string
+    } = {}
     if ('status' in fields) {
       const s = fields['status']
       if (typeof s !== 'string' || !ISSUE_STATUSES.includes(s as IssueStatus)) {
@@ -194,6 +207,29 @@ export function createIssuesRoutes(svc: WorkspaceService, deps: IssueRoutesDeps 
         patch.agent = agent
       }
     }
+    if ('model' in fields) {
+      const raw = fields['model']
+      if (raw === null || raw === '') {
+        patch.model = null
+      } else if (typeof raw !== 'string' || !raw.trim()) {
+        return c.json({ error: 'invalid_model', message: 'model must be a native model id or null' }, 400)
+      } else {
+        patch.model = raw.trim()
+      }
+    }
+    if ('effort' in fields) {
+      const raw = fields['effort']
+      if (raw === null || raw === '') {
+        patch.effort = null
+      } else if (!isModelReasoningEffort(raw)) {
+        return c.json({
+          error: 'invalid_effort',
+          message: `effort must be one of: ${MODEL_REASONING_EFFORTS.join(', ')}`,
+        }, 400)
+      } else {
+        patch.effort = raw
+      }
+    }
     if ('what' in fields) {
       const what = fields['what']
       if (typeof what !== 'string' || what.trim().length === 0) {
@@ -205,7 +241,10 @@ export function createIssuesRoutes(svc: WorkspaceService, deps: IssueRoutesDeps 
       patch.what = what.trim()
     }
     if (Object.keys(patch).length === 0) {
-      return c.json({ error: 'no_fields', message: 'provide at least one of status, priority, assignee, agent, what' }, 400)
+      return c.json({
+        error: 'no_fields',
+        message: 'provide at least one of status, priority, assignee, agent, model, effort, what',
+      }, 400)
     }
 
     try {

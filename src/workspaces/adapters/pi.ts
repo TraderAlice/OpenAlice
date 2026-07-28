@@ -1,15 +1,22 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { mkdir, readFile, realpath, rename, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 
 import { runtimeProfileFromEnv } from '@/core/runtime-profile.js';
 import { resolveBashPath } from '@/core/shell-resolver.js';
 
-import type { CliAdapter, SpawnContext, WorkspaceAiCred } from '../cli-adapter.js';
+import type {
+  CliAdapter,
+  HeadlessRunOverrides,
+  SpawnContext,
+  WorkspaceAiCred,
+} from '../cli-adapter.js';
 import type { HeadlessOutputEvent } from '../headless-output.js';
 import {
   migrateLegacyPiAgentDir,
   PI_BINDING_STATE_PATH,
+  PI_PROJECT_SETTINGS_PATH,
+  PI_PROVIDER_PREFIX,
   readPiWorkspaceConfig,
   resolvePiAgentDir,
   syncPiWorkspaceTheme,
@@ -20,6 +27,28 @@ import {
 const PI_TRUST_FILENAME = 'trust.json';
 
 let piTrustWriteQueue: Promise<void> = Promise.resolve();
+
+function piRunModel(cwd: string, model: string): string {
+  try {
+    const settings = JSON.parse(
+      readFileSync(join(cwd, PI_PROJECT_SETTINGS_PATH), 'utf8'),
+    ) as Record<string, unknown>;
+    const provider = settings['defaultProvider'];
+    const registeredModel = settings['defaultModel'];
+    if (
+      typeof provider === 'string' &&
+      provider.startsWith(PI_PROVIDER_PREFIX) &&
+      registeredModel !== model
+    ) {
+      throw new Error(
+        `Pi model override "${model}" is not registered by this Workspace provider; save that model in Workspace AI settings first`,
+      );
+    }
+  } catch (err) {
+    if (err instanceof Error && err.message.startsWith('Pi model override')) throw err;
+  }
+  return model;
+}
 
 function piCommandHead(env: Readonly<Record<string, string | undefined>>): readonly string[] {
   const profile = runtimeProfileFromEnv(env);
@@ -254,10 +283,19 @@ export const piAdapter: CliAdapter = {
   // REJECTS a `--` end-of-options terminator ("Unknown option: --", verified
   // 0.78.1), so the prompt is a bare trailing positional — a prompt literally
   // starting with `-`/`--` is unprotected on pi (rare for task prompts).
-  composeHeadlessCommand(_base: readonly string[], _ctx: SpawnContext, prompt: string): readonly string[] {
+  composeHeadlessCommand(
+    _base: readonly string[],
+    _ctx: SpawnContext,
+    prompt: string,
+    overrides?: HeadlessRunOverrides,
+  ): readonly string[] {
     return [
       ...piCommandHead(_ctx.env),
       ...piHeadlessApproveArgs(_ctx.env),
+      ...(overrides?.model ? ['--model', piRunModel(_ctx.cwd, overrides.model)] : []),
+      ...(overrides?.reasoningEffort
+        ? ['--thinking', overrides.reasoningEffort === 'none' ? 'off' : overrides.reasoningEffort]
+        : []),
       ...(_ctx.resume === 'last'
         ? ['--continue']
         : _ctx.resume

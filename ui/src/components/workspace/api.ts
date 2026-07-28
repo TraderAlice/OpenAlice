@@ -400,6 +400,8 @@ export interface AgentCapabilities {
   readonly resumeLast: boolean;
   readonly resumeById: boolean;
   readonly transcriptDiscovery: 'fs-watch' | 'subprocess' | 'none';
+  readonly assignsSessionId?: boolean;
+  readonly headless?: boolean;
 }
 
 export interface AgentInfo {
@@ -467,6 +469,55 @@ export async function listAgents(): Promise<AgentInfo[]> {
   if (!res.ok) throw new Error(`list agents failed: ${res.status}`);
   const body = (await res.json()) as { agents: AgentInfo[] };
   return body.agents;
+}
+
+export type WorkspaceLaunchMode = 'direct' | 'node-shim' | 'bash-shim' | 'cmd-shim';
+export type WorkspaceLaunchEnvironmentSource = 'terminal' | 'workspace' | 'tools' | 'adapter';
+
+export interface WorkspaceLaunchEnvironmentEntry {
+  readonly key: string;
+  readonly source: WorkspaceLaunchEnvironmentSource;
+  readonly presentation: 'value' | 'configured' | 'redacted' | 'path-count';
+  readonly value?: string;
+  readonly count?: number;
+}
+
+export interface WorkspaceLaunchPlan {
+  readonly workspace: {
+    readonly id: string;
+    readonly tag: string;
+    readonly dir: string;
+  };
+  readonly agent: AgentInfo & {
+    readonly kind: 'agent' | 'utility';
+    readonly installed: boolean;
+    readonly binPath: string | null;
+  };
+  readonly launch: {
+    readonly intent: 'fresh';
+    readonly mode: WorkspaceLaunchMode;
+    readonly composedCommand: readonly string[];
+    readonly resolvedCommand: readonly string[];
+    readonly cwd: string;
+    readonly envPWD: string | null;
+    readonly environment: readonly WorkspaceLaunchEnvironmentEntry[];
+    readonly transcriptDir: string | null;
+  };
+}
+
+export async function getWorkspaceLaunchPlan(
+  id: string,
+  agent: string,
+): Promise<WorkspaceLaunchPlan> {
+  const query = new URLSearchParams({ agent });
+  const res = await fetch(
+    `/api/workspaces/${encodeURIComponent(id)}/launch-plan?${query.toString()}`,
+  );
+  if (!res.ok) {
+    const parsed = (await res.json().catch(() => null)) as { message?: string; error?: string } | null;
+    throw new Error(parsed?.message ?? parsed?.error ?? `load launch plan failed: ${res.status}`);
+  }
+  return (await res.json()) as WorkspaceLaunchPlan;
 }
 
 export async function getAgentRuntimeReadiness(): Promise<AgentRuntimeReadinessSnapshot> {

@@ -25,7 +25,7 @@ export const PI_BINDING_STATE_PATH = '.pi/openalice-provider.json';
 export const LEGACY_PI_AGENT_DIR = '.pi-agent';
 export const PI_AUTOMATIC_THEME_PAIR = 'light/dark';
 
-const PI_PROVIDER_PREFIX = 'openalice-workspace-';
+export const PI_PROVIDER_PREFIX = 'openalice-workspace-';
 const PI_PROVIDER_NAME_PREFIX = 'OpenAlice workspace provider';
 const PI_GLOBAL_MODELS_FILENAME = 'models.json';
 const PI_GLOBAL_SETTINGS_FILENAME = 'settings.json';

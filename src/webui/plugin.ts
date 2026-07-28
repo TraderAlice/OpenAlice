@@ -71,6 +71,8 @@ export interface WebConfig {
   listen?: boolean
   /** Optional Unix socket / named pipe for workspace CLI shims in app mode. */
   cliSocketPath?: string
+  /** Internal packaged-acceptance seam; normal runtime leaves this undefined. */
+  scheduleScannerIntervalMs?: number
 }
 
 export class WebPlugin implements Plugin {
@@ -249,6 +251,9 @@ export class WebPlugin implements Plugin {
       toolBaseUrl: this.config.toolBaseUrl,
       ...(this.config.cliSocketPath ? { toolSocketPath: this.config.cliSocketPath } : {}),
       mcpBaseUrl: this.config.mcpBaseUrl,
+      ...(this.config.scheduleScannerIntervalMs !== undefined
+        ? { scheduleScannerIntervalMs: this.config.scheduleScannerIntervalMs }
+        : {}),
       inboxStore: ctx.inboxStore,
     })
     this.workspacesIpc = attachWorkspacesIpc(this.workspaceService)

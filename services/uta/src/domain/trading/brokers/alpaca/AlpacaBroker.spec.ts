@@ -830,6 +830,35 @@ describe('AlpacaBroker — getHistorical()', () => {
     expect(acc.getCapabilities().historicalBars).toEqual({ supported: true, quality: 'iex' })
   })
 
+  it('tail-slices a bounded window instead of forwarding Alpaca first-N limit semantics', async () => {
+    const acc = new AlpacaBroker({ apiKey: 'k', secretKey: 's', paper: true })
+    async function* gen() {
+      for (let day = 1; day <= 4; day++) {
+        yield {
+          Timestamp: `2025-01-0${day}T00:00:00Z`,
+          OpenPrice: day,
+          HighPrice: day,
+          LowPrice: day,
+          ClosePrice: day,
+          Volume: day,
+        }
+      }
+    }
+    const getBarsV2 = vi.fn(() => gen())
+    ;(acc as any).client = { getBarsV2 }
+
+    const bars = await acc.getHistorical(
+      Object.assign(new Contract(), { symbol: 'AAPL' }),
+      { interval: '1d', start: new Date('2025-01-01T00:00:00Z'), limit: 2 },
+    )
+
+    expect(bars.map((bar) => bar.close)).toEqual(['3', '4'])
+    expect(getBarsV2).toHaveBeenCalledWith(
+      'AAPL',
+      expect.not.objectContaining({ limit: expect.anything() }),
+    )
+  })
+
   it('throws when contract cannot be resolved', async () => {
     const acc = new AlpacaBroker({ apiKey: 'k', secretKey: 's', paper: true })
     const contract = new Contract()

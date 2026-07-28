@@ -26,6 +26,7 @@ import { join } from 'node:path'
 import { tool } from 'ai'
 import { z } from 'zod'
 
+import { MODEL_REASONING_EFFORTS } from '../ai-providers/model-semantics.js'
 import type { WorkspaceToolFactory, WorkspaceToolContext } from '../core/workspace-tool-center.js'
 import {
   ACTIVITY_UPDATE_COALESCE_MS,
@@ -203,6 +204,8 @@ function rowOf(issue: IssueRecord) {
     priority: issue.priority,
     assignee: issue.assignee,
     ...(issue.agent ? { agent: issue.agent } : {}),
+    ...(issue.model ? { model: issue.model } : {}),
+    ...(issue.effort ? { effort: issue.effort } : {}),
     scheduled: issue.when !== undefined,
   }
 }
@@ -294,12 +297,13 @@ export const issueUpdateFactory: WorkspaceToolFactory = {
       description: [
         "Update one of THIS workspace's issues — its board fields.",
         '',
-        'Patch any subset of `status`, `priority`, `assignee`, `what`; omitted fields are',
+        'Patch any subset of `status`, `priority`, `assignee`, `agent`, `model`,',
+        '`effort`, or `what`; omitted fields are',
         'left untouched. `assignee:"@me"` binds this current product',
         'Session; `@new` recruits once and assigns that first Session permanently;',
         'pass an exact `@resumeId` to assign another known Session. What is the',
         'canonical markdown work definition and exact scheduled prompt. Other scheduling',
-        'frontmatter (`when`/`agent`) is preserved — edit it by writing the file directly',
+        'schedule timing (`when`) is preserved — edit it by writing the file directly',
         '(`.alice/issues/<id>.md`).',
         '',
         'Marking an issue `done` or `canceled` is how a self-scheduled issue is',
@@ -312,20 +316,37 @@ export const issueUpdateFactory: WorkspaceToolFactory = {
         assignee: issueAssigneeInputSchema
           .optional()
           .describe('@new, @workspace, @human, @unassigned, @me, or an exact @resumeId.'),
+        agent: z.string().min(1).nullable().optional().describe('Runtime id for @new/@workspace; null inherits the Workspace default.'),
+        model: z.string().min(1).nullable().optional().describe('Native one-run model id; null inherits the Workspace/runtime default.'),
+        effort: z.enum(MODEL_REASONING_EFFORTS).nullable().optional().describe('One-run reasoning effort; null inherits the Workspace/runtime default.'),
         what: z.string().min(1).optional().describe('Canonical markdown work definition; exact scheduled prompt.'),
       }),
-      execute: async ({ id, status, priority, assignee, what }) => {
+      execute: async ({ id, status, priority, assignee, agent, model, effort, what }) => {
         const dir = selfDir(ctx)
         if (!dir.ok) return { ok: false as const, error: dir.error }
         const resolvedAssignee = resolveIssueAssignee(ctx, assignee)
         if (!resolvedAssignee.ok) return { ok: false as const, error: resolvedAssignee.error }
-        if (status === undefined && priority === undefined && resolvedAssignee.assignee === undefined && what === undefined) {
-          return { ok: false as const, error: 'no fields to update (pass status/priority/assignee/what)' }
+        if (
+          status === undefined &&
+          priority === undefined &&
+          resolvedAssignee.assignee === undefined &&
+          agent === undefined &&
+          model === undefined &&
+          effort === undefined &&
+          what === undefined
+        ) {
+          return {
+            ok: false as const,
+            error: 'no fields to update (pass status/priority/assignee/agent/model/effort/what)',
+          }
         }
         const res = await updateIssueFields(dir.dir, id, {
           status,
           priority,
           assignee: resolvedAssignee.assignee,
+          agent,
+          model,
+          effort,
           what,
         })
         if (res.ok) {
@@ -455,8 +476,10 @@ export const issueCreateFactory: WorkspaceToolFactory = {
           .describe('Schedule shape — { kind:"at", at } | { kind:"every", every } | { kind:"cron", cron, timezone?:"local"|IANA }. Present iff the issue self-schedules.'),
         what: z.string().min(1).optional().describe('Markdown work definition; exact scheduled prompt. Defaults to title.'),
         agent: z.string().min(1).optional().describe('Adapter id when assignee is @new or @workspace; an exact Session owns its runtime.'),
+        model: z.string().min(1).optional().describe('Native model id for one scheduled run; provider/auth stay Workspace-owned.'),
+        effort: z.enum(MODEL_REASONING_EFFORTS).optional().describe('Reasoning effort for one scheduled run.'),
       }),
-      execute: async ({ title, id, status, priority, assignee, when, what, agent }) => {
+      execute: async ({ title, id, status, priority, assignee, when, what, agent, model, effort }) => {
         const dir = selfDir(ctx)
         if (!dir.ok) return { ok: false as const, error: dir.error }
         // Structured creation is attributable: "who creates it owns it". A
@@ -474,6 +497,8 @@ export const issueCreateFactory: WorkspaceToolFactory = {
           when,
           what,
           agent,
+          model,
+          effort,
         })
         if (res.ok) {
           await recordIssueProvenance(ctx, res.issue.id, 'created')

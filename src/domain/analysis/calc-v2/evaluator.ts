@@ -26,10 +26,12 @@ export type CalcValue = number | string | CalcValue[] | { [k: string]: CalcValue
 
 export interface CalcOutput {
   value: CalcValue
-  /** Sources actually fetched, keyed by barId. */
+  /** Sources actually fetched. A single interval keeps the barId key; when the
+   *  same barId is fetched at multiple intervals, keys become barId@interval. */
   dataRange: Record<string, DataSourceMeta>
-  /** Per-source date axis (ascending), keyed by barId — only when withDates. Lets
-   *  the caller map a dumped series back to dates without a second snapshot call. */
+  /** Per-series date axis (ascending), using the same keys as dataRange — only
+   *  when withDates. Lets the caller map a dumped series back to dates without
+   *  a second snapshot call. */
   dates?: Record<string, string[]>
 }
 
@@ -61,14 +63,51 @@ export async function evaluate(program: Program, deps: CalcDeps, opts: EvalOpts 
   const env = new Map<string, V>()
   const dataRange: Record<string, DataSourceMeta> = {}
   const dates: Record<string, string[]> = {}
+  const intervalsByBarId = new Map<string, Set<string>>()
+
+  const intervalKey = (barId: string, interval: string) => `${barId}@${interval}`
+
+  const recordProvenance = (r: BarsResult, interval: string): void => {
+    const barId = r.meta.barId
+    if (!barId) return
+    const meta: DataSourceMeta = { ...r.meta, interval }
+    const axis = opts.withDates ? r.bars.map((b) => b.date) : undefined
+    let intervals = intervalsByBarId.get(barId)
+
+    if (!intervals) {
+      intervals = new Set([interval])
+      intervalsByBarId.set(barId, intervals)
+      dataRange[barId] = meta
+      if (axis) dates[barId] = axis
+      return
+    }
+
+    if (!intervals.has(interval)) {
+      // Preserve the compact/backward-compatible barId key for the common
+      // single-interval case. Only upgrade to explicit series keys when a
+      // collision actually appears.
+      if (intervals.size === 1) {
+        const [firstInterval] = intervals
+        const firstKey = intervalKey(barId, firstInterval)
+        dataRange[firstKey] = dataRange[barId]
+        delete dataRange[barId]
+        if (opts.withDates && dates[barId]) {
+          dates[firstKey] = dates[barId]
+          delete dates[barId]
+        }
+      }
+      intervals.add(interval)
+    }
+
+    const key = intervals.size === 1 ? barId : intervalKey(barId, interval)
+    dataRange[key] = meta
+    if (axis) dates[key] = axis
+  }
 
   const fetchBars = async (barId: string, fetchOpts: GetBarsOpts, assetClass: AssetClass | undefined): Promise<BarsResult> => {
     const ref = assetClass ? { barId, assetClass } : { barId }
     const r = await deps.barService.getBars(ref, fetchOpts)
-    if (r.meta.barId) {
-      dataRange[r.meta.barId] = r.meta
-      if (opts.withDates) dates[r.meta.barId] = r.bars.map((b) => b.date)
-    }
+    recordProvenance(r, fetchOpts.interval)
     return r
   }
 

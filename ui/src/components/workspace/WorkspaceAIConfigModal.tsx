@@ -11,7 +11,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Bot, GitMerge, Info, Layers3, Settings, X } from 'lucide-react'
+import { Bot, GitMerge, Info, Layers3, Rocket, Settings, X } from 'lucide-react'
 import {
   getAgentConfig,
   listCredentials,
@@ -43,6 +43,7 @@ import { useWorkspaces } from '../../contexts/workspaces-context'
 import { notifyWorkspaceAgentConfigChanged } from '../../lib/workspaceAiEvents'
 import { WorkspaceTemplateUpgradePanel } from './WorkspaceTemplateUpgradePanel'
 import { WorkspaceAbsorbPanel } from './WorkspaceAbsorbPanel'
+import { WorkspaceLaunchConfigurationPanel } from './WorkspaceLaunchConfigurationPanel'
 
 // The agent tab implies a default vendor when the baseUrl alone can't say:
 // claude → Anthropic, codex → OpenAI; opencode/pi run anything so they have no
@@ -55,7 +56,7 @@ const TAB_FALLBACK_VENDOR: Record<Tab, string | null> = {
 }
 
 export type Tab = 'claude' | 'codex' | 'opencode' | 'pi'
-type Section = 'general' | 'ai' | 'template' | 'absorb'
+type Section = 'general' | 'launch' | 'ai' | 'template' | 'absorb'
 
 interface Props {
   wsId: string
@@ -199,6 +200,16 @@ export function connectionFieldsChanged(
   form: FormState,
   tab: Tab,
 ): boolean {
+  // Codex and Claude Code can inherit their native login while a project file
+  // selects only model/effort. With no OpenAlice-managed endpoint or key there
+  // is no credential-bearing HTTP connection for this modal to probe.
+  if (
+    (tab === 'codex' || tab === 'claude') &&
+    !form.baseUrl.trim() &&
+    !form.apiKey.trim()
+  ) {
+    return false
+  }
   return testKey(configToForm(saved, tab)) !== testKey(form)
 }
 
@@ -463,8 +474,9 @@ export function WorkspaceAIConfigModal({
     window.dispatchEvent(new CustomEvent('openalice:credentials-changed'))
   }
 
-  const canTest =
-    !!form.baseUrl.trim() && !!form.apiKey.trim() && !!form.model.trim()
+  // Official endpoints may be omitted; the backend probe resolves them from
+  // the selected wire shape. Managed credentials still require key + model.
+  const canTest = !!form.apiKey.trim() && !!form.model.trim()
 
   const stableTag = workspace?.tag || wsId
   const savedDisplayName = workspace?.displayName ?? ''
@@ -544,7 +556,7 @@ export function WorkspaceAIConfigModal({
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
-          <aside className="flex w-full shrink-0 gap-1 border-b border-border bg-secondary/25 p-2 sm:block sm:w-40 sm:border-b-0 sm:border-r">
+          <aside className="grid w-full shrink-0 grid-cols-2 gap-1 border-b border-border bg-secondary/25 p-2 sm:block sm:w-40 sm:border-b-0 sm:border-r">
             <button
               type="button"
               onClick={() => setSection('general')}
@@ -556,6 +568,18 @@ export function WorkspaceAIConfigModal({
             >
               <Settings size={15} />
               <span>{t('workspaceSettings.section.general')}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSection('launch')}
+              className={`flex min-w-0 items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:w-full ${
+                section === 'launch'
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+              }`}
+            >
+              <Rocket size={15} />
+              <span>{t('workspaceSettings.section.launch')}</span>
             </button>
             <button
               type="button"
@@ -1151,9 +1175,9 @@ export function WorkspaceAIConfigModal({
             >
               {t('common.cancel')}
             </button>
-            {/* Single primary CTA that walks the connection gate. Transport,
-                auth, or model changes show Test first; local runtime metadata
-                changes can be saved directly. */}
+            {/* Single primary CTA that walks the connection gate. Managed
+                transport/auth/model changes show Test first; native-login
+                model/effort and local runtime metadata save directly. */}
             {needsTest ? (
               <button
                 onClick={handleTest}
@@ -1175,6 +1199,14 @@ export function WorkspaceAIConfigModal({
           </div>
         </div>
               </>
+            )}
+
+            {section === 'launch' && (
+              <WorkspaceLaunchConfigurationPanel
+                wsId={wsId}
+                agents={workspace?.agents ?? []}
+                initialAgent={initialAgent}
+              />
             )}
 
             {section === 'template' && (

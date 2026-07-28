@@ -14,9 +14,11 @@ import type { DataSourceMeta } from '../indicator/types.js'
 
 export interface RunResult {
   value?: CalcValue
-  /** Sources actually fetched, keyed by barId (source/provider/capability). */
+  /** Sources actually fetched. Single-interval sources use barId keys; repeated
+   *  barIds at multiple intervals use barId@interval keys. */
   dataRange?: Record<string, DataSourceMeta>
-  /** Per-source date axis (ascending) — present only when `dates` was requested. */
+  /** Per-series date axis (ascending), keyed exactly like dataRange — present
+   *  only when `dates` was requested. */
   dates?: Record<string, string[]>
   /** Present iff the script failed — actionable for self-correction. */
   error?: CalcDiagnostic

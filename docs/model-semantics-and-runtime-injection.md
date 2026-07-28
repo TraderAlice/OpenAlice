@@ -99,6 +99,40 @@ resolved value:
 - Claude Code: project `effortLevel` (only values Claude can persist);
 - Codex: project `model_reasoning_effort`.
 
+### Persistent defaults and one-run overrides
+
+Workspace defaults and headless run selection are different configuration
+layers. A Workspace-local file expresses the durable preference; an explicit
+CLI argument selects one Issue run and wins without rewriting that file:
+
+| Runtime | Workspace-local preference | One-run headless override |
+|---|---|---|
+| Claude Code | `.claude/settings.local.json`: `model`, `effortLevel` | `--model`, `--effort` |
+| Codex | `.codex/config.toml`: `model`, `model_reasoning_effort` | `--model`, `-c model_reasoning_effort=...` |
+| opencode | `opencode.json` provider/model binding | `--model`, `--variant` |
+| Pi | project settings plus registered provider | `--model`, `--thinking` |
+
+An Issue may request only agent/model/effort. Endpoint, provider, key, auth, and
+wire shape always come from the selected Workspace/native login. Dispatch
+records the requested model/effort for provenance and translates them into CLI
+arguments; it never mutates persistent configuration.
+
+OpenAlice-managed opencode models register effort-named variants in the
+Workspace config up front, so `--variant` remains a genuine one-run selection.
+Dispatch rejects a custom-provider model or effort that is not registered
+instead of silently falling back or rewriting the provider during a run.
+
+Exact Session ownership is intentionally stricter. An `@resumeId` already owns
+its runtime conversation, so an Issue cannot attach agent, model, or effort
+overrides to it. This avoids silently changing a resumed conversation's saved
+model semantics.
+
+Codex project configuration must not be confused with `CODEX_HOME`; the latter
+owns global auth, sessions, skills, and user configuration. Provider definitions
+are not a supported Codex project layer, so OpenAlice-managed custom providers
+use an explicit `.codex/openalice-home/`, while model/effort-only login-backed
+preferences leave `CODEX_HOME` unset.
+
 Context-window and output limits follow the same ownership boundary. Registered
 model semantics provide known limits; an explicit Workspace preference may
 override the context registration for runtimes that support it; otherwise the
@@ -176,12 +210,16 @@ read-only, best-effort launch guidance, but it must not mark private global
 state complete or accept trust on the user's behalf. Unknown native state is
 advisory and fail-open; it never becomes a fabricated ready/not-ready fact.
 
-The test-before-save gate follows the same boundary as the probe. Changes to
-the key, endpoint, wire shape, authentication mode, or model require a fresh
-probe. Context-window, reasoning capability, and reasoning effort are local
-runtime registration fields; changing only those fields saves directly without
-making an unrelated provider request. Both automatic creation-default saves
-and explicit Workspace saves must acknowledge completion in the UI.
+The test-before-save gate follows the same boundary as the probe. Changes to a
+managed key, endpoint, wire shape, authentication mode, or its model require a
+fresh probe. A Codex/Claude native-login binding with no OpenAlice-managed key
+or endpoint has no HTTP credential for the modal to probe: model/effort-only
+changes save directly and are validated by the native runtime at launch.
+Context-window, reasoning capability, and reasoning effort are also local
+runtime registration fields and save without an unrelated provider request.
+Official endpoints may be omitted because the probe resolves their default from
+the wire shape. Both automatic creation-default saves and explicit Workspace
+saves must acknowledge completion in the UI.
 
 ## Configuration Ownership and Reset
 
@@ -195,9 +233,15 @@ Claude Code and opencode use the same lifecycle rule with
 the first write snapshots only the nodes OpenAlice will replace, later writes
 retain that original snapshot, and reset restores a node only if it still equals
 the last injected value. A user edit or whole-file deletion made after injection
-wins. Codex is the
-exception because its Workspace `.codex/` is an intentionally exclusive
-`CODEX_HOME`, not a shared project-config layer.
+wins.
+
+Codex applies the same reversible ownership rule to top-level `model` and
+`model_reasoning_effort` assignments in the shared project
+`.codex/config.toml`; comments, sections, and unknown keys remain untouched.
+Only `.codex/openalice-home/` is an exclusive `CODEX_HOME`, and only while an
+OpenAlice-managed custom provider is active. Reset removes that dedicated home
+and restores owned project scalars without deleting the user's `.codex/`
+directory or global login state.
 
 The rollback sidecars can contain prior or injected secrets and are therefore
 sensitive Workspace state. Templates must exclude both sidecars and native
@@ -215,6 +259,9 @@ contain credentials.
 - `src/core/config.ts` — credential access and creation-time Workspace defaults.
 - `src/workspaces/credential-injection.ts` — credential + selection + semantics composition.
 - `src/workspaces/adapters/` — native runtime projection and round-trip parsing.
+- `src/workspaces/adapters/owned-toml-config.ts` — reversible Codex project-scalar ownership.
+- `src/workspaces/schedule/scanner.ts` — Issue selection to one-run override dispatch.
+- `src/workspaces/headless-task-registry.ts` — durable requested model/effort provenance.
 - `ui/src/components/credentials/` — credential/account setup.
 - `ui/src/components/workspace/WorkspaceAIConfigModal.tsx` — per-Workspace selection and unknown-model overrides.
 

@@ -1,10 +1,20 @@
 import { execFile } from 'node:child_process';
-import { statSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
-import type { CliAdapter, OnDiskSession, SpawnContext, WorkspaceAiCred } from '../cli-adapter.js';
-import { isModelReasoningEffort } from '../../ai-providers/model-semantics.js';
+import type {
+  CliAdapter,
+  HeadlessRunOverrides,
+  OnDiskSession,
+  SpawnContext,
+  WorkspaceAiCred,
+} from '../cli-adapter.js';
+import {
+  MODEL_REASONING_EFFORTS,
+  isModelReasoningEffort,
+  type ModelReasoningEffort,
+} from '../../ai-providers/model-semantics.js';
 import { readWorkspaceFile, writeWorkspaceFile } from '../file-service.js';
 import type { HeadlessOutputEvent } from '../headless-output.js';
 import { resetOwnedJsonConfig, writeOwnedJsonConfig } from './owned-json-config.js';
@@ -24,8 +34,72 @@ const OPENCODE_OWNED_PATHS = [
 ] as const;
 const DEFAULT_OUTPUT_TOKENS = 16_384;
 
-function modelEffortOptions(cred: WorkspaceAiCred): Record<string, unknown> | null {
-  const effort = cred.reasoningEffort;
+function opencodeRunModel(cwd: string, model: string): string {
+  if (model.includes('/')) return model;
+  try {
+    const config = JSON.parse(readFileSync(join(cwd, OPENCODE_CONFIG_PATH), 'utf8')) as Record<string, unknown>;
+    const providers = config['provider'];
+    const workspace = providers && typeof providers === 'object'
+      ? (providers as Record<string, unknown>)[OPENCODE_PROVIDER_NAME]
+      : null;
+    const models = workspace && typeof workspace === 'object'
+      ? (workspace as Record<string, unknown>)['models']
+      : null;
+    if (models && typeof models === 'object') {
+      if (Object.prototype.hasOwnProperty.call(models, model)) {
+        return `${OPENCODE_PROVIDER_NAME}/${model}`;
+      }
+      throw new Error(
+        `OpenCode model override "${model}" is not registered by this Workspace provider; use a provider/model id or save that model in Workspace AI settings first`,
+      );
+    }
+  } catch (err) {
+    if (err instanceof Error && err.message.startsWith('OpenCode model override')) throw err;
+  }
+  return model;
+}
+
+function opencodeRunVariant(
+  cwd: string,
+  requestedModel: string | undefined,
+  effort: ModelReasoningEffort,
+): string {
+  if (requestedModel?.includes('/')) return effort;
+  try {
+    const config = JSON.parse(readFileSync(join(cwd, OPENCODE_CONFIG_PATH), 'utf8')) as Record<string, unknown>;
+    const topModel = typeof config['model'] === 'string' ? config['model'] : null;
+    const model = requestedModel
+      ?? (topModel?.startsWith(`${OPENCODE_PROVIDER_NAME}/`)
+        ? topModel.slice(OPENCODE_PROVIDER_NAME.length + 1)
+        : null);
+    if (!model) return effort;
+    const providers = config['provider'];
+    const workspace = providers && typeof providers === 'object'
+      ? (providers as Record<string, unknown>)[OPENCODE_PROVIDER_NAME]
+      : null;
+    const models = workspace && typeof workspace === 'object'
+      ? (workspace as Record<string, unknown>)['models']
+      : null;
+    const modelConfig = models && typeof models === 'object'
+      ? (models as Record<string, unknown>)[model]
+      : null;
+    if (!modelConfig || typeof modelConfig !== 'object') return effort;
+    const variants = (modelConfig as Record<string, unknown>)['variants'];
+    if (!variants || typeof variants !== 'object' || !Object.prototype.hasOwnProperty.call(variants, effort)) {
+      throw new Error(
+        `OpenCode effort override "${effort}" is not registered for Workspace model "${model}"`,
+      );
+    }
+  } catch (err) {
+    if (err instanceof Error && err.message.startsWith('OpenCode effort override')) throw err;
+  }
+  return effort;
+}
+
+function modelEffortOptions(
+  cred: WorkspaceAiCred,
+  effort = cred.reasoningEffort,
+): Record<string, unknown> | null {
   if (!effort) return null;
   if (cred.wireShape === 'anthropic') {
     if (effort === 'none') return { thinking: { type: 'disabled' } };
@@ -38,9 +112,21 @@ function modelEffortOptions(cred: WorkspaceAiCred): Record<string, unknown> | nu
       : { effort };
   }
   if (cred.wireShape === 'google-generative-ai') {
-    return { thinkingConfig: { includeThoughts: effort !== 'none', thinkingLevel: effort } };
+    return effort === 'none'
+      ? { thinkingConfig: { includeThoughts: false } }
+      : { thinkingConfig: { includeThoughts: true, thinkingLevel: effort } };
   }
   return { reasoningEffort: effort };
+}
+
+function modelEffortVariants(cred: WorkspaceAiCred): Record<string, Record<string, unknown>> | null {
+  if (cred.reasoning === false) return null;
+  return Object.fromEntries(
+    MODEL_REASONING_EFFORTS.map((effort) => [
+      effort,
+      modelEffortOptions(cred, effort) ?? {},
+    ]),
+  );
 }
 
 function readModelEffort(
@@ -223,9 +309,18 @@ export const opencodeAdapter: CliAdapter = {
   // boundary. Tool access is via the injected CLI shims and bundled skills;
   // prompt is the trailing positional after a `--` end-of-options terminator
   // (so a `-`-leading prompt isn't read as a flag).
-  composeHeadlessCommand(_base: readonly string[], ctx: SpawnContext, prompt: string): readonly string[] {
+  composeHeadlessCommand(
+    _base: readonly string[],
+    ctx: SpawnContext,
+    prompt: string,
+    overrides?: HeadlessRunOverrides,
+  ): readonly string[] {
     return [
       'opencode', 'run', '--format', 'json',
+      ...(overrides?.model ? ['--model', opencodeRunModel(ctx.cwd, overrides.model)] : []),
+      ...(overrides?.reasoningEffort
+        ? ['--variant', opencodeRunVariant(ctx.cwd, overrides.model, overrides.reasoningEffort)]
+        : []),
       ...(ctx.resume === 'last' ? ['--continue'] : ctx.resume ? ['--session', ctx.resume.sessionId] : []),
       '--', prompt,
     ];
@@ -375,6 +470,8 @@ export const opencodeAdapter: CliAdapter = {
       if (typeof cred.reasoning === 'boolean') model['reasoning'] = cred.reasoning;
       const effortOptions = modelEffortOptions(cred);
       if (effortOptions) model['options'] = effortOptions;
+      const effortVariants = modelEffortVariants(cred);
+      if (effortVariants) model['variants'] = effortVariants;
       const contextWindow = positiveNumber(cred.contextWindow);
       if (contextWindow !== null) {
         // opencode treats missing custom-model limits as 0, which disables its
