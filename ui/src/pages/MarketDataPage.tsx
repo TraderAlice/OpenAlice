@@ -243,7 +243,12 @@ export function MarketDataPage() {
         right={
           <div className="flex items-center gap-3">
             <SaveIndicator status={status} onRetry={retry} />
-            <Toggle size="sm" checked={enabled} onChange={(v) => updateConfigImmediate({ enabled: v })} />
+            <Toggle
+              ariaLabel="Market data"
+              size="sm"
+              checked={enabled}
+              onChange={(v) => updateConfigImmediate({ enabled: v })}
+            />
           </div>
         }
       />
@@ -294,7 +299,7 @@ function HubCard({
     <section className="mb-6 border border-border/60 rounded-xl bg-secondary/50 p-5">
       <div className="flex items-center justify-between mb-1.5">
         <h2 className="text-[14px] font-semibold">Data Hub</h2>
-        <Toggle size="sm" checked={hub.enabled} onChange={onToggle} />
+        <Toggle ariaLabel="Data Hub" size="sm" checked={hub.enabled} onChange={onToggle} />
       </div>
       {hub.enabled ? (
         <div className="flex items-center gap-2 mb-1.5">
@@ -385,7 +390,7 @@ function ChartVendorsSection({
                 {v.alwaysOn ? (
                   <span className="text-[11px] text-muted-foreground/60 uppercase tracking-wider shrink-0">always on</span>
                 ) : (
-                  <Toggle size="sm" checked={on} onChange={(val) => onToggle(v.id, val)} />
+                  <Toggle ariaLabel={v.name} size="sm" checked={on} onChange={(val) => onToggle(v.id, val)} />
                 )}
               </div>
               <p className="text-[12px] text-muted-foreground/70 mt-1.5 leading-relaxed">{v.desc}</p>

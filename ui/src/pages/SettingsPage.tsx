@@ -930,6 +930,7 @@ function ToolGroupCard({
           </span>
         </button>
         <Toggle
+          ariaLabel={`${label} tools`}
           size="sm"
           checked={!noneEnabled}
           onChange={(v) => onToggleGroup(group.tools, v)}
@@ -961,6 +962,7 @@ function ToolGroupCard({
                   )}
                 </div>
                 <Toggle
+                  ariaLabel={t.name}
                   size="sm"
                   checked={enabled}
                   onChange={() => onToggleTool(t.name)}

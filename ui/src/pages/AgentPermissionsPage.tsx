@@ -190,7 +190,11 @@ function AiTradingToggle({
             {enabled ? t('settings.agent.allowAiTradingOn') : t('settings.agent.allowAiTradingOff')}
           </p>
         </div>
-        <Toggle checked={enabled} onChange={onToggle} />
+        <Toggle
+          ariaLabel={t('settings.agent.allowAiTrading')}
+          checked={enabled}
+          onChange={onToggle}
+        />
       </div>
       {enabled && (
         <div className="mt-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-[12px] text-destructive leading-relaxed">

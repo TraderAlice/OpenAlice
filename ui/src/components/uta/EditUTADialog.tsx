@@ -115,7 +115,12 @@ export function EditUTADialog({ uta, preset, health, onSave, onDelete, onViewInP
                 Allow analysis reads; block broker-side order changes.
               </div>
             </div>
-            <Toggle size="sm" checked={draft.readOnly === true} onChange={(v) => setDraft(d => ({ ...d, readOnly: v }))} />
+            <Toggle
+              ariaLabel="Read-only account"
+              size="sm"
+              checked={draft.readOnly === true}
+              onChange={(v) => setDraft(d => ({ ...d, readOnly: v }))}
+            />
           </div>
           <div className="mb-3 flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2.5">
             <div className="min-w-0">
@@ -124,7 +129,12 @@ export function EditUTADialog({ uta, preset, health, onSave, onDelete, onViewInP
                 Include this UTA in K-line and contract discovery.
               </div>
             </div>
-            <Toggle size="sm" checked={draft.asVendor !== false} onChange={(v) => setDraft(d => ({ ...d, asVendor: v }))} />
+            <Toggle
+              ariaLabel="Use as data source"
+              size="sm"
+              checked={draft.asVendor !== false}
+              onChange={(v) => setDraft(d => ({ ...d, asVendor: v }))}
+            />
           </div>
           <SchemaFormFields
             fields={fields}
@@ -181,11 +191,15 @@ export function EditUTADialog({ uta, preset, health, onSave, onDelete, onViewInP
           )}
           {draft.enabled !== false && <ReconnectButton accountId={uta.id} />}
           <label className="flex items-center gap-2 cursor-pointer">
-            <Toggle checked={draft.enabled !== false} onChange={async (v) => {
-              const updated = { ...draft, enabled: v }
-              setDraft(updated)
-              await onSave(updated)
-            }} />
+            <Toggle
+              ariaLabel={`${uta.id} enabled`}
+              checked={draft.enabled !== false}
+              onChange={async (v) => {
+                const updated = { ...draft, enabled: v }
+                setDraft(updated)
+                await onSave(updated)
+              }}
+            />
             <span className="text-[12px] text-muted-foreground">{draft.enabled !== false ? 'Enabled' : 'Disabled'}</span>
           </label>
           {msg && <span className="text-[12px] text-muted-foreground">{msg}</span>}
