@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Bot,
   ChevronDown,
@@ -204,7 +204,19 @@ export function AutomationRunsSection() {
   const [error, setError] = useState<string | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  const { openHeadlessRun } = useWorkspaces()
+  const { openHeadlessRun, workspaces } = useWorkspaces()
+  const workspaceLabels = useMemo(() => new Map(
+    workspaces.map((workspace) => {
+      const displayName = workspace.displayName?.trim()
+      return [
+        workspace.id,
+        {
+          label: workspace.tag,
+          title: displayName ? `${displayName} (${workspace.tag})` : workspace.tag,
+        },
+      ] as const
+    }),
+  ), [workspaces])
 
   const toggle = (id: string) => setExpanded((prev) => {
     const next = new Set(prev)
@@ -322,6 +334,7 @@ export function AutomationRunsSection() {
           {snapshot.tasks.map((task) => {
             const isExpanded = expanded.has(task.taskId)
             const openable = task.status !== 'running' && task.resumable
+            const workspaceLabel = workspaceLabels.get(task.wsId)
             const toolSummary = task.output?.toolCalls
               ? `${task.output.toolCalls} tool${task.output.toolCalls === 1 ? '' : 's'}`
               : task.output
@@ -349,7 +362,12 @@ export function AutomationRunsSection() {
                     </span>
                     <span className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
                       <span>{task.agent}</span>
-                      <span className="font-mono">{task.wsId.slice(0, 8)}</span>
+                      <span
+                        className={workspaceLabel ? undefined : 'font-mono'}
+                        title={workspaceLabel?.title ?? task.wsId}
+                      >
+                        {workspaceLabel?.label ?? task.wsId}
+                      </span>
                       <span>{formatRelativeTime(task.startedAt)}</span>
                       <span>{fmtDuration(task.durationMs)}</span>
                       <span>{toolSummary}</span>

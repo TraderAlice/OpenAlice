@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw'
 
 import type { HeadlessOutput, HeadlessTaskRecord } from '../../api/headless'
+import { DEMO_CHAT_WORKSPACE_ID, DEMO_WORKSPACE_ID } from '../fixtures/workspaces'
 
 const now = Date.now()
 const demoHeadlessTasks: HeadlessTaskRecord[] = [
@@ -8,7 +9,7 @@ const demoHeadlessTasks: HeadlessTaskRecord[] = [
     taskId: 'demo-headless-1',
     resumeId: 'demo-resume-1',
     resumable: true,
-    wsId: 'demo-ws',
+    wsId: DEMO_WORKSPACE_ID,
     agent: 'codex',
     prompt: 'Compute a quant snapshot of NVDA and push a report to the inbox.',
     status: 'done',
@@ -21,7 +22,7 @@ const demoHeadlessTasks: HeadlessTaskRecord[] = [
     taskId: 'demo-headless-2',
     resumeId: 'demo-resume-2',
     resumable: false,
-    wsId: 'demo-chat',
+    wsId: DEMO_CHAT_WORKSPACE_ID,
     agent: 'claude',
     prompt: "Summarize today's AI-sector headlines and flag anything actionable.",
     status: 'running',
@@ -31,7 +32,7 @@ const demoHeadlessTasks: HeadlessTaskRecord[] = [
     taskId: 'demo-headless-3',
     resumeId: 'demo-resume-3',
     resumable: false,
-    wsId: 'demo-ws',
+    wsId: DEMO_WORKSPACE_ID,
     agent: 'pi',
     prompt: 'Refresh the uranium watchlist and note any breakouts.',
     status: 'interrupted',
