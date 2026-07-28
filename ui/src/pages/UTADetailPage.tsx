@@ -747,7 +747,7 @@ interface OpenOrderRow {
 
 type OrdersTab = 'open' | 'history' | 'trades'
 
-function OrdersArea({ utaId, openOrders }: { utaId: string; openOrders: unknown[] }) {
+export function OrdersArea({ utaId, openOrders }: { utaId: string; openOrders: unknown[] }) {
   const [tab, setTab] = useState<OrdersTab>('open')
   const [history, setHistory] = useState<OrderHistoryEntry[] | null>(null)
   const [trades, setTrades] = useState<TradeHistoryEntry[] | null>(null)
@@ -776,21 +776,25 @@ function OrdersArea({ utaId, openOrders }: { utaId: string; openOrders: unknown[
     return () => { cancelled = true; clearInterval(t) }
   }, [tab, utaId])
 
-  const tabs: Array<{ id: OrdersTab; label: string }> = [
-    { id: 'open', label: `Open (${openOrders.length})` },
-    { id: 'history', label: 'History' },
-    { id: 'trades', label: 'Trades' },
+  const tabs: Array<{ id: OrdersTab; label: string; panelLabel: string }> = [
+    { id: 'open', label: `Open (${openOrders.length})`, panelLabel: 'Open orders' },
+    { id: 'history', label: 'History', panelLabel: 'Order history' },
+    { id: 'trades', label: 'Trades', panelLabel: 'Trade history' },
   ]
+  const activeTab = tabs.find(candidate => candidate.id === tab)!
 
   return (
     <Section
       title="Orders"
       action={
-        <div className="flex gap-1">
+        <div className="flex gap-1" role="group" aria-label="Order views">
           {tabs.map(t => (
             <button
               key={t.id}
+              type="button"
               onClick={() => setTab(t.id)}
+              aria-pressed={tab === t.id}
+              aria-controls={`orders-${t.id}-panel`}
               className={`px-2 py-0.5 text-[11px] rounded transition-colors ${
                 tab === t.id
                   ? 'bg-primary/15 text-primary font-medium'
@@ -803,9 +807,15 @@ function OrdersArea({ utaId, openOrders }: { utaId: string; openOrders: unknown[
         </div>
       }
     >
-      {tab === 'open' && <OpenOrdersTable orders={openOrders} />}
-      {tab === 'history' && <OrderHistoryTable orders={history} />}
-      {tab === 'trades' && <TradeHistoryTable trades={trades} />}
+      <div
+        id={`orders-${tab}-panel`}
+        role="region"
+        aria-label={activeTab.panelLabel}
+      >
+        {tab === 'open' && <OpenOrdersTable orders={openOrders} />}
+        {tab === 'history' && <OrderHistoryTable orders={history} />}
+        {tab === 'trades' && <TradeHistoryTable trades={trades} />}
+      </div>
     </Section>
   )
 }
