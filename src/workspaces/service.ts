@@ -11,7 +11,7 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
-import { basename, join } from 'node:path';
+import { basename, delimiter, join } from 'node:path';
 
 import { cliBinPath } from '@/core/paths.js';
 import { readCredentials, readIssueDefaultAgent, readWorkspaceDefaultAgent } from '@/core/config.js';
@@ -184,6 +184,120 @@ export class IssueRetryError extends Error {
     this.name = 'IssueRetryError';
   }
 }
+
+export type SpawnEnvironmentSource = 'terminal' | 'workspace' | 'tools' | 'adapter';
+
+export interface SpawnEnvironmentDisclosure {
+  readonly key: string;
+  readonly source: SpawnEnvironmentSource;
+  readonly presentation: 'value' | 'configured' | 'redacted' | 'path-count';
+  readonly value?: string;
+  readonly count?: number;
+}
+
+function sensitiveEnvironmentKey(key: string): boolean {
+  return /(?:API_?KEY|(?:^|_)KEY(?:_|$)|AUTH|BEARER|CREDENTIAL|PASSWORD|SECRET|TOKEN)/i.test(key);
+}
+
+function discloseEnvironmentValue(
+  key: string,
+  value: string,
+  source: SpawnEnvironmentSource,
+): SpawnEnvironmentDisclosure {
+  if (sensitiveEnvironmentKey(key)) {
+    return { key, source, presentation: 'redacted' };
+  }
+  if (key === 'PATH') {
+    return {
+      key,
+      source,
+      presentation: 'path-count',
+      count: value.split(delimiter).filter(Boolean).length,
+    };
+  }
+  if (
+    key === 'OPENALICE_TOOL_URL' ||
+    key === 'OPENALICE_TOOL_SOCKET' ||
+    key === 'OPENALICE_MCP_URL'
+  ) {
+    return { key, source, presentation: 'configured' };
+  }
+  // Adapter env may include Workspace-local, user-authored keys (Codex
+  // env.json is intentionally extensible). Only disclose values for the small
+  // set of launcher-owned, non-secret adapter settings we understand.
+  if (
+    source === 'adapter' &&
+    key !== 'CODEX_HOME' &&
+    !key.startsWith('OPENCODE_DISABLE_')
+  ) {
+    return { key, source, presentation: 'configured' };
+  }
+  return { key, source, presentation: 'value', value };
+}
+
+export function launchEnvironmentDisclosure(
+  env: Readonly<Record<string, string>>,
+  adapterEnv: Readonly<Record<string, string>>,
+): readonly SpawnEnvironmentDisclosure[] {
+  const adapterKeys = new Set(Object.keys(adapterEnv));
+  const groups: readonly {
+    source: SpawnEnvironmentSource;
+    keys: readonly string[];
+  }[] = [
+    {
+      source: 'terminal',
+      keys: [
+        'TERM',
+        'COLORTERM',
+        'TERM_PROGRAM',
+        'TERM_PROGRAM_VERSION',
+        'LANG',
+        'LC_CTYPE',
+      ],
+    },
+    {
+      source: 'workspace',
+      keys: [
+        'PWD',
+        'AQ_WS_ID',
+        'AQ_LAUNCHER_REPO_ROOT',
+        'GIT_AUTHOR_NAME',
+        'GIT_AUTHOR_EMAIL',
+        'GIT_COMMITTER_NAME',
+        'GIT_COMMITTER_EMAIL',
+      ],
+    },
+    {
+      source: 'tools',
+      keys: [
+        'PATH',
+        'OPENALICE_TOOL_URL',
+        'OPENALICE_TOOL_SOCKET',
+        'OPENALICE_MCP_URL',
+      ],
+    },
+    {
+      source: 'adapter',
+      keys: Object.keys(adapterEnv).sort(),
+    },
+  ];
+  const seen = new Set<string>();
+  const out: SpawnEnvironmentDisclosure[] = [];
+  for (const group of groups) {
+    for (const key of group.keys) {
+      if (seen.has(key)) continue;
+      const value = env[key];
+      if (value === undefined) continue;
+      seen.add(key);
+      out.push(discloseEnvironmentValue(
+        key,
+        value,
+        adapterKeys.has(key) ? 'adapter' : group.source,
+      ));
+    }
+  }
+  return out;
+}
 import { ScrollbackStore } from './scrollback-store.js';
 import { SessionPool, type SessionFactoryContext } from './session-pool.js';
 import { SessionRegistry, type SessionRecord } from './session-registry.js';
@@ -221,8 +335,11 @@ export interface SpawnPlan {
   /** Adapter-native id used only for backend diagnostics. */
   readonly nativeSessionId: string | null;
   readonly composedCommand: readonly string[];
+  readonly resolvedCommand: readonly string[];
+  readonly launchMode: 'direct' | 'node-shim' | 'bash-shim' | 'cmd-shim';
   readonly spawnCwd: string;
   readonly envPWD: string | null;
+  readonly environment: readonly SpawnEnvironmentDisclosure[];
   readonly transcriptDir: string | null;
   readonly projectKey: string | null;
 }
@@ -732,8 +849,11 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     extraEnv?: Record<string, string>,
   ): {
     command: readonly string[];
+    resolvedCommand: readonly string[];
+    launchMode: SpawnPlan['launchMode'];
     cwd: string;
     env: Record<string, string>;
+    environment: readonly SpawnEnvironmentDisclosure[];
     transcriptDir: string | null;
   } => {
     const baseEnv = buildSpawnEnv(process.env, {
@@ -801,8 +921,17 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       launcherLogger.warn('spawn.seed_dropped_win32_shim', { wsId: ws.id, agent: adapter.id });
       command = compose(false);
     }
+    const resolved = resolveLaunchCommand(command, { env, cwd: ws.dir });
     const transcriptDir = adapter.transcriptDir ? adapter.transcriptDir(ws.dir) : null;
-    return { command, cwd: ws.dir, env, transcriptDir };
+    return {
+      command,
+      resolvedCommand: resolved.argv,
+      launchMode: resolved.mode,
+      cwd: ws.dir,
+      env,
+      environment: launchEnvironmentDisclosure(env, adapterEnv),
+      transcriptDir,
+    };
   };
 
   const getRuntimeAdapters = () => adapters.list().filter(isAgentRuntime);
@@ -1098,13 +1227,24 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     adapter: CliAdapter,
     resume: SessionFactoryContext['resume'],
   ): SpawnPlan => {
-    const { command, cwd, env, transcriptDir } = composeSpawnInputs(ws, adapter, resume);
+    const {
+      command,
+      resolvedCommand,
+      launchMode,
+      cwd,
+      env,
+      environment,
+      transcriptDir,
+    } = composeSpawnInputs(ws, adapter, resume);
     return {
       resumeMode: resume === undefined ? 'fresh' : resume === 'last' ? 'last' : 'by-id',
       nativeSessionId: resume && resume !== 'last' ? resume.sessionId : null,
       composedCommand: command,
+      resolvedCommand,
+      launchMode,
       spawnCwd: cwd,
       envPWD: env['PWD'] ?? null,
+      environment,
       transcriptDir,
       projectKey: transcriptDir ? basename(transcriptDir) : null,
     };

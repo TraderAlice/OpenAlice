@@ -9,6 +9,7 @@ import { WorkspaceAIConfigModal } from './WorkspaceAIConfigModal'
 const mocks = vi.hoisted(() => ({
   useWorkspaces: vi.fn(),
   getAgentConfig: vi.fn(),
+  getWorkspaceLaunchPlan: vi.fn(),
   listCredentials: vi.fn(),
   saveAgentConfig: vi.fn(),
   saveCredential: vi.fn(),
@@ -25,6 +26,7 @@ vi.mock('./api', async (importOriginal) => {
   return {
     ...actual,
     getAgentConfig: mocks.getAgentConfig,
+    getWorkspaceLaunchPlan: mocks.getWorkspaceLaunchPlan,
     listCredentials: mocks.listCredentials,
     saveAgentConfig: mocks.saveAgentConfig,
     saveCredential: mocks.saveCredential,
@@ -71,6 +73,32 @@ beforeEach(async () => {
       pi: { ...savedPi, contextWindow: 512_000 },
     })
   mocks.saveAgentConfig.mockResolvedValue(undefined)
+  mocks.getWorkspaceLaunchPlan.mockResolvedValue({
+    workspace: { id: 'chat-1', tag: 'chat-1', dir: '/tmp/chat-1' },
+    agent: {
+      id: 'pi',
+      displayName: 'Pi',
+      kind: 'agent',
+      installed: true,
+      binPath: '/usr/local/bin/pi',
+      capabilities: {
+        parallelPerCwd: true,
+        resumeLast: true,
+        resumeById: true,
+        transcriptDiscovery: 'none',
+      },
+    },
+    launch: {
+      intent: 'fresh',
+      mode: 'direct',
+      composedCommand: ['pi'],
+      resolvedCommand: ['pi'],
+      cwd: '/tmp/chat-1',
+      envPWD: '/tmp/chat-1',
+      environment: [],
+      transcriptDir: null,
+    },
+  })
 })
 
 afterEach(cleanup)

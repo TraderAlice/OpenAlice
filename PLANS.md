@@ -21,10 +21,12 @@ the durable truth after it changes.
 
 ## Active
 
-No active plans are indexed yet.
+None.
 
 ## Completed
 
+- [[plans/workspace-launch-configuration.md]] — Made the next Workspace runtime
+  launch plan inspectable from the existing Workspace settings panel.
 - [[plans/windows-headless-launch.md]] — Safely launches Windows npm Agent
   runtimes for scheduled work and makes pre-process failures observable.
 - [[plans/issue-model-effort-overrides.md]] — Separated login-backed Workspace

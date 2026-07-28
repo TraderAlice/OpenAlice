@@ -321,6 +321,27 @@ the same immutable managed runtime while the `openalice` launcher still uses
 the explicit env contract. User-installed standalone Pi in plain source/dev
 continues to use the normal `pi` command path.
 
+### Workspace launch-plan disclosure
+
+**Workspace Settings → Launch** is the read-only explanation surface for the
+next fresh interactive Session. It calls the same spawn composer used by the
+PTY pool, then shows:
+
+- the adapter-composed argv and the platform-resolved process argv when they
+  differ;
+- the resolved runtime path and direct/node-shim/bash-shim/cmd-shim mode;
+- cwd, transcript discovery, and adapter capabilities; and
+- only launcher-controlled environment contributions, grouped by terminal,
+  Workspace, toolchain, and adapter ownership.
+
+Reading a launch plan never runs `prepareWorkspace`, writes native runtime
+configuration, or starts a process. The response omits inherited host
+environment values. Secret-like command arguments and environment values are
+redacted before crossing the API boundary; local tool transports are reported
+only as configured, and `PATH` is summarized by entry count. Keep this policy
+aligned with the structured-log rule above: launch-plan UI access does not
+authorize complete argv, prompts, credentials, or environment values in logs.
+
 Pi project trust follows the runtime boundary:
 
 - before TUI or WebPi startup, the Pi adapter records a genuinely undecided
