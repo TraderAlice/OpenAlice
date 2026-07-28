@@ -44,7 +44,7 @@ safe reconciliation needed before those release cadences can be separated.
 - [x] Add the previous-release Broker Pack upgrade smoke to the release matrix.
 - [x] Record the v0.85 incident and durable owner-guide contract.
 - [x] Complete focused, repository-wide, and packaged verification.
-- [ ] Merge to `dev` and inspect trailing CI.
+- [x] Merge to `dev` and inspect trailing CI.
 - [ ] Prepare, promote, and publish `v0.86.0-beta`.
 - [ ] Verify GitHub Release and CDN artifacts after publication.
 
