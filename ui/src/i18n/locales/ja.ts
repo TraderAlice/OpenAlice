@@ -147,7 +147,7 @@ export const ja: Resources = {
       aiProvider: 'AI プロバイダー',
       agentPermissions: 'エージェント権限',
       trading: '取引',
-      issues: 'Issues',
+      issues: 'イシュー',
       connectors: 'コネクター',
       mcpServer: 'MCP サーバー',
       marketData: 'マーケットデータ',
