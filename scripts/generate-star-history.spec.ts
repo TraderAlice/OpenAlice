@@ -72,7 +72,26 @@ describe('renderStarHistorySvg', () => {
     expect(svg).toContain('<desc id="description">')
     expect(svg).toContain('<aggregation>daily cumulative active stargazers</aggregation>')
     expect(svg).toContain('<generated-at>2026-03-20T13:00:00.000Z</generated-at>')
+    expect(svg).toContain('<theme>light</theme>')
+    expect(svg).toContain('stop-color="#fbfffd"')
+    expect(svg).not.toContain('LAST 30 DAYS')
     expect(svg).not.toContain('login')
     expect(svg).not.toContain('starred_at')
+  })
+
+  it('renders the matching dark-mode palette', () => {
+    const points = aggregateStarHistory([
+      '2026-02-19T10:40:01Z',
+      '2026-03-20T12:00:00Z',
+    ])
+    const svg = renderStarHistorySvg({
+      points,
+      generatedAt: new Date('2026-03-20T13:00:00Z'),
+      theme: 'dark',
+    })
+
+    expect(svg).toContain('<theme>dark</theme>')
+    expect(svg).toContain('stop-color="#101a16"')
+    expect(svg).toContain('stroke="#63d6aa"')
   })
 })
