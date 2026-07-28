@@ -142,10 +142,11 @@ function PlaceForm({ initialAliceId, ...p }: SharedFormProps & { initialAliceId?
   const [subAccountId, setSubAccountId] = useState(() => initialWallet(p.subAccounts, p.defaultSubAccountId))
 
   const multiWallet = (p.subAccounts?.length ?? 0) > 1
+  const hasOrderSize = !!quantity.trim() || (orderType === 'MKT' && !!cashQty.trim())
   const canSubmit =
     !!aliceId.trim() &&
     !!message.trim() &&
-    (!!quantity.trim() || !!cashQty.trim()) &&
+    hasOrderSize &&
     (orderType !== 'LMT' || !!lmtPrice.trim()) &&
     (!multiWallet || !!subAccountId) &&
     !p.submitting
@@ -160,8 +161,11 @@ function PlaceForm({ initialAliceId, ...p }: SharedFormProps & { initialAliceId?
         orderType,
         tif,
         message: message.trim(),
-        ...(quantity.trim() && { totalQuantity: quantity.trim() }),
-        ...(cashQty.trim() && { cashQty: cashQty.trim() }),
+        ...(orderType === 'MKT' && cashQty.trim()
+          ? { cashQty: cashQty.trim() }
+          : quantity.trim()
+            ? { totalQuantity: quantity.trim() }
+            : {}),
         ...(orderType === 'LMT' && lmtPrice.trim() && { lmtPrice: lmtPrice.trim() }),
         ...(multiWallet && subAccountId && { subAccountId }),
       }
@@ -197,15 +201,27 @@ function PlaceForm({ initialAliceId, ...p }: SharedFormProps & { initialAliceId?
           <Segmented value={action} options={[{ id: 'BUY' }, { id: 'SELL' }]} onChange={(v) => setAction(v as 'BUY' | 'SELL')} />
         </Field>
         <Field label="Order Type">
-          <Segmented value={orderType} options={[{ id: 'MKT', label: 'Market' }, { id: 'LMT', label: 'Limit' }]} onChange={(v) => setOrderType(v as 'MKT' | 'LMT')} />
+          <Segmented
+            value={orderType}
+            options={[{ id: 'MKT', label: 'Market' }, { id: 'LMT', label: 'Limit' }]}
+            onChange={(v) => {
+              const next = v as 'MKT' | 'LMT'
+              setOrderType(next)
+              if (next !== 'MKT') setCashQty('')
+            }}
+          />
         </Field>
       </div>
 
-      <Field label={`Quantity${cashQty ? ' (or use Cash Qty below)' : ''}`}>
+      <Field label={`Quantity${cashQty ? ' (using Cash Qty below)' : ''}`}>
         <input
           className={`${inputClass} font-mono`}
           value={quantity}
-          onChange={(e) => setQuantity(e.target.value)}
+          onChange={(e) => {
+            const next = e.target.value
+            setQuantity(next)
+            if (next.trim()) setCashQty('')
+          }}
           placeholder="0.001"
           inputMode="decimal"
         />
@@ -232,16 +248,24 @@ function PlaceForm({ initialAliceId, ...p }: SharedFormProps & { initialAliceId?
       </button>
       {showAdvanced && (
         <div className="space-y-3 border-l border-border pl-3">
-          <Field label="Cash Qty (notional)">
-            <input
-              className={`${inputClass} font-mono`}
-              value={cashQty}
-              onChange={(e) => setCashQty(e.target.value)}
-              placeholder="50"
-              inputMode="decimal"
-            />
-            <p className="text-[11px] text-muted-foreground/60 mt-1">USDT-equivalent notional. Overrides Quantity if both are set.</p>
-          </Field>
+          {orderType === 'MKT' && (
+            <Field label="Cash Qty (notional)">
+              <input
+                className={`${inputClass} font-mono`}
+                value={cashQty}
+                onChange={(e) => {
+                  const next = e.target.value
+                  setCashQty(next)
+                  if (next.trim()) setQuantity('')
+                }}
+                placeholder="50"
+                inputMode="decimal"
+              />
+              <p className="text-[11px] text-muted-foreground/60 mt-1">
+                Market orders only. Entering a cash quantity clears Quantity.
+              </p>
+            </Field>
+          )}
           <Field label="Time in Force">
             <select className={inputClass} value={tif} onChange={(e) => setTif(e.target.value)}>
               <option value="DAY">DAY</option>
@@ -482,4 +506,3 @@ function Segmented({ value, options, onChange }: {
     </div>
   )
 }
-
