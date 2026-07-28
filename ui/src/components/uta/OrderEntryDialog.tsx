@@ -365,13 +365,16 @@ function PushResultPanel({ result }: { result: WalletPushResult }) {
   const totalRejected = result.rejected.length
   const totalSubmitted = result.submitted.length
   const fullySubmitted = totalRejected === 0 && totalSubmitted > 0
+  const simulated = result.simulated === true
 
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
         <span className={`w-2 h-2 rounded-full shrink-0 ${fullySubmitted ? 'bg-success' : 'bg-warning'}`} />
         <span className={`text-[13px] font-medium ${fullySubmitted ? 'text-success' : 'text-warning'}`}>
-          {fullySubmitted
+          {simulated
+            ? `${totalSubmitted} operation${totalSubmitted > 1 ? 's' : ''} simulated`
+            : fullySubmitted
             ? `${totalSubmitted} operation${totalSubmitted > 1 ? 's' : ''} submitted to broker`
             : `${totalSubmitted} submitted, ${totalRejected} rejected`}
         </span>
@@ -389,16 +392,24 @@ function PushResultPanel({ result }: { result: WalletPushResult }) {
       </div>
 
       {result.submitted.length > 0 && (
-        <OpTable title="Submitted" rows={result.submitted} kind="submitted" />
+        <OpTable title={simulated ? 'Simulated' : 'Submitted'} rows={result.submitted} kind="submitted" />
       )}
       {result.rejected.length > 0 && (
         <OpTable title="Rejected" rows={result.rejected} kind="rejected" />
       )}
 
-      <p className="text-[11px] text-muted-foreground leading-relaxed">
-        Status <strong className="text-foreground">Submitted</strong> means the broker accepted the order — fills happen async.
-        Refresh the positions / orders panels in a moment to see the order transition to <strong className="text-foreground">Filled</strong>.
-      </p>
+      {simulated
+        ? (
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            Demo simulation only — no order was sent to a broker and portfolio data was not changed.
+          </p>
+        )
+        : (
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            Status <strong className="text-foreground">Submitted</strong> means the broker accepted the order — fills happen async.
+            Refresh the positions / orders panels in a moment to see the order transition to <strong className="text-foreground">Filled</strong>.
+          </p>
+        )}
     </div>
   )
 }
@@ -482,4 +493,3 @@ function Segmented({ value, options, onChange }: {
     </div>
   )
 }
-
