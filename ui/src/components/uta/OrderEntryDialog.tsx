@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import Decimal from 'decimal.js'
 import { Field, inputClass } from '../form'
 import { Dialog } from './Dialog'
 import { tradingApi, OrderEntryError } from '../../api/trading'
@@ -281,13 +282,34 @@ function PlaceForm({ initialAliceId, ...p }: SharedFormProps & { initialAliceId?
 
 // ==================== Close form ====================
 
+function closeQuantityError(qty: string, availableQty: string): string | null {
+  if (!qty.trim()) return null
+
+  const available = new Decimal(availableQty).abs()
+  let requested: Decimal
+  try {
+    requested = new Decimal(qty.trim())
+  } catch {
+    return `Enter a positive quantity no greater than ${available.toString()}.`
+  }
+
+  if (!requested.isFinite() || requested.lte(0)) {
+    return `Enter a positive quantity no greater than ${available.toString()}.`
+  }
+  if (requested.gt(available)) {
+    return `Quantity cannot exceed the current position size (${available.toString()}).`
+  }
+  return null
+}
+
 function CloseForm({ aliceId, initialQty, symbol, ...p }: SharedFormProps & { aliceId: string; initialQty: string; symbol?: string }) {
   const [qty, setQty] = useState(initialQty)
   const [message, setMessage] = useState('')
   const [subAccountId, setSubAccountId] = useState(() => initialWallet(p.subAccounts, p.defaultSubAccountId))
 
   const multiWallet = (p.subAccounts?.length ?? 0) > 1
-  const canSubmit = !!message.trim() && (!multiWallet || !!subAccountId) && !p.submitting
+  const quantityError = closeQuantityError(qty, initialQty)
+  const canSubmit = !!message.trim() && !quantityError && (!multiWallet || !!subAccountId) && !p.submitting
 
   const handleSubmit = async () => {
     p.setError(null)
@@ -330,8 +352,16 @@ function CloseForm({ aliceId, initialQty, symbol, ...p }: SharedFormProps & { al
           onChange={(e) => setQty(e.target.value)}
           placeholder="(empty = full position)"
           inputMode="decimal"
+          aria-label="Quantity to close"
+          aria-invalid={quantityError ? 'true' : undefined}
+          aria-describedby="close-position-quantity-help"
         />
-        <p className="text-[11px] text-muted-foreground/60 mt-1">Defaults to current position size. Override for partial close. Empty = close entire position.</p>
+        <p
+          id="close-position-quantity-help"
+          className={`text-[11px] mt-1 ${quantityError ? 'text-destructive' : 'text-muted-foreground/60'}`}
+        >
+          {quantityError ?? `Current position size: ${new Decimal(initialQty).abs().toString()}. Enter less for a partial close, or clear to close all.`}
+        </p>
       </Field>
 
       <Field label="Commit Message — required">
@@ -341,6 +371,7 @@ function CloseForm({ aliceId, initialQty, symbol, ...p }: SharedFormProps & { al
           onChange={(e) => setMessage(e.target.value)}
           placeholder="Why are you closing?"
           autoFocus
+          aria-label="Commit Message — required"
         />
       </Field>
 
@@ -482,4 +513,3 @@ function Segmented({ value, options, onChange }: {
     </div>
   )
 }
-
