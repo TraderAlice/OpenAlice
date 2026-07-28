@@ -96,7 +96,7 @@ describe('WorkspaceLaunchConfigurationPanel', () => {
     render(
       <WorkspaceLaunchConfigurationPanel
         wsId="chat-1"
-        agents={['codex', 'shell']}
+        agents={['codex']}
         initialAgent="codex"
       />,
     )
@@ -107,6 +107,19 @@ describe('WorkspaceLaunchConfigurationPanel', () => {
     expect((await screen.findAllByText('/bin/zsh')).length).toBe(2)
     expect(screen.getByText('不发现原生会话记录')).toBeTruthy()
     expect(mocks.getWorkspaceLaunchPlan).toHaveBeenLastCalledWith('chat-1', 'shell')
+  })
+
+  it('shows Shell even when the Workspace has no configured agent runtime', async () => {
+    render(
+      <WorkspaceLaunchConfigurationPanel
+        wsId="chat-1"
+        agents={[]}
+      />,
+    )
+
+    expect((await screen.findAllByText('/bin/zsh')).length).toBe(2)
+    expect(screen.getByRole('button', { name: 'Shell' })).toBeTruthy()
+    expect(mocks.getWorkspaceLaunchPlan).toHaveBeenCalledWith('chat-1', 'shell')
   })
 
   it('surfaces a read-only load failure without closing the settings panel', async () => {

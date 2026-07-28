@@ -711,7 +711,7 @@ export function createWorkspaceRoutes(
     }
     const adapter = svc.adapters.get(agentId);
     if (!adapter) return c.json({ error: 'unknown_agent' }, 400);
-    if (!meta.agents.includes(agentId)) {
+    if (isAgentRuntime(adapter) && !meta.agents.includes(agentId)) {
       return c.json({
         error: 'agent_not_enabled',
         message: `agent "${agentId}" not enabled on this workspace`,

@@ -1,3 +1,5 @@
+import { delimiter } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { launchEnvironmentDisclosure } from './service.js';
@@ -6,7 +8,7 @@ describe('launchEnvironmentDisclosure', () => {
   it('shows only controlled keys and redacts adapter credential values', () => {
     const result = launchEnvironmentDisclosure({
       TERM: 'xterm-256color',
-      PATH: '/openalice/bin:/usr/bin',
+      PATH: ['/openalice/bin', '/usr/bin'].join(delimiter),
       PWD: '/workspace',
       AQ_WS_ID: 'ws-1',
       OPENALICE_TOOL_SOCKET: '/private/openalice.sock',
@@ -55,8 +57,8 @@ describe('launchEnvironmentDisclosure', () => {
 
   it('attributes an adapter override to the adapter even for a shared key', () => {
     expect(launchEnvironmentDisclosure(
-      { PATH: '/adapter/bin:/usr/bin' },
-      { PATH: '/adapter/bin:/usr/bin' },
+      { PATH: ['/adapter/bin', '/usr/bin'].join(delimiter) },
+      { PATH: ['/adapter/bin', '/usr/bin'].join(delimiter) },
     )).toEqual([{
       key: 'PATH',
       source: 'adapter',

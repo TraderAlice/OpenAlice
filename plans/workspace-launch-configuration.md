@@ -23,7 +23,8 @@ cross-platform shell preference.
 ## Decisions
 
 - Add a dedicated **Launch** section beside General and AI Provider.
-- Preview one enabled Workspace runtime at a time.
+- Preview one enabled Workspace runtime at a time, with the Shell utility
+  always available because it shares the common launcher environment.
 - Show both adapter-composed argv and the platform-resolved process argv when
   they differ.
 - Describe only launcher-controlled environment contributions. Secret-like
@@ -55,6 +56,6 @@ cross-platform shell preference.
 ## Completion
 
 The Workspace settings panel can explain the exact safe launch plan for every
-enabled runtime, browser and Electron transports can read the same API shape,
-and all required checks pass without exposing credentials or changing launch
-behavior.
+enabled runtime and the always-available Shell utility. Browser and Electron
+transports can read the same API shape, and all required checks pass without
+exposing credentials or changing launch behavior.
