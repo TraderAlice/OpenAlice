@@ -1,6 +1,8 @@
 # Agent Conversation Semantics and Log
 
-Status: Active
+Status: Completed
+
+Delivered by PR #741.
 
 Related issues: none
 
@@ -71,7 +73,7 @@ Not in scope:
 - [x] Update agent-facing guidance and owner docs for collaboration rhythms.
 - [x] Add focused tool, control, store, service, and migration tests.
 - [x] Run required typechecks, suite, and proportional runtime verification.
-- [ ] Publish and merge a serial PR to `dev`.
+- [x] Publish and merge a serial PR to `dev`.
 
 ## Completion Criteria
 

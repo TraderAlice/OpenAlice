@@ -21,13 +21,12 @@ the durable truth after it changes.
 
 ## Active
 
+## Completed
+
 - [[plans/agent-conversation-semantics.md]] — Separates ordinary peer
   conversation from explicit artifact reconstruction, documents synchronous
   and asynchronous delegation, and records cross-Agent exchanges in a
-  dedicated local event log.
-
-## Completed
-
+  dedicated local event log. Delivered in PR #741.
 - [[plans/broker-pack-release-safety.md]] — Repaired the v0.85 existing-user
   Broker Pack upgrade gap, shipped v0.86.0-beta, and made N-1→N reconciliation
   a blocking release contract.
