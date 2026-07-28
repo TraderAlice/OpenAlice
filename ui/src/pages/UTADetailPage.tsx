@@ -17,7 +17,7 @@ import { EquityCurve } from '../components/EquityCurve'
 import { Metric, signFromDelta } from '../components/Metric'
 import { fmt, fmtPnl, fmtNum, fmtPctSigned, isUnsetDecimal } from '../lib/format'
 import { secTypeToClass, assetClassLabel, ASSET_CLASS_ORDER, type AssetClass } from '../lib/asset-class'
-import { ContractCell } from '../lib/contract-display'
+import { ContractCell, contractPrimary } from '../lib/contract-display'
 
 // ==================== Page ====================
 
@@ -573,7 +573,7 @@ function Section({ title, action, children }: { title: string; action?: React.Re
 
 interface PositionGroup { class: AssetClass; positions: Position[] }
 
-function PositionsSection({ positions, onCloseClick }: {
+export function PositionsSection({ positions, onCloseClick }: {
   positions: Position[]
   onCloseClick: (p: Position) => void
 }) {
@@ -613,7 +613,9 @@ function PositionsSection({ positions, onCloseClick }: {
               <th className="px-3 py-2 font-medium text-right">Avg → Mark</th>
               <th className="px-3 py-2 font-medium text-right">Mkt Value</th>
               <th className="px-3 py-2 font-medium text-right">PnL</th>
-              <th className="px-3 py-2 font-medium text-right" />
+              <th className="px-3 py-2 font-medium text-right">
+                <span className="sr-only">Actions</span>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -685,7 +687,9 @@ function PositionRow({ position: p, onClose }: { position: Position; onClose: ()
       </td>
       <td className="px-3 py-2 text-right">
         <button
+          type="button"
           onClick={onClose}
+          aria-label={`Close ${contractPrimary(p.contract)} position`}
           className="text-[11px] text-muted-foreground hover:text-destructive transition-colors"
         >
           Close
