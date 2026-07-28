@@ -10,6 +10,13 @@ export function filterAccountTierUTAs<T extends UTAAccountCandidate>(utas: reado
   return utas.filter(isAccountTierUTA)
 }
 
+export function displayNameForUTA(
+  uta: { id: string; label?: string },
+  preset?: { label?: string },
+): string {
+  return uta.label?.trim() || preset?.label?.trim() || uta.id
+}
+
 export function displayProviderForUTA(uta: { id: string; provider?: string }): string {
   if (uta.provider) return uta.provider
   const id = uta.id.toLowerCase()
