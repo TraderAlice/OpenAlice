@@ -190,10 +190,16 @@ export class EClient {
 
       const msg = makeInitialMsg(v100version)
       const msg2 = Buffer.concat([Buffer.from(v100prefix, 'ascii'), msg])
+
+      // Install the handshake listeners before sending the greeting. A local
+      // peer can consume the write and close its socket before the next
+      // JavaScript turn (notably on Windows); registering afterwards misses
+      // that close and leaves this connect attempt waiting for its 10s timer.
+      const handshake = this.waitForHandshake()
       this.conn.sendMsg(msg2)
 
       // Wait for server version response
-      const { serverVersion, connTime } = await this.waitForHandshake()
+      const { serverVersion, connTime } = await handshake
       this.serverVersion_ = serverVersion
       this.connTime = connTime
 

@@ -2,7 +2,7 @@ import { createServer, type Socket } from 'node:net'
 
 import { describe, it, expect, vi } from 'vitest'
 import Decimal from 'decimal.js'
-import { Contract, EClient, makeField, makeMsg, NO_VALID_ID, TickTypeEnum } from '@traderalice/ibkr'
+import { Connection, Contract, EClient, makeField, makeMsg, NO_VALID_ID, TickTypeEnum } from '@traderalice/ibkr'
 import { RequestBridge } from './request-bridge.js'
 
 function stk(conId: number, symbol: string): Contract {
@@ -58,6 +58,13 @@ describe('RequestBridge — connection handshake', () => {
   })
 
   it('contains a server-side handshake close as a normal rejected connect', async () => {
+    const originalSendMsg = Connection.prototype.sendMsg
+    let handshakeListenersReady = false
+    const sendMsg = vi.spyOn(Connection.prototype, 'sendMsg').mockImplementation(function (msg) {
+      handshakeListenersReady = this.listenerCount('data') > 0
+        && (this.socket?.listenerCount('close') ?? 0) > 1
+      return originalSendMsg.call(this, msg)
+    })
     const server = createServer((socket) => {
       socket.once('data', () => socket.destroy())
     })
@@ -75,8 +82,10 @@ describe('RequestBridge — connection handshake', () => {
       const startedAt = Date.now()
       await expect(bridge.waitForConnect(client, '127.0.0.1', address.port, 19, 1_000))
         .rejects.toThrow('Connection to TWS/Gateway closed during handshake')
+      expect(handshakeListenersReady).toBe(true)
       expect(Date.now() - startedAt).toBeLessThan(1_000)
     } finally {
+      sendMsg.mockRestore()
       await new Promise<void>((resolve) => server.close(() => resolve()))
     }
   }, 3_000)
