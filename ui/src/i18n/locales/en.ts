@@ -93,6 +93,7 @@ export const en = {
       workItem: 'Work item',
       workItemDescription: 'Ownership and schedule are part of this Issue.',
       sectionNavigation: 'Issue sections',
+      replyNavigation: 'Reply',
       status: 'Status',
       priority: 'Priority',
       assignee: 'Assignee',

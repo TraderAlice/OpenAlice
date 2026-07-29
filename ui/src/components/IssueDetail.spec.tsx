@@ -152,11 +152,14 @@ describe('IssueDetail property controls', () => {
     expect(identityRow?.className).toContain('flex-col')
     expect(identityRow?.className).toContain('sm:flex-row')
 
-    expect(screen.getByRole('combobox', { name: 'Status' })).toBeTruthy()
+    const status = screen.getByRole('combobox', { name: 'Status' })
+    expect(status).toBeTruthy()
+    expect(status.className).toContain('min-h-10')
     expect(screen.getByText('Status').parentElement?.className).toContain('max-[359px]:flex-col')
     expect(screen.getByRole('combobox', { name: 'Priority' })).toBeTruthy()
     expect(screen.getByRole('combobox', { name: 'Assignee' })).toBeTruthy()
     expect(screen.getByRole('combobox', { name: 'Runtime' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Configure codex' }).className).toContain('min-h-10')
     const model = screen.getByRole('combobox', { name: 'Run model' }) as HTMLSelectElement
     const effort = screen.getByRole('combobox', { name: 'Run effort' }) as HTMLSelectElement
     await waitFor(() => {
@@ -178,9 +181,16 @@ describe('IssueDetail property controls', () => {
 
     expect(workItem.compareDocumentPosition(what) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(workItem.compareDocumentPosition(activity) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(sectionNavigation.className).toContain('sticky')
+    expect(sectionNavigation.className).toContain('overflow-x-auto')
+    expect(sectionNavigation.className).toContain('flex-nowrap')
     expect(sectionNavigation.querySelector('a[href="#issue-work-item"]')).toBeTruthy()
+    expect(sectionNavigation.querySelector('a[href="#issue-work-item"]')?.className).toContain('min-h-10')
     expect(sectionNavigation.querySelector('a[href="#issue-what"]')).toBeTruthy()
     expect(sectionNavigation.querySelector('a[href="#issue-activity"]')).toBeTruthy()
+    expect(sectionNavigation.querySelector('a[href="#issue-reply"]')?.textContent).toBe('Reply')
+    expect(document.querySelector('#issue-reply textarea')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Comment & ask' }).className).toContain('min-h-10')
     expect(sectionNavigation.querySelector('a[href="#issue-runs"]')).toBeNull()
     expect(sectionNavigation.querySelector('a[href="#issue-inbox-reports"]')).toBeNull()
   })

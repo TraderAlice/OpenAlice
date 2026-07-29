@@ -64,7 +64,10 @@ const PRIORITY_OPTIONS: IssuePriority[] = ['urgent', 'high', 'medium', 'low', 'n
 // Shared compact control styling for the rail's selects / inline input — the
 // settings `inputClass`, trimmed for the narrow rail.
 const railControl =
-  'min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1 text-[13px] text-foreground outline-none transition-colors focus:border-primary/60 focus:shadow-[0_0_0_1px_var(--primary-muted)] disabled:cursor-not-allowed disabled:opacity-50'
+  'min-h-10 min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1 text-[13px] text-foreground outline-none transition-colors focus:border-primary/60 focus:shadow-[0_0_0_1px_var(--primary-muted)] disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-0'
+
+const mobileSectionLink =
+  'oa-pressable inline-flex min-h-10 shrink-0 items-center rounded-md px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground'
 
 const CONFIGURABLE_AGENTS: readonly AgentId[] = ['claude', 'codex', 'opencode', 'pi']
 const ALL_RUN_EFFORTS: readonly ModelReasoningEffort[] = [
@@ -246,7 +249,7 @@ function AgentEditor({
         aria-label={canConfigure
           ? t('issues.detail.configureRuntime', { runtime: effectiveAgent })
           : t('issues.detail.noConfigurableRuntime')}
-        className="shrink-0 rounded-md border border-border bg-background px-2 py-1 text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+        className="min-h-10 min-w-10 shrink-0 rounded-md border border-border bg-background px-2 py-1 text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-0 sm:min-w-0"
       >
         <Settings size={14} aria-hidden />
       </button>
@@ -620,7 +623,7 @@ function PropertiesRail({
                     type="button"
                     disabled={retrying}
                     onClick={onRetry}
-                    className="oa-pressable mt-1 inline-flex items-center gap-1.5 rounded-md border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-[11px] font-medium text-warning transition-colors hover:border-warning/60 hover:bg-warning/15 disabled:cursor-wait disabled:opacity-50"
+                    className="oa-pressable mt-1 inline-flex min-h-10 items-center gap-1.5 rounded-md border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-[11px] font-medium text-warning transition-colors hover:border-warning/60 hover:bg-warning/15 disabled:cursor-wait disabled:opacity-50 sm:min-h-0"
                   >
                     <RotateCcw size={12} aria-hidden />
                     {retrying ? t('issues.detail.retrying') : t('issues.detail.retryNow')}
@@ -686,7 +689,10 @@ function CommentComposer({
   }, [text, sending, wsId, id, onPosted])
 
   return (
-    <div className="rounded-xl border border-border bg-background px-3 py-3 shadow-sm transition-colors focus-within:border-primary/45">
+    <div
+      id="issue-reply"
+      className="scroll-mt-20 rounded-xl border border-border bg-background px-3 py-3 shadow-sm transition-colors focus-within:border-primary/45"
+    >
       <textarea
         rows={3}
         value={text}
@@ -716,7 +722,7 @@ function CommentComposer({
           type="button"
           onClick={() => void submit()}
           disabled={sending || text.trim().length === 0}
-          className="oa-pressable rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
+          className="oa-pressable min-h-10 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-0"
         >
           {sending
             ? t('issues.detail.sending')
@@ -787,7 +793,7 @@ function RunRow({ run, onOpen }: { run: IssueRunRecord; onOpen: (run: IssueRunRe
           title={run.resumable
             ? t('issues.detail.openRunSessionTitle')
             : t('issues.detail.noResumableSessionTitle')}
-          className="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+          className="min-h-10 rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-0"
         >
           {t('issues.detail.openConversation')}
         </button>
@@ -1094,7 +1100,7 @@ export function IssueActivity({
                           aria-controls={`issue-session-${record.id}`}
                           onClick={() => setIdentityPopoverId((open) => open === record.id ? null : record.id)}
                           disabled={openingId !== null}
-                          className="inline rounded-sm font-medium text-foreground/80 underline decoration-border underline-offset-2 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-wait disabled:opacity-50"
+                          className="inline-flex min-h-10 items-center rounded-sm font-medium text-foreground/80 underline decoration-border underline-offset-2 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-wait disabled:opacity-50 sm:min-h-0"
                         >
                           {originLabel}
                         </button>
@@ -1116,7 +1122,7 @@ export function IssueActivity({
                               type="button"
                               onClick={() => void openSession(record)}
                               disabled={openingId !== null}
-                              className="oa-pressable mt-3 w-full rounded-lg bg-primary px-3 py-2 text-[11px] font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-wait disabled:opacity-50"
+                              className="oa-pressable mt-3 min-h-10 w-full rounded-lg bg-primary px-3 py-2 text-[11px] font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-wait disabled:opacity-50"
                             >
                               {openingId === record.id
                                 ? t('issues.detail.opening')
@@ -1189,7 +1195,7 @@ function RunsSection({
         <button
           type="button"
           onClick={() => setExpanded((value) => !value)}
-          className="oa-pressable mt-3 w-full rounded-md px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="oa-pressable mt-3 min-h-10 w-full rounded-md px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:min-h-0"
         >
           {expanded
             ? t('issues.detail.showRecentRuns')
@@ -1481,7 +1487,7 @@ export function IssueDetail({
         setSidebar('issue')
         openOrFocus({ kind: 'issue', params: {} })
       }}
-      className="mb-4 inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+      className="mb-2 inline-flex min-h-10 items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground sm:mb-4 sm:min-h-0"
     >
       <ArrowLeft size={13} /> {backLabel ?? t('nav.item.issue')}
     </button>
@@ -1543,46 +1549,34 @@ export function IssueDetail({
             {issue.when && <CadencePill when={issue.when} />}
           </div>
           <h1 className="text-xl font-semibold text-foreground">{issue.title}</h1>
-          <nav
-            aria-label={t('issues.detail.sectionNavigation')}
-            className="mt-3 flex flex-wrap gap-1 border-y border-border/60 py-2 lg:hidden"
-          >
-            <a
-              href="#issue-work-item"
-              className="oa-pressable rounded-md px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              {t('issues.detail.workItem')}
-            </a>
-            <a
-              href="#issue-what"
-              className="oa-pressable rounded-md px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              {t('issues.detail.what')}
-            </a>
-            <a
-              href="#issue-activity"
-              className="oa-pressable rounded-md px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              {t('issues.detail.activity')}
-            </a>
-            {runs.length > 0 && (
-              <a
-                href="#issue-runs"
-                className="oa-pressable rounded-md px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-              >
-                {t('issues.detail.runs')}
-              </a>
-            )}
-            {inboxReports.length > 0 && (
-              <a
-                href="#issue-inbox-reports"
-                className="oa-pressable rounded-md px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-              >
-                {t('issues.detail.inboxReports')}
-              </a>
-            )}
-          </nav>
         </header>
+        <nav
+          aria-label={t('issues.detail.sectionNavigation')}
+          className="scrollbar-hide sticky top-0 z-20 -mx-4 mt-3 flex flex-nowrap gap-1 overflow-x-auto overscroll-x-contain border-y border-border/60 bg-background/95 px-4 py-1.5 shadow-sm backdrop-blur md:-mx-6 md:px-6 lg:hidden"
+        >
+          <a href="#issue-work-item" className={mobileSectionLink}>
+            {t('issues.detail.workItem')}
+          </a>
+          <a href="#issue-what" className={mobileSectionLink}>
+            {t('issues.detail.what')}
+          </a>
+          <a href="#issue-activity" className={mobileSectionLink}>
+            {t('issues.detail.activity')}
+          </a>
+          <a href="#issue-reply" className={mobileSectionLink}>
+            {t('issues.detail.replyNavigation')}
+          </a>
+          {runs.length > 0 && (
+            <a href="#issue-runs" className={mobileSectionLink}>
+              {t('issues.detail.runs')}
+            </a>
+          )}
+          {inboxReports.length > 0 && (
+            <a href="#issue-inbox-reports" className={mobileSectionLink}>
+              {t('issues.detail.inboxReports')}
+            </a>
+          )}
+        </nav>
         <PropertiesRail
           wsId={wsId}
           issue={issue}
