@@ -233,6 +233,8 @@ export const ja: Resources = {
   aiProvider: {
     title: 'AI プロバイダー',
     description: 'Alice がワークスペースへ注入できるプロバイダーアカウントとモデル既定値を管理します。',
+    loadErrorTitle: 'AI 認証情報を読み込めませんでした',
+    loadErrorDescription: 'OpenAlice は認証情報の保管庫を読み取れませんでした。保存済みの認証情報は変更されていません。',
     vaultIntro: 'API キーは Alice が一元管理します。新しいワークスペースには選択した既定の認証情報を書き込め、任意のワークスペースから保存済み認証情報を読み込めます。サブスクリプションのログインは agent CLI 側で管理します（claude login / codex login）。',
     credentials: '認証情報',
     addFirst: '最初の認証情報を追加',

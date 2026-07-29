@@ -240,6 +240,8 @@ export const zhHant: Resources = {
   aiProvider: {
     title: 'AI 供應方',
     description: '管理 Alice 可注入工作區的供應方帳戶與模型預設值。',
+    loadErrorTitle: '無法載入 AI 憑證',
+    loadErrorDescription: 'OpenAlice 無法讀取憑證庫。你已儲存的憑證沒有變更。',
     vaultIntro: 'API key 由 Alice 集中保管。新工作區可以寫入所選的預設憑證，任何工作區也都能載入已儲存憑證。訂閱登入仍由 agent CLI 自行管理（claude login / codex login）。',
     credentials: '憑證庫',
     addFirst: '新增第一個憑證',

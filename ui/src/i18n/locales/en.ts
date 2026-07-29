@@ -244,6 +244,8 @@ export const en = {
   aiProvider: {
     title: 'AI Provider',
     description: 'Provider accounts and model defaults Alice can inject into workspaces.',
+    loadErrorTitle: 'Couldn’t load AI credentials',
+    loadErrorDescription: 'OpenAlice could not read the credential vault. Your saved credentials have not been changed.',
     vaultIntro: "API keys are kept centrally. New workspaces can receive a chosen default, and any workspace can load a saved credential. Subscription logins stay in the agent CLI (claude login / codex login).",
     credentials: 'Credentials',
     addFirst: 'Add your first credential',
