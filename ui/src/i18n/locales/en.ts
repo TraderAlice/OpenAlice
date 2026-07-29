@@ -327,6 +327,7 @@ export const en = {
     notSet: 'not set',
     officialEndpoint: 'provider official endpoint',
     deleteFailed: 'Delete failed',
+    editCredentialAria: 'Edit {{credential}}',
     deleteCredentialAria: 'Delete {{credential}}',
     deleteConfirmTitle: 'Delete {{credential}}?',
     deleteConfirmMessage: 'This permanently removes {{slug}} from Alice’s credential vault and clears any new Workspace defaults that use it. Existing Workspace files are not changed.',

@@ -316,6 +316,7 @@ export const ja: Resources = {
     notSet: '未設定',
     officialEndpoint: 'プロバイダー公式エンドポイント',
     deleteFailed: '削除に失敗しました',
+    editCredentialAria: '{{credential}} を編集',
     deleteCredentialAria: '{{credential}} を削除',
     deleteConfirmTitle: '{{credential}} を削除しますか？',
     deleteConfirmMessage: 'Alice の認証情報保管庫から {{slug}} を完全に削除し、それを使用する新規ワークスペースの既定値も解除します。既存のワークスペースファイルは変更されません。',

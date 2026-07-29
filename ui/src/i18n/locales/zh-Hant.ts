@@ -323,6 +323,7 @@ export const zhHant: Resources = {
     notSet: '未設定',
     officialEndpoint: '供應方官方端點',
     deleteFailed: '刪除失敗',
+    editCredentialAria: '編輯 {{credential}}',
     deleteCredentialAria: '刪除 {{credential}}',
     deleteConfirmTitle: '刪除 {{credential}}？',
     deleteConfirmMessage: '這會從 Alice 憑證庫中永久刪除 {{slug}}，並清除所有引用它的新工作區預設值。現有工作區檔案不會變更。',

@@ -315,6 +315,7 @@ export const zh: Resources = {
     notSet: '未设置',
     officialEndpoint: '提供方官方端点',
     deleteFailed: '删除失败',
+    editCredentialAria: '编辑 {{credential}}',
     deleteCredentialAria: '删除 {{credential}}',
     deleteConfirmTitle: '删除 {{credential}}？',
     deleteConfirmMessage: '这会从 Alice 凭证库中永久删除 {{slug}}，并清除所有引用它的新工作区默认值。现有工作区文件不会改变。',

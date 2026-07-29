@@ -201,12 +201,20 @@ export function AIProviderPage() {
                     </div>
                     <div className="flex shrink-0 gap-2 self-end sm:self-auto">
                       <button
+                        type="button"
                         onClick={() => setModal({ mode: 'edit', cred })}
+                        title={t('aiProvider.editCredentialAria', {
+                          credential: credentialLabel(cred),
+                        })}
+                        aria-label={t('aiProvider.editCredentialAria', {
+                          credential: credentialLabel(cred),
+                        })}
                         className="text-[11px] px-2 py-1 rounded-md border border-border text-muted-foreground hover:text-foreground transition-colors"
                       >
                         {t('common.edit')}
                       </button>
                       <button
+                        type="button"
                         onClick={() => setPendingDelete(cred)}
                         title={t('aiProvider.deleteCredentialAria', {
                           credential: credentialLabel(cred),
