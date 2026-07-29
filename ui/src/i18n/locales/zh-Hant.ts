@@ -765,7 +765,11 @@ export const zhHant: Resources = {
     },
   },
   dev: {
+    onboarding: '新手引導',
     snapshots: '快照',
+    filterTools: '篩選工具…',
+    selectTool: '請從左側面板選擇一個工具。',
+    toolDetailsLoadError: '工具詳細資料載入失敗。',
   },
   simulator: {
     title: '模擬器',

@@ -768,7 +768,11 @@ export const en = {
     },
   },
   dev: {
+    onboarding: 'Onboarding',
     snapshots: 'Snapshots',
+    filterTools: 'Filter tools…',
+    selectTool: 'Select a tool from the left panel.',
+    toolDetailsLoadError: 'Failed to load tool details.',
   },
   simulator: {
     title: 'Simulator',
