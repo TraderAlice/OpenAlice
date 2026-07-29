@@ -196,13 +196,13 @@ describe('IssueDetail property controls', () => {
   })
 
   it.each([
-    ['en', 'Work item', 'Status', 'What', 'Activity', 'Issue sections', 'Schedule is valid and has not run yet.'],
-    ['zh', '工作项', '状态', '任务内容', '动态', '议题分区', '运行计划有效，但尚未执行。'],
-    ['zh-Hant', '工作項目', '狀態', '任務內容', '動態', '議題區段', '執行排程有效，但尚未執行。'],
-    ['ja', '作業項目', 'ステータス', '作業内容', 'アクティビティ', '課題セクション', 'スケジュールは有効ですが、まだ実行されていません。'],
+    ['en', 'Work item', 'Status', 'What', 'Activity', 'Issue sections', 'Tap or click the text to edit · changes save automatically.', 'Schedule is valid and has not run yet.'],
+    ['zh', '工作项', '状态', '任务内容', '动态', '议题分区', '点按文字即可编辑 · 更改会自动保存。', '运行计划有效，但尚未执行。'],
+    ['zh-Hant', '工作項目', '狀態', '任務內容', '動態', '議題區段', '點按文字即可編輯 · 變更會自動儲存。', '執行排程有效，但尚未執行。'],
+    ['ja', '作業項目', 'ステータス', '作業内容', 'アクティビティ', '課題セクション', 'テキストをタップまたはクリックして編集 · 変更は自動保存されます。', 'スケジュールは有効ですが、まだ実行されていません。'],
   ] as const)(
     'localizes Issue chrome in %s while preserving authored content',
-    async (locale, workItem, status, what, activity, sectionNavigation, healthMessage) => {
+    async (locale, workItem, status, what, activity, sectionNavigation, editHint, healthMessage) => {
       await i18n.changeLanguage(locale)
       scheduledIssue.issue.automationHealth = {
         state: 'not_started',
@@ -216,6 +216,7 @@ describe('IssueDetail property controls', () => {
       expect(screen.getByRole('heading', { level: 2, name: what })).toBeTruthy()
       expect(screen.getByRole('heading', { level: 2, name: activity })).toBeTruthy()
       expect(screen.getByRole('navigation', { name: sectionNavigation })).toBeTruthy()
+      expect(screen.getByText(editHint)).toBeTruthy()
       expect(screen.getByText(healthMessage)).toBeTruthy()
       expect(screen.getByText('Morning movers scan')).toBeTruthy()
       expect(screen.getByText('Scan the market and publish a brief.')).toBeTruthy()

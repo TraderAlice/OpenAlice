@@ -758,6 +758,9 @@ function WhatEditor({
             ? t('issues.detail.whatScheduledDescription')
             : t('issues.detail.whatDescription')}
         </p>
+        <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+          {t('issues.detail.whatEditHint')}
+        </p>
       </div>
       <MarkdownWhatEditor value={value} onSave={onSave} />
     </section>
