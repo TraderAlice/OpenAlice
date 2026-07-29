@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Moon, RotateCcw, Sun } from 'lucide-react'
-import { api, type AppConfig } from '../api'
+import { api } from '../api'
 import type { ToolInfo } from '../api/tools'
 import { Toggle } from '../components/Toggle'
 import { SaveIndicator } from '../components/SaveIndicator'
@@ -653,13 +653,6 @@ function WorkspaceShellSection() {
 
 function SettingsSection() {
   const { t } = useTranslation()
-  const [config, setConfig] = useState<AppConfig | null>(null)
-
-  useEffect(() => {
-    api.config.load().then(setConfig).catch(() => {})
-  }, [])
-
-  if (!config) return <PageLoading />
 
   return (
     <div className="mx-auto w-full max-w-[1100px]">
