@@ -14,7 +14,7 @@ import { PageHeader } from '../components/PageHeader'
 import type { AppConfig, McpConfig } from '../api'
 
 export function MCPPage() {
-  const { config, status, loadError, updateConfig, retry } = useConfigPage<McpConfig>({
+  const { config, status, loadError, updateConfig, reload, retry } = useConfigPage<McpConfig>({
     section: 'mcp',
     extract: (full: AppConfig) => full.mcp,
   })
@@ -56,7 +56,14 @@ export function MCPPage() {
             </ConfigSection>
           </div>
         )}
-        {loadError && <p className="text-[13px] text-destructive">Failed to load configuration.</p>}
+        {loadError && (
+          <div role="alert" className="mx-auto max-w-[880px] text-center">
+            <p className="text-[13px] text-destructive">Failed to load configuration.</p>
+            <button type="button" className="btn-secondary-sm mt-3" onClick={() => void reload()}>
+              Retry
+            </button>
+          </div>
+        )}
       </SettingsScrollArea>
     </div>
   )

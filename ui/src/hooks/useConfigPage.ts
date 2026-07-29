@@ -20,6 +20,8 @@ interface UseConfigPageResult<T> {
   updateConfig: (patch: Partial<T>) => void
   /** Update config and immediately flush (no debounce) */
   updateConfigImmediate: (patch: Partial<T>) => void
+  /** Retry the initial config read after a transient failure */
+  reload: () => Promise<void>
   retry: () => void
 }
 
@@ -36,16 +38,23 @@ export function useConfigPage<T extends object>({
   const [config, setConfig] = useState<T | null>(null)
   const [loadError, setLoadError] = useState(false)
   const flushRequestedRef = useRef(false)
+  const extractRef = useRef(extract)
+  extractRef.current = extract
+
+  const reload = useCallback(async () => {
+    setLoadError(false)
+    try {
+      const full = await api.config.load()
+      setFullConfig(full)
+      setConfig(extractRef.current(full))
+    } catch {
+      setLoadError(true)
+    }
+  }, [])
 
   useEffect(() => {
-    api.config
-      .load()
-      .then((full) => {
-        setFullConfig(full)
-        setConfig(extract(full))
-      })
-      .catch(() => setLoadError(true))
-  }, []) // extract is stable (caller should memoize or use inline arrow)
+    void reload()
+  }, [reload])
 
   const saveConfig = useCallback(
     async (data: T) => {
@@ -83,5 +92,5 @@ export function useConfigPage<T extends object>({
     flushRequestedRef.current = true
   }, [])
 
-  return { config, fullConfig, status, loadError, updateConfig, updateConfigImmediate, retry }
+  return { config, fullConfig, status, loadError, updateConfig, updateConfigImmediate, reload, retry }
 }
