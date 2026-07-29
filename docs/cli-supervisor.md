@@ -256,6 +256,58 @@ The command prints to stdout and never edits shell configuration. The root
 commands and lifecycle option names share the same registry used by generated
 completion; detailed shell installation remains user-owned.
 
+## TUI Renderer and PTY Test Foundation
+
+The current tree ships the terminal foundation for the later Supervisor TUI,
+but does not yet expose `openalice tui` or change bare `openalice`. The boundary
+is deliberately small:
+
+- `createSupervisorFrame` is a pure projection from a structured control model
+  to fixed-width terminal rows;
+- `AnsiTerminalRenderer` owns alternate-screen entry, row-level diffs, cursor
+  visibility, style reset, and alternate-screen exit;
+- `createTerminalSession` owns TTY refusal, raw-mode setup/restoration, resize,
+  Ctrl+C/SIGINT/SIGTERM cleanup, and renderer-error cleanup;
+- product actions and polling remain outside the renderer and will call the
+  same lifecycle services as non-interactive commands.
+
+The frame sanitizes control bytes, accounts for grapheme clusters, emoji, and
+East Asian display width, switches to a narrow projection below 60 columns,
+and honors `NO_COLOR` and `TERM=dumb`. After the first draw, unchanged rows
+emit no bytes and an ordinary state change rewrites only changed rows.
+
+### Renderer selection evidence
+
+A disposable spike compared Ink 7.1.1 plus React 19 with a repository-owned
+ANSI renderer against the same fake control model and PTY journey. Measurements
+were taken on 2026-07-30 with Node 22.22.1 on Darwin arm64; they are selection
+evidence rather than release performance promises:
+
+| Measure | Repository renderer | Ink 7.1.1 |
+|---|---:|---:|
+| cold start median, two eight-run samples | 98–118 ms | 313–314 ms |
+| CPU during a one-second idle/resize journey | 8–10 ms | 26–27 ms |
+| journey output | 497 bytes | 962 bytes |
+| retained renderer/frame/session source or installed dependency closure | 9.8 KiB | 22,368 KiB |
+
+Both candidates restored cursor/raw/alternate-screen state, rendered the
+Unicode fixture, honored the narrow projection, and remained idle between
+events. Ink provides a maintained React/Yoga layout system, but the first
+Supervisor has a fixed information architecture and low-frequency updates; its
+extra dependency and startup surface did not buy a needed capability. The
+rejected spike and its dependencies are not retained.
+
+### PTY harness
+
+`packages/cli/test/pty-harness.mjs` owns an isolated `HOME` and
+`OPENALICE_HOME`, launches the fixture through a real `node-pty`, mirrors bytes
+through `@xterm/headless`, records input/output/resize/screen checkpoints, and
+includes the complete transcript in timeout diagnostics. Acceptance covers
+normal detach, Ctrl+C, SIGTERM where supported, resize, Unicode/no-color,
+renderer failure, and control disconnect without TUI exit. The Windows matrix
+also launches the fixture through Git for Windows Bash before accepting the
+renderer.
+
 ## Load-bearing Files
 
 - `packages/cli/bin/openalice.mjs` — root dispatch and process exit mapping.
@@ -270,6 +322,13 @@ completion; detailed shell installation remains user-owned.
 - `packages/cli/src/server.mjs` — legacy `server` presenter.
 - `packages/cli/src/server-control.mjs` — local control client and normalized
   status.
+- `packages/cli/src/tui-frame.mjs` — pure wide/narrow frame projection and
+  Unicode-width/control-byte handling.
+- `packages/cli/src/tui-renderer.mjs` — alternate-screen row-diff renderer.
+- `packages/cli/src/tui-session.mjs` — raw-mode, resize, signal, and restoration
+  guard.
+- `packages/cli/test/pty-harness.mjs` — isolated real-PTY/xterm acceptance
+  harness.
 - `scripts/guardian/control-server.mjs` — Guardian control server.
 - `scripts/guardian/prod.mjs` — built Runtime owner/status source.
 - `packages/cli/src/lifecycle{,-command}.spec.mjs` — lifecycle and presentation
@@ -286,6 +345,15 @@ pnpm -F @traderalice/openalice-cli test
 npx tsc --noEmit
 pnpm test
 ```
+
+For TUI rendering, input, or cleanup changes:
+
+```bash
+pnpm test:cli-tui
+```
+
+The Windows cross-platform suite must exercise the Git Bash journey before a
+renderer selection or terminal-lifecycle change is considered complete.
 
 For launcher ownership or takeover changes:
 

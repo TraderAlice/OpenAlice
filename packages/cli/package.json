@@ -22,12 +22,15 @@
     "src/server.mjs",
     "src/server-control.mjs",
     "src/ssh-connect.mjs",
+    "src/tui-frame.mjs",
+    "src/tui-renderer.mjs",
+    "src/tui-session.mjs",
     "src/uninstall.mjs",
     "src/update.mjs"
   ],
   "scripts": {
-    "build": "node --check bin/openalice.mjs && node --check src/doctor.mjs && node --check src/install-layout.mjs && node --check src/install-source.mjs && node --check src/lifecycle-command.mjs && node --check src/lifecycle.mjs && node --check src/local-start.mjs && node --check src/logs.mjs && node --check src/observability-command.mjs && node --check src/remote.mjs && node --check src/runtime-deps.mjs && node --check src/runtime-client.mjs && node --check src/server.mjs && node --check src/server-control.mjs && node --check src/ssh-connect.mjs && node --check src/uninstall.mjs && node --check src/update.mjs",
-    "test": "vitest run --root ../.. --config vitest.config.ts --project node packages/cli/src"
+    "build": "node --check bin/openalice.mjs && node --check src/doctor.mjs && node --check src/install-layout.mjs && node --check src/install-source.mjs && node --check src/lifecycle-command.mjs && node --check src/lifecycle.mjs && node --check src/local-start.mjs && node --check src/logs.mjs && node --check src/observability-command.mjs && node --check src/remote.mjs && node --check src/runtime-deps.mjs && node --check src/runtime-client.mjs && node --check src/server.mjs && node --check src/server-control.mjs && node --check src/ssh-connect.mjs && node --check src/tui-frame.mjs && node --check src/tui-renderer.mjs && node --check src/tui-session.mjs && node --check src/uninstall.mjs && node --check src/update.mjs",
+    "test": "vitest run --root ../.. --config vitest.config.ts --project node packages/cli/src packages/cli/test"
   },
   "engines": {
     "node": ">=22.19.0"

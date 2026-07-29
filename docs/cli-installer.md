@@ -109,6 +109,9 @@ runs `npm ci --omit=dev --ignore-scripts` in the staged release.
 - `packages/cli/src/{logs,doctor,observability-command}.mjs` — bounded
   redacted log tails and read-only diagnostics shipped in the immutable CLI
   release.
+- `packages/cli/src/tui-{frame,renderer,session}.mjs` — dependency-free
+  Supervisor frame, ANSI diff, and terminal-restoration foundation shipped
+  ahead of the explicit TUI command.
 - `packages/cli/src/server{,-control}.mjs` — detached lifecycle and the
   legacy presenter plus Guardian control client.
 - `packages/cli/src/remote.mjs` — consent-first managed SSH orchestration.

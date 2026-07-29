@@ -160,6 +160,12 @@ cmp /fixture/packages/cli/src/server.mjs "$v1_release/src/server.mjs" \
   || fail "downloaded Server CLI file differs from the fixture"
 cmp /fixture/packages/cli/src/server-control.mjs "$v1_release/src/server-control.mjs" \
   || fail "downloaded Server control file differs from the fixture"
+cmp /fixture/packages/cli/src/tui-frame.mjs "$v1_release/src/tui-frame.mjs" \
+  || fail "downloaded TUI frame module differs from the fixture"
+cmp /fixture/packages/cli/src/tui-renderer.mjs "$v1_release/src/tui-renderer.mjs" \
+  || fail "downloaded TUI renderer module differs from the fixture"
+cmp /fixture/packages/cli/src/tui-session.mjs "$v1_release/src/tui-session.mjs" \
+  || fail "downloaded TUI session module differs from the fixture"
 cmp /fixture/packages/cli/src/update.mjs "$v1_release/src/update.mjs" \
   || fail "downloaded update module differs from the fixture"
 cmp /fixture/packages/cli/src/uninstall.mjs "$v1_release/src/uninstall.mjs" \

@@ -259,13 +259,13 @@ and verification before the next dependent branch starts from updated `dev`.
 
 ### 3. TUI renderer spike and PTY harness
 
-- [ ] Build two bounded renderer candidates against the same fake control model.
+- [x] Build two bounded renderer candidates against the same fake control model.
 - [ ] Measure package size, startup, idle CPU, resize, flicker, Unicode,
   no-color, restoration, and Git Bash behavior.
-- [ ] Select one renderer and remove the rejected spike.
-- [ ] Build a PTY harness with isolated HOME, deterministic control fixtures,
+- [x] Select one renderer and remove the rejected spike.
+- [x] Build a PTY harness with isolated HOME, deterministic control fixtures,
   real input/resize, `@xterm/headless` parsing, transcripts, and timeouts.
-- [ ] Test normal exit, Ctrl+C, SIGTERM, renderer failure, and disconnect.
+- [x] Test normal exit, Ctrl+C, SIGTERM, renderer failure, and disconnect.
 
 ### 4. Supervisor TUI MVP
 
@@ -477,3 +477,18 @@ This plan is complete only when:
   `EPERM`. The failed-job rerun passed Guardian recovery and the complete dev
   smoke without a runtime-lock change, so no speculative retry was introduced.
 - 2026-07-30: Published increment 2 as serial PR #855 targeting `dev`.
+- 2026-07-30: Started increment 3 from merged PR #855. Compared Ink 7.1.1
+  with a small repository renderer against one fake control model and real PTY.
+  On Node 22.22.1/Darwin arm64, the repository candidate started in 98–118 ms
+  versus Ink's 313–314 ms, used 8–10 ms versus 26–27 ms CPU during the
+  one-second idle/resize journey, and retained 9.8 KiB of source rather than a
+  22,368 KiB Ink/React install closure. Both restored the terminal and handled
+  Unicode, resize, and no-color. Kept the row-diff ANSI renderer, removed the
+  rejected spike, and added the isolated real-PTY/xterm harness. Git Bash
+  acceptance remains pending on the Windows matrix.
+- 2026-07-30: Increment 3 local verification passed: TUI renderer/PTY tests
+  passed 12 with the Windows-only Git Bash journey skipped locally; the full
+  CLI suite passed 138 with that one skip; root TypeScript and Vitest passed
+  (3,639 tests before the final two preflight assertions); clean installer,
+  managed remote SSH, distributed-payload equality, and Electron PTY smoke all
+  passed. OrbStack was returned to its prior stopped state.
