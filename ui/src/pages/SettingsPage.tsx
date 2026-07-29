@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Moon, RotateCcw, Sun } from 'lucide-react'
-import { api, type AppConfig } from '../api'
+import { api } from '../api'
 import type { ToolInfo } from '../api/tools'
 import { Toggle } from '../components/Toggle'
 import { SaveIndicator } from '../components/SaveIndicator'
@@ -658,13 +658,6 @@ function WorkspaceShellSection() {
 
 function SettingsSection() {
   const { t } = useTranslation()
-  const [config, setConfig] = useState<AppConfig | null>(null)
-
-  useEffect(() => {
-    api.config.load().then(setConfig).catch(() => {})
-  }, [])
-
-  if (!config) return <PageLoading />
 
   return (
     <div className="mx-auto w-full max-w-[1100px]">
@@ -774,7 +767,7 @@ interface ToolGroup {
   tools: ToolInfo[]
 }
 
-function ToolsSection() {
+export function ToolsSection() {
   const { t } = useTranslation()
   const groupLabel = (key: string): string => {
     switch (key) {
@@ -794,15 +787,25 @@ function ToolsSection() {
   const [inventory, setInventory] = useState<ToolInfo[]>([])
   const [disabled, setDisabled] = useState<Set<string>>(new Set())
   const [loaded, setLoaded] = useState(false)
+  const [loadError, setLoadError] = useState(false)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
-  useEffect(() => {
-    api.tools.load().then((res) => {
+  const loadTools = useCallback(async () => {
+    setLoaded(false)
+    setLoadError(false)
+    try {
+      const res = await api.tools.load()
       setInventory(res.inventory)
       setDisabled(new Set(res.disabled))
       setLoaded(true)
-    }).catch(() => {})
+    } catch {
+      setLoadError(true)
+    }
   }, [])
+
+  useEffect(() => {
+    void loadTools()
+  }, [loadTools])
 
   const groups = useMemo<ToolGroup[]>(() => {
     const map = new Map<string, ToolInfo[]>()
@@ -859,7 +862,16 @@ function ToolsSection() {
   return (
     <div className="mx-auto w-full max-w-[1100px]">
       {!loaded ? (
-        <PageLoading />
+        loadError ? (
+          <div role="alert" className="flex flex-col items-center justify-center py-16 text-center">
+            <p className="text-sm font-medium text-foreground">{t('settings.tools.loadError')}</p>
+            <button type="button" className="btn-secondary-sm mt-4" onClick={() => void loadTools()}>
+              {t('common.retry')}
+            </button>
+          </div>
+        ) : (
+          <PageLoading />
+        )
       ) : groups.length === 0 ? (
         <EmptyState title={t('settings.tools.emptyTitle')} description={t('settings.tools.emptyDescription')} />
       ) : (

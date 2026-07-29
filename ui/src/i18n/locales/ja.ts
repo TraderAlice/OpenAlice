@@ -173,6 +173,8 @@ export const ja: Resources = {
     },
     agentPermissions: {
       title: 'エージェント権限',
+      loadErrorTitle: 'エージェント権限を読み込めませんでした',
+      loadErrorDescription: 'OpenAlice は現在の設定を読み取れませんでした。権限は変更されていません。',
       mode: {
         title: '取引モード',
         description: 'Alice とワークスペースエージェントのグローバルなブローカー権限。',
@@ -211,6 +213,7 @@ export const ja: Resources = {
     },
     tools: {
       summary: '{{groups}} グループ {{tools}} ツール——変更は次回の AI リクエストで反映されます',
+      loadError: 'ツールカタログを読み込めませんでした。',
       emptyTitle: '登録されたツールはありません。',
       emptyDescription: 'エンジンが起動するとツールがここに表示されます。',
       group: {
@@ -230,6 +233,8 @@ export const ja: Resources = {
   aiProvider: {
     title: 'AI プロバイダー',
     description: 'Alice がワークスペースへ注入できるプロバイダーアカウントとモデル既定値を管理します。',
+    loadErrorTitle: 'AI 認証情報を読み込めませんでした',
+    loadErrorDescription: 'OpenAlice は認証情報の保管庫を読み取れませんでした。保存済みの認証情報は変更されていません。',
     vaultIntro: 'API キーは Alice が一元管理します。新しいワークスペースには選択した既定の認証情報を書き込め、任意のワークスペースから保存済み認証情報を読み込めます。サブスクリプションのログインは agent CLI 側で管理します（claude login / codex login）。',
     credentials: '認証情報',
     addFirst: '最初の認証情報を追加',

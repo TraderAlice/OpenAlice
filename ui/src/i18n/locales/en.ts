@@ -184,6 +184,8 @@ export const en = {
     },
     agentPermissions: {
       title: 'Agent Permissions',
+      loadErrorTitle: 'Couldn’t load Agent Permissions',
+      loadErrorDescription: 'OpenAlice could not read the current configuration. Your permissions have not been changed.',
       mode: {
         title: 'Trading mode',
         description: 'Global broker capability for Alice and workspace agents.',
@@ -222,6 +224,7 @@ export const en = {
     },
     tools: {
       summary: '{{tools}} tools in {{groups}} groups — changes apply on next AI request',
+      loadError: 'Could not load the tool catalog.',
       emptyTitle: 'No tools registered.',
       emptyDescription: 'Tools will appear here when the engine starts.',
       group: {
@@ -241,6 +244,8 @@ export const en = {
   aiProvider: {
     title: 'AI Provider',
     description: 'Provider accounts and model defaults Alice can inject into workspaces.',
+    loadErrorTitle: 'Couldn’t load AI credentials',
+    loadErrorDescription: 'OpenAlice could not read the credential vault. Your saved credentials have not been changed.',
     vaultIntro: "API keys are kept centrally. New workspaces can receive a chosen default, and any workspace can load a saved credential. Subscription logins stay in the agent CLI (claude login / codex login).",
     credentials: 'Credentials',
     addFirst: 'Add your first credential',

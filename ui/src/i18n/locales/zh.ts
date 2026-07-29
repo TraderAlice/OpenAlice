@@ -172,6 +172,8 @@ export const zh: Resources = {
     },
     agentPermissions: {
       title: '智能体权限',
+      loadErrorTitle: '无法加载智能体权限',
+      loadErrorDescription: 'OpenAlice 无法读取当前配置。你的权限没有发生变化。',
       mode: {
         title: '交易模式',
         description: 'Alice 和工作区智能体的全局券商能力。',
@@ -210,6 +212,7 @@ export const zh: Resources = {
     },
     tools: {
       summary: '{{groups}} 个分组共 {{tools}} 个工具——更改在下次 AI 请求时生效',
+      loadError: '无法加载工具目录。',
       emptyTitle: '尚未注册任何工具。',
       emptyDescription: '引擎启动后工具会显示在这里。',
       group: {
@@ -229,6 +232,8 @@ export const zh: Resources = {
   aiProvider: {
     title: 'AI 提供方',
     description: '管理 Alice 可注入工作区的提供方账户和模型默认值。',
+    loadErrorTitle: '无法加载 AI 凭证',
+    loadErrorDescription: 'OpenAlice 无法读取凭证库。你已保存的凭证没有发生变化。',
     vaultIntro: 'API key 由 Alice 集中保管。新工作区可以写入选定的默认凭证，任何工作区也都能载入已保存凭证。订阅登录仍由 agent CLI 自己管理（claude login / codex login）。',
     credentials: '凭证库',
     addFirst: '添加第一个凭证',
