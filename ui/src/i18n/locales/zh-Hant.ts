@@ -729,6 +729,13 @@ export const zhHant: Resources = {
     yesterday: '昨天',
     collapseSessions: '收合工作階段',
     expandSessions: '展開工作階段',
+    workspaceActions: {
+      collapse: '收合 {{workspace}} 的工作階段',
+      expand: '展開 {{workspace}} 的工作階段',
+      newConversation: '在 {{workspace}} 中新增對話',
+      configure: '設定 {{workspace}}',
+      offboard: '辦理 {{workspace}} 離職',
+    },
     viewAllSessions: '查看全部 {{count}} 個工作階段',
     deleteWorkspace: '辦理工作區離職',
     deleteWorkspaceTitle: '辦理對話工作區離職',
