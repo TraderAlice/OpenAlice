@@ -123,7 +123,21 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm build
+      # The hosted Windows runner can fail to initialize an otherwise unrelated
+      # `tsc` child with STATUS_DLL_INIT_FAILED when Turbo fans out every
+      # package build at once. Keep the complete build, but bound only the
+      # Windows task fanout so the cross-platform gate reaches the runtime tests.
+      - name: Build (bounded Windows concurrency)
+        if: runner.os == 'Windows'
+        run: |
+          pnpm build:migration-index
+          pnpm exec turbo run build --concurrency=4
+          pnpm exec tsup src/main.ts --format esm --dts
+        timeout-minutes: 15
+
+      - name: Build
+        if: runner.os != 'Windows'
+        run: pnpm build
         timeout-minutes: 15
 
       - run: pnpm test
