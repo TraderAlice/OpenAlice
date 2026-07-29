@@ -245,7 +245,7 @@ and verification before the next dependent branch starts from updated `dev`.
 - [x] Add the durable Shell CLI Supervisor owner guide and index routes.
 - [x] Complete real Guardian/browser, installer, repository, and Electron
   verification.
-- [ ] Deliver through the first serial PR to `dev`.
+- [x] Publish the first serial PR to `dev` as #853.
 
 ### 2. Control compatibility and observability
 
@@ -464,3 +464,4 @@ This plan is complete only when:
   smoke, real isolated background `up/status/down`, foreground PTY Ctrl+C,
   clean installer upgrade/uninstall Docker smoke, managed remote SSH smoke, UI
   typecheck, server build, and Electron PTY smoke.
+- 2026-07-30: Published increment 1 as serial PR #853 targeting `dev`.
