@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import type { TFunction } from 'i18next'
+import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Hash, History, Inbox, ListChecks, MessageSquare, RotateCcw, Settings, TrendingUp, X } from 'lucide-react'
 
 import type { HeadlessTaskStatus } from '../api/headless'
@@ -120,6 +122,7 @@ function AssigneeEditor({
   disabled?: boolean
   onChange: (next: string) => void
 }) {
+  const { t } = useTranslation()
   const sessionChoices = sessions
     .filter((session) => session.resumeId && session.agent !== 'shell' && session.resumable)
     .toSorted((a, b) => Number(b.active) - Number(a.active) || b.updatedAt - a.updatedAt)
@@ -144,21 +147,23 @@ function AssigneeEditor({
       className={railControl}
       value={value}
       disabled={disabled}
-      aria-label="Assignee"
+      aria-label={t('issues.detail.assignee')}
       onChange={(event) => onChange(event.target.value)}
     >
-      {scheduled && <option value="@new">New Session · assign after first run</option>}
-      <option value="@workspace">{scheduled ? '@Workspace · new Session each run' : '@Workspace'}</option>
-      {!scheduled && <option value="@human">Human</option>}
-      {!scheduled && <option value="@unassigned">Unassigned</option>}
-      <optgroup label="Workspace Sessions">
+      {scheduled && <option value="@new">{t('issues.detail.assigneeNew')}</option>}
+      <option value="@workspace">
+        {scheduled ? t('issues.detail.assigneeWorkspaceScheduled') : t('issues.detail.assigneeWorkspace')}
+      </option>
+      {!scheduled && <option value="@human">{t('issues.detail.human')}</option>}
+      {!scheduled && <option value="@unassigned">{t('issues.detail.unassigned')}</option>}
+      <optgroup label={t('issues.detail.workspaceSessions')}>
         {sessionChoices.map((session) => (
           <option key={session.resumeId} value={`@${session.resumeId}`}>
             {labelFor(session)}
           </option>
         ))}
         {!hasSelected && selectedResumeId && (
-          <option value={value}>Signed Session · @{selectedResumeId}</option>
+          <option value={value}>{t('issues.detail.signedSession', { resumeId: selectedResumeId })}</option>
         )}
       </optgroup>
     </select>
@@ -184,16 +189,21 @@ function AgentEditor({
   onChange: (next: string | null) => void
   onConfigure: (agent: AgentId) => void
 }) {
+  const { t } = useTranslation()
   const selected = value ?? ''
   const issueDefaultInOptions = issueDefaultAgent && options.some((a) => a.id === issueDefaultAgent) ? issueDefaultAgent : null
   const defaultInOptions = defaultAgent && options.some((a) => a.id === defaultAgent) ? defaultAgent : null
   const effectiveAgent = value || issueDefaultInOptions || defaultInOptions || options[0]?.id || null
   const canConfigure = isConfigurableAgent(effectiveAgent)
   const defaultLabel = issueDefaultInOptions
-    ? `Default (${options.find((a) => a.id === issueDefaultInOptions)?.displayName ?? issueDefaultInOptions})`
+    ? t('issues.detail.defaultRuntime', {
+        runtime: options.find((a) => a.id === issueDefaultInOptions)?.displayName ?? issueDefaultInOptions,
+      })
     : defaultInOptions
-    ? `Default (${options.find((a) => a.id === defaultInOptions)?.displayName ?? defaultInOptions}, workspace)`
-    : 'Default'
+    ? t('issues.detail.defaultWorkspaceRuntime', {
+        runtime: options.find((a) => a.id === defaultInOptions)?.displayName ?? defaultInOptions,
+      })
+    : t('issues.detail.default')
 
   return (
     <>
@@ -201,7 +211,7 @@ function AgentEditor({
         className={railControl}
         value={selected}
         disabled={disabled}
-        aria-label="Runtime"
+        aria-label={t('issues.detail.runtime')}
         onChange={(e) => {
           const next = e.target.value
           onChange(next ? next : null)
@@ -211,8 +221,8 @@ function AgentEditor({
         {options.map((agent) => {
           const row = readiness[agent.id]
           const suffix =
-            agent.installed === false ? ' (missing)'
-            : row?.requiresCredential && !row.ready ? ' (needs cred)'
+            agent.installed === false ? t('issues.detail.runtimeMissingSuffix')
+            : row?.requiresCredential && !row.ready ? t('issues.detail.runtimeCredentialSuffix')
             : ''
           return (
             <option key={agent.id} value={agent.id}>
@@ -230,8 +240,12 @@ function AgentEditor({
         onClick={() => {
           if (canConfigure) onConfigure(effectiveAgent)
         }}
-        title={canConfigure ? `Configure ${effectiveAgent}` : 'No configurable runtime selected'}
-        aria-label={canConfigure ? `Configure ${effectiveAgent}` : 'No configurable runtime selected'}
+        title={canConfigure
+          ? t('issues.detail.configureRuntime', { runtime: effectiveAgent })
+          : t('issues.detail.noConfigurableRuntime')}
+        aria-label={canConfigure
+          ? t('issues.detail.configureRuntime', { runtime: effectiveAgent })
+          : t('issues.detail.noConfigurableRuntime')}
         className="shrink-0 rounded-md border border-border bg-background px-2 py-1 text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
       >
         <Settings size={14} aria-hidden />
@@ -253,6 +267,7 @@ function ModelEditor({
   disabled?: boolean
   onChange: (next: string | null) => void
 }) {
+  const { t } = useTranslation()
   const [customMode, setCustomMode] = useState(Boolean(value))
   const [draft, setDraft] = useState(value ?? '')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -266,10 +281,10 @@ function ModelEditor({
     if (!next) setCustomMode(false)
   }
   const workspaceLabel = loadingWorkspaceDefault
-    ? 'Default · loading…'
+    ? t('issues.detail.defaultLoading')
     : workspaceModel
-      ? `Default · ${workspaceModel}`
-      : 'Default · runtime decides'
+      ? t('issues.detail.defaultValue', { value: workspaceModel })
+      : t('issues.detail.defaultRuntimeDecides')
 
   return (
     <div className="min-w-0 flex-1">
@@ -277,7 +292,7 @@ function ModelEditor({
         className={`${railControl} w-full`}
         value={customMode ? 'custom' : 'workspace'}
         disabled={disabled}
-        aria-label="Run model"
+        aria-label={t('issues.detail.runModel')}
         onChange={(event) => {
           if (event.target.value === 'workspace') {
             setCustomMode(false)
@@ -290,7 +305,9 @@ function ModelEditor({
         }}
       >
         <option value="workspace">{workspaceLabel}</option>
-        <option value="custom">{value ? `Override · ${value}` : 'Custom model…'}</option>
+        <option value="custom">
+          {value ? t('issues.detail.overrideValue', { value }) : t('issues.detail.customModel')}
+        </option>
       </select>
       {customMode && (
         <input
@@ -298,8 +315,8 @@ function ModelEditor({
           className={`${railControl} mt-1 w-full`}
           value={draft}
           disabled={disabled}
-          placeholder="Exact native model ID"
-          aria-label="Custom run model"
+          placeholder={t('issues.detail.nativeModelPlaceholder')}
+          aria-label={t('issues.detail.customRunModel')}
           onChange={(event) => setDraft(event.target.value)}
           onBlur={commit}
           onKeyDown={(event) => {
@@ -320,14 +337,15 @@ function ModelEditor({
 function workspaceEffortLabel(
   detected: WorkspaceCredentialDetection | null,
   loading: boolean,
+  t: TFunction,
 ): string {
-  if (loading) return 'Default · loading…'
-  if (detected?.reasoningEffort) return `Default · ${detected.reasoningEffort}`
-  if (detected?.reasoningMode === 'none') return 'Default · none'
-  if (detected?.reasoningMode === 'required') return 'Default · required'
-  if (detected?.reasoningDefaultEnabled === true) return 'Default · thinking on'
-  if (detected?.reasoningDefaultEnabled === false) return 'Default · thinking off'
-  return 'Default · runtime decides'
+  if (loading) return t('issues.detail.defaultLoading')
+  if (detected?.reasoningEffort) return t('issues.detail.defaultValue', { value: detected.reasoningEffort })
+  if (detected?.reasoningMode === 'none') return t('issues.detail.defaultValue', { value: t('issues.detail.none') })
+  if (detected?.reasoningMode === 'required') return t('issues.detail.defaultValue', { value: t('issues.detail.required') })
+  if (detected?.reasoningDefaultEnabled === true) return t('issues.detail.defaultThinkingOn')
+  if (detected?.reasoningDefaultEnabled === false) return t('issues.detail.defaultThinkingOff')
+  return t('issues.detail.defaultRuntimeDecides')
 }
 
 function PropertySection({
@@ -379,6 +397,7 @@ function PropertiesRail({
   onRetry: () => void
   onConfigureAgent: (agent: AgentId) => void
 }) {
+  const { t } = useTranslation()
   const meta = STATUS_META[issue.status]
   const issueDefaultInOptions = issueDefaultAgent && agentOptions.some((a) => a.id === issueDefaultAgent) ? issueDefaultAgent : null
   const defaultInOptions = defaultAgent && agentOptions.some((a) => a.id === defaultAgent) ? defaultAgent : null
@@ -438,43 +457,76 @@ function PropertiesRail({
   const selectedWorkspaceDefaults = workspaceDefaults?.agent === effectiveAgent
     ? workspaceDefaults
     : null
+  const automationHealthMessage = useMemo<string | null>(() => {
+    const health = issue.automationHealth
+    if (!health) return null
+    // Failure/interruption messages may contain authoritative runtime diagnostics.
+    // Keep those verbatim; only localize launcher-owned, deterministic states.
+    if (health.state === 'failed' || health.state === 'interrupted') return health.message
+    if (health.state === 'inactive') {
+      return t('issues.detail.healthMessage.inactive', {
+        status: t(`issues.status.${issue.status}`),
+      })
+    }
+    const blockedMessages = {
+      'Assigned Session does not exist. Choose an active Session or @workspace.': 'missingSession',
+      'Assigned Session is retired. Reassign the Issue before its next run.': 'retiredSession',
+      'Assigned Session has no resumable runtime conversation yet.': 'unboundSession',
+      'Schedule has no future fire. Check its expression and timestamp.': 'noFutureRun',
+    } as const
+    if (health.state === 'blocked') {
+      const key = blockedMessages[health.message as keyof typeof blockedMessages]
+      if (key === 'missingSession') return t('issues.detail.healthMessage.missingSession')
+      if (key === 'retiredSession') return t('issues.detail.healthMessage.retiredSession')
+      if (key === 'unboundSession') return t('issues.detail.healthMessage.unboundSession')
+      if (key === 'noFutureRun') return t('issues.detail.healthMessage.noFutureRun')
+      return health.message
+    }
+    if (health.state === 'not_started') return t('issues.detail.healthMessage.not_started')
+    if (health.state === 'due') return t('issues.detail.healthMessage.due')
+    if (health.state === 'running') return t('issues.detail.healthMessage.running')
+    return t('issues.detail.healthMessage.healthy')
+  }, [issue.automationHealth, issue.status, t])
 
   return (
     <aside className="min-w-0 w-full shrink-0 space-y-3 lg:col-start-2 lg:row-start-1 lg:row-span-2">
-      <PropertySection title="Work item" description="Ownership and schedule are part of this Issue.">
-        <EditRow label="Status">
+      <PropertySection
+        title={t('issues.detail.workItem')}
+        description={t('issues.detail.workItemDescription')}
+      >
+        <EditRow label={t('issues.detail.status')}>
           <meta.Icon size={14} className={`shrink-0 ${meta.className}`} />
           <select
             className={railControl}
             value={issue.status}
             disabled={saving}
-            aria-label="Status"
+            aria-label={t('issues.detail.status')}
             onChange={(e) => onPatch({ status: e.target.value as IssueStatus })}
           >
             {STATUS_OPTIONS.map((s) => (
               <option key={s} value={s}>
-                {STATUS_META[s].label}
+                {t(`issues.status.${s}`)}
               </option>
             ))}
           </select>
         </EditRow>
-        <EditRow label="Priority">
+        <EditRow label={t('issues.detail.priority')}>
           <PriorityIndicator priority={issue.priority} />
           <select
             className={`${railControl} capitalize`}
             value={issue.priority}
             disabled={saving}
-            aria-label="Priority"
+            aria-label={t('issues.detail.priority')}
             onChange={(e) => onPatch({ priority: e.target.value as IssuePriority })}
           >
             {PRIORITY_OPTIONS.map((p) => (
               <option key={p} value={p}>
-                {p}
+                {t(`issues.priority.${p}`)}
               </option>
             ))}
           </select>
         </EditRow>
-        <EditRow label="Assignee">
+        <EditRow label={t('issues.detail.assignee')}>
           <AssigneeEditor
             value={issue.assignee}
             scheduled={Boolean(issue.when)}
@@ -485,15 +537,15 @@ function PropertiesRail({
         </EditRow>
         {issue.when && (
           <>
-          <PropRow label="Cadence"><CadencePill when={issue.when} /></PropRow>
+          <PropRow label={t('issues.detail.cadence')}><CadencePill when={issue.when} /></PropRow>
           {ownerResumeId ? (
-            <PropRow label="Runtime">
-              <span title="The responsible Session determines its runtime">
-                {ownerSession?.agent ?? 'Session-owned'}
+            <PropRow label={t('issues.detail.runtime')}>
+              <span title={t('issues.detail.sessionDeterminesRuntime')}>
+                {ownerSession?.agent ?? t('issues.detail.sessionOwned')}
               </span>
             </PropRow>
           ) : (
-            <EditRow label="Runtime">
+            <EditRow label={t('issues.detail.runtime')}>
               <AgentEditor
                 value={issue.agent}
                 issueDefaultAgent={issueDefaultAgent}
@@ -516,7 +568,7 @@ function PropertiesRail({
           )}
           {!ownerResumeId && (
             <>
-              <EditRow label="Model">
+              <EditRow label={t('issues.detail.model')}>
                 <ModelEditor
                   value={issue.model}
                   workspaceModel={selectedWorkspaceDefaults?.detected?.model ?? null}
@@ -525,12 +577,12 @@ function PropertiesRail({
                   onChange={(model) => onPatch({ model })}
                 />
               </EditRow>
-              <EditRow label="Effort">
+              <EditRow label={t('issues.detail.effort')}>
                 <select
                   className={railControl}
                   value={issue.effort ?? ''}
                   disabled={saving}
-                  aria-label="Run effort"
+                  aria-label={t('issues.detail.runEffort')}
                   onChange={(event) => onPatch({
                     effort: event.target.value
                       ? event.target.value as ModelReasoningEffort
@@ -541,6 +593,7 @@ function PropertiesRail({
                     {workspaceEffortLabel(
                       selectedWorkspaceDefaults?.detected ?? null,
                       selectedWorkspaceDefaults?.loading ?? false,
+                      t,
                     )}
                   </option>
                   {effortOptions.map((effort) => (
@@ -551,14 +604,16 @@ function PropertiesRail({
             </>
           )}
           {agentNeedsCredential && (
-            <p className="py-2 text-right text-[11px] leading-snug text-warning">AI credential missing.</p>
+            <p className="py-2 text-right text-[11px] leading-snug text-warning">
+              {t('issues.detail.aiCredentialMissing')}
+            </p>
           )}
           {issue.automationHealth && (
-            <PropRow label="Health">
+            <PropRow label={t('issues.detail.health')}>
               <div className="flex flex-col items-end gap-1">
                 <AutomationHealthPill health={issue.automationHealth} />
                 <span className="max-w-44 text-[11px] leading-snug text-muted-foreground">
-                  {issue.automationHealth.message}
+                  {automationHealthMessage}
                 </span>
                 {canRetry && (
                   <button
@@ -568,16 +623,18 @@ function PropertiesRail({
                     className="oa-pressable mt-1 inline-flex items-center gap-1.5 rounded-md border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-[11px] font-medium text-warning transition-colors hover:border-warning/60 hover:bg-warning/15 disabled:cursor-wait disabled:opacity-50"
                   >
                     <RotateCcw size={12} aria-hidden />
-                    {retrying ? 'Retrying…' : 'Retry now'}
+                    {retrying ? t('issues.detail.retrying') : t('issues.detail.retryNow')}
                   </button>
                 )}
               </div>
             </PropRow>
           )}
-          <PropRow label="Last run">
-            {issue.lastFiredAtMs ? formatRelativeTime(issue.lastFiredAtMs) : <span className="text-muted-foreground">never</span>}
+          <PropRow label={t('issues.detail.lastRun')}>
+            {issue.lastFiredAtMs
+              ? formatRelativeTime(issue.lastFiredAtMs)
+              : <span className="text-muted-foreground">{t('issues.detail.never')}</span>}
           </PropRow>
-          <PropRow label="Next run">
+          <PropRow label={t('issues.detail.nextRun')}>
             {issue.nextDueAtMs ? formatRelativeTime(issue.nextDueAtMs) : <span className="text-muted-foreground">—</span>}
           </PropRow>
           </>
@@ -607,6 +664,7 @@ function CommentComposer({
   assignee: string
   onPosted: (next: IssueDetailData) => void
 }) {
+  const { t } = useTranslation()
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -633,7 +691,9 @@ function CommentComposer({
         rows={3}
         value={text}
         disabled={sending}
-        placeholder={ownerResumeId ? `Comment to @${ownerResumeId}…` : 'Ask about this Issue…'}
+        placeholder={ownerResumeId
+          ? t('issues.detail.commentTo', { resumeId: ownerResumeId })
+          : t('issues.detail.askAboutIssue')}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
           if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
@@ -647,10 +707,10 @@ function CommentComposer({
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-2">
         <p className="min-w-0 flex-1 basis-full break-words text-[11px] leading-snug text-muted-foreground sm:basis-auto">
           {ownerResumeId
-            ? <>The assigned Session <span className="font-mono text-foreground/75">@{ownerResumeId}</span> will reply here.</>
+            ? <>{t('issues.detail.assignedSessionPrefix')} <span className="font-mono text-foreground/75">@{ownerResumeId}</span> {t('issues.detail.assignedSessionSuffix')}</>
             : assignee === '@new'
-              ? 'Until the first run assigns an owner, the creator or a reconstructed Workspace Agent will reply here.'
-              : 'The creator or a reconstructed Workspace Agent will reply here; ownership stays unchanged.'}
+              ? t('issues.detail.replyBeforeFirstRun')
+              : t('issues.detail.replyWithoutOwner')}
         </p>
         <button
           type="button"
@@ -658,7 +718,11 @@ function CommentComposer({
           disabled={sending || text.trim().length === 0}
           className="oa-pressable rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {sending ? 'Sending…' : ownerResumeId ? 'Comment & notify' : 'Comment & ask'}
+          {sending
+            ? t('issues.detail.sending')
+            : ownerResumeId
+              ? t('issues.detail.commentNotify')
+              : t('issues.detail.commentAsk')}
         </button>
       </div>
     </div>
@@ -676,12 +740,17 @@ function WhatEditor({
   scheduled: boolean
   onSave: (what: string) => Promise<boolean>
 }) {
+  const { t } = useTranslation()
   return (
     <section className="mt-4 border-t border-border/60 pt-4">
       <div className="mb-2">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/80">What</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/80">
+          {t('issues.detail.what')}
+        </h2>
         <p className="mt-1 text-[11px] leading-snug text-muted-foreground/65">
-          {scheduled ? 'This exact markdown is sent to the agent on every scheduled run.' : 'The canonical markdown definition of this work item.'}
+          {scheduled
+            ? t('issues.detail.whatScheduledDescription')
+            : t('issues.detail.whatDescription')}
         </p>
       </div>
       <MarkdownWhatEditor value={value} onSave={onSave} />
@@ -692,6 +761,7 @@ function WhatEditor({
 // ==================== Run history ====================
 
 function RunRow({ run, onOpen }: { run: IssueRunRecord; onOpen: (run: IssueRunRecord) => void }) {
+  const { t } = useTranslation()
   const displayStatus = run.failure?.kind === 'system_paused' || run.failure?.kind === 'launcher_restarted'
     ? 'interrupted'
     : run.status
@@ -701,7 +771,7 @@ function RunRow({ run, onOpen }: { run: IssueRunRecord; onOpen: (run: IssueRunRe
         <span
           className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-medium ${RUN_STATUS_STYLE[displayStatus]}`}
         >
-          {displayStatus}
+          {t(`issues.detail.runStatus.${displayStatus}`)}
         </span>
         <span className="text-xs text-muted-foreground">{run.agent}</span>
         {run.model && <span className="text-xs text-muted-foreground">· {run.model}</span>}
@@ -714,10 +784,12 @@ function RunRow({ run, onOpen }: { run: IssueRunRecord; onOpen: (run: IssueRunRe
           type="button"
           onClick={() => onOpen(run)}
           disabled={!run.resumable || run.status === 'running'}
-          title={run.resumable ? 'Open the Session behind this run' : 'This run did not capture a resumable Session'}
+          title={run.resumable
+            ? t('issues.detail.openRunSessionTitle')
+            : t('issues.detail.noResumableSessionTitle')}
           className="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
         >
-          Open conversation
+          {t('issues.detail.openConversation')}
         </button>
       </div>
       {run.prompt && (
@@ -732,8 +804,10 @@ function RunRow({ run, onOpen }: { run: IssueRunRecord; onOpen: (run: IssueRunRe
       )}
       {run.output && (run.output.toolCalls > 0 || run.output.toolFailures > 0) && (
         <p className={`mt-1 text-[11px] ${run.output.toolFailures > 0 ? 'text-destructive' : 'text-muted-foreground/60'}`}>
-          {run.output.toolCalls} tool {run.output.toolCalls === 1 ? 'call' : 'calls'}
-          {run.output.toolFailures > 0 ? ` · ${run.output.toolFailures} failed` : ''}
+          {t('issues.detail.toolCalls', { count: run.output.toolCalls })}
+          {run.output.toolFailures > 0
+            ? ` · ${t('issues.detail.toolFailures', { count: run.output.toolFailures })}`
+            : ''}
         </p>
       )}
       {run.failure && (
@@ -773,22 +847,25 @@ function InboxReportsSection({
   reports: InboxEntry[]
   onOpen: (entryId: string) => void
 }) {
+  const { t } = useTranslation()
   if (reports.length === 0) return null
   return (
     <section className="mt-8">
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">Inbox reports</h3>
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
+        {t('issues.detail.inboxReports')}
+      </h3>
       <ul className="space-y-2">
         {reports.map((entry) => (
           <li key={entry.id}>
             <button
               type="button"
               onClick={() => onOpen(entry.id)}
-              title="Open in Inbox"
+              title={t('issues.detail.openInInbox')}
               className="group flex w-full items-center gap-2.5 rounded-lg border border-border bg-secondary px-3 py-2.5 text-left transition-colors hover:border-primary/40 hover:bg-muted"
             >
               <Inbox size={14} className="shrink-0 text-muted-foreground/70 transition-colors group-hover:text-primary" aria-hidden />
               <span className="min-w-0 flex-1 truncate text-[12px] text-foreground/80">
-                {previewForEntry(entry) || '(empty push)'}
+                {previewForEntry(entry) || t('issues.detail.emptyPush')}
               </span>
               <span
                 className="ml-auto shrink-0 text-xs text-muted-foreground"
@@ -806,46 +883,53 @@ function InboxReportsSection({
 
 // ==================== Issue activity (changes + comments) ====================
 
-const PROVENANCE_ACTION_LABEL: Record<IssueProvenanceRecord['action'], string> = {
-  created: 'created the Issue',
-  updated: 'updated the Issue',
-  commented: 'commented',
-  sent: 'sent the Issue',
-  decided: 'recorded a decision',
-  reconstructed: 'reconstructed the Issue context',
+function provenanceActionLabel(action: IssueProvenanceRecord['action'], t: TFunction): string {
+  return t(`issues.detail.provenanceAction.${action}`)
 }
 
-const MUTATION_FIELD_LABEL: Record<string, string> = {
-  title: 'Title',
-  status: 'Status',
-  priority: 'Priority',
-  assignee: 'Assignee',
-  schedule: 'Schedule',
-  runtime: 'Runtime',
-  model: 'Model',
-  effort: 'Effort',
-  what: 'What',
-}
-
-function unknownOriginLabel(reason: string): string {
-  if (reason === 'direct-file-edit') return 'Direct file edit'
-  if (reason === 'concurrent-workspace-edit') return 'Concurrent Workspace edit · author unknown'
-  return `Unknown · ${reason.replaceAll('-', ' ')}`
-}
-
-function mutationValue(field: string, value: string): string {
-  if (field === 'assignee') {
-    if (value === '@new') return 'New Session, then keep owner'
-    if (value === '@workspace') return 'New Session each run'
-    if (value === '@human') return 'Human'
-    if (value === '@unassigned') return 'Unassigned'
+function mutationFieldLabel(field: string, t: TFunction): string {
+  switch (field) {
+    case 'title': return t('issues.detail.mutationField.title')
+    case 'status': return t('issues.detail.mutationField.status')
+    case 'priority': return t('issues.detail.mutationField.priority')
+    case 'assignee': return t('issues.detail.mutationField.assignee')
+    case 'schedule': return t('issues.detail.mutationField.schedule')
+    case 'runtime': return t('issues.detail.mutationField.runtime')
+    case 'model': return t('issues.detail.mutationField.model')
+    case 'effort': return t('issues.detail.mutationField.effort')
+    case 'what': return t('issues.detail.mutationField.what')
+    default: return field
   }
-  if (field === 'status' || field === 'priority') return value.replaceAll('_', ' ')
+}
+
+function unknownOriginLabel(reason: string, t: TFunction): string {
+  if (reason === 'direct-file-edit') return t('issues.detail.directFileEdit')
+  if (reason === 'concurrent-workspace-edit') return t('issues.detail.concurrentEditUnknown')
+  return t('issues.detail.unknownOrigin', { reason: reason.replaceAll('-', ' ') })
+}
+
+function mutationValue(field: string, value: string, t: TFunction): string {
+  if (field === 'assignee') {
+    if (value === '@new') return t('issues.detail.mutationValue.newSessionKeepOwner')
+    if (value === '@workspace') return t('issues.detail.mutationValue.newSessionEachRun')
+    if (value === '@human') return t('issues.detail.human')
+    if (value === '@unassigned') return t('issues.detail.unassigned')
+  }
+  if (field === 'status' && STATUS_OPTIONS.includes(value as IssueStatus)) {
+    return t(`issues.status.${value as IssueStatus}`)
+  }
+  if (field === 'priority' && PRIORITY_OPTIONS.includes(value as IssuePriority)) {
+    return t(`issues.priority.${value as IssuePriority}`)
+  }
   if (field === 'schedule') {
     try {
       const schedule = JSON.parse(value) as { kind?: string; at?: string; every?: string; cron?: string; timezone?: string }
-      if (schedule.kind === 'at') return `Once · ${schedule.at}`
-      if (schedule.kind === 'every') return `Every ${schedule.every}`
+      if (schedule.kind === 'at' && schedule.at) {
+        return t('issues.detail.mutationValue.once', { at: schedule.at })
+      }
+      if (schedule.kind === 'every' && schedule.every) {
+        return t('issues.detail.mutationValue.every', { every: schedule.every })
+      }
       if (schedule.kind === 'cron') return `${schedule.cron}${schedule.timezone ? ` · ${schedule.timezone}` : ''}`
     } catch {
       // Older audit rows can still carry a hand-written value; show it safely.
@@ -854,12 +938,26 @@ function mutationValue(field: string, value: string): string {
   return value
 }
 
-function mutationSummary(change: { field: string; before?: string; after?: string }): string {
-  const label = MUTATION_FIELD_LABEL[change.field] ?? change.field
-  if (change.before === undefined && change.after === undefined) return `edited ${label}`
-  if (change.before === undefined) return `set ${label} to ${mutationValue(change.field, change.after!)}`
-  if (change.after === undefined) return `cleared ${label}`
-  return `changed ${label} from ${mutationValue(change.field, change.before)} to ${mutationValue(change.field, change.after)}`
+function mutationSummary(
+  change: { field: string; before?: string; after?: string },
+  t: TFunction,
+): string {
+  const label = mutationFieldLabel(change.field, t)
+  if (change.before === undefined && change.after === undefined) {
+    return t('issues.detail.mutationSummary.edited', { field: label })
+  }
+  if (change.before === undefined) {
+    return t('issues.detail.mutationSummary.set', {
+      field: label,
+      value: mutationValue(change.field, change.after!, t),
+    })
+  }
+  if (change.after === undefined) return t('issues.detail.mutationSummary.cleared', { field: label })
+  return t('issues.detail.mutationSummary.changed', {
+    field: label,
+    before: mutationValue(change.field, change.before, t),
+    after: mutationValue(change.field, change.after, t),
+  })
 }
 
 export function IssueActivity({
@@ -879,6 +977,7 @@ export function IssueActivity({
   assignee: string
   onPosted: (next: IssueDetailData) => void
 }) {
+  const { t } = useTranslation()
   const [openingId, setOpeningId] = useState<string | null>(null)
   const [openError, setOpenError] = useState<string | null>(null)
   const [identityPopoverId, setIdentityPopoverId] = useState<string | null>(null)
@@ -918,12 +1017,14 @@ export function IssueActivity({
   return (
     <section className="mt-8">
       <div className="mb-3 flex items-baseline justify-between gap-3 border-t border-border/60 pt-5">
-        <h2 className="text-sm font-semibold text-foreground">Activity</h2>
-        <span className="hidden text-[11px] text-muted-foreground sm:inline">Changes and conversation</span>
+        <h2 className="text-sm font-semibold text-foreground">{t('issues.detail.activity')}</h2>
+        <span className="hidden text-[11px] text-muted-foreground sm:inline">
+          {t('issues.detail.activityDescription')}
+        </span>
       </div>
       {activity.length === 0 ? (
         <p className="mb-3 rounded-lg border border-dashed border-border px-4 py-4 text-center text-xs text-muted-foreground">
-          No changes or comments have been recorded yet.
+          {t('issues.detail.noActivity')}
         </p>
       ) : (
         <ul className="relative mb-4 space-y-3 before:absolute before:bottom-3 before:left-[11px] before:top-3 before:w-px before:bg-border">
@@ -939,7 +1040,9 @@ export function IssueActivity({
                   <article className={`rounded-xl border bg-secondary px-4 py-3 ${comment.replyTo ? 'ml-3 border-primary/25' : 'border-border'}`}>
                     <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
                       <span className="font-medium text-foreground/85">{comment.author}</span>
-                      {comment.replyTo && <span className="rounded bg-muted px-1.5 py-0.5">reply</span>}
+                      {comment.replyTo && (
+                        <span className="rounded bg-muted px-1.5 py-0.5">{t('issues.detail.reply')}</span>
+                      )}
                       <time className="ml-auto" dateTime={comment.at} title={new Date(comment.at).toLocaleString()}>
                         {formatRelativeTime(item.at)}
                       </time>
@@ -947,12 +1050,14 @@ export function IssueActivity({
                     <MarkdownContent text={comment.markdown} />
                     {delivery?.state === 'pending' && (
                       <p className="mt-3 border-t border-border/60 pt-2 text-[11px] text-muted-foreground">
-                        Waiting for <span className="font-mono text-foreground/75">@{delivery.targetResumeId}</span> to reply…
+                        {t('issues.detail.waitingForPrefix')}{' '}
+                        <span className="font-mono text-foreground/75">@{delivery.targetResumeId}</span>{' '}
+                        {t('issues.detail.waitingForSuffix')}
                       </p>
                     )}
                     {delivery?.state === 'failed' && (
                       <p className="mt-3 rounded-md border border-warning/25 bg-warning/10 px-2.5 py-2 text-[11px] leading-snug text-warning">
-                        The comment is saved, but an Agent could not reply: {delivery.error}
+                        {t('issues.detail.replyFailed', { error: delivery.error })}
                       </p>
                     )}
                   </article>
@@ -965,10 +1070,10 @@ export function IssueActivity({
             const originLabel = isSession
               ? `${origin.agent} · ${origin.resumeId}`
               : origin.kind === 'human'
-                ? 'Human'
+                ? t('issues.detail.human')
                 : origin.kind === 'external'
-                  ? `External · ${origin.system}`
-                  : unknownOriginLabel(origin.reason)
+                  ? t('issues.detail.externalOrigin', { system: origin.system })
+                  : unknownOriginLabel(origin.reason, t)
             return (
               <li key={`provenance:${record.id}`} className="relative flex min-w-0 items-start gap-2.5 py-1 pl-8">
                 <span className="absolute left-[3px] top-2 z-10 grid h-[18px] w-[18px] place-items-center rounded-full border border-border bg-background text-muted-foreground">
@@ -983,7 +1088,7 @@ export function IssueActivity({
                       >
                         <button
                           type="button"
-                          aria-label={`Show Session details for ${originLabel}`}
+                          aria-label={t('issues.detail.showSessionDetails', { origin: originLabel })}
                           aria-haspopup="dialog"
                           aria-expanded={identityPopoverId === record.id}
                           aria-controls={`issue-session-${record.id}`}
@@ -997,11 +1102,11 @@ export function IssueActivity({
                           <div
                             id={`issue-session-${record.id}`}
                             role="dialog"
-                            aria-label={`Session ${origin.resumeId}`}
+                            aria-label={t('issues.detail.sessionDialog', { resumeId: origin.resumeId })}
                             className="oa-popover-enter absolute left-0 top-full z-30 mt-2 w-72 max-w-[calc(100vw-3rem)] rounded-xl border border-border/70 bg-secondary p-3 text-left shadow-lg"
                           >
                             <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60">
-                              Session
+                              {t('issues.detail.session')}
                             </p>
                             <p className="mt-1 text-[12px] font-medium text-foreground">{origin.agent}</p>
                             <p className="mt-0.5 break-all font-mono text-[10px] leading-relaxed text-muted-foreground">
@@ -1013,7 +1118,9 @@ export function IssueActivity({
                               disabled={openingId !== null}
                               className="oa-pressable mt-3 w-full rounded-lg bg-primary px-3 py-2 text-[11px] font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-wait disabled:opacity-50"
                             >
-                              {openingId === record.id ? 'Opening…' : 'Open conversation'}
+                              {openingId === record.id
+                                ? t('issues.detail.opening')
+                                : t('issues.detail.openConversation')}
                             </button>
                           </div>
                         )}
@@ -1021,13 +1128,13 @@ export function IssueActivity({
                     ) : (
                       <span className="font-medium text-foreground/80">{originLabel}</span>
                     )}{' '}
-                    {PROVENANCE_ACTION_LABEL[record.action]} ·{' '}
+                    {provenanceActionLabel(record.action, t)} ·{' '}
                     <span title={new Date(record.at).toLocaleString()}>{formatRelativeTime(record.at)}</span>
                   </div>
                   {record.mutation && (
                     <ul className="mt-1 space-y-0.5 text-[11px] leading-relaxed text-muted-foreground/80">
                       {record.mutation.fields.map((change) => (
-                        <li key={change.field}>{mutationSummary(change)}</li>
+                        <li key={change.field}>{mutationSummary(change, t)}</li>
                       ))}
                     </ul>
                   )}
@@ -1037,7 +1144,11 @@ export function IssueActivity({
           })}
         </ul>
       )}
-      {openError && <p className="mt-2 text-xs text-destructive">Could not open Session: {openError}</p>}
+      {openError && (
+        <p className="mt-2 text-xs text-destructive">
+          {t('issues.detail.openSessionFailed', { error: openError })}
+        </p>
+      )}
       <CommentComposer
         wsId={wsId}
         id={issueId}
@@ -1056,6 +1167,7 @@ function RunsSection({
   runs: IssueRunRecord[]
   onOpen: (run: IssueRunRecord) => void
 }) {
+  const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
   if (runs.length === 0) return null
   const visible = expanded ? runs : runs.slice(0, 4)
@@ -1063,8 +1175,10 @@ function RunsSection({
     <section className="mt-8 rounded-xl border border-border bg-secondary/45 px-3 py-3 sm:px-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-foreground">Runs</h2>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">Operational execution history</p>
+          <h2 className="text-sm font-semibold text-foreground">{t('issues.detail.runs')}</h2>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            {t('issues.detail.runsDescription')}
+          </p>
         </div>
         <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">{runs.length}</span>
       </div>
@@ -1077,7 +1191,9 @@ function RunsSection({
           onClick={() => setExpanded((value) => !value)}
           className="oa-pressable mt-3 w-full rounded-md px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
-          {expanded ? 'Show recent runs' : `Show ${runs.length - 4} more runs`}
+          {expanded
+            ? t('issues.detail.showRecentRuns')
+            : t('issues.detail.showMoreRuns', { count: runs.length - 4 })}
         </button>
       )}
     </section>
@@ -1104,6 +1220,7 @@ function WikilinkPicker({
   onEntity: (name: string) => void
   onIssue: (ref: WikilinkIssueRef) => void
 }) {
+  const { t } = useTranslation()
   const EntityIcon = resolution.entity?.type === 'asset' ? TrendingUp : Hash
   return (
     <div
@@ -1117,19 +1234,20 @@ function WikilinkPicker({
       >
         <div className="mb-1 flex items-start justify-between gap-2">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
-            <span className="font-mono normal-case text-foreground">[[{resolution.name}]]</span> matches several
+            <span className="font-mono normal-case text-foreground">[[{resolution.name}]]</span>{' '}
+            {t('issues.detail.matchesSeveral')}
           </h3>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t('issues.detail.close')}
             className="-mr-1 -mt-0.5 shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
           >
             <X size={14} />
           </button>
         </div>
         <p className="mb-3 text-[12px] leading-snug text-muted-foreground">
-          This name is a global handle pointing at more than one thing — pick the one you meant.
+          {t('issues.detail.pickWikilinkTarget')}
         </p>
         <ul className="space-y-1.5">
           {resolution.entity && (
@@ -1137,7 +1255,7 @@ function WikilinkPicker({
               <button
                 type="button"
                 onClick={() => onEntity(resolution.entity!.name)}
-                title={`Open tracked entity ${resolution.entity.name}`}
+                title={t('issues.detail.openTrackedEntity', { name: resolution.entity.name })}
                 className="group flex w-full items-center gap-2.5 rounded-lg border border-border bg-muted/30 px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-muted"
               >
                 <EntityIcon size={14} className="shrink-0 text-muted-foreground/70 transition-colors group-hover:text-primary" aria-hidden />
@@ -1155,14 +1273,17 @@ function WikilinkPicker({
               <button
                 type="button"
                 onClick={() => onIssue(iss)}
-                title={`Open ${iss.id} in ${iss.wsTag}`}
+                title={t('issues.detail.openIssueInWorkspace', { id: iss.id, workspace: iss.wsTag })}
                 className="group flex w-full items-center gap-2.5 rounded-lg border border-border bg-muted/30 px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-muted"
               >
                 <ListChecks size={14} className="shrink-0 text-muted-foreground/70 transition-colors group-hover:text-primary" aria-hidden />
                 <span className="min-w-0 flex-1 truncate text-[12px] text-foreground">{iss.title}</span>
                 <span
                   className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground"
-                  title={`Workspace: ${iss.wsTag} (${iss.wsId.slice(0, 8)})`}
+                  title={t('issues.workspaceTitle', {
+                    workspace: iss.wsTag,
+                    id: iss.wsId.slice(0, 8),
+                  })}
                 >
                   {iss.wsTag}
                 </span>
@@ -1198,10 +1319,11 @@ interface IssueDetailProps {
 export function IssueDetail({
   wsId,
   id,
-  backLabel = 'Issues',
+  backLabel,
   onBack,
   onOpenIssue,
 }: IssueDetailProps) {
+  const { t } = useTranslation()
   const { data, error, loading, mutate } = useIssueDetail(wsId, id)
   const { agents, defaultAgent, issueDefaultAgent, openAgentConfig, openHeadlessRun, workspaces } = useWorkspaces()
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
@@ -1360,7 +1482,7 @@ export function IssueDetail({
       }}
       className="mb-4 inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
     >
-      <ArrowLeft size={13} /> {backLabel}
+      <ArrowLeft size={13} /> {backLabel ?? t('nav.item.issue')}
     </button>
   )
 
@@ -1377,7 +1499,9 @@ export function IssueDetail({
         ) : (
           <div className="rounded-lg border border-border bg-secondary px-6 py-12 text-center">
             <ListChecks size={24} className="mx-auto text-muted-foreground/50" />
-            <p className="mt-3 text-sm text-destructive">Failed to load issue: {error}</p>
+            <p className="mt-3 text-sm text-destructive">
+              {t('issues.detail.loadError', { error: error ?? t('issues.unknownError') })}
+            </p>
             <p className="mt-1 font-mono text-xs text-muted-foreground/70">
               {wsId.slice(0, 8)} / {id}
             </p>
