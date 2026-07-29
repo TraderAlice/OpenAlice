@@ -97,6 +97,12 @@ runs `npm ci --omit=dev --ignore-scripts` in the staged release.
 - `packages/cli/bin/openalice.mjs` — installed command entry point.
 - `packages/cli/src/install-source.mjs` — validated installation-source
   metadata used when managed remote reproduces the invoking CLI.
+- `packages/cli/src/install-layout.mjs` — strict discovery of installer-owned
+  roots from immutable release paths.
+- `packages/cli/src/update.mjs` — stable manifest checks, bounded start notice,
+  installer verification, and update handoff.
+- `packages/cli/src/uninstall.mjs` — installer-lock safety, PATH cleanup, and
+  the state-preserving CLI-only removal boundary.
 - `packages/cli/src/server{,-control}.mjs` — detached lifecycle and the
   Guardian control client.
 - `packages/cli/src/remote.mjs` — consent-first managed SSH orchestration.
@@ -267,8 +273,9 @@ That metadata is returned by `openalice version --json` together with the
 Managed `openalice remote` compares both provenance and content identity before
 deciding that a remote CLI matches, then invokes the same ordinary installer
 source and selector when it does not. This catches changed payload bytes even
-when the CLI semantic version and branch name are unchanged. `remote` has no
-independent branch/version option.
+when the product version and branch name are unchanged. The CLI package version
+must equal the root OpenAlice version; tests and the release workflow reject a
+mismatch. `remote` has no independent branch/version option.
 
 The resulting directory is:
 
@@ -298,8 +305,73 @@ complete old release or the complete new release, never to a half-written
 replacement tree. The final installed launcher is executed again with
 `--version` before success is reported.
 
-Old content-addressed releases are retained. There is currently no automatic
-garbage collection, rollback command, or CLI-only uninstall command.
+Old content-addressed releases are retained during installation and update.
+There is currently no automatic garbage collection or rollback command.
+
+## Product Version and Update Lifecycle
+
+The computer-level CLI uses the OpenAlice product version from the same release:
+
+```text
+package.json#version == packages/cli/package.json#version
+```
+
+There is no second user-facing CLI version sequence. Version bumps that do not
+update both manifests fail CLI tests and release preflight.
+
+An installed stable-channel CLI checks
+`https://download.openalice.ai/manifest.json` before an interactive
+`openalice start`:
+
+- only a recorded public `branch master` installation from
+  `https://openalice.ai/install` participates;
+- exact tag/commit installations remain pinned;
+- `dev` and other branch installations keep their selected development channel;
+- custom installer/mirror installations do not cross into the public trust
+  boundary;
+- checks time out after 1.5 seconds, failures are silent, and the result is
+  cached for 24 hours under `<install-root>/.cli-update-check.json`;
+- `--no-update-check` or `OPENALICE_NO_UPDATE_CHECK=1` disables the start check;
+- discovery only prints a notice. It never mutates files or makes startup
+  depend on a successful network request.
+
+Explicit controls are:
+
+```bash
+openalice update --check
+openalice update --check --json
+openalice update
+openalice update --yes
+```
+
+`openalice update` downloads the release's versioned Bash installer from the
+manifest, verifies its SHA-256, and invokes the ordinary installer for the
+detected install root. The normal install plan and default-no consent remain
+authoritative; `--yes` is the explicit automation path. The updater also passes
+the manifest version as an expected CLI version so a release/payload race cannot
+publish an unexpected product version.
+
+## CLI-Only Uninstall
+
+The supported removal flow is:
+
+```bash
+openalice uninstall --plan
+openalice uninstall
+openalice uninstall --yes
+```
+
+The command refuses to race a live installer and removes only:
+
+- the four `openalice`/`pi` shell and CMD launchers;
+- all immutable directories under `cli-versions/`;
+- the installer lock and update-check cache;
+- managed PATH blocks that reference this exact install root.
+
+It may remove an empty `bin/` directory, but it never removes the shared install
+root. It explicitly preserves `data/`, `workspaces/`, `sources/`,
+`provider-keys.json`, `sealing.key`, backups, credentials, and every other
+application or user-owned path. Symlinked shell profiles remain symlinks.
 
 ## Installed Layout
 
@@ -319,6 +391,7 @@ With the default installer and Runtime roots:
 │   ├── dev-<content-id>/   # only after an explicit --branch dev install
 │   └── <older-ref-or-content>/
 ├── .cli-install.lock/       # present only while an installer owns it
+├── .cli-update-check.json   # best-effort stable update cache
 ├── sources/                 # selector-specific managed remote checkouts
 ├── data/                    # application state, not installer debris
 ├── workspaces/              # user work, not installer debris
@@ -331,13 +404,9 @@ installer itself. The installer root and Runtime `OPENALICE_HOME` independently 
 `~/.openalice`. The installer does not read an `OPENALICE_HOME` override, and
 `openalice start` does not infer Runtime home from the CLI's install location.
 Either override may therefore diverge intentionally. Their default co-location
-is convenient, but it makes the uninstall boundary critical: never implement
-uninstall as `rm -rf ~/.openalice`.
-
-A future uninstall operation must remove only installer-owned launchers,
-installer-owned CLI releases, its lock, and its marked PATH block. It must
-preserve application data, Workspaces, credentials, keys, backups, and any
-other user-owned state.
+is convenient, but it makes the uninstall boundary critical:
+`openalice uninstall` resolves ownership from its immutable CLI path and never
+implements removal as `rm -rf ~/.openalice`.
 
 ## PATH Integration
 
@@ -403,6 +472,7 @@ Environment inputs:
 | `OPENALICE_PI_SOURCE_DIR` | Read the exact Pi manifest/lock assets from a local fixture |
 | `OPENALICE_NPM_BIN` | Use a single alternate npm executable in installer tests |
 | `OPENALICE_INSTALL_CONTEXT` | Internal managed-remote context; returns control without local checkout/start guidance |
+| `OPENALICE_EXPECTED_CLI_VERSION` | Internal verified-update guard; rejects a payload whose CLI/product version differs from the release manifest |
 | `NO_COLOR` | Disable installer color output |
 | `HOME`, `SHELL`, `PATH`, `TERM` | Standard environment used for paths, profile detection, conflicts, and color |
 
@@ -421,6 +491,8 @@ The public bootstrap is release-owned: each accepted release carries a
 versioned installer asset, the R2 manifest records its SHA-256, and the rolling
 main-site entry resolves to the mirrored bytes. The installed content identity
 then protects update layout and detects accidental or local modification.
+`openalice update` improves consistency by fetching the versioned installer URL
+from that manifest and verifying the recorded SHA-256 before execution.
 
 This is still not a cryptographic signature. The installer downloads the CLI
 payload as individual files from the selected raw GitHub ref, and the R2
@@ -466,7 +538,13 @@ The unit suite covers:
 - blank-input cancellation;
 - explicit interactive approval and separate start refusal;
 - source-build-tool preflight before pnpm;
-- live installer lock rejection.
+- live installer lock rejection;
+- product/CLI version alignment and release-version comparison;
+- stable, pinned, and development update-channel behavior;
+- daily-cached failure-tolerant start notices;
+- update installer checksum and expected-version enforcement;
+- uninstall plan, consent, live-lock refusal, symlink preservation, and exact
+  state-preservation boundaries.
 
 ### Clean Docker acceptance
 
@@ -497,7 +575,10 @@ It verifies:
 - runnable OpenAlice/Pi shell and CMD launchers plus managed-Pi env injection;
 - idempotent managed PATH configuration;
 - identical-release reuse;
-- ref switching without deleting the prior release.
+- ref switching without deleting the prior release;
+- development-channel update guidance without a stable-channel network check;
+- installed uninstall execution that removes CLI assets and PATH integration
+  while preserving data, Workspaces, sources, credentials, and keys.
 
 Relevant PRs run this deterministic acceptance in CI against the exact checkout.
 The same workflow runs `pnpm test:remote:docker` in a separate clean SSH fixture
@@ -544,6 +625,8 @@ with an explicit `y`, and run at least:
 command -v openalice
 openalice --version
 openalice version --json
+openalice update --check
+openalice uninstall --plan
 command -v pi
 pi --version
 cat ~/.bashrc
@@ -579,9 +662,9 @@ Before publishing or promoting a change that affects the installer:
 
 1. Confirm the CLI payload list in `install` and `packages/cli/package.json`
    still match the imports reachable from `bin/openalice.mjs`.
-2. Confirm the intended source ref, CLI package version, Pi version, release
-   asset hashes, lockfile engine floor, and root/CLI Node engines. Do not
-   accidentally advertise mutable `dev` as a stable release.
+2. Confirm the intended source ref, equal root and CLI package versions, Pi
+   version, release asset hashes, lockfile engine floor, and root/CLI Node
+   engines. Do not accidentally advertise mutable `dev` as a stable release.
 3. Run the fast installer tests and the full repository-required checks.
 4. Require checkout install and managed-remote CI acceptance to pass, then
    require the post-merge `pnpm test:install:dev-channel` result for current
@@ -614,6 +697,9 @@ versioned promotion under [[docs/development-workflow.md]].
 | npm is missing or Node is below 22.19.0 | Install the complete Node.js 22 LTS distribution; OpenAlice rejects the host before consent instead of publishing a broken Pi runtime |
 | Pi asset SHA-256 check fails | Stop. The pinned release metadata and downloaded asset disagree; do not bypass the check |
 | A `.damaged.<pid>` directory appears | A content-addressed release no longer matched its identity; preserve it for diagnosis while the validated replacement becomes active |
+| `stable release update checks are disabled` | This CLI is pinned or follows a development branch; re-run that selector's installer instead of silently crossing channels |
+| update installer SHA-256 fails | Stop. The release manifest and versioned installer bytes disagree; the updater must not execute them |
+| uninstall reports a live installer | Wait for that PID to finish; uninstall and install share the same ownership boundary and must not race |
 | CLI installs but localhost startup fails | Installation succeeded; continue with [[docs/local-runtime.md]] and Guardian/runtime diagnostics |
 | Remote install succeeds and then prints no clone command | Managed remote set the installer context and is continuing with its already-approved source plan |
 | Native PowerShell/CMD bootstrap is unavailable | Use the complete Electron installer, WSL, or Git Bash until a reviewed native bootstrap exists |

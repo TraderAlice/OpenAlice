@@ -21,6 +21,10 @@ the durable truth after it changes.
 
 ## Active
 
+- [[plans/cli-lifecycle-quality.md]] — Aligns the computer-level CLI with the
+  OpenAlice product version and adds bounded update discovery, installer-backed
+  updates, and state-preserving CLI uninstall.
+
 ## Completed
 
 - [[plans/agent-conversation-log-ui.md]] — Adds a read-only, paginated Agent

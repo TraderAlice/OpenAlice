@@ -45,7 +45,9 @@ curl -fsSL https://openalice.ai/install | bash
 Development dogfooding can opt into `dev` explicitly with `--branch dev`. The
 installer requires Node.js 22.19.0 or newer and always installs the small CLI
 plus OpenAlice's pinned Pi runtime inside the same immutable install release;
-the two visible commands are `openalice` and `pi`.
+the two visible commands are `openalice` and `pi`. The installed CLI reports
+the same version as the OpenAlice product release; there is no independent CLI
+version sequence.
 When explicitly selected,
 it can also install missing Linux Git/Python/make/C++ tools needed to build the
 source Runtime. It does not clone OpenAlice, write application state, install
@@ -101,7 +103,15 @@ openalice start --no-open
 openalice start --rebuild
 openalice start --home /tmp/openalice-test-home --port 41000
 openalice start /path/to/OpenAlice
+openalice start --no-update-check
+openalice update --check
 ```
+
+An installed stable-channel CLI performs a short, daily-cached release check
+before an interactive local start. Failure is silent and never blocks startup.
+A newer release produces guidance for `openalice update`; it is not installed
+without the ordinary visible plan and consent. Exact-ref and development
+installations do not silently cross into the stable channel.
 
 For concurrent source worktrees, select a complete home outside the checkout:
 
