@@ -18,6 +18,9 @@ export function ConnectorsPage() {
   const [config, setConfig] = useState<PublicConnectorConfig | null>(null)
   const [health, setHealth] = useState<ConnectorHealth | null>(null)
   const [loadError, setLoadError] = useState(false)
+  const [secretDrafts, setSecretDrafts] = useState<Record<string, string>>({})
+  const [savingSecret, setSavingSecret] = useState<string | null>(null)
+  const [secretErrors, setSecretErrors] = useState<Record<string, string>>({})
   const [testing, setTesting] = useState<string | null>(null)
   const [testError, setTestError] = useState<string | null>(null)
   const [lastProbe, setLastProbe] = useState<{ connectorId: string; probeId: string } | null>(null)
@@ -128,6 +131,57 @@ export function ConnectorsPage() {
     })
   }, [])
 
+  const saveSecret = useCallback(async (id: string, key: string) => {
+    if (!config) return
+    const draftKey = connectorFieldKey(id, key)
+    const value = secretDrafts[draftKey] ?? ''
+    if (!value) return
+
+    const existing = config.adapters[id] ?? emptyAdapter()
+    const next: PublicConnectorConfig = {
+      ...config,
+      adapters: {
+        ...config.adapters,
+        [id]: {
+          ...existing,
+          settings: { ...existing.settings, [key]: value },
+          configuredSecrets: [...new Set([...existing.configuredSecrets, key])],
+        },
+      },
+    }
+
+    setSavingSecret(draftKey)
+    setSecretErrors((current) => omitRecordKey(current, draftKey))
+    try {
+      const response = await api.connectors.save(next)
+      setConfig((current) => {
+        if (!current) return response.config
+        const currentAdapter = current.adapters[id] ?? emptyAdapter()
+        const savedAdapter = response.config.adapters[id]
+        if (!savedAdapter) return current
+        const configuredSecrets = savedAdapter.configuredSecrets
+        if (sameStrings(currentAdapter.configuredSecrets, configuredSecrets)) return current
+        return {
+          ...current,
+          adapters: {
+            ...current.adapters,
+            [id]: { ...currentAdapter, configuredSecrets },
+          },
+        }
+      })
+      setSecretDrafts((current) => omitRecordKey(current, draftKey))
+      window.setTimeout(() => { void refreshRuntime() }, 900)
+      window.setTimeout(() => { void refreshRuntime() }, 2_400)
+    } catch (error) {
+      setSecretErrors((current) => ({
+        ...current,
+        [draftKey]: error instanceof Error ? error.message : String(error),
+      }))
+    } finally {
+      setSavingSecret((current) => current === draftKey ? null : current)
+    }
+  }, [config, refreshRuntime, secretDrafts])
+
   const test = useCallback(async (id: string) => {
     setTesting(id)
     setTestError(null)
@@ -197,52 +251,90 @@ export function ConnectorsPage() {
                       {definition.fields.filter((field) => !field.learnedBy).map((field) => {
                         const configured = adapter.configuredSecrets.includes(field.key)
                         const value = adapter.settings[field.key]
+                        const draftKey = connectorFieldKey(definition.id, field.key)
+                        const secretDraft = secretDrafts[draftKey] ?? ''
+                        const secretSaving = savingSecret === draftKey
+                        const inputId = `connector-${definition.id}-${field.key}`
                         return (
                           <Field key={field.key} label={field.label} description={field.description}>
                             {field.kind === 'boolean' ? (
                               <input
+                                id={inputId}
+                                aria-label={`${definition.label} ${field.label}`}
                                 type="checkbox"
                                 checked={value === true}
                                 onChange={(event) => updateSetting(definition.id, field.key, event.target.checked)}
                               />
-                            ) : (
-                              <div className="flex flex-col gap-2 sm:flex-row">
-                                <input
-                                  className={inputClass}
-                                  type={field.kind === 'secret' ? 'password' : field.kind}
-                                  value={String(value ?? '')}
-                                  placeholder={configured ? 'Configured — enter a new value to replace' : field.placeholder}
-                                  autoComplete="off"
-                                  onChange={(event) => updateSetting(
-                                    definition.id,
-                                    field.key,
-                                    field.kind === 'number' ? Number(event.target.value) : event.target.value,
-                                  )}
-                                />
-                                {field.kind === 'secret' && configured && (
+                            ) : field.kind === 'secret' ? (
+                              <>
+                                <div className="flex flex-col gap-2 sm:flex-row">
+                                  <input
+                                    id={inputId}
+                                    aria-label={`${definition.label} ${field.label}`}
+                                    className={inputClass}
+                                    type="password"
+                                    value={secretDraft}
+                                    placeholder={configured ? 'Configured — enter a new value to replace' : field.placeholder}
+                                    autoComplete="off"
+                                    onChange={(event) => {
+                                      setSecretDrafts((current) => ({ ...current, [draftKey]: event.target.value }))
+                                      setSecretErrors((current) => omitRecordKey(current, draftKey))
+                                    }}
+                                  />
                                   <button
                                     type="button"
-                                    className="shrink-0 rounded-lg border border-border px-3 text-[12px] text-muted-foreground hover:text-destructive"
-                                    onClick={() => setConfig((current) => {
-                                      if (!current) return current
-                                      const currentAdapter = current.adapters[definition.id]!
-                                      return {
-                                        ...current,
-                                        adapters: {
-                                          ...current.adapters,
-                                          [definition.id]: {
-                                            ...currentAdapter,
-                                            settings: { ...currentAdapter.settings, [field.key]: '' },
-                                            configuredSecrets: currentAdapter.configuredSecrets.filter((key) => key !== field.key),
-                                          },
-                                        },
-                                      }
-                                    })}
+                                    className="shrink-0 rounded-lg border border-border px-3 py-2 text-[12px] text-foreground hover:border-primary/50 disabled:opacity-50"
+                                    disabled={!secretDraft || secretSaving}
+                                    onClick={() => void saveSecret(definition.id, field.key)}
                                   >
-                                    Clear
+                                    {secretSaving ? 'Saving…' : configured ? 'Replace token' : 'Save token'}
                                   </button>
+                                  {configured && (
+                                    <button
+                                      type="button"
+                                      className="shrink-0 rounded-lg border border-border px-3 py-2 text-[12px] text-muted-foreground hover:text-destructive"
+                                      disabled={secretSaving}
+                                      onClick={() => setConfig((current) => {
+                                        if (!current) return current
+                                        const currentAdapter = current.adapters[definition.id]!
+                                        return {
+                                          ...current,
+                                          adapters: {
+                                            ...current.adapters,
+                                            [definition.id]: {
+                                              ...currentAdapter,
+                                              settings: { ...currentAdapter.settings, [field.key]: '' },
+                                              configuredSecrets: currentAdapter.configuredSecrets.filter((key) => key !== field.key),
+                                            },
+                                          },
+                                        }
+                                      })}
+                                    >
+                                      Remove token
+                                    </button>
+                                  )}
+                                </div>
+                                {secretErrors[draftKey] && (
+                                  <p className="mt-1 text-[12px] text-destructive" role="alert">
+                                    Token was not saved: {secretErrors[draftKey]}
+                                  </p>
                                 )}
-                              </div>
+                              </>
+                            ) : (
+                              <input
+                                id={inputId}
+                                aria-label={`${definition.label} ${field.label}`}
+                                className={inputClass}
+                                type={field.kind}
+                                value={String(value ?? '')}
+                                placeholder={field.placeholder}
+                                autoComplete="off"
+                                onChange={(event) => updateSetting(
+                                  definition.id,
+                                  field.key,
+                                  field.kind === 'number' ? Number(event.target.value) : event.target.value,
+                                )}
+                              />
                             )}
                           </Field>
                         )
@@ -451,4 +543,19 @@ function HealthLine({ health }: { health: ConnectorHealth | null }) {
 
 function emptyAdapter(): PublicConnectorConfig['adapters'][string] {
   return { enabled: false, settings: {}, configuredSecrets: [] }
+}
+
+function connectorFieldKey(connectorId: string, fieldKey: string): string {
+  return `${connectorId}:${fieldKey}`
+}
+
+function omitRecordKey(record: Record<string, string>, key: string): Record<string, string> {
+  if (!(key in record)) return record
+  const next = { ...record }
+  delete next[key]
+  return next
+}
+
+function sameStrings(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index])
 }
