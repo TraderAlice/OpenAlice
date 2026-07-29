@@ -204,6 +204,7 @@ export const zh: Resources = {
     },
     tools: {
       summary: '{{groups}} 个分组共 {{tools}} 个工具——更改在下次 AI 请求时生效',
+      loadError: '无法加载工具目录。',
       emptyTitle: '尚未注册任何工具。',
       emptyDescription: '引擎启动后工具会显示在这里。',
       group: {

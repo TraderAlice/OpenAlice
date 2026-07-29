@@ -204,6 +204,7 @@ export const ja: Resources = {
     },
     tools: {
       summary: '{{groups}} グループ {{tools}} ツール——変更は次回の AI リクエストで反映されます',
+      loadError: 'ツールカタログを読み込めませんでした。',
       emptyTitle: '登録されたツールはありません。',
       emptyDescription: 'エンジンが起動するとツールがここに表示されます。',
       group: {
