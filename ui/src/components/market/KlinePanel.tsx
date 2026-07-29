@@ -338,13 +338,20 @@ export function KlinePanel({ selection, source, onSnapshot }: Props) {
               </select>
             </label>
           )}
-          <label className="flex items-center gap-2">
+          <div
+            className="flex items-center gap-2"
+            role="group"
+            aria-label="Interval"
+            title="Candle width (how much time each bar covers)"
+          >
             <span className="text-[11px] uppercase tracking-wide text-muted-foreground/70">Interval</span>
-            <div className="flex border border-border rounded overflow-hidden" title="Candle width (how much time each bar covers)">
+            <div className="flex border border-border rounded overflow-hidden">
               {INTERVALS.map((iv, i) => (
                 <button
                   key={iv}
+                  type="button"
                   onClick={() => selectInterval(iv)}
+                  aria-pressed={interval === iv}
                   className={`px-2 py-1 text-[12px] transition-colors cursor-pointer ${
                     i > 0 ? 'border-l border-border' : ''
                   } ${interval === iv ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
@@ -353,14 +360,21 @@ export function KlinePanel({ selection, source, onSnapshot }: Props) {
                 </button>
               ))}
             </div>
-          </label>
-          <label className="flex items-center gap-2">
+          </div>
+          <div
+            className="flex items-center gap-2"
+            role="group"
+            aria-label="Range"
+            title="How far back to load history"
+          >
             <span className="text-[11px] uppercase tracking-wide text-muted-foreground/70">Range</span>
-            <div className="flex border border-border rounded overflow-hidden" title="How far back to load history">
+            <div className="flex border border-border rounded overflow-hidden">
               {TIMEFRAMES.map((t, i) => (
                 <button
                   key={t}
+                  type="button"
                   onClick={() => setTf(t)}
+                  aria-pressed={tf === t}
                   className={`px-2 py-1 text-[12px] transition-colors cursor-pointer ${
                     i > 0 ? 'border-l border-border' : ''
                   } ${tf === t ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
@@ -369,7 +383,7 @@ export function KlinePanel({ selection, source, onSnapshot }: Props) {
                 </button>
               ))}
             </div>
-          </label>
+          </div>
         </div>
       </div>
 
