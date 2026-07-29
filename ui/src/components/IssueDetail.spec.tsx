@@ -153,6 +153,7 @@ describe('IssueDetail property controls', () => {
     expect(identityRow?.className).toContain('sm:flex-row')
 
     expect(screen.getByRole('combobox', { name: 'Status' })).toBeTruthy()
+    expect(screen.getByText('Status').parentElement?.className).toContain('max-[359px]:flex-col')
     expect(screen.getByRole('combobox', { name: 'Priority' })).toBeTruthy()
     expect(screen.getByRole('combobox', { name: 'Assignee' })).toBeTruthy()
     expect(screen.getByRole('combobox', { name: 'Runtime' })).toBeTruthy()

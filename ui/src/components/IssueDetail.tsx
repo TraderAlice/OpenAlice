@@ -92,9 +92,9 @@ function fmtDuration(ms?: number): string {
 
 function PropRow({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex items-start justify-between gap-3 py-2">
+    <div className="flex items-start justify-between gap-3 py-2 max-[359px]:flex-col max-[359px]:gap-1">
       <span className="shrink-0 text-xs text-muted-foreground">{label}</span>
-      <div className="min-w-0 text-right text-[13px] text-foreground">{children}</div>
+      <div className="min-w-0 text-right text-[13px] text-foreground max-[359px]:w-full max-[359px]:text-left">{children}</div>
     </div>
   )
 }
@@ -102,9 +102,9 @@ function PropRow({ label, children }: { label: string; children: ReactNode }) {
 /** Editable row: label on the left, an interactive control filling the right. */
 function EditRow({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-3 py-2">
+    <div className="flex items-center justify-between gap-3 py-2 max-[359px]:flex-col max-[359px]:items-stretch max-[359px]:gap-1">
       <span className="shrink-0 text-xs text-muted-foreground">{label}</span>
-      <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5">{children}</div>
+      <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5 max-[359px]:w-full max-[359px]:justify-start">{children}</div>
     </div>
   )
 }
@@ -604,15 +604,15 @@ function PropertiesRail({
             </>
           )}
           {agentNeedsCredential && (
-            <p className="py-2 text-right text-[11px] leading-snug text-warning">
+            <p className="py-2 text-right text-[11px] leading-snug text-warning max-[359px]:text-left">
               {t('issues.detail.aiCredentialMissing')}
             </p>
           )}
           {issue.automationHealth && (
             <PropRow label={t('issues.detail.health')}>
-              <div className="flex flex-col items-end gap-1">
+              <div className="flex flex-col items-end gap-1 max-[359px]:items-start">
                 <AutomationHealthPill health={issue.automationHealth} />
-                <span className="max-w-44 text-[11px] leading-snug text-muted-foreground">
+                <span className="max-w-44 text-[11px] leading-snug text-muted-foreground max-[359px]:max-w-none">
                   {automationHealthMessage}
                 </span>
                 {canRetry && (
