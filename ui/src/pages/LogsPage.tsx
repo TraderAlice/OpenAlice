@@ -64,6 +64,7 @@ function ToolCallLogSection() {
   const [totalPages, setTotalPages] = useState(1)
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [failed, setFailed] = useState(false)
   const [toolNames, setToolNames] = useState<string[]>([])
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -79,8 +80,10 @@ function ToolCallLogSection() {
       setPage(result.page)
       setTotalPages(result.totalPages)
       setTotal(result.total)
+      setFailed(false)
     } catch (err) {
       console.warn('Failed to load tool calls:', err)
+      setFailed(true)
     } finally {
       setLoading(false)
     }
@@ -146,9 +149,11 @@ function ToolCallLogSection() {
         </button>
 
         <span className="text-xs text-muted-foreground ml-auto">
-          {total > 0
-            ? `Page ${page} of ${totalPages} \u00b7 ${total} calls`
-            : '0 calls'
+          {failed && entries.length === 0
+            ? 'Tool calls unavailable'
+            : total > 0
+              ? `Page ${page} of ${totalPages} \u00b7 ${total} calls`
+              : '0 calls'
           }
           {nameFilter && ' (filtered)'}
         </span>
@@ -161,6 +166,23 @@ function ToolCallLogSection() {
       >
         {loading && entries.length === 0 ? (
           <LogRowsSkeleton />
+        ) : failed && entries.length === 0 ? (
+          <div
+            role="alert"
+            className="flex h-full min-h-64 flex-col items-center justify-center gap-3 px-6 text-center font-sans"
+          >
+            <div>
+              <p className="text-sm font-medium text-foreground">Could not load tool calls</p>
+              <p className="mt-1 text-xs text-muted-foreground">The read-only audit log was not changed.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void fetchPage(page, nameFilter || undefined)}
+              className="oa-pressable rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              Retry
+            </button>
+          </div>
         ) : entries.length === 0 ? (
           <div className="px-4 py-8 text-center text-muted-foreground">No tool calls yet</div>
         ) : (

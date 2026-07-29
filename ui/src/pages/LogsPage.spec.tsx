@@ -118,6 +118,23 @@ describe('LogsPage Agent conversations', () => {
     expect(screen.getByText('No tool calls yet')).toBeTruthy()
   })
 
+  it('distinguishes an unavailable tool-call log from an empty log', async () => {
+    mocks.toolQuery.mockRejectedValueOnce(new Error('offline'))
+    render(<LogsPage />)
+    await screen.findByText(/2 conversations/)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tool calls' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Could not load tool calls')
+    expect(screen.getByText('Tool calls unavailable')).toBeTruthy()
+    expect(screen.queryByText('No tool calls yet')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+
+    await waitFor(() => expect(mocks.toolQuery).toHaveBeenCalledTimes(2))
+    expect(await screen.findByText('No tool calls yet')).toBeTruthy()
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
   it('offers a retry when the read-only projection is unavailable', async () => {
     mocks.conversationQuery.mockRejectedValueOnce(new Error('offline'))
     render(<LogsPage />)
