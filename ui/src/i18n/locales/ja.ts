@@ -873,7 +873,9 @@ export const ja: Resources = {
   },
   automation: {
     runs: '実行',
+    runsDescription: 'ワークスペースをまたぐヘッドレス Agent の実行状況を確認します。',
     api: 'API',
+    apiDescription: '外部からワークスペース自動化を起動し、スケジュールファイル形式を確認します。',
   },
   news: {
     lookback1h: '1 時間',
