@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   getQuickChat: vi.fn(),
   rememberQuickChatCredential: vi.fn(),
   openAgentConfig: vi.fn(),
+  refreshWorkspaceManager: vi.fn(),
 }))
 
 vi.mock('../contexts/workspaces-context', () => ({
@@ -119,7 +120,7 @@ function context(
     hasLoaded: true,
     templatesLoaded: true,
     refresh: vi.fn(),
-    refreshWorkspaceManager: vi.fn(async () => undefined),
+    refreshWorkspaceManager: mocks.refreshWorkspaceManager,
     quickStartWorkspaceManager: mocks.quickStartWorkspaceManager,
     spawn: vi.fn(async () => undefined),
     openHeadlessRun: vi.fn(async () => undefined),
@@ -178,6 +179,7 @@ beforeEach(async () => {
   mocks.rememberQuickChatCredential.mockResolvedValue(undefined)
   mocks.openWebPiSession.mockResolvedValue(undefined)
   mocks.resumeSession.mockResolvedValue(undefined)
+  mocks.refreshWorkspaceManager.mockResolvedValue(undefined)
   mocks.quickStartWorkspaceManager.mockResolvedValue({
     manager: managerSnapshot(),
     session: {
@@ -201,6 +203,21 @@ beforeEach(async () => {
 afterEach(cleanup)
 
 describe('WorkspaceManagerPage runtime selection', () => {
+  it('offers a retry when the manager snapshot cannot load', async () => {
+    mocks.useWorkspaces.mockImplementation(() => ({
+      ...context('codex'),
+      workspaceManager: null,
+      workspaceManagerError: 'Manager snapshot unavailable',
+    }))
+
+    render(<WorkspaceManagerPage spec={{ kind: 'workspace-manager', params: {} }} />)
+
+    expect(screen.getByRole('alert').textContent).toContain('Manager snapshot unavailable')
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+
+    await waitFor(() => expect(mocks.refreshWorkspaceManager).toHaveBeenCalledOnce())
+  })
+
   it('uses the Quick Chat runtime catalog and launches the selected native runtime', async () => {
     render(<WorkspaceManagerPage spec={{ kind: 'workspace-manager', params: {} }} />)
 
