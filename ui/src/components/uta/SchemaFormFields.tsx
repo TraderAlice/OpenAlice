@@ -20,7 +20,12 @@ export function SchemaFormFields({ fields, formData, setField, showSecrets }: {
           case 'boolean':
             return (
               <label key={f.key} className="flex items-start gap-2 cursor-pointer select-none">
-                <Toggle size="sm" checked={value === 'true'} onChange={(v) => setField(f.key, v ? 'true' : 'false')} />
+                <Toggle
+                  ariaLabel={f.title}
+                  size="sm"
+                  checked={value === 'true'}
+                  onChange={(v) => setField(f.key, v ? 'true' : 'false')}
+                />
                 <span>
                   <span className="text-[13px] text-foreground">{f.title}</span>
                   {f.description && <p className="text-[11px] text-muted-foreground/60 mt-0.5">{f.description}</p>}

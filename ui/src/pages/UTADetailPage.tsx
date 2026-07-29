@@ -220,6 +220,7 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
           // paddings — mixed sizes were what made this row look drunk.
           <div className="flex items-center gap-2">
             <Toggle
+              ariaLabel={`${preset?.label ?? uta.id} enabled`}
               size="sm"
               checked={!isDisabled}
               onChange={async (v) => { await tc.saveUTA({ ...uta, enabled: v }) }}

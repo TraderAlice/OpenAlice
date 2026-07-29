@@ -29,7 +29,12 @@ function CollectorSettings() {
     <div className="mx-auto w-full max-w-[880px]">
       <div className="mb-4 flex items-center justify-end gap-3">
         <SaveIndicator status={status} onRetry={retry} />
-        <Toggle size="sm" checked={enabled} onChange={(v) => updateConfigImmediate({ enabled: v })} />
+        <Toggle
+          ariaLabel="News collection"
+          size="sm"
+          checked={enabled}
+          onChange={(v) => updateConfigImmediate({ enabled: v })}
+        />
       </div>
 
       <div className={`${!enabled ? 'opacity-40 pointer-events-none' : ''}`}>
@@ -129,6 +134,7 @@ function FeedsSection({
                 className={`flex items-center gap-3 border border-border/60 rounded-lg px-3 py-2.5 ${isEnabled ? '' : 'opacity-50'}`}
               >
                 <Toggle
+                  ariaLabel={feed.name}
                   size="sm"
                   checked={isEnabled}
                   onChange={(v) => setEnabled(i, v)}
