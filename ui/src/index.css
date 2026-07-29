@@ -284,6 +284,29 @@ body {
   @apply text-[11px] tracking-wide;
 }
 
+/* Page headers normally keep compact actions inline. Dense operational
+   controls can opt into a content-pane-aware stack so their title and status
+   retain full width after app/local sidebars are accounted for. */
+@container (max-width: 34rem) {
+  .oa-page-header-stack-actions {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .oa-page-header-stack-actions > :first-child {
+    width: 100%;
+  }
+
+  .oa-page-header-actions {
+    width: 100%;
+  }
+
+  .oa-uta-header-divider {
+    display: none;
+  }
+}
+
 /* ==================== Live-data pulse ====================
    Small breathing dot used in PageHeader to communicate "this
    surface is auto-refreshing". 2.4s cycle so it reads as ambient
