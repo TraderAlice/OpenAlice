@@ -1170,6 +1170,11 @@ export const zhHant: Resources = {
       starting: '正在啟動',
     },
   },
+  fileViewer: {
+    back: '返回',
+    backToWorkspace: '返回 {{workspace}}',
+    backToTracked: '返回追蹤',
+  },
   inbox: {
     noMessages: '收件匣是空的。',
     emptyHint: '工作區會將狀態更新推送到這裡。',

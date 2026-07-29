@@ -3,6 +3,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import '../i18n'
 import { FileViewerPage } from './FileViewerPage'
 
 const mocks = vi.hoisted(() => ({
@@ -63,7 +64,9 @@ describe('FileViewerPage back navigation', () => {
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    const back = screen.getByRole('button', { name: 'Back to chat-jul20' })
+    expect(back.getAttribute('title')).toBe('Back to chat-jul20')
+    fireEvent.click(back)
 
     expect(mocks.setSidebar).toHaveBeenCalledWith('chat')
     expect(mocks.openOrFocus).toHaveBeenCalledWith({
@@ -83,7 +86,7 @@ describe('FileViewerPage back navigation', () => {
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Back to chat-jul20' }))
 
     expect(mocks.setSidebar).toHaveBeenCalledWith('workspaces')
     expect(mocks.openOrFocus).toHaveBeenCalledWith({
@@ -107,7 +110,7 @@ describe('FileViewerPage back navigation', () => {
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Tracked' }))
 
     expect(mocks.selectTracked).toHaveBeenCalledWith('stock-vst')
     expect(mocks.setSidebar).toHaveBeenCalledWith('tracked')

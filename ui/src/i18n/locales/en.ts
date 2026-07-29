@@ -1174,6 +1174,11 @@ export const en = {
       starting: 'Starting',
     },
   },
+  fileViewer: {
+    back: 'Back',
+    backToWorkspace: 'Back to {{workspace}}',
+    backToTracked: 'Back to Tracked',
+  },
   inbox: {
     noMessages: 'No inbox messages.',
     emptyHint: 'Workspaces will push status updates here.',

@@ -1163,6 +1163,11 @@ export const ja: Resources = {
       starting: '起動中',
     },
   },
+  fileViewer: {
+    back: '戻る',
+    backToWorkspace: '{{workspace}} に戻る',
+    backToTracked: '追跡に戻る',
+  },
   inbox: {
     noMessages: '受信トレイにメッセージがありません。',
     emptyHint: 'ワークスペースがステータス更新をここに送ります。',
