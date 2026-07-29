@@ -172,6 +172,8 @@ export const zh: Resources = {
     },
     agentPermissions: {
       title: '智能体权限',
+      loadErrorTitle: '无法加载智能体权限',
+      loadErrorDescription: 'OpenAlice 无法读取当前配置。你的权限没有发生变化。',
       mode: {
         title: '交易模式',
         description: 'Alice 和工作区智能体的全局券商能力。',

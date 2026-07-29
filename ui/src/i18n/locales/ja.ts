@@ -173,6 +173,8 @@ export const ja: Resources = {
     },
     agentPermissions: {
       title: 'エージェント権限',
+      loadErrorTitle: 'エージェント権限を読み込めませんでした',
+      loadErrorDescription: 'OpenAlice は現在の設定を読み取れませんでした。権限は変更されていません。',
       mode: {
         title: '取引モード',
         description: 'Alice とワークスペースエージェントのグローバルなブローカー権限。',
