@@ -1,0 +1,196 @@
+import { describe, expect, it, vi } from 'vitest'
+
+import {
+  formatLifecycleHelp,
+  formatRootHelp,
+  formatShellCompletion,
+  parseLifecycleArgs,
+  runLifecycleCommand,
+} from './lifecycle-command.mjs'
+
+describe('OpenAlice top-level lifecycle commands', () => {
+  it('parses background startup independently from browser opening', () => {
+    expect(parseLifecycleArgs('up', [
+      '/tmp/OpenAlice',
+      '--home', '/tmp/alice-home',
+      '--port', '41000',
+      '--log', '/tmp/openalice.log',
+      '--wait', '15',
+      '--open',
+      '--json',
+    ])).toEqual(expect.objectContaining({
+      appDir: '/tmp/OpenAlice',
+      homeRoot: '/tmp/alice-home',
+      port: 41000,
+      logFile: '/tmp/openalice.log',
+      waitMs: 15_000,
+      openBrowser: true,
+      json: true,
+    }))
+    expect(parseLifecycleArgs('up', [])).toEqual(expect.objectContaining({
+      openBrowser: false,
+      json: false,
+    }))
+  })
+
+  it('keeps foreground run non-JSON and browserless', () => {
+    expect(parseLifecycleArgs('run', ['--home', '/tmp/alice-home'])).toEqual(expect.objectContaining({
+      homeRoot: '/tmp/alice-home',
+      openBrowser: false,
+      json: false,
+    }))
+    expect(() => parseLifecycleArgs('run', ['--open'])).toThrow('does not support --open')
+    expect(() => parseLifecycleArgs('run', ['--json'])).toThrow('does not support --json')
+  })
+
+  it('uses explicit control timeouts and exit-code-2 usage errors', () => {
+    expect(parseLifecycleArgs('status', ['--home', '/tmp/alice-home', '--wait', '3', '--json'])).toEqual({
+      homeRoot: '/tmp/alice-home',
+      json: true,
+      waitMs: 3_000,
+    })
+    expect(parseLifecycleArgs('down', [])).toEqual({
+      homeRoot: null,
+      json: false,
+      waitMs: 15_000,
+    })
+    expect(() => parseLifecycleArgs('open', ['--json'])).toThrow(expect.objectContaining({
+      code: 'EUSAGE',
+      exitCode: 2,
+    }))
+  })
+
+  it('prints a stable success envelope for status', async () => {
+    const stdout = output()
+    await expect(runLifecycleCommand('status', parseLifecycleArgs('status', ['--json']), {
+      inspectRuntime: async () => runningStatus(),
+      stdout,
+    })).resolves.toBe(0)
+    expect(JSON.parse(stdout.text())).toEqual({
+      schemaVersion: 1,
+      command: 'status',
+      ok: true,
+      result: { status: runningStatus() },
+    })
+  })
+
+  it('prints a stable error envelope and returns the lifecycle exit code', async () => {
+    const stderr = output()
+    const failure = new Error('Runtime is owned elsewhere')
+    failure.code = 'EOWNED'
+    failure.exitCode = 4
+    await expect(runLifecycleCommand('down', parseLifecycleArgs('down', ['--json']), {
+      stopRuntime: async () => { throw failure },
+      stderr,
+      stdout: output(),
+    })).resolves.toBe(4)
+    expect(JSON.parse(stderr.text())).toEqual({
+      schemaVersion: 1,
+      command: 'down',
+      ok: false,
+      error: {
+        code: 'EOWNED',
+        message: 'Runtime is owned elsewhere',
+      },
+    })
+  })
+
+  it('presents structured background readiness and optional browser opening', async () => {
+    const stdout = output()
+    const startRuntime = vi.fn(async (_options, dependencies) => {
+      const result = startedResult()
+      dependencies.emit({ type: 'ready', result })
+      return result
+    })
+    const openRuntime = vi.fn(async () => ({
+      opened: true,
+      url: runningStatus().endpoints.web,
+      status: runningStatus(),
+    }))
+    await expect(runLifecycleCommand('up', parseLifecycleArgs('up', ['--open']), {
+      startRuntime,
+      openRuntime,
+      stdout,
+    })).resolves.toBe(0)
+    expect(stdout.text()).toContain('OpenAlice Runtime:')
+    expect(stdout.text()).toContain('keep running')
+    expect(stdout.text()).toContain('Opened OpenAlice Web UI')
+    expect(openRuntime).toHaveBeenCalledOnce()
+  })
+
+  it('keeps already-absent down idempotent', async () => {
+    const stdout = output()
+    await expect(runLifecycleCommand('down', parseLifecycleArgs('down', []), {
+      stopRuntime: async () => ({ stopped: false, status: absentStatus() }),
+      stdout,
+    })).resolves.toBe(0)
+    expect(stdout.text()).toContain('is not running')
+  })
+
+  it('generates root help and four shell completions from one command registry', () => {
+    const help = formatRootHelp()
+    for (const command of ['up', 'run', 'down', 'status', 'open', 'completion']) {
+      expect(help).toContain(command)
+    }
+    expect(formatLifecycleHelp('up')).toContain('persistent background Runtime')
+    expect(formatLifecycleHelp('run')).toContain('foreground')
+    expect(formatShellCompletion('bash')).toContain('complete -F _openalice_completion openalice')
+    expect(formatShellCompletion('zsh')).toContain('#compdef openalice')
+    expect(formatShellCompletion('fish')).toContain('complete -c openalice')
+    expect(formatShellCompletion('powershell')).toContain('Register-ArgumentCompleter')
+    expect(() => formatShellCompletion('tcsh')).toThrow(expect.objectContaining({
+      code: 'EUSAGE',
+      exitCode: 2,
+    }))
+  })
+})
+
+function output() {
+  let value = ''
+  return {
+    write(chunk) {
+      value += String(chunk)
+    },
+    text() {
+      return value
+    },
+  }
+}
+
+function startedResult() {
+  return {
+    outcome: 'started',
+    mode: 'detached',
+    appDir: '/tmp/OpenAlice',
+    homeRoot: '/tmp/alice-home',
+    logPath: '/tmp/alice-home/logs/server.log',
+    status: runningStatus(),
+  }
+}
+
+function runningStatus() {
+  return {
+    protocol: 1,
+    class: 'running',
+    runtimeVersion: '0.87.0-beta',
+    state: 'running',
+    home: '/tmp/alice-home',
+    owner: { surface: 'cli-server', pid: 123, instanceId: 'test', mode: 'detached' },
+    endpoints: { web: 'http://127.0.0.1:41000' },
+    components: { alice: 'ready', uta: 'disabled', connector: 'disabled' },
+    capabilities: ['runtime.stop'],
+  }
+}
+
+function absentStatus() {
+  return {
+    protocol: 1,
+    class: 'absent',
+    state: 'absent',
+    home: '/tmp/alice-home',
+    owner: null,
+    endpoints: {},
+    components: {},
+    capabilities: [],
+  }
+}

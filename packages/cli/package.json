@@ -10,6 +10,8 @@
     "bin/openalice.mjs",
     "src/install-layout.mjs",
     "src/install-source.mjs",
+    "src/lifecycle-command.mjs",
+    "src/lifecycle.mjs",
     "src/local-start.mjs",
     "src/remote.mjs",
     "src/runtime-deps.mjs",
@@ -21,7 +23,7 @@
     "src/update.mjs"
   ],
   "scripts": {
-    "build": "node --check bin/openalice.mjs && node --check src/install-layout.mjs && node --check src/install-source.mjs && node --check src/local-start.mjs && node --check src/remote.mjs && node --check src/runtime-deps.mjs && node --check src/runtime-client.mjs && node --check src/server.mjs && node --check src/server-control.mjs && node --check src/ssh-connect.mjs && node --check src/uninstall.mjs && node --check src/update.mjs",
+    "build": "node --check bin/openalice.mjs && node --check src/install-layout.mjs && node --check src/install-source.mjs && node --check src/lifecycle-command.mjs && node --check src/lifecycle.mjs && node --check src/local-start.mjs && node --check src/remote.mjs && node --check src/runtime-deps.mjs && node --check src/runtime-client.mjs && node --check src/server.mjs && node --check src/server-control.mjs && node --check src/ssh-connect.mjs && node --check src/uninstall.mjs && node --check src/update.mjs",
     "test": "vitest run --root ../.. --config vitest.config.ts --project node packages/cli/src"
   },
   "engines": {
