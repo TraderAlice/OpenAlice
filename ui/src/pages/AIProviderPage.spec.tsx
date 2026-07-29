@@ -49,11 +49,12 @@ beforeEach(async () => {
   mocks.setWorkspaceCredentialDefaults.mockImplementation(async (defaults) => ({
     defaults,
   }))
+  mocks.deleteCredential.mockResolvedValue(undefined)
 })
 
 afterEach(cleanup)
 
-describe('AIProviderPage defaults', () => {
+describe('AIProviderPage', () => {
   it('puts creation defaults before collapsed runtime reference and localizes the primary UI', async () => {
     render(<AIProviderPage />)
 
@@ -78,5 +79,40 @@ describe('AIProviderPage defaults', () => {
       { pi: { credentialSlug: 'google-1', wireShape: 'google-generative-ai' } },
     ))
     expect(await screen.findByText('已保存')).toBeTruthy()
+  })
+
+  it('confirms credential deletion and explains the default cleanup', async () => {
+    render(<AIProviderPage />)
+
+    const deleteCredential = await screen.findByRole('button', { name: '删除 Gemini' })
+    fireEvent.click(deleteCredential)
+
+    expect(screen.getByRole('heading', { name: '删除 Gemini？' })).toBeTruthy()
+    expect(screen.getByText(/永久删除 google-1/)).toBeTruthy()
+    expect(screen.getByText(/清除所有引用它的新工作区默认值/)).toBeTruthy()
+    expect(mocks.deleteCredential).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: '取消' }))
+    expect(screen.queryByRole('heading', { name: '删除 Gemini？' })).toBeNull()
+    expect(mocks.deleteCredential).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: '删除 Gemini' }))
+    fireEvent.click(screen.getByRole('button', { name: '删除' }))
+
+    await waitFor(() => expect(mocks.deleteCredential).toHaveBeenCalledWith('google-1'))
+    await waitFor(() => expect(screen.queryByRole('heading', { name: '删除 Gemini？' })).toBeNull())
+  })
+
+  it('keeps the confirmation open when credential deletion fails', async () => {
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
+    mocks.deleteCredential.mockRejectedValueOnce(new Error('credential still in use'))
+    render(<AIProviderPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: '删除 Gemini' }))
+    fireEvent.click(screen.getByRole('button', { name: '删除' }))
+
+    await waitFor(() => expect(alertSpy).toHaveBeenCalledWith('credential still in use'))
+    expect(screen.getByRole('heading', { name: '删除 Gemini？' })).toBeTruthy()
+    alertSpy.mockRestore()
   })
 })

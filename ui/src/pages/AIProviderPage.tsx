@@ -26,6 +26,7 @@ import { PageHeader } from '../components/PageHeader'
 import { PageLoading, Skeleton } from '../components/StateViews'
 import { SettingsScrollArea, inputClass } from '../components/form'
 import { CredentialModal } from '../components/credentials/CredentialModal'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import {
   AGENT_LABELS,
   WIRE_SHAPE_GUIDANCE,
@@ -96,6 +97,7 @@ export function AIProviderPage() {
   const [credentialsLoadError, setCredentialsLoadError] = useState(false)
   const [presets, setPresets] = useState<Preset[]>([])
   const [modal, setModal] = useState<{ mode: 'add' } | { mode: 'edit'; cred: CredentialSummary } | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<CredentialSummary | null>(null)
 
   const reload = useCallback(async () => {
     setCredentials(null)
@@ -115,12 +117,14 @@ export function AIProviderPage() {
 
   const apiKeyPresets = useMemo(() => presets.filter(isApiKeyPreset), [presets])
 
-  const handleDelete = async (slug: string) => {
+  const handleDelete = async (slug: string): Promise<boolean> => {
     try {
       await api.config.deleteCredential(slug)
       await reload()
+      return true
     } catch (err) {
       alert(err instanceof Error ? err.message : t('aiProvider.deleteFailed'))
+      return false
     }
   }
 
@@ -203,7 +207,13 @@ export function AIProviderPage() {
                         {t('common.edit')}
                       </button>
                       <button
-                        onClick={() => handleDelete(cred.slug)}
+                        onClick={() => setPendingDelete(cred)}
+                        title={t('aiProvider.deleteCredentialAria', {
+                          credential: credentialLabel(cred),
+                        })}
+                        aria-label={t('aiProvider.deleteCredentialAria', {
+                          credential: credentialLabel(cred),
+                        })}
                         className="text-[11px] px-2 py-1 rounded-md border border-border text-muted-foreground hover:text-destructive transition-colors"
                       >
                         {t('common.delete')}
@@ -274,6 +284,24 @@ export function AIProviderPage() {
           presets={apiKeyPresets}
           onClose={() => setModal(null)}
           onSaved={async () => { await reload(); setModal(null) }}
+        />
+      )}
+      {pendingDelete && (
+        <ConfirmDialog
+          title={t('aiProvider.deleteConfirmTitle', {
+            credential: credentialLabel(pendingDelete),
+          })}
+          message={t('aiProvider.deleteConfirmMessage', {
+            slug: pendingDelete.slug,
+          })}
+          confirmLabel={t('common.delete')}
+          cancelLabel={t('common.cancel')}
+          onConfirm={async () => {
+            if (await handleDelete(pendingDelete.slug)) {
+              setPendingDelete(null)
+            }
+          }}
+          onClose={() => setPendingDelete(null)}
         />
       )}
     </div>

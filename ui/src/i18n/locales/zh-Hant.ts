@@ -250,6 +250,9 @@ export const zhHant: Resources = {
     notSet: '未設定',
     officialEndpoint: '供應方官方端點',
     deleteFailed: '刪除失敗',
+    deleteCredentialAria: '刪除 {{credential}}',
+    deleteConfirmTitle: '刪除 {{credential}}？',
+    deleteConfirmMessage: '這會從 Alice 憑證庫中永久刪除 {{slug}}，並清除所有引用它的新工作區預設值。現有工作區檔案不會變更。',
     defaultsIntro: '選擇 Alice 在建立工作區時寫入的預設設定。現有工作區不會被變更，之後仍可在局部覆寫。opencode 與 Pi 需要 API 憑證；Claude Code 與 Codex 通常使用各自的 CLI 登入。',
     defaultsTitle: '新工作區預設值',
     defaultCredentialLabel: '{{agent}} 預設憑證',
@@ -1229,6 +1232,8 @@ export const zhHant: Resources = {
     cannotReplyWorkspaceGone: '工作區已不存在——無處回覆。',
     deleteEntryTitle: '刪除此則（Delete / Backspace）',
     deleteEntryAriaLabel: '刪除此收件匣項目',
+    deleteConfirmTitle: '刪除這則收件匣訊息？',
+    deleteConfirmMessage: '這會從收件匣中永久刪除此更新，但不會刪除 {{workspace}} 中連結的檔案。',
   },
   templates: {
     catalogTitle: '工作區模板',

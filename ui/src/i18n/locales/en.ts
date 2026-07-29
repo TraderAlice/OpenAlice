@@ -254,6 +254,9 @@ export const en = {
     notSet: 'not set',
     officialEndpoint: 'provider official endpoint',
     deleteFailed: 'Delete failed',
+    deleteCredentialAria: 'Delete {{credential}}',
+    deleteConfirmTitle: 'Delete {{credential}}?',
+    deleteConfirmMessage: 'This permanently removes {{slug}} from Alice’s credential vault and clears any new Workspace defaults that use it. Existing Workspace files are not changed.',
     defaultsIntro: "Choose what Alice writes into each new workspace at creation. Existing workspaces stay untouched and can still be overridden locally. opencode and Pi need an API credential; Claude Code and Codex normally use their own CLI login.",
     defaultsTitle: 'New workspace defaults',
     defaultCredentialLabel: '{{agent}} default credential',
@@ -1233,6 +1236,8 @@ export const en = {
     cannotReplyWorkspaceGone: 'Workspace no longer exists — nowhere to reply.',
     deleteEntryTitle: 'Delete this entry (Delete / Backspace)',
     deleteEntryAriaLabel: 'Delete this inbox entry',
+    deleteConfirmTitle: 'Delete Inbox entry?',
+    deleteConfirmMessage: 'This permanently removes this update from Inbox. Files linked from {{workspace}} are not deleted.',
   },
   templates: {
     catalogTitle: 'Workspace templates',

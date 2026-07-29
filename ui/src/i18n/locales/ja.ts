@@ -243,6 +243,9 @@ export const ja: Resources = {
     notSet: '未設定',
     officialEndpoint: 'プロバイダー公式エンドポイント',
     deleteFailed: '削除に失敗しました',
+    deleteCredentialAria: '{{credential}} を削除',
+    deleteConfirmTitle: '{{credential}} を削除しますか？',
+    deleteConfirmMessage: 'Alice の認証情報保管庫から {{slug}} を完全に削除し、それを使用する新規ワークスペースの既定値も解除します。既存のワークスペースファイルは変更されません。',
     defaultsIntro: 'Alice がワークスペース作成時に書き込む既定設定を選びます。既存ワークスペースは変更されず、後からローカルに上書きできます。opencode と Pi には API 認証情報が必要です。Claude Code と Codex は通常それぞれの CLI ログインを使用します。',
     defaultsTitle: '新規ワークスペースの既定値',
     defaultCredentialLabel: '{{agent}} の既定認証情報',
@@ -1222,6 +1225,8 @@ export const ja: Resources = {
     cannotReplyWorkspaceGone: 'ワークスペースが存在しないため、返信先がありません。',
     deleteEntryTitle: 'この項目を削除（Delete / Backspace）',
     deleteEntryAriaLabel: 'この受信トレイの項目を削除',
+    deleteConfirmTitle: '受信トレイの項目を削除しますか？',
+    deleteConfirmMessage: 'この更新を受信トレイから完全に削除します。{{workspace}} でリンクされているファイルは削除されません。',
   },
   templates: {
     catalogTitle: 'ワークスペーステンプレート',

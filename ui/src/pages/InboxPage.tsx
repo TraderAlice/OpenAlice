@@ -17,6 +17,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import { Skeleton } from '../components/StateViews'
 import { MarkdownContent } from '../components/MarkdownContent'
 import { FileContentView } from '../components/FileContentView'
@@ -48,8 +49,8 @@ interface InboxPageProps {
  * background or open the same Session interactively.
  *
  * Selection (an entryId) is owned by `useInboxSelection`; the sidebar
- * drives it and marks the entry read on select. Delete (header trash +
- * page-level Delete/Backspace) advances selection to the next entry.
+ * drives it and marks the entry read on select. Confirmed Delete (header
+ * trash + page-level Delete/Backspace) advances selection to the next entry.
  */
 export function InboxPage({ visible }: InboxPageProps) {
   const { t } = useTranslation()
@@ -58,8 +59,10 @@ export function InboxPage({ visible }: InboxPageProps) {
   const selectedId = useInboxSelection((s) => s.selectedEntryId)
   const select = useInboxSelection((s) => s.select)
   const markRead = useInboxRead((s) => s.markRead)
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
   const selected = entries.find((e) => e.id === selectedId) ?? null
+  const pendingDelete = entries.find((e) => e.id === pendingDeleteId) ?? null
 
   /** Hard-delete an entry. Optimistically removes it, advances selection
    *  to the next-older entry (or previous if last), fires the DELETE,
@@ -88,8 +91,14 @@ export function InboxPage({ visible }: InboxPageProps) {
     refreshInbox()
   }, [entries, select, markRead])
 
+  const requestDelete = useCallback((id: string) => {
+    setPendingDeleteId(id)
+  }, [])
+
   // Delete / Backspace shortcut. Gated on `visible` (background inbox
-  // tabs must not intercept) and on a selected entry existing.
+  // tabs must not intercept) and on a selected entry existing. The
+  // shortcut requests confirmation rather than deleting durable Inbox
+  // history immediately.
   useEffect(() => {
     if (!visible) return
     if (!selectedId) return
@@ -98,36 +107,53 @@ export function InboxPage({ visible }: InboxPageProps) {
       if (e.metaKey || e.ctrlKey || e.altKey) return
       if (e.key !== 'Delete' && e.key !== 'Backspace') return
       e.preventDefault()
-      void handleDelete(selectedId!)
+      requestDelete(selectedId!)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [visible, selectedId, handleDelete])
+  }, [visible, selectedId, requestDelete])
 
   return (
-    <div className="flex flex-col flex-1 min-h-0">
-      <PageHeader
-        title={t('nav.item.inbox')}
-        description={t('inbox.pageDescription', { count: entries.length })}
-      />
-      <div className="flex-1 overflow-y-auto min-h-0">
-        {loading && entries.length === 0 ? (
-          <InboxLoadingSkeleton />
-        ) : entries.length === 0 ? (
-          <EmptyState />
-        ) : !selected ? (
-          <div className="px-6 py-8 text-muted-foreground text-sm">
-            {t('inbox.selectFromSidebar')}
-          </div>
-        ) : (
-          <Detail
-            key={selected.id}
-            entry={selected}
-            onDelete={() => handleDelete(selected.id)}
-          />
-        )}
+    <>
+      <div className="flex flex-col flex-1 min-h-0">
+        <PageHeader
+          title={t('nav.item.inbox')}
+          description={t('inbox.pageDescription', { count: entries.length })}
+        />
+        <div className="flex-1 overflow-y-auto min-h-0">
+          {loading && entries.length === 0 ? (
+            <InboxLoadingSkeleton />
+          ) : entries.length === 0 ? (
+            <EmptyState />
+          ) : !selected ? (
+            <div className="px-6 py-8 text-muted-foreground text-sm">
+              {t('inbox.selectFromSidebar')}
+            </div>
+          ) : (
+            <Detail
+              key={selected.id}
+              entry={selected}
+              onDelete={() => requestDelete(selected.id)}
+            />
+          )}
+        </div>
       </div>
-    </div>
+      {pendingDelete && (
+        <ConfirmDialog
+          title={t('inbox.deleteConfirmTitle')}
+          message={t('inbox.deleteConfirmMessage', {
+            workspace: pendingDelete.workspaceLabel ?? pendingDelete.workspaceId,
+          })}
+          confirmLabel={t('common.delete')}
+          cancelLabel={t('common.cancel')}
+          onConfirm={async () => {
+            await handleDelete(pendingDelete.id)
+            setPendingDeleteId(null)
+          }}
+          onClose={() => setPendingDeleteId(null)}
+        />
+      )}
+    </>
   )
 }
 

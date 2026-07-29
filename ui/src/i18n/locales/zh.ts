@@ -242,6 +242,9 @@ export const zh: Resources = {
     notSet: '未设置',
     officialEndpoint: '提供方官方端点',
     deleteFailed: '删除失败',
+    deleteCredentialAria: '删除 {{credential}}',
+    deleteConfirmTitle: '删除 {{credential}}？',
+    deleteConfirmMessage: '这会从 Alice 凭证库中永久删除 {{slug}}，并清除所有引用它的新工作区默认值。现有工作区文件不会改变。',
     defaultsIntro: '选择 Alice 在创建工作区时写入的默认配置。现有工作区不会被改动，之后仍可在局部覆盖。opencode 和 Pi 需要 API 凭证；Claude Code 和 Codex 通常使用各自的 CLI 登录。',
     defaultsTitle: '新工作区默认值',
     defaultCredentialLabel: '{{agent}} 默认凭证',
@@ -1221,6 +1224,8 @@ export const zh: Resources = {
     cannotReplyWorkspaceGone: '工作区已不存在——无处回复。',
     deleteEntryTitle: '删除此条（Delete / Backspace）',
     deleteEntryAriaLabel: '删除此收件箱条目',
+    deleteConfirmTitle: '删除这条收件箱消息？',
+    deleteConfirmMessage: '这会从收件箱中永久删除此更新，但不会删除 {{workspace}} 中链接的文件。',
   },
   templates: {
     catalogTitle: '工作区模板',
