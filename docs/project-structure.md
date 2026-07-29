@@ -49,6 +49,13 @@ Launchers share the same ownership model:
 - `packages/guardian-runtime/` owns cross-launcher single-writer locks,
   heartbeat metadata, process identity, and controlled takeover.
 
+Owner metadata is published by writing a temporary file and atomically
+replacing `owner.json`. On Windows only, replacement retries the transient
+`EPERM`, `EACCES`, and `EBUSY` sharing failures on a bounded schedule. The
+previous owner file remains authoritative until replacement succeeds; retry
+exhaustion or any other error still causes the live handle to report ownership
+loss rather than weakening the single-writer boundary.
+
 UTA may be disabled in lite/read-only mode. Alice and the Workspace UI must
 remain usable without it; only broker/trading capabilities disappear.
 

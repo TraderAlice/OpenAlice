@@ -1,6 +1,6 @@
 import './xterm-node-polyfill.mjs'
 
-import { access, mkdtemp, rm } from 'node:fs/promises'
+import { access, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -14,6 +14,7 @@ export class TuiPtyHarness {
     const root = await mkdtemp(join(tmpdir(), 'openalice-tui-pty-'))
     const home = join(root, 'home')
     const openaliceHome = join(root, 'openalice-home')
+    const resultPath = join(root, 'result.json')
     const fixture = options.fixture
     const launch = await resolveLaunch(options, fixture)
     const columns = options.columns ?? 80
@@ -27,17 +28,19 @@ export class TuiPtyHarness {
         HOME: home,
         USERPROFILE: home,
         OPENALICE_HOME: openaliceHome,
+        OPENALICE_TUI_RESULT_PATH: resultPath,
         TERM: 'xterm-256color',
         ...(options.noColor ? { NO_COLOR: '1' } : {}),
         ...launch.environment,
         ...options.environment,
       },
     })
-    return new TuiPtyHarness({ root, terminal, columns, rows })
+    return new TuiPtyHarness({ root, resultPath, terminal, columns, rows })
   }
 
-  constructor({ root, terminal, columns, rows }) {
+  constructor({ root, resultPath, terminal, columns, rows }) {
     this.root = root
+    this.resultPath = resultPath
     this.terminal = terminal
     this.pid = terminal.pid
     this.rawOutput = ''
@@ -118,6 +121,16 @@ export class TuiPtyHarness {
     })
   }
 
+  async readResult() {
+    try {
+      return JSON.parse(await readFile(this.resultPath, 'utf8'))
+    } catch (error) {
+      throw new Error(
+        `TUI PTY result is unavailable: ${error instanceof Error ? error.message : String(error)}\n${this.diagnostics()}`,
+      )
+    }
+  }
+
   diagnostics() {
     return [
       `screen:\n${this.screen()}`,
@@ -151,8 +164,8 @@ async function resolveLaunch(options, fixture) {
     args: [
       '--noprofile',
       '--norc',
-      '-lc',
-      'exec "$(cygpath -u "$OPENALICE_NODE")" "$(cygpath -u "$OPENALICE_TUI_FIXTURE")"',
+      '-c',
+      '"$(cygpath -u "$OPENALICE_NODE")" "$(cygpath -u "$OPENALICE_TUI_FIXTURE")"',
     ],
     environment: {
       OPENALICE_NODE: process.execPath,

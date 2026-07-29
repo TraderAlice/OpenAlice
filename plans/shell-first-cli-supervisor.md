@@ -495,3 +495,14 @@ This plan is complete only when:
 - 2026-07-30: Published increment 3 as serial PR #857 targeting `dev`; merge
   waits for its real Windows Git Bash PTY journey because that result completes
   the renderer-selection evidence rather than serving as generic trailing CI.
+- 2026-07-30: PR #857's first Windows matrix exposed two real platform
+  boundaries: Git Bash did not propagate the fixture exit cleanly through an
+  MSYS `exec`, and a Guardian heartbeat again hit transient `EPERM` while
+  replacing `owner.json`. Reworked the harness to wait on Bash's Node child,
+  persist a structured post-cleanup result, and drain terminal diagnostics.
+  Added a Windows-only bounded `EPERM`/`EACCES`/`EBUSY` owner replacement retry
+  that preserves the prior owner until success, plus deterministic heartbeat,
+  exhaustion, and non-transient regressions. Local TUI, CLI, Guardian full
+  recovery/dev smoke, root TypeScript/Vitest (3,644 passed, 10 skipped), and
+  Electron Guardian takeover/PTY acceptance passed; Windows rerun remains the
+  merge gate.

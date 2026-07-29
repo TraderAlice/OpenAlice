@@ -27,6 +27,11 @@ describe('Supervisor TUI PTY harness', { timeout: 10_000 }, () => {
     expect(exit.exitCode).toBe(0)
     expect(harness.rawOutput).toContain(terminalSequences.leaveAlternateScreen)
     expect(harness.rawOutput).toContain('OPENALICE_TUI_RESTORED raw=false reason=detach')
+    await expect(harness.readResult()).resolves.toEqual({
+      reason: 'detach',
+      raw: false,
+      errorMessage: null,
+    })
   })
 
   it('treats Ctrl+C as detach and leaves the Runtime-oriented UI without a stop action', async () => {
@@ -35,12 +40,12 @@ describe('Supervisor TUI PTY harness', { timeout: 10_000 }, () => {
     harness.send('\x03')
 
     expect((await harness.waitForExit()).exitCode).toBe(0)
-    expect(harness.rawOutput).toContain('OPENALICE_TUI_RESTORED raw=false reason=ctrl-c')
+    await expect(harness.readResult()).resolves.toMatchObject({ reason: 'ctrl-c', raw: false })
   })
 
   it('parses Unicode through xterm, resizes to the narrow view, and honors NO_COLOR', async () => {
     const harness = await start({ noColor: true })
-    expect(await harness.waitForScreen('爱丽丝')).toContain('q detach')
+    expect(await harness.waitForScreen(/爱丽丝[\s\S]*q detach/)).toContain('q detach')
     harness.resize(48, 16)
     const screen = await harness.waitForScreen('Provider fixture')
 
@@ -56,7 +61,7 @@ describe('Supervisor TUI PTY harness', { timeout: 10_000 }, () => {
     harness.signal('SIGTERM')
 
     expect((await harness.waitForExit()).exitCode).toBe(143)
-    expect(harness.rawOutput).toContain('OPENALICE_TUI_RESTORED raw=false reason=SIGTERM')
+    await expect(harness.readResult()).resolves.toMatchObject({ reason: 'SIGTERM', raw: false })
     expect(harness.rawOutput.indexOf(terminalSequences.leaveAlternateScreen))
       .toBeLessThan(harness.rawOutput.indexOf('OPENALICE_TUI_RESTORED'))
   })
@@ -68,8 +73,11 @@ describe('Supervisor TUI PTY harness', { timeout: 10_000 }, () => {
 
     expect((await harness.waitForExit()).exitCode).toBe(1)
     expect(harness.rawOutput).toContain(terminalSequences.leaveAlternateScreen)
-    expect(harness.rawOutput).toContain('OPENALICE_TUI_RESTORED raw=false reason=error')
-    expect(harness.rawOutput).toContain('intentional renderer failure')
+    await expect(harness.readResult()).resolves.toEqual({
+      reason: 'error',
+      raw: false,
+      errorMessage: 'intentional renderer failure',
+    })
   })
 
   it('keeps the TUI attached to its model when control disconnects', async () => {
@@ -90,8 +98,11 @@ describe('Supervisor TUI PTY harness', { timeout: 10_000 }, () => {
     harness.resize(64, 20)
     harness.send('q')
 
-    expect((await harness.waitForExit()).exitCode).toBe(0)
-    expect(harness.rawOutput).toContain('OPENALICE_TUI_RESTORED raw=false reason=detach')
+    const exit = await harness.waitForExit()
+    const result = await harness.readResult()
+    expect(exit.exitCode, `${JSON.stringify(result)}\n${harness.diagnostics()}`).toBe(0)
+    expect(result).toEqual({ reason: 'detach', raw: false, errorMessage: null })
+    expect(harness.rawOutput).toContain(terminalSequences.leaveAlternateScreen)
   })
 })
 

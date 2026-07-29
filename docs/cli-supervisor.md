@@ -302,11 +302,14 @@ rejected spike and its dependencies are not retained.
 `packages/cli/test/pty-harness.mjs` owns an isolated `HOME` and
 `OPENALICE_HOME`, launches the fixture through a real `node-pty`, mirrors bytes
 through `@xterm/headless`, records input/output/resize/screen checkpoints, and
-includes the complete transcript in timeout diagnostics. Acceptance covers
-normal detach, Ctrl+C, SIGTERM where supported, resize, Unicode/no-color,
-renderer failure, and control disconnect without TUI exit. The Windows matrix
-also launches the fixture through Git for Windows Bash before accepting the
-renderer.
+includes the complete transcript in timeout diagnostics. The fixture also
+writes a structured result inside the isolated harness root after cleanup, so
+raw-mode restoration and the terminal byte stream are independent evidence;
+terminal writes are drained before fixture exit. Acceptance covers normal
+detach, Ctrl+C, SIGTERM where supported, resize, Unicode/no-color, renderer
+failure, and control disconnect without TUI exit. The Windows matrix also
+launches the fixture as a Git for Windows Bash child and requires Bash to
+propagate the Node fixture's real exit status before accepting the renderer.
 
 ## Load-bearing Files
 
