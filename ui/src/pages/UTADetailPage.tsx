@@ -1,4 +1,4 @@
-import { Fragment, useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { Fragment, useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import type { ViewSpec } from '../tabs/types'
 import { api } from '../api'
@@ -882,6 +882,8 @@ const ORDER_STATUS_STYLES: Record<OrderHistoryStatus, string> = {
   submitted: 'bg-primary/15 text-primary',
 }
 
+const ORDER_HISTORY_COMPACT_WIDTH = 760
+
 function OrderStatusBadge({ status }: { status: OrderHistoryStatus }) {
   return (
     <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${ORDER_STATUS_STYLES[status] ?? 'bg-muted text-muted-foreground'}`}>
@@ -908,6 +910,17 @@ function SourceChip({ label }: { label: string }) {
 
 export function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | null }) {
   const [expanded, setExpanded] = useState<number | null>(null)
+  const [container, setContainer] = useState<HTMLDivElement | null>(null)
+  const [compact, setCompact] = useState(false)
+
+  useLayoutEffect(() => {
+    if (!container || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(([entry]) => {
+      setCompact(entry.contentRect.width < ORDER_HISTORY_COMPACT_WIDTH)
+    })
+    observer.observe(container)
+    return () => observer.disconnect()
+  }, [container])
 
   if (orders == null) {
     return (
@@ -923,9 +936,84 @@ export function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | nu
       </div>
     )
   }
+
+  if (compact) {
+    return (
+      <div ref={setContainer}>
+        <ul className="grid gap-2" aria-label="Order history">
+          {orders.map((o, i) => {
+            const detailsId = `order-history-card-details-${i}`
+            const isExpanded = expanded === i
+            return (
+              <li key={`${o.commitHash}-${i}`} className="overflow-hidden rounded-lg border border-border bg-background">
+                <div className="p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <ContractCell contract={o.contract} />
+                    <span className="inline-flex shrink-0 items-center gap-1.5">
+                      <OrderStatusBadge status={o.status} />
+                      {o.source === 'external' && <SourceChip label="External" />}
+                    </span>
+                  </div>
+
+                  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+                    <span className="tabular-nums">{formatHistoryTime(o.timestamp)}</span>
+                    <span aria-hidden>·</span>
+                    <SideBadge side={o.side} />
+                    <span aria-hidden>·</span>
+                    <span>{o.orderType ?? '—'}</span>
+                  </div>
+
+                  <dl className="mt-3 grid grid-cols-3 gap-2">
+                    <div className="min-w-0 rounded-md bg-muted/35 px-2.5 py-2">
+                      <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">Qty</dt>
+                      <dd className="mt-0.5 truncate text-[12px] text-foreground tabular-nums">
+                        {o.quantity != null ? fmtNum(o.quantity) : '—'}
+                      </dd>
+                    </div>
+                    <div className="min-w-0 rounded-md bg-muted/35 px-2.5 py-2">
+                      <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">Limit</dt>
+                      <dd className="mt-0.5 truncate text-[12px] text-foreground tabular-nums">{o.limitPrice ?? '—'}</dd>
+                    </div>
+                    <div className="min-w-0 rounded-md bg-muted/35 px-2.5 py-2">
+                      <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">Fill</dt>
+                      <dd className="mt-0.5 truncate text-[12px] text-foreground tabular-nums">
+                        {o.avgFillPrice ? `${o.avgFillPrice}${o.filledQty ? ` × ${o.filledQty}` : ''}` : '—'}
+                      </dd>
+                    </div>
+                  </dl>
+
+                  <button
+                    type="button"
+                    aria-expanded={isExpanded}
+                    aria-controls={detailsId}
+                    aria-label={`${isExpanded ? 'Hide' : 'Show'} details for ${contractPrimary(o.contract)} order`}
+                    onClick={() => setExpanded(prev => prev === i ? null : i)}
+                    className="oa-pressable mt-3 flex w-full items-center justify-between rounded-md border border-border px-3 py-2 text-[11px] text-muted-foreground hover:text-foreground"
+                  >
+                    <span>Order details</span>
+                    <span>{isExpanded ? 'Hide' : 'Show'}</span>
+                  </button>
+                </div>
+
+                {isExpanded && (
+                  <div id={detailsId} className="oa-disclosure-enter border-t border-border bg-muted/20 px-3 py-2.5 text-[11px] text-muted-foreground">
+                    <div className="font-mono text-foreground">{o.commitHash}</div>
+                    <p className="mt-1 break-words leading-5">{o.message}</p>
+                    {o.error && <p className="mt-1 break-words text-destructive">{o.error}</p>}
+                    {o.resolvedAt && <p className="mt-1">resolved {formatHistoryTime(o.resolvedAt)}</p>}
+                  </div>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      </div>
+    )
+  }
+
   return (
-    <div className="border border-border rounded-lg overflow-x-auto">
-      <table className="w-full text-[13px]">
+    <div ref={setContainer} className="border border-border rounded-lg overflow-x-auto">
+      <table className="w-full min-w-[760px] text-[13px]">
         <thead>
           <tr className="bg-secondary text-muted-foreground text-left">
             <th className="px-3 py-2 font-medium">Time</th>
