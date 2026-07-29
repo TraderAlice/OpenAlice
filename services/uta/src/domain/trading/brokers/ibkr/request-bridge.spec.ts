@@ -132,6 +132,18 @@ describe('RequestBridge — error routing', () => {
     await expect(promise).rejects.toThrow(/subscription/)
   })
 
+  it('keeps snapshots open when 10167 announces delayed market data', async () => {
+    const b = new RequestBridge()
+    const promise = b.requestSnapshot(9002, 5000)
+
+    b.error(9002, 0, 10167, 'Requested market data is not subscribed. Displaying delayed market data.')
+    b.tickPrice(9002, TickTypeEnum.DELAYED_BID, 214.1, {} as never)
+    b.tickPrice(9002, TickTypeEnum.DELAYED_ASK, 214.14, {} as never)
+    b.tickSnapshotEnd(9002)
+
+    await expect(promise).resolves.toMatchObject({ bid: 214.1, ask: 214.14 })
+  })
+
   it('still ignores 21xx farm-status noise', () => {
     const b = new RequestBridge()
     // no pending request — must simply not throw
