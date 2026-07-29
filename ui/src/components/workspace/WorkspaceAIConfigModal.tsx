@@ -9,7 +9,7 @@
  * changes to take effect (env is read at CLI startup).
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Bot, GitMerge, Info, Layers3, Rocket, Settings, X } from 'lucide-react'
 import {
@@ -83,6 +83,56 @@ const CONTEXT_WINDOW_OPTIONS = [
   { value: 512_000, label: '512K' },
   { value: 1_000_000, label: '1M' },
 ] as const
+
+const DIALOG_FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',')
+
+function dialogFocusableElements(dialog: HTMLElement): HTMLElement[] {
+  return Array.from(dialog.querySelectorAll<HTMLElement>(DIALOG_FOCUSABLE_SELECTOR))
+    .filter((element) => (
+      element.tabIndex >= 0 &&
+      element.closest('[hidden], [aria-hidden="true"]') === null
+    ))
+}
+
+function makeDialogBackgroundInert(modalBranch: HTMLElement): () => void {
+  const changed: Array<{
+    element: HTMLElement
+    hadInert: boolean
+    ariaHidden: string | null
+  }> = []
+  let branch: HTMLElement | null = modalBranch
+
+  while (branch?.parentElement) {
+    const parent: HTMLElement = branch.parentElement
+    for (const sibling of Array.from(parent.children)) {
+      if (sibling === branch || !(sibling instanceof HTMLElement)) continue
+      changed.push({
+        element: sibling,
+        hadInert: sibling.hasAttribute('inert'),
+        ariaHidden: sibling.getAttribute('aria-hidden'),
+      })
+      sibling.setAttribute('inert', '')
+      sibling.setAttribute('aria-hidden', 'true')
+    }
+    if (parent === document.body) break
+    branch = parent
+  }
+
+  return () => {
+    for (const { element, hadInert, ariaHidden } of changed.reverse()) {
+      if (!hadInert) element.removeAttribute('inert')
+      if (ariaHidden === null) element.removeAttribute('aria-hidden')
+      else element.setAttribute('aria-hidden', ariaHidden)
+    }
+  }
+}
 
 export interface FormState {
   baseUrl: string
@@ -221,6 +271,11 @@ export function WorkspaceAIConfigModal({
   initialSection = 'general',
 }: Props) {
   const { t } = useTranslation()
+  const backdropRef = useRef<HTMLDivElement>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const onCloseRef = useRef(onClose)
+  const dialogTitleId = useId()
+  const dialogDescriptionId = useId()
   const { workspaces, refresh, saveWorkspaceMetadata } = useWorkspaces()
   const workspace = workspaces.find((w) => w.id === wsId) ?? null
   const workspaceLabel = workspace?.displayName?.trim() || workspace?.tag || wsId
@@ -254,6 +309,61 @@ export function WorkspaceAIConfigModal({
   const opencodeGate = useTestGate()
   const piGate = useTestGate()
   const [presets, setPresets] = useState<Preset[]>([])
+
+  onCloseRef.current = onClose
+
+  useEffect(() => {
+    const dialog = dialogRef.current
+    const backdrop = backdropRef.current
+    if (!dialog || !backdrop) return
+
+    const previouslyFocused = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null
+    const restoreBackground = makeDialogBackgroundInert(backdrop)
+    const initialFocus = dialog.querySelector<HTMLElement>('[aria-current="page"]')
+      ?? dialogFocusableElements(dialog)[0]
+      ?? dialog
+    initialFocus.focus()
+
+    const handleDialogKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onCloseRef.current()
+        return
+      }
+      if (event.key !== 'Tab') return
+
+      const focusable = dialogFocusableElements(dialog)
+      if (focusable.length === 0) {
+        event.preventDefault()
+        dialog.focus()
+        return
+      }
+
+      const first = focusable[0]!
+      const last = focusable[focusable.length - 1]!
+      const active = document.activeElement
+      if (!dialog.contains(active)) {
+        event.preventDefault()
+        first.focus()
+      } else if (event.shiftKey && active === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener('keydown', handleDialogKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleDialogKeyDown)
+      restoreBackground()
+      if (previouslyFocused?.isConnected) previouslyFocused.focus()
+    }
+  }, [])
 
   useEffect(() => {
     setSection(initialSection)
@@ -531,18 +641,25 @@ export function WorkspaceAIConfigModal({
 
   return (
     <div
+      ref={backdropRef}
       className="fixed inset-0 z-[60] flex items-center justify-center bg-backdrop backdrop-blur-sm"
       onMouseDown={handleBackdropMouseDown}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={dialogTitleId}
+        aria-describedby={dialogDescriptionId}
+        tabIndex={-1}
         className="bg-background border border-border rounded-xl shadow-2xl w-[calc(100vw-24px)] max-w-3xl max-h-[85vh] flex flex-col"
         onMouseDown={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border">
           <div className="min-w-0">
-            <h2 className="text-[15px] font-semibold text-foreground">{t('workspaceSettings.title')}</h2>
-            <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{workspaceLabel}</p>
+            <h2 id={dialogTitleId} className="text-[15px] font-semibold text-foreground">{t('workspaceSettings.title')}</h2>
+            <p id={dialogDescriptionId} className="mt-0.5 truncate text-[11px] text-muted-foreground">{workspaceLabel}</p>
           </div>
           <button
             type="button"
@@ -560,6 +677,7 @@ export function WorkspaceAIConfigModal({
             <button
               type="button"
               onClick={() => setSection('general')}
+              aria-current={section === 'general' ? 'page' : undefined}
               className={`flex min-w-0 flex-1 items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:w-full ${
                 section === 'general'
                   ? 'bg-primary/10 text-primary'
@@ -572,6 +690,7 @@ export function WorkspaceAIConfigModal({
             <button
               type="button"
               onClick={() => setSection('launch')}
+              aria-current={section === 'launch' ? 'page' : undefined}
               className={`flex min-w-0 items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:w-full ${
                 section === 'launch'
                   ? 'bg-primary/10 text-primary'
@@ -584,6 +703,7 @@ export function WorkspaceAIConfigModal({
             <button
               type="button"
               onClick={() => setSection('ai')}
+              aria-current={section === 'ai' ? 'page' : undefined}
               className={`flex min-w-0 flex-1 items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:w-full ${
                 section === 'ai'
                   ? 'bg-primary/10 text-primary'
@@ -596,6 +716,7 @@ export function WorkspaceAIConfigModal({
             <button
               type="button"
               onClick={() => setSection('template')}
+              aria-current={section === 'template' ? 'page' : undefined}
               className={`flex min-w-0 flex-1 items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:w-full ${
                 section === 'template'
                   ? 'bg-primary/10 text-primary'
@@ -611,6 +732,7 @@ export function WorkspaceAIConfigModal({
             <button
               type="button"
               onClick={() => setSection('absorb')}
+              aria-current={section === 'absorb' ? 'page' : undefined}
               className={`flex min-w-0 flex-1 items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:w-full ${
                 section === 'absorb'
                   ? 'bg-primary/10 text-primary'

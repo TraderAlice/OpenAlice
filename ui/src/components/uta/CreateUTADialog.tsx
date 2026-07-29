@@ -204,7 +204,7 @@ export function CreateUTADialog({
   ) : null
 
   return (
-    <Dialog onClose={onClose}>
+    <Dialog ariaLabel={headerLabel} onClose={onClose}>
       <div className="shrink-0 px-6 py-4 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-3 min-w-0">
           <h3 className="text-[14px] font-semibold text-foreground truncate">{headerLabel}</h3>

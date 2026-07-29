@@ -116,4 +116,43 @@ describe('InboxPage deletion', () => {
     await waitFor(() => expect(deleteEntry).toHaveBeenCalledWith(entry.id))
     await waitFor(() => expect(screen.queryByText('Delete Inbox entry?')).toBeNull())
   })
+
+  it('keeps the entry and confirmation available when deletion fails, then allows a retry', async () => {
+    const entry = {
+      id: 'inbox-retry',
+      ts: Date.now(),
+      workspaceId: 'ws-1',
+      workspaceLabel: 'research',
+      comments: 'Keep this update until the server confirms deletion.',
+    }
+    let serverHasEntry = true
+    vi.spyOn(api.inbox, 'history').mockImplementation(async () => ({
+      entries: serverHasEntry ? [entry] : [],
+      hasMore: false,
+    }))
+    const deleteEntry = vi.spyOn(api.inbox, 'delete')
+      .mockRejectedValueOnce(new Error('temporary network failure'))
+      .mockImplementationOnce(async () => {
+        serverHasEntry = false
+        return true
+      })
+    useInboxSelection.getState().select(entry.id)
+
+    render(<InboxPage visible />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete this inbox entry' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'Couldn’t delete this Inbox entry. It is still available. Try again.',
+    )
+    expect(screen.getByText(entry.comments)).toBeTruthy()
+    expect(screen.getByText('Delete Inbox entry?')).toBeTruthy()
+    expect(useInboxSelection.getState().selectedEntryId).toBe(entry.id)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+
+    await waitFor(() => expect(deleteEntry).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(screen.queryByText('Delete Inbox entry?')).toBeNull())
+  })
 })

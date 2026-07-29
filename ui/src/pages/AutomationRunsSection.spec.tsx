@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -12,7 +12,9 @@ const mocks = vi.hoisted(() => ({
   snapshot: vi.fn(),
   output: vi.fn(),
   openHeadlessRun: vi.fn(),
+  openOrFocus: vi.fn(),
   workspaces: [] as unknown[],
+  issues: null as import('../api/issues').IssueSnapshot | null,
 }))
 
 vi.mock('../api', () => ({
@@ -29,6 +31,16 @@ vi.mock('../contexts/workspaces-context', () => ({
     workspaces: mocks.workspaces,
     openHeadlessRun: mocks.openHeadlessRun,
   }),
+}))
+
+vi.mock('../hooks/useIssues', () => ({
+  useIssues: () => ({ data: mocks.issues, error: null, loading: mocks.issues === null }),
+}))
+
+vi.mock('../tabs/store', () => ({
+  useWorkspace: (
+    selector: (state: { openOrFocus: typeof mocks.openOrFocus }) => unknown,
+  ) => selector({ openOrFocus: mocks.openOrFocus }),
 }))
 
 const liveWorkspace: Workspace = {
@@ -71,6 +83,7 @@ function snapshot(tasks: HeadlessTaskRecord[]): HeadlessListSnapshot {
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.workspaces = [liveWorkspace]
+  mocks.issues = null
 })
 
 afterEach(cleanup)
@@ -96,6 +109,110 @@ describe('AutomationRunsSection workspace identity', () => {
 
     expect(await screen.findByText(departedId)).toBeTruthy()
     expect(screen.getByTitle(departedId).className).toContain('font-mono')
+  })
+
+  it('uses the owning Issue as the primary run identity and links back to it', async () => {
+    mocks.issues = {
+      workspaces: [{
+        wsId: liveWorkspace.id,
+        tag: liveWorkspace.tag,
+        status: 'ok',
+        issues: [{
+          id: 'daily-risk-scan',
+          title: 'Daily portfolio risk scan',
+          status: 'todo',
+          priority: 'high',
+          assignee: '@workspace',
+        }],
+      }],
+    }
+    mocks.snapshot.mockResolvedValue(snapshot([
+      task({
+        taskId: 'run-issue',
+        prompt: 'Inspect every live position and report only material changes.',
+        trigger: {
+          kind: 'issue',
+          workspaceId: liveWorkspace.id,
+          issueId: 'daily-risk-scan',
+        },
+      }),
+    ]))
+
+    render(<AutomationRunsSection />)
+
+    const issueTitle = await screen.findByText('Daily portfolio risk scan')
+    expect(screen.getByText('Issue')).toBeTruthy()
+    expect(screen.getByText('Inspect every live position and report only material changes.')).toBeTruthy()
+    expect(screen.getByRole('button', {
+      name: 'Run details, running: Daily portfolio risk scan. codex in quant-desk.',
+    })).toBeTruthy()
+
+    const article = issueTitle.closest('article')
+    expect(article).toBeTruthy()
+    fireEvent.click(within(article as HTMLElement).getAllByRole('button')[0]!)
+    fireEvent.click(within(article as HTMLElement).getByRole('button', { name: 'Open Issue' }))
+
+    expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'issue-detail',
+      params: { wsId: liveWorkspace.id, id: 'daily-risk-scan' },
+    })
+  })
+
+  it('falls back to the stable Issue id when the Issue is no longer in the board', async () => {
+    mocks.issues = { workspaces: [] }
+    mocks.snapshot.mockResolvedValue(snapshot([
+      task({
+        taskId: 'run-departed-issue',
+        trigger: {
+          kind: 'issue',
+          workspaceId: liveWorkspace.id,
+          issueId: 'departed-daily-scan',
+        },
+      }),
+    ]))
+
+    render(<AutomationRunsSection />)
+
+    expect((await screen.findByText('departed-daily-scan')).className).toContain('font-mono')
+  })
+
+  it('identifies an Issue comment follow-up as a reply to its owning Issue', async () => {
+    mocks.issues = {
+      workspaces: [{
+        wsId: liveWorkspace.id,
+        tag: liveWorkspace.tag,
+        status: 'ok',
+        issues: [{
+          id: 'daily-risk-scan',
+          title: 'Daily portfolio risk scan',
+          status: 'todo',
+          priority: 'high',
+          assignee: '@workspace',
+        }],
+      }],
+    }
+    mocks.snapshot.mockResolvedValue(snapshot([
+      task({
+        taskId: 'run-issue-reply',
+        prompt: 'Reconstruct the Issue context and answer the new comment.',
+        inquiry: {
+          subject: {
+            kind: 'issue',
+            workspaceId: liveWorkspace.id,
+            issueId: 'daily-risk-scan',
+            relation: 'owner',
+            commentId: 'comment-1',
+          },
+          question: 'What changed?',
+          resolution: { mode: 'reconstructed', reason: 'non-session-origin' },
+        },
+      }),
+    ]))
+
+    render(<AutomationRunsSection />)
+
+    expect(await screen.findByText('Daily portfolio risk scan')).toBeTruthy()
+    expect(screen.getByText('Reply')).toBeTruthy()
   })
 })
 

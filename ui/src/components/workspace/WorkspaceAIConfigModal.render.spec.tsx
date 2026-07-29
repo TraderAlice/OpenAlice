@@ -104,6 +104,76 @@ beforeEach(async () => {
 afterEach(cleanup)
 
 describe('WorkspaceAIConfigModal local model metadata', () => {
+  it('exposes a named modal dialog and moves focus into the selected section', () => {
+    render(
+      <WorkspaceAIConfigModal
+        wsId="chat-1"
+        initialSection="general"
+        onClose={vi.fn()}
+      />,
+    )
+
+    const dialog = screen.getByRole('dialog', { name: '工作区设置' })
+    expect(dialog.getAttribute('aria-modal')).toBe('true')
+    expect(screen.getByRole('button', { name: '通用' }).getAttribute('aria-current')).toBe('page')
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: '通用' }))
+  })
+
+  it('keeps forward and reverse Tab navigation inside the dialog', () => {
+    render(
+      <WorkspaceAIConfigModal
+        wsId="chat-1"
+        initialSection="general"
+        onClose={vi.fn()}
+      />,
+    )
+
+    const dialog = screen.getByRole('dialog', { name: '工作区设置' })
+    const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    ))
+    const first = focusable[0]!
+    const last = focusable[focusable.length - 1]!
+
+    last.focus()
+    fireEvent.keyDown(document, { key: 'Tab' })
+    expect(document.activeElement).toBe(first)
+
+    first.focus()
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
+    expect(document.activeElement).toBe(last)
+  })
+
+  it('closes on Escape, restores focus, and removes its keyboard listener', () => {
+    const trigger = document.createElement('button')
+    trigger.textContent = 'Open workspace settings'
+    document.body.append(trigger)
+    trigger.focus()
+    const onClose = vi.fn()
+
+    const { unmount } = render(
+      <WorkspaceAIConfigModal
+        wsId="chat-1"
+        initialSection="general"
+        onClose={onClose}
+      />,
+    )
+
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: '通用' }))
+    expect(trigger.hasAttribute('inert')).toBe(true)
+    expect(trigger.getAttribute('aria-hidden')).toBe('true')
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(onClose).toHaveBeenCalledTimes(1)
+
+    unmount()
+    expect(document.activeElement).toBe(trigger)
+    expect(trigger.hasAttribute('inert')).toBe(false)
+    expect(trigger.getAttribute('aria-hidden')).toBeNull()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(onClose).toHaveBeenCalledTimes(1)
+    trigger.remove()
+  })
+
   it('saves a Codex native-login model without requiring an API probe', async () => {
     mocks.getAgentConfig.mockReset().mockResolvedValue({
       claude: null,

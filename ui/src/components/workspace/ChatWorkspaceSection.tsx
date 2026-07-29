@@ -34,7 +34,7 @@ import {
 import { CreateWorkspaceDialog } from './CreateWorkspaceDialog'
 import { WorkspaceOffboardingDialog } from './WorkspaceOffboardingDialog'
 import { SessionRow } from './Sidebar'
-import { workspaceDisplayTitle } from './display'
+import { workspaceDisplayName, workspaceDisplayTitle } from './display'
 import { orderSessionsForSidebar, orderWorkspacesForSidebar } from './sidebar-order'
 import { useReorderMotion } from './useReorderMotion'
 import { preferencesApi } from '../../api/preferences'
@@ -199,7 +199,7 @@ export function ChatWorkspaceSection({ onNavigate = () => undefined }: { onNavig
           <ChatWorkspaceRow
             key={w.id}
             workspace={w}
-            label={workspaceDisplayTitle(w)}
+            label={workspaceDisplayName(w)}
             selection={selection}
             onOpen={() => {
               rememberChatWorkspace(w.id)
@@ -357,7 +357,8 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
   const [expanded, setExpanded] = useState(true)
   const isSelected = props.selection?.wsId === w.id && props.selection.sessionId === null
   const displayName = w.displayName?.trim()
-  const subtitle = displayName && displayName !== props.label ? displayName : null
+  const subtitle = displayName && displayName !== w.tag ? w.tag : null
+  const actionWorkspace = subtitle ? `${props.label} (${w.tag})` : w.tag
   const orderedSessions = useMemo(
     () => orderSessionsForSidebar(w.sessions),
     [w.sessions],
@@ -389,9 +390,13 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
             e.stopPropagation()
             setExpanded((v) => !v)
           }}
-          className="w-4 h-5 flex items-center justify-center text-muted-foreground/50 hover:text-foreground shrink-0"
-          aria-label={expanded ? t('chat.collapseSessions') : t('chat.expandSessions')}
-          title={expanded ? t('chat.collapseSessions') : t('chat.expandSessions')}
+          className="flex h-7 w-7 shrink-0 items-center justify-center text-muted-foreground/50 hover:text-foreground sm:h-5 sm:w-4"
+          aria-label={expanded
+            ? t('chat.workspaceActions.collapse', { workspace: actionWorkspace })
+            : t('chat.workspaceActions.expand', { workspace: actionWorkspace })}
+          title={expanded
+            ? t('chat.workspaceActions.collapse', { workspace: actionWorkspace })
+            : t('chat.workspaceActions.expand', { workspace: actionWorkspace })}
         >
           {expanded ? (
             <ChevronDown size={12} strokeWidth={2.25} />
@@ -430,22 +435,22 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
             e.stopPropagation()
             props.onSpawn()
           }}
-          className="oa-icon-action shrink-0 w-5 h-5 rounded flex items-center justify-center text-muted-foreground/50 hover:text-foreground hover:bg-secondary transition-colors"
-          title={t('chat.newSession')}
-          aria-label={t('chat.newSession')}
+          className="oa-icon-action flex h-7 w-7 shrink-0 items-center justify-center rounded text-muted-foreground/50 transition-colors hover:bg-secondary hover:text-foreground sm:h-5 sm:w-5"
+          title={t('chat.workspaceActions.newConversation', { workspace: actionWorkspace })}
+          aria-label={t('chat.workspaceActions.newConversation', { workspace: actionWorkspace })}
         >
           <MessageSquarePlus size={13} strokeWidth={2.1} />
         </button>
-        <span className="shrink-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        <span className="flex shrink-0 items-center gap-0.5 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation()
               props.onConfigure()
             }}
-            className="oa-icon-action w-5 h-5 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary"
-            title={t('workspace.configure')}
-            aria-label={t('workspace.configure')}
+            className="oa-icon-action flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-secondary hover:text-foreground sm:h-5 sm:w-5"
+            title={t('chat.workspaceActions.configure', { workspace: actionWorkspace })}
+            aria-label={t('chat.workspaceActions.configure', { workspace: actionWorkspace })}
           >
             <SettingsIcon size={12} strokeWidth={2} />
           </button>
@@ -455,9 +460,9 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
               e.stopPropagation()
               props.onDelete()
             }}
-            className="oa-icon-action w-5 h-5 rounded flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-            title={t('chat.deleteWorkspace')}
-            aria-label={t('chat.deleteWorkspace')}
+            className="oa-icon-action flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive sm:h-5 sm:w-5"
+            title={t('chat.workspaceActions.offboard', { workspace: actionWorkspace })}
+            aria-label={t('chat.workspaceActions.offboard', { workspace: actionWorkspace })}
           >
             <X size={12} strokeWidth={2.5} />
           </button>

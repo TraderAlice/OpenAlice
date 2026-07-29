@@ -10,6 +10,11 @@ const demoHeadlessTasks: HeadlessTaskRecord[] = [
     resumeId: 'demo-resume-1',
     resumable: true,
     wsId: DEMO_WORKSPACE_ID,
+    trigger: {
+      kind: 'issue',
+      workspaceId: 'demo-ws-auto-quant',
+      issueId: 'morning-scan',
+    },
     agent: 'codex',
     prompt: 'Compute a quant snapshot of NVDA and push a report to the inbox.',
     status: 'done',

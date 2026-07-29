@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { api, type AppConfig } from '../api'
 import { SaveIndicator } from '../components/SaveIndicator'
-import { ConfigSection, Field, SettingsScrollArea, inputClass } from '../components/form'
+import { ConfigSection, SettingsScrollArea, inputClass } from '../components/form'
 import { Toggle } from '../components/Toggle'
 import { useConfigPage } from '../hooks/useConfigPage'
 import { PageHeader } from '../components/PageHeader'
@@ -462,19 +462,38 @@ function AdvancedSection({
 
 // ==================== Test Button ====================
 
+type ProviderTestStatus = 'idle' | 'testing' | 'ok' | 'error'
+
+function providerTestStatusLabel(providerName: string, status: ProviderTestStatus): string {
+  switch (status) {
+    case 'testing':
+      return `Testing ${providerName} key`
+    case 'ok':
+      return `${providerName} key test passed`
+    case 'error':
+      return `${providerName} key test failed`
+    default:
+      return `Test ${providerName} key`
+  }
+}
+
 function TestButton({
+  providerName,
   status,
   disabled,
   onClick,
 }: {
-  status: 'idle' | 'testing' | 'ok' | 'error'
+  providerName: string
+  status: ProviderTestStatus
   disabled: boolean
   onClick: () => void
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       disabled={disabled}
+      aria-label={providerTestStatusLabel(providerName, status)}
       className={`shrink-0 border rounded-md px-3 py-2 text-[13px] font-medium cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-default ${
         status === 'ok'
           ? 'border-success text-success'
@@ -506,7 +525,7 @@ function KeyProvidersSection({
     for (const p of ALL_PROVIDERS) init[p.key] = providerKeys[p.key] || ''
     return init
   })
-  const [testStatus, setTestStatus] = useState<Record<string, 'idle' | 'testing' | 'ok' | 'error'>>({})
+  const [testStatus, setTestStatus] = useState<Record<string, ProviderTestStatus>>({})
 
   const handleKeyChange = (keyName: string, value: string) => {
     setLocalKeys((prev) => ({ ...prev, [keyName]: value }))
@@ -543,29 +562,56 @@ function KeyProvidersSection({
               {group.providers.map(({ key, name, desc, hint }) => {
                 const status = testStatus[key] || 'idle'
                 const isFmp = key === 'fmp'
+                const inputId = `market-data-provider-${key}-key`
+                const descriptionId = `${inputId}-description`
+                const hintId = `${inputId}-hint`
+                const statusId = `${inputId}-test-status`
                 return (
                   <div
                     key={key}
                     ref={isFmp ? fmpRef : undefined}
                     className={`rounded-lg transition-shadow ${isFmp && highlightFmp ? 'ring-2 ring-primary/60' : ''}`}
                   >
-                    <Field label={name} description={hint}>
-                      <p className="text-[12px] text-muted-foreground/70 mb-2">{desc}</p>
+                    <div className="mb-3.5 last:mb-0">
+                      <label
+                        htmlFor={inputId}
+                        className="block text-[13px] text-foreground mb-1.5 font-medium"
+                      >
+                        {name}
+                      </label>
+                      <p id={descriptionId} className="text-[12px] text-muted-foreground/70 mb-2">
+                        {desc}
+                      </p>
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                         <input
+                          id={inputId}
                           className={inputClass}
                           type="password"
                           value={localKeys[key]}
                           onChange={(e) => handleKeyChange(key, e.target.value)}
+                          aria-label={`${name} API key`}
+                          aria-describedby={`${descriptionId} ${hintId} ${statusId}`}
                           placeholder="Not configured"
                         />
                         <TestButton
+                          providerName={name}
                           status={status}
                           disabled={!localKeys[key] || status === 'testing'}
                           onClick={() => testProvider(key)}
                         />
                       </div>
-                    </Field>
+                      <p id={hintId} className="text-[12px] text-muted-foreground/60 mt-1">
+                        {hint}
+                      </p>
+                      <span
+                        id={statusId}
+                        className="sr-only"
+                        role="status"
+                        aria-live="polite"
+                      >
+                        {status === 'idle' ? '' : providerTestStatusLabel(name, status)}
+                      </span>
+                    </div>
                   </div>
                 )
               })}
