@@ -1,5 +1,10 @@
 import { http, HttpResponse } from 'msw'
-import { demoChatWorkspace, demoWorkspaces, demoTemplates } from '../fixtures/workspaces'
+import {
+  DEMO_AUTO_QUANT_WORKSPACE_ID,
+  demoChatWorkspace,
+  demoWorkspaces,
+  demoTemplates,
+} from '../fixtures/workspaces'
 import { demoWorkspaceFilePaths, demoWorkspaceFiles } from '../fixtures/inbox'
 import {
   createDemoWebPiSnapshot,
@@ -14,6 +19,7 @@ import type {
   DepartedWorkspace,
   SessionRecord,
   WebPiSnapshot,
+  Workspace,
   WorkspaceMetadataPatch,
 } from '../../components/workspace/api'
 
@@ -34,6 +40,18 @@ const demoManagerSession = {
 
 let demoManagerMessages: unknown[] = []
 let demoQuickChatSequence = 0
+let demoWorkspaceCreateSequence = 0
+const demoCreatedWorkspaceIds = new Set<string>()
+const DEMO_WORKSPACE_TAG_RE = /^[a-z0-9][a-z0-9_-]{0,32}$/
+
+export function resetDemoWorkspaceCreateState(): void {
+  for (const id of demoCreatedWorkspaceIds) {
+    const index = demoWorkspaces.findIndex((workspace) => workspace.id === id)
+    if (index >= 0) demoWorkspaces.splice(index, 1)
+  }
+  demoCreatedWorkspaceIds.clear()
+  demoWorkspaceCreateSequence = 0
+}
 
 function webPiKey(wsId: string, sessionId: string): string {
   return `${wsId}::${sessionId}`
@@ -56,7 +74,9 @@ export function resetDemoWorkspaceWebPiState(): void {
     const workspace = demoWorkspaces[index]!
     demoWorkspaces[index] = {
       ...workspace,
-      sessions: workspace.sessions.filter((session) => !session.id.startsWith('demo-quick-chat-')),
+      sessions: workspace.sessions.filter((session) =>
+        !session.id.startsWith('demo-quick-chat-')
+        && !session.id.startsWith('run-demo-resume-')),
     }
   }
 }
@@ -335,12 +355,64 @@ export const workspacesHandlers = [
     Object.assign(workspace, { lifecycle: 'purged', purgedAt: new Date().toISOString() })
     return HttpResponse.json({ ok: true })
   }),
-  http.post('/api/workspaces', () =>
-    HttpResponse.json(
-      { ok: false, status: 400, error: { error: 'bootstrap_failed', message: 'Demo mode — workspace creation is disabled.' } },
-      { status: 400 },
-    ),
-  ),
+  http.post('/api/workspaces', async ({ request }) => {
+    const body = await request.json().catch(() => ({})) as {
+      tag?: unknown
+      template?: unknown
+    }
+    if (typeof body.tag !== 'string') {
+      return HttpResponse.json({ error: 'tag_required', message: 'Workspace tag is required.' }, { status: 400 })
+    }
+    const tag = body.tag.trim()
+    if (!DEMO_WORKSPACE_TAG_RE.test(tag)) {
+      return HttpResponse.json({
+        error: 'invalid_tag',
+        message: 'Use a-z, 0-9, "-", or "_"; start with a letter or number; maximum 33 characters.',
+      }, { status: 400 })
+    }
+    if (demoWorkspaces.some((workspace) => workspace.tag === tag)) {
+      return HttpResponse.json({
+        error: 'tag_in_use',
+        message: `A Workspace with tag "${tag}" already exists.`,
+      }, { status: 409 })
+    }
+
+    const templateName = typeof body.template === 'string' && body.template.length > 0
+      ? body.template
+      : demoTemplates[0]?.name
+    if (!templateName) {
+      return HttpResponse.json({
+        error: 'no_templates_configured',
+        message: 'No Workspace templates are available.',
+      }, { status: 500 })
+    }
+    const template = demoTemplates.find((candidate) => candidate.name === templateName)
+    if (!template) {
+      return HttpResponse.json({
+        error: 'unknown_template',
+        message: `Unknown Workspace template: ${templateName}`,
+      }, { status: 400 })
+    }
+
+    demoWorkspaceCreateSequence += 1
+    const workspace: Workspace = {
+      id: `demo-created-ws-${demoWorkspaceCreateSequence}`,
+      tag,
+      dir: `/demo/workspaces/${tag}`,
+      createdAt: new Date().toISOString(),
+      template: template.name,
+      ...(template.version
+        ? { spawnedFromVersion: template.version, currentVersion: template.version }
+        : {}),
+      upgradeAvailable: null,
+      agents: ['claude', 'codex', 'opencode', 'pi'],
+      sessions: [],
+      agentOverride: { claude: false, codex: false, opencode: false, pi: false },
+    }
+    demoWorkspaces.push(workspace)
+    demoCreatedWorkspaceIds.add(workspace.id)
+    return HttpResponse.json({ workspace }, { status: 201 })
+  }),
   http.get('/api/workspaces/:id/offboarding', ({ params }) => {
     const workspace = demoWorkspaces.find((candidate) => candidate.id === String(params.id))
     if (!workspace) return HttpResponse.json({ error: 'not_found' }, { status: 404 })
@@ -709,7 +781,7 @@ export const workspacesHandlers = [
     const workspace = demoWorkspaces.find((candidate) =>
       candidate.sessions.some((session) => session.resumeId === resumeId),
     ) ?? (resumeId === 'resume-demo-thesis-owner'
-      ? demoWorkspaces.find((candidate) => candidate.id === 'demo-ws-auto-quant')
+      ? demoWorkspaces.find((candidate) => candidate.id === DEMO_AUTO_QUANT_WORKSPACE_ID)
       : undefined)
     if (!workspace) return HttpResponse.json({ error: 'not_found' }, { status: 404 })
     const session = workspace.sessions.find((candidate) => candidate.resumeId === resumeId)
@@ -724,7 +796,7 @@ export const workspacesHandlers = [
   }),
   http.get('/api/workspaces/:id/resumes', ({ params }) => {
     const wsId = String(params.id)
-    if (wsId === 'demo-ws-auto-quant') {
+    if (wsId === DEMO_AUTO_QUANT_WORKSPACE_ID) {
       return HttpResponse.json({
         workspace: { id: wsId, tag: 'auto-quant' },
         sessions: [{
@@ -759,13 +831,14 @@ export const workspacesHandlers = [
       })),
     })
   }),
-  http.post('/api/workspaces/:id/resumes/:resumeId/session', ({ params }) => {
+  http.post('/api/workspaces/:id/resumes/:resumeId/session', async ({ params, request }) => {
     const wsId = String(params.id)
     const resumeId = String(params.resumeId)
     const workspace = demoWorkspaces.find((candidate) => candidate.id === wsId)
     if (!workspace) return HttpResponse.json({ error: 'workspace_not_found' }, { status: 404 })
     const existing = workspace.sessions.find((session) => session.resumeId === resumeId)
     if (existing) return HttpResponse.json({ session: existing, created: false })
+    const body = await request.json().catch(() => ({})) as { title?: unknown }
     const now = new Date().toISOString()
     const session = {
       id: `run-${resumeId}`,
@@ -778,7 +851,9 @@ export const workspacesHandlers = [
       state: 'running' as const,
       pid: 0,
       startedAt: Date.now(),
-      title: 'Compute a quant snapshot of NVDA and push a report to the inbox.',
+      title: typeof body.title === 'string' && body.title.trim()
+        ? body.title.trim()
+        : 'Resumed demo run',
       sourceRunId: 'demo-headless-1',
     }
     ;(workspace.sessions as Array<typeof session>).push(session)

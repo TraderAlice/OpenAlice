@@ -1,8 +1,13 @@
 import { http, HttpResponse } from 'msw'
 
 import type { InquiryRecord, InquirySubject } from '../../api/inquiries'
+import { demoInboxEntries } from '../fixtures/inbox'
 
 const records: InquiryRecord[] = []
+
+export function resetDemoInquiryState(): void {
+  records.length = 0
+}
 
 function list(subject: InquirySubject) {
   return records.filter((record) => {
@@ -15,12 +20,16 @@ function list(subject: InquirySubject) {
   })
 }
 
-function completed(subject: InquirySubject, question: string): InquiryRecord {
+function completed(
+  subject: InquirySubject,
+  question: string,
+  context: Partial<Pick<InquiryRecord, 'workspaceId' | 'agent'>> = {},
+): InquiryRecord {
   return {
     taskId: `demo-inquiry-${records.length + 1}`,
     resumeId: `demo-inquiry-resume-${records.length + 1}`,
-    workspaceId: subject.kind === 'issue' ? subject.workspaceId : 'demo-ws',
-    agent: 'pi',
+    workspaceId: context.workspaceId ?? (subject.kind === 'issue' ? subject.workspaceId : 'demo-ws'),
+    agent: context.agent ?? 'pi',
     status: 'done',
     startedAt: Date.now(),
     finishedAt: Date.now(),
@@ -40,11 +49,20 @@ export const inquiryHandlers = [
   ),
   http.post('/api/inquiries/inbox/:id', async ({ params, request }) => {
     const body = await request.json() as { prompt?: string }
-    const record = completed({ kind: 'inbox', entryId: String(params.id) }, body.prompt ?? '')
+    const entryId = String(params.id)
+    const entry = demoInboxEntries.find((candidate) => candidate.id === entryId)
+    const record = completed(
+      { kind: 'inbox', entryId },
+      body.prompt ?? '',
+      {
+        workspaceId: entry?.workspaceId,
+        agent: entry?.origin?.agent,
+      },
+    )
     records.unshift(record)
     return HttpResponse.json({
       status: 'dispatched', taskId: record.taskId, resumeId: record.resumeId,
-      workspaceId: record.workspaceId, workspace: 'demo', agent: record.agent,
+      workspaceId: record.workspaceId, workspace: entry?.workspaceLabel ?? 'demo', agent: record.agent,
       resolution: record.inquiry.resolution,
     }, { status: 202 })
   }),

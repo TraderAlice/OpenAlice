@@ -30,6 +30,13 @@ export const ja: Resources = {
     collapseRail: 'アクティビティバーを折りたたむ',
     expandRail: 'アクティビティバーを展開',
   },
+  demoBanner: {
+    badge: 'デモ',
+    compact: 'スナップショットデータ · AI 応答はシミュレーション',
+    description:
+      '記録済みデータを使った OpenAlice のスナップショットを表示しています。変更は保存されず、WebPi の応答はシミュレーションです。',
+    install: 'インストール',
+  },
   settings: {
     title: '設定',
     tab: {

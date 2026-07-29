@@ -38,6 +38,12 @@ export const zhHant: Resources = {
     collapseRail: '收合活動列',
     expandRail: '展開活動列',
   },
+  demoBanner: {
+    badge: '示範',
+    compact: '快照資料 · 模擬 AI',
+    description: '你正在查看包含錄製資料的 OpenAlice 快照。變更不會儲存；WebPi 回覆為模擬產生。',
+    install: '安裝',
+  },
   settings: {
     title: '設定',
     tab: {
