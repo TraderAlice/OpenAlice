@@ -489,6 +489,6 @@ This plan is complete only when:
 - 2026-07-30: Increment 3 local verification passed: TUI renderer/PTY tests
   passed 12 with the Windows-only Git Bash journey skipped locally; the full
   CLI suite passed 138 with that one skip; root TypeScript and Vitest passed
-  (3,639 tests before the final two preflight assertions); clean installer,
+  (3,641 tests, 10 skipped); clean installer, installed-CLI Runtime/Web handoff,
   managed remote SSH, distributed-payload equality, and Electron PTY smoke all
   passed. OrbStack was returned to its prior stopped state.
