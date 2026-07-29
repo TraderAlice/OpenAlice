@@ -190,6 +190,7 @@ export function ActivityBar({
                           type="button"
                           onClick={handleClick}
                           title={t(item.labelKey)}
+                          aria-current={isActive ? 'page' : undefined}
                           className={`oa-nav-item relative flex items-center rounded-md text-left ${
                             compactRail
                               ? denseRail
