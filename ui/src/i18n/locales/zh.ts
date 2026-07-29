@@ -1209,6 +1209,9 @@ export const zh: Resources = {
   },
   tracked: {
     nothingTrackedYet: '还没有追踪任何东西。',
+    listLoadErrorTitle: '无法加载追踪列表',
+    listLoadErrorDescription: 'OpenAlice 暂时无法刷新追踪的资产和主题。现有内容没有被删除。',
+    listStale: '实时刷新失败——当前显示上次成功加载的追踪项。',
     detailLoadErrorTitle: '无法加载 {{name}}',
     detailLoadErrorDescription: '这个追踪实体可能已经变更，或 OpenAlice 暂时不可用。',
     backlinksTooltip: '{{count}} 条笔记链接到此',
