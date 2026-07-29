@@ -161,7 +161,7 @@ export const zhHant: Resources = {
       aiProvider: 'AI 供應方',
       agentPermissions: '智慧體權限',
       trading: '交易',
-      issues: 'Issues',
+      issues: '議題',
       connectors: '連接器',
       mcpServer: 'MCP 伺服器',
       marketData: '市場資料',
