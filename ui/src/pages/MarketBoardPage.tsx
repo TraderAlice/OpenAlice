@@ -67,13 +67,18 @@ function MoversBoardView() {
         live={{ lastUpdated: updatedAt }}
       />
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 flex flex-col gap-4 min-h-0">
-        <div className="flex items-center gap-1">
+        <div
+          className="flex flex-wrap items-center gap-1"
+          role="group"
+          aria-label={t('market.boardMovers')}
+        >
           {(['gainers', 'losers', 'active', 'undervaluedGrowth', 'growthTech', 'smallCaps', 'undervaluedLarge'] as const).map((k) => (
             <button
               key={k}
               type="button"
               onClick={() => setList(k)}
-              className={`px-3 py-1 rounded-md text-[12px] font-medium transition-colors ${
+              aria-pressed={list === k}
+              className={`shrink-0 whitespace-nowrap px-3 py-1 rounded-md text-[12px] font-medium transition-colors ${
                 list === k
                   ? 'bg-muted text-foreground'
                   : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
@@ -113,16 +118,16 @@ function MoversTable({ rows }: { rows: MoverRow[] }) {
   const { t } = useTranslation()
   const open = useOpenEquity()
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-[12px] border-collapse">
+    <div className="min-w-0 overflow-x-auto">
+      <table className="w-full table-fixed md:table-auto text-[12px] border-collapse">
         <thead>
           <tr className="text-muted-foreground/70 text-left border-b border-border">
-            <th className="py-1.5 pr-3 font-medium">{t('market.colSymbol')}</th>
-            <th className="py-1.5 px-3 font-medium text-right">{t('market.colPrice')}</th>
-            <th className="py-1.5 px-3 font-medium text-right">{t('market.colChangePct')}</th>
-            <th className="py-1.5 px-3 font-medium text-right">{t('market.colVolume')}</th>
-            <th className="py-1.5 px-3 font-medium text-right">{t('market.colRvol')}</th>
-            <th className="py-1.5 pl-3 font-medium text-right">{t('market.colDollarVolume')}</th>
+            <th className="w-1/2 md:w-auto py-1.5 pr-2 md:pr-3 font-medium">{t('market.colSymbol')}</th>
+            <th className="w-1/4 md:w-auto py-1.5 px-1.5 md:px-3 font-medium text-right">{t('market.colPrice')}</th>
+            <th className="w-1/4 md:w-auto py-1.5 pl-1.5 md:px-3 font-medium text-right">{t('market.colChangePct')}</th>
+            <th className="hidden md:table-cell py-1.5 px-3 font-medium text-right">{t('market.colVolume')}</th>
+            <th className="hidden md:table-cell py-1.5 px-3 font-medium text-right">{t('market.colRvol')}</th>
+            <th className="hidden md:table-cell py-1.5 pl-3 font-medium text-right">{t('market.colDollarVolume')}</th>
           </tr>
         </thead>
         <tbody>
@@ -132,14 +137,14 @@ function MoversTable({ rows }: { rows: MoverRow[] }) {
               className="border-b border-border/50 hover:bg-secondary/40 cursor-pointer"
               onClick={() => open(r.symbol)}
             >
-              <td className="py-1.5 pr-3">
+              <td className="min-w-0 py-1.5 pr-2 md:pr-3">
                 <EquityDetailButton symbol={r.symbol} name={r.name} />
               </td>
-              <td className="py-1.5 px-3 text-right font-mono text-foreground">{fmtPrice(r.price)}</td>
-              <td className={`py-1.5 px-3 text-right font-mono ${signColor(r.percent_change)}`}>{fmtPct(r.percent_change)}</td>
-              <td className="py-1.5 px-3 text-right text-foreground">{fmtCompact(r.volume)}</td>
-              <td className={`py-1.5 px-3 text-right ${rvolColor(r.relative_volume)}`}>{r.relative_volume?.toFixed(2) ?? '—'}</td>
-              <td className="py-1.5 pl-3 text-right text-foreground">{fmtCompact(r.dollar_volume, '$')}</td>
+              <td className="py-1.5 px-1.5 md:px-3 text-right font-mono text-foreground">{fmtPrice(r.price)}</td>
+              <td className={`py-1.5 pl-1.5 md:px-3 text-right font-mono ${signColor(r.percent_change)}`}>{fmtPct(r.percent_change)}</td>
+              <td className="hidden md:table-cell py-1.5 px-3 text-right text-foreground">{fmtCompact(r.volume)}</td>
+              <td className={`hidden md:table-cell py-1.5 px-3 text-right ${rvolColor(r.relative_volume)}`}>{r.relative_volume?.toFixed(2) ?? '—'}</td>
+              <td className="hidden md:table-cell py-1.5 pl-3 text-right text-foreground">{fmtCompact(r.dollar_volume, '$')}</td>
             </tr>
           ))}
         </tbody>
@@ -255,8 +260,8 @@ function EquityDetailButton({
       }}
       className="inline-flex max-w-full items-baseline gap-2 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
     >
-      <span className="font-mono font-semibold text-foreground">{symbol}</span>
-      {name && <span className="truncate text-muted-foreground">{name}</span>}
+      <span className="shrink-0 font-mono font-semibold text-foreground">{symbol}</span>
+      {name && <span className="min-w-0 truncate text-muted-foreground">{name}</span>}
     </button>
   )
 }
